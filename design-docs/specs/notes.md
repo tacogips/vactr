@@ -63,4 +63,62 @@ Relevance to nagamu:
 - Rhombus `if` needs no parentheses because it has infix operators and
   `|` delimiters; nagamu gets the same effect from `{}` blocks.
 
+### Deferred: Music-Visual Coupling (2026-09-24)
+
+Music and visuals are specified separately for now (author). The
+proposal below was drafted before that decision and is parked here
+unchanged. It assumes one machine on the evaluator thread (cycle clock,
+slot table, event stream, instrument/look registry, late-bound names)
+and couples the two domains through values only.
+
+```nagm
+# ---- music into visuals (author intent 2026-09-24; PROPOSED) ----------
+# Music reaches visuals only through VALUES, never callbacks. Three
+# couplings, plus musical time.
+# 1. analysis signals: what it SOUNDS like
+fft 0                            # a band level, 0..1
+amp                              # overall amplitude
+env :d1                          # envelope follower of one slot
+# 2. event signals: what it is PLAYING (sample-and-hold per event)
+hits :d1                         # 1 at each event of d1, decaying
+hits :d1 s: :bd                  # only the kicks: filter by any control
+ctrl :d1 :note                   # the last event's note on d1
+ctrl :d1 :gain                   # ... or any control
+# 3. shared values: one pattern drives both chains; edit it once
+let kit [:bd :sd :hh :sd]
+kit > s > d1
+kit > map look > out o0          # look: keyword -> texture
+let pulse [1 0.2 0.6 0.2]
+s [:bd :hh :sd :hh] > gain pulse > d1
+osc 20 > scale {+ 1 pulse} > out o1     # a number pattern is a signal
+                                        # that steps with the cycle
+# 4. musical time is a visual signal
+osc 20 > rotate {* 6.28 phase} > out o2 # phase: 0..1 within the cycle;
+                                        # also `cycle`, `beat`
+[{shape 4} {osc 10}] > alt > out o3     # a sequence of textures: visual
+                                        # sequencing on the music grid
+# signal shaping
+lag {hits :d1} 0.1                      # smooth a signal
+map-range {ctrl :d1 :note} 48 72 0 1    # rescale, e.g. pitch -> hue
+osc 20 > hue {map-range {ctrl :d1 :note} 48 72 0 1} > out
+# 5. one machine, two projections: a sound can carry its own LOOK,
+#    keyed like an instrument, and a slot then renders both
+look :bd-haus:
+	shape 4 > scale {+ 1 hit}      # `hit` inside a look: this sound.s own
+                                 # event signal
+look :sn-dub:
+	noise 3 > thresh hit
+s [:bd-haus :sn-dub] > d1
+looks :d1 > out o0               # the layered looks of what d1 plays
+looks :d1 > kaleid 4 > out o1    # an ordinary texture, so it chains
+# Everything above reads ONE machine on the evaluator thread: the cycle
+# clock, the slot table, the event stream, the instrument/look
+# registry, and late-bound names. Music and visuals are two projections
+# of it; nothing is duplicated and nothing calls back.
+# The reverse direction (input or visual analysis into music: mouse,
+# camera brightness) is the same mechanism with signals supplied by the
+# graphics capability; later.
+
+```
+
 ---

@@ -25,7 +25,9 @@ This directory contains reference materials for system design and implementation
 
 | Name | URL | Description |
 |------|-----|-------------|
-| Sonic Pi | https://sonic-pi.net/ | Music live-coding environment; timing and scheduling model |
+| Sonic Pi | https://sonic-pi.net/ | Music live-coding environment; its imperative model was evaluated and withdrawn |
+| Overtone | https://overtone.github.io/ | Clojure audio environment; instruments as unit-generator chains (`definst`) |
+| Hydra | https://hydra.ojack.xyz/ | Browser visual live coding; texture chains |
 | TidalCycles | https://tidalcycles.org/ | Pattern-based music live coding |
 | Clojure Vars | https://clojure.org/reference/vars | Late-bound var indirection enabling live redefinition |
 | Cranelift | https://cranelift.dev/ | Rust-native code generator for a future JIT backend |

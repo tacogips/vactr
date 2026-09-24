@@ -711,9 +711,11 @@ upd cutoff 400                   # heard at the next event; no re-binding
 # functions are late-bound the same way: a fn passed as a pattern
 # parameter is called at every event (a param may be a fn of time), so a
 # redefinition is heard at the next event
-fn kick-sound: :bd-haus
+fn kick-sound:                   # block form; an inline body is not allowed
+	:bd-haus
 s kick-sound > d1                # `kick-sound` in argument position is the fn
-fn kick-sound: :bd-tek           # d1 plays :bd-tek from its next event
+fn kick-sound:
+	:bd-tek                        # d1 plays :bd-tek from its next event
 # re-binding a slot itself (`... > d1` again) switches at the next cycle
 # boundary, so a running phrase is never cut mid-way
 # Decided (principle 3): late-bound names change at the next event; a

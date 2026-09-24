@@ -4,7 +4,8 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 6.4, 6.5.5, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25
+**Last Updated**: 2026-09-25 (session 167 revision: U4/U5 cases reclassified as decided)
+**Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-READER (wave 3; needs `Node`, `NodeKind`, `Atom`, `ReadResult::next_node_id`, `sexpr::print`, and the manifest runner)
 
 ---
@@ -37,7 +38,7 @@ exactly, because the plan criterion "desugarings match the `# ~`/`# ==` annotati
 - `src/lib.rs`: add one line, `pub mod expand;`.
 - `src/types/diag.rs`: change it only if an expander code is missing. Add the code and record it in the progress log for FE-FINAL.
 - `tests/fixtures/spec/manifest.toml`: set each block's `expand` field to `"clean"` or `"diagnostics"`, with `expand_diags`.
-  Add `expand` strings to the cases and add the new cases listed below.
+  Add `expand` strings to the cases and add the new U5 case listed below.
 - `tests/spec_fixtures.rs`: extend it to expand every form of every block and case. A form that contains an `Error` node is skipped,
   and the test asserts that it returns `read-error-present`. The runner compares the diagnostic multiset and `print_all` output, and
   asserts `is_kernel` on every successful output.
@@ -112,12 +113,19 @@ exactly, because the plan criterion "desugarings match the `# ~`/`# ==` annotati
 ## Manifest Additions (tests/fixtures/spec/manifest.toml)
 
 - Set `expand` for all 11 blocks. Sections 1-3 of both documents must be `clean` unless a form is a documented authority
-  question. The inline-body `fn` of lang-reference section 4 is expected to give `malformed-fn`.
+  question. The lang-reference section 4 block now writes `fn kick-sound:` in block form (lines 714-718), so those forms
+  must expand clean (design 6.5.5); any section 4 `expand_diags` come only from forms that already had reader errors.
 - Add `expand` to every existing case where the table above or FE-READER defines one.
-- Add authority-question cases:
-  - The inline `fn kick-sound: :bd-haus` gives `malformed-fn` (U4).
-  - The bare-variant binding `if` (`if x none -> 1`) expands to `(match x {(-> (false | nil) nil) (-> (none) 1)})` (U5).
-  - The `fn f a b:` / `* a 12` and `let base`/`upd base` cases get their expand forms. Evaluation stays pending.
+- Decided cases (no `class`; U4 and U5 are answered, design 6.5.6):
+  - `u4-inline-fn-body` (added by FE-READER, `verbatim = false`, read clean): change `diags` from `[]` to
+    `["malformed-fn"]` and add no `expand` string. Rule for every case: `diags` is the multiset of reader codes plus
+    expander codes. When FE-EXPAND extends `tests/spec_fixtures.rs` to expand cases, it appends the expander diagnostic
+    (if any) to the reader diagnostics before comparing; a case with an expander diagnostic has no `expand` string.
+  - New case `u5-bare-variant-binding-if`, `source = 'if x none -> 1'`, `verbatim = false`, expanding to
+    `(match x {(-> (false | nil) nil) (-> (none) 1)})`, with `note` stating that TASK-004 (checker) must diagnose a
+    bare field-less variant used as the binding pattern of `if`. The expander implements no such diagnostic.
+- Authority-question cases (`class = "authority-question"`): the `fn f a b:` / `* a 12` and `let base`/`upd base` cases get
+  their expand forms. Evaluation stays pending.
 
 ## Invariants
 
@@ -152,6 +160,10 @@ In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTAT
 - [ ] V1-V6 pass
 
 ## Progress Log
+
+### Plan revision: 2026-09-25 (session 167, plan author)
+U4 and U5 are answered, so their cases are decided cases, not authority questions. The section 4 block is expected to
+expand clean for `fn kick-sound:`. The U5 case notes the TASK-004 checker obligation. No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

@@ -1,16 +1,16 @@
 {
   "taskId": "fe-frontend-20260925-s165",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-166",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-167",
   "resumedFrom": {
-    "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-165",
-    "originalHead": "8681890bed506f1a13ca990b191794cb75319330",
-    "note": "Session 166 resumes the same task. The accepted design and FE-* plans are unchanged since the session-165 checkpoint (48765c9), and 8b6ca60 only rewrote a documentation example. No FE plan has started: src/ is still the scaffold (lib.rs, main.rs)."
+    "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-166",
+    "originalHead": "8b6ca60ae69b8e27aea62354b86cf90a83cf842a",
+    "note": "Session 167 resumes the same task under GitHub issue tacogips/vactrol#1. Session 166 (resumed from 165, original head 8681890) started no FE plan. In session 167 the design (6.5 preamble, 6.5.4-6.5.7) and the four FE plans were revised to apply the answered user-qa U1-U5: the wasm32 builds are required, and the U4/U5 fixtures are decided cases. src/ is still the scaffold (lib.rs, main.rs)."
   },
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "8b6ca60ae69b8e27aea62354b86cf90a83cf842a",
+  "originalHead": "6500f370260b61d8f34447cfcfb7cfccb0898e9d",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/lang-reference.md",
@@ -23,7 +23,7 @@
   "evidenceRoot": "tmp/fe-frontend-20260925-s165",
   "evidenceLayout": "tmp/fe-frontend-20260925-s165/<planId>/attempt-<n>/ (untracked; tmp is gitignored). Cargo logs also go to target/fe-logs/<plan>-*.log as the plans require.",
   "reviewContext": {
-    "issueReference": null,
+    "issueReference": {"repository": "tacogips/vactrol", "number": 1, "url": "https://github.com/tacogips/vactrol/issues/1"},
     "userProblem": "The user asked (in Japanese: 'claude riela design impl workflowで実装を進めて') for implementation to go ahead through the Riela design-and-implement workflow. The Vactrol crate is still a scaffold (src/lib.rs has a placeholder hello()). The language front end, TASK-001..003 in impl-plans/active/vactrol-core.md, needs to be implemented.",
     "requiredOutcomes": [
       "TASK-001 core value model: Value tagging, structural equality, a dict as a sorted map (BTreeMap) with key-ordered iteration and put semantics, exact self-reducing Ratio64 arithmetic, and int/float widening rules (FE-VALUE).",
@@ -37,8 +37,8 @@
     "nonGoals": [
       "Checker, VM, compiler, pattern engine, scheduler, DSP, session, LSP and editor behavior (TASK-004..010).",
       "Arithmetic natives, the concat native, variant resolution and checker diagnostics.",
-      "Changing the toolchain, including rustup target add wasm32 (user-qa U1).",
-      "Settling authority questions. They are pinned as fixtures only.",
+      "Changing the toolchain. The wasm32-unknown-unknown target is already installed (user-qa U1, answered).",
+      "Settling the two remaining authority questions (fn f a b arity, let/upd base). They are pinned as fixtures only.",
       "Pull requests, worktrees, parallel fanout, and archiving plans to completed/."
     ],
     "constraints": [
@@ -50,17 +50,16 @@
       "Core modules use no std::thread, fs, time, net or process.",
       "Design 6.5.4 and 6.5.5 are normative. When a plan and the design differ, the design wins and the difference goes in the progress log.",
       "Commits use the AGENTS.md six-section message with no AI attribution or Co-Authored-By line. Work on main. No PRs.",
-      "Only FE-FINAL edits vactrol-core.md, impl-plans/README.md and design-implementation.md (one sentence in 6.5.4)."
+      "Only FE-FINAL edits vactrol-core.md, impl-plans/README.md and design-implementation.md (one sentence in 6.5.4, and the section 5.6 kick-sound wording fix)."
     ],
     "designDecisionsAndRationale": [
       "The front end is split into four strictly serial plans: FE-VALUE, then FE-READER, then FE-EXPAND, then FE-FINAL. Each depends on the types from the previous one. Shared indexes are edited only in the final serial reconciliation wave.",
       "Shell types (Closure, Pat, Sig, TexNode, VarSlotRef) derive only Debug and have no constructors. This keeps the section 4 layout and Value variants complete without implementing later tasks.",
       "Diagnostics use a closed DiagCode enum with kebab-case names: 26 reader codes and 11 expander codes. misplaced-arrow is the plan's code for '->' inside '[..]', and FE-FINAL records it in 6.5.4.",
       "The spec fixture manifest (tests/fixtures/spec/manifest.toml, 11 blocks from the 'vactrol' and 'vact' fences) pins reader and expander behavior against the spec documents, parsed by an in-repo TOML subset (no dependency).",
-      "User-QA defaults are applied until the user answers: U1 leaves the wasm32 checkbox unchecked; U2 decides a line-initial '>' by indentation; U3 sets escapes to \\\" \\\\ \\n \\t \\{ \\}; U4 makes an inline fn body malformed-fn; U5 accepts the bare-variant binding-if edge."
+      "User-QA U1-U5 are answered (2026-09-25) and binding: U1, the wasm32 target is installed and both wasm32 builds must pass; U2, a line-initial '>' is decided by indentation; U3, the escapes are \\\" \\\\ \\n \\t \\{ \\}; U4, fn bodies are block form only, and an inline body is malformed-fn (decided case, verbatim=false); U5, the bare-variant binding-if desugaring is kept (decided case), and the checker (TASK-004) must diagnose it."
     ],
     "intentionalTradeoffs": [
-      "The wasm32 build criterion stays unchecked (blocked on U1) rather than changing the toolchain.",
       "The vactrol-core.md progress entry is condensed so the file stays under 1000 lines (992 lines at plan time).",
       "rustfmt runs per plan on owned files only. A crate-wide cargo fmt is deferred to FE-FINAL V4."
     ],
@@ -74,10 +73,9 @@
       "Nesting of 129 levels gives nesting-too-deep. Every line-boundary prefix of all spec blocks reads without panic."
     ],
     "outOfScopeEdgeCases": [
-      "Evaluation semantics of the authority-question fixtures (fn f a b arity, let/upd base, inline fn, bare-variant if). These stay pending.",
-      "Distinguishing variant names from binding names in binding-if patterns (U5; needs the checker).",
-      "Directive attachment to forms (editor 13.5), package fetching, and open semantics.",
-      "Actually building for wasm32 (U1)."
+      "Evaluation semantics of the authority-question fixtures (fn f a b arity, let/upd base). These stay pending.",
+      "Distinguishing variant names from binding names in binding-if patterns (U5; a TASK-004 checker diagnostic).",
+      "Directive attachment to forms (editor 13.5), package fetching, and open semantics."
     ],
     "sourcePaths": [
       "design-docs/specs/design-implementation.md",
@@ -93,11 +91,19 @@
       "AGENTS.md"
     ],
     "acceptedReviewFindings": [
-      "Low: in impl-plans/active/vactrol-frontend-reader.md:124, the bad-pair example ('once gain:' followed by '> d1') is not reachable under the 6.5.4 colon rules. Pick an input that 6.5.4 actually reaches, or record that no reachable example exists. Do not change the lexer to fit the test.",
-      "Low: in impl-plans/active/vactrol-frontend-value.md:36, src/value/value.rs triggers clippy::module_inception. Put #[allow(clippy::module_inception)] on that one mod declaration in src/value/mod.rs and record it in the progress log."
+      "Low: in impl-plans/active/vactrol-frontend-reader.md:126, the bad-pair example ('once gain:' followed by '> d1') is not reachable under the 6.5.4 colon rules. Pick an input that 6.5.4 actually reaches, or record that no reachable example exists. Do not change the lexer to fit the test.",
+      "Low: in impl-plans/active/vactrol-frontend-value.md:38, src/value/value.rs triggers clippy::module_inception. Put #[allow(clippy::module_inception)] on that one mod declaration in src/value/mod.rs and record it in the progress log.",
+      "Low: in impl-plans/active/vactrol-frontend-expander.md:124, the u5-bare-variant-binding-if case gives no 'read' string, but the case runner compares 'read' for every case. Use the 6.5.4 read form '(-> (if x none) 1)' and record it in the progress log."
     ],
+    "planCheckpoint": {
+      "reviewStep": "step5-impl-plan-review-attempt-1-exec-132",
+      "accepted": true,
+      "needsRevision": false,
+      "needsDesignRevision": false,
+      "preconditionReminder": "FE-VALUE starts only after this checkpoint commit lands on main (design and plan revisions committed; AGENTS.md six-section message, no AI attribution or Co-Authored-By line)."
+    },
     "residualRisks": [
-      "The acceptance criterion 'TASK-001..003 criteria checked' cannot be fully met until U1 is decided. The wasm32 checkbox stays unchecked, and that is reported truthfully.",
+      "The wasm32 builds are now required. A std or feature usage that is incompatible with wasm32-unknown-unknown fails TASK-001 and must be fixed serially.",
       "Hand-derived canonical strings may differ from 6.5.4 in edge cases. The design wins, and each discrepancy is recorded in the progress log."
     ]
   },
@@ -164,7 +170,8 @@
         "Ratio ops are exact and self-reducing. i64 overflow and a zero denominator are Failure.",
         "Dict iteration is in key order, and a duplicate literal key keeps the last pair.",
         "Every required test exists and passes (V3).",
-        "V1, V2, V4, V5 and V7 pass. V6 is run, or recorded as blocked on U1."
+        "V1, V2, V4, V5 and V7 pass.",
+        "Both wasm32 builds (V6a default features, V6b --no-default-features --features host-wasm) exit 0."
       ],
       "verification": [
         "mkdir -p target/fe-logs",
@@ -173,7 +180,8 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/value-nextest.log",
         "find src -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
-        "rustup target list --installed",
+        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 | tee target/fe-logs/value-wasm32.log",
+        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 | tee target/fe-logs/value-wasm32-hostwasm.log",
         "git diff --stat -- Cargo.toml"
       ]
     },
@@ -247,7 +255,7 @@
       "sharedPaths": [
         {"path": "src/lib.rs", "owner": "FE-VALUE", "intent": "Add one line: 'pub mod expand;'."},
         {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Add an expander code only if one is missing, and record it for FE-FINAL."},
-        {"path": "tests/fixtures/spec/manifest.toml", "owner": "FE-READER", "intent": "Set expand/expand_diags for all 11 blocks, add expand strings to cases, and add the U4/U5 authority cases."},
+        {"path": "tests/fixtures/spec/manifest.toml", "owner": "FE-READER", "intent": "Set expand/expand_diags for all 11 blocks, add expand strings to cases, set diags=[\"malformed-fn\"] on the decided U4 case, and add the decided U5 case."},
         {"path": "tests/spec_fixtures.rs", "owner": "FE-READER", "intent": "Expand every block and case form. Assert read-error-present for Error forms, compare diags and print_all, and assert is_kernel."}
       ],
       "acceptanceCriteria": [
@@ -284,13 +292,13 @@
         {"path": "impl-plans/active/vactrol-frontend-reader.md", "owner": "FE-READER", "intent": "Set the header Status to Completed only."},
         {"path": "impl-plans/active/vactrol-frontend-expander.md", "owner": "FE-EXPAND", "intent": "Set the header Status to Completed only."},
         {"path": "impl-plans/active/vactrol-frontend-finalize.md", "owner": "FE-FINAL", "intent": "Set the header Status to Completed, and fill in the progress log."},
-        {"path": "design-docs/specs/design-implementation.md", "owner": "FE-FINAL", "intent": "Append one sentence to 6.5.4 naming misplaced-arrow and any code added during implementation."}
+        {"path": "design-docs/specs/design-implementation.md", "owner": "FE-FINAL", "intent": "Append one sentence to 6.5.4 naming misplaced-arrow and any code added during implementation, and rewrite the section 5.6 inline 'fn kick-sound: :bd-tek' example in block form."}
       ],
       "acceptanceCriteria": [
         "vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, the Verification lint command and the progress log are updated. No other task changed (V7).",
         "impl-plans/README.md and the FE-* plan headers are updated.",
         "vactrol-core.md stays under 1000 lines.",
-        "V1-V6 and V8 pass. V9 is recorded (wasm32 blocked on U1 if absent).",
+        "V1-V6, V8, V9a, V9b, V10 and V11 pass.",
         "The final commit on main uses the AGENTS.md six-section message, with no AI attribution or Co-Authored-By line."
       ],
       "verification": [
@@ -302,9 +310,11 @@
         "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "ls src",
         "git diff -U0 -- impl-plans/active/vactrol-core.md | grep -n 'TASK-00[4-9]\\|TASK-010' || echo none",
-        "git diff 8681890 -- Cargo.toml",
-        "rustup target list --installed",
-        "wc -l impl-plans/active/vactrol-core.md"
+        "git diff 6500f37 -- Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 | tee target/fe-logs/final-wasm32.log",
+        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 | tee target/fe-logs/final-wasm32-hostwasm.log",
+        "wc -l impl-plans/active/vactrol-core.md",
+        "grep -n 'fn kick-sound: :bd-tek' design-docs/specs/design-implementation.md || echo none"
       ]
     }
   ]

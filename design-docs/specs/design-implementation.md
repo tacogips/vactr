@@ -1114,10 +1114,10 @@ kernel. The expander is a pure `Node -> Node` pass; spans are preserved
 
 These decisions were recorded when TASK-001..003 started. They fill in
 details that sections 4-6.4 leave open, and they change no Decided item.
-Items marked **(author question)** are also listed in
-`design-docs/user-qa/pending-frontend-questions.md`. Until the author
-answers, the implementation follows the recommendation given here and a
-fixture pins that behavior (6.5.6).
+The questions they raised (U1-U5 in
+`design-docs/user-qa/pending-frontend-questions.md`) were all answered
+on 2026-09-25. Each answer is marked **(U<n>, answered)** where it
+applies, and it is binding for TASK-001..003.
 
 #### 6.5.1 Foundation types and placeholder shells
 
@@ -1340,9 +1340,9 @@ byte offsets into the source.
   end of the line.
 - **Strings.** A string stays on one line; an unfinished one is
   `unterminated-string`. The escapes are `\" \\ \n \t \{ \}`, and any
-  other escape is `bad-escape` **(author question: the spec defines no
-  escapes)**. A `{` inside a string starts a nested expression that runs
-  to its matching `}`. The nested scan follows the full token rules,
+  other escape is `bad-escape` **(U3, answered)**. A `{` inside a
+  string starts a nested expression that runs to its matching `}`.
+  The nested scan follows the full token rules,
   so nested strings and groups are allowed. A string with at least one
   `{}` reads as `Interp`, and one without reads as a `Str` atom.
 - **Colon classes.** The token right before a colon decides its role:
@@ -1377,7 +1377,7 @@ This reconciles the two Decided sentences of lang-reference section 1.
 A line that begins with `>` continues the previous expression when it is
 indented under it. A `>` at statement level (level exactly `L`) is in
 head position, so it is greater-than. Every example in the spec fits
-this reading **(author confirmation requested)**.
+this reading **(U2, answered: confirmed; a fixture pins it)**.
 
 After a body is split into statements, a statement headed `elif` or
 `else` joins the statement just before it in an `IfChain` when that
@@ -1545,8 +1545,10 @@ lang-reference section 3 exactly: the `g` case and the `ok v` case.
 One edge is known. When `P` is a bare field-less variant name, the
 first row's form sends a truthy value that does not match `P` to a
 match failure instead of the else branch. The expander cannot tell a
-variant from a binding name; only the checker knows **(author
-question; recommendation: keep it, and write `match` for that case)**.
+variant from a binding name; only the checker knows **(U5, answered:
+the expander keeps this syntactic desugaring; the checker, TASK-004,
+must diagnose a bare field-less variant used as the binding pattern of
+`if`)**. TASK-001..003 do not implement that diagnostic.
 Guards in a binding `if` are `if-guard`. A wrong `if` arity is
 `malformed-if`. A stray `elif` or `else` is `else-without-if`. A `for`
 without exactly a pattern, a source and a body is `malformed-for`.
@@ -1572,10 +1574,11 @@ Each kernel head has a fixed shape:
 | `upd` | `(upd NAME EXPR)` | `malformed-binding` |
 | `enum` | `(enum NAME Block)`, each line a `Sym` or a `Sym`-headed call | `malformed-enum` |
 
-The inline-body `fn` of lang-reference section 4 (`fn kick-sound:
-:bd-haus`) reads as a pair, and the expander reports it as
-`malformed-fn` **(author question: `fn f a: int` and `fn f a: body` are
-indistinguishable)**. It is pinned as an authority-question fixture.
+A `fn` body is block form only **(U4, answered)**. `name: x` in a `fn`
+header is always a typed parameter, so an inline body such as
+`fn kick-sound: :bd-haus` reads as a pair and the expander reports it
+as `malformed-fn`. lang-reference section 4 now writes that example in
+block form, so its block must read and expand clean.
 The test helper `kernel::is_kernel(&Node) -> bool` checks all of
 the above. The tests apply it to every expanded fixture form.
 
@@ -1628,13 +1631,20 @@ The cases cover:
 - Imports: `import`, `as`, `open`, the fresh-document `pads.warm`, the
   `as pd` variant, and an unbound qualifier.
 
-Four authority questions ship as fixtures. The runner asserts their
-read and expand results, and their evaluation stays pending:
+Two authority questions ship as fixtures with
+`class = "authority-question"`. The runner asserts their read and
+expand results, and their evaluation stays pending:
 - `fn f a b:` / `* a 12` against `f 1 2 # => 24` (lang-reference
   section 1).
 - `let base` followed by `upd base` (section 4).
-- The inline `fn` body (6.5.5).
-- The bare-variant binding `if` (6.5.5).
+
+The answered U4 and U5 behaviors are ordinary decided cases, with no
+`class`:
+- The inline `fn kick-sound: :bd-haus` gives `malformed-fn`. The spec
+  no longer contains this text, so the case has `verbatim = false`.
+- The bare-variant binding `if` (`if x none -> 1`) expands to
+  `(match x {(-> (false | nil) nil) (-> (none) 1)})`. Its `note`
+  records the TASK-004 diagnostic obligation.
 
 A no-panic test reads every line-boundary prefix of every block.
 
@@ -1642,13 +1652,15 @@ A no-panic test reads every line-boundary prefix of every block.
 
 - Lint uses the stricter `cargo clippy --all-targets -- -D warnings`,
   which also covers tests.
-- The wasm32 criterion of TASK-001 needs the `wasm32-unknown-unknown`
-  target, and only `aarch64-apple-darwin` is installed. Adding the
-  target changes the toolchain, which needs user approval (user-qa).
-  Until then the criterion stays unchecked with the reason recorded,
-  and the core stays wasm-safe by construction: no `std::thread`,
+- The `wasm32-unknown-unknown` target is installed **(U1, answered)**,
+  so the wasm32 criterion of TASK-001 is run and must pass. Two builds
+  count: `cargo build --target wasm32-unknown-unknown` (default
+  features) and the same with `--no-default-features --features
+  host-wasm`. Both work because every feature is empty at this stage.
+  The core stays wasm-safe by construction: no `std::thread`,
   `std::fs`, `std::time`, `std::net` or `std::process` in any core
-  module.
+  module. A failing wasm32 build fails TASK-001; it is not recorded as
+  blocked.
 - Rust 1.83, edition 2021: no let-chains.
 - No `.rs` file may reach 1000 lines (section 4 note).
 - Rollback is `git revert` of the task commits. There is nothing to

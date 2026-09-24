@@ -4,8 +4,9 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 4, 5.1-5.4, 6.5.1-6.5.3, 6.5.7
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25
+**Last Updated**: 2026-09-25 (session 167 revision: U1 answered, wasm32 builds are required)
 **dependsOn**: none (wave 1). Precondition: design section 6.5 and all FE-* plans are committed on `main`.
+**Issue**: https://github.com/tacogips/vactrol/issues/1
 
 ---
 
@@ -26,7 +27,8 @@ available. The crate has no dependencies and must keep none.
 - No arithmetic natives (`+`, `/`, and so on). They belong to TASK-005. Only the widening join and `widen` are in scope.
 - No methods, constructors or trait impls on shells beyond `Debug`.
 - No edits to `impl-plans/active/vactrol-core.md` or `impl-plans/README.md`. FE-FINAL owns those files.
-- No toolchain change. Do not run `rustup target add` (design-docs/user-qa/pending-frontend-questions.md U1).
+- No toolchain change. `wasm32-unknown-unknown` is already installed (design-docs/user-qa/pending-frontend-questions.md
+  U1, answered; design 6.5.7), so nothing needs to be installed or modified.
 
 ## writePaths (exclusive to this plan)
 
@@ -173,7 +175,8 @@ In the tables, `\|` stands for a literal `|`. For piped commands, the exit statu
 | V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 \| tee target/fe-logs/value-nextest.log` | exit 0; the summary line shows 0 failed |
 | V4 | `find src -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | the largest file is under 1000 lines |
 | V5 | `grep -rnE 'std::(thread\|fs\|time\|net\|process)' src/ \|\| echo none` | prints `none` |
-| V6 | `rustup target list --installed` | if `wasm32-unknown-unknown` is listed, run `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`; otherwise record "blocked: U1" |
+| V6a | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 \| tee target/fe-logs/value-wasm32.log` | exit 0 (default features; the issue's acceptance command) |
+| V6b | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 \| tee target/fe-logs/value-wasm32-hostwasm.log` | exit 0. A V6a or V6b failure fails this plan (design 6.5.7); fix the core code, never record it as blocked |
 | V7 | `git diff --stat -- Cargo.toml` | the only change is the `[features]` table |
 
 ## Completion Criteria
@@ -183,14 +186,18 @@ In the tables, `\|` stands for a literal `|`. For piped commands, the exit statu
 - [ ] Ratio ops are exact and self-reducing; i64 overflow and a zero denominator are `Failure`
 - [ ] Dict iteration is in key order; a duplicate literal key keeps the last pair
 - [ ] Every required test above exists and passes (V3)
-- [ ] V1, V2, V4, V5 and V7 pass; V6 is run or recorded as blocked on U1
+- [ ] V1, V2, V4, V5 and V7 pass
+- [ ] Both wasm32 builds (V6a, V6b) exit 0
 
 ## Progress Log
+
+### Plan revision: 2026-09-25 (session 167, plan author)
+U1 is answered: the wasm32 target is installed, so V6 is split into two required builds (V6a, V6b). No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:
 **Hashes / intent snapshots**:
-**Verification evidence**: V1-V7 exit codes and log paths
+**Verification evidence**: V1-V7 exit codes and log paths (V6a and V6b separately)
 **Blockers**:
 
 ## Related Plans

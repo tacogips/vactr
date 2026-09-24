@@ -4,7 +4,8 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.7, 6.1-6.3, 6.5.4, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25
+**Last Updated**: 2026-09-25 (session 167 revision: U4 inline-fn case reclassified as decided)
+**Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-VALUE (wave 2; needs `Span`/`FileId`/`NodeId`, `Ratio64`, `Diagnostic`/`DiagCode`)
 
 ---
@@ -25,7 +26,8 @@ never panic.
 - No interning. The reader stores names as `Rc<str>` text.
 - No package fetching, `open` semantics or directive attachment. Directive attachment belongs to the editor (13.5).
 - No formatter.
-- No settling of authority questions. They are recorded as fixtures only.
+- No settling of the two remaining authority questions (design 6.5.6). They are recorded as fixtures only.
+  U2 (indentation reading of a line-initial `>`) and U3 (escapes) are answered and binding; implement them as 6.5.4 states.
 
 ## writePaths (exclusive)
 
@@ -161,11 +163,17 @@ A top-level `>` statement `> a 10` reads as `(> a 10)`, which is the head-positi
   - Pipe-continuation cases from design-music: section 1 lines 29-32 (the `every`/`whenmod` chain), section 3 lines 176-179
     (the three `d1` spellings), `slot :drums:` plus its block, and the `inst pluck ...:` header of section 2.
   - The negative examples.
-  - The authority questions, with `class = "authority-question"`:
+  - The U2 pin (design 6.5.4): `id = "u2-gt-statement-level"`, `source = '> a 10'`, `read = '(> a 10)'`, `verbatim = false`.
+    The pipe-continuation cases above pin the deeper-indented reading.
+  - The two remaining authority questions (design 6.5.6), with `class = "authority-question"`:
     - `fn f a b:` / `* a 12` against `f 1 2  # => 24` (lang-reference section 1).
     - `let base 60` ... `upd base 62` (section 4).
-    - `fn kick-sound: :bd-haus` (section 4).
-    - For read now, only the read form is asserted. FE-EXPAND adds the expand forms and the bare-variant binding-`if` case.
+  - The U4 inline-body case as an ordinary decided case (no `class`), `id = "u4-inline-fn-body"`,
+    `source = 'fn kick-sound: :bd-haus'`, `verbatim = false` (lang-reference section 4 now writes this example in block
+    form, lines 714-718, so the inline text no longer appears in the spec). The reader gives no diagnostic. Under 6.5.4
+    `fn` reads as a flat item list and `kick-sound: :bd-haus` is a pair, so `read = '(fn [:kick-sound :bd-haus])'`.
+    If the implemented 6.5.4 rules print something else, stop and report it; do not change the rules to fit.
+  - For read now, only the read form is asserted. FE-EXPAND adds the expand forms and the U5 bare-variant binding-`if` case.
 - `tests/spec_fixtures.rs` does the following:
   - Loads the manifest.
   - Reads each block (`FileId::new(1)`) and compares the diagnostic multiset.
@@ -208,6 +216,10 @@ In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTAT
 - [ ] V1-V6 pass
 
 ## Progress Log
+
+### Plan revision: 2026-09-25 (session 167, plan author)
+Design 6.5.6 now keeps two authority questions. The U4 inline-fn case is a decided case with `verbatim = false` and
+the read form `(fn [:kick-sound :bd-haus])`. No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

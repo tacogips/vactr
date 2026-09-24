@@ -1127,7 +1127,7 @@ applies, and it is binding for TASK-001..003.
 | `KwId`, `SymId`, `Interner` | `src/value/intern.rs` | final |
 | `Failure`, `FailCode`, `Origin` (8.4) | `src/vm/fail.rs` | final; TASK-005 adds codes |
 | `Diagnostic`, `Severity`, `DiagCode`, `RunOrigin` (section 7) | `src/types/diag.rs` | final; TASK-004 adds codes |
-| `FormGen(u64)`, `VarSlotRef` (shell) | `src/ns/namespace.rs` | TASK-005 |
+| `FormGen(u64)`, `VarSlotRef` (shell; derives `Clone` and `Debug`, since `Value` derives `Clone` and holds it by value) | `src/ns/namespace.rs` | TASK-005 |
 | `TweakId` | `src/ns/tweak.rs` | TASK-005 |
 | `Closure` (shell) | `src/compile/proto.rs` | TASK-005 |
 | `Pat` (shell), `Sig` (shell) | `src/pattern/pat.rs`, `src/pattern/signal.rs` | TASK-006 |
@@ -1197,9 +1197,14 @@ ids before anything crosses threads.
 - **NumKey** (`src/value/key.rs`) has two forms. `Exact(Ratio64)` holds
   every int, int64 and ratio, and also every finite float whose value is
   exactly a `Ratio64` (a dyadic rational in range). `Float(f64)` holds
-  the other finite floats. Keys order numerically. Between an `Exact`
-  and a `Float` that compare equal as `f64`, the `Exact` sorts first,
-  so the order stays total. `-0.0` normalizes to `0`. A NaN key, or a
+  the other finite floats. Keys order numerically by EXACT value
+  (an `Exact` against a `Float` is compared without rounding, via
+  i128 shifts); because a `Float` key is never exactly a `Ratio64`,
+  an `Exact` and a `Float` are never equal, and the order is total
+  without a tie rule. (Amended 2026-09-25 from "equal as f64, Exact
+  first": that rule is total only under a monotone ratio-to-f64
+  conversion, which `to_f64` does not guarantee; the implementation's
+  exact comparison is adopted.) `-0.0` normalizes to `0`. A NaN key, or a
   key that is not a number, keyword or string, is
   `Failure(FailCode::Type)` (5.4). So `1`, `1.0` and `1/1` are the same
   key.

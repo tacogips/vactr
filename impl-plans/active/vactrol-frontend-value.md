@@ -1,10 +1,10 @@
 # Vactrol Front End: Value Model and Foundation (FE-VALUE) Implementation Plan
 
 **planId**: FE-VALUE (implements vactrol-core.md TASK-001)
-**Status**: In Progress (implementation done; re-verification under design 6.5.7, review and commit pending)
+**Status**: In Progress (implementation and session-169 verification done; review and commit pending)
 **Design Reference**: design-docs/specs/design-implementation.md sections 4, 5.1-5.4, 6.5.1-6.5.3, 6.5.7
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 169: plan revision for design 6.5.7 verification evidence)
+**Last Updated**: 2026-09-25 (session 169: step 6 re-verification under design 6.5.7)
 **dependsOn**: none (wave 1). Precondition: design section 6.5 and all FE-* plans are committed on `main`.
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 
@@ -188,6 +188,7 @@ In the tables, `\|` stands for a literal `|`.
 | V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings in the log |
 | V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
 | V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; the summary line shows a non-zero run count and 0 failed |
+| V3t | `CARGO_TERM_QUIET=true cargo test` | `cargotest` | exit 0 and a non-zero test count; run in addition to V3 because the workflow gate recognizes `cargo test` but not `cargo nextest run` as behavioral test evidence (2026-09-25) |
 | V4 | `find src -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | the largest file is under 1000 lines |
 | V5 | `grep -rnE 'std::(thread\|fs\|time\|net\|process)' src/ \|\| echo none` | - | prints `none` |
 | V6a | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown` | `wasm32` | `exit=0` (default features; the issue's acceptance command) |
@@ -206,9 +207,9 @@ Before V1, run V0 once per session to prove the exit-capture idiom records a fai
 - [x] `Value`, `Ratio64`, `Key`/`NumKey`, dict ops, `Interner`, `num`, `access`, `eq` and `print` are implemented per design 6.5.3
 - [x] Ratio ops are exact and self-reducing; i64 overflow and a zero denominator are `Failure`
 - [x] Dict iteration is in key order; a duplicate literal key keeps the last pair
-- [ ] Every required test above exists and passes (V3, session-169 log per design 6.5.7)
-- [ ] V0, V1, V2, V4, V5 and V7 pass (session-169 logs per design 6.5.7)
-- [ ] Both wasm32 builds (V6a, V6b) record `exit=0` (session-169 logs per design 6.5.7)
+- [x] Every required test above exists and passes (V3, session-169 log per design 6.5.7)
+- [x] V0, V1, V2, V4, V5 and V7 pass (session-169 logs per design 6.5.7)
+- [x] Both wasm32 builds (V6a, V6b) record `exit=0` (session-169 logs per design 6.5.7)
 
 ## Progress Log
 
@@ -224,11 +225,25 @@ logs are 0 bytes with no exit status). They are re-checked only from session-169
 them, so no code change is planned. Session 169 re-runs V0-V7 against the existing tree. If a row fails, fix it
 serially within this plan's writePaths.
 
-### Session: 2026-09-25 (session 169, implementer fills in)
-**Tasks Completed**:
-**Verification evidence** (log path and `exit=` per cargo row; nextest run/passed counts; inline output for V4, V5, V7):
-**Deviations**:
-**Blockers**:
+### Session: 2026-09-25 (session 169, step 6 implementer)
+**Tasks Completed**: Re-verification of the existing FE-VALUE tree under design 6.5.7. Drift check first: every path in
+`tmp/fe-frontend-20260925-s165/FE-VALUE/post-edit-hashes.txt` still matches (`shasum -a 256 -c`, no mismatch), so no
+source was changed this session. Bounded self-check of `ratio.rs`, `key.rs`, `dict.rs`, `access.rs`, `eq.rs` and
+`num.rs` against design 6.5.3 found no defect; the `join` test table matches the 6.5.3 widening table.
+A read-only audit mapped every Required Tests clause to a test function under `src/value/tests/`; none is missing.
+**Verification evidence** (logs under `target/fe-logs/`, all new in session 169; no earlier log was overwritten):
+- V0 `value-idiom-s169-1.log` ends with `exit=1` (idiom records a failure).
+- V1 `value-build-s169-1.log` `exit=0`, no warnings (the log holds only the exit line).
+- V2 `value-clippy-s169-1.log` `exit=0`.
+- V3 `value-nextest-s169-1.log` `exit=0`; `61 tests run: 61 passed, 0 skipped`.
+- V4 largest files: `src/types/diag.rs` 177, `src/value/key.rs` 222, `src/value/ratio.rs` 268 (total 2785); all under 1000.
+- V5 prints `none`.
+- V6a `value-wasm32-s169-1.log` `exit=0`. V6b `value-wasm32-hostwasm-s169-1.log` `exit=0`.
+- V7 `Cargo.toml | 6 ++++++` (the `[features]` table only; `[dependencies]` unchanged).
+- Extra: `rustfmt --edition 2021 --check` over `src/**/*.rs` exits 0.
+**Deviations**: none beyond the session-168 interpretations (now design amendments).
+**Blockers**: none. Downstream (later workflow steps): formal test-integrity and adversarial review, then the separate
+FE-VALUE commit (`Cargo.toml`, `src/`, this plan file only), then FE-READER.
 
 ### Session: 2026-09-25 (session 168, step 6 implementer)
 **Tasks Completed**: All FE-VALUE deliverables. Foundation ids (an `id_newtype!` macro in `src/lib.rs`), shells,
@@ -281,3 +296,14 @@ For the retry:
 - The fingerprint guard requires real progress: the design amendments, the
   fresh complete logs, and any lint or test change are that progress. Do not
   relabel the previous attempt.
+
+### Gate contract notes (2026-09-25, after the second FE-VALUE block)
+
+- The branch-local progress gate classifies behavioral test evidence by the
+  command text and recognizes `cargo test` but NOT `cargo nextest run`, so
+  nextest evidence alone is always "materially unverified". Run V3t
+  (`CARGO_TERM_QUIET=true cargo test`) in addition to V3 and report it as
+  a `verification` record with `command`, `exitCode: 0`, `testsRun` and
+  `testsPassed` (non-zero) and its complete log path.
+- Include `"planId": "FE-VALUE"` in the Step 6 output payload so the gate
+  binds the evidence to this plan instead of `unknown-plan`.

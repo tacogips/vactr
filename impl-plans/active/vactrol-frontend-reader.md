@@ -210,6 +210,7 @@ In the tables, `\|` stands for a literal `|`.
 | V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings |
 | V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
 | V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; a non-zero run count and 0 failed |
+| V3t | `CARGO_TERM_QUIET=true cargo test` | `cargotest` | exit 0 and a non-zero test count; run in addition to V3 because the workflow gate recognizes `cargo test` but not `cargo nextest run` as behavioral test evidence (2026-09-25) |
 | V3f | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'` | `fixtures` | `exit=0`; the summary shows a non-zero run count and 0 failed. This proves the spec-fixture harness (`tests/spec_fixtures.rs`) ran; a run count of 0 fails the row |
 | V4 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | every file is under 1000 lines |
 | V5 | `grep -c '^\[\[block\]\]' tests/fixtures/spec/manifest.toml` | - | prints `11` |

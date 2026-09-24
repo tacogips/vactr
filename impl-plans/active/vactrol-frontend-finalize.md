@@ -82,6 +82,7 @@ In the tables, `\|` stands for a literal `|`. Rows with `-` in the `<check>` col
 | V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings |
 | V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
 | V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; record the run and passed counts (run non-zero) |
+| V3t | `CARGO_TERM_QUIET=true cargo test` | `cargotest` | exit 0 and a non-zero test count; run in addition to V3 because the workflow gate recognizes `cargo test` but not `cargo nextest run` as behavioral test evidence (2026-09-25) |
 | V4 | `CARGO_TERM_QUIET=true cargo fmt -- --check` | `fmt` | `exit=0` |
 | V5 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | every file is under 1000 lines |
 | V6 | `ls src` | - | exactly `compile dsp expand lib.rs main.rs ns pattern reader sched tex types value vm` (the section 4 layout subset) |

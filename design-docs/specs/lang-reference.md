@@ -23,6 +23,17 @@ Conventions used in the code blocks:
    `if`, `match`, and a `{}` group. Everything else chains left to right.
    Library functions therefore take their subject first (`fast pat 2`,
    `d :amp`, `assoc d :amp 0.7`) so that pipes work without placeholders.
+3. **Readable live code over type safety.** When a rule would make a chain
+   longer or noisier in exchange for a static guarantee, the chain wins.
+   Failures are reported by the runtime, not values threaded through every
+   call and not a type in the language; types are optional annotations, never
+   obligations.
+4. **Typed, with inference.** nagamu is statically typed. Every expression
+   has a type the checker can name and the LSP shows. Annotations are
+   optional because inference makes them unnecessary, not because types are.
+   In Live mode a type error is a diagnostic and never stops the music; in
+   Frozen mode it is a compile error. `any` is an explicit escape hatch,
+   never the default.
 
 ```nagm
 + 43 32 > * 12 > echo        # thought order: 43+32, times 12, print
@@ -46,12 +57,29 @@ f 1 2               # => 24
 #        Accept both? Mixed? Recommendation: spaces only, any consistent
 #        width per block; a tab character is a reader error.
 
-# binding
-let a 12            # ~ (let a 12); a = 12
-# QA-02: is top-level `let` a namespace var (live-redefinable, visible
-#        to other loops) and `let` inside a fn a local? Or should the
-#        top level use a distinct `def`? This decides hot-reload rules.
-# QA-03: is `let a 13` again in the same scope allowed (shadowing)?
+# binding (author, 2026-09-24): `let` is immutable, `var` is mutable,
+# `upd` reassigns a var
+let a 12            # ~ (let a 12); immutable
+var n 0             # mutable
+upd n {+ n 1}       # reassign; returns the new value; only a var may be upd'd
+upd a 13            # error: a is a let
+# No shadowing, in either direction: a name is bound once per scope
+let a 13            # error: a is already bound in this scope
+var n 5             # error: n exists; write `upd n 5`
+# Values are immutable; a var is REBOUND to a new value, never mutated
+# in place (Clojure's model, one level simpler than atoms)
+var arr [1 2]
+upd arr {conj arr 3}
+# Scope by position: a top-level let/var is a namespace binding visible
+# to every live-loop; inside a body it is local. Re-evaluating a
+# top-level `let` or `var` line while editing REPLACES that binding:
+# that is live redefinition (loops see the new value), which is neither
+# mutation nor shadowing.
+# QA-02: (resolved 2026-09-24) one `let`, scope by position; no `def`.
+# QA-03: (resolved 2026-09-24) no shadowing; rebinding is an error.
+# QA-89: `upd` from inside a live-loop body may target a top-level var
+#        (this is what replaces Sonic Pi `set`/`get`). Confirm, and
+#        confirm `upd` returns the new value so it can end a body.
 
 # lambda (anonymous function): params before `->`, body after.
 x b -> x * b        # like |x, b| x * b in Rust; lexical scope
@@ -62,29 +90,22 @@ x b -> x * b        # like |x, b| x * b in Rust; lexical scope
 #        reader feature without changing the AST.
 # QA-05: multi-line lambda. PROPOSED: `->:` opens a block:
 #   x ->:
-#     let y (* x 2)
+#     let y {* x 2}
 #     + y 1
 # QA-06: zero-parameter lambda. A plain block `{sample :bd-haus}` is one
 #        (section 2), so no arrow form is needed. Withdrawn:
 #   -> sample :bd-haus
 
 # Every expression has a value. A value that is not referenced is
-# discarded immediately. `_1` refers to the value of the previous
-# expression.
+# discarded immediately.
+# `_1` (the previous value) exists ONLY in the console, where a session
+# reads like a transcript. In a file it is a reader error; files chain
+# with `>` instead (below). (Author, 2026-09-24.)
 let a 12
-echo _1             # 12
-echo a              # => 12
-echo _1             # 12; echo returns its argument
-# QA-07: scope of `_1`: previous expression in the same block, or the
-#        previous top-level expression? What is `_1` on the first line
-#        of a fn body: the last argument, nil, or an error? (The chain in
-#        some-fn below treats the parameter `a` as the previous value.)
-# QA-08: are `_2`, `_3` ... available? Only `_1` keeps the runtime cheap.
-# QA-09: you asked whether `_1` should be lazy. Recommendation: eager.
-#        `_1` is a slot the evaluator writes after each expression; that
-#        is one store, and the JIT can drop it when unused. Lazy `_1`
-#        needs thunks and blocks optimization. Patterns (section 6) are
-#        lazy by nature, which covers the cases where laziness matters.
+echo a              # => 12; echo returns its argument
+# QA-07, QA-08, QA-09: (superseded) `_1` scope, `_2`.., and laziness no
+#        longer arise in files. In the console `_1` is the last
+#        top-level value, eager, and `_2` does not exist.
 
 # naming convention: kebab-case, words divided by '-'
 fn fn1 a b:
@@ -100,51 +121,145 @@ repeat 3 4          # (from Strudel)
 # QA-10: what did this line mean: Strudel's `.repeat`, "repeat 4 three
 #        times", or a placeholder for the pattern section?
 
-# chaining with `>:`: each line receives the previous line's value as
-# its first argument (thread-first, like Clojure's ->)
+# chaining (decided 2026-09-24): `>` is the pipe. The value on its left
+# becomes the FIRST argument of the call on its right (thread-first). A
+# line that BEGINS with `>` continues the previous expression, so a
+# chain reads top to bottom with no wrapper form; the seed is simply
+# the first line.
 fn some-fn a:
-	>:
-		fn1 12          # == fn1 a 12
-		fn2 32 43       # == fn2 _1 32 43
-# QA-11: what seeds the chain? Here it is `a`. Rule candidates:
-#        (a) the chain starts from `_1`, and `_1` at the top of a fn body
-#            is its last parameter; or
-#        (b) the seed is written on the `>:` line. PROPOSED:
-#          >: a
-#            fn1 12
-#            fn2 32 43
-#        Recommendation: (b); it also works at top level and in loops.
-# QA-12: inline chain form for short pipelines. PROPOSED:
-#          a > fn1 12 > fn2 32 43
-#        `>` is also greater-than. Alternatives: `|>` or `>>`.
-#        Principle 2 makes this core, not sugar. Recommendation: `>`,
-#        with one rule: `>` in HEAD position of a line or `{}` group is
-#        greater-than (`{> a 10}`); `>` anywhere else is the pipe. The
-#        piped value becomes the FIRST argument of the next call
-#        (thread-first; settles QA-13). To pass `>` itself as a function
-#        value write `gt` (all comparison operators get word aliases).
-# QA-13: thread-first vs thread-last. Every pattern function below is
-#        written pattern-first (`fast pat 2`) so thread-first works. In
-#        Tidal/Strudel the pattern comes last. Confirm pattern-first.
+	fn1 a 12
+		> fn2 32 43     # == fn2 {fn1 a 12} 32 43
+a > fn1 12 > fn2 32 43   # inline, the same thing
+# `>` in HEAD position of a line or `{}` group is greater-than
+# (`{> a 10}`); anywhere else it is the pipe. To pass greater-than as a
+# value write `gt` (every comparison operator has a word alias).
+# QA-11: (superseded) the `>:` block form and its seed question are
+#        withdrawn; the first line of a chain is the seed.
+# QA-12: (decided 2026-09-24) `>` is the pipe, head-position rule above.
+# QA-13: (decided 2026-09-24) subject first everywhere (principle 2);
+#        Tidal's pattern-last order is not followed.
 ```
 
 ## 2. Literals and Data
 
 ```nagm
-# numbers
-1  2.5  -3  0.25
-1/4                 # QA-14: ratio literal? Tidal uses rationals for time
-                    #        and it avoids float drift in beats. PROPOSED yes.
+# numbers (author, 2026-09-24): fixed widths, Zig/WGSL style
+#   int     i32        int64    i64
+#   float   f32        float64  f64
+#   ratio   int64/int64, exact
+# i32 and f32 are Wasm's native scalars and f32 is the shader float, so
+# visuals pay no conversion.
+1  -3               # int, when nothing constrains it
+2.5  0.25           # float, when nothing constrains it
+let big: int64 1    # a literal adapts to its context (Zig comptime style)
+sleep 0.25          # `sleep` takes float64; the literal is float64 here
+1/4                 # ratio, exact: `sleep 1/3` never drifts
+/ 1 3               # => 1/3; int / int is a ratio (Clojure)
+# widening is implicit only where it reads naturally:
+#   int -> int64,  float -> float64,  int -> float64   (exact)
+#   int -> float                                        (lossy past 2^24,
+#                                                        accepted so that
+#                                                        `* 60 1.5` works)
+# narrowing is always an explicit call: `int x`, `int64 x`, `round x`
++ 1 2.5             # => 3.5 float
+* 60 1.5            # => 90.0 float
+int 90.7            # => 90 (truncates); `round 90.7` => 91
+# overflow of int / int64 is a failure, like division by zero
+# QA-14: (decided 2026-09-24) ratio literal is in.
+# QA-90: (decided 2026-09-24) fixed widths as above; no bignum.
+# QA-94: confirm the widening table, and whether int64 -> float64 is
+#        implicit (lossy past 2^53). Recommendation: implicit, by the
+#        same argument as int -> float.
+# QA-95: literal defaults: an unconstrained `1` is int, `1.0` is float.
+#        Should a literal that does not fit i32 (`3000000000`) become
+#        int64 automatically or be an error? Recommendation: int64.
 
-# strings
+# strings; `{}` inside a string interpolates, because `{}` already
+# means "evaluate this" (Python f-string taste, without the prefix)
 "bd sd hh"
+"note {n} at beat {beat}"
+# QA-91: interpolation in every string literal (recommended; `\{`
+#        escapes), or only behind a prefix? Mini-notation contains no
+#        braces, so there is no conflict there.
 
 # keywords evaluate to themselves; used for sample, synth, fx, and note
-# names and for named arguments
+# names and for named arguments. Typed like Zig enum literals: `:minor`
+# where a `scale-kind` is expected checks against that enum, and
+# `sample :bd-haus` checks against the host's sample set, so the LSP
+# completes them.
 :kick  :bd-haus  :minor  :e3
 
 # nil and booleans
 nil  true  false
+
+# ---- nil: Clojure semantics (author, 2026-09-24) --------------------
+# Option IS nil. `?T` in a type means "T or nil"; there is no
+# some/none wrapper and no constructor.
+d :missing                       # => nil
+next it                          # => nil when exhausted
+if false "x"                     # => nil (no else)
+# Truthiness: nil and false are falsy; EVERYTHING else is truthy,
+# including 0, "", and []. (Settles QA-44.) One rule for every form:
+# plain `if`, binding `if`/`while` (section 3), `and`, `or`, `when`.
+# nil-punning: accessors on nil give nil, so a chain that goes nil
+# stays nil instead of failing
+first nil                        # => nil
+nth nil 3                        # => nil
+nil :k                           # => nil
+count nil                        # => 0
+# `and` / `or` return values, not booleans
+or nil 0 5                       # => 0   (first truthy)
+and 1 2 nil 3                    # => nil (first falsy, else last)
+d :gain ? 1.0                    # `x ? d` == `or x d`, left to right
+is-nil x                         # predicate (QA-79 naming)
+# QA-88: `is-some x` as the complement of `is-nil`, or just `x`
+#        (truthy)? Recommendation: neither; write `if x` and only add
+#        `is-some` when an optional bool actually shows up.
+
+# ---- identifiers (author, 2026-09-24) --------------------------------
+# identifier = [a-zA-Z][a-zA-Z0-9]* ( "-" [a-zA-Z0-9]+ )*
+#   - letters and digits only, joined by "-"; no "_" anywhere
+#   - no leading digit; digits allowed afterwards (fn1, d1, o0)
+#   - no leading "-": that is negation, the `-` function, or `->`
+#   - "-" inside a name must be followed by a name character, so
+#     `a->b` lexes as `a` `->` `b` and `foo-` is not a name
+#   - ASCII only in v1; uppercase allowed, kebab-lowercase by convention
+# keyword    = ":" identifier            (:kick, :bd-haus)
+# language tokens (never identifiers):
+#   "_"          reserved: wildcard in patterns, and a live-loop meaning
+#                to be decided (QA-81)
+#   "_" digits   previous values (_1)
+# operators  = + - * / = < > <= >= .. -> & |
+#   a separate token class: callable like functions, but not
+#   user-definable; word aliases (gt, lt, add ...) exist for passing
+#   them as values (QA-12)
+fn1 12              # ok
+d1 pat              # ok
+my-long-name        # ok
+# 1st   -foo   a->b   foo?   swap!   my_name   _tmp     # not identifiers
+# QA-81: what does `_` mean inside a live-loop? Candidates:
+#          (a) the iteration counter, read-only per iteration:
+#                live-loop :arp:
+#                  play {nth [60 64 67] _}
+#                  sleep 0.25
+#              replaces Sonic Pi `tick`/`look` and their ordering rules
+#          (b) the loop's beat position within its cycle
+#          (c) the loop handle, for `stop _` / `sync _`
+#          (d) the previous iteration's last value (QA-50 said no)
+#        Recommendation: (a); it is the most typed thing in a loop.
+#        Note the `match` wildcard is also `_`; a pattern is a separate
+#        context, so `_ -> ...` stays a wildcard even inside a loop
+#        whose body uses `_` as a value. Confirm that this overlap is
+#        acceptable, or choose another wildcard spelling (`else`).
+# QA-79: predicate suffix `?` (`even?`, Lisp/Ruby style) is excluded by
+#        the rule. This document was renamed to the `is-` prefix
+#        (`is-even`). Keep `is-`, or add `?` as an allowed trailing
+#        character? Recommendation: keep `is-`; one fewer rule.
+#        Consequence: `!` is also out, which settles QA-36 in favour of
+#        `var` + `upd` rather than `swap!`.
+# QA-80: lexing `-`: `-3` is a number, `- a b` is subtraction, and `-x`
+#        (minus directly before a name) needs a meaning. Recommendation:
+#        `-x` is sugar for `{neg x}`; `- x` with a space is the function.
 
 # ---- blocks (author proposal, 2026-09-24) ---------------------------
 # `{ ... }` is an inline block. It is the only nesting form; it replaces
@@ -175,7 +290,7 @@ each arr {x -> echo x}
 # `while` are sugar over `match` and `loop` (section 3), so they are
 # neither primitives nor functions.
 # KERNEL (what the spec must define; everything else is a function or
-# sugar):  match  loop/break  fn  let  ->  >:  {}  enum
+# sugar):  match  loop/break  fn  let  var  upd  ->  {}  enum
 # (plus `for`, unless it is written as `each` with a lambda; QA-45).
 # QA-54: confirm block semantics above. Alternative: `{}` is always
 #        eager grouping and only `:`-indent blocks are closures; simpler
@@ -236,12 +351,9 @@ play 60 & p                      # == play 60 amp: 0.5 pan: -1
 #        lookup only if `merge` prepends). Pick: `merge` PREPENDS the
 #        new pairs, so the newest value is found first and old pairs
 #        stay reachable via `rest`.
-# QA-78: how a `fn` receives named arguments: Ruby-style, all trailing
-#        pairs land in one dict parameter (`fn play note & opts:`), or
-#        declared keyword parameters with defaults
-#        (`fn play note amp: 1.0 pan: 0:`)? Recommendation: declared
-#        keyword parameters; the LSP can complete them and `& opts`
-#        remains available for pass-through.
+# QA-78: (decided 2026-09-24) a fn declares keyword parameters with
+#        defaults in its header, Python-style (section 8, types);
+#        `& opts` remains for pass-through.
 # QA-60: missing key -> nil (Clojure, Sonic Pi `get`) or error
 #        (Rhombus)? Recommendation: nil; live code should not throw on
 #        a lookup, and `get d k default` covers the rest.
@@ -282,13 +394,56 @@ match v:
 #        `play`? Recommendation: no; `play 60 amp: 0.5` stays, structs
 #        are for user data.
 
-# named (keyword) arguments. PROPOSED: trailing `name: value` pairs
-play 60 amp: 0.5 release: 2      # ~ (play 60 :amp 0.5 :release 2)
-# QA-15: `name:` mid-line is a named argument, while `fn f a b:` uses a
-#        trailing `:` to open a block. Rule: `:` at end of line opens a
-#        block; `name:` followed by a value on the same line is a named
-#        argument. Acceptable? Alternative: `:name value` (no ambiguity,
-#        less familiar).
+# named (keyword) arguments (decided 2026-09-24): trailing `name: value`
+# pairs, which are the pairs of the dict section
+play 60 amp: 0.5 release: 2      # ~ (play 60 [:amp 0.5] [:release 2])
+# `:` at end of line opens a block; `name:` followed by a value on the
+# same line is a pair. `with-fx :reverb mix: 0.5:` is therefore legal.
+# The callee declares keyword parameters in its header (section 8).
+# QA-15: (decided) `name: value`; `:name value` rejected.
+
+# ---- errors (author, 2026-09-24; principle 3) ------------------------
+# There is no error TYPE in the language. This is live coding, not a
+# system: a failure is something the runtime reports, not a value the
+# program handles.
+# A failing expression UNWINDS: it leaves the expression, the chain,
+# and the enclosing calls up to the top level (or the current live-loop
+# iteration), where the runtime reports it with its origin (source
+# position, loop name, beat) and the session continues. Chains need no
+# annotation and no unwrapping; results are never wrapped.
+parse "x" > * 2 > d1             # parse fails; nothing after it runs;
+                                 # d1's slot is untouched; the console
+                                 # and the editor show the failure
+/ 1 0                            # fails (division by zero)
++ 1 "a"                          # fails (type)
+# "absent" cases are nil, not failures
+nth [1 2 3] 99                   # => nil
+d :missing                       # => nil
+d :gain ? 1.0                    # `?` supplies a fallback for nil
+# In the console, `_1` is not written by an expression that failed; it
+# keeps the value of the last expression that completed.
+# No try/catch, no error object, no user-raised errors in v1. Failures
+# are surfaced by tooling instead: see architecture.md "Realtime
+# Validation" (static LSP checks, a dry run against a no-op host
+# before a live-loop or pattern is swapped in, runtime diagnostics
+# pushed back to the editor with loop and beat).
+# in types (QA-40): `?int` means "may be nil". Nothing marks failure.
+# QA-82: (revised) confirm: exceptions as a runtime mechanism only, with
+#        no error type, no `try`/`catch`, and no `error`/`fail` call in
+#        v1. Earlier models (error values with `!T`; exceptions with an
+#        error struct and try/catch) are withdrawn.
+# QA-83: keep `x ! fallback` as a one-line "if this fails, use that"?
+#        It needs no error value. Recommendation: yes, optional and
+#        cheap; `?` (nil fallback) is independent and recommended.
+# QA-85: a failure mid-iteration in a live-loop: skip to the next
+#        iteration immediately (QA-38) or keep the loop's timing by
+#        sleeping until the next scheduled beat, as Sonic Pi does?
+#        Recommendation: sleep to the next beat; a broken loop must not
+#        spin.
+# QA-87: confirm the split: arithmetic and type faults fail; index and
+#        key misses are nil. Open case: `nth` on a RING (Sonic Pi wraps
+#        around) vs an array (nil past the end). Recommendation: arrays
+#        return nil; `ring arr` gives the wrapping view when wanted.
 
 # ranges. PROPOSED
 0..8                # => [0 1 2 3 4 5 6 7]
@@ -340,9 +495,9 @@ if {d :gain} g ->:
 else:
 	play 60
 # ==  match {d :gain}:
-#       nil -> play 60
+#       false | nil -> play 60
 #       g -> play 60 amp: g
-# Any pattern is allowed, so enum results unwrap the same way:
+# Any pattern is allowed, so enum values unwrap the same way:
 if {parse s} ok v ->:
 	echo v
 else:
@@ -350,12 +505,12 @@ else:
 # ==  match {parse s}:
 #       ok v -> echo v
 #       _ -> echo "parse failed"
-# The binding form tests PRESENCE (not nil), the way Zig unwraps an
-# optional: `false` is a present value and binds. The plain form
-# `if c X Y` tests truthiness (false | nil). Two rules, one per form.
-# QA-70: confirm the presence-vs-truthiness split above. Alternative:
-#        the binding form also skips `false`; simpler to state, but then
-#        an optional bool cannot be unwrapped.
+# The binding form uses the SAME truthiness as the plain form: nil and
+# false go to else, anything else binds (Clojure `if-let`). One rule.
+# QA-70: (resolved 2026-09-24, Clojure semantics) the Zig-style split,
+#        where the binding form tested presence and let `false` bind,
+#        is withdrawn. An optional bool cannot be unwrapped with `if`;
+#        use `match` on nil if that ever matters.
 # QA-71: inline binding `if` with an else: `->` takes the rest of the
 #        line, so `if x v -> A else B` cannot be parsed without an `else`
 #        keyword that terminates the body. Recommendation: inline
@@ -499,9 +654,9 @@ live-loop :player:
 #        or namespaced (`shape.circle 5`)? Recommendation: global in v1;
 #        short names matter when typing live, and the LSP can warn on a
 #        collision.
-# QA-66: named fields and field types (`circle r: float`)? Same
-#        collision as QA-40. Recommendation: positional fields in v1;
-#        types via the `sig`-style line when QA-40 is decided.
+# QA-66: (decided 2026-09-24) fields carry `name: type` and an optional
+#        default with the same header syntax as fn parameters
+#        (`circle r: float`); see section 8, types.
 # QA-67: exhaustiveness: the LSP warns when a `match` on an enum misses
 #        a variant; the runtime never refuses to run. Confirm.
 # QA-68: can a variant with no fields be spelled `none` and also matched
@@ -512,7 +667,7 @@ live-loop :player:
 #        resolution rule; it is what Rust does.
 
 # truthiness: only nil and false are false; 0, "", [] are true
-# QA-44: confirm. (Lisp/Ruby rule; differs from Python and JavaScript.)
+# QA-44: (decided 2026-09-24) confirmed; Clojure rule. See section 2, nil.
 
 # ---- loops -------------------------------------------------------
 # Loops are explicit constructs. They are not implemented as recursion
@@ -550,10 +705,11 @@ while {next it} item ->:
 	echo item
 #   ==  loop:
 #         match {next it}:
-#           nil -> break
+#           false | nil -> break
 #           item -> echo item
-while {< {get :n} 10}:
-	set :n {inc {get :n}}
+var n 0
+while {< n 10}:
+	upd n {inc n}
 
 # loop: infinite until break
 loop:
@@ -561,29 +717,22 @@ loop:
 	if {= v :quit} {break}
 	echo v
 
-# break and continue; `break v` makes the loop evaluate to v
-let found {loop:
+# break and continue; `break v` makes the loop evaluate to v. To keep
+# that value, `let` reads the rest of its line (QA-58), and a trailing
+# `:` block is the last argument, exactly as in `d1:`
+let found loop:
 	let v {next-item}
-	if {good? v} {break v}
-	}
+	if {is-good v} {break v}
 # QA-48: is `break v` wanted, or should a searching loop be written with
 #        `find`? Recommendation: keep `break v`; it costs nothing and
 #        avoids reaching for recursion.
-# QA-49: braced multi-line block as an argument, as in
-#        `let found {loop: ... }`. Is this legal, or must a block form
-#        always be a statement (so `let found` needs `_1` on the next
-#        line)? Recommendation: illegal in v1; write
-#          loop:
-#            ...
-#          let found _1
-#        This keeps the reader line-based.
-
-# `_1` inside a loop body follows QA-07: on the first line it is the
-# loop variable (for) or nil (while/loop); across iterations it does
-# not carry over.
-# QA-50: should `_1` carry the previous iteration's last value into the
-#        next iteration (an implicit accumulator)? Recommendation: no;
-#        use `set`/`get` or an explicit variable.
+# QA-49: (revised) `let found loop:` above depends on QA-58 (`let` reads
+#        the rest of the line). Without it, a `var found nil` before the
+#        loop and `upd found v` inside is the fallback. A braced
+#        multi-line block (`let found {loop: ... }`) stays illegal;
+#        `{}` is single-line (QA-56).
+# QA-50: (superseded) `_1` is console-only, so no implicit accumulator
+#        exists; a loop that accumulates uses a `var` and `upd`.
 
 # iteration functions still exist for collecting results
 each arr x ->:
@@ -612,9 +761,9 @@ fn fact n:
 	if {<= n 1} 1 {* n {fact {- n 1}}}
 
 fn flatten-notes tree:
-	if {array? tree}:
-		>: map tree flatten-notes
-			concat
+	if {is-array tree}:
+		map tree flatten-notes
+			> concat
 	else:
 		[tree]
 # QA-52: tail-call optimization. Since loops exist, TCO is not needed
@@ -772,7 +921,7 @@ s "bd sd" > d1                   # pipe into the sink (principle 2)
 d1 {s "bd sd"}                   # plain call
 d1:                              # trailing block; the block's value is
 	s "bd sd"                      # its last expression, i.e. the pattern
-echo _1                          # the pattern; d1 returned it
+s "bd sd" > d1 > fast 2 > d2     # d1 returns the pattern, so it can go on
 # Re-running any of these lines while editing calls d1 again, which IS
 # the live replacement; nothing else is needed.
 # QA-25: (revised) confirm `d1`..`d9` as plain sink functions rather
@@ -782,13 +931,13 @@ echo _1                          # the pattern; d1 returned it
 
 # transforming a pattern: a chain (Strudel: s("bd sd").fast(2).gain(0.8))
 # ending in the sink, so the whole thing reads top to bottom
->: s "bd*2 [sd cp]"
-	fast 2
-	gain 0.8
-	room 0.3
-	every 4 rev
-	sometimes {fast 2}
-	d1
+s "bd*2 [sd cp]"
+	> fast 2
+	> gain 0.8
+	> room 0.3
+	> every 4 rev
+	> sometimes {fast 2}
+	> d1
 # QA-26: `every 4 rev` receives the pattern first, so its signature is
 #        {every pat n f} and `rev` is passed as a function value that
 #        takes one pattern. Confirm with QA-13.
@@ -800,12 +949,12 @@ echo _1                          # the pattern; d1 returned it
 
 # control patterns: every parameter is itself patternable
 d1:
-	>: s "bd sd"
-		n "0 1 2 3"
-		gain "1 0.8 0.6"
-		pan sine
-		speed "<1 2>"
-		lpf {range 200 2000 sine}
+	s "bd sd"
+		> n "0 1 2 3"
+		> gain "1 0.8 0.6"
+		> pan sine
+		> speed "<1 2>"
+		> lpf {range 200 2000 sine}
 
 # combining patterns
 stack [{s "bd*4"} {s "~ sd"} {s "hh*8"}]
@@ -834,14 +983,14 @@ segment sine 8                   # sample a signal 8 times per cycle
 range sine 1 5
 
 # notes, scales, chords (Strudel)
->: note "c e g b"
-	s "piano"
->: n "0 2 4 <6 7>"
-	scale "C:minor"
-	s "sawtooth"
->: chord "<C^7 Dm7 G7>"
-	voicing
-	s "piano"
+note "c e g b"
+	> s "piano"
+n "0 2 4 <6 7>"
+	> scale "C:minor"
+	> s "sawtooth"
+chord "<C^7 Dm7 G7>"
+	> voicing
+	> s "piano"
 arp {chord "Cm7"} "up"
 
 # sound parameters available on any pattern:
@@ -871,12 +1020,12 @@ set-cps 0.5                      # see QA-19: whether this exists or
 # hydra style: source -> transforms -> output. A chain fits directly,
 # and `out o0` is the sink (the visual counterpart of `d1`), so no
 # wrapper form is needed. `out` returns the chain it bound.
->: osc 20 0.1 0.8
-	rotate 0.5
-	kaleid 4
-	modulate {noise 3} 0.2
-	color 1 0.5 0.2
-	out o0
+osc 20 0.1 0.8
+	> rotate 0.5
+	> kaleid 4
+	> modulate {noise 3} 0.2
+	> color 1 0.5 0.2
+	> out o0
 # sources:    osc noise voronoi shape gradient solid src
 # geometry:   rotate scale pixelate repeat repeat-x repeat-y kaleid scroll
 # color:      posterize shift invert contrast brightness luma thresh
@@ -894,20 +1043,20 @@ set-cps 0.5                      # see QA-19: whether this exists or
 # time-varying parameters: any number may be a lambda of time
 osc {t -> * 20 {sin t}}
 # or a signal, the same signals as section 6
->: osc {range sine 10 30}
-	out
+osc {range sine 10 30}
+	> out
 # QA-31: unify parameters across music and visuals. PROPOSED: a param
 #        is number | signal | pattern | (t -> number), with one coercion
 #        rule shared by both domains. This keeps the spec small and lets
 #        a pattern drive a visual directly.
 
 # audio-reactive
->: shape 4
-	scale {+ 1 {fft 0}}            # bass band, 0..1
-	out
+shape 4
+	> scale {+ 1 {fft 0}}            # bass band, 0..1
+	> out
 d1:
-	>: s "bd*4"
-		on-trigger {flash o1}   # run visual code on each event
+	s "bd*4"
+		> on-trigger {flash o1}   # run visual code on each event
 # QA-32: names for audio accessors: `fft n`, `amp`, `beat`? And the
 #        hook name for pattern events into visuals (`on-trigger`).
 
@@ -928,8 +1077,8 @@ shader :plasma:
 	uniform float time;
 	void main() { ... }
 	"""
->: src {shader :plasma}
-	out
+src {shader :plasma}
+	> out
 # QA-34: multi-line string syntax (`"""`), and whether raw GLSL is in
 #        scope for v1 or Hydra-style operators only. Recommendation:
 #        operators only in v1; GLSL via a host capability later.
@@ -942,14 +1091,15 @@ shader :plasma:
 ## 8. State, Redefinition, Modules
 
 ```nagm
-# mutable state that survives redefinition of the code that uses it
-let counter {atom 0}
-swap! counter inc
-deref counter                    # => 1
-# QA-36: Clojure names (atom / swap! / deref, `!` in identifiers) or
-#        Sonic Pi names (`set :counter 0` / `get :counter`)?
-#        Recommendation: Sonic Pi style `set`/`get` keyed by keyword;
-#        it is simpler and already time-aware in Sonic Pi.
+# mutable state that survives redefinition of the code that uses it: a
+# top-level `var` (section 1). Re-evaluating the `var` line resets it;
+# re-evaluating the loop that uses it does not.
+var counter 0
+live-loop :count:
+	upd counter {+ counter 1}
+	sleep 1
+# QA-36: (resolved 2026-09-24) neither atoms nor Sonic Pi `set`/`get`;
+#        `var` + `upd` is the one state mechanism.
 
 # redefining a fn while a live-loop calls it takes effect on the next call
 fn kick:
@@ -977,16 +1127,42 @@ use :nagamu.music
 #        visual functions are globals in a live session, and `use` is
 #        added when Frozen mode needs explicit dependencies.
 
-# optional type annotations (decided: dynamic + optional annotations)
-fn add {a: int} {b: int} -> int:
+# ---- types (principle 4: typed, with inference; author, 2026-09-24) --
+# Every expression has a type the checker can name; the LSP shows it on
+# hover. Annotations are optional because inference makes them
+# unnecessary, not because types are. Type errors are diagnostics in
+# Live mode and compile errors in Frozen mode. `any` is an explicit
+# escape hatch.
+fn add a b:                      # inferred from the body and its uses
 	+ a b
-let bpm: int 120
-# QA-40: annotation syntax. The `name: type` form collides with named
-#        arguments (QA-15) unless params are parenthesized as above.
-#        Alternatives: `a :int`, `a ^int`, or a separate `sig` line:
-#          sig add int int -> int
-#          fn add a b:
-#            + a b
-#        Recommendation: the `sig` line; it keeps `fn` lines identical
-#        with or without types and reads well in an LSP hover.
+# Annotations live in the fn HEADER, Python-style: `name: type`, and
+# `= default` for keyword parameters. A header contains no calls, so
+# `name:` there cannot be mistaken for a pair. A parameter with a
+# default is a keyword parameter; one without is positional.
+fn play note: int amp: float = 1.0 pan: float = 0 -> voice:
+	...
+let bpm: int 120                 # annotated binding
+var count: int 0
+struct voice:
+	amp: float 1.0                 # field: name, type, default
+	pan: float 0
+	note: int
+enum shape:
+	circle r: float
+	rect w: float h: float
+# type expressions:
+#   int int64 float float64 ratio bool string keyword nil
+#   ?T          T or nil
+#   [T]         list of T          [K: V]  dict
+#   fn T U -> V function           pattern T   signal   any
+# QA-40: (decided 2026-09-24) header annotations as above; the `sig`
+#        line and `{a: int}` groups are withdrawn.
+# QA-92: inference model: monomorphic signatures inferred per fn (Zig-
+#        like, no generics) or Hindley-Milner with let-polymorphism, so
+#        `map`, `filter`, `first` are typed once for every T?
+#        Recommendation: HM-lite; the library needs polymorphism and HM
+#        adds no syntax.
+# QA-93: `any`: may a value typed `any` be used directly, or only after
+#        narrowing through `match`/`if` patterns? Recommendation:
+#        narrowing only; otherwise `any` leaks everywhere.
 ```

@@ -22,7 +22,7 @@ Design priorities, in order: simplicity, ease of writing, then everything else.
 | 2026-09-24 | Host platform | Own runtime in Rust. Not built on Racket/Rhombus (see `notes.md`). | Decided |
 | 2026-09-24 | Live-coding domains | Both music/audio and visuals/graphics are first-class. | Decided |
 | 2026-09-24 | Wasm / browser | Definite target. Runtime must stay `wasm32`-compilable. | Decided |
-| 2026-09-24 | Typing (v1) | Dynamic, with optional annotations accepted from day one. | Decided |
+| 2026-09-24 | Typing | Statically typed with inference (principle 4). Annotations optional, Python-style in headers/bindings/fields. Type errors: diagnostics in Live, compile errors in Frozen. `any` explicit. | Decided |
 | 2026-09-24 | Indent rule set | Deferred. See `user-qa/pending-indent-syntax.md`. | Pending |
 | 2026-09-24 | Macro hygiene | Unhygienic with auto-gensym (`x#`) proposed; hygiene later if needed. | Proposed |
 | 2026-09-24 | Collections | Clojure-style literals (`[]`, `{}`, `:kw`), immutable by default proposed. | Proposed |
@@ -34,6 +34,17 @@ Design priorities, in order: simplicity, ease of writing, then everything else.
 | 2026-09-24 | `if` | Sugar over `match` (`false \| nil` clause = else); `when`/`unless`/`elif` likewise; `while` is sugar over `loop`+`match`. | Decided |
 | 2026-09-24 | Kernel | Core forms: `match`, `loop`/`break`, `fn`, `let`, `->`, `>:`, `{}`, `enum`. Everything else is a function or sugar. | Proposed |
 | 2026-09-24 | Binding `if`/`while` | Zig-style capture: `if subj pattern -> body` binds on presence (nil check); plain `if` tests truthiness. Optionals are nil-able values. | Decided |
+| 2026-09-24 | Identifiers | `[a-zA-Z][a-zA-Z0-9]*(-[a-zA-Z0-9]+)*`: no `_`, no leading digit or `-`, ASCII only. `_` and `_<digits>` are language tokens; operators are a separate non-user-definable class. | Decided |
+| 2026-09-24 | Errors | No error type in the language. A failure unwinds to the top level or the current loop iteration, is reported with origin (source, loop, beat), and the session continues. No try/catch, no user-raised errors in v1. nil = absent (`?T`, `x ? d`). `x ! d` optional fallback proposed. | Decided |
+| 2026-09-24 | nil (Clojure) | Option is nil (`?T` = T or nil, no wrapper). nil and false are falsy, all else truthy; one rule for plain and binding `if`/`while`. nil-punning on accessors; `and`/`or` return values; `x ? d` == `or x d`. | Decided |
+| 2026-09-24 | Pipe | `>` is the pipe (thread-first); a line beginning with `>` continues the previous expression. The `>:` block form is withdrawn. Head-position `>` is greater-than. | Decided |
+| 2026-09-24 | `_1` | Console only; a reader error in files. | Decided |
+| 2026-09-24 | let / var / upd | `let` immutable, `var` mutable, `upd` reassigns a var. No shadowing in any direction. Values immutable; vars are rebound. Top-level var replaces Sonic Pi `set`/`get`. | Decided |
+| 2026-09-24 | Named arguments | `name: value` pairs at call sites; keyword parameters with `= default` in fn headers. | Decided |
+| 2026-09-24 | Numbers | Fixed widths: `int` i32, `int64`, `float` f32, `float64`, `ratio` int64/int64. Literals adapt to context. Implicit widening only; explicit narrowing; overflow fails. | Decided |
+| 2026-09-24 | Strings | `{}` interpolates inside every string literal. | Proposed |
+| 2026-09-24 | Kernel (revised) | `match`, `loop`/`break`, `fn`, `let`, `var`, `upd`, `->`, `{}`, `enum`. | Proposed |
+| 2026-09-24 | Principle 3 | Readable live code over type safety: no rule may lengthen a chain for a static guarantee. | Decided |
 
 ### Execution Modes
 
@@ -100,11 +111,50 @@ audio capability. Recorded in the decision log as follow-up.
 - Live mode in the browser runs the interpreter/VM compiled to Wasm; Frozen
   mode emits Wasm from nagamu programs and is a later milestone.
 
+### Realtime Validation
+
+Errors such as division by zero are exceptions (see `lang-reference.md`,
+errors). Surfacing them before and while code plays is a tooling concern,
+not a language one. Three layers, each independent of the next:
+
+| Layer | When | Where | Catches |
+|-------|------|-------|---------|
+| Static diagnostics | while typing | LSP | literal `/ x 0`, undefined names, unknown sample/synth keywords, `match` missing an enum variant, loop body without `sleep`/`sync`, annotation mismatches |
+| Dry run before swap | on eval of a live-loop or pattern | runtime | any exception raised by one iteration (or one cycle of a pattern) run against a no-op capability host with the current live state; the old body keeps playing until the dry run passes |
+| Runtime diagnostics | while playing | runtime -> LSP | uncaught exceptions from the live session, shown on the originating line with loop name and beat, cleared when the next iteration succeeds |
+
+What the language guarantees to make this possible:
+
+- Every error carries its origin: source position, loop name, beat.
+- All effects are capability calls (audio, graphics, I/O), so a
+  validation host can implement them as no-ops.
+- Pattern evaluation is pure: querying a cycle has no side effects.
+
+Consequences for the toolchain: the LSP server and the live session share
+one process (or a socket), because runtime diagnostics originate in the
+scheduler. `nagm` therefore runs both; an external editor connects to
+the same session the console shows.
+
 ### Typing
 
-v1 is dynamically typed. Annotations are part of the syntax from the start
-and are checked at runtime where cheap, so that programs written today keep
-their meaning when a checker or typed IR uses them later. The annotation
-syntax is decided together with the indent rule set.
+nagamu is statically typed with inference (principle 4 in
+`lang-reference.md`). Every expression has a type the checker can name;
+annotations are optional because inference usually makes them
+unnecessary. Annotations go in `fn` headers, `let`/`var` bindings,
+and struct/enum fields, Python-style (`name: type`, `= default`).
+
+| Mode | Type error |
+|------|------------|
+| Live | Diagnostic in the editor and console; the code still runs |
+| Frozen | Compile error |
+
+`any` is an explicit escape hatch that must be narrowed by a pattern
+before use. Numbers have fixed widths: `int` (i32), `int64`, `float` (f32),
+`float64`, and exact `ratio` (int64/int64); literals adapt to context.
+Widening is implicit (int -> int64, float -> float64, int -> float/float64);
+narrowing is an explicit call; overflow is a failure. Keywords are typed like
+Zig enum literals against the enum or host set expected at that
+position. The inference model (per-function monomorphic vs HM-lite) is
+open as QA-92.
 
 ---

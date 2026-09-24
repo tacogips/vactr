@@ -55,6 +55,12 @@ Conventions used in the code blocks:
 
 ```vactrol
 # this is a comment
+# A comment line that starts with `#@` is an EDITOR DIRECTIVE;
+# consecutive `#@` lines form one block, which applies to the nearest
+# PRECEDING statement, block, or definition (fn, inst, bus) no deeper
+# than the comment (same line =
+# that line). Which parameters a control panel shows, MIDI mapping, etc.
+# The language ignores it; see architecture.md, Editor Requirements.
 
 # function definition: `fn name params:` opens an indented body block.
 # The last expression of the body is the return value.
@@ -242,6 +248,7 @@ is-nil x                         # predicate (`is-` prefix)
 #     `a->b` lexes as `a` `->` `b` and `foo-` is not a name
 #   - ASCII only in v1; uppercase allowed, kebab-lowercase by convention
 # keyword    = ":" identifier            (:kick, :bd-haus)
+# qualified  = identifier "." identifier  (pads.warm; only after `import`)
 # language tokens (never identifiers):
 #   "_"          reserved: the wildcard in patterns
 #   "_" digits   previous values (_1), console only
@@ -715,9 +722,54 @@ fn kick-sound: :bd-tek           # d1 plays :bd-tek from its next event
 # a failing event is dropped and reported; the slot keeps playing
 s [:bd-haus :not-a-sample] > d1  # diagnostic on :not-a-sample; kicks still play
 
-# modules
-# Decided (principle 1): no module system in v1; music and visual
-# functions are one global prelude in a live session
+# ---- reactive dependency graph (author, 2026-09-24) ------------------
+# Changing a value changes everything computed from it: bindings that
+# use it, patterns that name it, the slots those patterns are bound to,
+# and the editor's displays and sliders -- and only the affected part
+# is recomputed. The runtime keeps the reference structure explicitly.
+let base 60
+let line note [base {+ base 7}] > s :pluck   # depends on base
+line > d1                                    # d1 depends on line
+upd base 62                                  # line and d1's pattern update;
+                                             # d1 re-binds at the cycle boundary
+# Recommended structure (not signals as the substrate): a demand-driven
+# incremental graph with revision stamps and early cutoff, in the Salsa
+# / Adapton family, because patterns are PULLED per cycle by the
+# scheduler. Dependency edges are STATIC, taken from the checker's free
+# variables of each definition; dynamic edges (function values passed
+# as parameters, signals) are re-evaluated per event as before. A
+# change bumps the revision and marks dependents dirty; a dependent
+# recomputes when demanded, and if its value is unchanged (values are
+# immutable, so equality is cheap) its own dependents are left alone.
+# Pull is glitch-free without height bookkeeping. PUSH is used only for
+# notifications: slots, displays, and sliders subscribe to nodes and
+# pull on wake. SolidJS-style signals are the mental model; the
+# implementation design chooses the exact structure.
+# Decided (author): the requirement. Recommended: the Salsa-style graph.
+
+# ---- modules and packages (author, 2026-09-24; supersedes "no modules") --
+# External Vactrol libraries are imported by repository path, Go style.
+# A package is a git repository (or a directory of one) with a
+# `vactrol.toml` manifest and `.vact` files; it can provide instruments,
+# effects (chains of builtins), patterns, looks, and sample assets.
+import github.com/someone/vactrol-pads                  # qualified: pads.warm
+import github.com/someone/vactrol-pads as pd            # alias
+import github.com/someone/vactrol-pads open             # names unqualified
+note [:c3] > s pads.warm > d1
+# qualified name = identifier "." identifier; the reader accepts it only
+# after an import bound the prefix. Unqualified opening is for the live
+# set; the LSP warns on a collision with the prelude or another package.
+# Versions: git tags (semver); `vactrol get` resolves and records them in
+# `vactrol.lock` (minimal version selection, as Go); packages are cached
+# under ~/.vactrol/pkg/<path>@<version>. In the browser the same paths
+# are fetched through a package proxy (no git); the lock file pins the
+# content hash either way. Packages are Vactrol code only in v1 -- no
+# native extensions -- so a package can never touch the audio thread
+# except through builtins.
+# Decided (author, 2026-09-24): modules and a GitHub-path package system
+#   are in; the earlier "no module system in v1" decision is withdrawn.
+#   Manifest fields, proxy protocol, and MVS details are for the
+#   implementation design.
 
 # ---- types (principle 4: typed, with inference; author, 2026-09-24) --
 # Every expression has a type the checker can name; the LSP shows it on
@@ -774,7 +826,7 @@ less common one was renamed (Hydra `repeat` -> `tile`).
 | lists and dicts | `put` (add elements, set keys, merge with `&`), `join` (join many), `len`, `first`, `last`, `tail`, `reverse`, `sort`, `map`, `filter`, `reduce`, `find`, `any`, `all`, `take`, `take-while`, `drop`, `enumerate`, `repeat value count`, `dict`; a list is callable with an index and a dict with a key; `0..8` is the range literal and `0..` a lazy infinite one |
 | values | `is-nil`, `is-list`, `int`, `int64`, `float`, `round`, `neg`, `mod`, `sin`, `cos`, `min`, `max`, `abs` |
 | console | `print` |
-| time and slots | `use-bpm`, `use-cycle`, `once`, `at`, `stop`, `hush`, `d1`..`d9`, `slot` |
+| time and slots | `use-bpm`, `use-cycle`, `use-clock`, `midi-clock-out`, `once`, `at`, `stop`, `hush`, `d1`..`d9`, `slot`, `bus`, `master` |
 
 Domain vocabulary lives with its specification: `design-music.md`
 (patterns, signals, sound) and `design-visual.md` (Hydra names).

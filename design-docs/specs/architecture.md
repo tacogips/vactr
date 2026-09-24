@@ -55,6 +55,14 @@ Design priorities, in order: simplicity, ease of writing, then everything else.
 | 2026-09-24 | Specification split | `lang-reference.md` = core language; `design-music.md` = time, sound, patterns; `design-visual.md` = Hydra chains. | Decided |
 | 2026-09-24 | Targets | Browser (Wasm), macOS, iPad, iPhone, other desktops. The bytecode VM is the mandatory engine (iOS forbids JIT); JIT is desktop-only. DSP in the AudioWorklet without SharedArrayBuffer. | Decided |
 | 2026-09-24 | Implementation language | Rust core; Swift for the Apple shell only (one SwiftUI app for macOS/iPadOS/iOS via UniFFI bindings); TS shell for the browser. Swift-for-the-core, Zig, C++/JUCE, TypeScript evaluated. | Decided |
+| 2026-09-24 | Effects | Builtin effect catalog (dynamics, EQ/filters, delay, reverb, saturation, modulation, lo-fi, resonator, spatial, restoration, utility, analyzers) usable as pattern controls, inst ugens, and bus chains (`bus`, `master`). | Decided |
+| 2026-09-24 | Synthesis models | Sampler, analog modeling, digital (FM, phase distortion, additive), wavetable, granular: all definable in code as `inst` chains over builtin ugens, each also a prelude template. | Decided |
+| 2026-09-24 | Packages | Go-style GitHub-path imports, git-tag versions, lock file, cache, browser proxy; packages are Vactrol code only. Supersedes "no module system in v1". | Decided |
+| 2026-09-24 | Editor: sliders and MIDI | Right-pane slider panel over every numeric site (chosen from all candidates), mouse drag on numbers, MIDI in (learn, `cc` signal, note input), MIDI out sink, MIDI clock/transport sync in and out (Link planned). No syntax for any of it. | Decided |
+| 2026-09-24 | Host tiers | Browser tier (Wasm core, AudioWorklet, Web MIDI) first; native tier (same core inside the Tauri app on macOS/iOS, CoreAudio/CoreMIDI) second. Features may differ by tier behind capability traits; the language is identical; a missing capability is a diagnostic. Swift is glue only. | Decided |
+| 2026-09-24 | Editor: DAW-style parameter editors | Effect/instrument call sites get meaning-matched editors (EQ curve with bands and live spectrum, filter response, dynamics transfer curve, envelope shape, delay taps, sampler waveform, wavetable frames, granular region, LFO shape, XY pad, euclid ring with hits/steps/rotation). Sequences are edited in code only; step grid and piano roll are displays. All write back to the same numeric sites; all MIDI-learnable; nothing in the code. | Decided |
+| 2026-09-24 | Reactive dependency graph | Changing a value updates every binding, pattern, slot, and display computed from it, recomputing only the affected part; the reference structure is kept explicitly. Recommended structure: demand-driven incremental graph (Salsa/Adapton family) with static edges from the checker, revision stamps, early cutoff, push notifications to subscribers; signals are the mental model, not the substrate. | Decided (requirement) / Recommended (structure) |
+| 2026-09-24 | Directive comments | Control-panel membership, editor kind, ranges, and MIDI mapping are written in `.vact` as one-line comments with a fixed marker on the line they apply to; the language ignores them, the editor validates them. Shape decided: every directive line starts with `#@`, consecutive lines form one block, applies to the nearest preceding statement/block no deeper than the comment (same line = that line). Labels: written in the trailing comment on the line they name (candidate `#@ bass-filter: lpf cc: 74`), `#@ name X` explicit, block-following for bodies; named things (`let`, `fn`, `inst`, `bus`) are labels already; labels are the preferred provenance identity. Vocabulary to be designed. | Decided |
 | 2026-09-24 | Model | TidalCycles/Strudel (patterns) + Overtone (instruments as ugen chains) + Hydra (visual chains). The Sonic Pi imperative layer (live-loop, sleep, sync, cue, density, tick, play/sample-now, with-fx blocks, p5 draw loop) is withdrawn. | Decided |
 
 ### Execution Modes
@@ -120,6 +128,14 @@ the current value at each event, so `upd` and redefinition are heard at
 the next event without re-binding. Re-binding a slot switches at the
 next cycle boundary.
 
+The namespace is a reactive dependency graph (author, 2026-09-24): a
+change to a value marks everything computed from it dirty -- bindings,
+patterns, the slots they are bound to, editor displays -- and only the
+affected part recomputes. Recommended structure: demand-driven
+incremental computation with static dependency edges from the checker,
+revision stamps, and early cutoff (Salsa/Adapton family), with push
+notifications to subscribers; see lang-reference.md, section 4.
+
 Because no body suspends, the VM needs no coroutines, the browser build
 needs no threads, and a dry run of a pattern (Realtime Validation) is a
 complete check of it.
@@ -173,7 +189,7 @@ three ways:
 | Build | Delivery |
 |-------|----------|
 | `wasm32` + thin TypeScript shell (Web Audio, WebGL) | browser, iPad Safari / PWA; the first deliverable |
-| static library for Apple targets + ONE SwiftUI shell (AVAudioEngine, CoreMIDI, later an AUv3 extension); Swift bindings generated by UniFFI | macOS, iPadOS, iOS from one shell; lower latency; the second deliverable |
+| the same core compiled natively inside a Tauri app (shared web UI, native Rust engine on CoreAudio/CoreMIDI); Swift only as glue, AUv3 later | macOS, iPadOS, iOS; lower latency and richer host capabilities; the second deliverable |
 | native binary (`cpal`) | desktop development build on every OS, and the shipped build for Windows and Linux |
 
 Alternatives evaluated: Swift for the CORE (unbeatable for the Apple shell,
@@ -187,6 +203,178 @@ ecosystem, worst fit for a memory-safe VM; a possible host layer for
 AUv3); TypeScript (cheapest to ship everywhere, as Strudel and Hydra
 show, but no native path and the DSP would be Rust-in-Wasm anyway);
 Swift, Go, Kotlin/Wasm, Dart (immature Wasm or a GC on the audio path).
+
+### Host Tiers (DECIDED, 2026-09-24)
+
+The editor is a Tauri app on macOS and iOS as well as a web app, and the
+same Rust core runs in two host tiers behind the capability traits:
+
+| Tier | Engine | Audio | MIDI |
+|------|--------|-------|------|
+| Browser (first deliverable) | the core compiled to Wasm, in the page | Web Audio, DSP inside the AudioWorklet | Web MIDI |
+| Native: macOS and iOS via Tauri (second) | the same core compiled natively, inside the Tauri process (a library inside the app on iOS) | CoreAudio directly (`cpal`), real-time thread, low latency | CoreMIDI |
+
+The WebView only renders the editor and talks to the core over Tauri IPC,
+which is the editor-runtime protocol; it never touches audio in the
+native tier. Feature sets MAY differ between tiers (author): the native
+host advertises richer capabilities -- more voices, long convolution
+impulse responses, heavy granular densities, multichannel output,
+offline rendering, file access, and later AUv3/plugin hosting -- while
+the browser host advertises the subset that fits the worklet budget.
+The language is identical on both; using a capability the current host
+lacks is a diagnostic ("not available on this host"), never a crash.
+Swift is reduced to glue (AVAudioSession, background-audio mode, an
+AUv3 extension later) rather than a separate SwiftUI shell. iOS still
+forbids JIT, so the native tier runs the bytecode VM.
+
+### Editor Requirements (DECIDED, 2026-09-24)
+
+The dedicated editor (Tauri; also web and Wasm) is part of the product,
+not tooling around it. Requirements from the author:
+
+- **Slider panel (right pane).** The editor enumerates every numeric site
+  in the current source — literals inside patterns and controls,
+  top-level `let`/`var` numbers, `inst` parameter defaults — from the
+  checker's AST, and the performer picks any of them to add a slider.
+  A slider's value flows back either as a source edit (live
+  redefinition of that literal) or as a runtime tweak overlay keyed to
+  the site's provenance, without touching the text; both modes exist.
+  Nothing about the slider appears in the code (lang-reference.md,
+  principle: music code contains only music).
+- **Mouse.** Dragging a number in the editor adjusts it the same way.
+- **DAW-style parameter editors (author, 2026-09-24).** The slider is
+  the generic editor; effect and instrument call sites get an editor
+  matched to their meaning, with the operability of a DAW. Each builtin
+  declares its parameter groups and their editor kind, so the editor
+  panel can show, for a call site chosen from the same enumeration as
+  the sliders:
+  - EQ (`peq`, `geq`, `dynamic-eq`, `tilt`, `tone`): a frequency/level
+    curve with draggable bands (frequency, gain, Q), the live spectrum
+    analyzer drawn behind it.
+  - Filters (`lpf`, `hpf`, `bpf`, `ladder`, `svf`, `auto-filter`): the
+    response curve with a cutoff/resonance handle.
+  - Dynamics (`compressor`, `expander`, `gate`, `limiter`, multiband):
+    the transfer curve with threshold, ratio, and knee handles, gain
+    reduction metered live; multiband editors add crossover handles.
+  - Envelopes (`env-adsr`, `env-perc`): the envelope shape with
+    draggable stage points.
+  - Delay and reverb: taps on a beat-aligned timeline; decay and size
+    as a room sketch.
+  - Sampler: the waveform with draggable start, end, and loop handles; a
+    slice grid (`slice n`) or manual slice markers (`slice [...]`) drawn
+    on the waveform, draggable; clicking a slice sets the index pattern
+    step; `chop`/`striate` counts as a grid overlay; the bank index `n`
+    as a sample browser with the waveform preview (author, 2026-09-24).
+  - Wavetable: the frame stack with the position scrubber.
+  - Granular: the source waveform with position and spray as a region,
+    grain size and density as overlays.
+  - LFOs and signals (`sine`, `range`, `lag`): the shape with rate and
+    range handles.
+  - Pan and spatial: a stereo field; any two parameters: an XY pad.
+  - Sequences are written in CODE only (author, 2026-09-24): the step
+    grid and the piano roll are DISPLAYS of what is sounding, never
+    editors of the list. The numeric parameters inside sequence
+    operators do get DAW-style editors: `euclid` a ring with draggable
+    hits, steps, and rotation; `maybe` a probability dial; `hold` and
+    `fast`/`slow` a length handle on the step display.
+  Every handle writes back to the same numeric sites as a slider (source
+  edit or tweak overlay), every handle can be MIDI-learned, and the code
+  never changes shape because of the editor used.
+
+- **MIDI in.** Controllers map to sliders or directly to sites (MIDI
+  learn); in code, `cc n channel:` is a signal usable as any parameter
+  and note input is an event source. Web MIDI in the browser, CoreMIDI
+  natively.
+- **MIDI out.** `midi` is a sink for patterns (design-music.md).
+- **MIDI sync.** The cycle clock can follow incoming MIDI clock and
+  transport, or send MIDI clock and transport; Ableton Link is the same
+  mechanism with a different transport and is planned alongside.
+- **Control-panel setup lives in the code, as comments (author,
+  2026-09-24).** Everything except the interactive gesture itself must be
+  expressible in `.vact`: which parameters of a call site appear in the
+  control panel, their editor kind, ranges, and MIDI channel/CC mapping.
+  It is written as a **directive comment** on the line it applies to, so
+  the music code stays music, indentation is untouched, and the file
+  carries the whole setup for a set. Requirements on the notation, to be
+  designed separately: one line; a fixed marker after `#` so ordinary
+  comments are never mistaken for directives; attaches to the call
+  site(s) on its line; names parameters by their keyword; the language
+  ignores it entirely (the reader keeps comments with positions for the
+  LSP anyway); the editor layer validates it and reports unknown names
+  as diagnostics. Length is kept short by four rules (author question
+  2026-09-24, "does a filter line get too long?"): ranges and editor
+  kinds are never written (they come from the builtin's parameter
+  metadata); channel and device defaults are set once at the top of the
+  file (`#@ midi ch: 1`); a line names its call sites, with CC numbers
+  positional in declared parameter order and `name.param` only to pick
+  one; and the editor WRITES learned CC numbers back into the comment,
+  so they are rarely typed. A directive on its own line applies to the
+  next line when the margin is too short.
+  **Shape (author, 2026-09-24, decided):** every directive line starts
+  with `#@`; consecutive `#@` lines form one directive block (no closing
+  marker, so a forgotten delimiter can never swallow later comments, and
+  ordinary `# text` comments stay distinct). The block applies to the
+  nearest PRECEDING statement, block, or definition (`fn`, `inst`, `bus`,
+  `look`) whose indentation is no deeper
+  than the comment's: inside an `inst` body it binds to the previous
+  line of the body; at column 0 after the block it binds to the whole
+  `inst`. On the same line as code it binds to that line. The
+  vocabulary after `#@` is still to be designed; candidate:
+  ```vact
+  #@ midi ch: 1
+  s [:bd :sd] > lpf 800 res: 0.4 > hpf 120 > d1
+  #@ lpf cc: 74 71
+  #@ hpf cc: 30
+  inst analog cutoff: float = 1200 res: float = 0.3:
+  	vco :saw freq > ladder cutoff res > * amp
+  #@ cutoff res
+  ```
+  (The alternative `# @ ... @` delimited region was considered and set
+  aside: it needs a closing marker and a parser state across lines.)
+  **Labels (author, 2026-09-24):** the language has no metadata syntax,
+  so a label is also a directive: `#@ name bass-filter` after a block
+  labels that block, and any directive anywhere may then address it as
+  `bass-filter.lpf` (parameter by keyword). Things that already have a
+  name in the code -- `let`, `fn`, `inst`, `bus`, `look`, slots -- are
+  labels without a directive. Labels are the preferred identity for
+  slider and tweak provenance, since they survive edits that move
+  lines; source positions are the fallback for unlabeled sites.
+  Placement (author, 2026-09-24): a label goes in the trailing comment
+  ON THE LINE IT NAMES (same line = that line); the block-following
+  form is for what has no single line, such as an `inst` body.
+  Candidate short form, PROPOSED: a leading token ending in `:` is the
+  label and the rest of the comment is the directive for that site.
+  ```vact
+  s [:bd :sd] > lpf 800 res: 0.4 > d1        #@ bass-filter: lpf cc: 74 71
+  s [:hh] > hpf 2000 > d2                    #@ hats:
+  #@ hats.hpf cc: 30                          # later, by label
+  #@ analog.cutoff cc: 1                      # an inst's name is a label
+  ```
+  Two kinds of directive, told apart by the first token (author,
+  2026-09-24): POSITIONAL -- a call-site name or a label definition
+  (`#@ lpf hpf`, `#@ bass-filter: ...`, `#@ name X`) -- attaches to the
+  same line or the preceding block; ADDRESSED -- a label reference
+  (`#@ hats.hpf cc: 30`) or a file-level setting (`#@ midi ch: 1`) -- is
+  position-free and may be grouped anywhere, typically as a controller
+  map at the end of the file.
+
+- **Visual feedback.** Currently sounding steps and events shown on a
+  step grid and a piano roll (display only), slot levels, analyzers
+  (design-music.md section 5), and inline diagnostics.
+
+### Packages (DECIDED, 2026-09-24)
+
+External Vactrol libraries are imported by repository path, Go style:
+`import github.com/owner/name`, versions by git tag with minimal version
+selection, `vactrol.lock` pinning version and content hash, a cache
+under `~/.vactrol/pkg`, and a package proxy for the browser build (no
+git there). A package is Vactrol code plus assets (samples, tables) and
+a `vactrol.toml` manifest; native extensions are out of v1, so a package
+cannot reach the audio thread except through builtins. This supersedes
+the earlier "no module system in v1" decision. Builtin catalogs that
+packages build on: effects, synthesis models (sampler, analog, FM,
+phase distortion, additive, wavetable), and granular (design-music.md
+sections 4-6).
 
 ### Wasm Constraints
 

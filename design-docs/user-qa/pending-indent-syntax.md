@@ -1,12 +1,21 @@
 # Indent-to-S-expression Rule Set
 
-**Status**: Pending Decision
+**Status**: Resolved (superseded, 2026-09-24)
 
 **Created**: 2026-09-24
 
 **Category**: Language Syntax
 
-## Decision Needed
+## Resolution
+
+Superseded. None of the three families was adopted; the reader rules were
+decided piecemeal in `specs/lang-reference.md`: one line is one prefix call;
+a trailing `:` opens an indented block (the multi-line form of a `{}` group);
+`{}` is the only inline nesting form and `( )` is a reader error; a line that
+begins with `>` continues the previous expression (the pipe); tabs, one per
+level. Kept below for the record.
+
+## Original Decision Needed
 
 Which rule set maps indented source text to S-expressions? The user chose to
 defer this on 2026-09-24. Everything below the reader is independent of it,

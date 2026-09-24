@@ -45,6 +45,17 @@ var cutoff 800
 s [:bd-haus :sn-dub] > lpf cutoff > d1
 upd cutoff 400                   # the next event already uses 400
 
+# ---- external clocks and MIDI (author, 2026-09-24) -------------------
+use-clock :internal              # the default
+use-clock :midi                  # follow incoming MIDI clock and transport
+midi-clock-out true              # send MIDI clock and start/stop
+use-clock :link                  # Ableton Link, same mechanism (planned)
+# MIDI input as signals and events; controller binding without code is
+# the editor's job (architecture.md, Editor Requirements)
+s [:bd-haus :sn-dub] > lpf {range {cc 74} 200 2000} > d1   # `cc n` is a 0..1 signal
+midi-notes channel: 1 > s :pluck > d1                       # note input as a pattern
+note [:c :e :g] > midi 1                                    # MIDI out is a sink
+
 # stopping
 stop :drums                      # stop one slot (`d1` == `slot 1`)
 hush                             # silence every slot; the session stays alive
@@ -80,6 +91,20 @@ note [:e2 :g2 :b2] > s :pluck > gain 0.4 > cutoff {range sine 400 2000} > d1
 # checker knows the set
 s [:bd-haus :sn-dub] > d1
 n [0 3] > s :bd > d1             # sample index
+
+# ---- sample slicing (author, 2026-09-24) -------------------------------
+# Every way of cutting a sample is a pattern control, so it is patternable
+# and its numbers are editable from the waveform in the editor.
+s :break > n 3 > d1                         # bank index
+s :break > begin 0.25 > end 0.5 > d1        # start and end, 0..1 of the sample
+s :break > chop 8 > d1                      # cut each event into 8 grains in order
+s :break > striate 8 > d1                   # interleave 8 slices across events
+s :break > slice 8 [0 2 4 7] > d1           # 8 equal slices, play these by index
+s :break > splice 8 [0 2 4 7] > d1          # slice, and fit each to its step
+s :break > slice [0 0.31 0.5 0.8] [2 0] > d1  # manual slice points, 0..1
+s :break > loop-at 2 > d1                   # stretch to two cycles
+s :break > fit > d1                         # fit the sample to the event length
+s :break > cut 1 > d1                       # cut group: a new event stops the last
 
 # effects are controls too (SuperDirt), so they are patternable
 s [:bd-haus :sn-dub] > room 0.3 > size 0.8 > delay 0.25 > d1
@@ -128,7 +153,7 @@ s [:bd :sd [:hh :hh] [:cp :cp] {alt :bd :sd} {maybe :bd} {euclid :bd 3 8} nil]
 #            {fast :hh 1.5}      non-integer repeat
 #   <bd sd>  {alt :bd :sd}       alternate per cycle
 #   bd?      {maybe :bd}         50%; {maybe :bd 0.3} for 30%
-#   bd(3,8)  {euclid :bd 3 8}
+#   bd(3,8)  {euclid :bd 3 8}      also `rotation: 2`; DAW ring editor
 #   bd@3     {hold :bd 3}        weight: three steps long
 #   bd!2     {repeat :bd 2}         replicate, or write :bd :bd
 #   bd:3     > n 3               sample index, as a control
@@ -235,10 +260,121 @@ arp {chord [:c :m7]} :up
 ```
 
 
-## 4. Vocabulary
+## 4. Synthesis Models (author, 2026-09-24)
+
+Every synthesis model is expressible in code as an `inst` chain over
+builtin unit generators, and each also ships as a ready template with
+named parameters, so a performer can type `s :analog` and refine later.
+
+```vact
+# ---- sampler ----------------------------------------------------------
+# sample playback with pitch, start/end, loop, and an envelope; the host
+# sample bank is addressed by keyword, sample index by `n`
+inst drum: sampler bank: :bd-haus begin: 0 end: 1 loop: false:
+	sample-play bank n: n rate: {pitch-to-rate note} begin: begin end: end loop: loop
+		> * {env-perc attack release}
+s [:bd-haus :sn-dub] > n [0 3] > s :drum > d1     # or the template directly:
+s [:bd-haus :sn-dub] > d1                          # every sample IS a sampler
+
+# ---- analog modeling ----------------------------------------------------
+# oscillators with drift and pulse width, unison/detune, ladder or state-
+# variable filter, ADSR, noise, sub oscillator
+inst analog wave: :saw cutoff: float = 1200 res: float = 0.3 unison: int = 1 detune: float = 0.1:
+	vco wave freq unison: unison detune: detune drift: 0.002
+		> + {* {sub-osc freq} 0.3}
+		> ladder cutoff res
+		> * {env-adsr attack decay sustain release}
+		> * amp
+note [:e2 :g2] > s :analog > cutoff {range sine 400 2000} > d1
+
+# ---- digital: FM, phase distortion, additive ----------------------------
+# operators with ratio and index, wired by an algorithm number or an
+# explicit graph; phase distortion and additive partials as ugens
+inst epiano algorithm: int = 5 ratio: float = 14 index: float = 2:
+	fm-op freq ratio: 1 index: {* index {env-perc 0.01 0.8}}
+		> fm-mod {fm-op freq ratio: ratio}
+		> * {env-adsr 0.01 0.6 0.3 1.2}
+inst pd: phase-distortion freq shape: {range sine 0 1} > * {env-perc 0.01 0.4}
+inst organ: additive freq partials: [1 0.5 0.33 0.25 0.2] > * amp
+
+# ---- wavetable ----------------------------------------------------------
+# a table of frames scanned by `position` (0..1), morphing between
+# frames; tables from the host bank or built from a sample
+inst wt table: :basic-shapes position: float = 0:
+	wavetable table freq position: position
+		> svf lowpass cutoff res
+		> * {env-adsr 0.005 0.3 0.6 0.5}
+note [:c3 :e3] > s :wt > position {range sine 0 1} > d1
+```
+
+Templates shipped in the prelude: `sampler`, `analog`, `fm`, `pd`,
+`additive`, `wavetable`, `granular` (section 6). Parameters are pattern
+controls like any other, so every knob of every model is patternable.
+
+## 5. Effects (builtin catalog; author, 2026-09-24)
+
+Effects are builtins, usable in three positions: as per-event pattern
+controls (`> room 0.3`, SuperDirt style), as unit generators inside an
+`inst` chain, and on a **bus**: a declared effect chain that a slot
+routes into, plus `master`. Names are plain English, kebab-case; each
+takes named parameters with defaults.
+
+```vact
+bus :drums:                      # a declared chain; slots route into it
+	compressor threshold: -18 ratio: 4 attack: 0.01 release: 0.1
+		> tape drive: 0.3
+		> plate size: 0.6 mix: 0.2
+s [:bd-haus :sn-dub] > bus :drums > d1
+master:                          # the main output chain
+	multiband-compressor > limiter ceiling: -0.3
+```
+
+| Group | Builtins |
+|-------|----------|
+| dynamics | `compressor`, `expander`, `gate`, `limiter`, `multiband-compressor`, `multiband-expander`, `transient` (attack/sustain), `multiband-transient`, `auto-level` (loudness normalizer), `sag` (power-amp sag) |
+| eq and filters | `peq` (n bands), `geq`, `dynamic-eq`, `tilt`, `tone`, `loudness-eq`, `lpf`, `hpf`, `bpf`, `notch`, `comb`, `narrow`, `linear-phase-eq`, `group-delay-eq`, `crossover` |
+| delay | `delay`, `ping-pong`, `multitap`, `time-align` |
+| reverb | `plate`, `fdn`, `convolution` (impulse responses), `scatter` (random-scattering diffusion), `room` (the SuperDirt control) |
+| saturation | `saturate`, `tube`, `clip`, `harmonics` (2nd-5th order), `exciter`, `multiband-saturate`, `sub-synth`, `bandwidth-extend`, `dynamic-saturate` |
+| modulation | `chorus`, `flanger`, `phaser`, `tremolo`, `auto-pan`, `auto-filter`, `pitch-shift`, `pitch-shift-hq`, `freq-shift` (and ring modulation), `rotary`, `wow-flutter`, `doppler`, `vibrato` |
+| lo-fi | `bitcrush`, `decimate`, `jitter`, `noise-blend`, `hum`, `tape`, `cassette`, `vinyl`, `vinyl-artifacts`, `codec` (kind: `:mp3`, `:gsm`, `:sbc`, `:atrac`, `:g726`), `radio` (kind: `:am`, `:fm`, `:sw`), `tv-audio`, `digital-error`, `dsd-imd` |
+| resonator | `modal` (up to n resonators), `horn` |
+| spatial | `width` (stereo blend), `balance`, `multiband-balance`, `ms` (mid/side), `crossfeed`, `crosstalk-cancel`, `phase-select-eq`, `spatial-map` (direct/diffuse/residual), `pan`, `matrix` |
+| restoration | `declick`, `declip`, `dehum`, `denoise` |
+| granular | `granulate` (section 6) |
+| utility | `gain`, `mute`, `polarity`, `dc-offset`, `dry-wet`, `section` (bypass a group), `channel-divider`, `fir-crossover` |
+| analyzers (signals, for the editor's visual feedback, never audible) | `level`, `spectrum`, `spectrogram`, `note-spectrogram`, `oscilloscope`, `pitch-meter`, `stereo-meter` |
+
+Effects are ordinary functions, so a package (lang-reference.md,
+modules) can define new ones as chains of these builtins.
+
+## 6. Granular (builtin; author, 2026-09-24)
+
+One engine, two faces: an instrument template that granulates a sample
+or a wavetable, and an effect that granulates a bus or a live input.
+
+```vact
+inst cloud source: :pad-loop:    # granular instrument template
+	granular source size: 0.08 density: 24 position: {range sine 0 1} spray: 0.05
+		pitch: 0 pitch-spray: 0.02 envelope: :hann reverse: 0.1 freeze: false
+		> * {env-adsr 0.2 0.5 0.8 1.5}
+note [:c3 :g3] > s :cloud > position {range perlin 0 1} > d1
+
+bus :texture:                    # granular effect on a bus
+	granulate size: 0.05 density: 40 spray: 0.2 pitch-spray: 0.1 freeze: {alt false true}
+s [:vocal] > bus :texture > d1
+```
+
+Parameters: `size` (seconds), `density` (grains per second), `position`
+(0..1 in the source), `spray` (position randomness), `pitch`,
+`pitch-spray`, `envelope` (`:hann`, `:tri`, `:trapezoid`, `:expo`),
+`reverse` (probability), `freeze` (hold the read position), `stereo-spray`.
+All are pattern controls.
+
+## 7. Vocabulary
 
 | Area | Functions |
 |------|-----------|
-| patterns (Tidal/Strudel names) | `s`/`sound`, `n`, `note`, `gain`, `pan`, `speed`, `lpf`, `hpf`, `room`, `size`, `delay`, `fast`, `slow`, `rev`, `every`, `whenmod`, `sometimes`, `rarely`, `often`, `alt`, `maybe`, `euclid`, `hold`, `repeat`, `choose`, `stack`, `cat`, `fastcat`, `superimpose`, `off`, `jux`, `iter`, `chop`, `ply`, `chunk`, `hurry`, `segment`, `range`, `scale`, `chord`, `voicing`, `arp`, and Tidal's `struct` (rename pending, see review) |
-| signals | `sine`, `saw`, `tri`, `square`, `rand`, `irand`, `perlin`, `time`, `beat`, `phase`, `cycle`, `fft`, `amp`, `env`, `hits`, `ctrl` (per-slot event signals), `looks`, `lag`, `map-range` |
-| sound (SuperCollider names) | `inst`, `look` (a visual keyed to a sound), `sin-osc`, `saw`, `pulse`, `tri`, `white-noise`, `lpf`, `hpf`, `bpf`, `delay`, `comb`, `env-perc`, `env-adsr`, `line`, `midi`, `osc` |
+| patterns (Tidal/Strudel names) | `s`/`sound`, `n`, `note`, `gain`, `pan`, `speed`, `lpf`, `hpf`, `room`, `size`, `delay`, `fast`, `slow`, `rev`, `every`, `whenmod`, `sometimes`, `rarely`, `often`, `alt`, `maybe`, `euclid`, `hold`, `repeat`, `choose`, `stack`, `cat`, `fastcat`, `superimpose`, `off`, `jux`, `iter`, `chop`, `striate`, `slice`, `splice`, `begin`, `end`, `loop-at`, `fit`, `cut`, `ply`, `chunk`, `hurry`, `segment`, `range`, `scale`, `chord`, `voicing`, `arp`, and Tidal's `struct` (rename pending, see review) |
+| signals | `sine`, `saw`, `tri`, `square`, `rand`, `irand`, `perlin`, `time`, `beat`, `phase`, `cycle`, `fft`, `amp`, `cc` (MIDI controller, 0..1), `midi-notes` (note input as a pattern), `lag`, `map-range` |
+| sound (SuperCollider names) | `inst`, `look` (a visual keyed to a sound), `sin-osc`, `saw`, `pulse`, `tri`, `white-noise`, `lpf`, `hpf`, `bpf`, `delay`, `comb`, `env-perc`, `env-adsr`, `line`, `midi`, `osc` ; synthesis: `sampler`, `analog`, `fm`, `pd`, `additive`, `wavetable`, `granular`, ugens `vco`, `sub-osc`, `ladder`, `svf`, `fm-op`, `fm-mod`, `phase-distortion`, `sample-play`, `env-perc`, `env-adsr`; buses `bus`, `master`; effects: see section 5 |

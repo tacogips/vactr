@@ -39,7 +39,7 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
-| (No active plans yet) | - | - | - |
+| [vactrol-core.md](active/vactrol-core.md) | Planning (design and plan accepted by the Fable/Astra review loop, 2026-09-25) | design-docs/specs/design-implementation.md | 2026-09-25 |
 
 ## Completed Plans
 

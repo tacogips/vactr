@@ -14,7 +14,7 @@ but the reader, formatter, and LSP cannot start until it is fixed.
 
 ## Background
 
-nagamu programs are written without most parentheses; the reader reconstructs
+vactrol programs are written without most parentheses; the reader reconstructs
 lists from line and indentation structure. Three established families exist.
 
 ## Alternatives

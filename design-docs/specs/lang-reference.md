@@ -1,4 +1,4 @@
-# nagamu Language Reference (working draft)
+# vactrol Language Reference (working draft)
 
 Reference code from which the language specification is reverse-engineered.
 Section 1 is the original sketch; the rest is the core language. The two
@@ -32,7 +32,7 @@ Conventions used in the code blocks:
    Failures are reported by the runtime, not values threaded through every
    call and not a type in the language; types are optional annotations, never
    obligations.
-4. **Typed, with inference.** nagamu is statically typed. Every expression
+4. **Typed, with inference.** vactrol is statically typed. Every expression
    has a type the checker can name and the LSP shows. Annotations are
    optional because inference makes them unnecessary, not because types are.
    In Live mode a type error is a diagnostic and never stops the music; in
@@ -46,14 +46,14 @@ Conventions used in the code blocks:
    allowed. They are safe because every line of user code runs on one
    evaluator thread; the audio and render threads only ever receive values.
 
-```nagm
+```vactrol
 + 43 32 > * 12 > print        # thought order: 43+32, times 12, print
 * 12 {+ 43 32}               # same value; the group had to be planned
 ```
 
 ## 1. Basics (original sketch)
 
-```nagm
+```vactrol
 # this is a comment
 
 # function definition: `fn name params:` opens an indented body block.
@@ -143,7 +143,7 @@ a > fn1 12 > fn2 32 43   # inline, the same thing
 
 ## 2. Literals and Data
 
-```nagm
+```vactrol
 # numbers (author, 2026-09-24): fixed widths, Zig/WGSL style
 #   int     i32        int64    i64
 #   float   f32        float64  f64
@@ -450,7 +450,7 @@ Decisions so far (author, 2026-09-24): iteration is declarative (`map`,
 `break`, and never recursion-based. Function recursion remains allowed for
 recursive data. Everything here is an expression with a value.
 
-```nagm
+```vactrol
 # ---- if ----------------------------------------------------------
 
 # `if` is SUGAR for `match` (author, 2026-09-24). The expander rewrites
@@ -692,7 +692,7 @@ fn flatten-notes tree:
 
 ## 4. State, Redefinition, Modules
 
-```nagm
+```vactrol
 # live parameters: a top-level `var` referenced by a bound pattern is
 # late-bound and read at each event (`design-music.md`, section 1)
 var cutoff 800

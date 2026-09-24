@@ -1,11 +1,11 @@
 [package]
-name = "nagamu"
+name = "vactrol"
 version = "0.1.0"
 edition = "2021"
-description = "Nagamu scripting language"
+description = "Vactrol scripting language"
 
-homepage = "https://github.com/tacogips/nagamu"
-repository = "https://github.com/tacogips/nagamu"
+homepage = "https://github.com/tacogips/vactrol"
+repository = "https://github.com/tacogips/vactrol"
 license = "MIT"
 readme = "README.md"
 
@@ -21,9 +21,9 @@ panic = "abort"
 strip = true
 
 [[bin]]
-name = "nagm"
+name = "vactrol"
 path = "src/main.rs"
 
 [lib]
-name = "nagamu"
+name = "vactrol"
 path = "src/lib.rs"

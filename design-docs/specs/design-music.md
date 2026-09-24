@@ -1,4 +1,4 @@
-# nagamu Music Specification (working draft)
+# vactrol Music Specification (working draft)
 
 Supporting document to `lang-reference.md`: time, sound, and patterns.
 Modeled on TidalCycles/Strudel and Overtone. Music and visuals are
@@ -9,7 +9,7 @@ Conventions are those of `lang-reference.md` (`# Decided`, `# => v`).
 
 ## 1. Time (Tidal / Overtone model)
 
-```nagm
+```vactrol
 # Time is data (principle 5). There is no `sleep`, no `sync`, no loop
 # that waits: every sound is placed at a position in a cycle by a
 # pattern, and the scheduler plays whatever the bound patterns say.
@@ -60,7 +60,7 @@ hush                             # silence every slot; the session stays alive
 
 ## 2. Sound (Overtone / Tidal model)
 
-```nagm
+```vactrol
 # Instruments (Overtone `definst`): a named signal chain over unit
 # generators, the audio counterpart of a Hydra chain. The chain's value
 # is the instrument's output.
@@ -110,12 +110,12 @@ note [:c :e :g] > midi 1         # channel 1
 
 ## 3. Patterns (TidalCycles / Strudel model)
 
-```nagm
+```vactrol
 # A pattern is a function of time to events. Patterns are lazy and
 # infinite; nothing sounds until a pattern is bound to an output slot.
 
 # ---- sequences: no strings (author, 2026-09-24) ---------------------
-# Tidal's mini-notation lives in strings; nagamu has no string
+# Tidal's mini-notation lives in strings; vactrol has no string
 # notation. A LIST given where a pattern is expected is one cycle of
 # steps; a nested list subdivides its step; nil is a rest. Steps are
 # keywords (checked against the host's sample or synth set, so a typo

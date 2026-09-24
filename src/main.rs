@@ -1,8 +1,8 @@
-//! nagamu - Nagamu scripting language
+//! vactrol - Vactrol scripting language
 //!
-//! This is the main entry point for the nagamu binary.
+//! This is the main entry point for the vactrol binary.
 
-use nagamu::hello;
+use vactrol::hello;
 
 fn main() {
     println!("{}", hello());

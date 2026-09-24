@@ -4,7 +4,7 @@ This document describes system architecture and design decisions.
 
 ## Overview
 
-nagamu is a live-coding scripting language and its LSP server, implemented in Rust.
+vactrol is a live-coding scripting language and its LSP server, implemented in Rust.
 The surface syntax is indent-based and desugars into S-expressions; the core is a
 small Lisp. It runs as an interpreter first and is designed so that a JIT and a
 Wasm backend can be added without changing the language.
@@ -60,7 +60,7 @@ Design priorities, in order: simplicity, ease of writing, then everything else.
 ### Execution Modes
 
 Live coding requires runtime redefinition; Wasm and JIT want a closed program.
-Rather than choosing one, nagamu defines two modes over the same core language.
+Rather than choosing one, vactrol defines two modes over the same core language.
 
 | Mode | Purpose | `eval` / REPL | Redefinition | Backend |
 |------|---------|---------------|--------------|---------|
@@ -141,7 +141,7 @@ by construction, exactly as in JavaScript, Hydra, and Strudel.
 | Render (GPU, per frame) | the shader a visual chain compiles to | never; receives uniforms (`time`, `fft`, `amp`, `beat`, `hits`, signal parameters) |
 | I/O | editor/LSP transport, MIDI, OSC | no |
 
-Invariant: a nagamu closure is never evaluated on the audio or render
+Invariant: a vactrol closure is never evaluated on the audio or render
 thread. A function-of-time parameter is evaluated at control rate on
 the evaluator thread and pushed as a value. Visuals therefore need no
 multithreading of user code; the GPU is the parallelism. In Wasm the
@@ -195,7 +195,7 @@ Swift, Go, Kotlin/Wasm, Dart (immature Wasm or a GC on the audio path).
 - No assumption of OS threads in the core; concurrency is scheduler-driven.
 - All I/O and platform access goes through capability traits.
 - Live mode in the browser runs the interpreter/VM compiled to Wasm; Frozen
-  mode emits Wasm from nagamu programs and is a later milestone.
+  mode emits Wasm from vactrol programs and is a later milestone.
 
 ### Realtime Validation
 
@@ -218,12 +218,12 @@ What the language guarantees to make this possible:
 
 Consequences for the toolchain: the LSP server and the live session share
 one process (or a socket), because runtime diagnostics originate in the
-scheduler. `nagm` therefore runs both; an external editor connects to
+scheduler. `vactrol` therefore runs both; an external editor connects to
 the same session the console shows.
 
 ### Typing
 
-nagamu is statically typed with inference (principle 4 in
+vactrol is statically typed with inference (principle 4 in
 `lang-reference.md`). Every expression has a type the checker can name;
 annotations are optional because inference usually makes them
 unnecessary. Annotations go in `fn` headers, `let`/`var` bindings,

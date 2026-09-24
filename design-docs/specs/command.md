@@ -10,6 +10,15 @@ Command-line interface design decisions, including subcommands, flags, options, 
 
 ## Sections
 
+### Naming (decided 2026-09-24)
+
+| Item | Value |
+|------|-------|
+| Language | Vactrol (renamed from nagamu; a vactrol is an LED coupled to a photoresistor: light controlling sound) |
+| Binary and crate | `vactrol` |
+| Source file extension | `.vact` |
+| Repository | https://github.com/tacogips/vactrol |
+
 ### Subcommands
 
 Define the CLI subcommand structure and hierarchy.

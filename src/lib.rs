@@ -1,17 +1,17 @@
-//! nagamu - Nagamu scripting language
+//! vactrol - Vactrol scripting language
 //!
-//! This crate provides the core functionality for the nagamu project.
+//! This crate provides the core functionality for the vactrol project.
 
 /// A placeholder function that returns a greeting message.
 ///
 /// # Examples
 ///
 /// ```
-/// use nagamu::hello;
-/// assert_eq!(hello(), "Hello from nagamu!");
+/// use vactrol::hello;
+/// assert_eq!(hello(), "Hello from vactrol!");
 /// ```
 pub fn hello() -> &'static str {
-    "Hello from nagamu!"
+    "Hello from vactrol!"
 }
 
 #[cfg(test)]
@@ -20,6 +20,6 @@ mod tests {
 
     #[test]
     fn test_hello() {
-        assert_eq!(hello(), "Hello from nagamu!");
+        assert_eq!(hello(), "Hello from vactrol!");
     }
 }

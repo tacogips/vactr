@@ -23,7 +23,11 @@
   "evidenceRoot": "tmp/fe-frontend-20260925-s165",
   "evidenceLayout": "tmp/fe-frontend-20260925-s165/<planId>/attempt-<n>/ (untracked; tmp is gitignored). Cargo logs also go to target/fe-logs/<plan>-*.log as the plans require.",
   "reviewContext": {
-    "issueReference": {"repository": "tacogips/vactrol", "number": 1, "url": "https://github.com/tacogips/vactrol/issues/1"},
+    "issueReference": {
+      "repository": "tacogips/vactrol",
+      "number": 1,
+      "url": "https://github.com/tacogips/vactrol/issues/1"
+    },
     "userProblem": "The user asked (in Japanese: 'claude riela design impl workflowで実装を進めて') for implementation to go ahead through the Riela design-and-implement workflow. The Vactrol crate is still a scaffold (src/lib.rs has a placeholder hello()). The language front end, TASK-001..003 in impl-plans/active/vactrol-core.md, needs to be implemented.",
     "requiredOutcomes": [
       "TASK-001 core value model: Value tagging, structural equality, a dict as a sorted map (BTreeMap) with key-ordered iteration and put semantics, exact self-reducing Ratio64 arithmetic, and int/float widening rules (FE-VALUE).",
@@ -160,9 +164,9 @@
         "src/reader/mod.rs"
       ],
       "sharedPaths": [
-        {"path": "src/reader/mod.rs", "owner": "FE-VALUE", "intent": "Create the file with only 'pub mod span;'. FE-READER extends it later."},
-        {"path": "src/lib.rs", "owner": "FE-VALUE", "intent": "Create the crate root with the section 4 module list, excluding expand. FE-EXPAND later adds 'pub mod expand;'."},
-        {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Define the full DiagCode enum. Later plans add a code only if one is missing, and record it."}
+        "src/reader/mod.rs",
+        "src/lib.rs",
+        "src/types/diag.rs"
       ],
       "acceptanceCriteria": [
         "Foundation ids, shells, Failure, Diagnostic and DiagCode exist at the listed paths.",
@@ -190,7 +194,9 @@
       "planPath": "impl-plans/active/vactrol-frontend-reader.md",
       "implementsTask": "TASK-002",
       "wave": 2,
-      "dependsOn": ["FE-VALUE"],
+      "dependsOn": [
+        "FE-VALUE"
+      ],
       "progressFile": "impl-plans/active/vactrol-frontend-reader.md#progress-log",
       "writePaths": [
         "src/reader/node.rs",
@@ -212,8 +218,8 @@
         "tests/fixtures/spec/manifest.toml"
       ],
       "sharedPaths": [
-        {"path": "src/reader/mod.rs", "owner": "FE-VALUE", "intent": "Add the reader submodules, read(), ReadResult and re-exports. Keep 'pub mod span;'."},
-        {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Add a DiagCode only if one is missing, and record it for FE-FINAL."}
+        "src/reader/mod.rs",
+        "src/types/diag.rs"
       ],
       "acceptanceCriteria": [
         "All manifest fixtures read per their classification (console cases under FileId::CONSOLE). No blanket clean-parse claim.",
@@ -238,7 +244,9 @@
       "planPath": "impl-plans/active/vactrol-frontend-expander.md",
       "implementsTask": "TASK-003",
       "wave": 3,
-      "dependsOn": ["FE-READER"],
+      "dependsOn": [
+        "FE-READER"
+      ],
       "progressFile": "impl-plans/active/vactrol-frontend-expander.md#progress-log",
       "writePaths": [
         "src/expand/mod.rs",
@@ -253,10 +261,10 @@
         "src/expand/tests/diagnostics.rs"
       ],
       "sharedPaths": [
-        {"path": "src/lib.rs", "owner": "FE-VALUE", "intent": "Add one line: 'pub mod expand;'."},
-        {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Add an expander code only if one is missing, and record it for FE-FINAL."},
-        {"path": "tests/fixtures/spec/manifest.toml", "owner": "FE-READER", "intent": "Set expand/expand_diags for all 11 blocks, add expand strings to cases, set diags=[\"malformed-fn\"] on the decided U4 case, and add the decided U5 case."},
-        {"path": "tests/spec_fixtures.rs", "owner": "FE-READER", "intent": "Expand every block and case form. Assert read-error-present for Error forms, compare diags and print_all, and assert is_kernel."}
+        "src/lib.rs",
+        "src/types/diag.rs",
+        "tests/fixtures/spec/manifest.toml",
+        "tests/spec_fixtures.rs"
       ],
       "acceptanceCriteria": [
         "The desugarings match the '# ~ (...)' and '# ==' annotations in lang-reference.md (the plan's canonical table).",
@@ -280,7 +288,11 @@
       "planPath": "impl-plans/active/vactrol-frontend-finalize.md",
       "implementsTask": "TASK-001..003 reconciliation",
       "wave": 4,
-      "dependsOn": ["FE-VALUE", "FE-READER", "FE-EXPAND"],
+      "dependsOn": [
+        "FE-VALUE",
+        "FE-READER",
+        "FE-EXPAND"
+      ],
       "progressFile": "impl-plans/active/vactrol-frontend-finalize.md#progress-log",
       "writePaths": [
         "impl-plans/active/vactrol-core.md",
@@ -288,11 +300,11 @@
         "design-docs/specs/design-implementation.md"
       ],
       "sharedPaths": [
-        {"path": "impl-plans/active/vactrol-frontend-value.md", "owner": "FE-VALUE", "intent": "Set the header Status to Completed only."},
-        {"path": "impl-plans/active/vactrol-frontend-reader.md", "owner": "FE-READER", "intent": "Set the header Status to Completed only."},
-        {"path": "impl-plans/active/vactrol-frontend-expander.md", "owner": "FE-EXPAND", "intent": "Set the header Status to Completed only."},
-        {"path": "impl-plans/active/vactrol-frontend-finalize.md", "owner": "FE-FINAL", "intent": "Set the header Status to Completed, and fill in the progress log."},
-        {"path": "design-docs/specs/design-implementation.md", "owner": "FE-FINAL", "intent": "Append one sentence to 6.5.4 naming misplaced-arrow and any code added during implementation, and rewrite the section 5.6 inline 'fn kick-sound: :bd-tek' example in block form."}
+        "impl-plans/active/vactrol-frontend-value.md",
+        "impl-plans/active/vactrol-frontend-reader.md",
+        "impl-plans/active/vactrol-frontend-expander.md",
+        "impl-plans/active/vactrol-frontend-finalize.md",
+        "design-docs/specs/design-implementation.md"
       ],
       "acceptanceCriteria": [
         "vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, the Verification lint command and the progress log are updated. No other task changed (V7).",

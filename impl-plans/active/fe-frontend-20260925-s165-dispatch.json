@@ -1,0 +1,306 @@
+{
+  "taskId": "fe-frontend-20260925-s165",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-165",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "8681890bed506f1a13ca990b191794cb75319330",
+  "designDocPaths": [
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/lang-reference.md",
+    "design-docs/specs/design-music.md",
+    "design-docs/user-qa/pending-frontend-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "parentPlanPath": "impl-plans/active/vactrol-core.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/fe-frontend-20260925-s165",
+  "evidenceLayout": "tmp/fe-frontend-20260925-s165/<planId>/attempt-<n>/ (untracked; tmp is gitignored). Cargo logs also go to target/fe-logs/<plan>-*.log as the plans require.",
+  "reviewContext": {
+    "issueReference": null,
+    "userProblem": "The user asked (in Japanese: 'claude riela design impl workflowで実装を進めて') for implementation to go ahead through the Riela design-and-implement workflow. The Vactrol crate is still a scaffold (src/lib.rs has a placeholder hello()). The language front end, TASK-001..003 in impl-plans/active/vactrol-core.md, needs to be implemented.",
+    "requiredOutcomes": [
+      "TASK-001 core value model: Value tagging, structural equality, a dict as a sorted map (BTreeMap) with key-ordered iteration and put semantics, exact self-reducing Ratio64 arithmetic, and int/float widening rules (FE-VALUE).",
+      "TASK-002 reader: every construct in lang-reference.md sections 1-3 and in the design-music.md sections 1-3 samples reads to the documented S-expression form. '( )' is rejected. Pipe continuation lines work. '#@' directive comments are kept as trivia with spans (FE-READER).",
+      "TASK-003 expander: if/elif sugar becomes match and for sugar becomes map. The output contains kernel forms only. Malformed forms produce diagnostics with their origin span (FE-EXPAND).",
+      "CARGO_TERM_QUIET=true cargo build succeeds, and cargo clippy --all-targets -- -D warnings is clean.",
+      "cargo nextest passes with the quiet environment settings.",
+      "vactrol-core.md marks TASK-001..003 complete, with their criteria checked, module status updated, and a progress-log entry. No other task is touched (FE-FINAL).",
+      "No Rust source file reaches 1000 lines, and the crate layout matches design-implementation.md section 4."
+    ],
+    "nonGoals": [
+      "Checker, VM, compiler, pattern engine, scheduler, DSP, session, LSP and editor behavior (TASK-004..010).",
+      "Arithmetic natives, the concat native, variant resolution and checker diagnostics.",
+      "Changing the toolchain, including rustup target add wasm32 (user-qa U1).",
+      "Settling authority questions. They are pinned as fixtures only.",
+      "Pull requests, worktrees, parallel fanout, and archiving plans to completed/."
+    ],
+    "constraints": [
+      "Follow .agents/skills/rust-coding-standards/ and AGENTS.md. Split any touched .rs file of 1000 or more lines.",
+      "Rust 1.83, edition 2021. No let-chains. Add no dependencies; Cargo.toml changes only by adding the [features] table.",
+      "Run cargo with CARGO_TERM_QUIET=true. Run nextest with NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1.",
+      "Decided spec items hold: the identifier rule, tabs at one per level, '{}' as the only nesting form, '( )' as a reader error, a '>' line continuing the pipe, 'key: value' as a pair, a dict over a BTreeMap, int=i32/int64/float=f32/float64 plus exact ratio, '_' as the wildcard only, '#@' as trivia, qualified names only after import, and the kernel forms match/fn/let/var/upd/->/{}/enum. There is no while/loop/break/when/unless/each.",
+      "The reader and expander never panic on untrusted input. The nesting cap is 128.",
+      "Core modules use no std::thread, fs, time, net or process.",
+      "Design 6.5.4 and 6.5.5 are normative. When a plan and the design differ, the design wins and the difference goes in the progress log.",
+      "Commits use the AGENTS.md six-section message with no AI attribution or Co-Authored-By line. Work on main. No PRs.",
+      "Only FE-FINAL edits vactrol-core.md, impl-plans/README.md and design-implementation.md (one sentence in 6.5.4)."
+    ],
+    "designDecisionsAndRationale": [
+      "The front end is split into four strictly serial plans: FE-VALUE, then FE-READER, then FE-EXPAND, then FE-FINAL. Each depends on the types from the previous one. Shared indexes are edited only in the final serial reconciliation wave.",
+      "Shell types (Closure, Pat, Sig, TexNode, VarSlotRef) derive only Debug and have no constructors. This keeps the section 4 layout and Value variants complete without implementing later tasks.",
+      "Diagnostics use a closed DiagCode enum with kebab-case names: 26 reader codes and 11 expander codes. misplaced-arrow is the plan's code for '->' inside '[..]', and FE-FINAL records it in 6.5.4.",
+      "The spec fixture manifest (tests/fixtures/spec/manifest.toml, 11 blocks from the 'vactrol' and 'vact' fences) pins reader and expander behavior against the spec documents, parsed by an in-repo TOML subset (no dependency).",
+      "User-QA defaults are applied until the user answers: U1 leaves the wasm32 checkbox unchecked; U2 decides a line-initial '>' by indentation; U3 sets escapes to \\\" \\\\ \\n \\t \\{ \\}; U4 makes an inline fn body malformed-fn; U5 accepts the bare-variant binding-if edge."
+    ],
+    "intentionalTradeoffs": [
+      "The wasm32 build criterion stays unchecked (blocked on U1) rather than changing the toolchain.",
+      "The vactrol-core.md progress entry is condensed so the file stays under 1000 lines (992 lines at plan time).",
+      "rustfmt runs per plan on owned files only. A crate-wide cargo fmt is deferred to FE-FINAL V4."
+    ],
+    "supportedEdgeCases": [
+      "Byte-accurate spans with multi-byte UTF-8, and a \\r in CRLF excluded from spans.",
+      "Console registers (_1) are allowed only under FileId::CONSOLE, and give console-register-in-file elsewhere.",
+      "Error recovery per statement: the next line still reads after a diagnostic.",
+      "Ratio overflow, including negating i64::MIN, and zero denominators become Failure, not panics.",
+      "Dict key total order: Exact before Float when equal as f64, -0.0 as 0, NaN keys as Type, and keywords ordered by name.",
+      "The if/elif/else chain nests into match, and both forms of binding if are handled.",
+      "Nesting of 129 levels gives nesting-too-deep. Every line-boundary prefix of all spec blocks reads without panic."
+    ],
+    "outOfScopeEdgeCases": [
+      "Evaluation semantics of the authority-question fixtures (fn f a b arity, let/upd base, inline fn, bare-variant if). These stay pending.",
+      "Distinguishing variant names from binding names in binding-if patterns (U5; needs the checker).",
+      "Directive attachment to forms (editor 13.5), package fetching, and open semantics.",
+      "Actually building for wasm32 (U1)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-implementation.md",
+      "design-docs/specs/lang-reference.md",
+      "design-docs/specs/design-music.md",
+      "design-docs/user-qa/pending-frontend-questions.md",
+      "impl-plans/active/vactrol-core.md",
+      "impl-plans/active/vactrol-frontend-value.md",
+      "impl-plans/active/vactrol-frontend-reader.md",
+      "impl-plans/active/vactrol-frontend-expander.md",
+      "impl-plans/active/vactrol-frontend-finalize.md",
+      ".agents/skills/rust-coding-standards/SKILL.md",
+      "AGENTS.md"
+    ],
+    "acceptedReviewFindings": [
+      "Low: in impl-plans/active/vactrol-frontend-reader.md:124, the bad-pair example ('once gain:' followed by '> d1') is not reachable under the 6.5.4 colon rules. Pick an input that 6.5.4 actually reaches, or record that no reachable example exists. Do not change the lexer to fit the test.",
+      "Low: in impl-plans/active/vactrol-frontend-value.md:36, src/value/value.rs triggers clippy::module_inception. Put #[allow(clippy::module_inception)] on that one mod declaration in src/value/mod.rs and record it in the progress log."
+    ],
+    "residualRisks": [
+      "The acceptance criterion 'TASK-001..003 criteria checked' cannot be fully met until U1 is decided. The wasm32 checkbox stays unchecked, and that is reported truthfully.",
+      "Hand-derived canonical strings may differ from 6.5.4 in edge cases. The design wins, and each discrepancy is recorded in the progress log."
+    ]
+  },
+  "plans": [
+    {
+      "planId": "FE-VALUE",
+      "planPath": "impl-plans/active/vactrol-frontend-value.md",
+      "implementsTask": "TASK-001",
+      "wave": 1,
+      "dependsOn": [],
+      "progressFile": "impl-plans/active/vactrol-frontend-value.md#progress-log",
+      "writePaths": [
+        "Cargo.toml",
+        "src/main.rs",
+        "src/lib.rs",
+        "src/value/mod.rs",
+        "src/value/value.rs",
+        "src/value/ratio.rs",
+        "src/value/key.rs",
+        "src/value/dict.rs",
+        "src/value/intern.rs",
+        "src/value/num.rs",
+        "src/value/access.rs",
+        "src/value/eq.rs",
+        "src/value/print.rs",
+        "src/value/tests/mod.rs",
+        "src/value/tests/ratio.rs",
+        "src/value/tests/key.rs",
+        "src/value/tests/dict.rs",
+        "src/value/tests/num.rs",
+        "src/value/tests/access.rs",
+        "src/value/tests/eq.rs",
+        "src/value/tests/print.rs",
+        "src/value/tests/intern.rs",
+        "src/reader/span.rs",
+        "src/types/mod.rs",
+        "src/types/diag.rs",
+        "src/vm/mod.rs",
+        "src/vm/fail.rs",
+        "src/ns/mod.rs",
+        "src/ns/namespace.rs",
+        "src/ns/tweak.rs",
+        "src/compile/mod.rs",
+        "src/compile/proto.rs",
+        "src/pattern/mod.rs",
+        "src/pattern/pat.rs",
+        "src/pattern/signal.rs",
+        "src/tex/mod.rs",
+        "src/tex/texnode.rs",
+        "src/sched/mod.rs",
+        "src/sched/slots.rs",
+        "src/dsp/mod.rs",
+        "src/dsp/graph.rs",
+        "src/reader/mod.rs"
+      ],
+      "sharedPaths": [
+        {"path": "src/reader/mod.rs", "owner": "FE-VALUE", "intent": "Create the file with only 'pub mod span;'. FE-READER extends it later."},
+        {"path": "src/lib.rs", "owner": "FE-VALUE", "intent": "Create the crate root with the section 4 module list, excluding expand. FE-EXPAND later adds 'pub mod expand;'."},
+        {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Define the full DiagCode enum. Later plans add a code only if one is missing, and record it."}
+      ],
+      "acceptanceCriteria": [
+        "Foundation ids, shells, Failure, Diagnostic and DiagCode exist at the listed paths.",
+        "Value, Ratio64, Key/NumKey, dict ops, Interner, num, access, eq and print are implemented per design 6.5.3.",
+        "Ratio ops are exact and self-reducing. i64 overflow and a zero denominator are Failure.",
+        "Dict iteration is in key order, and a duplicate literal key keeps the last pair.",
+        "Every required test exists and passes (V3).",
+        "V1, V2, V4, V5 and V7 pass. V6 is run, or recorded as blocked on U1."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/value-build.log",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/value-clippy.log",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/value-nextest.log",
+        "find src -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
+        "rustup target list --installed",
+        "git diff --stat -- Cargo.toml"
+      ]
+    },
+    {
+      "planId": "FE-READER",
+      "planPath": "impl-plans/active/vactrol-frontend-reader.md",
+      "implementsTask": "TASK-002",
+      "wave": 2,
+      "dependsOn": ["FE-VALUE"],
+      "progressFile": "impl-plans/active/vactrol-frontend-reader.md#progress-log",
+      "writePaths": [
+        "src/reader/node.rs",
+        "src/reader/lexer.rs",
+        "src/reader/layout.rs",
+        "src/reader/line.rs",
+        "src/reader/import.rs",
+        "src/reader/sexpr.rs",
+        "src/reader/tests/mod.rs",
+        "src/reader/tests/lexer.rs",
+        "src/reader/tests/layout.rs",
+        "src/reader/tests/line.rs",
+        "src/reader/tests/import.rs",
+        "src/reader/tests/spans.rs",
+        "src/reader/tests/no_panic.rs",
+        "tests/spec_fixtures.rs",
+        "tests/support/mod.rs",
+        "tests/support/toml_subset.rs",
+        "tests/fixtures/spec/manifest.toml"
+      ],
+      "sharedPaths": [
+        {"path": "src/reader/mod.rs", "owner": "FE-VALUE", "intent": "Add the reader submodules, read(), ReadResult and re-exports. Keep 'pub mod span;'."},
+        {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Add a DiagCode only if one is missing, and record it for FE-FINAL."}
+      ],
+      "acceptanceCriteria": [
+        "All manifest fixtures read per their classification (console cases under FileId::CONSOLE). No blanket clean-parse claim.",
+        "Every negative example ('( )', '_tmp', 'foo-', '_1' in a file) yields a reader diagnostic, and the following lines still read.",
+        "import, as and open read correctly. The fresh-session pads.warm and 'as pd' cases read. An unbound qualifier is an error. prescan_imports finds every import. '#@' lines land in trivia with positions.",
+        "Spans are byte-accurate: the golden tests pass.",
+        "The manifest has 11 [[block]] entries.",
+        "V1-V6 pass."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/reader-build.log",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/reader-clippy.log",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/reader-nextest.log",
+        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -c '^\\[\\[block\\]\\]' tests/fixtures/spec/manifest.toml",
+        "git diff --stat -- Cargo.toml"
+      ]
+    },
+    {
+      "planId": "FE-EXPAND",
+      "planPath": "impl-plans/active/vactrol-frontend-expander.md",
+      "implementsTask": "TASK-003",
+      "wave": 3,
+      "dependsOn": ["FE-READER"],
+      "progressFile": "impl-plans/active/vactrol-frontend-expander.md#progress-log",
+      "writePaths": [
+        "src/expand/mod.rs",
+        "src/expand/expander.rs",
+        "src/expand/sugar.rs",
+        "src/expand/kernel.rs",
+        "src/expand/tests/mod.rs",
+        "src/expand/tests/if_match.rs",
+        "src/expand/tests/for_map.rs",
+        "src/expand/tests/small_sugar.rs",
+        "src/expand/tests/kernel.rs",
+        "src/expand/tests/diagnostics.rs"
+      ],
+      "sharedPaths": [
+        {"path": "src/lib.rs", "owner": "FE-VALUE", "intent": "Add one line: 'pub mod expand;'."},
+        {"path": "src/types/diag.rs", "owner": "FE-VALUE", "intent": "Add an expander code only if one is missing, and record it for FE-FINAL."},
+        {"path": "tests/fixtures/spec/manifest.toml", "owner": "FE-READER", "intent": "Set expand/expand_diags for all 11 blocks, add expand strings to cases, and add the U4/U5 authority cases."},
+        {"path": "tests/spec_fixtures.rs", "owner": "FE-READER", "intent": "Expand every block and case form. Assert read-error-present for Error forms, compare diags and print_all, and assert is_kernel."}
+      ],
+      "acceptanceCriteria": [
+        "The desugarings match the '# ~ (...)' and '# ==' annotations in lang-reference.md (the plan's canonical table).",
+        "The output tree contains kernel forms only, asserted structurally through is_kernel.",
+        "Malformed forms produce the listed diagnostics with their origin span.",
+        "Synthesized node ids are at least first_free and unique.",
+        "V1-V6 pass."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/expand-build.log",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/expand-clippy.log",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/expand-nextest.log",
+        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -c '^expand = ' tests/fixtures/spec/manifest.toml",
+        "grep -n 'expand = \"unchecked\"' tests/fixtures/spec/manifest.toml || echo none"
+      ]
+    },
+    {
+      "planId": "FE-FINAL",
+      "planPath": "impl-plans/active/vactrol-frontend-finalize.md",
+      "implementsTask": "TASK-001..003 reconciliation",
+      "wave": 4,
+      "dependsOn": ["FE-VALUE", "FE-READER", "FE-EXPAND"],
+      "progressFile": "impl-plans/active/vactrol-frontend-finalize.md#progress-log",
+      "writePaths": [
+        "impl-plans/active/vactrol-core.md",
+        "impl-plans/README.md",
+        "design-docs/specs/design-implementation.md"
+      ],
+      "sharedPaths": [
+        {"path": "impl-plans/active/vactrol-frontend-value.md", "owner": "FE-VALUE", "intent": "Set the header Status to Completed only."},
+        {"path": "impl-plans/active/vactrol-frontend-reader.md", "owner": "FE-READER", "intent": "Set the header Status to Completed only."},
+        {"path": "impl-plans/active/vactrol-frontend-expander.md", "owner": "FE-EXPAND", "intent": "Set the header Status to Completed only."},
+        {"path": "impl-plans/active/vactrol-frontend-finalize.md", "owner": "FE-FINAL", "intent": "Set the header Status to Completed, and fill in the progress log."},
+        {"path": "design-docs/specs/design-implementation.md", "owner": "FE-FINAL", "intent": "Append one sentence to 6.5.4 naming misplaced-arrow and any code added during implementation."}
+      ],
+      "acceptanceCriteria": [
+        "vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, the Verification lint command and the progress log are updated. No other task changed (V7).",
+        "impl-plans/README.md and the FE-* plan headers are updated.",
+        "vactrol-core.md stays under 1000 lines.",
+        "V1-V6 and V8 pass. V9 is recorded (wasm32 blocked on U1 if absent).",
+        "The final commit on main uses the AGENTS.md six-section message, with no AI attribution or Co-Authored-By line."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/final-build.log",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/final-clippy.log",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/final-nextest.log",
+        "cargo fmt -- --check",
+        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "ls src",
+        "git diff -U0 -- impl-plans/active/vactrol-core.md | grep -n 'TASK-00[4-9]\\|TASK-010' || echo none",
+        "git diff 8681890 -- Cargo.toml",
+        "rustup target list --installed",
+        "wc -l impl-plans/active/vactrol-core.md"
+      ]
+    }
+  ]
+}

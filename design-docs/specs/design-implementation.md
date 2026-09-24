@@ -128,8 +128,10 @@ socket.
 ```
 src/
   value/     value.rs ratio.rs key.rs dict.rs intern.rs   # sections 5
+             num.rs access.rs eq.rs print.rs              # 6.5.3 (TASK-001)
   reader/    lexer.rs layout.rs sexpr.rs span.rs          # section 6
-  expand/    expander.rs                                  # section 6.4
+             node.rs line.rs import.rs                    # 6.5.4 (TASK-002)
+  expand/    expander.rs sugar.rs kernel.rs               # section 6.4, 6.5.5
   types/     ty.rs infer.rs diag.rs manifest.rs           # section 7
   ns/        namespace.rs tweak.rs                        # section 8
   compile/   compiler.rs proto.rs                         # section 9
@@ -154,6 +156,13 @@ editor/      TypeScript: CodeMirror 6 frontend, Tauri shell, worklet JS
 The core modules (`value` … `dsp`) have no I/O dependencies and no
 assumption of OS threads, keeping `wasm32-unknown-unknown` green from
 the first commit.
+
+Each module directory may hold more files than the table lists, provided
+every file stays under the 1000-line limit. Unit tests that would push a
+file over the limit go in a sibling `tests/` submodule, for example
+`src/reader/tests/lexer.rs`, declared as `#[cfg(test)] mod tests;`.
+Section 6.5.1 lists where the foundation types and placeholder shells
+created by TASK-001 live.
 
 ## 5. Core Value Model
 
@@ -1100,6 +1109,550 @@ string interpolation to a concat call, `x ? d` to `or x d`, `-x` to
 forms only: `match fn let var upd -> {} enum` plus calls — the decided
 kernel. The expander is a pure `Node -> Node` pass; spans are preserved
 (a synthesized node carries its origin span).
+
+### 6.5 Front-end implementation decisions (TASK-001..003, 2026-09-25)
+
+These decisions were recorded when TASK-001..003 started. They fill in
+details that sections 4-6.4 leave open, and they change no Decided item.
+Items marked **(author question)** are also listed in
+`design-docs/user-qa/pending-frontend-questions.md`. Until the author
+answers, the implementation follows the recommendation given here and a
+fixture pins that behavior (6.5.6).
+
+#### 6.5.1 Foundation types and placeholder shells
+
+| Type | Path | Later owner |
+|------|------|-------------|
+| `Span`, `FileId` (`FileId::CONSOLE` = id 0; the plan's "`FileId::Console`"), `NodeId`, `SrcRef` | `src/reader/span.rs` | final |
+| `KwId`, `SymId`, `Interner` | `src/value/intern.rs` | final |
+| `Failure`, `FailCode`, `Origin` (8.4) | `src/vm/fail.rs` | final; TASK-005 adds codes |
+| `Diagnostic`, `Severity`, `DiagCode`, `RunOrigin` (section 7) | `src/types/diag.rs` | final; TASK-004 adds codes |
+| `FormGen(u64)`, `VarSlotRef` (shell) | `src/ns/namespace.rs` | TASK-005 |
+| `TweakId` | `src/ns/tweak.rs` | TASK-005 |
+| `Closure` (shell) | `src/compile/proto.rs` | TASK-005 |
+| `Pat` (shell), `Sig` (shell) | `src/pattern/pat.rs`, `src/pattern/signal.rs` | TASK-006 |
+| `TexNode` (shell), `OutId` | `src/tex/texnode.rs` | TASK-006 |
+| `SlotId`, `CtlId(u16)` | `src/sched/slots.rs` | TASK-007 |
+| `InstId` | `src/dsp/graph.rs` | TASK-008 |
+
+- Id newtypes wrap `u32`, except `FormGen` (`u64`) and `CtlId` (`u16`, per
+  11.4). Each derives `Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+  Debug` and has `new` and `get`. Nothing else.
+- A shell is a struct with one private unit field and `Debug`. It has no
+  methods and no constructor. No TASK-001..003 code or test builds a
+  `Value` that holds a shell, so later tasks may replace a shell
+  without keeping any behavior. `src/lib.rs` declares only the modules
+  that contain these files: `value reader expand types ns compile vm
+  pattern tex sched dsp`. `clock`, `host`, `session` and `lsp` wait for
+  their tasks.
+- The other types a `Value` needs are defined in `src/value/value.rs`:
+  `StructVal { ty: SymId, fields: Box<[(KwId, Value)]> }` and
+  `VariantVal { enum_ty: SymId, tag: SymId, fields: Box<[(KwId, Value)]> }`
+  (both with fields sorted by key name, 5.4), `NativeId(u32)`, and
+  `RangeVal { start: i64, end: Option<i64> }` (exclusive end;
+  `None` means the lazy open range).
+- Cargo features: `default = ["host-native"]`; `host-native`, `host-wasm`
+  and `lsp` start empty. No dependency is added, including dev-dependencies.
+- `src/main.rs` prints only `vactrol <version>`, because the placeholder
+  `hello()` it calls is removed. The CLI belongs to TASK-009.
+
+#### 6.5.2 Interner scope
+
+`Key` must be `Ord` without a context argument, because it is a
+`BTreeMap` key, and keyword order is alphabetical (5.2). So the
+`Interner` lives in a thread-local on the evaluator thread, matching 5.2
+("evaluator-thread-only"). The free functions `intern_kw`, `intern_sym`
+and `name_of` reach it, and `Ord for Key` resolves keyword names through
+it. A `KwId` or `SymId` has no meaning on another thread. That is
+already the invariant for `Value`, and the POD handoff (11.4) converts
+ids before anything crosses threads.
+
+#### 6.5.3 Numbers, keys, equality, accessors, print (TASK-001)
+
+- **Widening lattice** (`src/value/num.rs`; lang-reference section 2).
+  `NumKind = Int | Int64 | Float | Float64 | Ratio`. `join(a, b)` is
+  symmetric:
+
+  | join | Int | Int64 | Float | Float64 | Ratio |
+  |------|-----|-------|-------|---------|-------|
+  | Int | Int | Int64 | Float | Float64 | Ratio |
+  | Int64 | | Int64 | Float64 | Float64 | Ratio |
+  | Float | | | Float | Float64 | Float |
+  | Float64 | | | | Float64 | Float64 |
+  | Ratio | | | | | Ratio |
+
+  `widen(&Value, NumKind) -> Result<Value, Failure>` converts only
+  upward along the lattice. Any narrowing request is
+  `Failure(FailCode::Type)`, because narrowing is only the explicit
+  `int`, `int64` and `round` calls. The join governs `+ - *` and the
+  comparisons. `/` of two exact operands producing a ratio is TASK-005
+  arithmetic.
+- **Ratio64** is as in 5.3. It uses `i128` intermediates, and a
+  normalized result that does not fit in `i64` is
+  `Failure(FailCode::Overflow)`. A zero denominator is
+  `Failure(FailCode::DivisionByZero)`. `Display` prints an integral
+  ratio as an int (`1`) and any other ratio as `3/8`.
+  `from_decimal(&str) -> Option<Ratio64>` gives the exact value of a
+  decimal literal (`1.5` becomes `3/2`), or `None` on overflow.
+- **NumKey** (`src/value/key.rs`) has two forms. `Exact(Ratio64)` holds
+  every int, int64 and ratio, and also every finite float whose value is
+  exactly a `Ratio64` (a dyadic rational in range). `Float(f64)` holds
+  the other finite floats. Keys order numerically. Between an `Exact`
+  and a `Float` that compare equal as `f64`, the `Exact` sorts first,
+  so the order stays total. `-0.0` normalizes to `0`. A NaN key, or a
+  key that is not a number, keyword or string, is
+  `Failure(FailCode::Type)` (5.4). So `1`, `1.0` and `1/1` are the same
+  key.
+- **deep_eq** (`src/value/eq.rs`) follows the key normalization:
+  - Numbers compare by exact value across widths, so `= 1 1.0` is true.
+    NaN is not equal to itself.
+  - `Nil`, `Bool`, `Keyword` and `Str` compare by value.
+  - A `List` compares elementwise.
+  - A `Dict` equals a `Dict` with the same entries. A `Dict` equals a
+    `List` exactly when the list's elements are the dict's pairs in key
+    order. This follows from "a dict is a list of pairs", so `[]` as an
+    empty list equals `[]` as an empty dict.
+  - A `Struct` equals only a struct of the same type with equal fields.
+    A `Variant` compares tag and fields.
+  - `Inst` compares by id, and `Range` compares structurally.
+  - `Fn`, `Native`, `Thunk`, `VarRef`, `Pattern`, `Signal` and `Tex` give
+    `Err(Failure(FailCode::Type))`. The caller has already forced a
+    thunk or dereferenced a `VarRef` (5.1).
+- **Accessors** (`src/value/access.rs`):
+  - `truthy`: only `Nil` and `Bool(false)` are falsy.
+  - `index(v, i)` is 0-based. `Nil` gives `Nil`. An index out of range,
+    including a negative one, gives `Nil`. A non-integer index is
+    `Failure(Type)`.
+  - `get(v, key)`: `Nil` gives `Nil`. A dict miss gives `Nil`. An
+    unknown struct or variant field is `Failure(FailCode::UnknownField)`.
+  - `len(v)`: `Nil` gives 0.
+  - `first(v)`: `Nil` or an empty collection gives `Nil`. A dict gives
+    its smallest pair.
+
+  Only accessors pun nil. `put` on `Nil` is `Failure(Type)`, following
+  lang-reference ("arithmetic and calls do not").
+- **Dict operations** (`src/value/dict.rs`):
+  - `dict_from_pairs`: a repeated key keeps the last pair.
+  - `put(coll, elems)`: on a list it appends. On a dict every element
+    must be a pair (a 2-list with a key-typed head); otherwise it is
+    `Failure(Type)`. Later pairs win.
+  - `join(colls)`: the first collection sets the result kind. A dict
+    merges the others, which must be dicts or lists of pairs. A list
+    concatenates the others, and a dict among them contributes its
+    pairs. An empty input gives the empty list.
+  - `pairs(d)`: iterates in key order.
+- **Print format** (`src/value/print.rs`, `Display for Value`).
+  Values print in literal syntax:
+  - `nil`, `true`, `false`.
+  - Ints as written.
+  - Floats use Rust's shortest round-trip form for their width, with
+    `.0` appended when the output has no `.` or exponent (`90.0`).
+  - Ratios print per `Ratio64` above.
+  - Keywords print as `:name`.
+  - A string prints raw at top level and quoted, with escapes, inside a
+    collection.
+  - Lists print as `[..]`.
+  - A dict prints with pair sugar when the key is a keyword
+    (`[amp: 0.5 pan: -1]`) and as `[k v]` otherwise.
+  - A struct prints as `name field: v ..`, and a variant as `tag v ..`.
+  - A range prints as `0..8` or `0..`.
+  - Opaque values print as `<fn>`, `<native>`, `<thunk>`, `<var>`,
+    `<pattern>`, `<signal>`, `<inst>` or `<tex>`.
+
+#### 6.5.4 Reader (TASK-002)
+
+Files in `src/reader/`:
+
+| File | Contents |
+|------|----------|
+| `span.rs` | span and id types |
+| `node.rs` | `Node`, `NodeKind`, `Atom`, `Op`, `Trivia` |
+| `lexer.rs` | tokens, including string interpolation |
+| `layout.rs` | physical lines to statements |
+| `line.rs` | one statement's tokens to a `Node` |
+| `import.rs` | `ImportDecl`, `AliasEnv`, `prescan_imports` |
+| `sexpr.rs` | canonical printer |
+| `mod.rs` | `read`, `ReadResult` |
+
+**Node model.** `Node { id, kind, span, children }` as 6.1 defines it.
+
+`NodeKind` has these variants:
+
+| Variant | Children |
+|---------|----------|
+| `Atom(Atom)` | none |
+| `Call` | `[head, args..]` |
+| `List` | items; a dict literal is a list of pairs |
+| `Block` | statements |
+| `Pair` | `[key, value]` |
+| `Arrow` | `[lhs.., body]`; the body is always the last child and the lhs may be empty |
+| `Splat` | `[expr]` |
+| `Neg` | `[expr]` |
+| `Fallback` | `[lhs, rhs]` |
+| `Interp` | `[parts..]`, each part a `Str` atom or an expression |
+| `IfChain` | `[if-stmt, elif-stmt.., else-stmt?]` |
+| `Import(Box<ImportDecl>)` | none |
+| `Error` | none |
+
+`Atom` has these variants:
+- `Int(i64)`. Kind resolution waits for the checker (5.3).
+- `Float { value: f64, exact: Option<Ratio64> }`.
+- `Ratio(Ratio64)`.
+- `Str(Rc<str>)`, `Keyword(Rc<str>)`, `Sym(Rc<str>)`.
+- `Qualified { prefix, name }`.
+- `Op(Op)`, where `Op` is one of `+ - * / = < > <= >= .. -> & | ?`.
+- `Wildcard`, `ConsoleReg(u32)`, `Nil`, `Bool(bool)`.
+- `Builtin(Rc<str>)`, which only the expander produces (6.5.5).
+
+The reader stores names as text, not interned ids. It never touches
+the interner or `Value`.
+
+Node ids are sequential in pre-order across one `read`, starting at 0,
+and `ReadResult::next_node_id()` returns the first free id. Spans are
+byte offsets into the source.
+- A CRLF line end counts as the terminator: `\r` belongs to no span.
+- A tab is one byte.
+- Non-ASCII text is allowed only inside strings and comments.
+- A source longer than `u32::MAX - 1` bytes gets one diagnostic,
+  `source-too-large`, and no nodes.
+
+**Lexer rules.** These add to 6.2.
+- **Numbers.** Allowed forms are `12`, `-3`, `2.5`, `-0.25`, `1/4` and
+  `-1/4`. A float needs a digit after the `.`, so `0..8` is a range.
+  A literal that does not fit in `i64` is `bad-number`. So is a ratio
+  with a zero denominator, and so is a digit sequence followed
+  directly by a name character (`1st`).
+- **Negative literals and negation.** `-` directly followed by a digit is
+  part of a negative literal. `-` directly followed by a name or a `{`
+  is `Neg` when it comes at the start of a line or right after a space,
+  `{` or `[`. Otherwise `-` is the operator.
+- **Ranges.** `a..b` and `a..`, written without spaces, read as
+  `Call[Op(..), a, b]` and `Call[Op(..), a]`.
+- **Qualified names.** `x.y` with both parts identifiers is `Qualified`.
+- **Names and underscores.** `_` alone is `Wildcard`. `_` followed by
+  digits `[1-9][0-9]*` is `ConsoleReg`, and it is `console-register-in-file`
+  unless the file is `FileId::CONSOLE`. Any other name containing `_`
+  (`_tmp`, `my_name`), or a name ending in `-` (`foo-`), is
+  `bad-identifier`.
+- **Stray characters.** `( )` is `paren-form`. Any other character
+  outside the token set (`! ; , @ $ ~`, non-ASCII) is `stray-char`.
+- **Comments.** `#` outside a string starts a comment that runs to the
+  end of the line.
+- **Strings.** A string stays on one line; an unfinished one is
+  `unterminated-string`. The escapes are `\" \\ \n \t \{ \}`, and any
+  other escape is `bad-escape` **(author question: the spec defines no
+  escapes)**. A `{` inside a string starts a nested expression that runs
+  to its matching `}`. The nested scan follows the full token rules,
+  so nested strings and groups are allowed. A string with at least one
+  `{}` reads as `Interp`, and one without reads as a `Str` atom.
+- **Colon classes.** The token right before a colon decides its role:
+  - A colon with only whitespace or a comment after it on the line is
+    the block opener. So `d1:`, `->:`, `0.8:` and `:drums:` each open a
+    block.
+  - A colon directly after a key token (identifier, string or number)
+    and followed by whitespace and a value is a pair key. An identifier
+    key becomes a keyword key: `amp: 0.5` reads as `[:amp 0.5]`.
+  - `:name` at the start of a line, or right after whitespace or an
+    opening `{` or `[`, is a keyword.
+  - Any other colon is `misplaced-colon`.
+
+**Layout** (`layout.rs`). Blank and comment-only lines affect only
+trivia. Indentation counts leading tabs. A space inside the indentation
+is `indent-space`, and that line reads as `Error`.
+
+A body at level `L` (the top level is `L = 0`) holds statements at
+exactly level `L`. When a line ends with a block colon, the lines after
+it at level `>= B` form that block's body, where `B` is the opening
+line's level + 1. A body with no lines is `empty-block`.
+
+A line that begins with `>` and is deeper than `L` continues the most
+recent statement of the body. Its tokens are appended to that
+statement's tokens, so the `>` falls in mid-statement position and acts
+as the pipe. The formatter normalizes such lines to `L + 1`. A
+continuation line may itself end with a block colon. After a statement
+has opened a block, a later continuation line is
+`continuation-after-block`. Any other deeper line is `unexpected-indent`.
+
+This reconciles the two Decided sentences of lang-reference section 1.
+A line that begins with `>` continues the previous expression when it is
+indented under it. A `>` at statement level (level exactly `L`) is in
+head position, so it is greater-than. Every example in the spec fits
+this reading **(author confirmation requested)**.
+
+After a body is split into statements, a statement headed `elif` or
+`else` joins the statement just before it in an `IfChain` when that
+statement is headed `if` or `elif` and no `else` has closed it. The
+statement can be a `Call`, or an `Arrow` whose lhs starts with `if`. A
+stray `elif` or `else` is left alone, and the expander reports it.
+
+The unit of error recovery is the statement, including its
+continuations and its block. A bad statement becomes one `Error` node
+with the diagnostics recorded, and the next statements still read.
+
+**Statement grammar** (`line.rs`). The statement's head token picks the
+rule:
+
+- `import` reads `import PATH [as ALIAS] [open]` and nothing else. It is
+  allowed only at the top level; elsewhere it is `import-not-top-level`.
+  - `PATH` is lowercase ASCII `[a-z0-9._-]` segments joined by `/`,
+    with at least one `/`. No segment may be empty, `.` or `..`.
+  - The prefix is `ALIAS`, or else the last segment with any `vactrol-`
+    prefix removed. It must match the identifier rule.
+  - A violation is `bad-import`.
+- `let`, `var` and `upd` read `Call[head, TARGET, EXPR]`. `TARGET` is
+  exactly one item: a name, a `name: type` pair, or a `[..]` pattern.
+  `EXPR` is the rest of the statement, including continuation lines,
+  read by the expression rule. This implements "`let` reads the rest
+  of its line", with pipes inside it. An empty rest is
+  `binding-without-value`.
+- `fn` reads the statement as a flat item list. A top-level `->` does
+  not split it; it stays an `Op` atom, the return-type marker of
+  lang-reference section 4.
+- Any other head goes through the expression rule, in four steps:
+  1. **Arrow.** Split at the first `->` outside brackets. The lhs is a
+     flat item list; lhs items are patterns or header items and are
+     never piped. The body is the expression rule applied to the rest.
+     A missing body with no block is `arrow-without-body`.
+  2. **Pipe.** Split the body at each `>` that is not the segment's
+     first token.
+  3. **Fallback.** Split each segment at `?` into operands. The fold
+     puts the running value in as the first argument of each later
+     segment's first operand. Then `?` folds left:
+     `d :gain ? 1.0 > * 2` reads as
+     `Call[*, Fallback(Call[d, :gain], 1.0), 2]`. An empty operand is
+     `misplaced-fallback`.
+  4. **Operand.** One item reads as itself; two or more read as a
+     `Call`.
+- A trailing block colon's `Block` becomes the last item of the last
+  operand. So `slot :drums gain: 0.8:` reads as
+  `Call[slot, :drums, Pair, Block]`, and `x ->:` reads as an `Arrow`
+  whose body is the `Block`.
+
+The item kinds:
+- An atom.
+- A pair: a key and exactly one item. A missing value is `bad-pair`.
+- `& item`, which reads as `Splat`. A missing operand is
+  `misplaced-splat`.
+- `Neg`.
+- A `[..]` list. It holds items only, so `->` or `?` inside it is a
+  diagnostic, and `>` inside it is an `Op` atom.
+- A `{..}` group. Its content goes through the expression rule, so a
+  `>` at its start is in head position. A group whose content is an
+  `Arrow` reads as that `Arrow`, with the group's span; this is the
+  lambda. Any other group reads as `Block[expr]`. `{}` is
+  `empty-group`. A group still open at the end of its line is
+  `unclosed-group` (no multi-line `{}`).
+- An unclosed `[` is `unclosed-bracket`.
+
+A qualified name whose prefix is bound in no `AliasEnv` entry is
+`unbound-qualifier`. Nesting of groups, lists, interpolation and
+blocks is capped at depth 128; deeper input is `nesting-too-deep`.
+The reader and expander must never panic on any input, because
+packages and the editor feed them untrusted text.
+
+**Imports** (`import.rs`).
+- `ImportDecl { path, alias: Option<Rc<str>>, open: bool, prefix, span }`.
+- `AliasEnv { prefixes: BTreeMap<Rc<str>, Rc<str>> }` maps a prefix to
+  its package path.
+- `prescan_imports` splits the text into top-level statements by layout
+  alone and parses those headed `import`. It skips malformed imports,
+  because `read` reports them.
+- `read` clones the given env. After each top-level `import` form it
+  adds that form's prefix, so later forms in the same document read
+  `pads.warm` (5.7).
+- `open` has no effect on the reader.
+
+**Trivia.** `Trivia { items: Vec<TriviaItem { span, kind: Comment | Directive }> }`
+lists every comment in source order, including trailing comments. A
+span runs from `#` to the end of the line text. A comment whose text
+starts with `#@` is a `Directive`. Attaching directives to statements
+is left to the editor layer (13.5).
+
+**Canonical printer** (`sexpr.rs`, `print(&Node) -> String`). The golden
+tests use it.
+
+| Node | Printed form |
+|------|--------------|
+| `Call` | `(h a b)` |
+| `List` | `[a b]` |
+| `Pair` | `[:k v]` |
+| `Block` | `{c1 c2}`, with every child printed normally, so a one-call block is `{(+ 43 32)}` |
+| `Arrow` | `(-> (lhs..) body)` |
+| `Splat` | `(& x)` |
+| `Neg` | `(#neg x)` |
+| `Fallback` | `(#? a b)` |
+| `Interp` | `(#interp "a " n)` |
+| `IfChain` | `(#if-chain ..)` |
+| `Import` | `(#import "path" as p open)` |
+| `Error` | `(#error)` |
+
+Atoms print in source syntax, and a `Builtin` prints as its bare name.
+Heads starting with `#` cannot come from source, so the printed form is
+unambiguous. The spec's `# ~` annotations write a one-call block as
+either `(h a)` or `{h a}`. The fixture manifest therefore stores the
+canonical expected string next to the verbatim annotation.
+
+#### 6.5.5 Expander (TASK-003)
+
+**API and files.** The signature is the plan's:
+`expand(&Node, &mut ExpandCx) -> Result<Node, Diagnostic>`. It works on
+one top-level form, and the first diagnostic ends expansion of that
+form. `ExpandCx::new(first_free: NodeId)` gives synthesized nodes fresh
+ids. Every synthesized node carries the span of the sugar node it
+replaces. A form that contains an `Error` node returns
+`read-error-present`, which callers do not show, because the reader has
+already reported the error. Files: `expander.rs` (traversal),
+`sugar.rs` (rewrites), `kernel.rs` (shape validation and `is_kernel`).
+
+**Positions.**
+- Expression positions are expanded. They are call heads and
+  arguments, list items, pair values, splat operands, block
+  statements, arrow bodies, and a match guard.
+- Pattern and header positions are never expanded. They are arrow lhs
+  items, `let`/`var`/`upd`/`for` targets, `fn` header items, and `enum`
+  bodies. A `Neg`, `Fallback`, `Interp` or `IfChain` found there is
+  `sugar-in-pattern`.
+- In a `match` clause lhs, a top-level `if` splits the pattern from its
+  guard. The guard must be exactly one item, and it is expanded.
+
+**Hygiene.** Sugar produces calls to prelude natives, and it refers to
+them through `Atom::Builtin` heads that resolve only in the prelude.
+So a user parameter named `map` or `neg` cannot capture a desugared
+`for` or `-x`. The kernel words are
+`match fn let var upd enum if elif else for import`, plus `nil`,
+`true` and `false`. They are reserved: binding one as a name, parameter,
+fn name or target is `reserved-word`. `struct`, `inst` and the rest stay
+ordinary names, since design Q3 is still open. `while`, `loop`, `break`,
+`when`, `unless` and `each` get no special treatment; they are unknown
+names that the checker (TASK-004) reports.
+
+**Desugarings** (canonical output). `E` defaults to `nil` when there is
+no else. `FN` stands for the atoms `false | nil`.
+
+| Input | Output |
+|-------|--------|
+| `(if C T E)`, or `(if C T)` | `(match C {(-> (FN) E) (-> (_) T)})` |
+| binding `if`, pattern `P` = one identifier or `_` | `(match S {(-> (FN) E) (-> (P) T)})` |
+| binding `if`, any other pattern | `(match S {(-> (P..) T) (-> (_) E)})` |
+| `IfChain` | nested as above: each `elif` or `else` link is the `E` of the level before it |
+| `(for P S B)` | `(match (map S (-> (P) B)) {(-> (_) nil)})`: the value is discarded and nil is returned |
+| `(#? X D)` | `(or X D)` |
+| `(#neg X)` | `(neg X)` |
+| `(#interp p..)` | `(concat p..)`; empty text pieces are dropped, and the TASK-005 `concat` formats each part per 6.5.3 |
+
+The two binding-if rows reproduce the two `# ==` annotations of
+lang-reference section 3 exactly: the `g` case and the `ok v` case.
+One edge is known. When `P` is a bare field-less variant name, the
+first row's form sends a truthy value that does not match `P` to a
+match failure instead of the else branch. The expander cannot tell a
+variant from a binding name; only the checker knows **(author
+question; recommendation: keep it, and write `match` for that case)**.
+Guards in a binding `if` are `if-guard`. A wrong `if` arity is
+`malformed-if`. A stray `elif` or `else` is `else-without-if`. A `for`
+without exactly a pattern, a source and a body is `malformed-for`.
+
+**Pairs and splats.** A call-site pair stays a `Pair` argument, which is
+the 2-list value `[:k v]`. A `& x` argument stays a `Splat`, and the
+compiler resolves both into keyword slots (8.1). The expander does not
+reorder arguments. `put` treats pairs as plain elements and header forms
+such as `inst` interleave `=`, so no position rule is imposed. A
+`Splat` anywhere other than a call argument or a list item is
+`misplaced-splat`.
+
+**Kernel validation.** After expansion, a form may contain only the kinds
+`Atom`, `Call`, `List`, `Block`, `Pair`, `Arrow` and `Splat`, plus
+`Import` at the top level. A `Builtin` may appear only as a call head.
+Each kernel head has a fixed shape:
+
+| Head | Shape | Error code |
+|------|-------|------------|
+| `match` | `(match SUBJ {Arrow+})`, every clause lhs non-empty | `malformed-match` |
+| `fn` | `(fn NAME HEADER* Block)`, `NAME` a `Sym` | `malformed-fn` |
+| `let`, `var` | `(let TARGET EXPR)` | `malformed-binding` |
+| `upd` | `(upd NAME EXPR)` | `malformed-binding` |
+| `enum` | `(enum NAME Block)`, each line a `Sym` or a `Sym`-headed call | `malformed-enum` |
+
+The inline-body `fn` of lang-reference section 4 (`fn kick-sound:
+:bd-haus`) reads as a pair, and the expander reports it as
+`malformed-fn` **(author question: `fn f a: int` and `fn f a: body` are
+indistinguishable)**. It is pinned as an authority-question fixture.
+The test helper `kernel::is_kernel(&Node) -> bool` checks all of
+the above. The tests apply it to every expanded fixture form.
+
+#### 6.5.6 Spec fixture manifest
+
+`tests/fixtures/spec/manifest.toml` is written in a TOML subset, so a
+real TOML parser could read it later. The subset is:
+`[[block]]`/`[[case]]` headers, basic and `'''` literal strings, integers,
+string arrays, and comments. A test-only parser in
+`tests/support/toml_subset.rs` reads it, so no dependency is needed.
+The runner is `tests/spec_fixtures.rs`. It reads the spec documents from
+`CARGO_MANIFEST_DIR`.
+
+- A `[[block]]` entry has these fields:
+  - `doc` and `ordinal`: the 1-based index of the `vactrol` fence in the
+    document. The runner extracts the block text itself, so the source
+    is never copied.
+  - `section`.
+  - `reader = "clean" | "diagnostics"` with
+    `reader_diags = ["code@line"]`, where the line is counted within the
+    block.
+  - `expand = "clean" | "diagnostics"` with `expand_diags`.
+  - `eval = "unclassified"`, which later tasks refine to `positive`,
+    `diagnostic`, `illustrative-excluded` or `authority-question`.
+  - `note`.
+
+  Every `vactrol` block in `lang-reference.md` and in `design-music.md`
+  has an entry. The runner compares the diagnostic multisets exactly.
+- A `[[case]]` entry has these fields:
+  - `id`, `doc`, `source` (a literal string), and
+    `file = "file" | "console"`.
+  - `verbatim = true | false`. When true, the source must appear
+    verbatim in the document, which catches drift.
+  - `read` and/or `expand`: the canonical printed forms, joined by
+    newlines.
+  - `diags`: the expected codes.
+  - `annotation`: the spec text.
+  - Optional: `class = "authority-question"` and `question`.
+
+The cases cover:
+- Every `# ~` and `# ==` annotation in sections 1-3 of both documents.
+  This is the acceptance bar; blocks outside those sections have
+  block-level entries only.
+- The negative examples `( )`, `_tmp`, `foo-` and `_1` in a file, each
+  followed by a line that must still read.
+- Pipe continuation.
+- Byte-accurate span goldens with tabs, CRLF and UTF-8 in strings and
+  comments.
+- `#@` trivia.
+- Imports: `import`, `as`, `open`, the fresh-document `pads.warm`, the
+  `as pd` variant, and an unbound qualifier.
+
+Four authority questions ship as fixtures. The runner asserts their
+read and expand results, and their evaluation stays pending:
+- `fn f a b:` / `* a 12` against `f 1 2 # => 24` (lang-reference
+  section 1).
+- `let base` followed by `upd base` (section 4).
+- The inline `fn` body (6.5.5).
+- The bare-variant binding `if` (6.5.5).
+
+A no-panic test reads every line-boundary prefix of every block.
+
+#### 6.5.7 Verification and rollout constraints
+
+- Lint uses the stricter `cargo clippy --all-targets -- -D warnings`,
+  which also covers tests.
+- The wasm32 criterion of TASK-001 needs the `wasm32-unknown-unknown`
+  target, and only `aarch64-apple-darwin` is installed. Adding the
+  target changes the toolchain, which needs user approval (user-qa).
+  Until then the criterion stays unchecked with the reason recorded,
+  and the core stays wasm-safe by construction: no `std::thread`,
+  `std::fs`, `std::time`, `std::net` or `std::process` in any core
+  module.
+- Rust 1.83, edition 2021: no let-chains.
+- No `.rs` file may reach 1000 lines (section 4 note).
+- Rollback is `git revert` of the task commits. There is nothing to
+  migrate.
 
 ## 7. Static Checker and Inference
 

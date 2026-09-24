@@ -4,7 +4,7 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md 6.5.7; impl-plans/active/vactrol-core.md
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 167 revision: U1-U5 answered, wasm32 required, section 5.6 wording fix)
+**Last Updated**: 2026-09-25 (session 169 revision: design 6.5.7 verification evidence rule)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-VALUE, FE-READER, FE-EXPAND (wave 4; serial, and the only plan that edits shared indexes)
 
@@ -68,22 +68,29 @@ unexpected change appears (the hash does not match the value recorded at plan st
 
 ## Verification (foreground; logs under target/fe-logs/)
 
-In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTATUS[0]}`.
+Run `mkdir -p target/fe-logs` first. Log evidence follows design 6.5.7 ("Verification evidence"):
+- `LOG` for a cargo row is a new file `target/fe-logs/final-<check>-s<S>-<n>.log` (`<S>` is the session number, `<n>`
+  counts from 1 per check within the session). Never reuse or overwrite an existing file.
+- Run every cargo row as `(set -o pipefail; CMD 2>&1 | tee LOG); echo "exit=$?" >> LOG`.
+- The progress log cites, per cargo row, the counting log path (the last run after the final code change) and its
+  `exit=` value. For V3 it also cites the run and passed counts, and the run count must be non-zero. A missing log, a
+  log without `exit=`, or a truncated log fails the row. Other rows record their output inline.
+In the tables, `\|` stands for a literal `|`. Rows with `-` in the `<check>` column are run as written.
 
-| # | Command | Evidence |
-|---|---------|----------|
-| V1 | `CARGO_TERM_QUIET=true cargo build 2>&1 \| tee target/fe-logs/final-build.log` | exit 0, no warnings |
-| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 \| tee target/fe-logs/final-clippy.log` | exit 0 |
-| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 \| tee target/fe-logs/final-nextest.log` | exit 0; record the passed count |
-| V4 | `cargo fmt -- --check` | exit 0 |
-| V5 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | every file is under 1000 lines |
-| V6 | `ls src` | exactly `compile dsp expand lib.rs main.rs ns pattern reader sched tex types value vm` (the section 4 layout subset) |
-| V7 | `git diff -U0 -- impl-plans/active/vactrol-core.md \| grep -n 'TASK-00[4-9]\|TASK-010' \|\| echo none` | prints `none`, or only Related Plans and Progress Log lines |
-| V8 | `git diff 6500f37 -- Cargo.toml` (6500f37 is the session-167 original HEAD; Cargo.toml is unchanged since 8681890) | the only change is the added `[features]` table |
-| V9a | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 \| tee target/fe-logs/final-wasm32.log` | exit 0 |
-| V9b | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 \| tee target/fe-logs/final-wasm32-hostwasm.log` | exit 0 |
-| V10 | `wc -l impl-plans/active/vactrol-core.md` | under 1000 |
-| V11 | `grep -n 'fn kick-sound: :bd-tek' design-docs/specs/design-implementation.md \|\| echo none` | prints `none` (the 6.5.5/6.5.6 mentions of the inline `:bd-haus` form are intentional and stay) |
+| # | Command (`CMD`) | `<check>` | Evidence |
+|---|---------|-----------|----------|
+| V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings |
+| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
+| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; record the run and passed counts (run non-zero) |
+| V4 | `CARGO_TERM_QUIET=true cargo fmt -- --check` | `fmt` | `exit=0` |
+| V5 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | every file is under 1000 lines |
+| V6 | `ls src` | - | exactly `compile dsp expand lib.rs main.rs ns pattern reader sched tex types value vm` (the section 4 layout subset) |
+| V7 | `git diff -U0 -- impl-plans/active/vactrol-core.md \| grep -n 'TASK-00[4-9]\|TASK-010' \|\| echo none` | - | prints `none`, or only Related Plans and Progress Log lines |
+| V8 | `git diff 6500f37 -- Cargo.toml` (6500f37 is the session-167 original HEAD; Cargo.toml is unchanged since 8681890) | - | the only change is the added `[features]` table |
+| V9a | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown` | `wasm32` | `exit=0` |
+| V9b | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` | `wasm32-hostwasm` | `exit=0` |
+| V10 | `wc -l impl-plans/active/vactrol-core.md` | - | under 1000 |
+| V11 | `grep -n 'fn kick-sound: :bd-tek' design-docs/specs/design-implementation.md \|\| echo none` | - | prints `none` (the 6.5.5/6.5.6 mentions of the inline `:bd-haus` form are intentional and stay) |
 
 ## Completion Criteria
 
@@ -98,6 +105,12 @@ In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTAT
 ### Plan revision: 2026-09-25 (session 167, plan author)
 U1-U5 are answered: the wasm32 builds (V9a, V9b) are required, and U1-U5 are recorded as answered. V8 uses base 6500f37.
 Added the section 5.6 wording fix (V11) and the explicit line-count check (V10). No other change.
+
+### Plan revision: 2026-09-25 (session 169, plan author)
+The verification table follows design 6.5.7: per-run logs `final-<check>-s<S>-<n>.log`, `exit=` recorded inside each
+log, and non-zero nextest run counts. V4 now also writes a log (`fmt`). The session-169 6.5.7 "Verification evidence"
+bullet is part of the design/plan checkpoint commit, not an FE-FINAL edit. The "exactly two edits" rule is measured
+against that commit. No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

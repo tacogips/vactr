@@ -4,7 +4,7 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.7, 6.1-6.3, 6.5.4, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 167 revision: U4 inline-fn case reclassified as decided)
+**Last Updated**: 2026-09-25 (session 169 revision: design 6.5.7 verification evidence rule)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-VALUE (wave 2; needs `Span`/`FileId`/`NodeId`, `Ratio64`, `Diagnostic`/`DiagCode`)
 
@@ -196,16 +196,24 @@ snapshot in the progress log, drift detection, and serial repair. `rustfmt` runs
 
 ## Verification (foreground; logs under target/fe-logs/)
 
-In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTATUS[0]}`.
+Run `mkdir -p target/fe-logs` first. Log evidence follows design 6.5.7 ("Verification evidence"):
+- `LOG` for a cargo row is a new file `target/fe-logs/reader-<check>-s<S>-<n>.log` (`<S>` is the session number, `<n>`
+  counts from 1 per check within the session). Never reuse or overwrite an existing file.
+- Run every cargo row as `(set -o pipefail; CMD 2>&1 | tee LOG); echo "exit=$?" >> LOG`.
+- The progress log cites, per cargo row, the counting log path (the last run after the final code change) and its
+  `exit=` value. For V3 it also cites the run and passed counts, and the run count must be non-zero. A missing log, a
+  log without `exit=`, or a truncated log fails the row. Non-cargo rows record their output inline.
+In the tables, `\|` stands for a literal `|`.
 
-| # | Command | Evidence |
-|---|---------|----------|
-| V1 | `CARGO_TERM_QUIET=true cargo build 2>&1 \| tee target/fe-logs/reader-build.log` | exit 0, no warnings |
-| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 \| tee target/fe-logs/reader-clippy.log` | exit 0 |
-| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 \| tee target/fe-logs/reader-nextest.log` | exit 0; the log lists `spec_fixtures` tests and 0 failed |
-| V4 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | every file is under 1000 lines |
-| V5 | `grep -c '^\[\[block\]\]' tests/fixtures/spec/manifest.toml` | prints `11` |
-| V6 | `git diff --stat -- Cargo.toml` | empty |
+| # | Command (`CMD`) | `<check>` | Evidence |
+|---|---------|-----------|----------|
+| V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings |
+| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
+| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; a non-zero run count and 0 failed |
+| V3f | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'` | `fixtures` | `exit=0`; the summary shows a non-zero run count and 0 failed. This proves the spec-fixture harness (`tests/spec_fixtures.rs`) ran; a run count of 0 fails the row |
+| V4 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | every file is under 1000 lines |
+| V5 | `grep -c '^\[\[block\]\]' tests/fixtures/spec/manifest.toml` | - | prints `11` |
+| V6 | `git diff --stat -- Cargo.toml` | - | empty |
 
 ## Completion Criteria (they mirror vactrol-core.md TASK-002)
 
@@ -213,13 +221,20 @@ In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTAT
 - [ ] Every negative example (`( )`, `_tmp`, `foo-`, `_1` in a file) yields a reader diagnostic, and the following lines still read
 - [ ] `import`, `as` and `open` read correctly; the fresh-session `pads.warm` and `as pd` cases read; an unbound qualifier is an error; `prescan_imports` finds every import; `#@` lines land in trivia with positions
 - [ ] Spans are byte-accurate (golden tests pass)
-- [ ] V1-V6 pass
+- [ ] V1-V6 and V3f pass (V3f: the `spec_fixtures` binary ran with a non-zero run count)
 
 ## Progress Log
 
 ### Plan revision: 2026-09-25 (session 167, plan author)
 Design 6.5.6 now keeps two authority questions. The U4 inline-fn case is a decided case with `verbatim = false` and
 the read form `(fn [:kick-sound :bd-haus])`. No other change.
+
+### Plan revision: 2026-09-25 (session 169, plan author)
+The verification table follows design 6.5.7: per-run logs `reader-<check>-s<S>-<n>.log`, `exit=` recorded inside each
+log, and non-zero nextest run counts. With `NEXTEST_STATUS_LEVEL=fail`, nextest does not name passing tests, so the V3
+requirement that "the log lists `spec_fixtures` tests" could not be met. It is replaced by the logged row V3f
+(`cargo nextest run -E 'binary(spec_fixtures)'`, check `fixtures`, non-zero run count; Step 5 review finding). No
+other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

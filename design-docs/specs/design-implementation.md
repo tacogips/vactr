@@ -1668,6 +1668,28 @@ A no-panic test reads every line-boundary prefix of every block.
   blocked.
 - Rust 1.83, edition 2021: no let-chains.
 - No `.rs` file may reach 1000 lines (section 4 note).
+- **Verification evidence** (added 2026-09-25, session 169, after the
+  FE-VALUE gate rejected a clippy log that a rerun had overwritten).
+  This rule applies to every cargo check in the four FE plans, and it
+  overrides the fixed log names in the plans' verification tables:
+  - Every run writes a new file,
+    `target/fe-logs/<plan>-<check>-s<session>-<n>.log`. `<plan>` is
+    `value`, `reader`, `expand` or `final`. `<check>` is the plan's name
+    for the check (`build`, `clippy`, `nextest`, `wasm32`,
+    `wasm32-hostwasm`). `<n>` counts up from 1 within the session. No
+    run may overwrite an existing log, including logs that an earlier
+    session cited.
+  - Each log ends with its exit status. Run
+    `(set -o pipefail; CMD 2>&1 | tee LOG); echo "exit=$?" >> LOG`,
+    which works in both bash and zsh. The plans' `${PIPESTATUS[0]}` is
+    bash-only. A quiet build that succeeds writes nothing else, so the
+    `exit=` line is what separates it from a run that never finished.
+  - The progress log cites, for each check, the path of the log that
+    counts and its `exit=` value. For nextest it also cites the run and
+    passed counts, and the run count must be non-zero. A log that is
+    missing, has no `exit=` line, or was cut short fails the check.
+  - Reruns stay on disk. The evidence is the last run of each check
+    after the final code change.
 - Rollback is `git revert` of the task commits. There is nothing to
   migrate.
 

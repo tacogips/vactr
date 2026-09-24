@@ -4,7 +4,7 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 6.4, 6.5.5, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 167 revision: U4/U5 cases reclassified as decided)
+**Last Updated**: 2026-09-25 (session 169 revision: design 6.5.7 verification evidence rule)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-READER (wave 3; needs `Node`, `NodeKind`, `Atom`, `ReadResult::next_node_id`, `sexpr::print`, and the manifest runner)
 
@@ -141,29 +141,42 @@ This is the same as FE-VALUE: a fresh read and a `shasum -a 256` hash before and
 
 ## Verification (foreground; logs under target/fe-logs/)
 
-In the tables, `\|` stands for a literal `|`, and the exit status is `${PIPESTATUS[0]}`.
+Run `mkdir -p target/fe-logs` first. Log evidence follows design 6.5.7 ("Verification evidence"):
+- `LOG` for a cargo row is a new file `target/fe-logs/expand-<check>-s<S>-<n>.log` (`<S>` is the session number, `<n>`
+  counts from 1 per check within the session). Never reuse or overwrite an existing file.
+- Run every cargo row as `(set -o pipefail; CMD 2>&1 | tee LOG); echo "exit=$?" >> LOG`.
+- The progress log cites, per cargo row, the counting log path (the last run after the final code change) and its
+  `exit=` value. For V3 it also cites the run and passed counts, and the run count must be non-zero. A missing log, a
+  log without `exit=`, or a truncated log fails the row. Non-cargo rows record their output inline.
+In the tables, `\|` stands for a literal `|`.
 
-| # | Command | Evidence |
-|---|---------|----------|
-| V1 | `CARGO_TERM_QUIET=true cargo build 2>&1 \| tee target/fe-logs/expand-build.log` | exit 0, no warnings |
-| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 \| tee target/fe-logs/expand-clippy.log` | exit 0 |
-| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 \| tee target/fe-logs/expand-nextest.log` | exit 0; 0 failed |
-| V4 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | every file is under 1000 lines |
-| V5 | `grep -c '^expand = ' tests/fixtures/spec/manifest.toml` | at least 11 (every block has an expand classification) |
-| V6 | `grep -n 'expand = "unchecked"' tests/fixtures/spec/manifest.toml \|\| echo none` | prints `none` |
+| # | Command (`CMD`) | `<check>` | Evidence |
+|---|---------|-----------|----------|
+| V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings |
+| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
+| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; a non-zero run count and 0 failed |
+| V3f | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'` | `fixtures` | `exit=0`; a non-zero run count and 0 failed (proves the extended fixture harness ran) |
+| V4 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | every file is under 1000 lines |
+| V5 | `grep -c '^expand = ' tests/fixtures/spec/manifest.toml` | - | at least 11 (every block has an expand classification) |
+| V6 | `grep -n 'expand = "unchecked"' tests/fixtures/spec/manifest.toml \|\| echo none` | - | prints `none` |
 
 ## Completion Criteria (they mirror vactrol-core.md TASK-003)
 
 - [ ] The desugarings match the `# ~ (...)` and `# ==` annotations in lang-reference.md (canonical table above)
 - [ ] The output tree contains kernel forms only (asserted structurally through `is_kernel`)
 - [ ] Malformed forms produce the listed diagnostics with their origin span
-- [ ] V1-V6 pass
+- [ ] V1-V6 and V3f pass
 
 ## Progress Log
 
 ### Plan revision: 2026-09-25 (session 167, plan author)
 U4 and U5 are answered, so their cases are decided cases, not authority questions. The section 4 block is expected to
 expand clean for `fn kick-sound:`. The U5 case notes the TASK-004 checker obligation. No other change.
+
+### Plan revision: 2026-09-25 (session 169, plan author)
+The verification table follows design 6.5.7: per-run logs `expand-<check>-s<S>-<n>.log`, `exit=` recorded inside each
+log, and non-zero nextest run counts. V3f (`cargo nextest run -E 'binary(spec_fixtures)'`, check `fixtures`) is added so
+the log proves the extended fixture harness ran, because `NEXTEST_STATUS_LEVEL=fail` does not name passing tests. No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

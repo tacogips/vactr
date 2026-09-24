@@ -1,10 +1,10 @@
 # Vactrol Front End: Value Model and Foundation (FE-VALUE) Implementation Plan
 
 **planId**: FE-VALUE (implements vactrol-core.md TASK-001)
-**Status**: In Progress (implementation done; formal review and commit pending)
+**Status**: In Progress (implementation done; re-verification under design 6.5.7, review and commit pending)
 **Design Reference**: design-docs/specs/design-implementation.md sections 4, 5.1-5.4, 6.5.1-6.5.3, 6.5.7
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 168: implementation and V1-V7 evidence)
+**Last Updated**: 2026-09-25 (session 169: plan revision for design 6.5.7 verification evidence)
 **dependsOn**: none (wave 1). Precondition: design section 6.5 and all FE-* plans are committed on `main`.
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 
@@ -25,7 +25,7 @@ available. The crate has no dependencies and must keep none.
 
 - No checker, VM, compiler, pattern engine, scheduler, DSP, session, LSP or editor behavior.
 - No arithmetic natives (`+`, `/`, and so on). They belong to TASK-005. Only the widening join and `widen` are in scope.
-- No methods, constructors or trait impls on shells beyond `Debug`.
+- No methods, constructors or trait impls on shells beyond `Debug` (plus `Clone` on `VarSlotRef`, design 6.5.1).
 - No edits to `impl-plans/active/vactrol-core.md` or `impl-plans/README.md`. FE-FINAL owns those files.
 - No toolchain change. `wasm32-unknown-unknown` is already installed (design-docs/user-qa/pending-frontend-questions.md
   U1, answered; design 6.5.7), so nothing needs to be installed or modified.
@@ -63,7 +63,8 @@ Each id is a newtype deriving `Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash
 - `src/pattern/pat.rs`: shell `Pat`. `src/pattern/signal.rs`: shell `Sig`.
 - `src/tex/texnode.rs`: shell `TexNode`, and `OutId(u32)`.
 - `src/sched/slots.rs`: `SlotId(u32)`, `CtlId(u16)`. `src/dsp/graph.rs`: `InstId(u32)`.
-- Every shell derives only `Debug`, has a private unit field, and has no constructor.
+- Every shell derives only `Debug` (`VarSlotRef` also derives `Clone`, design 6.5.1), has a private unit field, and has
+  no constructor.
 
 ### Failure (src/vm/fail.rs, design 8.4)
 - `pub enum FailCode { DivisionByZero, Overflow, Type, UnknownField }`
@@ -107,7 +108,7 @@ Each id is a newtype deriving `Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash
   `Display` (an integral value prints as an int). Use i128 intermediates. A result that does not fit in i64 is
   `Overflow`; this includes negating `i64::MIN`. A zero denominator is `DivisionByZero`.
 - `key.rs`: `NumKey { Exact(Ratio64), Float(f64) }` and `Key { Num(NumKey), Kw(KwId), Str(Rc<str>) }`, with a total
-  `Ord` per 6.5.3 (Exact before Float when they are equal as f64; `-0.0` becomes 0; keywords compare by name
+  `Ord` per 6.5.3 (an Exact and a Float compare by exact value through i128, never equal, no tie rule; `-0.0` becomes 0; keywords compare by name
   through the thread-local interner). Also `Key::from_value(&Value) -> Result<Key, Failure>` (NaN, or a value that is not a key, is `Type`)
   and `Key::to_value(&self) -> Value`.
 - `dict.rs`: `dict_from_pairs(items: &[Value]) -> Result<BTreeMap<Key, Value>, Failure>` (a repeated key keeps the last pair),
@@ -162,22 +163,42 @@ Each id is a newtype deriving `Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash
 2. Before editing a shared path, write a one-line intent snapshot in the progress log. After the edit, record the new hash.
 3. If a pre-edit hash differs from the last recorded post-edit hash, stop, re-read, and reapply the intent instead of overwriting.
 4. Do not run `cargo fmt` over the whole crate if files owned by other plans exist. Run `rustfmt` on this plan's files only.
+5. Commit separation (session 169): the FE-VALUE code is uncommitted in the working tree. Never run `git reset`,
+   `git clean`, `git stash` or `git checkout -- <path>` on it. The design/plan checkpoint commit stages only
+   `design-docs/specs/design-implementation.md` and `impl-plans/active/*` by explicit path; it must not use
+   `git add -A` or `git add .`, and it must not include `Cargo.toml` or `src/`. The FE-VALUE commit that follows stages
+   `Cargo.toml`, `src/` and this plan file only. Check each staged set with `git diff --staged --stat` before committing.
 
 ## Verification (run in the foreground; keep logs under target/fe-logs/)
 
-Run `mkdir -p target/fe-logs` first. For each row, run the command and record the exit status and log path in the progress log.
-In the tables, `\|` stands for a literal `|`. For piped commands, the exit status is `${PIPESTATUS[0]}`.
+Run `mkdir -p target/fe-logs` first. Log evidence follows design 6.5.7 ("Verification evidence"), which overrides any
+fixed log name:
+- `LOG` in a row is a new file `target/fe-logs/value-<check>-s<S>-<n>.log`. `<check>` is shown in the row, `<S>` is the
+  session number (169 for this session) and `<n>` counts from 1 per check within the session. Never reuse or overwrite
+  an existing file, including the session-168 `value-*.log` files.
+- Run every cargo row as `(set -o pipefail; CMD 2>&1 | tee LOG); echo "exit=$?" >> LOG`, where `CMD` is the row's command.
+- In the progress log, cite for each cargo row the counting log path (the last run after the final code change) and its
+  `exit=` value. For V3 also cite the run and passed counts; the run count must be non-zero. A missing log, a log without
+  an `exit=` line, or a truncated log fails the row.
+- Non-cargo rows (V4, V5, V7) record their command output inline in the progress log.
+In the tables, `\|` stands for a literal `|`.
+
+| # | Command (`CMD`) | `<check>` | Evidence required |
+|---|---------|-----------|-------------------|
+| V1 | `CARGO_TERM_QUIET=true cargo build` | `build` | `exit=0`, no warnings in the log |
+| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
+| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; the summary line shows a non-zero run count and 0 failed |
+| V4 | `find src -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | the largest file is under 1000 lines |
+| V5 | `grep -rnE 'std::(thread\|fs\|time\|net\|process)' src/ \|\| echo none` | - | prints `none` |
+| V6a | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown` | `wasm32` | `exit=0` (default features; the issue's acceptance command) |
+| V6b | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` | `wasm32-hostwasm` | `exit=0`. A V6a or V6b failure fails this plan (design 6.5.7); fix the core code, never record it as blocked |
+| V7 | `git diff --stat -- Cargo.toml` | - | the only change is the `[features]` table |
+
+Before V1, run V0 once per session to prove the exit-capture idiom records a failure (design 6.5.7 review finding):
 
 | # | Command | Evidence required |
 |---|---------|-------------------|
-| V1 | `CARGO_TERM_QUIET=true cargo build 2>&1 \| tee target/fe-logs/value-build.log` | exit 0, no warnings in the log |
-| V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 \| tee target/fe-logs/value-clippy.log` | exit 0 |
-| V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 \| tee target/fe-logs/value-nextest.log` | exit 0; the summary line shows 0 failed |
-| V4 | `find src -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | the largest file is under 1000 lines |
-| V5 | `grep -rnE 'std::(thread\|fs\|time\|net\|process)' src/ \|\| echo none` | prints `none` |
-| V6a | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 \| tee target/fe-logs/value-wasm32.log` | exit 0 (default features; the issue's acceptance command) |
-| V6b | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 \| tee target/fe-logs/value-wasm32-hostwasm.log` | exit 0. A V6a or V6b failure fails this plan (design 6.5.7); fix the core code, never record it as blocked |
-| V7 | `git diff --stat -- Cargo.toml` | the only change is the `[features]` table |
+| V0 | `(set -o pipefail; false 2>&1 \| tee target/fe-logs/value-idiom-s<S>-<n>.log); echo "exit=$?" >> target/fe-logs/value-idiom-s<S>-<n>.log` (the same new `<n>` in both places) | the log ends with `exit=1`. If it ends with `exit=0`, stop and report the idiom as broken; run no other row |
 
 ## Completion Criteria
 
@@ -185,14 +206,29 @@ In the tables, `\|` stands for a literal `|`. For piped commands, the exit statu
 - [x] `Value`, `Ratio64`, `Key`/`NumKey`, dict ops, `Interner`, `num`, `access`, `eq` and `print` are implemented per design 6.5.3
 - [x] Ratio ops are exact and self-reducing; i64 overflow and a zero denominator are `Failure`
 - [x] Dict iteration is in key order; a duplicate literal key keeps the last pair
-- [x] Every required test above exists and passes (V3)
-- [x] V1, V2, V4, V5 and V7 pass
-- [x] Both wasm32 builds (V6a, V6b) exit 0
+- [ ] Every required test above exists and passes (V3, session-169 log per design 6.5.7)
+- [ ] V0, V1, V2, V4, V5 and V7 pass (session-169 logs per design 6.5.7)
+- [ ] Both wasm32 builds (V6a, V6b) record `exit=0` (session-169 logs per design 6.5.7)
 
 ## Progress Log
 
 ### Plan revision: 2026-09-25 (session 167, plan author)
 U1 is answered: the wasm32 target is installed, so V6 is split into two required builds (V6a, V6b). No other change.
+
+### Plan revision: 2026-09-25 (session 169, plan author)
+Design 6.5.7 now has a "Verification evidence" rule. The verification table therefore uses per-run log names
+(`value-<check>-s<S>-<n>.log`) and records the exit status inside each log, and V0 checks that the idiom works. The three
+evidence criteria are unchecked again: the gate rejected the session-168 logs (the clippy log was overwritten, and four
+logs are 0 bytes with no exit status). They are re-checked only from session-169 logs. The foundation text now states the
+7c72f23 amendments (`VarSlotRef` also derives `Clone`; `NumKey` exact Exact-vs-Float order). The code already follows
+them, so no code change is planned. Session 169 re-runs V0-V7 against the existing tree. If a row fails, fix it
+serially within this plan's writePaths.
+
+### Session: 2026-09-25 (session 169, implementer fills in)
+**Tasks Completed**:
+**Verification evidence** (log path and `exit=` per cargo row; nextest run/passed counts; inline output for V4, V5, V7):
+**Deviations**:
+**Blockers**:
 
 ### Session: 2026-09-25 (session 168, step 6 implementer)
 **Tasks Completed**: All FE-VALUE deliverables. Foundation ids (an `id_newtype!` macro in `src/lib.rs`), shells,
@@ -234,9 +270,10 @@ clippy log was overwritten by a rerun, and because two documented deviations
 awaited acknowledgement. Both deviations are now design amendments (above).
 For the retry:
 
-- Keep every verification log for the whole attempt; never overwrite a log
-  within an attempt. Use distinct file names per run (for example
-  `value-clippy-1.log`, `value-clippy-2.log`) under `target/fe-logs/`.
+- (Superseded by design 6.5.7 and the Verification section above: use
+  `target/fe-logs/value-<check>-s<S>-<n>.log`, for example
+  `value-clippy-s169-1.log`, with an `exit=` line. Do not use the old
+  `value-clippy-1.log` style.) Keep every verification log; never overwrite one.
 - Report all of: `cargo build`; `cargo clippy --all-targets -- -D warnings`;
   `cargo nextest run` (non-zero test count, exit status, complete log);
   `cargo build --target wasm32-unknown-unknown`; and

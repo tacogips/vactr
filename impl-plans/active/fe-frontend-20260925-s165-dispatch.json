@@ -1,16 +1,16 @@
 {
   "taskId": "fe-frontend-20260925-s165",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-168",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-169",
   "resumedFrom": {
-    "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-167",
-    "originalHead": "6500f370260b61d8f34447cfcfb7cfccb0898e9d",
-    "note": "Session 168 resumes the same task under GitHub issue tacogips/vactrol#1. Session 167 committed the U1-U5 design and plan revisions (28214f6) and the sharedPaths fix (1fd6fac); the accepted design and four FE plans are unchanged from HEAD in session 168. Session 166 (resumed from 165, original head 8681890) started no FE plan. src/ is still the scaffold (lib.rs, main.rs); no FE plan has started."
+    "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-168",
+    "originalHead": "1fd6faccc037759d7e4085f1129bfe3345c993fc",
+    "note": "Session 169 resumes the same task under GitHub issue tacogips/vactrol#1. Session 168 implemented FE-VALUE, but it is uncommitted in the working tree: Cargo.toml, src/lib.rs and src/main.rs are modified, and src/{compile,dsp,ns,pattern,reader,sched,tex,types,value,vm}/ are untracked. The branch-local gate blocked FE-VALUE because a rerun overwrote the clippy log and two deviations were open. Commit 7c72f23 adopted both deviations into the design. Session 169 adds design 6.5.7 'Verification evidence' (per-run logs with exit= lines) and revises the four plans to follow it. FE-VALUE must be re-verified with session-169 logs; the uncommitted tree must be preserved (no reset or clean). FE-READER, FE-EXPAND and FE-FINAL have not started."
   },
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "1fd6faccc037759d7e4085f1129bfe3345c993fc",
+  "originalHead": "7c72f23d87b72c0da0c75c5fb37e01bd891ee1be",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/lang-reference.md",
@@ -21,7 +21,8 @@
   "parentPlanPath": "impl-plans/active/vactrol-core.md",
   "planIndexPath": "impl-plans/README.md",
   "evidenceRoot": "tmp/fe-frontend-20260925-s165",
-  "evidenceLayout": "tmp/fe-frontend-20260925-s165/<planId>/attempt-<n>/ (untracked; tmp is gitignored). Cargo logs also go to target/fe-logs/<plan>-*.log as the plans require.",
+  "evidenceLayout": "tmp/fe-frontend-20260925-s165/<planId>/attempt-<n>/ (untracked; tmp is gitignored). Cargo logs go to target/fe-logs/<plan>-<check>-s<S>-<n>.log per design 6.5.7.",
+  "logRule": "Design 6.5.7: every cargo run writes a new target/fe-logs/<plan>-<check>-s<S>-<n>.log (S = session number, n counts from 1 per check within the session; never overwrite an existing file). Run each cargo command as (set -o pipefail; CMD 2>&1 | tee LOG); echo \"exit=$?\" >> LOG. The progress log cites the counting log path and its exit= value, plus the nextest run and passed counts (run > 0). A missing log, a log with no exit= line, or a truncated log fails the check. In the verification arrays below, 'LOG(<plan>-<check>): CMD' means CMD run under this rule.",
   "reviewContext": {
     "issueReference": {
       "repository": "tacogips/vactrol",
@@ -58,7 +59,7 @@
     ],
     "designDecisionsAndRationale": [
       "The front end is split into four strictly serial plans: FE-VALUE, then FE-READER, then FE-EXPAND, then FE-FINAL. Each depends on the types from the previous one. Shared indexes are edited only in the final serial reconciliation wave.",
-      "Shell types (Closure, Pat, Sig, TexNode, VarSlotRef) derive only Debug and have no constructors. This keeps the section 4 layout and Value variants complete without implementing later tasks.",
+      "Shell types (Closure, Pat, Sig, TexNode, VarSlotRef) derive only Debug (VarSlotRef also derives Clone, design 6.5.1, amended in 7c72f23) and have no constructors. This keeps the section 4 layout and Value variants complete without implementing later tasks.",
       "Diagnostics use a closed DiagCode enum with kebab-case names: 26 reader codes and 11 expander codes. misplaced-arrow is the plan's code for '->' inside '[..]', and FE-FINAL records it in 6.5.4.",
       "The spec fixture manifest (tests/fixtures/spec/manifest.toml, 11 blocks from the 'vactrol' and 'vact' fences) pins reader and expander behavior against the spec documents, parsed by an in-repo TOML subset (no dependency).",
       "User-QA U1-U5 are answered (2026-09-25) and binding: U1, the wasm32 target is installed and both wasm32 builds must pass; U2, a line-initial '>' is decided by indentation; U3, the escapes are \\\" \\\\ \\n \\t \\{ \\}; U4, fn bodies are block form only, and an inline body is malformed-fn (decided case, verbatim=false); U5, the bare-variant binding-if desugaring is kept (decided case), and the checker (TASK-004) must diagnose it."
@@ -72,7 +73,7 @@
       "Console registers (_1) are allowed only under FileId::CONSOLE, and give console-register-in-file elsewhere.",
       "Error recovery per statement: the next line still reads after a diagnostic.",
       "Ratio overflow, including negating i64::MIN, and zero denominators become Failure, not panics.",
-      "Dict key total order: Exact before Float when equal as f64, -0.0 as 0, NaN keys as Type, and keywords ordered by name.",
+      "Dict key total order: an Exact and a Float compare by exact value (never equal; design 6.5.3, amended in 7c72f23), -0.0 as 0, NaN keys as Type, and keywords ordered by name.",
       "The if/elif/else chain nests into match, and both forms of binding if are handled.",
       "Nesting of 129 levels gives nesting-too-deep. Every line-boundary prefix of all spec blocks reads without panic."
     ],
@@ -100,12 +101,21 @@
       "Low: in impl-plans/active/vactrol-frontend-expander.md:124, the u5-bare-variant-binding-if case gives no 'read' string, but the case runner compares 'read' for every case. Use the 6.5.4 read form '(-> (if x none) 1)' and record it in the progress log."
     ],
     "planCheckpoint": {
-      "reviewStep": "step5-impl-plan-review-attempt-1-exec-132",
-      "checkpointStep": "plan-checkpoint (session 168)",
+      "reviewStep": "step5-impl-plan-review-attempt-1-exec-152",
+      "checkpointStep": "plan-checkpoint (session 169)",
+      "previousCheckpoint": "plan-checkpoint (session 168), review step5-impl-plan-review-attempt-1-exec-132",
       "accepted": true,
       "needsRevision": false,
       "needsDesignRevision": false,
-      "preconditionReminder": "FE-VALUE starts only after this checkpoint commit lands on main (design and plan revisions committed; AGENTS.md six-section message, no AI attribution or Co-Authored-By line)."
+      "session169ResolvedFindings": [
+        "Mid (reader.md:213, expander.md:158): the impossible 'log lists spec_fixtures tests' requirement is replaced by V3f, LOG(<plan>-fixtures) running cargo nextest run -E 'binary(spec_fixtures)' with exit=0, run > 0 and 0 failed.",
+        "Low (value.md:201): V0 writes value-idiom-s<S>-<n>.log with the same new <n> in both places.",
+        "Low (value.md:275-276): the resume notes name value-clippy-s169-1.log and reject the value-clippy-1.log style."
+      ],
+      "nonBlockingGaps": [
+        "Pre- and post-edit shasum values for the plan files were not recorded in session 169. The checkpoint commit diff is the review record; implementers still record hashes under the Edit Protocol."
+      ],
+      "preconditionReminder": "FE-VALUE re-verification starts only after this checkpoint commit lands on main (design and plan revisions committed; AGENTS.md six-section message, no AI attribution or Co-Authored-By line). The checkpoint commit must not include the uncommitted FE-VALUE tree (Cargo.toml, src/lib.rs, src/main.rs, untracked src/ directories); preserve it without reset or clean."
     },
     "residualRisks": [
       "The wasm32 builds are now required. A std or feature usage that is incompatible with wasm32-unknown-unknown fails TASK-001 and must be fixed serially.",
@@ -174,19 +184,21 @@
         "Value, Ratio64, Key/NumKey, dict ops, Interner, num, access, eq and print are implemented per design 6.5.3.",
         "Ratio ops are exact and self-reducing. i64 overflow and a zero denominator are Failure.",
         "Dict iteration is in key order, and a duplicate literal key keeps the last pair.",
-        "Every required test exists and passes (V3).",
-        "V1, V2, V4, V5 and V7 pass.",
-        "Both wasm32 builds (V6a default features, V6b --no-default-features --features host-wasm) exit 0."
+        "Every required test exists and passes (V3), shown by a session-169 log that ends in exit=0 and has a non-zero run count.",
+        "V0, V1, V2, V4, V5 and V7 pass. Cargo rows use session-169 logs per design 6.5.7.",
+        "Both wasm32 builds (V6a default features, V6b --no-default-features --features host-wasm) record exit=0 in session-169 logs.",
+        "FE-VALUE is committed on its own (separate from later waves) after review."
       ],
       "verification": [
         "mkdir -p target/fe-logs",
-        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/value-build.log",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/value-clippy.log",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/value-nextest.log",
+        "(set -o pipefail; false 2>&1 | tee target/fe-logs/value-idiom-s<S>-<n>.log); echo \"exit=$?\" >> target/fe-logs/value-idiom-s<S>-<n>.log  (V0: same new <n> in both places; the log must end with exit=1)",
+        "LOG(value-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(value-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(value-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
         "find src -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
-        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 | tee target/fe-logs/value-wasm32.log",
-        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 | tee target/fe-logs/value-wasm32-hostwasm.log",
+        "LOG(value-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(value-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "git diff --stat -- Cargo.toml"
       ]
     },
@@ -228,13 +240,15 @@
         "import, as and open read correctly. The fresh-session pads.warm and 'as pd' cases read. An unbound qualifier is an error. prescan_imports finds every import. '#@' lines land in trivia with positions.",
         "Spans are byte-accurate: the golden tests pass.",
         "The manifest has 11 [[block]] entries.",
-        "V1-V6 pass."
+        "The spec-fixture harness ran: V3f logs 'cargo nextest run -E binary(spec_fixtures)' with exit=0, a non-zero run count and 0 failed.",
+        "V1-V6 and V3f pass."
       ],
       "verification": [
         "mkdir -p target/fe-logs",
-        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/reader-build.log",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/reader-clippy.log",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/reader-nextest.log",
+        "LOG(reader-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(reader-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(reader-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(reader-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'  (V3f: exit=0, run count > 0, 0 failed)",
         "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "grep -c '^\\[\\[block\\]\\]' tests/fixtures/spec/manifest.toml",
         "git diff --stat -- Cargo.toml"
@@ -272,13 +286,14 @@
         "The output tree contains kernel forms only, asserted structurally through is_kernel.",
         "Malformed forms produce the listed diagnostics with their origin span.",
         "Synthesized node ids are at least first_free and unique.",
-        "V1-V6 pass."
+        "V1-V6 and V3f pass (V3f: spec_fixtures binary ran with a non-zero run count)."
       ],
       "verification": [
         "mkdir -p target/fe-logs",
-        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/expand-build.log",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/expand-clippy.log",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/expand-nextest.log",
+        "LOG(expand-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(expand-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(expand-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(expand-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'  (V3f: exit=0, run count > 0, 0 failed)",
         "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "grep -c '^expand = ' tests/fixtures/spec/manifest.toml",
         "grep -n 'expand = \"unchecked\"' tests/fixtures/spec/manifest.toml || echo none"
@@ -316,16 +331,16 @@
       ],
       "verification": [
         "mkdir -p target/fe-logs",
-        "CARGO_TERM_QUIET=true cargo build 2>&1 | tee target/fe-logs/final-build.log",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings 2>&1 | tee target/fe-logs/final-clippy.log",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run 2>&1 | tee target/fe-logs/final-nextest.log",
-        "cargo fmt -- --check",
+        "LOG(final-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(final-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(final-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(final-fmt): CARGO_TERM_QUIET=true cargo fmt -- --check",
         "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "ls src",
         "git diff -U0 -- impl-plans/active/vactrol-core.md | grep -n 'TASK-00[4-9]\\|TASK-010' || echo none",
         "git diff 6500f37 -- Cargo.toml",
-        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown 2>&1 | tee target/fe-logs/final-wasm32.log",
-        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm 2>&1 | tee target/fe-logs/final-wasm32-hostwasm.log",
+        "LOG(final-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(final-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "wc -l impl-plans/active/vactrol-core.md",
         "grep -n 'fn kick-sound: :bd-tek' design-docs/specs/design-implementation.md || echo none"
       ]

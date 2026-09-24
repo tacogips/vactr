@@ -1,14 +1,26 @@
 # Vactrol
 
-Vactrol is a planned scripting language. Its implementation currently contains the Rust template scaffold; the language syntax and runtime have not yet been implemented.
+Vactrol is a live-coding language for music and visuals: declarative,
+statically typed with inference, written in Rust, targeting the browser
+(Wasm), macOS, iPad, and iPhone. The repository currently contains the
+design documents and the Rust scaffold; the language runtime is not yet
+implemented. See `design-docs/specs/` for the specification.
 
 ## Name
 
-**Vactrol** comes from the classical Japanese verb **詠む（ながむ）**, meaning to draw out one's voice and recite or sing a poem. The name evokes quietly singing a thought to oneself. The planned command is `vactrol`, and Vactrol source files will use the `.vactrol` extension.
+A **vactrol** is an electronic component: an LED sealed together with a
+photoresistor, so that light controls resistance. It gives Buchla-style
+low-pass gates their organic decay and lives inside optical compressors
+and tremolos. Light controlling sound is the right picture for a language
+that is half patterns and half visuals. The command is `vactrol`; source
+files use the `.vact` extension.
 
-**Vactrol** は、古語の **詠む（ながむ）** に由来します。声を長く引いて詩歌を口ずさむ言葉で、小さな声で歌うイメージを込めました。実行コマンドは `vactrol`、ソースファイルの拡張子は `.vactrol` を予定しています。
-
-Reference: [日本国語大辞典「詠む」](https://kotobank.jp/word/%E8%A9%A0%E3%82%80-588109).
+**Vactrol**（バクトロール）は電子部品の名前です。LED とフォトレジスタを
+一体に封じたもので、光で抵抗を制御します。Buchla 系のローパスゲートに
+独特の減衰を与え、光学式コンプレッサーやトレモロの中にも入っています。
+「光が音を制御する」という構図を、パターンとビジュアルを半々に持つこの
+言語の名前にしました。実行コマンドは `vactrol`、ソースファイルの拡張子は
+`.vact` です。
 
 ## Development
 

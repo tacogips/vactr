@@ -1,0 +1,113 @@
+min_version = "2026.8.3"
+
+[[hooks.enter]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko --path "$MISE_PROJECT_ROOT" hook enter bash)"
+fi
+'''
+
+[[hooks.leave]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko hook leave bash)"
+fi
+'''
+
+[tools]
+rust = "1.83.0"
+rust-analyzer = "latest"
+taplo = "latest"
+"cargo:cargo-nextest" = "latest"
+"cargo:cargo-audit" = "latest"
+gitleaks = "latest"
+pre-commit = "latest"
+
+[tasks.default]
+description = "Show available tasks"
+run = "mise tasks ls"
+
+[tasks.build]
+description = "Build the binary"
+run = "cargo build"
+
+[tasks.build-release]
+description = "Build the release binary"
+run = "cargo build --release"
+
+[tasks.run]
+description = "Run the application"
+run = "cargo run"
+
+[tasks.test]
+description = "Run tests with nextest"
+run = "cargo nextest run"
+
+[tasks.test-verbose]
+description = "Run tests with verbose output"
+run = "cargo nextest run --no-capture"
+
+[tasks.test-cargo]
+description = "Run tests with cargo test"
+run = "cargo test"
+
+[tasks.check]
+description = "Run cargo check"
+run = "cargo check"
+
+[tasks.clippy]
+description = "Run clippy"
+run = "cargo clippy --all-targets -- -D warnings"
+
+[tasks.fmt]
+description = "Format code"
+run = "cargo fmt"
+
+[tasks.fmt-check]
+description = "Check code formatting"
+run = "cargo fmt -- --check"
+
+[tasks.lint]
+description = "Run all lints"
+run = "mise run fmt-check && mise run clippy"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "cargo clean"
+
+[tasks.doc]
+description = "Generate documentation"
+run = "cargo doc --no-deps"
+
+[tasks.doc-open]
+description = "Generate and open documentation"
+run = "cargo doc --no-deps --open"
+
+[tasks.audit]
+description = "Run security audit"
+run = "cargo audit"
+
+[tasks.ci]
+description = "Run all CI checks"
+run = "mise run lint && mise run test && mise run build"
+
+[tasks.install-git-hooks]
+description = "Install mise tools and the repository pre-commit hook"
+run = '''
+mise install
+
+hooks_path=$(git config --local --get core.hooksPath || true)
+if [ "$hooks_path" = ".git/hooks" ]; then
+  git config --local --unset-all core.hooksPath
+  hooks_path=""
+fi
+
+if [ -z "$hooks_path" ]; then
+  mise exec -- pre-commit install
+else
+  mise exec -- pre-commit validate-config .pre-commit-config.yaml
+  echo "Using existing custom Git hooks path: $hooks_path"
+fi
+'''

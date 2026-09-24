@@ -1,0 +1,29 @@
+[package]
+name = "nagamu"
+version = "0.1.0"
+edition = "2021"
+description = "Nagamu scripting language"
+
+homepage = "https://github.com/tacogips/nagamu"
+repository = "https://github.com/tacogips/nagamu"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+# Add your dependencies here
+
+[dev-dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[[bin]]
+name = "nagm"
+path = "src/main.rs"
+
+[lib]
+name = "nagamu"
+path = "src/lib.rs"

@@ -1,0 +1,14 @@
+{
+  "variables": {
+    "AUTHOR_EMAIL": "",
+    "AUTHOR_NAME": "",
+    "DESCRIPTION": "Nagamu scripting language",
+    "EDITION": 2021,
+    "HAS_AUTHOR": false,
+    "HOMEPAGE": "https://github.com/tacogips/nagamu",
+    "PROJECT_NAME": "nagamu",
+    "REPOSITORY": "https://github.com/tacogips/nagamu",
+    "RUST_VERSION": "1.83.0",
+    "VERSION": "0.1.0"
+  }
+}

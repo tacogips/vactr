@@ -40,6 +40,18 @@ Large features are split into multiple related plans with cross-references.
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
 | [vactrol-core.md](active/vactrol-core.md) | In Progress (TASK-001..009 completed; TASK-009 on 2026-09-26, issue #4; the TASK-008 beep check and the TASK-009 audible REPL gate are pending user confirmation; TASK-010 not started) | design-docs/specs/design-implementation.md | 2026-09-26 |
+| [vactrol-editor-scaffold.md](active/vactrol-editor-scaffold.md) | Ready (ED-SCAFFOLD, issue #5 TASK-010, wave 1; npm project, protocol client, store, transports, host.js options; holds the common ED contract) | design-implementation.md 15.1.3, 15.1.4, 15.1.6 | 2026-09-26 |
+| [vactrol-editor-wire.md](active/vactrol-editor-wire.md) | Ready (ED-WIRE, wave 2; Rust G2-G6) | design-implementation.md 15.1.2 | 2026-09-26 |
+| [vactrol-editor-code.md](active/vactrol-editor-code.md) | Ready (ED-CODE, wave 2; CodeMirror surface, highlighting, transport, samples) | design-implementation.md 15.1.4, 15.1.5 | 2026-09-26 |
+| [vactrol-editor-midi.md](active/vactrol-editor-midi.md) | Ready (ED-MIDI, wave 2; WebMIDI access, picker, learn, forwarding) | design-implementation.md 15.1.9 | 2026-09-26 |
+| [vactrol-editor-wasm.md](active/vactrol-editor-wasm.md) | Ready (ED-WASM, wave 3; Rust G1 browser Session over the raw ABI) | design-implementation.md 15.1.2 G1; command.md "Browser transport" | 2026-09-26 |
+| [vactrol-editor-bind.md](active/vactrol-editor-bind.md) | Ready (ED-BIND, wave 3; slider panel, write-back, directives, persistence) | design-implementation.md 15.1.6, 13, 13.5 | 2026-09-26 |
+| [vactrol-editor-visual.md](active/vactrol-editor-visual.md) | Ready (ED-VISUAL, wave 3; WebGL2 RenderHost panes, analyzer displays) | design-implementation.md 15.1.8, 9 | 2026-09-26 |
+| [vactrol-editor-params.md](active/vactrol-editor-params.md) | Ready (ED-PARAMS, wave 4; parameter editors, sampler waveform, display-only grid/roll) | design-implementation.md 15.1.7, 13.5 | 2026-09-26 |
+| [vactrol-editor-pkg.md](active/vactrol-editor-pkg.md) | Ready (ED-PKG, wave 4; browser package import, fetch driver, OPFS) | design-implementation.md 15.1.10 | 2026-09-26 |
+| [vactrol-editor-tauri.md](active/vactrol-editor-tauri.md) | Ready (ED-TAURI, wave 4; standalone Tauri shell crate; E1 governs its cargo check) | design-implementation.md 15.1.11 | 2026-09-26 |
+| [vactrol-editor-finalize.md](active/vactrol-editor-finalize.md) | Ready (ED-FINAL, serial reconciliation, wave 5) | design-implementation.md 15.1.12, 6.5.7 | 2026-09-26 |
+| [ed-editor-20260926-s186-dispatch.json](active/ed-editor-20260926-s186-dispatch.json) | Dispatch manifest for the eleven ED plans (issue #5, TASK-010) | - | 2026-09-26 |
 | [vactrol-session-contracts.md](completed/vactrol-session-contracts.md) | Completed (SS-CONTRACTS, issue #4 TASK-009, wave 1; archiving to completed/ after the workflow commit) | design-implementation.md 14.5.2, 14.5.3, 14.5.6, 14.5.9, 14.5.12 | 2026-09-26 |
 | [vactrol-session-pkg.md](completed/vactrol-session-pkg.md) | Completed (SS-PKG, wave 2; archiving to completed/ after the workflow commit) | design-implementation.md 5.7, 14.5.7 | 2026-09-26 |
 | [vactrol-session-directives.md](completed/vactrol-session-directives.md) | Completed (SS-DIRECTIVES, wave 2; archiving to completed/ after the workflow commit) | design-implementation.md 13.5, 14.5.8 | 2026-09-26 |

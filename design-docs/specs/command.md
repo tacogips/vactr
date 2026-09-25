@@ -87,8 +87,12 @@ printed URL.
 The transport is WebSocket text frames on
 `ws://127.0.0.1:<port>/session?token=<hex>` (native `serve`). A handshake
 with the wrong path or token gets HTTP 401. There are at most 8
-connections, and a frame is at most 1 MiB. The browser uses the same
-JSON shapes over direct calls (TASK-010).
+connections, and a frame is at most 1 MiB. The browser passes the same
+JSON text through the raw wasm ABI (see "Browser transport" below,
+design 15.1.2).
+
+Fields marked "(TASK-010)" are additive: `v` stays 1, each one is
+optional, and a client that does not know it ignores it.
 
 ### Envelope
 
@@ -110,7 +114,9 @@ JSON shapes over direct calls (TASK-010).
 | span | `{"start": <byte>, "end": <byte>}` in the document revision named alongside it |
 | srcref | `{"file": str, "span": span, "doc_revision": int, "form_gen": int}` |
 | diagnostic | `{"code": str, "severity": "error"\|"warning"\|"hint", "message": str, "span": span, "file": str, "slot"?: str, "beat"?: [num, den]}` |
-| site | `{"id": int, "span": span, "tier": "direct"\|"reeval"\|"manual", "origin": "pattern-literal"\|"binding"\|"inst-default", "value": number, "form_gen": int, "key"?: str}` (`key` is the BindingKey `label.site.n.param` or `label.param`, when the site is labeled) |
+| site | `{"id": int, "span": span, "tier": "direct"\|"reeval"\|"manual", "origin": "pattern-literal"\|"binding"\|"inst-default", "value": number, "form_gen": int, "key"?: str, "call"?: call}` (`key` is the BindingKey `label.site.n.param` or `label.param`, when the site is labeled) |
+| call (TASK-010) | `{"name": str, "head": span, "ordinal": int (1-based among same-named calls in the top-level form), "arg": int (0-based argument index), "param"?: str}`: the nearest enclosing symbol-headed call the literal is an argument of, directly or inside a list or pattern argument. `param` is the named-argument keyword, else the declared parameter at that position. It is absent when unknown (design 15.1.2 G3) |
+| editor-decl (TASK-010) | `{"name": str, "kind": "eq-curve"\|"filter-response"\|"dynamics-transfer"\|"envelope-shape"\|"delay-taps"\|"reverb-room"\|"sampler-wave"\|"wavetable-frames"\|"granular-region"\|"lfo-shape"\|"stereo-field"\|"xy-pad"\|"euclid-ring"\|"probability-dial"\|"length-handle"\|"scalar", "multiband"?: bool, "params": [{"name": str, "ctl"?: int, "range": [float, float], "curve": "linear"\|"log"\|"stepped", "unit": "none"\|"db"\|"s"\|"ms"\|"hz"\|"st", "group": int}]}`. Pattern functions carry no `ctl` |
 | change | `{"from": <byte>, "to": <byte>, "insert_len": int}` (base-revision offsets) |
 
 ### Client to session
@@ -134,13 +140,52 @@ JSON shapes over direct calls (TASK-010).
 | `eval-result` | requester | `{"file": str, "doc_revision": int, "forms": [{"span": span, "value"?: str, "failure"?: diagnostic, "form_gen": int}], "diagnostics": [diagnostic], "sites": [site], "directives": {"file_level": {...}, "entries": [...]}}` |
 | `stale-binding` | requester | `{"target": int (tweak id) \| str (name), "reason": "stale-form-gen"\|"edit-invalidated"\|"unreconciled-edit"\|"superseded-definition", "current_form_gen"?: int}` |
 | `directive-edit` | requester | `{"file": str, "doc_revision": int, "span": span, "expected": str, "text": str}` |
-| `manifest` | requester | `{"sounds": [str], "synths": [str], "controls": [str]}` |
+| `manifest` | requester | `{"sounds": [str], "synths": [str], "controls": [str], "editors"?: [editor-decl]}` (`editors` TASK-010: every builtin's EditorDecl plus the pattern-function table, design 15.1.2 G2) |
 | `protocol-error` | requester | `{"code": "bad-json"\|"unsupported-version"\|"unknown-kind"\|"bad-body", "message": str}` |
 | `bindings` | subscribers | `{"pass": int, "changed": [{"name": str, "value": str, "form_gen": int}], "sites": [site], "states": [{"name": str, "state": "ok"\|"failed"\|"blocked", "value": str, "blocked_on"?: str, "diagnostic"?: diagnostic}]}`; exactly one per completed reactive pass |
 | `diag` | subscribers (`diagnostics`) | `{"add": [diagnostic], "clear": [{"slot": str}]}` |
 | `playing` | subscribers (`telemetry`) | `{"events": [{"slot": str, "beat": [num, den], "time": float, "dur": [num, den], "src"?: srcref}]}` |
-| `levels` | subscribers (`levels`) | `{"levels": [{"source": ":master", "rms": float}]}` (master only in v1), at most 10 per second |
-| `tempo` | subscribers | `{"bpm": float, "beats_per_cycle": int, "cycle": [num, den]}` on change |
+| `levels` | subscribers (`levels`) | `{"levels": [{"source": ":master", "rms": float, "bands"?: [float x 8]}], "analyzers"?: [{"bus": str, "kind": str, "id": int, "cells": [float]}]}` (master only in v1), at most 10 per second. TASK-010: `bands` holds the host FFT bands, and `analyzers` lists every analyzer unit of the installed bus graph with a constant `id` and its current cells (design 12.5, 15.1.2 G4) |
+| `tempo` | subscribers | `{"bpm": float, "beats_per_cycle": int, "cycle": [num, den], "clock"?: {"source": "internal"\|"midi", "locked"?: bool}}` on change (a clock change counts; `clock` TASK-010) |
 
 Ordering: `eval-result` comes before any `bindings` batch its eval
 triggered. Nothing is published mid-pass.
+
+### Browser transport (raw wasm ABI, TASK-010)
+
+The editor initializes wasm #1 with `session_init` instead of the dev
+harness's `main_init`. It uses one or the other, never both. Byte
+arguments are memory from `alloc`, as in design 12.8.10. Outputs are
+framed outbox records (`[u32 LE length][tag][payload]`):
+
+| Export | Effect | Output records |
+|--------|--------|----------------|
+| `session_init(sample_rate f32, arena_bytes u32) -> u32` | builds the browser `Session` (browser caps, worklet cells, Directive persistence) | worklet install records |
+| `session_apply(ptr, len)` | one client envelope (JSON text), connection 1 | `0x71` server envelopes (JSON text), worklet records |
+| `session_tick(now f64)` | one session tick at the worklet's posted time | `0x71`, `0x72`, worklet records |
+| `session_frame(now f64)` | resolves the active visual uniform plans | `0x72` |
+| `session_inbox(ptr, len)`, `session_sample_put(...)` | the session twins of `inbox` and `sample_put` | — |
+| `session_check(ptr, len)` | static analysis of the document text, never executes | one `0x71` record `{"kind": "check", "diagnostics": [diagnostic]}` (browser-local, not a protocol message) |
+| `session_midi_in(ptr, len, time f64)` | raw MIDI bytes at an audio-clock time | — |
+| `pkg_resolve(ptr, len)` | package driver step, JSON `{"proxy": url, "requirements": {path: version\|""}}` or `{"proxy": url, "lock": str}` (restore) | one `0x73` |
+| `pkg_supply(url_ptr, url_len, status u32, ptr, len)` | supplies a fetched body (`200`), a not-found (`404`) or a network failure (any other status) | — |
+
+| Tag | Payload |
+|-----|---------|
+| `0x71` | a server envelope as JSON text |
+| `0x72` | render record JSON: `{"op": "program", "out": 0-3, "source": str, "uniform_names": [str], "assets": [{"id": int, "text": str}]}` or `{"op": "uniforms", "out": 0-3, "values": [float]}` |
+| `0x73` | package driver reply JSON: `{"status": "need", "url": str}`, `{"status": "done", "lock": str, "resolved": [{"path": str, "version": str, "sha256": str}]}` or `{"status": "error", "code": str, "message": str}` |
+
+`host.js` routes `0x70` to the console, `0x71`-`0x73` to its `onRecord`
+option, and every other tag to the worklet. The worklet never sees an
+editor record.
+
+### Editor files (TASK-010)
+
+The editor saves `.vact` as the buffer text. In ExternalFile mode it
+also writes `<doc>.bindings.json`, in the format of the Files table
+above. The browser stores package data in OPFS under `vactrol-pkg/`:
+the root requirements, the lock text, and the proxy response bodies
+keyed by URL. Nothing is trusted from OPFS without validation and a
+digest check (design 15.1.10). The proxy URL is kept in `localStorage`,
+and the session token is never stored.

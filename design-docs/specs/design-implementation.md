@@ -5334,6 +5334,705 @@ The editor may show visual feedback about music (steps, events,
 levels); it does not couple the music and visual LANGUAGES — that stays
 deferred.
 
+### 15.1 Editor implementation decisions (TASK-010, 2026-09-26)
+
+This section fixes the choices that sections 9, 11.7, 12.5, 13, 13.5,
+14.4, 15, 16 and 17 leave open for issue #5 (the `editor/` app, the
+browser delivery and the Tauri shell). It follows the shape of 12.8 and
+14.5 and changes no Decided behavior. The wire additions and the
+browser ABI are in `design-docs/specs/command.md`; this section holds
+the rules. Open author questions are in
+`design-docs/user-qa/pending-editor-questions.md` (E1-E5). The
+implementation follows each recommendation until it is answered.
+
+#### 15.1.1 Scope boundary
+
+In scope: every TASK-010 deliverable and completion criterion of
+`impl-plans/active/vactrol-core.md`, plus the two items TASK-009 moved
+here, with the dispositions below.
+
+- **One frontend, two transports.** The editor speaks Session Protocol
+  v1 only. The browser tier runs a `Session` inside wasm #1 and passes
+  the same JSON text through the raw ABI (15.1.2 G1). The native tier
+  connects to `vactrol serve` over the WebSocket. No UI component knows
+  which transport it has, except the four tier-dependent features
+  listed in 15.1.4.
+- **Rust changes only where the protocol cannot express a criterion.**
+  The contract gaps G1-G6 (15.1.2) are the complete list. Each is
+  additive: `v` stays 1, every new field is optional, and old clients
+  ignore it. No Decided behavior changes, and the native CLI, REPL and
+  LSP behave exactly as before.
+- **Browser package store: done here** (moved from TASK-009, 14.5.1).
+  `fetch()` is the proxy transport, driven by a need-URL loop around
+  the existing core `pkg::get_all`. OPFS persists the digest-pinned
+  proxy responses and the lock (15.1.10).
+- **Browser self-analysis taps: NOT done here** (moved from TASK-009,
+  recommendation E2). `scope`/`spectrum`/`capture` on a live source
+  still fail in the browser with "not available on this host". No
+  TASK-010 criterion needs them, and they would add rendering-thread
+  record traffic under the 16.1 bounded-work rule. The editor's meters
+  and scopes do not use taps. They render from the analyzer cells
+  (12.5) that already reach the runtime on both tiers (G4).
+- **No UI framework.** Plain DOM components plus CodeMirror 6. Each
+  component is a `mount(root, deps)` function returning a handle.
+- **Out of scope** (each is a residual risk, none is a criterion):
+  - native-tier visuals (the native session keeps `NoopRender`, 9.4);
+  - browser MIDI output and clock-out (E2);
+  - `use-fps`/`use-canvas`, which reach no `RenderHost` method today;
+  - live gain-reduction metering, because no GR cell exists;
+  - the MIDI access fallback in Tauri (15 lists it). WKWebView has no
+    WebMIDI, so Tauri reports "not available on this host", the Decided
+    host-tier rule for a missing capability.
+
+#### 15.1.2 Rust contract additions (G1-G6)
+
+One Rust plan pair owns every Rust file below (15.1.12). All wire
+shapes are in `command.md`.
+
+- **G1: browser Session over the raw ABI.** A new
+  `src/host/wasm/session_half.rs` (declared in `host/wasm/mod.rs`,
+  compiled under `all(target_arch = "wasm32", feature = "host-wasm")`)
+  builds `Session::new` with:
+  - `CapabilitySet::browser()`;
+  - `RuntimeConfig { tier: Tier::Browser(WasmCellPort) }`;
+  - the shared `InstRegistry`, `WasmAudioHost`, `WasmSamples`, the new
+    `WasmRenderHost` and `WasmMidiIn`;
+  - the in-memory package cache of G6;
+  - `PersistenceMode::Directive`.
+
+  Its exports:
+  - `session_init(sample_rate, arena_bytes)`;
+  - `session_apply(ptr, len)`: one UTF-8 envelope, run through
+    `Session::apply_text` on connection 1;
+  - `session_tick(now)`, `session_inbox(ptr, len)` and
+    `session_sample_put(...)`, the session twins of `tick`, `inbox`
+    and `sample_put`;
+  - `session_check(ptr, len)`: static analysis of the document text via
+    `session::eval::analyze` plus the directive lint. It never
+    executes;
+  - `session_frame(now)`: G5;
+  - `session_midi_in(ptr, len, time)`: raw MIDI bytes at an audio-clock
+    time, buffered for `MidiInHost::poll`, which feeds `cc`, note
+    input and clock sync (11.7);
+  - `pkg_resolve` and `pkg_supply`: G6.
+
+  Outputs go to the existing outbox under the new tags `TAG_SESSION`
+  (0x71, one server envelope as JSON text), `TAG_RENDER` (0x72, a
+  `set_program` or `set_uniforms` record as JSON) and `TAG_PKG` (0x73,
+  a package-driver reply as JSON). These tags are free: wire uses
+  0x01-0x1A and 0x40-0x48, abi uses 0x60, 0x61 and 0x70. A page
+  initializes EITHER `main_init` (the dev harness, unchanged) or
+  `session_init` (the editor). `main_half.rs` is NOT edited, because
+  the TASK-008 harness evidence cannot be re-run headless in every
+  sandbox. The session half carries its own copy of the small
+  worklet-record decoding (the same `TAG_FAULT`, `TAG_SIGS` and
+  `HostMsg` cases).
+- **G2: editor metadata on the wire.** `manifest` gains `editors`: every
+  `dsp::meta::all()` entry, plus a fixed PATTERN-FUNCTION table in a new
+  `src/session/editors.rs`:
+  - `euclid` -> `euclid-ring` (hits, steps, rotation);
+  - `maybe` and `degrade-by` -> `probability-dial`;
+  - `hold`, `fast` and `slow` -> `length-handle`;
+  - `sine`, `saw`, `tri`, `square`, `rand` and `perlin` -> `lfo-shape`.
+
+  Pattern-function params carry no `ctl`, because they have no
+  control-table row. The table lives in the core, not in the editor,
+  so the editor, LSP and directives share one source (13.5, "every
+  builtin declares"). Ranges and editor kinds are still never
+  persisted.
+- **G3: site call identity.** A `site` gains
+  `call: {name, head, ordinal, arg, param?}`:
+  - the call is the nearest enclosing symbol-headed call that the
+    literal is an argument of, directly or inside a list or pattern
+    argument (so `n [0 3 5]` gives name `n` for all three literals);
+  - `ordinal` counts same-named call sites in the top-level form
+    (1-based, as in 13.5);
+  - `arg` is the 0-based argument index;
+  - `param` is the named-argument keyword, else the declared parameter
+    at that position (EditorDecl order or the definition header, the
+    same rule as `directives/attach.rs` `CallSite::params`). It is
+    absent when unknown.
+
+  Heads in `attach.rs` `NOT_SITES` are never calls. This lets
+  parameter editors, the sampler editor and CC routing find their sites
+  without the editor parsing the language.
+
+  Ownership: `directives/attach.rs` `CallSite` gains its argument spans
+  (and named-argument keywords). `directives/mod.rs` returns the
+  document's call sites alongside the table. `session/publish.rs`
+  `site_wire` maps each site to its innermost call from that list.
+- **G4: analysis and clock telemetry.**
+  - `levels[0]` (`:master`) gains `bands`, the 8 host FFT bands already
+    in `HostSigs`.
+  - `levels` gains `analyzers`: for every `EffectKind::Analyzer` unit
+    of the installed bus graph, its bus, kind, first cell `id` and
+    current values `cells(kind)`, read from the runtime `InputCells`
+    that `HostMsg::AnalysisCell` already fills on both tiers.
+
+  Publication stays at most 10 per second and subscribers only. An
+  analyzer whose `id` is not a constant is left out.
+
+  `tempo` gains `clock: {source: "internal"|"midi", locked?: bool}`,
+  from `Runtime::clock().source()` and the MIDI slave state
+  (`is_lost`). A clock change also triggers a `tempo` message. This
+  serves the transport bar's MIDI clock status on both tiers.
+- **G5: per-frame uniforms and render records.**
+  - `Runtime::activate` keeps the `UniformPlan` that `compile_tex`
+    returns, which it discards today, per output.
+  - A new `sched/render.rs` adds `Runtime::render_frame(ev, now)`. It
+    resolves every active plan (9.3) and calls
+    `RenderHost::set_uniforms`.
+  - `Session::render_frame(now)` forwards to it.
+  - `WasmRenderHost` encodes `set_program` and `set_uniforms` as the
+    `TAG_RENDER` records of `command.md` (`op` `program` or
+    `uniforms`).
+  - `hush`/`stop` of a visual slot already sends the empty program
+    (`sched/control.rs`). The TS host draws that as black.
+- **G6: browser packages.**
+  - A new core `src/pkg/mem_cache.rs` implements `CacheBackend` in
+    memory, with the same staging and atomic-publish contract.
+  - `Session` gains one additive method that lends the package driver
+    the session's own cache backend (`&mut dyn CacheBackend`) and
+    installs the resulting lock. The session still owns the cache, so
+    the next eval loads from exactly what the driver published.
+
+  The package driver (15.1.10) runs `pkg::get_all` (root requirements
+  as a `PkgManifest`) or, for a restore, `fetch_and_publish` against
+  the persisted lock, over `ProxyStore<Prefetched>`. `Prefetched` is a
+  `ProxyTransport` whose `get` answers from supplied URL bodies and
+  records the first missing URL. The driver then returns `need` for
+  that URL, and the partial run has already discarded its staging
+  (14.5.7). Success installs the lock into the session.
+
+Every Rust file stays under 800 lines (14.5.3). `session/session.rs`
+(703) splits if the additions push it to 800. Rust tests cover G2-G6
+natively under `src/session/tests/`, `src/sched/tests/` and
+`src/pkg/tests/`. G1 is wasm-only glue. Its owner tests it with a
+real-wasm ABI smoke test, and FINAL's criterion tests exercise it end
+to end (15.1.12).
+
+#### 15.1.3 Tooling, dependencies and layout
+
+- **Toolchain.**
+  - Node is taken from the environment. `package.json` declares
+    `engines.node >= 20`.
+  - mise does not pin node (E5), because a mise node install is a
+    download from outside the npm registry.
+  - `npm ci` installs from the committed `editor/package-lock.json`.
+- **Dependencies** (exact versions, pinned once by the scaffold plan,
+  which runs `npm audit` for its evidence):
+  - runtime: `@codemirror/{state,view,language,commands,lint}`,
+    `@lezer/highlight`, `@tauri-apps/api`,
+    `@tauri-apps/plugin-dialog`, `@tauri-apps/plugin-fs`;
+  - dev: `typescript`, `vite`, `vitest`, `jsdom`.
+
+  No other package is added by any later plan. The scaffold plan is the
+  only writer of `package.json` and the lockfile.
+- **Scripts.**
+  - `check`: `tsc --noEmit`.
+  - `test`: `vitest run`.
+  - `build`: `vite build`.
+  - `dev`: `vite`, which is not part of verification.
+- **Wasm artifact.**
+  - The editor uses `$VACTROL_WASM`, else
+    `../target/wasm32-unknown-unknown/debug/vactrol.wasm`, the output
+    of the mandatory `--features host-wasm` build.
+  - `vite build` copies it to `dist/vactrol.wasm`, and
+    `worklet/processor.js` to `dist/worklet/`.
+  - The build FAILS if the file is missing, and the real-wasm tests fail
+    (never skip) if it is missing or lacks the `session_init` export.
+    The build's own export check runs when `VACTROL_REQUIRE_SESSION_ABI=1`,
+    which the plans that land or join G1 set (the export arrives in a
+    later wave than the scaffold).
+  - `vite build` honors `--outDir`, so parallel plans build into their
+    own directory and never race on the shared `dist/` (15.1.12).
+  - Because the default-feature wasm32 build writes the same path, the
+    verification order is fixed: wasm32 default, then wasm32
+    host-wasm, then the editor steps (15.1.12).
+- **Worklet glue.** `editor/worklet/host.js` gains two additive options:
+  - `init: 'main' | 'session'`: the default `'main'` keeps the harness
+    exactly as before, and `'session'` calls the `session_*` exports;
+  - `onRecord(tag, bytes)`: receives 0x71-0x73 records, which are
+    never posted to the worklet.
+
+  A typed declaration `host.d.ts` accompanies it. `processor.js` is
+  unchanged.
+- **Tests.** vitest with the `jsdom` environment by default. The
+  real-wasm files declare `@vitest-environment node`. CodeMirror runs
+  under jsdom. WebGL2, `MIDIAccess`, canvas 2D, `AudioContext`, OPFS
+  and `fetch` are recording mocks under `editor/test/support/`, each
+  owned by the plan whose code uses it.
+- **Git hygiene.** A new `editor/.gitignore` covers `dist/`,
+  `src-tauri/target/` and `src-tauri/gen/`. The root `.gitignore`
+  already covers `node_modules`. It also ignores `*.zip`, so fixture
+  zips are built inside the tests, never committed.
+- **Layout.** `editor/src/<area>/` with the areas:
+  - `app`: shell, layout, the `mount` registry;
+  - `protocol`: types, envelope, client, transports;
+  - `code`: CodeMirror mode, diagnostics, eval, highlight, reconcile,
+    transport bar, sample browser;
+  - `bind`: sites, keys, slider panel, drag, write-back, directives
+    panel, persistence, save;
+  - `params`: parameter editors, grid, roll;
+  - `visual`: render host, panes, meters and scopes;
+  - `midi`;
+  - `pkg`;
+  - `platform`: file access.
+
+  `app/main.ts` imports each area's `mount.ts`. The scaffold creates
+  every `mount.ts` as a stub and the area owner fills it (the 14.5.3
+  seed-then-fill rule). TS files also stay under 800 lines.
+
+#### 15.1.4 Protocol client
+
+- **Transports.** `Transport { send(text), onText(cb), close() }` with
+  three implementations:
+  - `WasmTransport`: `session_apply` in, `TAG_SESSION` records out,
+    ticked by host.js;
+  - `SocketTransport`: `ws://127.0.0.1:<port>/session?token=<hex>`,
+    where the token is pasted by the user and never stored;
+  - `RecordingTransport`: tests; it records every client envelope and
+    replays scripted server envelopes.
+
+  The client owns `seq`, matches replies by `re`, and dispatches
+  broadcasts to a store (15.1.6 "Reactive displays").
+- **Revisions and epochs per document.**
+  - `doc_revision` starts at 1 on open and increments on every
+    CodeMirror transaction that changes the document.
+  - `edit_epoch` increments on EVERY local edit, synchronously, before
+    any debounce (14.4).
+  - `doc-changed` is debounced at 200 ms, and it is FLUSHED before any
+    `set-tweak`, `set-var`, `learn` or `eval` for that document (14.4
+    rule 1).
+  - Every write is stamped with the epoch current when its input was
+    produced.
+- **Offsets.** The protocol uses UTF-8 byte offsets and CodeMirror uses
+  UTF-16 units. The client converts through a per-revision UTF-8 index,
+  in both directions.
+  - Changes are `{from, to, insert_len}` in base-revision bytes.
+  - Dirty spans are the new-revision byte ranges of the inserted text,
+    plus a zero-length span at each pure deletion.
+  - Tests use non-ASCII text.
+- **Stale handling.**
+  - `stale-form-gen`: the value is kept and re-sent latest-wins to the
+    re-keyed site once fresh sites arrive.
+  - `edit-invalidated` and `unreconciled-edit`: the slider shows STALE
+    until an eval brings fresh sites.
+  - `superseded-definition`: the target is dropped.
+- **Rate.** Controller writes are limited per target to one per 16 ms,
+  latest-wins. The session coalesces further per tick (14.5.6).
+- **Tier-dependent features** (the only places the UI asks the tier):
+  - visual panes and typing-time static diagnostics (`session_check`):
+    browser only. The native tier shows static diagnostics from
+    `eval-result`.
+  - package import: browser only. The native tier shows the
+    `vactrol get <path>` command to run, because a running session
+    never fetches (14.5.1).
+  - highlight timing: the browser schedules on
+    `AudioContext.currentTime`, which is the session's clock. The
+    native tier anchors host times at batch receipt, best effort and
+    not asserted.
+  - sample waveform previews: browser only.
+
+#### 15.1.5 Code surface
+
+- **`.vact` mode.** A CodeMirror `StreamLanguage` tokenizer for
+  highlighting only: comments, `#@` directives, keywords (`:kw`),
+  numbers, strings, path/url literals, and the definition heads. It is
+  never used for binding decisions. Diagnostics come from
+  `session_check` (browser, debounced 300 ms), from `eval-result`, and
+  from runtime `diag`, shown with slot and beat. A `diag` `clear` for a
+  slot removes that slot's runtime markers.
+- **Eval.**
+  - `Mod-Enter` evaluates the form at the cursor. Its span runs from
+    the nearest line at or above the cursor that starts at column 0
+    with a character other than space, `#` or `>`, through the line
+    before the next such line, minus trailing blank lines. The session
+    then selects the forms inside it (14.5.4).
+  - `Mod-Shift-Enter` evaluates the whole document (no span).
+  - `Mod-.` sends `hush`.
+  - `eval.code` is always the full text (14.5.6).
+  - The eval span flashes for 200 ms, and forms with a `failure` flash
+    the error color.
+- **Highlighting.**
+  - A `playing` event with `src` is scheduled on the tier clock
+    (`Clock.now()`, with `MockClock` in tests).
+  - The decoration is active over `[time, time + dur_seconds)`, where
+    `dur_seconds` comes from `dur` and the latest `tempo`.
+  - Its span is mapped from the event's own `doc_revision` to the
+    current one through a bounded history of CodeMirror `ChangeSet`s
+    (the last 256 revisions).
+  - A span touched by a change, or older than the history, is dropped.
+  - Events without `src` highlight nothing. Events whose list has no
+    element provenance already carry the binding span (5.4).
+- **Transport bar.**
+  - Tempo and cycle/beat come from `tempo`, extrapolated locally
+    between messages.
+  - MIDI clock status comes from `tempo.clock` (`internal`,
+    `midi locked`, `midi lost`).
+  - hush/panic sends `hush`. The protocol has no separate panic, and
+    the session's hush already releases with panic.
+  - The per-slot list is built from `playing` and `eval-result`. It
+    shows an activity light from telemetry, and mute (`stop`, the only
+    per-slot message).
+  - Per-slot levels are not available (E3). The master meter comes
+    from `levels`.
+- **Sample bank browser.**
+  - It lists `manifest.sounds`.
+  - In the browser, a `SampleLibrary` loads a user-configured sample
+    map (`{"<bank>": ["<url>", ...]}`), decodes entries with
+    `decodeAudioData`, and hands them over as `bank:index` through
+    `session_sample_put`. Admission and the arena are 16.1's.
+  - Per-entry waveform previews are drawn from the decoded frames.
+
+#### 15.1.6 Binding UI
+
+- **Sites and keys.**
+  - The slider panel lists every `site` of the latest `eval-result`,
+    updated by `bindings.sites`, grouped by `origin` (pattern literal,
+    binding, inst default).
+  - Binding identity follows 13 and 13.5. A site with `key` is keyed by
+    its `BindingKey` spelling.
+  - Any other site is keyed by its tracked span, mapped through the
+    change history. It is re-keyed to the fresh `TweakId` whose span
+    matches when a new site table arrives. When nothing matches it
+    shows as unbound, and when the mapping was touched it shows as
+    STALE.
+  - Duplicate literals are distinct sites and bind independently.
+- **Two modes per slider** (13, both Decided).
+  - OVERLAY sends `set-tweak {id, form_gen, value, edit_epoch}`. The
+    text is untouched, and the overlay value is rendered beside the
+    literal.
+  - SOURCE-EDIT and overlay COMMIT both do a VALIDATED TEXT EDIT, then
+    an `eval` of the owning form's span:
+    - the edit applies only if the current text at the mapped span
+      still spells the last-known literal; otherwise it declines with
+      a notice;
+    - the literal is formatted as an integer when the original literal
+      had no `.`, and trimmed to the ParamMeta step otherwise;
+    - at most one eval is in flight per form, latest-wins.
+  - Mouse drag on a literal that is a site, and a learned CC, are front
+    ends to the same two paths. The drag scale is the ParamMeta range
+    and curve when `site.call.param` has one, else relative to the
+    magnitude.
+- **Directive control panel.** It renders `eval-result.directives`
+  (entries, labels, bindings). Directive lint diagnostics
+  (`unknown-label` and the others) render as editor diagnostics. Panel
+  membership is edited only in the text. The v1 UI has no
+  add-to-panel action (no criterion needs one).
+- **CC routing.** Incoming CC `(ch, cc)` resolves to a binding:
+  - Directive mode: through the directive table's `bindings`, matched
+    to a site by `key`, else by span containment plus
+    `site.call.param`;
+  - ExternalFile mode: through the editor-side set.
+
+  The binding's slider mode then decides the path. Keys are the full
+  `BindingKey`, so `hats.lpf`, `hats.hpf`, `hats.lpf.1` and
+  `hats.lpf.2` never cross-talk.
+- **Learn.**
+  - Directive mode sends `learn {binding: key | tweak id, cc, ch}`,
+    then applies the returned `directive-edit` only after checking
+    `expected` against the current text at the mapped span, then sends
+    `doc-changed`.
+  - In ExternalFile mode the editor updates its own set and sends no
+    `learn` (E4).
+- **Persistence and saving (MODE-SCOPED, 13).**
+  - DIRECTIVE mode (the default, and the session's mode on both tiers):
+    the saved `.vact` is the buffer text, `#@` comments with learned
+    CCs included, and nothing else is added.
+  - EXTERNALFILE mode (E4): the editor keeps a binding set
+    `{key, panel, midi?, overlay?}` and writes `<doc>.bindings.json` in
+    the 14.5.8 format (`{"v": 1, "bindings": [...]}`, keys spelled
+    `label.site.n.param`, overlays kept).
+    - It never inserts or edits `#@` text, so the saved `.vact` gets no
+      binding artifact from the editor.
+    - It never strips `#@` lines the user wrote, so "source untouched"
+      holds.
+    - Switching into ExternalFile copies the current panel (directive
+      bindings plus learned mappings) into the set. The panel is
+      preserved and no text changes.
+  - In BOTH modes an overlay value reaches the text only through an
+    explicit commit.
+  - Save goes through `platform/files.ts`: File System Access or a
+    download in the browser, dialog-scoped fs in Tauri, and an
+    in-memory implementation in tests.
+- **Reactive displays.**
+  - A store applies each `bindings` batch ATOMICALLY: `changed` values,
+    `sites` re-keying, and `states` badges (`failed` with its
+    diagnostic and restored value, `blocked` with `blocked_on`, `ok`
+    clearing).
+  - It then runs ONE repaint of exactly the components subscribed to
+    an affected name, site or slot. Unrelated components do not
+    repaint, and tests count renders.
+  - Nothing is rendered from anything but completed batches, so a
+    provisional value can never appear (14.5.5).
+
+#### 15.1.7 Parameter editors and displays
+
+- **Opening.**
+  - A call site is chosen from the same enumeration: the sites grouped
+    by `site.call` (name, head, ordinal) in one top-level form.
+  - The editor kind comes from `manifest.editors[name]`. A name with no
+    entry, or an unknown kind, gets the `scalar` editor (sliders).
+  - Each handle is bound to the site whose `call.param` (else `arg`)
+    matches. A missing site means a disabled handle, never a text
+    insertion.
+- **Handles are sliders.** Every handle calls the same site-write
+  function as the slider (both modes) and is MIDI-learnable through the
+  same learn path. The criterion test asserts that a drag and the
+  equivalent slider move record the identical `set-tweak` (id,
+  `form_gen`, value).
+- **Kinds.**
+  - `eq-curve`: bands, with the live spectrum drawn behind them. The
+    spectrum is a `spectrum` analyzer's cells on the site's bus when
+    one exists (G4), else the `:master` `bands`.
+  - `filter-response`: a response curve.
+  - `dynamics-transfer`: a transfer curve (gain-reduction metering is
+    out of scope).
+  - `envelope-shape`: stages.
+  - `delay-taps`: beat-aligned taps.
+  - `sampler-wave`, `wavetable-frames` and `granular-region`: views.
+  - `lfo-shape`: the shape, from the signal call's numeric sites.
+  - `stereo-field`: a pan field.
+  - `xy-pad`: the user picks any two sites.
+  - `euclid-ring`: hits, steps and rotation handles.
+  - `probability-dial` and `length-handle`.
+- **Sampler waveform** (13.5).
+  - The waveform comes from `SampleLibrary` frames for the call's bank
+    and `n` (browser tier).
+  - Start/end/loop handles are the `begin`/`end`/`loop` sites
+    (`call.name`) in the same top-level form.
+  - `slice n`, `chop n` and `striate n` counts draw as grid overlays.
+  - Manual slice markers are the numeric sites of the `slice` point
+    list, and each drag writes through the standard path.
+  - Clicking a slice writes the clicked index into the SELECTED,
+    EXISTING index literal, through the same validated write. The
+    selection is the site under the editor cursor or the one last
+    focused in the panel. With no selection the click does nothing and
+    shows a hint. The editor never adds, removes or reorders steps.
+  - The `n` site opens the sample browser at that bank.
+- **Step grid and piano roll are DISPLAYS.**
+  - Both are rendered from `playing` events per slot, with steps
+    placed by beat within the cycle.
+  - The roll's pitch is read, for display only, from the source text
+    at the event's mapped `src` span: a note keyword or a number. Other
+    text goes to an unpitched lane.
+  - Their modules import neither the protocol client nor the write-back
+    module. The structural test scans their imports and then fires
+    pointer and keyboard events, asserting that no client envelope is
+    recorded and the document is unchanged.
+
+#### 15.1.8 Visual panes and analyzer displays
+
+- **WebGL2 RenderHost** (9.2-9.4, browser and Tauri).
+  - It consumes `TAG_RENDER` records.
+  - Each output `o0..o3` owns two framebuffers (ping-pong). `src oN`
+    samples the previous frame.
+  - `render oN` selects the displayed pane, and `render` tiles all
+    four.
+  - The builtin uniforms `time` (audio clock seconds) and `resolution`
+    are set by the host. The named uniforms come from `set_uniforms`,
+    and `session_frame(now)` runs once per `requestAnimationFrame`.
+  - `TextAsset` text is rasterized with canvas 2D into a texture bound
+    at the asset id's sampler.
+  - A GLSL compile or link failure keeps the previous program
+    rendering and reports a host diagnostic. A language-level broken
+    chain never reaches the host: its slot keeps the previous binding,
+    and the eval shows the diagnostic.
+  - Activation at the cycle boundary is the runtime's
+    (`Runtime::activate`). The host draws whatever program it last
+    received.
+- **Meters and scopes** come from `levels` (G4):
+  - a master level meter (`rms`) and an 8-band spectrum (`bands`);
+  - one display per published analyzer, chosen by kind: `level`,
+    `spectrum`, `spectrogram` (from the ring cells), `oscilloscope`
+    (from the ring cells), `pitch-meter` and `stereo-meter`.
+
+  The editor never opens an audio input: there is no `getUserMedia`
+  call anywhere (the Decided "never monitors the input device unless
+  asked"; v1 has no ask path).
+
+#### 15.1.9 MIDI
+
+- **Access.** `navigator.requestMIDIAccess({sysex: false})` is called
+  only on a user action. Where it is absent (Tauri WKWebView), the
+  editor shows "not available on this host".
+- **Device picker.** It chooses the inputs whose messages are:
+  1. used for learn and CC routing (15.1.6), on both tiers;
+  2. forwarded to the session as `cc`, note input and clock (browser
+     tier only), through `session_midi_in`. Timestamps are converted
+     to the audio clock with `AudioContext.getOutputTimestamp()`.
+
+  On the native tier, the session's own midir input serves the
+  language.
+- **Learn.** The next CC (with its channel) after "learn" on a slider or
+  a handle becomes the binding's mapping (15.1.6).
+- **Clock status.** Shown from `tempo.clock`.
+
+#### 15.1.10 Packages in the browser
+
+- **UI.**
+  - It lists unresolved imports from `package-not-locked` and
+    `package-not-fetched` diagnostics, and the proxy URL, which is
+    user-configured and stored in `localStorage`. There is no default
+    proxy.
+  - "Import" runs the driver loop:
+    1. `pkg_resolve({proxy, requirements})` returns `need <url>`;
+    2. `fetch(url)`;
+    3. `pkg_supply(url, status, bytes)`;
+    4. repeat until `done` (lock text, resolved entries) or `error`
+       (code and message, shown as a package diagnostic).
+  - Load diagnostics then arrive with the next eval, started by the
+    user. The UI never auto-evaluates.
+  - Requests go only to the configured proxy. The proxy must allow
+    CORS.
+- **OPFS.**
+  - The root requirements, the lock text and every successful proxy
+    response body, keyed by URL, are stored under
+    `vactrol-pkg/`.
+  - On load, the editor supplies the stored bodies and runs
+    `pkg_resolve({proxy, lock})`. That restore re-validates and
+    compares every digest with the lock.
+  - A mismatch is `package-integrity`, and the entry is deleted from
+    OPFS.
+  - Content reaches the session cache only through validation, digest
+    and staged publication (17). OPFS holds raw bytes, never a trusted
+    tree.
+  - Without OPFS, packages are memory-only and a hint is shown.
+- **Native tier.** The UI shows the diagnostics and the exact
+  `vactrol get <path>` command. It never fetches (14.5.1).
+
+#### 15.1.11 Tauri shell
+
+- **Crate.** `editor/src-tauri/` holds a standalone crate
+  (`vactrol-editor`, `publish = false`) with its own empty `[workspace]`
+  table, `Cargo.lock` and `target/`. The root crate has no
+  `[workspace]` and never builds it. Root `cargo build`, `clippy`,
+  `fmt` and `nextest` are unaffected.
+- **Dependencies.**
+  - `tauri` 2, `tauri-build` 2, `tauri-plugin-dialog` 2 and
+    `tauri-plugin-fs` 2 only.
+  - Versions follow the 12.8.10 policy on Rust 1.83: the highest whose
+    tree builds, with `cargo update --precise` where needed.
+  - Fetching them from crates.io is E1. Without that access, the
+    `cargo check` gate is BLOCKED, which is not passing.
+- **Frontend.** `frontendDist` is `../dist`, the identical Vite build.
+  `cargo check` therefore runs after `npm run build`, because
+  `generate_context!` embeds `dist/`. A minimal icon is committed if
+  tauri-codegen requires one.
+- **Allowlist** (17): capability `default` with `core:default`,
+  `dialog:allow-open`, `dialog:allow-save`, `fs:allow-read-text-file`
+  and `fs:allow-write-text-file`.
+  - There is no static fs scope: only paths the user picked in a dialog
+    are allowed (`.vact` and `.bindings.json` filters).
+  - There is no shell plugin and no custom command.
+  - The CSP is `default-src 'self'; script-src 'self'
+    'wasm-unsafe-eval'; connect-src 'self' ws://127.0.0.1:* https:;
+    img-src 'self' data: blob:; worker-src 'self' blob:`.
+- **Evidence.** `cargo tauri build` and running the app are manual,
+  pending user confirmation.
+
+#### 15.1.12 Tests, waves and verification
+
+**Criteria to tests.** File names are indicative; the plans enumerate
+them.
+- **Criterion 1: highlight within one lookahead window.** Mock-clock
+  highlight tests (browser and edit mapping). The real-wasm test runs
+  `eval` + `session_tick` at mock times and asserts `playing` with
+  `src`/`doc_revision` within the lookahead. Hearing the audio is
+  manual, pending user confirmation.
+- **Criterion 2: direct/reeval/manual and the two modes.** Slider tests
+  on a RecordingTransport: overlay `set-tweak` with the text unchanged
+  until commit; source edit with verified text plus form eval. The
+  real-wasm test covers a `direct` and a `reeval` site through
+  `bindings`.
+- **Criterion 3: site kinds, learn, meters, package UI.** Panel
+  grouping over all three origins; learn to slider; meter rendering
+  from scripted `levels` with `analyzers`; the package UI against a
+  mocked proxy serving an in-test zip, plus a real-wasm driver test
+  with an integrity failure surfacing as a diagnostic.
+- **Criterion 4: parameter editors and displays.** `peq` opens
+  `eq-curve` with the spectrum; `env-adsr` opens `envelope-shape`;
+  `euclid` opens `euclid-ring`. Handle equals slider on the recording
+  transport. Learnable. Grid and roll pass the structural test.
+- **Criterion 5: directive round trip.** Spec directives give the
+  panel; learn applies `directive-edit`; a dangling label gives a
+  diagnostic; switching to ExternalFile leaves the text byte-identical.
+- **Criterion 6: mode-scoped saving.** Two tests, one per mode, plus
+  overlay absence in both.
+- **Criterion 7: multi-site bindings.** Independent keys on the
+  recording transport; persist and read back in both modes; a line
+  move; a reorder migration; STALE on a broken mapping.
+- **Criterion 8: reactive displays.** The store replays every 14.5.5
+  batch shape (changing edge, failed diamond, provisional rollback,
+  conditional unblocking, status recovery, late failure, ordinary
+  failure then recovery), asserting render counts and that no
+  provisional value is displayed.
+- **Criterion 9: sampler waveform.** Handles, overlays and markers; the
+  click-into-selection write; the no-selection no-op; the structural
+  test.
+- **Criterion 10: edit reconciliation.** Insert, delete and reorder
+  above and inside a playing form; duplicates; `doc-changed`
+  invalidation and a delayed write answered by `stale-binding`;
+  declined write-back; the stored-list revision.
+- **Criterion 11: visual pane.** The recording GL gets the program only
+  after the boundary tick (real-wasm `TAG_RENDER` order) and the
+  `TextAsset` texture; a GLSL failure keeps the previous program.
+  Viewing the pane in a real browser is manual, pending user
+  confirmation.
+- **Criterion 12: Tauri.** `cargo check`, plus `npm run build`, `check`
+  and `test`. The app run is manual.
+
+**Waves.**
+- The plans are `impl-plans/active/vactrol-editor-<wave>.md`. The
+  manifest is `impl-plans/active/ed-editor-20260926-s186-dispatch.json`.
+  Evidence goes to
+  `target/fe-logs/ed-<wave>-<check>-s<session>-<n>.log`, with the exit
+  status recorded in each log.
+- Each plan lists its own plan file in `writePaths`.
+- Only FINAL edits `vactrol-core.md`, `impl-plans/README.md` and the
+  root `README.md`, and FINAL never edits the manifest.
+
+| Wave | Content | Depends on |
+|------|---------|------------|
+| WIRE | Rust G2-G6: `session/{protocol,session,publish,editors,mod}.rs` (split `session.rs` at 800), `directives/{attach,mod}.rs` (G3 call arguments), `sched/{runtime,render,mod}.rs`, `pkg/{mem_cache,mod}.rs`, their tests; build-lsp and clippy-lsp included | — |
+| SCAFFOLD | `package.json`, lockfile, tsconfig, vite and vitest configs, `index.html`, `editor/.gitignore`, `app/` shell with the stub `mount.ts` files, `protocol/` (all v1 + G-addition types, client, three transports), `platform/files.ts`, `worklet/host.js` options + `host.d.ts`, the mock clock and recording transport | — |
+| WASM | Rust G1: `host/wasm/{session_half,mod}.rs` (+ a sibling file if 800 is reached), and its own real-wasm ABI smoke test `editor/test/wasm/abi.test.ts` (init, apply/eval, tick, check, frame, the pkg need/supply loop) | WIRE, SCAFFOLD |
+| CODE | `code/` + its `mount.ts` | SCAFFOLD |
+| MIDI | `midi/` + its `mount.ts`, the MIDI mock | SCAFFOLD |
+| BIND | `bind/` + its `mount.ts` | CODE, MIDI |
+| VISUAL | `visual/` + its `mount.ts`, the GL and canvas mocks | SCAFFOLD |
+| PACKAGES | `pkg/` + its `mount.ts`, the OPFS and fetch mocks, the in-test zip builder | SCAFFOLD |
+| PARAMS | `params/` + its `mount.ts` | BIND, VISUAL |
+| TAURI | `editor/src-tauri/*` | SCAFFOLD |
+| FINAL | `editor/test/wasm/*.test.ts` (real-wasm tests over G1-G6), `app/main.ts` wiring fixes, core-plan TASK-010 checkboxes, progress log and pending manual gates, `impl-plans/README.md`, root `README.md` | all |
+
+Plans that share no dependency run in parallel in the one workspace.
+When an editor-wide check fails only because a sibling is mid-edit,
+that is recorded and the join re-verifies (issue #5 contract).
+
+**Verification.** The 6.5.7 evidence rule applies to every plan.
+- The Rust checks: `build`, `clippy` (`--all-targets -- -D warnings`),
+  `fmt` (`--check`), `nextest`, `test` (plain
+  `CARGO_TERM_QUIET=true cargo test`), `wasm32`, then `wasm32-hostwasm`,
+  and `linecount` (the largest `.rs` under 800).
+- The editor steps come after those: `npm ci`, `npm run check`,
+  `npm run test`, `npm run build`.
+- TAURI and FINAL add `cargo check --manifest-path
+  editor/src-tauri/Cargo.toml` and `cargo fmt --check` for that crate.
+- WIRE adds `build-lsp`, `clippy-lsp` and `tree-wasm32`. No new Rust
+  crate enters the root tree.
+- Every plan runs `npm run test`, `cargo test` and `nextest` (issue #5).
+
+Manual gates, pending user confirmation with automated proxies:
+- hearing the worklet audio in a real browser;
+- the visual pane in a real browser;
+- `cargo tauri build` and running the app.
+
+Rollback is a `git revert` of the single implementation commit. OPFS
+data is namespaced under `vactrol-pkg/` and can be deleted, and
+nothing migrates.
+
 ## 16. Wasm and AudioWorklet Layout
 
 No SharedArrayBuffer, no COOP/COEP (decided). Two instantiations of the

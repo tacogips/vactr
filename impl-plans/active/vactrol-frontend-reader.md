@@ -1,7 +1,7 @@
 # Vactrol Front End: Reader and Spec Fixture Manifest (FE-READER) Implementation Plan
 
 **planId**: FE-READER (implements vactrol-core.md TASK-002)
-**Status**: Ready
+**Status**: In Progress (implementation complete in session 170; formal review, FE-FINAL reconciliation and the commit are pending)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.7, 6.1-6.3, 6.5.4, 6.5.6
 **Created**: 2026-09-25
 **Last Updated**: 2026-09-25 (session 170 revision: bad-pair finding folded in)
@@ -221,11 +221,11 @@ In the tables, `\|` stands for a literal `|`.
 
 ## Completion Criteria (they mirror vactrol-core.md TASK-002)
 
-- [ ] All manifest fixtures read per their classification (console cases under `FileId::CONSOLE`); no blanket clean-parse claim
-- [ ] Every negative example (`( )`, `_tmp`, `foo-`, `_1` in a file) yields a reader diagnostic, and the following lines still read
-- [ ] `import`, `as` and `open` read correctly; the fresh-session `pads.warm` and `as pd` cases read; an unbound qualifier is an error; `prescan_imports` finds every import; `#@` lines land in trivia with positions
-- [ ] Spans are byte-accurate (golden tests pass)
-- [ ] V1-V6 and V3f pass (V3f: the `spec_fixtures` binary ran with a non-zero run count)
+- [x] All manifest fixtures read per their classification (console cases under `FileId::CONSOLE`); no blanket clean-parse claim
+- [x] Every negative example (`( )`, `_tmp`, `foo-`, `_1` in a file) yields a reader diagnostic, and the following lines still read
+- [x] `import`, `as` and `open` read correctly; the fresh-session `pads.warm` and `as pd` cases read; an unbound qualifier is an error; `prescan_imports` finds every import; `#@` lines land in trivia with positions
+- [x] Spans are byte-accurate (golden tests pass)
+- [x] V1-V6 and V3f pass (V3f: the `spec_fixtures` binary ran with a non-zero run count)
 
 ## Progress Log
 
@@ -244,12 +244,53 @@ other change.
 The accepted low review finding on the unreachable `bad-pair` example (dispatch manifest `acceptedReviewFindings`) is
 now in the negative-test list itself. No other change.
 
-### Session: (implementer fills in)
-**Tasks Completed**:
-**Hashes / intent snapshots**:
-**Verification evidence**:
+### Session: 2026-09-25 (session 170, FE-READER implementer)
+**Tasks Completed**: TASK-002 reader implemented per design 6.5.4 and the fixture manifest per 6.5.6.
+- `src/reader/{node,lexer,layout,line,import,sexpr}.rs` and `mod.rs` (`read`, `ReadResult`, re-exports). `span.rs` is unchanged.
+- Unit tests in `src/reader/tests/` (31): the canonical table, span goldens, negative and recovery cases, every reader code, imports and trivia, the nesting cap, and the no-panic test (line-boundary and char-boundary prefixes of all 11 blocks, plus hostile inputs).
+- `tests/spec_fixtures.rs`, `tests/support/{mod,toml_subset}.rs` and `tests/fixtures/spec/manifest.toml`: 11 blocks and 50 cases, 7 runner tests.
+- All 17 canonical expectations print exactly as the table says.
+**Design differences and decisions (6.5.4 wins; recorded for review)**:
+- SPEC CONFLICT (reported; rules unchanged). design-music sections 2 and 3 write `[:g :7]` (lines 114 and 242). `:7` is not a keyword, because the Decided identifier rule forbids a leading digit. Under the 6.5.4 colon classes it reads as `misplaced-colon`. Blocks music #2 and #3 are therefore `diagnostics` (`misplaced-colon@40`, `misplaced-colon@104`). Case `music-chord-seven-conflict` pins this. The language author needs to decide: rename the chord quality (for example `:dom7`), or amend the identifier or keyword rule. Every other construct in sections 1-3 of both documents reads clean.
+- Blocks outside sections 1-3 behave as the plan expected:
+  - lang #5 gives `stray-char@92`: the `...` body is `..` followed by a stray `.`.
+  - music #6 gives `unexpected-indent@3`: a continuation line without `>`.
+- A deeper line without `>` is `unexpected-indent`. It and the lines under it belong to the statement it is indented under, and that statement becomes the `Error` node, because the statement is the unit of recovery. A later `>` line still continues the statement, as 6.5.4 says. A deeper line with no statement before it in the body becomes an `Error` node of its own.
+- `bad-pair` is reachable under 6.5.4: `[amp: ]` and `once gain: > d1`, where the colon is followed by a space and the operand ends. No lexer or colon rule was changed.
+- `( + 1 2 )` gives one `paren-form`: every `(` reports, and a `)` reports only when it closes nothing.
+- A run of stray characters is one `stray-char`.
+- An unmatched `}` or `]` is `stray-char`.
+- A failed nested string reports once; enclosing strings add nothing.
+- `_` is a path character in `import` (6.5.4 `[a-z0-9._-]`), so `some_one` is a valid segment.
+- The `prescan_imports` spans carry `FileId::CONSOLE`, because the plan signature has no file argument. The byte offsets are exact.
+- Stack safety beyond the 128 cap (never panic):
+  - Arrow chains and prefix chains (`& -x`, `a: b: 1`) are built in loops.
+  - Pipes, fallbacks and arrows count toward a total tree-depth backstop of 1024, reported as `nesting-too-deep`.
+  - Measured stack for 128 nested groups: about 1.1 MiB in a debug build and 0.25 MiB in release, within the 2 MiB test threads and the 1 MiB wasm stack.
+- IfChain grouping (`group_if_chains`) lives in `layout.rs`, as this plan assigns. That also keeps `line.rs` at 741 lines, below the 800-line split trigger. No helper file was added.
+**Hashes / intent snapshots**: `tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/`
+- `pre-edit-hashes.txt`: `src/reader/mod.rs` ae28f82c, `src/types/diag.rs` da994cbe, `src/lib.rs` b5d8b093. `src/lib.rs` was not edited.
+- `intent.md`: every shared-path hunk.
+- `post-edit-hashes.txt`: `diag.rs` bf9b818f; `mod.rs` 40297ff8, then ff145791, then 091a2f07.
+- `final-hashes.txt`: 20 files.
+- `gen_manifest.py`: the manifest generator, which keeps the tabs literal.
+**Verification evidence** (the last run of each check after the final code change; all under `target/fe-logs/`):
+- V1 `reader-build-s170-2.log`: exit=0.
+- V2 `reader-clippy-s170-2.log`: exit=0.
+- V3 `reader-nextest-s170-2.log`: exit=0; 99 tests run, 99 passed, 0 skipped.
+- V3t `reader-cargotest-s170-2.log`: exit=0; lib 92 passed and spec_fixtures 7 passed, 0 failed.
+- V3f `reader-fixtures-s170-2.log`: exit=0; 7 tests run, 7 passed.
+- Extra, because `diag.rs` is an FE-VALUE file: `reader-wasm32-s170-2.log` exit=0 and `reader-wasm32-hostwasm-s170-2.log` exit=0.
+- Superseded runs `*-s170-1.log` stay on disk. They also all passed.
+- V4: largest files are `line.rs` 741, `lexer.rs` 690 and `layout.rs` 343 lines. Every file is under 1000.
+- V5: prints `11`.
+- V6: `git diff --stat -- Cargo.toml` shows only FE-VALUE's uncommitted `[features]` table (6 insertions). The Cargo.toml sha256 f8e41f7e equals the FE-VALUE post-edit hash, so FE-READER did not change Cargo.toml.
+- `grep -rnE 'std::(thread|fs|time|net|process)' src/` prints `none`.
+- `rustfmt --check` on the owned files: exit 0.
 **Diagnostic codes added to diag.rs (for FE-FINAL)**:
-**Blockers**:
+- `EmptyPipe => "empty-pipe"`, for a pipe `>` with no call after it (`print 1 >`). 6.5.4 defines no code for an empty trailing segment, and passing `>` as a value is not allowed.
+- The FE-VALUE count test is now 38 (27 reader and 11 expander codes). FE-FINAL records `empty-pipe` in 6.5.4 alongside `misplaced-arrow`.
+**Blockers**: none. The `:7` spec conflict above needs a language-author decision; it is not an implementation blocker, because the rules were kept as decided.
 
 ## Related Plans
 

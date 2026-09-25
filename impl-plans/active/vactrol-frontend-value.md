@@ -1,7 +1,7 @@
 # Vactrol Front End: Value Model and Foundation (FE-VALUE) Implementation Plan
 
 **planId**: FE-VALUE (implements vactrol-core.md TASK-001)
-**Status**: In Progress (implementation and session-169 verification done; review pending; commit folded into the FE-FINAL workflow commit)
+**Status**: In Progress (implementation and session-170 verification including V3t done; review pending; commit folded into the FE-FINAL workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 4, 5.1-5.4, 6.5.1-6.5.3, 6.5.7
 **Created**: 2026-09-25
 **Last Updated**: 2026-09-25 (session 170: single final commit, V3t criterion)
@@ -218,7 +218,7 @@ Before V1, run V0 once per session to prove the exit-capture idiom records a fai
 - [x] Every required test above exists and passes (V3, session-169 log per design 6.5.7)
 - [x] V0, V1, V2, V4, V5 and V7 pass (session-169 logs per design 6.5.7)
 - [x] Both wasm32 builds (V6a, V6b) record `exit=0` (session-169 logs per design 6.5.7)
-- [ ] V3t (`cargo test`) records `exit=0` with a non-zero test count in a new `value-cargotest-s<S>-<n>.log`
+- [x] V3t (`cargo test`) records `exit=0` with a non-zero test count in a new `value-cargotest-s<S>-<n>.log`
   (session 170 or later). If the adversarial review changes any FE-VALUE file, re-run V1, V2, V3, V3t, V6a and V6b
   with new logs, and cite only those post-change logs
 
@@ -247,6 +247,22 @@ Step 3 low finding: `Cargo.lock` (only if modified) and the dispatch manifest ar
 and the item now says a plan checkpoint commit is allowed. A V3t completion criterion is added because the session-169
 progress entry has no `cargo test` evidence (Gate contract notes). If review changes code, the affected rows are
 re-run. No code change.
+
+### Session: 2026-09-25 (session 170, step 6 implementer)
+**Tasks Completed**: V3t, plus a full re-run of V0-V7 against the unchanged tree. Drift check first:
+`shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-VALUE/post-edit-hashes.txt` reports all 42 paths OK, so no source
+was changed this session. Intent snapshot: `tmp/fe-frontend-20260925-s165/FE-VALUE/session170-intent.md`.
+**Verification evidence** (new logs under `target/fe-logs/`; no earlier log was overwritten):
+- V0 `value-idiom-s170-1.log` ends with `exit=1`.
+- V1 `value-build-s170-1.log` `exit=0`, no warnings. V2 `value-clippy-s170-1.log` `exit=0`.
+- V3 `value-nextest-s170-1.log` `exit=0`; `61 tests run: 61 passed, 0 skipped`.
+- V3t `value-cargotest-s170-1.log` `exit=0`; `test result: ok. 61 passed; 0 failed` (lib), and 0 tests in the bin and doctests.
+- V4 largest files: `src/types/diag.rs` 177, `src/value/key.rs` 222, `src/value/ratio.rs` 268; all under 1000.
+- V5 prints `none`. V6a `value-wasm32-s170-1.log` `exit=0`. V6b `value-wasm32-hostwasm-s170-1.log` `exit=0`.
+- V7 `Cargo.toml | 6 ++++++` (the `[features]` table only).
+**Deviations**: none. **Blockers**: none. Downstream (later workflow steps): test-integrity and adversarial review
+(re-run V1, V2, V3, V3t, V6a and V6b if review changes an FE-VALUE file), then FE-READER, FE-EXPAND, FE-FINAL and the
+single front-end workflow commit.
 
 ### Session: 2026-09-25 (session 169, step 6 implementer)
 **Tasks Completed**: Re-verification of the existing FE-VALUE tree under design 6.5.7. Drift check first: every path in

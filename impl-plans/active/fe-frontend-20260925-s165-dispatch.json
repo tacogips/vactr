@@ -1,7 +1,19 @@
 {
   "taskId": "fe-frontend-20260925-s165",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-170",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-171",
+  "session171Revision": {
+    "originalHead": "6e35f7cda73e87ace5a2d6d7d8554570947e80e5",
+    "note": "Session 171 resumes issue tacogips/vactrol#1 after integration review (session 170, integration-review-attempt-1-exec-186) returned one mid finding. The FE-READER branch failed at step7-adversarial-review with validationRejected ($.findings missing), so FE-READER has no review verdict. There is also no after:step7 snapshot under tmp/riela-fanout/B5649614-9AE5-48A0-AD47-344A09DDBB53/. No design or plan requirement changed. This checkpoint commits the session-170 implementer progress entries in the FE-VALUE and FE-READER plans. Consistent with earlier checkpoints, the plan progress logs are committed and the source tree is not. It also records the redispatch: FE-READER reruns only step7 adversarial review on the unchanged tree. The FE-VALUE and FE-READER source tree stays uncommitted and must be preserved (no reset or clean). It goes into the single front-end commit at the workflow commit step.",
+    "intakeTreeCheck": "At checkpoint time, HEAD is 6e35f7c on main and nothing is staged. tmp/fe-frontend-20260925-s165/reconcile-implementations/attempt-2/fe-reader-final-hashes-recheck.log shows 20/20 OK with exit=0. Every FE-READER-owned file and shared file has an mtime earlier than final-hashes.txt (09:38). The redispatched reviewer must re-run the shasum check before reviewing.",
+    "dispatchState": {
+      "FE-VALUE": "accepted (session 170 reconcile attempt-1). Do not redispatch. Its tests still pass in reconcile attempt-2. Two post-edit-hash mismatches (src/reader/mod.rs, src/types/diag.rs) are intended FE-READER shared-path edits.",
+      "FE-READER": "implemented, verified and reconciled (reconcile attempt-2 combined-tree checks all exit=0), but not reviewed. Redispatch review-only: rerun step7 adversarial review under tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. Do not rerun implementation.",
+      "FE-EXPAND": "not started; waits for an accepted FE-READER verdict.",
+      "FE-FINAL": "not started; waits for FE-EXPAND."
+    },
+    "carriedFinding": "[mid] impl-plans/active/vactrol-frontend-reader.md: FE-READER (TASK-002) has no adversarial review verdict. Redispatch FE-READER to rerun only the review on the unchanged tree after checking final-hashes.txt. It must produce a schema-valid verdict (a findings array, empty if none) that covers RECON2-2 (empty-pipe) and RECON2-3 (the `:7` spec conflict)."
+  },
   "session170Revision": {
     "originalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
     "note": "Session 170 resumes issue tacogips/vactrol#1. The FE-VALUE tree is still uncommitted and must be preserved. Commit granularity is settled: there is no separate FE-VALUE commit. The whole front end is one commit on main at the workflow commit step, staged by the explicit path list in FE-VALUE Edit Protocol item 5. FE-VALUE gains a V3t criterion. FE-FINAL gains V3f. The accepted low findings for reader bad-pair and expander U5 read string are folded into the plan texts."
@@ -14,8 +26,8 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
-  "previousOriginalHead": "7c72f23d87b72c0da0c75c5fb37e01bd891ee1be",
+  "originalHead": "6e35f7cda73e87ace5a2d6d7d8554570947e80e5",
+  "previousOriginalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/lang-reference.md",
@@ -105,10 +117,15 @@
       "Low: in impl-plans/active/vactrol-frontend-value.md:38, src/value/value.rs triggers clippy::module_inception. Put #[allow(clippy::module_inception)] on that one mod declaration in src/value/mod.rs and record it in the progress log.",
       "Low: in impl-plans/active/vactrol-frontend-expander.md:124, the u5-bare-variant-binding-if case gives no 'read' string, but the case runner compares 'read' for every case. Use the 6.5.4 read form '(-> (if x none) 1)' and record it in the progress log."
     ],
+    "openReviewItems": [
+      "RECON2-2 (empty-pipe): FE-READER added DiagCode EmptyPipe ('empty-pipe') for a pipe '>' with no call after it (for example 'print 1 >'). 6.5.4 has no code for this, and the FE-VALUE code-count test changed from 37 to 38. The reviewer decides whether the code is justified or an existing 6.5.4 code covers the case. FE-FINAL records an accepted code in 6.5.4 next to misplaced-arrow.",
+      "RECON2-3 (':7' spec conflict): design-music.md sections 2 and 3 write '[:g :7]' (lines 114 and 242). Under the Decided identifier rule (no leading digit) and the 6.5.4 colon classes, ':7' reads as misplaced-colon. Music blocks #2 and #3 are therefore classified 'diagnostics', and case music-chord-seven-conflict pins this. The reviewer checks that the reader rules were not bent, that the fixture classification is honest, and that the conflict is reported for a language-author decision (rename the chord quality or amend the rule). It is not an implementation blocker."
+    ],
     "planCheckpoint": {
       "reviewStep": "step5-impl-plan-review-attempt-1-exec-166",
-      "checkpointStep": "plan-checkpoint (session 170)",
-      "previousCheckpoint": "plan-checkpoint (session 169), review step5-impl-plan-review-attempt-1-exec-152",
+      "checkpointStep": "plan-checkpoint (session 171)",
+      "session171Decision": "The plans are unchanged in requirements since the session-170 acceptance (exec-166). The only plan diffs are the session-170 implementer progress entries and criteria checkboxes in vactrol-frontend-value.md and vactrol-frontend-reader.md. The integration-review mid finding is process-only, so no design or plan revision is needed. It is handled by the review-only FE-READER redispatch below.",
+      "previousCheckpoint": "plan-checkpoint (session 170) at 6e35f7c; before that session 169, review step5-impl-plan-review-attempt-1-exec-152",
       "accepted": true,
       "needsRevision": false,
       "needsDesignRevision": false,
@@ -138,6 +155,8 @@
       "planPath": "impl-plans/active/vactrol-frontend-value.md",
       "implementsTask": "TASK-001",
       "wave": 1,
+      "dispatchMode": "accepted",
+      "dispatchNote": "Session 171: accepted in session 170 (reconcile attempt-1). Do not redispatch.",
       "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-frontend-value.md#progress-log",
       "writePaths": [
@@ -219,6 +238,8 @@
       "planPath": "impl-plans/active/vactrol-frontend-reader.md",
       "implementsTask": "TASK-002",
       "wave": 2,
+      "dispatchMode": "review-only",
+      "dispatchNote": "Session 171: do not re-implement. First run 'shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt' and require 20/20 OK. On any mismatch, stop and report blocked. Then rerun only the step7 adversarial review on the unchanged tree. Write evidence to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. The verdict must be schema-valid, with a findings array (empty if none), and must cover RECON2-2 (empty-pipe) and RECON2-3 (the ':7' spec conflict) from reviewContext.openReviewItems. If the review changes any file, re-run every verification row with new s171 logs.",
       "dependsOn": [
         "FE-VALUE"
       ],
@@ -253,9 +274,11 @@
         "Spans are byte-accurate: the golden tests pass.",
         "The manifest has 11 [[block]] entries.",
         "The spec-fixture harness ran: V3f logs 'cargo nextest run -E binary(spec_fixtures)' with exit=0, a non-zero run count and 0 failed.",
-        "V1-V6 and V3f pass."
+        "V1-V6 and V3f pass.",
+        "A schema-valid adversarial review verdict exists for the tree recorded in final-hashes.txt. It covers the empty-pipe code (RECON2-2) and the ':7' spec conflict (RECON2-3)."
       ],
       "verification": [
+        "shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt",
         "mkdir -p target/fe-logs",
         "LOG(reader-build): CARGO_TERM_QUIET=true cargo build",
         "LOG(reader-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",

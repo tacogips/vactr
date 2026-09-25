@@ -1,0 +1,203 @@
+# Vactrol Session Layer: Directives (SS-DIRECTIVES) Implementation Plan
+
+**planId**: SS-DIRECTIVES (issue #4, wave 2; `#@` parsing, attachment, labels, selector resolution, `BindingKey`, both `BindingPersistence` impls, learned-CC write-back, vocabulary fixtures)
+**Status**: Ready
+**Design Reference**: design-docs/specs/design-implementation.md 13.5 (Decided shape, PROPOSED vocabulary, ADDRESSED SELECTOR RESOLUTION, `BindingKey`, labels, write-back), 13 (persistence mode scope, overlays never in source), 14.5.8 (all rules), 14.5.6 (`ChangeSet`), 14.5.12; architecture.md Editor Requirements; design-docs/user-qa/pending-session-questions.md S4
+**Created**: 2026-09-25
+**Issue**: https://github.com/tacogips/vactrol/issues/4
+**dependsOn**: SS-CONTRACTS
+**Dispatch manifest**: impl-plans/active/ss-session-20260925-s183-dispatch.json
+
+---
+
+## Intent and Context
+
+The `#@` directive machinery is a pure, wasm-safe library over reader output. SESSION calls it on every eval, and the
+LSP calls it for lint. What already exists:
+- The reader keeps trivia: `ReadResult.trivia: Trivia { items: Vec<TriviaItem { span, kind: Comment | Directive }> }`.
+  The lexer marks `#@` comments as `TriviaKind::Directive`.
+- `HostManifest` exposes `editor_decl`/`editor_decls` (declared parameter order of builtins) and `template_params`.
+- SS-CONTRACTS supplies `session::changes::ChangeSet` and the directive `DiagCode`s (all warnings).
+
+The language never reads a directive (13.5): nothing here may change evaluation.
+
+## Non-Goals
+
+- No protocol messages, no `edit_epoch` checks (SESSION's authority layer), no file IO (the caller reads and writes
+  `<doc>.bindings.json`).
+- No change to the reader, checker or evaluator.
+- No new vocabulary beyond the 13.5 PROPOSED grammar. `range:` is reserved and rejected.
+- The spec manifest `tests/fixtures/spec/manifest.toml` is NOT touched (ANALYSIS writes it in this wave).
+
+## writePaths (exclusive in wave 2)
+
+- `src/directives/mod.rs` (fills the CONTRACTS stub), `src/directives/parse.rs`, `src/directives/attach.rs`,
+  `src/directives/labels.rs`, `src/directives/resolve.rs`, `src/directives/key.rs`, `src/directives/persist.rs`,
+  `src/directives/writeback.rs`
+- `src/directives/tests/mod.rs`, `src/directives/tests/parse.rs`, `src/directives/tests/attach.rs`,
+  `src/directives/tests/labels.rs`, `src/directives/tests/resolve.rs`, `src/directives/tests/key.rs`,
+  `src/directives/tests/persist.rs`, `src/directives/tests/writeback.rs`
+- `tests/directive_fixtures.rs`, `tests/fixtures/directives/vocabulary.toml`
+- `impl-plans/active/vactrol-session-directives.md`
+
+## sharedPaths
+
+None.
+
+## File-Level Changes (signatures and behavior; no code)
+
+1. **`mod.rs`.**
+   - Entry point: `build_table(src: &str, file: FileId, nodes: &[Node], trivia: &Trivia, manifest: &HostManifest) ->
+     (DirectiveTable, Vec<Diagnostic>)`.
+   - `DirectiveTable { file_level: FileDefaults { midi_ch: Option<u8> }, entries: Vec<Directive>, labels:
+     LabelRegistry, resolved: Vec<ResolvedBinding> }`.
+   - `ResolvedBinding { key: Option<BindingKey>, target_span: Span /*call site or definition header*/, param:
+     KwId, param_index: u16, cc: Option<u8>, ch: Option<u8>, directive_span: Span }`.
+   - A table summary serializable for the protocol (`serde::Serialize`).
+2. **`parse.rs` (13.5 PROPOSED grammar).**
+   - `Directive { span, kind: Positional | Addressed, body }`.
+   - `body` is one of:
+     - `FileDefault { pairs }`;
+     - `LabelDef { name, rest: Option<positional> }`, for `#@ name X` and the leading `ident:` short form;
+     - `Positional { sites: Vec<SiteSel { name, ordinal: Option<u16> }>, pairs }`;
+     - `Addressed { label, sel, ordinal, pairs }`.
+   - `Pair::Cc(Vec<Option<u8>>)` (`_` is `None`) and `Pair::Ch(u8)`.
+   - Classification by first token: `midi` and `label.sel[.n]` are Addressed; everything else is Positional.
+   - `range:` (and any unknown key) gives `reserved-key`. A CC outside 0..127 or a channel outside 1..16 gives
+     `cc-out-of-range`.
+   - One directive per line.
+3. **`attach.rs` (the Decided attachment rule).**
+   - A trailing `#@` on a code line attaches to that line's statement.
+   - Consecutive own-line `#@` lines form one block. The block attaches to the nearest PRECEDING statement, block or
+     definition whose indentation (column of its first token) is no deeper than the block's. At column 0 after an
+     `inst` body, that is the whole `inst`; inside a body, it is the previous body line.
+   - A positional block with no preceding target gives `unknown-directive-site`.
+   - Addressed directives are position-free.
+   - A second `#@ midi ch:` replaces the first and gives `duplicate-key`.
+4. **`labels.rs`.**
+   - `LabelRegistry`: explicit labels (trailing `label:` short form, `#@ name X`, block-following for bodies) plus
+     implicit labels (every top-level `let`/`fn`/`inst`/`bus`/`look` name and every named slot) in ONE per-document
+     namespace, with exact match.
+   - Any collision (explicit vs explicit, explicit vs implicit) gives `duplicate-label`, and the name is marked
+     ambiguous.
+   - `resolve(name) -> LabelLookup { Target(LabelTarget { span, kind: Line | Definition{params} }), Ambiguous, Unknown }`.
+5. **`resolve.rs` (ADDRESSED SELECTOR RESOLUTION, exactly 13.5).**
+   - Resolution order:
+     1. a definition target with declared parameters: `sel` matching a PARAMETER keyword selects that parameter;
+     2. otherwise, `sel` matching a CALL-SITE name inside the labeled line or block selects that call site, and `cc:`
+        maps positionally over ITS declared parameter order (builtin order from `HostManifest`; `inst`/`fn`/`bus` order
+        from the header node);
+     3. a `sel` matching BOTH a parameter and a call-site name gives `ambiguous-selector`;
+     4. a repeated same-named call site used bare gives `ambiguous-selector`; the ordinal `.n` selects the n-th in
+        source order.
+   - Positional first tokens resolve against the attach target the same way (`#@ lpf.2`).
+   - `cc:` numbers map in declared parameter order, `_` skips, and fewer numbers leave the rest panel-only. `ch:`
+     overrides the file default.
+   - Diagnostics: `unknown-directive-site`, `unknown-parameter`, `unknown-label`, `ambiguous-selector`. A reference to
+     an ambiguous label gives `duplicate-label` and falls back to positional provenance (no `BindingKey`).
+6. **`key.rs`.**
+   - `BindingKey { label: Rc<str>, site: Option<(Rc<str>, u16)>, param: Rc<str> }`, with `Display` as
+     `label.site.n.param` or `label.param`, plus `FromStr`.
+   - `KeyTable` maps each key to its last resolved span and revision.
+   - `migrate(&mut self, changes: &ChangeSet, new_table: &DirectiveTable) -> Vec<(BindingKey, KeyState { Live, Stale })>`:
+     - each span is mapped through the change set and the same-named call sites of the new revision are counted again;
+     - a clean mapping onto a same-named site MIGRATES the key, rewriting the ordinal;
+     - a `Touched` mapping, or one that does not land on a same-named site, marks the key `Stale` and keeps its data.
+     It never guesses.
+7. **`persist.rs`.**
+   - `BindingEntry { key: BindingIdent { Key(BindingKey), Positional { span, param } }, panel: bool, midi: Option<{cc,
+     ch}>, overlay: Option<f64> }` and `BindingSet`.
+   - `trait BindingPersistence { fn load(&self, doc: &DocInput) -> BindingSet; fn save(&mut self, doc: &DocInput, set:
+     &BindingSet) -> Persisted }`, where `Persisted { Edits(Vec<TextEdit { span, expected, text }>), File(String) }`.
+   - `DirectivePersistence`: `load` reads the table; `save` renders directive text edits for panel membership and
+     mappings and NEVER writes overlay values (13, S4).
+   - `ExternalFilePersistence`: JSON `{"v":1,"bindings":[...]}` through serde_json, keys spelled with `Display`; it
+     keeps overlays.
+8. **`writeback.rs`.**
+   - `learn_edit(doc_text, table, target: &BindingIdent, cc: u8, ch: Option<u8>) -> Result<TextEdit, LearnError {
+     Stale, NotDirectiveBacked, Unknown }>`.
+   - It makes the minimal edit that inserts or replaces the `cc:` number at the binding's parameter position inside
+     its directive, or appends a new directive block after the target statement if none exists.
+   - `expected` holds the current directive text, so the editor can verify it before applying.
+
+## Required Tests (`src/directives/tests/*.rs`, `tests/directive_fixtures.rs`)
+
+- **attach.rs.** The spec's own examples parse with correct attachment:
+  - same-line trailing;
+  - a consecutive-line block to the nearest preceding statement or block at no deeper indentation;
+  - a whole-`inst` binding at column 0;
+  - Addressed `hats.hpf` and a file-level `#@ midi ch: 1`.
+
+  The examples are architecture.md Editor Requirements and design 13.5; copy their text.
+- **labels.rs.** Explicit and implicit labels resolve. `duplicate-label` fires for explicit vs explicit AND explicit vs
+  implicit, its addressed references are rejected, and the sites fall back to positional provenance.
+- **resolve.rs.**
+  - `analog.cutoff` selects the inst PARAMETER.
+  - `hats.hpf cc: 30` selects the hpf CALL SITE on the hats line, with 30 on its FIRST declared parameter (asserted
+    exactly).
+  - A parameter/call-site clash is `ambiguous-selector`.
+  - A repeated `lpf` bare is `ambiguous-selector`, while `hats.lpf.2` and positional `#@ lpf.2` select the second.
+  - `cc: 74 _ 30` skips the second declared parameter.
+  - Fewer numbers leave the rest panel-only.
+  - A directive `ch:` overrides the file `#@ midi ch:`.
+  - `range:` gives `reserved-key`.
+  - Unknown site, param and label give their codes.
+  - Directives never change evaluation: an `Evaluator` result for a program with and without its directives is
+    identical.
+- **key.rs.**
+  - Independent keys on `hats.lpf` and `hats.hpf` (same `cutoff` keyword) are distinct, and so are `hats.lpf.1` and
+    `hats.lpf.2`.
+  - Moving the labeled line keeps every key.
+  - Reordering the two `lpf` sites MIGRATES each binding with its site.
+  - An edit that breaks the mapping marks it `Stale`.
+- **persist.rs.**
+  - The same `BindingSet` (the lpf/hpf and lpf.1/lpf.2 keys, panel and MIDI) round-trips through BOTH impls without
+    cross-talk.
+  - Overlays round-trip in ExternalFile mode and are absent from Directive-mode edits (S4).
+- **writeback.rs.**
+  - A MIDI-learn writes the CC into the directive text at the right position.
+  - A missing directive gets a new block.
+  - A `Stale` binding is refused.
+- **`tests/directive_fixtures.rs` + `tests/fixtures/directives/vocabulary.toml`.** One `[[case]]` per vocabulary
+  construct (file default, `#@ name`, trailing short form, positional `cc:` with `_`, fewer numbers, `ch:` override,
+  addressed param, addressed call site, ordinal, reserved key, duplicate label). Each case has `id`, `source`,
+  expected diagnostic codes and expected resolved bindings, plus `class = "authority-question"` and a `question`. The
+  runner uses `tests/support`'s TOML subset parser through `mod support;` WITHOUT editing `tests/support/`, and
+  asserts that every case carries the channel.
+
+## Invariants
+
+- Wasm-safe, with no IO.
+- Directive processing never changes reader, checker or evaluator output.
+- Every diagnostic here is warning severity.
+- No `.rs` file reaches 800 lines.
+
+## Edit Protocol
+
+The common protocol in `vactrol-session-contracts.md`. Evidence goes under
+`tmp/ss-session-20260925-s183/SS-DIRECTIVES/attempt-<n>/`. Sibling-caused crate-wide failures are recorded, never
+fixed.
+
+## Verification (`<wave>` = `directives`)
+
+The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plus:
+
+| # | Command | Evidence |
+|---|---------|----------|
+| D1 | LOG(`ss-directives-own`): `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/directives::tests/) \| binary(directive_fixtures)'` | `exit=0`, run > 0 |
+
+## Completion Criteria
+
+- [ ] Items 1-8 implemented
+- [ ] Every required test passes, including the authority-question channel on every vocabulary case
+- [ ] V1-V9 and D1 pass with logs cited; `final-hashes.txt` written
+
+## Progress Log
+
+(Implementer: add one `### Session: <date> (session <S>, SS-DIRECTIVES implementer)` entry. Edit only this log.)
+
+## Related Plans
+
+- **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
+- **Previous**: vactrol-session-contracts.md. **Parallel**: vactrol-session-pkg.md, vactrol-session-analysis.md
+- **Next**: vactrol-session-core.md, vactrol-session-lsp.md

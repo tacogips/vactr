@@ -146,16 +146,21 @@ src/
   sched/     slots.rs runtime.rs staging.rs telemetry.rs  # section 11, 12.8.2
   dsp/       graph.rs engine.rs voice.rs ugen/ effects/   # section 12, 12.8.2
   host/      caps.rs wire.rs noop.rs native/ wasm/        # sections 11.5, 16, 12.8
-  session/   protocol.rs session.rs repl.rs bindings.rs   # sections 13, 14
-  lsp/       server.rs                                    # section 14.3
+  session/   session.rs eval.rs publish.rs authority.rs   # sections 13, 14, 14.5
+             protocol.rs codec.rs changes.rs console.rs repl.rs
+  pkg/       manifest.rs lock.rs mvs.rs digest.rs store.rs native/  # 5.7, 14.5.7
+  directives/ parse.rs attach.rs labels.rs resolve.rs key.rs persist.rs  # 13.5, 14.5.8
+  cli/       args.rs repl.rs run.rs serve.rs get.rs ws.rs # 14.5.10, command.md
+  lsp/       server.rs analysis.rs                        # section 14.3, 14.5.11
 editor/      TypeScript: CodeMirror 6 frontend, Tauri shell, worklet JS
 ```
 
 | Feature flag | Pulls in | Default |
 |--------------|----------|---------|
-| `host-native` | cpal, midir (non-wasm32 targets only, 12.8.10); tungstenite (session socket) joins in TASK-009 | yes (desktop dev) |
+| (none) | serde, serde_json, miniz_oxide: wasm32-clean, used by the protocol codec and proxy zips (14.5.2) | always |
+| `host-native` | cpal, midir (non-wasm32 targets only, 12.8.10); tungstenite + getrandom for the session socket (TASK-009, 14.5.2) | yes (desktop dev) |
 | `host-wasm` | no crates: raw `extern "C"` exports (12.8.10) | no (wasm builds) |
-| `lsp` | tower-lsp, tokio | no |
+| `lsp` | tower-lsp, tokio, and implies `host-native` (non-wasm32 only) | no |
 
 The core modules (`value` … `dsp`) have no I/O dependencies and no
 assumption of OS threads, keeping `wasm32-unknown-unknown` green from
@@ -4567,7 +4572,7 @@ socket). Versioned envelope `{v, seq, kind, body}`.
 
 | Direction | Message | Body |
 |-----------|---------|------|
-| C→S | `eval` | code, file, span (for flash + origin), `doc_revision` |
+| C→S | `eval` | code (the full document text, 14.5.6), file, span (selects forms; flash + origin), `doc_revision`, `edit_epoch` (14.5.6) |
 | C→S | `hush` / `stop` | (slot) |
 | C→S | `set-var` | name, value, `defining_form_gen` (authority check), `edit_epoch` |
 | C→S | `doc-changed` | file, `doc_revision`, base `doc_revision`, dirty spans (new-revision bytes) + change set, `edit_epoch` |
@@ -4638,6 +4643,649 @@ TASK-010): a debounce-race write stamped with a newer `edit_epoch`
 than the session's last `doc-changed` is rejected; an insertion
 before a site followed by an edit to the shifted site invalidates the
 correct site through composed change-set mapping.
+
+### 14.5 Session-layer implementation decisions (TASK-009, 2026-09-25)
+
+This section fixes the choices that sections 5.7, 12.3, 13.5, 14.1-14.4
+and 17 leave open for issue #4 (Session, protocol, packages, directives,
+REPL, LSP, CLI and the self-analysis surfaces). It follows the shape of
+12.8 and changes no Decided behavior. The wire format of every message
+and the CLI verbs are in `design-docs/specs/command.md`; this section
+holds the rules. Open author questions are in
+`design-docs/user-qa/pending-session-questions.md` (S1-S6). The
+implementation follows each recommendation until it is answered.
+
+#### 14.5.1 Scope boundary
+
+In scope: every TASK-009 deliverable and completion criterion of
+`impl-plans/active/vactrol-core.md` plus the 12.3 amendment surfaces.
+These are the boundary decisions:
+
+- **Session wraps, never re-implements.** `Session` owns one `Evaluator`
+  and one `sched::Runtime` (12.8.1) and adds document state, package
+  state, directive tables, console registers, write authority and the
+  outbox. It adds no second evaluator loop and no second scheduler.
+- **Fetching happens only in `vactrol get`.** A running session reads
+  packages from `vactrol.lock` and the verified cache and never touches
+  the network, so the evaluator can never block on it (5.7 failure
+  contract). If an import is not in the lock, the result is a load
+  diagnostic that says to run `vactrol get`. The editor's import action
+  (TASK-010) calls the same resolve-and-fetch code on its IO side.
+- **Browser package store: Rust half only.** TASK-009 implements the
+  proxy protocol, validation, digest and staged publication against
+  two traits: `ProxyTransport` (GET a URL) and `CacheBackend` (staging
+  directory, atomic rename, stamp). A local HTTP fixture exercises them.
+  The `fetch()` transport and the OPFS backend belong to TASK-010's TS
+  shell, because the raw wasm ABI (12.8.10) has no JS imports.
+- **Native package stores:** a git-tag store that shells out to `git`
+  (14.5.7) and a local-directory store. TASK-009 has no native HTTP
+  client.
+- **Self-analysis: live taps are native-tier, for `:master` and named
+  buses only.** The browser taps are TASK-010. The slot sources
+  `:d1..:d9` and the input `:in` report "not available on this host"
+  (S2). The source forms `fft :src` and `amp :src` (design-music lines
+  89-90) are not in issue #4's list. `fft n` and bare `amp` stay as they
+  are (S2).
+- **No `Engine::render` API.** 12.3 names `Engine::render`, but TASK-008
+  shipped `NativeAudioHost::headless` + `AudioSide::render` as the
+  offline path, and that is what offline `render` uses (14.5.9).
+  `dsp/engine.rs` (786 lines) is not touched.
+
+#### 14.5.2 Dependencies and features
+
+| Crate | Gate | Why |
+|-------|------|-----|
+| `serde` (derive), `serde_json` | regular | protocol codec (14.4 says serde). Both are wasm32-clean and are also required by tower-lsp |
+| `miniz_oxide` | regular | raw-deflate inflate for proxy zips. Pure Rust, wasm32-clean. The zip container reader is in-crate |
+| `tungstenite` (default features, no TLS) | `host-native`, non-wasm32 target table | session socket server and the LSP attach client |
+| `getrandom` | `host-native`, non-wasm32 | session token. Already in tungstenite's tree |
+| `tower-lsp`, `tokio` (rt, io-std, macros, sync) | `lsp`, non-wasm32 | `vactrol lsp` |
+
+- `lsp = ["host-native", "dep:tower-lsp", "dep:tokio"]`, because the LSP
+  attach client uses tungstenite.
+- SHA-256 is in-crate (`pkg/sha256.rs`) and is tested against the FIPS
+  180-4 vectors: empty, `abc`, the 448-bit message and one million `a`.
+- `vactrol.toml` uses an in-crate TOML subset parser (14.5.7).
+- No git library, no HTTP client, no zip crate, no CLI-parser crate and
+  no line-editor crate.
+- Versions follow the 12.8.10 policy: the highest releases whose whole
+  resolved tree builds on Rust 1.83, with `cargo update --precise` where
+  needed. The chosen versions, the `Cargo.lock` diff and a `cargo audit`
+  run go in the CONTRACTS evidence.
+- `cargo tree -e normal --target wasm32-unknown-unknown` must list none
+  of tungstenite, getrandom, tokio or tower-lsp.
+- **Gating of modules.**
+  - `cli/ws.rs` (the session socket server): `all(feature = "host-native", not(target_arch = "wasm32"))`,
+    declared from the CLI-owned `cli/mod.rs`.
+  - `pkg/native/` and `cli/`: `not(target_arch = "wasm32")`. They use
+    `std::fs` and `std::process`.
+  - `lsp/`: `all(feature = "lsp", not(target_arch = "wasm32"))`.
+  - `src/main.rs` keeps an empty wasm32 `main` so the default-feature
+    wasm32 build still links the bin target.
+  - Every other new module is core and stays wasm-safe (6.5.7).
+
+#### 14.5.3 Files and the 800-line budget
+
+No `.rs` file may reach 800 lines (hard limit 1000). A wave that pushes
+a file it touches to 800 or more lines splits that file in the same
+wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
+
+**Ownership rule.**
+- A file has exactly ONE writer per wave.
+- A module is declared by the wave that owns its parent `mod.rs`, in
+  the same wave that creates the file, or earlier with a stub.
+- A file may pass between SEQUENTIAL waves only in the form "CONTRACTS
+  creates a stub or seed, a later wave fills it". Both plans then list
+  that file in their `writePaths`. Two plans of the same wave never
+  share a file.
+- Each NEW top-level module belongs wholly to one wave, `mod.rs`
+  included. CONTRACTS adds only the `src/lib.rs` declarations and an
+  empty `mod.rs` stub for each, so the crate compiles between waves.
+  The one exception is `session/mod.rs`. CONTRACTS seeds it with
+  `pub mod changes;`, because DIRECTIVES (wave 2) uses `ChangeSet`.
+  SESSION then adds its own declarations, and both plans list the file.
+- Every seeded or stubbed file with a later writer is listed here:
+  - `session/mod.rs` (CONTRACTS -> SESSION)
+  - `ns/eval_doc.rs` (CONTRACTS -> SESSION)
+  - `value/sample.rs` (CONTRACTS -> ANALYSIS, for the playback and
+    analysis helpers)
+  - `host/native/tap.rs` (CONTRACTS -> ANALYSIS)
+
+  `ns/stage.rs` and `host/caps.rs` are written only by CONTRACTS, which
+  lands their final variant shapes and default method bodies.
+  - the `pkg/`, `directives/`, `cli/` and `lsp/` `mod.rs` stubs
+    (CONTRACTS -> their owner)
+
+| Module | Files (owner wave) |
+|--------|--------------------|
+| `session/` | `changes.rs` (`ChangeSet`, which DIRECTIVES and SESSION both use) and the seed `mod.rs` declaring it (CONTRACTS); `mod.rs` (extended), `session.rs` (`Session`, `SessionConfig`, per-file `DocState`), `eval.rs` (document pipeline, `alias_env_for`), `publish.rs` (`bindings` batches), `authority.rs` (edit epochs, invalidation, write validation), `protocol.rs` (`ClientMsg`/`ServerMsg`/envelope), `codec.rs` (JSON), `console.rs` (registers, transcript), `repl.rs` (line loop over `BufRead`/`Write`), `tests/` (SESSION). SESSION owns every file here except `changes.rs`, and `session/` has no socket file |
+| `pkg/` | `mod.rs`, `semver.rs`, `manifest.rs`, `lock.rs`, `mvs.rs`, `sha256.rs`, `digest.rs`, `validate.rs`, `zip.rs`, `store.rs` (`PackageStore`, `PkgSources`, `PkgError`), `proxy.rs`, `cache.rs`, `load.rs`, `native/{mod,dir_store,git_store,fs_cache}.rs`, `tests/` (PKG) |
+| `directives/` | `mod.rs`, `parse.rs`, `attach.rs`, `labels.rs`, `resolve.rs`, `key.rs`, `persist.rs`, `writeback.rs`, `tests/` (DIRECTIVES) |
+| `cli/` | `mod.rs`, `args.rs`, `repl.rs`, `run.rs`, `serve.rs`, `get.rs`, `ws.rs` (the session socket server) (CLI) |
+| `lsp/` | `mod.rs`, `server.rs`, `analysis.rs`, `convert.rs` (LSP) |
+| language | `compile/compiler.rs` split into `compiler.rs` + `names.rs` (it is at 798 lines; `compile/mod.rs` declares the new file) plus console-register resolution; `ns/namespace.rs` (console register slots); `value/mod.rs`, `ns/mod.rs` and `host/native/mod.rs` (declarations of the new stubs); `types/diag.rs`, `vm/fail.rs` (the codes of 14.5.12); `value/value.rs`, `value/sample.rs`, `value/print.rs`, `value/eq.rs` (`Sound::Buffer`); `ns/stage.rs` (`StagedEffect::{Capture, Render}`); `host/caps.rs` (tap default methods, `SampleLoader::register_bank` default); `host/native/tap.rs` stub + declaration (CONTRACTS). `ns/pkg.rs` (package evaluation into `PkgNs`), `host/native/loader.rs` (asset banks) (PKG). `ns/eval_doc.rs` (`impl Evaluator`: eval with a manifest and a doc revision; `evaluator.rs` is at 777 lines and is not edited) (SESSION). Self-analysis files (ANALYSIS): `value/sample.rs` (fills the CONTRACTS seed), `types/natives_domain.rs`, `types/natives.rs`, `types/infer_call.rs` (split if it reaches 800), `vm/natives/{mod,analysis,tex}.rs`, `dsp/{mod,offline,caps,bus,fft}.rs`, `dsp/effects/analyzer.rs` (visibility only), `sched/{mod,offline,tap,runtime,commit}.rs`, `ns/insts.rs`, `host/native/{audio,tap}.rs`, `host/testing.rs` |
+| other | `Cargo.toml`, `Cargo.lock`, `src/lib.rs` (CONTRACTS); `src/main.rs`, `tests/cli.rs` (CLI); `tests/lsp_smoke.rs` (LSP); `tests/directive_fixtures.rs`, `tests/fixtures/directives/vocabulary.toml` (DIRECTIVES); `tests/fixtures/spec/manifest.toml` (ANALYSIS for design-music ordinal 2, FINAL for lang-reference ordinal 5; the waves never run in parallel), `tests/support/eval.rs` (FINAL) |
+
+#### 14.5.4 Session and the eval pipeline
+
+- **Construction.** `Session::new(cfg: SessionConfig, hosts: Hosts) ->
+  Session`. The config holds:
+  - the `CapabilitySet` tier;
+  - the project root, where `vactrol.toml` and `vactrol.lock` live;
+  - the package cache;
+  - the `PersistenceMode` (`Directive` by default, 13.5).
+
+  `Session::new` builds the Evaluator + Runtime pair exactly as 12.8.3
+  describes, and registers the analysis context of 14.5.9 in the
+  prelude.
+- **Files.** Protocol `file` strings map to `FileId`s. The first file
+  gets 1, the next 2, and so on; `FileId::CONSOLE` (0) is the REPL. Each
+  file has a `DocState`: its last evaluated revision and text, its
+  directive table, the authority state of 14.5.6, and the labels.
+- **`eval(src, file, doc_revision) -> EvalOutcome`** does this, in order:
+  1. Phase 1: `prescan_imports(src)`.
+  2. Packages: every import is resolved through the lock and the
+     verified cache and compiled into its `PkgNs` (14.5.7). This comes
+     before any form runs, so no form waits.
+  3. Phase 2: read the whole document with an `AliasEnv` holding the
+     session prefixes plus every prescanned import. The session then
+     walks the nodes and turns any `Atom::Qualified` whose prefix is
+     bound only by an import that starts AFTER the atom into
+     `unbound-qualifier`. This matches reading form by form with the
+     env threaded through (5.7), without a reader change.
+  4. Expand.
+  5. Build the directive table (14.5.8) from the reader trivia.
+  6. For each top-level form inside the requested span (the whole
+     document when there is no span): check it against the SESSION
+     `HostManifest` (the spec default plus package banks), evaluate it
+     with `Evaluator::eval_form_in(form, &manifest, doc_revision)`,
+     then `Runtime::drain`. Any queued `upd` then runs one
+     `run_pass` (14.5.5).
+
+  Draining after every form is what lets a later form of the same
+  document see an offline `render` or a finished `capture` from an
+  earlier form (14.5.9). Every `SrcRef` made by a form evaluated at
+  revision r carries r.
+- **`EvalOutcome`** holds:
+  - per form: the span, the value text (the canonical print, 6.5.3),
+    the failure as a diagnostic with origin, and the `form_gen`;
+  - all static diagnostics: reader, expander, checker, load, package
+    and directive lint;
+  - the refreshed tweak-site table, tagged with `doc_revision`;
+  - the directive table summary.
+
+  A reader or expander error in one form does not stop the other forms.
+  This differs from `eval_str`, which stops at the first error.
+- **`tick(host_now) -> Vec<ServerMsg>`** does this, in order: apply the
+  coalesced writes (14.5.6), run `Runtime::tick`, poll captures, then
+  emit `diag`, `playing` (subscribers only), `levels` (at most 10 per
+  second) and `tempo` (on change).
+- **`apply(msg) -> Vec<ServerMsg>`** returns replies and broadcasts in
+  order. The transport routes by kind:
+  - to the requester only: `eval-result`, `stale-binding`,
+    `directive-edit`, `manifest`, `protocol-error`;
+  - to every subscriber: `bindings`, `diag`, `playing`, `levels`,
+    `tempo`.
+- **A live session never dies (17, invariant 5).** Every failure class becomes a
+  diagnostic or a failure with its origin. A panic is a bug, and a
+  no-panic test covers malformed protocol input.
+
+#### 14.5.5 Reactive publication
+
+- **One batch per completed pass, built after the pass.** A pass is
+  complete when `run_pass`, or a `set_tweak` that returns
+  `Some(PassReport)`, returns. By then 5.6 validation and rollback have
+  already run. `publish.rs` builds exactly ONE `bindings` message from
+  the `PassReport`:
+  - `changed`: the names whose committed value changed in the pass,
+    each with its display value and defining `form_gen`
+    (`PassReport.bindings`);
+  - `sites`: the refreshed tweak-site table of every rebuilt form;
+  - `states`: EVERY form scheduled in the pass, with its final state,
+    one of:
+    - `ok`: clears a badge;
+    - `failed`: with the diagnostic and the committed, restored display
+      value;
+    - `blocked`: with `blocked_on` and the committed display value.
+- **Pass boundaries.** A pass that scheduled no form publishes nothing.
+  Because the batch is built from the returned report, nothing can be
+  published mid-pass or mid-round. `PassEvent`s are never forwarded, so
+  a provisional value, a staged bind, a revocation or a cell update of
+  a rolled-back form cannot reach a subscriber. The recording host
+  proves the host half.
+- **Recovery batches.** Equal-value repairs and unblocking both publish
+  the affected forms as `ok`, even when no value changed. Badges are
+  state, not value (5.6 joins rule).
+- **Ordering.** `eval-result` comes before the `bindings` batch of any
+  pass that the eval triggered.
+
+#### 14.5.6 Protocol codec and write authority
+
+- **Envelope.** `{v, seq, kind, body}` with an optional `re` (the seq of
+  the client message a reply answers). The version is `v = 1`.
+  - Unknown `v`, unknown `kind`, a malformed body or invalid JSON each
+    produce `protocol-error` (`unsupported-version`, `unknown-kind`,
+    `bad-body`, `bad-json`), and the connection stays open.
+  - Frames larger than 1 MiB are refused.
+- **Additions to the 14.4 table.** These are needed by the criteria and
+  add nothing else:
+  - `protocol-error` (S→C).
+  - `learn` (C→S: binding, cc, ch, `edit_epoch`) and `directive-edit`
+    (S→C: file, `doc_revision`, span, expected text, new text) carry
+    the 13.5 MIDI-learn write-back. The editor applies a
+    `directive-edit` only after it checks the expected text, and then
+    sends `doc-changed` as usual.
+  - `manifest` (S→C), the reply to `manifest?`.
+- **Meaning of `eval` fields.** `eval.code` is the FULL document text
+  at `doc_revision`, the optional `span` selects the forms to run, and
+  `edit_epoch` is the editor epoch that the text reflects (rule 3).
+  The session needs the whole text for the directive table and the
+  phase-1 `AliasEnv` (5.7, a single-form eval uses the buffer's scan).
+- **Value encoding.** `set-tweak` and `set-var` values are JSON numbers,
+  coerced to the site's `NumTy` or to the var's current type, or
+  booleans. Anything else is `bad-body`. Display values are canonical
+  prints. Beats are `[num, den]` pairs, and host times are f64 seconds.
+- **Change sets.** A `ChangeSet` is a sorted list of non-overlapping
+  replacements `{from, to, insert_len}` in base-revision byte offsets.
+  `map_span` shifts a span that lies entirely before or after every
+  replacement and reports `Touched` otherwise. Composition applies the
+  maps in order.
+- **Authority rules**, applied when a write arrives AND again when the
+  coalesced write is applied at the tick:
+  1. `set-tweak`: the site's `form_gen` must equal the message's
+     `form_gen`, else `stale-binding` with reason `stale-form-gen`.
+  2. The site must not be edit-invalidated, else reason
+     `edit-invalidated`.
+  3. Unreconciled edit: `edit_epoch` is per editor document and
+     monotonic. The session keeps a RECONCILED epoch per document: the
+     highest `edit_epoch` carried by any `eval` or `doc-changed` for
+     that document. `eval` carries the epoch its text reflects, which
+     is an addition to the 14.4 table. Without it, edits made before
+     the first eval would look unreconciled forever. A write whose
+     `edit_epoch` is higher than the reconciled epoch is rejected with
+     reason `unreconciled-edit`, and stays rejected until the matching
+     `doc-changed` or `eval` arrives (14.4 rule 3).
+  4. `set-var`: rules 2 and 3 apply to the name's defining span. The
+     name's CURRENT defining form must have `defining_form_gen`, else
+     reason `superseded-definition`.
+  5. `doc-changed` whose base revision equals the session's revision
+     for the file: every stored site and definition span is mapped
+     forward, and any span that is `Touched` or intersects a dirty span
+     is edit-invalidated. Every other span moves to its mapped
+     coordinates, and the stored revision advances.
+  6. `doc-changed` whose base revision is not the session's revision:
+     the session cannot map it, so every site and definition in the
+     file is edit-invalidated until the next eval. It never guesses.
+  7. An eval of the file clears invalidation for the forms it rebuilds,
+     through fresh sites.
+- **Coalescing (13).** An accepted write is stored latest-wins per
+  target (a `TweakId` or a name) until the next tick. The tick applies
+  all pending `set-var`s as `queue_upd` plus ONE `run_pass`, then each
+  pending `set-tweak` through `Evaluator::set_tweak`, whose `reeval`
+  rebuild is its own pass and its own batch.
+- **Tiers.** `direct`, `reeval` and `manual` keep the meanings they
+  already have in the evaluator (13, 5.6). A `manual` site updates its
+  slot with no replay and reports `manual` in the site table.
+
+#### 14.5.7 Packages
+
+- **`vactrol.toml`** is an in-crate strict TOML subset: tables
+  `[package]` and `[deps]`, basic strings, string arrays and `#`
+  comments. Anything else is a manifest parse error.
+  - `[package]` keys: `path` (the `PackageId`, which must equal the
+    import path it was fetched as), `vactrol` (the minimum language
+    semver) and `assets` (relative directories).
+  - `[deps]`: `"github.com/o/n" = "v1.2.0"`.
+  - A set's ROOT manifest may omit `[package]`. `vactrol get` creates
+    `./vactrol.toml` with only `[deps]` when none exists.
+- **`vactrol.lock`** is line-based and deterministic. The first line is
+  `# vactrol.lock v1`, followed by one line per package,
+  `<path> <version> sha256:<64 lowercase hex>`, sorted bytewise by path.
+  An unknown header version or a malformed line is a load diagnostic.
+- **Semver and MVS.** Versions are tags `vMAJOR.MINOR.PATCH[-pre]` with
+  semver 2.0 precedence; other tags are ignored. MVS follows 5.7: a
+  breadth-first walk of the requirement graph over each visited
+  version's manifest, then the maximum of the minimums per path. With
+  no version given, `vactrol get` picks the highest non-prerelease tag.
+  Semantic-import-versioning (`/v2` paths) is not in v1: majors compare
+  like any other version (S5).
+- **Stores (`PackageStore`, IO side, never on the evaluator).** The
+  trait has `list_versions(id)`, `manifest(id, version)` and
+  `fetch_into(id, version, staging)`.
+  - LOCAL-DIRECTORY store: `<root>/<path>@<version>/`, used by fixtures
+    and by `vactrol get --store dir:<root>`.
+  - GIT store: runs the `git` binary with fixed argv arrays (no shell),
+    `--` before operands, the environment `GIT_TERMINAL_PROMPT=0` and
+    `GIT_CONFIG_NOSYSTEM=1`, and `-c core.hooksPath=/dev/null
+    -c protocol.file.allow=user`. Tags come from `ls-remote --tags
+    <base>/<path>`, and the fetch is `clone --depth 1 --branch <tag>
+    --single-branch`. `.git/` is removed before validation and never
+    takes part in the digest.
+    - `<base>` is a constructor argument, `GitStore::new(base)`. The CLI
+      always passes `https://` and has no flag to change it. The PKG
+      test passes a `file://` URL for a temporary directory holding
+      local bare repositories, `<tmp>/github.com/o/n`, that the test
+      creates with the `git` CLI, so the test never reaches the public
+      network.
+  - PROXY store (`proxy.rs`): `{proxy}/{path}/@v/list`,
+    `{proxy}/{path}/@v/{version}.toml` (the manifest, so an MVS walk
+    never downloads zips) and `{proxy}/{path}/@v/{version}.zip`, over
+    `ProxyTransport`.
+- **Validation (5.7 revised), run first on every store** over the
+  entries of a staged tree or the entries of a zip:
+  - Each path is relative, uses `/`, is UTF-8, contains no byte below
+    0x20 and no 0x7f, and has no empty, `.` or `..` segment and no
+    drive or absolute prefix.
+  - Only regular files are allowed. Symlinks are refused (tree:
+    `symlink_metadata`; zip: Unix mode bits in the external attributes).
+    So are devices and hardlinks.
+  - Exact duplicates and duplicates under Unicode simple case folding
+    are refused.
+  - Default caps: 10 000 entries and 256 MiB uncompressed, checked
+    during extraction.
+  - Zip: only stored and deflate entries are allowed; encryption, zip64
+    and multi-disk archives are refused. The declared size is enforced
+    against the inflated byte count.
+  - Manifest `assets` must normalize strictly under the root.
+
+  A violation is `package-integrity` naming the entry, and the cache is
+  not changed.
+- **Digest.** `digest.rs` implements the 5.7 record exactly,
+  `u32_be(len) || path || sha256(contents)` over bytewise-sorted paths,
+  with the lock digest being the sha256 of the concatenation. A tree
+  and a zip of the same sources give the same digest (portability
+  test).
+- **Staged, atomic publication (`cache.rs`).** The sequence is: fetch or
+  extract into `<cache>/.staging/<random>` (created with
+  `create_dir`, never reused), validate, digest, compare with the lock
+  (or record the digest when `vactrol get` writes the lock), write the
+  stamp `<entry>/.vactrol-digest`, and finally `rename` into
+  `<cache>/<path>@<version>`. Any earlier failure removes the staging
+  directory. On a verified read, the stamp must equal the lock digest.
+  A mismatch is `package-integrity` and the session never re-hashes
+  while it plays. The cache root is `$VACTROL_HOME/pkg`, with
+  `VACTROL_HOME` defaulting to `~/.vactrol`. An interrupted-extraction
+  test injects a failure after half the entries and asserts that no
+  entry path exists.
+- **Loading (`ns/pkg.rs`, `pkg/load.rs`).** A package's `.vact` files,
+  in bytewise path order, go through read -> expand -> check -> compile
+  -> run into a fresh `PkgNs`. Each file gets its own `FileId`, so
+  diagnostics are attributed to the package. The package's forms are
+  ordinary forms: they share the session prelude, instrument registry
+  and effect sink. Its own imports resolve through the same lock.
+  Re-import replaces the `PkgNs` (5.7).
+- **Assets.** Each immediate subdirectory `<bank>` of a manifest asset
+  directory registers, through `SampleLoader::register_bank`, as the
+  bank `:<name>-<bank>`, where `<name>` is the package's default prefix.
+  That keyword joins the session `HostManifest` (S3). A clash with an
+  existing bank is `import-collision` (w), and the first registration
+  wins. Path literals inside package files resolve relative to the
+  file, contained under the package root.
+- **Failure contract.** The load diagnostics are:
+  - `package-not-locked`: the import is not in the lock;
+  - `package-not-fetched`: the lock entry has no verified cache entry;
+  - `package-integrity`;
+  - `package-load-failed`: a manifest parse error or the package's own
+    compile errors, which are also listed at their package origins.
+
+  Each sits at the import span. The prefix stays bound-but-broken, so
+  qualified uses under it become `undefined-name`, and the session keeps
+  playing.
+- **LSP analysis (no execution).** The LSP uses the same `alias_env_for`.
+  A fetched package's qualified names are typed by a check-only pass
+  over its cached sources. An unfetched package types them as `any`,
+  with the warning `package-not-fetched`.
+
+#### 14.5.8 Directives and binding persistence
+
+- **Parse (`parse.rs`)** implements the 13.5 PROPOSED grammar as
+  written. It classifies each directive by its first token: `midi` and
+  `label.sel[.n]` are Addressed; everything else is Positional.
+  `#@ name X` and a leading `ident:` define labels. `cc:` takes ints
+  and `_`, and `ch:` takes an int. `range:` gives `reserved-key`, and a
+  CC outside 0..127 or a channel outside 1..16 gives `cc-out-of-range`.
+- **Attach (`attach.rs`)**, per the Decided rule:
+  - A trailing `#@` on a code line attaches to that line.
+  - Consecutive own-line `#@` lines form one block, which attaches to
+    the nearest PRECEDING statement, block or definition whose
+    indentation is no deeper than the block's. At column 0 after an
+    `inst` body, that means the whole `inst`.
+  - A positional block with no preceding target gives
+    `unknown-directive-site`.
+  - Addressed directives are position-free.
+  - `#@ midi ch: n` sets the file default. A later one replaces it,
+    with `duplicate-key` (w).
+- **Labels (`labels.rs`).** Explicit labels plus implicit ones (every
+  top-level `let`/`fn`/`inst`/`bus`/`look` name and every named slot)
+  share one per-document namespace. Any collision is `duplicate-label`.
+  An addressed reference to the colliding name is rejected, and the
+  affected sites fall back to positional provenance.
+- **Resolve (`resolve.rs`)** follows 13.5 ADDRESSED SELECTOR RESOLUTION
+  exactly: parameter first for definition targets, then call-site name,
+  then ordinal. It reports `ambiguous-selector`, `unknown-label`,
+  `unknown-parameter` and `unknown-directive-site`. Declared parameter
+  order comes from the `inst`/`fn`/`bus` header nodes and, for
+  builtins, from the `EditorDecl`/`ParamMeta` order. All of these are
+  lint-severity warnings, and evaluation never reads the table.
+- **Binding identity (`key.rs`).**
+  - The key is `BindingKey { label, site: Option<(SymId, u16)>, param }`
+    as in 13.5; an unlabeled site keeps `TweakId` + `form_gen`.
+  - On `doc-changed`, each keyed site's last resolved span goes through
+    the `ChangeSet` and the same-named call sites are counted again:
+    - a clean mapping onto a same-named site MIGRATES the key (ordinal
+      rewritten);
+    - a `Touched` mapping, or one that does not land on a same-named
+      site, marks the binding `stale`. It keeps its data and waits for
+      re-confirmation; positional fallback is the recovery.
+- **Persistence (`persist.rs`).** `trait BindingPersistence { fn
+  load(&self, doc) -> BindingSet; fn save(&mut self, doc, &BindingSet)
+  -> Persisted; }`. A `BindingSet` holds entries `{ key, panel: bool,
+  midi: Option<{cc, ch}>, overlay: Option<f64> }`.
+  - `Directive` (the default) renders panel membership and mappings as
+    directive text edits, and never writes overlay values into the
+    source (13).
+  - `ExternalFile` writes `<doc>.bindings.json` (`{v: 1, bindings}`,
+    with keys spelled `label.site.n.param`) and does keep overlays.
+
+  The round-trip criterion covers keys, panel membership and mappings
+  in both modes, plus overlays in ExternalFile mode (S4).
+- **Write-back (`writeback.rs`).** A `learn` produces the minimal edit
+  that inserts or replaces the `cc:` number at the binding's position
+  in its directive, or appends a new directive block if none exists.
+  The edit is validated like literal write-back:
+  - the binding must not be stale;
+  - the `edit_epoch` must pass rule 3 of 14.5.6;
+  - the expected text is the directive's current text.
+
+  In ExternalFile mode, `learn` updates the session file and returns no
+  `directive-edit`.
+- **Vocabulary fixtures** are in `tests/fixtures/directives/vocabulary.toml`,
+  read by `tests/directive_fixtures.rs` through `tests/support`'s TOML
+  subset parser. Each case carries `class = "authority-question"` and
+  `question`: this is the vocabulary's authority-question channel, kept
+  apart from the spec manifest so that the DIRECTIVES and ANALYSIS waves
+  never write the same file.
+
+#### 14.5.9 Self-analysis surfaces (12.3 amendment)
+
+- **Sample values.** `Sound::Buffer(Rc<SampleBuf>)` is typed `sound`.
+  - `SampleBuf` holds the sample rate, interleaved stereo `f32` frames,
+    and a state: `Pending`, `Ready` or `Failed(Failure)`.
+  - Reading a `Pending` buffer (analysis or playback) is
+    `Failure(capture-pending)`. A `Failed` buffer returns its failure.
+  - `s buf` plays a Ready buffer through the `sampler` route. At commit
+    it is installed as a sample resource keyed by the buffer's
+    identity, so `chop` and `granular` compose.
+- **Surfaces and checker types.** `spectrum`, `scope` and `render` join
+  the M1 fixed subject-overload group (7.1.4, B2):
+
+  | Call | Type | Meaning |
+  |------|------|---------|
+  | `scope :src n` | `fn keyword int -> [float]` | the last n mono frames of a live tap, n <= 8192 |
+  | `scope buf n` | `fn sound int -> [float]` | the first n mono frames of a buffer |
+  | `spectrum :src bins: b` | `fn keyword -> [float]` (kw `bins`, default 64) | one FFT frame of 2b samples from the tap. b is a power of two in 8..2048, else `Failure(type)` |
+  | `spectrum buf bins: b` | `fn sound -> [float]` | the same, averaged over consecutive frames of the buffer |
+  | `spectrum` in a `bus`/`inst` body | unchanged | the analyzer unit (12.8.6 rule) |
+  | `capture :src cycles` | `fn keyword any -> sound`, effect, needs `Analysis` | a `Pending` buffer that records the NEXT `cycles` cycles, starting at the next cycle boundary (S1) |
+  | `render cycles` | `fn any -> sound`, effect | offline render; a number subject selects it |
+  | `render` / `render :o0` | unchanged | the visual setting |
+  | `rms buf` / `peak buf` | `fn sound -> float` | RMS / absolute peak over both channels |
+
+  `dsp/offline.rs` runs the SAME `fft.rs` and analyzer helpers over a
+  slice, so nothing forks.
+- **Live taps (native).** `AudioSide::render` copies the `:master`
+  output and each named bus's block into preallocated per-source
+  history rings of 8192 mono frames. The copy is lock-free and
+  allocation-free (the 12.8.9 probe covers it). The evaluator reads a
+  seqlock snapshot through the `AudioHost` default methods
+  `tap_snapshot` and `arm_capture`/`poll_capture`. `NoopHost` and the
+  browser return `host-unavailable`; the recording host
+  (`host/testing.rs`) returns a synthetic signal. A capture streams the
+  armed source into an SPSC ring that `Runtime::tick` drains into the
+  buffer. It is bounded by `max_capture_seconds`: a longer request is
+  `beyond-capability` at the call. `dsp/bus.rs` gains the read-only
+  bus-frame accessor.
+- **Offline render (`sched/offline.rs`).** A `Render` effect staged by
+  `render` is handled in `Runtime::drain`, where `&mut Evaluator` is
+  free. The runtime:
+  - builds a headless `NativeAudioHost` and a second `Runtime` with the
+    same resolver and caps;
+  - installs the live instrument and bus graphs and the ACTIVE slot
+    bindings;
+  - ticks a virtual clock from cycle 0 at the live tempo through the
+    six 11.3 steps WITHOUT step 6 (no `at`/`once` thunk runs, so
+    nothing leaks into the live session);
+  - renders `cycles` cycles into the buffer and marks it `Ready`.
+
+  The live runtime and clock are untouched. The work is bounded by
+  `max_capture_seconds` and done synchronously on the evaluator thread,
+  outside any audio callback. `CapabilitySet::native()` sets
+  `offline_render = true`. The browser preset keeps it false, so
+  `render n` fails AT THE CALL with `Failure(beyond-capability)` "not
+  available on this host". Builds without `host-native` behave like the
+  browser.
+- **Analysis context.** `Session::new` registers an
+  `AnalysisCx { caps, taps }` in the prelude, the same way
+  `register_load` does, so natives can reach the caps and the tap
+  snapshots without a new VM field. When no context is registered, as
+  in a bare `Evaluator` or the spec fixture runner, every self-analysis
+  native fails with `host-unavailable`, just as under `NoopHost`. That
+  lets ANALYSIS repin design-music ordinal 2 without touching the
+  runner.
+
+#### 14.5.10 REPL, CLI and the session socket
+
+- **REPL (`session/repl.rs` + `cli/repl.rs`).** A stdin reader thread
+  sends lines over an mpsc channel. The main (evaluator) thread waits
+  in `recv_timeout(TICK_PERIOD)` and ticks the session between lines,
+  so sound keeps playing while the prompt waits.
+  - Continuation: a line ending in the block colon, or an indented line
+    or a `>` line that follows one, continues the entry. A blank line
+    submits.
+  - EOF exits with code 0.
+  - A completed non-failing expression binds the next register `_n`
+    (`Namespace` console slots; the compiler resolves
+    `Atom::ConsoleReg`, and the checker keeps typing it `any`) and
+    prints `_n = <value>`. A failure prints the diagnostic and binds
+    nothing.
+  - The transcript prints diagnostics, console output and runtime
+    `diag`s as they arrive.
+- **CLI.** Hand-written argument parsing. The verbs and flags are in
+  `command.md`. The host is `--host native|noop`; the default is
+  `native` when the crate is built with `host-native`. If the device
+  fails to open, the CLI warns and falls back to `noop` (a live session
+  never dies, S6). `--cycles N` with `noop` drives a VIRTUAL clock, so
+  tests end deterministically.
+- **Session socket (`cli/ws.rs`, 17).**
+  - It binds `127.0.0.1` only; a non-loopback `--bind` is refused.
+  - The token is 32 bytes from `getrandom`, hex-encoded, and printed
+    once to stderr as the connect URL
+    `ws://127.0.0.1:<port>/session?token=<hex>`.
+  - The handshake requires the path `/session` and a constant-time
+    token match. Anything else gets HTTP 401 before the upgrade.
+  - At most 8 connections, and frames up to 1 MiB.
+  - Each connection has one thread that reads with a 5 ms timeout,
+    parses messages, and forwards them over mpsc to the evaluator
+    thread; the same thread flushes that connection's outbound queue.
+  - `Session` never leaves the evaluator thread (17.1).
+  - The token is never written to disk.
+
+#### 14.5.11 LSP
+
+- **Threading.** tower-lsp over stdio on a current-thread tokio
+  runtime. All `!Send` analysis state (interner, `Rc` values) lives on
+  ONE analysis thread, and handlers talk to it through channels. This
+  is required because tower-lsp futures are `Send`.
+- **Features.**
+  - Full-text sync.
+  - `publishDiagnostics`: reader, expander, checker, package
+    (`package-not-fetched` and so on) and directive lint.
+  - Hover: the type of the innermost node at the cursor, from
+    `CheckResult.types`, which is the `TypedInfo` of 14.3.
+  - Completion: prelude names from `NativeTable`, document top-level
+    names, manifest keywords, package prefixes and qualified names.
+  - Formatting: only strips trailing whitespace and ensures one final
+    newline. This keeps every comment and directive byte-identical.
+- **Attach.** `vactrol lsp --session <url>` connects to a running
+  `serve` socket, subscribes to diagnostics, and merges runtime `diag`s
+  into the matching document's diagnostics. Standalone, it serves
+  static diagnostics only (14.3).
+- **Smoke test.** `tests/lsp_smoke.rs`, under
+  `#![cfg(feature = "lsp")]`, starts `CARGO_BIN_EXE_vactrol lsp` over
+  pipes with Content-Length framing. It sends `initialize`, `didOpen`
+  of a lang-reference spec block, and a `hover` over a bound name, and
+  asserts one `publishDiagnostics` for the URI and a hover whose
+  contents contain the type.
+
+#### 14.5.12 Codes, waves and verification
+
+**New codes (closed list), added by CONTRACTS in one edit.**
+- `DiagCode`, directive lint, all (w): `unknown-directive-site`,
+  `unknown-parameter`, `unknown-label`, `duplicate-label`,
+  `ambiguous-selector`, `cc-out-of-range`, `reserved-key`.
+- `DiagCode`, packages: `package-not-locked`, `package-not-fetched`
+  (w), `package-integrity`, `package-load-failed`, `package-resolve`
+  (from `vactrol get`: an unresolvable version or a store or network
+  error).
+- `FailCode`: `capture-pending`, `beyond-capability`.
+- Protocol `protocol-error` codes and `stale-binding` reasons are
+  protocol strings (14.5.6), not `DiagCode`s.
+
+**Waves.** Plans are `impl-plans/active/vactrol-session-<wave>.md`.
+Each lists its own plan file in its manifest `writePaths`. Only FINAL
+edits `vactrol-core.md` and `impl-plans/README.md`, and FINAL never
+edits the dispatch manifest.
+
+| Wave | Content | Depends on |
+|------|---------|------------|
+| CONTRACTS | Cargo deps and features plus version pinning and audit; the `src/lib.rs` declarations with stub `mod.rs` files; `session/changes.rs` with its tests and the seed `session/mod.rs` (`pub mod changes;` only); the codes; the `Sound::Buffer`/`SampleBuf` shape with minimal arms; `StagedEffect::{Capture, Render}` shapes (the runtime ignores them until ANALYSIS); the `host/caps.rs` default methods and the `host/native/tap.rs` stub (declared in `host/native/mod.rs`); `value/sample.rs` (declared in `value/mod.rs`); the `ns/eval_doc.rs` stub (declared in `ns/mod.rs`); the `compile/compiler.rs` split into `compile/compiler.rs` + `compile/names.rs` (declared in `compile/mod.rs`) plus console-register resolution; `Namespace` console slots | — |
+| PKG | `pkg/`, `ns/pkg.rs`, `host/native/loader.rs` | CONTRACTS |
+| DIRECTIVES | `directives/`, `tests/directive_fixtures.rs`, `tests/fixtures/directives/vocabulary.toml` | CONTRACTS |
+| ANALYSIS | the 14.5.9 files, plus repinning design-music ordinal 2 in the spec manifest | CONTRACTS |
+| SESSION | `session/` (every file except `changes.rs`), `ns/eval_doc.rs`: pipeline, publication, authority, codec, console, REPL loop, and the protocol, publication, stale-write, package-through-session and recording-host tests | PKG, DIRECTIVES, ANALYSIS |
+| CLI | `src/main.rs`, `cli/` (including `cli/ws.rs`), `tests/cli.rs` (the binary with `--host noop`: `run --cycles`, `repl` over piped stdin, `get --store dir:` in a temp `VACTROL_HOME`, and `serve` with a token-checked client round trip) | SESSION |
+| LSP | `lsp/`, `tests/lsp_smoke.rs` | SESSION |
+| FINAL | reclassify lang-reference ordinal 5 (evaluated through `Session`, `tests/support/eval.rs`); core-plan TASK-009 checkboxes, progress log and the pending audible gate; README; archive | CLI, LSP |
+
+The waves run in this order: CONTRACTS; then PKG + DIRECTIVES +
+ANALYSIS; then SESSION; then CLI + LSP; then FINAL.
+
+**Verification.** The 6.5.7 evidence rule applies to every wave, with
+`<plan>` = `ss-<wave>`. The checks are:
+- `build`, `build-lsp` (`cargo build --features lsp`), `clippy`
+  (`--all-targets -- -D warnings`), `clippy-lsp` (the same with
+  `--features lsp`), `fmt` (`--check`), `nextest`, `test` (plain
+  `CARGO_TERM_QUIET=true cargo test`), `wasm32`, `wasm32-hostwasm`,
+  `linecount` (the largest `.rs` is under 800) and `tree-wasm32` (none
+  of the gated crates appears);
+- CONTRACTS also runs `audit`;
+- LSP also runs `lsp-smoke` (`cargo test --features lsp --test
+  lsp_smoke`).
+
+The audible REPL gate stays a manual step, recorded as pending user
+confirmation. Its automated proxy is the SESSION recording-host test:
+a REPL-bound pattern reaches the audio host as events. Rollback is a
+`git revert` of the single implementation commit; nothing migrates.
 
 ## 15. Editor: Tauri, Web, Wasm — and What Performance Needs
 

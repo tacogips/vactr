@@ -1,7 +1,7 @@
 # Vactrol Middle End: Path, Url and Sound Front-End Amendment (ME-FRONTEND) Implementation Plan
 
 **planId**: ME-FRONTEND (front-end amendment of issue #2; amends TASK-001/002 outputs)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in sessions 175/176; removed from the dispatch manifest by the session-177 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in sessions 175/176; removed from the dispatch manifest by the session-177 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md section 6.5.8 (normative), 6.5.4 (lexer rules), 6.5.3 (eq/print/access), 7.1.7 (FRONTEND wave); lang-reference.md section 3 "path and url literals"; design-music.md "sound kits"
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

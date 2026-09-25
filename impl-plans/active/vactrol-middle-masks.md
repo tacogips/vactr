@@ -1,7 +1,7 @@
 # Vactrol Middle End: Types, Masks, Native Table and Codes (ME-MASKS) Implementation Plan
 
 **planId**: ME-MASKS (first deliverable of vactrol-core.md TASK-004; TASK-005's compiler consumes it)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in sessions 175/176; removed from the dispatch manifest by the session-177 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in sessions 175/176; removed from the dispatch manifest by the session-177 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.5, 7, 7.1.2, 7.1.3 (Masks, Native signature table, Codes), 7.1.4, 7.1.6
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

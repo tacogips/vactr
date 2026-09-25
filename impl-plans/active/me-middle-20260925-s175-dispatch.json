@@ -1,7 +1,7 @@
 {
   "taskId": "me-middle-20260925-s175",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-179",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-180",
   "issueReference": {
     "repository": "tacogips/vactrol",
     "number": 2,
@@ -10,7 +10,7 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "f7a937c05fb8e7a7f719ab6b93b26c524b33b9d8",
+  "originalHead": "f27253652c1db420a452c008e11cc0998abe8c99",
   "parentPlanPath": "impl-plans/active/vactrol-core.md",
   "planIndexPath": "impl-plans/README.md",
   "designDocPaths": [
@@ -135,80 +135,13 @@
   },
   "plans": [
     {
-      "planId": "ME-INTEGRATE",
-      "planPath": "impl-plans/active/vactrol-middle-integrate.md",
-      "implementsTask": "TASK-004/005/006 whole-pipeline criteria: QueryVm for Vm, domain natives, check stage, spec fixture evaluation",
-      "wave": 5,
-      "status": "ready",
-      "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-middle-integrate.md#progress-log",
-      "writePaths": [
-        "src/vm/query_vm.rs",
-        "src/vm/natives/pattern.rs",
-        "src/vm/natives/signal.rs",
-        "src/vm/natives/tex.rs",
-        "src/vm/natives/music.rs",
-        "src/vm/natives/sound.rs",
-        "src/vm/tests/integrate_query.rs",
-        "src/vm/tests/integrate_sound.rs",
-        "src/vm/tests/integrate_pattern.rs",
-        "src/vm/tests/integrate_tex.rs",
-        "src/vm/tests/native_table.rs",
-        "tests/spec_fixtures.rs",
-        "tests/support/mod.rs",
-        "tests/support/eval.rs",
-        "tests/fixtures/spec/manifest.toml",
-        "impl-plans/active/vactrol-middle-integrate.md"
-      ],
-      "sharedPaths": [
-        "src/vm/mod.rs",
-        "src/vm/natives/mod.rs",
-        "src/vm/tests/mod.rs",
-        "src/ns/evaluator.rs",
-        "src/ns/load.rs",
-        "src/types/manifest.rs",
-        "src/types/diag.rs",
-        "src/vm/fail.rs",
-        "src/lib.rs",
-        "src/value/dict.rs",
-        "src/compile/matchc.rs"
-      ],
-      "acceptanceCriteria": [
-        "Serial repairs R1 (src/value/dict.rs put merges a dict element, later keys win) and R2 (src/compile/matchc.rs shape_of binds a match name unless it names the variant itself) are applied; blocked_by/defect_run_fails are removed from case eval-sound-kit-override and lang-reference block 4; integrate_sound.rs uses the verbatim put default-sound-kit [bd: ..] spelling.",
-        "QueryVm for Vm, the domain natives, the prelude sound-kit values and the check stage in eval_form/load are implemented.",
-        "The native-table completeness test passes.",
-        "TASK-004: fixtures type-check per their classification, and the annotated negatives produce their codes in isolated sessions.",
-        "TASK-005: every positive fixture produces its annotated value via read -> expand -> check -> compile -> run; diagnostic fixtures produce their codes; authority-question and illustrative-excluded fixtures are tracked with dispositions.",
-        "TASK-006: PParam::Late/PParam::Fn via the VM, the tweaked-probability re-query in both directions, bind-time input-lane rejection, and a failing visual chain keeping the previous binding.",
-        "TASK-005 forcing criterion, visual case: osc {* 20 {sin time}} through the real registered osc native keeps its thunk deferred at the call boundary (Late mask) and forces it only at uniform resolution (src/vm/tests/integrate_tex.rs).",
-        "The sound-kit late binding, kit: and sound-value cases pass.",
-        "No block has eval = \"unclassified\"; V1-V8 pass with logs cited; final-hashes.txt written."
-      ],
-      "verification": [
-        "mkdir -p target/fe-logs",
-        "LOG(integrate-build): CARGO_TERM_QUIET=true cargo build",
-        "LOG(integrate-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
-        "LOG(integrate-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "LOG(integrate-cargotest): CARGO_TERM_QUIET=true cargo test",
-        "LOG(integrate-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
-        "LOG(integrate-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
-        "LOG(integrate-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
-        "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
-        "git diff --stat -- Cargo.toml Cargo.lock",
-        "rustfmt --edition 2021 --check <owned .rs files>",
-        "grep -c 'eval = \"unclassified\"' tests/fixtures/spec/manifest.toml"
-      ]
-    },
-    {
       "planId": "ME-FINAL",
       "planPath": "impl-plans/active/vactrol-middle-finalize.md",
       "implementsTask": "TASK-004..006 reconciliation, crate-wide fmt, plan bookkeeping",
       "wave": 6,
       "status": "ready",
-      "dependsOn": [
-        "ME-INTEGRATE"
-      ],
+      "dispatchNote": "RECON-S184-1 review-pass redispatch on the unchanged tree. The session-183 bookkeeping is done (see completion); the redispatch re-runs the gate on the current tree and must not rewrite plan documents or this manifest unless a review finding requires it. The step6-implement payload carries planId. The step7-adversarial-review output carries a findings array ([] when none) and NO planId. Evidence goes to tmp/me-middle-20260925-s175/ME-FINAL/attempt-2/.",
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-middle-finalize.md#progress-log",
       "writePaths": [
         "impl-plans/active/vactrol-core.md",
@@ -252,7 +185,8 @@
         "jq . impl-plans/completed/fe-frontend-20260925-s165-dispatch.json > /dev/null",
         "jq . impl-plans/active/me-middle-20260925-s175-dispatch.json > /dev/null",
         "git status --short"
-      ]
+      ],
+      "completion": "Completed session 183: join integrity checked (tmp/me-middle-20260925-s175/ME-FINAL/attempt-1/join-integrity.txt, every mismatch explained); target/fe-logs/final-{build,clippy,fmt,nextest,cargotest,fixtures,wasm32,wasm32-hostwasm}-s183-1.log all exit=0 (nextest 489 passed, 1 skipped; cargo test lib 479 + spec_fixtures 10 passed, 1 ignored); vactrol-core.md TASK-004..006 bookkeeping done; formal review and the workflow commit pending."
     }
   ],
   "session177Amendment": {
@@ -459,6 +393,30 @@
           "src/ns/mod.rs",
           "src/ns/tests/mod.rs"
         ]
+      }
+    ]
+  },
+  "completion": {
+    "date": "2026-09-25",
+    "session": 183,
+    "note": "All eight ME plans completed: ME-MASKS, ME-FRONTEND, ME-CHECK, ME-VM, ME-PATTERN and ME-REACTIVE were accepted outside the manifest (session 177/178/179 amendments), and ME-INTEGRATE and ME-FINAL are completed here. Final combined-tree logs: target/fe-logs/final-<check>-s183-1.log, all exit=0. Plans are marked Completed and move to impl-plans/completed/ after the workflow commit, on user confirmation."
+  },
+  "session180Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-INTEGRATE was accepted in session 179 (adversarial review 0 blocking, integration review accepted). ME-FINAL implemented its bookkeeping (gate and integrity passed) but its adversarial review output omitted the required findings array, and the redispatch was refused with 'dispatch manifest differs from the committed checkpoint' because ME-FINAL legitimately edited this manifest (status/completion fields). This checkpoint commits that manifest state; ME-INTEGRATE is removed from plans[] as accepted; ME-FINAL is re-dispatched alone for its review pass. Reviewer: the step7 output MUST carry the findings array (empty when none).",
+    "recon184Repair": "Integration review finding RECON-S184-1 (high): the native fanoutJoin failed branch ME-FINAL at step7-adversarial-review (validationRejected: $.findings missing); snapshot sequence tmp/riela-fanout/C129010E-58BC-4A07-9174-1851A02FD806/ ends at 18E43122 (before:step7). Repair per the finding: ME-FINAL is re-dispatched natively on the unchanged tree (plans[].status reset from completed to ready so the dispatcher selects it; its completion note is kept). The reconciler must not repair this in place; integration review decides acceptance. workflowExecutionId moves to session-180 and originalHead from f7a937c to f272536 (the session-179 plan checkpoint). impl-plans/completed/fe-frontend-20260925-s165-dispatch.json (ME-FINAL closure note) is not part of this checkpoint, so this manifest is the only dispatch manifest in the checkpoint; the closure note rides in the single workflow commit.",
+    "acceptedOutsideManifest": [
+      "ME-MASKS",
+      "ME-FRONTEND",
+      "ME-CHECK",
+      "ME-VM",
+      "ME-PATTERN",
+      "ME-REACTIVE",
+      "ME-INTEGRATE"
+    ],
+    "removedPlans": [
+      {
+        "planId": "ME-INTEGRATE",
+        "planPath": "impl-plans/active/vactrol-middle-integrate.md"
       }
     ]
   }

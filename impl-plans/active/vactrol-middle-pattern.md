@@ -1,7 +1,7 @@
 # Vactrol Middle End: Pattern Engine, Signals, Clock, Visual Chains (ME-PATTERN) Implementation Plan
 
 **planId**: ME-PATTERN (implements vactrol-core.md TASK-006 except the criteria that need the VM, which ME-INTEGRATE completes)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 9 (visual chains), 10.1 (representation, sample-region operators, "Sound first and the first-structure rule"), 10.2-10.5, 11.1, 11.7 (`midi-notes` after `s`, input lane, `cc`, `:midi` clock), 7.1.2, 7.1.3 (Query VM handle, Input cells), 7.1.4 (chords, `grid`, overloads, sound kit), 7.1.5; design-music.md sections 1-3; design-visual.md
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

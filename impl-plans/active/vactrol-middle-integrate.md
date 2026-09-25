@@ -1,7 +1,7 @@
 # Vactrol Middle End: Integration, Domain Natives and Spec Fixture Evaluation (ME-INTEGRATE) Implementation Plan
 
 **planId**: ME-INTEGRATE (completes vactrol-core.md TASK-004/005/006 criteria that need the whole pipeline)
-**Status**: Ready (attempt-2: apply serial repairs R1, R2 via the repair sharedPaths below, then re-verify; attempt-1 implemented)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 179; removed from the dispatch manifest by the session-180 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 7.1.1 (pipeline), 7.1.3 (Query VM handle, native table completeness, source loading), 7.1.4 (sounds and the sound kit, `kit:`), 7.1.7 (INTEGRATE wave, spec fixture evaluation, cases), 10.1, 10.4, 11.7; lang-reference.md sections 1-5 (`# => v` annotations)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -137,10 +137,10 @@ V3f must show the new evaluation tests ran. Also record inline `grep -c 'eval = 
 - [x] `QueryVm` for `Vm`, domain natives, prelude sound-kit values and the `check` stage in `eval_form`/`load` implemented
 - [x] Native-table completeness test passes
 - [x] TASK-004: fixtures type-check per their classification; annotated negatives produce their codes in isolated sessions
-- [ ] TASK-005: all `positive` fixtures produce their annotated values via read -> expand -> check -> compile -> run; `diagnostic` fixtures produce their codes; `authority-question` and `illustrative-excluded` are tracked with dispositions (everything passes except lang-reference block 4 line 157, which fails `no-match` only because of defect R2 in src/compile/matchc.rs, outside writePaths; pinned as a strict expected failure)
+- [x] TASK-005: all `positive` fixtures produce their annotated values via read -> expand -> check -> compile -> run; `diagnostic` fixtures produce their codes; `authority-question` and `illustrative-excluded` are tracked with dispositions (attempt-2: repair R2 applied, lang-reference block 4 line 157 runs clean, `blocked_by`/`defect_run_fails` removed)
 - [x] TASK-006: `PParam::Late`/`PParam::Fn` via the VM, the tweaked-probability re-query in both directions, bind-time input-lane rejection, failing visual chain keeps the previous binding
 - [x] TASK-005 forcing criterion, visual case: `osc {* 20 {sin time}}` through the real `osc` native keeps its thunk deferred via the `Late` mask and forces it only at uniform resolution (`integrate_tex.rs`)
-- [ ] Sound-kit late binding, `kit:` and sound-value cases pass (the `kit:`, `var` kit, sound-value, MIDI-out and late-binding tests pass; the design-music spelling `put default-sound-kit [bd: ..]` fails `type` because of defect R1 in src/value/dict.rs, outside writePaths; the late-binding test uses the `&` splat and the case is a strict expected failure)
+- [x] Sound-kit late binding, `kit:` and sound-value cases pass (attempt-2: repair R1 applied; `integrate_sound.rs` uses the verbatim `put default-sound-kit [bd: ..]` spelling and case `eval-sound-kit-override` passes with no `blocked_by`)
 - [x] No block has `eval = "unclassified"`; V1-V8 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
@@ -240,6 +240,40 @@ post-edit-hashes.txt, final-hashes.txt, report-final.txt, report-probe.txt, repa
 | V5 | v5-stdio.txt | none |
 | V7 | v7-deps.txt | empty |
 | V8 | v8-rustfmt.txt | exit=0 on the 14 owned .rs files |
+| unclassified | v-unclassified.txt | 0 |
+
+### Session s181 (2026-09-25), attempt-2 (serial repairs)
+
+**Work done** (intents and hashes: tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-2/intent.md,
+pre-edit-hashes.txt, post-edit-hashes.txt, final-hashes.txt)
+- R1 `src/value/dict.rs` `put`, Dict arm: an element that is itself a `Value::Dict` merges its pairs (later keys
+  win); other elements go through `as_pair` as before, so `put d & other` keeps working.
+- R2 `src/compile/matchc.rs` `shape_of`: a global name is a variant/struct pattern only when it names the variant
+  itself (`Value::Variant` whose tag is the name, or a ctor `Fn` whose proto name is the name); any other name binds,
+  matching the checker's rule (Decided Q1).
+- `tests/fixtures/spec/manifest.toml`: `blocked_by`/`defect_run_fails` removed from lang-reference block 4 and case
+  `eval-sound-kit-override`; the block 4 and design-music block 2 notes updated. The strict runner passes with the
+  pins unchanged otherwise (block 4 no longer fails `no-match@157`; the case's `query_values` hear the 909 sample).
+- `src/vm/tests/integrate_sound.rs`: the late-binding test uses the verbatim design-music spelling.
+- The first build of attempt-2 failed on a missing `name_of_sym` import in matchc.rs
+  (target/fe-logs/integrate-build-s181-2a-failed.log, integrate-nextest-s181-2a-failed.log, exit=101); fixed and
+  re-run below.
+
+**Evidence** (tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-2/)
+
+| # | Log | Result |
+|---|-----|--------|
+| V1 | target/fe-logs/integrate-build-s181-2.log | exit=0 |
+| V2 | target/fe-logs/integrate-clippy-s181-2.log | exit=0 |
+| V3 | target/fe-logs/integrate-nextest-s181-2.log | 489 run, 489 passed, 1 skipped, exit=0 |
+| V3t | target/fe-logs/integrate-cargotest-s181-2.log | lib 479 passed, spec_fixtures 10 passed (1 ignored), exit=0 |
+| V3f | target/fe-logs/integrate-fixtures-s181-2.log | 10 run, 10 passed, exit=0 |
+| V6a | target/fe-logs/integrate-wasm32-s181-2.log | exit=0 |
+| V6b | target/fe-logs/integrate-wasm32-hostwasm-s181-2.log | exit=0 |
+| V4 | v4-linecount.txt | largest compiler.rs 792 |
+| V5 | v5-stdio.txt | none |
+| V7 | v7-deps.txt | empty |
+| V8 | v8-rustfmt.txt | exit=0 on the 14 owned .rs files plus dict.rs and matchc.rs |
 | unclassified | v-unclassified.txt | 0 |
 
 ## Related Plans

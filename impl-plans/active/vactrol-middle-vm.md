@@ -1,7 +1,7 @@
 # Vactrol Middle End: Namespace, Compiler, Bytecode VM, Tweak Sites, Staging (ME-VM) Implementation Plan
 
 **planId**: ME-VM (implements the non-reactive part of vactrol-core.md TASK-005)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.5 (forcing contract), 5.6 (VarRef load rules, scope model, tweak slots, form generations), 5.7 (PkgNs, lookup order), 7.1.1-7.1.6, 8 (bytecode, frames, failure), 10.4 (Query effect mode), 13 (tweak site tiers)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

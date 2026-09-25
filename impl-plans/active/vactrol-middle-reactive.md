@@ -1,7 +1,7 @@
 # Vactrol Middle End: Reactive Dependency Graph, Evaluator and load (ME-REACTIVE) Implementation Plan
 
 **planId**: ME-REACTIVE (implements the reactive part of vactrol-core.md TASK-005, plus `load` and the `NoopHost` stub)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 178; removed from the dispatch manifest by the session-179 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 178; removed from the dispatch manifest by the session-179 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.6 (revised reactive graph, pass journal, rounds, Failed/Blocked, attempt edge sets, status events, equality cutoff, rebuild eligibility), 7.1.3 (Staged effects, Top-level driver, Source loading), 7.1.5, 13 (reeval tier); lang-reference.md section 4 (`load`)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

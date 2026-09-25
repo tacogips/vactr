@@ -1,7 +1,7 @@
 # Vactrol Middle End: Static Checker with Inference (ME-CHECK) Implementation Plan
 
 **planId**: ME-CHECK (implements vactrol-core.md TASK-004, except `types/masks.rs` and the native table, which ME-MASKS owns)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.5 (masks consumed), 5.6 "Scope model", 5.7 (qualified names), 6.5.8 (path/url types), 7, 7.1.1, 7.1.4 (normative checker rules), 7.1.5, 7.1.6; architecture.md Typing and Realtime Validation
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

@@ -1,7 +1,7 @@
 # Vactrol Middle End: Reconciliation and Plan Bookkeeping (ME-FINAL) Implementation Plan
 
 **planId**: ME-FINAL (reconciles TASK-004..006 for issue #2)
-**Status**: Ready
+**Status**: Completed (session 183: reconciliation and bookkeeping done, all final gates exit=0; formal review, commit and push belong to the workflow steps; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 6.5.7 (evidence rule), 7.1.7 (verification, rollback)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -98,16 +98,86 @@ The ME-MASKS table and log rule with `<plan>` = `final`: V1, V2, V3, V3t, V3f, V
 
 ## Completion Criteria
 
-- [ ] Join integrity checked; mismatches explained
-- [ ] V1-V13 pass (V9 crate-wide fmt) with logs cited
-- [ ] vactrol-core.md TASK-004/005/006 COMPLETED with every criterion checked and evidenced (or an unmet criterion reported, not checked)
-- [ ] Module Status, Dependencies, module sketches and progress log updated; README index updated
-- [ ] ME plans marked Completed with archiving noted; dispatch manifest statuses set; FE dispatch closure note added
-- [ ] Commit staging list recorded
+- [x] Join integrity checked; mismatches explained
+- [x] V1-V13 pass (V9 crate-wide fmt) with logs cited
+- [x] vactrol-core.md TASK-004/005/006 COMPLETED with every criterion checked and evidenced (or an unmet criterion reported, not checked)
+- [x] Module Status, Dependencies, module sketches and progress log updated; README index updated
+- [x] ME plans marked Completed with archiving noted; dispatch manifest statuses set; FE dispatch closure note added
+- [x] Commit staging list recorded
 
 ## Progress Log
 
 (Implementer: one entry per session: work done, evidence per row, mismatches, formatter changes, blockers.)
+
+### Session: 2026-09-25 (session 183, attempt-1)
+**Dependency**: ME-INTEGRATE is in the dispatch item's acceptedPlanIds (integration review accepted).
+**Evidence root**: tmp/me-middle-20260925-s175/ME-FINAL/attempt-1/ holds intent.md, pre-edit-hashes.txt, pre-source-hashes.txt,
+pre-status.txt, join-integrity.txt, join-explanations.md, v4/v5/v7/v10/v11/v12/v13 files, and probe/ with probe-run-{1,2,3}.log.
+**Join integrity (task 1)**: ME-INTEGRATE attempt-2 is 140/140 OK. The earlier plans have mismatches: MASKS 3, FRONTEND 2, CHECK 1,
+VM 7, PATTERN 2, REACTIVE 3. Each source mismatch is a hand-off chain: the earlier final hash equals a later owner's pre-edit
+hash, and that owner's post/final hash equals the tree. The chains are:
+- CHECK: types/mod.rs, types/tests/mod.rs.
+- REACTIVE: ns/mod.rs, ns/tests/mod.rs.
+- INTEGRATE: vm/mod.rs, vm/natives/mod.rs, vm/tests/mod.rs, lib.rs, ns/evaluator.rs, ns/load.rs, manifest.toml, and the
+  compile/matchc.rs repair R2.
+Each plan-doc mismatch is a checkpoint rewrite: the pre-ME-FINAL hash equals the HEAD blob of 4a50479, f7a937c or f272536.
+No mismatch is unexplained and no behavior was lost.
+**Verification (task 2)**: every cargo log is under target/fe-logs/ and ends with exit=0.
+- V1 final-build-s183-1.log
+- V2 final-clippy-s183-1.log
+- V3 final-nextest-s183-1.log: 489 run, 489 passed, 1 skipped.
+- V3t final-cargotest-s183-1.log: lib 479 passed; spec_fixtures 10 passed, 1 ignored; 0 failed.
+- V3f final-fixtures-s183-1.log: 10 passed, 1 skipped.
+- V6a final-wasm32-s183-1.log
+- V6b final-wasm32-hostwasm-s183-1.log
+- V9 final-fmt-s183-1.log: crate-wide `cargo fmt --check` exit=0, so no formatter rewrite was needed and no .rs file changed.
+  The src/ and tests/ hashes are identical before and after (pre-source-hashes.txt).
+- V4: largest file is src/compile/compiler.rs at 792 lines.
+- V5: none.
+- V7: empty (Cargo.toml and Cargo.lock unchanged).
+- V10: 17 diff lines match the TASK pattern. All are intended: TASK-004..006 status, criteria and dependency rows whose text
+  names TASK-007, the Verification note, and the progress-log entry. No TASK-001..003 or TASK-007..010 section text changed.
+- V11: 0.
+- V12: both jq exit=0.
+- V13: git status shows only the pre-existing src/tests/plan changes plus this plan's bookkeeping paths.
+**Criteria audit (task 3)**: every TASK-004/005/006 criterion is checked, and each cites named tests in vactrol-core.md. Three
+read-only audits mapped each clause to asserting tests. A scratch probe crate outside the tree (probe/, path dependency on
+the crate, own target dir) added evidence for weakly covered sub-clauses:
+- P1: the VM-built `osc 20 > rotate 0.5 > out o0` evaluates and its source is byte-stable. Because `osc` is all-Late, the
+  literals become uniforms u0/u1, so the source differs from the TexNode golden. This is a residual, recorded in the core log.
+- P2: VM `text "hello"` yields TextAsset (0, "hello").
+- P3: literal slice points that are unsorted, 1.5 or -0.2 each give `bad-slice-points`.
+- P4: the end-to-end var root / raised / real pattern form gives note 69, one rebind and one batch.
+- P5: trace 2 produces no Revoke, SlotBind or CellUpdate for X.
+- P6: the fan-out source gives `mixed-forcing` through the evaluator.
+TASK-006 11.3 box: checked with the note that the re-query semantics are tested and the staging invalidation lands with
+TASK-007.
+**Bookkeeping (tasks 3-6)**:
+- vactrol-core.md: Module 3/4/5 status and sketches (`Ty` Path/Url/Sound; the `Namespace` scope-chain comment;
+  `PatNode::Sound { src, kit }`, `MidiNotes { subject, channel }`, `Pat.structured`), Module Status with test counts,
+  Dependencies, the Verification note, the progress log and Related Plans.
+- README: eight ME rows and the core row updated.
+- ME plan headers: seven Status lines now include the archiving note; ME-INTEGRATE is now Completed.
+- Dispatch manifest: plans[].status completed, per-plan and top-level `completion` notes.
+- FE dispatch: `closure` note RECON3-1.
+- design-implementation.md: not edited. The ME logs record refinements under "the design wins", not accepted design
+  amendments.
+**Residual**: vactrol-core.md is now 1046 lines. It was 1005 before this session, already over the README 1000-line plan
+guideline. Splitting it is out of scope (Non-Goals) and left to TASK-007 planning.
+**Commit staging (task 7, for the workflow commit step)**:
+- Stage by explicit path only: `git add src/ tests/ design-docs/specs/ design-docs/user-qa/ impl-plans/active/
+  impl-plans/completed/fe-frontend-20260925-s165-dispatch.json impl-plans/README.md`.
+- Never use `-A` or `.`, and never stage target/ or tmp/. Cargo.toml and Cargo.lock are unchanged.
+- The message uses the six CLAUDE.md sections on separate lines and has no AI attribution or Co-Authored-By line.
+- After staging, `git status --short` must show no `??` under src/ or tests/.
+- `git status --short` at hand-off (the src/tests entries are unchanged from pre-status.txt, 76 lines):
+  - `M` impl-plans/README.md, impl-plans/active/{me-middle-20260925-s175-dispatch.json, vactrol-core.md,
+    vactrol-middle-*.md}, impl-plans/completed/fe-frontend-20260925-s165-dispatch.json.
+  - `M` for the 30 tracked src/tests files listed in the workflow git status, and `??` for the new src/ and tests/ modules
+    (src/clock/, src/compile/{compiler,matchc,sites}.rs, src/ns/{depgraph,evaluator,journal,load,pkg,stage}.rs,
+    src/pattern/{build,eval,occ,query,rng,step}.rs, src/tex/{shader,uniforms}.rs, src/types/{check,deps,infer,...}.rs,
+    src/vm/{call,frame,ops,query_vm,vm}.rs, src/vm/natives/, the test dirs, tests/support/eval.rs).
+**Blockers**: none. Formal test-integrity and adversarial review, the commit and the push are pending in the workflow steps.
 
 ## Related Plans
 

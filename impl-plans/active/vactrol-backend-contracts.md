@@ -1,7 +1,7 @@
 # Vactrol Back End: Contracts and Skeleton (BE-CONTRACTS) Implementation Plan
 
 **planId**: BE-CONTRACTS (issue #3, wave 1; the contracts every TASK-007/TASK-008 wave builds on)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 181; removed from the dispatch manifest by the session-182 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 12.8 (12.8.2 skeleton rule and enum shapes, 12.8.3, 12.8.5, 12.8.7, 12.8.9, 12.8.10 Cargo, 12.8.12 codes), 11.3, 11.4, 11.5, 11.7, 12.1, 12.5, 12.7, 6.5.7
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/3
@@ -229,18 +229,111 @@ Plan-specific rows:
 
 ## Completion Criteria
 
-- [ ] Cargo features, target-gated optional cpal/midir, `crate-type`, `rust-version`, `[[example]] beep`; C1-C3 recorded
-- [ ] `host/{caps,wire,noop,testing}.rs` and `dsp/{graph,controls,cells,release,caps,alloc_probe}.rs` exist as listed
-- [ ] The 12.8.2 skeleton exists: every declaration and stub of items 16 and the writePaths list; later waves need not
+- [x] Cargo features, target-gated optional cpal/midir, `crate-type`, `rust-version`, `[[example]] beep`; C1-C3 recorded
+- [x] `host/{caps,wire,noop,testing}.rs` and `dsp/{graph,controls,cells,release,caps,alloc_probe}.rs` exist as listed
+- [x] The 12.8.2 skeleton exists: every declaration and stub of items 16 and the writePaths list; later waves need not
       edit any `mod.rs` they do not own
-- [ ] `Value::UGen`, `Sound::Inst`, `Sound::Osc`, `StagedEffect::Install` declared with minimal arms; `NoopHost` re-exported
-- [ ] 10 `DiagCode`s and 2 `FailCode`s added; count assertions 75 and 22
-- [ ] Required tests pass; V1-V8 and C1-C3 pass with logs cited; `final-hashes.txt` written
+- [x] `Value::UGen`, `Sound::Inst`, `Sound::Osc`, `StagedEffect::Install` declared with minimal arms; `NoopHost` re-exported
+- [x] 10 `DiagCode`s and 2 `FailCode`s added; count assertions 75 and 22
+- [x] Required tests pass; V1-V8 and C1-C3 pass with logs cited; `final-hashes.txt` written (session 181, run 2:
+      `target/fe-logs/be-contracts-*-s181-2.log`)
 
 ## Progress Log
 
 (Implementer: one `### Session: <date> (session <S>, BE-CONTRACTS implementer)` entry with work done, chosen crate
 versions, design differences, hash/intent paths, evidence per row, blockers. Edit only this log.)
+
+### Session: 2026-09-25 (session 181, BE-CONTRACTS implementer)
+
+**Tasks Completed**: every BE-CONTRACTS deliverable (items 1-16) and required test.
+- Cargo (item 1): `rust-version = "1.83"`, `crate-type = ["rlib", "cdylib"]`, `host-native = ["dep:cpal", "dep:midir"]`,
+  `host-wasm = []` (default `["host-native"]`, `lsp` unchanged), cpal/midir `optional` under
+  `[target.'cfg(not(target_arch = "wasm32"))'.dependencies]`, `[[example]] beep` (`required-features = ["host-native"]`).
+  Versions: **cpal 0.16.0, midir 0.10.4** (first choice; `cargo generate-lockfile` + `cargo build` on rustc 1.83.0 exit 0
+  for the whole tree, `cargo build --example beep` exit 0). **No `--precise` pins were needed.** The committed
+  `Cargo.lock` listed only `vactrol`, so its diff is the new resolution (`Cargo.lock | 1006 +`, `Cargo.toml | 15 +-`).
+- New files: `src/host/{mod,caps,wire,noop,testing}.rs`, `src/host/tests/{mod,contracts}.rs`,
+  `src/dsp/{cells,controls,release,caps,alloc_probe}.rs`, `src/dsp/tests/{mod,contracts}.rs`; `src/dsp/graph.rs`
+  rewritten from the id stub (item 8). Largest: `host/wire.rs` 772 lines, `host/tests/contracts.rs` 484,
+  `host/testing.rs` 460.
+- Skeleton (item 16): `sched/mod.rs` declares all 12 modules + `#[cfg(test)] mod tests` (`midi`, `sched`); `dsp/mod.rs`
+  declares all 16 modules + `#[cfg(test)] pub(crate) mod alloc_probe` + tests (`contracts`, `dsp`); `host/mod.rs` with the
+  gated `native`/`wasm` modules; `lib.rs` `pub mod host;` and the `#[cfg(test)] #[global_allocator]`; `ns/mod.rs`
+  `pub mod insts;`; `vm/natives/mod.rs` `pub mod dsp;`; `mod inst;` in `ns/`, `vm/`, `types/`, `compile/` `tests/mod.rs`.
+  Stubs (one `//! Owned by BE-<WAVE> (design 12.8.x).` line, `examples/beep.rs` also `fn main() {}`): `host/native/mod.rs`,
+  `host/wasm/mod.rs`, `host/tests/e2e.rs`, `sched/{runtime,staging,ledger,commit,control,cells,dryrun,telemetry,oneshot,
+  midi_in,midi_clock}.rs`, `sched/tests/{sched,midi}.rs`, `dsp/{engine,voice,ring,fft,granular,bus,arena,meta,build}.rs`,
+  `dsp/ugen/mod.rs`, `dsp/effects/mod.rs`, `dsp/tests/dsp.rs`, `ns/insts.rs`, `ns/tests/inst.rs`, `vm/natives/dsp.rs`,
+  `vm/tests/inst.rs`, `types/tests/inst.rs`, `compile/tests/inst.rs`.
+- Enum shapes (item 14): `Value::UGen(Rc<UGenNode>)` (print `<ugen>`, `deep_eq` pointer equality, `kind_name` "a unit
+  generator", tag list `ugen`), `Sound::Inst(InstId)` / `Sound::Osc(Rc<str>)` (print `(sound inst N)`,
+  `(sound osc "/a")`, structural equality; `integrate_sound.rs` `sound_str` arms), `StagedEffect::Install(GraphHandle)`,
+  `Event { late: Option<VarSlotRef>, cells: BTreeMap<KwId, VarSlotRef> }`, both empty in `Event::new`.
+  **Conditional paths: none edited** - after the new variants the compiler reported no non-exhaustive match in
+  `ns/evaluator.rs`, `ns/tests/{evaluator,stage}.rs`, `vm/natives/{music,tex}.rs` or `vm/tests/integrate_tex.rs`.
+- Codes (item 15): 10 `DiagCode`s (4 warnings: `latency-widened`, `grain-skip`, `voice-steal`, `clock-lost`), count
+  assertion 75, severity assertion `(11, 1)`; `FailCode` `inst-failed`, `too-many-controls`, assertion 22.
+- Tests: 16 in `src/host/tests/contracts.rs` (every `CtlMsg`/`HostMsg` round trip, 24-control `AudioEvent`, 25th control
+  is `too-many-controls`, truncation at every cut is `WireError::Truncated`, bad tag/field, short output buffer, batch
+  entries, merge hush-then-stop / hush-then-tempo / idempotence, noop host, recording hosts, native transport, browser
+  transport delay / one-batch-per-tick / loss / stall) and 16 in `src/dsp/tests/contracts.rs` (mirror replay, stale
+  epoch, retire -> retired -> reuse, supersede, non-increasing seq, out of range; `AtomicCells`; browser caps with
+  origin span, native limits; `gain` -> `amp`, control-name coverage, `encode`; alloc probe; `TagMap`/`Tombstones` with
+  zero armed allocations; effect catalog names).
+
+**Design differences and decisions** (all inside this plan's writePaths):
+- `HostMsg::CellRetired { cell, epoch }` is added: 11.3 needs a retire ack per cell incarnation (with the epoch, so it
+  is idempotent), and `Retired { resource }` names samples and graph templates (16.1).
+- `Mirror::apply_init` returns `Option<HostMsg>`: an id beyond the fixed capacity is never acknowledged (the sender keeps
+  re-sending and reports `host-transport`); every in-range init is acknowledged (init-once, replay/stale ack-only).
+  `apply_batch` re-acknowledges a replay of the last applied `seq` without applying it (so a lost ack cannot wedge the
+  sender) and rejects an older `seq` with `None`. The mirror keeps one `last_epoch` per id: only `CellInit` advances it,
+  so it is also the highest initialized epoch. Epochs start at 1. `retired(cell)` is the audio side's Retiring -> Vacant
+  step and returns the `CellRetired` ack.
+- Wire: `GraphInstall`/`GraphRetire` carry a `u32` resource id (16.1 resource ids cover graph templates);
+  `CellBatch.count` is `u32`. `encode` returns 0 when the output buffer is too short. Added helpers:
+  `AudioEvent::{new, controls, push_ctl, ENCODED_LEN}`, `CtlMsg::MAX_LEN`, `HostMsg::MAX_LEN`, `batch_len`, `BatchView`
+  (zero-allocation entry iterator). The `SampleSlice` payload layout is documented (raw `f32` LE after the header), but
+  its encode/decode helpers are left to BE-WASM (`host/wasm/`): they were written and then removed to keep `wire.rs`
+  under 800 lines, and the plan does not name them. The `HostMsg` codec is a one-row-per-variant word table
+  (`#[rustfmt::skip]`), with the same byte layout.
+- Controls (50 rows): `gain` shares `amp`'s `CtlId` (so `row("gain")` routes to `amp`, and `row_by_id` returns `amp`).
+  `note`/`n` keep their own ids for commit's scale mapping. Routes: filter/delay/distortion/vowel orbit units for
+  `lpf hpf resonance` / `delay delaytime delayfeedback` / `crush shape` / `vowel`, `room` = `BusUnit { param: 0 }`,
+  `size` = `BusUnit { param: 1 }`, `orbit bus cut legato` = `Scheduler`, everything else `InstParam`. The module doc
+  records the rule that a control the playing instrument declares goes to it first, which matters for dual-use
+  names such as `size` and `shape` (grain size, phase-distortion shape). BE-SCHED's commit applies this rule. Enum
+  lists: `wave` `[saw pulse square tri sine]`, `envelope` `[hann tri trapezoid expo]`, `vowel` `[a e i o u]`.
+  Resource rows (`bank table source bus`) are encoded by the caller, and `encode` rejects them with `type`.
+- `NoopHost` also implements `InstResolver`: `route` fails `host-unavailable`, `inst` is `None`, and there are no
+  signal inputs. `RecordingMidiHost`/`RecordingOscHost` are aliases of one generic `RecordingSink<E>`. The browser
+  transport sends every record as encoded wire bytes, so it exercises the codec and never shares memory.
+- Sound print forms follow this plan's item 14 (`(sound inst N)`, `(sound osc "/a")`), not the `<inst>`/`<osc>` shorthand
+  of design 12.8.2.
+- Rust was written directly by this plan's single implementer, not by a separate rust-coding subagent, so that one
+  owner kept the cross-file contracts consistent. The check-and-test-after-modify agent was then run (build, clippy,
+  nextest 522/522, fmt: all exit 0), and the gate rows below are the logged runs.
+
+**Evidence** (`tmp/be-backend-20260925-s181/BE-CONTRACTS/attempt-1/`: `pre-edit-hashes.txt`, `post-edit-hashes.txt`,
+`intent.md`, `notes.md`, `c-rows-2.txt`, `final-hashes.txt`; no drift event: this plan ran alone in wave 1). Counting
+logs are run 2, after the final code change:
+- V1 `target/fe-logs/be-contracts-build-s181-2.log` exit=0, no warnings
+- V2 `be-contracts-clippy-s181-2.log` exit=0; fmt (`cargo fmt --check`) `be-contracts-fmt-s181-2.log` exit=0
+- V3 `be-contracts-nextest-s181-2.log` exit=0: 521 run, 521 passed, 1 skipped (489 existing + 32 new)
+- V3t `be-contracts-cargotest-s181-2.log` exit=0: lib 511 passed, spec_fixtures 10 passed / 1 ignored, 0 failed
+- V3f `be-contracts-fixtures-s181-2.log` exit=0: 10 run, 10 passed, 1 skipped
+- V6a `be-contracts-wasm32-s181-2.log` exit=0; V6b `be-contracts-wasm32-hostwasm-s181-2.log` exit=0,
+  `target/wasm32-unknown-unknown/debug/vactrol.wasm` exists (1451892 bytes)
+- `be-contracts-example-beep-s181-1.log` (`cargo build --example beep`) exit=0
+- V4 largest `.rs`: `src/compile/compiler.rs` 792, `src/host/wire.rs` 772 (all under 800)
+- V5 prints `none`; V8 `rustfmt --edition 2021 --check` on the 72 owned `.rs` files exit 0
+- C1 `be-contracts-audit-s181-2.log` exit=0 (1269 advisories, 112 crates scanned, no vulnerability or warning)
+- C2 `Cargo.lock | 1006 +`, `Cargo.toml | 15 +-`: only this plan's dependency change, no pins
+- C3 `cargo tree -e normal --target wasm32-unknown-unknown` (default features and `--no-default-features --features
+  host-wasm`) print only `vactrol v0.1.0`: no `cpal`/`midir`/`coreaudio`/`alsa`
+- Run 1 logs (`*-s181-1.log`, all exit=0) predate the final wire/noop/cells edits and are superseded.
+
+**Blockers**: none. Downstream (not this plan): formal reviews, and FINAL's core-plan and README bookkeeping.
 
 ## Related Plans
 

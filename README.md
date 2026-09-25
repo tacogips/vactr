@@ -7,12 +7,12 @@ specification.
 
 ## Status
 
-The language front end, middle end, runtime back end and session layer
-are implemented (`impl-plans/active/vactrol-core.md` TASK-001..009).
+The language front end, middle end, runtime back end, session layer and
+editor are implemented (`impl-plans/active/vactrol-core.md` TASK-001..010).
 Every top-level form goes read -> expand -> check -> compile -> run, and
 bound patterns are scheduled into audio, MIDI and OSC sinks. The
 `vactrol` binary provides `repl`, `run`, `serve`, `get` and `lsp`. The
-editor (TASK-010) is not implemented yet.
+editor lives in `editor/` (see "Editor" below).
 
 Front end (TASK-001..003):
 
@@ -107,6 +107,60 @@ The CLI and the session protocol are specified in
 `design-docs/specs/command.md`. The audible REPL check (a REPL-bound
 pattern sounding on the native host) is pending user confirmation. Its
 automated proxy is a recording-host test.
+
+## Editor
+
+The editor (TASK-010, design `design-docs/specs/design-implementation.md`
+15.1) is a Vite + TypeScript app in `editor/` with CodeMirror 6 and no UI
+framework. One frontend speaks Session Protocol v1 over two transports:
+
+- Browser tier (default): the wasm core runs a `Session` on the main
+  thread (`src/host/wasm/session_half.rs`) and audio runs in the
+  AudioWorklet (`editor/worklet/`).
+- Native tier: open the page with `?session=<ws-url>`, using the URL that
+  `vactrol serve` prints (token included). The page then drives the
+  native engine over the loopback WebSocket.
+
+It provides:
+
+- the `.vact` mode, eval keybindings and flash, and inline diagnostics;
+- playing-step highlighting on the audio clock, and the transport bar;
+- the right-pane slider panel (source-edit and overlay modes), the
+  `#@` directive control panel, drag on literals and WebMIDI learn;
+- parameter editors from `EditorDecl`/`ParamMeta`, and the display-only
+  step grid and piano roll;
+- analyzer meters and scopes from the analysis cells;
+- visual panes o0..o3 on a WebGL2 render host;
+- the package import pane and the sample browser.
+
+Browser self-analysis taps, browser MIDI out and per-slot level meters are
+not available on this host. ExternalFile binding persistence is handled
+by the editor.
+
+```sh
+# the wasm artifact the editor loads (the --lib build keeps the cdylib at the default path)
+CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm
+cd editor
+npm ci
+npm run dev        # http://localhost:5173
+npm run check      # tsc
+npm run test       # vitest (real-wasm suites read $VACTROL_WASM)
+VACTROL_REQUIRE_SESSION_ABI=1 npm run build   # editor/dist
+```
+
+`VACTROL_WASM` overrides the artifact path (the default is
+`target/wasm32-unknown-unknown/debug/vactrol.wasm`). Build with `--lib`.
+Without it, the binary target can overwrite that path with a stub that
+has no `session_init` export. With `VACTROL_REQUIRE_SESSION_ABI=1`,
+`npm run build` refuses that stub.
+
+The Tauri shell (`editor/src-tauri/`) is a standalone crate that wraps
+the same `editor/dist`. Its file access is limited to dialog-picked text
+files. `cargo check --manifest-path editor/src-tauri/Cargo.toml` is part
+of verification. `cargo tauri build` and running the app are manual steps.
+
+Pending user confirmation: hearing worklet audio in a real browser, the
+real-browser visual pane, and the Tauri app run.
 
 ## Name
 

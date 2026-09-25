@@ -179,6 +179,10 @@ passed); npm-build with `VACTROL_REQUIRE_SESSION_ABI=1`; dist-check; ts-lines (m
 
 **Notes**: formal test-integrity, adversarial and integration reviews are downstream workflow steps.
 
+### CLOSING NOTE (ED-FINAL, session 188)
+
+Status confirmed Completed (accepted). Final-tree evidence (ED-FINAL attempt-2, `tmp/ed-editor-20260926-s186/ED-FINAL/attempt-2/`): join integrity re-checked (this plan's hashes OK or explained); every row exit=0 in `target/fe-logs/ed-final-*-s188-1.log`: build, build-lsp, clippy, clippy-lsp, fmt, nextest (1007 passed, 1 skipped), cargo test, both wasm32 builds, clippy wasm32 host-wasm, npm ci/check/test (54 files, 336 tests)/build (`VACTROL_REQUIRE_SESSION_ABI=1`), real-wasm vitest (3 files, 20 tests), Tauri fetch/check/fmt, session subset, lsp_smoke, spec fixtures. Own evidence: `test/wasm/abi.test.ts` (8 tests) in target/fe-logs/ed-final-wasm-tests-verbose-s188-1.log; the artifact is the host-wasm cdylib re-uplifted by the `--lib` row (target/fe-logs/ed-final-wasm32-hostwasm-lib-s188-1.log, target/fe-logs/ed-final-v6c-copy-s188-1.log: 48 exports, `session_init`).
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-010)

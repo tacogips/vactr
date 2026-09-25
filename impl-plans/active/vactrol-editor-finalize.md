@@ -3,7 +3,7 @@
 **planId**: ED-FINAL (issue #5, TASK-010, wave 5; the join integrity check, real-wasm criterion tests over G1-G6,
 `app/main.ts` wiring fixes, full-tree verification, TASK-010 checkboxes with evidence, pending manual gates, plan
 statuses, README updates, commit staging list and message)
-**Status**: In Progress (the session-187 blocker, ED-CODE `editor/src/code/highlight.ts` reading `playing.dur` as cycles, was repaired by the operator before session 188; re-dispatched alone in session 188 to re-run items 5-10)
+**Status**: Completed (session 188 rerun, attempt-2: items 5-10 done; every automated row exit=0; test-integrity, adversarial and integration review accepted with no findings; manual gates PENDING USER CONFIRMATION; archiving to completed/ in a follow-up docs commit after the workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.12, 6.5.7; impl-plans/active/vactrol-core.md
 TASK-010; design-docs/user-qa/pending-editor-questions.md E1-E5
 **Created**: 2026-09-26
@@ -152,11 +152,11 @@ V2l, V9, X1 (see `vactrol-editor-wasm.md`) and T0-T5 (see `vactrol-editor-tauri.
 ## Completion Criteria
 
 - [x] Join integrity recorded; every mismatch explained
-- [ ] `criteria.test.ts` and `packages.test.ts` pass against the real artifact
-- [ ] All rows pass with logs cited (T1 may be BLOCKED only under E1, stated as a gap)
-- [ ] `vactrol-core.md` TASK-010 criteria checked with evidence, manual gates PENDING USER CONFIRMATION, status set
+- [x] `criteria.test.ts` and `packages.test.ts` pass against the real artifact (`target/fe-logs/ed-final-wasm-tests-s188-1.log`, 3 files, 20 tests, exit=0)
+- [x] All rows pass with logs cited (T1 may be BLOCKED only under E1, stated as a gap) — T1 passed, no gap (`target/fe-logs/ed-final-*-s188-1.log`)
+- [x] `vactrol-core.md` TASK-010 criteria checked with evidence, manual gates PENDING USER CONFIRMATION, status set
       per item 6; Module Status updated
-- [ ] `impl-plans/README.md`, `README.md` and the ED plan statuses updated; the commit staging list and message recorded
+- [x] `impl-plans/README.md`, `README.md` and the ED plan statuses updated; the commit staging list and message recorded
 
 ## Progress Log
 
@@ -219,6 +219,85 @@ treats `playing.dur` as cycles. The Rust wire sends beats (`src/session/publish.
 
 **Not done (blocked)**: the TASK-010 checkboxes and status in `vactrol-core.md`, `impl-plans/README.md`, the
 `README.md` Editor section, the ED plan statuses and closing notes, and the commit staging list and message.
+
+### Session: 2026-09-26 (session 188, ED-FINAL implementer, attempt-2)
+
+**Tasks Completed**: items 5-10 (items 1-4 stand from session 187; item 1 re-checked). Evidence:
+`tmp/ed-editor-20260926-s186/ED-FINAL/attempt-2/` (base-commit.txt = ea95f1b, join-integrity.txt, intent.md, run.sh,
+pre/post/final hashes, test-names.txt, staging-list.txt, commit-message.txt). Logs: `target/fe-logs/ed-final-<row>-s188-1.log`.
+
+- Item 1 (re-check): 184 OK. The explained mismatches are:
+  - the six scaffold `mount.ts` stubs (each owner's hash is OK);
+  - the plan files changed by checkpoints 1c02480/ea95f1b (`git diff HEAD -- impl-plans/` is empty);
+  - the operator's `highlight.ts` / `highlight.test.ts` repair (checkpoint ea95f1b).
+  `criteria.test.ts` and `packages.test.ts` are unchanged from attempt-1. There is no unexplained drift.
+- Items 2-4: no edits. The blocker test "HighlightScheduler on the mock clock activates exactly the playing step" now
+  passes. `app/main.ts` and `app/layout.ts` are unchanged.
+- Item 5 (serial; every row exit=0):
+  - Rust: build, build-lsp, clippy, clippy-lsp, fmt; nextest (1007 run, 1007 passed, 1 skipped); cargotest (lib 986,
+    cli 9, directive_fixtures 2, spec_fixtures 10 + 1 ignored); wasm32 and wasm32-hostwasm; clippy-wasm32 (X1);
+    tree and tree-hostwasm (no native crates).
+  - Artifact: `artifact-after-v6b` shows the 4-export stub. The corrective `wasm32-hostwasm-lib` row runs next. In
+    `v6c-copy`, ED-FINAL.wasm has 48 exports including `session_init` and equals `deps/vactrol.wasm`.
+  - Line limits: rs-lines max 799, ts-lines max 547.
+  - npm: node v26.9.0 / npm 11.19.1; npm-ci; npm-check; npm-test (54 files, 336 tests); npm-build
+    (`VACTROL_REQUIRE_SESSION_ABI=1`); dist-check; wasm-tests (F1: abi, criteria, packages; 3 files, 20 tests).
+  - Tauri: tauri-fetch, tauri-check, tauri-fmt, root-cargo-untouched, tauri-perms (`true`), tauri-status (`gen/`,
+    `target/` ignored).
+  - Final rows: session (F2: 233 passed); lsp-smoke (F3: 1 passed); fixtures (F4: 10 passed); frozen (F5);
+    git-status (F6: node_modules, dist, src-tauri/target and gen ignored only); manifest-json (F7).
+  - F8: `getusermedia` prints only the doc comment `editor/src/visual/meters.ts:6`, as in session 187.
+    `getusermedia-code` prints `none`.
+  - Extra evidence rows: `wasm-tests-verbose` and `npm-test-verbose` (test names, exit=0).
+- Item 6: `vactrol-core.md`:
+  - TASK-010 is COMPLETED, and all 12 criteria are checked with test names and log paths.
+  - PENDING USER CONFIRMATION: criterion 1 (hearing audio), criterion 11 (real-browser view) and criterion 12
+    (`cargo tauri build` and the app run).
+  - Also updated: the deliverable amendment (plans, manifest, G1-G6, E2/E3/E4), Module 8 status, the Module Status
+    and Dependencies rows, the Verification note, a progress-log entry and a Related Plans row.
+  - The project-level completion criteria are left unchanged. They still wait on the TASK-008/009/010 manual gates.
+- Item 7: `impl-plans/README.md`: the ED rows are Completed (ED-FINAL "Implemented, pending formal review"), and the
+  core row and manifest row are refreshed.
+- Item 8: `README.md` has a new Editor section, and the Status paragraph is updated.
+- Item 9: the ten ED plan status lines were already Completed (checkpoints). Each plan gets a
+  `### CLOSING NOTE (ED-FINAL, session 188)` with its evidence.
+- Item 10: commit record.
+  - Staging list: `staging-list.txt`, 202 explicit files. The list is `git diff --name-only` plus
+    `git ls-files --others --exclude-standard`, so ignored paths are excluded.
+  - Top-level `editor/` files: `.gitignore`, `index.html`, `package.json`, `package-lock.json`, `tsconfig.json`,
+    `vite.config.ts`, `vitest.config.ts`, `worklet/host.js`, `worklet/host.d.ts`.
+  - `editor/src-tauri/`: `Cargo.toml`, `Cargo.lock`, `build.rs`, `src/main.rs`, `tauri.conf.json`,
+    `capabilities/default.json`, `icons/icon.png`.
+  - Editor sources and tests: 79 files under `editor/src/**` and 65 under `editor/test/**`.
+  - ED-WIRE / ED-WASM Rust: `src/directives/attach.rs`, `src/directives/tests/attach.rs`,
+    `src/host/wasm/{abi,mod,session_half,session_hosts}.rs`, `src/ns/insts.rs`,
+    `src/pkg/{mod,driver,mem_cache}.rs`, `src/pkg/tests/{mod,driver,mem_cache}.rs`,
+    `src/sched/{mod,runtime,render}.rs`, `src/sched/tests/{mod,render}.rs`,
+    `src/session/{editors,eval,frontend,mod,protocol,publish,session}.rs`,
+    `src/session/tests/{codec,editor_wire,mod}.rs`.
+  - Docs: `README.md`, `impl-plans/README.md`, `impl-plans/active/vactrol-core.md`,
+    `impl-plans/active/vactrol-editor-*.md` (11).
+  - NEVER stage `node_modules/`, `dist/`, `target/`, `tmp/` or `editor/src-tauri/gen/`. The dispatch manifest is
+    unchanged and not staged.
+  - Commit message: `commit-message.txt`. It has six sections on separate lines and no attribution or Co-Authored-By
+    line. The subject is `feat: implement the editor - browser + Tauri, visual feedback, controller binding
+    (TASK-010, #5)`.
+
+**Pending (later workflow steps)**: test-integrity, adversarial and integration review; exact-file staging and the
+commit; archiving the plans to `impl-plans/completed/` in a follow-up docs commit.
+
+### Session: 2026-09-26 (session 188, step 8 documentation refresh)
+
+**Reviews**: step 6 test integrity was accepted with no findings. Step 7 adversarial review was accepted with no
+findings and needs_revision=false. Integration review accepted ED-FINAL. Step 7b E2E was skipped because the
+repository has no browser E2E suite; the proxies are 336 vitest tests (jsdom) and 20 real-wasm tests. Status is now
+Completed.
+**Docs**: `README.md` Editor section now warns that a build without `--lib` can overwrite the artifact with a stub
+that has no `session_init`. The session-layer rows in `impl-plans/README.md` move to Completed Plans, archived in
+f345e62.
+**Not archived here**: the eleven ED plans and the dispatch manifest stay in `impl-plans/active/`. The staging list
+(202 paths) and the manifest's plan paths refer to them there, and the accepted tradeoff archives them in a separate
+docs commit after the workflow commit, as for issues #3 and #4.
 
 ## Related Plans
 

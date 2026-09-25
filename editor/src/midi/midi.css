@@ -1,0 +1,41 @@
+/* The MIDI section of the right pane (design 15.1.9). */
+.midi-pane {
+  padding: 4px 8px;
+  border-bottom: 1px solid #2a2f36;
+}
+
+.midi-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.midi-title {
+  font-weight: 600;
+}
+
+.midi-status {
+  color: #8b95a1;
+}
+
+.midi-devices {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.midi-devices-empty {
+  color: #8b95a1;
+}
+
+.midi-learn {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  color: #e0b050;
+}
+
+.midi-learn[hidden] {
+  display: none;
+}

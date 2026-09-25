@@ -1,0 +1,56 @@
+/* The package pane (design 15.1.10). */
+
+.pkg-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-top: 1px solid #333;
+  font-size: 12px;
+}
+
+.pkg-title {
+  font-weight: bold;
+}
+
+.pkg-proxy input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.pkg-hint {
+  color: #b90;
+}
+
+.pkg-imports,
+.pkg-diagnostics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pkg-imports li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pkg-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pkg-imports code {
+  user-select: all;
+}
+
+.pkg-diagnostics li {
+  color: #d55;
+}
+
+.pkg-status {
+  color: #888;
+}

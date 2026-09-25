@@ -1,0 +1,243 @@
+// The Session Protocol v1 client (design 15.1.4).
+//
+// The client owns `seq`, correlates replies by `re`, hands every decoded
+// server message to the store (which keeps the kinds it tracks), and
+// notifies per-kind listeners. Every write helper first flushes the
+// document's pending `doc-changed` (14.4 rule 1) and stamps the edit epoch
+// current when its input was produced. `setTweak` is rate-limited per
+// target: at most one per 16 ms, latest wins, the trailing value always
+// sent (the session coalesces further per tick, 14.5.6).
+
+import { DocSync, defaultTimers, type Timers } from './document';
+import { decodeServer, encodeClient, type DecodeError } from './envelope';
+import type { Transport } from './transport';
+import type {
+  ClientMsg,
+  ServerEnvelope,
+  ServerKind,
+  Span,
+  SubscribeBody,
+} from './types';
+
+export const TWEAK_INTERVAL_MS = 16;
+
+/** Where the client hands every decoded server message (the store). */
+export interface MessageSink {
+  apply(env: ServerEnvelope): void;
+}
+
+export interface ClientOptions {
+  store?: MessageSink;
+  timers?: Timers;
+  /** Milliseconds, for the rate limit. */
+  now?: () => number;
+  /** The `doc-changed` debounce. */
+  debounceMs?: number;
+}
+
+type Listener = (env: ServerEnvelope) => void;
+
+interface Pending {
+  resolve: (env: ServerEnvelope) => void;
+  reject: (err: Error) => void;
+}
+
+interface TweakSlot {
+  last: number;
+  timer: unknown;
+  queued: ClientMsg | null;
+}
+
+export class Client {
+  private readonly transport: Transport;
+  private readonly store: MessageSink | undefined;
+  private readonly timers: Timers;
+  private readonly now: () => number;
+  private readonly debounceMs: number | undefined;
+  private readonly docs = new Map<string, DocSync>();
+  private readonly pending = new Map<number, Pending>();
+  private readonly listeners = new Map<ServerKind | '*', Listener[]>();
+  private readonly errorListeners: ((e: DecodeError) => void)[] = [];
+  private readonly tweaks = new Map<string, TweakSlot>();
+  private seq = 0;
+  private closed = false;
+
+  constructor(transport: Transport, opts: ClientOptions = {}) {
+    this.transport = transport;
+    this.store = opts.store;
+    this.timers = opts.timers ?? defaultTimers;
+    this.now = opts.now ?? (() => Date.now());
+    this.debounceMs = opts.debounceMs;
+    transport.onText((text) => this.receive(text));
+  }
+
+  /** The sync state of `file`, created at revision 1 on first use. */
+  document(file: string): DocSync {
+    let d = this.docs.get(file);
+    if (!d) {
+      const opts = this.debounceMs === undefined ? { timers: this.timers } : { timers: this.timers, debounceMs: this.debounceMs };
+      d = new DocSync(file, (m) => this.send(m), opts);
+      this.docs.set(file, d);
+    }
+    return d;
+  }
+
+  /** Forgets `file` (closed buffer); its pending edit is dropped. */
+  closeDocument(file: string): void {
+    this.docs.get(file)?.dispose();
+    this.docs.delete(file);
+  }
+
+  /** Sends one message; returns its `seq`. */
+  send(msg: ClientMsg): number {
+    this.seq += 1;
+    if (!this.closed) this.transport.send(encodeClient(this.seq, msg));
+    return this.seq;
+  }
+
+  /** Sends one message and resolves with the first reply whose `re` is its `seq`. */
+  request(msg: ClientMsg): Promise<ServerEnvelope> {
+    if (this.closed) return Promise.reject(new Error('client closed'));
+    return new Promise((resolve, reject) => {
+      // Registered before sending: the wasm transport replies synchronously.
+      const seq = this.seq + 1;
+      this.pending.set(seq, { resolve, reject });
+      this.send(msg);
+    });
+  }
+
+  /** Listens to one server kind, or to every message with `'*'`. */
+  on(kind: ServerKind | '*', cb: Listener): () => void {
+    const list = this.listeners.get(kind) ?? [];
+    list.push(cb);
+    this.listeners.set(kind, list);
+    return () => {
+      const l = this.listeners.get(kind);
+      if (l) this.listeners.set(kind, l.filter((x) => x !== cb));
+    };
+  }
+
+  /** Listens to undecodable frames (dropped after reporting). */
+  onDecodeError(cb: (e: DecodeError) => void): void {
+    this.errorListeners.push(cb);
+  }
+
+  // ------------------------------------------------------------- helpers
+
+  /** Evaluates the whole document or one span of it. */
+  eval(file: string, code: string, span?: Span): Promise<ServerEnvelope> {
+    const doc = this.document(file);
+    doc.flush();
+    const body = { file, code, ...doc.stamp(), ...(span ? { span } : {}) };
+    return this.request({ kind: 'eval', body });
+  }
+
+  hush(): void {
+    this.send({ kind: 'hush', body: {} });
+  }
+
+  stop(slot: string): void {
+    this.send({ kind: 'stop', body: { slot } });
+  }
+
+  /** A controller write to a tweak site; rate-limited per `(file, id)`. */
+  setTweak(file: string, id: number, formGen: number, value: number): void {
+    const doc = this.document(file);
+    const msg: ClientMsg = {
+      kind: 'set-tweak',
+      body: { file, id, form_gen: formGen, value, edit_epoch: doc.epoch },
+    };
+    const key = `${file}\u0000${id}`;
+    let slot = this.tweaks.get(key);
+    if (!slot) {
+      slot = { last: -Infinity, timer: null, queued: null };
+      this.tweaks.set(key, slot);
+    }
+    const t = this.now();
+    if (slot.timer === null && t - slot.last >= TWEAK_INTERVAL_MS) {
+      slot.last = t;
+      this.write(file, msg);
+      return;
+    }
+    slot.queued = msg;
+    if (slot.timer === null) {
+      const s = slot;
+      s.timer = this.timers.set(() => {
+        s.timer = null;
+        const q = s.queued;
+        s.queued = null;
+        if (q) {
+          s.last = this.now();
+          this.write(file, q);
+        }
+      }, Math.max(0, s.last + TWEAK_INTERVAL_MS - t));
+    }
+  }
+
+  /** A `bind` variable write. */
+  setVar(file: string, name: string, value: number | boolean, definingFormGen: number): void {
+    const doc = this.document(file);
+    this.write(file, {
+      kind: 'set-var',
+      body: { file, name, value, defining_form_gen: definingFormGen, edit_epoch: doc.epoch },
+    });
+  }
+
+  /** Directive-mode learn; resolves with `directive-edit`, `stale-binding` or `protocol-error`. */
+  learn(file: string, binding: string | number, cc: number, ch?: number): Promise<ServerEnvelope> {
+    const doc = this.document(file);
+    doc.flush();
+    const body = { file, binding, cc, edit_epoch: doc.epoch, ...(ch === undefined ? {} : { ch }) };
+    return this.request({ kind: 'learn', body });
+  }
+
+  subscribe(body: SubscribeBody): void {
+    this.send({ kind: 'subscribe', body });
+  }
+
+  manifest(): Promise<ServerEnvelope> {
+    return this.request({ kind: 'manifest?', body: {} });
+  }
+
+  /** Closes the transport; pending requests reject and queued tweaks drop. */
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    for (const s of this.tweaks.values()) {
+      if (s.timer !== null) this.timers.clear(s.timer);
+    }
+    this.tweaks.clear();
+    for (const d of this.docs.values()) d.dispose();
+    for (const p of this.pending.values()) p.reject(new Error('client closed'));
+    this.pending.clear();
+    this.transport.close();
+  }
+
+  // ------------------------------------------------------------ internals
+
+  /** Flushes the document's pending edit, then sends the write. */
+  private write(file: string, msg: ClientMsg): void {
+    this.docs.get(file)?.flush();
+    this.send(msg);
+  }
+
+  private receive(text: string): void {
+    if (this.closed) return;
+    const d = decodeServer(text);
+    if (!d.ok) {
+      for (const cb of this.errorListeners) cb(d.error);
+      return;
+    }
+    const env = d.env;
+    this.store?.apply(env);
+    for (const cb of this.listeners.get(env.kind) ?? []) cb(env);
+    for (const cb of this.listeners.get('*') ?? []) cb(env);
+    if (env.re !== undefined) {
+      const p = this.pending.get(env.re);
+      if (p) {
+        this.pending.delete(env.re);
+        p.resolve(env);
+      }
+    }
+  }
+}

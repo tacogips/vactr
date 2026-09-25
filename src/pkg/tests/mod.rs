@@ -7,9 +7,11 @@ mod support;
 
 mod cache;
 mod digest;
+mod driver;
 mod load;
 mod lock;
 mod manifest;
+mod mem_cache;
 mod mvs;
 mod proxy;
 mod semver;

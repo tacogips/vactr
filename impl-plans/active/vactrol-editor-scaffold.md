@@ -352,6 +352,10 @@ jsdom 30.1.1. node v26.9.0, npm 11.19.1 (E0).
 
 **Deviations**: none. Pending downstream: test-integrity, adversarial and integration review (later workflow steps).
 
+### CLOSING NOTE (ED-FINAL, session 188)
+
+Status confirmed Completed (accepted). Final-tree evidence (ED-FINAL attempt-2, `tmp/ed-editor-20260926-s186/ED-FINAL/attempt-2/`): join integrity re-checked (this plan's hashes OK or explained); every row exit=0 in `target/fe-logs/ed-final-*-s188-1.log`: build, build-lsp, clippy, clippy-lsp, fmt, nextest (1007 passed, 1 skipped), cargo test, both wasm32 builds, clippy wasm32 host-wasm, npm ci/check/test (54 files, 336 tests)/build (`VACTROL_REQUIRE_SESSION_ABI=1`), real-wasm vitest (3 files, 20 tests), Tauri fetch/check/fmt, session subset, lsp_smoke, spec fixtures. Own evidence: `test/protocol/*`, `test/platform/files.test.ts`, `test/app/main.test.ts` pass in target/fe-logs/ed-final-npm-test-verbose-s188-1.log; the six `mount.ts` stubs were replaced by their owners as planned.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-010)

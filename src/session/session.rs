@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
+use crate::clock::clock::ClockSource;
 use crate::directives::key::KeyTable;
 use crate::directives::persist::BindingSet;
 use crate::directives::DirectiveTable;
@@ -218,7 +219,9 @@ pub struct Session {
     /// Console lines not yet taken.
     pub(super) console: Vec<String>,
     pub(super) last_levels: Option<f64>,
-    pub(super) last_tempo: Option<(Ratio64, Ratio64)>,
+    /// bpm, beats per cycle, clock source and its `locked` state (TASK-010
+    /// G4: a clock change alone must also emit `tempo`).
+    pub(super) last_tempo: Option<(Ratio64, Ratio64, ClockSource, Option<bool>)>,
 }
 
 impl std::fmt::Debug for Session {
@@ -498,6 +501,7 @@ impl Session {
             sounds: list(&self.manifest.sounds),
             synths: list(&self.manifest.synths),
             controls: list(&self.manifest.controls),
+            editors: Some(crate::session::editors::editor_decls()),
         }
     }
 }

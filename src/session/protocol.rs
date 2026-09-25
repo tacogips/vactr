@@ -77,6 +77,22 @@ pub struct WireDiag {
     pub beat: Option<[i64; 2]>,
 }
 
+/// A site's enclosing call (`site.call`, TASK-010 G3): the nearest
+/// enclosing symbol-headed call the literal is an argument of, directly or
+/// inside a list or pattern argument.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct WireCall {
+    pub name: String,
+    pub head: WireSpan,
+    /// 1-based among same-named calls in the top-level form.
+    pub ordinal: u16,
+    /// 0-based argument index.
+    pub arg: u16,
+    /// The named-argument keyword, else the declared parameter at `arg`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param: Option<String>,
+}
+
 /// A tweak site's tier.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -107,6 +123,10 @@ pub struct WireSite {
     /// The `BindingKey` spelling, when the site is labeled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
+    /// The nearest enclosing call (TASK-010 G3); absent with no enclosing
+    /// call (e.g. a `let`/`inst`/`fn` header literal).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call: Option<WireCall>,
 }
 
 /// A number, or a boolean for `set-var`. Integers stay integers.
@@ -365,11 +385,42 @@ pub struct DirectiveEditBody {
     pub text: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// One parameter's editor metadata (`editor-decl`, TASK-010 G2).
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct WireParamMeta {
+    pub name: String,
+    /// The control-table wire id; absent for a pattern-function parameter
+    /// (no control-table row).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ctl: Option<u16>,
+    pub range: [f32; 2],
+    /// `linear`, `log` or `stepped`.
+    pub curve: String,
+    /// `none`, `db`, `s`, `ms`, `hz` or `st`.
+    pub unit: String,
+    /// Parameters drawn together (bands of a multiband unit share one).
+    pub group: u32,
+}
+
+/// One builtin's editor declaration (`manifest.editors`, TASK-010 G2).
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct WireEditorDecl {
+    pub name: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiband: Option<bool>,
+    pub params: Vec<WireParamMeta>,
+}
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ManifestBody {
     pub sounds: Vec<String>,
     pub synths: Vec<String>,
     pub controls: Vec<String>,
+    /// Every builtin's `EditorDecl` plus the pattern-function table
+    /// (TASK-010 G2, `session::editors::editor_decls`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub editors: Option<Vec<WireEditorDecl>>,
 }
 
 /// A `protocol-error` code.
@@ -489,11 +540,40 @@ pub struct PlayingBody {
 pub struct WireLevel {
     pub source: String,
     pub rms: f64,
+    /// The host FFT bands (TASK-010 G4); `:master` only in v1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bands: Option<[f32; 8]>,
+}
+
+/// One analyzer unit's current cells (`levels.analyzers`, TASK-010 G4).
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct WireAnalyzer {
+    /// `:master` or the bus name.
+    pub bus: String,
+    pub kind: String,
+    /// The unit's first analysis cell (its constant `id` parameter).
+    pub id: u32,
+    pub cells: Vec<f32>,
 }
 
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct LevelsBody {
     pub levels: Vec<WireLevel>,
+    /// Every `EffectKind::Analyzer` unit of the installed bus graph with a
+    /// constant `id` (TASK-010 G4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub analyzers: Option<Vec<WireAnalyzer>>,
+}
+
+/// The transport's clock state (`tempo.clock`, TASK-010 G4).
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct WireClock {
+    /// `internal` or `midi`.
+    pub source: String,
+    /// Whether the slave is locked (not freewheeling); present only under
+    /// `midi`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locked: Option<bool>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -501,6 +581,8 @@ pub struct TempoBody {
     pub bpm: f64,
     pub beats_per_cycle: i64,
     pub cycle: [i64; 2],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clock: Option<WireClock>,
 }
 
 /// A message from the session.

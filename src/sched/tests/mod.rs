@@ -2,4 +2,5 @@
 
 mod analysis;
 mod midi;
+mod render;
 mod sched;

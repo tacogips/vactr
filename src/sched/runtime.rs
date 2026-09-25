@@ -34,6 +34,7 @@ use crate::sched::slots::{Binding, SlotTable};
 use crate::sched::staging::query_lane;
 use crate::sched::telemetry::{PlayingEvent, Telemetry};
 use crate::tex::shader::{compile_tex, ShaderDesc};
+use crate::tex::uniforms::UniformPlan;
 use crate::types::diag::{DiagCode, Diagnostic};
 use crate::value::intern::{intern_kw, KwId};
 use crate::value::ratio::Ratio64;
@@ -167,6 +168,12 @@ pub struct Runtime {
     pub(crate) captures: Vec<crate::sched::tap::PendingCapture>,
     /// Step (6) runs `at` thunks; an offline render turns it off.
     pub(crate) run_thunks: bool,
+    /// The evaluator-owned uniform plan `compile_tex` returned for each
+    /// output `o0`..`o3` (design 9.2-9.3, G5), kept here since `activate`
+    /// discarded it before. `render.rs`'s `render_frame` resolves it every
+    /// frame and clears the entry once the output's slot is no longer
+    /// bound.
+    pub(crate) uniform_plans: [Option<UniformPlan>; 4],
 }
 
 impl std::fmt::Debug for Runtime {
@@ -248,6 +255,7 @@ impl Runtime {
             midi_clock: crate::sched::midi_clock::MidiClockState::default(),
             captures: Vec::new(),
             run_thunks: true,
+            uniform_plans: [None, None, None, None],
         };
         (rt, RuntimeSink(queue))
     }
@@ -573,8 +581,12 @@ impl Runtime {
                 continue;
             };
             if let (Binding::Texture(t), Some(out)) = (&b, slot.out_id()) {
-                if let Ok((desc, _)) = compile_tex(t) {
+                if let Ok((desc, plan)) = compile_tex(t) {
                     self.hosts.render.set_program(out, desc);
+                    let idx = usize::try_from(out.get()).unwrap_or(0);
+                    if let Some(entry) = self.uniform_plans.get_mut(idx) {
+                        *entry = Some(plan);
+                    }
                 }
             }
             slot.bound = Some(b);

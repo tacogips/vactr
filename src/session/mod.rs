@@ -9,12 +9,17 @@
 //! - `protocol`, `codec`: the v1 messages and their JSON codec.
 //! - `console`, `repl`: console registers and the REPL line loop (14.5.10).
 //! - `changes`: editor change sets (SS-CONTRACTS).
+//! - `editors`: the `manifest.editors` table (TASK-010 G2).
+//! - `frontend`: additive `Session` methods for the editor: `render_frame`
+//!   (G5), `drive_packages` and `check` (G6).
 
 pub mod authority;
 pub mod changes;
 pub mod codec;
 pub mod console;
+pub mod editors;
 pub mod eval;
+mod frontend;
 pub mod protocol;
 pub mod publish;
 pub mod repl;

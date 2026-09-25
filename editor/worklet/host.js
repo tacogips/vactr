@@ -15,8 +15,27 @@
 // A test hook, `host.filter(buf) -> 'pass' | 'hold' | 'drop' | ArrayBuffer`,
 // sits on the main -> worklet path so the dev harness can hold, drop,
 // replace or reorder records; `host.release()` posts the held ones in order.
+//
+// Editor options (TASK-010, design 15.1.3; additive, the defaults keep the
+// behavior above): `init: 'main' | 'session'` (default 'main') picks
+// `main_init` + `tick`/`inbox`/`sample_put`, or `session_init` +
+// `session_tick`/`session_inbox`/`session_sample_put`. Records tagged
+// 0x71-0x73 (session envelope, render, package driver) go to
+// `onRecord(tag, payload)` after the outbox is cleared and are NEVER posted
+// to the worklet.
 
 const TAG_CONSOLE = 0x70;
+const TAG_EDITOR_FIRST = 0x71;
+const TAG_EDITOR_LAST = 0x73;
+const EXPORTS = {
+  main: { init: 'main_init', tick: 'tick', inbox: 'inbox', samplePut: 'sample_put' },
+  session: {
+    init: 'session_init',
+    tick: 'session_tick',
+    inbox: 'session_inbox',
+    samplePut: 'session_sample_put',
+  },
+};
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -29,6 +48,7 @@ export class VactrolHost {
     this.now = 0;
     this.lastTick = -1;
     this.tickEvery = opts.tickEvery ?? 0.005;
+    this.fn = opts.init === 'session' ? EXPORTS.session : EXPORTS.main;
     this.report = null;
     this.js = null;
     this.console = [];
@@ -55,7 +75,7 @@ export class VactrolHost {
       return;
     }
     if (m.o) {
-      this.withBytes(new Uint8Array(m.o), (p, n) => this.x.inbox(p, n));
+      this.withBytes(new Uint8Array(m.o), (p, n) => this.x[this.fn.inbox](p, n));
     }
     if (m.r) {
       this.report = m.r;
@@ -67,7 +87,7 @@ export class VactrolHost {
       this.now = m.t;
       if (this.lastTick < 0 || this.now - this.lastTick >= this.tickEvery) {
         this.lastTick = this.now;
-        this.x.tick(this.now);
+        this.x[this.fn.tick](this.now);
       }
     }
     this.flush();
@@ -89,14 +109,16 @@ export class VactrolHost {
     }
   }
 
-  // Moves every outbox record: console lines to the page, the rest to the
-  // worklet (through the test filter).
+  // Moves every outbox record: console lines to the page, editor records
+  // (0x71-0x73) to `onRecord` once the outbox is cleared (a listener may
+  // re-enter wasm), the rest to the worklet (through the test filter).
   flush() {
     const x = this.x;
     const len = x.outbox_len();
     if (len === 0) return;
     const view = new Uint8Array(x.memory.buffer, x.outbox_ptr(), len);
     let at = 0;
+    const editor = [];
     while (at + 4 <= len) {
       const n = view[at] | (view[at + 1] << 8) | (view[at + 2] << 16) | (view[at + 3] << 24);
       const rec = view.slice(at + 4, at + 4 + n);
@@ -105,11 +127,16 @@ export class VactrolHost {
         const line = dec.decode(rec.subarray(1));
         this.console.push({ t: this.now, line });
         if (this.opts.onConsole) this.opts.onConsole(line);
+      } else if (rec[0] >= TAG_EDITOR_FIRST && rec[0] <= TAG_EDITOR_LAST) {
+        editor.push(rec);
       } else {
         this.toWorklet(rec.buffer);
       }
     }
     x.outbox_clear();
+    if (this.opts.onRecord) {
+      for (const rec of editor) this.opts.onRecord(rec[0], rec.subarray(1));
+    }
   }
 
   toWorklet(buf) {
@@ -171,7 +198,9 @@ export class VactrolHost {
     const kb = enc.encode(key);
     const bytes = new Uint8Array(frames.buffer, frames.byteOffset, frames.byteLength);
     return this.withBytes(kb, (kp, kn) =>
-      this.withBytes(bytes, (dp) => this.x.sample_put(kp, kn, dp, frames.length, rate, channels)),
+      this.withBytes(bytes, (dp) =>
+        this.x[this.fn.samplePut](kp, kn, dp, frames.length, rate, channels),
+      ),
     );
   }
 
@@ -202,7 +231,8 @@ export class VactrolHost {
 }
 
 // Starts both halves. Options: wasmUrl, processorUrl, arenaBytes, voices,
-// sampleRate, onConsole, onLog, tickEvery.
+// sampleRate, onConsole, onLog, tickEvery, init ('main' | 'session'),
+// onRecord(tag, payload).
 export async function startHost(opts) {
   const bytes = await (await fetch(opts.wasmUrl)).arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -212,7 +242,8 @@ export async function startHost(opts) {
     latencyHint: 'interactive',
   });
   await ctx.audioWorklet.addModule(opts.processorUrl);
-  x.main_init(ctx.sampleRate, opts.arenaBytes ?? 0);
+  const init = opts.init === 'session' ? EXPORTS.session.init : EXPORTS.main.init;
+  x[init](ctx.sampleRate, opts.arenaBytes ?? 0);
   const node = new AudioWorkletNode(ctx, 'vactrol-processor', {
     numberOfInputs: 0,
     numberOfOutputs: 1,

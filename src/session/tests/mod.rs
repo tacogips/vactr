@@ -7,6 +7,7 @@ mod analysis;
 mod authority;
 mod codec;
 mod directives;
+mod editor_wire;
 mod eval;
 mod packages;
 mod publish;

@@ -110,6 +110,10 @@ pub struct CallSite {
     /// Declared parameters, in order (builtin `EditorDecl` or a document
     /// definition's header).
     pub params: Vec<Rc<str>>,
+    /// Every argument, in order: the named-argument keyword (a `Pair` whose
+    /// key is a `Keyword`), else `None`, and the argument's full extent
+    /// (design 15.1.2 G3).
+    pub args: Vec<(Option<Rc<str>>, Span)>,
 }
 
 /// The document model: targets and call sites in source order.
@@ -133,6 +137,18 @@ pub fn extent(n: &Node) -> Span {
     let mut s = n.span;
     n.walk(&mut |c: &Node| s = s.join(c.span));
     s
+}
+
+/// The named-argument keyword of a call argument: `n` of a `key: value`
+/// `Pair` (design 15.1.2 G3), else `None` for a positional argument.
+fn arg_keyword(item: &Node) -> Option<Rc<str>> {
+    if item.kind != NodeKind::Pair {
+        return None;
+    }
+    match &item.children.first()?.kind {
+        NodeKind::Atom(Atom::Keyword(k)) => Some(Rc::clone(k)),
+        _ => None,
+    }
 }
 
 fn def_info(n: &Node) -> Option<DefInfo> {
@@ -243,10 +259,27 @@ impl Doc {
                         .map(|d| d.params.iter().map(|(p, _)| Rc::clone(p)).collect())
                         .unwrap_or_default(),
                 };
+                // A piped call (`x > f a b`) reads as `f x a b`: the
+                // reader inserts the piped value right after the head
+                // (`reader/line.rs` `fold_operand`), so it is always the
+                // FIRST child and always textually BEFORE the head (the
+                // typed arguments always follow the head). Filtering by
+                // position excludes it, so `args` lines up with the
+                // declared `params` the same way for a piped and a plain
+                // call.
+                let args = c
+                    .children
+                    .iter()
+                    .skip(1)
+                    .map(|item| (item, extent(item)))
+                    .filter(|(_, ext)| ext.start >= head.span.end)
+                    .map(|(item, ext)| (arg_keyword(item), ext))
+                    .collect();
                 doc.sites.push(CallSite {
                     name: Rc::from(name),
                     head: head.span,
                     params,
+                    args,
                 });
             });
         }

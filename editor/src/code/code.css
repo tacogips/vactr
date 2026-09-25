@@ -1,0 +1,69 @@
+/* The code area (design 15.1.5): editor tokens, flash, playing highlight,
+   transport bar and sample browser. */
+
+.vact-code {
+  height: 100%;
+  min-height: 12rem;
+}
+
+.vact-code .cm-editor {
+  height: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+/* Tokens (language.ts). */
+.vact-tok-comment { color: #7a7f87; font-style: italic; }
+.vact-tok-directive { color: #b07bd8; font-style: normal; }
+.vact-tok-keyword { color: #d08770; }
+.vact-tok-number { color: #88c0d0; }
+.vact-tok-string { color: #a3be8c; }
+.vact-tok-path { color: #a3be8c; text-decoration: underline dotted; }
+.vact-tok-head { color: #ebcb8b; font-weight: 600; }
+.vact-tok-bracket { color: #8a8f98; }
+
+/* Eval flash (eval.ts) and playing highlight (highlight.ts). */
+.vact-flash { background: rgba(136, 192, 208, 0.35); }
+.vact-flash-error { background: rgba(191, 97, 106, 0.45); }
+.vact-playing {
+  background: rgba(235, 203, 139, 0.45);
+  outline: 1px solid rgba(235, 203, 139, 0.8);
+  border-radius: 2px;
+}
+
+/* Transport bar (transport.ts). */
+.vact-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.vact-clock[data-status='midi-locked'] { color: #a3be8c; }
+.vact-clock[data-status='midi-lost'] { color: #bf616a; font-weight: 600; }
+.vact-hush { font-weight: 600; }
+.vact-slots {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vact-slot { display: flex; align-items: center; gap: 0.25rem; }
+.vact-light {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #3b4252;
+}
+.vact-light[data-lit='true'] { background: #ebcb8b; }
+
+/* Sample browser (samples.ts). */
+.vact-samples { font-size: 12px; padding: 0.25rem 0.5rem; }
+.vact-sounds, .vact-banks, .vact-entries { margin: 0; padding-left: 1rem; }
+.vact-entry { display: flex; align-items: center; gap: 0.5rem; }
+.vact-entry[data-missing='true'] { color: #7a7f87; }
+.vact-preview { width: 96px; height: 24px; }
+.vact-samples-status { color: #7a7f87; }

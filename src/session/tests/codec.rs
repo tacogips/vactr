@@ -32,6 +32,7 @@ fn site() -> WireSite {
         value: 0.25,
         form_gen: 7,
         key: Some("drums.lpf.1.cutoff".to_string()),
+        call: None,
     }
 }
 
@@ -186,6 +187,7 @@ fn servers() -> Vec<ServerMsg> {
             sounds: vec!["bd".to_string()],
             synths: vec!["analog".to_string()],
             controls: vec!["gain".to_string()],
+            editors: None,
         }),
         ServerMsg::ProtocolError(ProtocolError::new(ErrorCode::UnknownKind, "nope")),
         ServerMsg::Bindings(BindingsBody {
@@ -244,12 +246,15 @@ fn servers() -> Vec<ServerMsg> {
             levels: vec![WireLevel {
                 source: ":master".to_string(),
                 rms: 0.125,
+                bands: None,
             }],
+            analyzers: None,
         }),
         ServerMsg::Tempo(TempoBody {
             bpm: 120.0,
             beats_per_cycle: 4,
             cycle: [7, 2],
+            clock: None,
         }),
     ]
 }

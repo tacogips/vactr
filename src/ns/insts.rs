@@ -184,6 +184,15 @@ impl InstRegistry {
         self.master.as_ref()
     }
 
+    /// Every installed named bus and `master`, for the editor's analyzer
+    /// telemetry (design 15.1.2 G4): `None` names `master`.
+    pub fn buses(&self) -> impl Iterator<Item = (Option<KwId>, &BusEntry)> {
+        self.buses
+            .iter()
+            .map(|(k, e)| (Some(*k), e))
+            .chain(self.master.iter().map(|e| (None, e)))
+    }
+
     /// Cell-backed defaults of an instrument and their tweak slots: the
     /// runtime initializes each cell from its slot and writes it on
     /// `TweakRefresh` (11.3, 13).

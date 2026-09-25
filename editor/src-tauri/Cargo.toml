@@ -1,0 +1,18 @@
+[package]
+name = "vactrol-editor"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+publish = false
+description = "Tauri shell wrapping the Vactrol editor frontend"
+
+# Standalone crate: the root vactrol crate never builds it.
+[workspace]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"

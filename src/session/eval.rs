@@ -12,7 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
-use crate::directives::attach::extent;
+use crate::directives::attach::{extent, Doc};
 use crate::directives::{build_table, DirectiveTable};
 use crate::expand::{expand, ExpandCx};
 use crate::ns::namespace::FormGen;
@@ -374,7 +374,7 @@ impl Session {
         &mut self,
         report: &crate::ns::evaluator::PassReport,
     ) -> Option<ServerMsg> {
-        let msg = bindings_from(report, &self.ev, self.passes + 1, &self.files)?;
+        let msg = bindings_from(report, &self.ev, self.passes + 1, &self.files, &self.docs)?;
         self.passes += 1;
         Some(msg)
     }
@@ -416,6 +416,8 @@ impl Session {
         let keys = doc
             .map(|d| site_keys(&d.directives, &sites))
             .unwrap_or_default();
+        let empty_doc = Doc::default();
+        let call_doc = doc.map_or(&empty_doc, |d| &d.directives.doc);
         EvalResultBody {
             file: self.file_name(fid),
             doc_revision: rev,
@@ -431,7 +433,7 @@ impl Session {
             diagnostics,
             sites: sites
                 .iter()
-                .map(|s| site_wire(&self.ev, s, keys.get(&s.id).cloned()))
+                .map(|s| site_wire(&self.ev, s, keys.get(&s.id).cloned(), call_doc))
                 .collect(),
             directives: doc
                 .map(|d| directives_wire(&d.directives))

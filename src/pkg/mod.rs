@@ -11,9 +11,11 @@
 
 pub mod cache;
 pub mod digest;
+pub mod driver;
 pub mod load;
 pub mod lock;
 pub mod manifest;
+pub mod mem_cache;
 pub mod mvs;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
@@ -29,9 +31,11 @@ mod tests;
 
 pub use cache::{fetch_and_publish, get_all, CacheBackend, StagingId};
 pub use digest::{canonical_bytes, tree_digest};
+pub use driver::{drive, DriverReply, DriverRequest, Prefetched};
 pub use load::{asset_banks, default_prefix, locked_sources};
 pub use lock::{LockEntry, LockFile};
 pub use manifest::{ManifestError, PackageMeta, PkgManifest};
+pub use mem_cache::MemCache;
 pub use mvs::mvs_resolve;
 pub use proxy::{ProxyStore, ProxyTransport};
 pub use semver::{latest_release, Version};

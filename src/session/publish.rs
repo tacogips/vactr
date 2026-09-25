@@ -10,17 +10,24 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use crate::clock::clock::ClockSource;
+use crate::directives::attach::{CallSite, Doc};
+use crate::dsp::effects::{analyzer::cells as analyzer_cell_count, param_ctl};
+use crate::dsp::graph::{EffectKind, EffectSpec};
+use crate::host::wire::Ctl;
 use crate::ns::depgraph::{FormId, FormRec, FormState, WriteItem};
 use crate::ns::evaluator::{Evaluator, PassReport};
 use crate::ns::tweak::{SiteOrigin, SiteTier, TweakSite};
+use crate::pattern::eval::AnalyzerId;
 use crate::reader::span::{FileId, Span, SrcRef};
+use crate::sched::runtime::Runtime;
 use crate::sched::telemetry::PlayingEvent;
 use crate::session::protocol::{
-    BindingsBody, DiagBody, LevelsBody, PlayingBody, ServerMsg, TempoBody, WireChanged, WireClear,
-    WireDiag, WireFormState, WireLevel, WireOrigin, WirePlaying, WireSite, WireSpan, WireSrcRef,
-    WireState, WireTier,
+    BindingsBody, DiagBody, LevelsBody, PlayingBody, ServerMsg, TempoBody, WireAnalyzer, WireCall,
+    WireChanged, WireClear, WireClock, WireDiag, WireFormState, WireLevel, WireOrigin, WirePlaying,
+    WireSite, WireSpan, WireSrcRef, WireState, WireTier,
 };
-use crate::session::session::{Outgoing, Session};
+use crate::session::session::{DocState, Outgoing, Session};
 use crate::types::diag::Diagnostic;
 use crate::value::intern::{name_of_kw, name_of_sym};
 use crate::value::ratio::Ratio64;
@@ -97,9 +104,12 @@ pub fn num_f64(v: &Value) -> f64 {
     }
 }
 
-/// One site on the wire, with its EFFECTIVE tier.
+/// One site on the wire, with its EFFECTIVE tier. `doc` is the site's file's
+/// document model (`DirectiveTable::doc`), used to find its enclosing call
+/// (TASK-010 G3); an empty `Doc` (no document available) simply gives
+/// `call: None`.
 #[must_use]
-pub fn site_wire(ev: &Evaluator, site: &TweakSite, key: Option<String>) -> WireSite {
+pub fn site_wire(ev: &Evaluator, site: &TweakSite, key: Option<String>, doc: &Doc) -> WireSite {
     let tier = match ev.site_tier(site.id).unwrap_or(site.tier) {
         SiteTier::Direct => WireTier::Direct,
         SiteTier::Reeval => WireTier::Reeval,
@@ -118,7 +128,64 @@ pub fn site_wire(ev: &Evaluator, site: &TweakSite, key: Option<String>) -> WireS
         value: num_f64(&site.slot.get()),
         form_gen: site.form_gen.get(),
         key,
+        call: call_of(doc, site.span),
     }
+}
+
+/// The nearest enclosing symbol-headed call of `site_span` (design 15.1.2
+/// G3): the `CallSite` of `doc` whose argument extent containing
+/// `site_span` is smallest, directly or inside a list or pattern argument.
+/// `None` with no enclosing call (e.g. a `let`/`inst`/`fn` header literal).
+fn call_of(doc: &Doc, site_span: Span) -> Option<WireCall> {
+    let mut best: Option<(&CallSite, u16, Span)> = None;
+    for call in &doc.sites {
+        for (idx, (_, extent)) in call.args.iter().enumerate() {
+            if extent.start > site_span.start || extent.end < site_span.end {
+                continue;
+            }
+            let smaller = best
+                .as_ref()
+                .is_none_or(|(_, _, b)| extent.end - extent.start < b.end - b.start);
+            if smaller {
+                let idx = u16::try_from(idx).unwrap_or(u16::MAX);
+                best = Some((call, idx, *extent));
+            }
+        }
+    }
+    let (call, arg, _) = best?;
+    let param = call
+        .args
+        .get(usize::from(arg))
+        .and_then(|(kw, _)| kw.clone())
+        .map(|k| k.to_string())
+        .or_else(|| call.params.get(usize::from(arg)).map(ToString::to_string));
+    Some(WireCall {
+        name: call.name.to_string(),
+        head: wire_span(call.head),
+        ordinal: ordinal_of(doc, call),
+        arg,
+        param,
+    })
+}
+
+/// The 1-based count of same-named `CallSite`s within `call`'s top-level
+/// form, in source order (design 15.1.2 G3).
+fn ordinal_of(doc: &Doc, call: &CallSite) -> u16 {
+    let scope = doc
+        .targets
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| t.extent.start <= call.head.start && call.head.end <= t.extent.end)
+        .min_by_key(|(_, t)| t.extent.end - t.extent.start)
+        .map(|(k, _)| doc.targets[doc.top_of(k)].extent);
+    let Some(scope) = scope else { return 1 };
+    let pos = doc
+        .sites
+        .iter()
+        .filter(|s| s.name == call.name && s.head.start >= scope.start && s.head.end <= scope.end)
+        .position(|s| s.head == call.head)
+        .unwrap_or(0);
+    u16::try_from(pos + 1).unwrap_or(u16::MAX)
 }
 
 /// The name a form is published under: its first defined name, else its
@@ -155,7 +222,9 @@ pub fn bindings_from(
     ev: &Evaluator,
     pass: u64,
     files: &[Rc<str>],
+    docs: &BTreeMap<FileId, DocState>,
 ) -> Option<ServerMsg> {
+    let empty_doc = Doc::default();
     let mut finals: BTreeMap<FormId, FormState> = BTreeMap::new();
     let mut order: Vec<FormId> = Vec::new();
     for (f, st) in &report.states {
@@ -202,12 +271,12 @@ pub fn bindings_from(
         };
         if *st == FormState::Recomputed {
             let table = ev.ns().tweaks().borrow();
-            sites.extend(
-                table
-                    .sites_of(rec.gen)
-                    .iter()
-                    .map(|s| site_wire(ev, s, None)),
-            );
+            sites.extend(table.sites_of(rec.gen).iter().map(|s| {
+                let doc = docs
+                    .get(&s.span.file)
+                    .map_or(&empty_doc, |d| &d.directives.doc);
+                site_wire(ev, s, None, doc)
+            }));
         }
         states.push(WireFormState {
             name: form_name(rec),
@@ -254,6 +323,48 @@ pub fn playing_wire(
             form_gen: s.form_gen.get(),
         }),
     }
+}
+
+/// The constant `id` parameter of an analyzer's `EffectSpec`, when it has
+/// one (a `Ctl::Cell` default is skipped, design 15.1.2 G4).
+fn analyzer_id(spec: &EffectSpec) -> Option<u32> {
+    let ctl = param_ctl(spec.kind, "id")?;
+    spec.params
+        .iter()
+        .find(|(id, _)| *id == ctl)
+        .and_then(|(_, c)| match c {
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            Ctl::Const(v) => Some(*v as u32),
+            Ctl::Cell(_) => None,
+        })
+}
+
+/// Every `EffectKind::Analyzer` unit of `chain` with a constant `id`, with
+/// its current cells read from the runtime's input cells (design 12.5,
+/// 15.1.2 G4).
+fn analyzers_of(rt: &Runtime, bus: &str, chain: &[EffectSpec]) -> Vec<WireAnalyzer> {
+    chain
+        .iter()
+        .filter_map(|spec| {
+            let EffectKind::Analyzer(kind) = spec.kind else {
+                return None;
+            };
+            let id = analyzer_id(spec)?;
+            let count = analyzer_cell_count(kind);
+            let cells = (0..count)
+                .map(|k| {
+                    let off = u32::try_from(k).unwrap_or(0);
+                    rt.input.analyzer(AnalyzerId::new(id.saturating_add(off)))
+                })
+                .collect();
+            Some(WireAnalyzer {
+                bus: bus.to_string(),
+                kind: spec.kind.name().to_string(),
+                id,
+                cells,
+            })
+        })
+        .collect()
 }
 
 impl Session {
@@ -331,21 +442,47 @@ impl Session {
             .map_or(true, |t| host_now - t >= LEVELS_PERIOD || host_now < t);
         if due && self.subs.values().any(|s| s.levels) {
             self.last_levels = Some(host_now);
-            let rms = f64::from(self.rt.hosts.audio.analysis().amp);
+            let sigs = self.rt.hosts.audio.analysis();
+            let rms = f64::from(sigs.amp);
+            let analyzers = self.ev.insts().map(|reg| {
+                let reg = reg.borrow();
+                reg.buses()
+                    .flat_map(|(name, bus)| {
+                        let bus_name = name
+                            .map_or_else(|| ":master".to_string(), |k| name_of_kw(k).to_string());
+                        analyzers_of(&self.rt, &bus_name, &bus.def.chain)
+                    })
+                    .collect::<Vec<_>>()
+            });
             msgs.push(ServerMsg::Levels(LevelsBody {
                 levels: vec![WireLevel {
                     source: ":master".to_string(),
                     rms,
+                    bands: Some(sigs.fft),
                 }],
+                analyzers: analyzers.filter(|v| !v.is_empty()),
             }));
         }
-        let key = (tempo.bpm, tempo.beats_per_cycle);
+        let source = self.rt.clock().source();
+        let clock = if source == ClockSource::MidiClock {
+            WireClock {
+                source: "midi".to_string(),
+                locked: Some(!self.rt.midi_clock.is_lost()),
+            }
+        } else {
+            WireClock {
+                source: "internal".to_string(),
+                locked: None,
+            }
+        };
+        let key = (tempo.bpm, tempo.beats_per_cycle, source, clock.locked);
         if self.last_tempo != Some(key) {
             self.last_tempo = Some(key);
             msgs.push(ServerMsg::Tempo(TempoBody {
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.floor(),
                 cycle: ratio_pair(self.rt.pos),
+                clock: Some(clock),
             }));
         }
         let routed = self.route(0, None, msgs);

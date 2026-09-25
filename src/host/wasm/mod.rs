@@ -9,10 +9,14 @@
 //! the main half's hosts (`WasmAudioHost` with the 16.1 sender-paced slice
 //! window, the cell port, the sample loader); `cells` the worklet's probed
 //! cell mirror. Every record crossing between the halves is a `host::wire`
-//! or `dsp::ring` byte record that JS moves as an `ArrayBuffer`.
+//! or `dsp::ring` byte record that JS moves as an `ArrayBuffer`. `session_half`
+//! and `session_hosts` are the editor's session half: a page calls
+//! `session_init` instead of `main_init` (design 15.1.2 G1).
 
 pub mod abi;
 pub mod cells;
 pub mod main_half;
 pub mod messages;
+pub mod session_half;
+pub mod session_hosts;
 pub mod worklet_half;

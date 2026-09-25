@@ -20,6 +20,15 @@ pub const TAG_CONSOLE: u8 = 0x70;
 pub const TAG_FAULT: u8 = 0x60;
 /// Worklet -> main: the host signals, `[amp f32][fft 8 x f32]`.
 pub const TAG_SIGS: u8 = 0x61;
+/// Session -> page: one Session Protocol v1 server envelope, or the
+/// browser-local `check` record, as UTF-8 JSON (design 15.1.2 G1).
+pub const TAG_SESSION: u8 = 0x71;
+/// Session -> page: a render record (`set_program`/`set_uniforms`) as
+/// UTF-8 JSON (design 15.1.2 G1).
+pub const TAG_RENDER: u8 = 0x72;
+/// Session -> page: a package driver reply as UTF-8 JSON (design 15.1.2
+/// G6).
+pub const TAG_PKG: u8 = 0x73;
 
 /// The frame header: the record length.
 pub const FRAME_LEN: usize = 4;

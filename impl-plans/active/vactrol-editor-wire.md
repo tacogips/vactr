@@ -256,6 +256,10 @@ exit=0 (51 files, 316 tests); E4 `ed-wire-npm-build-s187-1.log` exit=0; E4c `ed-
 `ed-wire-w4-lines-s187-1.log` (max 788 `sched/runtime.rs`; `session/session.rs` 707, `session/protocol.rs` 706).
 The npm rows ran on the shared tree with sibling editor files present; ED-FINAL re-verifies the combined tree.
 
+### CLOSING NOTE (ED-FINAL, session 188)
+
+Status confirmed Completed (accepted). Final-tree evidence (ED-FINAL attempt-2, `tmp/ed-editor-20260926-s186/ED-FINAL/attempt-2/`): join integrity re-checked (this plan's hashes OK or explained); every row exit=0 in `target/fe-logs/ed-final-*-s188-1.log`: build, build-lsp, clippy, clippy-lsp, fmt, nextest (1007 passed, 1 skipped), cargo test, both wasm32 builds, clippy wasm32 host-wasm, npm ci/check/test (54 files, 336 tests)/build (`VACTROL_REQUIRE_SESSION_ABI=1`), real-wasm vitest (3 files, 20 tests), Tauri fetch/check/fmt, session subset, lsp_smoke, spec fixtures. Own evidence: G2-G6 Rust tests in the nextest and session-subset runs (target/fe-logs/ed-final-nextest-s188-1.log, target/fe-logs/ed-final-session-s188-1.log); the `manifest.editors`, `site.call`, telemetry and render records are consumed by `test/wasm/criteria.test.ts` against the real artifact.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-010)

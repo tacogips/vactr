@@ -6,26 +6,56 @@ use crate::reader::span::Span;
 use crate::value::intern::KwId;
 use crate::value::ratio::Ratio64;
 
-/// Why an evaluation failed. TASK-005 adds codes.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum FailCode {
-    DivisionByZero,
-    Overflow,
-    Type,
-    UnknownField,
+macro_rules! fail_codes {
+    ($($(#[$meta:meta])* $variant:ident => $name:literal,)*) => {
+        /// Why an evaluation failed (8.4, 7.1.6).
+        #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+        pub enum FailCode {
+            $($(#[$meta])* $variant,)*
+        }
+
+        impl FailCode {
+            /// Every code, in declaration order.
+            pub const ALL: &'static [FailCode] = &[$(FailCode::$variant,)*];
+
+            /// The kebab-case name of the code.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(FailCode::$variant => $name,)*
+                }
+            }
+        }
+    };
 }
 
-impl FailCode {
-    /// The kebab-case name of the code.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            FailCode::DivisionByZero => "division-by-zero",
-            FailCode::Overflow => "overflow",
-            FailCode::Type => "type",
-            FailCode::UnknownField => "unknown-field",
-        }
-    }
+fail_codes! {
+    DivisionByZero => "division-by-zero",
+    Overflow => "overflow",
+    Type => "type",
+    UnknownField => "unknown-field",
+    // Middle end (7.1.6).
+    NoMatch => "no-match",
+    FuelExhausted => "fuel-exhausted",
+    DepthExceeded => "depth-exceeded",
+    EffectInQuery => "effect-in-query",
+    EffectInRebuild => "effect-in-rebuild",
+    UndefinedName => "undefined-name",
+    NotCallable => "not-callable",
+    Arity => "arity",
+    /// A form reported `blocked-on: X` (5.6).
+    Blocked => "blocked",
+    SliceIndex => "slice-index",
+    /// Dynamic manual slice points.
+    BadSlicePoints => "bad-slice-points",
+    /// A region operator got an event with `whole = None`.
+    NoWhole => "no-whole",
+    UpdImmutable => "upd-immutable",
+    /// A key missing from the current `sound-kit` (event-local).
+    UnknownSound => "unknown-sound",
+    /// `NoopHost`.
+    HostUnavailable => "host-unavailable",
+    LoadFailed => "load-failed",
 }
 
 impl fmt::Display for FailCode {
@@ -82,3 +112,22 @@ impl fmt::Display for Failure {
 }
 
 impl std::error::Error for Failure {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn code_names_are_unique_kebab_case() {
+        assert_eq!(FailCode::ALL.len(), 20);
+        let mut names: Vec<&str> = FailCode::ALL.iter().map(|c| c.as_str()).collect();
+        assert!(names
+            .iter()
+            .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), 20);
+        assert_eq!(FailCode::LoadFailed.as_str(), "load-failed");
+        assert_eq!(FailCode::DivisionByZero.to_string(), "division-by-zero");
+    }
+}

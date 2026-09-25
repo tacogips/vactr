@@ -35,7 +35,7 @@ pub struct RunOrigin {
 
 macro_rules! diag_codes {
     ($($(#[$meta:meta])* $variant:ident => $name:literal,)*) => {
-        /// A closed set of diagnostic codes. TASK-004 adds checker codes.
+        /// A closed set of diagnostic codes (6.5.4, 6.5.5, 7.1.6).
         #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
         pub enum DiagCode {
             $($(#[$meta])* $variant,)*
@@ -100,6 +100,60 @@ diag_codes! {
     MalformedFn => "malformed-fn",
     MalformedBinding => "malformed-binding",
     MalformedEnum => "malformed-enum",
+    // Reader codes for path and url literals (FRONTEND, 6.5.8).
+    BadPath => "bad-path",
+    BadUrl => "bad-url",
+    // Checker: types and names (7.1.6).
+    TypeMismatch => "type-mismatch",
+    AnnotationMismatch => "annotation-mismatch",
+    OptionalAsValue => "optional-as-value",
+    AnyNotNarrowed => "any-not-narrowed",
+    UndefinedName => "undefined-name",
+    Rebinding => "rebinding",
+    /// Warning: a binding shadows a user binding of an enclosing scope.
+    Shadowing => "shadowing",
+    /// Hint: a binding shadows a prelude name.
+    ShadowsPrelude => "shadows-prelude",
+    UpdImmutable => "upd-immutable",
+    LiteralDivisionByZero => "literal-division-by-zero",
+    UnknownKeyword => "unknown-keyword",
+    MissingVariant => "missing-variant",
+    BareVariantBinding => "bare-variant-binding",
+    SoundNotFirst => "sound-not-first",
+    // Checker: hygiene (7.1.6).
+    DuplicateKey => "duplicate-key",
+    ImportCollision => "import-collision",
+    BeyondCapability => "beyond-capability",
+    EffectInPattern => "effect-in-pattern",
+    UnboundedSource => "unbounded-source",
+    // Forcing (5.5).
+    MixedForcing => "mixed-forcing",
+    LatentForcing => "latent-forcing",
+    // Patterns and clock.
+    BadSlicePoints => "bad-slice-points",
+    InputLaneOperator => "input-lane-operator",
+    ClockSourceUnavailable => "clock-source-unavailable",
+    // Reactive (5.6).
+    DependencyCycle => "dependency-cycle",
+}
+
+impl DiagCode {
+    /// The severity the code is reported with (7.1.6): warnings and the one
+    /// hint are listed, every other code is an error.
+    #[must_use]
+    pub const fn default_severity(self) -> Severity {
+        match self {
+            DiagCode::Shadowing
+            | DiagCode::DuplicateKey
+            | DiagCode::ImportCollision
+            | DiagCode::EffectInPattern
+            | DiagCode::UnboundedSource
+            | DiagCode::MixedForcing
+            | DiagCode::LatentForcing => Severity::Warning,
+            DiagCode::ShadowsPrelude => Severity::Hint,
+            _ => Severity::Error,
+        }
+    }
 }
 
 impl fmt::Display for DiagCode {
@@ -156,15 +210,33 @@ mod tests {
 
     #[test]
     fn code_names_are_unique_kebab_case() {
-        assert_eq!(DiagCode::ALL.len(), 38);
+        assert_eq!(DiagCode::ALL.len(), 65);
         let mut names: Vec<&str> = DiagCode::ALL.iter().map(|c| c.as_str()).collect();
         assert!(names
             .iter()
             .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 38);
+        assert_eq!(names.len(), 65);
         assert_eq!(DiagCode::MisplacedArrow.as_str(), "misplaced-arrow");
+    }
+
+    #[test]
+    fn default_severity_per_code() {
+        assert_eq!(DiagCode::Rebinding.default_severity(), Severity::Error);
+        assert_eq!(DiagCode::ParenForm.default_severity(), Severity::Error);
+        assert_eq!(DiagCode::Shadowing.default_severity(), Severity::Warning);
+        assert_eq!(DiagCode::MixedForcing.default_severity(), Severity::Warning);
+        assert_eq!(DiagCode::ShadowsPrelude.default_severity(), Severity::Hint);
+        let warnings = DiagCode::ALL
+            .iter()
+            .filter(|c| c.default_severity() == Severity::Warning)
+            .count();
+        let hints = DiagCode::ALL
+            .iter()
+            .filter(|c| c.default_severity() == Severity::Hint)
+            .count();
+        assert_eq!((warnings, hints), (7, 1));
     }
 
     #[test]

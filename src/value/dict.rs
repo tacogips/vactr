@@ -41,8 +41,8 @@ pub fn pairs(d: &BTreeMap<Key, Value>) -> impl Iterator<Item = Value> + '_ {
         .map(|(k, v)| Value::list(vec![k.to_value(), v.clone()]))
 }
 
-/// `put`: appends to a list, assocs pairs into a dict (later pairs win), or
-/// replaces known fields of a struct.
+/// `put`: appends to a list, assocs pairs into a dict (later pairs win; a
+/// dict element merges its pairs), or replaces known fields of a struct.
 ///
 /// # Errors
 /// `Type` for `nil` or a non-collection, and for a non-pair element on a
@@ -58,6 +58,10 @@ pub fn put(coll: &Value, elems: &[Value]) -> Result<Value, Failure> {
         Value::Dict(d) => {
             let mut map = (**d).clone();
             for e in elems {
+                if let Value::Dict(o) = e {
+                    map.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
+                    continue;
+                }
                 let (k, v) = as_pair(e)?;
                 map.insert(k, v);
             }

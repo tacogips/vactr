@@ -11,6 +11,7 @@ mod eq;
 mod intern;
 mod key;
 mod num;
+mod pathval;
 mod print;
 mod ratio;
 
@@ -68,6 +69,9 @@ fn tagging_every_non_shell_variant() {
             start: 0,
             end: Some(8),
         }),
+        Value::path("/abs/x", None),
+        Value::url("https://example.org/x.vact"),
+        Value::Sound(Rc::new(crate::value::value::Sound::MidiOut(1))),
     ];
     let tags: Vec<&str> = values
         .iter()
@@ -88,6 +92,9 @@ fn tagging_every_non_shell_variant() {
             Value::Native(_) => "native",
             Value::Inst(_) => "inst",
             Value::Range(_) => "range",
+            Value::Path(_) => "path",
+            Value::Url(_) => "url",
+            Value::Sound(_) => "sound",
             Value::Fn(_)
             | Value::Thunk(_)
             | Value::VarRef(_)
@@ -100,7 +107,7 @@ fn tagging_every_non_shell_variant() {
         tags,
         [
             "nil", "bool", "int", "int64", "float", "float64", "ratio", "keyword", "str", "list",
-            "dict", "struct", "variant", "native", "inst", "range"
+            "dict", "struct", "variant", "native", "inst", "range", "path", "url", "sound"
         ]
     );
 }

@@ -100,7 +100,7 @@ fn write_atom(out: &mut String, atom: &Atom) {
             out.push(':');
             out.push_str(k);
         }
-        Atom::Sym(s) | Atom::Builtin(s) => out.push_str(s),
+        Atom::Sym(s) | Atom::Builtin(s) | Atom::Path(s) | Atom::Url(s) => out.push_str(s),
         Atom::Qualified { prefix, name } => {
             out.push_str(prefix);
             out.push('.');

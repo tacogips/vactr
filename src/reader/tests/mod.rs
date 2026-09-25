@@ -8,6 +8,7 @@ mod layout;
 mod lexer;
 mod line;
 mod no_panic;
+mod pathlit;
 mod spans;
 
 /// An ordinary file (not the console).

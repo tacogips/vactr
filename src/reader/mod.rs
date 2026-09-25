@@ -9,6 +9,7 @@ pub(crate) mod layout;
 pub(crate) mod lexer;
 pub(crate) mod line;
 pub mod node;
+pub(crate) mod pathlit;
 pub mod sexpr;
 pub mod span;
 

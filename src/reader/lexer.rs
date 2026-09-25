@@ -7,6 +7,7 @@
 use std::rc::Rc;
 
 use crate::reader::node::{Op, TriviaItem, TriviaKind};
+use crate::reader::pathlit::{scan_path_or_url, PathTok};
 use crate::reader::span::{FileId, Span};
 use crate::reader::MAX_NESTING;
 use crate::types::diag::{DiagCode, Diagnostic};
@@ -31,6 +32,10 @@ pub(crate) enum Tok {
     },
     Wildcard,
     ConsoleReg(u32),
+    /// An unquoted path literal, as written (6.5.8).
+    Path(Rc<str>),
+    /// A `scheme://` url literal, as written (6.5.8).
+    Url(Rc<str>),
     Op(Op),
     /// `-` directly before a name or `{` in prefix position.
     Neg,
@@ -223,6 +228,12 @@ impl Lexer<'_> {
         let mut braces = 0u32;
         let mut parens = 0u32;
         while let Some(b) = self.byte(i) {
+            if matches!(b, b'.' | b'~' | b'/' | b'a'..=b'z') && self.prefix_position(i) {
+                if let Some(next) = self.path_or_url(i, &mut tokens) {
+                    i = next;
+                    continue;
+                }
+            }
             match b {
                 b' ' | b'\t' => i += 1,
                 b'#' => {
@@ -341,6 +352,26 @@ impl Lexer<'_> {
             next: self.end,
             closed: !interp,
         }
+    }
+
+    /// A path or url literal at a keyword position (6.5.8); `None` when the
+    /// text there is not one.
+    fn path_or_url(&mut self, i: usize, tokens: &mut Vec<Token>) -> Option<usize> {
+        let (kind, end) = scan_path_or_url(self.src.get(..self.end)?, i)?;
+        // The scan stops only at ASCII bytes, so this slice is on char boundaries.
+        let text: Rc<str> = Rc::from(self.src.get(i..end).unwrap_or(""));
+        match kind {
+            PathTok::Path => self.push(tokens, Tok::Path(text), i, end),
+            PathTok::Url => self.push(tokens, Tok::Url(text), i, end),
+            PathTok::BadPath => self.diag(
+                DiagCode::BadPath,
+                i,
+                end,
+                "malformed path: empty segment, trailing `/`, or nothing after the prefix",
+            ),
+            PathTok::BadUrl => self.diag(DiagCode::BadUrl, i, end, "a url needs text after `://`"),
+        }
+        Some(end)
     }
 
     /// A run of characters outside the token set (`! ; , @ $ ~`, a lone `.`,

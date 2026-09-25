@@ -40,10 +40,6 @@ Large features are split into multiple related plans with cross-references.
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
 | [vactrol-core.md](active/vactrol-core.md) | In Progress (TASK-001..006 completed 2026-09-25; TASK-007..010 not started) | design-docs/specs/design-implementation.md | 2026-09-25 |
-| [vactrol-frontend-value.md](completed/vactrol-frontend-value.md) | Completed (FE-VALUE, TASK-001, wave 1; archived 2026-09-25) | design-docs/specs/design-implementation.md 5.1-5.4, 6.5.1-6.5.3 | 2026-09-25 |
-| [vactrol-frontend-reader.md](completed/vactrol-frontend-reader.md) | Completed (FE-READER, TASK-002, wave 2; archived 2026-09-25) | design-docs/specs/design-implementation.md 5.7, 6.1-6.3, 6.5.4, 6.5.6 | 2026-09-25 |
-| [vactrol-frontend-expander.md](completed/vactrol-frontend-expander.md) | Completed (FE-EXPAND, TASK-003, wave 3; archived 2026-09-25) | design-docs/specs/design-implementation.md 6.4, 6.5.5, 6.5.6 | 2026-09-25 |
-| [vactrol-frontend-finalize.md](completed/vactrol-frontend-finalize.md) | Completed (FE-FINAL, serial reconciliation, wave 4; archived 2026-09-25) | design-docs/specs/design-implementation.md 6.5.7 | 2026-09-25 |
 | [vactrol-middle-masks.md](active/vactrol-middle-masks.md) | Completed (ME-MASKS, issue #2, wave 1; archiving to completed/ pending, after the workflow commit) | design-implementation.md 5.5, 7, 7.1.3, 7.1.6 | 2026-09-25 |
 | [vactrol-middle-frontend.md](active/vactrol-middle-frontend.md) | Completed (ME-FRONTEND, wave 2; archiving to completed/ pending, after the workflow commit) | design-implementation.md 6.5.8 | 2026-09-25 |
 | [vactrol-middle-check.md](active/vactrol-middle-check.md) | Completed (ME-CHECK, TASK-004, wave 3; archiving to completed/ pending, after the workflow commit) | design-implementation.md 5.6, 7, 7.1.4 | 2026-09-25 |
@@ -58,7 +54,11 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
-| (No completed plans yet) | - | - |
+| [vactrol-frontend-value.md](completed/vactrol-frontend-value.md) | 2026-09-25 (FE-VALUE, TASK-001, wave 1; archived in 850c606) | design-docs/specs/design-implementation.md 5.1-5.4, 6.5.1-6.5.3 |
+| [vactrol-frontend-reader.md](completed/vactrol-frontend-reader.md) | 2026-09-25 (FE-READER, TASK-002, wave 2; archived in 850c606) | design-docs/specs/design-implementation.md 5.7, 6.1-6.3, 6.5.4, 6.5.6 |
+| [vactrol-frontend-expander.md](completed/vactrol-frontend-expander.md) | 2026-09-25 (FE-EXPAND, TASK-003, wave 3; archived in 850c606) | design-docs/specs/design-implementation.md 6.4, 6.5.5, 6.5.6 |
+| [vactrol-frontend-finalize.md](completed/vactrol-frontend-finalize.md) | 2026-09-25 (FE-FINAL, serial reconciliation, wave 4; archived in 850c606) | design-docs/specs/design-implementation.md 6.5.7 |
+| [fe-frontend-20260925-s165-dispatch.json](completed/fe-frontend-20260925-s165-dispatch.json) | 2026-09-25 (FE dispatch manifest; closure note added in issue #2) | - |
 
 ## Phase Dependencies (for impl-exec-auto)
 

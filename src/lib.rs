@@ -1,8 +1,23 @@
 //! vactrol - Vactrol scripting language
 //!
-//! The core crate: value model, reader and the module skeleton laid out in
-//! `design-docs/specs/design-implementation.md` section 4. Core modules use
-//! no OS threads and no I/O so the crate builds for `wasm32-unknown-unknown`.
+//! The core crate, laid out as in `design-docs/specs/design-implementation.md`
+//! section 4. Every top-level form goes read -> expand -> check -> compile ->
+//! run (section 7.1.1):
+//!
+//! - `value`: the runtime value model (numbers, lists, dicts, paths, sounds).
+//! - `reader`: the lexer, layout rules and the node tree; `expand`: the
+//!   expander that lowers surface sugar to the kernel forms.
+//! - `types`: the static checker with inference, the forcing masks and the
+//!   native signature table.
+//! - `ns`, `compile`, `vm`: namespaces and tweak slots, the reactive
+//!   dependency graph and top-level `Evaluator`, the bytecode compiler, and
+//!   the VM with the core and domain natives.
+//! - `pattern`, `clock`, `tex`: the pattern engine and signals, the cycle
+//!   clock, and the visual chains with their shader and uniform plans.
+//!
+//! Core modules use no OS threads and no I/O, so the crate builds for
+//! `wasm32-unknown-unknown`; host file and sample I/O stay behind the
+//! `NoopHost` source loader until the host tasks.
 
 /// Defines an id newtype over a raw integer (design 6.5.1).
 ///
@@ -30,6 +45,7 @@ macro_rules! id_newtype {
     };
 }
 
+pub mod clock;
 pub mod compile;
 pub mod dsp;
 pub mod expand;

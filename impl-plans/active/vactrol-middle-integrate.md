@@ -1,7 +1,7 @@
 # Vactrol Middle End: Integration, Domain Natives and Spec Fixture Evaluation (ME-INTEGRATE) Implementation Plan
 
 **planId**: ME-INTEGRATE (completes vactrol-core.md TASK-004/005/006 criteria that need the whole pipeline)
-**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 179; removed from the dispatch manifest by the session-180 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 179; removed from the dispatch manifest by the session-180 amendment; source rides in the single workflow commit; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 7.1.1 (pipeline), 7.1.3 (Query VM handle, native table completeness, source loading), 7.1.4 (sounds and the sound kit, `kit:`), 7.1.7 (INTEGRATE wave, spec fixture evaluation, cases), 10.1, 10.4, 11.7; lang-reference.md sections 1-5 (`# => v` annotations)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2

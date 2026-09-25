@@ -4,7 +4,7 @@ use std::fmt::{self, Display, Write as _};
 
 use crate::value::intern::{name_of_kw, name_of_sym};
 use crate::value::key::Key;
-use crate::value::value::Value;
+use crate::value::value::{Sound, Value};
 
 impl Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -108,6 +108,13 @@ fn write_value(f: &mut fmt::Formatter<'_>, v: &Value, top: bool) -> fmt::Result 
         Value::Range(r) => match r.end {
             Some(end) => write!(f, "{}..{end}", r.start),
             None => write!(f, "{}..", r.start),
+        },
+        Value::Path(p) => f.write_str(&p.text),
+        Value::Url(u) => f.write_str(u),
+        Value::Sound(s) => match &**s {
+            Sound::Builtin(k) => write!(f, "(sound :{})", name_of_kw(*k)),
+            Sound::Sample(p) => write!(f, "(sound {})", p.text),
+            Sound::MidiOut(ch) => write!(f, "(sound midi {ch})"),
         },
         Value::Fn(_) => f.write_str("<fn>"),
         Value::Native(_) => f.write_str("<native>"),

@@ -606,6 +606,8 @@ impl<'a> Parser<'a> {
             Tok::Keyword(k) => plain(Atom::Keyword(Rc::clone(k))),
             Tok::Wildcard => plain(Atom::Wildcard),
             Tok::ConsoleReg(n) => plain(Atom::ConsoleReg(*n)),
+            Tok::Path(text) => plain(Atom::Path(Rc::clone(text))),
+            Tok::Url(text) => plain(Atom::Url(Rc::clone(text))),
             Tok::Op(Op::Arrow) if mode == Mode::List => {
                 return Err(err(DiagCode::MisplacedArrow, span, "`->` inside `[..]`"));
             }

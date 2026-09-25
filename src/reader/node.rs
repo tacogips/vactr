@@ -62,6 +62,10 @@ pub enum Atom {
     Op(Op),
     Wildcard,
     ConsoleReg(u32),
+    /// An unquoted path literal, as written (6.5.8).
+    Path(Rc<str>),
+    /// A `scheme://` url literal, as written (6.5.8).
+    Url(Rc<str>),
     Nil,
     Bool(bool),
     /// Produced only by the expander (6.5.5).

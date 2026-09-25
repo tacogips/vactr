@@ -1,11 +1,12 @@
-//! Spec fixture runner (design 6.5.6): pins reader and expander behavior
-//! against `lang-reference.md` and `design-music.md` through
-//! `tests/fixtures/spec/manifest.toml`.
+//! Spec fixture runner (design 6.5.6, 7.1.7): pins reader, expander,
+//! checker and evaluation behavior against `lang-reference.md` and
+//! `design-music.md` through `tests/fixtures/spec/manifest.toml`.
 
 mod support;
 
 use std::collections::BTreeMap;
 
+use support::eval::{check_diags, check_errors, clean_forms, query_cycle, run};
 use support::toml_subset::{self, Table};
 use support::{manifest, multiset, spec_blocks, spec_doc};
 use vactrol::expand::{expand, is_kernel, ExpandCx};
@@ -210,7 +211,7 @@ fn cases_read_per_expectation() {
         let got = multiset(codes.map(|d| d.code.to_string()).collect());
         assert_eq!(got, multiset(case.array("diags")), "case {id}: diagnostics");
         assert!(
-            case.str("read").is_some() || !got.is_empty(),
+            case.str("read").is_some() || !got.is_empty() || is_eval_case(case),
             "case {id}: nothing asserted"
         );
     }
@@ -322,4 +323,189 @@ fn toml_subset_rejects_unsupported_constructs() {
     assert_eq!(t.array("c"), ["p", "q"]);
     assert_eq!(t.bool("d"), Some(true));
     assert_eq!(t.int("e"), Some(-3));
+}
+
+/// The evaluation classes of a block (7.1.7).
+const EVAL_CLASSES: [&str; 5] = [
+    "positive",
+    "diagnostic",
+    "authority-question",
+    "illustrative-excluded",
+    "deferred",
+];
+
+/// The failures a block or case shows ONLY because of a recorded
+/// implementation defect (`blocked_by`, a repair request of the ME-INTEGRATE
+/// progress log). They are asserted to reproduce exactly, so a repair makes
+/// the runner fail until the manifest drops them (a strict expected failure,
+/// never a silent pin).
+fn defects(t: &Table, what: &str) -> Vec<String> {
+    let d = t.array("defect_run_fails");
+    assert_eq!(
+        t.str("blocked_by").is_some(),
+        !d.is_empty(),
+        "{what}: blocked_by and defect_run_fails go together"
+    );
+    d
+}
+
+/// A case with an evaluation expectation (`value` or `fail`).
+fn is_eval_case(case: &Table) -> bool {
+    case.str("value").is_some() || case.str("fail").is_some()
+}
+
+fn block_text(b: &Table) -> (String, String) {
+    let doc = b.req("doc");
+    let ordinal = usize::try_from(b.int("ordinal").expect("ordinal")).expect("ordinal");
+    let blocks = spec_blocks(&spec_doc(doc));
+    (format!("{doc} #{ordinal}"), blocks[ordinal - 1].clone())
+}
+
+#[test]
+fn blocks_evaluate_per_classification() {
+    let m = manifest();
+    let mut evaluated = 0;
+    for b in &m.blocks {
+        let (what, text) = block_text(b);
+        let class = b.req("eval");
+        assert!(EVAL_CLASSES.contains(&class), "{what}: eval = {class:?}");
+        assert!(
+            b.str("note").is_some(),
+            "{what}: a classification needs a note"
+        );
+        let file = FileId::new(1);
+        match class {
+            "positive" | "diagnostic" => {
+                let forms = clean_forms(&text, file);
+                assert!(!forms.is_empty(), "{what}: nothing to evaluate");
+                let checked = check_diags(&text, &forms);
+                assert_eq!(checked, multiset(b.array("check_diags")), "{what}: check");
+                let ran = run(&text, &forms).fails();
+                let mut want = b.array("run_fails");
+                want.extend(defects(b, &what));
+                assert_eq!(ran, multiset(want), "{what}: run");
+                if class == "positive" {
+                    assert!(check_errors(&text, &forms).is_empty(), "{what}");
+                    assert!(ran.is_empty(), "{what}: a positive block runs clean");
+                } else {
+                    assert!(
+                        !checked.is_empty() || !ran.is_empty(),
+                        "{what}: a diagnostic block pins a code"
+                    );
+                }
+                evaluated += 1;
+            }
+            "deferred" => {
+                let to = b.req("deferred_to");
+                assert!(to.starts_with("TASK-00"), "{what}: deferred_to = {to:?}");
+                // No panic and no abort: the whole block is checked.
+                let forms = clean_forms(&text, file);
+                let checked = check_diags(&text, &forms);
+                if b.bool("pin_check") == Some(true) {
+                    assert_eq!(checked, multiset(b.array("check_diags")), "{what}: check");
+                }
+            }
+            "authority-question" => {
+                assert!(b.str("question").is_some(), "{what}: missing question");
+            }
+            _ => {}
+        }
+    }
+    assert!(evaluated > 0, "no block was evaluated");
+}
+
+#[test]
+fn cases_evaluate_per_expectation() {
+    let m = manifest();
+    let mut evaluated = 0;
+    for case in m.cases.iter().filter(|c| is_eval_case(c)) {
+        let id = case.req("id");
+        let source = case.req("source");
+        let forms = clean_forms(source, case_file(case));
+        assert!(!forms.is_empty(), "case {id}: nothing to evaluate");
+        let checked = check_diags(source, &forms);
+        assert_eq!(
+            checked,
+            multiset(case.array("check_diags")),
+            "case {id}: check"
+        );
+        let mut r = run(source, &forms);
+        let mut want = case.array("run_fails");
+        let blocked = defects(case, id);
+        let is_blocked = !blocked.is_empty();
+        want.extend(blocked);
+        assert_eq!(
+            r.fails_before_last(),
+            multiset(want),
+            "case {id}: earlier forms"
+        );
+        if is_blocked {
+            // The defect reproduces exactly; the later expectations are the
+            // design's and are asserted once the repair lands.
+            continue;
+        }
+        let last = r.last().cloned().expect("a last form");
+        match (case.str("value"), case.str("fail")) {
+            (Some(v), None) => {
+                let got = last.as_ref().map(ToString::to_string);
+                assert_eq!(got.as_deref(), Ok(v), "case {id}: value");
+            }
+            (None, Some(code)) => {
+                let got = last.as_ref().err().map(|e| e.code.as_str());
+                assert_eq!(got, Some(code), "case {id}: fail");
+            }
+            _ => panic!("case {id}: exactly one of value and fail"),
+        }
+        let sounds = case.array("query_values");
+        let faults = case.array("query_faults");
+        if !sounds.is_empty() || !faults.is_empty() {
+            let v = last.expect("a queried case returns a pattern");
+            let q = query_cycle(&mut r.ev, &v, 0).expect("a pattern");
+            let got: Vec<String> = q.events.iter().map(|e| e.value.to_string()).collect();
+            assert_eq!(got, sounds, "case {id}: queried values");
+            let got: Vec<String> = q.faults.iter().map(|f| f.code.to_string()).collect();
+            assert_eq!(got, faults, "case {id}: query faults");
+        }
+        evaluated += 1;
+    }
+    assert!(evaluated > 0, "no case was evaluated");
+}
+
+/// Prints what every block and evaluation case produces (maintenance aid
+/// for classifying fixtures): `cargo test --test spec_fixtures --
+/// --ignored --nocapture evaluation_report`.
+#[test]
+#[ignore = "prints a report; run on demand"]
+fn evaluation_report() {
+    let m = manifest();
+    for b in &m.blocks {
+        let (what, text) = block_text(b);
+        let forms = clean_forms(&text, FileId::new(1));
+        println!("== {what} [{}]", b.req("eval"));
+        println!("   check_diags = {:?}", check_diags(&text, &forms));
+        println!("   run_fails = {:?}", run(&text, &forms).fails());
+    }
+    for case in m.cases.iter().filter(|c| is_eval_case(c)) {
+        let source = case.req("source");
+        let forms = clean_forms(source, case_file(case));
+        let mut r = run(source, &forms);
+        let last = match r.last() {
+            Some(Ok(v)) => format!("value {v}"),
+            Some(Err(e)) => format!("fail {}", e.code),
+            None => "none".to_string(),
+        };
+        println!("== case {}", case.req("id"));
+        println!("   check_diags = {:?}", check_diags(source, &forms));
+        println!(
+            "   before_last = {:?}; last = {last}",
+            r.fails_before_last()
+        );
+        if let Some(Ok(v)) = r.last().cloned() {
+            if let Some(q) = query_cycle(&mut r.ev, &v, 0) {
+                let vals: Vec<String> = q.events.iter().map(|e| e.value.to_string()).collect();
+                let faults: Vec<String> = q.faults.iter().map(|f| f.code.to_string()).collect();
+                println!("   query_values = {vals:?}; query_faults = {faults:?}");
+            }
+        }
+    }
 }

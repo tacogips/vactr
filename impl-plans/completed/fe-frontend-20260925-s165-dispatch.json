@@ -405,5 +405,9 @@
   ],
   "session172Amendment": {
     "note": "Bounded checkpoint amendment (operator, 2026-09-25) after dispatch-plans refused redispatch twice: integration-review mid findings named impl-plans/active/vactrol-frontend-reader.md and this manifest, which no pending plan owned. Each plan now owns its own planPath in writePaths, so review findings on a plan document route to that plan. FE-READER no longer dependsOn FE-VALUE at dispatch time (see its dispatchNote). The FE-VALUE gate-contract note was narrowed: planId goes only in the step6-implement payload, never in the test-integrity or adversarial-review outputs (their contracts reject additional properties; session-171 failed on this). Source tree stays uncommitted until the workflow commit step."
+  },
+  "closure": {
+    "date": "2026-09-25",
+    "note": "RECON3-1 resolved: FE-READER review verdict accepted (attempt-2, findings []); all FE plans archived in 850c606."
   }
 }

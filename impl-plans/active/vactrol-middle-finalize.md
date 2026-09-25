@@ -1,7 +1,7 @@
 # Vactrol Middle End: Reconciliation and Plan Bookkeeping (ME-FINAL) Implementation Plan
 
 **planId**: ME-FINAL (reconciles TASK-004..006 for issue #2)
-**Status**: Completed (session 183: reconciliation and bookkeeping done, all final gates exit=0; formal review, commit and push belong to the workflow steps; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
+**Status**: Completed (session 183: reconciliation and bookkeeping done, all final gates exit=0; session 185 attempt-2: RECON-S184-1 review-pass redispatch, tree unchanged, gates re-run exit=0; formal review, commit and push belong to the workflow steps; archiving to impl-plans/completed/ after the workflow commit, on user confirmation)
 **Design Reference**: design-docs/specs/design-implementation.md sections 6.5.7 (evidence rule), 7.1.7 (verification, rollback)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -79,7 +79,7 @@ It does not commit.
 
 Stage by explicit path only (never `git add -A` or `git add .`): `src/`, `tests/`, `design-docs/specs/`,
 `design-docs/user-qa/`, `impl-plans/active/`, `impl-plans/completed/fe-frontend-20260925-s165-dispatch.json`,
-`impl-plans/README.md`. `Cargo.toml` and `Cargo.lock` must be unchanged (V7). `target/` and `tmp/` are ignored and never
+`impl-plans/README.md`, `README.md` (added by the step-8 documentation refresh, session 180). `Cargo.toml` and `Cargo.lock` must be unchanged (V7). `target/` and `tmp/` are ignored and never
 staged. The message uses the six CLAUDE.md sections on separate lines and has no AI attribution or Co-Authored-By line.
 After staging, `git diff --staged --stat` is shown and `git status --short` must show no untracked path under `src/` or
 `tests/`.
@@ -178,6 +178,31 @@ guideline. Splitting it is out of scope (Non-Goals) and left to TASK-007 plannin
     src/pattern/{build,eval,occ,query,rng,step}.rs, src/tex/{shader,uniforms}.rs, src/types/{check,deps,infer,...}.rs,
     src/vm/{call,frame,ops,query_vm,vm}.rs, src/vm/natives/, the test dirs, tests/support/eval.rs).
 **Blockers**: none. Formal test-integrity and adversarial review, the commit and the push are pending in the workflow steps.
+
+### Session: 2026-09-25 (session 185, attempt-2)
+**Trigger**: RECON-S184-1 (high). Attempt-1 had no adversarial-review verdict because its step7 output was rejected
+($.findings missing). This attempt is a review-pass redispatch on the unchanged tree. Evidence root:
+tmp/me-middle-20260925-s175/ME-FINAL/attempt-2/ (intent.md, pre-status.txt, pre/post-edit-hashes.txt, tree-identity-vs-attempt1.txt,
+plan-doc-mismatch.txt, v4/v5/v7/v10/v11/v12/v13 files).
+**Tree identity**: `shasum -a 256 -c` against attempt-1/final-hashes.txt gives 150/152 OK. No src/ or tests/ path differs, and
+the src/tests file set is identical. The 2 mismatches are me-middle-20260925-s175-dispatch.json (ME-FINAL status ready,
+dispatchNote) and vactrol-middle-integrate.md. Both equal their HEAD blobs from checkpoint 853eb8b (plan-doc-mismatch.txt).
+**Edits**:
+- vactrol-middle-integrate.md Status line: restored the archiving note that attempt-1 wrote. Checkpoint 853eb8b dropped it.
+- This entry, and the Status line of this plan.
+- No change to the manifest, vactrol-core.md, the README or the design docs (dispatchNote). V10 against HEAD is `none`.
+**Verification (s185)**: every log is under target/fe-logs/ and ends with exit=0.
+- V1 final-build-s185-1.log
+- V2 final-clippy-s185-1.log
+- V3 final-nextest-s185-1.log: 489 run, 489 passed, 1 skipped.
+- V3t final-cargotest-s185-1.log: lib 479 passed; spec_fixtures 10 passed, 1 ignored; 0 failed.
+- V3f final-fixtures-s185-1.log: 10 passed, 1 skipped.
+- V9 final-fmt-s185-1.log
+- V6a final-wasm32-s185-1.log
+- V6b final-wasm32-hostwasm-s185-1.log
+- V4: max 792 (src/compile/compiler.rs). V5: none. V7: empty. V11: 0. V12: exit=0. V13: v13-status.txt.
+**Blockers**: none. The formal test-integrity and adversarial review (its output carries findings and no planId), the
+integration review, the commit and the push are pending in the workflow steps.
 
 ## Related Plans
 

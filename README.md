@@ -7,23 +7,49 @@ specification.
 
 ## Status
 
-The language front end is implemented as a Rust library
-(`impl-plans/active/vactrol-core.md` TASK-001..003):
+The language front end and middle end are implemented as a Rust library
+(`impl-plans/active/vactrol-core.md` TASK-001..006). Every top-level form
+goes read -> expand -> check -> compile -> run.
+
+Front end (TASK-001..003):
 
 - `src/value/`: the core value model. It covers value tagging, structural
   equality, dicts as sorted maps (key-ordered iteration and `put`), exact
-  self-reducing ratio arithmetic, and int/float widening.
+  self-reducing ratio arithmetic, int/float widening, and `path`/`url`
+  values.
 - `src/reader/`: reads `.vact` source into S-expression nodes with
   byte-accurate spans. It covers indentation blocks, `{}` nesting, pipe
   continuation lines, and `#@` directives kept as trivia. `( )` is a
-  reader error.
+  reader error. Unquoted paths (`./x ../x ~/x /abs/x`) and `scheme://`
+  urls are literals; `#` ends a url.
 - `src/expand/`: expands `if`/`elif` into `match` and `for` into `map`.
   Its output uses kernel forms only, and malformed forms produce
   diagnostics that point at their origin.
 
-The checker, VM, compiler, pattern engine, scheduler, DSP, session, and
-editor/LSP (TASK-004..010) are not implemented yet. Their modules exist
-only as the skeleton from `design-implementation.md` section 4.
+Middle end (TASK-004..006):
+
+- `src/types/`: the static checker with inference, the forcing masks and
+  the native signature table. Scopes chain as prelude (read-only) ->
+  session -> fn/block: rebinding a name in the same scope is an error,
+  shadowing a prelude name is a hint, and shadowing a user-defined parent
+  name is a warning. It enforces SOUND FIRST (`n [..] > s :x` and
+  `note [..] > s :x` are errors), checks `s` keywords against the
+  late-bound `sound-kit` prelude binding, types `load path` and
+  `sample path`, and diagnoses a bare field-less enum variant used as a
+  binding pattern in `if`/`match`.
+- `src/ns/`, `src/compile/`, `src/vm/`: namespaces and tweak slots, the
+  reactive dependency graph and the top-level `Evaluator`, the bytecode
+  compiler, and the VM with the core and domain natives.
+- `src/pattern/`, `src/clock/`, `src/tex/`: the pattern engine and
+  signals (the first list-valued step after `s` gives the structure;
+  `midi-notes` is a structure-giving step), the cycle clock, and the
+  visual chains with their shader and uniform plans.
+
+Core modules use no OS threads and no I/O. File and sample I/O for `load`
+and `sample` stay behind the `NoopHost` source loader for now.
+
+The slot table, scheduler, hosts, DSP, session/REPL/LSP, and editor
+(TASK-007..010) are not implemented yet.
 
 ## Name
 
@@ -56,14 +82,20 @@ Verification:
 ```sh
 CARGO_TERM_QUIET=true cargo build
 CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown
+CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm
 CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings
+CARGO_TERM_QUIET=true cargo fmt --check
 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 \
   CARGO_TERM_QUIET=true cargo nextest run
 CARGO_TERM_QUIET=true cargo test
 ```
 
-The spec fixtures in `tests/fixtures/spec/manifest.toml` pin reader and
-expander output against the code blocks in the spec. To run only those:
+The spec fixtures in `tests/fixtures/spec/manifest.toml` pin reader,
+expander, checker and evaluation behavior against the code blocks in
+`lang-reference.md` and `design-music.md`. Each case is classified as
+`positive`, `diagnostic` or `deferred`. Deferred cases need the DSP, host
+file I/O or package loading of TASK-008/009; they are checked for no
+panic and no abort only. To run only those:
 `cargo nextest run -E 'binary(spec_fixtures)'`.
 
 Cargo features: `host-native` (the default), `host-wasm`, and `lsp`. For

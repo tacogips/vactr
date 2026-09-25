@@ -1,5 +1,6 @@
 //! Shared helpers for the spec fixture tests.
 
+pub mod eval;
 pub mod toml_subset;
 
 use std::path::PathBuf;

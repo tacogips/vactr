@@ -33,7 +33,8 @@ const fn is_nan(v: &Value) -> bool {
 ///
 /// Numbers compare by exact value across widths (NaN is not equal to
 /// itself). A dict equals a list whose elements are its pairs in key order.
-/// Structs are nominal; variants compare tag and fields.
+/// Structs are nominal; variants compare tag and fields. A path compares
+/// text and containing file, a url its text, and a sound structurally.
 ///
 /// # Errors
 /// `Type` when either side is a function, native, thunk, var ref, pattern,
@@ -81,6 +82,9 @@ pub fn deep_eq(a: &Value, b: &Value) -> Result<bool, Failure> {
         }
         (Value::Inst(x), Value::Inst(y)) => x == y,
         (Value::Range(x), Value::Range(y)) => x == y,
+        (Value::Path(x), Value::Path(y)) => x == y,
+        (Value::Url(x), Value::Url(y)) => x == y,
+        (Value::Sound(x), Value::Sound(y)) => x == y,
         _ => false,
     })
 }

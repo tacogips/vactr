@@ -8,7 +8,7 @@ use crate::dsp::graph::InstId;
 use crate::ns::namespace::{FormGen, VarSlotRef};
 use crate::pattern::pat::Pat;
 use crate::pattern::signal::Sig;
-use crate::reader::span::Span;
+use crate::reader::span::{FileId, Span};
 use crate::tex::texnode::TexNode;
 use crate::value::intern::{intern_kw, KwId, SymId};
 use crate::value::key::Key;
@@ -50,6 +50,12 @@ pub enum Value {
     Tex(Rc<TexNode>),
     /// `0..8` (eager, list-like) or `0..` (lazy).
     Range(RangeVal),
+    /// An unquoted path literal (6.5.8).
+    Path(Rc<PathVal>),
+    /// A `scheme://` url literal, as written (6.5.8).
+    Url(Rc<str>),
+    /// A sound selected by `s` (6.5.8).
+    Sound(Rc<Sound>),
 }
 
 impl Value {
@@ -79,6 +85,38 @@ impl Value {
     pub fn dict(map: BTreeMap<Key, Value>) -> Value {
         Value::Dict(Rc::new(map))
     }
+
+    /// A path literal. `file` is the containing file for a relative path
+    /// (`./`, `../`) and `None` for `/` and `~/` paths.
+    #[must_use]
+    pub fn path(text: &str, file: Option<FileId>) -> Value {
+        Value::Path(Rc::new(PathVal {
+            text: Rc::from(text),
+            file,
+        }))
+    }
+
+    /// A url literal.
+    #[must_use]
+    pub fn url(text: &str) -> Value {
+        Value::Url(Rc::from(text))
+    }
+}
+
+/// A path as written. The host resolves it against `file` when it performs
+/// I/O; no stage here resolves, normalizes or expands it (6.5.8).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PathVal {
+    pub text: Rc<str>,
+    pub file: Option<FileId>,
+}
+
+/// A sound: a builtin host sound, a sample file, or a MIDI-out channel.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Sound {
+    Builtin(KwId),
+    Sample(PathVal),
+    MidiOut(u8),
 }
 
 /// An immutable list, with element provenance when it came from a literal.

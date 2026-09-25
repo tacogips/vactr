@@ -1,7 +1,7 @@
 # Vactrol Middle End: Reactive Dependency Graph, Evaluator and load (ME-REACTIVE) Implementation Plan
 
 **planId**: ME-REACTIVE (implements the reactive part of vactrol-core.md TASK-005, plus `load` and the `NoopHost` stub)
-**Status**: In Progress (implemented; formal test-integrity, adversarial and integration review pending)
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 178; removed from the dispatch manifest by the session-179 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.6 (revised reactive graph, pass journal, rounds, Failed/Blocked, attempt edge sets, status events, equality cutoff, rebuild eligibility), 7.1.3 (Staged effects, Top-level driver, Source loading), 7.1.5, 13 (reeval tier); lang-reference.md section 4 (`load`)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -183,6 +183,27 @@ The ME-MASKS table and log rule with `<plan>` = `reactive`: V1, V2, V3, V3t, V3f
   `QueryVm::sound_kit` (ME-INTEGRATE). A rebuild recompiles and so resolves afresh. No change here.
 - ME-INTEGRATE inserts `check` into `eval_form`/`load` (7.1.1) and implements `QueryVm` for `Vm` using
   `Evaluator::vm_and_ns`; `load` is registered by `Evaluator::new` (not by `Prelude::core`).
+
+### Session: 2026-09-25 s179 (attempt-2, step6-implement re-dispatch)
+
+**Work done**
+- Re-dispatch after the s178 join held the attempt-1 payload (implementation-progress-check: its
+  priorVerification listed a superseded development run, `cargo test --lib ns::tests::reactive_traces`, exit 101,
+  from before the trace fixes; the same filter reran exit 0, 6/6, in target/fe-logs/reconcile-reactive-traces-s178.log).
+- No source change: all 13 owned/shared files matched attempt-1/final-hashes.txt before this attempt
+  (attempt-2/pre-edit-hashes.txt). The only edit is this progress-log entry (attempt-2/intent.md).
+- Bounded self-check: the six trace tests in `reactive_traces.rs` and the recovery cases in `reactive_recovery.rs`
+  assert the vactrol-core.md TASK-005 wording (final values, states, edge sets, attempt edges, subscriptions,
+  no staged intent of failed/restored forms); no new finding.
+
+**Evidence (fresh full-tree run, evidence root tmp/me-middle-20260925-s175/ME-REACTIVE/attempt-2/)**
+- V1 target/fe-logs/reactive-build-s179-1.log exit=0; V2 reactive-clippy-s179-1.log exit=0.
+- V3 reactive-nextest-s179-1.log exit=0, 453 run / 453 passed; V3t reactive-cargotest-s179-1.log exit=0,
+  445 + 8 passed, 0 failed; V3f reactive-fixtures-s179-1.log exit=0, 8/8.
+- V6a reactive-wasm32-s179-1.log exit=0; V6b reactive-wasm32-hostwasm-s179-1.log exit=0.
+- V4 v4-linecount.txt: largest src/compile/compiler.rs 792; owned max evaluator.rs 723 (owned-linecount.txt).
+- V5 v5-stdio.txt `none`; V7 v7-deps.txt empty; V8 v8-rustfmt.txt exit=0 (10 owned leaf files).
+- final-hashes.txt written. Formal test-integrity, adversarial and integration review remain downstream.
 
 ## Related Plans
 

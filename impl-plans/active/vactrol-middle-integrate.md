@@ -1,7 +1,7 @@
 # Vactrol Middle End: Integration, Domain Natives and Spec Fixture Evaluation (ME-INTEGRATE) Implementation Plan
 
 **planId**: ME-INTEGRATE (completes vactrol-core.md TASK-004/005/006 criteria that need the whole pipeline)
-**Status**: Ready
+**Status**: Ready (attempt-2: apply serial repairs R1, R2 via the repair sharedPaths below, then re-verify; attempt-1 implemented)
 **Design Reference**: design-docs/specs/design-implementation.md sections 7.1.1 (pipeline), 7.1.3 (Query VM handle, native table completeness, source loading), 7.1.4 (sounds and the sound kit, `kit:`), 7.1.7 (INTEGRATE wave, spec fixture evaluation, cases), 10.1, 10.4, 11.7; lang-reference.md sections 1-5 (`# => v` annotations)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -55,6 +55,16 @@ The earlier waves built each layer against stubs. This plan joins them:
 - `src/types/manifest.rs`: add sound keys to `spec_default()` only if a positive fixture needs one (record each key).
 - `src/types/diag.rs` / `src/vm/fail.rs`: only to add a code a wave recorded as missing (7.1.3); record it.
 - `src/lib.rs`: crate doc comment only.
+- Serial repairs (session-179 checkpoint amendment; details in
+  `tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-1/repair-requests.md`):
+  - `src/value/dict.rs` (R1): `put`, Dict arm: an element that is itself a `Value::Dict` merges its pairs (later
+    wins); other elements go through `as_pair` as now (`put d & other` keeps working). Covered by
+    `integrate_sound.rs` and the manifest case `eval-sound-kit-override`.
+  - `src/compile/matchc.rs` (R2): `shape_of` treats a name as a variant pattern only when it names the variant itself
+    (`Value::Variant` whose tag is that name, or a ctor `Fn` whose proto name is that name); otherwise it binds.
+  - After both repairs: drop `blocked_by`/`defect_run_fails` from case `eval-sound-kit-override` and lang-reference
+    block 4, switch `integrate_sound.rs` back to the verbatim `put default-sound-kit [bd: ..]` spelling, and check the
+    two open Completion Criteria with the new logs.
 
 ## Required Tests
 
@@ -124,19 +134,113 @@ V3f must show the new evaluation tests ran. Also record inline `grep -c 'eval = 
 
 ## Completion Criteria
 
-- [ ] `QueryVm` for `Vm`, domain natives, prelude sound-kit values and the `check` stage in `eval_form`/`load` implemented
-- [ ] Native-table completeness test passes
-- [ ] TASK-004: fixtures type-check per their classification; annotated negatives produce their codes in isolated sessions
-- [ ] TASK-005: all `positive` fixtures produce their annotated values via read -> expand -> check -> compile -> run; `diagnostic` fixtures produce their codes; `authority-question` and `illustrative-excluded` are tracked with dispositions
-- [ ] TASK-006: `PParam::Late`/`PParam::Fn` via the VM, the tweaked-probability re-query in both directions, bind-time input-lane rejection, failing visual chain keeps the previous binding
-- [ ] TASK-005 forcing criterion, visual case: `osc {* 20 {sin time}}` through the real `osc` native keeps its thunk deferred via the `Late` mask and forces it only at uniform resolution (`integrate_tex.rs`)
-- [ ] Sound-kit late binding, `kit:` and sound-value cases pass
-- [ ] No block has `eval = "unclassified"`; V1-V8 pass with logs cited; `final-hashes.txt` written
+- [x] `QueryVm` for `Vm`, domain natives, prelude sound-kit values and the `check` stage in `eval_form`/`load` implemented
+- [x] Native-table completeness test passes
+- [x] TASK-004: fixtures type-check per their classification; annotated negatives produce their codes in isolated sessions
+- [ ] TASK-005: all `positive` fixtures produce their annotated values via read -> expand -> check -> compile -> run; `diagnostic` fixtures produce their codes; `authority-question` and `illustrative-excluded` are tracked with dispositions (everything passes except lang-reference block 4 line 157, which fails `no-match` only because of defect R2 in src/compile/matchc.rs, outside writePaths; pinned as a strict expected failure)
+- [x] TASK-006: `PParam::Late`/`PParam::Fn` via the VM, the tweaked-probability re-query in both directions, bind-time input-lane rejection, failing visual chain keeps the previous binding
+- [x] TASK-005 forcing criterion, visual case: `osc {* 20 {sin time}}` through the real `osc` native keeps its thunk deferred via the `Late` mask and forces it only at uniform resolution (`integrate_tex.rs`)
+- [ ] Sound-kit late binding, `kit:` and sound-value cases pass (the `kit:`, `var` kit, sound-value, MIDI-out and late-binding tests pass; the design-music spelling `put default-sound-kit [bd: ..]` fails `type` because of defect R1 in src/value/dict.rs, outside writePaths; the late-binding test uses the `&` splat and the case is a strict expected failure)
+- [x] No block has `eval = "unclassified"`; V1-V8 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
-(Implementer: one entry per session: work done, fixture classification table (block -> class, reason), design
-differences, repairs, hash/intent paths, evidence per row, blockers.)
+### Session s180 (2026-09-25), attempt-1
+
+**Work done**
+- `src/vm/query_vm.rs`: `VmQuery { vm, ns }` implements `QueryVm`: every call runs under `Vm::with_effect_mode(Query)`
+  (restored on failure), with a fresh `fuel_limit` budget (1,000,000 by default) that is given back to the caller
+  afterwards; `call` goes through `Vm::call_value` (one Rust-level re-entry); `deref` is an eager `read_slot`;
+  `sound_kit()` reads the SESSION `sound-kit` binding, else the prelude's.
+- Domain natives registered against their table entries: `natives/pattern.rs` (transforms, steps, combinators,
+  `segment`, `midi-notes`, plus the shared coercions and the bind-time `reject_input_lanes`), `natives/music.rs`
+  (the 24 controls with `n`/`note`, `chord`, `voicing`, `arp`, `range`, and the `scale`/`shape` subject overloads),
+  `natives/signal.rs` (signal prelude values, `irand`, `fft`, `cc`, `lag`, `map-range`), `natives/tex.rs` (sources,
+  geometry/color, blend and modulate families, `add`/`sub` overloads, `src`, `text`, `out` with `compile_tex`
+  validation, render settings, `o0`..`o3`), `natives/sound.rs` (`s`/`sound` with `kit:`, `sample`, `midi`,
+  `default-sound-kit` and `sound-kit`: one `Sound::Builtin(k)` per `spec_default().sound_kit_keys()` key).
+- Shared hunks: `vm/natives/mod.rs` (`register_domain`, idempotent, and `full_prelude`; `register_core` is unchanged
+  because the ME-VM test `each_registration_matches_its_table_entry` pins `Prelude::core()` to the core set);
+  `vm/mod.rs` (`query_vm` module, `VmQuery` re-export); `ns/evaluator.rs` (`Evaluator::new` registers the domain;
+  `eval_form` checks the form against `ns.check_env()` + `HostManifest::spec_default()` before the attempt and prepends
+  the diagnostics, never gating; `attempt` rejects a bind whose pattern has an invalid `midi-notes` lane with
+  `input-lane-operator` (value `Err(type)`, so the snapshot rolls back and nothing is staged) and drains the loaded
+  files' check diagnostics); `ns/load.rs` (`LoaderHost` carries the loaded files' diagnostics, `run_source` checks the
+  file as one document in the fresh prelude child scope before running it, `take_load_diags`); `vm/tests/mod.rs`
+  (module declarations); `src/lib.rs` (crate doc: reader, expander, checker, namespace/compiler/VM, pattern engine,
+  clock, visual chains). `types/manifest.rs`, `types/diag.rs`, `vm/fail.rs` were not edited (no key or code added).
+- Tests: `native_table.rs` (4), `integrate_query.rs` (7 + the shared `Ev` harness), `integrate_sound.rs` (13),
+  `integrate_pattern.rs` (6), `integrate_tex.rs` (4). `tests/support/eval.rs` + runner tests
+  `blocks_evaluate_per_classification`, `cases_evaluate_per_expectation` and the on-demand `evaluation_report`
+  (`#[ignore]`).
+- Manifest: all 11 blocks classified; 69 evaluation cases added (52 for the lang-reference sections 1-5 `# => v`
+  annotations, the annotated negatives `+ 1 "a"` (type-mismatch), `?T` as `T` (optional-as-value), rebinding,
+  `upd` of a `let` (upd-immutable), `/ 1 0`, `var` rebinding, `round 90.7`, and the 7.1.7 non-verbatim scope,
+  SOUND FIRST and sound-kit cases). `music-chord-seven-conflict` stays a `verbatim = false` misplaced-colon case.
+
+**Fixture classification**
+
+| Block | eval | Reason |
+|-------|------|--------|
+| lang-reference #1 | positive | both forms check and run clean |
+| lang-reference #2 | diagnostic | annotated negatives (upd-immutable@25, rebinding@27/@28), one-document rebinding of `a`/`arr` (@68/@80), fn parameters shadow session `a` (warnings), placeholder `my-kick` |
+| lang-reference #3 | diagnostic | illustrative literal listings are calls, free example names, annotated negatives (duplicate-key, unknown-keyword/unknown-field, division by zero, `+ 1 "a"`), pattern names shadow `p` |
+| lang-reference #4 | diagnostic, blocked_by R2 | free example names, rebinding@51, shadowing warnings, unbounded `for`; line 157 `no-match` is defect R2 (strict expected failure) |
+| lang-reference #5 | deferred TASK-009 (check pinned) | package import and `load` host I/O; pins rebinding@15, unknown-keyword@23, upd-immutable@33, undefined-name@58 |
+| design-music #1 | diagnostic | every form runs; `use-clock :link` is clock-source-unavailable@49 (planned) |
+| design-music #2 | deferred TASK-008 (check pinned) | `inst pluck` and sound-pack `load`; pins rebinding@32 (M6) and undefined-name@36 (`tr909`); run also hits R1 |
+| design-music #3 | diagnostic | placeholder `pat`, the signal listing line, pre-SOUND-FIRST lines 100/103/106 (sound-not-first), subject-less `off {note ..}` / `arp {chord ..}` |
+| design-music #4-#6 | deferred TASK-008 | DSP instruments, buses, effects, granular |
+
+No block is `authority-question` or `illustrative-excluded`; the two authority-question CASES stay pending.
+
+**Design differences and findings**
+- Spec text errata (implementation follows the Decided rule or the example's own definitions; values pinned with a
+  TOML comment per case): lang-reference line 71 `f 1 2 # => 24` is 12 (`* a 12`); line 373 `put d gain: 1.0 pan: 0`
+  keeps `amp: 0.5` (`d` is immutable); line 465 `0..8` prints as the range `0..8`; line 671 `map arr ..` is
+  `[24 24 88]` with `a = 12`; line 679 `[[0 a] ..]` is `[[0 12] ..]`; lang-reference block 5 `upd base 62` upd's a
+  `let` (upd-immutable); design-music block 3 lines 97-106 predate SOUND FIRST (sound-not-first).
+- `kit:` given a `var`: the VM forces a native's named arguments at the call boundary (src/vm/call.rs, ME-VM), so the
+  `s` native sees the value; a `upd` of the kit is heard at the next query through the reactive pass (the form's
+  eager read of the var re-evaluates and rebinds `d1`), not through `PParam::Late`. `s` uses `param_of`, so a late
+  keyword argument becomes `PParam::Late` if call.rs ever passes it unforced. Low residual.
+- `add`/`sub` on a pattern: `range p k k+1` (exactly `k + v` for exact numbers); a number subject calls `+`/`-`.
+- `map-range` supports `s lo hi` only (`Sig::MapRange` has no input range); the 5-argument form is `arity`.
+- `render`, `use-fps`, `use-canvas` check the effect mode only: `ns/stage.rs` has no render-settings effect; the
+  render host is TASK-007/010.
+- Bind-time `input-lane-operator` uses FailCode `type` for the form's failure (7.1.6 has no lane FailCode; the
+  diagnostic carries the code).
+- `chord` forces a block argument at bind so its `[root quality]` literals are recognized; a `var` stays late.
+- The design-visual example `osc {* 20 {sin time}}` with the real core `sin` fails `type` at uniform resolution
+  (`sin` does not lift signals); the plan's forcing test uses a counting native, as specified. Follow-up for the
+  visual vocabulary owner.
+- 11.3 staging invalidation of uncommitted events is TASK-007's; `integrate_pattern.rs` asserts only the re-query
+  semantics it relies on.
+
+**Repairs / blockers** (details: tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-1/repair-requests.md)
+- R1: `put` of a dict element must merge (7.1.4, design-music sound kits); src/value/dict.rs `put` fails `type`.
+- R2: src/compile/matchc.rs `shape_of` compiles a match name bound in the session to a variant VALUE as a variant
+  pattern; the checker binds it (Decided Q1), so lang-reference block 4 line 157 fails `no-match`.
+Both are outside ME-INTEGRATE writePaths and not applied; the manifest marks them with `blocked_by` +
+`defect_run_fails` (strict expected failures that break the runner once repaired).
+
+**Evidence** (tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-1/: pre-edit-hashes.txt, intent.md,
+post-edit-hashes.txt, final-hashes.txt, report-final.txt, report-probe.txt, repair-requests.md, v4/v5/v7/v8 files)
+
+| # | Log | Result |
+|---|-----|--------|
+| V1 | target/fe-logs/integrate-build-s180-1.log | exit=0 |
+| V2 | target/fe-logs/integrate-clippy-s180-1.log | exit=0 |
+| V3 | target/fe-logs/integrate-nextest-s180-1.log | 489 run, 489 passed, 1 skipped (the ignored report), exit=0 |
+| V3t | target/fe-logs/integrate-cargotest-s180-1.log | lib 479 passed, spec_fixtures 10 passed (1 ignored), exit=0 |
+| V3f | target/fe-logs/integrate-fixtures-s180-1.log | 10 run, 10 passed (includes the two new evaluation tests), exit=0 |
+| V6a | target/fe-logs/integrate-wasm32-s180-1.log | exit=0 |
+| V6b | target/fe-logs/integrate-wasm32-hostwasm-s180-1.log | exit=0 |
+| V4 | v4-linecount.txt | largest compiler.rs 792; largest owned/shared-edited evaluator.rs 744 |
+| V5 | v5-stdio.txt | none |
+| V7 | v7-deps.txt | empty |
+| V8 | v8-rustfmt.txt | exit=0 on the 14 owned .rs files |
+| unclassified | v-unclassified.txt | 0 |
 
 ## Related Plans
 

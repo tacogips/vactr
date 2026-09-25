@@ -1,7 +1,7 @@
 {
   "taskId": "me-middle-20260925-s175",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-178",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-179",
   "issueReference": {
     "repository": "tacogips/vactrol",
     "number": 2,
@@ -10,7 +10,7 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "4a50479aed2420183c56f8feecf07f7eadeba2d0",
+  "originalHead": "f7a937c05fb8e7a7f719ab6b93b26c524b33b9d8",
   "parentPlanPath": "impl-plans/active/vactrol-core.md",
   "planIndexPath": "impl-plans/README.md",
   "designDocPaths": [
@@ -135,61 +135,12 @@
   },
   "plans": [
     {
-      "planId": "ME-REACTIVE",
-      "planPath": "impl-plans/active/vactrol-middle-reactive.md",
-      "implementsTask": "TASK-005 (DepGraph, pass journal, Evaluator, rebuild, reactive propagation) plus load/SourceLoader/NoopHost",
-      "wave": 4,
-      "status": "ready",
-      "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-middle-reactive.md#progress-log",
-      "writePaths": [
-        "src/ns/depgraph.rs",
-        "src/ns/journal.rs",
-        "src/ns/evaluator.rs",
-        "src/ns/load.rs",
-        "src/ns/tests/reactive_basic.rs",
-        "src/ns/tests/reactive_traces.rs",
-        "src/ns/tests/reactive_recovery.rs",
-        "src/ns/tests/rebuild.rs",
-        "src/ns/tests/evaluator.rs",
-        "src/ns/tests/load.rs",
-        "impl-plans/active/vactrol-middle-reactive.md"
-      ],
-      "sharedPaths": [
-        "src/ns/mod.rs",
-        "src/ns/tests/mod.rs"
-      ],
-      "acceptanceCriteria": [
-        "DepGraph, PassJournal and Evaluator implement design 5.6 revised and 7.1.3.",
-        "Every reactive-propagation case and trace in the TASK-005 reactive criterion passes.",
-        "The rebuild tests pass, and reeval-tier tweak writes re-evaluate the owning form.",
-        "SourceLoader, NoopHost and load behave as listed: fresh prelude child scope, last expression, load-failed, depth-exceeded on a cycle, host-unavailable, effect-in-query.",
-        "V1-V8 pass with logs cited; final-hashes.txt written."
-      ],
-      "verification": [
-        "mkdir -p target/fe-logs",
-        "LOG(reactive-build): CARGO_TERM_QUIET=true cargo build",
-        "LOG(reactive-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
-        "LOG(reactive-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "LOG(reactive-cargotest): CARGO_TERM_QUIET=true cargo test",
-        "LOG(reactive-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
-        "LOG(reactive-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
-        "LOG(reactive-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
-        "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
-        "git diff --stat -- Cargo.toml Cargo.lock",
-        "rustfmt --edition 2021 --check <owned .rs files>"
-      ]
-    },
-    {
       "planId": "ME-INTEGRATE",
       "planPath": "impl-plans/active/vactrol-middle-integrate.md",
       "implementsTask": "TASK-004/005/006 whole-pipeline criteria: QueryVm for Vm, domain natives, check stage, spec fixture evaluation",
       "wave": 5,
       "status": "ready",
-      "dependsOn": [
-        "ME-REACTIVE"
-      ],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-middle-integrate.md#progress-log",
       "writePaths": [
         "src/vm/query_vm.rs",
@@ -218,9 +169,12 @@
         "src/types/manifest.rs",
         "src/types/diag.rs",
         "src/vm/fail.rs",
-        "src/lib.rs"
+        "src/lib.rs",
+        "src/value/dict.rs",
+        "src/compile/matchc.rs"
       ],
       "acceptanceCriteria": [
+        "Serial repairs R1 (src/value/dict.rs put merges a dict element, later keys win) and R2 (src/compile/matchc.rs shape_of binds a match name unless it names the variant itself) are applied; blocked_by/defect_run_fails are removed from case eval-sound-kit-override and lang-reference block 4; integrate_sound.rs uses the verbatim put default-sound-kit [bd: ..] spelling.",
         "QueryVm for Vm, the domain natives, the prelude sound-kit values and the check stage in eval_form/load are implemented.",
         "The native-table completeness test passes.",
         "TASK-004: fixtures type-check per their classification, and the annotated negatives produce their codes in isolated sessions.",
@@ -350,7 +304,8 @@
       "ME-FRONTEND",
       "ME-CHECK",
       "ME-VM",
-      "ME-PATTERN"
+      "ME-PATTERN",
+      "ME-REACTIVE"
     ],
     "removedPlans": [
       {
@@ -468,6 +423,41 @@
           "src/lib.rs",
           "src/pattern/mod.rs",
           "src/tex/mod.rs"
+        ]
+      }
+    ]
+  },
+  "session179Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-REACTIVE was accepted in session 178 (adversarial review 0 blocking, integration review accepted). ME-INTEGRATE then implemented and verified green (integrate-nextest-s180-1.log 489/489, cargotest, fixtures, both wasm32 builds exit 0) but its progress gate reported implementation_blocked with a single riela fanout observation: content-or-mode-drift on impl-plans/active/vactrol-middle-reactive.md (the ME-REACTIVE attempt-2 progress-log entry written after that branch's snapshot). As a single-branch wave this ended the session as implementation-blocked. Recovery as before: ME-REACTIVE is removed from plans[] and dependsOn; ME-INTEGRATE is re-dispatched on the unchanged tree (review pass), then ME-FINAL. Workers MUST NOT edit plan documents outside their own writePaths/sharedPaths; ME-FINAL owns the cross-plan bookkeeping.",
+    "repairScope": "ME-INTEGRATE attempt-1 left two completion criteria open on repair requests R1 (src/value/dict.rs put must merge a dict element, design 7.1.4 / design-music sound kits) and R2 (src/compile/matchc.rs shape_of must bind a match name that does not name the variant, design 20 Q1) because those files were outside its paths (tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-1/repair-requests.md). A review-only re-dispatch would block again and leave ME-FINAL unable to check every TASK-004..006 criterion, so the session-179 checkpoint adds both files to ME-INTEGRATE sharedPaths as serial repairs (the plan already makes this wave the serial-repair point; no other plan in plans[] touches them) and ME-INTEGRATE attempt-2 applies them, removes blocked_by/defect_run_fails, and re-verifies. originalHead moves from 4a50479 to f7a937c (session-179 intake, the session-178 plan checkpoint); workflowExecutionId moves to session-179.",
+    "acceptedOutsideManifest": [
+      "ME-MASKS",
+      "ME-FRONTEND",
+      "ME-CHECK",
+      "ME-VM",
+      "ME-PATTERN",
+      "ME-REACTIVE"
+    ],
+    "removedPlans": [
+      {
+        "planId": "ME-REACTIVE",
+        "planPath": "impl-plans/active/vactrol-middle-reactive.md",
+        "writePaths": [
+          "src/ns/depgraph.rs",
+          "src/ns/journal.rs",
+          "src/ns/evaluator.rs",
+          "src/ns/load.rs",
+          "src/ns/tests/reactive_basic.rs",
+          "src/ns/tests/reactive_traces.rs",
+          "src/ns/tests/reactive_recovery.rs",
+          "src/ns/tests/rebuild.rs",
+          "src/ns/tests/evaluator.rs",
+          "src/ns/tests/load.rs",
+          "impl-plans/active/vactrol-middle-reactive.md"
+        ],
+        "sharedPaths": [
+          "src/ns/mod.rs",
+          "src/ns/tests/mod.rs"
         ]
       }
     ]

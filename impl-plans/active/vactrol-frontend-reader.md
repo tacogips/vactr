@@ -1,7 +1,7 @@
 # Vactrol Front End: Reader and Spec Fixture Manifest (FE-READER) Implementation Plan
 
 **planId**: FE-READER (implements vactrol-core.md TASK-002)
-**Status**: In Progress (implementation complete in session 170; formal review, FE-FINAL reconciliation and the commit are pending)
+**Status**: Completed (reconciled by FE-FINAL in session 175; stays in active/ until the user confirms archiving)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.7, 6.1-6.3, 6.5.4, 6.5.6
 **Created**: 2026-09-25
 **Last Updated**: 2026-09-25 (session 172 checkpoint: review-only redispatch, review-verdict criterion)
@@ -226,7 +226,7 @@ In the tables, `\|` stands for a literal `|`.
 - [x] `import`, `as` and `open` read correctly; the fresh-session `pads.warm` and `as pd` cases read; an unbound qualifier is an error; `prescan_imports` finds every import; `#@` lines land in trivia with positions
 - [x] Spans are byte-accurate (golden tests pass)
 - [x] V1-V6 and V3f pass (V3f: the `spec_fixtures` binary ran with a non-zero run count)
-- [ ] A schema-valid adversarial review verdict (a `findings` array, empty if none) exists for the tree in `tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt`, and it covers RECON2-2 (`empty-pipe`) and RECON2-3 (the `:7` spec conflict). Evidence: `tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/`
+- [x] A schema-valid adversarial review verdict (a `findings` array, empty if none) exists for the tree in `tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt`, and it covers RECON2-2 (`empty-pipe`) and RECON2-3 (the `:7` spec conflict). Evidence: `tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/`
 
 ## Progress Log
 
@@ -298,6 +298,33 @@ Session 171 dispatched only FE-VALUE, so FE-READER still has no review verdict (
 session-170 finding-1). The dispatch dependsOn on FE-VALUE is cleared, so FE-READER is dispatchable now. This rerun is
 review-only: re-check `final-hashes.txt` (20/20 OK), re-verify with s172 logs, then run step7 into `attempt-2/`. The
 review-verdict criterion above mirrors the dispatch manifest acceptance criterion. No requirement or code change.
+
+### Session: 2026-09-25 (session 172, FE-READER step6 re-verification)
+**Tasks Completed**: review-only redispatch (RECON3-1). No source file was edited. The tree is unchanged since session 170:
+`reader-hashes-s172-1.log` shows 20/20 OK, exit=0. Cargo.toml sha256 is still f8e41f7e (FE-VALUE's `[features]` table only).
+**Verification evidence** (all under `target/fe-logs/`):
+- V1 `reader-build-s172-1.log`: exit=0.
+- V2 `reader-clippy-s172-1.log`: exit=0.
+- V3 `reader-nextest-s172-1.log`: exit=0; 99 tests run, 99 passed, 0 skipped.
+- V3t `reader-cargotest-s172-1.log`: exit=0; lib 92 passed and spec_fixtures 7 passed, 0 failed.
+- V3f `reader-fixtures-s172-1.log`: exit=0; 7 tests run, 7 passed.
+- Extra: `reader-wasm32-s172-1.log` exit=0.
+- `reader-rustfmt-s172-2.log`: `rustfmt --check` on the 19 owned `.rs` files, exit=0. The `-s172-1` run failed only because
+  zsh did not split the file list; it is superseded.
+- V4: the largest files are `line.rs` 741, `lexer.rs` 690 and `layout.rs` 343 lines. V5 prints `11`. V6 shows only FE-VALUE's
+  6-line `[features]` table. The `std::(thread|fs|time|net|process)` grep prints `none`.
+**Pending (step7)**: the adversarial review verdict in `attempt-2/` must cover RECON2-2 (`empty-pipe`) and RECON2-3 (the
+`:7` conflict). The last completion criterion stays unchecked until then.
+
+### Session: 2026-09-25 (session 172, reconcile-implementations: step7 verdict persisted)
+**Tasks Completed**: The step7 adversarial review-only verdict (`step7-adversarial-review-attempt-1-exec-210`, accepted
+01:03:12Z) is `accepted=true`, `needs_revision=false`, `findings=[]`. It was copied verbatim from the Riela session record to
+`tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/step7-review-verdict.json`. The review re-ran the `final-hashes.txt` check
+(20/20 OK) and covers RECON2-2 (`empty-pipe` matches design 6.5.4 step 2; the `line.rs:169` branch cannot be reached and is a
+harmless guard) and RECON2-3 (`[:g :7]` reads as misplaced-colon and is pinned for the language author). The review-verdict
+criterion is now checked. No source was edited. Combined-tree checks: `tmp/fe-frontend-20260925-s165/reconcile-implementations/attempt-4/`.
+**Residual (not in this plan)**: FE-FINAL records `empty-pipe` and `misplaced-arrow` in design 6.5.4. The `:7` decision belongs to the language author.
+Plan acceptance still belongs to the integration review.
 
 ## Related Plans
 

@@ -1,0 +1,793 @@
+# Spec fixture manifest (design 6.5.6). Parsed by tests/support/toml_subset.rs.
+# [[block]]: one entry per `vactrol`/`vact` fence, found by ordinal per document;
+#   reader_diags is the exact multiset of reader codes, `code@line` with the line
+#   counted within the block. `expand_diags` is the exact multiset of expander codes,
+#   `code@line`; forms with a reader error are skipped (the runner asserts that they
+#   return read-error-present) and are not listed. Later tasks refine `eval`.
+# [[case]]: `read` and `expand` are canonical prints (src/reader/sexpr.rs) joined by
+#   newlines; `diags` is the multiset of reader codes plus expander codes (a case with
+#   an expander diagnostic has no `expand`); `verbatim = true` means `source` appears
+#   verbatim in `doc`.
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 1
+section = 0
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Principles: the two spellings of 43+32 times 12."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 2
+section = 1
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Basics: fn, bindings, lambdas, pipes and continuation lines."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 3
+section = 2
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Literals and data: numbers, strings, keywords, nil, identifiers, blocks, pairs, dicts, structs, errors, ranges."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 4
+section = 3
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Control flow: if/elif/else chains, binding if, match, enum, iteration."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 5
+section = 4
+reader = "diagnostics"
+reader_diags = ["stray-char@92"]
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 92) is `..` plus a stray `.`."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 1
+section = 1
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Time: pipes into slots, the every/whenmod continuation chain, once/at, live vars."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 2
+section = 2
+reader = "diagnostics"
+reader_diags = ["misplaced-colon@40"]
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Sound. SPEC CONFLICT (reported, rules unchanged): `[:g :7]` on block line 40; `:7` is not a keyword because an identifier cannot start with a digit (lang-reference section 2, Decided identifier rule; design 6.5.4 colon classes)."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 3
+section = 3
+reader = "diagnostics"
+reader_diags = ["misplaced-colon@104"]
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Patterns. SPEC CONFLICT (reported, rules unchanged): `[:g :7]` on block line 104, as in section 2."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 4
+section = 4
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Synthesis models: inst headers with pairs and typed parameters."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 5
+section = 5
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Effects: bus and master blocks with continuation lines."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 6
+section = 6
+reader = "diagnostics"
+reader_diags = ["unexpected-indent@3"]
+expand = "clean"
+expand_diags = []
+eval = "unclassified"
+note = "Granular. Block line 3 continues the granular call without `>`, so it is unexpected-indent (6.5.4); the statement it sits under becomes Error."
+
+[[case]]
+id = "canon-pipe-thought-order"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '+ 43 32 > * 12 > print'
+read = '(print (* (+ 43 32) 12))'
+expand = '(print (* (+ 43 32) 12))'
+diags = []
+annotation = "# thought order: 43+32, times 12, print"
+
+[[case]]
+id = "canon-group"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '* 12 {+ 43 32}'
+read = '(* 12 {(+ 43 32)})'
+expand = '(* 12 {(+ 43 32)})'
+diags = []
+annotation = "# ~ (* 12 (+ 43 32))  => 900"
+
+[[case]]
+id = "canon-pair"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'amp: 0.5'
+read = '[:amp 0.5]'
+expand = '[:amp 0.5]'
+diags = []
+annotation = "# ~ [:amp 0.5]"
+
+[[case]]
+id = "canon-string-key-pair"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '"a": 1'
+read = '["a" 1]'
+expand = '["a" 1]'
+diags = []
+annotation = "# any literal key: ~ [\"a\" 1]"
+
+[[case]]
+id = "canon-dict-literal"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '[amp: 0.5 pan: -1]'
+read = '[[:amp 0.5] [:pan -1]]'
+expand = '[[:amp 0.5] [:pan -1]]'
+diags = []
+annotation = "# a dict; ~ [[:amp 0.5] [:pan -1]]"
+
+[[case]]
+id = "canon-named-args"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'once {s :crash} at: 4 gain: 0.5'
+read = '(once {(s :crash)} [:at 4] [:gain 0.5])'
+expand = '(once {(s :crash)} [:at 4] [:gain 0.5])'
+diags = []
+annotation = "# ~ (once {s :crash} [:at 4] [:gain 0.5])"
+
+[[case]]
+id = "canon-let"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let a 12'
+read = '(let a 12)'
+expand = '(let a 12)'
+diags = []
+annotation = "# ~ (let a 12); immutable"
+
+[[case]]
+id = "canon-pipe-inline"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'a > fn1 12 > fn2 32 43'
+read = '(fn2 (fn1 a 12) 32 43)'
+expand = '(fn2 (fn1 a 12) 32 43)'
+diags = []
+annotation = "# inline, the same thing"
+
+[[case]]
+id = "canon-pipe-continuation"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+fn some-fn a:
+	fn1 a 12
+		> fn2 32 43'''
+read = '(fn some-fn a {(fn2 (fn1 a 12) 32 43)})'
+expand = '(fn some-fn a {(fn2 (fn1 a 12) 32 43)})'
+diags = []
+annotation = "# == fn2 {fn1 a 12} 32 43"
+
+[[case]]
+id = "canon-fallback-precedence"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'd :gain ? 1.0 > * 2'
+read = '(* (#? (d :gain) 1.0) 2)'
+expand = '(* (or (d :gain) 1.0) 2)'
+diags = []
+annotation = "# `?` applies to the expression just to its left and binds tighter than `>`"
+
+[[case]]
+id = "canon-lambda"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'x b -> * x b'
+read = '(-> (x b) (* x b))'
+expand = '(-> (x b) (* x b))'
+diags = []
+annotation = "# like |x, b| x * b in Rust"
+
+[[case]]
+id = "canon-lambda-in-group"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'map arr {x -> * x 2}'
+read = '(map arr (-> (x) (* x 2)))'
+expand = '(map arr (-> (x) (* x 2)))'
+diags = []
+
+[[case]]
+id = "canon-if-block"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {> a 10}:
+	print "big"'''
+read = '(if {(> a 10)} {(print "big")})'
+expand = '(match {(> a 10)} {(-> (false | nil) nil) (-> (_) {(print "big")})})'
+diags = []
+annotation = "# these two are identical"
+
+[[case]]
+id = "canon-if-inline-group"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if {> a 10} {print "big"}'
+read = '(if {(> a 10)} {(print "big")})'
+expand = '(match {(> a 10)} {(-> (false | nil) nil) (-> (_) {(print "big")})})'
+diags = []
+annotation = "# these two are identical"
+
+[[case]]
+id = "canon-neg"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = 'print -x'
+read = '(print (#neg x))'
+expand = '(print (neg x))'
+diags = []
+annotation = "# `-x` is `{neg x}`; `- x` with a space is the function"
+
+[[case]]
+id = "canon-interp"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '"note {n} at beat {beat}"'
+read = '(#interp "note " n " at beat " beat)'
+expand = '(concat "note " n " at beat " beat)'
+diags = []
+
+[[case]]
+id = "canon-for-range"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+for i 0..8:
+	print i'''
+read = '(for i (.. 0 8) {(print i)})'
+expand = '(match (map (.. 0 8) (-> (i) {(print i)})) {(-> (_) nil)})'
+diags = []
+
+[[case]]
+id = "canon-let-reads-rest"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let label if {> a 10} "big" "small"'
+read = '(let label (if {(> a 10)} "big" "small"))'
+expand = '(let label (match {(> a 10)} {(-> (false | nil) "small") (-> (_) "big")}))'
+diags = []
+annotation = "# `let` reads the rest of its line"
+
+[[case]]
+id = "sec2-splat-args"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'once {s :crash} & p'
+read = '(once {(s :crash)} (& p))'
+expand = '(once {(s :crash)} (& p))'
+diags = []
+annotation = "# == once {s :crash} gain: 0.5 pan: -1"
+
+[[case]]
+id = "sec2-struct-construct"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let v voice note: 60 pan: -1'
+read = '(let v (voice [:note 60] [:pan -1]))'
+expand = '(let v (voice [:note 60] [:pan -1]))'
+diags = []
+annotation = "# construct: a plain call; `let` reads the rest of its line"
+
+[[case]]
+id = "sec3-if-value"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if {> a 10} "big" "small"'
+read = '(if {(> a 10)} "big" "small")'
+expand = '(match {(> a 10)} {(-> (false | nil) "small") (-> (_) "big")})'
+diags = []
+annotation = "# == match {> a 10}: false | nil -> \"small\"; _ -> \"big\""
+
+[[case]]
+id = "sec3-if-no-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let maybe if {> a 100} "huge"'
+read = '(let maybe (if {(> a 100)} "huge"))'
+expand = '(let maybe (match {(> a 100)} {(-> (false | nil) nil) (-> (_) "huge")}))'
+diags = []
+annotation = "# => nil when false"
+
+[[case]]
+id = "sec3-binding-if-inline"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if {d :gain} g -> once {s :bd} gain: g'
+read = '(-> (if {(d :gain)} g) (once {(s :bd)} [:gain g]))'
+expand = '(match {(d :gain)} {(-> (false | nil) nil) (-> (g) (once {(s :bd)} [:gain g]))})'
+diags = []
+annotation = "# g bound when {d :gain} is not nil"
+
+[[case]]
+id = "sec3-binding-if-block"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {d :gain} g ->:
+	once {s :bd} gain: g
+else:
+	once {s :bd}'''
+read = '(#if-chain (-> (if {(d :gain)} g) {(once {(s :bd)} [:gain g])}) (else {(once {(s :bd)})}))'
+expand = '(match {(d :gain)} {(-> (false | nil) {(once {(s :bd)})}) (-> (g) {(once {(s :bd)} [:gain g])})})'
+diags = []
+annotation = "# == match {d :gain}: false | nil -> once {s :bd}; g -> once {s :bd} gain: g"
+
+[[case]]
+id = "sec3-binding-if-variant"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {parse s} ok v ->:
+	print v
+else:
+	print "parse failed"'''
+read = '(#if-chain (-> (if {(parse s)} ok v) {(print v)}) (else {(print "parse failed")}))'
+expand = '(match {(parse s)} {(-> (ok v) {(print v)}) (-> (_) {(print "parse failed")})})'
+diags = []
+annotation = "# == match {parse s}: ok v -> print v; _ -> print \"parse failed\""
+
+[[case]]
+id = "sec3-if-elif-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {> a 10}:
+	print "big"
+elif {> a 5}:
+	print "medium"
+else:
+	print "small"'''
+read = '(#if-chain (if {(> a 10)} {(print "big")}) (elif {(> a 5)} {(print "medium")}) (else {(print "small")}))'
+expand = '(match {(> a 10)} {(-> (false | nil) (match {(> a 5)} {(-> (false | nil) {(print "small")}) (-> (_) {(print "medium")})})) (-> (_) {(print "big")})})'
+diags = []
+annotation = "# multi-line form; `else:` and `elif cond:` align with `if`"
+
+[[case]]
+id = "sec3-for-statement"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+for x arr:
+	print x'''
+read = '(for x arr {(print x)})'
+expand = '(match (map arr (-> (x) {(print x)})) {(-> (_) nil)})'
+diags = []
+annotation = "# `for pattern source: body` == `map source {pattern -> body}`"
+
+[[case]]
+id = "sec3-match-clauses"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+match x:
+	:kick -> :bd-haus
+	:snare -> :sn-dub
+	_ -> nil'''
+read = '(match x {(-> (:kick) :bd-haus) (-> (:snare) :sn-dub) (-> (_) nil)})'
+expand = '(match x {(-> (:kick) :bd-haus) (-> (:snare) :sn-dub) (-> (_) nil)})'
+diags = []
+
+[[case]]
+id = "music-every-whenmod-chain"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+s [:bd-haus :sn-dub]
+	> every 4 {p -> fast p 2}      # every fourth cycle, double time
+	> whenmod 8 6 rev              # cycles 6 and 7 of every 8, reversed
+	> d1'''
+read = '(d1 (whenmod (every (s [:bd-haus :sn-dub]) 4 (-> (p) (fast p 2))) 8 6 rev))'
+expand = '(d1 (whenmod (every (s [:bd-haus :sn-dub]) 4 (-> (p) (fast p 2))) 8 6 rev))'
+diags = []
+
+[[case]]
+id = "music-d1-three-spellings"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+s [:bd :sd] > d1                   # pipe into the sink (principle 2)
+d1 {s [:bd :sd]}                   # plain call
+d1:                              # trailing block; the block's value is
+	s [:bd :sd]                      # its last expression, i.e. the pattern'''
+read = '''
+(d1 (s [:bd :sd]))
+(d1 {(s [:bd :sd])})
+(d1 {(s [:bd :sd])})'''
+expand = '''
+(d1 (s [:bd :sd]))
+(d1 {(s [:bd :sd])})
+(d1 {(s [:bd :sd])})'''
+diags = []
+annotation = "# Three spellings of the same call"
+
+[[case]]
+id = "music-slot-drums"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+slot :drums:
+	s [:bd :sd]'''
+read = '(slot :drums {(s [:bd :sd])})'
+expand = '(slot :drums {(s [:bd :sd])})'
+diags = []
+annotation = "# `d1 == slot 1`"
+
+[[case]]
+id = "music-inst-pluck-header"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+inst pluck freq: float = 440 amp: float = 0.5 cutoff: float = 2000:
+	saw freq
+		> lpf cutoff
+		> * {env-perc 0.01 0.3}
+		> * amp'''
+read = '(inst pluck [:freq float] = 440 [:amp float] = 0.5 [:cutoff float] = 2000 {(* (* (lpf (saw freq) cutoff) {(env-perc 0.01 0.3)}) amp)})'
+expand = '(inst pluck [:freq float] = 440 [:amp float] = 0.5 [:cutoff float] = 2000 {(* (* (lpf (saw freq) cutoff) {(env-perc 0.01 0.3)}) amp)})'
+diags = []
+
+[[case]]
+id = "music-control-patterns"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+d1:
+	s [:bd :sd]
+		> n [0 1 2 3]
+		> gain [1 0.8 0.6]
+		> pan sine
+		> speed {alt 1 2}
+		> lpf {range 200 2000 sine}'''
+read = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range 200 2000 sine)})})'
+expand = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range 200 2000 sine)})})'
+diags = []
+
+[[case]]
+id = "music-chord-seven-conflict"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = 'chord {alt [:c :maj7] [:d :m7] [:g :7]}'
+read = '(#error)'
+diags = ["misplaced-colon"]
+note = "SPEC CONFLICT, reported for the language author: `:7` breaks the Decided identifier rule (no leading digit), so 6.5.4 reads the colon as misplaced-colon. The reader rules are not changed to fit."
+
+[[case]]
+id = "neg-paren-form"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+( + 1 2 )
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["paren-form"]
+annotation = "# `( )` is a reader error"
+
+[[case]]
+id = "neg-underscore-name"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let _tmp 1
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["bad-identifier"]
+annotation = "# not identifiers: _tmp"
+
+[[case]]
+id = "neg-trailing-dash"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let foo- 1
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["bad-identifier"]
+annotation = "# `foo-` is not a name"
+
+[[case]]
+id = "neg-console-register-in-file"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+print _1
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["console-register-in-file"]
+annotation = "# In a file it is a reader error"
+
+[[case]]
+id = "console-register-in-console"
+doc = "lang-reference.md"
+file = "console"
+verbatim = false
+source = '''
+print _1
+print 1'''
+read = '''
+(print _1)
+(print 1)'''
+expand = '''
+(print _1)
+(print 1)'''
+diags = []
+annotation = "# `_1` (the previous value) exists ONLY in the console"
+
+[[case]]
+id = "u2-gt-statement-level"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '> a 10'
+read = '(> a 10)'
+expand = '(> a 10)'
+diags = []
+note = "U2 pin (design 6.5.4): a line-initial `>` at statement level is in head position; the pipe-continuation cases pin the deeper-indented reading."
+
+[[case]]
+id = "aq-fn-arity"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+fn f a b:
+	* a 12            # ~ (* a 12)
+
+# function call: prefix, no parens, no commas
+f 1 2               # => 24'''
+read = '''
+(fn f a b {(* a 12)})
+(f 1 2)'''
+expand = '''
+(fn f a b {(* a 12)})
+(f 1 2)'''
+diags = []
+annotation = "# => 24"
+class = "authority-question"
+question = "fn f a b takes two parameters and returns * a 12; is f 1 2 => 24 the intended arity and value?"
+
+[[case]]
+id = "aq-let-upd-base"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+let base 60
+let line note [base {+ base 7}] > s :pluck   # depends on base
+line > d1                                    # d1 depends on line
+upd base 62'''
+read = '''
+(let base 60)
+(let line (s (note [base {(+ base 7)}]) :pluck))
+(d1 line)
+(upd base 62)'''
+expand = '''
+(let base 60)
+(let line (s (note [base {(+ base 7)}]) :pluck))
+(d1 line)
+(upd base 62)'''
+diags = []
+annotation = "# line and d1's pattern update"
+class = "authority-question"
+question = "section 4 applies upd to a name bound by let, while section 1 says only a var may be upd'd."
+
+[[case]]
+id = "u4-inline-fn-body"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = 'fn kick-sound: :bd-haus'
+read = '(fn [:kick-sound :bd-haus])'
+diags = ["malformed-fn"]
+note = "U4: fn bodies are block form only. 6.5.4 reads `kick-sound: :bd-haus` as a pair; the expander reports malformed-fn."
+
+[[case]]
+id = "import-default-prefix"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'import github.com/someone/vactrol-pads'
+read = '(#import "github.com/someone/vactrol-pads")'
+expand = '(#import "github.com/someone/vactrol-pads")'
+diags = []
+annotation = "# qualified: pads.warm"
+
+[[case]]
+id = "import-alias"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'import github.com/someone/vactrol-pads as pd'
+read = '(#import "github.com/someone/vactrol-pads" as pd)'
+expand = '(#import "github.com/someone/vactrol-pads" as pd)'
+diags = []
+annotation = "# alias"
+
+[[case]]
+id = "import-open"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'import github.com/someone/vactrol-pads open'
+read = '(#import "github.com/someone/vactrol-pads" open)'
+expand = '(#import "github.com/someone/vactrol-pads" open)'
+diags = []
+annotation = "# names unqualified"
+
+[[case]]
+id = "import-fresh-document"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+import github.com/someone/vactrol-pads
+note [:c3] > s pads.warm > d1'''
+read = '''
+(#import "github.com/someone/vactrol-pads")
+(d1 (s (note [:c3]) pads.warm))'''
+expand = '''
+(#import "github.com/someone/vactrol-pads")
+(d1 (s (note [:c3]) pads.warm))'''
+diags = []
+note = "Import-then-use in one fresh document (5.7 two-phase frontend)."
+
+[[case]]
+id = "import-fresh-alias"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+import github.com/someone/vactrol-pads as pd
+note [:c3] > s pd.warm > d1'''
+read = '''
+(#import "github.com/someone/vactrol-pads" as pd)
+(d1 (s (note [:c3]) pd.warm))'''
+expand = '''
+(#import "github.com/someone/vactrol-pads" as pd)
+(d1 (s (note [:c3]) pd.warm))'''
+diags = []
+
+[[case]]
+id = "unbound-qualifier"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'note [:c3] > s pads.warm > d1'
+read = '(#error)'
+diags = ["unbound-qualifier"]
+note = "Read with no import before it: the qualifier is unbound."
+
+[[case]]
+id = "directive-trivia"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+#@ panel: gain
+let g 1'''
+read = '(let g 1)'
+expand = '(let g 1)'
+diags = []
+note = "`#@` lines are trivia with spans (unit tests check the spans)."
+
+[[case]]
+id = "u5-bare-variant-binding-if"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = 'if x none -> 1'
+read = '(-> (if x none) 1)'
+expand = '(match x {(-> (false | nil) nil) (-> (none) 1)})'
+diags = []
+note = "U5 (answered): the expander keeps the syntactic binding-if desugaring. When `none` is a field-less variant, a truthy value that is not `none` fails the match instead of taking the else branch; the checker (TASK-004) must diagnose a bare field-less variant used as the binding pattern of `if`. The expander implements no such diagnostic."

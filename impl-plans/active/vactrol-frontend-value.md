@@ -1,7 +1,7 @@
 # Vactrol Front End: Value Model and Foundation (FE-VALUE) Implementation Plan
 
 **planId**: FE-VALUE (implements vactrol-core.md TASK-001)
-**Status**: In Progress (implementation and session-170 verification including V3t done; review pending; commit folded into the FE-FINAL workflow commit)
+**Status**: Completed (reconciled by FE-FINAL in session 175; stays in active/ until the user confirms archiving)
 **Design Reference**: design-docs/specs/design-implementation.md sections 4, 5.1-5.4, 6.5.1-6.5.3, 6.5.7
 **Created**: 2026-09-25
 **Last Updated**: 2026-09-25 (session 170: single final commit, V3t criterion)
@@ -247,6 +247,22 @@ Step 3 low finding: `Cargo.lock` (only if modified) and the dispatch manifest ar
 and the item now says a plan checkpoint commit is allowed. A V3t completion criterion is added because the session-169
 progress entry has no `cargo test` evidence (Gate contract notes). If review changes code, the affected rows are
 re-run. No code change.
+
+### Session: 2026-09-25 (session 173, step 6 implementer, redispatch)
+**Tasks Completed**: Re-verification only (dispatch session172Revision: FE-VALUE accepted in session 170; a redispatch
+is re-verification with new logs and no source edits). The FE-VALUE review feedback is empty; the two carried
+integration findings name the dispatch manifest and FE-READER's review verdict and are not assigned here. Drift check:
+the pre-node snapshot (`tmp/riela-fanout/F227D161-CF92-457A-8881-4FFA8482FEEB/41C0CB0B-F030-4FC8-8DF9-18CFC9BA9AD8.json`)
+matches all 43 paths. `post-edit-hashes.txt` differs only for the FE-READER shared paths `src/reader/mod.rs` and
+`src/types/diag.rs`, as in session 171. Intent: `tmp/fe-frontend-20260925-s165/FE-VALUE/session173-intent.md`.
+**Verification evidence** (new logs under `target/fe-logs/`, current tree with FE-READER shared edits):
+- V0 `value-idiom-s173-1.log` ends with `exit=1`. V1 `value-build-s173-1.log` `exit=0`. V2 `value-clippy-s173-1.log` `exit=0`.
+- V3 `value-nextest-s173-1.log` `exit=0`; `99 tests run: 99 passed, 0 skipped` (crate-wide; `cargo test --lib value::` runs 57 value tests, all passing).
+- V3t `value-cargotest-s173-1.log` `exit=0`; lib `92 passed; 0 failed`, integration `7 passed; 0 failed`.
+- V4 largest file `src/reader/line.rs` 741; all under 1000. V5 `none`.
+- V6a `value-wasm32-s173-1.log` `exit=0`. V6b `value-wasm32-hostwasm-s173-1.log` `exit=0`.
+- V7 `Cargo.toml | 6 ++++++` (the `[features]` table only).
+**Deviations**: none. **Blockers**: none. Downstream: review, then FE-FINAL and the single front-end workflow commit.
 
 ### Session: 2026-09-25 (session 171, step 6 implementer, redispatch)
 **Tasks Completed**: Re-verification only. The FE-VALUE review feedback is empty. The session-170 integration finding

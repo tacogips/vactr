@@ -1,10 +1,10 @@
 # Vactrol Front End: Serial Finalization (FE-FINAL) Implementation Plan
 
 **planId**: FE-FINAL (reconciles vactrol-core.md for TASK-001..003)
-**Status**: Ready
+**Status**: Completed (session 175: reconciliation and final verification done; the commit belongs to the workflow commit step; stays in active/ until the user confirms archiving)
 **Design Reference**: design-docs/specs/design-implementation.md 6.5.7; impl-plans/active/vactrol-core.md
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 170 revision: V3f, commit staging contract)
+**Last Updated**: 2026-09-25 (session 175, FE-FINAL step 6 implementer)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-VALUE, FE-READER, FE-EXPAND (wave 4; serial, and the only plan that edits shared indexes)
 
@@ -96,10 +96,10 @@ In the tables, `\|` stands for a literal `|`. Rows with `-` in the `<check>` col
 
 ## Completion Criteria
 
-- [ ] vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, Verification lint and progress log are updated; no other task changed (V7)
-- [ ] impl-plans/README.md and the FE-* plan headers are updated
-- [ ] V1-V6 (including V3t and V3f), V8, V9a, V9b, V10 and V11 pass
-- [ ] design-implementation.md has only the two edits listed above (`git diff 67ecd5a -- design-docs/specs/design-implementation.md` shows exactly those two hunks)
+- [x] vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, Verification lint and progress log are updated; no other task changed (V7)
+- [x] impl-plans/README.md and the FE-* plan headers are updated
+- [x] V1-V6 (including V3t and V3f), V8, V9a, V9b, V10 and V11 pass
+- [x] design-implementation.md has only the two edits listed above (`git diff 67ecd5a -- design-docs/specs/design-implementation.md` shows exactly those two hunks)
 - [ ] The final commit (one commit on `main`, AGENTS.md six-section message, no AI attribution or Co-Authored-By line) is left to the workflow's commit step. FE-FINAL does not commit. The commit step stages the explicit path list in FE-VALUE Edit Protocol item 5, never `git add -A`/`git add .`, and checks `git status --short` afterwards: no untracked path may remain under `src/` or `tests/`
 
 ## Progress Log
@@ -120,11 +120,33 @@ acceptance signal. V3t and V3f are now named in the completion criteria. The two
 the last commit to touch design-implementation.md. The commit contract points to the FE-VALUE item 5 staging list
 (single front-end commit, including the untracked `src/` directories). No other change.
 
-### Session: (implementer fills in)
-**Tasks Completed**:
-**Hashes**:
-**Verification evidence**:
-**Blockers**:
+### Session: 2026-09-25 (session 175, FE-FINAL step 6 implementer)
+**Tasks Completed**: every writePaths edit above. No Rust source changed: the 68 `src/`/`tests/` files match
+`pre-source-hashes.txt`, and `cargo fmt -- --check` passed, so no crate-wide fmt ran. Intent is in
+`tmp/fe-frontend-20260925-s165/FE-FINAL/attempt-1/intent.md`.
+- vactrol-core.md: header In Progress; Module 1/2, TASK-001..003, Module Status (value 57, reader 33, expand 55 unit
+  tests; spec_fixtures 8 shared) and Dependencies rows COMPLETED; every TASK-001..003 checkbox checked; the Verification
+  preamble and the Lint row (`--all-targets`) updated; one Related Plans line; a 6-line revision-16 progress entry. It is
+  996 lines because the revision-15 entry was folded into one line of the condensed entry (no other content deleted).
+- design-implementation.md, exactly two hunks against 67ecd5a: the 5.6 late-binding bullet now refers to re-running the
+  block-form `fn kick-sound:` with body `:bd-tek` (U4), and the 6.5.4 `[..]` bullet gains one sentence naming
+  `misplaced-arrow` and the FE-READER code `empty-pipe`.
+- README Active Plans statuses; FE-VALUE, FE-READER and FE-EXPAND headers set to Completed; no plan was moved.
+**Hashes** (sha256 prefix, before -> after): vactrol-core.md 7d05836d -> 0f4bcf61; README.md 3ce6b575 -> 5cb18791;
+design-implementation.md ef7f4af6 -> 704d23f5, then (the 6.5.4 sentence narrowed: the `line.rs:169` branch is unreachable per the FE-READER attempt-2 verdict) the value in `post-edit-hashes.txt`; frontend-value d164aef0 -> 39c6d061; frontend-reader 14032f33 ->
+3bd37fcb; frontend-expander 803b6575 -> 0b0df319; this file 7709631e before the edit (after-hash is in the evidence dir).
+**Verification evidence** (`target/fe-logs/`, one run each after the final state, every log ends in `exit=0`):
+- V1 `final-build-s175-1.log`; V2 `final-clippy-s175-1.log`; V4 `final-fmt-s175-1.log`.
+- V3 `final-nextest-s175-1.log`: 155 tests run, 155 passed, 0 skipped. V3t `final-cargotest-s175-1.log`: lib 147 passed,
+  spec_fixtures 8 passed, 0 failed. V3f `final-fixtures-s175-1.log`: 8 run, 8 passed.
+- V9a `final-wasm32-s175-1.log`; V9b `final-wasm32-hostwasm-s175-1.log`.
+- V5: largest `src/reader/line.rs` 741, `src/reader/lexer.rs` 690. V6: `compile dsp expand lib.rs main.rs ns pattern
+  reader sched tex types value vm`. V7: only Progress Log lines (the two folded revision-15 lines and the U5 pointer)
+  plus a hunk-header context line. V8: only the `[features]` table. V10: 996. V11: `none`.
+**Blockers**: none.
+**Deferred notes**: the FE-EXPAND request to write the expander depth cap (512, `nesting-too-deep`) into 6.5.5 was not
+applied, because this plan allows exactly two design edits; it is recorded in the vactrol-core.md progress entry. The
+last criterion (the commit) belongs to the workflow commit step and stays unchecked here.
 
 ## Related Plans
 

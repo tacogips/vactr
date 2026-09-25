@@ -1,10 +1,10 @@
 # Vactrol Front End: Expander and Kernel Forms (FE-EXPAND) Implementation Plan
 
 **planId**: FE-EXPAND (implements vactrol-core.md TASK-003)
-**Status**: Ready
+**Status**: Completed (reconciled by FE-FINAL in session 175; stays in active/ until the user confirms archiving)
 **Design Reference**: design-docs/specs/design-implementation.md sections 6.4, 6.5.5, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 170 revision: U5 read string folded in)
+**Last Updated**: 2026-09-25 (session 174: implementation)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-READER (wave 3; needs `Node`, `NodeKind`, `Atom`, `ReadResult::next_node_id`, `sexpr::print`, and the manifest runner)
 
@@ -164,10 +164,10 @@ In the tables, `\|` stands for a literal `|`.
 
 ## Completion Criteria (they mirror vactrol-core.md TASK-003)
 
-- [ ] The desugarings match the `# ~ (...)` and `# ==` annotations in lang-reference.md (canonical table above)
-- [ ] The output tree contains kernel forms only (asserted structurally through `is_kernel`)
-- [ ] Malformed forms produce the listed diagnostics with their origin span
-- [ ] V1-V6 and V3f pass
+- [x] The desugarings match the `# ~ (...)` and `# ==` annotations in lang-reference.md (canonical table above)
+- [x] The output tree contains kernel forms only (asserted structurally through `is_kernel`)
+- [x] Malformed forms produce the listed diagnostics with their origin span
+- [x] V1-V6 and V3f pass
 
 ## Progress Log
 
@@ -184,11 +184,60 @@ the log proves the extended fixture harness ran, because `NEXTEST_STATUS_LEVEL=f
 The accepted low review finding (dispatch manifest `acceptedReviewFindings`) is folded in: the U5 case now states its
 `read` string `(-> (if x none) 1)`. No other change.
 
-### Session: (implementer fills in)
-**Tasks Completed**:
-**Hashes / intent snapshots**:
-**Verification evidence**:
-**Blockers**:
+### Session: 2026-09-25 (session 174, step6 implementer)
+**Tasks Completed**: FE-EXPAND (TASK-003) implementation. Dependency check: FE-READER and FE-VALUE are in the
+dispatch `acceptedPlanIds`.
+- `src/expand/mod.rs` (`ExpandCx::new`, `expand`, `pub use kernel::is_kernel`), `expander.rs` (positions, the `Splat`
+  rule, `match`/`fn`/`let`/`var`/`upd`/`enum` handling, and the pattern check), `sugar.rs` (if, binding if, `IfChain`,
+  `for`, `?`, `-x`, interpolation; `Builtin` heads `map`, `or`, `neg`, `concat`), `kernel.rs` (shapes, reserved words,
+  `is_kernel`).
+- Tests: `src/expand/tests/{mod,if_match,for_map,small_sugar,kernel,diagnostics}.rs`, 55 tests. All 12 canonical rows,
+  every expander code with its origin span, fresh and unique synthesized ids, a no-panic prefix sweep, and the depth cap.
+- Shared paths: `src/lib.rs` gets `pub mod expand;` only. `src/types/diag.rs` is unchanged (every code already existed).
+  `tests/fixtures/spec/manifest.toml`: all 11 blocks are `expand = "clean"` with `expand_diags = []`; 43 cases get an
+  `expand` string; `u4-inline-fn-body` diags are `["malformed-fn"]`; the `u5-bare-variant-binding-if` case is added.
+  `tests/spec_fixtures.rs`: `blocks_expand_per_classification` is new. The case test appends expander codes to reader
+  codes and compares `expand`. Every successful output is asserted `is_kernel`, and every form with an `Error` node is
+  asserted to return `read-error-present`. The authority-question and U4/U5 pins are extended.
+**Decisions and plan/design differences (for FE-FINAL)**:
+- Blocks with reader errors (lang-reference #5 and design-music #2, #3, #6) are `clean`. Their error forms are skipped and
+  asserted as `read-error-present` but are not listed, because callers do not show that code (6.5.5). So sections 1-3 of
+  both documents expand clean.
+- The expander caps its own recursion at depth 512 and reports the existing code `nesting-too-deep`. Pipes and `?` folds
+  nest calls without brackets, so the reader's cap of 128 alone does not bound the expander. This implements the plan
+  invariant "expansion never panics". An `Import` below the root (the reader never produces one) reports
+  `import-not-top-level`. FE-FINAL may record both in 6.5.5.
+- Diagnostic origin: a malformed form reports the span of the whole form. A bad `match` clause, `enum` line or `else`
+  link reports that clause, line or link. `reserved-word`, `sugar-in-pattern`, `if-guard` and `misplaced-splat` report
+  the offending node. Reserved words are checked on binders: `let`/`var`/`upd`/`for` targets (including names in list
+  patterns), fn names and parameters (before a `->` return marker), and enum and variant names. Arrow patterns are not
+  checked, because `nil`, `false` and the guard `if` are legal there.
+- The outermost `match` of an `IfChain` carries the chain's span. Nested links carry their link's span.
+**Hashes / intent snapshots**: `tmp/fe-frontend-20260925-s165/FE-EXPAND/attempt-1/` (`intent.md`, `pre-edit-hashes.txt`,
+`post-edit-lib-hash.txt`, `post-edit-hashes.txt`, and `probe/`, the read-only block probe source). Pre-edit hashes of
+the shared paths were verified OK immediately before each edit.
+**Verification evidence** (session 174, after the final code change):
+- V1 `target/fe-logs/expand-build-s174-1.log` exit=0
+- V2 `target/fe-logs/expand-clippy-s174-1.log` exit=0
+- V3 `target/fe-logs/expand-nextest-s174-1.log` exit=0, 155 tests run, 155 passed
+- V3t `target/fe-logs/expand-cargotest-s174-1.log` exit=0 (lib 147 passed, spec_fixtures 8 passed)
+- V3f `target/fe-logs/expand-fixtures-s174-1.log` exit=0, 8 tests run, 8 passed
+- Extra: `expand-wasm32-s174-1.log` and `expand-wasm32-hostwasm-s174-1.log` exit=0
+- V4 largest files: `src/reader/line.rs` 741, `src/reader/lexer.rs` 690, `src/reader/layout.rs` 343; `src/expand` max 307
+- V5 `grep -c '^expand = '` prints 55 (11 blocks and 44 cases)
+- V6 prints `none`
+- rustfmt `--check` is clean on `src/expand/**` and `tests/spec_fixtures.rs`. The `tests/support/*` hashes are unchanged.
+**Blockers**: none. Pending downstream: the step7 adversarial review, FE-FINAL (vactrol-core.md, the 6.5.4/6.5.5
+records) and the workflow commit.
+
+### Session: 2026-09-25 (session 172, reconcile-implementations: step7 verdict persisted)
+**Tasks Completed**: The step7 adversarial review (`step7-adversarial-review-attempt-1-exec-220`) is `accepted=true`,
+`needs_revision=false`, `findings=[]`. It was copied verbatim from the Riela session record to
+`tmp/fe-frontend-20260925-s165/FE-EXPAND/attempt-1/step7-review-verdict.json`. No source was edited. Combined-tree checks:
+`tmp/fe-frontend-20260925-s165/reconcile-implementations/attempt-5/`.
+**Residual (low)**: `fresh()` saturates at u32::MAX; `assert_fresh_ids` also accepts a reused reader id; the U5 bare-variant
+diagnostic and the arrow-pattern scope belong to TASK-004. Plan acceptance still belongs to the integration review.
+Pending downstream: FE-FINAL and the workflow commit.
 
 ## Related Plans
 

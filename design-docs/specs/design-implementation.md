@@ -422,8 +422,8 @@ Late-binding rule (implements `lang-reference.md` section 4):
   VM auto-derefs a `VarRef` wherever a concrete value is demanded (same
   demand points as thunk forcing), but pattern, instrument, and signal
   constructors STORE the ref and deref at each query/event — that is
-  how `upd cutoff 400` and `fn kick-sound: :bd-tek` are heard at the
-  next event with no re-binding.
+  how `upd cutoff 400` and re-running the block-form `fn kick-sound:`
+  with body `:bd-tek` are heard at the next event with no re-binding.
 - Loading a top-level `let` derefs immediately (a snapshot). Re-running
   the `let` line replaces the slot for future evaluations (live
   redefinition), which is neither mutation nor shadowing.
@@ -1440,7 +1440,9 @@ The item kinds:
   `misplaced-splat`.
 - `Neg`.
 - A `[..]` list. It holds items only, so `->` or `?` inside it is a
-  diagnostic, and `>` inside it is an `Op` atom.
+  diagnostic, and `>` inside it is an `Op` atom. The implementation
+  names the `->` case `misplaced-arrow`, and it reports a pipe `>`
+  with no call after it (`print 1 >`) as `empty-pipe`.
 - A `{..}` group. Its content goes through the expression rule, so a
   `>` at its start is in head position. A group whose content is an
   `Arrow` reads as that `Arrow`, with the group's span; this is the

@@ -9,6 +9,12 @@ repository = "https://github.com/tacogips/vactrol"
 license = "MIT"
 readme = "README.md"
 
+[features]
+default = ["host-native"]
+host-native = []
+host-wasm = []
+lsp = []
+
 [dependencies]
 # Add your dependencies here
 

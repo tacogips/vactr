@@ -1,9 +1,9 @@
 # Vactrol Core Implementation Plan
 
-**Status**: Planning
+**Status**: In Progress
 **Design Reference**: design-docs/specs/design-implementation.md (all sections; section numbers cited per task)
 **Created**: 2026-09-24
-**Last Updated**: 2026-09-24
+**Last Updated**: 2026-09-25
 
 ---
 
@@ -62,7 +62,7 @@ architecture.md Host Tiers.
 
 ### 1. Core values — `src/value/`
 
-**Status**: NOT_STARTED — TASK-001, design sections 5.1–5.4
+**Status**: COMPLETED — TASK-001, design sections 5.1–5.4
 
 ```rust
 pub enum Value { Nil, Bool(bool), Int(i32), Int64(i64), Float(f32), Float64(f64),
@@ -89,7 +89,7 @@ pub fn deep_eq(a: &Value, b: &Value) -> Result<bool, Failure>;
 
 ### 2. Reader and expander — `src/reader/`, `src/expand/`
 
-**Status**: NOT_STARTED — TASK-002, TASK-003, design section 6
+**Status**: COMPLETED — TASK-002, TASK-003, design section 6
 
 ```rust
 pub struct Span { pub file: FileId, pub start: u32, pub end: u32 }
@@ -455,7 +455,7 @@ config with minimal allowlist (design 17).
 ## Tasks
 
 ### TASK-001: Core value model
-**Status**: NOT_STARTED | **Parallelizable**: Yes (foundation; nothing precedes it)
+**Status**: COMPLETED | **Parallelizable**: Yes (foundation; nothing precedes it)
 **Depends on**: —
 **Deliverables**: Module 1 (`src/value/*`) including `ListVal`/`ListProv`;
 the foundation scaffolding: id newtypes (`KwId`, `SymId`, `NodeId`,
@@ -471,15 +471,15 @@ strings), dict put/join/iteration order, truthiness, nil-punning, deep
 equality.
 **Design ref**: design-implementation.md sections 5.1–5.4.
 **Completion criteria**:
-- [ ] `Value`, `Ratio64`, `Key`, dict ops, `Interner` implemented as specified
-- [ ] Ratio ops exact and self-reducing; i64 overflow and zero denominator are `Failure`
-- [ ] Dict iteration is key-ordered; duplicate literal key keeps last pair
-- [ ] Foundation newtypes, placeholder shells, and the three feature declarations compile natively and for wasm32
-- [ ] `CARGO_TERM_QUIET=true cargo build` and nextest pass (planned; not yet run)
-- [ ] `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown` passes
+- [x] `Value`, `Ratio64`, `Key`, dict ops, `Interner` implemented as specified
+- [x] Ratio ops exact and self-reducing; i64 overflow and zero denominator are `Failure`
+- [x] Dict iteration is key-ordered; duplicate literal key keeps last pair
+- [x] Foundation newtypes, placeholder shells, and the three feature declarations compile natively and for wasm32
+- [x] `CARGO_TERM_QUIET=true cargo build` and nextest pass (session 175 final logs)
+- [x] `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown` passes
 
 ### TASK-002: Reader
-**Status**: NOT_STARTED | **Parallelizable**: Yes (with TASK-001; only Span/ids shared)
+**Status**: COMPLETED | **Parallelizable**: Yes (with TASK-001; only Span/ids shared)
 **Depends on**: TASK-001 (interner, literal values)
 **Deliverables**: Module 2 reader half: lexer (decided identifier rule,
 operators, ratio literals, string interpolation scan, tabs-only indent),
@@ -493,14 +493,14 @@ Verification) with reader-level classification of every spec code
 block.
 **Design ref**: sections 5.7, 6.1–6.3.
 **Completion criteria**:
-- [ ] All manifest fixtures parse per their classification (console forms under `FileId::Console`); `illustrative-excluded` blocks are excluded or carry expected reader diagnostics in the manifest — no blanket clean-parse claim
-- [ ] Every negative example (`( )`, `_tmp`, `foo-`, `_1` in a file) yields a reader diagnostic, and following lines still parse
-- [ ] `import path`, `as alias`, `open` read correctly; the TWO-PHASE frontend makes a FRESH-SESSION file containing `import ... vactrol-pads` followed by `pads.warm` read correctly (and its `as pd` variant); a qualified name with no session or earlier-form import remains a reader error; `prescan_imports` finds every import without evaluation; `#@` lines land in trivia with positions
-- [ ] Spans are byte-accurate (asserted in golden tests)
-- [ ] Build + nextest pass (planned)
+- [x] All manifest fixtures parse per their classification (console forms under `FileId::Console`); `illustrative-excluded` blocks are excluded or carry expected reader diagnostics in the manifest — no blanket clean-parse claim
+- [x] Every negative example (`( )`, `_tmp`, `foo-`, `_1` in a file) yields a reader diagnostic, and following lines still parse
+- [x] `import path`, `as alias`, `open` read correctly; the TWO-PHASE frontend makes a FRESH-SESSION file containing `import ... vactrol-pads` followed by `pads.warm` read correctly (and its `as pd` variant); a qualified name with no session or earlier-form import remains a reader error; `prescan_imports` finds every import without evaluation; `#@` lines land in trivia with positions
+- [x] Spans are byte-accurate (asserted in golden tests)
+- [x] Build + nextest pass (session 175 final logs)
 
 ### TASK-003: Expander and kernel forms
-**Status**: NOT_STARTED | **Parallelizable**: No
+**Status**: COMPLETED | **Parallelizable**: No
 **Depends on**: TASK-002
 **Deliverables**: Module 2 expander half: if/elif -> match (single
 truthiness site), binding if -> match, for -> map (value discarded),
@@ -509,9 +509,9 @@ string interpolation -> concat; kernel-form validation (`match fn let
 var upd -> {} enum` + calls only); span preservation on synthesized nodes.
 **Design ref**: section 6.4.
 **Completion criteria**:
-- [ ] Desugarings match the `# ~ (...)` and `# ==` annotations in lang-reference.md
-- [ ] Output tree contains kernel forms only (asserted structurally)
-- [ ] Build + nextest pass (planned)
+- [x] Desugarings match the `# ~ (...)` and `# ==` annotations in lang-reference.md
+- [x] Output tree contains kernel forms only (asserted structurally)
+- [x] Build + nextest pass (session 175 final logs)
 
 ### TASK-004: Static checker with inference
 **Status**: NOT_STARTED | **Parallelizable**: Yes (with TASK-005; both consume TASK-003 output)
@@ -888,9 +888,9 @@ with minimal allowlist. No language syntax anywhere in bindings.
 
 | Module | File Path | Status | Tests | Task |
 |--------|-----------|--------|-------|------|
-| Core values | `src/value/` | NOT_STARTED | - | TASK-001 |
-| Reader | `src/reader/` | NOT_STARTED | - | TASK-002 |
-| Expander | `src/expand/` | NOT_STARTED | - | TASK-003 |
+| Core values | `src/value/` | COMPLETED | 57 unit | TASK-001 |
+| Reader | `src/reader/` | COMPLETED | 33 unit + 8 spec_fixtures (shared) | TASK-002 |
+| Expander | `src/expand/` | COMPLETED | 55 unit + 8 spec_fixtures (shared) | TASK-003 |
 | Checker | `src/types/` | NOT_STARTED | - | TASK-004 |
 | Namespace/compiler/VM | `src/ns/ src/compile/ src/vm/` | NOT_STARTED | - | TASK-005 |
 | Pattern engine + visuals + clock | `src/pattern/ src/tex/ src/clock/` | NOT_STARTED | - | TASK-006 |
@@ -903,9 +903,9 @@ with minimal allowlist. No language syntax anywhere in bindings.
 
 | Task | Depends On | Parallelizable | Status |
 |------|------------|----------------|--------|
-| TASK-001 | — | Yes | NOT_STARTED |
-| TASK-002 | TASK-001 | Yes (with 001 tail) | NOT_STARTED |
-| TASK-003 | TASK-002 | No | NOT_STARTED |
+| TASK-001 | — | Yes | COMPLETED |
+| TASK-002 | TASK-001 | Yes (with 001 tail) | COMPLETED |
+| TASK-003 | TASK-002 | No | COMPLETED |
 | TASK-004 | TASK-003 | Yes (with 005) | NOT_STARTED |
 | TASK-005 | TASK-003; TASK-004 `types/masks.rs` | Yes (with the rest of 004) | NOT_STARTED |
 | TASK-006 | TASK-001 (int. 005) | Yes (with 004/005) | NOT_STARTED |
@@ -921,9 +921,10 @@ web-sys behind `host-wasm` (TASK-008). Core modules stay dependency-free.
 
 ## Verification
 
-All commands below are PLANNED verification for implementation
-sessions; none has been executed for this plan (planning only, no code
-written). Cargo runs use `CARGO_TERM_QUIET=true`; nextest runs use
+The Build, Tests, Lint and Wasm rows (plus the default-feature wasm32
+build) were executed for TASK-001..003 in session 175 (see the Progress
+Log); the LSP and Editor rows remain planned for their later tasks.
+Cargo runs use `CARGO_TERM_QUIET=true`; nextest runs use
 `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final
 NEXTEST_HIDE_PROGRESS_BAR=1`.
 
@@ -951,7 +952,7 @@ disposition is tracked in the manifest.
 |-------|---------|----------|
 | Build | `CARGO_TERM_QUIET=true cargo build` | success, no warnings |
 | Tests | `CARGO_TERM_QUIET=true cargo nextest run` (env above) | all pass |
-| Lint | `CARGO_TERM_QUIET=true cargo clippy -- -D warnings` | clean |
+| Lint | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | clean |
 | Wasm | `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` | success (from TASK-001 on, core modules only until TASK-008) |
 | LSP | `CARGO_TERM_QUIET=true cargo build --features lsp` | success |
 | Editor | `npm run build && npm test` in `editor/` | success |
@@ -968,7 +969,7 @@ disposition is tracked in the manifest.
 
 ## Progress Log
 
-### Sessions: 2026-09-24/25 (revisions 1-14, condensed; detail in the workflow discussion history)
+### Sessions: 2026-09-24/25 (revisions 1-15, condensed; detail in the workflow discussion history)
 **Tasks Completed**: None (planning)
 **Blockers**: None at the time
 **Notes**: Rev 1 authored both documents (Q1-Q4 remain recommendations). Rev 2 answered ASTRA-001..011. Revs 3-5: masks, activation, rebuild transactions, install credit, edit_epoch, Forward sets, control channel, Ctl::Cell reads.
@@ -978,15 +979,18 @@ Rev 11: stale-read rounds with dependency-set replacement; all-path Failed/Block
 Rev 12: PASS JOURNAL + pass-level staging of all host-visible effects + end-of-pass VALIDATION/ROLLBACK; deref-time Failed/Blocked checks replacing the pre-execution gate; 10.1 whole-span region operators; invariance criteria in TASK-006/007/008.
 Rev 13: unreachable provisional A=1/3 trace withdrawn; abort/retry + reachable X/Z/Y rollback traces; recovery subscriptions and status-recovery cutoff bypass; layer-1 cover equivalence vs layer-2 emission uniqueness; Event.occ/OccKey; occurrence merge with occ-keyed replacement + committed ledger.
 Rev 14: FAILURE-SENSITIVE validation (pre-pass-read exemption withdrawn); ->Failed/Blocked as invalidation status events; late-failure trace 3; ATTEMPT EDGE SET on aborts (a/b/broken selector case); occurrence RECORDS with covered extents replacing occ-keyed replacement (future-span both-order onset preservation, boundary-crossing fragments, partial invalidation).
+Rev 15: ASTRA-017 — every unsuccessful evaluation (failed-deref, dirty-read or ordinary runtime failure) retains the ATTEMPT EDGE SET of its successful reads (a/b division walked in 5.6); ASTRA-018 — SEMANTIC PAYLOAD REPLACEMENT for a surviving same-key uncommitted record whose whole.begin lies in the invalidated span (slice-index 0 -> 1 walked in 11.3).
 
-### Session: 2026-09-25 (revision 15, ASTRA-017 + ASTRA-018 round-21 narrowed forms)
-**Tasks Completed**: None (planning)
-**Blockers**: None
-**Notes**: ASTRA-017: the abort-only scoping of the three-record rule is WITHDRAWN — EVERY unsuccessful evaluation (failed-deref abort, dirty-read abort, or ORDINARY runtime failure) now retains the ATTEMPT EDGE SET of its successful reads, with the wake-up union applying to Failed AND Blocked forms alike (subscriptions empty for a healthy-read fault; replaced per attempt, cleared on commit, rollback-surviving, publishes nothing); Astra's a/b division scenario walked normatively in 5.6 (selected Failed with retained 5, attempt edges {a, b}, `upd b 1` alone recomputes to 1 and clears the failure) and asserted in TASK-005/009/010 including publication and display without manual re-evaluation.
-ASTRA-018: semantic invalidation gains SEMANTIC PAYLOAD REPLACEMENT, distinct from extension-only merging — a surviving same-key uncommitted record whose whole.begin lies in the invalidated span takes the NEW snapshot's whole/value/derived controls/src wholesale (one snapshot per emission; identity, generation and single-emission accounting untouched; refreshed whole.end intersects coverage; changed whole.begin = changed key = drop-plus-new-record); onsets outside the span are never refreshed by it and committed occurrences stay immutable; the coverage-extension payload-equality claim is qualified to one read snapshot; Astra's slice-index 0 -> 1 case walked in 11.3 and asserted in TASK-007/008 (same key and generation, exactly one emission with the NEW region, no old-region output, continuation-only invalidation leaves the onset payload untouched).
+### Session: 2026-09-25 (revision 16, TASK-001..003 implemented)
+**Tasks Completed**: TASK-001 (FE-VALUE), TASK-002 (FE-READER), TASK-003 (FE-EXPAND), reconciled by FE-FINAL; the single front-end commit on `main` is left to the workflow commit step.
+**Verification** (session 175, `target/fe-logs/final-<check>-s175-1.log`, all `exit=0`): build; clippy `--all-targets -- -D warnings`; nextest 155 run / 155 passed; cargo test (lib 147 + spec_fixtures 8 passed); fixtures 8/8; fmt `--check`; wasm32 and wasm32 `host-wasm` builds. Largest `.rs` file: `src/reader/line.rs`, 741 lines.
+**User QA**: U1-U5 answered 2026-09-25 (`design-docs/user-qa/pending-frontend-questions.md`). TASK-004 pointer: the checker must diagnose a bare field-less variant used as a binding-if pattern (U5; fixture `u5-bare-variant-binding-if`).
+**Plan revisions**: Lint is now `clippy --all-targets` (stricter); TASK-001..003 ran through the four FE-* sub-plans; design 6.5.4 records `misplaced-arrow` (plan choice) and `empty-pipe` (added by FE-READER); the expander's own depth cap of 512 (`nesting-too-deep`) is not yet written into 6.5.5.
+**Open**: the `fn f a b` arity and `let`/`upd base` authority questions stay pending; design-music `[:g :7]` conflicts with the identifier rule and reads as `misplaced-colon` (fixture `music-chord-seven-conflict`) until the language author decides.
 
 ## Related Plans
 
 - **Previous**: none (first plan of the project)
 - **Next**: Frozen-mode codegen and Swift/UniFFI shell (future plans, out of scope here); TASK-010 may split into `vactrol-editor.md` when work starts if it approaches size limits
 - **Depends On**: none
+- **Front-end sub-plans (TASK-001..003)**: vactrol-frontend-value.md (FE-VALUE), vactrol-frontend-reader.md (FE-READER), vactrol-frontend-expander.md (FE-EXPAND), vactrol-frontend-finalize.md (FE-FINAL), all in impl-plans/active/

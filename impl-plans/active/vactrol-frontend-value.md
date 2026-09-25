@@ -248,6 +248,22 @@ and the item now says a plan checkpoint commit is allowed. A V3t completion crit
 progress entry has no `cargo test` evidence (Gate contract notes). If review changes code, the affected rows are
 re-run. No code change.
 
+### Session: 2026-09-25 (session 171, step 6 implementer, redispatch)
+**Tasks Completed**: Re-verification only. The FE-VALUE review feedback is empty. The session-170 integration finding
+concerns FE-READER's missing review verdict and is not assigned here. Drift check: the pre-node snapshot
+(`tmp/riela-fanout/B5C7D500-D2B4-4AB6-BBB2-E4A45FFE851F/D1AE139A-9F55-41B1-A833-68352FC54B93.json`) matches all 42
+tracked paths. `post-edit-hashes.txt` differs only for the shared paths `src/reader/mod.rs` (091a2f07) and
+`src/types/diag.rs` (bf9b818f). Both are FE-READER edits recorded in its progress log. No FE-VALUE source changed.
+Intent: `tmp/fe-frontend-20260925-s165/FE-VALUE/session171-intent.md`.
+**Verification evidence** (new logs under `target/fe-logs/`, current tree with FE-READER shared edits):
+- V0 `value-idiom-s171-1.log` ends with `exit=1`. V1 `value-build-s171-1.log` `exit=0`. V2 `value-clippy-s171-1.log` `exit=0`.
+- V3 `value-nextest-s171-1.log` `exit=0`; `99 tests run: 99 passed, 0 skipped` (crate-wide; `cargo test --lib value::` runs 57 value tests, all passing).
+- V3t `value-cargotest-s171-1.log` `exit=0`; lib `92 passed; 0 failed`, integration `7 passed; 0 failed`.
+- V4 largest file `src/reader/line.rs` 741; all under 1000. V5 `none`.
+- V6a `value-wasm32-s171-1.log` `exit=0`. V6b `value-wasm32-hostwasm-s171-1.log` `exit=0`.
+- V7 `Cargo.toml | 6 ++++++` (the `[features]` table only).
+**Deviations**: none. **Blockers**: none. Downstream: review, then FE-FINAL and the single front-end workflow commit.
+
 ### Session: 2026-09-25 (session 170, step 6 implementer)
 **Tasks Completed**: V3t, plus a full re-run of V0-V7 against the unchanged tree. Drift check first:
 `shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-VALUE/post-edit-hashes.txt` reports all 42 paths OK, so no source
@@ -344,5 +360,8 @@ For the retry:
   (`CARGO_TERM_QUIET=true cargo test`) in addition to V3 and report it as
   a `verification` record with `command`, `exitCode: 0`, `testsRun` and
   `testsPassed` (non-zero) and its complete log path.
-- Include `"planId": "FE-VALUE"` in the Step 6 output payload so the gate
-  binds the evidence to this plan instead of `unknown-plan`.
+- Include `"planId": "FE-VALUE"` in the step6-implement output payload ONLY, so the
+  gate binds the evidence to this plan instead of `unknown-plan`. Do NOT add
+  `planId` to the step6-test-integrity-check or step7-adversarial-review outputs:
+  their contracts reject additional properties (session-171 failed on exactly this).
+  The review outputs MUST carry the required `findings` array (empty when none).

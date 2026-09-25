@@ -4,9 +4,9 @@
 **Status**: In Progress (implementation complete in session 170; formal review, FE-FINAL reconciliation and the commit are pending)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.7, 6.1-6.3, 6.5.4, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 170 revision: bad-pair finding folded in)
+**Last Updated**: 2026-09-25 (session 172 checkpoint: review-only redispatch, review-verdict criterion)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
-**dependsOn**: FE-VALUE (wave 2; needs `Span`/`FileId`/`NodeId`, `Ratio64`, `Diagnostic`/`DiagCode`)
+**dependsOn**: FE-VALUE at the source level, already satisfied in the working tree; dispatch dependsOn cleared by the session-172 amendment (wave 2; needs `Span`/`FileId`/`NodeId`, `Ratio64`, `Diagnostic`/`DiagCode`)
 
 ---
 
@@ -226,6 +226,7 @@ In the tables, `\|` stands for a literal `|`.
 - [x] `import`, `as` and `open` read correctly; the fresh-session `pads.warm` and `as pd` cases read; an unbound qualifier is an error; `prescan_imports` finds every import; `#@` lines land in trivia with positions
 - [x] Spans are byte-accurate (golden tests pass)
 - [x] V1-V6 and V3f pass (V3f: the `spec_fixtures` binary ran with a non-zero run count)
+- [ ] A schema-valid adversarial review verdict (a `findings` array, empty if none) exists for the tree in `tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt`, and it covers RECON2-2 (`empty-pipe`) and RECON2-3 (the `:7` spec conflict). Evidence: `tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/`
 
 ## Progress Log
 
@@ -291,6 +292,12 @@ now in the negative-test list itself. No other change.
 - `EmptyPipe => "empty-pipe"`, for a pipe `>` with no call after it (`print 1 >`). 6.5.4 defines no code for an empty trailing segment, and passing `>` as a value is not allowed.
 - The FE-VALUE count test is now 38 (27 reader and 11 expander codes). FE-FINAL records `empty-pipe` in 6.5.4 alongside `misplaced-arrow`.
 **Blockers**: none. The `:7` spec conflict above needs a language-author decision; it is not an implementation blocker, because the rules were kept as decided.
+
+### Plan revision: 2026-09-25 (session 172, plan checkpoint)
+Session 171 dispatched only FE-VALUE, so FE-READER still has no review verdict (integration findings RECON3-1 and
+session-170 finding-1). The dispatch dependsOn on FE-VALUE is cleared, so FE-READER is dispatchable now. This rerun is
+review-only: re-check `final-hashes.txt` (20/20 OK), re-verify with s172 logs, then run step7 into `attempt-2/`. The
+review-verdict criterion above mirrors the dispatch manifest acceptance criterion. No requirement or code change.
 
 ## Related Plans
 

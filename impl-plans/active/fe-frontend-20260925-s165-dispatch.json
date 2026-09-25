@@ -1,7 +1,22 @@
 {
   "taskId": "fe-frontend-20260925-s165",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-171",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-172",
+  "session172Revision": {
+    "originalHead": "39aad1e28be3e7e9f7c095a348812e206782ed41",
+    "note": "Session 172 plan-checkpoint rerun for issue tacogips/vactrol#1 after integration review (session 171, integration-review-attempt-1-exec-197) returned two mid findings. RECON3-1: the fanout dispatched only FE-VALUE (failed validationRejected '$.planId additional property is not allowed') and never ran the FE-READER review-only rerun. The carried finding: FE-READER has no adversarial review verdict. No design or plan requirement changed. This checkpoint commits the session-172 dispatch amendment (FE-READER dependsOn cleared, each plan owns its planPath), the narrowed FE-VALUE gate-contract note, the session-171 FE-VALUE re-verification entry, and the FE-READER review-verdict criterion. The source tree stays uncommitted and must be preserved (no reset or clean) until the workflow commit step.",
+    "intakeTreeCheck": "HEAD is 39aad1e on main. The intake status shows unstaged changes only. tmp/fe-frontend-20260925-s165/reconcile-implementations/attempt-3/fe-reader-final-hashes-recheck.log shows 20/20 OK with exit=0, and reconcile attempt-3 found no source written in session 171 (all 42 FE-VALUE snapshot paths match). The redispatched FE-READER reviewer must re-run the shasum check first.",
+    "dispatchState": {
+      "FE-VALUE": "accepted (session 170). The dispatcher restarts from plan-checkpoint with acceptedPlanIds=[], so FE-VALUE may be dispatched again. If so it is re-verification only: no source edits, new s172 logs, planId only in the step6-implement payload, and review outputs carry a findings array with no planId.",
+      "FE-READER": "implemented, verified and reconciled, but not reviewed. Dispatchable now (dependsOn cleared). Review-only: step6 re-verifies the unchanged tree with s172 logs, then step7 adversarial review writes to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/ and must cover RECON2-2 and RECON2-3.",
+      "FE-EXPAND": "not started; waits for an accepted FE-READER verdict.",
+      "FE-FINAL": "not started; waits for FE-EXPAND."
+    },
+    "resolvedFindings": [
+      "claude-code-design-and-implement-review-loop-session-171-integration-review-attempt-1-finding-1 (RECON3-1): FE-READER dependsOn is cleared, so FE-READER is in the first dispatch wave with FE-VALUE. The FE-VALUE gate-contract note forbids planId in test-integrity and adversarial-review outputs.",
+      "claude-code-design-and-implement-review-loop-session-171-integration-review-attempt-1-finding-2 (carried): the FE-READER plan now has an unchecked completion criterion for the schema-valid review verdict covering RECON2-2 and RECON2-3. It is satisfied only by the attempt-2 review."
+    ]
+  },
   "session171Revision": {
     "originalHead": "6e35f7cda73e87ace5a2d6d7d8554570947e80e5",
     "note": "Session 171 resumes issue tacogips/vactrol#1 after integration review (session 170, integration-review-attempt-1-exec-186) returned one mid finding. The FE-READER branch failed at step7-adversarial-review with validationRejected ($.findings missing), so FE-READER has no review verdict. There is also no after:step7 snapshot under tmp/riela-fanout/B5649614-9AE5-48A0-AD47-344A09DDBB53/. No design or plan requirement changed. This checkpoint commits the session-170 implementer progress entries in the FE-VALUE and FE-READER plans. Consistent with earlier checkpoints, the plan progress logs are committed and the source tree is not. It also records the redispatch: FE-READER reruns only step7 adversarial review on the unchanged tree. The FE-VALUE and FE-READER source tree stays uncommitted and must be preserved (no reset or clean). It goes into the single front-end commit at the workflow commit step.",
@@ -26,8 +41,8 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "6e35f7cda73e87ace5a2d6d7d8554570947e80e5",
-  "previousOriginalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
+  "originalHead": "39aad1e28be3e7e9f7c095a348812e206782ed41",
+  "previousOriginalHead": "6e35f7cda73e87ace5a2d6d7d8554570947e80e5",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/lang-reference.md",
@@ -156,7 +171,7 @@
       "implementsTask": "TASK-001",
       "wave": 1,
       "dispatchMode": "accepted",
-      "dispatchNote": "Session 171: accepted in session 170 (reconcile attempt-1). Do not redispatch.",
+      "dispatchNote": "Session 171: accepted in session 170 (reconcile attempt-1). Do not redispatch. | Session 172: the dispatcher restarts with acceptedPlanIds=[] and may dispatch FE-VALUE anyway. If dispatched, re-verify only: check post-edit-hashes.txt (40 OK plus the 2 intended FE-READER shared-path edits), make no source edits, write new s172 logs, put planId in the step6-implement payload only, and give review outputs a findings array with no planId.",
       "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-frontend-value.md#progress-log",
       "writePaths": [
@@ -201,7 +216,8 @@
         "src/sched/slots.rs",
         "src/dsp/mod.rs",
         "src/dsp/graph.rs",
-        "src/reader/mod.rs"
+        "src/reader/mod.rs",
+        "impl-plans/active/vactrol-frontend-value.md"
       ],
       "sharedPaths": [
         "src/reader/mod.rs",
@@ -239,10 +255,8 @@
       "implementsTask": "TASK-002",
       "wave": 2,
       "dispatchMode": "review-only",
-      "dispatchNote": "Session 171: do not re-implement. First run 'shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt' and require 20/20 OK. On any mismatch, stop and report blocked. Then rerun only the step7 adversarial review on the unchanged tree. Write evidence to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. The verdict must be schema-valid, with a findings array (empty if none), and must cover RECON2-2 (empty-pipe) and RECON2-3 (the ':7' spec conflict) from reviewContext.openReviewItems. If the review changes any file, re-run every verification row with new s171 logs.",
-      "dependsOn": [
-        "FE-VALUE"
-      ],
+      "dispatchNote": "Session 171: do not re-implement. First run 'shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt' and require 20/20 OK. On any mismatch, stop and report blocked. Then rerun only the step7 adversarial review on the unchanged tree. Write evidence to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. The verdict must be schema-valid, with a findings array (empty if none), and must cover RECON2-2 (empty-pipe) and RECON2-3 (the ':7' spec conflict) from reviewContext.openReviewItems. If the review changes any file, re-run every verification row with new s171 logs. | Session-172 amendment: dependsOn cleared because FE-VALUE is implemented, verified and accepted in the working tree (session 170, 0 blocking findings) and a rerun from plan-checkpoint restarts with acceptedPlanIds=[]; FE-VALUE and FE-READER may run in the same review-only wave. Both are read-only on the source tree. | Session 172: step6 re-verification logs and any post-review re-runs use s172 (not s171). Write review evidence to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. Do not put planId in the test-integrity or adversarial-review outputs.",
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-frontend-reader.md#progress-log",
       "writePaths": [
         "src/reader/node.rs",
@@ -261,7 +275,8 @@
         "tests/spec_fixtures.rs",
         "tests/support/mod.rs",
         "tests/support/toml_subset.rs",
-        "tests/fixtures/spec/manifest.toml"
+        "tests/fixtures/spec/manifest.toml",
+        "impl-plans/active/vactrol-frontend-reader.md"
       ],
       "sharedPaths": [
         "src/reader/mod.rs",
@@ -309,7 +324,8 @@
         "src/expand/tests/for_map.rs",
         "src/expand/tests/small_sugar.rs",
         "src/expand/tests/kernel.rs",
-        "src/expand/tests/diagnostics.rs"
+        "src/expand/tests/diagnostics.rs",
+        "impl-plans/active/vactrol-frontend-expander.md"
       ],
       "sharedPaths": [
         "src/lib.rs",
@@ -350,7 +366,8 @@
       "writePaths": [
         "impl-plans/active/vactrol-core.md",
         "impl-plans/README.md",
-        "design-docs/specs/design-implementation.md"
+        "design-docs/specs/design-implementation.md",
+        "impl-plans/active/vactrol-frontend-finalize.md"
       ],
       "sharedPaths": [
         "impl-plans/active/vactrol-frontend-value.md",
@@ -385,5 +402,8 @@
         "grep -n 'fn kick-sound: :bd-tek' design-docs/specs/design-implementation.md || echo none"
       ]
     }
-  ]
+  ],
+  "session172Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25) after dispatch-plans refused redispatch twice: integration-review mid findings named impl-plans/active/vactrol-frontend-reader.md and this manifest, which no pending plan owned. Each plan now owns its own planPath in writePaths, so review findings on a plan document route to that plan. FE-READER no longer dependsOn FE-VALUE at dispatch time (see its dispatchNote). The FE-VALUE gate-contract note was narrowed: planId goes only in the step6-implement payload, never in the test-integrity or adversarial-review outputs (their contracts reject additional properties; session-171 failed on this). Source tree stays uncommitted until the workflow commit step."
+  }
 }

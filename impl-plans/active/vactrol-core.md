@@ -1,6 +1,6 @@
 # Vactrol Core Implementation Plan
 
-**Status**: In Progress
+**Status**: Completed (implementation; all ten tasks COMPLETED as of 2026-09-26 across issues #1-#5 and commits 0bee1fb, 3ab64b6, 04afe7d, d6fdc4b, 8aad85f). Manual confirmations pending user sign-off: examples/beep.rs and the REPL audible gates on the native host, worklet audio and the WebGL2 pane in a real browser, cargo tauri build and app run. The plan stays under active/ until those are confirmed.
 **Design Reference**: design-docs/specs/design-implementation.md (all sections; section numbers cited per task)
 **Created**: 2026-09-24
 **Last Updated**: 2026-09-25
@@ -1023,12 +1023,12 @@ disposition is tracked in the manifest.
 
 ## Completion Criteria
 
-- [ ] All ten tasks complete with their per-task criteria checked
-- [ ] The spec fixture manifest is complete; all `positive` and `diagnostic` fixtures pass; every `authority-question` fixture has a recorded disposition
-- [ ] Visual chain golden and render-recovery tests pass (design 9)
+- [x] All ten tasks complete with their per-task criteria checked, except the manual audible/browser/Tauri confirmations listed in the plan status (operator verification 2026-09-26 on 8aad85f: build, clippy -D warnings, fmt, nextest 1007/1007, both wasm32 builds incl. the host-wasm --lib session ABI, editor tsc/vitest 336/336/vite build, Tauri cargo check)
+- [x] The spec fixture manifest is complete; all `positive` and `diagnostic` fixtures pass; every `authority-question` fixture has a recorded disposition
+- [x] Visual chain golden and render-recovery tests pass (design 9) (in nextest 1007/1007)
 - [ ] REPL performs an audible pattern session natively; browser build performs the same via Wasm + AudioWorklet
-- [ ] Editor shows inline diagnostics, playing-step highlighting, and controller binding with no language construct involved
-- [ ] cargo build, clippy, nextest, wasm32 build all pass (commands above)
+- [x] Editor shows inline diagnostics, playing-step highlighting, and controller binding with no language construct involved (vitest suites with mock clock and recording host; real-browser run pending user confirmation)
+- [x] cargo build, clippy, nextest, wasm32 build all pass (commands above) (operator verification 2026-09-26 on 8aad85f: build, clippy -D warnings, fmt, nextest 1007/1007, both wasm32 builds incl. the host-wasm --lib session ABI, editor tsc/vitest 336/336/vite build, Tauri cargo check)
 - [x] impl-plans/README.md index and design-docs/specs/command.md CLI table updated (deferred from planning phase, where only the two planning documents could be edited) — **Evidence**: design-docs/specs/command.md (Subcommands, Flags, Environment, Session Protocol v1; issue #4 design) and impl-plans/README.md (updated by SS-FINAL, session 186)
 
 ## Progress Log

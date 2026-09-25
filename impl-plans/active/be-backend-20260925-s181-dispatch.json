@@ -1,0 +1,461 @@
+{
+  "taskId": "be-backend-20260925-s181",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-181",
+  "issueReference": {
+    "repository": "tacogips/vactrol",
+    "number": 3,
+    "url": "https://github.com/tacogips/vactrol/issues/3"
+  },
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "eddb5f002ecc466d2e74ab9ea07ef7192f05ded9",
+  "parentPlanPath": "impl-plans/active/vactrol-core.md",
+  "planIndexPath": "impl-plans/README.md",
+  "designDocPaths": [
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-music.md",
+    "design-docs/specs/lang-reference.md",
+    "design-docs/user-qa/pending-backend-questions.md"
+  ],
+  "evidenceRoot": "tmp/be-backend-20260925-s181",
+  "evidenceLayout": "tmp/be-backend-20260925-s181/<planId>/attempt-<n>/ holds pre-edit-hashes.txt, intent.md, post-edit-hashes.txt and final-hashes.txt (tmp is gitignored). Cargo logs go to target/fe-logs/be-<wave>-<check>-s<S>-<n>.log per design 6.5.7; the harness report goes to target/fe-logs/be-wasm-harness-s<S>-<n>.json.",
+  "logRule": "Design 6.5.7: every run writes a new target/fe-logs/be-<wave>-<check>-s<S>-<n>.log (S = Riela session number; n counts from 1 per check within the session; never overwrite). Run each command as (set -o pipefail; CMD 2>&1 | tee LOG); echo \"exit=$?\" >> LOG. The progress log cites the counting log path and its exit= value, and for nextest and cargo test the run and passed counts (run > 0). A missing log, a log without exit=, or a truncated log fails the check. 'LOG(<name>): CMD' in the verification arrays means CMD run under this rule with <name> as the log stem.",
+  "commonContract": {
+    "editProtocol": "vactrol-backend-contracts.md section 'Edit Protocol (common to every BE plan)': fresh read and sha256 before each edit, intent snapshot before each shared or conditional path edit, post-edit hash, stop and reapply on drift, keep the tree compiling, never edit files outside writePaths/sharedPaths, rustfmt on owned files only, no git reset/clean/stash/checkout, no branches or worktrees, no commits, Rust through the rust-coding agent followed by check-and-test-after-modify, final-hashes.txt at the end.",
+    "skeletonRule": "Design 12.8.2: BE-CONTRACTS creates every mod.rs declaration, stub file and test skeleton. Later waves write only files they own and create new files only in subdirectories whose mod.rs they own (BE-DSP dsp/ugen/, dsp/effects/, dsp/tests/dsp/; BE-SCHED sched/tests/sched/; BE-MIDI sched/tests/midi/; BE-NATIVE host/native/; BE-WASM host/wasm/; BE-FINAL host/tests/e2e/).",
+    "gateContract": "The step6-implement output payload carries planId. The test-integrity and adversarial-review outputs carry NO planId; the adversarial-review output always carries a findings array (empty when none). The integration-review output carries needs_revision and lists in acceptedPlanIds only plans present in plans[] of this manifest.",
+    "parallelSafety": "Wave 2 (BE-SCHED, BE-DSP, BE-INST) and wave 3 (BE-MIDI, BE-NATIVE, BE-WASM) run in the same working directory at the same time with disjoint writePaths and no sharedPaths. A build error in another plan's file is waited out and recorded, never fixed by the observer; serial repair happens at the join and in BE-FINAL.",
+    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/design-implementation.md, design-docs/user-qa/pending-backend-questions.md, design-docs/user-qa/README.md, impl-plans/active/vactrol-backend-*.md, impl-plans/active/be-backend-20260925-s181-dispatch.json, impl-plans/README.md. It never stages src/, examples/, editor/, tests/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is in vactrol-backend-finalize.md. BE-FINAL never edits this manifest.",
+    "normativeDesign": "design-implementation.md 11.2-11.7, 12, 16, 16.1, 17 and 12.8 are normative. Where a plan and the design differ, the design wins and the difference goes in that plan's progress log."
+  },
+  "reviewContext": {
+    "issueReference": {
+      "repository": "tacogips/vactrol",
+      "number": 3,
+      "url": "https://github.com/tacogips/vactrol/issues/3",
+      "title": "Implement the runtime back end: scheduler, slot table, hosts, DSP graph, native and wasm audio hosts (TASK-007..008)",
+      "baseCommit": "eddb5f002ecc466d2e74ab9ea07ef7192f05ded9",
+      "implementationPlanPath": "impl-plans/active/vactrol-core.md"
+    },
+    "userProblem": "TASK-001..006 (commits 0bee1fb, 3ab64b6) produce compiled patterns, signals, clock and visual chains, but nothing schedules them or makes sound. There is no scheduler, slot table, capability host, dry run, DSP graph, native audio host or wasm/AudioWorklet host (issue #3).",
+    "requiredOutcomes": [
+      "Every TASK-007 and TASK-008 completion criterion in impl-plans/active/vactrol-core.md is checked with evidence, and both task statuses are COMPLETED. The audible examples/beep.rs check is recorded as pending user confirmation, with the headless render test as its automated proxy.",
+      "Deterministic scheduler tests (mock clock, recording hosts), occurrence-merge and rebind cases, cell-transport per-tier tests, and MIDI clock slave/master and note-lifetime tests pass.",
+      "Headless render tests for every synthesis template, sample-region handoff, bus chains, analyzers and granular pass with zero callback allocation (debug counters).",
+      "examples/beep.rs builds under host-native. editor/dev-harness/ exercises the design 16.1 lifecycle checks.",
+      "On the final tree, build, clippy -D warnings, fmt --check, nextest, cargo test and both wasm32 builds (default features, and --no-default-features --features host-wasm) exit 0.",
+      "Per-wave plans are marked Completed and impl-plans/README.md is updated. A single commit on main uses the six-section message with no attribution lines."
+    ],
+    "supportedEdgeCases": [
+      "Rebind in the three deadline cases of 11.3, and the occurrence merge at exact ratio boundaries (vactrol-backend-sched.md merge.rs, rebind.rs).",
+      "hush followed by stop, tempo or rebind is ordered correctly; duplicate delivery is idempotent; a stale-started MIDI note gets an immediate note-off (vactrol-backend-sched.md).",
+      "Granular or analyzer over budget: the event still commits with a diagnostic that carries its origin, and the audio side clamps and counts with no dropout (sched granular.rs, dsp granular.rs and analyzer.rs).",
+      "A sample the bind dry run did not see: one host-unavailable diagnostic per resource while it loads, and the load is requested (vactrol-backend-sched.md SampleTable).",
+      "MIDI in: repeated same-pitch NoteOns release earliest-first; an old-gen held voice survives a rebind; hush Panic-gates open input voices (vactrol-backend-midi.md).",
+      "Native host: an absent audio or MIDI device, or an unreadable sample, reports a reason and never panics; a sample path outside the roots is rejected (vactrol-backend-native.md).",
+      "Headless Chrome unavailable: the harness exits 2 (BLOCKED), which never counts as a pass. Criteria 8 and 11 then need an operator-run report (B1, vactrol-backend-wasm.md)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Session socket token or protocol failures (TASK-009, B5).",
+      "Failures in UDP OSC transport, WebMIDI or the WebGL RenderHost (these are traits with Noop and recording hosts only).",
+      "Ableton Link sync (use-clock :link stays a diagnostic).",
+      "Reference-quality effect fidelity (B4).",
+      "Automated audible confirmation of examples/beep.rs (pending user confirmation)."
+    ],
+    "constraints": [
+      "Implement exactly the TASK-007/008 deliverables and completion criteria in impl-plans/active/vactrol-core.md, as pinned by design-implementation.md 12.8.",
+      "Files at 800+ lines are split (hard limit 1000, CLAUDE.md).",
+      "No allocation, lock, Rc or closure call on the audio callback path; proven by the cfg(test) alloc_probe in every render test.",
+      "cpal and midir are optional deps under the non-wasm32 target table behind host-native; host-wasm pulls no crate; both wasm32 builds exit 0.",
+      "Browser glue is plain JS/HTML with no build step beyond the wasm module; the dev harness runner uses node built-ins only.",
+      "Cargo runs with CARGO_TERM_QUIET=true; one complete log per command with exit= recorded; every plan runs plain cargo test besides nextest.",
+      "Secret-dependent commands run through kinko exec. No secret values are committed."
+    ],
+    "designDecisionsAndRationale": [
+      "sched::Runtime stands in for Session (TASK-009); dry_run(&Binding, &mut dyn QueryVm, &InputCells, seed).",
+      "InstResolver is the cross-wave contract; slots are Pattern | Texture with per-event routing to audio/MIDI/OSC sinks (MIDI and OSC are instruments).",
+      "Late-bound controls are resolved at query for structure but keep their source (Event::late/cells) so commit emits Ctl::Cell.",
+      "Raw extern \"C\" wasm ABI instead of wasm-bindgen (no CLI build step); session socket moved to TASK-009 (B5).",
+      "Real-worklet criteria are proven only by the headless-Chrome dev harness; a blocked run is never a pass (B1).",
+      "Implicit control names in inst/bus bodies and the DSP name overload set follow B2's recommendation; templates use the plain header form (B3); effect fidelity is not an acceptance criterion (B4)."
+    ],
+    "intentionalTradeoffs": [
+      "Waves: CONTRACTS -> {SCHED, DSP, INST} -> {MIDI, NATIVE, WASM} -> FINAL, sequenced only where source forces it.",
+      "Samples not seen by the bind dry run drop their first events while loading (event-local host-unavailable, once per resource).",
+      "Plan files are archived in a separate docs commit after the workflow commit (as issue #2), not during the run."
+    ],
+    "nonGoals": [
+      "Session, REPL, LSP, session socket, editor, WebMIDI, WebGL RenderHost, UDP OSC transport (TASK-009/010).",
+      "Ableton Link, frozen mode, JIT, reference-quality effect algorithms."
+    ],
+    "decisionsNotToReopen": [
+      "Scope chain, SOUND FIRST, d1..d9 as the only sinks, named-argument rule, inst header params as control names (M3), Q3/Q4/M1, host tiers, VM-only execution, DSP never runs user closures, no allocation or locking on the audio callback, ratio time in the scheduler, use-clock :link as a diagnostic."
+    ],
+    "openUserQa": [
+      "B1 operator-run harness evidence when headless Chrome is blocked (surfaced, never silently accepted).",
+      "B2 implicit control names and DSP overloads (recommendation followed).",
+      "B3 'inst drum: sampler ...:' meaning (templates use the plain header form).",
+      "B4 effect fidelity (approximations accepted).",
+      "B5 session socket moved to TASK-009; raw wasm ABI."
+    ],
+    "sourcePaths": [
+      "impl-plans/active/vactrol-core.md",
+      "design-docs/specs/design-implementation.md",
+      "design-docs/user-qa/pending-backend-questions.md",
+      "impl-plans/active/vactrol-backend-contracts.md",
+      "impl-plans/active/vactrol-backend-sched.md",
+      "impl-plans/active/vactrol-backend-dsp.md",
+      "impl-plans/active/vactrol-backend-inst.md",
+      "impl-plans/active/vactrol-backend-midi.md",
+      "impl-plans/active/vactrol-backend-native.md",
+      "impl-plans/active/vactrol-backend-wasm.md",
+      "impl-plans/active/vactrol-backend-finalize.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "BE-CONTRACTS",
+      "planPath": "impl-plans/active/vactrol-backend-contracts.md",
+      "implementsTask": "TASK-007/008 shared contracts, Cargo deps, skeleton, codes",
+      "wave": 1,
+      "status": "ready",
+      "dependsOn": [],
+      "progressFile": "impl-plans/active/vactrol-backend-contracts.md#progress-log",
+      "writePaths": [
+        "Cargo.toml", "Cargo.lock", "src/lib.rs", "examples/beep.rs",
+        "src/host/mod.rs", "src/host/caps.rs", "src/host/wire.rs", "src/host/noop.rs", "src/host/testing.rs",
+        "src/host/native/mod.rs", "src/host/wasm/mod.rs",
+        "src/host/tests/mod.rs", "src/host/tests/contracts.rs", "src/host/tests/e2e.rs",
+        "src/sched/mod.rs", "src/sched/runtime.rs", "src/sched/staging.rs", "src/sched/ledger.rs", "src/sched/commit.rs",
+        "src/sched/control.rs", "src/sched/cells.rs", "src/sched/dryrun.rs", "src/sched/telemetry.rs", "src/sched/oneshot.rs",
+        "src/sched/midi_in.rs", "src/sched/midi_clock.rs",
+        "src/sched/tests/mod.rs", "src/sched/tests/sched.rs", "src/sched/tests/midi.rs",
+        "src/dsp/mod.rs", "src/dsp/graph.rs", "src/dsp/controls.rs", "src/dsp/cells.rs", "src/dsp/release.rs",
+        "src/dsp/caps.rs", "src/dsp/alloc_probe.rs",
+        "src/dsp/engine.rs", "src/dsp/voice.rs", "src/dsp/ring.rs", "src/dsp/fft.rs", "src/dsp/granular.rs",
+        "src/dsp/bus.rs", "src/dsp/arena.rs", "src/dsp/meta.rs", "src/dsp/build.rs",
+        "src/dsp/ugen/mod.rs", "src/dsp/effects/mod.rs",
+        "src/dsp/tests/mod.rs", "src/dsp/tests/contracts.rs", "src/dsp/tests/dsp.rs",
+        "src/ns/mod.rs", "src/ns/insts.rs", "src/ns/load.rs", "src/ns/stage.rs", "src/ns/tests/mod.rs", "src/ns/tests/inst.rs",
+        "src/vm/natives/mod.rs", "src/vm/natives/dsp.rs", "src/vm/tests/mod.rs", "src/vm/tests/inst.rs",
+        "src/types/tests/mod.rs", "src/types/tests/inst.rs", "src/compile/tests/mod.rs", "src/compile/tests/inst.rs",
+        "src/types/diag.rs", "src/vm/fail.rs",
+        "src/pattern/query.rs", "src/pattern/step.rs",
+        "src/value/value.rs", "src/value/print.rs", "src/value/eq.rs", "src/value/tests/mod.rs", "src/vm/call.rs",
+        "src/vm/tests/integrate_sound.rs",
+        "src/ns/evaluator.rs", "src/ns/tests/evaluator.rs", "src/ns/tests/stage.rs",
+        "src/vm/natives/music.rs", "src/vm/natives/tex.rs", "src/vm/tests/integrate_tex.rs",
+        "impl-plans/active/vactrol-backend-contracts.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "Cargo features and target-gated optional cpal/midir; crate-type rlib+cdylib; rust-version 1.83; [[example]] beep; cargo audit and cargo tree (wasm32 has no cpal/midir) recorded.",
+        "host/{caps,wire,noop,testing}.rs and dsp/{graph,controls,cells,release,caps,alloc_probe}.rs as listed; NoopHost re-exported from ns::load.",
+        "The 12.8.2 skeleton: every mod.rs declaration, stub and test skeleton, so no later wave edits a mod.rs it does not own.",
+        "Value::UGen, Sound::Inst, Sound::Osc, StagedEffect::Install and Event::late/cells declared with minimal arms; conditional paths edited only if the compiler requires, each recorded.",
+        "DiagCode count 75 and FailCode count 22.",
+        "Contract tests pass; V1-V8 and C1-C3 pass with logs cited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-contracts-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-contracts-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-contracts-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-contracts-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-contracts-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-contracts-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-contracts-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "LOG(be-contracts-audit): cargo audit",
+        "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git diff --stat -- Cargo.toml Cargo.lock",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-SCHED",
+      "planPath": "impl-plans/active/vactrol-backend-sched.md",
+      "implementsTask": "TASK-007 (scheduler, slot table, Runtime, cells, control channel, dry run, telemetry, once/at)",
+      "wave": 2,
+      "status": "ready",
+      "dependsOn": ["BE-CONTRACTS"],
+      "progressFile": "impl-plans/active/vactrol-backend-sched.md#progress-log",
+      "writePaths": [
+        "src/sched/slots.rs", "src/sched/runtime.rs", "src/sched/staging.rs", "src/sched/ledger.rs", "src/sched/commit.rs",
+        "src/sched/control.rs", "src/sched/cells.rs", "src/sched/dryrun.rs", "src/sched/telemetry.rs", "src/sched/oneshot.rs",
+        "src/sched/tests/sched.rs", "src/sched/tests/sched/",
+        "src/pattern/step.rs", "src/pattern/combinators/control.rs",
+        "impl-plans/active/vactrol-backend-sched.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "Runtime, RuntimeSink, SlotTable, staging/occurrence merge/ledger, commit (incl. SampleTable and granular admission), control channel, ControlCells (both tiers), dry run, telemetry, once/at, tempo change, captured output implemented.",
+        "TASK-007 criteria 1, 2, 3, 4, 5, 8, 9, 11 and the pattern/texture half of 10 proven by src/sched/tests/sched/*.rs with emitted multiplicity asserted.",
+        "TASK-008 criteria 5 and 6 diagnostic half proven by src/sched/tests/sched/granular.rs (beyond-capability with the event's origin for density, size and capture depth on the browser caps; event still commits).",
+        "V1-V8 and S1 pass with logs cited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-sched-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-sched-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-sched-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-sched-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-sched-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-sched-own): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/sched::tests/)'",
+        "LOG(be-sched-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-sched-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-DSP",
+      "planPath": "impl-plans/active/vactrol-backend-dsp.md",
+      "implementsTask": "TASK-008 pure DSP (engine, voices, ring, ugens, effects, FFT, granular, buses, analyzers, arena, meta)",
+      "wave": 2,
+      "status": "ready",
+      "dependsOn": ["BE-CONTRACTS"],
+      "progressFile": "impl-plans/active/vactrol-backend-dsp.md#progress-log",
+      "writePaths": [
+        "src/dsp/engine.rs", "src/dsp/voice.rs", "src/dsp/ring.rs", "src/dsp/fft.rs", "src/dsp/granular.rs",
+        "src/dsp/bus.rs", "src/dsp/arena.rs", "src/dsp/meta.rs",
+        "src/dsp/ugen/", "src/dsp/effects/",
+        "src/dsp/tests/dsp.rs", "src/dsp/tests/dsp/",
+        "impl-plans/active/vactrol-backend-dsp.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "Engine::process is the single callback core; voices, ring, every UGenSpec kernel, every EffectKind, FFT, granular, buses with master, analyzers, arena slice install with credit and refcounted retirement, meta table implemented.",
+        "TASK-008 criterion 1 and the render/engine halves of 5 and 6 proven (diagnostic half is BE-SCHED's); DSP halves of 3, 4, 7 (IR diagnostic origin asserted) and the engine-level VoiceRelease half of 8 proven; every render asserts zero callback allocation.",
+        "V1-V8 and D1 pass with logs cited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-dsp-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-dsp-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-dsp-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-dsp-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-dsp-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-dsp-own): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/dsp::tests/)'",
+        "LOG(be-dsp-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-dsp-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-INST",
+      "planPath": "impl-plans/active/vactrol-backend-inst.md",
+      "implementsTask": "TASK-008 language side (inst -> InstDef, ugen values, overloads, implicit controls, bus/master, osc, registry + InstResolver, prelude templates)",
+      "wave": 2,
+      "status": "ready",
+      "dependsOn": ["BE-CONTRACTS"],
+      "progressFile": "impl-plans/active/vactrol-backend-inst.md#progress-log",
+      "writePaths": [
+        "src/types/ty.rs", "src/types/natives.rs", "src/types/natives_domain.rs", "src/types/check.rs", "src/types/infer.rs",
+        "src/types/infer_call.rs", "src/types/unify.rs", "src/types/scope.rs", "src/types/manifest.rs",
+        "src/types/tests/inst.rs", "src/types/tests/inst/",
+        "src/compile/compiler.rs", "src/compile/matchc.rs", "src/compile/tests/inst.rs",
+        "src/vm/natives/dsp.rs", "src/vm/natives/mod.rs", "src/vm/natives/num.rs", "src/vm/natives/sound.rs",
+        "src/vm/natives/tex.rs", "src/vm/query_vm.rs", "src/vm/vm.rs", "src/vm/call.rs", "src/vm/tests/inst.rs",
+        "src/ns/insts.rs", "src/ns/evaluator.rs", "src/ns/namespace.rs", "src/ns/tests/inst.rs",
+        "src/value/print.rs", "src/value/eq.rs",
+        "src/pattern/eval.rs", "src/pattern/combinators/sound.rs", "src/pattern/tests/stub_vm.rs",
+        "src/dsp/build.rs", "src/prelude/templates.vact",
+        "tests/fixtures/spec/manifest.toml",
+        "impl-plans/active/vactrol-backend-inst.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "inst realizes once to InstDef over the extended catalog; header Direct sites become Ctl::Cell defaults; graph-too-large and inst-failed behave as listed.",
+        "Ty::UGen, ugen/effect/bus/master/osc natives, B2 implicit control names and overload set, kit -> registry -> unknown-sound resolution, InstResolver routes incl. sampler for banks and sample files.",
+        "Seven prelude templates as src/prelude/templates.vact realize to InstDefs (TASK-008 criterion 2, compile half).",
+        "Fixture manifest edits limited to non-deferred multiset drift caused by newly defined names, each explained.",
+        "V1-V8, I1, I2 pass with logs cited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-inst-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-inst-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-inst-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-inst-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-inst-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-inst-own): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/::inst/)'",
+        "LOG(be-inst-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-inst-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "git diff -- tests/fixtures/spec/manifest.toml",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-MIDI",
+      "planPath": "impl-plans/active/vactrol-backend-midi.md",
+      "implementsTask": "TASK-007 MIDI (input draining, cc, midi-notes, note lifetime, clock slave/master, transport)",
+      "wave": 3,
+      "status": "ready",
+      "dependsOn": ["BE-SCHED", "BE-DSP"],
+      "progressFile": "impl-plans/active/vactrol-backend-midi.md#progress-log",
+      "writePaths": [
+        "src/sched/midi_in.rs", "src/sched/midi_clock.rs", "src/sched/runtime.rs",
+        "src/sched/tests/midi.rs", "src/sched/tests/midi/",
+        "src/clock/clock.rs", "src/clock/tests/clock.rs",
+        "impl-plans/active/vactrol-backend-midi.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "MIDI modules implemented and wired into Runtime tick/drain (runtime.rs edits are call-site additions only; clock/ edited only if needed, recorded).",
+        "TASK-007 criteria 6 and 7 and the open-input half of 10 proven; voice termination asserted against dsp::Engine.",
+        "V1-V8, M1, M2 pass with logs cited; BE-SCHED tests still pass (M2)."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-midi-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-midi-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-midi-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-midi-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-midi-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-midi-own): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/sched::tests::midi/)'",
+        "LOG(be-midi-schedregress): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/sched::tests::sched/)'",
+        "LOG(be-midi-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-midi-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-NATIVE",
+      "planPath": "impl-plans/active/vactrol-backend-native.md",
+      "implementsTask": "TASK-008 NativeAudioHost (cpal, timer tick, midir, WAV SampleLoader) and examples/beep.rs",
+      "wave": 3,
+      "status": "ready",
+      "dependsOn": ["BE-SCHED", "BE-DSP", "BE-INST"],
+      "progressFile": "impl-plans/active/vactrol-backend-native.md#progress-log",
+      "writePaths": [
+        "src/host/native/",
+        "examples/beep.rs",
+        "impl-plans/active/vactrol-backend-native.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "NativeAudioHost, TickSource, NativeMidiIn/Out, NativeSampleLoader implemented; device-free tests pass.",
+        "examples/beep.rs builds under host-native (TASK-008 criterion 10 build half); audible check recorded as pending user confirmation.",
+        "V1-V8, N1, N2 pass with logs cited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-native-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-native-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-native-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-native-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-native-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-native-example): CARGO_TERM_QUIET=true cargo build --example beep",
+        "LOG(be-native-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-native-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-WASM",
+      "planPath": "impl-plans/active/vactrol-backend-wasm.md",
+      "implementsTask": "TASK-008 WasmHost (raw ABI), editor/worklet glue, editor/dev-harness with headless runner",
+      "wave": 3,
+      "status": "ready",
+      "dependsOn": ["BE-SCHED", "BE-DSP", "BE-INST"],
+      "progressFile": "impl-plans/active/vactrol-backend-wasm.md#progress-log",
+      "writePaths": [
+        "src/host/wasm/",
+        "editor/worklet/processor.js", "editor/worklet/host.js",
+        "editor/dev-harness/index.html", "editor/dev-harness/harness.js", "editor/dev-harness/run-headless.mjs",
+        "editor/dev-harness/README.md",
+        "impl-plans/active/vactrol-backend-wasm.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "Raw extern \"C\" ABI (main half and worklet half), WasmAudioHost with the sender-paced slice window, worklet glue with O(1) handler, worklet-as-timebase, latency widen.",
+        "Harness checks for TASK-008 criteria 8 and 11 pass in the headless-Chrome run (W1 exit=0), or the run is recorded as BLOCKED (exit=2) with the operator step of B1 and both criteria left unchecked.",
+        "V1-V8, W1-W4 recorded with logs cited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-wasm-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-wasm-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-wasm-clippy-wasm): CARGO_TERM_QUIET=true cargo clippy --target wasm32-unknown-unknown --no-default-features --features host-wasm -- -D warnings",
+        "LOG(be-wasm-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-wasm-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-wasm-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-wasm-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-wasm-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "ls -l target/wasm32-unknown-unknown/debug/vactrol.wasm",
+        "node --check editor/dev-harness/run-headless.mjs editor/dev-harness/harness.js editor/worklet/host.js editor/worklet/processor.js",
+        "LOG(be-wasm-harness): node editor/dev-harness/run-headless.mjs",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "git status --short"
+      ]
+    },
+    {
+      "planId": "BE-FINAL",
+      "planPath": "impl-plans/active/vactrol-backend-finalize.md",
+      "implementsTask": "TASK-007/008 end-to-end tests, HostManifest metadata, fixture reclassification, final checks, bookkeeping",
+      "wave": 4,
+      "status": "ready",
+      "dependsOn": ["BE-MIDI", "BE-NATIVE", "BE-WASM"],
+      "progressFile": "impl-plans/active/vactrol-backend-finalize.md#progress-log",
+      "writePaths": [
+        "src/host/tests/e2e.rs", "src/host/tests/e2e/",
+        "src/types/manifest.rs",
+        "tests/fixtures/spec/manifest.toml",
+        "impl-plans/active/vactrol-core.md", "impl-plans/README.md",
+        "impl-plans/active/vactrol-backend-finalize.md"
+      ],
+      "sharedPaths": [
+        "impl-plans/active/vactrol-backend-contracts.md", "impl-plans/active/vactrol-backend-sched.md",
+        "impl-plans/active/vactrol-backend-dsp.md", "impl-plans/active/vactrol-backend-inst.md",
+        "impl-plans/active/vactrol-backend-midi.md", "impl-plans/active/vactrol-backend-native.md",
+        "impl-plans/active/vactrol-backend-wasm.md",
+        "src/", "examples/beep.rs", "editor/"
+      ],
+      "acceptanceCriteria": [
+        "Join integrity checked against every plan's final-hashes.txt, each mismatch explained.",
+        "TASK-008 criteria 2, 3, 4 proven end to end; beep headless proxy passes; HostManifest carries editor metadata; the four TASK-008 fixture blocks reclassified.",
+        "Final tree: build, clippy -D warnings, fmt --check, nextest, cargo test, both wasm32 builds and cargo build --example beep all exit 0 with logs cited.",
+        "The harness is always re-run on the final tree (LOG be-final-harness); TASK-008 criteria 8/11 are checked only from that run with exit=0, or from an operator-run headed report on the final tree labelled per B1 if it exits 2.",
+        "vactrol-core.md TASK-007/008 checked only with evidence (TASK-008 criterion 10 pending user confirmation; 5/6 cite src/dsp/tests/dsp/{granular,analyzer}.rs and src/sched/tests/sched/granular.rs; 8/11 per the final harness run), statuses COMPLETED only when complete; TASK-008 deliverable text amended; README updated; BE plans marked Completed (archive after the workflow commit).",
+        "Commit staging list and six-section message (no attribution lines) recorded; this manifest is not edited."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(be-final-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(be-final-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(be-final-fmt): CARGO_TERM_QUIET=true cargo fmt --check",
+        "LOG(be-final-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(be-final-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(be-final-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(be-final-e2e): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/host::tests::e2e/)'",
+        "LOG(be-final-example): CARGO_TERM_QUIET=true cargo build --example beep",
+        "LOG(be-final-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(be-final-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "LOG(be-final-harness): node editor/dev-harness/run-headless.mjs",
+        "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown",
+        "grep -c 'deferred_to = \"TASK-008\"' tests/fixtures/spec/manifest.toml || true",
+        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native || echo none",
+        "jq . impl-plans/active/be-backend-20260925-s181-dispatch.json > /dev/null",
+        "git diff --stat",
+        "git status --short"
+      ]
+    }
+  ]
+}

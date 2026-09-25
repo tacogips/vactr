@@ -122,8 +122,8 @@ because runtime diagnostics originate in the scheduler.
 
 One core crate `vactrol` (the existing package), feature-gated hosts.
 No workspace split in v1; the editor frontend is TypeScript under
-`editor/` and consumes the core through wasm-bindgen or the session
-socket.
+`editor/` and consumes the core through the raw wasm export ABI of
+12.8.10 (wasm-bindgen was dropped in issue #3) or the session socket.
 
 ```
 src/
@@ -143,9 +143,9 @@ src/
   pattern/   pat.rs step.rs query.rs combinators/ signal.rs eval.rs  # section 10, 7.1
   tex/       texnode.rs shader.rs uniforms.rs                  # section 9
   clock/     tempo.rs clock.rs                            # section 11.1, 11.7
-  sched/     slots.rs scheduler.rs telemetry.rs           # section 11
-  dsp/       ugen.rs graph.rs voice.rs sample.rs          # section 12
-  host/      caps.rs noop.rs native/ wasm/                # sections 11.5, 16
+  sched/     slots.rs runtime.rs staging.rs telemetry.rs  # section 11, 12.8.2
+  dsp/       graph.rs engine.rs voice.rs ugen/ effects/   # section 12, 12.8.2
+  host/      caps.rs wire.rs noop.rs native/ wasm/        # sections 11.5, 16, 12.8
   session/   protocol.rs session.rs repl.rs bindings.rs   # sections 13, 14
   lsp/       server.rs                                    # section 14.3
 editor/      TypeScript: CodeMirror 6 frontend, Tauri shell, worklet JS
@@ -153,8 +153,8 @@ editor/      TypeScript: CodeMirror 6 frontend, Tauri shell, worklet JS
 
 | Feature flag | Pulls in | Default |
 |--------------|----------|---------|
-| `host-native` | cpal, midir, tungstenite (session socket) | yes (desktop dev) |
-| `host-wasm` | wasm-bindgen, js-sys, web-sys | no (wasm builds) |
+| `host-native` | cpal, midir (non-wasm32 targets only, 12.8.10); tungstenite (session socket) joins in TASK-009 | yes (desktop dev) |
+| `host-wasm` | no crates: raw `extern "C"` exports (12.8.10) | no (wasm builds) |
 | `lsp` | tower-lsp, tokio | no |
 
 The core modules (`value` … `dsp`) have no I/O dependencies and no
@@ -3652,6 +3652,463 @@ high, MIDI without a device, offline render on the browser tier) into
 a diagnostic with origin — never a crash, never silent truncation.
 Swift is glue only (session/audio-background/AUv3 later) and outside
 this plan.
+
+### 12.8 Back-end implementation decisions (TASK-007..008, 2026-09-25)
+
+This section pins the choices that sections 10.3-10.4, 11.2-11.7, 12,
+16 and 17 leave open for issue #3 (scheduler, slot table, capability
+hosts, DSP graph, native and wasm hosts). It follows the shape of 6.5
+and 7.1 and changes no Decided behavior. The semantics of staging, the
+occurrence merge, rebind, `SlotControl`, control cells, note lifetime
+and the 16.1 lifecycle stay exactly as written in 11.3, 11.7, 12.6 and
+16.1; this section only fixes where they live, how they are wired and
+how they are proven. Open author questions are in
+`design-docs/user-qa/pending-backend-questions.md` (B1-B5); the
+implementation follows each recommendation until it is answered.
+
+#### 12.8.1 Scope boundary
+
+In scope: every TASK-007 and TASK-008 deliverable and completion
+criterion of `impl-plans/active/vactrol-core.md`, with these
+boundary decisions:
+
+- **No `Session` yet.** `Session` is TASK-009. TASK-007 adds
+  `sched::Runtime`, which owns the slot table, the scheduler, the
+  authoritative `ControlCells`, the clock, the `InputCells`
+  (7.1.3), the telemetry queue and the host bundle. TASK-009's
+  `Session` wraps `Evaluator` + `Runtime` and does not re-implement
+  either. Where 11.5 writes `dry_run(&Binding, &Session)`, the
+  signature is `dry_run(&Binding, &mut dyn QueryVm, &InputCells,
+  seed) -> QueryResult`.
+- **Session socket moves to TASK-009 (B5).** The tungstenite session
+  socket listed under `NativeAudioHost` needs the `ClientMsg`/
+  `ServerMsg` protocol and the token rule of 17, both TASK-009. No
+  TASK-008 criterion exercises it. TASK-008 adds no socket and no
+  tungstenite; the core plan's TASK-008 deliverable text is amended
+  by the FINAL wave and TASK-009 gains the item.
+- **No real OSC transport, no RenderHost implementation, no WebMIDI.**
+  `OscHost`, `RenderHost`, `MidiHost` and `MidiInHost` are traits
+  with `NoopHost` and recording test hosts. The native host
+  implements `MidiHost`/`MidiInHost` over midir (TASK-008). A UDP OSC
+  host, the WebGL `RenderHost` and WebMIDI wiring are TASK-010's TS
+  shell. The browser tier's `CapabilitySet` therefore advertises
+  `midi_in = midi_out = false` until TASK-010 flips it.
+- **Visual slots.** `out o0..o3` bind `Binding::Texture` in the same
+  table. On activation the scheduler calls `RenderHost::set_program`;
+  `stop`/`hush` call it with the empty program (black). Per-frame
+  uniform evaluation (9.3) needs a render loop and is TASK-010's.
+- **Spec fixtures.** The FINAL wave reclassifies the four blocks
+  `deferred_to = "TASK-008"` (design-music ordinals 2, 4, 5, 6) to
+  `positive` or `diagnostic` with pinned multisets, evaluated with
+  the fixture `NoopHost` (so `load`/`sample` I/O still fails
+  `host-unavailable` where a block needs files).
+
+#### 12.8.2 Files and the 800-line budget
+
+No `.rs` file may reach 800 lines (hard limit 1000). Tests go in
+`tests/` submodules as in 6.5/7.1. Owner waves are in 12.8.12.
+
+**Skeleton rule (no shared module files after CONTRACTS).** CONTRACTS
+creates every module declaration and file this map names, so that no
+later wave edits a `mod.rs` it does not own:
+- `src/lib.rs` (`pub mod host;`), `host/mod.rs` (`pub mod native;`
+  gated by `all(feature = "host-native", not(target_arch = "wasm32"))`,
+  `pub mod wasm;` gated by `all(target_arch = "wasm32", feature =
+  "host-wasm")`), `sched/mod.rs`, `dsp/mod.rs` (including `pub mod
+  build;`), `ns/mod.rs` (`insts`), `vm/natives/mod.rs` (`dsp`), each
+  with every entry of the table;
+- a stub (a doc comment only, and for `examples/beep.rs` an empty
+  `fn main`) for every file a later wave owns, including the
+  subdirectory roots `dsp/ugen/mod.rs`, `dsp/effects/mod.rs`,
+  `host/native/mod.rs` and `host/wasm/mod.rs`;
+- the test skeletons: `<module>/tests/mod.rs` declaring one file per
+  owning wave (`sched/tests/{sched,midi}.rs`, `dsp/tests/dsp.rs`,
+  `host/tests/e2e.rs`, plus the `tests/` directories of the language
+  modules INST edits, `inst.rs` in each), each created as a stub.
+
+From then on each wave writes only its own files. A wave that needs
+another file creates it inside a subdirectory whose `mod.rs` it owns
+(DSP: `dsp/ugen/`, `dsp/effects/`; NATIVE: `host/native/`; WASM:
+`host/wasm/`). A test file may declare its own nested modules. After
+CONTRACTS, INST is the only writer of `value/`, `types/`, `compile/`,
+`vm/` and `ns/` (FINAL touches only fixtures there), so the INST plan
+lists the existing files it edits in those directories, native
+registration in `vm/natives/mod.rs` included, as its `writePaths`.
+
+**Enum shapes land in CONTRACTS.** CONTRACTS also declares
+`Value::UGen(Rc<UGenNode>)` (`UGenNode` as an opaque shell in
+`dsp/graph.rs`), `Sound::Inst(InstId)` and `Sound::Osc(Rc<str>)`, with
+the minimal arms that keep existing exhaustive matches compiling
+(print `<ugen>`, `<inst>`, `<osc>`; pointer equality for `UGen`;
+`kind_name`). SCHED and DSP then compile against the final shapes,
+and INST owns their semantics. `Ty::UGen` stays with INST, because
+only the checker matches on `Ty`.
+
+| Module | Files (owner wave) |
+|--------|--------------------|
+| `host/` | `mod.rs`, `caps.rs` (all capability traits, `HostSigs`, `GraphHandle`), `wire.rs` (POD priority-channel records and their little-endian byte codec, 12.8.5), `noop.rs` (`NoopHost` for every trait including `SourceLoader`; `ns::load::NoopHost` becomes a re-export), `testing.rs` (`#[cfg(test)]` recording hosts and mock transports) (CONTRACTS); `native/{mod,audio,midi,tick,loader}.rs` (NATIVE); `wasm/{mod,abi,main_half,worklet_half}.rs` (WASM); `tests/e2e.rs` and modules it declares under `tests/e2e/` (FINAL) |
+| `sched/` | `slots.rs` (`SlotTable`, `Slot`, `SlotKind`), `runtime.rs` (`Runtime`, command queue, tick driver), `staging.rs` (occurrence records, coverage extension, scoped invalidation), `ledger.rs`, `commit.rs` (POD conversion, control mapping, `Const` downgrade), `control.rs` (two-class channel, monotone merge, re-send), `cells.rs` (authoritative `ControlCells`, epochs, batches), `dryrun.rs`, `telemetry.rs`, `oneshot.rs` (`once`/`at`) (SCHED); `midi_in.rs` (`cc` cells, `midi-notes`, `NoteInstance`), `midi_clock.rs` (slave, master, transport) (MIDI) |
+| `dsp/` | `graph.rs` (`InstId`, `InstDef`, `UGenSpec`, `Edge`, `EffectKind`, `EffectSpec`, `BusDef`, ids), `controls.rs` (the control table, 12.8.7), `cells.rs` (`CellRead`, native `AtomicCells`, the browser `Mirror` state machine of 11.3), `release.rs` (`VoiceRelease` tag map + tombstone ring), `caps.rs` (`CapabilitySet` + tier presets), `alloc_probe.rs` (`#[cfg(test)]`) (CONTRACTS); `engine.rs` (the callback core), `voice.rs`, `ring.rs`, `ugen/{osc,filter,env,fm,additive,wavetable,sample}.rs`, `effects/{mod,dynamics,eq,delay,reverb,saturation,modulation,lofi,resonator,spatial,restoration,utility,analyzer}.rs`, `fft.rs`, `granular.rs`, `bus.rs`, `arena.rs` (`SampleArena`, slice install, credit, refcounted retirement), `meta.rs` (`EditorDecl`/`ParamMeta` table) (DSP); `build.rs` (ugen node tree -> `InstDef`/`BusDef` lowering, node cap) (INST) |
+| language | `value/value.rs`, `value/print.rs`, `value/eq.rs`, `vm/call.rs`: the `Value::UGen`, `Sound::Inst`, `Sound::Osc` declarations and their minimal arms (CONTRACTS, skeleton rule above; later INST edits to these files for semantics are allowed because no other wave writes them). Then (INST): `types/ty.rs` (`Ty::UGen`), `types/natives.rs` rows, `types/check.rs`/`infer*.rs` (inst-body rules), `compile/` (implicit control names), `vm/natives/dsp.rs` (ugen, effect, bus, `osc` natives), `ns/insts.rs` (instrument registry, `InstResolver` impl), `src/prelude/templates.vact` (INST) |
+| other | `Cargo.toml`, `src/lib.rs` (`pub mod host;`, test-only global allocator) (CONTRACTS); `examples/beep.rs` (NATIVE); `editor/worklet/*.js`, `editor/dev-harness/*` (WASM) |
+
+#### 12.8.3 Runtime wiring and contracts between waves
+
+- **Effect intake.** `Runtime::new(hosts, caps)` returns the runtime
+  and a `RuntimeSink: EffectSink` that shares an
+  `Rc<RefCell<CommandQueue>>` with it. The caller builds the
+  `Evaluator` with that sink (7.1.3 "Staged effects"). After every
+  `eval_str`/`eval_form`/`run_pass`, the caller calls
+  `Runtime::drain(&mut Evaluator)`, which applies queued commands with
+  VM access (`Evaluator::vm_and_ns`): a `SlotBind` runs the dry run
+  (11.5) and, on success, sets `pending`; on failure it returns the
+  diagnostics and the old binding keeps playing. `Evaluator` needs no
+  change beyond this.
+- **Tick.** `Runtime::tick(&mut Evaluator, host_now: f64)` runs the
+  six steps of 11.3 against a `VmQuery` (Query effect mode) and the
+  runtime's `InputCells`, then runs due `at`/`once` thunks in Normal
+  mode through the evaluator. Returned `TickReport` carries
+  diagnostics, forwarded console lines and telemetry counts.
+- **Instrument resolution** (the one cross-wave trait, defined by
+  CONTRACTS in `host/caps.rs`): `trait InstResolver { fn route(&self,
+  sound: &Sound) -> Result<Route, Failure>; }` with `Route = Audio
+  { inst: InstId } | Midi { ch: u8 } | Osc { addr: Rc<str> }`. SCHED
+  tests use a stub; INST implements it over the instrument registry
+  (12.8.6). Commit calls it once per emitted event.
+- **Per-event sink routing (supersedes 11.2 `SlotKind::{Audio, Midi,
+  Osc}`).** Decided 2026-09-25: MIDI and OSC are instruments selected
+  by `s`, and d1..d9 are the only sinks. A slot therefore has
+  `SlotKind = Pattern | Texture`; each committed event goes to the
+  `AudioHost`, `MidiHost` or `OscHost` its `Route` names, and every
+  `SlotControl` for a pattern slot goes to all three sinks, keeping
+  one (slot, gen) identity across them (11.4).
+- **Control writes.** A `CellUpdate`, `TweakRefresh` or `Bindings`
+  command writes the authoritative cells and invalidates uncommitted
+  staging of every slot from the commit horizon on (11.3 "Control
+  writes and STRUCTURE"). Scoped invalidation `invalidate(slot, span)`
+  is an internal API the tests call directly.
+- **Captured output.** Query output is attached to the staged query
+  fragment that produced it. It is forwarded when the first record of
+  that fragment commits, or when the fragment's end passes the commit
+  horizon with no record; invalidating the fragment discards it, and
+  restaging captures afresh (11.3 step 4, 10.4).
+- **Input cells.** `Runtime` owns `InputCells`; `cc` draining (MIDI
+  wave) and analyzer/host-signal cells published by the audio side
+  write it once per tick.
+
+#### 12.8.4 Time, horizons and thresholds
+
+- `host_now` is `f64` seconds on the AUDIO timebase of the host:
+  native = frames rendered / sample rate from an atomic counter the
+  callback advances; browser = the worklet's posted `currentFrame /
+  sampleRate` (16). Tests use a mock clock.
+- Defaults (all `Runtime` config fields): `lookahead` 120 ms,
+  `commit_lead` 30 ms, control re-send after 3 unacked ticks,
+  host-transport diagnostic after 20 unacked ticks, MIDI clock loss
+  timeout 500 ms, clock smoothing factor 0.1, latency auto-widen by
+  10 ms (cap 200 ms) when more than 4 late events arrive within one
+  second, reported as `latency-widened`.
+- Seconds conversion happens once per event in `commit.rs` through
+  `Clock` (11.1); nothing else in `sched/` holds `f64` time.
+
+#### 12.8.5 Channels and wire records
+
+Both tiers carry the same message set; only the transport differs.
+
+- **Evaluator -> audio**: the time-ordered event ring (`AudioEvent`,
+  11.4) and ONE priority control channel per sink carrying `CtlMsg =
+  SlotControl | CellInit | CellBatch | CellRetire | LiveNoteOn |
+  VoiceRelease | GraphInstall | GraphRetire | SampleSlice |
+  SampleRetire`.
+- **Audio -> evaluator**: `HostMsg = SlotControlAck | CellInitAck |
+  CellBatchAck | Retired | SliceOk | Installed | Counters (late,
+  dropped, stolen, skipped) | AnalysisCells`.
+- **Native**: the ring and each channel are preallocated lock-free
+  SPSC rings of POD records; cells are `AtomicCells`
+  (`AtomicU32` bit patterns, release store / acquire load), so
+  `CellInit`/`CellBatch` are not sent natively. Graph swaps use the
+  12.2 triple buffer with the retired structure dropped on the
+  evaluator thread.
+- **Browser**: `host/wire.rs` encodes every record as fixed-layout
+  little-endian bytes. JS never parses a record; it moves
+  `ArrayBuffer`s between the two instances (12.8.10).
+- **Mock transports** (`host/testing.rs`): a native model (shared
+  `AtomicCells`, immediate) and a browser model (an isolated `Mirror`
+  behind a FIFO with configurable delay, loss and stall, no
+  shared-memory shortcut), used by the 11.3 cell and control tests.
+  The `Mirror` is the same `dsp/cells.rs` code the worklet runs.
+
+#### 12.8.6 Instruments, ugens and buses
+
+- **Value and type.** `inst` bodies build a node tree: `Value::UGen(Rc
+  <UGenNode>)` with checker type `Ty::UGen`. A ugen input accepts
+  `float`, `int`, `ugen` or `signal`; the unifier allows those only at
+  ugen input positions (the same local-coercion shape as `[sound]` in
+  7.1.4). `+ - *` get a `ugen` overload (a node-building native when
+  either operand is a ugen).
+- **Realization.** `inst` still compiles to a closure (7.1.4
+  "Definition heads"). At definition time INST calls it ONCE with
+  each header parameter bound to a `Param(CtlId)` node (M3: header
+  parameters are control names), lowers the returned tree to an
+  `InstDef` in `dsp/build.rs`, registers it, and installs it on the
+  audio side. A header default that is a `Direct` tweak site becomes
+  a cell-backed `Ctl::Cell` default (11.3); other defaults are
+  `Ctl::Const`. More than 256 nodes is `graph-too-large` (16.1). A
+  failing body is `Failure(inst-failed)` for the defining form and
+  leaves any previous definition installed.
+- **Implicit control names (B2).** Inside an `inst` or `bus` body, a
+  free name that is a row of the control table (12.8.7) and is not
+  bound in scope compiles to a `Param(CtlId)` node, typed from the
+  row. This is how `attack`, `release`, `amp`, `note` and `n` in the
+  design-music examples resolve without header declarations.
+  Everywhere else such a name is still `undefined-name`.
+- **Name collisions (extends the M1 fixed set, B2).** `saw`, `tri`,
+  `lpf`, `hpf`, `bpf`, `delay`, `comb`, `gain`, `pan`, `room`, `bus`,
+  `range` and every effect name that is also a pattern control join
+  the subject-overload group: a `pattern` subject selects the existing
+  pattern control or signal; a `ugen` subject, a numeric argument
+  inside an `inst` body, or no subject inside a `bus` body selects the
+  ugen/effect. Zero-argument `saw`/`tri` stay the signals.
+- **Signals as ugen inputs** (`shape: {range sine 0 1}`) become
+  control-rate cells (12.2 "control cells"): the scheduler samples the
+  signal once per tick for each installed instrument that uses it and
+  writes the cell; the voice reads it continuously. No closure runs on
+  the audio side.
+- **Sound resolution.** `inst NAME` binds `NAME` to
+  `Value::Sound(Sound::Inst(id))` and registers `:NAME`. `s :k`
+  resolves `k` in the kit first (7.1.4), then in the instrument
+  registry (prelude templates and session insts), else
+  `Failure(unknown-sound)`. `Sound::Builtin(k)` for a host sample
+  bank routes to the `sampler` template with `bank = k` ("every sample
+  IS a sampler"). `osc "/addr"` returns `Sound::Osc`. The checker's
+  known-key set adds the template names (the host manifest's synth
+  set) and the document's `inst` names, as 7.1.4 already says.
+- **Templates.** `sampler`, `analog`, `fm`, `pd`, `additive`,
+  `wavetable`, `granular` are ordinary `inst` definitions in
+  `src/prelude/templates.vact` (embedded with `include_str!`),
+  evaluated into the prelude at runtime construction through the
+  normal path. They use the plain header form (`inst analog wave: ...
+  :`), not the `inst drum: sampler ...:` spelling of design-music
+  section 4, whose meaning is open (B3).
+- **Buses.** `bus :name:` + block and `master:` + block are definition
+  heads like `inst`; the block's first element takes the bus input as
+  its implicit subject. They lower to `BusDef` and swap under the
+  generation + refcount lifecycle (12.5). `bus :name` with a pattern
+  subject is the routing control.
+
+#### 12.8.7 Control table
+
+`dsp/controls.rs` holds one row per control name: `CtlId`, default,
+range, and route = `InstParam` (by name, including `freq` and `amp`),
+`OrbitFx(unit, param)`, `BusUnit(param)` (`room` maps to the bus
+reverb unit's parameter) or `Scheduler` (`orbit`, `bus`, `cut`,
+`legato`). `note`/`n` map to `freq` through the scale, and `gain` maps
+to `amp` (Q4). `n` on a bank selects the sample (7.1.4). `Ctl` carries
+only `f32`, so commit encodes a keyword control as its index in the
+row's enum list (`wave`, `envelope`, `kind`), a bank or table keyword
+as the installed resource id, and a boolean as 0 or 1; a value outside
+the row's domain is an event-local `Failure(type)`. List-valued
+header arguments (`partials`) are realization-time constants of the
+node, not controls. A control an
+instrument does not declare is ignored (SuperDirt behavior), with no
+diagnostic. `MAX_CTLS = 24`; an event with more resolved controls is
+an event-local `Failure(too-many-controls)`.
+
+#### 12.8.8 Effect catalog and metadata
+
+- Every design-music section 5 name has an `EffectKind` variant, an
+  implementation, and an `EditorDecl`/`ParamMeta` row. One test
+  asserts that each catalog name, ugen and template has exactly one
+  meta row and one implementation.
+- **Fidelity (B4).** Each kind is a bounded, allocation-free algorithm
+  built from shared primitives (biquad, one-pole, delay line, allpass/
+  FDN, envelope follower, waveshaper, LFO, fixed-size radix-2 FFT).
+  Kinds whose reference-quality algorithm needs large state or
+  lookahead (`linear-phase-eq`, `group-delay-eq`, `pitch-shift-hq`,
+  `denoise`, `codec`, `spatial-map`, `crosstalk-cancel`,
+  `fir-crossover`) ship a documented approximation with fixed
+  preallocated state. The acceptance bar for every kind is finite,
+  bounded output, correct bypass (`mix 0` or `section` off is
+  bit-identical to the input where the kind has a mix) and zero
+  callback allocation. Sound quality is not an acceptance criterion
+  in v1.
+- Analyzers are transparent taps writing preallocated `f32` cells;
+  the bit-compare test renders with and without the analyzer.
+- **Capability checks.** `CapabilitySet::require(cap, origin) ->
+  Result<(), Diagnostic>` is the one gate. INST calls it at
+  realization or install (IR length against `max_ir_seconds`, grain
+  caps, voice counts), and the scheduler calls it at commit for values
+  that arrive at run time (12.6 admission). Offline render has no
+  language verb in v1, so its criterion calls `require(OfflineRender,
+  origin)` on the browser preset and asserts the "not available on
+  this host" diagnostic.
+
+#### 12.8.9 Audio engine and the allocation proof
+
+- `dsp::Engine::process(&mut [f32], frames)` is the one callback core
+  both hosts call. It drains the priority channel first, then the
+  ring (events due in the block, sample-accurate start at
+  `round((time - block_start) * sr)`, late events start at frame 0
+  and are counted), renders voices, orbit effects and buses, and
+  publishes counters. It is generic over `CellRead` (native
+  `AtomicCells`, browser `Mirror`).
+- Capacities are fixed at construction from `CapabilitySet`: voices
+  (browser 64, native 256), ring 1024 events, channel 256 records per
+  sink, tag map = voice count, tombstone ring 64, grain pools per
+  12.6. Short gate = 3 ms linear fade.
+- **Allocation probe.** `dsp/alloc_probe.rs` defines a counting
+  global allocator installed in `src/lib.rs` under `#[cfg(test)]`
+  only, so release, example and wasm builds never contain it. It
+  counts `alloc`/`realloc` on the current thread while a thread-local
+  flag is armed (`const`-initialized, so arming allocates nothing).
+  Headless render tests arm it around every `Engine::process` call
+  and assert a zero count. This is the "debug-mode counters" proof;
+  the tests are unit tests inside the crate because an integration
+  test would not see `cfg(test)`.
+
+#### 12.8.10 Hosts
+
+- **Cargo.** `rust-version = "1.83"`. `host-native = ["dep:cpal",
+  "dep:midir"]` with both crates optional under
+  `[target.'cfg(not(target_arch = "wasm32"))'.dependencies]`, and
+  `host/native` compiled only under `all(feature = "host-native",
+  not(target_arch = "wasm32"))`, so both wasm32 builds stay green.
+  `host-wasm` pulls NO crates (next point). `[lib] crate-type =
+  ["rlib", "cdylib"]` so the wasm32 build emits `vactrol.wasm`.
+  Version policy: the highest cpal/midir releases whose
+  `rust-version` and whole resolved tree build on 1.83 (cargo 1.83
+  has no MSRV-aware resolver, so transitive crates are pinned with
+  `cargo update --precise` where needed); prefer cpal 0.16.x (no
+  bindgen on macOS), fall back to 0.15.3. The chosen versions,
+  `Cargo.lock` diff and a `cargo audit` run are recorded in the
+  CONTRACTS evidence.
+- **NativeAudioHost** (`host/native`): a cpal output stream whose
+  callback runs `Engine::process`; `now()` from the frames counter;
+  a timer thread posting tick wakes over `std::sync::mpsc` every 5 ms
+  to the evaluator thread; midir input (first port or a configured
+  name) feeding `MidiInHost`, midir output for `MidiHost`; no device
+  = `beyond-capability` ("not available on this host"). The native
+  `SampleLoader` reads WAV only (RIFF PCM 16/24/32-bit int and 32-bit
+  float, mono or stereo) with an in-house parser, from configured
+  directories (17); a file sample rate other than the engine's scales
+  playback rate. Other formats are `Failure(host-unavailable)`.
+- **examples/beep.rs** (`required-features = ["host-native"]`):
+  builds `Evaluator` + `Runtime` + `NativeAudioHost`, evaluates
+  `s :analog > note [:a4] > once` (or `s {sample PATH} > once` when a
+  WAV path is given), ticks for two seconds and exits. Its audible
+  check is manual and pending user confirmation; the automated proxy
+  is the FINAL headless render of the same program.
+- **WasmHost, no wasm-bindgen (divergence from section 4 and the core
+  plan text).** wasm-bindgen needs its CLI to generate JS glue, which
+  is a build step beyond the wasm module. The module instead exports
+  a raw `extern "C"` ABI under `all(target_arch = "wasm32", feature =
+  "host-wasm")`: `alloc`/`free` for JS-written input bytes; main half
+  `main_init`, `eval(ptr, len)`, `tick(now)`, `inbox(ptr, len)` (a
+  `HostMsg` from the worklet) and `outbox_ptr`/`outbox_len`/
+  `outbox_clear`; worklet half `worklet_init(sample_rate,
+  capacities)`, `worklet_inbox(ptr, len)`, `process(frames) ->
+  out_ptr` and `report_ptr`/`report_len` (counters for the harness).
+  The core needs no JS imports.
+- **Worklet glue** (`editor/worklet/processor.js`, `host.js`, plain
+  JS): the main thread fetches the module bytes, instantiates wasm #1,
+  and posts a copy of the bytes to the `AudioWorkletProcessor`, which
+  instantiates wasm #2 during init and renders silence until ready.
+  The worklet posts its frame time every render quantum; the main
+  thread calls `tick`, then posts each outbox record as a transferred
+  `ArrayBuffer`. The worklet `onmessage` handler only stores the
+  buffer reference in a preallocated fixed-size JS slot array
+  (overflow = drop + count), which is O(1). `process()` drains the
+  slots into `worklet_inbox`, where all copying happens under the
+  16.1 per-quantum credit (at most `INSTALL_BYTES_PER_QUANTUM` of
+  slice copy and one `CellBatch` per call), then renders. Browser
+  sample decode is `decodeAudioData` on the main thread (off the
+  audio thread, 16.1).
+
+#### 12.8.11 Dev harness and real-worklet evidence
+
+- `editor/dev-harness/index.html` + `harness.js` load the wasm32
+  host-wasm build and the worklet glue, run the checks of the two
+  TASK-008 real-worklet criteria (cell transport and `VoiceRelease`;
+  the 16.1 lifecycle list) with synthetic sample buffers, and read
+  results from the worklet's report counters. They also assert that
+  worklet wasm memory size is unchanged from the end of init to the
+  end of the run (no growth, 16.1).
+- **Automated run (primary).** `node editor/dev-harness/
+  run-headless.mjs` (node built-ins only: `http`, `child_process`,
+  `fs`) serves the harness on `127.0.0.1` (a secure context for
+  worklets), launches Chrome from `$CHROME` or the default macOS path
+  with `--headless=new --autoplay-policy=no-user-gesture-required
+  --user-data-dir=<tmp>`, receives the page's JSON report by POST,
+  writes it to `target/fe-logs/be-wasm-harness-s<session>-<n>.json`,
+  and exits 0 when every check passes, 1 on a failed check or a
+  missing `target/wasm32-unknown-unknown/debug/vactrol.wasm` (built
+  by the `wasm32-hostwasm` check first), and 2 when blocked (Chrome
+  missing, or the realtime `AudioContext` never reaches `running`),
+  with a 120 s timeout.
+- **Blocked is not passing.** If the workflow sandbox cannot run
+  Chrome or open an audio context, the run is recorded as blocked,
+  the operator runs the same page headed (`run-headless.mjs --headed`)
+  and the resulting report is the evidence. That goes beyond the
+  issue's single beep exemption, so it is surfaced at review (B1),
+  not silently accepted. The headless `Engine::process` tests never
+  substitute for these checks (16.1).
+
+#### 12.8.12 Codes, waves and verification
+
+**New codes** (closed list). `DiagCode`: `graph-too-large`,
+`host-transport` (unacked controls past the threshold),
+`ring-overflow`, `latency-widened` (w), `arena-exhausted`,
+`install-queue-overflow`, `grain-skip` (w, sustained skipping),
+`voice-steal` (w), `clock-lost` (w), `clock-external` (`use-bpm` under
+`:midi`). Capability misses reuse `beyond-capability` with the message
+"not available on this host". `FailCode`: `inst-failed`,
+`too-many-controls`. CONTRACTS adds them all in one edit, as in 7.1.3.
+
+**Waves.** Plans `impl-plans/active/vactrol-backend-<wave>.md`; each
+lists its own plan file in its manifest `writePaths`, and only FINAL
+edits `vactrol-core.md`, `impl-plans/README.md` and the spec fixture
+manifest (it never edits the dispatch manifest).
+
+| Wave | Content | Depends on |
+|------|---------|------------|
+| CONTRACTS | Cargo features/deps (including the `[[example]] beep` entry) and version pinning, the 12.8.2 skeleton (every `mod.rs`, stubs, test skeletons), the enum shapes of 12.8.2, `host/{caps,wire,noop,testing}.rs`, `dsp/{graph,controls,cells,release,caps,alloc_probe}.rs`, the codes (`SlotId`/`CtlId` stay where they are in `sched/slots.rs`, which SCHED then owns) | — |
+| SCHED | TASK-007 core: slot table, staging, occurrence merge, ledger, commit, control channel, cells, dry run, telemetry, `once`/`at`, tempo change, captured output | CONTRACTS |
+| DSP | TASK-008 pure DSP: engine, voices, ring, ugens, effects, FFT, granular, buses, analyzers, arena, meta | CONTRACTS |
+| INST | language side: `UGenNode` contents and the semantics of the CONTRACTS enum variants, `Ty::UGen`, natives, inst realization, implicit control names, overloads, registry + `InstResolver`, `bus`/`master`, `osc`, prelude templates, `dsp/build.rs` | CONTRACTS |
+| MIDI | `sched/midi_in.rs`, `sched/midi_clock.rs`, `sched/tests/midi.rs`, plus `sched/runtime.rs` (to wire the MIDI calls into `tick`/`drain`) and `clock/clock.rs` (only if the slave anchor needs a change): `cc` cells, `midi-notes` realization, note lifetime (voice termination asserted against `dsp::Engine`), clock slave/master over the existing `clock::MidiClockSync`, transport, `use-clock`, `midi-clock-out` | SCHED, DSP |
+| NATIVE | `host/native/*`, `examples/beep.rs` | SCHED, DSP, INST |
+| WASM | `host/wasm/*`, `editor/worklet/`, `editor/dev-harness/` incl. the headless runner and its run | SCHED, DSP, INST |
+| FINAL | `host/tests/e2e.rs` + `host/tests/e2e/` (headless end-to-end: sample-region handoff through partitioned staging to the ring, template renders from prelude source, bus chains, the beep proxy), fixture reclassification, core plan checkboxes and progress log, README, archive | MIDI, NATIVE, WASM |
+
+Waves run as CONTRACTS; SCHED + DSP + INST; MIDI + NATIVE + WASM;
+FINAL.
+
+**MIDI wiring (chosen: MIDI owns the `runtime.rs` edit).** SCHED
+leaves `Runtime` with the MIDI settings recorded but not acted on: the
+`use-clock` and `midi-clock-out` staged effects are stored (`:link`
+already fails in the checker, 7.1.6), and the `MidiInHost` in the host
+bundle is never polled. In wave 3, MIDI adds the calls at the tick and
+drain points of `sched/runtime.rs`:
+- drain `MidiInHost` into `cc` cells and live `midi-notes` events;
+- close `NoteInstance` records on `stop`/`hush`;
+- apply the clock slave anchor, Start/Stop/Continue freeze and resume,
+  and clock-loss freewheel;
+- emit clock-master output.
+
+MIDI is the only wave-3 writer of `sched/runtime.rs` and `clock/`.
+NATIVE and WASM write only `host/native/`, `host/wasm/`,
+`examples/beep.rs` and `editor/`, and depend only on the
+`MidiInHost`/`MidiHost` traits, so the three wave-3 write sets are
+disjoint. No hook trait is added, because only one caller exists.
+
+**Verification.** The 6.5.7 evidence rule applies to every wave with
+`<plan>` = `be-<wave>`. The checks are `build`, `clippy`
+(`--all-targets -- -D warnings`), `fmt` (`--check`), `nextest`, `test`
+(plain `CARGO_TERM_QUIET=true cargo test`), `wasm32`,
+`wasm32-hostwasm` and `linecount` (largest `.rs` under 800); CONTRACTS
+adds `audit`, WASM adds `harness` (12.8.11), NATIVE adds
+`cargo build --example beep`. Rollback is `git revert` of the single
+implementation commit; nothing migrates.
 
 ## 13. Controller Binding (editor/runtime affordance, never syntax)
 

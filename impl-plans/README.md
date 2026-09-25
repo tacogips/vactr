@@ -40,10 +40,10 @@ Large features are split into multiple related plans with cross-references.
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
 | [vactrol-core.md](active/vactrol-core.md) | In Progress (TASK-001..003 completed 2026-09-25; TASK-004..010 not started) | design-docs/specs/design-implementation.md | 2026-09-25 |
-| [vactrol-frontend-value.md](active/vactrol-frontend-value.md) | Completed (FE-VALUE, TASK-001, wave 1; archiving awaits user confirmation) | design-docs/specs/design-implementation.md 5.1-5.4, 6.5.1-6.5.3 | 2026-09-25 |
-| [vactrol-frontend-reader.md](active/vactrol-frontend-reader.md) | Completed (FE-READER, TASK-002, wave 2; archiving awaits user confirmation) | design-docs/specs/design-implementation.md 5.7, 6.1-6.3, 6.5.4, 6.5.6 | 2026-09-25 |
-| [vactrol-frontend-expander.md](active/vactrol-frontend-expander.md) | Completed (FE-EXPAND, TASK-003, wave 3; archiving awaits user confirmation) | design-docs/specs/design-implementation.md 6.4, 6.5.5, 6.5.6 | 2026-09-25 |
-| [vactrol-frontend-finalize.md](active/vactrol-frontend-finalize.md) | Completed (FE-FINAL, serial reconciliation, wave 4; archiving awaits user confirmation) | design-docs/specs/design-implementation.md 6.5.7 | 2026-09-25 |
+| [vactrol-frontend-value.md](completed/vactrol-frontend-value.md) | Completed (FE-VALUE, TASK-001, wave 1; archived 2026-09-25) | design-docs/specs/design-implementation.md 5.1-5.4, 6.5.1-6.5.3 | 2026-09-25 |
+| [vactrol-frontend-reader.md](completed/vactrol-frontend-reader.md) | Completed (FE-READER, TASK-002, wave 2; archived 2026-09-25) | design-docs/specs/design-implementation.md 5.7, 6.1-6.3, 6.5.4, 6.5.6 | 2026-09-25 |
+| [vactrol-frontend-expander.md](completed/vactrol-frontend-expander.md) | Completed (FE-EXPAND, TASK-003, wave 3; archived 2026-09-25) | design-docs/specs/design-implementation.md 6.4, 6.5.5, 6.5.6 | 2026-09-25 |
+| [vactrol-frontend-finalize.md](completed/vactrol-frontend-finalize.md) | Completed (FE-FINAL, serial reconciliation, wave 4; archived 2026-09-25) | design-docs/specs/design-implementation.md 6.5.7 | 2026-09-25 |
 
 ## Completed Plans
 

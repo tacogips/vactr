@@ -3,7 +3,7 @@
 **planId**: ED-BIND (issue #5, TASK-010, wave 3; site enumeration and keys, overlay and source-edit writes, commit,
 mouse drag on literals, the slider panel, the directive control panel, CC routing and learn, ExternalFile persistence,
 mode-scoped saving, reactive display wiring)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 187; removed from the dispatch manifest by the session-188 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.6, 15.1.4 (stale handling, rate), 15.1.12
 (criteria 2, 3, 5, 6, 7, 8, 10); 13, 13.5 (BindingKey, write-back, learn); 14.5.5, 14.5.6, 14.5.8 (the
 `<doc>.bindings.json` format); design-docs/specs/command.md; design-docs/user-qa/pending-editor-questions.md E4
@@ -205,13 +205,72 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4 and E0-E5, plus:
 
 ## Completion Criteria
 
-- [ ] Items 1-9 implemented
-- [ ] Required tests pass (criteria 2, 3 slider/learn, 5, 6, 7, 8, 10 bindings half)
-- [ ] Common rows and B1 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-9 implemented
+- [x] Required tests pass (criteria 2, 3 slider/learn, 5, 6, 7, 8, 10 bindings half)
+- [x] Common rows and B1 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-BIND implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 187, ED-BIND implementer)
+
+**Tasks Completed**: items 1-9 and every required test file. Evidence: `tmp/ed-editor-20260926-s186/ED-BIND/attempt-1/`
+(`intent.md`, `notes.md`, `pre-edit-hashes.txt`, `post-edit-hashes.txt`, `final-hashes.txt`).
+
+**Implementation**:
+- `sites.ts`: `SiteTable` of bindings with stable `bindingId`s. A fresh `eval-result` re-keys in two passes: a clean
+  span mapping first (a keyed binding landing on a same-family key with a new ordinal MIGRATES), then keyed bindings by
+  key; otherwise `unbound`, or `stale` when the mapping was touched; dropped at the second miss unless it carries an
+  overlay or an ExternalFile entry. `bindings.sites` update by id, then span, then key, in the session's current
+  revision (`DocSync.baseRevision`, since the session remaps spans on `doc-changed`); unmatched bindings of a
+  recomputed form become `unbound`.
+- `write.ts`: `SiteWriter` implements `BindApi`; `writeSite` is the one write path (slider, drag, CC and later
+  ED-PARAMS handles). OVERLAY sends `set-tweak`; SOURCE-EDIT and `commit` verify the text at the mapped span against the
+  last-known literal, format it (integer / at most 6 decimals keeping a `.` / stepped), dispatch one CodeMirror change,
+  then `eval` the owning form's span; one eval in flight per form, latest values re-applied after the reply. In-flight
+  slots keep the evaluated form span because the writer's own edit touches the `eval-result` form mapping.
+  `stale-binding` reasons handled as the plan states. Tier badges "next cycle" / "re-evaluate to hear".
+- `drag.ts`: `DragController` (pointer-down on a bound literal, vertical drag, ParamMeta range/curve else 1% of
+  max(|v|, 1) per px, 3 px click slop) writing through `BindApi.writeSite`; the overlay widget `StateField`.
+- `panel.ts`: slider rows grouped by origin plus value displays per name; each row subscribes to its own
+  `site:<id>`/`name:<n>` keys; the table's store subscription is registered first so a batch re-keys before rows
+  repaint; a whole `eval-result` is one rebuild from the client listener.
+- `directives.ts`: control panel grouped by label or line, entry markers for directive lint codes, the persistence mode
+  select and Save; ExternalFile mode renders the set.
+- `routing.ts`: CC routing (directive `bindings` by key, else span containment plus `call.param`; `ch`, file default,
+  omni otherwise; mappings learned since the last `eval-result`; ExternalFile through the set), 0..127 scaling, learn in
+  both modes, verified `directive-edit` application (declined outside Directive mode, per E4).
+- `persistence.ts`: `EditorBindingSet` in the 14.5.8 format (keys or `{span, param}`, overlays kept, atomic
+  `renameAll` for ordinal migrations), unknown `v` ignored with a notice; `Persistence` mode with the panel snapshot on
+  switching into ExternalFile. `save.ts`: mode-scoped save through `deps.files`.
+- `mount.ts`: `BindArea` wires the store, client (`eval-result`, `bindings`, `stale-binding`, unsolicited
+  `directive-edit`), the drag/overlay extensions via `StateEffect.appendConfig`, `deps.midi` polled every 500 ms (it
+  appears only after the user enables MIDI) and sets `deps.bind`. `bind.css` is loaded as a Vite asset URL.
+
+**Tests** (`editor/test/bind/`, all on `RecordingTransport` with scripted fixtures): write (criterion 2), drag, panel
+(criterion 3), directives (criterion 5), save (criterion 6, two mode tests), multisite (criterion 7), reactive
+(criterion 8, all twelve 14.5.5 batch shapes plus a re-keying batch, render counters and a render-history spy),
+reconcile (criterion 10 bindings half), routing, persistence, sites: 11 files, 74 tests.
+
+**Verification** (session 187, logs under `target/fe-logs/`, all `exit=0`, run after the final code change):
+- V1 `ed-bind-build-s187-1.log`; V2 `ed-bind-clippy-s187-1.log`; V3 `ed-bind-nextest-s187-1.log` (989 run, 989
+  passed, 2 skipped); V3t `ed-bind-cargotest-s187-1.log` (lib 968 passed + cli 9 + directive_fixtures 2 +
+  spec_fixtures 10 = 989 passed, 0 failed); V7 `ed-bind-fmt-s187-1.log`; V6a `ed-bind-wasm32-s187-1.log`; V6b
+  `ed-bind-wasm32-hostwasm-s187-1.log`; V6c `target/ed-wasm/ED-BIND.wasm` copied; V4 `ed-bind-rs-lines-s187-1.log`
+  (max 799 lines, `src/dsp/build.rs`).
+- E0 `ed-bind-node-s187-1.log` (node v26.9.0, npm 11.19.1); E1 `ed-bind-npm-ls-s187-1.log`; E2
+  `ed-bind-npm-check-s187-1.log`; E3 `ed-bind-npm-test-s187-1.log` (43 files, 256 tests passed); E4
+  `ed-bind-npm-build-s187-1.log`; E4c `ed-bind-dist-check-s187-1.log`; E5 `ed-bind-ts-lines-s187-1.log` (max 447 lines,
+  `editor/test/bind/fixtures.ts`).
+- B1 `ed-bind-own-s187-1.log`: 11 test files, 74 tests passed.
+
+**Notes**:
+- No Rust file was touched; no file outside this plan's writePaths was edited.
+- The reorder-migration test uses an insertion before the same-named sites (every literal maps cleanly, ordinals
+  shift); a reorder that retypes a literal leaves that binding STALE for re-confirmation, per 14.5.8.
+- Directive-mode ordinal rewriting in `#@` text on reorder stays with the session (its scripted table supplies the
+  migrated keys); the editor migrates its own ExternalFile set keys.
 
 ## Related Plans
 

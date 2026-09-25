@@ -3,7 +3,7 @@
 **planId**: ED-FINAL (issue #5, TASK-010, wave 5; the join integrity check, real-wasm criterion tests over G1-G6,
 `app/main.ts` wiring fixes, full-tree verification, TASK-010 checkboxes with evidence, pending manual gates, plan
 statuses, README updates, commit staging list and message)
-**Status**: Ready
+**Status**: In Progress (the session-187 blocker, ED-CODE `editor/src/code/highlight.ts` reading `playing.dur` as cycles, was repaired by the operator before session 188; re-dispatched alone in session 188 to re-run items 5-10)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.12, 6.5.7; impl-plans/active/vactrol-core.md
 TASK-010; design-docs/user-qa/pending-editor-questions.md E1-E5
 **Created**: 2026-09-26
@@ -151,7 +151,7 @@ V2l, V9, X1 (see `vactrol-editor-wasm.md`) and T0-T5 (see `vactrol-editor-tauri.
 
 ## Completion Criteria
 
-- [ ] Join integrity recorded; every mismatch explained
+- [x] Join integrity recorded; every mismatch explained
 - [ ] `criteria.test.ts` and `packages.test.ts` pass against the real artifact
 - [ ] All rows pass with logs cited (T1 may be BLOCKED only under E1, stated as a gap)
 - [ ] `vactrol-core.md` TASK-010 criteria checked with evidence, manual gates PENDING USER CONFIRMATION, status set
@@ -162,6 +162,63 @@ V2l, V9, X1 (see `vactrol-editor-wasm.md`) and T0-T5 (see `vactrol-editor-tauri.
 
 (Implementer: add one `### Session: <date> (session <S>, ED-FINAL implementer)` entry. Edit only this log and the
 bookkeeping files above.)
+
+### Session: 2026-09-26 (session 187, ED-FINAL implementer)
+
+**Tasks Completed**: items 1-5. Items 6-10 were deliberately NOT done because of the blocker below. Evidence:
+`tmp/ed-editor-20260926-s186/ED-FINAL/attempt-1/` (join-integrity.txt, notes.md, intent.md, run.sh, pre/post/final
+hashes, highlight-unit-probe.txt). Logs: `target/fe-logs/ed-final-<check>-s187-1.log`.
+
+- Item 1: join-integrity.txt. The only mismatches are the six scaffold `mount.ts` stubs, replaced by their owners
+  (each owner's hashes verify OK), and five plan files changed by checkpoint 1c02480 (`git diff HEAD` empty). There is
+  no unexplained drift.
+- Item 2: `editor/test/wasm/criteria.test.ts` (547 lines, 9 tests, node env, real artifact). It covers:
+  - criterion 1: `doc_revision` 1 and a lookahead-bounded emission time for every event, spans through a non-ASCII
+    line, and `HighlightScheduler` + `DocumentSync` on a `MockClock`;
+  - criterion 2: a direct write goes out as a cell batch with no eval-result or pass, and the next site table
+    carries it; a reeval write gives one `bindings` batch with a new `form_gen`, then `stale-form-gen`;
+    `doc-changed` then write gives `edit-invalidated`;
+  - criterion 3 sites: the three origins, the `lpf` call fields, and an inst-default write with no eval-result,
+    no stale-binding and no inst rebuild;
+  - criterion 11: the `osc > rotate` program only at the boundary, then compiled and drawn by `GlRenderHost` over
+    `RecordingGL`; the `text "hello"` asset rasterized; the broken chain `rotate "a"` gives a form failure, no o0
+    program, and the old program keeps drawing;
+  - `session_check`: a type error changes nothing that plays.
+- Item 3: `editor/test/wasm/packages.test.ts` (192 lines, 3 tests) runs ED-PKG over the real core:
+  - the pane lists the unlocked import, import fetches list/toml/zip, and the next eval loads `pads.level = 42`;
+  - a traversal zip shows `package-integrity` in the pane;
+  - `restorePackages` with a tampered stored body gives `package-integrity` and deletes the lock and body.
+- Item 4: no wiring fix is needed. A throwaway jsdom smoke test mounted all six real areas without errors
+  (notes.md 2). `app/main.ts` and `app/layout.ts` are unchanged.
+- Item 5 (serial, in order): the corrective `--lib` host-wasm row runs before V6c, per the ED-WASM precedent.
+  `ed-final-artifact-after-v6b` shows the stub (4 exports); `ed-final-v6c-copy` shows ED-FINAL.wasm with 48 exports,
+  `session_init`, identical to `deps/vactrol.wasm`.
+
+**BLOCKER (dependency, outside ED-FINAL writePaths)**: `editor/src/code/highlight.ts` (ED-CODE) `durSeconds()`
+treats `playing.dur` as cycles. The Rust wire sends beats (`src/session/publish.rs:297` `dur_beats`), and ED-PARAMS
+`grid.ts`/`roll.ts` already read it as beats. Every highlight therefore lasts 4x its step.
+- Failing test: `criteria.test.ts` "HighlightScheduler on the mock clock activates exactly the playing step"
+  (`[0.62, ':bd,:sd']` vs `[0.62, ':sd']`).
+- The same test passes when the scheduler's tempo is overridden to beats_per_cycle 1 (highlight-unit-probe.txt).
+- Repair: `durSeconds` = beats * 60 / bpm, and the matching `editor/test/code/highlight.test.ts` expectations.
+- Resume: after the repair (integration review: redispatch ED-CODE, or repair in place), re-run ED-FINAL items 5-10.
+
+**Verification** (exit codes from the logs):
+- Pass (exit=0): build, build-lsp, clippy, clippy-lsp; nextest (1007 run, 1007 passed, 1 skipped); cargotest
+  (lib 986, cli 9, directive_fixtures 2, spec_fixtures 10 + 1 ignored); fmt; wasm32; wasm32-hostwasm;
+  wasm32-hostwasm-lib; v6c-copy; rs-lines (max 799); tree and tree-hostwasm (clean); clippy-wasm32 (X1); node
+  (v26.9.0 / npm 11.19.1); npm-ci; npm-check; npm-build (`VACTROL_REQUIRE_SESSION_ABI=1`); dist-check; ts-lines
+  (max 547); tauri-fetch, tauri-check, tauri-fmt, root-cargo-untouched, tauri-perms (`true`), tauri-status
+  (`target/`, `gen/` ignored); session (F2: 233 passed); lsp-smoke (F3: 1 passed); fixtures (F4: 10 passed);
+  frozen (F5); git-status (F6: node_modules, dist and src-tauri/target ignored only); manifest-json (F7).
+- **FAIL: npm-test** (exit=1; 54 files, 336 tests: 335 passed, 1 failed) and **wasm-tests** (F1, exit=1; 3 files,
+  20 tests: 19 passed, 1 failed). The only failure is the blocker test above.
+- F8 `getusermedia` prints the comment line `editor/src/visual/meters.ts:6` (a doc comment saying there is no
+  `getUserMedia`, the same as reconcile-s186-2), not `none`. The code-only check `ed-final-getusermedia-code` prints
+  `none` (exit=0).
+
+**Not done (blocked)**: the TASK-010 checkboxes and status in `vactrol-core.md`, `impl-plans/README.md`, the
+`README.md` Editor section, the ED plan statuses and closing notes, and the commit staging list and message.
 
 ## Related Plans
 

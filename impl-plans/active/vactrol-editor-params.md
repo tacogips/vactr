@@ -3,7 +3,7 @@
 **planId**: ED-PARAMS (issue #5, TASK-010, wave 4; parameter editors opened from `site.call` groups by
 `manifest.editors` kind, handles writing through `BindApi.writeSite`, the sampler waveform editor, the step grid and
 piano roll as displays with no write-back path)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 187; removed from the dispatch manifest by the session-188 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.7, 15.1.2 G2/G3, 13.5 ("DAW-style parameter
 editors", sampler requirements, "Sequences are code-only"), 15.1.12 (criteria 4 and 9);
 architecture.md Editor Requirements (Decided); design-docs/specs/command.md "call", "editor-decl"
@@ -159,13 +159,78 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4 and E0-E5, plus:
 
 ## Completion Criteria
 
-- [ ] Items 1-6 implemented
-- [ ] Required tests pass (criteria 4 and 9)
-- [ ] Common rows and P1-P2 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-6 implemented
+- [x] Required tests pass (criteria 4 and 9)
+- [x] Common rows and P1-P2 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-PARAMS implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 187, ED-PARAMS implementer)
+
+**Tasks Completed**: items 1-6 and all eight required test files. Dependency admission: ED-BIND is in the runtime
+`acceptedPlanIds`; `VisualApi.mountSpectrum` (ED-VISUAL) is present. Evidence:
+`tmp/ed-editor-20260926-s186/ED-PARAMS/attempt-1/` (`intent.md`, `notes.md`, `base-commit.txt`, `pre-edit-hashes.txt`,
+`post-edit-hashes.txt`, `final-hashes.txt`, `run.sh`).
+
+**Implementation**:
+- `open.ts`: `callGroups(sites, forms)` groups by (form, call name, head, ordinal) with a stable id
+  `<form>:<name>:<ordinal>`; `editorFor` returns the manifest kind, `scalar` for no entry or an unknown kind;
+  `bindHandles` binds by `call.param`, then by `call.arg` into `decl.params`, null when missing; `siblings` (the chain);
+  `offersSampler` (sampler controls also get a "waveform" button).
+- `curves.ts`: linear/log/stepped unit mapping with quantization (integer on stepped, 6 decimals otherwise), plus the
+  display math (bells/shelves, filter response, soft-knee transfer, LFO shapes, euclid pattern, beat snap, peaks).
+- `handles.ts`: `Handle {param, siteId, range, curve, unit}`; `set`/`drag`/`setUnit` call ONLY
+  `deps.bind.writeSite`, `learn` ONLY `deps.bind.learn`; a null or unknown site is disabled with "not in code" and
+  sends nothing. The last written value is shown while the site value is unchanged (overlay) and dropped once the
+  literal re-evaluates to another value. Shared kind scaffolding: canvas surface (null-context safe), draggable nodes
+  (applied from the drag start; unmoved axes are not written), handle rows with learn buttons, `KindCtx`.
+- Kinds: `eq` (bands by `ParamMeta.group`, freq x gain nodes, q on the wheel, summed curve; spectrum via
+  `deps.visual.mountSpectrum(el, {bus})` from a `bus` sibling site, else `{}` = master), `filter`, `dynamics`
+  (threshold/ratio/knee, multiband crossover handles, input level from a bus `level` analyzer; no GR meter),
+  `envelope` (ADSR/perc/line stages), `delay` (time snaps to 1/4 beat of `tempo`), `reverb`, `stereo`, `lfo` (shape
+  from the call name, plus the chain's `range` sites), `wavetable`, `granular` (region over sample frames), `euclid`
+  (rotation wraps modulo steps, hits clamp to steps), `probability`, `length`, `xy` (pick any two sites of the group or
+  the file), `scalar`.
+- `sampler.ts`: waveform from `deps.code.samples.frames(bank, n)` ("no preview" otherwise); begin/end/loop handles;
+  `slice`/`chop`/`striate` count overlays; manual markers from a `slice` point list; a slice click writes k into the
+  SELECTED existing index literal (`n` or `slice` arg 1 in the same form) via `writeSite`, else a no-op with the hint
+  "select an index literal"; "browse" opens `samples.openBrowser(bank)`. No step add/remove/reorder API.
+- `grid.ts`, `roll.ts`: displays of `playing` events per slot within the current cycle; roll pitch read (display only)
+  from the source text at the mapped `src` span (`:a4`, `:c#3`, numbers; other text unpitched). No imports from
+  `bind/`, `protocol/client`, `params/handles` or `platform/files`; no input handlers.
+- `mount.ts`: `ParamsArea` in the right pane (call-group list with open/waveform buttons, the open editor, grid and
+  roll tabs); store subscriptions (`sites`, `manifest`, `levels`, `tempo`), client `eval-result` and `playing`; call-head
+  mark decorations in the code view whose click opens the editor (re-marked only from an `eval-result`). No ED-BIND file
+  edited. `params.css` is loaded as the other areas load theirs.
+
+**Deviations / decisions** (see `notes.md`):
+- The sampler reads the bank keyword (`s :bd`) read-only from the form text through `mapWireSpan` + the view (a
+  keyword has no numeric site); no write.
+- The editor-table test fixtures copy the ED-WIRE shape from command.md "editor-decl" and the core declarations
+  (`src/dsp/meta.rs`, `src/dsp/effects/eq.rs`, `src/dsp/ugen/catalog.rs`), because the ED-WIRE redispatch was writing
+  `src/session/editors.rs` concurrently.
+
+**Verification** (logs under `target/fe-logs/`, each ends with `exit=`):
+- Rust rows first ran while the ED-WIRE redispatch was mid-edit in `src/session/*`: `ed-params-build-s187-1.log` and
+  `ed-params-clippy-s187-1.log` exit=101 (missing `frontend.rs`, sibling files), `ed-params-build-s187-2.log`,
+  `ed-params-clippy-s187-2.log` exit=0, `ed-params-nextest-s187-1.log` exit=100 (1 failure in ED-WIRE's own new
+  `session::tests::editor_wire` test while it was being written). No ED-PARAMS file is Rust. Re-run after the Rust tree
+  was quiet for 5 minutes and compiling:
+- V1 `ed-params-build-s187-3.log` exit=0; V2 `ed-params-clippy-s187-3.log` exit=0; V7 `ed-params-fmt-s187-2.log` exit=0;
+  V3 `ed-params-nextest-s187-2.log` exit=0 (1007 run, 1007 passed, 1 skipped); V3t `ed-params-cargotest-s187-1.log`
+  exit=0 (lib 986, cli 9, directive_fixtures 2, spec_fixtures 10 + 1 ignored); V6a `ed-params-wasm32-s187-1.log`
+  exit=0; V6b `ed-params-wasm32-hostwasm-s187-1.log` exit=0; V6c copied to `target/ed-wasm/ED-PARAMS.wasm`; V4
+  `ed-params-rs-lines-s187-1.log` (largest `src/dsp/build.rs` 799 lines, not touched by this plan).
+- E0 `ed-params-node-s187-1.log` (node v26.9.0, npm 11.19.1); E1 `ed-params-npm-ls-s187-2.log` exit=0; E2
+  `ed-params-npm-check-s187-2.log` exit=0; E3 `ed-params-npm-test-s187-1.log` exit=0 (51 files, 316 tests passed); E4
+  `ed-params-npm-build-s187-1.log` exit=0 to `target/ed-dist/ED-PARAMS`; E4c `ed-params-dist-check-s187-1.log` exit=0;
+  E5 `ed-params-ts-lines-s187-1.log` (largest `.ts` 447 lines; `params/handles.ts` 394).
+- P1 `ed-params-own-s187-2.log` exit=0 (8 files, 60 tests passed); P2 `ed-params-p2-s187-2.log` prints `none`.
+
+**Pending (manual)**: dragging editor nodes and seeing the live spectrum in a real browser are manual checks; the
+automated proxies are `handles.test.ts`, `eq.test.ts`, `envelope.test.ts`, `sampler.test.ts` on RecordingTransport.
 
 ## Related Plans
 

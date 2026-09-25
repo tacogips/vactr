@@ -2,7 +2,7 @@
 
 **planId**: ED-TAURI (issue #5, TASK-010, wave 4; the standalone `editor/src-tauri/` crate wrapping the identical
 `editor/dist` frontend with a minimal allowlist)
-**Status**: Completed (implementation, session 186; formal review pending)
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 187; removed from the dispatch manifest by the session-188 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.11, 15, 17 (Tauri allowlist), 12.8.10 (version
 policy on Rust 1.83); design-docs/user-qa/pending-editor-questions.md E1
 **Created**: 2026-09-26
@@ -235,3 +235,39 @@ crate and the npm build do not read.
   `CARGO_TERM_QUIET=true cargo test` (record `testsRun`/`testsPassed`), in
   addition to `cargo check` of the shell crate. Leave `verificationGaps` empty;
   manual Tauri runs go under `residualRisks`.
+
+### Session: 2026-09-26 (session 187, ED-TAURI implementer, attempt 3: gate-evidence rerun)
+
+**Trigger**: the operator GATE EVIDENCE NOTE above; `reviewFeedback.findings` was empty. `dependsOn` is `[]` at rerun
+(ED-SCAFFOLD accepted outside the manifest by `session187Amendment`). Evidence:
+`tmp/ed-editor-20260926-s186/ED-TAURI/attempt-3/` (intent.md, pre-edit-hashes.txt, final-hashes.txt).
+
+- No source change. The seven `editor/src-tauri` files match `attempt-2/final-hashes.txt` byte for byte; only this
+  plan file changed (the operator note and this entry).
+- Verification on the shared tree (logs under `target/fe-logs/`, all on the session-187 source):
+  - V1 `ed-tauri-build-s187-1.log`: exit=0
+  - V2 `ed-tauri-clippy-s187-1.log`: exit=0
+  - V3 `ed-tauri-nextest-s187-1.log`: exit=0, 985 run, 985 passed, 1 skipped
+  - V3t `ed-tauri-cargotest-s187-1.log`: exit=0, 985 passed, 0 failed, 1 ignored (lib 964, cli 9,
+    directive_fixtures 2, spec_fixtures 10)
+  - V7 `ed-tauri-fmt-s187-1.log`: exit=0
+  - V6a `ed-tauri-wasm32-s187-1.log`: exit=0; V6b `ed-tauri-wasm32-hostwasm-s187-1.log`: exit=0
+  - V6c: `target/ed-wasm/ED-TAURI.wasm` copied (exit 0)
+  - V4: max `.rs` file is 799 lines (src/dsp/build.rs)
+  - E0: node v26.9.0, npm 11.19.1
+  - E1 `ed-tauri-npm-ls-s187-1.log`: exit=0
+  - E2 `ed-tauri-npm-check-s187-1.log`: exit=0
+  - E3 `ed-tauri-npm-test-s187-1.log`: exit=0, 32 test files, 182 tests passed, 0 failed
+  - E4 `ed-tauri-npm-build-s187-1.log`: exit=0, built to `editor/dist`; E4c: exit 0
+  - E5: max `.ts` file is 446 lines (editor/src/protocol/types.ts)
+  - T0 `ed-tauri-tauri-fetch-s187-1.log`: exit=0
+  - T1 `ed-tauri-tauri-check-s187-1.log`: exit=0 on cargo/rustc 1.83.0, after E4
+  - T2 `ed-tauri-tauri-fmt-s187-1.log`: exit=0
+  - T3: `git diff --exit-code -- Cargo.toml Cargo.lock` exit 0
+  - T4: prints `true`
+  - T5: `gen/` and `target/` show as `!!`; the crate dir shows as `??` (source uncommitted until the workflow commit)
+- PENDING USER CONFIRMATION (unchanged): `cargo tauri build` and running the app; automated proxies T1 + E4/E4c.
+- Still open for the operator: the attempt-2 design-amendment request for the 15.1.11 CSP, and the `cargo audit`
+  residual risk (quick-xml 0.38.4, time 0.3.45; fixes need Rust 1.88).
+- Siblings ED-WIRE and ED-BIND were in flight on the shared tree; every common row passed, so no sibling-caused
+  failure is recorded. ED-FINAL re-verifies the combined tree.

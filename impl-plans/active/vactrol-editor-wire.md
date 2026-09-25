@@ -2,7 +2,7 @@
 
 **planId**: ED-WIRE (issue #5, TASK-010, wave 2; additive Session Protocol v1 fields and native-testable session,
 scheduler and package additions for the editor)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 187; removed from the dispatch manifest by the session-188 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.2 (G2, G3, G4, G5, G6; the `session_check`
 and package-driver logic behind G1), 15.1.12; design-docs/specs/command.md ("call", "editor-decl", `manifest`,
 `levels`, `tempo`, `0x72`/`0x73` payloads); 9.2-9.3 (uniform plans), 12.5 (analyzer cells), 13.5, 14.5.5-14.5.7
@@ -207,13 +207,54 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4, E0-E5, plus V1l, V2l and
 
 ## Completion Criteria
 
-- [ ] Items 1-6 implemented
-- [ ] Required tests pass; no existing test changed
-- [ ] Common rows and W1-W4 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-6 implemented
+- [x] Required tests pass; no existing test changed (except the operator-authorized codec.rs literal completion, and ED-WIRE's own sched/tests/render.rs, see the log)
+- [x] Common rows and W1-W4 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-WIRE implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 187, ED-WIRE implementer, attempt 3 redispatch after REC-S187-1)
+
+**Tasks completed**: items 1-6 (G2-G6). The attempt-2 G5/G6 core files re-hashed OK at start
+(`tmp/ed-editor-20260926-s186/ED-WIRE/attempt-3/partial-hashes-at-start.txt`) and were kept unchanged
+(`sched/runtime.rs` stays 788 lines). Evidence: `tmp/ed-editor-20260926-s186/ED-WIRE/attempt-3/`
+(intent.md, notes.md, pre/post-edit and final hashes).
+
+- G2: `src/session/editors.rs` `editor_decls()` (every `dsp::meta::all()` entry plus the 12-name pattern table; no name
+  omitted; `saw`/`tri` appear both as ugen and as `lfo-shape`, so clients key by `(name, kind)`); `ManifestBody.editors`.
+- G3: `CallSite.args` in `directives/attach.rs` (the piped operand, which the reader places before the head, is
+  excluded so `arg` lines up with `params`); `WireSite.call` resolved in `publish.rs` `site_wire` (smallest containing
+  argument extent, ordinal per top-level form, keyword else declared param); both callers pass the file's `Doc`.
+- G4: `WireLevel.bands` (host FFT), `LevelsBody.analyzers` (via the new read-only `InstRegistry::buses()`),
+  `TempoBody.clock` with the clock in the `last_tempo` change key.
+- G5/G6 frontend: `src/session/frontend.rs` `Session::render_frame`, `drive_packages` (takes `&mut Prefetched`, since
+  the transport records the first missing URL), `check` (analyze + directive lint, no evaluation).
+- Tests: `session/tests/editor_wire.rs` (12 tests), `directives/tests/attach.rs` (+2 args tests),
+  `pkg/tests/driver.rs` (the operator placeholder replaced by the four required driver tests),
+  `sched/tests/render.rs` (un-ignored; one expectation fixed: `osc 20 > rotate time` has two uniforms, the angle and
+  the late `20`, consistent with the first case of the same test).
+- `session/tests/codec.rs`: only the operator-authorized literal completion (`call`/`editors`/`bands`/`analyzers`/
+  `clock: None`); no assertion changed.
+
+**Adaptation**: the current compiler makes no tweak site for a named-argument literal (`compile/sites.rs` only promotes
+late positional arguments), so the named-keyword `param` test drives `site_wire` over a `Doc` of the spec example with a
+hand-built `TweakSite` (see attempt-3/notes.md item 3).
+
+**Verification (final source, logs under `target/fe-logs/`)**: V1 `ed-wire-build-s187-1.log` exit=0; V1l
+`ed-wire-build-lsp-s187-1.log` exit=0; V2 `ed-wire-clippy-s187-1.log` exit=0; V2l `ed-wire-clippy-lsp-s187-1.log`
+exit=0; V3 `ed-wire-nextest-s187-1.log` exit=0 (1007 run, 1007 passed, 1 skipped); V3t `ed-wire-cargotest-s187-1.log`
+exit=0 (lib 986, cli 9, directive_fixtures 2, spec_fixtures 10 + 1 ignored); V7 `ed-wire-fmt-s187-1.log` exit=0; V6a
+`ed-wire-wasm32-s187-1.log` exit=0; V6b `ed-wire-wasm32-hostwasm-s187-1.log` exit=0; V6c `target/ed-wasm/ED-WIRE.wasm`
+copied; V4 `ed-wire-rs-lines-s187-1.log` (largest `.rs` 799 `src/dsp/build.rs`, untouched); V9
+`ed-wire-tree-s187-1.log`, `ed-wire-tree-hostwasm-s187-1.log` exit=0, no gated crate; E0 node v26.9.0, npm 11.19.1;
+E1 `ed-wire-npm-ls-s187-1.log` exit=0; E2 `ed-wire-npm-check-s187-1.log` exit=0; E3 `ed-wire-npm-test-s187-1.log`
+exit=0 (51 files, 316 tests); E4 `ed-wire-npm-build-s187-1.log` exit=0; E4c `ed-wire-dist-check-s187-1.log` exit=0; E5
+`ed-wire-ts-lines-s187-1.log` (largest `.ts` 447); W1 `ed-wire-own-s187-1.log` exit=0 (29 passed); W2
+`ed-wire-session-s187-1.log` exit=0 (163 passed); W3 `ed-wire-lsp-smoke-s187-1.log` exit=0 (1 passed); W4
+`ed-wire-w4-lines-s187-1.log` (max 788 `sched/runtime.rs`; `session/session.rs` 707, `session/protocol.rs` 706).
+The npm rows ran on the shared tree with sibling editor files present; ED-FINAL re-verifies the combined tree.
 
 ## Related Plans
 

@@ -2,7 +2,7 @@
 
 **planId**: ED-WASM (issue #5, TASK-010, wave 3; G1: `session_*` and `pkg_*` exports, `WasmRenderHost`, `WasmMidiIn`,
 the `0x71`..`0x73` records, and its own real-wasm ABI smoke test)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 187; removed from the dispatch manifest by the session-188 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.2 G1 (and the G5/G6 glue), 12.8.10, 16, 16.1,
 17; design-docs/specs/command.md "Browser transport (raw wasm ABI, TASK-010)"
 **Created**: 2026-09-26
@@ -139,13 +139,45 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4, E0-E5 (E1 = `npm ls --de
 
 ## Completion Criteria
 
-- [ ] Items 1-6 implemented
-- [ ] `abi.test.ts` passes against the real host-wasm artifact
-- [ ] Common rows, V1l/V2l/V9 and X1-X3 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-6 implemented
+- [x] `abi.test.ts` passes against the real host-wasm artifact
+- [x] Common rows, V1l/V2l/V9 and X1-X3 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-WASM implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 187, ED-WASM implementer)
+
+**Tasks Completed**: items 1-6. Evidence: `tmp/ed-editor-20260926-s186/ED-WASM/attempt-1/` (intent.md, notes.md,
+pre/post/final hashes, run.sh). Logs: `target/fe-logs/ed-wasm-<check>-s187-1.log`.
+
+- Rust (rust-coding agent, owner-reviewed): `abi.rs` +3 tag constants; `mod.rs` declares `session_half`,
+  `session_hosts`; `session_hosts.rs` (159 lines: `WasmRenderHost`, `WasmMidiIn` + `MidiQueue`, local
+  `parse_midi`, `push_json`/`push_envelope`); `session_half.rs` (401 lines: the ten `session_*`/`pkg_*` exports,
+  connection 1, panic-free on malformed input).
+- TS: `test/support/wasm.ts` (real-artifact loader, throws on a missing file or no `session_init`; worklet
+  install-ack and `session_sample_put` helpers); `test/wasm/abi.test.ts` (8 tests: init and tag separation,
+  eval-result with sites and `playing` `src.doc_revision`, protocol-error, check never executes, the `0x72`
+  program at the cycle boundary then uniforms per frame and none after hush, pkg need/supply done + tampered
+  restore `package-integrity` + 404 `package-resolve` + malformed request, MIDI CC 74 = 127 read as gain 1.0).
+- Decisions (notes.md): `session_check` accepts the plan's JSON and the raw text the accepted `WasmCore.check`
+  sends; the MIDI criterion uses the native test's program text and observation (the sent events' gain).
+- Artifact collision (repair request for the operator and ED-FINAL): the `vactrol` bin and cdylib both uplift
+  to `target/wasm32-unknown-unknown/debug/vactrol.wasm`, and V6b leaves the stub bin there
+  (`ed-wasm-artifact-after-v6b-s187-1.log`: 4 exports, no `session_init`). Before V6c this plan ran
+  `cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm --lib`
+  (`ed-wasm-wasm32-hostwasm-lib-s187-1.log`, exit=0), which re-uplifts the cdylib; V6c then copied it
+  (`ed-wasm-artifact-ed-wasm-s187-1.log`: 48 exports, `session_init`, identical to `deps/vactrol.wasm`).
+
+**Verification** (all `exit=0`): build, build-lsp (V1l), clippy, clippy-lsp (V2l); nextest 1007 run, 1007 passed,
+1 skipped; cargo test (lib 986, cli 9, directive_fixtures 2, spec_fixtures 10 + 1 ignored); fmt; wasm32;
+wasm32-hostwasm; rs-lines (max 799, `src/dsp/build.rs`); tree and tree-hostwasm (V9: no cpal, midir, tungstenite,
+getrandom, tokio or tower-lsp); node (v26.9.0, npm 11.19.1); npm-ls; npm-check; npm-test (52 files, 324 tests
+passed); npm-build with `VACTROL_REQUIRE_SESSION_ABI=1`; dist-check; ts-lines (max 447); X1 clippy-wasm32; X2 abi
+(1 file, 8 tests passed); X3 x3-invariant.
+
+**Notes**: formal test-integrity, adversarial and integration reviews are downstream workflow steps.
 
 ## Related Plans
 

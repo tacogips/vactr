@@ -1,7 +1,7 @@
 # Vactrol Middle End: Pattern Engine, Signals, Clock, Visual Chains (ME-PATTERN) Implementation Plan
 
 **planId**: ME-PATTERN (implements vactrol-core.md TASK-006 except the criteria that need the VM, which ME-INTEGRATE completes)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 9 (visual chains), 10.1 (representation, sample-region operators, "Sound first and the first-structure rule"), 10.2-10.5, 11.1, 11.7 (`midi-notes` after `s`, input lane, `cc`, `:midi` clock), 7.1.2, 7.1.3 (Query VM handle, Input cells), 7.1.4 (chords, `grid`, overloads, sound kit), 7.1.5; design-music.md sections 1-3; design-visual.md
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -138,21 +138,141 @@ The ME-MASKS table and log rule with `<plan>` = `pattern`: V1, V2, V3, V3t, V3f,
 
 ## Completion Criteria (map to vactrol-core.md TASK-006)
 
-- [ ] Step-list and mini-notation equivalence goldens pass
-- [ ] `euclid 3 8`, `maybe`, `choose`, `degrade-by` reproducible and pure
-- [ ] Sample-region goldens and the full cover-equivalence matrix pass
-- [ ] Mixed valid/failing queries keep siblings and record origin-carrying faults
-- [ ] SOUND FIRST / first-structure goldens and `kit:` resolution tests pass
-- [ ] `MidiNotes` / input-lane walk tests, `Sig::Cc`/`Sig::Analyzer`, and the `:midi` clock anchor test pass
-- [ ] Visual goldens (shader source, `TextAsset`, uniforms, render-safe `ShaderDesc`) pass
-- [ ] V1-V8 pass with logs cited; `final-hashes.txt` written
+- [x] Step-list and mini-notation equivalence goldens pass (`src/pattern/tests/steps.rs`, 14 tests)
+- [x] `euclid 3 8`, `maybe`, `choose`, `degrade-by` reproducible and pure (`src/pattern/tests/random.rs`, 5 tests)
+- [x] Sample-region goldens and the full cover-equivalence matrix pass (`region.rs` 6 tests, `cover.rs` 4 tests)
+- [x] Mixed valid/failing queries keep siblings and record origin-carrying faults (`faults.rs`, 7 tests)
+- [x] SOUND FIRST / first-structure goldens and `kit:` resolution tests pass (`sound.rs`, 9 tests)
+- [x] `MidiNotes` / input-lane walk tests, `Sig::Cc`/`Sig::Analyzer`, and the `:midi` clock anchor test pass
+  (`input.rs` 6, `signals.rs` 4, `src/clock/tests/clock.rs` 4)
+- [x] Visual goldens (shader source, `TextAsset`, uniforms, render-safe `ShaderDesc`) pass (`src/tex/tests/`, 12 tests)
+- [x] V1-V8 pass with logs cited; `final-hashes.txt` written (session 177 progress log)
 
 ## Progress Log
 
 (Implementer: one entry per session: work done, design differences, hash/intent paths, evidence per row, blockers.)
+
+### Session: 2026-09-25 (session 177, ME-PATTERN implementer)
+
+**Tasks Completed**: every ME-PATTERN deliverable.
+- `src/pattern/`: `pat.rs` (`Pat`, `PatNode`, `PParam`, `SliceCuts`, structural node ids), `step.rs` (`Step`, step lists,
+  squeeze, `Pure`), `query.rs` (`TimeSpan`, `Event`, `Controls`, `QueryResult`, `query`, dispatch), `occ.rs` (`OccKey`),
+  `rng.rs` (splitmix hash RNG), `signal.rs` (`Sig`), `eval.rs` (`QueryVm`, `QueryCtx`, `InputCells`, `AnalyzerId`,
+  `HostSig`, parameter evaluation, bounds), `build.rs` (`pure`, `signal`, `pattern_of`, `param_of`, `alt`,
+  `midi_channel`), `combinators/{mod,time,structure,random,region,music,control,input,sound}.rs` (builders and queries
+  for the whole TASK-006 vocabulary), `tests/{mod,stub_vm,steps,combinators,random,region,cover,sound,input,signals,faults}.rs`.
+- `src/clock/`: `tempo.rs` (`Tempo`, exact cps), `clock.rs` (`Clock` with piecewise-linear anchors, `ClockSource`,
+  `MidiClockSync` for `:midi`), `tests/clock.rs`.
+- `src/tex/`: `texnode.rs` (`TexNode`, `TexKind`, `BlendOp`, `ModKind`, `VParam`, `pipe`, the M1 `scale_texture` /
+  `shape_source` builders; `OutId` kept), `shader.rs` (`ShaderDesc`, `TextAsset`, `compile_tex`: GLSL ES 3.0 from a
+  fixed 39-operator snippet library), `uniforms.rs` (`UniformPlan`, `UniformSpec`, `Uniforms`, `resolve_uniforms`),
+  `tests/{mod,goldens}.rs`. Written by a rust-coding subagent under this plan's write scope and reviewed here.
+- sharedPaths: `src/lib.rs` gains exactly `pub mod clock;` (crate doc untouched); `src/pattern/mod.rs` and
+  `src/tex/mod.rs` declare the new modules.
+
+**Design and plan differences** (design 10.1 wins; ME-INTEGRATE should read these):
+- `Pat` has a fourth field `id: NodeId`, a structural hash of the node, so a rebuilt identical pattern keeps its random
+  draws and occurrence keys. It is the "node id" of 10.2/10.3.
+- `PatNode` concrete shapes: `Control(name, value, subject)`, `Grid(subject, bools)`, `Euclid(subject, k, n, rot)`,
+  `ScaleNotes(root, name, subject)`, `Chord(chord values, subject)`, `Voicing(subject)`, `Arp(subject, mode)`. Added:
+  `Pure(Step)` (one atomic value per cycle, so a chord list `[:c :m7]` is not subdivided), `Hurry`, `Maybe`, `Choose`,
+  `Hold`, `Repeat` (the step constructors the design names in prose). `alt` builds `Cat`. `sometimes`/`rarely`/`often`
+  are `SometimesBy` with 0.5/0.25/0.75.
+- `OccKey.path` is a `Vec` (no `smallvec`). `query` fills `anchor`/`cycle` at the end.
+- `QueryCtx` also carries `tempo: Tempo` (for `time`, `beat` and fault beats). Fault origins carry the node or step span
+  and the beat (`anchor * beats_per_cycle`); `slot` stays `None` until the scheduler fills it.
+- Parameter timing: structural parameters (`fast`, `iter`, `every`, `whenmod`, `chunk`, `euclid`, `segment`,
+  `repeat`, `off`) are read once for a constant and at each cycle start otherwise; per-event parameters (probabilities,
+  chop/ply/striate counts, slice cuts and index, `range` bounds, `arp` mode) at the event's `whole.begin`.
+- First-structure rule: the builders set `structured`; a `Control`/`Chord` query reads its CHILDREN's flags (fixed at
+  construction) to pick the mode. A control whose value has a rest at the subject onset drops the event (Tidal `#`).
+- `slice`/`splice` with a structured index list on an unstructured subject take the structure from the index (the
+  first-structure rule applied to the list, needed for design-music `s :break > slice 8 [0 2 4 7]`); otherwise timing
+  is unchanged and the index is sampled at `whole.begin` (10.1).
+- Region controls are exact `Value::Ratio` `begin`/`end` (chop composes with an existing region). The commit-time rate
+  fit is the `speed-fit` marker control (`[:splice fraction cycles]`, `[:fit cycles]`, `[:loop-at n]`) resolved by
+  `SpeedFit::resolve(sample_seconds, cycle_seconds)`; `loop-at` also sets `loop 1` and the full region.
+- A bank (a list of sounds from the kit) is picked by `n` (default 0) when `query` finalizes, so the `n` control may come
+  after `s`. An index outside the bank is event-local `slice-index`.
+- `sometimes-by` draws independently on the original and the transformed events (not Tidal's complementary halves);
+  `off` applies `f` and then shifts. Both are equal for the documented examples.
+- Note numbers are `12 * octave + pitch class`, default octave 5 (`:c` = 60). `voicing` is close position with the first
+  tone in `[60, 72)`. `chord_pattern_of` reads a `[root quality]` list (also under `alt`/`choose`/`stack`) as ONE chord.
+- `input_lane_walk` returns `Result<LanePlan, LaneError { code, span: Option<Span>, message }>` (patterns built in tests
+  have no span). `realize_note(&Lane, &LiveNote, &mut QueryCtx) -> Result<Option<Event>, Failure>`; the realized event
+  has `whole = None`, `part = [at, at]`, `note` and `velocity` controls. `sometimes-by` on a lane runs the transform on
+  a one-note pattern.
+- `Sig::Lag` reads the inner signal (smoothing state belongs to the frame evaluator, TASK-007/010);
+  `Sig::MapRange(Rc<Sig>, f64, f64)`; `Sig::Ctrl`/`Hits` read telemetry cells in `InputCells`.
+- Bounds (7.1.5): query tree depth 256, 64 nested re-entries (VM calls and point samples), 1,000,000 work units per
+  query; each is a fault (`depth-exceeded`, `fuel-exhausted`), never a panic or a hang.
+- `Clock::set_tempo` fails with "clock is external" when slaved; 64 anchors are kept. `ClockSource::Link` is
+  represented, `is_available()` is false (the diagnostic is the checker's).
+- `tex`: `resolve_uniforms(plan, frame_time: Ratio64 /* cycles */, cx) -> Result<Vec<(String, f32)>, Failure>` (the first
+  failing uniform fails the frame; the renderer keeps the previous values). Each spec is forced exactly once per call.
+  Const params are inlined; every other `VParam` is `u0, u1, ...`. Text sources use `u_text<id>` samplers and
+  `src oN` uses `u_outN`. Host builtins `time` and `resolution` are not in `uniform_names`. Composition order is
+  geometry and modulate ops on the coordinate, then color and blend ops on the color (Hydra's shape, simplified).
+  "A failing chain leaves the previous program in place" is the slot table's activation (TASK-007); here a failing
+  chain is an `Err` from `compile_tex` (tested).
+- Deferred to ME-INTEGRATE, as planned: `PParam::Late` through a real VM (the stub cannot build a `VarSlotRef`), the
+  tweaked-probability re-query, a session `sound-kit` heard through `Vm`, and the native wrappers.
+
+**Evidence** (`tmp/me-middle-20260925-s175/ME-PATTERN/attempt-1/`): `pre-edit-hashes.txt`, `intent.md`,
+`post-edit-hashes.txt`, `inline-checks.txt`, `owned-rs.txt`, `final-hashes.txt`. Drift event: while this plan ran, a
+concurrent worker outside ME-PATTERN rustfmt-reformatted several `src/pattern`/`src/clock` files (whitespace only; the
+tex subagent confirmed it ran no formatter). The content was intact and every test still passed; no reapply was needed.
+While other plans' files were mid-edit, compile checks ran in `tmp/.../ME-PATTERN/scratch` (their files reverted to
+HEAD there); the rows below ran on the real shared tree.
+
+**Verification** (session 177, real tree, default target dir):
+- V1 `target/fe-logs/pattern-build-s177-2.log`: `exit=0`, no warnings.
+- V2 `target/fe-logs/pattern-clippy-s177-4.log`: `exit=0`. Runs 1-3 (`pattern-clippy-s177-{1,2,3}.log`, `exit=101`)
+  failed only on `needless_return` in ME-VM's in-progress `src/vm/vm.rs:304-320`. Per the edit protocol that file was
+  not touched; the scratch copy showed ME-PATTERN's files clippy-clean, and run 4 passed once ME-VM fixed its file.
+- V3 `target/fe-logs/pattern-nextest-s177-2.log`: 400 run, 400 passed, 0 failed, `exit=0`.
+- V3t `target/fe-logs/pattern-cargotest-s177-2.log`: lib 392 passed, spec_fixtures 8 passed, 0 failed, `exit=0`.
+- V3f `target/fe-logs/pattern-fixtures-s177-2.log`: 8 run, 8 passed, `exit=0`.
+- V6a `target/fe-logs/pattern-wasm32-s177-2.log`: `exit=0`. V6b `target/fe-logs/pattern-wasm32-hostwasm-s177-2.log`: `exit=0`.
+- V4: largest in the tree `src/compile/compiler.rs` 770 (ME-VM); largest owned `src/tex/shader.rs` 571; all under 800.
+- V5: `none`. V7: empty (no dependency change). V8: `rustfmt --edition 2021 --check` on the 40 owned `.rs` files
+  (`owned-rs.txt`), exit 0.
+- Earlier n=1 rows (`pattern-{build,nextest,cargotest,fixtures,wasm32,wasm32-hostwasm}-s177-1.log`, all `exit=0`) ran
+  before a final doc-comment-only edit in `src/clock/mod.rs`; the n=2 rows above are the counting logs.
+- Owned test counts: pattern 64 (`steps` 14, `combinators` 9, `random` 5, `region` 6, `cover` 4, `sound` 9, `input` 6,
+  `signals` 4, `faults` 7), clock 4, tex 12.
+
+**Blockers**: none owned by this plan. Formal review, ME-INTEGRATE and the workflow commit are downstream.
 
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-006)
 - **Previous**: vactrol-middle-masks.md, vactrol-middle-frontend.md
 - **Next**: vactrol-middle-integrate.md
+
+### OUTPUT CONTRACT NOTE (operator, 2026-09-25, after the ME-PATTERN attempt-1 failure)
+
+- `planId` belongs ONLY in the step6-implement output payload. The
+  step6-test-integrity-check and step7-adversarial-review outputs MUST NOT
+  contain `planId` (their contracts reject additional properties; ME-PATTERN
+  attempt 1 failed with "output contract $.planId additional property is not
+  allowed" after a green gate).
+- The adversarial-review output MUST contain the `findings` array (empty when
+  none) and the integration-review output MUST contain `needs_revision`.
+
+### Session: 2026-09-25 (session 178, attempt-2 re-verification)
+
+**Context**: step6 redispatch after attempt 1 was rejected by a later step's output contract (`$.planId` additional
+property). No implementation defect was reported, and the review feedback is empty.
+**Source changes**: none. `shasum -a 256 -c attempt-1/final-hashes.txt` matches every owned source file; only this plan
+document differs (operator note plus this entry). Evidence: `tmp/me-middle-20260925-s175/ME-PATTERN/attempt-2/`
+(`intent.md`, `pre-verify-hashes.txt`, `final-hashes.txt`). No drift occurred during verification.
+**Verification** (combined tree with ME-CHECK and ME-VM present, all `exit=0`):
+- V1 `target/fe-logs/pattern-build-s178-1.log`; V2 `pattern-clippy-s178-1.log`.
+- V3 `pattern-nextest-s178-1.log`: 409 run, 409 passed. V3t `pattern-cargotest-s178-1.log`: lib 401 passed, spec_fixtures
+  8 passed, 0 failed. V3f `pattern-fixtures-s178-1.log`: 8 run, 8 passed.
+- V6a `pattern-wasm32-s178-1.log`; V6b `pattern-wasm32-hostwasm-s178-1.log`.
+- V4: the largest file in the tree is `src/compile/compiler.rs` at 792 lines, and every file is under 800. V5: `none`.
+  V7: empty. V8: `rustfmt --edition 2021 --check` on the 40 owned files, exit 0. Owned tests (`cargo test --lib --
+  pattern:: clock:: tex::`): 80 passed.
+**Blockers**: none. Formal review, ME-INTEGRATE and the workflow commit are downstream.

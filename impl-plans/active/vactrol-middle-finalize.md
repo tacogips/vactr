@@ -113,3 +113,13 @@ The ME-MASKS table and log rule with `<plan>` = `final`: V1, V2, V3, V3t, V3f, V
 
 - **Parent**: impl-plans/active/vactrol-core.md
 - **Previous**: vactrol-middle-integrate.md
+
+### OUTPUT CONTRACT NOTE (operator, 2026-09-25, after the ME-PATTERN attempt-1 failure)
+
+- `planId` belongs ONLY in the step6-implement output payload. The
+  step6-test-integrity-check and step7-adversarial-review outputs MUST NOT
+  contain `planId` (their contracts reject additional properties; ME-PATTERN
+  attempt 1 failed with "output contract $.planId additional property is not
+  allowed" after a green gate).
+- The adversarial-review output MUST contain the `findings` array (empty when
+  none) and the integration-review output MUST contain `needs_revision`.

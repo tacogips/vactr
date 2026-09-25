@@ -1,7 +1,7 @@
 # Vactrol Middle End: Namespace, Compiler, Bytecode VM, Tweak Sites, Staging (ME-VM) Implementation Plan
 
 **planId**: ME-VM (implements the non-reactive part of vactrol-core.md TASK-005)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in session 177; removed from the dispatch manifest by the session-178 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.5 (forcing contract), 5.6 (VarRef load rules, scope model, tweak slots, form generations), 5.7 (PkgNs, lookup order), 7.1.1-7.1.6, 8 (bytecode, frames, failure), 10.4 (Query effect mode), 13 (tweak site tiers)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -145,20 +145,111 @@ The ME-MASKS table and log rule with `<plan>` = `vm`: V1, V2, V3, V3t, V3f, V6a,
 
 ## Completion Criteria (map to vactrol-core.md TASK-005)
 
-- [ ] Namespace with read-only prelude, session scope, child scopes and the 5.6/5.7 lookup order; `upd-immutable` on non-vars
-- [ ] Compiler (match via pattern ops, keyword args, splats, masks from `types/masks.rs`, path/url constants, `ListProv`, depth guard)
-- [ ] VM (frames, fuel, depth/re-entry limits, boundary forcing with `chase`, memo cells, Query mode, origin unwind)
-- [ ] All forcing-mask tests listed above pass (TASK-005 forcing criterion)
-- [ ] Package namespaces: `pads.warm` through `PkgNs`, lookup order, re-import replacement
-- [ ] Query effect mode tests pass
-- [ ] Failure cases unwind with origin and leave the session usable
-- [ ] Redefinition and `upd` observable through `VarRef` demand; `Direct`-tier tweak writes observable without re-eval
-- [ ] Staged effects released only on success
-- [ ] V1-V8 pass with logs cited; `final-hashes.txt` written
+- [x] Namespace with read-only prelude, session scope, child scopes and the 5.6/5.7 lookup order; `upd-immutable` on non-vars
+- [x] Compiler (match via pattern ops, keyword args, splats, masks from `types/masks.rs`, path/url constants, `ListProv`, depth guard)
+- [x] VM (frames, fuel, depth/re-entry limits, boundary forcing with `chase`, memo cells, Query mode, origin unwind)
+- [x] All forcing-mask tests listed above pass (TASK-005 forcing criterion; the real-`osc` case is ME-INTEGRATE's `integrate_tex.rs`)
+- [x] Package namespaces: `pads.warm` through `PkgNs`, lookup order, re-import replacement
+- [x] Query effect mode tests pass
+- [x] Failure cases unwind with origin and leave the session usable
+- [x] Redefinition and `upd` observable through `VarRef` demand; `Direct`-tier tweak writes observable without re-eval
+- [x] Staged effects released only on success
+- [x] V1-V8 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
-(Implementer: one entry per session: work done, design differences, hash/intent paths, evidence per row, blockers.)
+### Session 177 (2026-09-25), attempt 1: implemented
+
+**Work done**
+- `ns/`: `namespace.rs` (`VarSlot`/`VarSlotRef` with a process-unique id, `SlotKind {Let, Var, Fn, Tweak, Prelude}`,
+  `Prelude` with `register`/`register_custom`/`register_value`, `Namespace` with the 5.6 scope chain and the 5.7 lookup
+  order, `reserve` for forward references, `define`/`redefine`/`write_var`, `import`, `check_env`, `callee_mask` for the
+  `Forward` chase), `pkg.rs` (`PackageId`, `PkgNs`, `ImportBinding`), `tweak.rs` (`TweakSite`, `SiteTier`,
+  `SiteOrigin`, `TweakTable::write`), `stage.rs` (`SlotKey`, `StagedEffect`, `EffectBuffer`, `EffectSink`,
+  `RecordingSink`).
+- `compile/`: `compiler.rs` (`CompileCx`, `compile`, name resolution, expressions, calls, blocks, thunks, closures),
+  `matchc.rs` (match to pattern ops, or-patterns, guards, list/dict/variant/struct patterns, destructuring, lambdas,
+  `fn`/`inst`/`look`, `enum`/`struct` constructors), `proto.rs` (`FnProto`, `Closure` with memo cell, `Arity`, call/list
+  sites, `Shape`, the function builder and header parsing), `sites.rs` (tweak-site tiers; `let`/`var`/`upd`).
+- `vm/`: `ops.rs`, `vm.rs` (dispatch loop, run, fuel, Query mode guard, `ReadObserver`), `frame.rs` (frames, pending
+  calls, forcing, slot reads), `call.rs` (boundary forcing with `masks::chase`, memo cells, argument binding, natives,
+  re-entry, `NativeCx`), `natives/{mod,num,list,dict,value,console,effects}.rs` (66 core natives).
+- Tests (82 new): `vm/tests/{forcing,query_mode,failures,natives,tweak}.rs`, `ns/tests/{namespace,pkg,stage}.rs`,
+  `compile/tests/{compile,sites}.rs`, shared `Sess` harness in `vm/tests/mod.rs` (read -> expand -> compile -> run).
+
+**Design differences (the design wins; recorded here)**
+- Ops: `Call(u8)` for positional calls; `CallKw(site)` takes a call-site index (the positional/pair/splat layout, which a
+  splat makes dynamic) instead of `(u8, u8)`; `MakeList(site)` takes a list-site index (layout plus `ListProv`). Added
+  `LoadCapture`, `DefGlobal`, `UpdGlobal`, `UpdCell` (the plan's `UpdLocal`, generalized so a captured local `var` can be
+  updated), `MakeCell` (a local `var` is a local `VarSlot` cell), `MakeShape`, `TestShape`, `TestKey`, `TestLenMin`,
+  `TestTruthy`, `GetKey`, `Dup`. `BindField` reads a sequence item; variant fields are read by name (`GetKey`) because
+  `VariantVal` fields are key-sorted.
+- `Arity` is `{fixed, names, keys}`; keyword-parameter defaults are expressions evaluated where the `fn` is defined and
+  stored after the captures in `Closure::captures` (design 8.1 sketches `keys: [(KwId, Value)]`). A positional
+  parameter may also be passed by name (the constructor rule).
+- `VarSlot.kind` is a `Cell` (Live redefinition may turn a `let` into a `var`); `SlotKind` adds `Prelude`. `Namespace`
+  methods take `&self` (interior mutability) because `DefGlobal` defines slots while a proto runs against `&Namespace`.
+- A name that resolves nowhere at compile time reserves an unbound session slot (forward references and recursion);
+  loading it before definition is `undefined-name`. A reservation never hides a prelude or open-import name.
+- A bare name on a line of its own that names a zero-parameter native is a call (`hush`, design-music section 1). A
+  bare user `fn` name stays a value; zero-parameter user functions are not specified (recorded as a residual question).
+- A top-level form's result is `Deref`ed (a `VarRef` result shows its value); thunks are not forced there.
+- `/` of two ints is exact: an integral quotient is an int, otherwise a ratio; any zero divisor is `division-by-zero`.
+- 7.1.5 hardening: `Vm::stack_budget` and `CompileCx::stack_budget` (768 KiB default) bound Rust stack use; a nested
+  re-entry past it is `depth-exceeded` and a form past it is `nesting-too-deep`, so neither deep re-entry nor deep nesting
+  can overflow a 2 MiB test thread or the 1 MiB wasm32 stack (debug builds reach it before 64 re-entries or 1024 levels).
+- `import` nodes compile to `nil` (package loading is TASK-009); `load` is not registered here (ME-REACTIVE).
+- `lang-reference.md` annotations that disagree with their own bindings are asserted with the computed value and noted in
+  `vm/tests/natives.rs`: `map arr {x -> * x 2}` is `[24 24 88]` for `arr = [12 12 44]`, and `put d gain: 1.0 pan: 0`
+  keeps `amp: 0.5`.
+- A wrapper forwarding to a test native registered with `register_custom` (not in `NativeTable`) infers `Undetermined`
+  (types/masks.rs resolves natives through the table); the forcing tests call such natives directly.
+
+**Seams for later waves**: `ReadObserver` (eager-read recording and dirty-read abort for ME-REACTIVE; tested);
+`Vm::{run, call_value, force, with_effect_mode, set_fuel, take_output, effects_mut, set_host, take_host}` (`set_host` carries the ME-REACTIVE `SourceLoader` to the `load` native, which cannot capture state); `EffectBuffer::{release,
+truncate, take}`; `Prelude::{register, register_custom, register_value}`; `Namespace::{session_value, check_env,
+callee_mask, tweaks}`; `TweakTable::{sites_of, set_tier, retire, write}`; `VarSlotRef::{restore, owner, id}`.
+
+**Evidence** (shared tree, after the last source change; logs under `target/fe-logs/`)
+| Row | Log / command | Result |
+|-----|---------------|--------|
+| V1 | `vm-build-s177-2.log` | exit=0, no warnings |
+| V2 | `vm-clippy-s177-2.log` | exit=0 |
+| V3 | `vm-nextest-s177-2.log` | exit=0, 409 run, 409 passed |
+| V3t | `vm-cargotest-s177-2.log` | exit=0, 401 + 8 passed (lib + spec_fixtures), 0 failed |
+| V3f | `vm-fixtures-s177-2.log` | exit=0, 8 run, 8 passed |
+| V6a | `vm-wasm32-s177-2.log` | exit=0 |
+| V6b | `vm-wasm32-hostwasm-s177-2.log` | exit=0 |
+| V4 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | largest `src/compile/compiler.rs` 792 (< 800) |
+| V5 | `grep -rnE 'std::(thread\|fs\|time\|net\|process)' src/` | `none` |
+| V7 | `git diff --stat -- Cargo.toml Cargo.lock` | empty |
+| V8 | `rustfmt --edition 2021 --check` on the 35 owned `.rs` files | exit 0 |
+
+Hashes and intents: `tmp/me-middle-20260925-s175/ME-VM/attempt-1/{pre-edit-hashes.txt, intent.md,
+post-edit-hashes.txt, final-hashes.txt}`. While ME-CHECK's `src/types/infer_call.rs` did not compile mid-session, the
+iteration builds ran in a private snapshot (`scratch.sh` in the same directory; no shared file outside ME-VM paths was
+edited); the table above is from the shared tree once it built again.
+
+The `-1` logs (same rows, all exit=0: nextest 400/400, cargo test 392 + 8) predate the self-review fixes below; the
+`-2` logs are the final-source evidence.
+
+**Author self-review fixes (independent read-only review, same session)**
+- A top-level `let [a] [x]` stored the list item's `VarRef` unforced, so the binding was late instead of a snapshot and
+  `var [y] [y]` could make a slot refer to itself, which looped with no fuel check: destructured values are now forced,
+  and every slot read (`read_slot`) costs one unit of fuel, so no `VarRef` chain can loop unbounded; `Vm::force` is a
+  loop instead of Rust recursion.
+- Proto table indices (constants, list sites, nested protos, shapes) saturated at `u16::MAX` and silently read the
+  wrong entry past 65536: they now fail the form with `nesting-too-deep` (the closest listed code; "the form is too
+  large to compile").
+- Query mode let a closure update a local `var` cell it captured from outside the query (state that outlives it): a
+  cell created before the query is now `effect-in-query`; cells created inside the query stay writable (10.4).
+- `var [a b] ..` inside a body bound read-only locals: they are now `var` cells.
+- `min`/`max` failed on `VarRef` list items: they now read items through `NativeCx::deep`.
+- Not changed: a local `fn` cannot call itself (lang-reference section 3 decides "no local recursion; lift to a
+  top-level fn"; the name resolves outside the body). Dropping or printing a value nested ~100k deep recurses in the
+  value module (TASK-001, not an ME-VM path): recorded as a residual risk.
+
+**Blockers**: none.
 
 ## Related Plans
 

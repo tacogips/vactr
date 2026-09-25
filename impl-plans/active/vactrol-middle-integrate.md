@@ -143,3 +143,13 @@ differences, repairs, hash/intent paths, evidence per row, blockers.)
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-004, TASK-005, TASK-006)
 - **Previous**: vactrol-middle-check.md, vactrol-middle-reactive.md, vactrol-middle-pattern.md
 - **Next**: vactrol-middle-finalize.md
+
+### OUTPUT CONTRACT NOTE (operator, 2026-09-25, after the ME-PATTERN attempt-1 failure)
+
+- `planId` belongs ONLY in the step6-implement output payload. The
+  step6-test-integrity-check and step7-adversarial-review outputs MUST NOT
+  contain `planId` (their contracts reject additional properties; ME-PATTERN
+  attempt 1 failed with "output contract $.planId additional property is not
+  allowed" after a green gate).
+- The adversarial-review output MUST contain the `findings` array (empty when
+  none) and the integration-review output MUST contain `needs_revision`.

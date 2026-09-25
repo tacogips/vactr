@@ -1,7 +1,7 @@
 # Vactrol Middle End: Reactive Dependency Graph, Evaluator and load (ME-REACTIVE) Implementation Plan
 
 **planId**: ME-REACTIVE (implements the reactive part of vactrol-core.md TASK-005, plus `load` and the `NoopHost` stub)
-**Status**: Ready
+**Status**: In Progress (implemented; formal test-integrity, adversarial and integration review pending)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.6 (revised reactive graph, pass journal, rounds, Failed/Blocked, attempt edge sets, status events, equality cutoff, rebuild eligibility), 7.1.3 (Staged effects, Top-level driver, Source loading), 7.1.5, 13 (reeval tier); lang-reference.md section 4 (`load`)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -107,18 +107,95 @@ The ME-MASKS table and log rule with `<plan>` = `reactive`: V1, V2, V3, V3t, V3f
 
 ## Completion Criteria (map to vactrol-core.md TASK-005)
 
-- [ ] `DepGraph`, `PassJournal`, `Evaluator` implement design 5.6 revised and 7.1.3
-- [ ] Every reactive-propagation case and trace listed above passes (TASK-005 reactive criterion)
-- [ ] Rebuild tests pass (TASK-005 rebuild criterion); `reeval`-tier tweak writes re-evaluate the owning form
-- [ ] `SourceLoader`, `NoopHost` and `load` behave as listed (fresh prelude child scope, last expression, failures)
-- [ ] V1-V8 pass with logs cited; `final-hashes.txt` written
+- [x] `DepGraph`, `PassJournal`, `Evaluator` implement design 5.6 revised and 7.1.3
+- [x] Every reactive-propagation case and trace listed above passes (TASK-005 reactive criterion)
+- [x] Rebuild tests pass (TASK-005 rebuild criterion); `reeval`-tier tweak writes re-evaluate the owning form
+- [x] `SourceLoader`, `NoopHost` and `load` behave as listed (fresh prelude child scope, last expression, failures)
+- [x] V1-V8 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: one entry per session: work done, design differences, hash/intent paths, evidence per row, blockers.)
+
+### Session: 2026-09-25 s178 (attempt-1, step6-implement)
+
+**Work done**
+- `src/ns/depgraph.rs` (450 lines): `FormId`, `FormState {Clean, Recomputed, Failed(Failure), Blocked{on}}`,
+  `WriteItem`, `Edge`, `FormRec` (committed edges with read versions, attempt edge set, recovery subscriptions,
+  write set, `non_replayable`, run counter), `DepGraph` (active-owner registry for names and playing slots,
+  `claim`, `is_current`/`eligible` over the COMPLETE write set, `dependents`, `status_dependents`), and `Schedule`
+  (rounds, definition-order queue, dirty-read ordering constraints with constraint-cycle detection, round bound =
+  distinct scheduled forms + 1).
+- `src/ns/journal.rs` (646 lines): `SlotSnap`/`Snapshot` (whole-form transaction rollback of value, version, kind,
+  owner), `PassJournal` (first-write pre-pass journal, `(slot, version) -> writer`, pass-level staged effects that a
+  re-run supersedes, `discard` = restore + drop from every round) and the pass driver `Evaluator::propagate`
+  (`rebuild`, deref-gate outcomes, status events in both directions, round-end stale reads, cycle stop,
+  failure-sensitive validation to fixpoint, release with ONE `bindings` batch last).
+- `src/ns/evaluator.rs` (723 lines): `Evaluator::new(prelude, loader, sink)`, `eval_form`, `eval_str`, `queue_upd` +
+  `run_pass` (latest-wins coalescing), `set_tweak` (Reeval owner rebuild, binding-site dependents, Manual no pass),
+  `site_tier`, the read-observer gate, override migration, accessors (`form_state`, `edges`, `attempt_edges`,
+  `subscriptions`, `runs`, `sites_of`, `form_of`, `form_of_bind`, `last_pass`, `vm_and_ns`).
+- `src/ns/load.rs` (155 lines): `SourceLoader`, `NoopHost`, `LoaderHost` (VM host capability), `read_forms`, the
+  `load` native (registered by `Evaluator::new`), fresh `Namespace::with_prelude` scope, last value / `nil`,
+  `load-failed` with the first cause, `depth-exceeded` passed through, `effect-in-query`, observer suspended.
+- Tests (44 new): `reactive_basic.rs` 7 (+ shared `Harness`, `SharedSink`, `MapLoader`), `reactive_traces.rs` 6,
+  `reactive_recovery.rs` 6, `rebuild.rs` 9, `evaluator.rs` 5, `load.rs` 11.
+- Shared edits (intent in attempt-1/intent.md, pre/post hashes recorded): `src/ns/mod.rs` += `pub mod depgraph;
+  evaluator; journal; load;`; `src/ns/tests/mod.rs` += `mod evaluator; load; reactive_basic; reactive_recovery;
+  reactive_traces; rebuild;`. All ME-VM lines kept (pre-edit hashes matched ME-VM final-hashes).
+
+**Design differences and decisions (design wins; none weakens a trace assertion)**
+- Graph nodes are forms with a non-empty write set (a name defined or a slot bound). Plain expressions and
+  top-level `upd` forms are commands: never recorded, never replayed. A form that `upd`s a global it does not
+  define, or stages `once`/`at`/`print`/`hush`/`stop`, is non-replayable (sites `manual`); inside a rebuild the same
+  is `Failure(effect-in-rebuild)` (the second barrier; checked on the staged buffer, since `EffectMode` has no rebuild
+  mode and `vm/` is not this plan's). `Tempo` effects are replayable.
+- A rebuild re-evaluates the stored expanded form under a FRESH `FormGen` (fresh tweak slots, section 13), with
+  override migration by index/type/origin; the old generation's sites retire when the rebuild validates.
+- `FormState::Blocked { on: SymId }` (the plan text says `SlotKey`; `stage::SlotKey` names playing slots, so the
+  blocking origin is the read slot's name). A genuine cycle is `Failed` with `FailCode::Blocked` ("dependency cycle
+  through ...") plus the `dependency-cycle` diagnostic: 7.1.6 has no cycle `FailCode` (closest listed code, finding).
+- The six design traces are asserted with forms that both define and bind (`let x d1 {..}`), matching the design's
+  "X ... staging its slot intent"; the FAILED-DIAMOND case keeps a separate `d1 total` binder.
+- A standalone `eval_form` read of a `Failed`/`Blocked` owner's slot fails `blocked` (no mixing of a failed
+  branch's retained value); re-evaluating a failed form's text supersedes it and emits the recovery status event.
+- Dirty-read constraints take precedence over committed-edge order in `Schedule::pick` (committed edges are the
+  heuristic, the deref gate the correctness check), which the CHANGING-EDGE trace requires.
+
+**Evidence (evidence root tmp/me-middle-20260925-s175/ME-REACTIVE/attempt-1/)**
+- V1 target/fe-logs/reactive-build-s178-1.log exit=0; V2 reactive-clippy-s178-1.log exit=0.
+- V3 reactive-nextest-s178-1.log exit=0, 453 run / 453 passed; V3t reactive-cargotest-s178-1.log exit=0,
+  445 + 8 passed; V3f reactive-fixtures-s178-1.log exit=0, 8/8.
+- V6a reactive-wasm32-s178-1.log exit=0; V6b reactive-wasm32-hostwasm-s178-1.log exit=0.
+- V4 v4-linecount.txt: largest src/compile/compiler.rs 792; owned max evaluator.rs 723 (owned-linecount.txt).
+- V5 v5-stdio.txt `none`; V7 v7-deps.txt empty; V8 v8-rustfmt.txt exit=0 (10 owned leaf files; the shared
+  mod.rs files are not rustfmt-run because rustfmt recurses into other plans' child modules; ME-FINAL runs crate fmt).
+- final-hashes.txt written.
+
+**Repair requests / residual risks (routed to ME-INTEGRATE)**
+- `SlotSnap::restore` cannot UNBIND a slot that was a reserved forward reference before a failed attempt defined
+  it (no `Namespace` unbind API; `namespace.rs` is ME-VM's). It restores `nil` with the old version. Not reachable
+  by the tests (the compiler validates destructuring before any `DefGlobal`); ME-INTEGRATE may add an unbind.
+- ME-VM request "failed form does not undo DefGlobal writes": answered by the whole-form `Snapshot` rollback in
+  `Evaluator::attempt` (test `a_failed_standalone_form_rolls_back_its_namespace_writes` uses a partial `upd`).
+- ME-VM request "compiled forms keep the prelude slot after a later shadow": by the 5.6 scope model a later session
+  binding does not retarget earlier forms; prelude reads record no edge, and `sound-kit` is read dynamically by
+  `QueryVm::sound_kit` (ME-INTEGRATE). A rebuild recompiles and so resolves afresh. No change here.
+- ME-INTEGRATE inserts `check` into `eval_form`/`load` (7.1.1) and implements `QueryVm` for `Vm` using
+  `Evaluator::vm_and_ns`; `load` is registered by `Evaluator::new` (not by `Prelude::core`).
 
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-005)
 - **Previous**: vactrol-middle-vm.md
 - **Next**: vactrol-middle-integrate.md
+
+### OUTPUT CONTRACT NOTE (operator, 2026-09-25, after the ME-PATTERN attempt-1 failure)
+
+- `planId` belongs ONLY in the step6-implement output payload. The
+  step6-test-integrity-check and step7-adversarial-review outputs MUST NOT
+  contain `planId` (their contracts reject additional properties; ME-PATTERN
+  attempt 1 failed with "output contract $.planId additional property is not
+  allowed" after a green gate).
+- The adversarial-review output MUST contain the `findings` array (empty when
+  none) and the integration-review output MUST contain `needs_revision`.

@@ -40,15 +40,15 @@ Large features are split into multiple related plans with cross-references.
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
 | [vactrol-core.md](active/vactrol-core.md) | In Progress (TASK-001..006 completed 2026-09-25; TASK-007..010 not started) | design-docs/specs/design-implementation.md | 2026-09-25 |
-| [vactrol-middle-masks.md](active/vactrol-middle-masks.md) | Completed (ME-MASKS, issue #2, wave 1; archiving to completed/ pending, after the workflow commit) | design-implementation.md 5.5, 7, 7.1.3, 7.1.6 | 2026-09-25 |
-| [vactrol-middle-frontend.md](active/vactrol-middle-frontend.md) | Completed (ME-FRONTEND, wave 2; archiving to completed/ pending, after the workflow commit) | design-implementation.md 6.5.8 | 2026-09-25 |
-| [vactrol-middle-check.md](active/vactrol-middle-check.md) | Completed (ME-CHECK, TASK-004, wave 3; archiving to completed/ pending, after the workflow commit) | design-implementation.md 5.6, 7, 7.1.4 | 2026-09-25 |
-| [vactrol-middle-vm.md](active/vactrol-middle-vm.md) | Completed (ME-VM, TASK-005, wave 3; archiving to completed/ pending, after the workflow commit) | design-implementation.md 5.5-5.7, 8, 13 | 2026-09-25 |
-| [vactrol-middle-pattern.md](active/vactrol-middle-pattern.md) | Completed (ME-PATTERN, TASK-006, wave 3; archiving to completed/ pending, after the workflow commit) | design-implementation.md 9, 10, 11.1, 11.7 | 2026-09-25 |
-| [vactrol-middle-reactive.md](active/vactrol-middle-reactive.md) | Completed (ME-REACTIVE, TASK-005, wave 4; archiving to completed/ pending, after the workflow commit) | design-implementation.md 5.6, 7.1.3 | 2026-09-25 |
-| [vactrol-middle-integrate.md](active/vactrol-middle-integrate.md) | Completed (ME-INTEGRATE, TASK-004..006, wave 5; archiving to completed/ pending, after the workflow commit) | design-implementation.md 7.1.1, 7.1.3, 7.1.7 | 2026-09-25 |
-| [vactrol-middle-finalize.md](active/vactrol-middle-finalize.md) | Completed (ME-FINAL, serial reconciliation, wave 6; archiving to completed/ pending, after the workflow commit) | design-implementation.md 6.5.7, 7.1.7 | 2026-09-25 |
-| [me-middle-20260925-s175-dispatch.json](active/me-middle-20260925-s175-dispatch.json) | Dispatch manifest for the eight ME plans (issue #2; all plans completed, session 183) | - | 2026-09-25 |
+| [vactrol-middle-masks.md](completed/vactrol-middle-masks.md) | Completed (ME-MASKS, issue #2, wave 1; archived 2026-09-25) | design-implementation.md 5.5, 7, 7.1.3, 7.1.6 | 2026-09-25 |
+| [vactrol-middle-frontend.md](completed/vactrol-middle-frontend.md) | Completed (ME-FRONTEND, wave 2; archived 2026-09-25) | design-implementation.md 6.5.8 | 2026-09-25 |
+| [vactrol-middle-check.md](completed/vactrol-middle-check.md) | Completed (ME-CHECK, TASK-004, wave 3; archived 2026-09-25) | design-implementation.md 5.6, 7, 7.1.4 | 2026-09-25 |
+| [vactrol-middle-vm.md](completed/vactrol-middle-vm.md) | Completed (ME-VM, TASK-005, wave 3; archived 2026-09-25) | design-implementation.md 5.5-5.7, 8, 13 | 2026-09-25 |
+| [vactrol-middle-pattern.md](completed/vactrol-middle-pattern.md) | Completed (ME-PATTERN, TASK-006, wave 3; archived 2026-09-25) | design-implementation.md 9, 10, 11.1, 11.7 | 2026-09-25 |
+| [vactrol-middle-reactive.md](completed/vactrol-middle-reactive.md) | Completed (ME-REACTIVE, TASK-005, wave 4; archived 2026-09-25) | design-implementation.md 5.6, 7.1.3 | 2026-09-25 |
+| [vactrol-middle-integrate.md](completed/vactrol-middle-integrate.md) | Completed (ME-INTEGRATE, TASK-004..006, wave 5; archived 2026-09-25) | design-implementation.md 7.1.1, 7.1.3, 7.1.7 | 2026-09-25 |
+| [vactrol-middle-finalize.md](completed/vactrol-middle-finalize.md) | Completed (ME-FINAL, serial reconciliation, wave 6; archived 2026-09-25) | design-implementation.md 6.5.7, 7.1.7 | 2026-09-25 |
+| [me-middle-20260925-s175-dispatch.json](completed/me-middle-20260925-s175-dispatch.json) | Dispatch manifest for the eight ME plans (issue #2; all plans completed, session 183) | - | 2026-09-25 |
 
 ## Completed Plans
 

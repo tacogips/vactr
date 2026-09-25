@@ -17,7 +17,7 @@ use crate::value::ratio::Ratio64;
 use crate::value::value::{RangeVal, Value};
 use crate::vm::call::{kind_name, NativeCx};
 use crate::vm::fail::{FailCode, Failure};
-use crate::vm::natives::{int_of, type_err};
+use crate::vm::natives::{dsp, int_of, type_err};
 use crate::vm::vm::int_value;
 
 type Kw<'a> = &'a [(KwId, Value)];
@@ -156,14 +156,26 @@ fn fold(op: Arith, args: &[Value]) -> Result<Value, Failure> {
 }
 
 fn add(_: &mut NativeCx<'_>, args: &[Value], _: Kw<'_>) -> Result<Value, Failure> {
+    // A unit-generator operand builds a node (12.8.6).
+    if let Some(r) = dsp::arith('+', args) {
+        return r;
+    }
     fold(Arith::Add, args)
 }
 
 fn sub(_: &mut NativeCx<'_>, args: &[Value], _: Kw<'_>) -> Result<Value, Failure> {
+    // A unit-generator operand builds a node (12.8.6).
+    if let Some(r) = dsp::arith('-', args) {
+        return r;
+    }
     fold(Arith::Sub, args)
 }
 
 fn mul(_: &mut NativeCx<'_>, args: &[Value], _: Kw<'_>) -> Result<Value, Failure> {
+    // A unit-generator operand builds a node (12.8.6).
+    if let Some(r) = dsp::arith('*', args) {
+        return r;
+    }
     fold(Arith::Mul, args)
 }
 

@@ -139,18 +139,9 @@ fn required_names_present_and_out_of_scope_absent() {
         "grid",
         "range",
         "gain",
-    ] {
-        assert!(table().get(name).is_some(), "{name} missing");
-    }
-    // `struct` is never a pattern function (Q3); synthesis, effects, buses
-    // and granular are TASK-008, so they stay `undefined-name`.
-    for name in [
-        "struct",
-        "inst",
-        "look",
+        // TASK-008 vocabulary (BE-INST, design 12.8.6).
         "bus",
         "master",
-        "sampler",
         "granular",
         "granulate",
         "sin-osc",
@@ -158,6 +149,11 @@ fn required_names_present_and_out_of_scope_absent() {
         "compressor",
         "vco",
     ] {
+        assert!(table().get(name).is_some(), "{name} missing");
+    }
+    // `struct` is never a pattern function (Q3); `inst` is a special form and
+    // templates such as `sampler` are sounds, not natives.
+    for name in ["struct", "inst", "look", "sampler"] {
         assert!(table().get(name).is_none(), "{name} must be absent");
     }
     // `range` is subject first (M2): `range sine 200 2000`.

@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::ns::namespace::VarSlotRef;
 use crate::pattern::eval::QueryVm;
-use crate::value::intern::intern_kw;
+use crate::value::intern::{intern_kw, KwId};
 use crate::value::key::Key;
 use crate::value::value::{NativeId, Sound, Value};
 use crate::vm::fail::{FailCode, Failure, Origin};
@@ -18,6 +18,8 @@ pub(crate) struct StubVm {
     pub kit_calls: usize,
     pub calls: usize,
     pub output: Vec<(Origin, Rc<str>)>,
+    /// Instruments `inst_sound` finds (the registry fallback of `s :k`).
+    pub insts: BTreeMap<KwId, Value>,
     funcs: BTreeMap<u32, Callable>,
 }
 
@@ -30,6 +32,7 @@ impl StubVm {
             kit_calls: 0,
             calls: 0,
             output: Vec::new(),
+            insts: BTreeMap::new(),
             funcs: BTreeMap::new(),
         }
     }
@@ -66,9 +69,17 @@ impl QueryVm for StubVm {
         std::mem::take(&mut self.output)
     }
 
+    fn put_output(&mut self, out: Vec<(Origin, Rc<str>)>) {
+        self.output = out;
+    }
+
     fn sound_kit(&mut self) -> Result<Value, Failure> {
         self.kit_calls += 1;
         Ok(self.kit.clone())
+    }
+
+    fn inst_sound(&mut self, k: KwId) -> Option<Value> {
+        self.insts.get(&k).cloned()
     }
 }
 

@@ -33,12 +33,22 @@ pub trait QueryVm {
     /// Drains `print` output captured during the query (10.4).
     fn take_output(&mut self) -> Vec<(Origin, Rc<str>)>;
 
+    /// Replaces the captured output, used by filters to drop the output of
+    /// the events they remove (10.4).
+    fn put_output(&mut self, out: Vec<(Origin, Rc<str>)>);
+
     /// The current session-level `sound-kit` (the prelude's when the session
     /// binds none).
     ///
     /// # Errors
     /// A failed binding.
     fn sound_kit(&mut self) -> Result<Value, Failure>;
+
+    /// The instrument registered as `k` (a prelude template or a session
+    /// `inst`): where `s :k` resolves when the kit has no `k` (12.8.6).
+    fn inst_sound(&mut self, _k: KwId) -> Option<Value> {
+        None
+    }
 }
 
 id_newtype!(

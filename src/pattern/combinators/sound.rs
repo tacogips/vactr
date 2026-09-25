@@ -4,8 +4,9 @@
 //! on its own it realizes one event per cycle `[c, c + 1)` (M4), and a
 //! structure-giving step replaces that structure. `s [..]` is structured by
 //! its steps. Keywords resolve per query against the `kit:` argument when
-//! given, else `QueryVm::sound_kit()`; a missing key is an event-local
-//! `unknown-sound` failure.
+//! given, else `QueryVm::sound_kit()`, then in the instrument registry
+//! (`QueryVm::inst_sound`, 12.8.6); a key found in neither is an
+//! event-local `unknown-sound` failure.
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -114,7 +115,17 @@ pub(crate) fn query_sound(
                 e.value = v;
                 out.push(e);
             }
-            Err(f) => event_fault(st, &e, p, f),
+            // A key the kit lacks may name an instrument (12.8.6).
+            Err(f) => match (&e.value, f.code) {
+                (Value::Keyword(k), FailCode::UnknownSound) => match st.cx.vm.inst_sound(*k) {
+                    Some(v) => {
+                        e.value = v;
+                        out.push(e);
+                    }
+                    None => event_fault(st, &e, p, f),
+                },
+                _ => event_fault(st, &e, p, f),
+            },
         }
     }
     out

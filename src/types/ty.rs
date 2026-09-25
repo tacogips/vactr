@@ -70,7 +70,8 @@ impl KeySet {
 }
 
 /// A checker type (design 7). `Tex` is the visual chain type the `scale`
-/// overload needs (7.1.4); `NumLit` is a numeric literal's kind variable.
+/// overload needs (7.1.4); `UGen` a unit-generator node (12.8.6); `NumLit`
+/// is a numeric literal's kind variable.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ty {
     Int,
@@ -92,6 +93,8 @@ pub enum Ty {
     Url,
     Sound,
     Tex,
+    /// A unit-generator node built by an `inst` or `bus` body (12.8.6).
+    UGen,
     Named(TypeId),
     Any,
     Var(TyVar),
@@ -154,6 +157,7 @@ impl fmt::Display for Ty {
             Ty::Url => f.write_str("url"),
             Ty::Sound => f.write_str("sound"),
             Ty::Tex => f.write_str("tex"),
+            Ty::UGen => f.write_str("ugen"),
             Ty::Named(id) => write!(f, "type#{}", id.get()),
             Ty::Any => f.write_str("any"),
             Ty::Var(v) => write!(f, "'t{}", v.get()),
@@ -339,6 +343,7 @@ impl<'a> Parser<'a> {
             "url" => Ty::Url,
             "sound" => Ty::Sound,
             "tex" => Ty::Tex,
+            "ugen" => Ty::UGen,
             "any" => Ty::Any,
             _ => {
                 let name = tok.strip_prefix('\'').filter(|n| !n.is_empty())?;

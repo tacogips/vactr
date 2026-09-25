@@ -68,10 +68,12 @@ fn every_checker_code_has_a_trigger() {
 
 #[test]
 fn withdrawn_forms_are_undefined_names() {
-    for word in ["while", "loop", "break", "when", "unless", "each"] {
+    for word in ["while", "break", "when", "unless", "each"] {
         let src = format!("{word} true 1");
         assert_diags(&src, &["undefined-name@1"]);
     }
+    // `loop` is the sampler template's header control (M3), not a language form.
+    assert_diags("loop true 1", &["type-mismatch@1"]);
 }
 
 #[test]

@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use crate::ns::namespace::VarSlotRef;
 use crate::pattern::combinators::{control, input, music, random, region, sound, structure, time};
 use crate::pattern::eval::{QState, QueryCtx};
 use crate::pattern::occ::OccKey;
@@ -36,6 +37,13 @@ pub struct Event {
     pub controls: Controls,
     pub src: Option<SrcRef>,
     pub occ: OccKey,
+    /// The var or tweak this event's value was read from directly, if any.
+    /// Late-bound refs resolve at query time; commit keeps the source so it
+    /// can emit `Ctl::Cell` (11.3). BE-SCHED fills it.
+    pub late: Option<VarSlotRef>,
+    /// The controls whose value came from a late-bound var or tweak, by
+    /// control name (11.3). BE-SCHED fills it.
+    pub cells: BTreeMap<KwId, VarSlotRef>,
 }
 
 /// The result of a query: events, event- and subtree-local faults, and

@@ -102,11 +102,10 @@ reader = "clean"
 reader_diags = []
 expand = "clean"
 expand_diags = []
-eval = "deferred"
-deferred_to = "TASK-008"
-pin_check = true
-check_diags = ["rebinding@32", "undefined-name@36"]
-note = "Sound. The chord line writes `[:g :dom7]` (Decided 2026-09-25: letter-first chord qualities, never `:7`), so the block reads clean; its `./x` paths lex as path literals (6.5.8). Eval: Defines `inst pluck` (DSP instruments, TASK-008; `cutoff` is an inst parameter control) and loads a sound pack (host file I/O). Check pinned so `load path`, `sample path` and `kit:` are shown to type-check: the two alternative `let sound-kit` overrides are rebinding@32 as one document (question M6, deferred) and `tr909` is unbound (undefined-name@36). At run time the line-32 override merges its dict element (repair R1, attempt-2)."
+eval = "diagnostic"
+check_diags = ["rebinding@32", "type-mismatch@89", "type-mismatch@90", "type-mismatch@92", "type-mismatch@92", "type-mismatch@94", "undefined-name@36", "undefined-name@91", "undefined-name@93", "undefined-name@95", "undefined-name@95"]
+run_fails = ["host-unavailable@30", "not-callable@90", "type@100", "type@89", "type@92", "type@94", "undefined-name@31", "undefined-name@36", "undefined-name@91", "undefined-name@93", "undefined-name@95"]
+note = "Sound. The chord line writes `[:g :dom7]` (Decided 2026-09-25: letter-first chord qualities, never `:7`), so the block reads clean; its `./x` paths lex as path literals (6.5.8). Eval (BE-FINAL, TASK-008, fixture NoopHost): `inst pluck` realizes to an instrument and `s :pluck > .. > cutoff {..}` runs (`cutoff` is its header parameter used as a pattern control, M3; serial repair R1 made the VM agree with the checker). `load ./soundpack/..` is host file I/O (host-unavailable@30 under NoopHost), so `my-pack` is unbound on line 31 (undefined-name@31). The two alternative `let sound-kit` overrides are rebinding@32 as one document (question M6, deferred); at run time the line-32 override merges its dict element (repair R1, attempt-2). `tr909` is unbound (undefined-name@36). Lines 89-95 are the author's self-analysis and loopback amendment (2026-09-25, design 12.3): analyzers take a bus SOURCE, which the current `fft`/`amp`/`spectrum`/`render` signatures do not (check type-mismatch@89/@90/@92x2/@94; run type@89/@92/@94 and not-callable@90), and `scope`, `capture`, `rms`, `peak` are not defined yet (undefined-name@91/@93/@95). Line 100 `[1 0.5] > osc \"/trigger\"` puts a value list before `osc`: the VM takes the pattern-subject `osc` as the visual source and fails type@100 (the checker accepts it; recorded for the language author, not changed here). Pinned exactly so that implementing the amendment must update this entry."
 
 [[block]]
 doc = "design-music.md"
@@ -129,9 +128,10 @@ reader = "clean"
 reader_diags = []
 expand = "clean"
 expand_diags = []
-eval = "deferred"
-deferred_to = "TASK-008"
-note = "Synthesis models: inst headers with pairs and typed parameters. Eval: Needs the DSP instruments, buses and effects of TASK-008; checked for no-panic and no-abort only, not run."
+eval = "diagnostic"
+check_diags = []
+run_fails = ["type@4", "undefined-name@28", "undefined-name@29"]
+note = "Synthesis models: inst headers with pairs and typed parameters. Eval (BE-FINAL, TASK-008, fixture NoopHost): `inst analog`, `inst epiano` and `inst wt` realize to instruments, and their header parameters (`cutoff`, `position`) and `bank` run as pattern controls (M3, serial repair R1). Line 4 `inst drum: sampler bank: :bd-haus ...:` is the open spelling of question B3 (derive from a template, or define `sampler` itself): the definition head matches no clause (type@4), so `s :drum` on line 7 plays an unknown sound only at query time; the prelude templates use the plain header form (design 12.8.6). Lines 28-29 are the one-line `inst NAME: BODY` form (`inst pd: phase-distortion ..`, `inst organ: additive ..`): the checker reads them as definitions, but the compiler does not treat a one-line `inst` as a definition head, so `inst` itself is undefined-name@28/@29 at run time (recorded for the language author and TASK-009, not changed here)."
 
 [[block]]
 doc = "design-music.md"
@@ -141,9 +141,10 @@ reader = "clean"
 reader_diags = []
 expand = "clean"
 expand_diags = []
-eval = "deferred"
-deferred_to = "TASK-008"
-note = "Effects: bus and master blocks with continuation lines. Eval: Needs the DSP instruments, buses and effects of TASK-008; checked for no-panic and no-abort only, not run."
+eval = "positive"
+check_diags = []
+run_fails = []
+note = "Effects: bus and master blocks with continuation lines. Eval (BE-FINAL, TASK-008, fixture NoopHost): `bus :drums:` lowers to a three-unit `BusDef` (compressor > tape > plate), the slot routes into it with `bus :drums`, and `master:` lowers to the root bus; every form runs clean."
 
 [[block]]
 doc = "design-music.md"
@@ -153,9 +154,10 @@ reader = "diagnostics"
 reader_diags = ["unexpected-indent@3"]
 expand = "clean"
 expand_diags = []
-eval = "deferred"
-deferred_to = "TASK-008"
-note = "Granular. Block line 3 continues the granular call without `>`, so it is unexpected-indent (6.5.4); the statement it sits under becomes Error. Eval: Needs the DSP instruments, buses and effects of TASK-008; checked for no-panic and no-abort only, not run."
+eval = "diagnostic"
+check_diags = ["unknown-keyword@5"]
+run_fails = ["inst-failed@7"]
+note = "Granular. Block line 3 continues the granular call without `>`, so it is unexpected-indent (6.5.4); the `inst cloud` statement it sits under becomes Error and is not checked or run. Eval (BE-FINAL, TASK-008, fixture NoopHost): line 5 `position {range perlin 0 1}` runs as a pattern control (M3, serial repair R1); `:perlin` is not a known signal keyword (unknown-keyword@5, check only). Line 7 `bus :texture:` fails inst-failed@7 because `freeze: {alt false true}` is a pattern, and a bus unit parameter takes a number, ugen, keyword or signal (12.8.6); line 9 routes into the bus name."
 
 [[case]]
 id = "canon-pipe-thought-order"

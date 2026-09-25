@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Vactrol dev harness (TASK-008 real-worklet checks)</title>
+  <style>
+    body { font: 13px/1.4 ui-monospace, Menlo, monospace; margin: 1.5em; }
+    .pass { color: #176f2c; }
+    .fail { color: #b3261e; }
+    #log { white-space: pre-wrap; max-height: 40em; overflow: auto; border-top: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>Vactrol dev harness</h1>
+  <p>Loads the <code>host-wasm</code> module into the main thread and an AudioWorklet and runs the
+    TASK-008 criterion 8 (cell transport, <code>VoiceRelease</code>) and criterion 11 (16.1 lifecycle)
+    checks. Headless: <code>node editor/dev-harness/run-headless.mjs</code>; see README.md.</p>
+  <button id="start">Start</button>
+  <ul id="checks"></ul>
+  <div id="log"></div>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

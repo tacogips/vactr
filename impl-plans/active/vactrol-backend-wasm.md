@@ -1,7 +1,7 @@
 # Vactrol Back End: Wasm Host, Worklet Glue, Dev Harness (BE-WASM) Implementation Plan
 
 **planId**: BE-WASM (vactrol-core.md TASK-008 `WasmHost`, `editor/worklet/` glue, worklet-as-timebase, latency widen, the 16.1 lifecycle, `editor/dev-harness/` and its real-worklet checks)
-**Status**: Ready
+**Status**: Completed (accepted by integration review; reconciled by BE-FINAL session 186; archive after the workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 12.8.10 (raw ABI, worklet glue), 12.8.11 (harness, headless runner, evidence, blocked-not-passing), 16, 16.1, 11.3 (browser cell protocol), 11.7 (VoiceRelease), 12.8.4 (latency widen); design-docs/user-qa/pending-backend-questions.md B1, B5
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/3
@@ -123,20 +123,141 @@ Common table with `<wave>` = `wasm`: V1, V2, V3, V3t, V3f, V6a, V6b, V4, V5, V8.
 
 ## Completion Criteria (map to vactrol-core.md TASK-008)
 
-- [ ] Raw ABI, `WasmAudioHost`, worklet half, worklet glue, worklet-as-timebase, latency widen implemented as listed
-- [ ] Dev harness and headless runner implemented; W1 report cited
-- [ ] Criterion 8 proven by W1 (all criterion-8 check ids pass), or recorded as BLOCKED with the operator step (B1)
-- [ ] Criterion 11 proven by W1 (all criterion-11 check ids pass), or recorded as BLOCKED with the operator step (B1)
-- [ ] Criterion 9 (`--features host-wasm` wasm32 build) passes (V6b)
-- [ ] V1-V8, W1-W3 recorded with logs cited; `final-hashes.txt` written
+- [x] Raw ABI, `WasmAudioHost`, worklet half, worklet glue, worklet-as-timebase, latency widen implemented as listed
+  (session 182: `src/host/wasm/{abi,messages,cells,main_half,worklet_half}.rs`, `editor/worklet/{host,processor}.js`)
+- [x] Dev harness and headless runner implemented; W1 report cited (`target/fe-logs/be-wasm-harness-s182-1.json`)
+- [x] Criterion 8 proven by W1 (all criterion-8 check ids pass), or recorded as BLOCKED with the operator step (B1)
+  (W1 exit=0: the 10 criterion-8 ids pass in headless Chrome 154)
+- [x] Criterion 11 proven by W1 (all criterion-11 check ids pass), or recorded as BLOCKED with the operator step (B1)
+  (W1 exit=0: the 7 lifecycle ids and `memory-stable` pass)
+- [x] Criterion 9 (`--features host-wasm` wasm32 build) passes (V6b) (`be-wasm-wasm32-hostwasm-s182-1.log` exit=0)
+- [x] V1-V8, W1-W3 recorded with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: one `### Session: <date> (session <S>, BE-WASM implementer)` entry: work done, harness report path and
 per-check results, blocked status if any, design differences, evidence per row. Edit only this log.)
 
+### Session: 2026-09-25 (session 182, BE-WASM implementer)
+
+**Admission**: `dependsOn` BE-SCHED, BE-DSP, BE-INST are all in the fanout item's `acceptedPlanIds`.
+
+**Work done** (all files new except the CONTRACTS stub `src/host/wasm/mod.rs`; no file outside writePaths edited):
+- `src/host/wasm/abi.rs` (134 lines): `alloc`/`free`, the per-instance framed outbox (`[u32 LE len][record]`,
+  `outbox_ptr/len/clear`; the worklet fixes its capacity at init and counts refused records), extension tags
+  `TAG_CONSOLE` 0x70 (main -> page), `TAG_FAULT` 0x60 and `TAG_SIGS` 0x61 (worklet -> main).
+- `src/host/wasm/messages.rs` (408): `WasmAudioHost: AudioHost` (records into the outbox; 16.1 sender-paced window:
+  arena admission first with an immediate `arena-exhausted` diagnostic, `SampleBegin`, then ONE slice in flight, the
+  next posted only on its `SliceOk`; graphs via `dsp::arena::encode_inst/encode_bus` + `ring::encode_graph_record`
+  with graph resource ids from `0x4000_0000`; the engine's cumulative `Counters` become deltas so `Runtime::widen`
+  counts each late event once = latency widen; `HostSigs` from the worklet feed `analysis()`), `WasmCellPort:
+  CellPort`, `WasmSamples: SampleLoader` (keys `bank:index` or path text).
+- `src/host/wasm/cells.rs` (134): `ProbeMirror`, the worklet `CellStore` over `dsp::cells::Mirror` with fixed-size read
+  probes (reads, uninitialized reads, last read, a 16-entry read log); no allocation after construction.
+- `src/host/wasm/main_half.rs` (540): `main_init`, `eval`, `tick`, `inbox`, `sample_put`, `main_resync`
+  (`Runtime::resync_cells` on port re-establishment), observation exports (`main_stat`, `main_sent`,
+  `main_retired`, `main_probe_ctl`, `inst_id`, `ctl_id`, `sample_id`) and the `harness_*` record hooks (they only
+  encode wire records into the outbox; JS moves them over the real port). Registry caps set to the browser preset.
+- `src/host/wasm/worklet_half.rs` (474): `worklet_init` (allocates engine + arena, `ByteInbox`, rings, staging, outbox,
+  report; records the memory size), `staging_ptr`, `worklet_inbox`, `process` (planar output), `worklet_now`,
+  `report_ptr/len` (`REPORT_LEN` = 162 `f64`, indices `R_*`), `worklet_probe_cell/resource`, `worklet_reset_watch`.
+- `editor/worklet/processor.js`: O(1) `onmessage` (buffer reference into a 64-slot preallocated array, overflow drop +
+  count), wasm #2 instantiated from the posted copy, silence until ready, per-quantum drain -> `worklet_inbox` ->
+  `process` -> outputs, posts `{t: worklet_now(), o: outbox, js, r every 4 quanta}`.
+- `editor/worklet/host.js`: fetch + instantiate wasm #1, AudioContext + AudioWorkletNode, posts a COPY of the bytes,
+  `inbox` + `tick` (every 5 ms of worklet time) + outbox flush on every worklet message, console routing,
+  `decodeAudioData` sample loading, and the harness `filter`/`release`/`postRaw`/`workletCall` hooks.
+- `editor/dev-harness/{index.html,harness.js,run-headless.mjs,README.md}`: the 18 checks below; the runner uses node
+  built-ins only and exits 0 / 1 / 2 (BLOCKED) as specified.
+
+**W1 report** `target/fe-logs/be-wasm-harness-s182-1.json` (log `be-wasm-harness-s182-1.log`, `exit=0`, HeadlessChrome
+154, 48 kHz, module served from `target/wasm32-unknown-unknown/debug/deps/vactrol.wasm`, see difference 7):
+criterion 8: `cell-first-before-ack` PASS (5 `Const(0.5)` events and 0 mirror reads while `CellInit` was held; after the
+ack reads 0.5, 0 uninitialized), `cell-batch-next-voice` PASS (0.50,0.50 before; 0.80 x4 after), `cell-delayed-hop`
+PASS (0.80 x4 inside the hop, 0.30 x3 after), `cell-init-replay` PASS, `cell-reuse` PASS (Live 1 -> Vacant with
+`CellRetired` -> Live 2), `cell-stale-epoch` PASS, `cell-stall-burst` PASS (in flight <= 1, pending <= 1, 1 distinct
+seq in 7 held batch records, converged to 0.46), `cell-reconnect` PASS (0.90 x4 after the commit lead),
+`release-after-genbump` PASS, `release-tombstone` PASS (dropped 0 -> 1).
+criterion 11: `load-during-playback` PASS (6 slices, 0 silent quanta, 0 frame gaps), `graph-replace-during-playback`
+PASS, `arena-exhausted` PASS (main admission diagnostic + worklet `ArenaExhausted` fault), `graph-too-large` PASS,
+`deferred-queue-overflow` PASS (3 faults, `install-queue-overflow` diagnostic), `unload-while-playing` PASS (Retiring
+while the voice played, `Retired` 11 ms after the voice was last seen), `install-burst-credit` PASS (4 x 512 KB, max
+65536 bytes copied per `process()`, 1 `SliceOk` withheld to a later quantum), `memory-stable` PASS (50331648 bytes
+at init and at the end). Dev iterations: `tmp/be-backend-20260925-s181/BE-WASM/attempt-1/dev-run-{1,2,3}.{log,json}`.
+
+**Design differences** (signatures only; behavior as planned):
+1. `main_init(sample_rate, arena_bytes)`: the arena size drives the 16.1 admission check on the main side.
+2. `sample_put(key_ptr, key_len, data_ptr, len, rate, channels)`: keyed by `bank:index` or path text (the loader's
+   `SampleSrc`), data read as little-endian bytes (no alignment requirement).
+3. `worklet_inbox(len)` reads the record from the preallocated `staging_ptr()` buffer and returns 0 when the inbox is
+   full (JS keeps the record and the order); `inbox(ptr, len)` takes the worklet's framed records of one quantum.
+4. The posted frame time is `worklet_now()` (the engine's rendered-frames clock), not raw `currentFrame / sampleRate`,
+   which also counts the silent quanta before wasm #2 was ready; both advance together afterwards.
+5. JS -> wasm is one staging copy per record in `process()`; the engine's arena copy is the credit-governed one
+   (`R_BYTES_MAX` <= 65536). The staging copy is reported separately (`R_STAGED_MAX` 65571 = one slice + the forced
+   graph record of the burst check); with the one-slice window it is one slice per round trip.
+6. `unload-while-playing` holds the sample through a live `analog` voice whose event carries `bank` (the engine counts
+   `Voice::bank` as a user), because the prelude `sampler` template does not install (finding 1). `graph-too-large` uses
+   a balanced 10 x 15 graph (finding 3).
+7. The runner serves the module that exports the ABI: after a full `cargo build`, `debug/vactrol.wasm` is the `vactrol`
+   bin (output filename collision, finding 2) and `debug/deps/vactrol.wasm` is the cdylib.
+
+**Findings for BE-FINAL (outside BE-WASM writePaths; not fixed here)**:
+1. The prelude templates `sampler`, `wavetable` and `granular` do not install on the audio side: `Template::build`
+   returns `BadEdge` for the `InstDef` that `dsp::build::lower_inst` produces (node probe in
+   `attempt-1/notes.md`; the worklet reports them as `GraphTooLarge` because `Templates::build` maps every build error
+   to that code). The native tier builds templates with the same `Template::build`. Owners BE-INST/BE-DSP.
+2. `cargo build --target wasm32-unknown-unknown` warns `output filename collision` (bin and cdylib both `vactrol.wasm`);
+   the uplifted file is the bin. `Cargo.toml` (CONTRACTS-owned) should rename one target.
+3. A ~130-term `+` chain in an `inst` body overflows the Chrome main-thread stack in the debug wasm build (recursion in
+   `dsp::build::Graph::node/input`, `dev-run-1.log`); a trap leaves the main half's `RefCell` borrowed. Owner BE-INST.
+
+**Evidence** (`target/fe-logs/`, all `exit=0`): V1 `be-wasm-build-s182-1.log`; V2 `be-wasm-clippy-s182-1.log`; W4
+`be-wasm-clippy-wasm-s182-1.log`; V3 `be-wasm-nextest-s182-1.log` (747 run, 747 passed, 1 skipped); V3t
+`be-wasm-cargotest-s182-1.log` (lib 737 passed; spec_fixtures 10 passed, 1 ignored; 0 failed); V3f
+`be-wasm-fixtures-s182-1.log` (10 run, 10 passed); V6a `be-wasm-wasm32-s182-1.log`; V6b
+`be-wasm-wasm32-hostwasm-s182-1.log`; W3 `be-wasm-w3-s182-1.log`; W2 `be-wasm-w2-s182-1.log`; W1
+`be-wasm-harness-s182-1.{log,json}`; V4 `be-wasm-linecount-s182-1.log` (largest `.rs` 786, BE-WASM largest
+`main_half.rs` 540); V5 `be-wasm-stdgrep-s182-1.log` (`none`); V8 `be-wasm-fmt-owned-s182-1.log`; read-only
+`cargo fmt --check` `be-wasm-fmtcheck-s182-1.log`. Hashes: `tmp/be-backend-20260925-s181/BE-WASM/attempt-1/final-hashes.txt`.
+
+**Downstream**: formal test-integrity/adversarial review, the core-plan checkboxes and README (BE-FINAL), the commit.
+
+### Session: 2026-09-25 (session 183, BE-WASM rerun)
+
+**Reason**: attempt-1 failed only in the review output contract (`$.findings[0].intentIncerence`, see the operator
+note below), not in the implementation. Admission is unchanged: BE-SCHED, BE-DSP and BE-INST (and BE-MIDI) are in `acceptedPlanIds`.
+
+**Work done**: no source change. All 12 BE-WASM source/JS files match `attempt-1/final-hashes.txt`
+(the only mismatch is this plan file, because of the operator note). The only edit is this entry. Intent is recorded in `tmp/be-backend-20260925-s181/BE-WASM/attempt-2/intent.md`.
+
+**Evidence on the current shared tree** (`target/fe-logs/`, all `exit=0`): V1 `be-wasm-build-s183-1.log`; V2
+`be-wasm-clippy-s183-1.log`; W4 `be-wasm-clippy-wasm-s183-1.log`; V8 `be-wasm-fmtcheck-s183-1.log` (`cargo fmt --check`);
+V3 `be-wasm-nextest-s183-1.log` (747 run, 747 passed, 1 skipped); V3t `be-wasm-cargotest-s183-1.log` (lib 737 passed;
+spec_fixtures 10 passed, 1 ignored; 0 failed); V3f `be-wasm-fixtures-s183-1.log` (10 run, 10 passed); V6a
+`be-wasm-wasm32-s183-1.log`; V6b `be-wasm-wasm32-hostwasm-s183-1.log`; W3 `be-wasm-w3-s183-1.log`; W2
+`be-wasm-w2-s183-1.log`; W1 `be-wasm-harness-s183-1.log` + report `be-wasm-harness-s182-2.json` (the runner's report
+name keeps the s182 prefix). All 18 checks PASS in HeadlessChrome 154, `memoryStable=true`, harness `exit=0`. V4
+`be-wasm-linecount-s183-1.log` (largest `.rs` 786); V5 `be-wasm-stdgrep-s183-1.log` (`none`).
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-008)
 - **Previous**: vactrol-backend-sched.md, vactrol-backend-dsp.md, vactrol-backend-inst.md
 - **Next**: vactrol-backend-finalize.md
+
+### FINDING KEY NOTE (operator, 2026-09-25, after the BE-NATIVE and BE-WASM attempt-1 failures)
+
+- The step6-test-integrity-check and step7-adversarial-review output contracts
+  reject unknown keys INSIDE each `findings[]` item. BE-NATIVE failed with
+  `$.findings[0].intentRef additional property is not allowed` and BE-WASM with
+  `$.findings[0].intentIncerence ...`: both were misspellings of the accepted key
+  `intentReference`. Use ONLY the keys the riela contract defines for a finding item:
+  `findingId`, `severity`, `category`, `file`, `line`, `message`, `evidence`
+  (confirmed against the riela binary); put anything else, such as an intent
+  reference or a fix-cost note, inside the `message` or `evidence` text. `findings` must
+  be present (empty array when none) and the outputs must not carry `planId`.
+
+### Closing note (BE-FINAL, session 186)
+
+Accepted by the integration review (acceptedPlanIds) and reconciled by BE-FINAL on the joined tree: every final-tree gate exits 0 (`target/fe-logs/be-final-<check>-s186-1.log`), and the TASK-007/008 checkboxes in vactrol-core.md cite this plan's tests. The F8 final-tree harness re-run passed 18/18 (`target/fe-logs/be-final-harness-s186-1.json`). Archive to impl-plans/completed/ in the separate docs commit after the workflow commit.

@@ -18,6 +18,7 @@ use std::rc::Rc;
 use crate::compile::proto::FnProto;
 use crate::compile::{compile, CompileCx};
 use crate::ns::depgraph::{DepGraph, Edge, FormId, FormRec, FormState, WriteItem};
+use crate::ns::insts::{inst_target, load_templates, realize_inst, InstRegistry};
 use crate::ns::journal::{Restored, Snapshot};
 use crate::ns::load::{read_forms, register_load, take_load_diags, LoaderHost, SourceLoader};
 use crate::ns::namespace::{FormGen, Namespace, Prelude, VarSlotRef};
@@ -205,21 +206,38 @@ fn def_targets(proto: &FnProto) -> Vec<VarSlotRef> {
 impl Evaluator {
     /// An evaluator over `prelude` (the `load` native and the domain natives
     /// and prelude values are registered here), reading sources through
-    /// `loader` and releasing effects to `sink`.
+    /// `loader` and releasing effects to `sink`, with its own instrument
+    /// registry.
     #[must_use]
     pub fn new(
-        mut prelude: Prelude,
+        prelude: Prelude,
         loader: Box<dyn SourceLoader>,
         sink: Box<dyn EffectSink>,
+    ) -> Evaluator {
+        Evaluator::with_insts(prelude, loader, sink, InstRegistry::shared())
+    }
+
+    /// `new` over a shared instrument registry (the one the runtime
+    /// resolves sounds with, 12.8.3). The prelude templates are realized
+    /// into it here and their `Install` effects released to `sink`.
+    #[must_use]
+    pub fn with_insts(
+        mut prelude: Prelude,
+        loader: Box<dyn SourceLoader>,
+        mut sink: Box<dyn EffectSink>,
+        insts: Rc<RefCell<InstRegistry>>,
     ) -> Evaluator {
         register_load(&mut prelude);
         register_domain(&mut prelude);
         let gate = Rc::new(RefCell::new(Gate::default()));
         let mut vm = Vm::new();
         vm.set_host(Some(Box::new(LoaderHost(loader, Vec::new()))));
+        vm.dsp.registry = Some(insts);
+        let ns = Namespace::new(prelude);
+        load_templates(&mut vm, ns.prelude(), sink.as_mut());
         vm.set_read_observer(Some(Box::new(GateObserver(Rc::clone(&gate)))));
         Evaluator {
-            ns: Namespace::new(prelude),
+            ns,
             graph: DepGraph::default(),
             vm,
             form_gen: 0,
@@ -238,6 +256,12 @@ impl Evaluator {
     #[must_use]
     pub fn graph(&self) -> &DepGraph {
         &self.graph
+    }
+
+    /// The instrument registry (hand the same one to the runtime).
+    #[must_use]
+    pub fn insts(&self) -> Option<Rc<RefCell<InstRegistry>>> {
+        self.vm.dsp.registry.clone()
     }
 
     /// The VM (limits are configurable here).
@@ -660,6 +684,15 @@ impl Evaluator {
             g.abort = None;
         }
         let mut value = self.vm.run(proto, &self.ns);
+        // An `inst` definition is realized with the gate still armed, so the
+        // body's reads are the form's edges (12.8.6).
+        if let (Ok(_), Some(slot)) = (&value, inst_target(form, &targets)) {
+            value = realize_inst(&mut self.vm, &self.ns, &slot, form.span).map_err(|e| {
+                diags.extend(e.diag.map(|d| *d));
+                e.failure
+            });
+        }
+        diags.append(&mut self.vm.dsp.diags);
         let (reads, abort) = {
             let mut g = self.gate.borrow_mut();
             g.active = false;

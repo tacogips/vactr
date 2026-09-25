@@ -56,6 +56,12 @@ fail_codes! {
     /// `NoopHost`.
     HostUnavailable => "host-unavailable",
     LoadFailed => "load-failed",
+    // Back end (12.8.12).
+    /// An `inst` body failed at definition time; the previous definition
+    /// stays installed (12.8.6).
+    InstFailed => "inst-failed",
+    /// An event resolved more than `MAX_CTLS` controls (event-local, 12.8.7).
+    TooManyControls => "too-many-controls",
 }
 
 impl fmt::Display for FailCode {
@@ -119,14 +125,14 @@ mod tests {
 
     #[test]
     fn code_names_are_unique_kebab_case() {
-        assert_eq!(FailCode::ALL.len(), 20);
+        assert_eq!(FailCode::ALL.len(), 22);
         let mut names: Vec<&str> = FailCode::ALL.iter().map(|c| c.as_str()).collect();
         assert!(names
             .iter()
             .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 20);
+        assert_eq!(names.len(), 22);
         assert_eq!(FailCode::LoadFailed.as_str(), "load-failed");
         assert_eq!(FailCode::DivisionByZero.to_string(), "division-by-zero");
     }

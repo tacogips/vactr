@@ -8,7 +8,7 @@
 use std::rc::Rc;
 
 use crate::reader::node::{Atom, Node, NodeKind, Op};
-use crate::types::check::{Checker, MAX_CHECK_DEPTH};
+use crate::types::check::{dsp_def, Checker, MAX_CHECK_DEPTH};
 use crate::types::diag::DiagCode;
 use crate::types::masks::{infer_masks, mixed_forcing, static_mask, ForcingMask, MaskEntry};
 use crate::types::scope::{is_falsy_lhs, BindExtra, Binding, ScopeKind};
@@ -308,6 +308,7 @@ impl Checker<'_> {
             Some("enum" | "struct" | "inst" | "look") if self.def_head_free(head) => {
                 self.definition(n, d)
             }
+            Some("bus" | "master") if dsp_def(n).is_some() => self.definition(n, d),
             _ => self.apply(n, d),
         }
     }

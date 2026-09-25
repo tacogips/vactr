@@ -11,6 +11,7 @@
 
 use std::rc::Rc;
 
+pub(crate) use crate::compile::matchc::{binder_name, literal};
 use crate::compile::proto::{
     ArgKind, CallSite, CapSrc, Fb, FbKind, FnProto, ItemKind, ListSite, Local,
 };
@@ -85,6 +86,8 @@ pub fn compile(n: &Node, cx: &mut CompileCx<'_>) -> Result<Rc<FnProto>, Diagnost
         self_def: None,
         stack_base: stack_addr(),
         overflow: false,
+        dsp: 0,
+        head: false,
     };
     c.top_form(n)?;
     if c.overflow {
@@ -130,6 +133,10 @@ pub(crate) struct Compiler<'c, 'a> {
     /// A proto table (constants, list sites, nested protos, shapes)
     /// outgrew its `u16` index: the form fails to compile.
     pub overflow: bool,
+    /// Inside an `inst`, `bus` or `master` body (implicit control names).
+    pub dsp: u32,
+    /// The next atom is a call head (never an implicit control name).
+    pub head: bool,
 }
 
 impl Compiler<'_, '_> {
@@ -423,7 +430,7 @@ impl Compiler<'_, '_> {
     fn expr_inner(&mut self, n: &Node, pos: Pos) -> Result<(), Diagnostic> {
         match &n.kind {
             NodeKind::Atom(a) => self.atom(n, a),
-            NodeKind::Call => self.call(n),
+            NodeKind::Call => self.call_dsp(n),
             NodeKind::List => self.list(n),
             NodeKind::Block if pos == Pos::Arg => self.thunk(n),
             NodeKind::Block => self.block(n),
@@ -463,7 +470,9 @@ impl Compiler<'_, '_> {
             }
             Atom::Sym(name) => {
                 let r = self.resolve(name);
-                self.load_res(&r);
+                if !self.implicit_control(name, &r) {
+                    self.load_res(&r);
+                }
             }
             Atom::Qualified { prefix, name } => {
                 match self
@@ -648,7 +657,7 @@ impl Compiler<'_, '_> {
     }
 
     /// A call: kernel heads, definition heads, then an ordinary call.
-    fn call(&mut self, n: &Node) -> Result<(), Diagnostic> {
+    pub(crate) fn call(&mut self, n: &Node) -> Result<(), Diagnostic> {
         let ch = &n.children;
         let Some(head) = ch.first() else {
             self.load_const(Value::Nil);
@@ -663,7 +672,19 @@ impl Compiler<'_, '_> {
             _ => {}
         }
         let args = &ch[1..];
-        let callee_sig = self.static_native(head);
+        // A free, never-bound name that is an `InstParam` control (12.8.6
+        // M3, B2): `cutoff` after `inst .. cutoff: .. :` or a prelude
+        // template's own header (`analog`'s `cutoff`) compiles as a call to
+        // the `"inst control"` native with the name appended as a keyword,
+        // not as a call to the (undefined) name itself.
+        let inst_ctl = self.inst_control_head(head).and_then(|name| {
+            self.inst_control_native()
+                .map(|(slot, sig)| (name, slot, sig))
+        });
+        let callee_sig = match &inst_ctl {
+            Some((_, _, sig)) => Some(*sig),
+            None => self.static_native(head),
+        };
         let site = self.site;
         self.site = site.nested();
         if let NodeKind::List = head.kind {
@@ -678,8 +699,18 @@ impl Compiler<'_, '_> {
             ));
             return Ok(());
         }
-        self.expr(head, Pos::Value)?;
-        let mut kinds = Vec::with_capacity(args.len());
+        self.head = true;
+        let r = match &inst_ctl {
+            Some((_, slot, _)) => {
+                self.mark(head.span);
+                self.load_global(slot);
+                Ok(())
+            }
+            None => self.expr(head, Pos::Value),
+        };
+        self.head = false;
+        r?;
+        let mut kinds = Vec::with_capacity(args.len() + 1);
         let mut pos: usize = 0;
         for a in args {
             match a.kind {
@@ -708,6 +739,10 @@ impl Compiler<'_, '_> {
                     pos += 1;
                 }
             }
+        }
+        if let Some((name, _, _)) = &inst_ctl {
+            self.load_const(Value::Keyword(intern_kw(name)));
+            kinds.push(ArgKind::Pos);
         }
         self.site = site;
         self.mark(n.span);
@@ -760,33 +795,4 @@ pub(crate) enum Pos {
 pub(crate) enum FnDef {
     Fn,
     Inst,
-}
-
-/// The value of a literal atom.
-pub(crate) fn literal(a: &Atom) -> Option<Value> {
-    Some(match a {
-        Atom::Int(i) => match i32::try_from(*i) {
-            Ok(x) => Value::Int(x),
-            Err(_) => Value::Int64(*i),
-        },
-        Atom::Float { value, .. } => Value::Float(*value as f32),
-        Atom::Ratio(r) => Value::Ratio(*r),
-        Atom::Str(s) => Value::Str(Rc::clone(s)),
-        Atom::Keyword(k) => Value::Keyword(intern_kw(k)),
-        Atom::Nil => Value::Nil,
-        Atom::Bool(b) => Value::Bool(*b),
-        _ => return None,
-    })
-}
-
-/// The name a `let` target or parameter binds: `x` or `x: type`.
-pub(crate) fn binder_name(n: &Node) -> Option<Rc<str>> {
-    match &n.kind {
-        NodeKind::Atom(Atom::Sym(name)) => Some(Rc::clone(name)),
-        NodeKind::Pair => match n.children.first().map(|k| &k.kind) {
-            Some(NodeKind::Atom(Atom::Keyword(name))) => Some(Rc::clone(name)),
-            _ => None,
-        },
-        _ => None,
-    }
 }

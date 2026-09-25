@@ -419,7 +419,7 @@ pub(crate) fn query_loop_at(
         match r {
             Ok(cycles) => {
                 set_region(&mut e, Ratio64::ZERO, Ratio64::ONE);
-                e.controls.insert(kw("loop"), Value::Int(1));
+                e.controls.insert(kw("loop"), Value::Bool(true));
                 e.controls
                     .insert(kw("speed-fit"), SpeedFit::LoopAt { cycles }.to_value());
                 out.push(e);

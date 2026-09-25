@@ -3501,6 +3501,24 @@ tap (native: a separate thread fed by a ring; wasm: an
 `AnalyserNode`/worklet tap) and publishes `f32` cells the evaluator
 reads for `fft n` / `amp` signals.
 
+*Amendment (author, 2026-09-25 — self-analysis and loopback).* Every
+analyzer names its SOURCE: a bus id (`:master`, a `bus :name`, a slot
+`:d1`) or the host input `:in`. Bus taps are internal copies of the bus
+signal on the analysis path (12.5 analyzer units), so the engine can
+analyse its own output without any acoustic or device loop; input
+monitoring is off unless requested. Two further sources of sample
+values reuse the same taps: `capture :bus cycles` (record a bus into a
+`SampleBuf`, the sampler's recording face) and `render cycles` (offline
+render of the current bindings through `Engine::render`, native tier
+only per 12.7 — browser reports "not available on this host"). Analysis
+functions over a sample value (`rms`, `peak`, `spectrum bins:`,
+`scope n`) run the same analyzer code on a buffer. This is also the
+TEST path: headless tests render N cycles and assert on the numbers
+(RMS, peak, band energies, zero crossings) instead of on raw sample
+equality where a numeric criterion is the intent. Owner: the analyzer
+units and `Engine::render` are TASK-008; the prelude functions and the
+REPL/editor surfaces are TASK-009/010.
+
 ### 12.4 Synthesis models (Decided: design-music.md section 4)
 
 Every Decided model — sampler, analog, FM, phase distortion,

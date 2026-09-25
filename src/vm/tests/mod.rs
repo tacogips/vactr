@@ -17,6 +17,7 @@ use crate::vm::vm::Vm;
 
 mod failures;
 mod forcing;
+mod inst;
 mod integrate_pattern;
 mod integrate_query;
 mod integrate_sound;

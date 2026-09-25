@@ -13,6 +13,7 @@ use crate::types::ty::CheckEnv;
 mod check_basic;
 mod deps;
 mod diags;
+mod inst;
 mod masks;
 mod natives;
 mod no_abort;

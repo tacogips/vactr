@@ -161,6 +161,24 @@ s {choose :bd-haus :bd-tek} > gain {range rand 0.6 1} > d1
 # that receives events; `s` selects it, always first. Sources supply
 # structure and values: step lists, `midi-notes` (MIDI in, a structure-giving
 # step) and signals (`cc n`, `fft`, `amp`). Neither midi nor osc is a sink.
+
+# ---- self-analysis and loopback (author, 2026-09-25) ------------------------
+# Every analyzer takes a SOURCE: a bus (`:master`, `:drums`, a slot `:d1`) or
+# the host input `:in`. A bus tap reads the engine's own output INTERNALLY (a
+# copy of the bus signal), never through the speakers or the input device, so
+# analysing what you play cannot feed back. Monitoring the input device stays
+# off unless asked for. The same taps feed the editor's meters, and they are
+# how tests measure sound: render offline, then analyse numbers.
+fft :master                       # spectrum bands of the master bus, as a signal
+amp :d1                           # RMS of slot 1
+scope :master 512                 # the last 512 samples, as a list (oscilloscope)
+spectrum :master bins: 64         # one FFT frame as a list (spectrum analyzer)
+let hit capture :drums 1          # record one cycle of a bus into a sample value (sampler)
+let out render 2                  # offline render of the current bindings for two cycles
+rms out  /  peak out  /  spectrum out bins: 64   # analysis over a sample value; no audio device needed
+# Decided: analyzers are signals (never audible); `capture`/`render` produce
+# ordinary sample values, so they compose with `s`, `chop`, `granular`. Offline
+# `render` is a native-tier capability (browser: diagnostic, design 12.7).
 s {midi 1} > note [:c :e :g] > d1   # MIDI channel 1 as the instrument
 [1 0.5] > osc "/trigger"
 

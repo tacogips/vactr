@@ -60,6 +60,7 @@ pub(super) fn register(p: &mut Prelude) {
     p.register("voicing", voicing);
     p.register("arp", arp);
     p.register("range", range);
+    p.register("inst control", inst_control_native);
 }
 
 /// `subject > gain v`: the control named by the native's own entry. The
@@ -73,6 +74,20 @@ fn control_native(cx: &mut NativeCx<'_>, a: &[Value], _: Kw<'_>) -> R {
         .map(|e| e.sig.name)
         .ok_or_else(|| type_err("unregistered control"))?;
     out(cx, control(intern_kw(name), pat(a, 1)?, pat(a, 0)?, None))
+}
+
+/// An `inst` template header parameter used as a call head (compiler.rs,
+/// design 12.8.6 M3, B2): the control name is not the native's own table
+/// entry (it has none) but the keyword the compiler appended as the last
+/// argument.
+fn inst_control_native(cx: &mut NativeCx<'_>, a: &[Value], _: Kw<'_>) -> R {
+    let Value::Keyword(kw) = arg(a, 2) else {
+        return Err(type_err(format!(
+            "`inst control` expects a keyword control name, got {}",
+            kind_name(&arg(a, 2))
+        )));
+    };
+    out(cx, control(kw, pat(a, 1)?, pat(a, 0)?, None))
 }
 
 /// True for a subject in the pattern domain (a pattern, a step list, a

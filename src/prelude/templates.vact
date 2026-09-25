@@ -1,0 +1,52 @@
+# Prelude synthesis templates (design-music.md sections 4 and 6; design
+# 12.4, 12.8.6). Each is an ordinary `inst`, realized to an `InstDef` when
+# the session starts; `s :analog` plays it. Header parameters are controls
+# (M3), so every knob is patternable; free control names in a body
+# (`freq`, `amp`, `attack`, `n`, ..) are implicit controls (B2). The plain
+# header form is used, not `inst drum: sampler ...:` (B3).
+
+# sample playback: the host bank by keyword, the sample index by `n`
+inst sampler bank: keyword = :bd-haus begin: float = 0 end: float = 1 loop: bool = false:
+	sample-play bank n: n rate: speed begin: begin end: end loop: loop
+		> * {env-perc attack release}
+		> * amp
+
+# analog modeling: drifting oscillator with unison, sub oscillator, ladder
+inst analog wave: keyword = :saw cutoff: float = 1200 res: float = 0.3 unison: int = 1 detune: float = 0.1:
+	vco wave freq unison: unison detune: detune drift: 0.002
+		> + {* {sub-osc freq} 0.3}
+		> ladder cutoff res
+		> * {env-adsr attack decay sustain release}
+		> * amp
+
+# FM: two operators with ratio and index
+inst fm algorithm: int = 5 ratio: float = 14 index: float = 2:
+	fm-op freq ratio: 1 index: {* index {env-perc 0.01 0.8}}
+		> fm-mod {fm-op freq ratio: ratio}
+		> * {env-adsr attack decay sustain release}
+		> * amp
+
+# phase distortion
+inst pd shape: float = 0.5:
+	phase-distortion freq shape: shape
+		> * {env-perc attack release}
+		> * amp
+
+# additive partials (a realization-time constant list)
+inst additive partials: [float] = [1 0.5 0.33 0.25 0.2]:
+	additive freq partials: partials
+		> * {env-adsr attack decay sustain release}
+		> * amp
+
+# wavetable scanned by `position`
+inst wavetable table: keyword = :basic-shapes position: float = 0:
+	wavetable table freq position: position
+		> svf lowpass cutoff res
+		> * {env-adsr attack decay sustain release}
+		> * amp
+
+# granular over a sample or table (design-music section 6)
+inst granular source: keyword = :pad-loop size: float = 0.08 density: float = 24 position: float = 0 spray: float = 0.05 pitch-spray: float = 0.02 envelope: keyword = :hann reverse: float = 0.1 freeze: bool = false:
+	granular source size: size density: density position: position spray: spray pitch: pitch pitch-spray: pitch-spray envelope: envelope reverse: reverse freeze: freeze
+		> * {env-adsr attack decay sustain release}
+		> * amp

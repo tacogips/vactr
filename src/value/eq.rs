@@ -1,6 +1,7 @@
 //! Structural equality (design 5.1, 6.5.3).
 
 use std::cmp::Ordering;
+use std::rc::Rc;
 
 use crate::value::dict::pairs;
 use crate::value::intern::KwId;
@@ -34,7 +35,8 @@ const fn is_nan(v: &Value) -> bool {
 /// Numbers compare by exact value across widths (NaN is not equal to
 /// itself). A dict equals a list whose elements are its pairs in key order.
 /// Structs are nominal; variants compare tag and fields. A path compares
-/// text and containing file, a url its text, and a sound structurally.
+/// text and containing file, a url its text, and a sound structurally; a
+/// unit generator is equal only to itself (pointer equality).
 ///
 /// # Errors
 /// `Type` when either side is a function, native, thunk, var ref, pattern,
@@ -85,6 +87,7 @@ pub fn deep_eq(a: &Value, b: &Value) -> Result<bool, Failure> {
         (Value::Path(x), Value::Path(y)) => x == y,
         (Value::Url(x), Value::Url(y)) => x == y,
         (Value::Sound(x), Value::Sound(y)) => x == y,
+        (Value::UGen(x), Value::UGen(y)) => Rc::ptr_eq(x, y),
         _ => false,
     })
 }

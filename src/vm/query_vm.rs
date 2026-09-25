@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use crate::ns::namespace::{Namespace, VarSlotRef};
 use crate::pattern::eval::QueryVm;
-use crate::value::intern::intern_sym;
+use crate::value::intern::{intern_sym, KwId};
 use crate::value::value::Value;
 use crate::vm::fail::{FailCode, Failure, Origin};
 use crate::vm::vm::{EffectMode, Vm};
@@ -62,6 +62,10 @@ impl QueryVm for VmQuery<'_> {
         self.vm.take_output()
     }
 
+    fn put_output(&mut self, out: Vec<(Origin, Rc<str>)>) {
+        self.vm.put_output(out);
+    }
+
     /// The SESSION-level `sound-kit` (a `fn`-local binding never reaches
     /// here), else the prelude's.
     fn sound_kit(&mut self) -> Result<Value, Failure> {
@@ -73,5 +77,9 @@ impl QueryVm for VmQuery<'_> {
             .or_else(|| self.ns.prelude().slot(name))
             .ok_or_else(|| Failure::new(FailCode::UndefinedName, "`sound-kit` is not bound"))?;
         self.read(&slot)
+    }
+
+    fn inst_sound(&mut self, k: KwId) -> Option<Value> {
+        self.vm.dsp.registry.as_ref()?.borrow().sound(k)
     }
 }

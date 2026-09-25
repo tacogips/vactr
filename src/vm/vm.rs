@@ -10,6 +10,7 @@ use std::any::Any;
 use std::rc::Rc;
 
 use crate::compile::proto::{Closure, FnProto, ItemKind};
+use crate::ns::insts::DspCx;
 use crate::ns::namespace::{slot_id_mark, Namespace, SlotKind, VarSlotRef};
 use crate::ns::stage::EffectBuffer;
 use crate::reader::span::Span;
@@ -81,6 +82,8 @@ pub struct Vm {
     host: Option<Box<dyn Any>>,
     /// In Query mode, local cells with ids below this outlive the query.
     query_cells_from: u64,
+    /// The instrument registry and the `inst`/`bus` body depth (12.8.6).
+    pub dsp: DspCx,
 }
 
 impl Default for Vm {
@@ -120,6 +123,7 @@ impl Vm {
             stack_base: None,
             host: None,
             query_cells_from: 0,
+            dsp: DspCx::default(),
         }
     }
 
@@ -171,6 +175,12 @@ impl Vm {
     /// Takes the `print` output captured in Query mode.
     pub fn take_output(&mut self) -> Vec<(Origin, Rc<str>)> {
         std::mem::take(&mut self.output)
+    }
+
+    /// Replaces the captured `print` output (10.4): a filter drops the
+    /// output of the events it removes rather than forwarding it.
+    pub fn put_output(&mut self, out: Vec<(Origin, Rc<str>)>) {
+        self.output = out;
     }
 
     /// Installs (or removes) the eager-read observer.

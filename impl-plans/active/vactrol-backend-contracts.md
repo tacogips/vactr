@@ -1,7 +1,7 @@
 # Vactrol Back End: Contracts and Skeleton (BE-CONTRACTS) Implementation Plan
 
 **planId**: BE-CONTRACTS (issue #3, wave 1; the contracts every TASK-007/TASK-008 wave builds on)
-**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 181; removed from the dispatch manifest by the session-182 amendment; source rides in the single workflow commit)
+**Status**: Completed (accepted by integration review; reconciled by BE-FINAL session 186; archive after the workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 12.8 (12.8.2 skeleton rule and enum shapes, 12.8.3, 12.8.5, 12.8.7, 12.8.9, 12.8.10 Cargo, 12.8.12 codes), 11.3, 11.4, 11.5, 11.7, 12.1, 12.5, 12.7, 6.5.7
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/3
@@ -339,3 +339,7 @@ logs are run 2, after the final code change:
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-007, TASK-008)
 - **Next**: vactrol-backend-sched.md, vactrol-backend-dsp.md, vactrol-backend-inst.md
+
+### Closing note (BE-FINAL, session 186)
+
+Accepted by the integration review (acceptedPlanIds) and reconciled by BE-FINAL on the joined tree: every final-tree gate exits 0 (`target/fe-logs/be-final-<check>-s186-1.log`), and the TASK-007/008 checkboxes in vactrol-core.md cite this plan's tests. R3 added the `InstResolver::bus` default method to `src/host/caps.rs`. Archive to impl-plans/completed/ in the separate docs commit after the workflow commit.

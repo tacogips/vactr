@@ -8,11 +8,13 @@
 
 use std::rc::Rc;
 
+use crate::ns::namespace::VarSlotRef;
 use crate::pattern::combinators::event_fault;
 use crate::pattern::eval::QState;
 use crate::pattern::pat::{Pat, PatNode};
 use crate::pattern::query::{q, Event, TimeSpan};
 use crate::reader::span::Span;
+use crate::value::eq::deep_eq;
 use crate::value::intern::KwId;
 use crate::value::value::Value;
 use crate::vm::fail::Failure;
@@ -30,16 +32,17 @@ pub fn control(name: KwId, value: Rc<Pat>, subject: Rc<Pat>, span: Option<Span>)
     Pat::new(PatNode::Control(name, value, subject), span, structured)
 }
 
-/// Events of a control-like node: `(result event, value)` pairs where the
-/// result carries the structure and the subject's content, and `value` is
-/// the control value found for it.
+/// Events of a control-like node: `(result event, value, late)` triples
+/// where the result carries the structure and the subject's content,
+/// `value` is the control value found for it and `late` the var or tweak
+/// that value was read from directly (11.3), if any.
 pub(crate) fn pair_up(
     value: &Pat,
     subject: &Pat,
     p: &Pat,
     span: TimeSpan,
     st: &mut QState<'_, '_>,
-) -> Vec<(Event, Value)> {
+) -> Vec<(Event, Value, Option<VarSlotRef>)> {
     let mut out = Vec::new();
     if gives_structure(subject, value) {
         for v in q(value, span, st) {
@@ -53,7 +56,7 @@ pub(crate) fn pair_up(
                         e.whole = v.whole;
                         e.part = v.part;
                         e.src = v.src.or(e.src);
-                        out.push((e, v.value.clone()));
+                        out.push((e, v.value.clone(), v.late.clone()));
                     }
                 }
                 Err(f) => event_fault(st, &v, p, f),
@@ -66,7 +69,7 @@ pub(crate) fn pair_up(
                 // with Tidal's `#`.
                 Ok(sampled) => {
                     if let Some(v) = sampled.into_iter().next() {
-                        out.push((e, v.value));
+                        out.push((e, v.value, v.late));
                     }
                 }
                 Err(f) => event_fault(st, &e, p, f),
@@ -88,10 +91,20 @@ pub(crate) fn query_mapped(
 ) -> Vec<Event> {
     let pairs = pair_up(value, subject, p, span, st);
     let mut out = Vec::with_capacity(pairs.len());
-    for (mut e, v) in pairs {
+    for (mut e, v, late) in pairs {
         match map(&v) {
-            Ok(v) => {
-                e.controls.insert(name, v);
+            Ok(mapped) => {
+                // Only an unmapped late value can travel as a cell: a mapped
+                // one (a chord's tones) no longer equals its source.
+                match late {
+                    Some(r) if deep_eq(&mapped, &v).unwrap_or(false) => {
+                        e.cells.insert(name, r);
+                    }
+                    _ => {
+                        e.cells.remove(&name);
+                    }
+                }
+                e.controls.insert(name, mapped);
                 out.push(e);
             }
             Err(f) => event_fault(st, &e, p, f),

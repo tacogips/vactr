@@ -12,6 +12,7 @@
 
 pub mod console;
 pub mod dict;
+pub mod dsp;
 pub mod effects;
 pub mod list;
 pub mod music;
@@ -57,6 +58,7 @@ pub fn register_domain(p: &mut Prelude) {
     signal::register(p);
     sound::register(p);
     tex::register(p);
+    dsp::register(p);
 }
 
 /// The complete prelude: the core and the domain (everything in the table

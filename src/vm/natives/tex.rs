@@ -18,7 +18,7 @@ use crate::tex::shader::compile_tex;
 use crate::tex::texnode::{pipe, BlendOp, ModKind, OutId, TexKind, TexNode, VParam};
 use crate::types::natives::NativeTable;
 use crate::value::intern::{intern_kw, name_of_kw, KwId};
-use crate::value::value::Value;
+use crate::value::value::{Sound, Value};
 use crate::vm::call::{kind_name, NativeCx};
 use crate::vm::fail::Failure;
 use crate::vm::natives::pattern::out as pat_out;
@@ -129,7 +129,12 @@ fn tex_arg(v: &Value, what: &str) -> Result<Rc<TexNode>, Failure> {
 }
 
 fn source(cx: &mut NativeCx<'_>, a: &[Value], _: Kw<'_>) -> R {
-    let kind = TexKind::from_name(own_name(cx)?).ok_or_else(|| type_err("unknown source"))?;
+    let name = own_name(cx)?;
+    // `osc "/addr"` is an OSC-out sound; `osc 20` stays the Hydra source.
+    if let ("osc", [Value::Str(addr)]) = (name, a) {
+        return Ok(Value::Sound(Rc::new(Sound::Osc(Rc::clone(addr)))));
+    }
+    let kind = TexKind::from_name(name).ok_or_else(|| type_err("unknown source"))?;
     tex_out(TexNode::new(kind, vparams(a)?, cx.span))
 }
 

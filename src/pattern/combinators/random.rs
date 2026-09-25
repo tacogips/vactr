@@ -80,6 +80,32 @@ fn filter(
     out
 }
 
+// design 10.4 / TASK-007 criterion 8: the output of removed work is
+// dropped -- a control evaluated on an event this filter drops must
+// never forward its captured `print` output. Structure-only output,
+// where the inner query produced no events at all, is kept (R7).
+// Shared by `query_degrade` and both `query_sometimes` branches.
+fn query_filtered(
+    inner: &Pat,
+    x: &PParam,
+    keep_below: bool,
+    p: &Pat,
+    span: TimeSpan,
+    st: &mut QState<'_, '_>,
+) -> Vec<Event> {
+    let before = st.cx.vm.take_output();
+    let events = q(inner, span, st);
+    let produced = !events.is_empty();
+    let kept = filter(events, x, keep_below, p, st);
+    let inner_out = st.cx.vm.take_output();
+    let mut out = before;
+    if !(produced && kept.is_empty()) {
+        out.extend(inner_out);
+    }
+    st.cx.vm.put_output(out);
+    kept
+}
+
 pub(crate) fn query_degrade(
     inner: &Pat,
     x: &PParam,
@@ -88,8 +114,7 @@ pub(crate) fn query_degrade(
     span: TimeSpan,
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
-    let events = q(inner, span, st);
-    filter(events, x, keep_below, p, st)
+    query_filtered(inner, x, keep_below, p, span, st)
 }
 
 pub(crate) fn query_sometimes(
@@ -100,12 +125,10 @@ pub(crate) fn query_sometimes(
     span: TimeSpan,
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
-    let events = q(inner, span, st);
-    let mut out = filter(events, x, false, p, st);
+    let mut out = query_filtered(inner, x, false, p, span, st);
     out.extend(subtree(p, span.begin, st, |st| {
         let t = apply_transform(f, inner, st)?;
-        let events = q(&t, span, st);
-        Ok(filter(events, x, true, p, st))
+        Ok(query_filtered(&t, x, true, p, span, st))
     }));
     out
 }

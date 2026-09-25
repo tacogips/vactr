@@ -9,6 +9,7 @@
 
 use std::rc::Rc;
 
+use crate::host::caps::GraphHandle;
 use crate::ns::namespace::VarSlotRef;
 use crate::ns::tweak::TweakId;
 use crate::value::intern::{name_of_kw, KwId, SymId};
@@ -72,6 +73,10 @@ pub enum StagedEffect {
     },
     /// A console line from `print`.
     Console(Rc<str>),
+    /// Install a graph on the audio side: released by an `inst`, `bus` or
+    /// `master` definition. BE-INST stages it and BE-SCHED applies it
+    /// (12.8.6).
+    Install(GraphHandle),
 }
 
 /// Receives released effects in order.

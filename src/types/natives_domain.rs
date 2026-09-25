@@ -9,6 +9,7 @@
 //! Domain parameters take a number, signal, pattern or fn of time
 //! (design-visual section 1), so they are typed `any`.
 
+use crate::dsp::build::DSP_KEYWORDS;
 use crate::types::natives::{HostCap, NativeMask, NativeSig};
 
 use NativeMask::{Fn as F, Late as L, Value as V};
@@ -55,6 +56,14 @@ const fn f(
 /// A control step: `s :bd > gain 0.4` is `(gain (s :bd) 0.4)`.
 const fn control(name: &'static str) -> NativeSig {
     f(name, 2, 2, CONTROL, &[V, L])
+}
+
+/// A unit generator or effect: any number of ugen inputs and the DSP
+/// named parameters (12.8.6).
+const fn dsp(name: &'static str) -> NativeSig {
+    f(name, 0, 1, &["fn ugen -> ugen"], &[V])
+        .rest()
+        .kw(DSP_KEYWORDS)
 }
 
 const fn signal(name: &'static str) -> NativeSig {
@@ -119,6 +128,17 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     control("cut"),
     control("orbit"),
     control("velocity"),
+    // An `inst` template header parameter compiled as a call head
+    // (compiler.rs, design 12.8.6 M3, B2): the control name arrives as a
+    // keyword argument. The name has a space, so it can never be written
+    // in source; only the compiler emits a call to it.
+    f(
+        "inst control",
+        3,
+        3,
+        &["fn ctl any keyword -> ctl"],
+        &[V, L, V],
+    ),
     // The fixed overload group (20 Q2, M1): number subject = visual source,
     // pattern subject = the `shape` control; pattern subject = scale notes,
     // texture subject = the visual transform.
@@ -273,5 +293,125 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
         .needs(&[HostCap::Render]),
     f("use-canvas", 2, 2, &["fn int int -> nil"], &[V, V])
         .effect()
-        .needs(&[HostCap::Render]),
+        .needs(&[HostCap::Render]), // Unit generators and effects (design-music sections 2 and 4-6,
+    // design 12.8.6). `saw`, `tri`, `lpf`, `hpf`, `delay`, `gain`, `pan`,
+    // `room`, `saturate` and `range` are the entries above: the VM picks
+    // their DSP meaning from the subject (B2).
+    dsp("sin-osc"),
+    dsp("pulse"),
+    dsp("white-noise"),
+    dsp("bpf"),
+    dsp("comb"),
+    dsp("env-perc"),
+    dsp("env-adsr"),
+    dsp("line"),
+    dsp("sample-play"),
+    dsp("vco"),
+    dsp("sub-osc"),
+    dsp("ladder"),
+    dsp("svf"),
+    dsp("fm-op"),
+    dsp("fm-mod"),
+    dsp("phase-distortion"),
+    dsp("additive"),
+    dsp("wavetable"),
+    dsp("granular"),
+    dsp("compressor"),
+    dsp("expander"),
+    dsp("gate"),
+    dsp("limiter"),
+    dsp("multiband-compressor"),
+    dsp("multiband-expander"),
+    dsp("transient"),
+    dsp("multiband-transient"),
+    dsp("auto-level"),
+    dsp("sag"),
+    dsp("peq"),
+    dsp("geq"),
+    dsp("dynamic-eq"),
+    dsp("tilt"),
+    dsp("tone"),
+    dsp("loudness-eq"),
+    dsp("notch"),
+    dsp("narrow"),
+    dsp("linear-phase-eq"),
+    dsp("group-delay-eq"),
+    dsp("crossover"),
+    dsp("ping-pong"),
+    dsp("multitap"),
+    dsp("time-align"),
+    dsp("plate"),
+    dsp("fdn"),
+    dsp("convolution"),
+    dsp("scatter"),
+    dsp("tube"),
+    dsp("clip"),
+    dsp("harmonics"),
+    dsp("exciter"),
+    dsp("multiband-saturate"),
+    dsp("sub-synth"),
+    dsp("bandwidth-extend"),
+    dsp("dynamic-saturate"),
+    dsp("chorus"),
+    dsp("flanger"),
+    dsp("phaser"),
+    dsp("tremolo"),
+    dsp("auto-pan"),
+    dsp("auto-filter"),
+    dsp("pitch-shift"),
+    dsp("pitch-shift-hq"),
+    dsp("freq-shift"),
+    dsp("rotary"),
+    dsp("wow-flutter"),
+    dsp("doppler"),
+    dsp("vibrato"),
+    dsp("bitcrush"),
+    dsp("decimate"),
+    dsp("jitter"),
+    dsp("noise-blend"),
+    dsp("hum"),
+    dsp("tape"),
+    dsp("cassette"),
+    dsp("vinyl"),
+    dsp("vinyl-artifacts"),
+    dsp("codec"),
+    dsp("radio"),
+    dsp("tv-audio"),
+    dsp("digital-error"),
+    dsp("dsd-imd"),
+    dsp("modal"),
+    dsp("horn"),
+    dsp("width"),
+    dsp("balance"),
+    dsp("multiband-balance"),
+    dsp("ms"),
+    dsp("crossfeed"),
+    dsp("crosstalk-cancel"),
+    dsp("phase-select-eq"),
+    dsp("spatial-map"),
+    dsp("matrix"),
+    dsp("declick"),
+    dsp("declip"),
+    dsp("dehum"),
+    dsp("denoise"),
+    dsp("mute"),
+    dsp("polarity"),
+    dsp("dc-offset"),
+    dsp("dry-wet"),
+    dsp("section"),
+    dsp("channel-divider"),
+    dsp("fir-crossover"),
+    dsp("granulate"),
+    dsp("level"),
+    dsp("spectrum"),
+    dsp("spectrogram"),
+    dsp("note-spectrogram"),
+    dsp("oscilloscope"),
+    dsp("pitch-meter"),
+    dsp("stereo-meter"),
+    f("bus", 2, 2, &["fn ctl keyword -> ctl"], &[V, L]),
+    f("master", 1, 1, &["fn any -> nil"], &[F]).effect(),
+    NativeSig::value("lowpass", &["keyword"]),
+    NativeSig::value("highpass", &["keyword"]),
+    NativeSig::value("bandpass", &["keyword"]),
 ];

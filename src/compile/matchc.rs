@@ -5,15 +5,16 @@
 
 use std::rc::Rc;
 
-use crate::compile::compiler::{literal, too_deep, Compiler, FnDef, Pos, Res};
+use crate::compile::compiler::{too_deep, Compiler, FnDef, Pos, Res};
 use crate::compile::proto::{
     field_params, fn_params, struct_fields, Arity, Fb, FbKind, Param, Shape,
 };
 use crate::compile::sites::SiteCtx;
-use crate::ns::namespace::SlotKind;
+use crate::ns::namespace::{SlotKind, VarSlotRef};
 use crate::reader::node::{Atom, Node, NodeKind, Op as NodeOp};
 use crate::types::diag::{DiagCode, Diagnostic, Severity};
 use crate::types::masks::{infer_masks, ForcingMask, MaskEntry};
+use crate::types::natives::NativeSig;
 use crate::value::intern::{intern_kw, intern_sym, name_of_sym, KwId};
 use crate::value::value::{Value, VariantVal};
 use crate::vm::fail::FailCode;
@@ -567,13 +568,18 @@ impl Compiler<'_, '_> {
         self.latent(&mask, &params);
         let saved = self.self_def.take();
         let target = top.then(|| self.def_target(&name));
-        if let Some(slot) = &target {
+        // An `inst` body is built once and never recurses: its own name
+        // there is the prelude ugen (`inst additive ..: additive freq ..`).
+        let inst = u32::from(kind == FnDef::Inst);
+        if let Some(slot) = target.as_ref().filter(|_| inst == 0) {
             self.self_def = Some((Rc::clone(&name), slot.clone()));
         }
         let body = &ch[ch.len() - 1];
+        self.dsp += inst;
         let r = self.function(Some(Rc::clone(&name)), n, params, mask, &mut |c| {
             c.block(body)
         });
+        self.dsp -= inst;
         self.self_def = saved;
         let (fb, mask, defaults) = r?;
         self.finish_fn(fb, mask, &defaults, kind == FnDef::Inst)?;
@@ -699,5 +705,94 @@ impl Compiler<'_, '_> {
         let target = top.then(|| self.def_target(name));
         self.ctor(name, n, fields, shape)?;
         self.bind_def(name, target.as_ref(), SlotKind::Fn, n)
+    }
+}
+
+impl Compiler<'_, '_> {
+    /// A call; `bus :name {block}` and `master {block}` compile their block
+    /// as a DSP body (12.8.6).
+    pub(crate) fn call_dsp(&mut self, n: &Node) -> Result<(), Diagnostic> {
+        let body = u32::from(crate::types::check::dsp_def(n).is_some());
+        self.dsp += body;
+        let r = self.call(n);
+        self.dsp -= body;
+        r
+    }
+
+    /// Inside an `inst`, `bus` or `master` body, a free name that is a
+    /// control-table row (not a call head; unbound, or only a prelude
+    /// name) is that control's `Param` node (B2, 12.8.6). Returns true
+    /// when it loaded one.
+    pub(crate) fn implicit_control(&mut self, name: &str, r: &Res) -> bool {
+        let head = std::mem::take(&mut self.head);
+        if head || self.dsp == 0 {
+            return false;
+        }
+        let free = matches!(r, Res::Global(s) if !s.is_bound() || s.kind() == SlotKind::Prelude);
+        match crate::dsp::controls::row(name).filter(|_| free) {
+            Some(row) => {
+                self.load_const(crate::ns::insts::param_node(row.ctl));
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// The control name a call head names outside its `inst`'s own body
+    /// (12.8.6 M3, B2): a free, never-bound name that is an `InstParam` row
+    /// (`dsp::controls`, 12.8.7). Bare use inside the body is
+    /// `implicit_control` above.
+    pub(crate) fn inst_control_head(&mut self, head: &Node) -> Option<Rc<str>> {
+        let NodeKind::Atom(Atom::Sym(name)) = &head.kind else {
+            return None;
+        };
+        let Res::Global(slot) = self.resolve(name) else {
+            return None;
+        };
+        if slot.is_bound() {
+            return None;
+        }
+        let row = crate::dsp::controls::row(name)?;
+        (row.route == crate::dsp::controls::CtlRoute::InstParam).then(|| Rc::clone(name))
+    }
+
+    /// The prelude slot and signature of the `"inst control"` native, next
+    /// to `control(name)` in the table.
+    pub(crate) fn inst_control_native(&self) -> Option<(VarSlotRef, NativeSig)> {
+        let slot = self.cx.ns.prelude().slot(intern_sym("inst control"))?;
+        let sig = match slot.get() {
+            Value::Native(id) => self.cx.ns.prelude().native(id)?.sig,
+            _ => return None,
+        };
+        Some((slot, sig))
+    }
+}
+
+/// The value of a literal atom.
+pub(crate) fn literal(a: &Atom) -> Option<Value> {
+    Some(match a {
+        Atom::Int(i) => match i32::try_from(*i) {
+            Ok(x) => Value::Int(x),
+            Err(_) => Value::Int64(*i),
+        },
+        Atom::Float { value, .. } => Value::Float(*value as f32),
+        Atom::Ratio(r) => Value::Ratio(*r),
+        Atom::Str(s) => Value::Str(Rc::clone(s)),
+        Atom::Keyword(k) => Value::Keyword(intern_kw(k)),
+        Atom::Nil => Value::Nil,
+        Atom::Bool(b) => Value::Bool(*b),
+        _ => return None,
+    })
+}
+
+/// The name a `let` target or parameter binds: `x` or `x: type`.
+pub(crate) fn binder_name(n: &Node) -> Option<Rc<str>> {
+    match &n.kind {
+        NodeKind::Atom(Atom::Sym(name)) => Some(Rc::clone(name)),
+        NodeKind::Pair => match n.children.first().map(|k| &k.kind) {
+            Some(NodeKind::Atom(Atom::Keyword(name))) => Some(Rc::clone(name)),
+            _ => None,
+        },
+        _ => None,
     }
 }

@@ -4,9 +4,9 @@
 //! The checker reads the schemes, `infer_masks` reads the masks, and the VM
 //! registers each implementation against its entry. Core entries live here
 //! (lang-reference section 5); domain entries (patterns, controls, signals,
-//! sounds, visuals) live in `natives_domain.rs`. The synthesis, effect, bus
-//! and granular vocabulary (TASK-008) and package loading (TASK-009) are
-//! absent, so the checker reports them as `undefined-name`.
+//! sounds, visuals, and the unit generators, effects and buses of 12.8.6)
+//! live in `natives_domain.rs`. Package loading (TASK-009) is absent, so
+//! the checker reports it as `undefined-name`.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;

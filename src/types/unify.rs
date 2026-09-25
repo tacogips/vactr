@@ -447,6 +447,8 @@ impl Unifier {
                 self.bind_num(*x, bound);
                 Ok(())
             }
+            // A ugen input takes a number, a ugen or a signal (12.8.6).
+            (Ty::UGen, t) if is_numeric(t) || matches!(t, Ty::NumLit(_) | Ty::UGen) => Ok(()),
             (Ty::Pattern(x), _) => self.unify_step(x, &a, d),
             (Ty::Opt(x), Ty::Opt(y)) => self.unify_at(x, y, d),
             (Ty::Opt(_), Ty::Nil) | (Ty::Nil, Ty::Opt(_)) => Ok(()),

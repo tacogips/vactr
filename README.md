@@ -7,9 +7,10 @@ specification.
 
 ## Status
 
-The language front end and middle end are implemented as a Rust library
-(`impl-plans/active/vactrol-core.md` TASK-001..006). Every top-level form
-goes read -> expand -> check -> compile -> run.
+The language front end, middle end and runtime back end are implemented
+as a Rust library (`impl-plans/active/vactrol-core.md` TASK-001..008).
+Every top-level form goes read -> expand -> check -> compile -> run, and
+bound patterns are scheduled into audio, MIDI and OSC sinks.
 
 Front end (TASK-001..003):
 
@@ -50,6 +51,25 @@ and `sample` stay behind the `NoopHost` source loader for now.
 
 The slot table, scheduler, hosts, DSP, session/REPL/LSP, and editor
 (TASK-007..010) are not implemented yet.
+
+Back end (TASK-007..008):
+
+- `src/sched/`: the scheduler and slot table (d1..d9, `slot`, `out`), the
+  two-horizon staging buffer with occurrence merge, commit-time control
+  cells, slot generations with the two-class control channel, `once`/`at`,
+  dry run in Query effect mode, telemetry, MIDI input draining and MIDI
+  clock slave/master.
+- `src/dsp/`: the DSP engine (voice pool, event ring, graph and bus graph,
+  ugen and effect catalogs, synthesis templates, analyzers writing f32
+  cells, the granular engine with live-bus capture) with no allocation or
+  locking on the audio callback.
+- `src/host/`: capability traits and `NoopHost`; `native/` (cpal, timer
+  tick, midir, WAV loader) behind the `host-native` feature; `wasm/` (raw
+  ABI, control-cell mirror protocol, resource lifecycle) behind `host-wasm`
+  with the AudioWorklet glue in `editor/worklet/` and the browser lifecycle
+  harness in `editor/dev-harness/`.
+- `examples/beep.rs`: one event end to end on the native host
+  (`cargo run --example beep`; audible check pending).
 
 ## Name
 

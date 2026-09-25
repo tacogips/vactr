@@ -1,6 +1,7 @@
 //! Namespace, package and staging tests (ME-VM required tests).
 
 mod evaluator;
+mod inst;
 mod load;
 mod namespace;
 mod pkg;

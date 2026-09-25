@@ -13,7 +13,7 @@ use crate::types::infer_call::{pair_key, split_args, STEP_ALL, STEP_FIRST};
 use crate::types::natives::{HostCap, NativeSig};
 use crate::types::natives_domain::CONTROLS;
 use crate::types::scope::ScopeKind;
-use crate::types::ty::{KeySet, Ty};
+use crate::types::ty::{BindKind, KeySet, Ty};
 
 /// What the host provides, as far as the checker needs it.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -90,6 +90,35 @@ impl HostManifest {
     #[must_use]
     pub fn has_caps(&self, needs: &[HostCap]) -> bool {
         needs.iter().all(|c| self.caps.contains(c))
+    }
+
+    /// The editor declaration of one builtin (design 13.5: `EditorDecl`/
+    /// `ParamMeta` carried through `HostManifest`).
+    #[must_use]
+    pub fn editor_decl(&self, name: &str) -> Option<&'static crate::dsp::meta::EditorDecl> {
+        crate::dsp::meta::decl_for(name)
+    }
+
+    /// Every editor declaration this host's catalog defines (design 13.5).
+    #[must_use]
+    pub fn editor_decls(&self) -> &'static [crate::dsp::meta::EditorDecl] {
+        crate::dsp::meta::all()
+    }
+
+    /// The `inst` header parameter names of every synth template this host
+    /// provides (design 12.8.6 M3, 13.5): each is a control-table row, read
+    /// through the `EditorDecl`/`ParamMeta` carried here. `Open` synths
+    /// have no enumerable template list, so it is empty.
+    #[must_use]
+    pub fn template_params(&self) -> Vec<&'static str> {
+        let KeySet::Of(synths) = &self.synths else {
+            return Vec::new();
+        };
+        synths
+            .iter()
+            .filter_map(|name| self.editor_decl(name))
+            .flat_map(|decl| decl.params.iter().map(|p| p.name))
+            .collect()
     }
 }
 
@@ -178,7 +207,12 @@ impl Checker<'_> {
         }
         match &n.kind {
             NodeKind::Atom(Atom::Keyword(k)) => {
-                if check && !self.kit_keys.contains(k) && !self.inst_names.contains(&**k) {
+                let session_inst = self.env.global(k).is_some_and(|g| g.kind == BindKind::Inst);
+                if check
+                    && !self.kit_keys.contains(k)
+                    && !self.inst_names.contains(&**k)
+                    && !session_inst
+                {
                     self.emit(
                         DiagCode::UnknownKeyword,
                         n.span,

@@ -1,7 +1,7 @@
 # Vactrol Back End: Scheduler, Slot Table, Runtime, Dry Run (BE-SCHED) Implementation Plan
 
 **planId**: BE-SCHED (vactrol-core.md TASK-007 except MIDI input/clock/note lifetime, which BE-MIDI completes)
-**Status**: Ready
+**Status**: Completed (accepted by integration review; reconciled by BE-FINAL session 186; archive after the workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 11.2, 11.3 (all of it), 11.4, 11.5, 11.6, 10.3, 10.4, 18, 12.8.1, 12.8.3, 12.8.4, 12.8.5, 12.8.7
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/3
@@ -161,22 +161,130 @@ as LOG(`be-sched-own`), `exit=0`, run count cited per test file.
 
 ## Completion Criteria (map to vactrol-core.md TASK-007)
 
-- [ ] `Runtime`, `RuntimeSink`, `SlotTable`, staging/merge/ledger, commit, control channel, cells, dry run, telemetry,
+- [x] `Runtime`, `RuntimeSink`, `SlotTable`, staging/merge/ledger, commit, control channel, cells, dry run, telemetry,
       `once`/`at`, tempo change, captured output implemented as listed
-- [ ] TASK-007 criteria 1, 2, 3, 4, 5, 8 (captured print), 9 (dry run), 11 (mixed faults) proven by the tests above
+- [x] TASK-007 criteria 1, 2, 3, 4, 5, 8 (captured print), 9 (dry run), 11 (mixed faults) proven by the tests above
       (criteria numbered in order of the TASK-007 checklist; 6 and 7 are BE-MIDI's, 12 is BE-FINAL's)
-- [ ] Criterion 10 (hush/stop per release class) proven for pattern and texture slots; the open-input-voice half is BE-MIDI's
-- [ ] TASK-008 criteria 5 and 6, diagnostic half (granular admission with origin, event still commits) proven by
+- [x] Criterion 10 (hush/stop per release class) proven for pattern and texture slots; the open-input-voice half is BE-MIDI's
+- [x] TASK-008 criteria 5 and 6, diagnostic half (granular admission with origin, event still commits) proven by
       `src/sched/tests/sched/granular.rs`
-- [ ] V1-V8 and S1 pass with logs cited; `final-hashes.txt` written
+- [ ] V1-V8 and S1 pass with logs cited; `final-hashes.txt` written (session 182: V1, V3f, V4, V5, V6a, V6b, V8 and S1
+      pass and `final-hashes.txt` is written; V2, V3 and V3t fail only in BE-DSP/BE-INST files that are still being
+      written, 0 findings and 0 failures in this plan's files; re-run at the wave join / BE-FINAL)
 
 ## Progress Log
 
 (Implementer: one `### Session: <date> (session <S>, BE-SCHED implementer)` entry: work done, design differences, hash
 and intent paths, evidence per row, blockers. Edit only this log.)
 
+### Session: 2026-09-25 (session 182, BE-SCHED implementer)
+
+**Work done** (every file inside this plan's writePaths; no `mod.rs` edited):
+- `slots.rs` (241 lines): `SlotId`/`CtlId` kept; `SlotKind { Pattern, Texture }`, `Binding::{Pattern, Texture}` with
+  `from_value`, `Slot` (key, id, kind, bound, pending `(Binding, boundary)`, gen, orbit, muted, ephemeral, per-generation
+  lanes, fault bookkeeping), `SlotTable` (d1..d9 = ids 1..9, named slots and `o0..o3` from 10, `get`, `get_or_insert`,
+  `iter`, `remove`, `hush_all`).
+- `staging.rs` (634): `Coverage` (coalesced interval list), `OccRecord`, `Fragment`, `Dirty`, `Staging`
+  (`merge_fragment` = coverage union only; `invalidate` + `replace` = scoped removal and semantic payload replacement;
+  `truncate_from` for rebind; `emittable`; `mark_committed`; `expire`), `Lane` (one per (slot, gen): `[from, until)`,
+  offset for `once`, `queried_to`, ledger, dirty spans, `once` overrides), `query_lane`/`extend`/`query_span` (queries
+  split at every cycle boundary of pattern time).
+- `ledger.rs` (45): per-lane emitted-occurrence set, expiring when the position passes the whole.
+- `commit.rs` (631): `commit` (seconds once through `Clock`; `Route` per event; `note`/`n` through the scale to `freq`,
+  `gain` -> `amp` id, keyword/bool encoding, `orbit | cut << 8` in `voice_hint`; late controls -> `Ctl::Cell` via
+  `ControlCells` or the pre-ack `Ctl::Const`; `too-many-controls`; MIDI/OSC baked at transmission; chords give one event
+  per tone), `SampleTable` (`Loading | Installed | Retiring | Failed`, requested after a successful bind dry run, first
+  unseen use dropped with ONE `host-unavailable` "still loading", `bank` control = resource id, bank `index` from `n`),
+  granular admission (`density`, `size`, live capture depth -> `CapabilitySet::require`, diagnostic with span + slot +
+  beat, event still commits), and the tick's commit pass (`commit_all`, `send`).
+- `control.rs` (350): `ControlChannel` (immediate entry = monotone `SlotControl::merge`, future entry replaces only
+  itself, delivered to audio + MIDI + OSC in effective-time order, re-send every `resend_ticks`, `host-transport` after
+  `transport_diag_ticks`, missed boundary deadline reported once), `Runtime::rebind` (next cycle boundary, prospective
+  lane, old staged work at/after the boundary discarded, boundary control for a slot that already played) and
+  `Runtime::revoke` (stop Natural / hush Panic, texture outputs set to the empty program), MIDI stale-start note-off.
+- `cells.rs` (543): `ControlCells` (authoritative values, per-id epochs, pool, ack-gated `CellInit`, per-tick coalesced
+  `CellBatch` with at most one in flight + one pending, re-send capped at the transport threshold, `resync` snapshot,
+  retire + epoch-gated reuse, pool exhaustion -> `Const` + one `beyond-capability`), `CellPort`, `Tier`, `CellKey`,
+  `CellMap`.
+- `dryrun.rs` (34), `telemetry.rs` (101: `PlayingEvent` incl. `kind` and `reduced_lead`, bounded queue, per-slot window
+  writing `hits`/`ctrl`), `oneshot.rs` (221: `AtQueue`, `run_thunk` in Normal mode, `Runtime::tempo` re-anchor + gen bump
+  + restage, `Runtime::one_shot` ephemeral one-cycle lane shifted to its start).
+- `runtime.rs` (718): `RuntimeConfig` (12.8.4 defaults + `tier` + `seed`), `CommandQueue`, `RuntimeSink`, `DrainReport`,
+  `TickReport`, `Runtime::{new, drain, tick, telemetry, input_cells, slot_gen, invalidate, resync_cells, ...}`; `drain`
+  applies SlotBind (dry run -> pending or faults), Revoke, CellUpdate/TweakRefresh/Bindings (cell write + invalidation of
+  every uncommitted span), Tempo (Bpm/Cycle applied; Clock/MidiClockOut stored for BE-MIDI), OneShot, Console, Install
+  (cell-backed defaults initialized, then `swap_graph`); `tick` runs 11.3 steps (1)-(6), drains `HostMsg` acks
+  (controls, cells, samples, late counters, analysis cells), samples `InstResolver::signal_inputs()`, and auto-widens
+  `commit_lead` (`latency-widened`). `#[cfg(test)]` hooks: `stage_span`, `requery_dirty`, `commit_only`, `queued`.
+- `pattern/step.rs`, `pattern/combinators/control.rs` (item 9): a step that is a direct `VarRef` to a slot holding a
+  plain value sets `Event::late`; `pair_up` returns the value event's `late` and `query_mapped` copies it into
+  `Event::cells` under the control name when the mapped value is unchanged (a chord's mapped tones are not cells).
+  Query results are otherwise unchanged; all pre-existing pattern tests pass.
+
+**Tests** (`src/sched/tests/sched.rs` rig + 8 files, 47 tests, emitted multiplicity asserted at the recording hosts;
+`played()` models the 11.3 sink contract with an explicit control delay): merge.rs 12 (criterion 1), rebind.rs 3
+(criterion 2), control.rs 13 (criteria 3, 4, 10 incl. texture), cells.rs 9 (criterion 5, both tiers), output.rs 2
+(criterion 8), dryrun.rs 2 (criterion 9), granular.rs 2 (TASK-008 criteria 5/6 diagnostic half), faults.rs 4
+(criterion 11, sample table, telemetry). A mutation check (coverage replace instead of union) fails 8 merge tests.
+
+**Design differences** (the design wins where it is explicit; these fill gaps):
+- `Tier::Browser(Box<dyn CellPort>)` instead of a bare `Browser`: `AudioHost::post` carries one fixed-size record and a
+  `CellBatch`'s entries follow its header in the byte stream, so cell records need their own port (12.8.5 "only the
+  transport differs"). BE-WASM implements `CellPort` over its main-half channel.
+- `drain` returns `DrainReport { diags, faults, dry_output, console }`: dry-run faults are `Failure`s (no `DiagCode`
+  maps them); dry-run `print` stays in `dry_output`.
+- Captured output is held per occurrence ONSET (10.4 "keyed by its event's identity"): a window with occurrences may
+  re-evaluate continuing events, so its own output is dropped and a point query at each new uncommitted onset captures
+  that event's lines. Windows without occurrences keep their output (forwarded when they pass the commit horizon).
+  Overlapping polyphony at the same point shares the point query's lines (documented limit).
+- A rebind always lands at `ceil(pos)` (11.2); a fresh slot at a boundary starts at once. `once` starts at the commit
+  horizon or `pos + at/beats_per_cycle`; an `at` body runs when its position is reached and a `once` it stages starts at
+  that tick's commit horizon.
+- `orbit`/`cut` travel in `voice_hint` (`orbit | cut << 8`); `bus` and audio `legato` have no `AudioEvent` field (legato
+  scales MIDI `dur`); a later wave adds them if the engine needs them.
+- MIDI stale-start recovery is issued by the scheduler (`MidiEvent::NoteOff` for committed older-gen notes at/after a
+  control's effective time), since `MidiHost` has no ack path; OSC irrevocability is the sink's queue rule.
+- Live granular capture depth = `max(size, position)` seconds when a `source` control is present.
+- Runtime site cells take ids `0..min(cell_pool, INST_CELL_BASE)`, below BE-INST's instrument range (896..1024).
+- `Runtime::new` builds the clock with `expect` on the default tempo (cps 1/2, cannot fail on any input).
+- Rust was written by this plan's single implementer (one owner for the cross-file contracts, as BE-CONTRACTS did);
+  checks were run directly with logged gates instead of the check-and-test-after-modify agent.
+
+**Cross-wave notes for BE-FINAL** (not edited here): `InstResolver` has no `default_cells`, so a cell-backed inst default
+is initialized with its control row default at `Install` and is not rewritten on `TweakRefresh`; BE-MIDI owns the
+`use-clock`/`midi-clock-out` behavior stored in `Runtime::{clock_request, midi_clock_out}`.
+
+**Evidence** (`tmp/be-backend-20260925-s181/BE-SCHED/attempt-1/`: `pre-edit-hashes.txt`, `post-edit-hashes.txt`,
+`intent.md`, `notes.md`, `owned-rs.txt`, `v4.txt`, `v5.txt`, `v8.txt`, `scratch-source-hashes.txt`,
+`runtime.pre-split.rs`, `final-hashes.txt`; no drift event: no other plan wrote these files). Logs in `target/fe-logs/`:
+- V1 `be-sched-build-s182-2.log` exit=0 (run 1 exit=0)
+- V2 `be-sched-clippy-s182-2.log` exit=101: every finding is in BE-DSP files (`dsp/effects/*`, `dsp/engine.rs`,
+  `dsp/ring.rs`, `dsp/ugen/mod.rs`, `dsp/tests/dsp.rs`); 0 in this plan's files. Isolated copy
+  (`be-sched-clippy-scratch-s182-1.log`, BE-DSP files stubbed): findings only in BE-INST's `dsp/build.rs`/`ns/insts.rs`.
+- V3 `be-sched-nextest-s182-1.log` exit=100: 623 tests, the only failure is BE-INST's
+  `types::tests::natives::required_names_present_and_out_of_scope_absent` ("bus must be absent");
+  `be-sched-nextest-nofailfast-s182-1.log`: 623 run, 622 passed, 1 failed (the same). Run 2 (`-s182-2`) could not
+  compile tests: BE-DSP's `src/dsp/tests/dsp.rs` declares test files not yet written.
+- V3t `be-sched-cargotest-s182-1.log` exit=101: lib 612 passed, 1 failed (the same BE-INST test).
+- V3f `be-sched-fixtures-s182-1.log` exit=0: 10 run, 10 passed, 1 skipped.
+- S1 `be-sched-own-s182-1.log` exit=0: 47 run, 47 passed (merge 12, rebind 3, control 13, cells 9, output 2, dryrun 2,
+  granular 2, faults 4). Current source (after the last change, the cell-pool cap): `be-sched-own-scratch-s182-1.log`
+  exit=0, 47/47, on an isolated copy whose owned files hash-match the shared tree (`scratch-source-hashes.txt`);
+  `be-sched-scratch-full-s182-1.log`: 569 run, 568 passed, the 1 failure is the BE-INST test above.
+- V6a `be-sched-wasm32-s182-2.log` exit=0; V6b `be-sched-wasm32-hostwasm-s182-2.log` exit=0,
+  `target/wasm32-unknown-unknown/debug/vactrol.wasm` exists.
+- V4 largest `.rs` in the tree 785 (`dsp/engine.rs`); this plan's largest `sched/runtime.rs` 718 (all under 800).
+- V5 prints `none`. V8 `rustfmt --edition 2021 --check` on the 21 owned `.rs` files exit 0.
+
+**Blockers**: none for this plan's deliverables. V2/V3/V3t on the shared tree wait on BE-DSP/BE-INST files outside this
+plan's writePaths (recorded, not repaired, per the manifest's parallel-safety rule); they are re-run at the wave join.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-007)
 - **Previous**: vactrol-backend-contracts.md
 - **Next**: vactrol-backend-midi.md, vactrol-backend-native.md, vactrol-backend-wasm.md
+
+### Closing note (BE-FINAL, session 186)
+
+Accepted by the integration review (acceptedPlanIds) and reconciled by BE-FINAL on the joined tree: every final-tree gate exits 0 (`target/fe-logs/be-final-<check>-s186-1.log`), and the TASK-007/008 checkboxes in vactrol-core.md cite this plan's tests. BE-FINAL serial repairs touched this plan's area: R3 (commit writes the `bus` control), R4 (commit resolves `speed-fit`), R2c (a `bank`/`table`/`source` keyword control overrides the routed bank); targeted tests for criteria 3, 4, 8, 9, 10 sub-clauses were added in `src/host/tests/e2e/sched_gaps.rs`. Archive to impl-plans/completed/ in the separate docs commit after the workflow commit.

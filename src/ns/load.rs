@@ -1,9 +1,9 @@
 //! Source loading (design 7.1.3 "Source loading", lang-reference section 4).
 //!
 //! The one host capability of this issue: `SourceLoader` reads the file a
-//! path names and assigns its `FileId`. `NoopHost` reads nothing
-//! (`host-unavailable`); TASK-007 moves it to `host/noop.rs` and adds the real
-//! loaders behind the same trait. The `load` native runs the file through
+//! path names and assigns its `FileId`. `NoopHost` (in `host/noop.rs`) reads
+//! nothing (`host-unavailable`); the host tasks add the real loaders behind
+//! the same trait. The `load` native runs the file through
 //! read -> expand -> check -> compile -> run in a FRESH session-level scope
 //! whose parent is the prelude (never the caller's session) and returns the
 //! value of its last top-level form. The file's check diagnostics keep
@@ -37,18 +37,9 @@ pub trait SourceLoader {
     fn read(&mut self, path: &PathVal) -> Result<(FileId, Rc<str>), Failure>;
 }
 
-/// The default loader: no host, every read fails `host-unavailable`.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct NoopHost;
-
-impl SourceLoader for NoopHost {
-    fn read(&mut self, path: &PathVal) -> Result<(FileId, Rc<str>), Failure> {
-        Err(Failure::new(
-            FailCode::HostUnavailable,
-            format!("no host can read `{}`", path.text),
-        ))
-    }
-}
+/// The default loader: no host, every read fails `host-unavailable`. It
+/// lives in `host::noop` with every other capability (design 12.8.2).
+pub use crate::host::noop::NoopHost;
 
 /// The VM host capability that carries the loader (`Vm::set_host`) and the
 /// check diagnostics of the files loaded since the last `take_load_diags`.

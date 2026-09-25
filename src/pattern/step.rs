@@ -202,7 +202,26 @@ fn step_events(
                     Ok(())
                 }
                 Value::Nil => Ok(()),
-                other => atomic(other, src, whole, piece, p, st, out),
+                other => {
+                    let mark = out.len();
+                    atomic(other, src, whole, piece, p, st, out)?;
+                    // A direct var or tweak read (the slot holds the value
+                    // itself, not a function of time): commit keeps the
+                    // source so the value can travel as a control cell
+                    // (11.3).
+                    if let Value::VarRef(r) = value {
+                        let direct = !matches!(
+                            r.get(),
+                            Value::Fn(_) | Value::Native(_) | Value::Thunk(_) | Value::VarRef(_)
+                        );
+                        if direct {
+                            for e in &mut out[mark..] {
+                                e.late = Some(r.clone());
+                            }
+                        }
+                    }
+                    Ok(())
+                }
             }
         }
         other => atomic(other.clone(), src, whole, piece, p, st, out),
@@ -330,6 +349,8 @@ impl Event {
             controls: std::collections::BTreeMap::new(),
             src,
             occ: OccKey::empty(),
+            late: None,
+            cells: std::collections::BTreeMap::new(),
         }
     }
 }

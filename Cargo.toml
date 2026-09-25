@@ -2,6 +2,7 @@
 name = "vactrol"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.83"
 description = "Vactrol scripting language"
 
 homepage = "https://github.com/tacogips/vactrol"
@@ -11,12 +12,16 @@ readme = "README.md"
 
 [features]
 default = ["host-native"]
-host-native = []
+host-native = ["dep:cpal", "dep:midir"]
 host-wasm = []
 lsp = []
 
 [dependencies]
-# Add your dependencies here
+
+# Native-only host crates (design 12.8.10): never compiled for wasm32.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cpal = { version = "0.16", optional = true }
+midir = { version = "0.10", optional = true }
 
 [dev-dependencies]
 
@@ -33,3 +38,9 @@ path = "src/main.rs"
 [lib]
 name = "vactrol"
 path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
+
+[[example]]
+name = "beep"
+path = "examples/beep.rs"
+required-features = ["host-native"]

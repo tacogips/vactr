@@ -3,6 +3,7 @@
 
 pub mod depgraph;
 pub mod evaluator;
+pub mod insts;
 pub mod journal;
 pub mod load;
 pub mod namespace;

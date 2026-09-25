@@ -135,6 +135,24 @@ diag_codes! {
     ClockSourceUnavailable => "clock-source-unavailable",
     // Reactive (5.6).
     DependencyCycle => "dependency-cycle",
+    // Back end: scheduler, hosts and DSP (12.8.12).
+    /// An instrument or bus graph over `NODE_CAP` nodes (16.1).
+    GraphTooLarge => "graph-too-large",
+    /// Controls unacknowledged past the threshold (11.3, 12.8.4).
+    HostTransport => "host-transport",
+    RingOverflow => "ring-overflow",
+    /// Warning: the commit lead widened after late events (12.8.4).
+    LatencyWidened => "latency-widened",
+    ArenaExhausted => "arena-exhausted",
+    InstallQueueOverflow => "install-queue-overflow",
+    /// Warning: sustained grain skipping (12.6).
+    GrainSkip => "grain-skip",
+    /// Warning: a voice was stolen on pool exhaustion (11.7).
+    VoiceSteal => "voice-steal",
+    /// Warning: the external MIDI clock stopped arriving (11.7).
+    ClockLost => "clock-lost",
+    /// `use-bpm` while the clock follows `:midi` (11.7).
+    ClockExternal => "clock-external",
 }
 
 impl DiagCode {
@@ -149,7 +167,11 @@ impl DiagCode {
             | DiagCode::EffectInPattern
             | DiagCode::UnboundedSource
             | DiagCode::MixedForcing
-            | DiagCode::LatentForcing => Severity::Warning,
+            | DiagCode::LatentForcing
+            | DiagCode::LatencyWidened
+            | DiagCode::GrainSkip
+            | DiagCode::VoiceSteal
+            | DiagCode::ClockLost => Severity::Warning,
             DiagCode::ShadowsPrelude => Severity::Hint,
             _ => Severity::Error,
         }
@@ -210,14 +232,14 @@ mod tests {
 
     #[test]
     fn code_names_are_unique_kebab_case() {
-        assert_eq!(DiagCode::ALL.len(), 65);
+        assert_eq!(DiagCode::ALL.len(), 75);
         let mut names: Vec<&str> = DiagCode::ALL.iter().map(|c| c.as_str()).collect();
         assert!(names
             .iter()
             .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 65);
+        assert_eq!(names.len(), 75);
         assert_eq!(DiagCode::MisplacedArrow.as_str(), "misplaced-arrow");
     }
 
@@ -236,7 +258,9 @@ mod tests {
             .iter()
             .filter(|c| c.default_severity() == Severity::Hint)
             .count();
-        assert_eq!((warnings, hints), (7, 1));
+        assert_eq!((warnings, hints), (11, 1));
+        assert_eq!(DiagCode::VoiceSteal.default_severity(), Severity::Warning);
+        assert_eq!(DiagCode::ClockExternal.default_severity(), Severity::Error);
     }
 
     #[test]

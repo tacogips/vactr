@@ -18,7 +18,7 @@ use crate::types::masks::{CalleeRef, ForcingMask};
 use crate::types::natives::{NativeKind, NativeSig, NativeTable};
 use crate::types::ty::{BindKind, CheckEnv, GlobalInfo};
 use crate::value::intern::{intern_sym, name_of_sym, SymId};
-use crate::value::value::{NativeId, Value};
+use crate::value::value::{NativeId, Sound, Value};
 use crate::vm::fail::{FailCode, Failure};
 use crate::vm::natives::NativeFn;
 
@@ -560,6 +560,10 @@ impl Namespace {
     fn global_info(&self, slot: &VarSlotRef) -> GlobalInfo {
         let kind = match slot.kind() {
             SlotKind::Var => BindKind::Var,
+            // A realized `inst` is a sound (12.8.6).
+            SlotKind::Fn if matches!(slot.get(), Value::Sound(s) if matches!(*s, Sound::Inst(_))) => {
+                BindKind::Inst
+            }
             SlotKind::Fn => BindKind::Fn,
             _ => BindKind::Let,
         };

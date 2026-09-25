@@ -115,6 +115,12 @@ fn write_value(f: &mut fmt::Formatter<'_>, v: &Value, top: bool) -> fmt::Result 
             Sound::Builtin(k) => write!(f, "(sound :{})", name_of_kw(*k)),
             Sound::Sample(p) => write!(f, "(sound {})", p.text),
             Sound::MidiOut(ch) => write!(f, "(sound midi {ch})"),
+            Sound::Inst(id) => write!(f, "(sound inst {})", id.get()),
+            Sound::Osc(addr) => {
+                f.write_str("(sound osc ")?;
+                write_quoted(f, addr)?;
+                f.write_char(')')
+            }
         },
         Value::Fn(_) => f.write_str("<fn>"),
         Value::Native(_) => f.write_str("<native>"),
@@ -124,5 +130,6 @@ fn write_value(f: &mut fmt::Formatter<'_>, v: &Value, top: bool) -> fmt::Result 
         Value::Signal(_) => f.write_str("<signal>"),
         Value::Inst(_) => f.write_str("<inst>"),
         Value::Tex(_) => f.write_str("<tex>"),
+        Value::UGen(_) => f.write_str("<ugen>"),
     }
 }

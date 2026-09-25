@@ -231,6 +231,9 @@ impl Checker<'_> {
                 format!("`{}` takes {want} arguments, found {count}", sig.name),
             );
         }
+        if let Some(t) = self.dsp_call(sig, &a) {
+            return t;
+        }
         let numeric = NUMERIC.contains(&sig.name);
         // The overload group resolves on the first argument's type (M1).
         let scheme = if sig.is_overloaded() {
@@ -266,6 +269,24 @@ impl Checker<'_> {
             "/" if arg_tys.iter().all(|t| self.int_like(t)) => Ty::Ratio,
             "+" | "-" | "*" | "/" | "mod" | "min" | "max" => self.arith_result(&arg_tys, ret),
             _ => ret,
+        }
+    }
+
+    /// A ugen operand of `+ - *` or a ugen subject of a name shared with a
+    /// control, signal or visual selects the DSP node (12.8.6, B2); `osc`
+    /// on a string is an OSC sound.
+    fn dsp_call(&self, sig: &NativeSig, a: &Args<'_>) -> Option<Ty> {
+        let ty = |p: &Node| self.u.shallow(&self.ty_of(p));
+        let first = a.positional.first().map(|p| ty(p));
+        match sig.name {
+            "osc" if first == Some(Ty::Str) => Some(Ty::Sound),
+            "+" | "-" | "*" if a.positional.iter().any(|p| ty(p) == Ty::UGen) => Some(Ty::UGen),
+            "gain" | "pan" | "lpf" | "hpf" | "room" | "delay" | "saturate" | "range"
+                if first == Some(Ty::UGen) =>
+            {
+                Some(Ty::UGen)
+            }
+            _ => None,
         }
     }
 

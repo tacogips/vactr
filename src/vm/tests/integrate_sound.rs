@@ -17,6 +17,8 @@ fn sound_str(v: &Value) -> String {
             Sound::Builtin(k) => format!("builtin :{}", name_of_kw(*k)),
             Sound::Sample(p) => format!("sample {}", p.text),
             Sound::MidiOut(c) => format!("midi {c}"),
+            Sound::Inst(i) => format!("inst {}", i.get()),
+            Sound::Osc(a) => format!("osc {a}"),
         },
         other => format!("not a sound: {other}"),
     }

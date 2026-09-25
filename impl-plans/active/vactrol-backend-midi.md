@@ -1,7 +1,7 @@
 # Vactrol Back End: MIDI Input, Note Lifetime, Clock and Transport (BE-MIDI) Implementation Plan
 
 **planId**: BE-MIDI (vactrol-core.md TASK-007 MIDI deliverables: `MidiInHost` draining, `cc` cells, `midi-notes` live realization, note lifetime, MIDI clock slave/master, Start/Stop/Continue, `use-clock`, `midi-clock-out`)
-**Status**: Ready
+**Status**: Completed (accepted by integration review; reconciled by BE-FINAL session 186; archive after the workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 11.7 (all), 11.1, 11.3 (priority channel, `SlotControl`), 12.8.12 "MIDI wiring (chosen: MIDI owns the runtime.rs edit)", 12.8.4 (clock thresholds)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/3
@@ -95,17 +95,101 @@ proving the wiring changed no scheduler behavior.
 
 ## Completion Criteria (map to vactrol-core.md TASK-007)
 
-- [ ] `MidiInHost` draining, `cc` cells, `midi-notes` live realization, note lifetime, clock slave/master, transport,
-      `use-clock`/`midi-clock-out` implemented and wired
-- [ ] TASK-007 criteria 6 and 7 proven; the open-input half of criterion 10 proven
-- [ ] V1-V8, M1, M2 pass with logs cited; `final-hashes.txt` written
+- [x] `MidiInHost` draining, `cc` cells, `midi-notes` live realization, note lifetime, clock slave/master, transport,
+      `use-clock`/`midi-clock-out` implemented and wired (src/sched/midi_in.rs, src/sched/midi_clock.rs; runtime.rs
+      call sites listed in tmp/be-backend-20260925-s181/BE-MIDI/attempt-1/intent.md and runtime.rs.diff)
+- [x] TASK-007 criteria 6 and 7 proven; the open-input half of criterion 10 proven (src/sched/tests/midi/{input,clock,
+      transport,lifetime}.rs, 17 tests; be-midi-own-s182-1.log 17/17)
+- [x] V1-V8, M1, M2 pass with logs cited; `final-hashes.txt` written (see the session-182 log)
 
 ## Progress Log
 
 (Implementer: one `### Session: <date> (session <S>, BE-MIDI implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-25 (session 182, BE-MIDI implementer)
+
+**Dependency admission**: BE-SCHED and BE-DSP are in the dispatch `acceptedPlanIds`; the pre-edit runtime.rs hash
+(bd9c7331...) equals BE-SCHED's final-hashes.txt.
+
+**Work**:
+- `src/sched/midi_in.rs` (539 lines): `MidiIn` (lane table cached by bound-pattern identity, ordered pending notes,
+  arrivals, seq counters), `NoteInstance { key, slot, gen, seq, filtered, channel, pitch, open, sink }`, `Arrival`,
+  `LiveSink`. `take_midi_in` (cc -> `InputCells::set_cc(ch, controller, value/127)`, clock/transport dispatch, NoteOn
+  velocity 0 = NoteOff), `play_live_notes` (after activation: `input_lane_walk` per bound pattern, `realize_note`,
+  `commit()` directly, `CtlMsg::LiveNoteOn { tag, ev }` per voice on the audio priority channel; MIDI-out notes with
+  open duration; OSC sent), `note_off` (earliest unmatched arrival of (channel, pitch); filtered/closed consumed
+  silently; one `VoiceRelease` per started voice, MIDI-out a note-off), `close_live_notes` (stop/hush/transport stop),
+  `note_stolen` (`voice-steal` warning from the engine's cumulative `Counters.stolen`).
+- `src/sched/midi_clock.rs` (466 lines): `MidiClockState`; source switch by rebuilding the `Clock` exactly at the
+  current position (no clock/ edit needed); pulses through `MidiClockSync`; `Start` restarts every pattern slot at
+  cycle 0 (gen bump, `None`), `Stop` freezes (gen bump, staging/ledger cleared, `Natural` to all sinks, instances
+  closed, clock pinned), `Continue` resumes from the frozen position; clock-lost after `midi_clock_timeout` with
+  freewheel and re-sync on the pulse-grid point nearest the freewheeled position; master Start/Clock/Stop/Continue
+  sent only when a pulse's host time enters the commit horizon.
+- `src/sched/runtime.rs` (749 lines; call sites only, diff in attempt-1/runtime.rs.diff): two `RuntimeConfig` fields
+  (`midi_clock_timeout` 0.5, `clock_smoothing` 0.1, design 12.8.4), two `Runtime` fields, `Revoke` -> `close_live_notes`,
+  `Tempo` -> `apply_clock_settings`, tick -> `take_midi_in` + frozen early return + `play_live_notes` after activation +
+  `emit_midi_clock` after commit, `Counters` arm -> `note_stolen`.
+- Tests: `src/sched/tests/midi.rs` (harness: scripted `MidiInHost`, `MidiRig`, `EngineRig` feeding recorded calls into
+  a real `dsp::Engine` at their arrival times, every block under `alloc_probe::armed` with zero allocations asserted),
+  `midi/input.rs` (4), `midi/clock.rs` (3), `midi/transport.rs` (2), `midi/lifetime.rs` (8).
+- `clock/` not edited (hashes equal pre-edit).
+
+**Design differences (recorded)**:
+1. `NoteInstance` records are grouped per arrival: a NoteOff matches the earliest unmatched arrival of (channel,
+   pitch) and settles every listening lane's instance of it (two slots, or a stack of two lanes, both release).
+2. A chord realized from one note shares one tag; the release posts one `VoiceRelease` per started voice.
+3. MIDI channel numbering of `MidiInEvent.ch` is 1..16, as `cc channel:` and `midi-notes channel:` (BE-NATIVE's
+   adapter maps status nibbles 0..15 to 1..16).
+4. MIDI-routed live notes are sent with `dur = inf` and ended by `MidiEvent::NoteOff`; stop/hush send that note-off
+   directly (a MIDI host need not track open notes). They bypass `recent_midi`.
+5. `Start` carries no timestamp: cycle 0 is anchored at the draining tick's host time; `once` slots and `at` thunks
+   keep their positions across a `Start` rewind (documented limitation).
+6. `midi-clock-out true` sends `Start` together with the first pulse that enters the commit horizon.
+
+**Verification** (logs under target/fe-logs/, each ends with exit=):
+| Gate | Command | Log | Result |
+|------|---------|-----|--------|
+| V1 | `CARGO_TERM_QUIET=true cargo build` | be-midi-build-s182-1.log | exit 0 |
+| V2 | `cargo clippy --all-targets -- -D warnings` | be-midi-clippy-s182-1.log | exit 0 |
+| V8 | `cargo fmt --check` | be-midi-fmt-s182-2.log | exit 0 (the earlier be-midi-fmt-s182-1.log exit 1 had diffs only in BE-WASM's then in-progress src/host/wasm/{main_half,worklet_half}.rs) |
+| V8 own | `rustfmt --edition 2021 --check` on the 8 owned .rs files | be-midi-fmt-owned-s182-1.log | exit 0 |
+| V3 | nextest (full) | be-midi-nextest-s182-1.log | exit 0, 747/747 |
+| V3t | `CARGO_TERM_QUIET=true cargo test` | be-midi-cargotest-s182-1.log | exit 0, lib 737 passed, fixtures 10 passed |
+| V3f | nextest `binary(spec_fixtures)` | be-midi-fixtures-s182-1.log | exit 0, 10/10 |
+| M1 | nextest `test(/sched::tests::midi/)` | be-midi-own-s182-1.log | exit 0, 17/17 |
+| M2 | nextest `test(/sched::tests::sched/)` | be-midi-schedregress-s182-1.log | exit 0, 47/47 |
+| V6a | `cargo build --target wasm32-unknown-unknown` | be-midi-wasm32-s182-1.log | exit 0 |
+| V6b | same, `--no-default-features --features host-wasm` | be-midi-wasm32-hostwasm-s182-1.log | exit 0 |
+| V4 | largest .rs files | be-midi-wc-s182-1.log | largest 786 (dsp/engine.rs); owned max runtime.rs 749 |
+| V5 | std I/O grep | be-midi-stdgrep-s182-1.log | none |
+Mutation checks (isolated copy /tmp/vactrol-midi-mut, own target dir): latest-first NoteOff matching fails 2 lifetime
+tests; a no-op `close_live_notes` fails the stop and hush tests.
+
+**Evidence**: tmp/be-backend-20260925-s181/BE-MIDI/attempt-1/{intent.md, pre-edit-hashes.txt, runtime.rs.pre,
+runtime.rs.diff, owned-rs.txt, final-hashes.txt}.
+
+**Downstream (not this plan)**: formal test-integrity/adversarial/integration review, core-plan checkboxes and README
+(BE-FINAL), commit.
 
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-007)
 - **Previous**: vactrol-backend-sched.md, vactrol-backend-dsp.md
 - **Next**: vactrol-backend-finalize.md
+
+### FINDING KEY NOTE (operator, 2026-09-25, after the BE-NATIVE and BE-WASM attempt-1 failures)
+
+- The step6-test-integrity-check and step7-adversarial-review output contracts
+  reject unknown keys INSIDE each `findings[]` item. BE-NATIVE failed with
+  `$.findings[0].intentRef additional property is not allowed` and BE-WASM with
+  `$.findings[0].intentIncerence ...`: both were misspellings of the accepted key
+  `intentReference`. Use ONLY the keys the riela contract defines for a finding item:
+  `findingId`, `severity`, `category`, `file`, `line`, `message`, `evidence`
+  (confirmed against the riela binary); put anything else, such as an intent
+  reference or a fix-cost note, inside the `message` or `evidence` text. `findings` must
+  be present (empty array when none) and the outputs must not carry `planId`.
+
+### Closing note (BE-FINAL, session 186)
+
+Accepted by the integration review (acceptedPlanIds) and reconciled by BE-FINAL on the joined tree: every final-tree gate exits 0 (`target/fe-logs/be-final-<check>-s186-1.log`), and the TASK-007/008 checkboxes in vactrol-core.md cite this plan's tests. Archive to impl-plans/completed/ in the separate docs commit after the workflow commit.

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::compile::proto::Closure;
-use crate::dsp::graph::InstId;
+use crate::dsp::graph::{InstId, UGenNode};
 use crate::ns::namespace::{FormGen, VarSlotRef};
 use crate::pattern::pat::Pat;
 use crate::pattern::signal::Sig;
@@ -56,6 +56,8 @@ pub enum Value {
     Url(Rc<str>),
     /// A sound selected by `s` (6.5.8).
     Sound(Rc<Sound>),
+    /// A unit-generator node built by an `inst` or `bus` body (12.8.6).
+    UGen(Rc<UGenNode>),
 }
 
 impl Value {
@@ -111,12 +113,15 @@ pub struct PathVal {
     pub file: Option<FileId>,
 }
 
-/// A sound: a builtin host sound, a sample file, or a MIDI-out channel.
+/// A sound: a builtin host sound, a sample file, a MIDI-out channel, a
+/// session or template instrument, or an OSC address (12.8.6).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Sound {
     Builtin(KwId),
     Sample(PathVal),
     MidiOut(u8),
+    Inst(InstId),
+    Osc(Rc<str>),
 }
 
 /// An immutable list, with element provenance when it came from a literal.

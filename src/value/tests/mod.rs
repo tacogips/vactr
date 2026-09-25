@@ -72,6 +72,10 @@ fn tagging_every_non_shell_variant() {
         Value::path("/abs/x", None),
         Value::url("https://example.org/x.vact"),
         Value::Sound(Rc::new(crate::value::value::Sound::MidiOut(1))),
+        Value::UGen(Rc::new(crate::dsp::graph::UGenNode {
+            kind: crate::dsp::graph::UGenKind::BusInput,
+            args: Box::new([]),
+        })),
     ];
     let tags: Vec<&str> = values
         .iter()
@@ -95,6 +99,7 @@ fn tagging_every_non_shell_variant() {
             Value::Path(_) => "path",
             Value::Url(_) => "url",
             Value::Sound(_) => "sound",
+            Value::UGen(_) => "ugen",
             Value::Fn(_)
             | Value::Thunk(_)
             | Value::VarRef(_)
@@ -107,7 +112,7 @@ fn tagging_every_non_shell_variant() {
         tags,
         [
             "nil", "bool", "int", "int64", "float", "float64", "ratio", "keyword", "str", "list",
-            "dict", "struct", "variant", "native", "inst", "range", "path", "url", "sound"
+            "dict", "struct", "variant", "native", "inst", "range", "path", "url", "sound", "ugen"
         ]
     );
 }

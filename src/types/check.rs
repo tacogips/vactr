@@ -123,7 +123,11 @@ impl<'a> Checker<'a> {
             type_names: BTreeMap::new(),
             variants: BTreeMap::new(),
             inst_names: BTreeSet::new(),
-            inst_controls: BTreeSet::new(),
+            inst_controls: manifest
+                .template_params()
+                .into_iter()
+                .map(Rc::from)
+                .collect(),
             kit_keys: manifest.sound_kit_keys(),
             mute: 0,
             mute_types: 0,
@@ -419,6 +423,20 @@ pub(crate) fn def_head(form: &Node) -> Option<&'static str> {
     }
 }
 
+/// `bus :name {block}` or `master {block}`: a bus definition head, whose
+/// block is a DSP body (12.8.6).
+pub(crate) fn dsp_def(form: &Node) -> Option<&'static str> {
+    let ch = &form.children;
+    if !matches!(form.kind, NodeKind::Call) || !matches!(ch.last()?.kind, NodeKind::Block) {
+        return None;
+    }
+    match (ch.first()?.sym_name()?, ch.len()) {
+        ("master", 2) => Some("master"),
+        ("bus", 3) if matches!(ch[1].kind, NodeKind::Atom(Atom::Keyword(_))) => Some("bus"),
+        _ => None,
+    }
+}
+
 /// The name of a definition: `pluck` or the key of `drum: sampler`.
 pub(crate) fn def_name(n: &Node) -> Option<Rc<str>> {
     match &n.kind {
@@ -435,9 +453,19 @@ pub(crate) fn def_name(n: &Node) -> Option<Rc<str>> {
 impl Checker<'_> {
     /// `enum`, `struct`, `inst` and `look` (7.1.4 definition heads).
     pub(crate) fn definition(&mut self, n: &Node, d: u32) -> Ty {
-        let head = def_head(n).unwrap_or("");
+        let head = def_head(n).or_else(|| dsp_def(n)).unwrap_or("");
         match head {
             "enum" => self.enum_form(n),
+            "bus" | "master" => {
+                // A bus body builds effect nodes: checked for the no-abort
+                // property only, like an `inst` body.
+                self.mute += 1;
+                if let Some(block) = n.children.last() {
+                    self.block(block, d, None);
+                }
+                self.mute -= 1;
+                Ty::Nil
+            }
             "struct" => {
                 let Some(id) = self.def_id(n, "struct") else {
                     return Ty::Nil;

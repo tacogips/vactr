@@ -21,6 +21,7 @@ use crate::value::intern::{name_of_kw, KwId};
 use crate::value::value::{NativeId, Value};
 use crate::vm::fail::{FailCode, Failure, Origin};
 use crate::vm::frame::{Pending, RetTo};
+use crate::vm::natives::dsp;
 use crate::vm::vm::{internal, shallow, spread, EffectMode, Flow, Vm};
 
 fn not_callable(v: &Value) -> Failure {
@@ -56,6 +57,7 @@ pub fn kind_name(v: &Value) -> &'static str {
         Value::Path(_) => "a path",
         Value::Url(_) => "a url",
         Value::Sound(_) => "a sound",
+        Value::UGen(_) => "a unit generator",
     }
 }
 
@@ -188,6 +190,17 @@ impl Vm {
                 let v = self.call_native(ns, *id, &p.args, &p.kw, p.span)?;
                 self.deliver(ns, v, p.ret)
             }
+            // `saw 440` inside an `inst` body is the ugen (B2).
+            Value::Signal(s) if dsp::signal_call(self, s, &p.args) => {
+                let mut cx = NativeCx {
+                    vm: self,
+                    ns,
+                    id: NativeId::new(0),
+                    span: p.span,
+                };
+                let v = dsp::signal_ugen(&mut cx, s, &p.args, &p.kw)?;
+                self.deliver(ns, v, p.ret)
+            }
             other => {
                 if !p.kw.is_empty() {
                     return Err(not_callable(other));
@@ -218,6 +231,16 @@ impl Vm {
             .native(id)
             .ok_or_else(|| Failure::new(FailCode::UndefinedName, "the native is not available"))?;
         let sig = entry.sig;
+        // A DSP name shared with a pattern control or visual (B2).
+        if dsp::collides(self, sig.name, args) {
+            let mut cx = NativeCx {
+                vm: self,
+                ns,
+                id,
+                span,
+            };
+            return dsp::collision(&mut cx, sig.name, args, kw);
+        }
         let n = args.len();
         if n < usize::from(sig.min_args) || sig.max_args.is_some_and(|m| n > usize::from(m)) {
             return Err(Failure::new(

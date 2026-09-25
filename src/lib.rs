@@ -14,6 +14,9 @@
 //!   the VM with the core and domain natives.
 //! - `pattern`, `clock`, `tex`: the pattern engine and signals, the cycle
 //!   clock, and the visual chains with their shader and uniform plans.
+//! - `sched`, `dsp`, `host`: the scheduler and slot table, the DSP graph and
+//!   audio engine, and the capability hosts with their wire records
+//!   (design 11, 12, 12.8).
 //!
 //! Core modules use no OS threads and no I/O, so the crate builds for
 //! `wasm32-unknown-unknown`; host file and sample I/O stay behind the
@@ -49,6 +52,7 @@ pub mod clock;
 pub mod compile;
 pub mod dsp;
 pub mod expand;
+pub mod host;
 pub mod ns;
 pub mod pattern;
 pub mod reader;
@@ -57,3 +61,9 @@ pub mod tex;
 pub mod types;
 pub mod value;
 pub mod vm;
+
+/// The counting allocator of the zero-allocation proof (design 12.8.9).
+/// Test builds only: release, example and wasm builds never contain it.
+#[cfg(test)]
+#[global_allocator]
+static ALLOC: dsp::alloc_probe::Counting = dsp::alloc_probe::Counting;

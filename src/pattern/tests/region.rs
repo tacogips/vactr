@@ -200,7 +200,10 @@ fn splice_loop_at_fit_mark_commit_time_speed() {
     let la = loop_at(s(kw("break")), PParam::int(2), None);
     let ev = run(&la, cycle(0)).events;
     assert_eq!(region(&ev[0]), (r(0, 1), r(1, 1)));
-    assert_eq!(show(ctl_of(&ev[0], "loop").unwrap()), show(&int(1)));
+    assert_eq!(
+        show(ctl_of(&ev[0], "loop").unwrap()),
+        show(&Value::Bool(true))
+    );
     let lf = speed_fit(&ev[0]);
     assert_eq!(lf, SpeedFit::LoopAt { cycles: r(2, 1) });
     assert!((lf.resolve(3.0, cycle_s) - 0.75).abs() < 1e-12);

@@ -69,7 +69,8 @@ impl CapabilitySet {
             max_grain_size: 2.0,
             max_capture_seconds: 30.0,
             multichannel: 2,
-            offline_render: false,
+            // Offline `render` through a headless native host (14.5.9).
+            offline_render: true,
             midi_in: true,
             midi_out: true,
             file_access: true,

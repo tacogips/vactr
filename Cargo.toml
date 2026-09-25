@@ -12,16 +12,27 @@ readme = "README.md"
 
 [features]
 default = ["host-native"]
-host-native = ["dep:cpal", "dep:midir"]
+host-native = ["dep:cpal", "dep:midir", "dep:tungstenite", "dep:getrandom"]
 host-wasm = []
-lsp = []
+# The LSP attach client uses the session socket client (tungstenite), so
+# `lsp` implies `host-native` (design 14.5.2).
+lsp = ["host-native", "dep:tower-lsp", "dep:tokio"]
 
+# Core dependencies (design 14.5.2): wasm32-clean.
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+miniz_oxide = "0.9"
 
 # Native-only host crates (design 12.8.10): never compiled for wasm32.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cpal = { version = "0.16", optional = true }
 midir = { version = "0.10", optional = true }
+# Session socket and token (`host-native`), `vactrol lsp` (`lsp`); 14.5.2.
+tungstenite = { version = "0.29", optional = true }
+getrandom = { version = "0.3", optional = true }
+tower-lsp = { version = "0.20", optional = true }
+tokio = { version = "1", optional = true, features = ["rt", "io-std", "macros", "sync"] }
 
 [dev-dependencies]
 

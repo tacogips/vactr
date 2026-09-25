@@ -10,6 +10,7 @@ use crate::types::diag::{DiagCode, Severity};
 use crate::types::manifest::HostManifest;
 use crate::types::ty::CheckEnv;
 
+mod analysis;
 mod check_basic;
 mod deps;
 mod diags;

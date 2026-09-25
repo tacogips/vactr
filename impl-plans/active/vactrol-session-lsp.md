@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Language Server (SS-LSP) Implementation Plan
 
 **planId**: SS-LSP (issue #4, wave 4; `vactrol lsp` over stdio with tower-lsp behind the `lsp` feature)
-**Status**: Ready
+**Status**: Completed (accepted by the session-185 integration review; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/design-implementation.md 14.3, 14.5.11 (threading, features, attach, smoke test), 14.5.7 (LSP-only analysis without execution), 14.5.8 (directive lint), 14.5.2 (gating); design-docs/specs/command.md (`vactrol lsp [--session <ws-url>]`)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -118,13 +118,79 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
 
 ## Completion Criteria
 
-- [ ] Items 1-5 implemented
-- [ ] The LSP smoke test over stdio passes (`publishDiagnostics` plus hover on spec examples)
-- [ ] V1-V9 and G1-G2 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-5 implemented
+- [x] The LSP smoke test over stdio passes (`publishDiagnostics` plus hover on spec examples)
+- [x] V1-V9 and G1-G2 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, SS-LSP implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 185, SS-LSP implementer)
+
+**Dependency**: SS-SESSION is in the dispatch `acceptedPlanIds`. Evidence:
+`tmp/ss-session-20260925-s183/SS-LSP/attempt-1/` (`pre-edit-hashes.txt`, `intent.md` with one line per edit,
+`final-hashes.txt`, `scratch-logs/`).
+
+**Delivered** (only writePaths were edited):
+- `src/lsp/mod.rs`: `run_stdio(session: Option<&str>) -> i32` keeps the seeded signature. It runs a current-thread
+  tokio runtime and tower-lsp over stdin/stdout, and returns 0 only when `shutdown` preceded the end of input.
+- `src/lsp/analysis.rs`: the ONE analysis thread (`spawn`) owns an `Analyzer` holding every `!Send` value. It
+  talks over `std::sync::mpsc` using `AnalysisReq` (Configure/Open/Change/Close/Hover/Complete/Format/
+  RuntimeDiags), each with a tokio `oneshot` reply.
+  - Per document it runs `session::eval::analyze` plus `directives::build_table`.
+  - Hover shows the innermost typed node.
+  - Completion offers NativeTable names, top-level names, the manifest `:sound`/`:synth`/`:control` keywords,
+    package prefixes and qualified names from fetched packages, filtered by the word before the cursor.
+  - `format_edits` is whitespace-only: it skips every line containing `#@`.
+  - `PkgConfig::load` reads `<root>/vactrol.lock`. It opens the package cache only when the cache and its
+    `.staging` directory already exist, so analysis never creates files.
+- `src/lsp/convert.rs`: byte offset and UTF-16 `Position` conversion, `Diagnostic`/`WireDiag` to
+  `lsp_types::Diagnostic` (severity map, kebab code, source `vactrol`).
+- `src/lsp/server.rs`: `Backend` (`initialize` advertises full sync, hover, completion triggered by `:` and `.`,
+  and formatting). Handlers hold only `Send` values, so no `Rc` crosses an `.await`.
+  - Attach: `attach` starts a tungstenite client thread. It sends `subscribe {diagnostics: true}` and forwards
+    `diag` bodies over a tokio channel to `forward_runtime_diags`, which merges them (add per file, clear per
+    slot) and re-publishes. A failure logs one stderr line and the server continues.
+  - `ExitAwareStdin` exists because tower-lsp 0.20's `Server::serve` returns only at end of input, or on the
+    NEXT message after `exit`. The wrapper reports end of input right after the `exit` notification, so a
+    client that keeps the pipe open still sees the process exit. `tower` is not a direct dependency and
+    `Cargo.toml` is not in this plan's writePaths, so a Service wrapper was not possible.
+- Tests:
+  - `src/lsp/tests/analysis.rs` (9 tests): UTF-16 positions, hover int/float, completion (`sine`, `:bd`),
+    whitespace-only formatting with `#@` lines byte-identical, an unfetched import giving
+    `package-not-fetched` with nothing written, undefined-name and duplicate-label lint, runtime diag
+    merge/clear, `ExitAwareStdin`, and attach against a loopback tungstenite server.
+  - `tests/lsp_smoke.rs`: lang-reference block 1 over stdio gives exactly one publishDiagnostics (clean).
+    Hover gives `int` on a literal and `total: int` on a bound name; a second document gets `undefined-name`;
+    shutdown/exit returns code 0 within 10 s.
+
+**Deviations (plan-level)**:
+- `AnalysisReq::RuntimeDiags` carries the whole `DiagBody` (`add` plus `clear`) instead of `{file, diags}`,
+  so slot clears are honored.
+- The "recording sink stays empty" proof: `Analyzer` owns no host or runtime by construction. The test proves
+  "no execution or fetch" through the file system instead: the cache and workspace are unchanged after analysis.
+
+**Verification** (real tree, attempt 2, after SS-CLI's files compiled; all `exit=0`):
+- V1 `target/fe-logs/ss-lsp-build-s185-2.log`; V1l `ss-lsp-build-lsp-s185-2.log`.
+- V2 `ss-lsp-clippy-s185-2.log`; V2l `ss-lsp-clippy-lsp-s185-2.log`.
+- V3 `ss-lsp-nextest-s185-2.log`: 984 passed, 1 skipped.
+- V3t `ss-lsp-cargotest-s185-2.log`: 984 passed, 0 failed.
+- V3f `ss-lsp-fixtures-s185-2.log`: 10 passed.
+- V6a `ss-lsp-wasm32-s185-2.log`; V6b `ss-lsp-wasm32-hostwasm-s185-2.log`.
+- V7 `ss-lsp-fmt-s185-2.log`.
+- V9 `ss-lsp-tree-wasm32-s185-2.log` and `ss-lsp-tree-wasm32-hostwasm-s185-2.log`: 0 matches for
+  tokio/tower-lsp/tungstenite/getrandom/cpal/midir.
+- V4 `ss-lsp-linecount-s185-2.log`: largest file 799 lines, `src/dsp/build.rs`, not owned; the largest owned
+  file is `src/lsp/analysis.rs` at 564.
+- V5 `ss-lsp-io-grep-s185-2.log`: one hit, `src/main.rs:9 std::process::exit`. That is SS-CLI's native binary
+  entry, not owned here, recorded for SS-CLI/FINAL.
+- G1 `ss-lsp-smoke-s185-2.log`: 1 passed. G2 `ss-lsp-own-s185-2.log`: 9 passed.
+- Attempt-1 logs (`*-s185-1.log`, exit=101) failed only on SS-CLI's in-progress `src/cli/repl.rs:29` and the
+  missing `src/cli/tests/ws.rs`. They are sibling-caused, and the attempt-2 rerun supersedes them.
+
+**Pending downstream**: formal test-integrity/adversarial/integration review; marking the plan Completed is SS-FINAL's.
+
 
 ## Related Plans
 
@@ -143,3 +209,20 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
   pre-existing test outside every plan's ownership are reported in the
   progress log as a dependency blocker for the operator, never fixed by
   editing unowned files.
+
+### INTEGRATION REVIEW OUTPUT NOTE (operator, 2026-09-26, after two adapter rejections in session 185)
+
+- The integration-review step output MUST be an ENVELOPE with two top-level
+  keys: `"when"` (the routing flags `needs_revision`, `redispatch_required`,
+  `repair_in_place`, `plans_remaining`) and `"payload"` (an OBJECT holding the
+  review itself: `needs_revision`, `loopGate`, `acceptedPlanIds`, `findings`,
+  `recoveryDiagnostic`, summaries, evidence paths). Two attempts were rejected
+  with "payload must be an object when when is provided" because the review
+  fields were emitted at the top level next to `when` instead of inside
+  `payload`. `acceptedPlanIds` lists only plans present in the manifest's
+  `plans[]`.
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

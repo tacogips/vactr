@@ -65,6 +65,8 @@ pub struct RuntimeConfig {
     pub midi_clock_timeout: f64,
     /// Smoothing factor of the MIDI clock pulse period (11.7).
     pub clock_smoothing: f64,
+    /// The audio host's sample rate, Hz: the length of a capture (14.5.9).
+    pub sample_rate: u32,
 }
 
 impl Default for RuntimeConfig {
@@ -82,6 +84,7 @@ impl Default for RuntimeConfig {
             seed: 0,
             midi_clock_timeout: 0.5,
             clock_smoothing: 0.1,
+            sample_rate: 48_000,
         }
     }
 }
@@ -160,6 +163,10 @@ pub struct Runtime {
     pub(crate) midi_in: crate::sched::midi_in::MidiIn,
     /// Clock slave, transport and clock master (`sched/midi_clock.rs`).
     pub(crate) midi_clock: crate::sched::midi_clock::MidiClockState,
+    /// Armed captures (`sched/tap.rs`, 14.5.9).
+    pub(crate) captures: Vec<crate::sched::tap::PendingCapture>,
+    /// Step (6) runs `at` thunks; an offline render turns it off.
+    pub(crate) run_thunks: bool,
 }
 
 impl std::fmt::Debug for Runtime {
@@ -239,6 +246,8 @@ impl Runtime {
             recent_midi: Vec::new(),
             midi_in: crate::sched::midi_in::MidiIn::default(),
             midi_clock: crate::sched::midi_clock::MidiClockState::default(),
+            captures: Vec::new(),
+            run_thunks: true,
         };
         (rt, RuntimeSink(queue))
     }
@@ -372,6 +381,17 @@ impl Runtime {
                 }
                 self.hosts.audio.swap_graph(g);
             }
+            StagedEffect::Capture {
+                buf,
+                src,
+                cycles,
+                origin,
+            } => self.capture(buf, src, cycles, origin, &mut rep.faults),
+            StagedEffect::Render {
+                buf,
+                cycles,
+                origin,
+            } => self.render_effect(ev, &buf, cycles, origin, &mut rep.faults),
         }
     }
 
@@ -415,6 +435,7 @@ impl Runtime {
             return;
         }
         for e in &r.events {
+            self.samples.note_value(&e.value);
             if let Some(src) = self.sample_of(e) {
                 self.samples.request(&src, &mut self.hosts);
             }
@@ -455,6 +476,7 @@ impl Runtime {
     pub fn tick(&mut self, ev: &mut Evaluator, host_now: f64) -> TickReport {
         let mut rep = TickReport::default();
         self.take_host_msgs(&mut rep);
+        self.poll_captures(&mut rep.faults);
         // MIDI input: cc cells, clock slave pulses and transport (11.7).
         self.take_midi_in(host_now, &mut rep);
         if self.transport_frozen() {
@@ -479,8 +501,13 @@ impl Runtime {
             .extend(self.control.tick(host_now, &mut self.hosts));
         rep.diags.extend(self.cells.tick());
         self.retire(&mut rep);
-        // (6) due `at` thunks, in Normal mode.
-        for body in self.at.take_due(self.pos) {
+        // (6) due `at` thunks, in Normal mode (never in an offline render).
+        let due = if self.run_thunks {
+            self.at.take_due(self.pos)
+        } else {
+            Vec::new()
+        };
+        for body in due {
             match run_thunk(ev, &body) {
                 Ok(effects) => {
                     let mut dr = DrainReport::default();

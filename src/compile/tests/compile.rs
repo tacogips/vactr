@@ -217,3 +217,49 @@ fn a_proto_table_past_u16_is_a_compile_diagnostic_not_a_wrong_index() {
     let d = compile(&k, &mut CompileCx::new(&ns, FormGen::new(1))).expect_err("too large");
     assert_eq!(d.code, DiagCode::NestingTooDeep);
 }
+
+/// Reads, expands and compiles one console form.
+fn console_form(ns: &Namespace, src: &str) -> Rc<crate::compile::proto::FnProto> {
+    let r = crate::reader::read(src, FileId::CONSOLE, &crate::reader::AliasEnv::new());
+    assert!(r.diags.is_empty(), "{:?}", r.diags);
+    let k = crate::expand::expand(
+        &r.nodes[0],
+        &mut crate::expand::ExpandCx::new(r.next_node_id()),
+    )
+    .expect("expand");
+    compile(&k, &mut CompileCx::new(ns, FormGen::new(1))).expect("compile")
+}
+
+#[test]
+fn console_registers_resolve_in_the_console_only() {
+    let ns = Namespace::new(Prelude::core());
+    ns.set_console_register(1, Value::Int(42));
+    assert_eq!(
+        ns.console_register(1).map(|v| v.to_string()),
+        Some("42".into())
+    );
+    let mut s = Sess::new();
+    let v = s.vm.run(console_form(&ns, "_1"), &ns).expect("runs");
+    assert_eq!(v.to_string(), "42");
+    let v = s.vm.run(console_form(&ns, "+ _1 1"), &ns).expect("runs");
+    assert_eq!(v.to_string(), "43");
+    // Registers are not session names.
+    assert!(ns.session_names().is_empty());
+    assert!(ns.session_value("_1").is_none());
+
+    // An unset register fails `undefined-name` when read.
+    let unset = console_form(&ns, "_2");
+    assert!(ns.console_register(2).is_none());
+    let err = s.vm.run(Rc::clone(&unset), &ns).expect_err("unset");
+    assert_eq!(err.code, crate::vm::fail::FailCode::UndefinedName);
+    assert!(err.message.contains("_2"), "{}", err.message);
+    // Once set, the same compiled read sees it.
+    ns.set_console_register(2, Value::Int(7));
+    assert_eq!(s.vm.run(unset, &ns).expect("set").to_string(), "7");
+
+    // Outside the console the register does not exist.
+    let file_form = Node::atom(Atom::ConsoleReg(1), Span::new(FileId::new(1), 0, 2));
+    let p = compile(&file_form, &mut CompileCx::new(&ns, FormGen::new(2))).expect("compile");
+    let err = s.vm.run(p, &ns).expect_err("not in a file");
+    assert_eq!(err.code, crate::vm::fail::FailCode::UndefinedName);
+}

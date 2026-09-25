@@ -120,6 +120,21 @@ impl HostManifest {
             .flat_map(|decl| decl.params.iter().map(|p| p.name))
             .collect()
     }
+
+    /// This manifest with `extra` added to the sound keywords: the session
+    /// manifest is the spec default plus every registered package asset
+    /// bank (design 14.5.7 "Assets", S3). An `Open` set stays open.
+    #[must_use]
+    pub fn with_sounds<I, S>(&self, extra: I) -> HostManifest
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        HostManifest {
+            sounds: self.sounds.union(&KeySet::of(extra)),
+            ..self.clone()
+        }
+    }
 }
 
 /// `s`/`sound` and the sound-kit keyword check (7.1.4).

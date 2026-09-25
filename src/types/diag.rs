@@ -153,6 +153,35 @@ diag_codes! {
     ClockLost => "clock-lost",
     /// `use-bpm` while the clock follows `:midi` (11.7).
     ClockExternal => "clock-external",
+    // Session layer: directive lint (13.5, 14.5.12), all warnings.
+    /// Warning: "`#@` block attaches to no statement, block or definition".
+    UnknownDirectiveSite => "unknown-directive-site",
+    /// Warning: "`<param>` is not a parameter of `<site>`".
+    UnknownParameter => "unknown-parameter",
+    /// Warning: "no site is labeled `<label>`".
+    UnknownLabel => "unknown-label",
+    /// Warning: "label `<label>` is already used at <span>".
+    DuplicateLabel => "duplicate-label",
+    /// Warning: "selector `<selector>` matches more than one site".
+    AmbiguousSelector => "ambiguous-selector",
+    /// Warning: "cc `<n>` is outside 0..127" (or channel outside 1..16).
+    CcOutOfRange => "cc-out-of-range",
+    /// Warning: "`<key>` is a reserved directive key".
+    ReservedKey => "reserved-key",
+    // Session layer: packages (5.7, 14.5.7).
+    /// Warning: "package `<path>@<version>` is locked but not fetched; run
+    /// `vactrol get`".
+    PackageNotFetched => "package-not-fetched",
+    /// "package `<path>` is not in `vactrol.lock`".
+    PackageNotLocked => "package-not-locked",
+    /// "package `<path>@<version>` digest mismatch: expected <a>, got <b>"
+    /// (or an unsafe archive entry, named).
+    PackageIntegrity => "package-integrity",
+    /// "package `<path>` failed to load: <reason>".
+    PackageLoadFailed => "package-load-failed",
+    /// "cannot resolve `<path>`: <reason>" (`vactrol get`: an unresolvable
+    /// version or a store or network error).
+    PackageResolve => "package-resolve",
 }
 
 impl DiagCode {
@@ -171,7 +200,15 @@ impl DiagCode {
             | DiagCode::LatencyWidened
             | DiagCode::GrainSkip
             | DiagCode::VoiceSteal
-            | DiagCode::ClockLost => Severity::Warning,
+            | DiagCode::ClockLost
+            | DiagCode::UnknownDirectiveSite
+            | DiagCode::UnknownParameter
+            | DiagCode::UnknownLabel
+            | DiagCode::DuplicateLabel
+            | DiagCode::AmbiguousSelector
+            | DiagCode::CcOutOfRange
+            | DiagCode::ReservedKey
+            | DiagCode::PackageNotFetched => Severity::Warning,
             DiagCode::ShadowsPrelude => Severity::Hint,
             _ => Severity::Error,
         }
@@ -232,14 +269,14 @@ mod tests {
 
     #[test]
     fn code_names_are_unique_kebab_case() {
-        assert_eq!(DiagCode::ALL.len(), 75);
+        assert_eq!(DiagCode::ALL.len(), 87);
         let mut names: Vec<&str> = DiagCode::ALL.iter().map(|c| c.as_str()).collect();
         assert!(names
             .iter()
             .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 75);
+        assert_eq!(names.len(), 87);
         assert_eq!(DiagCode::MisplacedArrow.as_str(), "misplaced-arrow");
     }
 
@@ -258,7 +295,7 @@ mod tests {
             .iter()
             .filter(|c| c.default_severity() == Severity::Hint)
             .count();
-        assert_eq!((warnings, hints), (11, 1));
+        assert_eq!((warnings, hints), (19, 1));
         assert_eq!(DiagCode::VoiceSteal.default_severity(), Severity::Warning);
         assert_eq!(DiagCode::ClockExternal.default_severity(), Severity::Error);
     }

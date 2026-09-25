@@ -305,6 +305,25 @@ impl BusGraph {
             .unwrap_or(0)
     }
 
+    /// The live slot of bus `bus` (never the master), if any.
+    #[must_use]
+    pub fn find(&self, bus: BusId) -> Option<usize> {
+        self.slots
+            .iter()
+            .position(|s| !s.master && s.state == SlotState::Live && s.bus == bus)
+    }
+
+    /// The first `n` frames of slot `index`'s last rendered block, left and
+    /// right (read-only; the taps copy them, 14.5.9). Empty for an index or
+    /// length out of range.
+    #[must_use]
+    pub fn frames(&self, index: usize, n: usize) -> (&[f32], &[f32]) {
+        match self.slots.get(index) {
+            Some(s) => (&s.l[..n.min(s.l.len())], &s.r[..n.min(s.r.len())]),
+            None => (&[], &[]),
+        }
+    }
+
     /// The live slot of a bus, else the master.
     #[must_use]
     pub fn route(&self, bus: Option<BusId>) -> usize {

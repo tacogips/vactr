@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Session, Protocol, Publication, Authority, REPL Loop (SS-SESSION) Implementation Plan
 
 **planId**: SS-SESSION (issue #4, wave 3; the `Session`, eval pipeline, reactive `bindings` publication, JSON codec, write authority, console registers, REPL loop, and the end-to-end TASK-009 tests)
-**Status**: Ready
+**Status**: Completed (accepted by the session-185 integration review; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/design-implementation.md 14.1-14.4, 14.5.4 (pipeline), 14.5.5 (publication), 14.5.6 (codec, authority rules 1-7, coalescing, tiers), 14.5.7 (package failure contract, LSP-only analysis), 14.5.8 (session use of directives), 14.5.9 (`AnalysisCx`), 14.5.10 (REPL), 5.6 (reactive passes), 5.7 (two-phase frontend), 13 (tiers, override inheritance); design-docs/specs/command.md "Session Protocol (v1)"
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -255,15 +255,119 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
 
 ## Completion Criteria
 
-- [ ] Items 1-9 implemented
-- [ ] Every required test passes: codec, eval, all reactive publication traces, authority, tiers, packages,
+- [x] Items 1-9 implemented
+- [x] Every required test passes: codec, eval, all reactive publication traces, authority, tiers, packages,
       directives, REPL, analysis, audible-gate proxy
-- [ ] Join integrity recorded; every serial repair recorded
-- [ ] V1-V9 and S1 pass with logs cited; `final-hashes.txt` written
+- [x] Join integrity recorded; every serial repair recorded
+- [x] V1-V9 and S1 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, SS-SESSION implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 185, SS-SESSION implementer)
+
+**Join integrity**: `tmp/ss-session-20260925-s183/SS-SESSION/attempt-1/join-integrity.txt`. SS-PKG and SS-ANALYSIS
+attempt-2 `final-hashes.txt` match in full. SS-DIRECTIVES matches except its own plan file, which differs only by
+the operator's "INTEGRATION REVIEW OUTPUT NOTE" appended after that worker wrote its hashes. There is no source drift.
+A second check after the implementation still matches, and no file outside this plan's writePaths changed against
+`reconcile-s185/pre-verify-hashes.txt`.
+
+**Serial repairs**: none. No sharedPaths file was edited.
+
+**Files**:
+- New: `src/session/{session,eval,publish,authority,protocol,codec,console,repl}.rs` and
+  `src/session/tests/{mod,support,codec,eval,publish,authority,tiers,packages,directives,repl,analysis}.rs`.
+- Filled: `src/session/mod.rs` (CONTRACTS seed; `changes` kept) and `src/ns/eval_doc.rs` (CONTRACTS stub).
+- Edited: `src/types/manifest.rs`, ONLY `HostManifest::with_sounds`.
+- The largest owned file is `authority.rs` at 712 lines. The package loader moved from `eval.rs` into `session.rs`
+  to keep margin.
+
+**Deliverables** (items 1-9):
+- `ns/eval_doc.rs`: `Evaluator::eval_form_in(form, manifest)`.
+- `session/protocol.rs`: the command.md v1 messages, `Envelope`, `ServerMsg::routing()` and `Subscription`.
+- `session/codec.rs`: `decode`, `decode_as` and `encode`, with a 1 MiB frame cap. `bad-json`,
+  `unsupported-version`, `unknown-kind` and `bad-body` are classified. It never panics.
+- `session/session.rs`: `Session::new`, the per-file `DocState`, `apply_from`, `apply`, `apply_text`, `tick` and
+  `tick_routed`, `Dest`/`Outgoing`, and package loading.
+  - Package loading runs lock, verified cache and `PkgNs::load`, then `Namespace::import`.
+  - Asset banks are registered through `SampleLoader::register_bank` and join the session manifest.
+  - A failure leaves the prefix bound but broken.
+- `session/eval.rs`: `Session::eval` runs the 14.5.4 pipeline. It also provides `alias_env_for`, the ORDER check
+  and `analyze(src, file, &PackageView)`.
+- `session/publish.rs`: `bindings_from`, the wire conversions and the tick telemetry (`diag`, `playing`, `levels`
+  at most 10/s, `tempo` on change).
+- `session/authority.rs`: rules 1-7, `PendingWrites` (latest-wins, re-validated at the tick), `compose_sets`,
+  `on_doc_changed`, `prepare_doc`, `refresh_auth` and `learn`.
+- `session/console.rs`: `eval_console` with `_n` registers. `session/repl.rs`: `LineBuffer`, `submit`, `tick` and
+  `run_repl`.
+
+**Plan-level refinements and deviations** (the design wins; each is behavior-neutral for the criteria):
+- `doc_revision` stamping. `Evaluator::attempt` builds its `CompileCx` privately with revision 0, and
+  `evaluator.rs` may not be edited. So `eval_form_in` takes no revision.
+  - The session records the revision of every form it evaluates (`form_revs` by `FormId`, `gen_revs` by
+    generation).
+  - It stamps that revision into every published `SrcRef` (`playing`).
+  - The test `playing_telemetry_carries_srcrefs_with_the_evals_revision` proves the wire half. `ListProv` values
+    inside the VM still carry 0.
+- `has_queued_upd` is not added. The session is the only caller of `queue_upd` and runs its one `run_pass` in the
+  same tick step, so no upd is ever queued during `eval`. The `queued` field is private to `evaluator.rs`.
+- Package banks are also added to the prelude `default-sound-kit`/`sound-kit` values. Without that, `s :pads-warm`
+  checks but fails `unknown-sound` at query time. Import forms are checked (not run), so `import-collision` is
+  reported.
+- `SessionConfig` also carries `runtime: RuntimeConfig`. The tiers tests need the cell tier.
+- `analyze` takes `(src, file, &PackageView)`, as in the LSP plan. It checks against the spec manifest plus the
+  fetched packages' banks. It returns `nodes` and `trivia`, so the caller runs the directive lint with
+  `build_table` (the LSP plan runs it itself).
+- Routing: `bindings` and `tempo` reach every connection. `diag`, `playing` and `levels` go only to subscribed
+  connections.
+- Key migration across several `doc-changed` messages uses `compose_sets`. It is conservative: touching regions
+  merge. A unit test checks it against `map_through`.
+- The Rust was written by the implementing owner directly rather than through a nested rust-coding agent, per the
+  Riela single-owner rule. The checks ran in the foreground below.
+
+**Verification** (logs under `target/fe-logs/`, each ending in `exit=`):
+
+| Row | Log | Result |
+|-----|-----|--------|
+| V1 | `ss-session-build-s185-1.log` | exit=0 |
+| V1l | `ss-session-build-lsp-s185-1.log` | exit=0 |
+| V2 | `ss-session-clippy-s185-1.log` | exit=0 |
+| V2l | `ss-session-clippy-lsp-s185-1.log` | exit=0 |
+| V3 | `ss-session-nextest-s185-1.log` | exit=0; 954 run, 954 passed, 1 skipped |
+| V3t | `ss-session-cargotest-s185-1.log` | exit=0; lib 942 passed, `directive_fixtures` 2 passed, `spec_fixtures` 10 passed and 1 ignored, 0 failed |
+| V3f | `ss-session-fixtures-s185-1.log` | exit=0; 10 run, 10 passed, 1 skipped |
+| S1 | `ss-session-own-s185-2.log` (exact manifest command) | exit=0; 53 run, 53 passed |
+| S1 (names) | `ss-session-own-s185-1.log` (`NEXTEST_STATUS_LEVEL=pass`) | exit=0; 53 PASS lines |
+| V6a | `ss-session-wasm32-s185-1.log` | exit=0 |
+| V6b | `ss-session-wasm32-hostwasm-s185-1.log` | exit=0 |
+| V7 | `ss-session-fmt-s185-1.log` | exit=0 |
+| V9 | `ss-session-tree-wasm32-s185-1.log`, `ss-session-tree-wasm32-hostwasm-s185-1.log` | exit=0; 0 matches for tungstenite, getrandom, tower-lsp and tokio |
+| V4 | `ss-session-linecount-s185-1.log` | largest 799 (`src/dsp/build.rs`, not this plan) |
+| V5 | `ss-session-io-grep-s185-1.log` | `none` |
+
+**Criterion-1 trace tests** (each PASS in `ss-session-own-s185-1.log`):
+- `session::tests::publish::changing_edge_publishes_one_batch_after_all_rounds_with_final_values`
+- `session::tests::publish::failed_diamond_publishes_failure_block_and_recovery`
+- `session::tests::publish::provisional_rollback_publishes_restored_x_and_nothing_reaches_the_host`
+- `session::tests::publish::abort_retry_publishes_a_failed_with_its_previous_value_and_b_zero`
+- `session::tests::publish::conditional_unblocking_clears_the_badge_and_broken_stays_failed`
+- `session::tests::publish::switch_toward_publishes_the_badge_and_repair_clears_it`
+- `session::tests::publish::status_recovery_publishes_ok_badges_although_the_value_is_unchanged`
+- `session::tests::publish::late_failure_publishes_x_blocked_on_y_and_never_the_provisional_two`
+- `session::tests::publish::newly_discovered_selector_publishes_selected_and_clears_its_badge`
+- `session::tests::publish::ordinary_failure_publishes_the_failure_then_the_repair_without_re_eval`
+- plus `a_pass_that_schedules_no_form_publishes_nothing` and, in `eval.rs`,
+  `eval_result_precedes_the_bindings_batch_it_triggered`.
+
+**Other required tests**: `codec.rs` (5), `eval.rs` (5), `authority.rs` (8, including composed mapping and
+coalescing), `tiers.rs` (6: reeval, manual, direct native, direct browser, and the probabilistic parameter per tier),
+`packages.rs` (7), `directives.rs` (4), `repl.rs` (4, including the AUDIBLE-GATE PROXY
+`audible_gate_proxy_a_repl_bound_pattern_reaches_the_audio_host`) and `analysis.rs` (3).
+
+**Pending, owned by later steps**: formal test-integrity, adversarial and integration review; the audible REPL gate
+(manual, pending user confirmation; the recording-host proxy above passes); the TASK-009 checkboxes in
+`vactrol-core.md` (SS-FINAL); the commit.
 
 ## Related Plans
 
@@ -282,3 +386,20 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
   pre-existing test outside every plan's ownership are reported in the
   progress log as a dependency blocker for the operator, never fixed by
   editing unowned files.
+
+### INTEGRATION REVIEW OUTPUT NOTE (operator, 2026-09-26, after two adapter rejections in session 185)
+
+- The integration-review step output MUST be an ENVELOPE with two top-level
+  keys: `"when"` (the routing flags `needs_revision`, `redispatch_required`,
+  `repair_in_place`, `plans_remaining`) and `"payload"` (an OBJECT holding the
+  review itself: `needs_revision`, `loopGate`, `acceptedPlanIds`, `findings`,
+  `recoveryDiagnostic`, summaries, evidence paths). Two attempts were rejected
+  with "payload must be an object when when is provided" because the review
+  fields were emitted at the top level next to `when` instead of inside
+  `payload`. `acceptedPlanIds` lists only plans present in the manifest's
+  `plans[]`.
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

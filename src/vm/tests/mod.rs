@@ -15,6 +15,7 @@ use crate::vm::call::NativeCx;
 use crate::vm::fail::Failure;
 use crate::vm::vm::Vm;
 
+mod analysis;
 mod failures;
 mod forcing;
 mod inst;

@@ -235,10 +235,13 @@ impl Checker<'_> {
             return t;
         }
         let numeric = NUMERIC.contains(&sig.name);
-        // The overload group resolves on the first argument's type (M1).
+        // The overload group resolves on the first argument's type (M1); a
+        // call without one takes the first scheme (bare `render`).
         let scheme = if sig.is_overloaded() {
-            let first = a.positional.first().map(|f| self.ty_of(f));
-            first.and_then(|t| self.overload(sig, &t))
+            match a.positional.first().map(|f| self.ty_of(f)) {
+                Some(t) => self.overload(sig, &t),
+                None => sig.schemes().into_iter().next(),
+            }
         } else {
             sig.schemes().into_iter().next()
         };
@@ -344,21 +347,30 @@ impl Checker<'_> {
         acc
     }
 
-    /// Picks the `scale`/`shape` scheme from the subject type: a pattern
-    /// (or list) subject, a texture subject, a number subject. `None` when
-    /// the subject type is not known (the VM dispatches on the tag).
+    /// Picks the scheme of the overload group from the subject type (M1): a
+    /// pattern (or list), texture, number, keyword, sound or ugen subject
+    /// selects the scheme whose first parameter takes it (`scale`/`shape`,
+    /// and the 14.5.9 `scope`/`spectrum`/`render`). `None` when the subject
+    /// type is not known (the VM dispatches on the tag).
     fn overload(&mut self, sig: &NativeSig, subject: &Ty) -> Option<crate::types::ty::Scheme> {
         let schemes = sig.schemes();
-        let want = match self.u.shallow(subject) {
-            Ty::Pattern(_) | Ty::List(_) => "pattern",
-            Ty::Tex => "tex",
-            Ty::Int | Ty::Int64 | Ty::Float | Ty::Float64 | Ty::Ratio | Ty::NumLit(_) => "num",
-            _ => return None,
+        let subject = self.u.shallow(subject);
+        let takes = |first: Option<&Ty>| {
+            matches!(
+                (&subject, first),
+                (Ty::Pattern(_) | Ty::List(_), Some(Ty::Pattern(_)))
+                    | (Ty::Tex, Some(Ty::Tex))
+                    | (Ty::Sound, Some(Ty::Sound))
+                    | (Ty::UGen, Some(Ty::UGen))
+                    | (Ty::KeywordOf(_), Some(Ty::KeywordOf(_)))
+                    | (
+                        Ty::Int | Ty::Int64 | Ty::Float | Ty::Float64 | Ty::Ratio | Ty::NumLit(_),
+                        Some(Ty::Float | Ty::Any),
+                    )
+            )
         };
-        schemes.into_iter().find(|s| match (&s.ty, want) {
-            (Ty::Fn(ps, _), "pattern") => matches!(ps.first(), Some(Ty::Pattern(_))),
-            (Ty::Fn(ps, _), "tex") => ps.first() == Some(&Ty::Tex),
-            (Ty::Fn(ps, _), _) => matches!(ps.first(), Some(Ty::Float)),
+        schemes.into_iter().find(|s| match &s.ty {
+            Ty::Fn(ps, _) => takes(ps.first()),
             _ => false,
         })
     }

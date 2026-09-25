@@ -392,6 +392,9 @@ pub fn sample_key(src: &SampleSrc) -> String {
     match src {
         SampleSrc::Bank { kw, index } => format!("{}:{index}", name_of_kw(*kw)),
         SampleSrc::Path(p) => p.text.to_string(),
+        // A captured or rendered buffer is never loaded by the page; SS-ANALYSIS
+        // installs its frames at commit (design 14.5.9).
+        SampleSrc::Buffer { id } => format!("buffer:{id}"),
     }
 }
 

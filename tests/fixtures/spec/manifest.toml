@@ -7,7 +7,9 @@
 #   positive and diagnostic blocks pin `check_diags` (errors and warnings of checking
 #   the block as one document, `code@line`) and `run_fails` (failing forms,
 #   `code@first line`, one fresh Evaluator); deferred blocks name `deferred_to` and
-#   pin `check_diags` when `pin_check`; `blocked_by` + `defect_run_fails` mark
+#   pin `check_diags` when `pin_check`; `eval_via = "session"` runs a block
+#   through `vactrol::session::Session` instead (package loading; check_diags
+#   are then the session's reported codes); `blocked_by` + `defect_run_fails` mark
 #   failures caused only by a recorded implementation defect (asserted to reproduce
 #   exactly, so the repair must update them).
 # [[case]]: `read` and `expand` are canonical prints (src/reader/sexpr.rs) joined by
@@ -75,11 +77,11 @@ reader = "diagnostics"
 reader_diags = ["stray-char@100"]
 expand = "clean"
 expand_diags = []
-eval = "deferred"
-deferred_to = "TASK-009"
-pin_check = true
-check_diags = ["rebinding@15", "undefined-name@58", "unknown-keyword@23", "upd-immutable@33"]
-note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 100) is `..` plus a stray `.`; it is not a path, since its third character is not `/` (6.5.8). Eval: Needs package loading (`import`, `pads.warm`, TASK-009) and host file I/O for `load ./soundpack/..` (NoopHost: host-unavailable). Checked for no-abort with pinned check_diags: `fn kick-sound` is defined twice (rebinding@15; the prose means live redefinition), `:not-a-sample` is the annotated unknown-keyword@23, `upd base 62` of `let base 60` is upd-immutable@33 (the example upd's a `let`, which the Decided rule forbids: a spec text erratum), `pads.warm` is undefined-name@58 until TASK-009."
+eval = "diagnostic"
+eval_via = "session"
+check_diags = ["package-not-locked@55", "package-not-locked@56", "package-not-locked@57", "read-error-present@99", "stray-char@100", "undefined-name@58", "undefined-name@81", "unknown-keyword@23", "upd-immutable@33"]
+run_fails = ["arity@14", "arity@14", "host-unavailable@80", "undefined-name@58", "undefined-name@81", "unknown-sound@23", "upd-immutable@33"]
+note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 100) is `..` plus a stray `.`; it is not a path, since its third character is not `/` (6.5.8). Eval (SS-FINAL, TASK-009): Needs package loading, so the block runs as ONE document through `vactrol::session::Session` (`eval_via = \"session\"`: NoopHost hosts, native caps, no `vactrol.lock`, no package cache). check_diags are the session's reported errors and warnings (reader, expander, checker, load, package); run_fails are failing forms at their first line plus drain faults at their site. The three `import github.com/someone/vactrol-pads` forms are package-not-locked@55-57 (a running session never fetches, 14.5.7), so `pads.warm` stays undefined-name@58; `load ./soundpack/..` is host-unavailable@80 under NoopHost, so `my-pack` is unbound at @81 (undefined-name, check and run); `fn pluck` with its stray-char@100 body is read-error-present@99 (the session reports reader and expander codes with the checker's); `:not-a-sample` is the annotated unknown-keyword@23 and the dropped event's unknown-sound@23 fault (the slot keeps playing); `upd base 62` of `let base 60` is upd-immutable@33 (the example upd's a `let`, which the Decided rule forbids: a spec text erratum). The second `fn kick-sound` is live redefinition in a session (no rebinding). The runtime calls a fn-valued pattern parameter with the event time (a param may be a fn of time), so the zero-parameter `fn kick-sound:` of line 12/15 faults arity@14 on each dry run (bind and the redefinition's re-evaluation): recorded for the language author, not changed here."
 
 [[block]]
 doc = "design-music.md"
@@ -103,9 +105,9 @@ reader_diags = []
 expand = "clean"
 expand_diags = []
 eval = "diagnostic"
-check_diags = ["rebinding@32", "type-mismatch@89", "type-mismatch@90", "type-mismatch@92", "type-mismatch@92", "type-mismatch@94", "undefined-name@36", "undefined-name@91", "undefined-name@93", "undefined-name@95", "undefined-name@95"]
-run_fails = ["host-unavailable@30", "not-callable@90", "type@100", "type@89", "type@92", "type@94", "undefined-name@31", "undefined-name@36", "undefined-name@91", "undefined-name@93", "undefined-name@95"]
-note = "Sound. The chord line writes `[:g :dom7]` (Decided 2026-09-25: letter-first chord qualities, never `:7`), so the block reads clean; its `./x` paths lex as path literals (6.5.8). Eval (BE-FINAL, TASK-008, fixture NoopHost): `inst pluck` realizes to an instrument and `s :pluck > .. > cutoff {..}` runs (`cutoff` is its header parameter used as a pattern control, M3; serial repair R1 made the VM agree with the checker). `load ./soundpack/..` is host file I/O (host-unavailable@30 under NoopHost), so `my-pack` is unbound on line 31 (undefined-name@31). The two alternative `let sound-kit` overrides are rebinding@32 as one document (question M6, deferred); at run time the line-32 override merges its dict element (repair R1, attempt-2). `tr909` is unbound (undefined-name@36). Lines 89-95 are the author's self-analysis and loopback amendment (2026-09-25, design 12.3): analyzers take a bus SOURCE, which the current `fft`/`amp`/`spectrum`/`render` signatures do not (check type-mismatch@89/@90/@92x2/@94; run type@89/@92/@94 and not-callable@90), and `scope`, `capture`, `rms`, `peak` are not defined yet (undefined-name@91/@93/@95). Line 100 `[1 0.5] > osc \"/trigger\"` puts a value list before `osc`: the VM takes the pattern-subject `osc` as the visual source and fails type@100 (the checker accepts it; recorded for the language author, not changed here). Pinned exactly so that implementing the amendment must update this entry."
+check_diags = ["rebinding@32", "type-mismatch@89", "type-mismatch@90", "type-mismatch@95", "undefined-name@36"]
+run_fails = ["arity@95", "host-unavailable@30", "host-unavailable@91", "host-unavailable@92", "host-unavailable@93", "host-unavailable@94", "not-callable@90", "type@100", "type@89", "undefined-name@31", "undefined-name@36"]
+note = "Sound. The chord line writes `[:g :dom7]` (Decided 2026-09-25: letter-first chord qualities, never `:7`), so the block reads clean; its `./x` paths lex as path literals (6.5.8). Eval (BE-FINAL, TASK-008, fixture NoopHost): `inst pluck` realizes to an instrument and `s :pluck > .. > cutoff {..}` runs (`cutoff` is its header parameter used as a pattern control, M3; serial repair R1 made the VM agree with the checker). `load ./soundpack/..` is host file I/O (host-unavailable@30 under NoopHost), so `my-pack` is unbound on line 31 (undefined-name@31). The two alternative `let sound-kit` overrides are rebinding@32 as one document (question M6, deferred); at run time the line-32 override merges its dict element (repair R1, attempt-2). `tr909` is unbound (undefined-name@36). Lines 89-95 are the author's self-analysis and loopback amendment (2026-09-25, design 12.3), implemented by SS-ANALYSIS (design 14.5.9, repinned): `scope :master 512`, `spectrum :master bins: 64`, `let hit capture :drums 1` and `let out render 2` check clean (the M1 overload group and the new rows) and, since the fixture runner registers no `AnalysisCx`, fail host-unavailable@91/@92/@93/@94 at run time. The source forms `fft :master` and `amp :d1` are out of issue #4's scope (S2) and keep type-mismatch@89/@90 (run type@89, not-callable@90). Line 95 writes three alternatives as prose (`rms out  /  peak out  /  spectrum out bins: 64`), which reads as ONE `rms` call with extra arguments: type-mismatch@95 (arity) in the checker and arity@95 at run time. Line 100 `[1 0.5] > osc \"/trigger\"` puts a value list before `osc`: the VM takes the pattern-subject `osc` as the visual source and fails type@100 (the checker accepts it; recorded for the language author, not changed here). Pinned exactly so that implementing the amendment must update this entry."
 
 [[block]]
 doc = "design-music.md"

@@ -6,7 +6,7 @@ mod support;
 
 use std::collections::BTreeMap;
 
-use support::eval::{check_diags, check_errors, clean_forms, query_cycle, run};
+use support::eval::{check_diags, check_errors, clean_forms, query_cycle, run, session_eval};
 use support::toml_subset::{self, Table};
 use support::{manifest, multiset, spec_blocks, spec_doc};
 use vactrol::expand::{expand, is_kernel, ExpandCx};
@@ -378,9 +378,15 @@ fn blocks_evaluate_per_classification() {
             "positive" | "diagnostic" => {
                 let forms = clean_forms(&text, file);
                 assert!(!forms.is_empty(), "{what}: nothing to evaluate");
-                let checked = check_diags(&text, &forms);
+                let (checked, ran) = match b.str("eval_via") {
+                    None => (check_diags(&text, &forms), run(&text, &forms).fails()),
+                    Some("session") => {
+                        let r = session_eval(&text);
+                        (r.diags, r.fails)
+                    }
+                    Some(other) => panic!("{what}: eval_via = {other:?}"),
+                };
                 assert_eq!(checked, multiset(b.array("check_diags")), "{what}: check");
-                let ran = run(&text, &forms).fails();
                 let mut want = b.array("run_fails");
                 want.extend(defects(b, &what));
                 assert_eq!(ran, multiset(want), "{what}: run");
@@ -484,6 +490,9 @@ fn evaluation_report() {
         println!("== {what} [{}]", b.req("eval"));
         println!("   check_diags = {:?}", check_diags(&text, &forms));
         println!("   run_fails = {:?}", run(&text, &forms).fails());
+        let r = session_eval(&text);
+        println!("   session check_diags = {:?}", r.diags);
+        println!("   session run_fails = {:?}", r.fails);
     }
     for case in m.cases.iter().filter(|c| is_eval_case(c)) {
         let source = case.req("source");

@@ -17,12 +17,14 @@
 pub mod audio;
 pub mod loader;
 pub mod midi;
+pub mod tap;
 pub mod tick;
 
 #[cfg(test)]
 mod tests;
 
 use std::path::PathBuf;
+use std::rc::Rc;
 
 pub use audio::{AudioSide, FrameClock, NativeAudioHost};
 pub use loader::{parse_wav, NativeSampleLoader};
@@ -30,7 +32,7 @@ pub use midi::{parse_midi, MidiOutQueue, NativeMidiIn, NativeMidiOut};
 pub use tick::{TickSource, TICK_PERIOD};
 
 use crate::dsp::cells::AtomicCells;
-use crate::host::caps::{Hosts, MidiHost, MidiInHost};
+use crate::host::caps::{Hosts, InstResolver, MidiHost, MidiInHost};
 use crate::host::noop::NoopHost;
 use crate::reader::span::{FileId, Span};
 use crate::types::diag::{DiagCode, Diagnostic};
@@ -100,7 +102,30 @@ impl NativeHosts {
     /// # Errors
     /// `beyond-capability` when no audio output can be opened.
     pub fn open(cfg: &NativeConfig) -> Result<NativeHosts, Diagnostic> {
-        let audio = NativeAudioHost::open(cfg)?;
+        Self::open_impl(cfg, None)
+    }
+
+    /// `open`, with the audio host's bus names resolver set before it is
+    /// boxed, so named-bus taps and captures (`scope`, `spectrum`,
+    /// `capture`) resolve through `names` from the first tick (14.5.9).
+    ///
+    /// # Errors
+    /// `beyond-capability` when no audio output can be opened.
+    pub fn open_with_bus_names(
+        cfg: &NativeConfig,
+        names: Rc<dyn InstResolver>,
+    ) -> Result<NativeHosts, Diagnostic> {
+        Self::open_impl(cfg, Some(names))
+    }
+
+    fn open_impl(
+        cfg: &NativeConfig,
+        names: Option<Rc<dyn InstResolver>>,
+    ) -> Result<NativeHosts, Diagnostic> {
+        let mut audio = NativeAudioHost::open(cfg)?;
+        if let Some(names) = names {
+            audio.set_bus_names(names);
+        }
         let cells = audio.cells();
         let clock = audio.clock();
         let mut diags = Vec::new();

@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use crate::dsp::cells::{AtomicCells, CellId, Mirror};
 use crate::host::caps::{
-    AudioHost, GraphHandle, HostSigs, MidiEvent, MidiHost, OscEvent, OscHost, RenderHost,
-    SampleData,
+    AudioHost, CaptureId, CapturePoll, GraphHandle, HostSigs, MidiEvent, MidiHost, OscEvent,
+    OscHost, RenderHost, SampleData, TapReader, TapSrc,
 };
 use crate::host::wire::{
     batch_len, decode_batch, encode_batch, AudioEvent, CtlMsg, HostMsg, SlotControl, SlotControlAck,
@@ -23,6 +23,7 @@ use crate::host::wire::{
 use crate::tex::shader::ShaderDesc;
 use crate::tex::texnode::OutId;
 use crate::tex::uniforms::Uniforms;
+use crate::vm::fail::{FailCode, Failure};
 
 /// A call log shared by a recording host and its clones: `(arrival, call)`.
 type Log<C> = Rc<RefCell<Vec<(f64, C)>>>;
@@ -60,13 +61,61 @@ pub enum AudioCall {
     RetireSample(u32),
 }
 
+/// The sample rate of the recording host's synthetic taps and captures.
+pub const SYNTH_RATE: u32 = 48_000;
+/// The synthetic tap frequency of `:master` (bin 8 of a 128-point FFT at
+/// `SYNTH_RATE`), Hz.
+pub const SYNTH_MASTER_HZ: f64 = 3000.0;
+/// The synthetic tap frequency of every named bus, Hz.
+pub const SYNTH_BUS_HZ: f64 = 6000.0;
+/// The synthetic tap amplitude.
+pub const SYNTH_AMP: f64 = 0.5;
+
+/// Sample `frame` of the synthetic signal of `src`.
+#[must_use]
+pub fn synth_sample(src: &TapSrc, frame: u64) -> f32 {
+    let hz = match src {
+        TapSrc::Master => SYNTH_MASTER_HZ,
+        TapSrc::Bus(_) => SYNTH_BUS_HZ,
+    };
+    #[allow(clippy::cast_precision_loss)]
+    let t = frame as f64 / f64::from(SYNTH_RATE);
+    #[allow(clippy::cast_possible_truncation)]
+    let x = (SYNTH_AMP * (std::f64::consts::TAU * hz * t).sin()) as f32;
+    x
+}
+
+/// A deterministic tap reader: a sine at a fixed frequency per source,
+/// ending at the current mock-clock frame.
+#[derive(Clone, Debug, Default)]
+pub struct SynthTaps {
+    pub clock: MockClock,
+}
+
+impl TapReader for SynthTaps {
+    fn snapshot(&mut self, src: &TapSrc, frames: usize, out: &mut Vec<f32>) -> Result<(), Failure> {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let end = (self.clock.now().max(0.0) * f64::from(SYNTH_RATE)) as u64;
+        let first = end.saturating_sub(frames as u64);
+        out.clear();
+        out.extend((0..frames as u64).map(|k| synth_sample(src, first + k)));
+        Ok(())
+    }
+}
+
+/// An armed synthetic capture: `(src, start frame, frames, delivered)`.
+type SynthCapture = (TapSrc, u64, u64, u64);
+
 /// Records every `AudioHost` call; `drain` returns the queued `replies`.
+/// Its taps are `SynthTaps`; a capture completes once `frames` worth of
+/// mock-clock time has passed after its start.
 #[derive(Clone, Debug, Default)]
 pub struct RecordingAudioHost {
     pub clock: MockClock,
     calls: Log<AudioCall>,
     replies: Rc<RefCell<Vec<HostMsg>>>,
     sigs: Rc<Cell<HostSigs>>,
+    captures: Rc<RefCell<Vec<Option<SynthCapture>>>>,
 }
 
 impl RecordingAudioHost {
@@ -124,6 +173,43 @@ impl AudioHost for RecordingAudioHost {
     }
     fn analysis(&self) -> HostSigs {
         self.sigs.get()
+    }
+    fn tap_reader(&mut self) -> Option<Box<dyn TapReader>> {
+        Some(Box::new(SynthTaps {
+            clock: self.clock.clone(),
+        }))
+    }
+    fn arm_capture(
+        &mut self,
+        src: &TapSrc,
+        start: f64,
+        frames: usize,
+    ) -> Result<CaptureId, Failure> {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let start = (start.max(0.0) * f64::from(SYNTH_RATE)).round() as u64;
+        let mut caps = self.captures.borrow_mut();
+        caps.push(Some((*src, start, frames as u64, 0)));
+        Ok(CaptureId::new(u32::try_from(caps.len() - 1).unwrap_or(0)))
+    }
+    fn poll_capture(&mut self, id: CaptureId, out: &mut Vec<f32>) -> CapturePoll {
+        let mut caps = self.captures.borrow_mut();
+        let Some(Some((src, start, frames, delivered))) = caps.get_mut(id.get() as usize) else {
+            return CapturePoll::Failed(Failure::new(FailCode::HostUnavailable, "no such capture"));
+        };
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let now = (self.clock.now().max(0.0) * f64::from(SYNTH_RATE)) as u64;
+        let ready = now.saturating_sub(*start).min(*frames);
+        for k in *delivered..ready {
+            let x = synth_sample(src, *start + k);
+            out.extend([x, x]);
+        }
+        *delivered = ready.max(*delivered);
+        if *delivered == *frames {
+            caps[id.get() as usize] = None;
+            CapturePoll::Done
+        } else {
+            CapturePoll::Pending
+        }
     }
 }
 

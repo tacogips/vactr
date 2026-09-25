@@ -4,6 +4,7 @@
 
 mod audio;
 mod midi;
+mod tap;
 mod tick;
 mod wav;
 

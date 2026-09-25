@@ -482,3 +482,29 @@ fn browser_transport_loss_and_stall() {
         Some(CtlMsg::CellRetire { .. })
     ));
 }
+
+#[test]
+fn noop_host_keeps_the_tap_and_bank_defaults() {
+    use crate::host::caps::TapSrc;
+    let mut host = NoopHost;
+    assert!(host.tap_reader().is_none());
+    let err = host
+        .arm_capture(&TapSrc::Master, 0.0, 64)
+        .expect_err("no taps");
+    assert_eq!(err.code, FailCode::HostUnavailable);
+    let mut out = Vec::new();
+    assert!(matches!(
+        host.poll_capture(crate::host::caps::CaptureId::new(0), &mut out),
+        crate::host::caps::CapturePoll::Failed(f) if f.code == FailCode::HostUnavailable
+    ));
+    let err = host
+        .register_bank(intern_kw("pkg-kit"), Vec::new())
+        .expect_err("no banks");
+    assert_eq!(err.code, FailCode::HostUnavailable);
+    let err = host
+        .load(&SampleSrc::Buffer { id: 1 })
+        .expect_err("a buffer is not loaded");
+    assert_eq!(err.code, FailCode::HostUnavailable);
+    let mut loader = NoopHost;
+    assert!(crate::ns::load::SourceLoader::analysis(&mut loader).is_none());
+}

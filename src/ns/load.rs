@@ -14,6 +14,7 @@ use std::rc::Rc;
 
 use crate::compile::{compile, CompileCx};
 use crate::expand::{expand, ExpandCx};
+use crate::host::caps::AnalysisCx;
 use crate::ns::namespace::{FormGen, Namespace, Prelude};
 use crate::reader::node::Node;
 use crate::reader::span::FileId;
@@ -35,6 +36,15 @@ pub trait SourceLoader {
     /// # Errors
     /// Any failure to read, `host-unavailable` when there is no host.
     fn read(&mut self, path: &PathVal) -> Result<(FileId, Rc<str>), Failure>;
+
+    /// The self-analysis context (14.5.9). The session's loader returns
+    /// its `AnalysisCx` here, so a native reaches the capabilities and taps
+    /// through the VM's `LoaderHost` (`host.0.analysis()`) without a new VM
+    /// field. `None` (every other loader) makes the self-analysis natives
+    /// fail `host-unavailable`.
+    fn analysis(&mut self) -> Option<&mut AnalysisCx> {
+        None
+    }
 }
 
 /// The default loader: no host, every read fails `host-unavailable`. It

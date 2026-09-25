@@ -7,10 +7,12 @@ specification.
 
 ## Status
 
-The language front end, middle end and runtime back end are implemented
-as a Rust library (`impl-plans/active/vactrol-core.md` TASK-001..008).
+The language front end, middle end, runtime back end and session layer
+are implemented (`impl-plans/active/vactrol-core.md` TASK-001..009).
 Every top-level form goes read -> expand -> check -> compile -> run, and
-bound patterns are scheduled into audio, MIDI and OSC sinks.
+bound patterns are scheduled into audio, MIDI and OSC sinks. The
+`vactrol` binary provides `repl`, `run`, `serve`, `get` and `lsp`. The
+editor (TASK-010) is not implemented yet.
 
 Front end (TASK-001..003):
 
@@ -46,11 +48,9 @@ Middle end (TASK-004..006):
   `midi-notes` is a structure-giving step), the cycle clock, and the
   visual chains with their shader and uniform plans.
 
-Core modules use no OS threads and no I/O. File and sample I/O for `load`
-and `sample` stay behind the `NoopHost` source loader for now.
-
-The slot table, scheduler, hosts, DSP, session/REPL/LSP, and editor
-(TASK-007..010) are not implemented yet.
+Core modules use no OS threads and no I/O. Threads, files, sockets and
+child processes are used only in `src/host/native/`, `src/pkg/native/`,
+`src/cli/` and `src/lsp/`.
 
 Back end (TASK-007..008):
 
@@ -70,6 +70,43 @@ Back end (TASK-007..008):
   harness in `editor/dev-harness/`.
 - `examples/beep.rs`: one event end to end on the native host
   (`cargo run --example beep`; audible check pending).
+
+Session layer (TASK-009):
+
+- `src/session/`: `Session` wraps the evaluator and the runtime. It holds
+  the per-form eval pipeline and the reactive `bindings` publication (one
+  batch per completed pass, so no provisional value leaks). It also
+  contains the edit-epoch and doc-revision write authority, the
+  `ClientMsg`/`ServerMsg` JSON protocol (v1), and the REPL console.
+- `src/pkg/`: Go-style packages (`import github.com/owner/name`). It
+  covers `vactrol.toml`, `vactrol.lock`, git-tag semver with minimal
+  version selection, the canonical length-prefixed sha256 digest,
+  archive safety checks (traversal, absolute paths, escaping symlinks,
+  case-fold duplicates, size limits) and atomic cache staging. Native
+  git and local-directory stores and the `~/.vactrol/pkg` cache live in
+  `pkg/native/`. A running session never fetches; `vactrol get` does.
+- `src/directives/`: `#@` directive comments. It covers block
+  attachment, labels (`#@ name X`, `label:`), addressed `label.param`
+  directives, `BindingKey`, and both binding persistence modes.
+  `DirectivePersistence` is the default and keeps panel membership and
+  MIDI mappings in the source as `#@` comments.
+  `ExternalFilePersistence` is optional and uses `<doc>.bindings.json`.
+- Self-analysis: `scope :bus n`, `spectrum :bus bins:`, `capture :bus
+  cycles` and `render cycles`, plus `rms`/`peak`/`spectrum`/`scope` over
+  sample values. The checker types them and the REPL can call them.
+  Offline `render` never mutates the live runtime. Taps and render need
+  the native tier. The browser tier and builds without `host-native`
+  fail the call with `beyond-capability`.
+- `src/cli/`: the `vactrol` verbs and the native session socket
+  (loopback only, token in the URL, HTTP 401 on a bad token or path, at
+  most 8 connections, 1 MiB frames).
+- `src/lsp/`: `vactrol lsp` over stdio (tower-lsp, `lsp` feature). It can
+  attach to a running `serve` socket with `--session`.
+
+The CLI and the session protocol are specified in
+`design-docs/specs/command.md`. The audible REPL check (a REPL-bound
+pattern sounding on the native host) is pending user confirmation. Its
+automated proxy is a recording-host test.
 
 ## Name
 
@@ -91,33 +128,62 @@ files use the `.vact` extension.
 
 Tools are managed by mise (`mise install`). Rust is pinned to 1.83.
 
-The CLI belongs to TASK-009. Until then, the binary only prints its version:
+Usage (see `design-docs/specs/command.md` for flags, exit codes and the
+protocol):
 
 ```sh
-CARGO_TERM_QUIET=true cargo run --bin vactrol
+vactrol repl [--host native|noop]
+vactrol run <file.vact> [--host native|noop] [--cycles N]
+vactrol serve [<file.vact>] [--host native|noop] [--port P] [--bind 127.0.0.1]
+vactrol get [github.com/<owner>/<name>[@vX.Y.Z]] [--store dir:<root>]
+vactrol lsp [--session <ws-url>]    # needs --features lsp
+```
+
+`--host` defaults to `native`. If the audio device fails to open, the
+CLI warns and falls back to `noop`. `run --host noop --cycles N` uses a
+virtual clock and ends deterministically. `serve` prints its connect
+URL, token included, once to stderr. The package cache lives under
+`$VACTROL_HOME/pkg` (default `~/.vactrol/pkg`). From a checkout:
+
+```sh
+CARGO_TERM_QUIET=true cargo run --bin vactrol -- repl --host noop
+CARGO_TERM_QUIET=true cargo run --features lsp --bin vactrol -- lsp
 ```
 
 Verification:
 
 ```sh
 CARGO_TERM_QUIET=true cargo build
+CARGO_TERM_QUIET=true cargo build --features lsp
 CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown
 CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm
 CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings
+CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings
 CARGO_TERM_QUIET=true cargo fmt --check
 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 \
   CARGO_TERM_QUIET=true cargo nextest run
 CARGO_TERM_QUIET=true cargo test
+CARGO_TERM_QUIET=true cargo test --features lsp --test lsp_smoke
 ```
 
 The spec fixtures in `tests/fixtures/spec/manifest.toml` pin reader,
 expander, checker and evaluation behavior against the code blocks in
 `lang-reference.md` and `design-music.md`. Each case is classified as
-`positive`, `diagnostic` or `deferred`. Deferred cases need the DSP, host
-file I/O or package loading of TASK-008/009; they are checked for no
-panic and no abort only. To run only those:
-`cargo nextest run -E 'binary(spec_fixtures)'`.
+`positive`, `diagnostic` or `deferred`. No case is deferred now. Blocks
+marked `eval_via = "session"` evaluate as one document through
+`Session`; the rest use a fresh `Evaluator`. To run only the fixtures:
+`cargo nextest run -E 'binary(spec_fixtures)'`. `tests/cli.rs` runs the
+CLI verbs against `NoopHost`. `tests/directive_fixtures.rs` covers the
+`#@` vocabulary. Package tests use only a local directory store, a local
+HTTP fixture and local git repositories, never the public network.
 
-Cargo features: `host-native` (the default), `host-wasm`, and `lsp`. For
-now they are empty markers. To build for a Wasm host, run
+Cargo features:
+
+- `host-native` (the default): cpal audio, midir MIDI, the session socket
+  (tungstenite) and its token (getrandom).
+- `host-wasm`: the browser host ABI.
+- `lsp`: `vactrol lsp` (tower-lsp, tokio). It implies `host-native`.
+
+The native-only crates are in the non-wasm32 target table, so both wasm32
+builds stay clean. To build for a Wasm host, run
 `cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`.

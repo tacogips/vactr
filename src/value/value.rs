@@ -13,6 +13,7 @@ use crate::tex::texnode::TexNode;
 use crate::value::intern::{intern_kw, KwId, SymId};
 use crate::value::key::Key;
 use crate::value::ratio::Ratio64;
+use crate::value::sample::SampleBuf;
 
 /// A runtime value. It holds `Rc`, so it is `!Send`: a `Value` never
 /// crosses to the audio or render thread (design 5.1).
@@ -114,7 +115,8 @@ pub struct PathVal {
 }
 
 /// A sound: a builtin host sound, a sample file, a MIDI-out channel, a
-/// session or template instrument, or an OSC address (12.8.6).
+/// session or template instrument, an OSC address (12.8.6), or a captured
+/// or rendered sample buffer (14.5.9).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Sound {
     Builtin(KwId),
@@ -122,6 +124,8 @@ pub enum Sound {
     MidiOut(u8),
     Inst(InstId),
     Osc(Rc<str>),
+    /// Buffers compare by identity.
+    Buffer(Rc<SampleBuf>),
 }
 
 /// An immutable list, with element provenance when it came from a literal.

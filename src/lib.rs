@@ -17,6 +17,10 @@
 //! - `sched`, `dsp`, `host`: the scheduler and slot table, the DSP graph and
 //!   audio engine, and the capability hosts with their wire records
 //!   (design 11, 12, 12.8).
+//! - `session`, `pkg`, `directives`: the session layer (design 14.5): the
+//!   eval pipeline and protocol, package loading, and the `#@` directive
+//!   machinery. `cli` (native only) and `lsp` (feature `lsp`, native only)
+//!   are the `vactrol` verbs.
 //!
 //! Core modules use no OS threads and no I/O, so the crate builds for
 //! `wasm32-unknown-unknown`; host file and sample I/O stay behind the
@@ -48,15 +52,22 @@ macro_rules! id_newtype {
     };
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod cli;
 pub mod clock;
 pub mod compile;
+pub mod directives;
 pub mod dsp;
 pub mod expand;
 pub mod host;
+#[cfg(all(feature = "lsp", not(target_arch = "wasm32")))]
+pub mod lsp;
 pub mod ns;
 pub mod pattern;
+pub mod pkg;
 pub mod reader;
 pub mod sched;
+pub mod session;
 pub mod tex;
 pub mod types;
 pub mod value;

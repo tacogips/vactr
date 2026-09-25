@@ -93,6 +93,7 @@ impl SampleLoader for NoopHost {
         let what = match src {
             SampleSrc::Bank { kw, index } => format!(":{} {index}", name_of_kw(*kw)),
             SampleSrc::Path(p) => p.text.to_string(),
+            SampleSrc::Buffer { id } => format!("buffer #{id}"),
         };
         Err(Failure::new(
             FailCode::HostUnavailable,

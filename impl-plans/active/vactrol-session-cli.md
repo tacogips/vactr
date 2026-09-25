@@ -1,7 +1,7 @@
 # Vactrol Session Layer: CLI, REPL Front End, Session Socket (SS-CLI) Implementation Plan
 
 **planId**: SS-CLI (issue #4, wave 4; `vactrol repl|run|serve|get|lsp` in `src/main.rs` + `src/cli/`, the native WebSocket session socket in `src/cli/ws.rs`)
-**Status**: Ready
+**Status**: Completed (accepted by the session-185 integration review; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/command.md (verbs, flags, env, exit codes, files, Session Protocol v1); design-docs/specs/design-implementation.md 14.2, 14.5.2 (gating), 14.5.10 (REPL threads, CLI, socket rules), 14.5.7 (`vactrol get`), 17 (localhost + token); design-docs/user-qa/pending-session-questions.md S6
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -146,15 +146,56 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
 
 ## Completion Criteria
 
-- [ ] Items 1-7 implemented
-- [ ] `vactrol repl`, `vactrol run <file.vact>`, `vactrol serve` and `vactrol get <path>` work against NoopHost (the
+- [x] Items 1-7 implemented
+- [x] `vactrol repl`, `vactrol run <file.vact>`, `vactrol serve` and `vactrol get <path>` work against NoopHost (the
       `tests/cli.rs` cases pass)
-- [ ] Socket security rules asserted (loopback only, 401 on a bad token or path, connection and frame limits)
-- [ ] V1-V9 and L1 pass with logs cited; `final-hashes.txt` written
+- [x] Socket security rules asserted (loopback only, 401 on a bad token or path, connection and frame limits)
+- [x] V1-V9 and L1 pass with logs cited; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, SS-CLI implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 185, SS-CLI implementer)
+
+**Tasks completed**: items 1-7 and the required tests. Evidence: `tmp/ss-session-20260925-s183/SS-CLI/attempt-1/`
+(`intent.md`, `pre-edit-hashes.txt`, `post-edit-hashes*.txt`, `notes.md`, `final-hashes.txt`).
+
+- Dependency: SS-SESSION is in the dispatch `acceptedPlanIds`.
+- Files: `src/main.rs`, `src/cli/{mod,args,repl,run,serve,get,ws}.rs`, `src/cli/tests/{mod,args,ws}.rs`, `tests/cli.rs`.
+- `cli::main(Vec<OsString>) -> i32` dispatches the verbs; exit codes 0/1/2/3 per command.md. `build_session`:
+  lock from `./vactrol.lock` (a parse error is printed, then ignored), `FsCache` at `$VACTROL_HOME/pkg`
+  (a failure is a warning), `NativeHosts::open` falling back to noop with a warning (S6), and a virtual clock under noop.
+  `lsp` calls `crate::lsp::run_stdio` under `lsp`; otherwise it prints "vactrol was built without the lsp feature" and
+  exits 1.
+- REPL: a stdin reader thread reads bytes (a line that is not UTF-8 is evaluated lossily), and the main loop runs
+  `recv_timeout(TICK_PERIOD)`, ticking while idle. This closes the SS-SESSION deferred item on continuous REPL ticking.
+  The prompts `vactrol> ` / `....> ` are shown only on a terminal.
+- `serve` / `ws`:
+  - loopback-only bind; the token is 32 bytes from `getrandom` (no weaker fallback: `serve` exits 1);
+  - one stderr URL line;
+  - the handshake callback checks `/session` and the token with `ct_eq`, else 401; the handshake read timeout is 5 s;
+  - 8 connections (the 9th gets a raw 503 before the handshake); 1 MiB message and frame caps; 5 ms connection reads;
+  - `Session` stays on the main thread, which ticks every `TICK_PERIOD` even under steady traffic.
+- Deviations (recorded in `notes.md`):
+  - `src/main.rs` calls `vactrol::cli::run()`, which does `std::process::exit(cli::main(..))`, so V5 stays `none`.
+  - `NativeSampleLoader` is the session source loader under `--host noop` too.
+  - The CLI keeps its own 5 ms `TICK_PERIOD` copy, so it builds without `host-native`.
+- Verification (final source; all `exit=0`):
+  - V1 `target/fe-logs/ss-cli-build-s185-3.log`; V1l `ss-cli-build-lsp-s185-3.log`; extra `ss-cli-build-nodefault-s185-2.log`;
+  - V2 `ss-cli-clippy-s185-3.log`; V2l `ss-cli-clippy-lsp-s185-3.log`;
+  - V3 `ss-cli-nextest-s185-3.log` (984 run, 984 passed, 1 skipped); V3t `ss-cli-cargotest-s185-3.log` (984 passed,
+    0 failed); V3f `ss-cli-fixtures-s185-3.log` (10 run, 10 passed);
+  - L1 `ss-cli-own-s185-3.log` (30 run, 30 passed);
+  - V6a `ss-cli-wasm32-s185-3.log`; V6b `ss-cli-wasm32-hostwasm-s185-3.log`; V7 `ss-cli-fmt-s185-3.log`;
+  - V4 `ss-cli-linecount-s185-2.log` (largest 799, `dsp/build.rs`, pre-existing; the largest SS-CLI file is
+    `tests/cli.rs`, 378 lines);
+  - V5 `ss-cli-io-grep-s185-2.log` (`none`);
+  - V9 `ss-cli-tree-wasm32-s185-1.log` and `ss-cli-tree-wasm32-hostwasm-s185-1.log` (both exit 0, 0 gated crates);
+  - L2 `attempt-1/git-version.txt` (git 2.55.0).
+- Earlier runs `-1`/`-2` also passed and were superseded by later source edits (review fixes, V5, URL).
+- Pending (later workflow steps): test-integrity, adversarial and integration review; the status goes to Completed at
+  SS-FINAL.
 
 ## Related Plans
 
@@ -173,3 +214,20 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
   pre-existing test outside every plan's ownership are reported in the
   progress log as a dependency blocker for the operator, never fixed by
   editing unowned files.
+
+### INTEGRATION REVIEW OUTPUT NOTE (operator, 2026-09-26, after two adapter rejections in session 185)
+
+- The integration-review step output MUST be an ENVELOPE with two top-level
+  keys: `"when"` (the routing flags `needs_revision`, `redispatch_required`,
+  `repair_in_place`, `plans_remaining`) and `"payload"` (an OBJECT holding the
+  review itself: `needs_revision`, `loopGate`, `acceptedPlanIds`, `findings`,
+  `recoveryDiagnostic`, summaries, evidence paths). Two attempts were rejected
+  with "payload must be an object when when is provided" because the review
+  fields were emitted at the top level next to `when` instead of inside
+  `payload`. `acceptedPlanIds` lists only plans present in the manifest's
+  `plans[]`.
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

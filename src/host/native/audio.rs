@@ -6,8 +6,9 @@
 //! the audio half: the `Engine` and the consumer ends. The cpal callback
 //! owns the `AudioSide` and only calls `AudioSide::render`, which runs
 //! `Engine::process` over preallocated buffers and then stores the frame
-//! counter and the host signals in atomics. It allocates nothing and takes
-//! no lock (17 invariant 3).
+//! counter and the host signals in atomics, and copies each block into the
+//! live tap rings and armed captures (`tap.rs`, 14.5.9). It allocates
+//! nothing and takes no lock (17 invariant 3).
 //!
 //! Resource ids: samples keep the scheduler's `SampleTable` ids; graph
 //! installs take fresh ids from `GRAPH_RESOURCE_BASE` up, so an
@@ -16,6 +17,7 @@
 //! template or bus by instrument (or bus) identity and hands the box back
 //! through the garbage ring, which `drain` empties on this thread.
 
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -32,11 +34,16 @@ use crate::dsp::ring::{
     NativeInstall, NativeRecord, Producer, SpscRing, CHANNEL_CAPACITY, EVENT_CAPACITY,
 };
 use crate::dsp::ugen::{BuildEnv, Template};
-use crate::host::caps::{AudioHost, GraphHandle, HostSigs, SampleData};
+use crate::host::caps::{
+    AudioHost, CaptureId, CapturePoll, GraphHandle, HostSigs, InstResolver, SampleData, TapReader,
+    TapSrc,
+};
+use crate::host::native::tap::{self, NativeTapReader, TapShared};
 use crate::host::native::{unavailable, NativeConfig};
 use crate::host::wire::{AudioEvent, CtlMsg, HostMsg, SlotControl};
 use crate::reader::span::{FileId, Span};
 use crate::types::diag::{DiagCode, Diagnostic};
+use crate::vm::fail::Failure;
 
 /// The engine block: longer callbacks render in pieces of this size.
 pub const MAX_BLOCK: usize = 512;
@@ -129,6 +136,7 @@ pub struct AudioSide {
     cells: AtomicCells,
     clock: FrameClock,
     sigs: Arc<SharedSigs>,
+    taps: Arc<TapShared>,
     /// Interleaved stereo for devices that are not stereo.
     scratch: Box<[f32]>,
 }
@@ -140,8 +148,17 @@ impl AudioSide {
     /// rest.
     pub fn render(&mut self, out: &mut [f32], channels: usize) {
         if channels == 2 {
-            let frames = out.len() / 2;
-            self.process(Target::Out(out), frames);
+            // Engine-block pieces, so every bus block reaches the taps.
+            let total = out.len() / 2;
+            let mut done = 0;
+            loop {
+                let n = (total - done).min(MAX_BLOCK);
+                self.process(Target::Out(&mut out[2 * done..2 * (done + n)]), n);
+                done += n;
+                if done >= total {
+                    break;
+                }
+            }
         } else if channels == 0 {
             out.fill(0.0);
         } else {
@@ -179,6 +196,7 @@ impl AudioSide {
             cells,
             clock,
             scratch,
+            taps,
             ..
         } = self;
         let mut io = EngineIo {
@@ -192,7 +210,9 @@ impl AudioSide {
             Target::Out(out) => out,
             Target::Scratch => &mut scratch[..],
         };
+        let at = clock.frames();
         engine.process(&mut io, buf, frames);
+        taps.record(buf, frames, at, engine.buses());
         clock.advance(frames as u64);
     }
 }
@@ -218,6 +238,9 @@ pub struct NativeAudioHost {
     diags: Vec<Diagnostic>,
     stream_errors: Arc<AtomicU32>,
     stream: Option<cpal::Stream>,
+    taps: Arc<TapShared>,
+    /// Resolves bus keywords for bus taps and captures (`set_bus_names`).
+    bus_names: Option<Rc<dyn InstResolver>>,
 }
 
 impl NativeAudioHost {
@@ -280,6 +303,7 @@ impl NativeAudioHost {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let clock = FrameClock::new(cfg.sample_rate as u32);
         let sigs = Arc::new(SharedSigs::default());
+        let taps = Arc::new(TapShared::new());
         let (events, events_rx) = EventRing::split(EVENT_CAPACITY);
         let (controls, controls_rx) = SpscRing::split(CONTROL_CAPACITY);
         let (acks_tx, acks) = SpscRing::split(ACK_CAPACITY);
@@ -293,6 +317,7 @@ impl NativeAudioHost {
             cells: cells.clone(),
             clock: clock.clone(),
             sigs: Arc::clone(&sigs),
+            taps: Arc::clone(&taps),
             scratch: vec![0.0; 2 * MAX_BLOCK].into_boxed_slice(),
         };
         let host = NativeAudioHost {
@@ -310,6 +335,8 @@ impl NativeAudioHost {
             diags: Vec::new(),
             stream_errors: Arc::new(AtomicU32::new(0)),
             stream: None,
+            taps,
+            bus_names: None,
         };
         (host, side)
     }
@@ -325,6 +352,12 @@ impl NativeAudioHost {
     #[must_use]
     pub fn clock(&self) -> FrameClock {
         self.clock.clone()
+    }
+
+    /// The bus names bus taps and captures resolve through (the session's
+    /// instrument registry); without them only `:master` is tapped.
+    pub fn set_bus_names(&mut self, names: Rc<dyn InstResolver>) {
+        self.bus_names = Some(names);
     }
 
     /// Records dropped because a ring or channel was full.
@@ -462,6 +495,28 @@ impl AudioHost for NativeAudioHost {
 
     fn analysis(&self) -> HostSigs {
         self.sigs.load()
+    }
+
+    fn tap_reader(&mut self) -> Option<Box<dyn TapReader>> {
+        Some(Box::new(NativeTapReader::new(
+            Arc::clone(&self.taps),
+            self.bus_names.clone(),
+        )))
+    }
+
+    fn arm_capture(
+        &mut self,
+        src: &TapSrc,
+        start: f64,
+        frames: usize,
+    ) -> Result<CaptureId, Failure> {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let start = (start.max(0.0) * f64::from(self.clock.sample_rate())).round() as u64;
+        tap::arm_capture(&self.taps, self.bus_names.as_ref(), src, start, frames)
+    }
+
+    fn poll_capture(&mut self, id: CaptureId, out: &mut Vec<f32>) -> CapturePoll {
+        tap::poll_capture(&self.taps, id, out)
     }
 }
 

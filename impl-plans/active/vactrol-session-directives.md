@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Directives (SS-DIRECTIVES) Implementation Plan
 
 **planId**: SS-DIRECTIVES (issue #4, wave 2; `#@` parsing, attachment, labels, selector resolution, `BindingKey`, both `BindingPersistence` impls, learned-CC write-back, vocabulary fixtures)
-**Status**: Completed (implementation; the crate-wide V2/V2l/V3/V3t rows are pending the SESSION join re-verification because of sibling-caused failures, see the progress log)
+**Status**: Completed (accepted by the session-185 integration review; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/design-implementation.md 13.5 (Decided shape, PROPOSED vocabulary, ADDRESSED SELECTOR RESOLUTION, `BindingKey`, labels, write-back), 13 (persistence mode scope, overlays never in source), 14.5.8 (all rules), 14.5.6 (`ChangeSet`), 14.5.12; architecture.md Editor Requirements; design-docs/user-qa/pending-session-questions.md S4
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -190,9 +190,9 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
 
 - [x] Items 1-8 implemented
 - [x] Every required test passes, including the authority-question channel on every vocabulary case
-- [ ] V1-V9 and D1 pass with logs cited; `final-hashes.txt` written. V1, V1l, V3f, V6a, V6b, V7, V4, V5, V9 and D1
-  pass, and `final-hashes.txt` is written. V2, V2l, V3 and V3t fail only in sibling SS-ANALYSIS files, so these rows
-  are left to the SESSION join (see the session-184 entry).
+- [x] V1-V9 and D1 pass with logs cited; `final-hashes.txt` written. In session 184, V2, V2l, V3 and V3t failed only in
+  sibling SS-ANALYSIS files. In session 185 every row passes on unchanged directives source (see the session-185
+  entry; logs `target/fe-logs/ss-directives-<check>-s185-3.log`, `attempt-2/final-hashes.txt`).
 
 ## Progress Log
 
@@ -287,6 +287,44 @@ The sibling-caused failures:
     exclusive directives are rewritten or deleted.
   - An entry with no channel under a file default reloads with the file default's channel.
 
+### Session: 2026-09-26 (session 185, SS-DIRECTIVES implementer)
+
+**Tasks completed**: re-verification after the operator updated the two pre-amendment tests
+(`src/types/tests/natives.rs`, `src/dsp/tests/contracts.rs`) to the 12.3 amendment. Evidence is in
+`tmp/ss-session-20260925-s183/SS-DIRECTIVES/attempt-2/`: `intent.md`, `pre-edit-hashes.txt`,
+`post-verify-hashes.txt` and `final-hashes.txt`.
+
+**Source**: no directives source or test file changed. Every hash in `attempt-2/pre-edit-hashes.txt` equals
+`attempt-1/final-hashes.txt`, and the hashes did not change during the run. The only edit in this session is to this
+plan (Status, the verification criterion and this entry).
+
+**Verification** (logs `target/fe-logs/ss-directives-<check>-s185-3.log`, except V1, V1l, V2, V2l and V3t, which
+are in `-s185-2.log`; all run on the shared tree):
+
+| Row | Check | Result |
+|-----|-------|--------|
+| V1 | `build` | exit=0 |
+| V1l | `build-lsp` | exit=0 |
+| V2 | `clippy` | exit=0 |
+| V2l | `clippy-lsp` | exit=0 |
+| V3 | `nextest` | exit=0; 901 run, 901 passed, 1 skipped |
+| V3t | `cargotest` | exit=0; lib 889 passed, `directive_fixtures` 2 passed, `spec_fixtures` 10 passed and 1 ignored, 0 failed |
+| V3f | `fixtures` | exit=0; 10 run, 10 passed, 1 skipped |
+| D1 | `own` | exit=0; 39 run, 39 passed |
+| V6a | `wasm32` | exit=0 |
+| V6b | `wasm32-hostwasm` | exit=0 |
+| V7 | `fmt` | exit=0 |
+| V9 | `tree-wasm32`, `tree-wasm32-hostwasm` | exit=0; 0 matches for tungstenite, getrandom, tower-lsp and tokio |
+| V4 | `linecount` | largest file 799 (`src/dsp/build.rs`, not this plan) |
+| V5 | `io-grep` | prints `none` |
+
+**Runner note**: the `nextest`, `fixtures` and `own` logs with the `-s185-2` suffix exit 2. My log runner did not
+word-split the nextest environment variables under zsh, so nextest rejected the `--status-level` value before any
+test ran. These are not test failures, and the `-s185-3` reruns supersede them.
+
+**Status**: every completion criterion is checked. Formal review, the SESSION join and the commit belong to later
+workflow steps.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
@@ -304,3 +342,20 @@ The sibling-caused failures:
   pre-existing test outside every plan's ownership are reported in the
   progress log as a dependency blocker for the operator, never fixed by
   editing unowned files.
+
+### INTEGRATION REVIEW OUTPUT NOTE (operator, 2026-09-26, after two adapter rejections in session 185)
+
+- The integration-review step output MUST be an ENVELOPE with two top-level
+  keys: `"when"` (the routing flags `needs_revision`, `redispatch_required`,
+  `repair_in_place`, `plans_remaining`) and `"payload"` (an OBJECT holding the
+  review itself: `needs_revision`, `loopGate`, `acceptedPlanIds`, `findings`,
+  `recoveryDiagnostic`, summaries, evidence paths). Two attempts were rejected
+  with "payload must be an object when when is provided" because the review
+  fields were emitted at the top level next to `when` instead of inside
+  `payload`. `acceptedPlanIds` lists only plans present in the manifest's
+  `plans[]`.
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

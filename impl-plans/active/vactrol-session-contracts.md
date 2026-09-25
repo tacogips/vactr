@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Contracts and Seeds (SS-CONTRACTS) Implementation Plan
 
 **planId**: SS-CONTRACTS (issue #4, wave 1; the dependencies, codes, shapes and seeds every TASK-009 wave builds on)
-**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 184; removed from the dispatch manifest by the session-185 amendment; source rides in the single workflow commit)
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 184; removed from the dispatch manifest by the session-185 amendment; source rides in the single workflow commit; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/design-implementation.md 14.5.2 (dependencies, gating), 14.5.3 (ownership rule, file table), 14.5.6 (`ChangeSet`), 14.5.9 (`Sound::Buffer`, taps, staged `Capture`/`Render`), 14.5.10 (console registers), 14.5.12 (codes, waves, verification); 6.5.7 (evidence rule)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -399,3 +399,8 @@ edited only this plan file.
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
 - **Next (wave 2)**: vactrol-session-pkg.md, vactrol-session-directives.md, vactrol-session-analysis.md
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

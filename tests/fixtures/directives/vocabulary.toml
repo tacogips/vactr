@@ -1,0 +1,141 @@
+# Directive vocabulary fixtures (design 13.5 PROPOSED vocabulary, 14.5.8).
+#
+# The SHAPE of `#@` directives is Decided; the vocabulary after `#@` is
+# PROPOSED, delegated to the design and not yet ratified by the author. Every
+# case is therefore in the authority-question channel: `class =
+# "authority-question"` plus the `question` the author is asked. This file is
+# kept apart from tests/fixtures/spec/manifest.toml.
+#
+# [[case]] fields: `id`; `source` (a whole document); `diags`, the multiset of
+# directive diagnostic codes; `bindings`, the merged bindings in order, each
+# `<key> cc:<n|-> ch:<n|->`, where `<key>` is `label.site.n.param`,
+# `label.param`, or `@line:col.param` for positional provenance (the 1-based
+# line and column of the call-site head or parameter).
+
+[[case]]
+id = "file-default"
+source = '''
+#@ midi ch: 1
+s [:bd :sd] > lpf 800 > d1
+#@ lpf cc: 74
+'''
+diags = []
+bindings = ["@2:15.cutoff cc:74 ch:1", "@2:15.q cc:- ch:-"]
+class = "authority-question"
+question = "Is `#@ midi ch: n` (file-wide channel default, a later one replacing the earlier with duplicate-key) the file-level spelling, and is `ch` its only key in v1?"
+
+[[case]]
+id = "name-label"
+source = '''
+s [:sd] > hpf 300 > d2
+#@ name snare
+#@ snare.hpf cc: 9
+'''
+diags = []
+bindings = ["snare.hpf.1.cutoff cc:9 ch:-", "snare.hpf.1.q cc:- ch:-"]
+class = "authority-question"
+question = "Is `#@ name X` the explicit label spelling, labeling the statement the block attaches to?"
+
+[[case]]
+id = "trailing-short-form"
+source = '''
+s [:bd :sd] > lpf 800 res: 0.4 > d1        #@ bass-filter: lpf cc: 74 71
+'''
+diags = []
+bindings = ["bass-filter.lpf.1.cutoff cc:74 ch:-", "bass-filter.lpf.1.q cc:71 ch:-"]
+class = "authority-question"
+question = "Is the leading `ident:` token the label short form, with the rest of the comment a positional directive for the same line?"
+
+[[case]]
+id = "positional-cc-skip"
+source = '''
+s [:hh] > ladder 900 0.3 > d1
+#@ ladder cc: 74 _ 30
+'''
+diags = []
+bindings = ["@1:11.in cc:74 ch:-", "@1:11.cutoff cc:- ch:-", "@1:11.res cc:30 ch:-"]
+class = "authority-question"
+question = "Do `cc:` numbers map in the site's declared parameter order, with `_` skipping one parameter?"
+
+[[case]]
+id = "fewer-numbers"
+source = '''
+s [:hh] > lpf 400 > d1
+#@ lpf cc: 74
+'''
+diags = []
+bindings = ["@1:11.cutoff cc:74 ch:-", "@1:11.q cc:- ch:-"]
+class = "authority-question"
+question = "Do fewer CC numbers than parameters leave the remaining parameters on the panel, unmapped?"
+
+[[case]]
+id = "ch-override"
+source = '''
+#@ midi ch: 1
+s [:hh] > lpf 1 > hpf 2 > d1
+#@ lpf cc: 74 ch: 5
+#@ hpf cc: 30
+'''
+diags = []
+bindings = ["@2:11.cutoff cc:74 ch:5", "@2:11.q cc:- ch:-", "@2:19.cutoff cc:30 ch:1", "@2:19.q cc:- ch:-"]
+class = "authority-question"
+question = "Does a directive's `ch:` override the `#@ midi ch:` file default for that directive's mappings only?"
+
+[[case]]
+id = "addressed-param"
+source = '''
+inst analog cutoff: float = 1200 res: float = 0.3:
+	vco :saw freq > ladder cutoff res > * amp
+#@ analog.cutoff cc: 1
+'''
+diags = []
+bindings = ["analog.cutoff cc:1 ch:-"]
+class = "authority-question"
+question = "Does `label.param` on a definition label select that declared parameter (an inst's name is a label)?"
+
+[[case]]
+id = "addressed-call-site"
+source = '''
+s [:hh] > hpf 2000 > d2                    #@ hats:
+#@ hats.hpf cc: 30
+'''
+diags = []
+bindings = ["hats.hpf.1.cutoff cc:30 ch:-", "hats.hpf.1.q cc:- ch:-"]
+class = "authority-question"
+question = "Does `label.site` select the call site on the labeled line, with `cc:` mapping from its first declared parameter?"
+
+[[case]]
+id = "ordinal"
+source = '''
+s [:hh] > lpf 800 > lpf 2000 > d2   #@ hats:
+#@ hats.lpf cc: 1
+#@ hats.lpf.2 cc: 31
+s [:bd] > lpf 1 > lpf 2 > d3   #@ lpf.2 cc: 30
+'''
+diags = ["ambiguous-selector"]
+bindings = ["hats.lpf.2.cutoff cc:31 ch:-", "hats.lpf.2.q cc:- ch:-", "@4:19.cutoff cc:30 ch:-", "@4:19.q cc:- ch:-"]
+class = "authority-question"
+question = "Is a repeated bare selector `ambiguous-selector`, with the 1-based ordinal `.n` (addressed `hats.lpf.2` or positional `lpf.2`) selecting the n-th in source order?"
+
+[[case]]
+id = "reserved-key"
+source = '''
+s [:hh] > lpf 1 > d1
+#@ lpf range: 20 2000
+'''
+diags = ["reserved-key"]
+bindings = ["@1:11.cutoff cc:- ch:-", "@1:11.q cc:- ch:-"]
+class = "authority-question"
+question = "Is `range:` (and any key other than `cc:`/`ch:`) reserved and rejected in v1, ranges coming only from ParamMeta?"
+
+[[case]]
+id = "duplicate-label"
+source = '''
+let hats 1
+s [:hh] > hpf 2000 > d2   #@ hats: hpf cc: 30
+#@ hats.hpf cc: 31
+'''
+diags = ["duplicate-label", "duplicate-label"]
+bindings = ["@2:11.cutoff cc:30 ch:-", "@2:11.q cc:- ch:-"]
+class = "authority-question"
+question = "Is an explicit label colliding with an implicit one (or another explicit one) `duplicate-label`, its addressed references rejected and its sites falling back to positional provenance?"

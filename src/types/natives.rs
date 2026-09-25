@@ -56,9 +56,9 @@ pub enum HostCap {
 /// One entry of the table.
 ///
 /// `ty` holds the schemes in the notation of `Scheme::parse`; more than one
-/// only for the fixed overload group `scale` and `shape` (7.1.4), in
-/// subject-type order. Parameters past `min_args` are optional. For a
-/// variadic native (`max_args == None`) the last parameter type and the last
+/// only for the fixed overload group (7.1.4 M1: `scale`, `shape`, and the
+/// 14.5.9 `scope`, `spectrum` and `render`), resolved on the subject type.
+/// Parameters past `min_args` are optional. For a variadic native (`max_args == None`) the last parameter type and the last
 /// mask entry apply to every further argument. `keywords` are the named
 /// arguments (`kit:` of `s`); they are not in the mask.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -153,7 +153,7 @@ impl NativeSig {
             .collect()
     }
 
-    /// True for the `scale`/`shape` overload group.
+    /// True for the M1 fixed subject-overload group.
     #[must_use]
     pub fn is_overloaded(&self) -> bool {
         self.ty.len() > 1

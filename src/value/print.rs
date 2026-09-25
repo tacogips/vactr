@@ -4,6 +4,7 @@ use std::fmt::{self, Display, Write as _};
 
 use crate::value::intern::{name_of_kw, name_of_sym};
 use crate::value::key::Key;
+use crate::value::sample::BufState;
 use crate::value::value::{Sound, Value};
 
 impl Display for Value {
@@ -121,6 +122,11 @@ fn write_value(f: &mut fmt::Formatter<'_>, v: &Value, top: bool) -> fmt::Result 
                 write_quoted(f, addr)?;
                 f.write_char(')')
             }
+            Sound::Buffer(buf) => match &*buf.state() {
+                BufState::Pending => f.write_str("(sound buffer pending)"),
+                BufState::Ready(data) => write!(f, "(sound buffer {} frames)", data.len() / 2),
+                BufState::Failed { .. } => f.write_str("(sound buffer failed)"),
+            },
         },
         Value::Fn(_) => f.write_str("<fn>"),
         Value::Native(_) => f.write_str("<native>"),

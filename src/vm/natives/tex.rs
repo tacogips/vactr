@@ -295,8 +295,13 @@ fn render_setting(cx: &mut NativeCx<'_>) -> R {
     Ok(Value::Nil)
 }
 
+/// `render` / `render :o0`: the visual setting; `render cycles` (a number
+/// subject): the offline audio render (14.5.9).
 fn render(cx: &mut NativeCx<'_>, a: &[Value], _: Kw<'_>) -> R {
     if let Some(v) = a.first() {
+        if crate::pattern::eval::num_f64(v).is_some() {
+            return crate::vm::natives::analysis::render(cx, v);
+        }
         output(v)?;
     }
     render_setting(cx)

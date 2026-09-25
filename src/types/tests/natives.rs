@@ -75,7 +75,12 @@ fn only_scale_and_shape_are_overloaded() {
         .filter(|(_, s)| s.is_overloaded())
         .map(|(_, s)| s.name)
         .collect();
-    assert_eq!(overloaded, ["shape", "scale"]);
+    // `scope`, `spectrum` and `render` are overloaded on a bus source versus a
+    // sample value (design 12.3 self-analysis amendment, 2026-09-25).
+    assert_eq!(
+        overloaded,
+        ["shape", "scale", "scope", "spectrum", "render"]
+    );
     for name in ["scale", "shape"] {
         let (_, sig) = table().get(name).expect("present");
         assert_eq!(sig.schemes().len(), 2, "{name}");

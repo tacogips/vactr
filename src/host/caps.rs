@@ -7,6 +7,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
 use crate::dsp::graph::{BusDef, BusId, InstDef, InstId};
 use crate::host::noop::NoopHost;
@@ -18,7 +19,7 @@ use crate::tex::texnode::OutId;
 use crate::tex::uniforms::Uniforms;
 use crate::value::intern::KwId;
 use crate::value::value::{PathVal, Sound};
-use crate::vm::fail::Failure;
+use crate::vm::fail::{FailCode, Failure};
 
 /// The audio sink (design 11.5, 12.8.5).
 pub trait AudioHost {
@@ -42,6 +43,78 @@ pub trait AudioHost {
     fn retire_sample(&mut self, id: u32);
     /// The host signals (`amp`, `fft`).
     fn analysis(&self) -> HostSigs;
+    /// A reader of the live tap history rings (14.5.9); `None` when the
+    /// host has no taps (`NoopHost`, the browser).
+    fn tap_reader(&mut self) -> Option<Box<dyn TapReader>> {
+        None
+    }
+    /// Arms a capture of `frames` frames of `src` starting at host time
+    /// `start` (14.5.9). The runtime polls it with `poll_capture`.
+    ///
+    /// # Errors
+    /// `host-unavailable` when the host cannot capture.
+    fn arm_capture(
+        &mut self,
+        src: &TapSrc,
+        start: f64,
+        frames: usize,
+    ) -> Result<CaptureId, Failure> {
+        let _ = (src, start, frames);
+        Err(no_taps())
+    }
+    /// Moves the frames captured so far into `out` and reports whether the
+    /// capture is done.
+    fn poll_capture(&mut self, id: CaptureId, out: &mut Vec<f32>) -> CapturePoll {
+        let _ = (id, out);
+        CapturePoll::Failed(no_taps())
+    }
+}
+
+/// The failure of a tap or capture on a host without taps.
+fn no_taps() -> Failure {
+    Failure::new(
+        FailCode::HostUnavailable,
+        "audio taps are not available on this host",
+    )
+}
+
+/// A live audio source a tap or capture reads (14.5.9).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum TapSrc {
+    /// The `:master` output.
+    Master,
+    /// A named bus.
+    Bus(KwId),
+}
+
+/// Reads snapshots of the live tap history rings (14.5.9).
+pub trait TapReader {
+    /// Copies the last `frames` mono frames of `src` into `out`.
+    ///
+    /// # Errors
+    /// `host-unavailable`, or `type` for an unknown source.
+    fn snapshot(&mut self, src: &TapSrc, frames: usize, out: &mut Vec<f32>) -> Result<(), Failure>;
+}
+
+id_newtype!(
+    /// An armed capture on the audio host.
+    CaptureId(u32)
+);
+
+/// Where an armed capture stands.
+#[derive(Clone, PartialEq, Debug)]
+pub enum CapturePoll {
+    Pending,
+    Done,
+    Failed(Failure),
+}
+
+/// What self-analysis natives reach through the source loader
+/// (`SourceLoader::analysis`, 14.5.9): the host capabilities and the tap
+/// reader, when the host has one.
+pub struct AnalysisCx {
+    pub caps: CapabilitySet,
+    pub taps: Option<Box<dyn TapReader>>,
 }
 
 /// The MIDI-out sink.
@@ -72,6 +145,17 @@ pub trait SampleLoader {
     /// # Errors
     /// Any failure to read or decode; `host-unavailable` with no host.
     fn load(&mut self, src: &SampleSrc) -> Result<Arc<SampleData>, Failure>;
+    /// Registers `files` as the host bank `kw` (a package's asset bank).
+    ///
+    /// # Errors
+    /// `host-unavailable` when the loader has no banks.
+    fn register_bank(&mut self, kw: KwId, files: Vec<PathVal>) -> Result<(), Failure> {
+        let _ = (kw, files);
+        Err(Failure::new(
+            FailCode::HostUnavailable,
+            "sample banks are not available on this host",
+        ))
+    }
 }
 
 /// Resolves a sound to where its events go (design 12.8.3). BE-INST
@@ -129,6 +213,12 @@ pub enum SampleSrc {
         index: u32,
     },
     Path(PathVal),
+    /// A captured or rendered buffer, by its `SampleBuf::id`. Loaders do
+    /// not load it (`host-unavailable`); SS-ANALYSIS installs the buffer's
+    /// own frames at commit.
+    Buffer {
+        id: u64,
+    },
 }
 
 /// Decoded, interleaved sample frames.

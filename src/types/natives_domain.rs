@@ -66,6 +66,19 @@ const fn dsp(name: &'static str) -> NativeSig {
         .kw(DSP_KEYWORDS)
 }
 
+/// The named arguments of `spectrum`: the analyzer unit's, plus `bins` of
+/// the tap and buffer forms (14.5.9).
+const SPECTRUM_KEYWORDS: [&str; DSP_KEYWORDS.len() + 1] = {
+    let mut out = [""; DSP_KEYWORDS.len() + 1];
+    let mut k = 0;
+    while k < DSP_KEYWORDS.len() {
+        out[k] = DSP_KEYWORDS[k];
+        k += 1;
+    }
+    out[k] = "bins";
+    out
+};
+
 const fn signal(name: &'static str) -> NativeSig {
     NativeSig::value(name, &["signal"])
 }
@@ -220,6 +233,35 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     signal("amp").needs(&[HostCap::Analysis]),
     f("irand", 1, 1, &["fn any -> signal"], &[L]),
     f("fft", 1, 1, &["fn int -> signal"], &[V]).needs(&[HostCap::Analysis]),
+    // Self-analysis (design 14.5.9, the 12.3 amendment): live taps of a bus
+    // source and analyses of sample values. `scope`, `spectrum` and
+    // `render` are in the M1 subject-overload group; `spectrum` over a ugen
+    // is the analyzer unit (12.8.6).
+    f(
+        "scope",
+        2,
+        2,
+        &["fn keyword int -> [float]", "fn sound int -> [float]"],
+        &[V, V],
+    ),
+    f(
+        "spectrum",
+        0,
+        1,
+        &[
+            "fn ugen -> ugen",
+            "fn keyword -> [float]",
+            "fn sound -> [float]",
+        ],
+        &[V],
+    )
+    .rest()
+    .kw(&SPECTRUM_KEYWORDS),
+    f("capture", 2, 2, &["fn keyword any -> sound"], &[V, V])
+        .effect()
+        .needs(&[HostCap::Analysis]),
+    f("rms", 1, 1, &["fn sound -> float"], &[V]),
+    f("peak", 1, 1, &["fn sound -> float"], &[V]),
     f("cc", 1, 1, &["fn int -> signal"], &[V])
         .kw(&["channel"])
         .needs(&[HostCap::MidiIn]),
@@ -285,9 +327,17 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     f("out", 1, 2, &["fn tex keyword -> tex"], &[V, V])
         .effect()
         .needs(&[HostCap::Render]),
-    f("render", 0, 1, &["fn keyword -> nil"], &[V])
-        .effect()
-        .needs(&[HostCap::Render]),
+    // A keyword or no subject: the visual setting; a number: offline render
+    // (14.5.9).
+    f(
+        "render",
+        0,
+        1,
+        &["fn keyword -> nil", "fn any -> sound"],
+        &[V],
+    )
+    .effect()
+    .needs(&[HostCap::Render]),
     f("use-fps", 1, 1, &["fn any -> nil"], &[V])
         .effect()
         .needs(&[HostCap::Render]),
@@ -403,7 +453,6 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("fir-crossover"),
     dsp("granulate"),
     dsp("level"),
-    dsp("spectrum"),
     dsp("spectrogram"),
     dsp("note-spectrogram"),
     dsp("oscilloscope"),

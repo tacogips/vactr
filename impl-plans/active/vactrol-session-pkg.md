@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Packages (SS-PKG) Implementation Plan
 
 **planId**: SS-PKG (issue #4, wave 2; package manifest, lock, MVS, stores, canonical digest, archive safety, staged cache publication, package evaluation into `PkgNs`)
-**Status**: In Progress (implementation complete; the crate-wide V3/V3t rows await the join re-verify of two SS-ANALYSIS-scope tests)
+**Status**: Completed (accepted by the session-185 integration review; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/design-implementation.md 5.7 (Decided package model, revised digest and archive safety), 14.5.1 (fetch only in `vactrol get`; browser store is Rust-half only), 14.5.2 (in-crate SHA-256 and TOML subset; miniz_oxide), 14.5.7 (all rules), 14.5.12; command.md (`vactrol.toml`, `vactrol.lock`, `VACTROL_HOME`)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -227,7 +227,8 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9 of `
 - [x] Items 1-14 implemented as specified
 - [x] Every required test passes, including the portability, injectivity, malicious-fixture, interrupted-extraction,
       local-HTTP proxy and local-git tests
-- [ ] V1-V9 and P1-P2 pass with logs cited; `final-hashes.txt` written (all rows exit 0 except V3/V3t, which fail only on two sibling-scope tests; see the session-184 log)
+- [x] V1-V9 and P1-P2 pass with logs cited; `final-hashes.txt` written (session 185: every row exits 0 after the operator's
+      amendment of the two sibling-scope tests; see the session-185 log)
 
 ## Progress Log
 
@@ -286,6 +287,27 @@ behavior lost; later edits used fresh content). There was no drift against `post
 
 **Blockers**: none owned by SS-PKG. The two sibling-scope test failures above are left for the join.
 
+### Session: 2026-09-25 (session 185, SS-PKG implementer)
+
+**Work done** (evidence root `tmp/ss-session-20260925-s183/SS-PKG/attempt-2/`: `intent.md`, `pre-edit-hashes.txt`,
+`final-hashes.txt`, `git-version.txt`, `tree-wasm32*.txt`, `v4-linecounts.txt`, `v5-grep.txt`, `git-status.txt`):
+- Re-dispatch after the operator amended `src/types/tests/natives.rs` and `src/dsp/tests/contracts.rs` to the 12.3
+  amendment (the two session-184 sibling-scope failures). No SS-PKG source edit was needed: `pre-edit-hashes.txt`,
+  `final-hashes.txt` and `attempt-1/final-hashes.txt` are identical for all 35 owned source files. Only this plan file
+  was edited (Status, criterion 3, this entry).
+
+**Verification** (shared tree, `target/fe-logs/*-s185-1.log`, each ending with `exit=`):
+- P2 `git --version`: git version 2.55.0.
+- V1 `ss-pkg-build` exit=0; V1l `ss-pkg-build-lsp` exit=0; V2 `ss-pkg-clippy` exit=0; V2l `ss-pkg-clippy-lsp` exit=0.
+- P1 `ss-pkg-own` exit=0: 47 run, 47 passed.
+- V3 `ss-pkg-nextest` exit=0: 901 run, 901 passed, 1 skipped. V3t `ss-pkg-cargotest` exit=0: 901 passed, 0 failed,
+  1 ignored. V3f `ss-pkg-fixtures` exit=0: 10 run, 10 passed, 1 skipped.
+- V6a `ss-pkg-wasm32` exit=0; V6b `ss-pkg-wasm32-hostwasm` exit=0; V7 `ss-pkg-fmt` exit=0.
+- V4: the largest `.rs` file is `src/dsp/build.rs` at 799 lines (not edited). V5: `none`. V9: 0 matches for
+  tungstenite|getrandom|tokio|tower-lsp|cpal|midir in both wasm32 trees.
+
+**Blockers**: none. Formal test-integrity/adversarial/integration review and the commit are downstream steps.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
@@ -303,3 +325,20 @@ behavior lost; later edits used fresh content). There was no drift against `post
   pre-existing test outside every plan's ownership are reported in the
   progress log as a dependency blocker for the operator, never fixed by
   editing unowned files.
+
+### INTEGRATION REVIEW OUTPUT NOTE (operator, 2026-09-26, after two adapter rejections in session 185)
+
+- The integration-review step output MUST be an ENVELOPE with two top-level
+  keys: `"when"` (the routing flags `needs_revision`, `redispatch_required`,
+  `repair_in_place`, `plans_remaining`) and `"payload"` (an OBJECT holding the
+  review itself: `needs_revision`, `loopGate`, `acceptedPlanIds`, `findings`,
+  `recoveryDiagnostic`, summaries, evidence paths). Two attempts were rejected
+  with "payload must be an object when when is provided" because the review
+  fields were emitted at the top level next to `when` instead of inside
+  `payload`. `acceptedPlanIds` lists only plans present in the manifest's
+  `plans[]`.
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

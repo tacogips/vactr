@@ -16,6 +16,7 @@ pub mod fft;
 pub mod granular;
 pub mod graph;
 pub mod meta;
+pub mod offline;
 pub mod release;
 pub mod ring;
 pub mod ugen;

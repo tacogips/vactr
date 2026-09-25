@@ -102,6 +102,10 @@ impl InstResolver for Stub {
                 inst: *id,
                 sample: None,
             },
+            Sound::Buffer(buf) => Route::Audio {
+                inst: SAMPLER,
+                sample: Some(SampleSrc::Buffer { id: buf.id }),
+            },
         })
     }
 

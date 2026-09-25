@@ -116,3 +116,27 @@ fn tagging_every_non_shell_variant() {
         ]
     );
 }
+
+#[test]
+fn sound_buffer_prints_by_state_and_equals_only_itself() {
+    use crate::value::deep_eq;
+    use crate::value::sample::SampleBuf;
+    use crate::value::value::Sound;
+    use crate::vm::fail::FailCode;
+
+    let sound = |b: &Rc<SampleBuf>| Value::Sound(Rc::new(Sound::Buffer(Rc::clone(b))));
+    let pending = SampleBuf::pending(48_000);
+    assert_eq!(sound(&pending).to_string(), "(sound buffer pending)");
+    pending.fill(vec![0.0_f32; 6]);
+    assert_eq!(sound(&pending).to_string(), "(sound buffer 3 frames)");
+    pending.fail(FailCode::HostUnavailable, "no taps");
+    assert_eq!(sound(&pending).to_string(), "(sound buffer failed)");
+
+    // Equal only to itself, never to a buffer with the same frames.
+    let a = SampleBuf::ready(48_000, vec![0.5_f32, 0.5]);
+    let b = SampleBuf::ready(48_000, vec![0.5_f32, 0.5]);
+    assert_ne!(a.id, b.id);
+    assert!(deep_eq(&sound(&a), &sound(&a)).expect("comparable"));
+    assert!(!deep_eq(&sound(&a), &sound(&b)).expect("comparable"));
+    assert_eq!(a.frames(), Some(1));
+}

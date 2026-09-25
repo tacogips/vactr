@@ -7,7 +7,10 @@
 //! (symbolic links resolved), and refused unless it lies inside a
 //! canonical root. A bank `SampleSrc::Bank { kw, index }` is file
 //! `index % count` of the lexically sorted `*.wav` files of `<root>/<kw>/`
-//! in the first root that has that directory.
+//! in the first root that has that directory. A package asset bank
+//! registered with `register_bank` (design 14.5.7 "Assets") comes first:
+//! its files, indexed by `n` in bytewise path order, are package-cache
+//! files and are not subject to the root check.
 //!
 //! Samples are RIFF WAV only, decoded by `parse_wav` (PCM 16/24/32-bit
 //! integer and 32-bit float, mono or stereo, `WAVE_FORMAT_EXTENSIBLE`
@@ -29,7 +32,7 @@ use std::sync::Arc;
 use crate::host::caps::{SampleData, SampleLoader, SampleSrc};
 use crate::ns::load::SourceLoader;
 use crate::reader::span::FileId;
-use crate::value::intern::name_of_kw;
+use crate::value::intern::{name_of_kw, KwId};
 use crate::value::value::PathVal;
 use crate::vm::fail::{FailCode, Failure};
 
@@ -51,6 +54,8 @@ struct State {
     base: PathBuf,
     files: Vec<(FileId, PathBuf)>,
     next: u32,
+    /// Registered package banks: keyword name and canonical files.
+    banks: Vec<(Rc<str>, Vec<PathBuf>)>,
 }
 
 /// Reads WAV samples and source files below configured roots.
@@ -71,6 +76,7 @@ impl NativeSampleLoader {
             base: base.to_path_buf(),
             files: Vec::new(),
             next: FIRST_LOADED_FILE,
+            banks: Vec::new(),
         })))
     }
 
@@ -118,6 +124,9 @@ impl NativeSampleLoader {
 
     /// The file of a bank entry.
     fn bank_file(&self, kw: &str, index: u32) -> Result<PathBuf, Failure> {
+        if let Some((_, files)) = self.0.borrow().banks.iter().find(|(k, _)| &**k == kw) {
+            return Ok(files[index as usize % files.len()].clone());
+        }
         let bad = kw.is_empty() || kw.starts_with('.') || kw.contains(['/', '\\']);
         if bad {
             return Err(fail(format!("`:{kw}` cannot name a sample directory")));
@@ -180,11 +189,57 @@ impl SampleLoader for NativeSampleLoader {
                 let kw = name_of_kw(*kw);
                 (self.bank_file(&kw, *index)?, format!(":{kw} {index}"))
             }
+            // A captured or rendered buffer carries its own frames
+            // (SS-ANALYSIS installs them); there is no file to load.
+            SampleSrc::Buffer { id } => {
+                return Err(Failure::new(
+                    FailCode::HostUnavailable,
+                    format!("buffer #{id} is not a file sample"),
+                ))
+            }
         };
         let bytes = read_limited(&file, MAX_WAV_BYTES, &text)?;
         parse_wav(&bytes)
             .map(Arc::new)
             .map_err(|why| fail(format!("cannot decode `{text}`: {why}")))
+    }
+
+    /// Registers a package asset bank. A name already used by a registered
+    /// bank or by a sample directory in a root is refused with `load-failed`
+    /// (the session reports it as `import-collision`; the first registration
+    /// wins). Every file must be a regular file.
+    fn register_bank(&mut self, kw: KwId, files: Vec<PathVal>) -> Result<(), Failure> {
+        let name = name_of_kw(kw);
+        let clash = {
+            let st = self.0.borrow();
+            st.banks.iter().any(|(k, _)| *k == name)
+                || st.roots.iter().any(|r| r.join(&*name).is_dir())
+        };
+        if clash {
+            return Err(Failure::new(
+                FailCode::LoadFailed,
+                format!("the sample bank `:{name}` already exists"),
+            ));
+        }
+        if files.is_empty() {
+            return Err(fail(format!("the sample bank `:{name}` has no file")));
+        }
+        let mut paths = Vec::with_capacity(files.len());
+        for f in &files {
+            let real = fs::canonicalize(&*f.text)
+                .map_err(|e| fail(format!("cannot read `{}`: {e}", f.text)))?;
+            if !real.is_file() {
+                return Err(fail(format!("`{}` is not a file", f.text)));
+            }
+            paths.push(real);
+        }
+        paths.sort_by(|a, b| {
+            a.as_os_str()
+                .as_encoded_bytes()
+                .cmp(b.as_os_str().as_encoded_bytes())
+        });
+        self.0.borrow_mut().banks.push((name, paths));
+        Ok(())
     }
 }
 

@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Self-Analysis Surfaces (SS-ANALYSIS) Implementation Plan
 
 **planId**: SS-ANALYSIS (issue #4, wave 2; `scope`/`spectrum`/`capture`/`render`/`rms`/`peak`, sample buffers, native live taps, offline render)
-**Status**: Blocked (implementation complete; V3/V3t fail only on two pre-existing assertions outside every plan's writePaths that contradict 14.5.9; operator amendment pending, see the session 184 log)
+**Status**: Completed (accepted by the session-185 integration review; SS-FINAL re-verified the joined tree in session 186)
 **Design Reference**: design-docs/specs/design-implementation.md 12.3 (self-analysis amendment), 14.5.1 (tap scope, no `Engine::render`), 14.5.9 (all rules), 14.5.3 (ownership), 14.5.12, 7.1.4 (M1 subject-overload group), 12.7/12.8.8 (`CapabilitySet::require`), 12.8.9 (allocation probe), 11.3 (tick steps); design-music.md "self-analysis and loopback"; design-docs/user-qa/pending-session-questions.md S1, S2
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -212,8 +212,8 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9, plu
 - [x] The surfaces are typed by the checker and callable (VM tests). Live taps, capture and offline render are proven
       with zero callback allocation
 - [x] Design-music ordinal 2 repinned; the fixtures are green
-- [ ] V1-V9 and A1-A2 pass with logs cited; `final-hashes.txt` written (every row passes except V3/V3t, blocked on the
-      two out-of-scope assertions below; `final-hashes.txt` written)
+- [x] V1-V9 and A1-A2 pass with logs cited; `final-hashes.txt` written (session 185: all rows exit 0,
+      `attempt-2/final-hashes.txt`)
 
 ## Progress Log
 
@@ -292,6 +292,29 @@ Every other failure count is zero; after the two amendments V3/V3t are expected 
 - Shared tree: sibling SS-DIRECTIVES/SS-PKG modules were mid-edit early in the session (missing modules); a sibling
   formatter pass reformatted two of this plan's files (content intact, `notes.md`).
 
+### Session: 2026-09-26 (session 185, SS-ANALYSIS implementer)
+
+**Outcome**: the session-184 blockers are resolved by the operator amendment (checkpoint `9d6db6e`):
+`src/dsp/tests/contracts.rs` now asserts `native.require(Cap::OfflineRender, None).is_ok()` and
+`src/types/tests/natives.rs` expects `["shape", "scale", "scope", "spectrum", "render"]`. No source edit was needed in
+this session: all 31 owned source, test and fixture files are hash-identical to `attempt-1/final-hashes.txt`
+(`attempt-2/start-hashes.txt`) and did not change during verification (`attempt-2/final-hashes.txt`). Every
+verification row passes. Formal test-integrity, adversarial and integration review are the downstream workflow steps.
+
+**Verification** (session 185; `target/fe-logs/ss-analysis-<check>-s185-1.log`, each ending in `exit=`; evidence
+`tmp/ss-session-20260925-s183/SS-ANALYSIS/attempt-2/`):
+- V1 build exit=0; V1l build-lsp exit=0; V2 clippy exit=0; V2l clippy-lsp exit=0; V7 fmt exit=0.
+- V3 nextest exit=0: 901 run, 901 passed, 1 skipped.
+- V3t cargotest (plain `cargo test`) exit=0: lib 889 passed / 0 failed; spec_fixtures 10 passed / 1 ignored; the other
+  binaries ok.
+- V3f fixtures exit=0: 10 run, 10 passed, 1 skipped. A1 own exit=0: 31 run, 31 passed.
+- V6a wasm32 exit=0; V6b wasm32-hostwasm exit=0. V9: `attempt-2/tree-wasm32*.txt` (cargo tree exit 0) contain 0 gated
+  crates (tungstenite, getrandom, tower-lsp, tokio).
+- A2 (`attempt-2/a2-wc.txt`): `infer_call.rs` 762, `runtime.rs` 776, `commit.rs` 743, `tex.rs` 323, each under 800.
+  V4 (`attempt-2/v4-largest.txt`): largest `.rs` 799 (`dsp/build.rs`, pre-existing, not edited). V5: `none`.
+- Shared tree: SS-PKG and SS-DIRECTIVES run in the same workspace; the tree was stable across this run (owned hashes
+  unchanged), and the crate-wide rows above are the join's baseline for this wave.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
@@ -309,3 +332,20 @@ Every other failure count is zero; after the two amendments V3/V3t are expected 
   pre-existing test outside every plan's ownership are reported in the
   progress log as a dependency blocker for the operator, never fixed by
   editing unowned files.
+
+### INTEGRATION REVIEW OUTPUT NOTE (operator, 2026-09-26, after two adapter rejections in session 185)
+
+- The integration-review step output MUST be an ENVELOPE with two top-level
+  keys: `"when"` (the routing flags `needs_revision`, `redispatch_required`,
+  `repair_in_place`, `plans_remaining`) and `"payload"` (an OBJECT holding the
+  review itself: `needs_revision`, `loopGate`, `acceptedPlanIds`, `findings`,
+  `recoveryDiagnostic`, summaries, evidence paths). Two attempts were rejected
+  with "payload must be an object when when is provided" because the review
+  fields were emitted at the top level next to `when` instead of inside
+  `payload`. `acceptedPlanIds` lists only plans present in the manifest's
+  `plans[]`.
+
+### CLOSING NOTE (SS-FINAL, session 186, 2026-09-26)
+
+- Status set to Completed by SS-FINAL. Join integrity: tmp/ss-session-20260925-s183/SS-FINAL/attempt-1/join-integrity.txt.
+- Final-tree evidence: target/fe-logs/ss-final-<check>-s186-1.log (build, build-lsp, clippy, clippy-lsp, fmt, nextest 984/984, cargotest 984, fixtures 10/10, lsp-smoke 1/1, cli 9/9, session 132/132, example, wasm32, wasm32-hostwasm; all exit=0).

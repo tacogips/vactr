@@ -166,7 +166,9 @@ fn native_accepts_its_advertised_limits() {
     for cap in [Cap::MidiIn, Cap::MidiOut, Cap::FileAccess] {
         assert!(native.require(cap, None).is_ok());
     }
-    assert!(native.require(Cap::OfflineRender, None).is_err());
+    // Offline `render` is a native-tier capability (design 12.3 self-analysis
+    // amendment, 2026-09-25); the browser tier still reports it unavailable.
+    assert!(native.require(Cap::OfflineRender, None).is_ok());
     assert!(native.require(Cap::IrSeconds(10.5), None).is_err());
 }
 

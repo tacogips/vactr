@@ -8,6 +8,7 @@ pub mod key;
 pub mod num;
 pub mod print;
 pub mod ratio;
+pub mod sample;
 // The `value/value.rs` layout is fixed by design section 4.
 #[allow(clippy::module_inception)]
 pub mod value;

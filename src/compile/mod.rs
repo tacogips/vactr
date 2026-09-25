@@ -2,6 +2,7 @@
 
 pub mod compiler;
 mod matchc;
+mod names;
 pub mod proto;
 mod sites;
 

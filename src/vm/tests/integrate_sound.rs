@@ -19,6 +19,7 @@ fn sound_str(v: &Value) -> String {
             Sound::MidiOut(c) => format!("midi {c}"),
             Sound::Inst(i) => format!("inst {}", i.get()),
             Sound::Osc(a) => format!("osc {a}"),
+            Sound::Buffer(b) => format!("buffer #{}", b.id),
         },
         other => format!("not a sound: {other}"),
     }

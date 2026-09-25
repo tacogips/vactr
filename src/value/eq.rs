@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crate::value::dict::pairs;
 use crate::value::intern::KwId;
 use crate::value::key::NumKey;
-use crate::value::value::Value;
+use crate::value::value::{Sound, Value};
 use crate::vm::fail::{FailCode, Failure};
 
 const fn is_opaque(v: &Value) -> bool {
@@ -86,7 +86,11 @@ pub fn deep_eq(a: &Value, b: &Value) -> Result<bool, Failure> {
         (Value::Range(x), Value::Range(y)) => x == y,
         (Value::Path(x), Value::Path(y)) => x == y,
         (Value::Url(x), Value::Url(y)) => x == y,
-        (Value::Sound(x), Value::Sound(y)) => x == y,
+        (Value::Sound(x), Value::Sound(y)) => match (&**x, &**y) {
+            // A sample buffer is equal only to itself (14.5.9).
+            (Sound::Buffer(a), Sound::Buffer(b)) => Rc::ptr_eq(a, b),
+            _ => x == y,
+        },
         (Value::UGen(x), Value::UGen(y)) => Rc::ptr_eq(x, y),
         _ => false,
     })

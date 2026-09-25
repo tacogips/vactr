@@ -10,6 +10,7 @@
 //! Any failure is event-local: that event (and its held output) is dropped.
 
 use std::collections::BTreeMap;
+use std::rc::{Rc, Weak};
 
 use crate::clock::clock::Clock;
 use crate::clock::tempo::Tempo;
@@ -31,6 +32,7 @@ use crate::sched::telemetry::PlayingEvent;
 use crate::types::diag::{Diagnostic, RunOrigin};
 use crate::value::intern::{name_of_kw, KwId};
 use crate::value::ratio::Ratio64;
+use crate::value::sample::SampleBuf;
 use crate::value::value::{Sound, Value};
 use crate::vm::fail::{FailCode, Failure, Origin};
 
@@ -80,30 +82,76 @@ struct SampleEntry {
 }
 
 /// Sample resources: `SampleSrc -> resource id` (16.1 "the scheduler
-/// references a resource only after that ack").
+/// references a resource only after that ack"). A captured or rendered
+/// buffer (`SampleSrc::Buffer`) is installed from its own frames, not
+/// through the loader, once it is `Ready` (14.5.9).
 #[derive(Clone, Debug, Default)]
 pub struct SampleTable {
     entries: Vec<SampleEntry>,
     next: u32,
+    buffers: BTreeMap<u64, Weak<SampleBuf>>,
 }
 
 fn describe(src: &SampleSrc) -> String {
     match src {
         SampleSrc::Bank { kw, index } => format!(":{} {index}", name_of_kw(*kw)),
         SampleSrc::Path(p) => p.text.to_string(),
+        SampleSrc::Buffer { id } => format!("buffer #{id}"),
     }
 }
 
 impl SampleTable {
+    /// Remembers the buffer a `sound` value plays, so `request` can install
+    /// its frames.
+    pub fn note_value(&mut self, v: &Value) {
+        if let Value::Sound(s) = v {
+            if let Sound::Buffer(b) = &**s {
+                self.buffers.insert(b.id, Rc::downgrade(b));
+            }
+        }
+    }
+
+    /// The state of a buffer source: `Ok` when it can be installed (or the
+    /// source is not a buffer); a pending or failed buffer's failure.
+    fn buffer_ready(&self, src: &SampleSrc) -> Result<(), Failure> {
+        let SampleSrc::Buffer { id } = src else {
+            return Ok(());
+        };
+        match self.buffers.get(id).and_then(Weak::upgrade) {
+            Some(b) => b.ready_frames().map(|_| ()),
+            None => Err(Failure::new(
+                FailCode::HostUnavailable,
+                format!("the sound buffer #{id} is gone"),
+            )),
+        }
+    }
+
+    /// Requests every source this table holds on `other` (an offline
+    /// render's table, 14.5.9).
+    pub fn preload(&self, other: &mut SampleTable, hosts: &mut Hosts) {
+        other.buffers.clone_from(&self.buffers);
+        for e in &self.entries {
+            other.request(&e.src, hosts);
+        }
+    }
+
     /// Requests a sample once: loads it and installs it on the audio side.
-    /// The entry is `Loading` until `HostMsg::Installed`.
+    /// The entry is `Loading` until `HostMsg::Installed`. A buffer that is
+    /// not `Ready` yet is not requested.
     pub fn request(&mut self, src: &SampleSrc, hosts: &mut Hosts) {
-        if self.entries.iter().any(|e| &e.src == src) {
+        if self.entries.iter().any(|e| &e.src == src) || self.buffer_ready(src).is_err() {
             return;
         }
         self.next += 1;
         let id = self.next;
-        let (state, seconds) = match hosts.samples.load(src) {
+        let loaded = match src {
+            SampleSrc::Buffer { id } => self.buffers.get(id).and_then(Weak::upgrade).map_or_else(
+                || Err(Failure::new(FailCode::HostUnavailable, "")),
+                |b| b.to_sample_data(),
+            ),
+            _ => hosts.samples.load(src),
+        };
+        let (state, seconds) = match loaded {
             Ok(data) => {
                 let channels = f64::from(data.channels.max(1));
                 let rate = f64::from(data.rate.max(1));
@@ -159,6 +207,8 @@ impl SampleTable {
     /// load is requested and the event dropped, reported ONCE per resource
     /// (`Err`) and silently after that (`Ok(None)`).
     fn gate(&mut self, src: &SampleSrc, hosts: &mut Hosts) -> Result<Option<u32>, Failure> {
+        // A pending or failed buffer fails each of its events (14.5.9).
+        self.buffer_ready(src)?;
         self.request(src, hosts);
         let Some(e) = self.entries.iter_mut().find(|e| &e.src == src) else {
             return Ok(None);
@@ -296,6 +346,7 @@ fn commit_inner(
     let time = cx.clock.to_host(whole.begin);
     let dur = (cx.clock.to_host(whole.end) - time).max(0.0);
     let sound = sound_of(&ev.value)?;
+    cx.samples.note_value(&ev.value);
     let route = cx.resolver.route(&sound)?;
     let controls = controls_of(ev, ecx.overrides);
     match route {

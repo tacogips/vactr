@@ -9,11 +9,13 @@
 
 use std::rc::Rc;
 
-use crate::host::caps::GraphHandle;
+use crate::host::caps::{GraphHandle, TapSrc};
 use crate::ns::namespace::VarSlotRef;
 use crate::ns::tweak::TweakId;
+use crate::reader::span::Span;
 use crate::value::intern::{name_of_kw, KwId, SymId};
 use crate::value::ratio::Ratio64;
+use crate::value::sample::SampleBuf;
 use crate::value::value::Value;
 
 /// A playing slot: `d1`..`d9`, a named `slot :name`, or every slot (`hush`).
@@ -77,6 +79,22 @@ pub enum StagedEffect {
     /// `master` definition. BE-INST stages it and BE-SCHED applies it
     /// (12.8.6).
     Install(GraphHandle),
+    /// `capture :src cycles`: record the next `cycles` cycles of `src` into
+    /// the `Pending` buffer `buf`, from the next cycle boundary (14.5.9).
+    /// SS-ANALYSIS's runtime handling consumes it.
+    Capture {
+        buf: Rc<SampleBuf>,
+        src: TapSrc,
+        cycles: Ratio64,
+        origin: Span,
+    },
+    /// `render cycles`: render `cycles` cycles offline into the `Pending`
+    /// buffer `buf` (14.5.9). SS-ANALYSIS's runtime handling consumes it.
+    Render {
+        buf: Rc<SampleBuf>,
+        cycles: Ratio64,
+        origin: Span,
+    },
 }
 
 /// Receives released effects in order.

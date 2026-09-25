@@ -62,6 +62,13 @@ fail_codes! {
     InstFailed => "inst-failed",
     /// An event resolved more than `MAX_CTLS` controls (event-local, 12.8.7).
     TooManyControls => "too-many-controls",
+    // Session layer: self-analysis (14.5.9, 14.5.12).
+    /// A `Pending` sample buffer (a capture or render not yet finished) was
+    /// read for analysis or playback.
+    CapturePending => "capture-pending",
+    /// The host tier cannot do this (`render n` on the browser, a capture
+    /// longer than `max_capture_seconds`): "not available on this host".
+    BeyondCapability => "beyond-capability",
 }
 
 impl fmt::Display for FailCode {
@@ -125,14 +132,14 @@ mod tests {
 
     #[test]
     fn code_names_are_unique_kebab_case() {
-        assert_eq!(FailCode::ALL.len(), 22);
+        assert_eq!(FailCode::ALL.len(), 24);
         let mut names: Vec<&str> = FailCode::ALL.iter().map(|c| c.as_str()).collect();
         assert!(names
             .iter()
             .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 22);
+        assert_eq!(names.len(), 24);
         assert_eq!(FailCode::LoadFailed.as_str(), "load-failed");
         assert_eq!(FailCode::DivisionByZero.to_string(), "division-by-zero");
     }

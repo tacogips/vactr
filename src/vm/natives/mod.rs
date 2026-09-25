@@ -10,6 +10,7 @@
 //! names and tweak sites in literals); natives that inspect items use
 //! `NativeCx::deep`.
 
+pub mod analysis;
 pub mod console;
 pub mod dict;
 pub mod dsp;
@@ -58,7 +59,31 @@ pub fn register_domain(p: &mut Prelude) {
     signal::register(p);
     sound::register(p);
     tex::register(p);
-    dsp::register(p);
+    register_dsp(p);
+    analysis::register(p);
+}
+
+/// The DSP natives, except `spectrum`: `analysis` registers the one
+/// `spectrum` native, which keeps the analyzer-unit meaning for a ugen or
+/// bus-body subject and adds the tap and buffer forms (14.5.9).
+fn register_dsp(p: &mut Prelude) {
+    let mut d = Prelude::empty();
+    dsp::register(&mut d);
+    let natives: Vec<(&'static str, NativeFn)> = d
+        .natives()
+        .map(|(_, e)| (e.sig.name, e.f))
+        .filter(|(name, _)| *name != "spectrum")
+        .collect();
+    for (name, f) in natives {
+        p.register(name, f);
+    }
+    for sym in d.names() {
+        let Some(slot) = d.slot(sym) else { continue };
+        let v = slot.get();
+        if !matches!(v, Value::Native(_)) {
+            p.register_value(&crate::value::intern::name_of_sym(sym), v);
+        }
+    }
 }
 
 /// The complete prelude: the core and the domain (everything in the table

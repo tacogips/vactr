@@ -10,10 +10,12 @@ pub mod dryrun;
 pub mod ledger;
 pub mod midi_clock;
 pub mod midi_in;
+pub mod offline;
 pub mod oneshot;
 pub mod runtime;
 pub mod slots;
 pub mod staging;
+pub mod tap;
 pub mod telemetry;
 
 #[cfg(test)]

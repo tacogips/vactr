@@ -1,9 +1,12 @@
 //! Spec fixture evaluation (design 7.1.7): a block or case is checked as
 //! one document (all its forms in one session scope), then run form by
 //! form in one fresh `Evaluator` (`NoopHost`, `RecordingSink`) through
-//! read -> expand -> check -> compile -> run.
+//! read -> expand -> check -> compile -> run. Blocks that need package
+//! loading run through a `Session` instead (`session_eval`).
 
+use vactrol::dsp::caps::CapabilitySet;
 use vactrol::expand::{expand, ExpandCx};
+use vactrol::host::caps::Hosts;
 use vactrol::ns::evaluator::Evaluator;
 use vactrol::ns::load::NoopHost;
 use vactrol::ns::namespace::Prelude;
@@ -11,6 +14,7 @@ use vactrol::ns::stage::RecordingSink;
 use vactrol::pattern::{query, InputCells, QueryCtx, QueryResult, TimeSpan};
 use vactrol::reader::span::FileId;
 use vactrol::reader::{read, AliasEnv, Node};
+use vactrol::session::session::{Session, SessionConfig};
 use vactrol::types::check;
 use vactrol::types::diag::{Diagnostic, Severity};
 use vactrol::types::ty::CheckEnv;
@@ -129,4 +133,45 @@ pub fn query_cycle(ev: &mut Evaluator, v: &Value, c: i64) -> Option<QueryResult>
     let mut handle = VmQuery::new(vm, ns);
     let mut cx = QueryCtx::new(&mut handle, &cells, 1);
     Some(query(p, TimeSpan::cycle(c).ok()?, &mut cx))
+}
+
+/// What evaluating a block through a `Session` produced (design 14.5.4).
+pub struct SessionRun {
+    /// `code@line` of every error and warning the session reported
+    /// (reader, expander, checker, load, package and directive).
+    pub diags: Vec<String>,
+    /// `code@line` of every failing form (its first line) and every drain
+    /// fault (its span's line; line 0 when it has none).
+    pub fails: Vec<String>,
+}
+
+/// Evaluates `text` as one document through `vactrol::session::Session`
+/// over `NoopHost` hosts with no lock and no package cache: the path of
+/// blocks that need package loading (`eval_via = "session"`).
+pub fn session_eval(text: &str) -> SessionRun {
+    let cfg = SessionConfig::new(CapabilitySet::native());
+    let mut s = Session::new(cfg, Hosts::noop());
+    let (out, _) = s.eval(text, "spec.vact", 1, 0, None);
+    let diags = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity != Severity::Hint)
+        .map(|d| code_at(text, d))
+        .collect();
+    let mut fails: Vec<String> = out
+        .forms
+        .iter()
+        .filter_map(|f| {
+            let line = line_of(text, f.span.start);
+            f.failure.as_ref().map(|e| format!("{}@{line}", e.code))
+        })
+        .collect();
+    fails.extend(out.faults.iter().map(|e| {
+        let line = e.origin.span.map_or(0, |sp| line_of(text, sp.start));
+        format!("{}@{line}", e.code)
+    }));
+    SessionRun {
+        diags: multiset(diags),
+        fails: multiset(fails),
+    }
 }

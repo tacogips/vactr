@@ -262,6 +262,25 @@ impl InstRegistry {
         }
     }
 
+    /// Every installed instrument, bus and `master` graph, for a second
+    /// audio host to install (the offline render, 14.5.9).
+    #[must_use]
+    pub fn graphs(&self) -> Vec<GraphHandle> {
+        let insts = self.insts.iter().map(|(id, e)| GraphHandle::Inst {
+            id: *id,
+            def: Arc::clone(&e.def),
+        });
+        let buses = self.buses.values().map(|b| GraphHandle::Bus {
+            id: b.id,
+            def: Arc::clone(&b.def),
+        });
+        let master = self
+            .master
+            .iter()
+            .map(|b| GraphHandle::Master(Arc::clone(&b.def)));
+        insts.chain(buses).chain(master).collect()
+    }
+
     /// The id a bus named `name` has or would get (`master` is 0).
     #[must_use]
     pub fn bus_id(&self, name: Option<KwId>) -> BusId {
@@ -318,6 +337,9 @@ impl InstResolver for InstRegistry {
             Sound::Osc(addr) => Ok(Route::Osc {
                 addr: Rc::clone(addr),
             }),
+            // A captured or rendered buffer plays through the sampler; the
+            // commit installs its frames under the buffer's id (14.5.9).
+            Sound::Buffer(b) => self.sampler(SampleSrc::Buffer { id: b.id }),
         }
     }
 

@@ -338,6 +338,10 @@ pub struct Namespace {
     /// Import bindings in import order, each with its package namespace.
     imports: RefCell<Vec<(ImportBinding, Rc<PkgNs>)>>,
     tweaks: RefCell<TweakTable>,
+    /// Console registers `_n` (14.5.10): kept apart from session names, so
+    /// they are never in `session_names`, never rebound, and only a console
+    /// read resolves them.
+    console: RefCell<BTreeMap<u32, VarSlotRef>>,
 }
 
 impl Namespace {
@@ -356,6 +360,7 @@ impl Namespace {
             order: RefCell::new(Vec::new()),
             imports: RefCell::new(Vec::new()),
             tweaks: RefCell::new(TweakTable::default()),
+            console: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -505,6 +510,35 @@ impl Namespace {
             .filter(|n| session.get(n).is_some_and(VarSlotRef::is_bound))
             .copied()
             .collect()
+    }
+
+    /// Binds the console register `_n` to `v` (the REPL's result of entry
+    /// `n`).
+    pub fn set_console_register(&self, n: u32, v: Value) {
+        self.console_slot(n).define(SlotKind::Let, v, None);
+    }
+
+    /// The value of the console register `_n`, when it is set.
+    #[must_use]
+    pub fn console_register(&self, n: u32) -> Option<Value> {
+        self.console
+            .borrow()
+            .get(&n)
+            .filter(|s| s.is_bound())
+            .map(VarSlotRef::get)
+    }
+
+    /// The slot of the console register `_n`, reserving an unbound one (an
+    /// unset register) if needed. The compiler reads registers through it.
+    pub(crate) fn console_slot(&self, n: u32) -> VarSlotRef {
+        self.console
+            .borrow_mut()
+            .entry(n)
+            .or_insert_with(|| {
+                let name = intern_sym(&format!("_{n}"));
+                VarSlotRef::make(name, SlotKind::Let, Value::Nil, false, false)
+            })
+            .clone()
     }
 
     /// The tweak-site table.

@@ -2,6 +2,7 @@
 //! (design 5.6, 5.7, 7.1.3, 13). TASK-005.
 
 pub mod depgraph;
+pub mod eval_doc;
 pub mod evaluator;
 pub mod insts;
 pub mod journal;

@@ -2,3 +2,4 @@
 
 mod contracts;
 mod dsp;
+mod offline;

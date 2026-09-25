@@ -39,16 +39,16 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
-| [vactrol-core.md](active/vactrol-core.md) | In Progress (TASK-001..008 completed 2026-09-25, TASK-008 audible beep check pending user confirmation; TASK-009..010 not started) | design-docs/specs/design-implementation.md | 2026-09-25 |
-| [vactrol-session-contracts.md](active/vactrol-session-contracts.md) | Ready (SS-CONTRACTS, issue #4 TASK-009, wave 1) | design-implementation.md 14.5.2, 14.5.3, 14.5.6, 14.5.9, 14.5.12 | 2026-09-25 |
-| [vactrol-session-pkg.md](active/vactrol-session-pkg.md) | Ready (SS-PKG, wave 2) | design-implementation.md 5.7, 14.5.7 | 2026-09-25 |
-| [vactrol-session-directives.md](active/vactrol-session-directives.md) | Ready (SS-DIRECTIVES, wave 2) | design-implementation.md 13.5, 14.5.8 | 2026-09-25 |
-| [vactrol-session-analysis.md](active/vactrol-session-analysis.md) | Ready (SS-ANALYSIS, wave 2) | design-implementation.md 12.3, 14.5.9 | 2026-09-25 |
-| [vactrol-session-core.md](active/vactrol-session-core.md) | Ready (SS-SESSION, wave 3) | design-implementation.md 14.1-14.4, 14.5.4-14.5.6 | 2026-09-25 |
-| [vactrol-session-cli.md](active/vactrol-session-cli.md) | Ready (SS-CLI, wave 4) | command.md; design-implementation.md 14.5.10 | 2026-09-25 |
-| [vactrol-session-lsp.md](active/vactrol-session-lsp.md) | Ready (SS-LSP, wave 4) | design-implementation.md 14.3, 14.5.11 | 2026-09-25 |
-| [vactrol-session-finalize.md](active/vactrol-session-finalize.md) | Ready (SS-FINAL, serial reconciliation, wave 5) | design-implementation.md 14.5.12, 6.5.7 | 2026-09-25 |
-| [ss-session-20260925-s183-dispatch.json](active/ss-session-20260925-s183-dispatch.json) | Dispatch manifest for the eight SS plans (issue #4) | - | 2026-09-25 |
+| [vactrol-core.md](active/vactrol-core.md) | In Progress (TASK-001..009 completed; TASK-009 on 2026-09-26, issue #4; the TASK-008 beep check and the TASK-009 audible REPL gate are pending user confirmation; TASK-010 not started) | design-docs/specs/design-implementation.md | 2026-09-26 |
+| [vactrol-session-contracts.md](active/vactrol-session-contracts.md) | Completed (SS-CONTRACTS, issue #4 TASK-009, wave 1; archiving to completed/ after the workflow commit) | design-implementation.md 14.5.2, 14.5.3, 14.5.6, 14.5.9, 14.5.12 | 2026-09-26 |
+| [vactrol-session-pkg.md](active/vactrol-session-pkg.md) | Completed (SS-PKG, wave 2; archiving to completed/ after the workflow commit) | design-implementation.md 5.7, 14.5.7 | 2026-09-26 |
+| [vactrol-session-directives.md](active/vactrol-session-directives.md) | Completed (SS-DIRECTIVES, wave 2; archiving to completed/ after the workflow commit) | design-implementation.md 13.5, 14.5.8 | 2026-09-26 |
+| [vactrol-session-analysis.md](active/vactrol-session-analysis.md) | Completed (SS-ANALYSIS, wave 2; archiving to completed/ after the workflow commit) | design-implementation.md 12.3, 14.5.9 | 2026-09-26 |
+| [vactrol-session-core.md](active/vactrol-session-core.md) | Completed (SS-SESSION, wave 3; archiving to completed/ after the workflow commit) | design-implementation.md 14.1-14.4, 14.5.4-14.5.6 | 2026-09-26 |
+| [vactrol-session-cli.md](active/vactrol-session-cli.md) | Completed (SS-CLI, wave 4; archiving to completed/ after the workflow commit) | command.md; design-implementation.md 14.5.10 | 2026-09-26 |
+| [vactrol-session-lsp.md](active/vactrol-session-lsp.md) | Completed (SS-LSP, wave 4; archiving to completed/ after the workflow commit) | design-implementation.md 14.3, 14.5.11 | 2026-09-26 |
+| [vactrol-session-finalize.md](active/vactrol-session-finalize.md) | Completed (SS-FINAL, serial reconciliation, wave 5; archiving to completed/ after the workflow commit) | design-implementation.md 14.5.12, 6.5.7 | 2026-09-26 |
+| [ss-session-20260925-s183-dispatch.json](active/ss-session-20260925-s183-dispatch.json) | Dispatch manifest for the eight SS plans (issue #4; all plans completed, SS-FINAL session 186; manifest unedited since checkpoint 9d6db6e) | - | 2026-09-26 |
 | [vactrol-backend-contracts.md](completed/vactrol-backend-contracts.md) | Completed (BE-CONTRACTS, issue #3, wave 1; archived 2026-09-25) | design-implementation.md 12.8.2, 12.8.3, 12.8.5, 12.8.10, 12.8.12 | 2026-09-25 |
 | [vactrol-backend-sched.md](completed/vactrol-backend-sched.md) | Completed (BE-SCHED, TASK-007, wave 2; archived 2026-09-25) | design-implementation.md 11.2-11.6, 12.8.3 | 2026-09-25 |
 | [vactrol-backend-dsp.md](completed/vactrol-backend-dsp.md) | Completed (BE-DSP, TASK-008, wave 2; archived 2026-09-25) | design-implementation.md 12, 16.1, 12.8.8, 12.8.9 | 2026-09-25 |

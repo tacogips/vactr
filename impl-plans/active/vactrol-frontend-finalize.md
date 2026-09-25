@@ -4,7 +4,7 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md 6.5.7; impl-plans/active/vactrol-core.md
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 169 revision: design 6.5.7 verification evidence rule)
+**Last Updated**: 2026-09-25 (session 170 revision: V3f, commit staging contract)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-VALUE, FE-READER, FE-EXPAND (wave 4; serial, and the only plan that edits shared indexes)
 
@@ -83,6 +83,7 @@ In the tables, `\|` stands for a literal `|`. Rows with `-` in the `<check>` col
 | V2 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | `clippy` | `exit=0` |
 | V3 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` | `nextest` | `exit=0`; record the run and passed counts (run non-zero) |
 | V3t | `CARGO_TERM_QUIET=true cargo test` | `cargotest` | exit 0 and a non-zero test count; run in addition to V3 because the workflow gate recognizes `cargo test` but not `cargo nextest run` as behavioral test evidence (2026-09-25) |
+| V3f | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'` | `fixtures` | `exit=0`; a non-zero run count and 0 failed (issue acceptance: the spec-fixture harness ran) |
 | V4 | `CARGO_TERM_QUIET=true cargo fmt -- --check` | `fmt` | `exit=0` |
 | V5 | `find src tests -name '*.rs' -exec wc -l {} + \| sort -n \| tail -5` | - | every file is under 1000 lines |
 | V6 | `ls src` | - | exactly `compile dsp expand lib.rs main.rs ns pattern reader sched tex types value vm` (the section 4 layout subset) |
@@ -97,9 +98,9 @@ In the tables, `\|` stands for a literal `|`. Rows with `-` in the `<check>` col
 
 - [ ] vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, Verification lint and progress log are updated; no other task changed (V7)
 - [ ] impl-plans/README.md and the FE-* plan headers are updated
-- [ ] V1-V6, V8, V9a, V9b, V10 and V11 pass
-- [ ] design-implementation.md has only the two edits listed above
-- [ ] The final commit (one commit on `main`, AGENTS.md six-section message, no AI attribution or Co-Authored-By line) is left to the workflow's commit step
+- [ ] V1-V6 (including V3t and V3f), V8, V9a, V9b, V10 and V11 pass
+- [ ] design-implementation.md has only the two edits listed above (`git diff 67ecd5a -- design-docs/specs/design-implementation.md` shows exactly those two hunks)
+- [ ] The final commit (one commit on `main`, AGENTS.md six-section message, no AI attribution or Co-Authored-By line) is left to the workflow's commit step. FE-FINAL does not commit. The commit step stages the explicit path list in FE-VALUE Edit Protocol item 5, never `git add -A`/`git add .`, and checks `git status --short` afterwards: no untracked path may remain under `src/` or `tests/`
 
 ## Progress Log
 
@@ -112,6 +113,12 @@ The verification table follows design 6.5.7: per-run logs `final-<check>-s<S>-<n
 log, and non-zero nextest run counts. V4 now also writes a log (`fmt`). The session-169 6.5.7 "Verification evidence"
 bullet is part of the design/plan checkpoint commit, not an FE-FINAL edit. The "exactly two edits" rule is measured
 against that commit. No other change.
+
+### Plan revision: 2026-09-25 (session 170, plan author)
+V3f (`final-fixtures-s<S>-<n>.log`) is added so the final evidence meets the issue's non-zero `spec_fixtures`
+acceptance signal. V3t and V3f are now named in the completion criteria. The two-edit check is pinned to base 67ecd5a,
+the last commit to touch design-implementation.md. The commit contract points to the FE-VALUE item 5 staging list
+(single front-end commit, including the untracked `src/` directories). No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

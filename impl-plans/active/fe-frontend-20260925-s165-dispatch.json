@@ -1,7 +1,11 @@
 {
   "taskId": "fe-frontend-20260925-s165",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-169",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-170",
+  "session170Revision": {
+    "originalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
+    "note": "Session 170 resumes issue tacogips/vactrol#1. The FE-VALUE tree is still uncommitted and must be preserved. Commit granularity is settled: there is no separate FE-VALUE commit. The whole front end is one commit on main at the workflow commit step, staged by the explicit path list in FE-VALUE Edit Protocol item 5. FE-VALUE gains a V3t criterion. FE-FINAL gains V3f. The accepted low findings for reader bad-pair and expander U5 read string are folded into the plan texts."
+  },
   "resumedFrom": {
     "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-168",
     "originalHead": "1fd6faccc037759d7e4085f1129bfe3345c993fc",
@@ -10,7 +14,8 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "7c72f23d87b72c0da0c75c5fb37e01bd891ee1be",
+  "originalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
+  "previousOriginalHead": "7c72f23d87b72c0da0c75c5fb37e01bd891ee1be",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/lang-reference.md",
@@ -101,12 +106,17 @@
       "Low: in impl-plans/active/vactrol-frontend-expander.md:124, the u5-bare-variant-binding-if case gives no 'read' string, but the case runner compares 'read' for every case. Use the 6.5.4 read form '(-> (if x none) 1)' and record it in the progress log."
     ],
     "planCheckpoint": {
-      "reviewStep": "step5-impl-plan-review-attempt-1-exec-152",
-      "checkpointStep": "plan-checkpoint (session 169)",
-      "previousCheckpoint": "plan-checkpoint (session 168), review step5-impl-plan-review-attempt-1-exec-132",
+      "reviewStep": "step5-impl-plan-review-attempt-1-exec-166",
+      "checkpointStep": "plan-checkpoint (session 170)",
+      "previousCheckpoint": "plan-checkpoint (session 169), review step5-impl-plan-review-attempt-1-exec-152",
       "accepted": true,
       "needsRevision": false,
       "needsDesignRevision": false,
+      "session170ReviewDecisions": "All seven checks pass: scope (TASK-001..003 only), design references, acyclic serial DAG FE-VALUE -> FE-READER -> FE-EXPAND -> FE-FINAL, shared-path shasum Edit Protocol, full-suite re-runs each wave, single explicit-path front-end commit, and V1-V6b coverage. There are no findings.",
+      "session170ResidualNotes": [
+        "The FE-VALUE header precondition 'all FE-* plans are committed on main' is historical. FE-VALUE is already implemented, and its revisions ride in the single final commit. Not blocking.",
+        "bad-pair may be unreachable under the 6.5.4 colon rules. The reader plan requires recording this rather than bending the lexer or the colon rules."
+      ],
       "session169ResolvedFindings": [
         "Mid (reader.md:213, expander.md:158): the impossible 'log lists spec_fixtures tests' requirement is replaced by V3f, LOG(<plan>-fixtures) running cargo nextest run -E 'binary(spec_fixtures)' with exit=0, run > 0 and 0 failed.",
         "Low (value.md:201): V0 writes value-idiom-s<S>-<n>.log with the same new <n> in both places.",
@@ -115,7 +125,7 @@
       "nonBlockingGaps": [
         "Pre- and post-edit shasum values for the plan files were not recorded in session 169. The checkpoint commit diff is the review record; implementers still record hashes under the Edit Protocol."
       ],
-      "preconditionReminder": "FE-VALUE re-verification starts only after this checkpoint commit lands on main (design and plan revisions committed; AGENTS.md six-section message, no AI attribution or Co-Authored-By line). The checkpoint commit must not include the uncommitted FE-VALUE tree (Cargo.toml, src/lib.rs, src/main.rs, untracked src/ directories); preserve it without reset or clean."
+      "preconditionReminder": "Implementation (FE-VALUE re-verification, then FE-READER) starts only after this session-170 checkpoint commit lands on main (design and plan revisions committed; AGENTS.md six-section message, no AI attribution or Co-Authored-By line). The checkpoint commit must not include the uncommitted FE-VALUE tree (Cargo.toml, src/lib.rs, src/main.rs, untracked src/ directories); preserve it without reset or clean."
     },
     "residualRisks": [
       "The wasm32 builds are now required. A std or feature usage that is incompatible with wasm32-unknown-unknown fails TASK-001 and must be fixed serially.",
@@ -187,7 +197,8 @@
         "Every required test exists and passes (V3), shown by a session-169 log that ends in exit=0 and has a non-zero run count.",
         "V0, V1, V2, V4, V5 and V7 pass. Cargo rows use session-169 logs per design 6.5.7.",
         "Both wasm32 builds (V6a default features, V6b --no-default-features --features host-wasm) record exit=0 in session-169 logs.",
-        "FE-VALUE is committed on its own (separate from later waves) after review."
+        "V3t (cargo test) records exit=0 with a non-zero test count in a new value-cargotest-s<S>-<n>.log. If review changes an FE-VALUE file, V1, V2, V3, V3t, V6a and V6b are re-run with new logs.",
+        "FE-VALUE is not committed on its own. It goes into the single front-end commit at the workflow commit step (session 170; supersedes the separate FE-VALUE commit)."
       ],
       "verification": [
         "mkdir -p target/fe-logs",
@@ -329,8 +340,9 @@
         "vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, the Verification lint command and the progress log are updated. No other task changed (V7).",
         "impl-plans/README.md and the FE-* plan headers are updated.",
         "vactrol-core.md stays under 1000 lines.",
-        "V1-V6, V8, V9a, V9b, V10 and V11 pass.",
-        "The final commit on main uses the AGENTS.md six-section message, with no AI attribution or Co-Authored-By line."
+        "V1-V6 (including V3t and V3f), V8, V9a, V9b, V10 and V11 pass.",
+        "design-implementation.md differs from 67ecd5a by exactly the two FE-FINAL edits.",
+        "The final commit on main uses the AGENTS.md six-section message, with no AI attribution or Co-Authored-By line. It is made by the workflow commit step, staged by the explicit path list in FE-VALUE Edit Protocol item 5, and leaves no untracked path under src/ or tests/."
       ],
       "verification": [
         "mkdir -p target/fe-logs",
@@ -338,6 +350,7 @@
         "LOG(final-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
         "LOG(final-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
         "LOG(final-cargotest): CARGO_TERM_QUIET=true cargo test  (V3t: exit=0 and a non-zero test count; the gate recognizes cargo test, not cargo nextest run)",
+        "LOG(final-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'  (V3f: exit=0, run count > 0, 0 failed)",
         "LOG(final-fmt): CARGO_TERM_QUIET=true cargo fmt -- --check",
         "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "ls src",

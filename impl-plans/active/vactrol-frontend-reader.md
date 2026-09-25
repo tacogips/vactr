@@ -4,7 +4,7 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.7, 6.1-6.3, 6.5.4, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 169 revision: design 6.5.7 verification evidence rule)
+**Last Updated**: 2026-09-25 (session 170 revision: bad-pair finding folded in)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-VALUE (wave 2; needs `Span`/`FileId`/`NodeId`, `Ratio64`, `Diagnostic`/`DiagCode`)
 
@@ -123,7 +123,10 @@ The following each produce their code:
 - `unterminated-string`.
 - `bad-escape`.
 - `misplaced-colon`.
-- `bad-pair` (`once gain:` followed by `> d1`).
+- `bad-pair`. The earlier example (`once gain:` followed by `> d1`) is not reachable under the 6.5.4 colon rules,
+  because a trailing colon is the block opener (accepted review finding). Use an input that 6.5.4 actually routes to
+  `bad-pair`, or, if no input reaches it, record that in the progress log and leave the code untested. Never change the
+  lexer or colon rules to make a test pass.
 - `misplaced-fallback` (`? 1`).
 - `unclosed-group` (`print {+ 1`).
 - `empty-group`.
@@ -236,6 +239,10 @@ log, and non-zero nextest run counts. With `NEXTEST_STATUS_LEVEL=fail`, nextest 
 requirement that "the log lists `spec_fixtures` tests" could not be met. It is replaced by the logged row V3f
 (`cargo nextest run -E 'binary(spec_fixtures)'`, check `fixtures`, non-zero run count; Step 5 review finding). No
 other change.
+
+### Plan revision: 2026-09-25 (session 170, plan author)
+The accepted low review finding on the unreachable `bad-pair` example (dispatch manifest `acceptedReviewFindings`) is
+now in the negative-test list itself. No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

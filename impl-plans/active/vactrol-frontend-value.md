@@ -1,10 +1,10 @@
 # Vactrol Front End: Value Model and Foundation (FE-VALUE) Implementation Plan
 
 **planId**: FE-VALUE (implements vactrol-core.md TASK-001)
-**Status**: In Progress (implementation and session-169 verification done; review and commit pending)
+**Status**: In Progress (implementation and session-169 verification done; review pending; commit folded into the FE-FINAL workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 4, 5.1-5.4, 6.5.1-6.5.3, 6.5.7
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 169: step 6 re-verification under design 6.5.7)
+**Last Updated**: 2026-09-25 (session 170: single final commit, V3t criterion)
 **dependsOn**: none (wave 1). Precondition: design section 6.5 and all FE-* plans are committed on `main`.
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 
@@ -166,8 +166,16 @@ Each id is a newtype deriving `Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash
 5. Commit separation (session 169): the FE-VALUE code is uncommitted in the working tree. Never run `git reset`,
    `git clean`, `git stash` or `git checkout -- <path>` on it. The design/plan checkpoint commit stages only
    `design-docs/specs/design-implementation.md` and `impl-plans/active/*` by explicit path; it must not use
-   `git add -A` or `git add .`, and it must not include `Cargo.toml` or `src/`. The FE-VALUE commit that follows stages
-   `Cargo.toml`, `src/` and this plan file only. Check each staged set with `git diff --staged --stat` before committing.
+   `git add -A` or `git add .`, and it must not include `Cargo.toml` or `src/`. (Superseded 2026-09-25, session 170:
+   there is no separate FE-VALUE commit. The FE-VALUE work goes into the single front-end commit that FE-FINAL leaves
+   to the workflow commit step. That commit stages by explicit path only: `Cargo.toml`, `Cargo.lock` (only if
+   `git status` shows it modified; it is expected unchanged because no dependency is added), `src/`, `tests/`, the four
+   `impl-plans/active/vactrol-frontend-*.md` files, `impl-plans/active/fe-frontend-20260925-s165-dispatch.json`,
+   `impl-plans/active/vactrol-core.md`, `impl-plans/README.md` and `design-docs/specs/design-implementation.md`.
+   `target/` and `tmp/` are ignored and are never staged. No FE plan step commits on its own. A workflow plan
+   checkpoint commit before implementation is allowed; it follows the first sentence of this item, staging only
+   `impl-plans/active/*` and design docs by explicit path and never `Cargo.toml`, `Cargo.lock` or `src/`.) Check each
+   staged set with `git diff --staged --stat` before committing.
 
 ## Verification (run in the foreground; keep logs under target/fe-logs/)
 
@@ -210,6 +218,9 @@ Before V1, run V0 once per session to prove the exit-capture idiom records a fai
 - [x] Every required test above exists and passes (V3, session-169 log per design 6.5.7)
 - [x] V0, V1, V2, V4, V5 and V7 pass (session-169 logs per design 6.5.7)
 - [x] Both wasm32 builds (V6a, V6b) record `exit=0` (session-169 logs per design 6.5.7)
+- [ ] V3t (`cargo test`) records `exit=0` with a non-zero test count in a new `value-cargotest-s<S>-<n>.log`
+  (session 170 or later). If the adversarial review changes any FE-VALUE file, re-run V1, V2, V3, V3t, V6a and V6b
+  with new logs, and cite only those post-change logs
 
 ## Progress Log
 
@@ -224,6 +235,18 @@ logs are 0 bytes with no exit status). They are re-checked only from session-169
 7c72f23 amendments (`VarSlotRef` also derives `Clone`; `NumKey` exact Exact-vs-Float order). The code already follows
 them, so no code change is planned. Session 169 re-runs V0-V7 against the existing tree. If a row fails, fix it
 serially within this plan's writePaths.
+
+### Plan revision: 2026-09-25 (session 170, design author)
+Commit granularity is settled (issue #1 intake unknown): the separate FE-VALUE commit in Edit Protocol item 5 is
+superseded, and FE-VALUE folds into the single FE-FINAL workflow commit on `main`. Pre-edit state: this file matched
+HEAD e7e072d (`git status` clean for it). No code, test or verification change; the adversarial review still covers
+the uncommitted FE-VALUE tree and skeleton.
+
+### Plan revision: 2026-09-25 (session 170, plan author)
+Step 3 low finding: `Cargo.lock` (only if modified) and the dispatch manifest are added to the final-commit staging list,
+and the item now says a plan checkpoint commit is allowed. A V3t completion criterion is added because the session-169
+progress entry has no `cargo test` evidence (Gate contract notes). If review changes code, the affected rows are
+re-run. No code change.
 
 ### Session: 2026-09-25 (session 169, step 6 implementer)
 **Tasks Completed**: Re-verification of the existing FE-VALUE tree under design 6.5.7. Drift check first: every path in

@@ -4,7 +4,7 @@
 **Status**: Ready
 **Design Reference**: design-docs/specs/design-implementation.md sections 6.4, 6.5.5, 6.5.6
 **Created**: 2026-09-25
-**Last Updated**: 2026-09-25 (session 169 revision: design 6.5.7 verification evidence rule)
+**Last Updated**: 2026-09-25 (session 170 revision: U5 read string folded in)
 **Issue**: https://github.com/tacogips/vactrol/issues/1
 **dependsOn**: FE-READER (wave 3; needs `Node`, `NodeKind`, `Atom`, `ReadResult::next_node_id`, `sexpr::print`, and the manifest runner)
 
@@ -121,7 +121,8 @@ exactly, because the plan criterion "desugarings match the `# ~`/`# ==` annotati
     `["malformed-fn"]` and add no `expand` string. Rule for every case: `diags` is the multiset of reader codes plus
     expander codes. When FE-EXPAND extends `tests/spec_fixtures.rs` to expand cases, it appends the expander diagnostic
     (if any) to the reader diagnostics before comparing; a case with an expander diagnostic has no `expand` string.
-  - New case `u5-bare-variant-binding-if`, `source = 'if x none -> 1'`, `verbatim = false`, expanding to
+  - New case `u5-bare-variant-binding-if`, `source = 'if x none -> 1'`, `verbatim = false`,
+    `read = '(-> (if x none) 1)'` (the 6.5.4 read form; the runner compares `read` for every case), expanding to
     `(match x {(-> (false | nil) nil) (-> (none) 1)})`, with `note` stating that TASK-004 (checker) must diagnose a
     bare field-less variant used as the binding pattern of `if`. The expander implements no such diagnostic.
 - Authority-question cases (`class = "authority-question"`): the `fn f a b:` / `* a 12` and `let base`/`upd base` cases get
@@ -178,6 +179,10 @@ expand clean for `fn kick-sound:`. The U5 case notes the TASK-004 checker obliga
 The verification table follows design 6.5.7: per-run logs `expand-<check>-s<S>-<n>.log`, `exit=` recorded inside each
 log, and non-zero nextest run counts. V3f (`cargo nextest run -E 'binary(spec_fixtures)'`, check `fixtures`) is added so
 the log proves the extended fixture harness ran, because `NEXTEST_STATUS_LEVEL=fail` does not name passing tests. No other change.
+
+### Plan revision: 2026-09-25 (session 170, plan author)
+The accepted low review finding (dispatch manifest `acceptedReviewFindings`) is folded in: the U5 case now states its
+`read` string `(-> (if x none) 1)`. No other change.
 
 ### Session: (implementer fills in)
 **Tasks Completed**:

@@ -753,7 +753,7 @@ s [:bd-haus :not-a-sample] > d1  # diagnostic on :not-a-sample; kicks still play
 # and the editor's displays and sliders -- and only the affected part
 # is recomputed. The runtime keeps the reference structure explicitly.
 let base 60
-let line note [base {+ base 7}] > s :pluck   # depends on base
+let line s :pluck > note [base {+ base 7}]   # depends on base
 line > d1                                    # d1 depends on line
 upd base 62                                  # line and d1's pattern update;
                                              # d1 re-binds at the cycle boundary

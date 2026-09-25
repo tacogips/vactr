@@ -607,7 +607,11 @@ jux, iter, chop, ply, chunk, hurry, segment, range, scale, chord,
 voicing, arp, grid [recommended rename of Tidal `struct`, design 20 Q3],
 degrade-by, sometimes-by), the SAMPLE-REGION operators (striate,
 slice/splice, loop-at, fit — WHOLE-SPAN-anchored, layer-1 COVER-EQUIVALENT region controls at query, commit-time speed from whole-span seconds, validation and index faults per design 10.1 revised),
-`OccKey` occurrence identity accumulated during query (structural ordinals + whole.begin + cycle, design 10.2 revised),
+SOUND-FIRST chains and the FIRST-STRUCTURE rule (design-music.md Decided
+2026-09-25: `s` takes a sound; a single-sound subject takes structure from
+the first list-valued step, later list controls are sampled at onsets;
+`s [..]` is structured; MIDI out is an instrument `s {midi 1}`; the
+checker rejects `n [..] > s :x`), `OccKey` occurrence identity accumulated during query (structural ordinals + whole.begin + cycle, design 10.2 revised),
 controls as `Control` nodes, pure
 per-(seed, node, cycle) hash RNG, signals (`Sig`), `Tempo`/`Clock`
 with piecewise-linear anchors and derived cps, event provenance spans

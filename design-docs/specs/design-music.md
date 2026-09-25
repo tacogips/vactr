@@ -22,6 +22,15 @@ use-cycle 4                      # beats per cycle
 #   pattern length in beats, default 4; cps is derived
 
 # the only event sources are patterns bound to slots (section 3)
+# Decided (author, 2026-09-25): SOUND FIRST, one way only. A pattern chain
+# starts with `s <sound>`; rhythm, structure and controls follow in the pipe.
+# `n [..] > s :x` and `note [..] > s :x` are errors (`s` takes a sound, not a
+# pattern). Structure rule: a single sound (`s :pluck`) has NO structure; the
+# first list-valued step after it (`note [..]`, `n [..]`, `euclid`) defines
+# the structure, and later list controls are sampled at the existing onsets;
+# `s [..]` is structured from the start. MIDI out is an instrument
+# (`s {midi 1}`), never a sink: d1..d9 are the only sinks. Sources (step
+# lists, `midi-notes`, signals) never come before `s`.
 s [:bd-haus :sn-dub] > d1        # a kick at 0 and a snare at 1/2, every cycle
 s [:bd-haus nil :sn-dub nil] > d1  # the same, spelled with rests
 
@@ -53,8 +62,8 @@ use-clock :link                  # Ableton Link, same mechanism (planned)
 # MIDI input as signals and events; controller binding without code is
 # the editor's job (architecture.md, Editor Requirements)
 s [:bd-haus :sn-dub] > lpf {range {cc 74} 200 2000} > d1   # `cc n` is a 0..1 signal
-midi-notes channel: 1 > s :pluck > d1                       # note input as a pattern
-note [:c :e :g] > midi 1                                    # MIDI out is a sink
+s :pluck > midi-notes channel: 1 > d1                       # MIDI in: a SOURCE step that gives structure and notes
+s {midi 1} > note [:c :e :g] > d1                          # MIDI out is an instrument; d1 is the sink
 
 # stopping
 stop :drums                      # stop one slot (`d1` == `slot 1`)
@@ -85,12 +94,12 @@ inst pluck freq: float = 440 amp: float = 0.5 cutoff: float = 2000:
 # An instrument is played by a pattern through `s`; pattern controls map
 # onto its parameters by name: note/n -> freq (through the scale),
 # gain -> amp, any other control by its own name.
-note [:e2 :g2 :b2] > s :pluck > gain 0.4 > cutoff {range sine 400 2000} > d1
+s :pluck > note [:e2 :g2 :b2] > gain 0.4 > cutoff {range sine 400 2000} > d1
 
 # samples are instruments the host provides; keywords name them and the
 # checker knows the set
 s [:bd-haus :sn-dub] > d1
-n [0 3] > s :bd > d1             # sample index
+s :bd > n [0 3] > d1             # sample index; the list gives the structure
 
 # ---- sound kits and sound packs (author, 2026-09-25) --------------------
 # `s` resolves its keywords against the LATE-BOUND binding `sound-kit`, a
@@ -127,10 +136,10 @@ s :break > cut 1 > d1                       # cut group: a new event stops the l
 s [:bd-haus :sn-dub] > room 0.3 > size 0.8 > delay 0.25 > d1
 
 # chords and scales, on patterns; a chord is [root quality]
-n [0 2 4] > scale :c :minor > s :pluck > d1
-chord {alt [:c :maj7] [:d :m7] [:g :dom7]} > voicing > s :piano > d1
+s :pluck > n [0 2 4] > scale :c :minor > d1
+s :piano > chord {alt [:c :maj7] [:d :m7] [:g :dom7]} > voicing > d1
 # Decided (2026-09-25): chord qualities are letter-first keywords (:maj7 :m7 :dom7 :sus4), never :7
-arp {chord [:c :m7]} :up > s :piano > d1
+s :piano > chord [:c :m7] > arp :up > d1
 
 # sound parameters available on any pattern:
 #   gain pan speed lpf hpf resonance room size delay delaytime
@@ -141,8 +150,12 @@ arp {chord [:c :m7]} :up > s :piano > d1
 # picks per cycle. Seeded per session, so a set is reproducible.
 s {choose :bd-haus :bd-tek} > gain {range rand 0.6 1} > d1
 
-# midi and osc are sinks, like d1
-note [:c :e :g] > midi 1         # channel 1
+# Decided (author, 2026-09-25): sources and destinations. An instrument (a
+# builtin sound, an `inst`, or a MIDI out channel `{midi 1}`) is a DESTINATION
+# that receives events; `s` selects it, always first. Sources supply
+# structure and values: step lists, `midi-notes` (MIDI in, a structure-giving
+# step) and signals (`cc n`, `fft`, `amp`). Neither midi nor osc is a sink.
+s {midi 1} > note [:c :e :g] > d1   # MIDI channel 1 as the instrument
 [1 0.5] > osc "/trigger"
 
 # Withdrawn with the Sonic Pi layer: play/sample as "sound now",

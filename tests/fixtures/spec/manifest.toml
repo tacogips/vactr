@@ -664,17 +664,17 @@ file = "file"
 verbatim = true
 source = '''
 let base 60
-let line note [base {+ base 7}] > s :pluck   # depends on base
+let line s :pluck > note [base {+ base 7}]   # depends on base
 line > d1                                    # d1 depends on line
 upd base 62'''
 read = '''
 (let base 60)
-(let line (s (note [base {(+ base 7)}]) :pluck))
+(let line (note (s :pluck) [base {(+ base 7)}]))
 (d1 line)
 (upd base 62)'''
 expand = '''
 (let base 60)
-(let line (s (note [base {(+ base 7)}]) :pluck))
+(let line (note (s :pluck) [base {(+ base 7)}]))
 (d1 line)
 (upd base 62)'''
 diags = []

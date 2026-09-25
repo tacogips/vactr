@@ -1,7 +1,7 @@
 # Vactrol Middle End: Types, Masks, Native Table and Codes (ME-MASKS) Implementation Plan
 
 **planId**: ME-MASKS (first deliverable of vactrol-core.md TASK-004; TASK-005's compiler consumes it)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in sessions 175/176; removed from the dispatch manifest by the session-177 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md sections 5.5, 7, 7.1.2, 7.1.3 (Masks, Native signature table, Codes), 7.1.4, 7.1.6
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -173,17 +173,75 @@ log without `exit=`, or a truncated log fails the row. `\|` is a literal `|`.
 
 ## Completion Criteria
 
-- [ ] `Ty`, `Scheme`, `KeySet`, `BindKind`, `GlobalInfo`, `CheckEnv` exist in `src/types/ty.rs` as listed
-- [ ] `MaskEntry`, `ForcingMask`, `CalleeRef`, `EffectiveEntry`, `chase`, `infer_masks`, `mixed_forcing` exist in `src/types/masks.rs` with the listed tests passing
-- [ ] The native table has every in-scope entry (7.1.3) including `s` with `kit`, `load`, `sample`, `midi`, `default-sound-kit`, `sound-kit`, and the `scale`/`shape` overload group
-- [ ] Domain constructors that capture deferred arguments (design 5.5, line ~380) carry `Late` entries; `osc`'s mask is asserted all `Late`
-- [ ] `DiagCode::ALL.len() == 65` and `FailCode::ALL.len() == 20`, with `default_severity`
-- [ ] V1-V8 pass with logs cited in the progress log; `final-hashes.txt` written
+- [x] `Ty`, `Scheme`, `KeySet`, `BindKind`, `GlobalInfo`, `CheckEnv` exist in `src/types/ty.rs` as listed
+- [x] `MaskEntry`, `ForcingMask`, `CalleeRef`, `EffectiveEntry`, `chase`, `infer_masks`, `mixed_forcing` exist in `src/types/masks.rs` with the listed tests passing
+- [x] The native table has every in-scope entry (7.1.3) including `s` with `kit`, `load`, `sample`, `midi`, `default-sound-kit`, `sound-kit`, and the `scale`/`shape` overload group
+- [x] Domain constructors that capture deferred arguments (design 5.5, line ~380) carry `Late` entries; `osc`'s mask is asserted all `Late`
+- [x] `DiagCode::ALL.len() == 65` and `FailCode::ALL.len() == 20`, with `default_severity`
+- [x] V1-V8 pass with logs cited in the progress log; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ME-MASKS implementer)` entry with Tasks Completed, design
 differences, hashes/intent paths, verification evidence per row, and blockers. Edit only this plan's log.)
+
+### Session: 2026-09-25 (session 175, ME-MASKS implementer)
+
+**Tasks Completed**: every ME-MASKS deliverable. New: `src/types/ty.rs` (420 lines), `src/types/masks.rs` (698),
+`src/types/natives.rs` (375), `src/types/natives_domain.rs` (277) and `src/types/tests/{mod,ty,masks,natives}.rs`.
+Edited: `src/types/diag.rs` (27 codes, now 65, plus `default_severity`), `src/vm/fail.rs` (16 codes, now 20, plus
+`FailCode::ALL` through a `fail_codes!` macro like `diag_codes!`, and a count test) and the sharedPath
+`src/types/mod.rs` (`pub mod ty; pub mod masks; pub mod natives; mod natives_domain; #[cfg(test)] mod tests;`).
+The native table has 200 entries.
+
+**Design and plan differences** (design 7.1 wins; ME-CHECK, ME-VM and ME-INTEGRATE should read these):
+- `NativeSig` stores its schemes as notation strings, `ty: &'static [&'static str]`, parsed by `Scheme::parse`. The
+  accessor is the method `schemes()` instead of the planned `fn() -> Vec<Scheme>` field. A test parses every entry.
+- `Ty::Tex` (visual chain) was added. The M1 `scale` overload needs a texture subject type, and design 7 lists none.
+- Rest convention: for a variadic native, the last parameter type and the last mask entry apply to every further
+  argument. `ForcingMask::entry(pos)` applies the same rule. A parameter past `min_args` is optional. An overloaded
+  scheme may have fewer parameters than the mask (`shape`: 3 or 2).
+- `CalleeRef`: a `Sym` head that resolves to the prelude links as `Global(name)`, so a session redefinition of `at` is
+  chased (5.5). Operator and expander `Builtin` heads link as `Native(id)`. A `Value`-masked native position decides
+  `Value` directly, as design 5.5 says.
+- `chase` precedence: any `Value` -> `Value`, then any `Undetermined`, then `Fn`, then `Late`. Design 5.5 does not
+  order `Value` against `Undetermined`. Forcing once at the boundary keeps exactly-once semantics. A path-local visited
+  set, depth 64 and a 4096-link budget bound the chase. `mixed` covers the top-level link set only.
+- `infer_masks`: a bare parameter on a statement line of its own is `Fn`. This follows lang-reference section 1
+  `maybe-do`: "`body` on a line of its own" is called. `Fn` > `Value` > `Undetermined` > `Forward`. A named argument
+  or a splatted value is `Value`. A positional argument after a splat is `Undetermined`. A list-pattern parameter is
+  `Value`.
+- Extra public API: `header_params` (the one header parser, `HeaderParam`; mask order is header order, keyword
+  parameters included), `static_mask` (a checker-side lookup for `mixed_forcing`), `CheckEnv::{global, qualified,
+  open_prefix}`, `NativeTable::{len, is_empty, name_count}`, `NativeSig::{entry_at, is_overloaded}`.
+- Arithmetic and math schemes are `'a`-generic (`+ : fn 'a 'a -> 'a`, `sin : fn 'a -> 'a`), so `{sin time}` over a
+  signal checks. The numeric lattice is ME-CHECK's unifier. Domain parameters are `any`: number | signal | pattern |
+  fn of time (design-visual section 1).
+- `shape` masks position 0 as `Value`, because the VM dispatches the overload on the runtime tag, which a thunk would
+  hide. `add`/`sub` take a generic subject because they are also pattern arithmetic (`add p 7`, design-music section 3).
+- Absent on purpose. `osc` as OSC output (design-music line 417): the entry is the visual source. `bus`, `master`,
+  synthesis, effects and granular are TASK-008. Also absent: `parse`, the word aliases (`gt`, `lt`, ...), and the
+  inst-parameter controls `cutoff`/`position`/`bank` (M3, TASK-008). The checker reports these as `undefined-name`
+  until a later wave records a finding. `o0`..`o3` are prelude values of type `keyword`.
+
+**Environment event**: the machine volume was full (about 120 MiB free), and a rustc ICE followed (os error 28). Only
+`target/debug/incremental` (a regenerable cache) was removed. Every cargo row below ran with `CARGO_INCREMENTAL=0` added.
+
+**Evidence** (`tmp/me-middle-20260925-s175/ME-MASKS/attempt-1/`): `pre-edit-hashes.txt`, `intent.md`,
+`post-edit-hashes.txt`, `final-hashes.txt`. No drift was detected on `src/types/mod.rs`, `diag.rs`, `fail.rs` or this plan.
+
+**Verification** (logs are under `target/fe-logs/`, each run after the final code change, `CARGO_INCREMENTAL=0` added):
+- V1 `masks-build-s175-1.log`: `exit=0`, no warnings.
+- V2 `masks-clippy-s175-1.log`: `exit=0`.
+- V3 `masks-nextest-s175-1.log`: 189 tests run, 189 passed, 0 failed, `exit=0`.
+- V3t `masks-cargotest-s175-1.log`: lib 181 passed, spec_fixtures 8 passed, 0 failed, `exit=0`.
+- V3f `masks-fixtures-s175-1.log`: 8 run, 8 passed, `exit=0`.
+- V6a `masks-wasm32-s175-1.log`: `exit=0`. V6b `masks-wasm32-hostwasm-s175-1.log`: `exit=0`.
+- V4: largest files `src/reader/line.rs` 741, `src/types/masks.rs` 698, `src/reader/lexer.rs` 690 (all under 800).
+- V5: `none`. V7: empty (no dependency change). V8: `rustfmt --edition 2021 --check` on the 11 owned files, exit 0.
+
+**Blockers**: none. Formal test-integrity/adversarial review, crate-wide fmt (ME-FINAL) and the single workflow
+commit are downstream.
 
 ## Related Plans
 

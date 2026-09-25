@@ -1,7 +1,7 @@
 # Vactrol Middle End: Path, Url and Sound Front-End Amendment (ME-FRONTEND) Implementation Plan
 
 **planId**: ME-FRONTEND (front-end amendment of issue #2; amends TASK-001/002 outputs)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review 0 blocking, integration review accepted in sessions 175/176; removed from the dispatch manifest by the session-177 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md section 6.5.8 (normative), 6.5.4 (lexer rules), 6.5.3 (eq/print/access), 7.1.7 (FRONTEND wave); lang-reference.md section 3 "path and url literals"; design-music.md "sound kits"
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/2
@@ -109,15 +109,70 @@ V7, V8 (rustfmt on owned files). V3f must show the spec_fixtures binary ran with
 
 ## Completion Criteria
 
-- [ ] Path and url literals lex per 6.5.8, with `bad-path`/`bad-url` and the unchanged readings asserted
-- [ ] `Atom::Path`/`Atom::Url` print as written; the expander passes them through
-- [ ] `Value::Path`/`Url`/`Sound` with `PathVal` and `Sound` exist with the 6.5.8 eq, print and access rules
-- [ ] The three PENDING manifest blocks read as stated; `verbatim_cases_appear_in_their_document` passes
-- [ ] V1-V8 pass with logs cited in the progress log; `final-hashes.txt` written
+- [x] Path and url literals lex per 6.5.8, with `bad-path`/`bad-url` and the unchanged readings asserted
+- [x] `Atom::Path`/`Atom::Url` print as written; the expander passes them through
+- [x] `Value::Path`/`Url`/`Sound` with `PathVal` and `Sound` exist with the 6.5.8 eq, print and access rules
+- [x] The three PENDING manifest blocks read as stated; `verbatim_cases_appear_in_their_document` passes
+- [x] V1-V8 pass with logs cited in the progress log; `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: one entry per session: work done, design differences, hash/intent paths, evidence per row, blockers.)
+
+### Session: 2026-09-25 (session 175, ME-FRONTEND implementer)
+
+**Tasks Completed**: every ME-FRONTEND deliverable. New: `src/reader/pathlit.rs` (79 lines, `PathTok`,
+`scan_path_or_url`), `src/reader/tests/pathlit.rs`, `src/value/tests/pathval.rs`. Edited: `src/reader/lexer.rs`
+(`Tok::Path`/`Tok::Url`; `path_or_url` is tried at a keyword position for a `.`, `~`, `/` or `a-z` byte before every
+other rule; 721 lines), `src/reader/node.rs` (`Atom::Path`/`Atom::Url`), `src/reader/sexpr.rs` (print as written),
+`src/value/value.rs` (`PathVal`, `Sound`, `Value::Path`/`Url`/`Sound`, `Value::path`, `Value::url`), `src/value/eq.rs`,
+`src/value/print.rs`, `src/value/tests/mod.rs` (declares `pathval`; the exhaustive tagging test gains the three
+variants), `src/reader/tests/mod.rs` (declares `pathlit`). sharedPaths the compiler forced: `src/reader/mod.rs`
+(`pub(crate) mod pathlit;`), `src/reader/line.rs` (two `leaf` arms mapping `Tok::Path`/`Tok::Url` to the atoms; 743
+lines). `tests/fixtures/spec/manifest.toml`: only the three PENDING blocks (see below). Not touched: `src/value/key.rs`
+(its `_` arm already gives `Failure(Type)`), the expander files (no exhaustive `Atom` match), `src/value/access.rs`
+(`len`/`index`/`get` already fall to `Failure(Type)` for the new variants and `truthy` is already true; asserted in
+`pathval.rs`), `src/value/mod.rs` (not a writePath; `PathVal`/`Sound` are reached as `crate::value::value::{PathVal,
+Sound}`, and ME-INTEGRATE may add a re-export).
+
+**Design and plan differences**:
+- `scan_path_or_url` returns `None` for a `/` not directly followed by a path character, so `//x` stays two `/`
+  operators (unchanged) and `/ a b` stays division. `./`, `../` and `~/` with nothing valid after them are `bad-path`
+  (bare prefix), as the plan's test list requires.
+- The lexer passes `src[..line_end]` to the scanner so a token never runs past the line.
+- A bad path or url produces no token (like `bad-number`); the statement reads as `(#error)` and the next line recovers.
+- Manifest: lang-reference 3 and design-music 2 are `reader = "clean"`, `reader_diags = []`. lang-reference 5 keeps
+  exactly `stray-char@100`: block line 100 is the tab-indented `...` body under `fn pluck ...` (line 99). The old note
+  said "block line 92"; it now says line 100. All three notes dropped the PENDING sentence. No remaining diagnostic in
+  those blocks is unexplained by 6.5.8.
+
+**Tests** (`src/reader/tests/pathlit.rs`, 8 tests): the four prefixes and a url; terminators (whitespace, `}`, `]`,
+`#` comment trivia, `#frag`, `:` giving `misplaced-colon`); a url with a port, query and `git+ssh` scheme; `bad-path`
+for `.//x`, `./dir/`, `./`, `~/`, `../` and `bad-url` for `https:// x` and `https://`, with recovery and spans; the
+unchanged readings of `/ a b`, `{/ a b}`, `1/4`, `-1/4`, `a/b`, `0..8`, `a..b`, `amp: 0.5`, `https`, `~`, `~x`, `f a:b`,
+`https:x`, `//x`, `...` and `./a!b` (`stray-char` at 5..6); a path inside interpolation; the expander passes paths and
+urls through as kernel output; no panic on every prefix/suffix of the sample strings and 200 deterministic random
+strings over `/ . ~ :` and brackets. `src/value/tests/pathval.rs` (6 tests): path eq by text and file (different
+`file` not equal, `/abs` with `None` equal to itself, no normalization), url and sound eq, cross-kind never equal,
+print forms (`(sound :bd)`, `(sound ./bd/1.wav)`, `(sound midi 1)`, nested in a list), accessors are `Failure(Type)` and
+truthy, and `Key::from_value` / `put` on a dict give `Failure(Type)`.
+
+**Verification** (session 175, n = 1, after the final code change; all `exit=0`):
+- V1 `target/fe-logs/frontend-build-s175-1.log` exit=0, no warnings
+- V2 `target/fe-logs/frontend-clippy-s175-1.log` exit=0
+- V3 `target/fe-logs/frontend-nextest-s175-1.log` exit=0, 203 run, 203 passed, 0 failed
+- V3t `target/fe-logs/frontend-cargotest-s175-1.log` exit=0, 195 unit + 8 spec_fixtures passed, 0 failed
+- V3f `target/fe-logs/frontend-fixtures-s175-1.log` exit=0, 8 run, 8 passed (includes
+  `verbatim_cases_appear_in_their_document` and `blocks_read_per_classification`)
+- V6a `target/fe-logs/frontend-wasm32-s175-1.log` exit=0; V6b `target/fe-logs/frontend-wasm32-hostwasm-s175-1.log` exit=0
+- V4 largest `.rs` files: `src/reader/line.rs` 743, `src/reader/lexer.rs` 721 (all under 800); V5 `none`; V7 empty;
+  V8 `rustfmt --edition 2021 --check` on the owned and touched `.rs` files exit 0
+  (`tmp/me-middle-20260925-s175/ME-FRONTEND/attempt-1/inline-checks.txt`)
+
+**Evidence**: `tmp/me-middle-20260925-s175/ME-FRONTEND/attempt-1/{intent.md,pre-edit-hashes.txt,post-edit-hashes.txt,
+final-hashes.txt,inline-checks.txt}`. The pre-edit hash of the manifest matched the checkpoint content (no drift).
+
+**Blockers**: none. Review, the ME-INTEGRATE serial verification and the workflow commit are downstream.
 
 ## Related Plans
 

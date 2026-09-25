@@ -1,7 +1,7 @@
 {
   "taskId": "me-middle-20260925-s175",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-175",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-177",
   "issueReference": {
     "repository": "tacogips/vactrol",
     "number": 2,
@@ -10,7 +10,7 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "51c5af700e616e360972bf07a127274127d24384",
+  "originalHead": "dc6830893fbe74a9d469187b113a2507c4563efd",
   "parentPlanPath": "impl-plans/active/vactrol-core.md",
   "planIndexPath": "impl-plans/README.md",
   "designDocPaths": [
@@ -106,7 +106,7 @@
       "impl-plans/active/vactrol-middle-integrate.md",
       "impl-plans/active/vactrol-middle-finalize.md"
     ],
-    "userProblem":"Issue #2: implement the Vactrol language middle end (TASK-004 checker, TASK-005 namespace/compiler/VM/tweak slots/reactive graph, TASK-006 pattern engine/signals/clock/visual chains) from impl-plans/active/vactrol-core.md, plus the 2026-09-25 amendments: parent-scope shadowing, path/url literals with load/sample, the sound-kit prelude bindings with the kit: argument, SOUND FIRST with the first-structure rule, midi-notes after s, and the U5 checker diagnostic.",
+    "userProblem": "Issue #2: implement the Vactrol language middle end (TASK-004 checker, TASK-005 namespace/compiler/VM/tweak slots/reactive graph, TASK-006 pattern engine/signals/clock/visual chains) from impl-plans/active/vactrol-core.md, plus the 2026-09-25 amendments: parent-scope shadowing, path/url literals with load/sample, the sound-kit prelude bindings with the kit: argument, SOUND FIRST with the first-structure rule, midi-notes after s, and the U5 checker diagnostic.",
     "requiredOutcomes": [
       "Every TASK-004, TASK-005 and TASK-006 completion criterion in vactrol-core.md is checked with evidence, and the statuses are COMPLETED (ME-FINAL).",
       "Spec fixtures type-check, compile and run per their classification through read -> expand -> check -> compile -> run (ME-INTEGRATE).",
@@ -135,113 +135,12 @@
   },
   "plans": [
     {
-      "planId": "ME-MASKS",
-      "planPath": "impl-plans/active/vactrol-middle-masks.md",
-      "implementsTask": "TASK-004 (first deliverable: types/masks.rs), native table, 7.1.6 codes",
-      "wave": 1,
-      "status": "ready",
-      "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-middle-masks.md#progress-log",
-      "writePaths": [
-        "src/types/ty.rs",
-        "src/types/masks.rs",
-        "src/types/natives.rs",
-        "src/types/natives_domain.rs",
-        "src/types/diag.rs",
-        "src/vm/fail.rs",
-        "src/types/tests/mod.rs",
-        "src/types/tests/ty.rs",
-        "src/types/tests/masks.rs",
-        "src/types/tests/natives.rs",
-        "impl-plans/active/vactrol-middle-masks.md"
-      ],
-      "sharedPaths": [
-        "src/types/mod.rs"
-      ],
-      "acceptanceCriteria": [
-        "Ty (with Path, Url, Sound), Scheme, KeySet, BindKind, GlobalInfo and CheckEnv exist in src/types/ty.rs.",
-        "MaskEntry, ForcingMask, CalleeRef, EffectiveEntry, chase, infer_masks and mixed_forcing exist in src/types/masks.rs, and the listed mask tests pass.",
-        "The native table has every in-scope entry, including s with the kit keyword, load, sample, midi, default-sound-kit, sound-kit and the scale/shape overload group; struct is absent.",
-        "Domain constructors that capture deferred arguments (design 5.5 line ~380) carry Late mask entries; a test asserts osc's mask is all Late.",
-        "DiagCode::ALL.len() == 65 and FailCode::ALL.len() == 20, with default_severity.",
-        "V1-V8 pass with logs cited; final-hashes.txt written."
-      ],
-      "verification": [
-        "mkdir -p target/fe-logs",
-        "LOG(masks-build): CARGO_TERM_QUIET=true cargo build",
-        "LOG(masks-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
-        "LOG(masks-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "LOG(masks-cargotest): CARGO_TERM_QUIET=true cargo test",
-        "LOG(masks-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
-        "LOG(masks-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
-        "LOG(masks-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
-        "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
-        "git diff --stat -- Cargo.toml Cargo.lock",
-        "rustfmt --edition 2021 --check <owned .rs files>"
-      ]
-    },
-    {
-      "planId": "ME-FRONTEND",
-      "planPath": "impl-plans/active/vactrol-middle-frontend.md",
-      "implementsTask": "Front-end amendment (design 6.5.8): path/url literals, Value::Path/Url/Sound",
-      "wave": 2,
-      "status": "ready",
-      "dependsOn": ["ME-MASKS"],
-      "progressFile": "impl-plans/active/vactrol-middle-frontend.md#progress-log",
-      "writePaths": [
-        "src/reader/pathlit.rs",
-        "src/reader/lexer.rs",
-        "src/reader/node.rs",
-        "src/reader/sexpr.rs",
-        "src/reader/tests/pathlit.rs",
-        "src/reader/tests/mod.rs",
-        "src/value/value.rs",
-        "src/value/eq.rs",
-        "src/value/print.rs",
-        "src/value/access.rs",
-        "src/value/tests/pathval.rs",
-        "src/value/tests/mod.rs",
-        "impl-plans/active/vactrol-middle-frontend.md"
-      ],
-      "sharedPaths": [
-        "tests/fixtures/spec/manifest.toml",
-        "src/reader/mod.rs",
-        "src/reader/line.rs",
-        "src/value/key.rs",
-        "src/expand/expander.rs",
-        "src/expand/sugar.rs",
-        "src/expand/kernel.rs"
-      ],
-      "acceptanceCriteria": [
-        "Path and url literals lex per design 6.5.8, with bad-path/bad-url and the unchanged readings of /, ratios, ranges, pairs, ~ and misplaced colons asserted.",
-        "Atom::Path/Atom::Url print as written and pass through the expander.",
-        "Value::Path/Url/Sound with PathVal and Sound follow the 6.5.8 eq, print and access rules.",
-        "The three PENDING manifest blocks read as stated (lang-reference 3 and design-music 2 clean; lang-reference 5 one stray-char at the ... line); verbatim_cases_appear_in_their_document passes.",
-        "V1-V8 pass with logs cited; final-hashes.txt written."
-      ],
-      "verification": [
-        "mkdir -p target/fe-logs",
-        "LOG(frontend-build): CARGO_TERM_QUIET=true cargo build",
-        "LOG(frontend-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
-        "LOG(frontend-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "LOG(frontend-cargotest): CARGO_TERM_QUIET=true cargo test",
-        "LOG(frontend-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
-        "LOG(frontend-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
-        "LOG(frontend-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
-        "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
-        "git diff --stat -- Cargo.toml Cargo.lock",
-        "rustfmt --edition 2021 --check <owned .rs files>"
-      ]
-    },
-    {
       "planId": "ME-CHECK",
       "planPath": "impl-plans/active/vactrol-middle-check.md",
       "implementsTask": "TASK-004 (checker, except masks and the native table)",
       "wave": 3,
       "status": "ready",
-      "dependsOn": ["ME-MASKS", "ME-FRONTEND"],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-middle-check.md#progress-log",
       "writePaths": [
         "src/types/infer.rs",
@@ -293,7 +192,7 @@
       "implementsTask": "TASK-005 (namespace, compiler, VM, tweak sites, packages, staging, core natives)",
       "wave": 3,
       "status": "ready",
-      "dependsOn": ["ME-MASKS", "ME-FRONTEND"],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-middle-vm.md#progress-log",
       "writePaths": [
         "src/compile/compiler.rs",
@@ -364,7 +263,7 @@
       "implementsTask": "TASK-006 (pattern engine, signals, clock, visual chains; VM-dependent criteria go to ME-INTEGRATE)",
       "wave": 3,
       "status": "ready",
-      "dependsOn": ["ME-MASKS", "ME-FRONTEND"],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-middle-pattern.md#progress-log",
       "writePaths": [
         "src/pattern/pat.rs",
@@ -444,7 +343,9 @@
       "implementsTask": "TASK-005 (DepGraph, pass journal, Evaluator, rebuild, reactive propagation) plus load/SourceLoader/NoopHost",
       "wave": 4,
       "status": "ready",
-      "dependsOn": ["ME-VM"],
+      "dependsOn": [
+        "ME-VM"
+      ],
       "progressFile": "impl-plans/active/vactrol-middle-reactive.md#progress-log",
       "writePaths": [
         "src/ns/depgraph.rs",
@@ -491,7 +392,11 @@
       "implementsTask": "TASK-004/005/006 whole-pipeline criteria: QueryVm for Vm, domain natives, check stage, spec fixture evaluation",
       "wave": 5,
       "status": "ready",
-      "dependsOn": ["ME-CHECK", "ME-REACTIVE", "ME-PATTERN"],
+      "dependsOn": [
+        "ME-CHECK",
+        "ME-REACTIVE",
+        "ME-PATTERN"
+      ],
       "progressFile": "impl-plans/active/vactrol-middle-integrate.md#progress-log",
       "writePaths": [
         "src/vm/query_vm.rs",
@@ -554,7 +459,9 @@
       "implementsTask": "TASK-004..006 reconciliation, crate-wide fmt, plan bookkeeping",
       "wave": 6,
       "status": "ready",
-      "dependsOn": ["ME-INTEGRATE"],
+      "dependsOn": [
+        "ME-INTEGRATE"
+      ],
       "progressFile": "impl-plans/active/vactrol-middle-finalize.md#progress-log",
       "writePaths": [
         "impl-plans/active/vactrol-core.md",
@@ -600,5 +507,46 @@
         "git status --short"
       ]
     }
-  ]
+  ],
+  "session177Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-MASKS (wave 1) and ME-FRONTEND (wave 2) were implemented, gate-verified, adversarially reviewed (0 blocking) and accepted by integration review in sessions 175/176 (evidence in their plan progress logs and target/fe-logs/{masks,frontend}-*-s175-*.log). Session-175 then failed on an integration-review output-contract slip, and a rerun from integration-review cannot dispatch (no checkpoint message in its inbox) while a rerun from plan-checkpoint restarts with acceptedPlanIds=[] and would re-dispatch accepted plans. The two accepted plans are therefore REMOVED from this manifest's plans[] and from every dependsOn; their source stays in the working tree (uncommitted, as all wave output) and goes into the single workflow commit. Their plan documents remain in impl-plans/active/ with status Completed/accepted. Session 177 resumes this manifest (no duplicate manifest): workflowExecutionId moves from session-175 to session-177 and originalHead from 51c5af7 (session-175 intake) to dc68308 (session-177 intake, the session-175 plan checkpoint); reviewContext.issueReference.baseCommit stays 51c5af7.",
+    "removedPlans": [
+      {
+        "planId": "ME-MASKS",
+        "planPath": "impl-plans/active/vactrol-middle-masks.md",
+        "writePaths": [
+          "src/types/ty.rs",
+          "src/types/masks.rs",
+          "src/types/natives.rs",
+          "src/types/natives_domain.rs",
+          "src/types/diag.rs",
+          "src/vm/fail.rs",
+          "src/types/tests/mod.rs",
+          "src/types/tests/ty.rs",
+          "src/types/tests/masks.rs",
+          "src/types/tests/natives.rs",
+          "impl-plans/active/vactrol-middle-masks.md"
+        ]
+      },
+      {
+        "planId": "ME-FRONTEND",
+        "planPath": "impl-plans/active/vactrol-middle-frontend.md",
+        "writePaths": [
+          "src/reader/pathlit.rs",
+          "src/reader/lexer.rs",
+          "src/reader/node.rs",
+          "src/reader/sexpr.rs",
+          "src/reader/tests/pathlit.rs",
+          "src/reader/tests/mod.rs",
+          "src/value/value.rs",
+          "src/value/eq.rs",
+          "src/value/print.rs",
+          "src/value/access.rs",
+          "src/value/tests/pathval.rs",
+          "src/value/tests/mod.rs",
+          "impl-plans/active/vactrol-middle-frontend.md"
+        ]
+      }
+    ]
+  }
 }

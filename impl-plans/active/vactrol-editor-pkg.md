@@ -2,7 +2,7 @@
 
 **planId**: ED-PKG (issue #5, TASK-010, wave 4; the package import UI, the need-URL driver loop over
 `pkg_resolve`/`pkg_supply` with `fetch()`, OPFS persistence and restore, and the native-tier `vactrol get` hint)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 186; removed from the dispatch manifest by the session-187 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.10, 15.1.2 G6, 5.7, 14.5.1, 14.5.7, 17;
 design-docs/specs/command.md `pkg_resolve`/`pkg_supply`, `0x73`, "Editor files (TASK-010)"
 **Created**: 2026-09-26
@@ -116,13 +116,65 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4 and E0-E5, plus:
 
 ## Completion Criteria
 
-- [ ] Items 1-6 implemented
-- [ ] Required tests pass
-- [ ] Common rows and K1 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-6 implemented
+- [x] Required tests pass
+- [x] Common rows and K1 pass with logs cited; `final-hashes.txt` written (E2 exit=1 is sibling-caused by ED-CODE's
+  in-flight `editor/test/code/reconcile.test.ts`; the join re-verifies, see the session-186 entry)
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-PKG implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 186, ED-PKG implementer)
+
+**Tasks Completed**: items 1-6. Dependency ED-SCAFFOLD is in the runtime `acceptedPlanIds`.
+
+- `editor/src/pkg/driver.ts`: `importPackages(core, {proxy, requirements} | {proxy, lock}, fetchFn)` loops
+  `pkgResolve` -> `0x73` reply (awaited through `core.onPkg`, synchronous or later). On `need`: 200 supplies the body
+  and records it for OPFS, 404 supplies 404, any other status or a thrown fetch supplies 0. `done` returns
+  `{lock, resolved, bodies}`, `error` returns `{code, message}`. URLs outside the proxy (`underProxy`: same origin and
+  a normalized href under `<proxy>/`, http(s) only) are refused with `package-resolve` before any fetch. `MAX_FETCHES`
+  = 256, then `package-resolve` "too many fetches". `restorePackages` supplies every stored body under the proxy,
+  then runs the loop with `{proxy, lock}`. `done` stores the lock again. `package-integrity` deletes the offending
+  bodies (`offendingUrls`: bodies under `/<path>/@v/<version>.` from the message's backticked `<path>@<version>`,
+  else every stored body) and the lock. Path rule (`importPath`): the first backticked token of a
+  `package-not-locked`/`package-not-fetched` message, cut at its first `@`.
+- `editor/src/pkg/opfs.ts`: `OpfsStore` under `vactrol-pkg/` (`requirements.json`, `vactrol.lock`, `index.json`
+  url -> file, `bodies/<sha256-hex(url)>`): `save` (merges bodies), `load`, `remove(url)`, `removeLock`.
+  `MemoryStore` fallback and `openPkgStore` (memory when `navigator.storage.getDirectory` is absent or throws).
+  `MEMORY_ONLY_HINT` = "packages are kept for this session only".
+- `editor/src/pkg/ui.ts`: `PkgPane` with the proxy field (`localStorage['vactrol.pkg.proxy']`, no default), the
+  unresolved list, one Import button per path (requirements plus the path at `""`), driver errors and
+  `package-*` load diagnostics as `code: message`, and the status "imported; evaluate to load". It never sends a
+  protocol message. Native tier: the list plus `vactrol get <path>`, no proxy field and no fetch.
+- `editor/src/pkg/mount.ts`: mounts the pane in the right pane, follows `client.on('eval-result')` files and the store
+  `diag` key (file plus runtime diagnostics), and runs the restore once on the browser tier. `pkg.css` is loaded
+  through `new URL('./pkg.css', import.meta.url)`, as in ED-MIDI; Vite inlines it.
+- `editor/test/support/opfs.ts` (`FakeDir`, `FakeFile`, `fakeStorage`) and `editor/test/support/fetch.ts`
+  (`FakeProxy`: `@v/list`, `@v/<v>.toml`, `@v/<v>.zip` built with `zip.ts`, scripted status or failure,
+  `requested` log).
+- Tests: `driver.test.ts` (7), `opfs.test.ts` (5), `ui.test.ts` (3). They use the real `WasmCore` over `FakeCore`,
+  and `ui.test.ts` uses a simulated resolver over the fake proxy.
+
+**Verification** (logs under `target/fe-logs/`; each ends with `exit=`):
+- V1 `ed-pkg-build-s186-1.log` exit=0; V2 `ed-pkg-clippy-s186-1.log` exit=0; V7 `ed-pkg-fmt-s186-1.log` exit=0.
+- V3 `ed-pkg-nextest-s186-1.log` exit=0, 985 run, 985 passed, 1 skipped.
+- V3t `ed-pkg-cargotest-s186-1.log` exit=0 (lib 964, cli 9, directive_fixtures 2, spec_fixtures 10 passed).
+- V6a `ed-pkg-wasm32-s186-1.log` exit=0; V6b `ed-pkg-wasm32-hostwasm-s186-1.log` exit=0; V6c copied to
+  `target/ed-wasm/ED-PKG.wasm`. V4 largest `.rs` 799 lines (`src/dsp/build.rs`).
+- E0 node v26.9.0, npm 11.19.1. E1 `ed-pkg-npm-ls-s186-1.log` exit=0.
+- E2 `ed-pkg-npm-check-s186-1.log`, `-2.log` and `-3.log` exit=1, sibling-caused. The only error is
+  `test/code/reconcile.test.ts(37,18) TS2741` (`TempoBody.cycle` missing) in ED-CODE's in-flight file, which was
+  modified at 03:51 and has no ED-CODE `final-hashes.txt` yet. `editor/src/protocol/types.ts` matches ED-SCAFFOLD's
+  final hash. The full `tsc --noEmit` right after the ED-PKG edits (03:50) exited 0. Supplementary
+  `ed-pkg-tsc-pkg-scope-s186-1.log` exit=0 ran the same config excluding only `editor/test/code/`. Left to the join.
+- E3 `ed-pkg-npm-test-s186-1.log` exit=0, 28 files, 154 tests passed.
+- E4 `ed-pkg-npm-build-s186-1.log` exit=0; E4c exit 0. E5 largest `.ts` 446 lines (`src/protocol/types.ts`).
+- K1 `ed-pkg-own-s186-1.log` exit=0, 3 files, 15 tests passed.
+- `final-hashes.txt` written under `tmp/ed-editor-20260926-s186/ED-PKG/attempt-1/`.
+
+**Notes**: no Rust change. No file outside writePaths touched. The real-wasm end-to-end import is ED-FINAL's.
+Formal review, integration and commit are later workflow steps.
 
 ## Related Plans
 

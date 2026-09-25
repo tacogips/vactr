@@ -2,7 +2,7 @@
 
 **planId**: ED-VISUAL (issue #5, TASK-010, wave 3; the WebGL2 host consuming `0x72` render records with ping-pong
 feedback, `TextAsset` rasterization, panes o0..o3, the frame loop, meters and scopes from `levels`)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 186; removed from the dispatch manifest by the session-187 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.8, 15.1.2 G4/G5, 9.2-9.4, 12.5, 15.1.12
 (criteria 3 meters, 11); design-docs/specs/command.md `0x72` and `levels`; design-docs/specs/design-visual.md;
 design-docs/user-qa/pending-editor-questions.md E2
@@ -129,15 +129,67 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4 and E0-E5, plus:
 
 ## Completion Criteria
 
-- [ ] Items 1-7 implemented
-- [ ] Required tests pass (criterion 11 automated proxy; criterion 3 meters)
-- [ ] Common rows and G1 pass with logs cited; `final-hashes.txt` written
-- [ ] The manual real-browser pane check is recorded as PENDING USER CONFIRMATION (ED-FINAL records it in the core
+- [x] Items 1-7 implemented
+- [x] Required tests pass (criterion 11 automated proxy; criterion 3 meters)
+- [x] Common rows and G1 pass with logs cited; `final-hashes.txt` written
+- [x] The manual real-browser pane check is recorded as PENDING USER CONFIRMATION (ED-FINAL records it in the core
       plan)
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-VISUAL implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 186, ED-VISUAL implementer)
+
+**Tasks completed**: items 1-7. Evidence: `tmp/ed-editor-20260926-s186/ED-VISUAL/attempt-1/` (intent.md,
+pre/post-edit-hashes.txt, notes.md, final-hashes.txt).
+
+- `render-host.ts` `GlRenderHost`: ping-pong framebuffer/texture pairs per output o0..o3; full-screen-triangle vertex
+  shader; `program` compile+link with `shader-compile` diagnostics that keep the previous program; the empty source
+  releases the program and clears both buffers to black; `uniforms` set by `uniform_names` on the next draw (values
+  arriving after a FAILED program are not applied to the previous one, since `uNN` names are positional); samplers
+  `u_out<k>` (output k's PREVIOUS frame, snapshotted before any output draws) and `u_text<id>` bound only when
+  `getUniformLocation` is non-null; `present(out)` blits into the default framebuffer for the panes.
+- `text-asset.ts`: canvas 2D rasterization (fixed `bold 64px monospace`, white on transparent, 512x128, flip-Y
+  upload); no 2D context gives a `text-asset` host diagnostic (emitted after the program-accept event).
+- `panes.ts` `VisualPanes`: four 2D canvases o0..o3 drawn from the host's canvas; selector o0..o3 / tile (the session
+  publishes no display choice in v1); a diagnostic banner cleared when the output accepts a program; notice mode.
+- `frame.ts`: rAF loop `core.frame(now)` then `host.draw(now)` then present; pauses on `visibilitychange` hidden;
+  stops on dispose or on a thrown frame (reported in the banner as `frame-loop`).
+- `meters.ts` `AnalyzerArea`, `spectrum.ts`, `scopes.ts`: master rms meter (dBFS, -60 floor) and 8 bands; per
+  analyzer kind `level`, `spectrum`, `spectrogram`/`note-spectrogram` (rolling image), `oscilloscope` (polyline),
+  `pitch-meter`/`stereo-meter` readouts, unknown kinds numeric; repaint only changed displays; entries no longer
+  published are removed. `mountSpectrum` prefers the bus `spectrum` analyzer, else the master bands.
+- `mount.ts`: analyzers on both tiers; native tier "visuals: browser tier only"; null WebGL2 "WebGL2 not available";
+  wires `core.onRender` to the host; sets and clears `deps.visual`. `visual.css` loads through
+  `new URL('./visual.css', import.meta.url)` plus a `<link>` (the ED-MIDI TS2882 precedent).
+- Ring index semantics follow `src/dsp/effects/analyzer.rs`: the spectrogram kinds' last cell is the index of the
+  frame written MOST RECENTLY (`ring_slot`), the oscilloscope's is the NEXT write position (`scope`).
+
+**Verification** (logs under `target/fe-logs/`, all with `exit=`):
+- V1 `ed-visual-build-s186-1.log` exit=0; V2 `ed-visual-clippy-s186-1.log` exit=0.
+- V3 `ed-visual-nextest-s186-1.log` exit=0 (985 run, 985 passed, 1 skipped).
+- V3t `ed-visual-cargotest-s186-1.log` exit=0 (985 passed, 0 failed over 7 result lines).
+- V7 `ed-visual-fmt-s186-1.log` exit=0; V6a `ed-visual-wasm32-s186-1.log` exit=0; V6b
+  `ed-visual-wasm32-hostwasm-s186-1.log` exit=0; V6c `target/ed-wasm/ED-VISUAL.wasm` copied.
+- V4 largest `.rs` 799 lines (src/dsp/build.rs); E0 node v26.9.0, npm 11.19.1.
+- E1 `ed-visual-npm-ls-s186-1.log` exit=0.
+- E2 `ed-visual-npm-check-s186-3.log` exit=0. Runs -1 and -2 exited 1 ONLY on the sibling ED-CODE in-flight file
+  `test/code/reconcile.test.ts(37,18)` (TS2741); a scoped check over `src/`, `test/visual`, `test/support`
+  (`ed-visual-tsc-scoped-s186-1.log`) exited 0, and run -3 passed once the sibling settled.
+- E3 `ed-visual-npm-test-s186-2.log` exit=0 (32 files, 182 tests passed); run -1 exit=0 (31 files, 174 tests).
+- E4 `ed-visual-npm-build-s186-1.log` exit=0 into `target/ed-dist/ED-VISUAL`; E4c exit 0; `visual.css` is inlined as
+  a data URL asset.
+- E5 largest `.ts` 446 lines (src/protocol/types.ts); this plan's largest is render-host.ts at 341.
+- G1 `ed-visual-own-s186-1.log` exit=0 (6 files, 28 tests passed).
+
+**Pending user confirmation**: the real-browser visual pane check (a WebGL2 page showing `osc 20 > rotate 0.5 > out
+o0`, feedback via `src o0`, a text source, tiling, and hush clearing to black). ED-FINAL records it in the core plan.
+The automated proxies are render-host.test.ts, text-asset.test.ts and panes.test.ts.
+
+**Notes for ED-FINAL**: the session does not publish the `render oN`/`render` display choice in v1, so the pane
+selector is the only path; `analyzer.rs`'s module doc says "next write index in the last cell" for every ring kind,
+but `ring_slot` stores the most recently written frame (the code is followed).
 
 ## Related Plans
 

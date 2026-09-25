@@ -2,7 +2,7 @@
 
 **planId**: ED-TAURI (issue #5, TASK-010, wave 4; the standalone `editor/src-tauri/` crate wrapping the identical
 `editor/dist` frontend with a minimal allowlist)
-**Status**: Ready
+**Status**: Completed (implementation, session 186; formal review pending)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.11, 15, 17 (Tauri allowlist), 12.8.10 (version
 policy on Rust 1.83); design-docs/user-qa/pending-editor-questions.md E1
 **Created**: 2026-09-26
@@ -115,18 +115,123 @@ before T1, because
 
 ## Completion Criteria
 
-- [ ] Items 1-6 implemented
-- [ ] T0-T5 and the common rows pass with logs cited, or T0/T1 recorded BLOCKED under E1 with a dependency blocker
+- [x] Items 1-6 implemented
+- [x] T0-T5 and the common rows pass with logs cited, or T0/T1 recorded BLOCKED under E1 with a dependency blocker
       (never claimed as passing)
-- [ ] The manual `cargo tauri build` and app run are recorded as PENDING USER CONFIRMATION
-- [ ] `final-hashes.txt` written
+- [x] The manual `cargo tauri build` and app run are recorded as PENDING USER CONFIRMATION
+- [x] `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-TAURI implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 186, ED-TAURI implementer)
+
+**Tasks Completed**: items 1-6. Evidence: `tmp/ed-editor-20260926-s186/ED-TAURI/attempt-1/` (intent.md, notes.md,
+pre-/post-/final-hashes.txt). ED-SCAFFOLD was in the runtime `acceptedPlanIds`.
+
+- Files created: `editor/src-tauri/{Cargo.toml, Cargo.lock, build.rs, src/main.rs, tauri.conf.json,
+  capabilities/default.json, icons/icon.png}`. `build.rs` and `src/main.rs` were written by the rust-coding agent.
+  The check-and-test-after-modify agent then ran check, fmt --check, clippy -D warnings and T3 on the shell crate; all
+  exited 0.
+- Resolved direct deps: tauri 2.11.6, tauri-build 2.6.3, tauri-plugin-dialog 2.7.3, tauri-plugin-fs 2.5.2. There are
+  429 packages from crates.io, all from a single source.
+- Rust 1.83 fit:
+  - Cargo 1.83 has no MSRV-aware resolver. The already-installed cargo 1.98.1 ran
+    `CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo generate-lockfile` as a resolution aid only. No toolchain
+    was installed.
+  - Cargo 1.83 applied three `cargo update --precise` pins:
+    - dlopen2 0.8.0 and dlopen2_derive 0.4.1: the newer versions use edition 2024 manifests.
+    - yoke-derive 0.8.2: 0.8.3 uses the inherent `str::from_utf8`, stable only since 1.87.
+  - Every gate ran on cargo/rustc 1.83.0.
+- `cargo audit --no-fetch` exited 1, which is not a plan gate. Its findings are recorded in notes.md as residual risk:
+  - quick-xml 0.38.4: RUSTSEC-2026-0194 and RUSTSEC-2026-0195.
+  - time 0.3.45: RUSTSEC-2026-0009.
+  - Both fixed releases need Rust 1.88.
+- Verification (logs under `target/fe-logs/`):
+  - V1 `ed-tauri-build-s186-1.log`: exit=0
+  - V2 `ed-tauri-clippy-s186-1.log`: exit=0
+  - V3 `ed-tauri-nextest-s186-1.log`: exit=0, 985 run, 985 passed, 1 skipped
+  - V3t `ed-tauri-cargotest-s186-1.log`: exit=0, 985 passed, 0 failed
+  - V7 `ed-tauri-fmt-s186-1.log`: exit=0
+  - V6a `ed-tauri-wasm32-s186-1.log`: exit=0
+  - V6b `ed-tauri-wasm32-hostwasm-s186-1.log`: exit=0
+  - V6c: `target/ed-wasm/ED-TAURI.wasm` copied
+  - V4: max `.rs` file is 799 lines (src/dsp/build.rs)
+  - E0: node v26.9.0, npm 11.19.1
+  - E1 `ed-tauri-npm-ls-s186-1.log`: exit=0
+  - E2 `ed-tauri-npm-check-s186-1.log`: exit=0
+  - E3 `ed-tauri-npm-test-s186-1.log`: exit=0, 32 test files, 182 tests passed
+  - E4 `ed-tauri-npm-build-s186-1.log`: exit=0, built to `editor/dist`
+  - E4c: exit 0
+  - E5: max `.ts` file is 446 lines
+  - T0 `ed-tauri-tauri-fetch-s186-2.log`: exit=0
+  - T1 `ed-tauri-tauri-check-s186-2.log`: exit=0. The earlier attempt `-s186-1` exited 101 on yoke-derive 0.8.3,
+    which was fixed by the pin.
+  - T2 `ed-tauri-tauri-fmt-s186-1.log`: exit=0
+  - T3: `git diff --exit-code -- Cargo.toml Cargo.lock` exit 0
+  - T4: prints `true`
+  - T5: `target/` and `gen/` show as `!!`. The crate dir shows as `??` because the source tree stays uncommitted until
+    the workflow commit step.
+- PENDING USER CONFIRMATION: `cargo tauri build` and running the app. Automated proxies: T1 `cargo check`, which runs
+  `generate_context!` over `../dist` and the capability file, plus E4/E4c.
+- Siblings: no drift. The common rows ran on the shared tree while ED-PARAMS and ED-PKG were in flight, and all passed.
+  ED-FINAL re-verifies the combined tree.
+
+### Session: 2026-09-26 (session 186, ED-TAURI implementer, attempt 2: adversarial-review repair)
+
+**Trigger**: step7 adversarial review (comm-002384) raised one mid finding on `editor/src-tauri/tauri.conf.json:22`.
+- The CSP had no `style-src`.
+- Tauri 2.11.6 (`src/manager/mod.rs:96-103`) injects a style nonce into `style-src`.
+- That blocks every runtime `<style>` element that CodeMirror 6 / style-mod creates without a nonce, so the Tauri editor
+  would render unstyled.
+
+**Change** (evidence in `tmp/ed-editor-20260926-s186/ED-TAURI/attempt-2/`: intent.md, pre-/post-/final-hashes.txt):
+- `app.security.csp` adds `style-src 'self' 'unsafe-inline'`.
+- `app.security.dangerousDisableAssetCspModification = ["style-src"]`. Without it, the injected nonce makes the webview
+  ignore `'unsafe-inline'`.
+- `connect-src` adds `ipc: http://ipc.localhost`, which Tauri documents for its IPC custom protocol. This was a
+  reviewer residual low risk and avoids a CSP violation and postMessage fallback on every dialog/fs call.
+- Unchanged: `script-src 'self' 'wasm-unsafe-eval'`, the other directives, the five capabilities, and every other key.
+
+**Design-amendment request (operator)**: design-implementation.md 15.1.11 and plan item 4 pin the CSP verbatim. The
+shipped CSP deviates from them as follows:
+- It adds `style-src 'self' 'unsafe-inline'`.
+- It adds `ipc: http://ipc.localhost` to `connect-src`.
+- It sets `dangerousDisableAssetCspModification: ["style-src"]`.
+
+Please amend 15.1.11 to match.
+- Rationale: CodeMirror injects its theme CSS at runtime.
+- Alternative not taken: wire Tauri's per-load style nonce into `EditorView.cspNonce`. That touches frontend files
+  outside ED-TAURI and is more fragile.
+- Risk: script policy stays strict and there is no remote content, so allowing inline styles adds negligible risk.
+
+**Verification (logs under `target/fe-logs/`)**:
+- E4c: `editor/dist` artifacts present, exit 0.
+- T1 `ed-tauri-tauri-check-s186-3.log`: exit=0 on cargo 1.83.0. The build script re-ran after the config edit, per
+  `rerun-if-changed` on tauri.conf.json.
+- T2 `ed-tauri-tauri-fmt-s186-2.log`: exit=0.
+- T3: `git diff --exit-code -- Cargo.toml Cargo.lock` exits 0.
+- T4: prints `true`.
+- T5: `gen/` and `target/` show as `!!`.
+
+The common rows from attempt 1 are unaffected. The change is confined to the shell crate's config, which the root
+crate and the npm build do not read.
 
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-010)
 - **Previous**: vactrol-editor-scaffold.md. **Parallel**: vactrol-editor-params.md, vactrol-editor-pkg.md
 - **Next**: vactrol-editor-finalize.md
+
+### GATE EVIDENCE NOTE (operator, 2026-09-26, after the ED-TAURI attempt-1 gate block)
+
+- The progress gate requires at least one SUCCESSFUL behavioral test command
+  with a POSITIVE test count in the step6 `verification` records. `cargo check`
+  of the shell crate is not a test. Attempt 1 was blocked with "no successful
+  behavioral test evidence with a positive test count". On redispatch run and
+  record, with exit codes and counts: `npm run test` in editor/ (vitest, the
+  shell's own frontend tests count) and a crate-wide
+  `CARGO_TERM_QUIET=true cargo test` (record `testsRun`/`testsPassed`), in
+  addition to `cargo check` of the shell crate. Leave `verificationGaps` empty;
+  manual Tauri runs go under `residualRisks`.

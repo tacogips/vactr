@@ -220,3 +220,12 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4, E0-E5, plus V1l, V2l and
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-010)
 - **Previous**: vactrol-editor-scaffold.md. **Parallel**: vactrol-editor-code.md, vactrol-editor-midi.md
 - **Next**: vactrol-editor-wasm.md
+
+
+### OWNERSHIP AMENDMENT (operator, 2026-09-26, resolves ED-WIRE-B1)
+
+- `src/session/tests/codec.rs` is added to this plan's writePaths (manifest
+  session187Amendment). Permitted edit: mechanical literal completion only
+  (`call: None` in `site()`, `editors: None` in the ManifestBody sample,
+  `bands: None` in the WireLevel sample, `analyzers: None` in the LevelsBody
+  sample, `clock: None` in the TempoBody sample); no assertion changes.

@@ -2,7 +2,7 @@
 
 **planId**: ED-SCAFFOLD (issue #5, TASK-010, wave 1; the `editor/` Vite + TypeScript + vitest app skeleton, Session
 Protocol v1 client, three transports, the batch store, platform file access, `editor/worklet/host.js` options)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 186; removed from the dispatch manifest by the session-187 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.1, 15.1.3, 15.1.4, 15.1.6 ("Reactive displays",
 "Persistence and saving" file access), 15.1.12; design-docs/specs/command.md "Session Protocol (v1)", "Browser transport
 (raw wasm ABI, TASK-010)", "Editor files (TASK-010)"; design-docs/user-qa/pending-editor-questions.md E5
@@ -295,15 +295,62 @@ Plan-specific rows (ED-SCAFFOLD):
 
 ## Completion Criteria
 
-- [ ] Items 1-12 implemented; dependencies pinned exactly; the lockfile committed-ready
-- [ ] Required tests pass
-- [ ] V1-V7, V6a-V6c, V4, E0-E5 (E1 = `npm ci`, E4 to `target/ed-dist/ED-SCAFFOLD`) and S1-S3 pass with logs cited;
+- [x] Items 1-12 implemented; dependencies pinned exactly; the lockfile committed-ready
+- [x] Required tests pass
+- [x] V1-V7, V6a-V6c, V4, E0-E5 (E1 = `npm ci`, E4 to `target/ed-dist/ED-SCAFFOLD`) and S1-S3 pass with logs cited;
       `final-hashes.txt` written
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-SCAFFOLD implementer)` entry: files, decisions, the
 dependency versions, evidence log paths with `exit=` values, deviations. Edit only this log.)
+
+### Session: 2026-09-26 (session 186, ED-SCAFFOLD implementer)
+
+**Files**: every writePath of this plan (45 files) was written; no file outside writePaths was touched.
+`editor/worklet/host.js` is the only pre-existing file edited (additive `init`/`onRecord`); `processor.js` and
+`editor/dev-harness/*` are byte-identical to HEAD (S3). Evidence: `tmp/ed-editor-20260926-s186/ED-SCAFFOLD/attempt-1/`
+(`intent.md`, `notes.md`, `pre-edit-hashes.txt`, `post-edit-hashes.txt`, `final-hashes.txt`, `v4-e0.txt`).
+
+**Dependency versions** (exact, public npm registry only; every lockfile `resolved` URL is under
+https://registry.npmjs.org/): @codemirror/state 6.7.6, @codemirror/view 6.43.13, @codemirror/language 6.12.4,
+@codemirror/commands 6.11.1, @codemirror/lint 6.9.7, @lezer/highlight 1.2.4, @tauri-apps/api 2.11.1,
+@tauri-apps/plugin-dialog 2.7.3, @tauri-apps/plugin-fs 2.5.2; dev typescript 7.0.2, vite 8.3.1, vitest 5.0.2,
+jsdom 30.1.1. node v26.9.0, npm 11.19.1 (E0).
+
+**Decisions** (details in `notes.md`):
+- The vite plugin emits `vactrol.wasm` and `worklet/processor.js` via `this.emitFile`, so `--outDir` is honored;
+  a missing artifact or bad magic bytes fails the build (checked: exit 1 with a clear message), and
+  `VACTROL_REQUIRE_SESSION_ABI=1` adds the `session_init` export check (checked: fails against today's artifact,
+  as expected before ED-WASM). No `@types/node` is pinned, so `vite.config.ts` types its node use locally.
+- Sidecar name: `song.vact` -> `song.bindings.json` (`sidecarName`, platform/files.ts).
+- `request()` resolves on the first reply whose `re` matches; set-tweak/set-var are fire-and-forget and their
+  `stale-binding` replies reach `client.on('stale-binding')`. `setTweak` rate limit: one per 16 ms per
+  `(file, id)`, latest wins, trailing value always sent; the trailing send flushes a newer pending edit first
+  and keeps the epoch stamped when the value was produced.
+- Store: `eval-result.sites` replaces the file's table; `bindings.sites` upserts by id and keeps a known key.
+  A message applied from inside a subscriber callback is queued until the current round ends.
+- host.js dispatches 0x71-0x73 to `onRecord` after `outbox_clear()` so a listener may re-enter wasm
+  (tested: no double delivery); the console/worklet path is unchanged.
+- `app.css` is linked from `index.html`; `main.ts` boots only when `#vactrol-app` exists.
+
+**Verification** (all logs at `target/fe-logs/`, one run each, final source):
+- V1 `ed-scaffold-build-s186-1.log` exit=0; V2 `ed-scaffold-clippy-s186-1.log` exit=0;
+  V3 `ed-scaffold-nextest-s186-1.log` exit=0, 985 run / 985 passed / 1 skipped;
+  V3t `ed-scaffold-cargotest-s186-1.log` exit=0 (lib 964, cli 9, directive_fixtures 2, spec_fixtures 10 + 1
+  ignored; 985 passed, 0 failed); V7 `ed-scaffold-fmt-s186-1.log` exit=0.
+- V6a `ed-scaffold-wasm32-s186-1.log` exit=0; V6b `ed-scaffold-wasm32-hostwasm-s186-1.log` exit=0;
+  V6c `target/ed-wasm/ED-SCAFFOLD.wasm` copied (1437858 bytes). V4: largest `.rs` 799 lines
+  (src/dsp/build.rs, untouched). E0: node v26.9.0, npm 11.19.1.
+- S1 `ed-scaffold-npm-install-s186-1.log` exit=0 (lockfile written); S2 `ed-scaffold-npm-audit-s186-1.log`
+  exit=0, 0 vulnerabilities; E1 `ed-scaffold-npm-ci-s186-1.log` exit=0 (npm 11 did not run the optional
+  `fsevents` install script; informational warning only).
+- E2 `ed-scaffold-npm-check-s186-1.log` exit=0; E3 `ed-scaffold-npm-test-s186-1.log` exit=0, 10 test files,
+  55 tests passed, 0 failed; E4 `ed-scaffold-npm-build-s186-1.log` exit=0 to `target/ed-dist/ED-SCAFFOLD`;
+  E4c exit 0 (`vactrol.wasm`, `worklet/processor.js`, `index.html` present); E5: largest `.ts` 446 lines
+  (src/protocol/types.ts); S3 `git diff --exit-code -- editor/worklet/processor.js editor/dev-harness` exit 0.
+
+**Deviations**: none. Pending downstream: test-integrity, adversarial and integration review (later workflow steps).
 
 ## Related Plans
 

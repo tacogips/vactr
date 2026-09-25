@@ -2,7 +2,7 @@
 
 **planId**: ED-MIDI (issue #5, TASK-010, wave 2; WebMIDI access on a user action, the input device picker, CC event
 stream and learn capture, forwarding of raw MIDI to the browser session)
-**Status**: Ready
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 186; removed from the dispatch manifest by the session-187 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 15.1.9, 15.1.1 (Tauri has no WebMIDI), 11.7;
 design-docs/specs/command.md `session_midi_in`
 **Created**: 2026-09-26
@@ -95,13 +95,60 @@ The common rows V1, V2, V3, V3t, V7, V6a, V6b, V6c, V4 and E0-E5, plus:
 
 ## Completion Criteria
 
-- [ ] Items 1-6 implemented
-- [ ] Required tests pass
-- [ ] Common rows and M1-M2 pass with logs cited; `final-hashes.txt` written
+- [x] Items 1-6 implemented
+- [x] Required tests pass
+- [x] Common rows and M1-M2 pass with logs cited; `final-hashes.txt` written (M2: see the session-186 note)
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, ED-MIDI implementer)` entry. Edit only this log.)
+
+### Session: 2026-09-26 (session 186, ED-MIDI implementer)
+
+**Tasks Completed**: items 1-6. Dependency ED-SCAFFOLD is in the runtime `acceptedPlanIds`.
+
+- `editor/src/midi/access.ts`: `requestMidi(nav?)` calls `requestMIDIAccess({sysex: false})` and returns null when the
+  API is absent or the request rejects (`NOT_AVAILABLE` = "MIDI not available on this host"). The `*Like` interfaces
+  are the structural Web MIDI subset.
+- `editor/src/midi/devices.ts`: `DevicePicker` lists connected inputs, refreshes on `statechange` (re-attaching and
+  detaching `midimessage` listeners), persists the active set by input name (id when unnamed) under
+  `localStorage['vactrol.midi.active-inputs']`, and dispatches only active inputs' messages. Inputs start inactive.
+- `editor/src/midi/learn.ts`: `parseCc` (0xBn, channel 1..16), `CcStream implements MidiApi` (`onCc`, `learnNext`,
+  `cancelLearn`, plus `onLearnState` for the indicator). A second `learnNext` rejects the first with
+  `LearnCancelled`. Notes and clock are not CC events.
+- `editor/src/midi/forward.ts`: `audioTime` (`contextTime + (timeStamp - performanceTime) / 1000`, falling back to
+  `currentTime`), `forwardable` (the native `parse_midi` set: note on/off, CC, F8/FA/FB/FC), `Forwarder` over
+  `core.midiIn`.
+- `editor/src/midi/mount.ts`: MIDI section in the right pane (Enable MIDI button, status, picker, learn indicator
+  with Cancel). Access is requested only from the click handler. `deps.midi` is set only on grant and cleared on
+  dispose. Forwarding only on `tier === 'browser'` with `deps.core`. CC event `time` is the audio-clock time on the
+  browser tier and page-clock seconds on the native tier, matching `deps.clock`. `midi.css` is loaded through
+  `new URL('./midi.css', import.meta.url)` and a `<link>`, because TypeScript 7 rejects a side-effect CSS import
+  (TS2882) and no plan owns a CSS module declaration (recorded for ED-FINAL in `notes.md`; Vite inlines it).
+- `editor/test/support/midi.ts`: `FakeMIDIAccess`, `FakeMIDIInput.emit(bytes, timeStamp)`, `fakeNavigator`,
+  `MemoryStorage`, `midiDeps`, `mountMidi`.
+- Tests: `access.test.ts` (7), `devices.test.ts` (5), `learn.test.ts` (8), `forward.test.ts` (7). Forwarding tests
+  use the real `WasmCore` over `FakeCore` and assert the `session_midi_in` bytes and times.
+
+**Verification** (logs under `target/fe-logs/`; each ends with `exit=`):
+- V1 `ed-midi-build-s186-1.log` exit=0; V2 `ed-midi-clippy-s186-1.log` exit=0; V7 `ed-midi-fmt-s186-1.log` exit=0.
+- V3 `ed-midi-nextest-s186-1.log` exit=0, 985 run, 985 passed, 1 skipped.
+- V3t `ed-midi-cargotest-s186-1.log` exit=0 (lib 964, cli 9, directive_fixtures 2, spec_fixtures 10 passed).
+- V6a `ed-midi-wasm32-s186-1.log` exit=0; V6b `ed-midi-wasm32-hostwasm-s186-1.log` exit=0; V6c copied to
+  `target/ed-wasm/ED-MIDI.wasm`. V4 largest `.rs` 799 lines (`src/dsp/build.rs`).
+- E0 node v26.9.0, npm 11.19.1. E1 `ed-midi-npm-ls-s186-1.log` exit=0.
+- E2 `ed-midi-npm-check-s186-1.log` exit=1, sibling-caused: `src/pkg/driver.ts` imported ED-WIRE's not-yet-written
+  `./opfs`. Counting run `ed-midi-npm-check-s186-2.log` exit=0 after the sibling file landed.
+- E3 `ed-midi-npm-test-s186-2.log` exit=0, 14 files, 82 tests passed (run 1 also exit=0, 14/82).
+- E4 `ed-midi-npm-build-s186-2.log` exit=0; E4c exit 0. E5 largest `.ts` 446 lines (`src/protocol/types.ts`).
+- M1 `ed-midi-own-s186-2.log` exit=0, 4 files, 27 tests passed.
+- M2 printed `none` right after the ED-MIDI edits. On the later moving tree it prints one line,
+  `editor/src/visual/meters.ts:6`, a COMMENT in ED-VISUAL's in-flight file stating that no `getUserMedia` is used.
+  No call exists anywhere (`grep ... | grep -vE ':[0-9]+:\s*(//|\*)'` prints nothing). Left to the join.
+- `final-hashes.txt` written under `tmp/ed-editor-20260926-s186/ED-MIDI/attempt-1/`.
+
+**Notes**: no Rust change. No file outside writePaths touched. Formal review, integration and commit are later
+workflow steps.
 
 ## Related Plans
 

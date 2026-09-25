@@ -79,3 +79,4 @@ implementation follows, is to accept this edge; write `match` or
   "a name resolving to a variant is a variant pattern") and must
   diagnose a bare field-less variant used as the binding pattern of
   `if`. Record that obligation in TASK-004 when it is planned.
+  The rule is designed in design section 7.1.4 (`bare-variant-binding`).

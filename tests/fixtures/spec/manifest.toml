@@ -35,12 +35,12 @@ note = "Basics: fn, bindings, lambdas, pipes and continuation lines."
 doc = "lang-reference.md"
 ordinal = 3
 section = 2
-reader = "clean"
-reader_diags = []
+reader = "diagnostics"
+reader_diags = ["bad-number@129", "misplaced-colon@130", "stray-char@128", "stray-char@129"]
 expand = "clean"
 expand_diags = []
 eval = "unclassified"
-note = "Literals and data: numbers, strings, keywords, nil, identifiers, blocks, pairs, dicts, structs, errors, ranges."
+note = "Literals and data: numbers, strings, keywords, nil, identifiers, blocks, pairs, dicts, structs, errors, ranges. PENDING (issue #2, path/url literal reader support, Decided 2026-09-25): the listed diagnostics come from the new unquoted path and url literals (`./x`, `https://...`); flip this block back to its previous classification once the reader lexes them."
 
 [[block]]
 doc = "lang-reference.md"
@@ -58,11 +58,11 @@ doc = "lang-reference.md"
 ordinal = 5
 section = 4
 reader = "diagnostics"
-reader_diags = ["stray-char@92"]
+reader_diags = ["stray-char@100", "stray-char@80"]
 expand = "clean"
 expand_diags = []
 eval = "unclassified"
-note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 92) is `..` plus a stray `.`."
+note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 92) is `..` plus a stray `.`. PENDING (issue #2, path/url literal reader support, Decided 2026-09-25): the listed diagnostics come from the new unquoted path and url literals (`./x`, `https://...`); flip this block back to its previous classification once the reader lexes them."
 
 [[block]]
 doc = "design-music.md"
@@ -80,22 +80,22 @@ doc = "design-music.md"
 ordinal = 2
 section = 2
 reader = "diagnostics"
-reader_diags = ["misplaced-colon@40"]
+reader_diags = ["bad-number@32", "stray-char@30", "stray-char@32"]
 expand = "clean"
 expand_diags = []
 eval = "unclassified"
-note = "Sound. SPEC CONFLICT (reported, rules unchanged): `[:g :7]` on block line 40; `:7` is not a keyword because an identifier cannot start with a digit (lang-reference section 2, Decided identifier rule; design 6.5.4 colon classes)."
+note = "Sound. The chord line writes `[:g :dom7]` (Decided 2026-09-25: letter-first chord qualities, never `:7`), so the block reads clean. PENDING (issue #2, path/url literal reader support, Decided 2026-09-25): the listed diagnostics come from the new unquoted path and url literals (`./x`, `https://...`); flip this block back to its previous classification once the reader lexes them."
 
 [[block]]
 doc = "design-music.md"
 ordinal = 3
 section = 3
-reader = "diagnostics"
-reader_diags = ["misplaced-colon@104"]
+reader = "clean"
+reader_diags = []
 expand = "clean"
 expand_diags = []
 eval = "unclassified"
-note = "Patterns. SPEC CONFLICT (reported, rules unchanged): `[:g :7]` on block line 104, as in section 2."
+note = "Patterns. The chord line writes `[:g :dom7]` as in section 2, and Tidal's `struct` is spelled `grid` (design 20 Q3, Decided 2026-09-25)."
 
 [[block]]
 doc = "design-music.md"
@@ -536,20 +536,20 @@ d1:
 		> gain [1 0.8 0.6]
 		> pan sine
 		> speed {alt 1 2}
-		> lpf {range 200 2000 sine}'''
-read = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range 200 2000 sine)})})'
-expand = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range 200 2000 sine)})})'
+		> lpf {range sine 200 2000}'''
+read = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range sine 200 2000)})})'
+expand = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range sine 200 2000)})})'
 diags = []
 
 [[case]]
 id = "music-chord-seven-conflict"
 doc = "design-music.md"
 file = "file"
-verbatim = true
+verbatim = false
 source = 'chord {alt [:c :maj7] [:d :m7] [:g :7]}'
 read = '(#error)'
 diags = ["misplaced-colon"]
-note = "SPEC CONFLICT, reported for the language author: `:7` breaks the Decided identifier rule (no leading digit), so 6.5.4 reads the colon as misplaced-colon. The reader rules are not changed to fit."
+note = "Negative case. The conflict is resolved (Decided 2026-09-25): design-music.md now writes `[:g :dom7]`. `:7` still breaks the Decided identifier rule (no leading digit), so 6.5.4 reads the colon as misplaced-colon; src/reader/tests/lexer.rs keeps the same assertion."
 
 [[case]]
 id = "neg-paren-form"

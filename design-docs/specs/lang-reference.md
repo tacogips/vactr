@@ -93,6 +93,17 @@ upd arr {put arr 3}
 # mutation nor shadowing.
 # Decided: one `let`, scope by position; no `def`.
 # Decided: no shadowing; rebinding is an error.
+# Decided (author, 2026-09-25, amends the line above): "no shadowing" holds
+# WITHIN ONE SCOPE, in either direction. Scopes form a chain:
+#   prelude  (builtins, default sound kit; read-only)
+#   -> session (the editor file / REPL top level; "main")
+#   -> fn and block scopes
+# A child scope MAY bind a name that a parent already binds; the inner
+# binding wins for that scope. Diagnostics: shadowing a prelude name is a
+# hint ("shadows prelude `scale`"); shadowing a user-defined parent name is
+# a warning. Rebinding within the same scope stays an error, and the
+# prelude itself cannot be rebound (it is the parent, not the session).
+let sound-kit put default-sound-kit [bd: my-kick]   # session shadows the prelude's sound-kit
 # Decided (implication 2026-09-24): yes; a top-level var is the live state
 #   mechanism (late-bound, section 4), and upd returns the new value
 
@@ -268,6 +279,18 @@ my-long-name        # ok
 # Decided (principle 2): `-x` is `{neg x}`; `- x` with a space is the
 #   function
 
+# ---- path and url literals (author, 2026-09-25; Nix-style) ---------------
+# A path is a first-class value, not a string: unquoted, and it must
+# contain a `/`. Forms: ./x  ../x  ~/x  /abs/x  (chars [A-Za-z0-9._~-] and `/`).
+# A url is `scheme://...` up to whitespace. Types: `path`, `url`.
+# No grammar conflict: division is `/ a b` with a space, and a qualified
+# name `pkg.name` never contains `/`.
+# A relative path resolves against the FILE that contains the literal
+# (as in Nix), so a sound pack can name its own samples. In the browser
+# tier paths resolve through the project root.
+let pack-dir ./soundpack                 # path
+let kick sample ./soundpack/bd/1.wav     # path -> loaded sample (host I/O, cached by path)
+let remote https://example.org/packs/x.vact   # url
 # ---- blocks (author proposal, 2026-09-24) ---------------------------
 # `{ ... }` is an inline block. It is the only nesting form; it replaces
 # the `( )` of Lisp; `( )` is a reader error.
@@ -773,6 +796,14 @@ note [:c3] > s pads.warm > d1
 #   Manifest fields, proxy protocol, and MVS details are for the
 #   implementation design.
 
+# ---- load: a file as a value (author, 2026-09-25) --------------------------
+# `load path` evaluates a .vact file in a FRESH child scope of the prelude
+# (never the caller's scope) and returns its last expression, like Nix's
+# import. Relative paths inside that file resolve against that file.
+# `import` stays for named code packages (Go style, above); `load` is for
+# one file that IS a value, typically a sound pack (see design-music.md).
+let my-pack load ./soundpack/sound-pack.vact
+let sound-kit put default-sound-kit my-pack   # later keys win; shadows the prelude's sound-kit
 # ---- types (principle 4: typed, with inference; author, 2026-09-24) --
 # Every expression has a type the checker can name; the LSP shows it on
 # hover. Annotations are optional because inference makes them

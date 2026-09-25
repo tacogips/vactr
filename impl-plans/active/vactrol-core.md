@@ -133,7 +133,7 @@ pub struct VarSlot { pub name: SymId, pub kind: SlotKind, pub value: RefCell<Val
     pub version: Cell<u64> }
 pub enum SlotKind { Let, Var, Fn, Tweak }
 pub struct Namespace;  // define/redefine/lookup; SINGLE global scope incl. prelude,
-                       // strict no-shadowing; parent-scope variant gated on design 20 Q1
+                       // no-shadowing per scope; prelude = read-only parent scope (design 20 Q1 decided 2026-09-25)
 pub struct FnProto { pub arity: Arity, pub code: Vec<Op>, pub consts: Vec<Value>,
     pub locals: u16, pub spans: Vec<(u32, Span)>, pub name: Option<SymId> }
 pub enum Op { LoadConst(u16), LoadLocal(u16), StoreLocal(u16), LoadGlobal(u32),
@@ -527,9 +527,11 @@ check over fan-out link sets,
 edges per top-level form (free variables split eager/late via the
 mask analysis) for LSP hover and subscription precomputation;
 runtime recording stays authoritative (design 5.6 revised),
-no-shadowing enforcement (STRICT against the
-prelude per current decisions; the parent-scope relaxation of design 20
-Q1 stays unimplemented pending adjudication), qualified-name typing
+no-shadowing enforcement PER SCOPE with the scope chain prelude ->
+session -> fn/block (design 20 Q1 DECIDED 2026-09-25: a child scope may
+shadow a parent binding; prelude shadow = hint, user-parent shadow =
+warning; same-scope rebinding = error; the prelude is read-only), `path`
+and `url` literal types with file-relative path resolution, qualified-name typing
 through `PkgNs` and package keyword sets in `HostManifest` (design
 5.7), diagnostics list (undefined names, literal `/ x 0`, missing enum
 variant in match, annotation mismatch, duplicate dict key,
@@ -547,8 +549,10 @@ complement of the enforced Query effect mode).
 **Status**: NOT_STARTED | **Parallelizable**: Yes (with the rest of TASK-004)
 **Depends on**: TASK-003 and TASK-004's `types/masks.rs` deliverable (mask inference is a MANDATORY compile dependency, not an opportunistic input; the remainder of TASK-004 proceeds in parallel)
 **Deliverables**: Module 4: `Namespace` (single global scope including
-the prelude, strict no-shadowing; the parent-scope variant is gated on
-design 20 Q1 adjudication), late-bound `VarRef` load rules (var/fn
+the prelude as a READ-ONLY PARENT SCOPE of the session namespace;
+no-shadowing per scope, child scopes may shadow — design 20 Q1 decided
+2026-09-25; `sound-kit`/`default-sound-kit` prelude bindings and
+`load path` per lang-reference.md and design-music.md), late-bound `VarRef` load rules (var/fn
 ref, let snapshot), redefinition, `FormGen` stamping and the
 REACTIVE `DepGraph` machinery (eager-read recording over ALL
 top-level slot kinds via `Deref` instrumentation, Late captures

@@ -133,12 +133,14 @@ src/
              node.rs line.rs import.rs                    # 6.5.4 (TASK-002)
   expand/    expander.rs sugar.rs kernel.rs               # section 6.4, 6.5.5
   types/     ty.rs infer.rs diag.rs manifest.rs           # section 7
-  ns/        namespace.rs tweak.rs                        # section 8
-  compile/   compiler.rs proto.rs                         # section 9
-  vm/        ops.rs frame.rs vm.rs fail.rs                # section 9
-  pattern/   pat.rs step.rs query.rs combinators.rs signal.rs  # section 10
+             masks.rs natives.rs deps.rs check.rs         # 7.1 (TASK-004)
+  ns/        namespace.rs tweak.rs                        # section 5.6
+             stage.rs depgraph.rs journal.rs evaluator.rs # 7.1 (TASK-005)
+  compile/   compiler.rs proto.rs                         # section 8
+  vm/        ops.rs frame.rs vm.rs fail.rs natives/       # section 8, 7.1
+  pattern/   pat.rs step.rs query.rs combinators/ signal.rs eval.rs  # section 10, 7.1
   tex/       texnode.rs shader.rs uniforms.rs                  # section 9
-  clock/     tempo.rs                                     # section 11.1
+  clock/     tempo.rs clock.rs                            # section 11.1, 11.7
   sched/     slots.rs scheduler.rs telemetry.rs           # section 11
   dsp/       ugen.rs graph.rs voice.rs sample.rs          # section 12
   host/      caps.rs noop.rs native/ wasm/                # sections 11.5, 16
@@ -1510,6 +1512,10 @@ replaces. A form that contains an `Error` node returns
 `read-error-present`, which callers do not show, because the reader has
 already reported the error. Files: `expander.rs` (traversal),
 `sugar.rs` (rewrites), `kernel.rs` (shape validation and `is_kernel`).
+Recursion is capped at `MAX_DEPTH = 512` levels of the input tree
+(`expander.rs`). The reader caps bracket nesting at 128, but pipes and
+`?` folds nest calls without brackets, so past the cap the form reports
+`nesting-too-deep` instead of overflowing the stack.
 
 **Positions.**
 - Expression positions are expanded. They are call heads and
@@ -1529,7 +1535,10 @@ So a user parameter named `map` or `neg` cannot capture a desugared
 `match fn let var upd enum if elif else for import`, plus `nil`,
 `true` and `false`. They are reserved: binding one as a name, parameter,
 fn name or target is `reserved-word`. `struct`, `inst` and the rest stay
-ordinary names, since design Q3 is still open. `while`, `loop`, `break`,
+ordinary names for the expander. Q3 is now Decided (Tidal's `struct` is
+`grid`); `struct`, `inst` and `look` are definition heads that the
+checker and compiler recognize (7.1.4), so the expander stays
+unchanged. `while`, `loop`, `break`,
 `when`, `unless` and `each` get no special treatment; they are unknown
 names that the checker (TASK-004) reports.
 
@@ -1734,6 +1743,256 @@ The checker is one crate module consumed identically by the compiler,
 the LSP (section 14.3), and the session's eval path — "LSP sharing the
 checker" is literal reuse, not a port.
 
+### 7.1 Middle-end implementation decisions (TASK-004..006, 2026-09-25)
+
+This section pins the choices that sections 5.5-5.6, 7-10, 11.1 and
+11.7 leave open for issue #2 (checker, namespace/compiler/VM, pattern
+engine). It follows the shape of 6.5 and changes no Decided behavior.
+TASK-007..010 stay out of scope: the slot table, the two-horizon
+scheduler, layer-2 dedup, capability hosts, DSP and package loading.
+
+#### 7.1.1 Pipeline and gating
+
+Every top-level form goes read -> expand -> check -> compile -> run.
+
+- A form with a reader or expander error is not checked, compiled or
+  run. Its diagnostics are the front end's (6.5).
+- Check diagnostics never gate compile or run (Live mode, section 7).
+  `check()` always returns a `CheckResult`; a node it cannot type gets
+  `Any` with a diagnostic, and it never returns early for the form.
+- `compile` fails a form only on `nesting-too-deep` (7.1.5). The form
+  is then not run and the diagnostic is reported.
+- `compile` always calls `infer_masks` on its own and does not depend on
+  the diagnostics pass (5.5). With diagnostics off, the masks are
+  identical.
+- Frozen mode is not implemented.
+
+#### 7.1.2 Files and the 800-line budget
+
+No `.rs` file may reach 800 lines. The hard limit is 1000 (section 4).
+A wave checks this before it completes: the largest `.rs` line count
+is recorded in its evidence. Tests go in `tests/` submodules, as in 6.5.
+
+| Module | Files (owner wave, 7.1.7) |
+|--------|---------------------------|
+| `types/` | `ty.rs`, `masks.rs`, `natives.rs` (MASKS); `infer.rs`, `unify.rs`, `check.rs`, `manifest.rs`, `deps.rs` (CHECK) |
+| `compile/` | `compiler.rs`, `matchc.rs` (match to pattern ops), `proto.rs`, `sites.rs` (tweak sites and tiers) (VM) |
+| `vm/` | `ops.rs`, `frame.rs`, `vm.rs`, `call.rs` (boundary forcing and `Forward` chase), `natives/{num,list,dict,value,console,effects}.rs` (VM); `query_vm.rs`, `natives/{pattern,signal,tex,music}.rs` (INTEGRATE) |
+| `ns/` | `namespace.rs`, `tweak.rs`, `pkg.rs` (`PkgNs`, `ImportBinding`), `stage.rs` (VM); `depgraph.rs`, `journal.rs`, `evaluator.rs` (REACTIVE) |
+| `pattern/` | `pat.rs`, `step.rs`, `query.rs`, `occ.rs`, `rng.rs`, `signal.rs`, `eval.rs`, `combinators/{time,structure,random,region,music,control,input}.rs` (PATTERN) |
+| `clock/` | `tempo.rs`, `clock.rs` (`Tempo`, `Clock`, `ClockSource`, `:midi` anchor math) (PATTERN) |
+| `tex/` | `texnode.rs`, `shader.rs` (snippets and `compile_tex`), `uniforms.rs` (PATTERN) |
+
+The clock lives in `src/clock/`, as in section 4 and the core plan, not
+in `src/sched/`. `sched/` stays TASK-007's.
+
+#### 7.1.3 Contracts between waves
+
+- **Masks.** `MaskEntry`, `ForcingMask`, `CalleeRef` and `infer_masks`
+  are defined once, in `types/masks.rs`. The compiler and the VM import
+  them and never redefine them. The masks-based `mixed-forcing` check
+  over fan-out link sets lives there as well.
+- **Native signature table** (`types/natives.rs`). There is one entry
+  per prelude name in scope for this issue, indexed by `NativeId`. An
+  entry holds the name, the arity and keyword parameters, the type
+  scheme, the per-parameter forcing mask, and the overload group
+  (7.1.4). The checker reads the types, `infer_masks` reads the masks,
+  and the VM registers each implementation against its entry. A test
+  asserts that every registered native has exactly one entry with the
+  same arity and mask, and that every entry has an implementation. In
+  scope: the lang-reference section 5 core prelude, the design-music
+  pattern, control and signal vocabulary, `d1`..`d9`/`slot`, `once`,
+  `at`, `hush`, `stop`, `use-bpm`, `use-cycle`, `midi-notes`, `cc`, and
+  the design-visual vocabulary. Out of scope and absent from the table,
+  so the checker reports them as `undefined-name`: the synthesis, effect,
+  bus and granular vocabulary (TASK-008) and package loading (TASK-009).
+- **Codes.** The MASKS wave adds every `DiagCode` and `FailCode` in
+  7.1.6 in one edit, so CHECK, VM and PATTERN start after it. No other
+  wave edits `types/diag.rs` or `vm/fail.rs` while the parallel waves
+  run. If a code turns out to be missing, a wave uses the closest listed
+  code, records a finding, and the INTEGRATE wave adds the code.
+- **Query VM handle** (`pattern/eval.rs`, the "VM handle" of 10.3). The
+  PATTERN wave defines the trait `QueryVm`:
+  - `call(f, args) -> Result<Value, Failure>`, for `PParam::Fn`,
+    `VParam::Fn` and transform closures;
+  - `deref(&VarSlotRef) -> Result<Value, Failure>`, for `Late`;
+  - `take_output() -> Vec<(Origin, Rc<str>)>`, for captured `print`.
+
+  The implementation enters Query effect mode with a scope guard on
+  every call (10.4). The PATTERN wave tests with a stub. The INTEGRATE
+  wave implements the trait for `Vm` in `vm/query_vm.rs`. `pattern/`
+  and `tex/` treat `VarSlotRef` and `Closure` as opaque, and never edit
+  `value/`, `ns/` or `vm/`.
+- **Input cells.** `Sig::Cc` and `Sig::Analyzer` read `f32` values from
+  an `InputCells` table that is passed into query and frame evaluation,
+  and so do the host signals `Sig::Host` (`fft`, `amp`). It is keyed by
+  (channel, controller), by `AnalyzerId` and by `HostSig`. Only tests
+  write it in this issue; TASK-007/008 hosts write it later.
+- **Staged effects** (`ns/stage.rs`, VM wave). Every host-visible effect
+  is a `StagedEffect`: a slot bind (pattern or texture), a revocation,
+  a control-cell update, a tweak refresh, the `bindings` batch, a tempo
+  change, a one-shot schedule (`once`/`at`), or a console line. A form
+  collects its effects in a buffer. They are released to an
+  `EffectSink` only when the whole form succeeds, and dropped when it
+  fails (the bind-then-fail case). The only sink in this issue is the
+  test `RecordingSink`; TASK-007 adds the slot-table sink. The REACTIVE
+  wave builds pass-level staging and the pass journal on top of this
+  buffer: a pass releases nothing until validation.
+- **Top-level driver** (`ns/evaluator.rs`, REACTIVE wave). `Evaluator`
+  owns the `Namespace`, `DepGraph`, `Vm`, staging and `FormGen`
+  counter. `eval_form` runs one expanded form and returns its outcome
+  with diagnostics. A top-level `upd` or a redefinition triggers the
+  reactive pass of 5.6, coalesced latest-wins per tick. TASK-009's
+  `Session` wraps `Evaluator` and does not re-implement it.
+
+#### 7.1.4 Checker and runtime rules pinned here
+
+- **No shadowing within one scope (20 Q1, Decided 2026-09-25: parent-scope
+  model; the strict single-scope text below is superseded — the prelude is a
+  read-only PARENT of the session namespace and a child scope may shadow).**
+  Original text: There is one global scope,
+  and it includes the prelude. A `let`/`var`/`fn` name, a parameter or a
+  pattern binding that equals a prelude name or a visible binding is
+  `shadowing`. Re-evaluating a top-level definition in Live mode is
+  redefinition, never `shadowing`.
+- **Definition heads.** The checker and compiler recognize top-level
+  `struct NAME:` blocks as definitions (lang-reference section 2).
+  `inst` and `look` are recognized as definition heads that own a slot.
+  Their bodies are type-checked for the no-abort property only, and the
+  compiler classifies `inst` header default literals as `Direct`-tier
+  tweak sites from the form's structure (section 13). Building the
+  instrument (`InstDef`, `Ctl::Cell`) is TASK-008's.
+- **Bare-variant binding (U5).** A `match` with exactly two clauses,
+  where the first clause's left side is the alternative `false | nil`
+  and the second clause's left side is one bare name that resolves to
+  a field-less enum variant, is `bare-variant-binding` (error). This is
+  the shape `if S P -> T` desugars to, so a truthy value that is not
+  the variant fails instead of taking the else branch. The hand-written
+  identical `match` gets the same diagnostic, because it is the same
+  trap. The message suggests `match S` with the variant and `_`, or
+  `if {= S none}`.
+- **Chord qualities (Decided 2026-09-25).** Qualities are letter-first
+  keywords. The v1 set and intervals are `:maj7` (0 4 7 11), `:m7`
+  (0 3 7 10), `:dom7` (0 4 7 10) and `:sus4` (0 5 7). A literal quality
+  outside the set is `unknown-keyword` (the keyword-set mechanism of
+  section 7). A dynamic one is an event-local query fault. `:7` never
+  reaches the checker: it is `misplaced-colon` in the reader. Adding a
+  quality means adding a row to the table.
+- **`grid` (20 Q3, Decided).** `grid` builds `PatNode::Grid`. `struct`
+  is never a pattern function.
+- **`gain` and `amp` (20 Q4, Decided).** `gain` is a pattern control
+  native. The `gain` -> `amp` mapping is a control-table row owned by
+  TASK-007/008.
+- **Subject overloading (20 Q2, open, M1).** TASK-006 follows the
+  recommendation for a fixed set only:
+  - `scale`: a pattern subject means scale notes; a texture subject
+    means the visual transform.
+  - `shape`: a number subject means the visual source; a pattern
+    subject means the `shape` control.
+
+  The checker resolves the overload when the first argument's type is
+  known. Otherwise the VM's native dispatch switches on the runtime tag,
+  and a tag outside the group is a `type` failure. User code cannot
+  declare overloads.
+- **`range` argument order (M2, open).** Every spec use but one is
+  subject first (`range sine 1 5`), as principle 2 decides.
+  design-music section 3 writes `lpf {range 200 2000 sine}`. The
+  signature is subject first. That line is pinned as a checker
+  `type-mismatch` in the fixtures until the author answers. The spec
+  text is not changed here.
+
+#### 7.1.5 Resource bounds (no panic on untrusted input)
+
+- The checker and the compiler each count recursion depth over the
+  expanded tree. Past 1024 levels they report `nesting-too-deep`: the
+  checker types the subtree as `Any`, and the compiler skips the form.
+  An `if`/`elif` chain expands into nested `match` forms, so the
+  expanded depth can exceed the expander's input cap of 512.
+- VM defaults (configurable on `Vm`): `depth_limit` = 512 frames, and at
+  most 64 nested Rust-level re-entries. A re-entry is a native calling
+  back into a closure, or a `QueryVm` call. Exceeding either is
+  `depth-exceeded`. Fuel is 1,000,000 per top-level evaluation and per
+  `QueryVm` call. Exhausting it is `fuel-exhausted`; this is the
+  "unbounded source" failure of `for x 0..:`.
+- All `Ratio64` arithmetic in query, clock and region math goes through
+  the checked operations of 5.3. Overflow is a `Failure`, event-local
+  or subtree-local per 10.3, and is never a panic.
+- There is no `std::thread`, `std::time`, `std::fs`, `std::net` or
+  `std::process` in `types/`, `ns/`, `compile/`, `vm/`, `pattern/`,
+  `clock/` or `tex/`. The `:midi` clock math takes pulse timestamps as
+  arguments.
+
+#### 7.1.6 Diagnostic and failure codes (closed list for this issue)
+
+New `DiagCode`s (kebab-case, as in 6.5). Severity is error unless it
+says (w) for warning:
+- Types and names: `type-mismatch`, `annotation-mismatch`,
+  `optional-as-value`, `any-not-narrowed`, `undefined-name`,
+  `shadowing`, `literal-division-by-zero`, `unknown-keyword`,
+  `missing-variant`, `bare-variant-binding`.
+- Hygiene: `duplicate-key` (w), `import-collision` (w),
+  `beyond-capability`, `effect-in-pattern` (w), `unbounded-source` (w).
+- Forcing: `mixed-forcing` (w), `latent-forcing` (w).
+- Patterns and clock: `bad-slice-points`, `input-lane-operator`,
+  `clock-source-unavailable`.
+- Reactive: `dependency-cycle`.
+
+New `FailCode`s: `no-match`, `fuel-exhausted`, `depth-exceeded`,
+`effect-in-query`, `effect-in-rebuild`, `undefined-name`,
+`not-callable`, `arity`, `blocked` (a form reported `blocked-on: X`,
+5.6), `slice-index`, `bad-slice-points` (dynamic points), and
+`no-whole` (a region operator got an event with `whole = None`).
+
+#### 7.1.7 Waves, fixtures and verification
+
+**Waves.** A manifest `dependsOn` appears only where source forces
+sequencing. Write sets are disjoint; the file owners are in 7.1.2.
+
+| Wave | Content | Depends on |
+|------|---------|------------|
+| MASKS | `types/ty.rs`, `masks.rs`, `natives.rs`; the code lists of 7.1.6 | — |
+| CHECK | the rest of TASK-004 | MASKS |
+| VM | TASK-005 namespace, compiler, VM, core natives, tweak sites, `PkgNs`, `stage.rs` | MASKS |
+| REACTIVE | TASK-005 `DepGraph`, pass journal, `Evaluator`, rebuild and reactive-propagation tests | VM |
+| PATTERN | TASK-006 `pattern/`, `clock/`, `tex/`, with unit and golden tests through the stub `QueryVm` | MASKS (the 7.1.6 codes only) |
+| INTEGRATE | `QueryVm` for `Vm`, domain native wrappers, fixture evaluation stages, `src/lib.rs` crate doc, TASK-006 criteria that need the VM (`PParam::Late`, `PParam::Fn`, the tweaked-probability re-query) | CHECK, REACTIVE, PATTERN |
+
+Only PATTERN adds a module to `src/lib.rs` (`pub mod clock;`).
+INTEGRATE edits the crate doc afterwards and mentions the expander (a
+carried TODO).
+
+**Spec fixture evaluation** (extends 6.5.6). `eval = "unclassified"`
+is replaced on every block by one of these classes:
+- `positive`: every form in the block checks with no error-severity
+  diagnostic, compiles, and runs without failure in one isolated
+  `Evaluator`.
+- `diagnostic`: `check_diags` and `run_fails` pin the exact multisets
+  as `code@line`.
+- `authority-question`: evaluation stays pending (6.5.6).
+- `illustrative-excluded`: not evaluated. The `note` says why.
+- `deferred`, with `deferred_to = "TASK-00N"`: the block needs a runtime
+  outside this issue (DSP instruments, buses, package loading). It is
+  checked for the no-panic and no-abort property only, and it is not
+  compiled or run.
+
+Every `# => v` annotation in lang-reference sections 1-5 gets a
+`[[case]]`. The case holds `value` (the canonical print, 6.5.3) or
+`fail` (a `FailCode`), plus `check_diags`, and it is evaluated in a
+fresh `Evaluator`. The annotated negatives (`+ 1 "a"`, `?T` used as
+`T`, rebinding) are cases with their codes. Chord disposition: blocks 2
+and 3 of design-music.md read clean with `[:g :dom7]`. Case
+`music-chord-seven-conflict` stays as a `verbatim = false` negative
+reader case (`misplaced-colon`), and `src/reader/tests/lexer.rs` keeps
+its `[:g :7]` assertion.
+
+**Verification.** The 6.5.7 evidence rule applies to every wave, with
+`<plan>` being the wave's short name (`masks`, `check`, `vm`,
+`reactive`, `pattern`, `integrate`, `final`). The checks are `build`,
+`clippy` (`--all-targets -- -D warnings`), `fmt` (`--check`),
+`nextest`, `test` (a plain `CARGO_TERM_QUIET=true cargo test`),
+`wasm32`, `wasm32-hostwasm` and `linecount`. Rollback is `git revert` of
+the single implementation commit; there is nothing to migrate.
+
 ## 8. Bytecode, Frames, and the VM
 
 ### 8.1 Compilation units
@@ -1912,7 +2171,7 @@ pub enum PatNode {
     Slice { pat: Rc<Pat>, cuts: SliceCuts, index: Rc<Pat> },
     Splice { pat: Rc<Pat>, cuts: SliceCuts, index: Rc<Pat> }, // + rate-fit to step
     LoopAt(Rc<Pat>, PParam), Fit(Rc<Pat>),    // stretch over n cycles / to the event
-    Chunk(Rc<Pat>, PParam, Value), Grid(Rc<Pat>, Rc<Pat>),   // Tidal `struct`; name: section 20 Q3
+    Chunk(Rc<Pat>, PParam, Value), Grid(Rc<Pat>, Rc<Pat>),   // `grid`, Tidal's `struct` (20 Q3, Decided)
     Euclid(Rc<Pat>, PParam, PParam, PParam),
     Control(KwId, Rc<Pat>, Rc<Pat>),           // gain/lpf/…: value pattern onto subject
     ScaleNotes(KwId, KwId, Rc<Pat>), Chord(…), Voicing(…), Arp(…),
@@ -3802,11 +4061,22 @@ only.
 
 ## 20. Open Questions — Recommendations
 
-**These four are recommendations only, clearly not decisions**; each
-respects every Decided item and is reversible before implementation of
-the affected module.
+**These four began as recommendations only.** Each respects every
+Decided item and is reversible before implementation of the affected
+module. **Status (author, issue #2, 2026-09-25):** Q1 is Decided as the
+STRICT rule (the parent-scope amendment is not adopted); Q3 is Decided
+as `grid`; Q4 is Decided as both names. Q2 is still open; TASK-006
+follows its recommendation for the fixed set in 7.1.4 until answered
+(`design-docs/user-qa/pending-middle-end-questions.md`, M1).
 
-**Q1 — Shadowing rule versus the global prelude.**
+**Q1 — Shadowing rule versus the global prelude.** *Decided
+(author, 2026-09-25, SUPERSEDES the earlier strict decision): the
+recommendation below is ADOPTED. Scope chain prelude -> session -> fn/block;
+no rebinding within one scope; a child scope may shadow a parent binding
+(prelude shadow = hint, user-parent shadow = warning); the prelude is
+read-only. Motivation: the builtin `sound-kit` is overridden by binding
+`sound-kit` in the session (design-music.md, sound kits). Also decided:
+`path` and `url` literal types and `load path` (lang-reference.md).*
 *Currently binding behavior:* the decisions state "no shadowing, in
 either direction" and give v1 one global scope that includes the
 prelude. Under them, a user top-level `let scale 2` collides with an
@@ -3837,7 +4107,7 @@ alternative (renaming one side) was already taken once where collision
 was rare (`tile` for Hydra `repeat`) and should stay the exception.
 
 **Q3 — Rename of Tidal's `struct` pattern function** (collides with the
-`struct` keyword).
+`struct` keyword). *Decided (2026-09-25): `grid`.*
 *Recommendation:* rename to **`grid`** (`grid {s :bd} [true false true
 true]`): plain-English, subject-first, evokes placing onsets onto a
 boolean grid, and is unclaimed across all three vocabulary tables.
@@ -3846,7 +4116,7 @@ step-count utility), `sieve` (implies removal, wrong direction),
 `trig` (SuperCollider ugen name, wrong domain). The design reserves
 `PatNode::Grid` accordingly; renaming later is a one-word change.
 
-**Q4 — `amp` versus `gain`.**
+**Q4 — `amp` versus `gain`.** *Decided (2026-09-25): both stay.*
 *Recommendation:* keep BOTH, each in its home vocabulary, with the
 documented mapping: `gain` is the pattern CONTROL (Tidal/Strudel name,
 what performers type in chains), `amp` is the instrument PARAMETER

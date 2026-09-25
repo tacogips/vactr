@@ -92,6 +92,23 @@ note [:e2 :g2 :b2] > s :pluck > gain 0.4 > cutoff {range sine 400 2000} > d1
 s [:bd-haus :sn-dub] > d1
 n [0 3] > s :bd > d1             # sample index
 
+# ---- sound kits and sound packs (author, 2026-09-25) --------------------
+# `s` resolves its keywords against the LATE-BOUND binding `sound-kit`, a
+# dict keyword -> sound. The prelude binds `default-sound-kit` (the builtin
+# kit, immutable) and `sound-kit` (initially the same value). A sound is an
+# `inst` template, one sample, or a list of samples (`n i` picks the i-th).
+# A sound pack is a .vact file whose value is such a dict; `load` reads it
+# and `put` merges packs (later keys win). Because the session is a child
+# scope of the prelude, binding `sound-kit` in the editor overrides the
+# builtin kit from the next event on; `default-sound-kit` is never rebound.
+let my-pack load ./soundpack/sound-pack.vact      # dict: [bd: ... sd: ...]
+let sound-kit put default-sound-kit my-pack       # override :bd, keep the rest
+let sound-kit put default-sound-kit [bd: {sample ./bd/909.wav}]   # one key
+# sound-pack.vact (its last expression is the pack):
+# [bd: [sample ./bd/1.wav sample ./bd/2.wav]   # `n 1` selects 2.wav
+#  sd: sample ./sd.wav
+#  pluck: {inst pluck ...}]
+
 # ---- sample slicing (author, 2026-09-24) -------------------------------
 # Every way of cutting a sample is a pattern control, so it is patternable
 # and its numbers are editable from the waveform in the editor.
@@ -111,7 +128,8 @@ s [:bd-haus :sn-dub] > room 0.3 > size 0.8 > delay 0.25 > d1
 
 # chords and scales, on patterns; a chord is [root quality]
 n [0 2 4] > scale :c :minor > s :pluck > d1
-chord {alt [:c :maj7] [:d :m7] [:g :7]} > voicing > s :piano > d1
+chord {alt [:c :maj7] [:d :m7] [:g :dom7]} > voicing > s :piano > d1
+# Decided (2026-09-25): chord qualities are letter-first keywords (:maj7 :m7 :dom7 :sus4), never :7
 arp {chord [:c :m7]} :up > s :piano > d1
 
 # sound parameters available on any pattern:
@@ -205,7 +223,7 @@ d1:
 		> gain [1 0.8 0.6]
 		> pan sine
 		> speed {alt 1 2}
-		> lpf {range 200 2000 sine}
+		> lpf {range sine 200 2000}
 
 # combining patterns
 stack [{s [:bd :bd :bd :bd]} {s [nil :sd]} {s {repeat :hh 8}}]
@@ -216,7 +234,7 @@ off {note [:c :e :g]} 0.25 {p -> add p 7}
 jux {s [:bd :sd]} rev              # apply to one stereo side
 
 # structure and probability
-struct {s :bd} [true false true true]
+grid {s :bd} [true false true true]
 degrade-by pat 0.3
 sometimes-by pat 0.3 {p -> fast p 2}
 iter pat 4
@@ -239,7 +257,7 @@ note [:c :e :g :b]
 n [0 2 4 {alt 6 7}]
 	> scale :c :minor
 	> s :sawtooth
-chord {alt [:c :maj7] [:d :m7] [:g :7]}
+chord {alt [:c :maj7] [:d :m7] [:g :dom7]}
 	> voicing
 	> s :piano
 arp {chord [:c :m7]} :up
@@ -375,6 +393,6 @@ All are pattern controls.
 
 | Area | Functions |
 |------|-----------|
-| patterns (Tidal/Strudel names) | `s`/`sound`, `n`, `note`, `gain`, `pan`, `speed`, `lpf`, `hpf`, `room`, `size`, `delay`, `fast`, `slow`, `rev`, `every`, `whenmod`, `sometimes`, `rarely`, `often`, `alt`, `maybe`, `euclid`, `hold`, `repeat`, `choose`, `stack`, `cat`, `fastcat`, `superimpose`, `off`, `jux`, `iter`, `chop`, `striate`, `slice`, `splice`, `begin`, `end`, `loop-at`, `fit`, `cut`, `ply`, `chunk`, `hurry`, `segment`, `range`, `scale`, `chord`, `voicing`, `arp`, and Tidal's `struct` (rename pending, see review) |
+| patterns (Tidal/Strudel names) | `s`/`sound`, `n`, `note`, `gain`, `pan`, `speed`, `lpf`, `hpf`, `room`, `size`, `delay`, `fast`, `slow`, `rev`, `every`, `whenmod`, `sometimes`, `rarely`, `often`, `alt`, `maybe`, `euclid`, `hold`, `repeat`, `choose`, `stack`, `cat`, `fastcat`, `superimpose`, `off`, `jux`, `iter`, `chop`, `striate`, `slice`, `splice`, `begin`, `end`, `loop-at`, `fit`, `cut`, `ply`, `chunk`, `hurry`, `segment`, `range`, `scale`, `chord`, `voicing`, `arp`, `grid` (Tidal's `struct`, renamed because `struct` declares a struct; Decided 2026-09-25) |
 | signals | `sine`, `saw`, `tri`, `square`, `rand`, `irand`, `perlin`, `time`, `beat`, `phase`, `cycle`, `fft`, `amp`, `cc` (MIDI controller, 0..1), `midi-notes` (note input as a pattern), `lag`, `map-range` |
 | sound (SuperCollider names) | `inst`, `look` (a visual keyed to a sound), `sin-osc`, `saw`, `pulse`, `tri`, `white-noise`, `lpf`, `hpf`, `bpf`, `delay`, `comb`, `env-perc`, `env-adsr`, `line`, `midi`, `osc` ; synthesis: `sampler`, `analog`, `fm`, `pd`, `additive`, `wavetable`, `granular`, ugens `vco`, `sub-osc`, `ladder`, `svf`, `fm-op`, `fm-mod`, `phase-distortion`, `sample-play`, `env-perc`, `env-adsr`; buses `bus`, `master`; effects: see section 5 |

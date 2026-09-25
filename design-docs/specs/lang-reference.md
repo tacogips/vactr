@@ -404,7 +404,7 @@ v :amp                           # => 1.0; same access as a dict
 v :nope                          # => error: not a field of voice (closed)
 put v amp: 0.5                  # => a voice; an unknown key is an error
 match v:
-	voice [note: p] -> note p > s :piano > once   # struct matches dict patterns
+	voice [note: p] -> s :piano > note p > once   # struct matches dict patterns
 	voice [amp: a pan: p] -> [a p]
 # An enum variant IS a struct tagged with the enum name:
 #   enum shape:                ==   struct circle: r     (tag shape)
@@ -583,7 +583,7 @@ match v:
 # multi-line bodies
 match msg:
 	hit num vel ->:
-		note num > gain vel > s :piano > once
+		s :piano > note num > gain vel > once
 	halt ->:
 		hush
 
@@ -780,7 +780,7 @@ upd base 62                                  # line and d1's pattern update;
 import github.com/someone/vactrol-pads                  # qualified: pads.warm
 import github.com/someone/vactrol-pads as pd            # alias
 import github.com/someone/vactrol-pads open             # names unqualified
-note [:c3] > s pads.warm > d1
+s pads.warm > note [:c3] > d1
 # qualified name = identifier "." identifier; the reader accepts it only
 # after an import bound the prefix. Unqualified opening is for the live
 # set; the LSP warns on a collision with the prelude or another package.

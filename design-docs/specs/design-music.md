@@ -113,6 +113,12 @@ s :bd > n [0 3] > d1             # sample index; the list gives the structure
 let my-pack load ./soundpack/sound-pack.vact      # dict: [bd: ... sd: ...]
 let sound-kit put default-sound-kit my-pack       # override :bd, keep the rest
 let sound-kit put default-sound-kit [bd: {sample ./bd/909.wav}]   # one key
+# Decided (author, 2026-09-25): choosing a kit per call is the named argument
+# `kit:` (default: the late-bound `sound-kit`); a keyword names a sound in that
+# kit, any other argument is a sound VALUE used as is. No `s-kit`, no options dict.
+s [:bd :sd] kit: tr909 > d1                       # (d1 (s [:bd :sd] [:kit tr909]))
+let kick sample ./kick.wav
+s kick > d1                                       # a bound sound value
 # sound-pack.vact (its last expression is the pack):
 # [bd: [sample ./bd/1.wav sample ./bd/2.wav]   # `n 1` selects 2.wav
 #  sd: sample ./sd.wav
@@ -304,7 +310,7 @@ named parameters, so a performer can type `s :analog` and refine later.
 inst drum: sampler bank: :bd-haus begin: 0 end: 1 loop: false:
 	sample-play bank n: n rate: {pitch-to-rate note} begin: begin end: end loop: loop
 		> * {env-perc attack release}
-s [:bd-haus :sn-dub] > n [0 3] > s :drum > d1     # or the template directly:
+s :drum > bank [:bd-haus :sn-dub] > n [0 3] > d1  # or the template directly:
 s [:bd-haus :sn-dub] > d1                          # every sample IS a sampler
 
 # ---- analog modeling ----------------------------------------------------
@@ -316,7 +322,7 @@ inst analog wave: :saw cutoff: float = 1200 res: float = 0.3 unison: int = 1 det
 		> ladder cutoff res
 		> * {env-adsr attack decay sustain release}
 		> * amp
-note [:e2 :g2] > s :analog > cutoff {range sine 400 2000} > d1
+s :analog > note [:e2 :g2] > cutoff {range sine 400 2000} > d1
 
 # ---- digital: FM, phase distortion, additive ----------------------------
 # operators with ratio and index, wired by an algorithm number or an
@@ -335,7 +341,7 @@ inst wt table: :basic-shapes position: float = 0:
 	wavetable table freq position: position
 		> svf lowpass cutoff res
 		> * {env-adsr 0.005 0.3 0.6 0.5}
-note [:c3 :e3] > s :wt > position {range sine 0 1} > d1
+s :wt > note [:c3 :e3] > position {range sine 0 1} > d1
 ```
 
 Templates shipped in the prelude: `sampler`, `analog`, `fm`, `pd`,
@@ -389,7 +395,7 @@ inst cloud source: :pad-loop:    # granular instrument template
 	granular source size: 0.08 density: 24 position: {range sine 0 1} spray: 0.05
 		pitch: 0 pitch-spray: 0.02 envelope: :hann reverse: 0.1 freeze: false
 		> * {env-adsr 0.2 0.5 0.8 1.5}
-note [:c3 :g3] > s :cloud > position {range perlin 0 1} > d1
+s :cloud > note [:c3 :g3] > position {range perlin 0 1} > d1
 
 bus :texture:                    # granular effect on a bus
 	granulate size: 0.05 density: 40 spray: 0.2 pitch-spray: 0.1 freeze: {alt false true}

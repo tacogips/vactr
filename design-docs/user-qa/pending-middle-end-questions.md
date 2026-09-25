@@ -7,9 +7,11 @@ the question is answered. Where a behavior needs pinning, a fixture in
 `tests/fixtures/spec/manifest.toml` fixes it, so an answer shows up as a
 visible test change. None of them blocks issue #2.
 
-Already decided for issue #2, so not asked here: strict no-shadowing
-(design 20 Q1), `grid` (Q3), `gain` and `amp` (Q4), and letter-first
-chord qualities.
+Already decided for issue #2, so not asked here: the scope model
+(design 20 Q1; the strict rule first recorded here was superseded the
+same day, see Answers), `grid` (Q3), `gain` and `amp` (Q4), and
+letter-first chord qualities. M1-M3 are answered below; M4-M6 are open
+and follow their recommendations.
 
 ## M1. Prelude overloading on the subject (design 20 Q2, author question)
 
@@ -52,6 +54,45 @@ would be `shadowing`.
   parameters as control names rather than bindings.
 - Issue #2 is not affected. Blocks that use `inst` are `deferred` to
   TASK-008, and their check diagnostics are not pinned.
+
+## M4. A single sound with no structure-giving step (SOUND FIRST)
+
+design-music.md says `s :pluck` has no structure until a list-valued
+step gives it one. It does not say what `s :crash > once` or
+`s :break > begin 0.25 > end 0.5 > d1` play, since no step gives
+structure there.
+
+- Recommendation (followed, design 10.1): an unstructured sound that
+  reaches a sink, `once`, or an operator such as `fast` or `every`
+  plays one event per cycle spanning the cycle (Tidal's `pure`).
+- Alternative: a checker diagnostic ("no structure; add a step list").
+  That would reject several spec examples.
+
+## M5. `#` inside a url literal
+
+lang-reference.md says a url runs "up to whitespace", and `#` starts a
+comment anywhere outside a string.
+
+- Recommendation (followed, design 6.5.8): `#` ends a url and starts a
+  comment, so url fragments are not supported in v1. Loading a file has
+  no use for a fragment. Closing brackets `}` and `]` also end a url, so
+  `{load https://x.org/p.vact}` reads as expected.
+- Alternative: keep `#` inside a url and require whitespace before a
+  comment that follows one.
+
+## M6. Two `let sound-kit` lines in one design-music block
+
+design-music.md section 2 shows two alternative overrides one after the
+other:
+`let sound-kit put default-sound-kit my-pack` and
+`let sound-kit put default-sound-kit [bd: {sample ./bd/909.wav}]`.
+Read as one document, the second line is `rebinding` (same scope).
+
+- Recommendation: mark the second line as an alternative in the spec
+  (for example, comment it out with "# or:"). Until answered, the block
+  is `deferred` to TASK-008 (it defines an `inst`), so no fixture pins
+  the `rebinding`; non-verbatim cases check each line on its own
+  (design 7.1.7).
 
 ## Answers (author via architect, 2026-09-25)
 

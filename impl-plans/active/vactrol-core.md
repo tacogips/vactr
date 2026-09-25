@@ -1001,4 +1001,5 @@ Rev 15: ASTRA-017 — every unsuccessful evaluation (failed-deref, dirty-read or
 - **Previous**: none (first plan of the project)
 - **Next**: Frozen-mode codegen and Swift/UniFFI shell (future plans, out of scope here); TASK-010 may split into `vactrol-editor.md` when work starts if it approaches size limits
 - **Depends On**: none
-- **Front-end sub-plans (TASK-001..003)**: vactrol-frontend-value.md (FE-VALUE), vactrol-frontend-reader.md (FE-READER), vactrol-frontend-expander.md (FE-EXPAND), vactrol-frontend-finalize.md (FE-FINAL), all in impl-plans/active/
+- **Front-end sub-plans (TASK-001..003)**: vactrol-frontend-value.md (FE-VALUE), vactrol-frontend-reader.md (FE-READER), vactrol-frontend-expander.md (FE-EXPAND), vactrol-frontend-finalize.md (FE-FINAL), archived in impl-plans/completed/
+- **Middle-end sub-plans (TASK-004..006, issue #2)**: vactrol-middle-{masks,frontend,check,vm,pattern,reactive,integrate,finalize}.md in impl-plans/active/, dispatched by me-middle-20260925-s175-dispatch.json (waves: MASKS -> FRONTEND -> CHECK/VM/PATTERN -> REACTIVE -> INTEGRATE -> FINAL)

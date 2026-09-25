@@ -80,7 +80,7 @@ doc = "design-music.md"
 ordinal = 2
 section = 2
 reader = "diagnostics"
-reader_diags = ["bad-number@32", "stray-char@30", "stray-char@32"]
+reader_diags = ["bad-number@32", "stray-char@30", "stray-char@32", "stray-char@37"]
 expand = "clean"
 expand_diags = []
 eval = "unclassified"
@@ -732,13 +732,13 @@ file = "file"
 verbatim = false
 source = '''
 import github.com/someone/vactrol-pads
-note [:c3] > s pads.warm > d1'''
+s pads.warm > note [:c3] > d1'''
 read = '''
 (#import "github.com/someone/vactrol-pads")
-(d1 (s (note [:c3]) pads.warm))'''
+(d1 (note (s pads.warm) [:c3]))'''
 expand = '''
 (#import "github.com/someone/vactrol-pads")
-(d1 (s (note [:c3]) pads.warm))'''
+(d1 (note (s pads.warm) [:c3]))'''
 diags = []
 note = "Import-then-use in one fresh document (5.7 two-phase frontend)."
 
@@ -749,13 +749,13 @@ file = "file"
 verbatim = false
 source = '''
 import github.com/someone/vactrol-pads as pd
-note [:c3] > s pd.warm > d1'''
+s pd.warm > note [:c3] > d1'''
 read = '''
 (#import "github.com/someone/vactrol-pads" as pd)
-(d1 (s (note [:c3]) pd.warm))'''
+(d1 (note (s pd.warm) [:c3]))'''
 expand = '''
 (#import "github.com/someone/vactrol-pads" as pd)
-(d1 (s (note [:c3]) pd.warm))'''
+(d1 (note (s pd.warm) [:c3]))'''
 diags = []
 
 [[case]]
@@ -763,7 +763,7 @@ id = "unbound-qualifier"
 doc = "lang-reference.md"
 file = "file"
 verbatim = true
-source = 'note [:c3] > s pads.warm > d1'
+source = 's pads.warm > note [:c3] > d1'
 read = '(#error)'
 diags = ["unbound-qualifier"]
 note = "Read with no import before it: the qualifier is unbound."

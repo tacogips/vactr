@@ -44,6 +44,15 @@ Large features are split into multiple related plans with cross-references.
 | [vactrol-frontend-reader.md](completed/vactrol-frontend-reader.md) | Completed (FE-READER, TASK-002, wave 2; archived 2026-09-25) | design-docs/specs/design-implementation.md 5.7, 6.1-6.3, 6.5.4, 6.5.6 | 2026-09-25 |
 | [vactrol-frontend-expander.md](completed/vactrol-frontend-expander.md) | Completed (FE-EXPAND, TASK-003, wave 3; archived 2026-09-25) | design-docs/specs/design-implementation.md 6.4, 6.5.5, 6.5.6 | 2026-09-25 |
 | [vactrol-frontend-finalize.md](completed/vactrol-frontend-finalize.md) | Completed (FE-FINAL, serial reconciliation, wave 4; archived 2026-09-25) | design-docs/specs/design-implementation.md 6.5.7 | 2026-09-25 |
+| [vactrol-middle-masks.md](active/vactrol-middle-masks.md) | Ready (ME-MASKS, issue #2, wave 1) | design-implementation.md 5.5, 7, 7.1.3, 7.1.6 | 2026-09-25 |
+| [vactrol-middle-frontend.md](active/vactrol-middle-frontend.md) | Ready (ME-FRONTEND, wave 2) | design-implementation.md 6.5.8 | 2026-09-25 |
+| [vactrol-middle-check.md](active/vactrol-middle-check.md) | Ready (ME-CHECK, TASK-004, wave 3) | design-implementation.md 5.6, 7, 7.1.4 | 2026-09-25 |
+| [vactrol-middle-vm.md](active/vactrol-middle-vm.md) | Ready (ME-VM, TASK-005, wave 3) | design-implementation.md 5.5-5.7, 8, 13 | 2026-09-25 |
+| [vactrol-middle-pattern.md](active/vactrol-middle-pattern.md) | Ready (ME-PATTERN, TASK-006, wave 3) | design-implementation.md 9, 10, 11.1, 11.7 | 2026-09-25 |
+| [vactrol-middle-reactive.md](active/vactrol-middle-reactive.md) | Ready (ME-REACTIVE, TASK-005, wave 4) | design-implementation.md 5.6, 7.1.3 | 2026-09-25 |
+| [vactrol-middle-integrate.md](active/vactrol-middle-integrate.md) | Ready (ME-INTEGRATE, TASK-004..006, wave 5) | design-implementation.md 7.1.1, 7.1.3, 7.1.7 | 2026-09-25 |
+| [vactrol-middle-finalize.md](active/vactrol-middle-finalize.md) | Ready (ME-FINAL, serial reconciliation, wave 6) | design-implementation.md 6.5.7, 7.1.7 | 2026-09-25 |
+| [me-middle-20260925-s175-dispatch.json](active/me-middle-20260925-s175-dispatch.json) | Dispatch manifest for the eight ME plans (issue #2) | - | 2026-09-25 |
 
 ## Completed Plans
 

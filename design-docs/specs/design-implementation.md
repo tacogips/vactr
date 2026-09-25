@@ -131,11 +131,13 @@ src/
              num.rs access.rs eq.rs print.rs              # 6.5.3 (TASK-001)
   reader/    lexer.rs layout.rs sexpr.rs span.rs          # section 6
              node.rs line.rs import.rs                    # 6.5.4 (TASK-002)
+             pathlit.rs                                   # 6.5.8 (issue #2)
   expand/    expander.rs sugar.rs kernel.rs               # section 6.4, 6.5.5
   types/     ty.rs infer.rs diag.rs manifest.rs           # section 7
              masks.rs natives.rs deps.rs check.rs         # 7.1 (TASK-004)
   ns/        namespace.rs tweak.rs                        # section 5.6
              stage.rs depgraph.rs journal.rs evaluator.rs # 7.1 (TASK-005)
+             load.rs                                      # 7.1.3 (issue #2)
   compile/   compiler.rs proto.rs                         # section 8
   vm/        ops.rs frame.rs vm.rs fail.rs natives/       # section 8, 7.1
   pattern/   pat.rs step.rs query.rs combinators/ signal.rs eval.rs  # section 10, 7.1
@@ -430,8 +432,9 @@ Late-binding rule (implements `lang-reference.md` section 4):
   the `let` line replaces the slot for future evaluations (live
   redefinition), which is neither mutation nor shadowing.
 - Locals live in VM frames; `let` locals are single-assignment, `var`
-  locals are frame slots `upd` may rewrite. No shadowing in any
-  direction is a checker error; at the top level in Live mode,
+  locals are frame slots `upd` may rewrite. Binding a name twice in ONE
+  scope is a checker error; a child scope may shadow a parent binding
+  (scope model below, 20 Q1 Decided). At the top level in Live mode,
   re-evaluating a definition is always redefinition, never an error.
 
 `version` increments on every write; the editor and controller-binding
@@ -887,16 +890,41 @@ binding (section 13):
   semantics: an eligible rebuild does exactly what re-evaluating that
   line by hand does — now for EVERY eager upstream change, `var`
   updates included: `var root 60`, `let raised + root 7`,
-  `note [raised] > s :pluck > d1`, then `upd root 62` recomputes
+  `s :pluck > note [raised] > d1`, then `upd root 62` recomputes
   `raised` (eager edge on `root`), rebuilds the pattern form that
   eagerly read `raised`, re-binds `d1` at the boundary, and updates
   the display batch — nothing else recomputes.
 
-**Shadowing baseline.** Under the current decisions there is ONE global
-scope that includes the prelude and no shadowing in any direction, so a
-user top-level definition of a prelude name is a checker error. The
-prelude-as-parent-scope relaxation is a PROPOSED AMENDMENT, not the
-implemented default — see section 20 Q1.
+**Scope model (20 Q1, Decided 2026-09-25; lang-reference section 4).**
+Scopes form the chain `prelude -> session -> fn/block`.
+- The PRELUDE is a read-only table of natives and prelude values
+  (including `default-sound-kit` and `sound-kit`, 7.1.4). No form can
+  write it: a session `let`/`var`/`fn` of a prelude name creates a
+  SESSION binding that shadows it, and `upd` of a prelude name is
+  `upd-immutable`.
+- The SESSION scope holds the top-level bindings of the editor buffer
+  or REPL. A file read by `load` gets its OWN fresh session-level scope
+  whose parent is the prelude, never the caller's session (7.1.3).
+- A child scope is opened by a `fn` (its parameters and the top-level
+  statements of its body share one scope), a lambda (parameters and
+  body), a `{..}` or indented block, and a `match` clause (its pattern
+  bindings and guard). Expander output keeps these boundaries: `if`
+  becomes `match`, `for` becomes `map` over a lambda.
+- Name resolution walks the chain innermost first; for the session,
+  open imports sit between the session and the prelude (5.7).
+  Resolution happens at compile time and fixes the slot a form reads:
+  a later session binding of a prelude name does not retarget forms
+  compiled before it (it is a new binding, not a write to the prelude
+  slot). The one dynamic lookup is `sound-kit`, which `s` reads by name
+  at every query (7.1.4).
+- Diagnostics (checker only, 7.1.4): a second binding of a name in the
+  same scope is `rebinding` (error); a binding that shadows a prelude
+  name is `shadows-prelude` (hint); a binding that shadows a user
+  binding of an enclosing scope is `shadowing` (warning). In Live mode,
+  re-evaluating a top-level definition is redefinition, never
+  `rebinding`, so the runtime `Namespace` never rejects a session write
+  for this reason; `rebinding` is found only by checking a whole
+  document or spec block.
 
 ### 5.7 Packages, imports, and qualified names (Decided scope)
 
@@ -1036,9 +1064,10 @@ pub struct ImportBinding { prefix: SymId, pkg: PackageId, open: bool }
   namespace > open imports (most recent import wins; any collision
   among opens or with the prelude is an LSP warning per the spec,
   and the qualified spelling always remains available) > prelude.
-  The strict no-shadowing rule (5.6, 20 Q1) governs the session
-  namespace itself and is unchanged; open-import precedence is the
-  spec's own collision-warning model, not shadowing inside a scope.
+  The per-scope rule (5.6 scope model, 20 Q1) governs the session
+  namespace itself; open-import precedence is the spec's own
+  collision-warning model (`import-collision`), not shadowing inside a
+  scope.
 - **Checker/LSP.** `HostManifest` gains the per-package keyword sets
   from assets; qualified names type through the package's `PkgNs`;
   completion offers prefixes, qualified names, and open names.
@@ -1343,6 +1372,10 @@ byte offsets into the source.
   `bad-identifier`.
 - **Stray characters.** `( )` is `paren-form`. Any other character
   outside the token set (`! ; , @ $ ~`, non-ASCII) is `stray-char`.
+  A `~` that starts a `~/` path is a path, not a stray character
+  (6.5.8).
+- **Paths and urls.** Unquoted path and url literals are lexed before
+  the number, operator and name rules (6.5.8).
 - **Comments.** `#` outside a string starts a comment that runs to the
   end of the line.
 - **Strings.** A string stays on one line; an unfinished one is
@@ -1704,20 +1737,107 @@ A no-panic test reads every line-boundary prefix of every block.
 - Rollback is `git revert` of the task commits. There is nothing to
   migrate.
 
+#### 6.5.8 Path and url literals (front-end amendment, issue #2)
+
+Implements lang-reference section 3 "path and url literals" (Decided
+2026-09-25). It is the FRONTEND wave of 7.1.7 and lands before the
+checker types these literals.
+
+**Lexing** (`src/reader/pathlit.rs`, called from `lexer.rs`, so
+`lexer.rs` stays under 800 lines). A path or url token can start only
+where a keyword can: at the start of a line, or right after whitespace,
+`{` or `[`. It is tried before the number, operator and name rules.
+- **Path.** The token starts with one of the prefixes `./`, `../`, `~/`
+  or `/` directly followed by a path character, and runs while the next
+  character is a path character `[A-Za-z0-9._~-]` or `/`. It ends at any
+  other character; whitespace, `}`, `]`, `#` and `:` are the usual
+  ends. The whole token must match
+  `PREFIX SEG ("/" SEG)*`, where `SEG` is one or more path characters.
+  An empty segment (`.//x`), a trailing `/` (`./dir/`), or a bare prefix
+  (`./`, `~/`) is `bad-path`. `.` and `..` segments are allowed and are
+  kept as written; normalization is the host's job.
+- A `/` followed by whitespace, or at the end of the line, stays the
+  division operator, so `/ a b` is unchanged. A `/` inside a number is
+  unchanged too: `1/4` is a ratio, since it does not start at a token
+  boundary after a digit. `..` directly followed by `/` at a token start
+  is a path, never a range: `a..b` and `0..8` start with a digit or
+  name.
+- **Url.** The token is `SCHEME "://" REST`. `SCHEME` is
+  `[a-z][a-z0-9+.-]*`. `REST` is one or more characters from printable
+  ASCII other than whitespace, `"`, `#`, `{`, `}`, `[`, `]`, `\`, `<`,
+  `>`, `|`, `^` and backtick. So a url ends at whitespace, at a closing
+  bracket, or at a comment. Url fragments (`#frag`) are not part of a
+  url in v1: a `#` ends the url and starts a comment. An empty `REST`
+  is `bad-url`. Without the `://` the token is lexed as before (a name
+  followed by a colon), so no current program changes meaning.
+- A path or url is not a pair-key token: in `./x: y` the colon follows
+  the colon-class rules of 6.5.4 as if it came after a string that is
+  not a key, so it is a block opener at the end of the line and
+  otherwise `misplaced-colon`.
+- A path token that contains a character outside the path set before
+  its end (for example `./a!b`) ends at that character, which is then
+  lexed on its own (`!` is `stray-char`). There is no other path
+  diagnostic.
+
+**Nodes and printing.** `Atom` gains `Path(Rc<str>)` and `Url(Rc<str>)`,
+holding the literal text as written. The canonical printer (6.5.4)
+prints both as written, so `./soundpack/bd/1.wav` round-trips. The
+expander passes both through unchanged; they are not names, so they are
+never `reserved-word` and never captured.
+
+**Values** (`src/value/value.rs`, TASK-001 files).
+- `Value::Path(Rc<PathVal>)` with `PathVal { text: Rc<str>, file:
+  Option<FileId> }`. `file` is the `FileId` of the literal's span for a
+  relative path (`./`, `../`), and `None` for `/` and `~/` paths. This
+  is how "relative to the containing file" is carried: the host maps a
+  `FileId` to a location when it performs I/O (TASK-007/008). The
+  console and the session buffer have ids too (`FileId::CONSOLE` and
+  the buffer's id), and the host resolves those against the project
+  root. No stage in this issue resolves, normalizes or expands a path.
+- `Value::Url(Rc<str>)`, holding the text as written.
+- `Value::Sound(Rc<Sound>)` with `enum Sound { Builtin(KwId),
+  Sample(PathVal), MidiOut(u8) }`: a builtin host sound named by
+  keyword, a sample file named by path (no I/O in this issue), or a
+  MIDI-out channel (`{midi 1}`, design-music "sources and
+  destinations"). TASK-008 adds the `inst` template variant. A sample
+  BANK is an ordinary list of sounds (7.1.4).
+- Equality (`eq.rs`): `Path` equals a `Path` with the same text and the
+  same `file`; `Url` compares by text; `Sound` compares structurally.
+  None of them is a dict key (`key.rs` is unchanged): using one as a key
+  is `Failure(Type)`, as for any non-key value.
+- Printing (`print.rs`): a path and a url print as their text. A sound
+  prints as `(sound :bd)`, `(sound ./bd/1.wav)` or `(sound midi 1)`.
+- Accessors treat all three as scalars: `len` and `index` are
+  `Failure(Type)`, and they are truthy.
+
+**Tests.** Lexer tests cover the four path prefixes, a url, each
+terminator (whitespace, `}`, `]`, `#`, `:`), `bad-path` for the three
+malformed shapes, `bad-url`, and the unchanged readings of `/ a b`,
+`1/4`, `-1/4`, `0..8`, `a..b`, `amp: 0.5`, `~` alone (`stray-char`) and
+a url-looking `name:x` (`misplaced-colon`). The three spec blocks now
+marked PENDING in the manifest drop the PENDING text:
+lang-reference block 3 and design-music block 2 read clean, and
+lang-reference block 5 keeps only the `stray-char` of the `...`
+placeholder in `fn pluck ...` (`...` is not a path: its third character
+is not `/`).
+
 ## 7. Static Checker and Inference
 
 HM-lite with let-polymorphism (decided): unification over
 
 ```
 int int64 float float64 ratio bool string keyword nil  ?T  [T]  [K: V]
-fn T… -> V   pattern T   signal   any   + named struct/enum types
+fn T… -> V   pattern T   signal   any   path   url   sound
++ named struct/enum types
 ```
 
 plus numeric-literal kind variables (a literal adapts to context;
-default int/float), keyword literal typing against the enum or host set
-expected at that position (`manifest.rs` holds the host's sample,
-synth, and control sets so `:bd-haus` completes and `:not-a-sample` is
-a diagnostic), `?T` optional flow (`?` supplies the default; using a
+default int/float), keyword literal typing against the enum or sound
+kit expected at that position (`manifest.rs` holds the host's builtin
+sound, synth, and control sets, from which the prelude's
+`default-sound-kit` is built, so `:bd-haus` completes and
+`:not-a-sample` is a diagnostic; 7.1.4 gives the `sound-kit` rule),
+`?T` optional flow (`?` supplies the default; using a
 `?T` as `T` in arithmetic/calls is a diagnostic; accessors nil-pun),
 and thunk parameter typing (section 5.5). `any` must be narrowed by a
 match/if pattern before use.
@@ -1735,8 +1855,8 @@ and runs on the dynamically checked VM (a fault at runtime is then a
 failure with origin). Frozen mode (later) turns the same list into
 compile errors. Static diagnostics also cover: literal `/ x 0`,
 undefined names, unknown sample/synth keywords, `match` missing an enum
-variant, annotation mismatches, duplicate dict-literal keys, shadowing
-violations, effectful calls inside pattern arguments (purity warning,
+variant, annotation mismatches, duplicate dict-literal keys, same-scope
+rebinding and shadowing (5.6 scope model), effectful calls inside pattern arguments (purity warning,
 section 10.4), and unbounded-source iteration where provable.
 
 The checker is one crate module consumed identically by the compiler,
@@ -1748,8 +1868,14 @@ checker" is literal reuse, not a port.
 This section pins the choices that sections 5.5-5.6, 7-10, 11.1 and
 11.7 leave open for issue #2 (checker, namespace/compiler/VM, pattern
 engine). It follows the shape of 6.5 and changes no Decided behavior.
-TASK-007..010 stay out of scope: the slot table, the two-horizon
-scheduler, layer-2 dedup, capability hosts, DSP and package loading.
+It also carries the 2026-09-25 amendments bound to issue #2: the
+parent-scope model (5.6), path and url literals (6.5.8), `load` and
+`sample`, the sound-kit prelude bindings, SOUND FIRST with the
+first-structure rule (10.1), and `midi-notes` as a step after `s`
+(11.7). TASK-007..010 stay out of scope: the slot table, the
+two-horizon scheduler, layer-2 dedup, capability hosts (beyond the
+`NoopHost` source-loader stub of 7.1.3), host file and sample I/O,
+DSP and package loading.
 
 #### 7.1.1 Pipeline and gating
 
@@ -1775,10 +1901,12 @@ is recorded in its evidence. Tests go in `tests/` submodules, as in 6.5.
 
 | Module | Files (owner wave, 7.1.7) |
 |--------|---------------------------|
-| `types/` | `ty.rs`, `masks.rs`, `natives.rs` (MASKS); `infer.rs`, `unify.rs`, `check.rs`, `manifest.rs`, `deps.rs` (CHECK) |
+| `reader/` | `pathlit.rs`, edits to `lexer.rs`, `node.rs`, `sexpr.rs` (FRONTEND) |
+| `value/` | edits to `value.rs`, `eq.rs`, `print.rs`, `access.rs` for `Path`, `Url`, `Sound` (FRONTEND) |
+| `types/` | `ty.rs`, `masks.rs`, `natives.rs`, and every 7.1.6 code in `diag.rs` (MASKS); `infer.rs`, `unify.rs`, `check.rs`, `scope.rs` (scope chain and the 5.6 diagnostics), `manifest.rs`, `deps.rs` (CHECK) |
 | `compile/` | `compiler.rs`, `matchc.rs` (match to pattern ops), `proto.rs`, `sites.rs` (tweak sites and tiers) (VM) |
-| `vm/` | `ops.rs`, `frame.rs`, `vm.rs`, `call.rs` (boundary forcing and `Forward` chase), `natives/{num,list,dict,value,console,effects}.rs` (VM); `query_vm.rs`, `natives/{pattern,signal,tex,music}.rs` (INTEGRATE) |
-| `ns/` | `namespace.rs`, `tweak.rs`, `pkg.rs` (`PkgNs`, `ImportBinding`), `stage.rs` (VM); `depgraph.rs`, `journal.rs`, `evaluator.rs` (REACTIVE) |
+| `vm/` | `ops.rs`, `frame.rs`, `vm.rs`, `call.rs` (boundary forcing and `Forward` chase), `natives/{num,list,dict,value,console,effects}.rs` (VM); `query_vm.rs`, `natives/{pattern,signal,tex,music,sound}.rs` (INTEGRATE; `sound.rs` holds `s`, `sample`, `midi`) |
+| `ns/` | `namespace.rs` (prelude, session and child scopes), `tweak.rs`, `pkg.rs` (`PkgNs`, `ImportBinding`), `stage.rs` (VM); `depgraph.rs`, `journal.rs`, `evaluator.rs`, `load.rs` (`SourceLoader`, `NoopHost`, the `load` native) (REACTIVE) |
 | `pattern/` | `pat.rs`, `step.rs`, `query.rs`, `occ.rs`, `rng.rs`, `signal.rs`, `eval.rs`, `combinators/{time,structure,random,region,music,control,input}.rs` (PATTERN) |
 | `clock/` | `tempo.rs`, `clock.rs` (`Tempo`, `Clock`, `ClockSource`, `:midi` anchor math) (PATTERN) |
 | `tex/` | `texnode.rs`, `shader.rs` (snippets and `compile_tex`), `uniforms.rs` (PATTERN) |
@@ -1802,12 +1930,16 @@ in `src/sched/`. `sched/` stays TASK-007's.
   same arity and mask, and that every entry has an implementation. In
   scope: the lang-reference section 5 core prelude, the design-music
   pattern, control and signal vocabulary, `d1`..`d9`/`slot`, `once`,
-  `at`, `hush`, `stop`, `use-bpm`, `use-cycle`, `midi-notes`, `cc`, and
-  the design-visual vocabulary. Out of scope and absent from the table,
+  `at`, `hush`, `stop`, `use-bpm`, `use-cycle`, `midi-notes`, `cc`,
+  `s`/`sound` (keyword parameter `kit`), `sample`, `midi`, `load`, the
+  prelude values
+  `default-sound-kit` and `sound-kit`, and the design-visual
+  vocabulary. Out of scope and absent from the table,
   so the checker reports them as `undefined-name`: the synthesis, effect,
   bus and granular vocabulary (TASK-008) and package loading (TASK-009).
 - **Codes.** The MASKS wave adds every `DiagCode` and `FailCode` in
-  7.1.6 in one edit, so CHECK, VM and PATTERN start after it. No other
+  7.1.6 in one edit, including the FRONTEND reader codes, so FRONTEND,
+  CHECK, VM and PATTERN start after it. No other
   wave edits `types/diag.rs` or `vm/fail.rs` while the parallel waves
   run. If a code turns out to be missing, a wave uses the closest listed
   code, records a finding, and the INTEGRATE wave adds the code.
@@ -1816,7 +1948,12 @@ in `src/sched/`. `sched/` stays TASK-007's.
   - `call(f, args) -> Result<Value, Failure>`, for `PParam::Fn`,
     `VParam::Fn` and transform closures;
   - `deref(&VarSlotRef) -> Result<Value, Failure>`, for `Late`;
-  - `take_output() -> Vec<(Origin, Rc<str>)>`, for captured `print`.
+  - `take_output() -> Vec<(Origin, Rc<str>)>`, for captured `print`;
+  - `sound_kit() -> Result<Value, Failure>`, the current value of the
+    SESSION-level `sound-kit`: the session binding when one exists,
+    otherwise the prelude's. A `PatNode::Sound` calls it per query only
+    when its `kit` is `None`, that is, when the `s` call had no `kit:`
+    (7.1.4, 10.1).
 
   The implementation enters Query effect mode with a scope guard on
   every call (10.4). The PATTERN wave tests with a stub. The INTEGRATE
@@ -1844,17 +1981,50 @@ in `src/sched/`. `sched/` stays TASK-007's.
   with diagnostics. A top-level `upd` or a redefinition triggers the
   reactive pass of 5.6, coalesced latest-wins per tick. TASK-009's
   `Session` wraps `Evaluator` and does not re-implement it.
+- **Source loading** (`ns/load.rs`, REACTIVE wave). The one host
+  capability in this issue is `trait SourceLoader { fn read(&mut self,
+  path: &PathVal) -> Result<(FileId, Rc<str>), Failure>; }`. The loader
+  resolves the path (6.5.8) and assigns the `FileId` of the file it
+  returns. `Evaluator` holds a `Box<dyn SourceLoader>`; the default is
+  `NoopHost`, whose `read` is always `Failure(host-unavailable)`.
+  Tests use an in-memory map loader. TASK-007 moves `NoopHost` to
+  `host/noop.rs` and adds the real loaders; it keeps this trait.
+  `load p` runs the returned text through read -> expand -> check ->
+  compile -> run in a fresh scope whose parent is the prelude, and
+  returns the value of its last top-level form (`nil` for an empty
+  file). The loaded file's bindings are not visible to the caller. Any
+  reader or expander error, or a run failure, in the file is
+  `Failure(load-failed)` for the `load` call, carrying the first cause;
+  its check diagnostics are reported with their own spans and do not
+  fail the load (7.1.1). A nested `load` counts as one Rust-level
+  re-entry (7.1.5), so a load cycle ends in `depth-exceeded`. `load`
+  is an effect: inside a query it is `effect-in-query`. `sample` does
+  no I/O here: it returns `Sound::Sample(path)`, and reading the file
+  is TASK-008's `SampleLoader`.
 
 #### 7.1.4 Checker and runtime rules pinned here
 
-- **No shadowing within one scope (20 Q1, Decided 2026-09-25: parent-scope
-  model; the strict single-scope text below is superseded — the prelude is a
-  read-only PARENT of the session namespace and a child scope may shadow).**
-  Original text: There is one global scope,
-  and it includes the prelude. A `let`/`var`/`fn` name, a parameter or a
-  pattern binding that equals a prelude name or a visible binding is
-  `shadowing`. Re-evaluating a top-level definition in Live mode is
-  redefinition, never `shadowing`.
+- **Scopes and shadowing (20 Q1, Decided 2026-09-25).** The checker
+  follows the 5.6 scope model. A binding is a `let`/`var`/`fn` name, a
+  parameter, or a pattern binding in a `match` clause or `let [..]`
+  target.
+  - The same name bound twice in one scope is `rebinding` (error), on
+    the second binding. Checking a document or spec block checks all
+    its top-level forms as one session scope, so
+    `let a 12` then `let a 13` is `rebinding`. `Evaluator::eval_form`
+    of one form never reports it: that is Live redefinition.
+  - A binding whose name resolves in the prelude is `shadows-prelude`
+    (hint), for example `let sound-kit ...` or `let scale 2`.
+  - A binding whose name resolves to a user binding of an enclosing
+    scope is `shadowing` (warning).
+  - `upd` of a name that is not a `var` (a `let`, a `fn`, a parameter,
+    a pattern binding or any prelude name) is `upd-immutable` (error).
+    The VM fails the same `upd` with `Failure(upd-immutable)`.
+  - `inst` header parameters are control names, not bindings (M3), so
+    `amp: float = 0.5` in an `inst` header never gets a scope
+    diagnostic.
+  - Hints are for the LSP. Fixture multisets (7.1.7) list errors and
+    warnings only; unit tests assert the hints.
 - **Definition heads.** The checker and compiler recognize top-level
   `struct NAME:` blocks as definitions (lang-reference section 2).
   `inst` and `look` are recognized as definition heads that own a slot.
@@ -1883,8 +2053,70 @@ in `src/sched/`. `sched/` stays TASK-007's.
 - **`gain` and `amp` (20 Q4, Decided).** `gain` is a pattern control
   native. The `gain` -> `amp` mapping is a control-table row owned by
   TASK-007/008.
-- **Subject overloading (20 Q2, open, M1).** TASK-006 follows the
-  recommendation for a fixed set only:
+- **Sounds and the sound kit (Decided 2026-09-25, design-music.md
+  "sound kits").** The prelude binds `default-sound-kit` and
+  `sound-kit`, both of type `[keyword: sound]` and initially the same
+  dict: one `Sound::Builtin(k)` per keyword `k` of the host manifest's
+  builtin sound set (`manifest.rs`). `sample : fn path -> sound` and
+  `midi : fn int -> sound` (channel 1..16; a literal outside the range
+  is `type-mismatch`, a dynamic one is `Failure(type)`).
+  - A list of sounds is a sample bank. The unifier accepts `[sound]`
+    where `sound` is expected, and only there, so a pack dict such as
+    `[bd: [sample ./bd/1.wav sample ./bd/2.wav] sd: sample ./sd.wav]`
+    types as `[keyword: sound]`. When the resolved sound is a bank,
+    `n i` picks its i-th sound at event time, and an index outside the
+    bank is an event-local `Failure(slice-index)`. For any other sound
+    `n` stays an ordinary control (the host's sample index, TASK-008).
+  - `s` (alias `sound`) takes exactly one positional argument of type
+    `pattern sound`, and one optional named argument `kit:` of type
+    `[keyword: sound]` (Decided 2026-09-25, design-music.md "sound
+    kits"). `s [:bd :sd] kit: tr909` reads as
+    `(s [:bd :sd] [:kit tr909])`; the `kit:` pair is not a positional
+    argument. Any other named argument is `type-mismatch`.
+  - A keyword in a `sound` position (directly, in a step list, or as an
+    argument of a step constructor such as `alt` or `choose`) NAMES a
+    sound in the kit and has type `sound`. Any other argument is a sound
+    VALUE and is used as is, with no kit lookup: `let kick sample
+    ./kick.wav` then `s kick`, or `s {midi 1}`.
+  - Static check: a keyword literal is checked against the key set of
+    `default-sound-kit` plus the names of the `inst` definitions in the
+    checked document (TASK-008 registers them), and a miss is
+    `unknown-keyword`. The check runs only when the call has no `kit:`
+    and `sound-kit` resolves to the prelude at the call site. When
+    `kit:` is given, or the session binds `sound-kit`, the checker
+    cannot know the keys (they may come from `load`), so it skips the
+    check.
+  - At run time `s` stores the keywords and resolves them per query
+    (10.1). The kit is the `kit:` value when the call has one (a
+    `PParam`, so a `var` kit is read per query). Otherwise it is
+    `QueryVm::sound_kit()` (7.1.3), so a new session `sound-kit`
+    binding is heard from the next event on, as the spec requires. A
+    key missing from the kit in use is an event-local
+    `Failure(unknown-sound)`. A local binding named `sound-kit` inside a
+    `fn` does not affect `s`; only `kit:` and the session-level binding
+    do.
+  - `sound-kit` in the prelude is read-only like every prelude name;
+    overriding it is a session `let`, which is `shadows-prelude`
+    (hint). `put` merges kits (6.5.3 dict `put`: later pairs win).
+- **SOUND FIRST (Decided 2026-09-25, design-music.md section 1).** A
+  call to `s`/`sound` with two or more positional (non-pair) arguments
+  is
+  `sound-not-first` (error). That is how `n [0 3] > s :bd` and
+  `note [:c] > s :x` read: the pipe puts the pattern in as the first
+  argument (6.5.4), giving `(s (n [0 3]) :bd)`. The message says that
+  `s` starts the chain and suggests `s :bd > n [0 3]`. `s` given a
+  single non-sound pattern (`s {n [0 3]}`) is an ordinary
+  `type-mismatch`. The runtime rule for structure is 10.1.
+- **`load` and `sample` typing.** `load : fn path -> 'a`, where `'a` is
+  a fresh type variable at each call site. The file's type is not known
+  until the host reads it, so the result unifies with its use (for
+  example `put default-sound-kit my-pack` makes it `[keyword: sound]`)
+  and the VM checks it dynamically. A `url` argument to `load` or
+  `sample` is `type-mismatch` in this issue; loading urls is TASK-009's
+  package proxy. A path literal has type `path` and a url literal has
+  type `url`; neither converts implicitly to or from `string`.
+- **Subject overloading (20 Q2, M1 answered 2026-09-25: follow the
+  recommendation).** TASK-006 implements a fixed set only:
   - `scale`: a pattern subject means scale notes; a texture subject
     means the visual transform.
   - `shape`: a number subject means the visual source; a pattern
@@ -1894,12 +2126,10 @@ in `src/sched/`. `sched/` stays TASK-007's.
   known. Otherwise the VM's native dispatch switches on the runtime tag,
   and a tag outside the group is a `type` failure. User code cannot
   declare overloads.
-- **`range` argument order (M2, open).** Every spec use but one is
-  subject first (`range sine 1 5`), as principle 2 decides.
-  design-music section 3 writes `lpf {range 200 2000 sine}`. The
-  signature is subject first. That line is pinned as a checker
-  `type-mismatch` in the fixtures until the author answers. The spec
-  text is not changed here.
+- **`range` argument order (M2 answered 2026-09-25).** `range` is
+  subject first (`range sine 200 2000`), and design-music section 3
+  already reads `lpf {range sine 200 2000}`. No fixture pins a
+  `type-mismatch` for it.
 
 #### 7.1.5 Resource bounds (no panic on untrusted input)
 
@@ -1925,11 +2155,13 @@ in `src/sched/`. `sched/` stays TASK-007's.
 #### 7.1.6 Diagnostic and failure codes (closed list for this issue)
 
 New `DiagCode`s (kebab-case, as in 6.5). Severity is error unless it
-says (w) for warning:
+says (w) for warning or (h) for hint:
+- Reader (FRONTEND, 6.5.8): `bad-path`, `bad-url`.
 - Types and names: `type-mismatch`, `annotation-mismatch`,
   `optional-as-value`, `any-not-narrowed`, `undefined-name`,
-  `shadowing`, `literal-division-by-zero`, `unknown-keyword`,
-  `missing-variant`, `bare-variant-binding`.
+  `rebinding`, `shadowing` (w), `shadows-prelude` (h),
+  `upd-immutable`, `literal-division-by-zero`, `unknown-keyword`,
+  `missing-variant`, `bare-variant-binding`, `sound-not-first`.
 - Hygiene: `duplicate-key` (w), `import-collision` (w),
   `beyond-capability`, `effect-in-pattern` (w), `unbounded-source` (w).
 - Forcing: `mixed-forcing` (w), `latent-forcing` (w).
@@ -1940,8 +2172,11 @@ says (w) for warning:
 New `FailCode`s: `no-match`, `fuel-exhausted`, `depth-exceeded`,
 `effect-in-query`, `effect-in-rebuild`, `undefined-name`,
 `not-callable`, `arity`, `blocked` (a form reported `blocked-on: X`,
-5.6), `slice-index`, `bad-slice-points` (dynamic points), and
-`no-whole` (a region operator got an event with `whole = None`).
+5.6), `slice-index`, `bad-slice-points` (dynamic points),
+`no-whole` (a region operator got an event with `whole = None`),
+`upd-immutable`, `unknown-sound` (a key missing from the current
+`sound-kit`, event-local), `host-unavailable` (`NoopHost`), and
+`load-failed` (7.1.3).
 
 #### 7.1.7 Waves, fixtures and verification
 
@@ -1950,12 +2185,13 @@ sequencing. Write sets are disjoint; the file owners are in 7.1.2.
 
 | Wave | Content | Depends on |
 |------|---------|------------|
-| MASKS | `types/ty.rs`, `masks.rs`, `natives.rs`; the code lists of 7.1.6 | — |
-| CHECK | the rest of TASK-004 | MASKS |
-| VM | TASK-005 namespace, compiler, VM, core natives, tweak sites, `PkgNs`, `stage.rs` | MASKS |
-| REACTIVE | TASK-005 `DepGraph`, pass journal, `Evaluator`, rebuild and reactive-propagation tests | VM |
-| PATTERN | TASK-006 `pattern/`, `clock/`, `tex/`, with unit and golden tests through the stub `QueryVm` | MASKS (the 7.1.6 codes only) |
-| INTEGRATE | `QueryVm` for `Vm`, domain native wrappers, fixture evaluation stages, `src/lib.rs` crate doc, TASK-006 criteria that need the VM (`PParam::Late`, `PParam::Fn`, the tweaked-probability re-query) | CHECK, REACTIVE, PATTERN |
+| MASKS | `types/ty.rs` (including `path`, `url`, `sound`), `masks.rs`, `natives.rs`; the code lists of 7.1.6 | — |
+| FRONTEND | 6.5.8: path/url lexing, `Atom::Path`/`Url`, `Value::Path`/`Url`/`Sound`, the three PENDING manifest blocks | MASKS (the reader codes) |
+| CHECK | the rest of TASK-004, including the scope diagnostics, sound-kit, SOUND FIRST and `load`/`sample` typing of 7.1.4 | MASKS, FRONTEND |
+| VM | TASK-005 namespace (prelude, session and child scopes), compiler, VM, core natives, tweak sites, `PkgNs`, `stage.rs` | MASKS, FRONTEND |
+| REACTIVE | TASK-005 `DepGraph`, pass journal, `Evaluator`, `load.rs`, rebuild and reactive-propagation tests | VM |
+| PATTERN | TASK-006 `pattern/`, `clock/`, `tex/`, including the first-structure rule and `midi-notes` after `s` (10.1, 11.7), with unit and golden tests through the stub `QueryVm` | MASKS (the 7.1.6 codes), FRONTEND (`Value::Sound`) |
+| INTEGRATE | `QueryVm` for `Vm` (including `sound_kit`), domain native wrappers (`natives/sound.rs`), fixture evaluation stages, `src/lib.rs` crate doc, TASK-006 criteria that need the VM (`PParam::Late`, `PParam::Fn`, the tweaked-probability re-query, a session `sound-kit` heard at the next event, `kit:` resolution and a `var` kit read per query) | CHECK, REACTIVE, PATTERN |
 
 Only PATTERN adds a module to `src/lib.rs` (`pub mod clock;`).
 INTEGRATE edits the crate doc afterwards and mentions the expander (a
@@ -1973,21 +2209,50 @@ is replaced on every block by one of these classes:
 - `deferred`, with `deferred_to = "TASK-00N"`: the block needs a runtime
   outside this issue (DSP instruments, buses, package loading). It is
   checked for the no-panic and no-abort property only, and it is not
-  compiled or run.
+  compiled or run. A block deferred ONLY because it needs host file I/O
+  (`load` or `sample` of a path, TASK-008) also pins `check_diags`, so
+  that `load path` and `sample path` are shown to type-check.
+
+A block or case is checked as one document: all its forms are checked
+together as one session scope (so `rebinding` is found), then run form
+by form. `check_diags` lists errors and warnings, never hints.
 
 Every `# => v` annotation in lang-reference sections 1-5 gets a
 `[[case]]`. The case holds `value` (the canonical print, 6.5.3) or
 `fail` (a `FailCode`), plus `check_diags`, and it is evaluated in a
 fresh `Evaluator`. The annotated negatives (`+ 1 "a"`, `?T` used as
-`T`, rebinding) are cases with their codes. Chord disposition: blocks 2
+`T`, rebinding, `upd` of a `let`) are cases with their codes
+(`rebinding`, `upd-immutable`). Scope, sound-kit and SOUND FIRST
+negatives get non-verbatim cases: `let a 1` twice (`rebinding`), a
+`fn` parameter shadowing a session name (`shadowing`),
+`n [0 3] > s :bd > d1` and `note [:c] > s :x > d1`
+(`sound-not-first`), `s :not-a-sound > d1` (`unknown-keyword`), and
+`s :bd909 kit: [bd: {sample ./bd.wav}] > d1` (checks clean because
+`kit:` skips the static check; the query fails event-locally with
+`unknown-sound`).
+Positive non-verbatim cases pin the sound-kit lines of design-music
+section 2 one at a time: `let sound-kit put
+default-sound-kit [bd: {sample ./bd/909.wav}]` then
+`s :bd > n [0 3] > d1` checks clean (one `shadows-prelude` hint) and
+runs. `kit:` gets two cases:
+`let tr909 [bd909: {sample ./tr909/bd.wav} sd909: {sample ./tr909/sd.wav}]`
+then `s [:bd909 :sd909] kit: tr909 > d1` checks clean (no
+`unknown-keyword`, although neither key is in `default-sound-kit`), runs,
+and its queried events carry `Sound::Sample` of the two tr909 paths;
+`let kick sample ./kick.wav` then `s kick > d1` checks clean and its
+events carry that sample without a kit lookup. That spec block binds `sound-kit` twice (two alternative
+overrides), which is `rebinding` when read as one document; the block
+is `deferred` (TASK-008, it defines an `inst`), so nothing pins that
+yet (question M6 in
+`design-docs/user-qa/pending-middle-end-questions.md`). Chord disposition: blocks 2
 and 3 of design-music.md read clean with `[:g :dom7]`. Case
 `music-chord-seven-conflict` stays as a `verbatim = false` negative
 reader case (`misplaced-colon`), and `src/reader/tests/lexer.rs` keeps
 its `[:g :7]` assertion.
 
 **Verification.** The 6.5.7 evidence rule applies to every wave, with
-`<plan>` being the wave's short name (`masks`, `check`, `vm`,
-`reactive`, `pattern`, `integrate`, `final`). The checks are `build`,
+`<plan>` being the wave's short name (`masks`, `frontend`, `check`,
+`vm`, `reactive`, `pattern`, `integrate`, `final`). The checks are `build`,
 `clippy` (`--all-targets -- -D warnings`), `fmt` (`--check`),
 `nextest`, `test` (a plain `CARGO_TERM_QUIET=true cargo test`),
 `wasm32`, `wasm32-hostwasm` and `linecount`. Rollback is `git revert` of
@@ -2157,9 +2422,10 @@ closure, because the dry run, the editor's step highlighting, and
 controller binding all need to SEE structure:
 
 ```rust
-pub struct Pat { node: PatNode, span: Option<Span> }
+pub struct Pat { node: PatNode, span: Option<Span>, structured: bool }
 pub enum PatNode {
     Steps(Box<[Step]>),                        // one cycle; nested = subdivide
+    Sound { src: PParam, kit: Option<PParam> },  // every `s` call; `kit:` if given (below)
     Signal(Rc<Sig>),
     Fast(Rc<Pat>, PParam), Slow(Rc<Pat>, PParam), Rev(Rc<Pat>),
     Every(PParam, Value /*fn*/, Rc<Pat>), WhenMod(PParam, PParam, Value, Rc<Pat>),
@@ -2176,7 +2442,7 @@ pub enum PatNode {
     Control(KwId, Rc<Pat>, Rc<Pat>),           // gain/lpf/…: value pattern onto subject
     ScaleNotes(KwId, KwId, Rc<Pat>), Chord(…), Voicing(…), Arp(…),
     Segment(Rc<Pat>, PParam), Range(Rc<Pat>, PParam, PParam),
-    MidiNotes { channel: Option<u8> },   // live MIDI note input (11.7): yields NO
+    MidiNotes { subject: Rc<Pat>, channel: Option<u8> },   // `s x > midi-notes`: live MIDI note input (11.7): yields NO
         // events under pure query/dry run. The bind-time INPUT-LANE walk
         // classifies operators between this node and the sink: control and
         // per-note probabilistic nodes apply per arriving note in tree order;
@@ -2200,6 +2466,56 @@ evaluated per query on the evaluator thread. EVERY numeric combinator
 parameter — including the probabilities of `maybe`, `degrade-by`, and
 `sometimes-by` — is a `PParam`, never a bare float, so tweak slots and
 vars stay live inside probabilistic combinators (section 13).
+
+**Sound first and the first-structure rule (Decided 2026-09-25,
+design-music.md section 1).** A pattern chain starts with `s`; the
+checker rejects a source before it (`sound-not-first`, 7.1.4).
+`Pat::structured` is set at construction and is read only by the
+structure-giving steps below; queries never read it.
+- Every `s` call builds `Sound { src, kit }`. `kit` is the `kit:`
+  argument as a `PParam` (`Const`, or `Late` for a `var`), or `None`.
+  With ONE sound (a keyword, a `sound` value, or a late ref to one),
+  `src` is `Const`/`Late` and the node is UNSTRUCTURED. With `s [..]`,
+  `s {alt ..}` or `s {choose ..}`, `src` is `PParam::Pat` over the
+  steps, and the node is structured from the start, with the steps'
+  events.
+- Per query, each keyword that `src` yields is looked up in the kit:
+  the `kit` param's value when it is `Some`, otherwise
+  `QueryVm::sound_kit()` (7.1.3). A `sound` value yielded by `src` is
+  used as is. A missing key is an event-local `unknown-sound` failure
+  (7.1.4). A structure-giving step keeps the resolved sound of its
+  subject, so the kit travels with the chain.
+- A STRUCTURE-GIVING step on an unstructured subject replaces the
+  structure: a control whose value is list-valued or a structured
+  pattern (`note [..]`, `n [..]`, `gain [..]`, ...), `euclid`, `grid`
+  and `midi-notes`. Each result event takes its `whole`/`part` from the
+  value pattern (or from the euclid/grid onsets, or the arriving note),
+  and carries the sound plus every control the subject already has.
+  The result is structured.
+- A scalar or signal control on an unstructured subject leaves it
+  unstructured and attaches the control; a signal is sampled at each
+  event's onset once the structure is known.
+- A control on a STRUCTURED subject keeps the subject's structure and
+  samples the value pattern at each subject event's `whole.begin`
+  (`part.begin` when `whole` is `None`); this is Tidal's `#`. So after
+  the first list-valued step, later list controls are sampled at the
+  existing onsets.
+- Any other operator (`fast`, `every`, `rev`, `stack`, `off`, ...) on an
+  unstructured subject, and a sink (`d1`..`d9`, `once`), realize it as
+  one event per cycle with `whole = [c, c+1)`, Tidal's `pure`; the
+  result is structured (question M4 in
+  `design-docs/user-qa/pending-middle-end-questions.md`; this is what
+  `s :crash > once` and `s :break > begin 0.25 > end 0.5 > d1` need).
+- The rule applies only to chains built by `s`/`sound`. A list used
+  where a value pattern is expected (a visual sequence, a control
+  value) is structured by the list as before, and `tex/` chains are
+  unchanged.
+- Goldens (PATTERN wave): `s :pluck > note [:e2 :g2 :b2]` gives three
+  events per cycle; `s [:bd :sn] > n [0 1 2 3]` gives two events with
+  `n` 0 and 2; `s :pluck > gain [0.5 1] > note [:c :e :g]` gives two
+  events with notes `:c` and `:e` (gain came first, so it gave the
+  structure); `s :bd > euclid 3 8` gives three onsets; `s :bd > gain 0.5`
+  gives one event per cycle.
 
 **Sample-region operators (Decided: design-music.md "sample
 slicing"; authority re-pinned in 13.5).** `SliceCuts` is
@@ -3037,11 +3353,19 @@ each tick on the evaluator thread — user code never runs off it.
   draining writes cells; the signal reads the cell at query/frame
   time like any host signal. The same cells feed MIDI-learn (13).
 - **`midi-notes channel:`** is the `PatNode::MidiNotes` LIVE pattern
-  (10.1): under pure query and dry run it yields no events (future
-  input is unknowable; purity is preserved). COMPOSITION is defined
-  by an INPUT-LANE partition performed AT BIND TIME: the dry run
-  walks the tree from each `MidiNotes` node to the sink and
-  classifies every operator on that path —
+  (10.1). It is a structure-giving STEP after `s` (Decided 2026-09-25,
+  design-music "sources and destinations"): `s :pluck > midi-notes
+  channel: 1 > d1`. The subject is the destination sound with the
+  controls attached so far; each arriving note becomes one event of
+  that sound carrying the note. The subject must be unstructured (a
+  single sound, 10.1): a structured subject (`s [:a :b] > midi-notes`)
+  would re-time live input, so the bind-time walk below reports it as
+  `input-lane-operator` too. Under pure query and dry run it yields no
+  events (future input is unknowable; purity is preserved).
+  COMPOSITION is defined by an INPUT-LANE partition performed AT BIND
+  TIME: the dry run walks the tree from each `MidiNotes` node to the
+  sink and classifies every operator on that path (the operators
+  AFTER `midi-notes` in the chain) —
   - SUPPORTED live operators, applied PER ARRIVING NOTE in tree
     order: control-attaching nodes (`Control`, `ScaleNotes`, chords
     and their kin — they decorate the note event) and per-event
@@ -3049,7 +3373,7 @@ each tick on the evaluator thread — user code never runs off it.
     with a per-event closure: the note is kept or dropped using the
     seeded RNG keyed by the node id and the note's arrival sequence
     number, and a kept note passes through the transform). Binding
-    `midi-notes > degrade-by 1 > s :pluck > d1` therefore drops
+    `s :pluck > midi-notes > degrade-by 1 > d1` therefore drops
     EVERY note — filtering is applied on the live path, never
     bypassed.
   - UNSUPPORTED over live input: structural and time operators that
@@ -4063,11 +4387,12 @@ only.
 
 **These four began as recommendations only.** Each respects every
 Decided item and is reversible before implementation of the affected
-module. **Status (author, issue #2, 2026-09-25):** Q1 is Decided as the
-STRICT rule (the parent-scope amendment is not adopted); Q3 is Decided
-as `grid`; Q4 is Decided as both names. Q2 is still open; TASK-006
-follows its recommendation for the fixed set in 7.1.4 until answered
-(`design-docs/user-qa/pending-middle-end-questions.md`, M1).
+module. **Status (author, issue #2, 2026-09-25):** all four are
+decided. Q1 is Decided as the parent-scope model (the recommendation
+below, which superseded an earlier strict decision the same day); Q2
+is answered by M1 (follow the recommendation for the fixed set in
+7.1.4, `design-docs/user-qa/pending-middle-end-questions.md`); Q3 is
+Decided as `grid`; Q4 is Decided as both names.
 
 **Q1 — Shadowing rule versus the global prelude.** *Decided
 (author, 2026-09-25, SUPERSEDES the earlier strict decision): the
@@ -4076,26 +4401,20 @@ no rebinding within one scope; a child scope may shadow a parent binding
 (prelude shadow = hint, user-parent shadow = warning); the prelude is
 read-only. Motivation: the builtin `sound-kit` is overridden by binding
 `sound-kit` in the session (design-music.md, sound kits). Also decided:
-`path` and `url` literal types and `load path` (lang-reference.md).*
-*Currently binding behavior:* the decisions state "no shadowing, in
-either direction" and give v1 one global scope that includes the
-prelude. Under them, a user top-level `let scale 2` collides with an
-existing binding and is a checker error. That strict behavior is what
-TASK-004/005 implement by default.
-*Recommendation — explicitly an AMENDMENT to the no-shadowing decision,
-requiring adjudication, not a compatible implementation detail:* move
-the prelude to a parent scope of the session namespace, so the user
-binding shadows the prelude name with an LSP warning ("shadows prelude
-`scale`") and one-keystroke rename support; "no shadowing" would then
-hold within any single scope only. Rationale: strict prohibition makes
-hundreds of short prelude names (`scale`, `range`, `time`, `delay`,
-`line`, …) unusable as user names mid-performance (principle 3), while
-silent shadowing would hide typos; the warning keeps it honest. Until
-adjudicated, the parent-scope behavior stays unimplemented and the
-affected plan criteria are conditional on the outcome.
+`path` and `url` literal types and `load path` (lang-reference.md).
+Implementation: 5.6 scope model, 7.1.4, 6.5.8.*
+*Recommendation (adopted):* move the prelude to a parent scope of the
+session namespace, so a user binding shadows the prelude name with an
+LSP diagnostic ("shadows prelude `scale`", a hint as decided) and
+one-keystroke rename support; "no shadowing" then holds within any
+single scope only. Rationale: strict prohibition makes hundreds of
+short prelude names (`scale`, `range`, `time`, `delay`, `line`, …)
+unusable as user names mid-performance (principle 3), while silent
+shadowing would hide typos; the diagnostic keeps it honest.
 
 **Q2 — Prelude overloading on the subject argument type
-(`scale`, `repeat`, `shape`, `add`).**
+(`scale`, `repeat`, `shape`, `add`).** *Answered (M1, 2026-09-25):
+adopted for the fixed set of 7.1.4.*
 *Recommendation:* allow type-directed overloading for a FIXED prelude
 set only, resolved on the subject (first) argument: statically by the
 checker when the type is known, dynamically by the subject's runtime

@@ -1,8 +1,11 @@
 {
   "taskId": "ss-session-20260925-s183",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-184",
-  "priorWorkflowExecutionIds": ["claude-code-design-and-implement-review-loop-session-183"],
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-185",
+  "priorWorkflowExecutionIds": [
+    "claude-code-design-and-implement-review-loop-session-183",
+    "claude-code-design-and-implement-review-loop-session-184"
+  ],
   "rerunContext": {
     "session": 184,
     "checkpointParent": "432c30d492bcbd7d3e5dc2a59f285799fb0aef36",
@@ -130,99 +133,12 @@
   },
   "plans": [
     {
-      "planId": "SS-CONTRACTS",
-      "planPath": "impl-plans/active/vactrol-session-contracts.md",
-      "implementsTask": "TASK-009 contracts: dependencies and features, module declarations and seeds, ChangeSet, codes, Sound::Buffer/SampleBuf, StagedEffect::{Capture, Render}, tap and analysis contracts, SourceLoader::analysis, compiler split and console registers",
-      "wave": 1,
-      "status": "ready",
-      "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-session-contracts.md#progress-log",
-      "writePaths": [
-        "Cargo.toml",
-        "Cargo.lock",
-        "src/lib.rs",
-        "src/session/mod.rs",
-        "src/session/changes.rs",
-        "src/pkg/mod.rs",
-        "src/directives/mod.rs",
-        "src/cli/mod.rs",
-        "src/lsp/mod.rs",
-        "src/ns/eval_doc.rs",
-        "src/host/native/tap.rs",
-        "src/ns/mod.rs",
-        "src/host/native/mod.rs",
-        "src/value/mod.rs",
-        "src/compile/mod.rs",
-        "src/types/diag.rs",
-        "src/vm/fail.rs",
-        "src/value/value.rs",
-        "src/value/sample.rs",
-        "src/value/print.rs",
-        "src/value/eq.rs",
-        "src/value/tests/mod.rs",
-        "src/ns/stage.rs",
-        "src/ns/load.rs",
-        "src/ns/namespace.rs",
-        "src/host/caps.rs",
-        "src/host/noop.rs",
-        "src/compile/compiler.rs",
-        "src/compile/names.rs",
-        "src/compile/tests/compile.rs",
-        "src/sched/runtime.rs",
-        "src/sched/commit.rs",
-        "src/ns/insts.rs",
-        "src/vm/natives/sound.rs",
-        "src/vm/natives/tex.rs",
-        "src/vm/tests/integrate_sound.rs",
-        "src/ns/tests/stage.rs",
-        "src/types/infer_call.rs",
-        "src/types/check.rs",
-        "src/host/native/loader.rs",
-        "src/host/testing.rs",
-        "src/host/tests/contracts.rs",
-        "src/sched/tests/sched.rs",
-        "src/host/wasm/messages.rs",
-        "impl-plans/active/vactrol-session-contracts.md"
-      ],
-      "sharedPaths": [],
-      "acceptanceCriteria": [
-        "Dependencies and features as design 14.5.2; cargo audit recorded; V9 shows no tungstenite/getrandom/tokio/tower-lsp/cpal/midir on wasm32.",
-        "lib.rs declarations; session/mod.rs seed (pub mod changes); stubs for pkg, directives, cli, ns/eval_doc, host/native/tap; lsp/mod.rs seeded with run_stdio(Option<&str>) -> i32.",
-        "ChangeSet with map_span/compose and its tests.",
-        "12 DiagCodes and 2 FailCodes; assertions 87, (19, 1), 24.",
-        "Sound::Buffer, SampleBuf (with id), SampleSrc::Buffer, StagedEffect::{Capture, Render}, TapSrc/TapReader/CaptureId/CapturePoll, AudioHost defaults, SampleLoader::register_bank, AnalysisCx, SourceLoader::analysis.",
-        "compile/compiler.rs split into compiler.rs + names.rs; console registers resolved; Namespace console slots.",
-        "V1-V9 and C1-C3 pass with logs cited; conditional edits recorded.",
-        "Rerun (session 184): the Sound::Buffer arm in src/sched/tests/sched.rs and the SampleSrc::Buffer arm in src/host/wasm/messages.rs are the only edits to those files; V2, V2l, V3, V3t, V3f and V6b exit 0 on the shared tree; evidence under tmp/ss-session-20260925-s183/SS-CONTRACTS/attempt-2/."
-      ],
-      "verification": [
-        "mkdir -p target/fe-logs",
-        "LOG(ss-contracts-build): CARGO_TERM_QUIET=true cargo build",
-        "LOG(ss-contracts-build-lsp): CARGO_TERM_QUIET=true cargo build --features lsp",
-        "LOG(ss-contracts-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
-        "LOG(ss-contracts-clippy-lsp): CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings",
-        "LOG(ss-contracts-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "LOG(ss-contracts-cargotest): CARGO_TERM_QUIET=true cargo test",
-        "LOG(ss-contracts-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
-        "LOG(ss-contracts-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
-        "LOG(ss-contracts-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "LOG(ss-contracts-fmt): CARGO_TERM_QUIET=true cargo fmt --check",
-        "LOG(ss-contracts-audit): cargo audit",
-        "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown",
-        "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
-        "grep -rnE 'std::(thread|fs|time|net|process)' src/ --exclude-dir=native --exclude-dir=cli --exclude-dir=lsp --exclude-dir=tests || echo none",
-        "git diff --stat -- Cargo.toml Cargo.lock",
-        "git status --short"
-      ]
-    },
-    {
       "planId": "SS-PKG",
       "planPath": "impl-plans/active/vactrol-session-pkg.md",
       "implementsTask": "TASK-009 packages: vactrol.toml, vactrol.lock, semver + MVS, in-crate SHA-256, canonical digest, entry validation, zip reader, PackageStore (dir, git, proxy), staged atomic cache publication, package evaluation into PkgNs, asset banks",
       "wave": 2,
       "status": "ready",
-      "dependsOn": ["SS-CONTRACTS"],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-session-pkg.md#progress-log",
       "writePaths": [
         "src/pkg/mod.rs",
@@ -297,7 +213,7 @@
       "implementsTask": "TASK-009 directives: #@ parse (13.5 PROPOSED vocabulary), attachment, LabelRegistry, selector resolution, BindingKey + migration, Directive and ExternalFile BindingPersistence, learned-CC write-back, vocabulary authority-question fixtures",
       "wave": 2,
       "status": "ready",
-      "dependsOn": ["SS-CONTRACTS"],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-session-directives.md#progress-log",
       "writePaths": [
         "src/directives/mod.rs",
@@ -355,7 +271,7 @@
       "implementsTask": "TASK-009 / 12.3 amendment: scope, spectrum, capture, render, rms, peak; sample buffers and their playback; native live taps and capture; offline render; native offline_render capability; design-music ordinal 2 repin",
       "wave": 2,
       "status": "ready",
-      "dependsOn": ["SS-CONTRACTS"],
+      "dependsOn": [],
       "progressFile": "impl-plans/active/vactrol-session-analysis.md#progress-log",
       "writePaths": [
         "src/value/sample.rs",
@@ -431,7 +347,11 @@
       "implementsTask": "TASK-009 Session: eval pipeline, reactive bindings publication, JSON codec, write authority and coalescing, console registers, REPL loop, packages/directives/analysis through the session, and the end-to-end criterion tests",
       "wave": 3,
       "status": "ready",
-      "dependsOn": ["SS-PKG", "SS-DIRECTIVES", "SS-ANALYSIS"],
+      "dependsOn": [
+        "SS-PKG",
+        "SS-DIRECTIVES",
+        "SS-ANALYSIS"
+      ],
       "progressFile": "impl-plans/active/vactrol-session-core.md#progress-log",
       "writePaths": [
         "src/session/mod.rs",
@@ -520,7 +440,9 @@
       "implementsTask": "TASK-009 CLI: vactrol repl|run|serve|get|lsp in src/main.rs + src/cli/, the loopback token-checked session socket in src/cli/ws.rs",
       "wave": 4,
       "status": "ready",
-      "dependsOn": ["SS-SESSION"],
+      "dependsOn": [
+        "SS-SESSION"
+      ],
       "progressFile": "impl-plans/active/vactrol-session-cli.md#progress-log",
       "writePaths": [
         "src/main.rs",
@@ -569,7 +491,9 @@
       "implementsTask": "TASK-009 LSP: vactrol lsp over stdio (tower-lsp, lsp feature): diagnostics incl. directive lint, hover, completion, whitespace formatting, optional session attach, stdio smoke test",
       "wave": 4,
       "status": "ready",
-      "dependsOn": ["SS-SESSION"],
+      "dependsOn": [
+        "SS-SESSION"
+      ],
       "progressFile": "impl-plans/active/vactrol-session-lsp.md#progress-log",
       "writePaths": [
         "src/lsp/mod.rs",
@@ -614,7 +538,10 @@
       "implementsTask": "TASK-009 serial reconciliation: join integrity, lang-reference ordinal 5 reclassification, final-tree checks, vactrol-core.md TASK-009 bookkeeping, README, plan statuses, commit staging list and six-section message",
       "wave": 5,
       "status": "ready",
-      "dependsOn": ["SS-CLI", "SS-LSP"],
+      "dependsOn": [
+        "SS-CLI",
+        "SS-LSP"
+      ],
       "progressFile": "impl-plans/active/vactrol-session-finalize.md#progress-log",
       "writePaths": [
         "tests/fixtures/spec/manifest.toml",
@@ -747,5 +674,19 @@
         "git status --short"
       ]
     }
-  ]
+  ],
+  "session185Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). SS-CONTRACTS was accepted in session 184 (adversarial and integration review). Wave 2 ended without acceptance: SS-PKG and SS-DIRECTIVES were gate-blocked as materially unverified because two pre-existing tests outside every plan's ownership encoded the pre-amendment scope (types/tests/natives.rs only_scale_and_shape_are_overloaded; dsp/tests/contracts.rs native_accepts_its_advertised_limits) and failed once SS-ANALYSIS added the scope/spectrum/render overloads and native OfflineRender; the operator updated both tests to the 12.3 amendment (tree green). SS-ANALYSIS failed its step6 output contract ($.changedFiles must be an array). SS-CONTRACTS is removed from plans[] and dependsOn; the three wave-2 plans are re-dispatched on their existing source.",
+    "checkpointParent": "36a861a304de7a23c0bb4d20e5f3e3a0846a78d5",
+    "rerunEvidence": "Wave-2 reruns write under tmp/ss-session-20260925-s183/<planId>/attempt-<next>/ and logs as target/fe-logs/ss-<wave>-<check>-s185-<n>.log; the step6 output carries changedFiles as an array of path strings.",
+    "acceptedOutsideManifest": [
+      "SS-CONTRACTS"
+    ],
+    "removedPlans": [
+      {
+        "planId": "SS-CONTRACTS",
+        "planPath": "impl-plans/active/vactrol-session-contracts.md"
+      }
+    ]
+  }
 }

@@ -128,3 +128,15 @@ and closing notes allowed above.)
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
 - **Previous**: vactrol-session-cli.md, vactrol-session-lsp.md
+
+
+### STEP6 OUTPUT NOTE (operator, 2026-09-25, after the SS-ANALYSIS attempt-1 failure)
+
+- The step6-implement output contract requires `changedFiles` to be an ARRAY of
+  path strings (SS-ANALYSIS attempt 1 failed with "$.changedFiles must be of type
+  array"). Carry `planId`; leave `verificationGaps` empty when every automated
+  command passed (manual checks go under `residualRisks`). Crate-wide test
+  failures caused only by a sibling branch's in-progress files or by a
+  pre-existing test outside every plan's ownership are reported in the
+  progress log as a dependency blocker for the operator, never fixed by
+  editing unowned files.

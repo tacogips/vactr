@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Packages (SS-PKG) Implementation Plan
 
 **planId**: SS-PKG (issue #4, wave 2; package manifest, lock, MVS, stores, canonical digest, archive safety, staged cache publication, package evaluation into `PkgNs`)
-**Status**: Ready
+**Status**: In Progress (implementation complete; the crate-wide V3/V3t rows await the join re-verify of two SS-ANALYSIS-scope tests)
 **Design Reference**: design-docs/specs/design-implementation.md 5.7 (Decided package model, revised digest and archive safety), 14.5.1 (fetch only in `vactrol get`; browser store is Rust-half only), 14.5.2 (in-crate SHA-256 and TOML subset; miniz_oxide), 14.5.7 (all rules), 14.5.12; command.md (`vactrol.toml`, `vactrol.lock`, `VACTROL_HOME`)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -224,10 +224,10 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9 of `
 
 ## Completion Criteria
 
-- [ ] Items 1-14 implemented as specified
-- [ ] Every required test passes, including the portability, injectivity, malicious-fixture, interrupted-extraction,
+- [x] Items 1-14 implemented as specified
+- [x] Every required test passes, including the portability, injectivity, malicious-fixture, interrupted-extraction,
       local-HTTP proxy and local-git tests
-- [ ] V1-V9 and P1-P2 pass with logs cited; `final-hashes.txt` written
+- [ ] V1-V9 and P1-P2 pass with logs cited; `final-hashes.txt` written (all rows exit 0 except V3/V3t, which fail only on two sibling-scope tests; see the session-184 log)
 
 ## Progress Log
 
@@ -235,8 +235,71 @@ The common rows V1, V1l, V2, V2l, V3, V3t, V3f, V6a, V6b, V7, V4, V5 and V9 of `
 differences, the hash and intent file paths, evidence per row, sibling-caused failures, and blockers. Edit only this
 log.)
 
+### Session: 2026-09-25 (session 184, SS-PKG implementer)
+
+**Work done** (evidence root `tmp/ss-session-20260925-s183/SS-PKG/attempt-1/`: `intent.md`, `notes.md`,
+`pre-edit-hashes.txt`, `post-edit-hashes.txt`, `final-hashes.txt`):
+- Items 1-12: `src/pkg/{mod,semver,manifest,lock,mvs,sha256,digest,validate,zip,store,proxy,cache,load}.rs`. Everything
+  outside `native/` and `tests/` is wasm-safe (V5 prints `none`; both wasm32 builds exit 0).
+- Item 13: `src/pkg/native/{mod,dir_store,git_store,fs_cache}.rs` (`DirStore`, `GitStore` with the fixed argv/env,
+  `FsCache` with `.staging/<unique>` + `create_dir` + `rename` + `.vactrol-digest`, `vactrol_home`, `pkg_cache_root`).
+- Item 14: `PkgNs::load` in `src/ns/pkg.rs`; `default_prefix`, `asset_banks`, `locked_sources` in `src/pkg/load.rs`;
+  `NativeSampleLoader::register_bank` in `src/host/native/loader.rs` (bytewise index order; a clash fails
+  `load-failed` for SESSION to report as `import-collision`; the first registration wins).
+- Tests: `src/pkg/tests/{support,http_fixture,sha256,semver,manifest,lock,mvs,digest,validate,zip,proxy,cache,stores,load}.rs`
+  and four new tests in `src/ns/tests/pkg.rs` (the three existing tests are unchanged). 47 tests in the P1 set.
+
+**Design differences** (plan-level refinements, detailed in `notes.md`): `PkgNs::load` has a 7th `imports` resolver
+parameter; `PkgError` variants carry payloads; `PkgSources` gains `root` (native cache dir) and `from_files`;
+`asset_banks` returns names without `:`; lock parse errors reuse `ManifestError`; `ProxyStore` has `limits` and zip
+paths are root-relative; `FsCache::new` creates `.staging` eagerly; the staging sink refuses `.vactrol-digest` and
+case-fold duplicates before each write (a case-insensitive file system would otherwise report an I/O error); the ZIP
+CRC-32 is not checked (the digest carries integrity); hard-linked files are `EntryKind::Other`.
+
+**Verification** (shared tree, `target/fe-logs/`, counting logs):
+- P2 `git --version`: git version 2.55.0 (`git-version.txt`).
+- V1 `ss-pkg-build-s184-1.log` exit=0; V1l `ss-pkg-build-lsp-s184-1.log` exit=0.
+- V2 `ss-pkg-clippy-s184-2.log` exit=0; V2l `ss-pkg-clippy-lsp-s184-2.log` exit=0 (the `-1` runs exited 101 only on
+  `clippy::match_like_matches_macro` at `src/types/infer_call.rs:358`, SS-ANALYSIS, since fixed by that plan).
+- P1 `ss-pkg-own-s184-1.log` exit=0: 47 run, 47 passed.
+- V3f `ss-pkg-fixtures-s184-1.log` exit=0: 10 run, 10 passed, 1 skipped.
+- V3 `ss-pkg-nextest-s184-2.log` exit=100 (fail-fast at 83/901) and V3t `ss-pkg-cargotest-s184-2.log` exit=101
+  (887 passed, 2 failed). Supplementary `ss-pkg-nextest-nofailfast-s184-1.log`: 901 run, 899 passed, 2 failed.
+  The two failures are SIBLING-CAUSED and outside every plan's writePaths:
+  `dsp::tests::contracts::native_accepts_its_advertised_limits` (asserts `Cap::OfflineRender` is refused natively,
+  which SS-ANALYSIS's `dsp/caps.rs` now grants) and `types::tests::natives::only_scale_and_shape_are_overloaded`
+  (SS-ANALYSIS adds overloaded `scope`/`spectrum`/`render`). These are pre-existing tests that contradict the
+  ANALYSIS scope, so they are a dependency blocker for the operator or the join, not an SS-PKG defect. The join
+  re-verifies V3/V3t.
+- V6a `ss-pkg-wasm32-s184-1.log` exit=0; V6b `ss-pkg-wasm32-hostwasm-s184-1.log` exit=0.
+- V7 `ss-pkg-fmt-s184-1.log` exit=0.
+- V4 (`v4-linecounts.txt`): the largest `.rs` file is 799 lines (`src/dsp/build.rs`); the largest SS-PKG file is
+  `src/pkg/manifest.rs` at 424 lines.
+- V5 (`v5-grep.txt`): `none`.
+- V9 (`tree-wasm32.txt`, `tree-wasm32-hostwasm.txt`): 0 matches for tungstenite|getrandom|tokio|tower-lsp|cpal|midir.
+
+**Parallel-wave notes**: while SS-DIRECTIVES was mid-edit, the shared lib-test build failed (missing
+`src/directives/tests/{key,persist,writeback}.rs`). SS-PKG tests were type-checked and run meanwhile in a scratch COPY
+(`attempt-1/scratch/tree`, directives tests stubbed in the copy only, separate target dir). All final evidence above
+comes from the shared tree. Another writer rustfmt-formatted several new SS-PKG files mid-attempt (formatting only; no
+behavior lost; later edits used fresh content). There was no drift against `post-edit-hashes.txt` at the end.
+
+**Blockers**: none owned by SS-PKG. The two sibling-scope test failures above are left for the join.
+
 ## Related Plans
 
 - **Parent**: impl-plans/active/vactrol-core.md (TASK-009)
 - **Previous**: vactrol-session-contracts.md. **Parallel**: vactrol-session-directives.md, vactrol-session-analysis.md
 - **Next**: vactrol-session-core.md (SESSION), vactrol-session-cli.md (`vactrol get`)
+
+
+### STEP6 OUTPUT NOTE (operator, 2026-09-25, after the SS-ANALYSIS attempt-1 failure)
+
+- The step6-implement output contract requires `changedFiles` to be an ARRAY of
+  path strings (SS-ANALYSIS attempt 1 failed with "$.changedFiles must be of type
+  array"). Carry `planId`; leave `verificationGaps` empty when every automated
+  command passed (manual checks go under `residualRisks`). Crate-wide test
+  failures caused only by a sibling branch's in-progress files or by a
+  pre-existing test outside every plan's ownership are reported in the
+  progress log as a dependency blocker for the operator, never fixed by
+  editing unowned files.

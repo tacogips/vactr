@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Contracts and Seeds (SS-CONTRACTS) Implementation Plan
 
 **planId**: SS-CONTRACTS (issue #4, wave 1; the dependencies, codes, shapes and seeds every TASK-009 wave builds on)
-**Status**: In Progress (blocked: two exhaustive matches in files outside every writePaths; see Progress Log)
+**Status**: Completed (implemented, gate-verified, adversarial review and integration review accepted in session 184; removed from the dispatch manifest by the session-185 amendment; source rides in the single workflow commit)
 **Design Reference**: design-docs/specs/design-implementation.md 14.5.2 (dependencies, gating), 14.5.3 (ownership rule, file table), 14.5.6 (`ChangeSet`), 14.5.9 (`Sound::Buffer`, taps, staged `Capture`/`Render`), 14.5.10 (console registers), 14.5.12 (codes, waves, verification); 6.5.7 (evidence rule)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -251,9 +251,9 @@ Plan-specific rows:
 - [x] `Sound::Buffer`/`SampleBuf` seed, `StagedEffect::{Capture, Render}`, the tap and analysis contracts, and
       `SourceLoader::analysis`
 - [x] `compile/compiler.rs` split, console registers resolved, `Namespace` console slots
-- [ ] Required tests pass; V1-V9 pass with logs cited; `final-hashes.txt` written (BLOCKED on the shared tree:
-      V2/V2l/V3/V3t/V3f/V6b cannot compile until the two unowned files below get one arm each; all pass on the
-      isolated projection with exactly those arms)
+- [x] Required tests pass; V1-V9 pass with logs cited; `final-hashes.txt` written (session 184 rerun on the shared
+      tree: every row exit 0, logs `target/fe-logs/ss-contracts-<check>-s184-1.log`,
+      `attempt-2/final-hashes.txt`)
 
 ## Progress Log
 
@@ -357,6 +357,43 @@ which needs Rust 1.88 / edition2024). This single pin was chosen over pinning se
 
 **Files.** Intent: `attempt-1/intent.md`; hashes: `attempt-1/{pre,post}-edit-hashes.txt`,
 `attempt-1/final-hashes.txt`; notes: `attempt-1/notes.md`. No drift was observed (this plan runs alone in wave 1).
+
+### Session: 2026-09-25 (session 184, SS-CONTRACTS implementer, attempt 2 rerun)
+
+**Result**: the session-183 blocker is resolved. The manifest now lists `src/sched/tests/sched.rs` and
+`src/host/wasm/messages.rs` in SS-CONTRACTS writePaths. At node start each file already carried exactly one new arm,
+and each file's sha256 matched the Riela pre-node snapshot
+(`tmp/riela-fanout/887A4CF9-A727-4B7C-80AE-3961614219A4/BFE17D9C-3305-4BD2-934D-6360432EEF11.json`):
+- `src/sched/tests/sched.rs` (`Stub::route`, +4 lines): `Sound::Buffer(buf) => Route::Audio { inst: SAMPLER, sample:
+  Some(SampleSrc::Buffer { id: buf.id }) }`. It routes the buffer to the stub sampler rather than returning the
+  `Err(host-unavailable)` proposed in attempt 1. Both are valid one-arm repairs. The routing form fits the stub's
+  other sample arms, so it was kept.
+- `src/host/wasm/messages.rs` (`sample_key`, +3 lines including a 2-line comment):
+  `SampleSrc::Buffer { id } => format!("buffer:{id}")`.
+
+These arms are the only diff in those two files (`attempt-2/rerun-arms.diff`). No other file was re-edited:
+`attempt-1/final-hashes.txt` still verifies (`attempt-2/attempt1-final-hash-check.txt`, check exit=0). This session
+edited only this plan file.
+
+**Evidence** (shared tree, `target/fe-logs/ss-contracts-<check>-s184-1.log`, each ends with `exit=`):
+- V1 build: exit=0.
+- V1l build-lsp: exit=0.
+- V2 clippy: exit=0.
+- V2l clippy-lsp: exit=0.
+- V3 nextest: exit=0; 791 run, 791 passed, 1 skipped. The pre-edit baseline was 780.
+- V3t cargotest: exit=0; 781 lib + 10 spec_fixtures passed, 0 failed.
+- V3f fixtures: exit=0; 10 run, 10 passed.
+- V6a wasm32: exit=0.
+- V6b wasm32-hostwasm: exit=0.
+- V7 fmt: exit=0.
+- C1 audit: exit=0 (196 crates, no advisory).
+- V4: the largest file is `dsp/build.rs` at 799 lines (pre-existing); nothing reaches 800.
+- V5: `none`.
+- V9: `attempt-2/tree-wasm32*.txt` contain 0 gated crates.
+- C2: `Cargo.toml` +15/-6 and `Cargo.lock` +852 (unchanged since attempt 1).
+- C3: `compiler.rs` 644 lines, `names.rs` 193.
+
+**Files**: `attempt-2/{intent.md,pre-edit-hashes.txt,post-edit-hashes.txt,final-hashes.txt,notes.md}`.
 
 ## Related Plans
 

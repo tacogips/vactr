@@ -1,7 +1,7 @@
 # Vactrol Session Layer: Contracts and Seeds (SS-CONTRACTS) Implementation Plan
 
 **planId**: SS-CONTRACTS (issue #4, wave 1; the dependencies, codes, shapes and seeds every TASK-009 wave builds on)
-**Status**: Ready
+**Status**: In Progress (blocked: two exhaustive matches in files outside every writePaths; see Progress Log)
 **Design Reference**: design-docs/specs/design-implementation.md 14.5.2 (dependencies, gating), 14.5.3 (ownership rule, file table), 14.5.6 (`ChangeSet`), 14.5.9 (`Sound::Buffer`, taps, staged `Capture`/`Render`), 14.5.10 (console registers), 14.5.12 (codes, waves, verification); 6.5.7 (evidence rule)
 **Created**: 2026-09-25
 **Issue**: https://github.com/tacogips/vactrol/issues/4
@@ -244,20 +244,119 @@ Plan-specific rows:
 
 ## Completion Criteria
 
-- [ ] Dependencies and features per item 1; C1-C3 recorded; V9 clean
-- [ ] `src/lib.rs` declarations, the `session/mod.rs` seed and every stub of item 5 exist
-- [ ] `ChangeSet` and its tests (item 4)
-- [ ] 12 `DiagCode`s and 2 `FailCode`s; assertions 87, `(19, 1)`, 24
-- [ ] `Sound::Buffer`/`SampleBuf` seed, `StagedEffect::{Capture, Render}`, the tap and analysis contracts, and
+- [x] Dependencies and features per item 1; C1-C3 recorded; V9 clean
+- [x] `src/lib.rs` declarations, the `session/mod.rs` seed and every stub of item 5 exist
+- [x] `ChangeSet` and its tests (item 4)
+- [x] 12 `DiagCode`s and 2 `FailCode`s; assertions 87, `(19, 1)`, 24
+- [x] `Sound::Buffer`/`SampleBuf` seed, `StagedEffect::{Capture, Render}`, the tap and analysis contracts, and
       `SourceLoader::analysis`
-- [ ] `compile/compiler.rs` split, console registers resolved, `Namespace` console slots
-- [ ] Required tests pass; V1-V9 pass with logs cited; `final-hashes.txt` written
+- [x] `compile/compiler.rs` split, console registers resolved, `Namespace` console slots
+- [ ] Required tests pass; V1-V9 pass with logs cited; `final-hashes.txt` written (BLOCKED on the shared tree:
+      V2/V2l/V3/V3t/V3f/V6b cannot compile until the two unowned files below get one arm each; all pass on the
+      isolated projection with exactly those arms)
 
 ## Progress Log
 
 (Implementer: add one `### Session: <date> (session <S>, SS-CONTRACTS implementer)` entry covering the work done,
 crate versions and pins, each conditional path edited, any design differences, the hash and intent file paths,
 evidence per row, and blockers. Edit only this log.)
+
+### Session: 2026-09-25 (session 183, SS-CONTRACTS implementer, attempt 1)
+
+**Result**: every item 1-13 is implemented. The plan is BLOCKED on two files that are in no plan's writePaths.
+Adding the variants this plan must add makes each of them a non-exhaustive match (E0004):
+- `src/sched/tests/sched.rs:79` (`Stub::route`, a `match` on `&Sound`): `Sound::Buffer` breaks every test target,
+  so V2, V2l, V3, V3t and V3f fail to compile.
+- `src/host/wasm/messages.rs:392` (`sample_key`, a `match` on `&SampleSrc`): `SampleSrc::Buffer` breaks V6b
+  (wasm32 + host-wasm).
+
+Per the issue's workflow contract, I did not edit either file. The proposed one-arm repairs are in
+`tmp/ss-session-20260925-s183/SS-CONTRACTS/attempt-1/proposed-repair.patch`:
+- `Sound::Buffer(_) => return Err(Failure::new(FailCode::HostUnavailable, "no buffers")),`
+- `SampleSrc::Buffer { id } => format!("buffer:{id}"),`
+
+**Resume criterion**: the operator does ONE of these:
+- adds both paths to SS-CONTRACTS `writePaths` and re-dispatches;
+- applies `proposed-repair.patch` itself.
+
+Then V2, V2l, V3, V3t, V3f and V6b are re-run on the shared tree.
+
+**Work done.**
+- Items 1-3 and 5: Cargo deps and features, `lib.rs` declarations, the `session/mod.rs` seed, and every stub.
+  `lsp/mod.rs` has `run_stdio(Option<&str>) -> i32`, which prints "vactrol lsp: not implemented yet" and returns 1.
+- Item 4: `session/changes.rs` has `Change` (serde derive, so SESSION can decode it), `ChangeSet::new`/`map_span`,
+  `Mapped`, `ChangeError`, `compose -> ComposedMap` and `map_through`. It has 8 inline tests.
+- Item 6: 12 `DiagCode`s (message templates are in the doc comments; 8 warnings) and 2 `FailCode`s, appended so
+  that existing `FailCode::ALL` indices stay stable. The assertions are 87, `(19, 1)` and 24.
+- Items 7-8: `value/sample.rs` has `SampleBuf` (with `id` from a thread-local counter), `BufState` and
+  pending/ready/state/fill/fail/frames. `Sound::Buffer` prints `(sound buffer N frames|pending|failed)`.
+  `deep_eq` uses `Rc::ptr_eq`, and `SampleBuf: PartialEq` is `ptr::eq`.
+- Item 9: `StagedEffect::{Capture, Render}`. `RecordingSink` records them unchanged.
+- Item 10: `host/caps.rs` has:
+  - `TapSrc`, `TapReader`, `CaptureId` and `CapturePoll`;
+  - `AudioHost::{tap_reader, arm_capture, poll_capture}` defaults and the `SampleLoader::register_bank` default
+    (both `host-unavailable`);
+  - `SampleSrc::Buffer { id }` and `AnalysisCx`.
+
+  `NoopHost` keeps every default.
+- Item 11: `SourceLoader::analysis() -> Option<&mut AnalysisCx>`, default `None`.
+- Item 12: `compile/compiler.rs` (798 -> 644 lines) is split by a pure move into `compile/names.rs` (193 lines).
+  The move covers `Res`, `resolve_in`, `resolve`, `load_global`, `load_res`, `atom`, `native_const` and
+  `static_native`. `Res` is re-exported from `compiler`, so `matchc.rs` and `sites.rs` are unchanged.
+  `Atom::ConsoleReg(n)` now reads the namespace console slot `n` in `FileId::CONSOLE`. In any other file it is
+  `Failure(undefined-name)`, as before.
+- Item 13: `Namespace::{set_console_register, console_register}` plus the crate-internal `console_slot`. Registers
+  are kept in a separate map: they are not in `session_names`, cannot be rebound, and are console-only.
+
+**Conditional paths edited.** Each one had a compiler-reported E0004 and is recorded in `intent.md`:
+- `src/host/native/loader.rs`: the `Buffer` source is `host-unavailable`.
+- `src/ns/insts.rs`: `Sound::Buffer` routes to `Failure(host-unavailable)`.
+- `src/sched/commit.rs`: `describe` handles `Buffer`.
+- `src/sched/runtime.rs`: the `Capture`/`Render` arms mark `buf` Failed(`host-unavailable`, "handled by
+  SS-ANALYSIS") and push the fault.
+- `src/vm/tests/integrate_sound.rs`: `sound_str` handles `Buffer`.
+- `src/host/tests/contracts.rs`: the new NoopHost default-method test only (fully qualified paths, no other
+  change).
+
+No `types/*`, `vm/natives/*`, `ns/tests/stage.rs` or `host/testing.rs` edit was needed.
+
+**Crate versions and pins** (12.8.10; rustc 1.83):
+- serde 1.0.229, serde_json 1.0.151, miniz_oxide 0.9.1;
+- tungstenite 0.29.0 (0.30 needs 1.85);
+- getrandom 0.3.4 (0.4 needs edition2024);
+- tower-lsp 0.20.0, tokio 1.53.1.
+
+Pin: `cargo update -p idna_adapter --precise 1.2.0` (tower-lsp -> lsp-types -> url -> idna; 1.2.1+ pulls icu 2.3,
+which needs Rust 1.88 / edition2024). This single pin was chosen over pinning seven icu 2.x crates.
+
+**Design differences.**
+- An unset register fails `undefined-name` with the VM's standard message "`_2` is not defined", not the plan's
+  "console register `_2` is not set". That wording needs a new op or message in `vm/vm.rs`/`vm/frame.rs`, which
+  are outside writePaths. SESSION's `console.rs` can present the plan wording before evaluating.
+- The console register slot is a `Let` slot, read as a snapshot.
+
+**Evidence** (`target/fe-logs/ss-contracts-<check>-s183-<n>.log`; the counting logs are `-2`):
+- V1 build `exit=0`; V1l build-lsp `exit=0`; V6a wasm32 `exit=0`; V7 fmt `exit=0` (`-1` was exit=1 before the
+  owned files were rustfmt'd).
+- V6b wasm32-hostwasm `exit=101` (messages.rs:392 E0004, blocked).
+- V2 clippy, V2l clippy-lsp, V3 nextest, V3t cargotest and V3f fixtures: `exit=101` (sched/tests/sched.rs:79
+  E0004, blocked).
+- C1 audit (`-1`) `exit=0`: 196 crates, no advisory.
+- V4: largest 799 (`dsp/build.rs`, pre-existing); `compiler.rs` 644, `names.rs` 193 (C3).
+- V5: `none`.
+- V9: both `cargo tree` outputs have 0 gated crates (`attempt-1/tree-wasm32*.txt`).
+- C2: `Cargo.toml` +15/-6 and `Cargo.lock` +852 (only this plan's dependencies).
+- Isolated projection: the shared tree plus exactly `proposed-repair.patch`, separate `CARGO_TARGET_DIR`, logs in
+  `attempt-1/projection-logs/`. Every command exits 0:
+  - build, build-lsp, clippy, clippy-lsp, wasm32 and wasm32-hostwasm;
+  - fmt (`fmt-2.log`);
+  - nextest: 791 run, 791 passed, 1 skipped (baseline before edits: 780/780, `attempt-1/baseline-nextest.log`;
+    +11 = 8 changes + 1 buffer + 1 noop defaults + 1 console register);
+  - cargo test: 781 + 10 passed;
+  - fixtures: 10 run, 10 passed.
+
+**Files.** Intent: `attempt-1/intent.md`; hashes: `attempt-1/{pre,post}-edit-hashes.txt`,
+`attempt-1/final-hashes.txt`; notes: `attempt-1/notes.md`. No drift was observed (this plan runs alone in wave 1).
 
 ## Related Plans
 

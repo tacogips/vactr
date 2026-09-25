@@ -1,7 +1,15 @@
 {
   "taskId": "ss-session-20260925-s183",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-183",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-184",
+  "priorWorkflowExecutionIds": ["claude-code-design-and-implement-review-loop-session-183"],
+  "rerunContext": {
+    "session": 184,
+    "checkpointParent": "432c30d492bcbd7d3e5dc2a59f285799fb0aef36",
+    "priorFindingResolved": "session-183 step3 finding 1 (session/ws.rs ownership contradiction, design-implementation.md:4737) is resolved in the accepted design and plans: the socket server is src/cli/ws.rs, owned wholly by SS-CLI (design 14.5.3 file table line 4764, CLI wave row line 5266, vactrol-session-cli.md); SS-SESSION's session/mod.rs declares no ws module.",
+    "contractsAttempt1": "SS-CONTRACTS attempt 1 (session 183) implemented items 1-13 and blocked on two E0004 exhaustive matches outside every writePaths: src/sched/tests/sched.rs (Sound::Buffer) and src/host/wasm/messages.rs (SampleSrc::Buffer). Per the plan's resume criterion both paths are now in SS-CONTRACTS writePaths; the working tree already carries one-arm repairs in both files. The rerun worker uses attempt-2 under the evidence root, re-verifies V1-V9 and C1-C3 on the shared tree, and records the result in its progress log.",
+    "preservedWorkingTree": "The uncommitted SS-CONTRACTS source edits (src/, Cargo.toml, Cargo.lock) are the rerun's starting tree and are not part of this checkpoint commit."
+  },
   "issueReference": {
     "repository": "tacogips/vactrol",
     "number": 4,
@@ -172,6 +180,8 @@
         "src/host/native/loader.rs",
         "src/host/testing.rs",
         "src/host/tests/contracts.rs",
+        "src/sched/tests/sched.rs",
+        "src/host/wasm/messages.rs",
         "impl-plans/active/vactrol-session-contracts.md"
       ],
       "sharedPaths": [],
@@ -182,7 +192,8 @@
         "12 DiagCodes and 2 FailCodes; assertions 87, (19, 1), 24.",
         "Sound::Buffer, SampleBuf (with id), SampleSrc::Buffer, StagedEffect::{Capture, Render}, TapSrc/TapReader/CaptureId/CapturePoll, AudioHost defaults, SampleLoader::register_bank, AnalysisCx, SourceLoader::analysis.",
         "compile/compiler.rs split into compiler.rs + names.rs; console registers resolved; Namespace console slots.",
-        "V1-V9 and C1-C3 pass with logs cited; conditional edits recorded."
+        "V1-V9 and C1-C3 pass with logs cited; conditional edits recorded.",
+        "Rerun (session 184): the Sound::Buffer arm in src/sched/tests/sched.rs and the SampleSrc::Buffer arm in src/host/wasm/messages.rs are the only edits to those files; V2, V2l, V3, V3t, V3f and V6b exit 0 on the shared tree; evidence under tmp/ss-session-20260925-s183/SS-CONTRACTS/attempt-2/."
       ],
       "verification": [
         "mkdir -p target/fe-logs",

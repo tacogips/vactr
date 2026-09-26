@@ -5375,6 +5375,7 @@ here, with the dispositions below.
   (12.5) that already reach the runtime on both tiers (G4).
 - **No UI framework.** Plain DOM components plus CodeMirror 6. Each
   component is a `mount(root, deps)` function returning a handle.
+  *Superseded (author, 2026-09-26) by 15.2: the panels move to Solid.js.*
 - **Out of scope** (each is a residual risk, none is a criterion):
   - native-tier visuals (the native session keeps `NoopRender`, 9.4);
   - browser MIDI output and clock-out (E2);
@@ -6032,6 +6033,51 @@ Manual gates, pending user confirmation with automated proxies:
 Rollback is a `git revert` of the single implementation commit. OPFS
 data is namespaced under `vactrol-pkg/` and can be deleted, and
 nothing migrates.
+
+### 15.2 Editor UI on Solid.js, audio start, icons, foldable pane (author, 2026-09-26)
+
+Decided after the first hands-on session, in which a document evaluated
+cleanly in the engine but the page stayed silent with no visible reason
+(the transport kept showing 120 bpm, so the eval never reached the
+session or audio was never unlocked).
+
+- **Solid.js for the UI.** Every panel (transport bar, right pane with
+  the slider panel and directive control panel, parameter editors, step
+  grid and piano roll, meters and scopes, sample browser, package pane,
+  status/diagnostic surfaces) becomes a Solid component. CodeMirror 6
+  stays the code surface, mounted from a Solid component. State comes
+  from signals derived from the protocol client: one signal (or store
+  path) per site, slot and telemetry stream, updated once per `bindings`
+  batch / `playing` / `tempo` / `levels` message, so a batch repaints
+  only the affected DOM (the 13/14.4 "one repaint per batch" rule holds
+  by construction). Protocol, transport, bind write-back and render-host
+  logic stay framework-free TypeScript modules; only views move. Build:
+  `vite-plugin-solid`; tests: vitest + `@solidjs/testing-library` (jsdom).
+- **Audio start and eval are never silent.** A visible audio-state
+  control (states: *off* before the first gesture, *starting*, *running*,
+  *suspended*, *failed* with reason) sits at the left of the transport;
+  clicking it resumes the `AudioContext`. Evaluating while audio is off
+  starts it (the eval keystroke is a user gesture). Every eval shows its
+  outcome: the flash on the evaluated range plus a transient status
+  (ok, n diagnostics, or not delivered), and a toolbar Run button
+  evaluates the whole document for users who do not know the shortcut.
+  Boot failures (wasm fetch, worklet `addModule`, session ABI missing)
+  render in the status surface, never only in the console.
+- **Icons instead of words in the transport.** Tempo = metronome icon +
+  number; position = cycle.beat readout with a small beat ring; clock
+  source = glyph (internal / MIDI locked / MIDI lost); hush = mute glyph;
+  panic = stop glyph. Every icon has an accessible label and a tooltip
+  carrying the old text. Icons are inline SVG in the bundle (no icon
+  font, no network).
+- **Foldable right pane.** The right pane collapses to a narrow rail
+  (toggle button and a keyboard shortcut); the code pane takes the width;
+  the folded state persists per viewer in `localStorage` (try/catch); the
+  slider panel keeps its bindings while folded (no teardown of
+  learned MIDI mappings). Sections inside the pane (sliders, directives,
+  parameter editors, samples, packages) fold individually too.
+- **Unchanged**: the protocol, the wasm and native tiers, Tauri wrapping
+  the same `dist`, and every TASK-010 behavior; the TASK-010 vitest
+  suites are ported, not dropped.
 
 ## 16. Wasm and AudioWorklet Layout
 

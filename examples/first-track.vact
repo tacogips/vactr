@@ -1,0 +1,22 @@
+# first track: a house sketch at 124 bpm, synths only (no sample bank needed)
+# evaluate the whole file, then re-evaluate any line while it plays
+
+use-bpm 124
+
+# kick: a low analog sine with a fast decay, four to the floor
+s :analog > note [:c1 :c1 :c1 :c1] > wave :sine > decay 0.18 > release 0.05 > gain 0.9 > d1
+
+# clap-ish hit on 2 and 4: fm with a short envelope
+s :fm > note [nil :g4 nil :g4] > ratio 7 > index 3 > decay 0.12 > release 0.08 > room 0.25 > size 0.6 > gain 0.6 > d2
+
+# hats: fm ticks in a swung pattern, sometimes dropped, high-passed
+s :fm > note [:c7 [:c7 :c7] :c7 {maybe :c7}] > ratio 11 > index 5 > decay 0.04 > release 0.02 > hpf 6000 > gain {range sine 0.3 0.55} > d3
+
+# bass: a sawtooth line under a slowly opening filter
+s :analog > note [:c2 :c2 :g1 :bb1] > wave :saw > cutoff {range sine 300 1800} > res 0.3 > release 0.15 > gain 0.5 > d4
+
+# chords: two bars alternating, spread into a voicing, in a room
+s :pd > chord {alt [:c :m7] [:f :maj7]} > voicing > attack 0.02 > release 0.4 > room 0.4 > gain 0.35 > d5
+
+# texture: a slow additive pad, wide and quiet
+s :additive > note [:c4] > attack 0.8 > release 1.2 > lpf 1200 > pan {range sine 0.3 0.7} > gain 0.25 > d6

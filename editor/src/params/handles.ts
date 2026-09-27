@@ -10,6 +10,9 @@
 // surface, draggable canvas nodes, the handle rows) and the context every
 // kind's `render(el, ctx)` receives.
 
+import { createComponent, createSignal } from 'solid-js';
+import { render } from 'solid-js/web';
+import { CanvasSurface, HandleRowsView, type HandleRow, type HandleRowState } from './handle-view';
 import type { BindApi } from '../app/apis';
 import type { EditorDeps } from '../app/deps';
 import type { EditorDecl, ParamCurve, ParamMeta, ParamUnit, WireSite } from '../protocol/types';
@@ -207,15 +210,15 @@ export interface Surface {
   ctx: CanvasRenderingContext2D | null;
   w: number;
   h: number;
+  dispose(): void;
 }
 
 export function surface(el: HTMLElement, cls: string, w = 240, h = 120): Surface {
-  const canvas = el.ownerDocument.createElement('canvas');
-  canvas.className = `params-canvas ${cls}`;
-  canvas.width = w;
-  canvas.height = h;
+  const holder = el.ownerDocument.createElement('div');
+  const disposeView = render(() => createComponent(CanvasSurface, { className: cls, width: w, height: h }), holder);
+  const canvas = holder.firstElementChild as HTMLCanvasElement;
   el.appendChild(canvas);
-  return { canvas, ctx: canvas.getContext('2d'), w, h };
+  return { canvas, ctx: canvas.getContext('2d'), w, h, dispose: () => { disposeView(); canvas.remove(); } };
 }
 
 export function polyline(ctx: CanvasRenderingContext2D, pts: readonly [number, number][], color = '#8fd'): void {
@@ -311,52 +314,34 @@ export function formatHandleValue(v: number): string {
 
 /** One row per handle: label, a 0..1 range input on the curve, the value and learn. */
 export function handleRows(el: HTMLElement, handles: readonly Handle[], after: () => void): KindView {
-  const doc = el.ownerDocument;
-  const box = doc.createElement('div');
-  box.className = 'params-handles';
-  el.appendChild(box);
-  const rows = handles.map((h) => {
-    const row = doc.createElement('div');
-    row.className = 'params-handle';
-    row.dataset.param = h.param;
-    const label = doc.createElement('span');
-    label.className = 'params-handle-label';
-    label.textContent = h.param;
-    const input = doc.createElement('input');
-    input.type = 'range';
-    input.className = 'params-handle-input';
-    input.min = '0';
-    input.max = '1';
-    input.step = 'any';
-    const value = doc.createElement('span');
-    value.className = 'params-handle-value';
-    const learn = doc.createElement('button');
-    learn.className = 'params-learn';
-    learn.textContent = 'learn';
-    row.append(label, input, value, learn);
-    box.appendChild(row);
-    input.addEventListener('input', () => {
-      h.setUnit(clamp(Number(input.value), 0, 1));
-      update();
-      after();
-    });
-    learn.addEventListener('click', () => void h.learn());
-    return { h, row, input, value, learn };
+  const holder = el.ownerDocument.createElement('div');
+  const rows: { row: HandleRow; setState: (state: HandleRowState) => void }[] = handles.map((handle) => {
+    const [state, setState] = createSignal(handleState(handle));
+    return { row: { handle, state }, setState };
   });
   const update = (): void => {
-    for (const r of rows) {
-      const on = r.h.enabled;
-      r.input.disabled = !on;
-      r.learn.disabled = !on;
-      r.row.classList.toggle('params-disabled', !on);
-      if (on) r.row.removeAttribute('title');
-      else r.row.title = NOT_IN_CODE;
-      r.input.value = String(r.h.unitPos);
-      r.value.textContent = on ? `${formatHandleValue(r.h.value)}${r.h.unit === 'none' ? '' : ` ${r.h.unit}`}` : NOT_IN_CODE;
-    }
+    for (const { row, setState } of rows) setState(handleState(row.handle));
   };
-  update();
-  return { update, dispose: () => box.remove() };
+  const disposeView = render(() => createComponent(HandleRowsView, {
+    rows: rows.map(({ row }) => row),
+    onInput: (handle, value) => {
+      handle.setUnit(clamp(value, 0, 1));
+      update();
+      after();
+    },
+  }), holder);
+  const box = holder.firstElementChild as HTMLElement;
+  el.appendChild(box);
+  return { update, dispose: () => { disposeView(); box.remove(); } };
+}
+
+function handleState(handle: Handle): HandleRowState {
+  const enabled = handle.enabled;
+  return {
+    enabled,
+    position: handle.unitPos,
+    value: enabled ? `${formatHandleValue(handle.value)}${handle.unit === 'none' ? '' : ` ${handle.unit}`}` : NOT_IN_CODE,
+  };
 }
 
 /**
@@ -388,7 +373,7 @@ export function standardView(
     dispose() {
       off();
       rows?.dispose();
-      s.canvas.remove();
+      s.dispose();
     },
   };
 }

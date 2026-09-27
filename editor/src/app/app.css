@@ -60,3 +60,212 @@ body {
   font-size: 12px;
   color: #9aa3ad;
 }
+
+/* ---- design 15.2: icon controls, audio state, eval status, folds ---- */
+
+.vact-transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vact-icon {
+  display: block;
+}
+
+.vact-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #2a2f36;
+  border-radius: 6px;
+  background: #181b20;
+  color: #d8dde3;
+  cursor: pointer;
+}
+
+.vact-icon-button:hover:not(:disabled) {
+  background: #222730;
+}
+
+.vact-icon-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.vact-icon-button:focus-visible,
+.vact-section-toggle:focus-visible {
+  outline: 2px solid #5aa9ff;
+  outline-offset: 1px;
+}
+
+.vact-audio .vact-audio-state[data-state='off'],
+.vact-audio .vact-audio-state[data-state='suspended'] {
+  color: #f0b44c;
+}
+
+.vact-audio .vact-audio-state[data-state='running'] {
+  color: #5fd38a;
+}
+
+.vact-audio .vact-audio-state[data-state='failed'] {
+  color: #ff6b6b;
+}
+
+.vact-audio .vact-audio-state[data-state='starting'] {
+  color: #9aa3ad;
+}
+
+.vact-run {
+  color: #5fd38a;
+}
+
+.vact-eval-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 16px;
+  color: #9aa3ad;
+}
+
+.vact-eval-status[data-status='ok'] {
+  color: #5fd38a;
+}
+
+.vact-eval-status[data-status='diagnostics'] {
+  color: #f0b44c;
+}
+
+.vact-eval-status[data-status='not-delivered'] {
+  color: #ff6b6b;
+}
+
+.vact-tempo,
+.vact-position,
+.vact-level,
+.vact-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vact-clock[data-status='midi-locked'] {
+  color: #5fd38a;
+}
+
+.vact-clock[data-status='midi-lost'] {
+  color: #ff6b6b;
+}
+
+.vact-beat-dot {
+  fill: #3a414b;
+}
+
+.vact-beat-dot[data-on='true'] {
+  fill: #5aa9ff;
+}
+
+.vact-hush {
+  color: #f0b44c;
+}
+
+.vact-stop-all,
+.vact-mute {
+  color: #ff8f8f;
+}
+
+.vact-slots {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vact-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vact-slot .vact-icon-button {
+  width: 20px;
+  height: 20px;
+}
+
+.vact-light {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2a2f36;
+}
+
+.vact-light[data-lit='true'] {
+  background: #5fd38a;
+}
+
+.pane-side-bar {
+  display: flex;
+  justify-content: flex-start;
+  padding: 4px;
+  border-bottom: 1px solid #2a2f36;
+}
+
+.pane-section-header {
+  flex: 0 0 auto;
+  border-bottom: 1px solid #2a2f36;
+}
+
+.vact-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 8px;
+  border: 0;
+  background: #15181c;
+  color: #9aa3ad;
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.vact-section-chevron {
+  display: inline-flex;
+  transition: transform 120ms ease;
+}
+
+.vact-section-chevron[data-folded='true'] {
+  transform: rotate(-90deg);
+}
+
+.pane[data-collapsed='true'] {
+  display: none;
+}
+
+/* The side column folded to a rail: only the fold button stays visible.
+   Areas stay mounted (hidden, not removed). */
+.vactrol-editor[data-side-folded='true'] .pane-side {
+  flex: 0 0 38px;
+  min-width: 38px;
+}
+
+.vactrol-editor[data-side-folded='true'] .pane-side > :not(.pane-side-bar) {
+  display: none;
+}
+
+.vactrol-editor[data-side-folded='true'] .pane-side-bar {
+  border-bottom: 0;
+}
+
+.pane-status[data-state='failed'] {
+  color: #ff6b6b;
+  font-weight: 600;
+}

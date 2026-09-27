@@ -6,6 +6,8 @@
 
 import { StateEffect, StateField, type Range } from '@codemirror/state';
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { buildLayout } from '../app/layout';
 import { DOC_FILE } from '../code/mount';
@@ -23,6 +25,7 @@ import { render as length } from './length';
 import { render as lfo } from './lfo';
 import { callGroups, editorFor, offersSampler, siblings, type CallGroup } from './open';
 import { render as probability } from './probability';
+import { EditorHostView, ParamsView, type GroupView, type ParamsTab } from './params-view';
 import { render as reverb } from './reverb';
 import { PianoRoll } from './roll';
 import { render as sampler } from './sampler';
@@ -50,7 +53,7 @@ export const KINDS: Record<EditorKind, KindRender> = {
   scalar,
 };
 
-export type ParamsTab = 'editors' | 'grid' | 'roll';
+export type { ParamsTab } from './params-view';
 
 const STYLESHEET = new URL('./params.css', import.meta.url).href;
 
@@ -117,9 +120,12 @@ export class ParamsArea {
   current: OpenEditor | null = null;
   private readonly deps: EditorDeps;
   private readonly host: HandleHost;
-  private readonly list: HTMLElement;
   private readonly editorEl: HTMLElement;
   private readonly panes: Record<ParamsTab, HTMLElement>;
+  private readonly setTab: Setter<ParamsTab>;
+  private readonly setGroups: Setter<GroupView[]>;
+  private readonly disposeView: () => void;
+  private disposeEditorView: (() => void) | null = null;
   private readonly offs: (() => void)[] = [];
   private readonly stylesheet: HTMLLinkElement | null;
   private evalRev = 0;
@@ -135,30 +141,24 @@ export class ParamsArea {
       bind: () => deps.bind,
       site: (id) => deps.bind?.siteById(id) ?? deps.store.site(id),
     };
-    this.el = doc.createElement('section');
-    this.el.className = 'params';
+    const holder = doc.createElement('div');
+    const [tab, setTab] = createSignal<ParamsTab>('editors');
+    const [groups, setGroups] = createSignal<GroupView[]>([]);
+    this.setTab = setTab;
+    this.setGroups = setGroups;
+    this.disposeView = render(() => createComponent(ParamsView, {
+      tab, groups,
+      onTab: (name) => this.showTab(name),
+      onOpen: (id, kind) => this.open(id, kind),
+    }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
     buildLayout(root).right.appendChild(this.el);
-    const tabs = doc.createElement('div');
-    tabs.className = 'params-tabs';
-    this.el.appendChild(tabs);
-    const pane = (tab: ParamsTab): HTMLElement => {
-      const b = doc.createElement('button');
-      b.className = 'params-tab';
-      b.dataset.tab = tab;
-      b.textContent = tab;
-      b.addEventListener('click', () => this.showTab(tab));
-      tabs.appendChild(b);
-      const p = doc.createElement('div');
-      p.className = `params-pane params-pane-${tab}`;
-      this.el.appendChild(p);
-      return p;
+    this.panes = {
+      editors: this.el.querySelector('.params-pane-editors') as HTMLElement,
+      grid: this.el.querySelector('.params-pane-grid') as HTMLElement,
+      roll: this.el.querySelector('.params-pane-roll') as HTMLElement,
     };
-    this.panes = { editors: pane('editors'), grid: pane('grid'), roll: pane('roll') };
-    this.list = doc.createElement('div');
-    this.list.className = 'params-list';
-    this.editorEl = doc.createElement('div');
-    this.editorEl.className = 'params-editor';
-    this.panes.editors.append(this.list, this.editorEl);
+    this.editorEl = this.el.querySelector('.params-editor') as HTMLElement;
     this.grid = new StepGrid(this.panes.grid);
     this.roll = new PianoRoll(this.panes.roll, () => deps.code);
     this.showTab('editors');
@@ -219,13 +219,10 @@ export class ParamsArea {
     const decl = found.decl && (kind === undefined || kind === found.kind) ? found.decl : undefined;
     const handles = makeHandles(group, decl, this.host);
     const doc = this.el.ownerDocument;
-    const title = doc.createElement('div');
-    title.className = 'params-title';
-    title.textContent = `${group.name} ${group.ordinal} - ${k}`;
-    const body = doc.createElement('div');
-    body.className = `params-kind params-kind-${k}`;
-    body.dataset.kind = k;
-    this.editorEl.append(title, body);
+    this.disposeEditorView = render(() => createComponent(EditorHostView, {
+      title: `${group.name} ${group.ordinal} - ${k}`, kind: k,
+    }), this.editorEl);
+    const body = this.editorEl.querySelector('.params-kind') as HTMLElement;
     const ctx: KindCtx = {
       doc,
       deps: this.deps,
@@ -245,12 +242,12 @@ export class ParamsArea {
   close(): void {
     this.current?.view.dispose();
     this.current = null;
-    this.editorEl.textContent = '';
+    this.disposeEditorView?.();
+    this.disposeEditorView = null;
   }
 
   showTab(tab: ParamsTab): void {
-    for (const [name, el] of Object.entries(this.panes)) el.hidden = name !== tab;
-    this.el.dataset.tab = tab;
+    this.setTab(tab);
   }
 
   dispose(): void {
@@ -260,6 +257,7 @@ export class ParamsArea {
     this.grid.dispose();
     this.roll.dispose();
     this.deps.code?.view.dispatch({ effects: setHeads.of([]) });
+    this.disposeView();
     this.el.remove();
     this.stylesheet?.remove();
   }
@@ -289,31 +287,11 @@ export class ParamsArea {
   }
 
   private renderList(): void {
-    const doc = this.el.ownerDocument;
     const editors = this.deps.store.manifest?.editors;
-    this.list.textContent = '';
-    for (const g of this.all) {
+    this.setGroups(this.all.map((g) => {
       const { kind } = editorFor(g, editors);
-      const row = doc.createElement('div');
-      row.className = 'params-group';
-      row.dataset.group = g.id;
-      const label = doc.createElement('span');
-      label.className = 'params-group-label';
-      label.textContent = `${g.name} ${g.ordinal}`;
-      const open = doc.createElement('button');
-      open.className = 'params-open';
-      open.textContent = kind;
-      open.addEventListener('click', () => this.open(g.id));
-      row.append(label, open);
-      if (kind !== 'sampler-wave' && offersSampler(g, kind)) {
-        const wave = doc.createElement('button');
-        wave.className = 'params-open-wave';
-        wave.textContent = 'waveform';
-        wave.addEventListener('click', () => this.open(g.id, 'sampler-wave'));
-        row.appendChild(wave);
-      }
-      this.list.appendChild(row);
-    }
+      return { id: g.id, label: `${g.name} ${g.ordinal}`, kind, waveform: kind !== 'sampler-wave' && offersSampler(g, kind) };
+    }));
   }
 
   private markHeads(): void {

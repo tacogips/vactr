@@ -5,6 +5,9 @@
 // else the master bands.
 
 import { bellDb, F_MAX, F_MIN, freqX, shelfDb } from './curves';
+import { createComponent } from 'solid-js';
+import { render as renderSolid } from 'solid-js/web';
+import { EqSpectrumView } from './kind-chrome';
 import { dot, findHandle, polyline, standardView, type Handle, type KindCtx, type KindView, type Node2D } from './handles';
 
 export const EQ_DB = 24;
@@ -46,8 +49,9 @@ function bandDb(b: Band, f: number, i: number, n: number): number {
 }
 
 export function render(el: HTMLElement, ctx: KindCtx): KindView {
-  const back = ctx.doc.createElement('div');
-  back.className = 'params-spectrum';
+  const holder = ctx.doc.createElement('div');
+  const disposeBack = renderSolid(() => createComponent(EqSpectrumView, {}), holder);
+  const back = holder.firstElementChild as HTMLElement;
   el.appendChild(back);
   const bus = chainBus(ctx);
   const spectrum = ctx.deps.visual?.mountSpectrum(back, bus === undefined ? {} : { bus }) ?? null;
@@ -86,6 +90,7 @@ export function render(el: HTMLElement, ctx: KindCtx): KindView {
     dispose() {
       view.dispose();
       spectrum?.dispose();
+      disposeBack();
       back.remove();
     },
   };

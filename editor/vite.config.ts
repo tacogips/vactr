@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import solid from 'vite-plugin-solid';
 
 // Build of the editor page (design 15.1.3 "Wasm artifact").
 //
@@ -116,7 +117,7 @@ export function vactrolAssets(): Plugin {
 export default defineConfig({
   // Relative asset URLs: the same dist serves the browser and the Tauri shell.
   base: './',
-  plugins: [vactrolAssets()],
+  plugins: [solid(), vactrolAssets()],
   build: {
     target: 'es2022',
   },

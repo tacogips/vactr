@@ -5,6 +5,9 @@
 // registers no input handler.
 
 import type { WirePlaying } from '../protocol/types';
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
+import { GridView, type GridRow } from './telemetry-view';
 
 export interface GridStep {
   /** 0..1 within the cycle. */
@@ -54,10 +57,15 @@ export class CycleSteps {
 export class StepGrid {
   readonly el: HTMLElement;
   private readonly data = new CycleSteps();
+  private readonly setRows: Setter<GridRow[]>;
+  private readonly disposeView: () => void;
 
   constructor(parent: HTMLElement) {
-    this.el = parent.ownerDocument.createElement('div');
-    this.el.className = 'params-grid';
+    const holder = parent.ownerDocument.createElement('div');
+    const [rows, setRows] = createSignal<GridRow[]>([]);
+    this.setRows = setRows;
+    this.disposeView = render(() => createComponent(GridView, { rows }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
     parent.appendChild(this.el);
   }
 
@@ -77,29 +85,11 @@ export class StepGrid {
   }
 
   dispose(): void {
+    this.disposeView();
     this.el.remove();
   }
 
   private draw(): void {
-    const doc = this.el.ownerDocument;
-    this.el.textContent = '';
-    for (const slot of this.data.slotNames()) {
-      const row = doc.createElement('div');
-      row.className = 'params-grid-row';
-      row.dataset.slot = slot;
-      const label = doc.createElement('span');
-      label.className = 'params-grid-slot';
-      label.textContent = slot;
-      row.appendChild(label);
-      for (const s of this.data.steps(slot)) {
-        const cell = doc.createElement('span');
-        cell.className = 'params-grid-step';
-        cell.dataset.pos = String(Number(s.pos.toFixed(6)));
-        cell.style.left = `${s.pos * 100}%`;
-        cell.style.width = `${Math.max(0.5, s.len * 100)}%`;
-        row.appendChild(cell);
-      }
-      this.el.appendChild(row);
-    }
+    this.setRows(this.data.slotNames().map((slot) => ({ slot, steps: [...this.data.steps(slot)] })));
   }
 }

@@ -110,9 +110,9 @@ automated proxy is a recording-host test.
 
 ## Editor
 
-The editor (TASK-010, design `design-docs/specs/design-implementation.md`
-15.1) is a Vite + TypeScript app in `editor/` with CodeMirror 6 and no UI
-framework. One frontend speaks Session Protocol v1 over two transports:
+The editor (TASK-010/011, design `design-docs/specs/design-implementation.md`
+15.1, 15.2) is a Vite + TypeScript app in `editor/` with CodeMirror 6 and
+Solid.js views. One frontend speaks Session Protocol v1 over two transports:
 
 - Browser tier (default): the wasm core runs a `Session` on the main
   thread (`src/host/wasm/session_half.rs`) and audio runs in the
@@ -121,8 +121,21 @@ framework. One frontend speaks Session Protocol v1 over two transports:
   `vactrol serve` prints (token included). The page then drives the
   native engine over the loopback WebSocket.
 
+The transport, code mount point, slider and directive rows, parameter pane
+and handles, read-only grid and roll, analyzer displays, visual panes,
+sample browser, and package pane are Solid views. Protocol, binding
+write-back, CodeMirror, canvas drawing, and the WebGL2 render host remain
+in TypeScript hosts.
+
 It provides:
 
+- a transport bar of icons (design 15.2): the audio control (click to
+  start; shows off / running / suspended / failed with the reason), Run
+  (evaluate the whole document), the eval outcome (ok, diagnostics count,
+  or not delivered), tempo, cycle.beat with a beat ring, clock source,
+  hush and stop; every icon has a tooltip;
+- a side column that folds to a rail (button or `Mod-\\`) with sections
+  that fold individually, remembered per browser;
 - the `.vact` mode, eval keybindings and flash, and inline diagnostics;
 - playing-step highlighting on the audio clock, and the transport bar;
 - the right-pane slider panel (source-edit and overlay modes), the

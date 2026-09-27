@@ -7,6 +7,9 @@
 
 import type { CodeApi } from '../app/apis';
 import type { WirePlaying } from '../protocol/types';
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
+import { RollView, type RollDisplayNote } from './telemetry-view';
 
 export interface RollNote {
   slot: string;
@@ -42,11 +45,16 @@ export class PianoRoll {
   private readonly code: () => CodeApi | undefined;
   private cycle = -1;
   private list: RollNote[] = [];
+  private readonly setNotes: Setter<RollDisplayNote[]>;
+  private readonly disposeView: () => void;
 
   constructor(parent: HTMLElement, code: () => CodeApi | undefined) {
     this.code = code;
-    this.el = parent.ownerDocument.createElement('div');
-    this.el.className = 'params-roll';
+    const holder = parent.ownerDocument.createElement('div');
+    const [notes, setNotes] = createSignal<RollDisplayNote[]>([]);
+    this.setNotes = setNotes;
+    this.disposeView = render(() => createComponent(RollView, { notes }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
     parent.appendChild(this.el);
   }
 
@@ -73,6 +81,7 @@ export class PianoRoll {
   }
 
   dispose(): void {
+    this.disposeView();
     this.el.remove();
   }
 
@@ -85,24 +94,13 @@ export class PianoRoll {
   }
 
   private draw(): void {
-    const doc = this.el.ownerDocument;
-    this.el.textContent = '';
     const pitches = this.list.map((n) => n.pitch).filter((p): p is number => p !== null);
     const hi = pitches.length > 0 ? Math.max(...pitches) : 0;
     const lo = pitches.length > 0 ? Math.min(...pitches) : 0;
     const lanes = hi - lo + 2;
-    for (const n of this.list) {
-      const note = doc.createElement('span');
-      note.className = 'params-roll-note';
-      note.dataset.slot = n.slot;
+    this.setNotes(this.list.map((n) => {
       const lane = n.pitch === null ? lanes - 1 : hi - n.pitch;
-      if (n.pitch === null) note.dataset.lane = 'unpitched';
-      else note.dataset.pitch = String(n.pitch);
-      note.style.left = `${n.pos * 100}%`;
-      note.style.width = `${Math.max(0.5, n.len * 100)}%`;
-      note.style.top = `${(lane / lanes) * 100}%`;
-      note.title = n.text;
-      this.el.appendChild(note);
-    }
+      return { ...n, lane: n.pitch === null ? 'unpitched' : undefined, top: (lane / lanes) * 100 };
+    }));
   }
 }

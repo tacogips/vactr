@@ -2,6 +2,9 @@
 // user picks the X and Y sites from the group's sites (default: its first
 // two) or from any site of the file.
 
+import { createComponent, createSignal } from 'solid-js';
+import { render as renderSolid } from 'solid-js/web';
+import { XyChrome, type AxisOption } from './kind-chrome';
 import type { WireSite } from '../protocol/types';
 import { dot, siteHandle, standardView, type Handle, type KindCtx, type KindView } from './handles';
 
@@ -24,22 +27,19 @@ export function render(el: HTMLElement, ctx: KindCtx): XyView {
     const rest = ctx.deps.store.sitesOf(ctx.file).filter((s) => !own.some((o) => o.id === s.id));
     return [...own, ...rest];
   };
-  const pickers = doc.createElement('div');
-  pickers.className = 'params-xy-pick';
-  el.appendChild(pickers);
-  const select = (axis: string): HTMLSelectElement => {
-    const sel = doc.createElement('select');
-    sel.className = `params-xy-${axis}`;
-    pickers.appendChild(sel);
-    return sel;
-  };
-  const sx = select('x');
-  const sy = select('y');
+  const [options, setOptions] = createSignal<AxisOption[]>([]);
+  const [x, setX] = createSignal('');
+  const [y, setY] = createSignal('');
+  const holder = doc.createElement('div');
+  const disposeChrome = renderSolid(() => createComponent(XyChrome, {
+    options, x, y,
+    onPick: (xValue, yValue) => pick(xValue ? Number(xValue) : null, yValue ? Number(yValue) : null),
+  }), holder);
+  el.append(...Array.from(holder.childNodes));
+  const body = el.querySelector('.params-xy-body') as HTMLElement;
   let hx: Handle | null = null;
   let hy: Handle | null = null;
   let view: (KindView & { surface: { w: number; h: number } }) | null = null;
-  const body = doc.createElement('div');
-  el.appendChild(body);
 
   const build = (): void => {
     view?.dispose();
@@ -62,31 +62,18 @@ export function render(el: HTMLElement, ctx: KindCtx): XyView {
     view = v;
   };
   const fill = (): void => {
-    for (const sel of [sx, sy]) {
-      const keep = sel.value;
-      sel.textContent = '';
-      for (const s of all()) {
-        const o = doc.createElement('option');
-        o.value = String(s.id);
-        o.textContent = describe(s);
-        sel.appendChild(o);
-      }
-      if (keep) sel.value = keep;
-    }
+    setOptions(all().map((site) => ({ id: site.id, label: describe(site) })));
   };
-  const pick = (x: number | null, y: number | null): void => {
-    hx = x === null ? null : siteHandle(x, 'x', ctx.host, editors);
-    hy = y === null ? null : siteHandle(y, 'y', ctx.host, editors);
-    if (x !== null) sx.value = String(x);
-    if (y !== null) sy.value = String(y);
+  const pick = (xId: number | null, yId: number | null): void => {
+    hx = xId === null ? null : siteHandle(xId, 'x', ctx.host, editors);
+    hy = yId === null ? null : siteHandle(yId, 'y', ctx.host, editors);
+    setX(xId === null ? '' : String(xId));
+    setY(yId === null ? '' : String(yId));
     build();
   };
   fill();
   const own = ctx.group.sites;
   pick(own[0]?.id ?? null, own[1]?.id ?? null);
-  const onPick = (): void => pick(sx.value ? Number(sx.value) : null, sy.value ? Number(sy.value) : null);
-  sx.addEventListener('change', onPick);
-  sy.addEventListener('change', onPick);
   return {
     pick,
     axes: () => [hx, hy],
@@ -96,8 +83,7 @@ export function render(el: HTMLElement, ctx: KindCtx): XyView {
     },
     dispose() {
       view?.dispose();
-      pickers.remove();
-      body.remove();
+      disposeChrome();
     },
   };
 }

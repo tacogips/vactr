@@ -5,6 +5,9 @@
 // and displays of entries no longer published are removed. There is no
 // audio input and no `getUserMedia` anywhere (E2).
 
+import { createComponent, createSignal } from 'solid-js';
+import { render } from 'solid-js/web';
+import { AnalyzerView, CanvasDisplayView, ReadoutDisplayView } from './meter-view';
 import type { Store } from '../protocol/store';
 import type { LevelsBody, WireAnalyzer } from '../protocol/types';
 import {
@@ -28,17 +31,7 @@ export interface AnalyzerDisplay {
   /** Repaints so far. */
   readonly paints: number;
   update(cells: readonly number[]): void;
-}
-
-function frame(doc: Document, title: string, kind: string): { el: HTMLElement; body: HTMLElement } {
-  const el = doc.createElement('div');
-  el.className = 'visual-display';
-  el.dataset.kind = kind;
-  const label = doc.createElement('span');
-  label.className = 'visual-display-title';
-  label.textContent = title;
-  el.appendChild(label);
-  return { el, body: el };
+  dispose(): void;
 }
 
 class CanvasDisplay implements AnalyzerDisplay {
@@ -48,15 +41,13 @@ class CanvasDisplay implements AnalyzerDisplay {
   private readonly w: number;
   private readonly h: number;
   private readonly draw: Draw;
+  private readonly disposeView: () => void;
 
   constructor(doc: Document, title: string, kind: string, h: number, draw: Draw) {
-    const f = frame(doc, title, kind);
-    this.el = f.el;
-    const canvas = doc.createElement('canvas');
-    canvas.width = DISPLAY_WIDTH;
-    canvas.height = h;
-    f.body.appendChild(canvas);
-    this.ctx = canvas.getContext('2d');
+    const holder = doc.createElement('div');
+    this.disposeView = render(() => createComponent(CanvasDisplayView, { title, kind, width: DISPLAY_WIDTH, height: h }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
+    this.ctx = this.el.querySelector('canvas')!.getContext('2d');
     this.w = DISPLAY_WIDTH;
     this.h = h;
     this.draw = draw;
@@ -68,27 +59,32 @@ class CanvasDisplay implements AnalyzerDisplay {
     this.ctx.clearRect(0, 0, this.w, this.h);
     this.draw(this.ctx, this.w, this.h, cells);
   }
+
+  dispose(): void { this.disposeView(); this.el.remove(); }
 }
 
 class ReadoutDisplay implements AnalyzerDisplay {
   readonly el: HTMLElement;
   paints = 0;
-  private readonly text: HTMLElement;
+  private readonly setText: (value: string) => void;
   private readonly format: (cells: readonly number[]) => string;
+  private readonly disposeView: () => void;
 
   constructor(doc: Document, title: string, kind: string, format: (cells: readonly number[]) => string) {
-    const f = frame(doc, title, kind);
-    this.el = f.el;
-    this.text = doc.createElement('span');
-    this.text.className = 'visual-readout';
-    f.body.appendChild(this.text);
+    const holder = doc.createElement('div');
+    const [text, setText] = createSignal('');
+    this.setText = setText;
+    this.disposeView = render(() => createComponent(ReadoutDisplayView, { title, kind, text }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
     this.format = format;
   }
 
   update(cells: readonly number[]): void {
     this.paints++;
-    this.text.textContent = this.format(cells);
+    this.setText(this.format(cells));
   }
+
+  dispose(): void { this.disposeView(); this.el.remove(); }
 }
 
 /** An rms bar on the dBFS scale plus a peak tick when the cells carry one. */
@@ -164,14 +160,14 @@ export class AnalyzerArea {
   private lastRms: readonly number[] | undefined;
   private lastBands: readonly number[] | undefined;
   private readonly off: () => void;
+  private readonly disposeView: () => void;
 
   constructor(parent: HTMLElement, store: Store) {
     const doc = parent.ownerDocument;
-    this.el = doc.createElement('section');
-    this.el.className = 'visual-analyzers';
-    this.el.dataset.area = 'analyzers';
-    const master = doc.createElement('div');
-    master.className = 'visual-master';
+    const holder = doc.createElement('div');
+    this.disposeView = render(() => createComponent(AnalyzerView, {}), holder);
+    this.el = holder.firstElementChild as HTMLElement;
+    const master = this.el.querySelector('.visual-master') as HTMLElement;
     this.master = {
       meter: new CanvasDisplay(doc, 'master rms', 'master-rms', METER_HEIGHT, drawMeter),
       bands: new CanvasDisplay(doc, 'master bands', 'master-bands', PLOT_HEIGHT, (ctx, w, h, c) =>
@@ -179,9 +175,7 @@ export class AnalyzerArea {
       ),
     };
     master.append(this.master.meter.el, this.master.bands.el);
-    this.list = doc.createElement('div');
-    this.list.className = 'visual-analyzer-list';
-    this.el.append(master, this.list);
+    this.list = this.el.querySelector('.visual-analyzer-list') as HTMLElement;
     parent.appendChild(this.el);
     this.off = store.subscribe(['levels'], () => this.update(store.levels));
     this.update(store.levels);
@@ -220,13 +214,17 @@ export class AnalyzerArea {
     }
     for (const [key, e] of this.entries) {
       if (seen.has(key)) continue;
-      e.display.el.remove();
+      e.display.dispose();
       this.entries.delete(key);
     }
   }
 
   dispose(): void {
     this.off();
+    for (const entry of this.entries.values()) entry.display.dispose();
+    this.master.meter.dispose();
+    this.master.bands.dispose();
+    this.disposeView();
     this.el.remove();
     this.entries.clear();
   }

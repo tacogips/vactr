@@ -36,9 +36,25 @@ export function buildLayout(root: HTMLElement): Layout {
     side.className = 'pane-side';
     main.appendChild(side);
   }
-  const right = get('right', side);
-  const visual = get('visual', side);
-  const analyzers = get('analyzers', side);
+  // Design 15.2: the side column folds to a rail (`.pane-side-bar` holds the
+  // fold button) and each section has a fold header before its pane.
+  if (!side.querySelector('.pane-side-bar')) {
+    const bar = doc.createElement('div');
+    bar.className = 'pane-side-bar';
+    side.appendChild(bar);
+  }
+  const section = (name: PaneName): HTMLElement => {
+    if (!side.querySelector(`.pane-section-header[data-section="${name}"]`)) {
+      const header = doc.createElement('div');
+      header.className = 'pane-section-header';
+      header.dataset.section = name;
+      side.appendChild(header);
+    }
+    return get(name, side);
+  };
+  const right = section('right');
+  const visual = section('visual');
+  const analyzers = section('analyzers');
   const status = get('status', root);
   return { transport, code, right, visual, analyzers, status };
 }

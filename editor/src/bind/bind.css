@@ -22,7 +22,7 @@
 
 .bind-row {
   display: grid;
-  grid-template-columns: minmax(6rem, 1fr) 7rem 3.5rem auto auto auto auto auto auto;
+  grid-template-columns: minmax(6rem, 1fr) 7rem 3.5rem auto auto auto auto auto auto auto;
   gap: 0.25rem;
   align-items: center;
   padding: 1px 0;
@@ -74,6 +74,11 @@
 .bind-midi {
   font-size: 10px;
   color: #88c0d0;
+}
+
+.bind-row .vact-icon-button,
+.bind-controls .vact-icon-button {
+  padding: 0.2rem;
 }
 
 .bind-name {

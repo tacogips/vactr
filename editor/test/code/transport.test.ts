@@ -18,7 +18,9 @@ function setup() {
   document.body.appendChild(parent);
   const bar = new TransportBar(parent, { client, clock });
   const text = (cls: string) => parent.querySelector(`.${cls}`)?.textContent;
-  return { clock, transport, client, parent, bar, text };
+  // Design 15.2: icons carry their words as the accessible name.
+  const label = (cls: string) => parent.querySelector(`.${cls}`)?.getAttribute('aria-label');
+  return { clock, transport, client, parent, bar, text, label };
 }
 
 const tempo = (extra: Partial<TempoBody> = {}): TempoBody => ({ bpm: 120, beats_per_cycle: 4, cycle: [3, 1], ...extra });
@@ -26,30 +28,32 @@ const play = (slot: string, time: number): WirePlaying => ({ slot, beat: [0, 1],
 
 describe('TransportBar', () => {
   it('renders tempo and extrapolates cycle/beat on the clock between messages', () => {
-    const { clock, bar, text } = setup();
+    const { clock, bar, text, label } = setup();
     bar.onTempo(tempo());
-    expect(text('vact-tempo')).toBe('120.0 bpm');
-    expect(text('vact-position')).toBe('cycle 3 beat 1');
+    expect(text('vact-tempo-value')).toBe('120.0');
+    expect(label('vact-tempo')).toBe('tempo 120.0 bpm');
+    expect(label('vact-position')).toBe('cycle 3 beat 1');
+    expect(text('vact-position-value')).toBe('3.1');
     // 120 bpm, 4 beats per cycle: 0.5 s is one beat.
     clock.advance(0.5);
     bar.tick();
     expect(bar.cycles()).toBeCloseTo(3.25);
-    expect(text('vact-position')).toBe('cycle 3 beat 2');
+    expect(label('vact-position')).toBe('cycle 3 beat 2');
     clock.advance(1.5);
     bar.tick();
-    expect(text('vact-position')).toBe('cycle 4 beat 1');
+    expect(label('vact-position')).toBe('cycle 4 beat 1');
   });
 
   it('shows the MIDI clock status, including midi lost (position held)', () => {
-    const { clock, bar, text, parent } = setup();
+    const { clock, bar, label, parent } = setup();
     expect(clockStatus(null)).toBe('internal');
     bar.onTempo(tempo({ clock: { source: 'internal' } }));
-    expect(text('vact-clock')).toBe('internal');
+    expect(label('vact-clock')).toBe('clock: internal');
     bar.onTempo(tempo({ bpm: 98, clock: { source: 'midi', locked: true } }));
-    expect(text('vact-clock')).toBe('midi locked');
-    expect(text('vact-tempo')).toBe('98.0 bpm');
+    expect(label('vact-clock')).toBe('clock: midi locked');
+    expect(label('vact-tempo')).toBe('tempo 98.0 bpm');
     bar.onTempo(tempo({ clock: { source: 'midi', locked: false } }));
-    expect(text('vact-clock')).toBe('midi lost');
+    expect(label('vact-clock')).toBe('clock: midi lost');
     expect(parent.querySelector<HTMLElement>('.vact-clock')?.dataset.status).toBe('midi-lost');
     clock.advance(2);
     bar.tick();
@@ -82,11 +86,12 @@ describe('TransportBar', () => {
   });
 
   it('adds slots named by diagnostics and reads the master level', () => {
-    const { bar, text } = setup();
+    const { bar, text, label } = setup();
     bar.onDiagnostics([{ code: 'x', severity: 'error', message: 'm', span: { start: 0, end: 1 }, file: 'f', slot: 'bass' }]);
     expect(bar.slotNames()).toEqual(['bass']);
     bar.onLevels({ levels: [{ source: 'master', rms: 0.5 }] });
-    expect(text('vact-level')).toBe('master -6.0 dB');
+    expect(text('vact-level-value')).toBe('-6.0');
+    expect(label('vact-level')).toBe('master level -6.0 dB');
     expect(formatLevel(0)).toBe('master -inf dB');
     expect(formatLevel(undefined)).toBe('master --');
   });
@@ -124,7 +129,7 @@ describe('code area mount', () => {
     expect(layout.code.querySelector('.cm-editor')).not.toBeNull();
     expect(layout.code.querySelector('.vact-samples')).not.toBeNull();
     transport.emit({ kind: 'tempo', body: tempo({ bpm: 140 }) });
-    expect(layout.transport.querySelector('.vact-tempo')?.textContent).toBe('140.0 bpm');
+    expect(layout.transport.querySelector('.vact-tempo')?.getAttribute('aria-label')).toBe('tempo 140.0 bpm');
     transport.emit({ kind: 'manifest', body: { sounds: ['bd', 'sd'], synths: [], controls: [] } });
     expect([...layout.code.querySelectorAll<HTMLElement>('.vact-sound')].map((e) => e.dataset.sound)).toEqual(['bd', 'sd']);
     m.dispose();

@@ -16,6 +16,9 @@
 //   code-only, and this module has no API that could change it.
 // - The `n` site's "browse" opens the sample browser at the bank.
 
+import { createComponent, createSignal } from 'solid-js';
+import { render as renderSolid } from 'solid-js/web';
+import { SamplerChrome } from './kind-chrome';
 import type { SampleFrames } from '../app/apis';
 import type { WireSite } from '../protocol/types';
 import { peaks } from './curves';
@@ -136,24 +139,18 @@ export function render(el: HTMLElement, ctx: KindCtx): SamplerView {
     return Array.from({ length: n }, (_, i): [number, number] => [i / n, (i + 1) / n]);
   };
 
-  const hint = doc.createElement('div');
-  hint.className = 'params-hint';
-  const preview = doc.createElement('div');
-  preview.className = 'params-no-preview';
-  el.append(hint, preview);
-
   const nSite = formGroups(ctx).find((g) => g.name === 'n')?.sites[0];
-  let browse: HTMLButtonElement | null = null;
-  if (nSite) {
-    browse = doc.createElement('button');
-    browse.className = 'params-browse';
-    browse.textContent = 'browse';
-    browse.addEventListener('click', () => {
+  const [hint, setHint] = createSignal('');
+  const [preview, setPreview] = createSignal('');
+  const chromeHolder = doc.createElement('div');
+  const disposeChrome = renderSolid(() => createComponent(SamplerChrome, {
+    hint, preview, browse: nSite !== undefined,
+    onBrowse: () => {
       const bank = sampleBank(ctx);
       ctx.deps.code?.samples.openBrowser(bank ?? undefined);
-    });
-    el.appendChild(browse);
-  }
+    },
+  }), chromeHolder);
+  el.append(...Array.from(chromeHolder.childNodes));
 
   const view = standardView(
     el,
@@ -162,7 +159,7 @@ export function render(el: HTMLElement, ctx: KindCtx): SamplerView {
     (s) => {
       const c = s.ctx;
       const frames = findSample(ctx, chainValue(ctx, 'n') ?? 0);
-      preview.textContent = frames ? '' : NO_PREVIEW;
+      setPreview(frames ? '' : NO_PREVIEW);
       if (!c) return;
       if (frames) {
         c.fillStyle = '#8fd';
@@ -196,10 +193,10 @@ export function render(el: HTMLElement, ctx: KindCtx): SamplerView {
     const id = ctx.deps.code?.selectedSiteId() ?? null;
     const site = id === null ? undefined : ctx.host.site(id);
     if (id === null || !isIndexSite(ctx, site)) {
-      hint.textContent = SELECT_HINT;
+      setHint(SELECT_HINT);
       return false;
     }
-    hint.textContent = '';
+    setHint('');
     ctx.host.bind()?.writeSite(id, k);
     return true;
   };
@@ -226,9 +223,7 @@ export function render(el: HTMLElement, ctx: KindCtx): SamplerView {
     dispose() {
       canvas.removeEventListener('click', onClick);
       view.dispose();
-      hint.remove();
-      preview.remove();
-      browse?.remove();
+      disposeChrome();
     },
   };
 }

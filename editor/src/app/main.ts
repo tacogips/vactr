@@ -22,6 +22,10 @@ import { mount as mountVisual } from '../visual/mount';
 import { AudioClock, PageClock } from './clock';
 import type { EditorDeps, Mounted, MountFn } from './deps';
 import { buildLayout, pane, type Layout } from './layout';
+import { mountShell, pageStorage } from '../ui/shell';
+import { BootFailure } from '../ui/status-view';
+import { createComponent } from 'solid-js';
+import { render } from 'solid-js/web';
 
 export const MOUNT_ORDER = ['code', 'midi', 'visual', 'bind', 'params', 'pkg'] as const;
 
@@ -46,7 +50,7 @@ export interface Editor {
 /** Builds the layout and mounts every area in `MOUNT_ORDER`. */
 export function createEditor(root: HTMLElement, deps: EditorDeps): Editor {
   const layout = buildLayout(root);
-  const handles: Mounted[] = [];
+  const handles: Mounted[] = [mountShell(root, pageStorage(root.ownerDocument.defaultView))];
   for (const area of MOUNT_ORDER) handles.push(MOUNTS[area](root, deps));
   return {
     root,
@@ -100,7 +104,10 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
 const appRoot = typeof document === 'undefined' ? null : document.getElementById('vactrol-app');
 if (appRoot) {
   boot(appRoot).catch((e: unknown) => {
+    // Design 15.2: boot failures are shown, never only logged.
     buildLayout(appRoot);
-    pane(appRoot, 'status').textContent = `failed to start: ${String(e)}`;
+    const status = pane(appRoot, 'status');
+    status.dataset.state = 'failed';
+    render(() => createComponent(BootFailure, { reason: e instanceof Error ? e.message : String(e) }), status);
   });
 }

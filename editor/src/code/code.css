@@ -31,34 +31,7 @@
   border-radius: 2px;
 }
 
-/* Transport bar (transport.ts). */
-.vact-transport {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-.vact-clock[data-status='midi-locked'] { color: #a3be8c; }
-.vact-clock[data-status='midi-lost'] { color: #bf616a; font-weight: 600; }
-.vact-hush { font-weight: 600; }
-.vact-slots {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.vact-slot { display: flex; align-items: center; gap: 0.25rem; }
-.vact-light {
-  display: inline-block;
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: #3b4252;
-}
-.vact-light[data-lit='true'] { background: #ebcb8b; }
+/* Transport bar: styled in app/app.css with the other design 15.2 controls. */
 
 /* Sample browser (samples.ts). */
 .vact-samples { font-size: 12px; padding: 0.25rem 0.5rem; }

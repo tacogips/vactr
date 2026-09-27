@@ -9,6 +9,9 @@
 // sends `eval`. Native tier: the same list with the exact `vactrol get
 // <path>` command text, and no fetching at all.
 
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
+import { PkgView, type PkgModel } from './pkg-view';
 import type { Tier } from '../app/deps';
 import type { Diagnostic } from '../protocol/types';
 import {
@@ -55,13 +58,12 @@ interface PaneDiag {
 
 export class PkgPane {
   readonly el: HTMLElement;
-  private readonly doc: Document;
   private readonly opts: PkgPaneOptions;
   private readonly proxyInput: HTMLInputElement;
-  private readonly list: HTMLUListElement;
-  private readonly statusEl: HTMLElement;
-  private readonly hintEl: HTMLElement;
-  private readonly diagList: HTMLUListElement;
+  private readonly setModel: Setter<PkgModel>;
+  private readonly disposeView: () => void;
+  private statusText = '';
+  private hintText = '';
   private requirements: Record<string, string> = {};
   private unresolved: UnresolvedImport[] = [];
   private loadDiags: PaneDiag[] = [];
@@ -69,45 +71,19 @@ export class PkgPane {
   private busy = false;
 
   constructor(doc: Document, opts: PkgPaneOptions) {
-    this.doc = doc;
     this.opts = opts;
-    const el = doc.createElement('section');
-    el.className = 'pkg-pane';
-    el.dataset.area = 'pkg';
-    const title = doc.createElement('div');
-    title.className = 'pkg-title';
-    title.textContent = 'Packages';
-
-    const proxyRow = doc.createElement('label');
-    proxyRow.className = 'pkg-proxy';
-    proxyRow.textContent = 'Proxy ';
-    this.proxyInput = doc.createElement('input');
-    this.proxyInput.type = 'url';
-    this.proxyInput.placeholder = 'https://proxy.example';
-    this.proxyInput.dataset.pkg = 'proxy';
-    this.proxyInput.value = opts.storage?.getItem(PROXY_KEY) ?? '';
-    this.proxyInput.addEventListener('change', () => {
-      opts.storage?.setItem(PROXY_KEY, this.proxyInput.value.trim());
-    });
-    proxyRow.appendChild(this.proxyInput);
-    proxyRow.hidden = opts.tier !== 'browser';
-
-    this.list = doc.createElement('ul');
-    this.list.className = 'pkg-imports';
-    this.list.dataset.pkg = 'imports';
-    this.statusEl = doc.createElement('div');
-    this.statusEl.className = 'pkg-status';
-    this.statusEl.dataset.pkg = 'status';
-    this.hintEl = doc.createElement('div');
-    this.hintEl.className = 'pkg-hint';
-    this.hintEl.dataset.pkg = 'hint';
-    this.hintEl.hidden = true;
-    this.diagList = doc.createElement('ul');
-    this.diagList.className = 'pkg-diagnostics';
-    this.diagList.dataset.pkg = 'diagnostics';
-
-    el.append(title, proxyRow, this.hintEl, this.list, this.statusEl, this.diagList);
-    this.el = el;
+    const holder = doc.createElement('div');
+    const [model, setModel] = createSignal<PkgModel>(this.model());
+    this.setModel = setModel;
+    this.disposeView = render(() => createComponent(PkgView, {
+      tier: opts.tier,
+      proxy: opts.storage?.getItem(PROXY_KEY) ?? '',
+      model,
+      onProxy: (value) => opts.storage?.setItem(PROXY_KEY, value),
+      onImport: (path) => void this.importPath(path),
+    }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
+    this.proxyInput = this.el.querySelector<HTMLInputElement>('[data-pkg="proxy"]')!;
     if (opts.store && !opts.store.persistent) this.showHint(MEMORY_ONLY_HINT);
   }
 
@@ -120,7 +96,7 @@ export class PkgPane {
   }
 
   get status(): string {
-    return this.statusEl.textContent ?? '';
+    return this.statusText;
   }
 
   /** The static and runtime diagnostics the pane derives its lists from. */
@@ -186,53 +162,31 @@ export class PkgPane {
   }
 
   dispose(): void {
+    this.disposeView();
     this.el.remove();
   }
 
   private setStatus(text: string): void {
-    this.statusEl.textContent = text;
+    this.statusText = text;
+    this.render();
   }
 
   private showHint(text: string): void {
-    this.hintEl.textContent = text;
-    this.hintEl.hidden = false;
+    this.hintText = text;
+    this.render();
+  }
+
+  private model(): PkgModel {
+    return {
+      unresolved: [...this.unresolved],
+      diagnostics: [...this.driverDiags, ...this.loadDiags],
+      busy: this.busy,
+      status: this.statusText,
+      hint: this.hintText,
+    };
   }
 
   private render(): void {
-    const doc = this.doc;
-    this.list.replaceChildren(
-      ...this.unresolved.map((u) => {
-        const li = doc.createElement('li');
-        li.dataset.pkgPath = u.path;
-        li.title = u.message;
-        const name = doc.createElement('span');
-        name.className = 'pkg-path';
-        name.textContent = u.path;
-        li.appendChild(name);
-        if (this.opts.tier === 'native') {
-          const cmd = doc.createElement('code');
-          cmd.dataset.pkg = 'get-command';
-          cmd.textContent = getCommand(u.path);
-          li.appendChild(cmd);
-        } else {
-          const btn = doc.createElement('button');
-          btn.type = 'button';
-          btn.dataset.pkgAction = 'import';
-          btn.textContent = 'Import';
-          btn.disabled = this.busy;
-          btn.addEventListener('click', () => void this.importPath(u.path));
-          li.appendChild(btn);
-        }
-        return li;
-      }),
-    );
-    this.diagList.replaceChildren(
-      ...[...this.driverDiags, ...this.loadDiags].map((d) => {
-        const li = doc.createElement('li');
-        li.dataset.code = d.code;
-        li.textContent = `${d.code}: ${d.message}`;
-        return li;
-      }),
-    );
+    this.setModel(this.model());
   }
 }

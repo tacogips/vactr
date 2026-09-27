@@ -11,7 +11,10 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { lintGutter } from '@codemirror/lint';
 import { EditorState, Text } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { createComponent } from 'solid-js';
+import { render } from 'solid-js/web';
 import type { CodeApi, SampleLibraryApi } from '../app/apis';
+import type { ServerEnvelope } from '../protocol/types';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { pane } from '../app/layout';
 import { DiagnosticsController } from './diagnostics';
@@ -21,6 +24,7 @@ import { vactLanguage } from './language';
 import { SampleBrowser, SampleLibrary, type DecodedAudio } from './samples';
 import { DocumentSync } from './sync';
 import { TransportBar } from './transport';
+import { CodeSurface } from './code-view';
 
 /** The document the code pane edits. */
 export const DOC_FILE = 'main.vact';
@@ -53,8 +57,9 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
   const codePane = pane(root, 'code');
   const transportPane = pane(root, 'transport');
 
-  const host = doc.createElement('div');
-  host.className = 'vact-code';
+  const holder = doc.createElement('div');
+  const disposeCodeView = render(() => createComponent(CodeSurface, {}), holder);
+  const host = holder.firstElementChild as HTMLElement;
   codePane.appendChild(host);
 
   const initial = Text.of(['']);
@@ -70,7 +75,15 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
     anchor,
     apply: (ranges) => view?.dispatch({ effects: setPlaying.of(ranges) }),
   });
-  const evalCtl = new EvalController({ client, sync, onHush: () => highlight.clear() });
+  // Filled once the transport exists: every eval starts audio (the key press
+  // is a user gesture) and shows its outcome (design 15.2).
+  let onEval: ((reply: Promise<ServerEnvelope>) => void) | null = null;
+  const evalCtl = new EvalController({
+    client,
+    sync,
+    onHush: () => highlight.clear(),
+    onEval: (reply) => onEval?.(reply),
+  });
   const diagnostics = new DiagnosticsController({
     client,
     sync,
@@ -100,7 +113,18 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
   evalCtl.attach(editorView);
   diagnostics.attach(editorView);
 
-  const transport = new TransportBar(transportPane, { client, clock, anchor, onHush: () => highlight.clear() });
+  const transport = new TransportBar(transportPane, {
+    client,
+    clock,
+    anchor,
+    onHush: () => highlight.clear(),
+    audio: deps.core?.host.ctx ?? null,
+    onRun: () => void evalCtl.evalAll(),
+  });
+  onEval = (reply) => {
+    void transport.audio.start();
+    transport.evalStarted(reply);
+  };
 
   const core = deps.core;
   const library =
@@ -189,6 +213,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
       transport.dispose();
       browser.dispose();
       editorView.destroy();
+      disposeCodeView();
       host.remove();
       view = null;
       if (deps.code === api) delete deps.code;

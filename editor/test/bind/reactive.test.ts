@@ -47,6 +47,53 @@ function rig(names: string[]) {
 }
 
 describe('reactive displays (criterion 8)', () => {
+  it('a one-site bindings batch preserves neighboring Solid row and value nodes', () => {
+    const { h, bindingOf } = rig(['x', 'y']);
+    h.emit({ kind: 'bindings', body: {
+      pass: 0,
+      changed: [{ name: 'x', value: '0', form_gen: 1 }, { name: 'y', value: '0', form_gen: 1 }],
+      sites: [], states: [],
+    } });
+    const panel = h.area.panel;
+    const xId = bindingOf(0);
+    const yId = bindingOf(1);
+    const xRow = panel.row(xId)!;
+    const yRow = panel.row(yId)!;
+    const xName = panel.nameRow('x')!;
+    const yName = panel.nameRow('y')!;
+    const xValue = xRow.querySelector('.bind-value');
+    const yValue = yRow.querySelector('.bind-value');
+    const xDisplay = xName.querySelector('.bind-name-value');
+    const yDisplay = yName.querySelector('.bind-name-value');
+    const xCount = panel.renderCount(`binding:${xId}`);
+    const yCount = panel.renderCount(`binding:${yId}`);
+    const xNameCount = panel.renderCount('name:x');
+    const yNameCount = panel.renderCount('name:y');
+
+    h.emit({ kind: 'bindings', body: {
+      pass: 1,
+      changed: [{ name: 'x', value: '3', form_gen: 2 }],
+      sites: [{ ...site(h.text(), '0', 11, { origin: 'binding', form_gen: 2, value: 3 }), value: 3 }],
+      states: [{ name: 'x', state: 'ok', value: '3' }],
+    } });
+
+    expect(panel.renderCount(`binding:${xId}`) - xCount).toBe(1);
+    expect(panel.renderCount(`binding:${yId}`) - yCount).toBe(0);
+    expect(panel.renderCount('name:x') - xNameCount).toBe(1);
+    expect(panel.renderCount('name:y') - yNameCount).toBe(0);
+    expect(panel.row(xId)).toBe(xRow);
+    expect(panel.row(yId)).toBe(yRow);
+    expect(xRow.querySelector('.bind-value')).toBe(xValue);
+    expect(yRow.querySelector('.bind-value')).toBe(yValue);
+    expect(panel.nameRow('x')).toBe(xName);
+    expect(panel.nameRow('y')).toBe(yName);
+    expect(xName.querySelector('.bind-name-value')).toBe(xDisplay);
+    expect(yName.querySelector('.bind-name-value')).toBe(yDisplay);
+    expect(q(xRow, '.bind-value')).toBe('3');
+    expect(q(yRow, '.bind-value')).toBe('0');
+    expect(q(xName, '.bind-name-value')).toBe('3');
+  });
+
   for (const shape of BATCH_SHAPES) {
     it(`${shape.name}: one repaint per affected row, none elsewhere, no provisional value`, () => {
       const names = namesOf(shape);

@@ -16,6 +16,9 @@
 // value cannot be rendered.
 
 import type { MidiMapping } from './persistence';
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
+import { NameRow, SiteRow, type NameRowState, type SiteRowState } from './panel-view';
 import { nameKey, siteKey, type Store } from '../protocol/store';
 import type { EditorDecl, SiteOrigin } from '../protocol/types';
 import type { Refresh, SiteEntry, SiteTable } from './sites';
@@ -46,26 +49,18 @@ export interface PanelHost {
 interface Row {
   id: string;
   el: HTMLElement;
-  label: HTMLElement;
-  slider: HTMLInputElement;
-  value: HTMLElement;
-  tier: HTMLElement;
-  mode: HTMLButtonElement;
-  commit: HTMLButtonElement;
-  learn: HTMLButtonElement;
-  midi: HTMLElement;
-  state: HTMLElement;
-  form: HTMLElement;
+  setState: Setter<SiteRowState>;
+  dispose: () => void;
   keys: string;
   off: () => void;
   range: [number, number] | null;
 }
 
-interface NameRow {
+interface ValueRow {
   name: string;
   el: HTMLElement;
-  value: HTMLElement;
-  badge: HTMLElement;
+  setState: Setter<NameRowState>;
+  dispose: () => void;
   off: () => void;
 }
 
@@ -77,7 +72,7 @@ export class SliderPanel {
   private readonly groups = new Map<SiteOrigin, HTMLElement>();
   private readonly namesEl: HTMLElement;
   private readonly rows = new Map<string, Row>();
-  private readonly nameRows = new Map<string, NameRow>();
+  private readonly nameRows = new Map<string, ValueRow>();
   private readonly renders = new Map<string, number>();
 
   constructor(parent: HTMLElement, host: PanelHost) {
@@ -157,8 +152,8 @@ export class SliderPanel {
   }
 
   dispose(): void {
-    for (const r of this.rows.values()) r.off();
-    for (const n of this.nameRows.values()) n.off();
+    for (const r of this.rows.values()) { r.off(); r.dispose(); }
+    for (const n of this.nameRows.values()) { n.off(); n.dispose(); }
     this.rows.clear();
     this.nameRows.clear();
     this.el.remove();
@@ -178,6 +173,7 @@ export class SliderPanel {
     for (const [id, row] of this.rows) {
       if (table.get(id)) continue;
       row.off();
+      row.dispose();
       row.el.remove();
       this.rows.delete(id);
     }
@@ -187,12 +183,12 @@ export class SliderPanel {
       let row = this.rows.get(e.bindingId);
       if (!row) {
         row = this.createRow(e.bindingId);
-        render.add(e.bindingId);
+        render.delete(e.bindingId); // the Solid root rendered its initial state
       }
       const keys = this.keysOf(e.bindingId);
       if (row.keys !== keys) {
         this.subscribe(row, keys);
-        render.add(e.bindingId);
+        if (this.renderCount(`binding:${e.bindingId}`) > 1) render.add(e.bindingId);
       }
       // Re-appending moves the element into order; it is not a render.
       this.groups.get(e.site.origin)?.appendChild(row.el);
@@ -214,137 +210,94 @@ export class SliderPanel {
   }
 
   private createRow(id: string): Row {
-    const doc = this.el.ownerDocument;
-    const el = doc.createElement('div');
-    el.className = 'bind-row';
-    el.dataset.binding = id;
-    const span = (cls: string): HTMLElement => {
-      const s = doc.createElement('span');
-      s.className = cls;
-      el.appendChild(s);
-      return s;
-    };
-    const button = (cls: string, text: string): HTMLButtonElement => {
-      const b = doc.createElement('button');
-      b.type = 'button';
-      b.className = cls;
-      b.textContent = text;
-      el.appendChild(b);
-      return b;
-    };
-    const label = span('bind-label');
-    const slider = doc.createElement('input');
-    slider.type = 'range';
-    slider.className = 'bind-slider';
-    el.appendChild(slider);
+    const holder = this.el.ownerDocument.createElement('div');
     const row: Row = {
-      id,
-      el,
-      label,
-      slider,
-      value: span('bind-value'),
-      tier: span('bind-tier'),
-      mode: button('bind-mode', 'overlay'),
-      commit: button('bind-commit', 'commit'),
-      learn: button('bind-learn', 'learn'),
-      midi: span('bind-midi'),
-      state: span('bind-state'),
-      form: span('bind-form'),
-      keys: '',
-      off: () => {},
-      range: null,
+      id, el: holder, setState: (() => {}) as Setter<SiteRowState>,
+      dispose: () => {}, keys: '', off: () => {}, range: null,
     };
-    const entry = (): SiteEntry | undefined => this.host.table.get(id);
-    slider.addEventListener('input', () => {
-      const e = entry();
-      if (e) this.host.writer.writeSite(e.site.id, Number(slider.value));
-    });
-    row.mode.addEventListener('click', () => {
-      const next = this.host.writer.modeOf(id) === 'overlay' ? 'source-edit' : 'overlay';
-      this.host.writer.setMode(id, next);
-    });
-    row.commit.addEventListener('click', () => {
-      const e = entry();
-      if (e) this.host.commit(e);
-    });
-    row.learn.addEventListener('click', () => {
-      const e = entry();
-      if (e) this.host.learn(e);
-    });
+    const [state, setState] = createSignal(this.siteState(row));
+    row.setState = setState;
+    row.dispose = render(() => createComponent(SiteRow, {
+      id, state,
+      onInput: (value) => {
+        const entry = this.host.table.get(id);
+        if (entry) this.host.writer.writeSite(entry.site.id, value);
+      },
+      onMode: () => this.host.writer.setMode(id, this.host.writer.modeOf(id) === 'overlay' ? 'source-edit' : 'overlay'),
+      onCommit: () => {
+        const entry = this.host.table.get(id);
+        if (entry) this.host.commit(entry);
+      },
+      onLearn: () => {
+        const entry = this.host.table.get(id);
+        if (entry) this.host.learn(entry);
+      },
+    }), holder);
+    row.el = holder.firstElementChild as HTMLElement;
     this.rows.set(id, row);
+    this.count(`binding:${id}`, row.el);
     return row;
   }
 
-  private renderRow(row: Row): void {
-    const e = this.host.table.get(row.id);
-    if (!e) return;
-    const { writer } = this.host;
-    const overlay = writer.overlay(e.bindingId);
-    const value = overlay ?? e.site.value;
-    const meta = paramMeta(e.site, this.host.editors());
-    row.label.textContent = e.key ?? this.host.lineExcerpt(e);
+  private siteState(row: Row): SiteRowState {
+    const entry = this.host.table.get(row.id)!;
+    const overlay = this.host.writer.overlay(entry.bindingId);
+    const value = overlay ?? entry.site.value;
+    const meta = paramMeta(entry.site, this.host.editors());
     if (!row.range) {
-      const mag = Math.max(1, Math.abs(e.site.value) * 2);
-      row.range = meta ? [meta.range[0], meta.range[1]] : [e.site.value < 0 ? -mag : 0, mag];
-      row.slider.min = String(row.range[0]);
-      row.slider.max = String(row.range[1]);
-      row.slider.step = isIntegerLiteral(e.literalText) || meta?.curve === 'stepped' ? '1' : 'any';
+      const magnitude = Math.max(1, Math.abs(entry.site.value) * 2);
+      row.range = meta ? [meta.range[0], meta.range[1]] : [entry.site.value < 0 ? -magnitude : 0, magnitude];
     }
-    row.slider.value = String(value);
-    row.slider.disabled = e.state !== 'bound';
-    row.value.textContent = formatValue(value);
-    row.tier.textContent = tierBadge(e.site.tier);
-    row.tier.dataset.tier = e.site.tier;
-    const mode = writer.modeOf(e.bindingId);
-    row.mode.textContent = mode;
-    row.el.dataset.mode = mode;
-    row.commit.hidden = mode !== 'overlay' || overlay === undefined;
-    const m = this.host.mappingOf(e);
-    row.midi.textContent = m ? `cc ${m.cc}${m.ch === undefined ? '' : ` ch ${m.ch}`}` : '';
-    row.state.textContent = e.state === 'stale' ? 'STALE' : e.state === 'unbound' ? 'unbound' : '';
-    row.el.dataset.state = e.state;
-    const owner = this.host.ownerName(e);
-    const ns = owner === undefined ? undefined : this.host.store.name(owner);
-    row.form.textContent =
-      ns?.state === 'failed'
-        ? `failed: ${ns.diagnostic?.message ?? ''}`
-        : ns?.state === 'blocked'
-          ? `blocked on ${ns.blocked_on ?? '?'}`
-          : '';
+    const mode = this.host.writer.modeOf(entry.bindingId);
+    const mapping = this.host.mappingOf(entry);
+    const owner = this.host.ownerName(entry);
+    const name = owner === undefined ? undefined : this.host.store.name(owner);
+    return {
+      label: entry.key ?? this.host.lineExcerpt(entry),
+      value: formatValue(value), rawValue: value,
+      tier: tierBadge(entry.site.tier), tierKind: entry.site.tier,
+      mode, commit: mode === 'overlay' && overlay !== undefined,
+      midi: mapping ? `cc ${mapping.cc}${mapping.ch === undefined ? '' : ` ch ${mapping.ch}`}` : '',
+      state: entry.state,
+      stateLabel: entry.state === 'stale' ? 'STALE' : entry.state === 'unbound' ? 'unbound' : '',
+      form: name?.state === 'failed'
+        ? `failed: ${name.diagnostic?.message ?? ''}`
+        : name?.state === 'blocked' ? `blocked on ${name.blocked_on ?? '?'}` : '',
+      min: row.range[0], max: row.range[1],
+      step: isIntegerLiteral(entry.literalText) || meta?.curve === 'stepped' ? '1' : 'any',
+    };
+  }
+
+  private renderRow(row: Row): void {
+    row.setState(this.siteState(row));
     this.count(`binding:${row.id}`, row.el);
   }
 
-  private createNameRow(name: string): NameRow {
-    const doc = this.el.ownerDocument;
-    const el = doc.createElement('div');
-    el.className = 'bind-name';
-    el.dataset.name = name;
-    const label = doc.createElement('span');
-    label.className = 'bind-name-label';
-    label.textContent = name;
-    const value = doc.createElement('span');
-    value.className = 'bind-name-value';
-    const badge = doc.createElement('span');
-    badge.className = 'bind-name-badge';
-    el.append(label, value, badge);
+  private createNameRow(name: string): ValueRow {
+    const holder = this.el.ownerDocument.createElement('div');
+    const [state, setState] = createSignal(this.nameState(name));
+    const dispose = render(() => createComponent(NameRow, { name, state }), holder);
+    const el = holder.firstElementChild as HTMLElement;
     this.namesEl.appendChild(el);
-    const nr: NameRow = { name, el, value, badge, off: () => {} };
-    nr.off = this.host.store.subscribe([nameKey(name)], () => this.renderName(nr));
-    this.nameRows.set(name, nr);
-    return nr;
+    const row: ValueRow = { name, el, setState, dispose, off: () => {} };
+    row.off = this.host.store.subscribe([nameKey(name)], () => this.renderName(row));
+    this.nameRows.set(name, row);
+    return row;
   }
 
-  private renderName(nr: NameRow): void {
-    const ns = this.host.store.name(nr.name);
-    nr.value.textContent = ns?.value ?? '';
-    nr.el.dataset.state = ns?.state ?? 'ok';
-    nr.badge.textContent =
-      ns?.state === 'failed'
-        ? `failed: ${ns.diagnostic?.message ?? ''}`
-        : ns?.state === 'blocked'
-          ? `blocked on ${ns.blocked_on ?? '?'}`
-          : '';
-    this.count(`name:${nr.name}`, nr.el);
+  private nameState(name: string): NameRowState {
+    const state = this.host.store.name(name);
+    return {
+      value: state?.value ?? '', state: state?.state ?? 'ok',
+      badge: state?.state === 'failed'
+        ? `failed: ${state.diagnostic?.message ?? ''}`
+        : state?.state === 'blocked' ? `blocked on ${state.blocked_on ?? '?'}` : '',
+    };
+  }
+
+  private renderName(row: ValueRow): void {
+    row.setState(this.nameState(row.name));
+    this.count(`name:${row.name}`, row.el);
   }
 
   private count(key: string, el: HTMLElement): void {

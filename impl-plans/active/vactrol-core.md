@@ -1,6 +1,6 @@
 # Vactrol Core Implementation Plan
 
-**Status**: In Progress (TASK-011 editor UI on Solid.js added 2026-09-26, issue #6). Earlier: implementation; all ten tasks COMPLETED as of 2026-09-26 across issues #1-#5 and commits 0bee1fb, 3ab64b6, 04afe7d, d6fdc4b, 8aad85f). Manual confirmations pending user sign-off: examples/beep.rs and the REPL audible gates on the native host, worklet audio and the WebGL2 pane in a real browser, cargo tauri build and app run. The plan stays under active/ until those are confirmed.
+**Status**: Completed (implementation; all eleven tasks COMPLETED as of 2026-09-27; TASK-011, the Solid.js editor UI, landed via issue #6). Earlier: all ten tasks COMPLETED as of 2026-09-26 across issues #1-#5 and commits 0bee1fb, 3ab64b6, 04afe7d, d6fdc4b, 8aad85f). Manual confirmations pending user sign-off: examples/beep.rs and the REPL audible gates on the native host, worklet audio and the WebGL2 pane in a real browser, cargo tauri build and app run. The plan stays under active/ until those are confirmed.
 **Design Reference**: design-docs/specs/design-implementation.md (all sections; section numbers cited per task)
 **Created**: 2026-09-24
 **Last Updated**: 2026-09-25
@@ -943,7 +943,7 @@ dispatched by `impl-plans/active/ed-editor-20260926-s186-dispatch.json` (evidenc
 ---
 
 ### TASK-011: Editor UI on Solid.js, audio start, icons, foldable pane
-**Status**: NOT_STARTED | **Parallelizable**: Partially (view ports per panel after the shell)
+**Status**: Completed (2026-09-27: transport, code mount point, foldable shell, and right-pane views are Solid components; the protocol, write-back, CodeMirror internals, canvas drawing, and WebGL2 render host remain framework-free) | **Parallelizable**: Partially
 **Depends on**: TASK-010
 **Deliverables**: design 15.2. `editor/` views ported to Solid.js
 (`vite-plugin-solid`, `solid-js`; tests with `@solidjs/testing-library`
@@ -960,13 +960,14 @@ component; protocol, transports, bind write-back and render host stay
 framework-free modules.
 **Design ref**: section 15.2 (and 13, 14.4, 15.1 behaviors unchanged).
 **Completion criteria**:
-- [ ] Every TASK-010 vitest suite passes against the Solid views (ported, none deleted or weakened); `npm run check`, `npm run test`, `npm run build` exit 0
-- [ ] Audio state: before a gesture the control shows *off*; clicking it or evaluating resumes the context and shows *running*; a failed resume or boot failure (missing session ABI, worklet load error) is rendered in the status surface with its reason (tests with a fake AudioContext and failing loaders)
-- [ ] Eval outcome: Mod-Enter / Mod-Shift-Enter / Run each flash the range and show ok / n diagnostics / not delivered; the transport tempo updates from the session's `tempo` message after `use-bpm` (test through the real host-wasm artifact: evaluating examples/first-track.vact shows 124 bpm)
-- [ ] Transport renders icons only (no visible words for tempo label, clock source, hush, panic); each icon has an accessible name and tooltip (structural test)
-- [ ] Right pane folds to a rail and back via button and shortcut; the state survives reload (localStorage, try/catch); folding keeps MIDI-learned bindings and slider state (test); each pane section folds independently
-- [ ] Reactive granularity: a `bindings` batch changing one site re-renders only that site's slider and value display (render-count assertion)
-- [ ] Rust verification unchanged (build, clippy -D warnings, fmt, nextest, cargo test, both wasm32 builds); Tauri shell `cargo check` passes
+- [x] Every TASK-010 vitest suite passes against the Solid views (ported, none deleted or weakened); `npm run check`, `npm run test`, `npm run build` exit 0 — **Evidence** (2026-09-27): 350/350 vitest (349 before the new reactive-granularity test; 336 TASK-010 tests kept; the four pre-existing transport assertions that read visible words now read accessible names), `npx tsc --noEmit -p .` clean, `VACTROL_REQUIRE_SESSION_ABI=1 npm run build` ok
+- [x] Audio state: before a gesture the control shows *off*; clicking it or evaluating resumes the context and shows *running*; a failed resume or boot failure (missing session ABI, worklet load error) is rendered in the status surface with its reason (tests with a fake AudioContext and failing loaders)
+- [x] Eval outcome: Mod-Enter / Mod-Shift-Enter / Run each flash the range and show ok / n diagnostics / not delivered; the transport tempo updates from the session's `tempo` message after `use-bpm` (test through the real host-wasm artifact: evaluating examples/first-track.vact shows 124 bpm)
+- [x] Transport renders icons only (no visible words for tempo label, clock source, hush, panic); each icon has an accessible name and tooltip (structural test)
+- [x] Right pane folds to a rail and back via button and shortcut; the state survives reload (localStorage, try/catch); folding keeps MIDI-learned bindings and slider state (test); each pane section folds independently
+- [x] Reactive granularity: one Solid signal per slider site and named value display; `test/bind/reactive.test.ts` proves that a one-site `bindings` batch updates only that site's render count and preserves neighboring row/value DOM nodes. Directive controls, parameter pane and handle rows, display-only grid and roll, analyzer displays, visual panes, sample browser, and package pane are Solid views.
+- [x] Rust verification unchanged: no Rust source, Cargo manifest, or lockfile changed for TASK-011; prior build, clippy -D warnings, fmt, nextest, cargo test, both wasm32 builds, and Tauri `cargo check` evidence is recorded below and remains applicable. The requested editor verification was rerun on 2026-09-27.
+- Evidence notes: `test/ui/controls.test.ts` (audio state off/running/suspended/failed/unavailable, eval pending/ok/diagnostics/not-delivered/superseded, Run button, icon-only transport, side fold by button and `Mod-\\`, persistence, per-section folds, throwing storage); `test/wasm/first-track.test.ts` (real host-wasm session: examples/first-track.vact evaluates with no errors, `tempo` 124 bpm, events on d1..d6, transport label `tempo 124.0 bpm`); headless Chrome against the dev server: boot, audio *running* after a click, Run -> *evaluated: ok*, tempo 124.0 bpm, slots d1..d6, no console errors. Hearing it remains a manual confirmation.
 
 ## Module Status
 

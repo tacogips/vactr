@@ -6,6 +6,9 @@
 // selector sets it. A `shader-compile` host diagnostic shows as a banner
 // until that output accepts a program again.
 
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
+import { PanesView } from './panes-view';
 import type { OutputIndex } from '../protocol/types';
 import { OUTPUTS, type HostDiagnostic } from './render-host';
 
@@ -36,8 +39,9 @@ export class VisualPanes {
   readonly el: HTMLElement;
   private readonly panes: Pane[] = [];
   private readonly banners = new Map<OutputIndex, string>();
-  private readonly banner: HTMLElement;
-  private readonly selector: HTMLSelectElement;
+  private readonly setSelection: Setter<PaneSelection>;
+  private readonly setBanner: Setter<string>;
+  private readonly disposeView: () => void;
   private readonly source: VisualPanesOptions['source'];
   private sel: PaneSelection;
 
@@ -45,61 +49,27 @@ export class VisualPanes {
     const doc = parent.ownerDocument;
     this.source = opts.source;
     this.sel = opts.selection ?? 0;
-    this.el = doc.createElement('section');
-    this.el.className = 'visual-panes';
-    this.el.dataset.area = 'visual';
-
-    const header = doc.createElement('div');
-    header.className = 'visual-header';
-    const title = doc.createElement('span');
-    title.className = 'visual-title';
-    title.textContent = 'Visuals';
-    this.selector = doc.createElement('select');
-    this.selector.className = 'visual-select';
-    this.selector.dataset.role = 'pane-select';
-    for (const value of ['o0', 'o1', 'o2', 'o3', 'tile']) {
-      const opt = doc.createElement('option');
-      opt.value = value;
-      opt.textContent = value === 'tile' ? 'tile o0..o3' : value;
-      this.selector.appendChild(opt);
-    }
-    this.selector.addEventListener('change', this.onSelect);
-    header.append(title, this.selector);
-
-    this.banner = doc.createElement('div');
-    this.banner.className = 'visual-banner';
-    this.banner.dataset.role = 'diagnostic';
-    this.banner.hidden = true;
-
-    const grid = doc.createElement('div');
-    grid.className = 'visual-grid';
-    this.el.append(header, this.banner, grid);
-
-    if (!this.source) {
-      this.selector.disabled = true;
-      const notice = doc.createElement('div');
-      notice.className = 'visual-notice';
-      notice.dataset.role = 'notice';
-      notice.textContent = opts.notice ?? 'visuals not available';
-      grid.appendChild(notice);
-    } else {
+    const [selection, setSelection] = createSignal<PaneSelection>(this.sel);
+    const [banner, setBanner] = createSignal('');
+    this.setSelection = setSelection;
+    this.setBanner = setBanner;
+    const holder = doc.createElement('div');
+    this.disposeView = render(() => createComponent(PanesView, {
+      source: this.source !== undefined,
+      notice: opts.notice ?? 'visuals not available',
+      selection, banner,
+      width: PANE_WIDTH, height: PANE_HEIGHT,
+      onSelect: (value) => this.select(value),
+    }), holder);
+    this.el = holder.firstElementChild as HTMLElement;
+    if (this.source) {
       for (const out of OUTPUTS) {
-        const el = doc.createElement('div');
-        el.className = 'visual-pane';
-        el.dataset.output = `o${out}`;
-        const canvas = doc.createElement('canvas');
-        canvas.width = PANE_WIDTH;
-        canvas.height = PANE_HEIGHT;
-        const label = doc.createElement('span');
-        label.className = 'visual-pane-label';
-        label.textContent = `o${out}`;
-        el.append(canvas, label);
-        grid.appendChild(el);
-        this.panes.push({ el, canvas, ctx: canvas.getContext('2d') });
+        const pane = this.el.querySelector<HTMLElement>(`[data-output="o${out}"]`)!;
+        const canvas = pane.querySelector('canvas')!;
+        this.panes.push({ el: pane, canvas, ctx: canvas.getContext('2d') });
       }
     }
     parent.appendChild(this.el);
-    this.select(this.sel);
   }
 
   get selection(): PaneSelection {
@@ -113,12 +83,7 @@ export class VisualPanes {
 
   select(sel: PaneSelection): void {
     this.sel = sel;
-    this.selector.value = sel === 'tile' ? 'tile' : `o${sel}`;
-    this.el.dataset.selection = this.selector.value;
-    const shown = new Set(this.visibleOutputs());
-    this.panes.forEach((p, i) => {
-      p.el.hidden = !shown.has(i as OutputIndex);
-    });
+    this.setSelection(sel);
   }
 
   /** Blits every visible output from the render host into its pane. */
@@ -143,18 +108,12 @@ export class VisualPanes {
   }
 
   dispose(): void {
-    this.selector.removeEventListener('change', this.onSelect);
+    this.disposeView();
     this.el.remove();
   }
 
-  private readonly onSelect = (): void => {
-    const v = this.selector.value;
-    this.select(v === 'tile' ? 'tile' : (Number(v.slice(1)) as OutputIndex));
-  };
-
   private renderBanner(): void {
     const lines = [...this.banners.entries()].sort((a, b) => a[0] - b[0]).map(([, text]) => text);
-    this.banner.textContent = lines.join('\n');
-    this.banner.hidden = lines.length === 0;
+    this.setBanner(lines.join('\n'));
   }
 }

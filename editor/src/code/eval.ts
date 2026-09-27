@@ -120,6 +120,8 @@ export interface EvalOptions {
   timers?: Timers;
   /** Called after `hush` is sent (the highlight scheduler clears). */
   onHush?: () => void;
+  /** Called with every eval reply, right after the request is sent (design 15.2: the outcome is shown, audio is started). */
+  onEval?: (reply: Promise<ServerEnvelope>) => void;
 }
 
 export class EvalController {
@@ -200,6 +202,7 @@ export class EvalController {
 
   /** Flashes the failed forms of the reply. */
   private watch(reply: Promise<ServerEnvelope>): Promise<ServerEnvelope> {
+    this.opts.onEval?.(reply);
     reply.then(
       (env) => {
         if (env.kind !== 'eval-result' || env.body.file !== this.opts.sync.file) return;

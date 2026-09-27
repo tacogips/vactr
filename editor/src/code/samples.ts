@@ -12,6 +12,9 @@
 //   no 2D context is available. The map url is kept in `localStorage`.
 // - Native tier: names only (no map, no previews).
 
+import { createComponent, createSignal, type Setter } from 'solid-js';
+import { render } from 'solid-js/web';
+import { SampleView, type BankView } from './sample-view';
 import type { SampleFrames } from '../app/apis';
 import type { Tier } from '../app/deps';
 
@@ -163,61 +166,39 @@ export interface SampleBrowserOptions {
 export class SampleBrowser {
   readonly el: HTMLDetailsElement;
   private readonly opts: SampleBrowserOptions;
-  private readonly soundsEl: HTMLElement;
-  private readonly banksEl: HTMLElement | null = null;
-  private readonly statusEl: HTMLElement;
-  private readonly urlInput: HTMLInputElement | null = null;
+  private readonly setSoundsSignal: Setter<readonly string[]>;
+  private readonly setBanks: Setter<BankView[]>;
+  private readonly setStatus: Setter<string>;
+  private readonly disposeView: () => void;
 
   constructor(parent: HTMLElement, opts: SampleBrowserOptions) {
     this.opts = opts;
-    const doc = parent.ownerDocument;
-    this.el = doc.createElement('details');
-    this.el.className = 'vact-samples';
-    const summary = doc.createElement('summary');
-    summary.textContent = 'samples';
-    this.el.appendChild(summary);
-    this.soundsEl = doc.createElement('ul');
-    this.soundsEl.className = 'vact-sounds';
-    this.el.appendChild(this.soundsEl);
-    if (opts.tier === 'browser' && opts.library) {
-      const row = doc.createElement('div');
-      row.className = 'vact-sample-map';
-      const input = doc.createElement('input');
-      input.type = 'url';
-      input.placeholder = 'sample map url';
-      input.value = this.storedUrl() ?? '';
-      const load = doc.createElement('button');
-      load.type = 'button';
-      load.textContent = 'load map';
-      load.addEventListener('click', () => void this.loadMap(input.value));
-      row.append(input, load);
-      this.el.appendChild(row);
-      this.urlInput = input;
-      this.banksEl = doc.createElement('ul');
-      this.banksEl.className = 'vact-banks';
-      this.el.appendChild(this.banksEl);
-    }
-    this.statusEl = doc.createElement('div');
-    this.statusEl.className = 'vact-samples-status';
-    this.el.appendChild(this.statusEl);
+    const holder = parent.ownerDocument.createElement('div');
+    const [sounds, setSounds] = createSignal<readonly string[]>([]);
+    const [banks, setBanks] = createSignal<BankView[]>([]);
+    const [status, setStatus] = createSignal('');
+    this.setSoundsSignal = setSounds;
+    this.setBanks = setBanks;
+    this.setStatus = setStatus;
+    this.disposeView = render(() => createComponent(SampleView, {
+      tier: opts.tier,
+      browserLibrary: opts.library !== undefined,
+      url: this.storedUrl() ?? '',
+      sounds, banks, status,
+      onLoadMap: (url) => void this.loadMap(url),
+      onLoadBank: (bank) => void this.loadBank(bank),
+      preview: (canvas, frames) => {
+        queueMicrotask(() => { if (!drawWaveform(canvas, frames)) canvas.remove(); });
+      },
+    }), holder);
+    this.el = holder.firstElementChild as HTMLDetailsElement;
     parent.appendChild(this.el);
   }
 
-  /** Lists the manifest's sounds. */
   setSounds(sounds: readonly string[]): void {
-    const doc = this.el.ownerDocument;
-    this.soundsEl.replaceChildren(
-      ...sounds.map((s) => {
-        const li = doc.createElement('li');
-        li.className = 'vact-sound';
-        li.dataset.sound = s;
-        li.textContent = s;
-        return li;
-      }),
-    );
+    this.setSoundsSignal([...sounds]);
   }
 
-  /** Opens the browser, scrolled to `bank` when given. */
   open(bank?: string): void {
     this.el.open = true;
     if (bank === undefined) return;
@@ -227,35 +208,40 @@ export class SampleBrowser {
     target?.scrollIntoView?.({ block: 'nearest' });
   }
 
-  /** Loads the map at `url`, remembers the url, and lists its banks. */
   async loadMap(url: string): Promise<void> {
     const lib = this.opts.library;
     if (!lib || url.trim() === '') return;
     try {
       await lib.loadMap(url.trim());
       this.opts.storage?.setItem(SAMPLE_MAP_KEY, url.trim());
-      if (this.urlInput) this.urlInput.value = url.trim();
-      this.status(`${lib.banks().length} banks`);
-      this.renderBanks();
-    } catch (e) {
-      this.status(String(e instanceof Error ? e.message : e));
+      const input = this.el.querySelector<HTMLInputElement>('input');
+      if (input) input.value = url.trim();
+      this.setStatus(`${lib.banks().length} banks`);
+      this.setBanks(lib.banks().map((name) => ({ name, count: lib.map[name]?.length ?? 0, entries: [] })));
+    } catch (error) {
+      this.setStatus(String(error instanceof Error ? error.message : error));
     }
   }
 
-  /** Loads one bank and draws its previews. */
   async loadBank(bank: string): Promise<void> {
     const lib = this.opts.library;
     if (!lib) return;
     try {
-      const n = await lib.loadBank(bank);
-      this.status(`${bank}: ${n} loaded`);
-      this.renderBank(bank);
-    } catch (e) {
-      this.status(String(e instanceof Error ? e.message : e));
+      const loaded = await lib.loadBank(bank);
+      this.setStatus(`${bank}: ${loaded} loaded`);
+      this.setBanks((old) => old.map((item) => item.name !== bank ? item : {
+        ...item,
+        entries: Array.from({ length: lib.map[bank]?.length ?? 0 }, (_, index) => ({
+          key: `${bank}:${index}`, frames: lib.frames(bank, index),
+        })),
+      }));
+    } catch (error) {
+      this.setStatus(String(error instanceof Error ? error.message : error));
     }
   }
 
   dispose(): void {
+    this.disposeView();
     this.el.remove();
   }
 
@@ -265,60 +251,6 @@ export class SampleBrowser {
     } catch {
       return null;
     }
-  }
-
-  private status(text: string): void {
-    this.statusEl.textContent = text;
-  }
-
-  private renderBanks(): void {
-    const lib = this.opts.library;
-    const list = this.banksEl;
-    if (!lib || !list) return;
-    const doc = this.el.ownerDocument;
-    list.replaceChildren(
-      ...lib.banks().map((bank) => {
-        const li = doc.createElement('li');
-        li.className = 'vact-bank';
-        li.dataset.bank = bank;
-        const name = doc.createElement('span');
-        name.textContent = `${bank} (${lib.map[bank]?.length ?? 0})`;
-        const load = doc.createElement('button');
-        load.type = 'button';
-        load.textContent = 'load';
-        load.addEventListener('click', () => void this.loadBank(bank));
-        const entries = doc.createElement('ul');
-        entries.className = 'vact-entries';
-        li.append(name, load, entries);
-        return li;
-      }),
-    );
-  }
-
-  private renderBank(bank: string): void {
-    const lib = this.opts.library;
-    const li = this.banksEl?.querySelector<HTMLElement>(`[data-bank="${attrValue(bank)}"]`);
-    const entries = li?.querySelector<HTMLElement>('.vact-entries');
-    if (!lib || !entries) return;
-    const doc = this.el.ownerDocument;
-    const count = lib.map[bank]?.length ?? 0;
-    const items: HTMLElement[] = [];
-    for (let i = 0; i < count; i += 1) {
-      const frames = lib.frames(bank, i);
-      const item = doc.createElement('li');
-      item.className = 'vact-entry';
-      item.dataset.key = `${bank}:${i}`;
-      item.textContent = `${bank}:${i}`;
-      if (frames) {
-        const canvas = doc.createElement('canvas');
-        canvas.className = 'vact-preview';
-        canvas.width = 96;
-        canvas.height = 24;
-        if (drawWaveform(canvas, frames)) item.appendChild(canvas);
-      } else item.dataset.missing = 'true';
-      items.push(item);
-    }
-    entries.replaceChildren(...items);
   }
 }
 

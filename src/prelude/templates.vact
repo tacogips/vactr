@@ -37,7 +37,7 @@ inst feedback-metal-drum metal-ratio: float = 2.4 metal-index: float = 3 metal-f
 		> * amp
 
 # Analytic struck-resonator percussion: four bass controls from the
-# referenced design, with neutral Vactrol names.
+# referenced design, with neutral Vactr names.
 inst low-drum kick-frequency: float = 60 kick-punch: float = 0.5 kick-tone: float = 0.5 kick-decay: float = 0.45:
 	analog-percussion kick-frequency punch: kick-punch tone: kick-tone decay: kick-decay mode: 0
 		> * amp
@@ -48,7 +48,7 @@ inst wire-drum snare-frequency: float = 180 snare-tone: float = 0.5 snare-snappy
 		> * amp
 
 # The referenced high-hat exposes no authored controls. These four knobs
-# are Vactrol extensions for its analytic metallic/noise architecture.
+# are Vactr extensions for its analytic metallic/noise architecture.
 inst metal-hat hat-frequency: float = 3900 hat-tone: float = 0.5 hat-decay: float = 0.12 hat-metal: float = 0.7:
 	analog-percussion hat-frequency tone: hat-tone decay: hat-decay metal: hat-metal mode: 2
 		> * amp
@@ -85,7 +85,7 @@ inst six-bank-c-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.
 	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp
 		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp > aux-out}
 
-# Original naive/SAM/LPC-like speech models and four Vactrol syllable tokens.
+# Original naive/SAM/LPC-like speech models and four Vactr syllable tokens.
 # Harmonics 0..1/3 blends the three models; above 1/3 selects token ava,
 # omi, era or unu. Main is formant voice, auxiliary is excitation.
 inst speech-voice speech-harmonics: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 speech-sustain: float = 0:
@@ -333,7 +333,7 @@ inst frame-keyframe-voice frames: [float] = [0 0 0.2 0.4 0.6 1 1 0.8 0.6 0.4] fr
 		> + {frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: frame-aux-channel > * amp > aux-out}
 
 # Original Peaks envelope/LFO/tap-LFO roles; half selects source alternate
-# layout. Main is processor lane 0, aux is a Vactrol phase/bipolar lane.
+# layout. Main is processor lane 0, aux is a Vactr phase/bipolar lane.
 inst peak-motion-voice peak-attack: float = 0.2 peak-decay: float = 0.3 peak-sustain: float = 0.5 peak-release: float = 0.3 peak-rate: float = 0.5 peak-shape: float = 0 peak-color: float = 0 peak-reset-phase: float = 0 peak-level: float = 1 peak-half: float = 0 peak-gate: float = 1 peak-trigger: float = 0 peak-tap: float = 0 peak-sync: float = 0 peak-mode: float = 1 peak-preset: float = 0:
 	peak-function-core freq peak-attack: peak-attack peak-decay: peak-decay peak-sustain: peak-sustain peak-release: peak-release peak-rate: peak-rate peak-shape: peak-shape peak-color: peak-color peak-reset-phase: peak-reset-phase peak-level: peak-level peak-half: peak-half peak-gate: peak-gate peak-trigger: peak-trigger peak-tap: peak-tap peak-sync: peak-sync peak-mode: peak-mode peak-channel: 0 peak-preset: peak-preset > * amp
 		> + {peak-function-core freq peak-attack: peak-attack peak-decay: peak-decay peak-sustain: peak-sustain peak-release: peak-release peak-rate: peak-rate peak-shape: peak-shape peak-color: peak-color peak-reset-phase: peak-reset-phase peak-level: peak-level peak-half: peak-half peak-gate: peak-gate peak-trigger: peak-trigger peak-tap: peak-tap peak-sync: peak-sync peak-mode: peak-mode peak-channel: 1 peak-preset: peak-preset > * amp > aux-out}

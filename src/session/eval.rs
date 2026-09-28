@@ -133,7 +133,7 @@ pub(super) fn pkg_diag(e: &PkgError, span: Span) -> Diagnostic {
     let code = e.code();
     let mut message = e.to_string();
     if matches!(e, PkgError::NotLocked(_)) {
-        message.push_str("; run `vactrol get`");
+        message.push_str("; run `vactr get`");
     }
     Diagnostic {
         span,

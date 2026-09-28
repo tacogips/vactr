@@ -10,10 +10,10 @@ fidelity paragraph
 
 Advance the `dual-mod` vocoder from its original authored 20-band
 approximation toward the pinned MIT Warps signal path. Keep each translated
-stage's provenance explicit, preserve Vactrol's `.vact` controls and
+stage's provenance explicit, preserve Vactr's `.vact` controls and
 native/browser stereo bus contract, and avoid importing oscillator wave
 tables or restricted drum assets. Source operating rate is 96 kHz with a
-60-frame codec block; host-rate behavior is a separately verified Vactrol
+60-frame codec block; host-rate behavior is a separately verified Vactr
 adaptation.
 
 ## Subtasks
@@ -97,7 +97,7 @@ tests pass. Retire its 100-float memory region when the converter succeeds.
 ### Session: 2026-09-28, WV-004 host-rate boundary
 
 The previous 100-float authored non-96-kHz bank has been retired. The same
-60-frame 96-kHz vocoder now runs behind Vactrol-generated input/output
+60-frame 96-kHz vocoder now runs behind Vactr-generated input/output
 Blackman-windowed sinc filters at other rates, with 33 coefficient phases,
 48–576 taps, bounded high/low relative phase words and separate
 carrier/modulator/output rings. At exactly 96 kHz, conversion is bypassed.
@@ -148,7 +148,7 @@ peak smoothing and formant interpolation drive block-ramped gains.
 The 2,806-float core estimate is below default bus memory at supported
 rates, with exact installation preflight required in WV-003. The source
 caps compensation at 256 samples; 60-frame input staging adds at least
-one block to the Vactrol port's latency and must be measured.
+one block to the Vactr port's latency and must be measured.
 
 `mise run probe-warps-vocoder` compiled only the pinned MIT filter
 coefficients into a temporary source reference and measured 6,000
@@ -164,7 +164,7 @@ recording enters the repository.
 
 ### Session: 2026-09-28, WV-001 output limiter
 
-Translated the pinned MIT limiter stage after Vactrol's vocoder synthesis
+Translated the pinned MIT limiter stage after Vactr's vocoder synthesis
 and before the XMOD/vocoder bridge. Fixed scalar state starts its peak at
 0.5; the source's 1.4 pre-gain, attack/release, reciprocal gain reduction,
 0.8 post-gain and soft-limit equation are preserved, with coefficients
@@ -178,7 +178,7 @@ native/no-default/wasm checks, strict Clippy, rustfmt and full tests passed:
 
 Audited pinned MIT limiter, vocoder and filter-bank structure. Source
 vocoder uses 20 bands grouped at 12×, 3× and native rate, with a limiter
-after synthesis; Vactrol currently uses an authored host-rate bank. WV-001
+after synthesis; Vactr currently uses an authored host-rate bank. WV-001
 isolates the source output stage before the larger multirate replacement.
 The pinned `filter_bank.py`, `resources.cc`, `filter_bank.{h,cc}`,
 `sample_rate_conversion_filters.h`, `vocoder.{h,cc}`, `limiter.h` and

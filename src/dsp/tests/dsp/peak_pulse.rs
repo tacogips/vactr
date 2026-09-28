@@ -74,7 +74,7 @@ fn three_rows_are_runnable_adaptations() {
     for row in &peaks_functions()[7..10] {
         assert_eq!(row.coverage, CoverageState::Adaptation);
         assert_eq!(row.resources, ResourceState::Replacement);
-        assert_eq!(row.vactrol_template, Some("peak-pulse-voice"));
+        assert_eq!(row.vactr_template, Some("peak-pulse-voice"));
     }
 }
 

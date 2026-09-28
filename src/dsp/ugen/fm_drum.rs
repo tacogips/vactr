@@ -2,7 +2,7 @@
 //!
 //! Source-stage translation of Emilie Gillet's MIT Peaks FM drum. The
 //! generated sine, exponential, oscillator-increment and overdrive tables,
-//! fixed-point arithmetic and source preset maps are not imported. Vactrol
+//! fixed-point arithmetic and source preset maps are not imported. Vactr
 //! keeps independent FM, auxiliary sweep, noise and drive controls.
 
 use std::f32::consts::TAU;

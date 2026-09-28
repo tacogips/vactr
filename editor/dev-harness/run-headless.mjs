@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Headless runner for the Vactrol dev harness (design 12.8.11).
+// Headless runner for the Vactr dev harness (design 12.8.11).
 //
 // Node built-ins only. Serves the repository root on 127.0.0.1:<free port>
 // (a secure context, so AudioWorklet is available), launches Chrome from
@@ -35,12 +35,12 @@ const opt = (name, dflt) => {
 const timeoutSec = Number(opt('--timeout', '120'));
 const logDir = path.join(root, 'target', 'fe-logs');
 
-// The cdylib: `cargo build` also links the `vactrol` bin to the same
+// The cdylib: `cargo build` also links the `vactr` bin to the same
 // uplifted file name, so the module with the ABI exports is chosen here.
 function findModule() {
   const candidates = [
-    path.join(root, 'target/wasm32-unknown-unknown/debug/vactrol.wasm'),
-    path.join(root, 'target/wasm32-unknown-unknown/debug/deps/vactrol.wasm'),
+    path.join(root, 'target/wasm32-unknown-unknown/debug/vactr.wasm'),
+    path.join(root, 'target/wasm32-unknown-unknown/debug/deps/vactr.wasm'),
   ];
   if (!fs.existsSync(candidates[0])) return { missing: candidates[0] };
   for (const file of candidates) {
@@ -117,7 +117,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   let file;
-  if (url.pathname === '/vactrol.wasm') {
+  if (url.pathname === '/vactr.wasm') {
     file = mod.file;
   } else {
     file = path.join(root, decodeURIComponent(url.pathname));
@@ -169,7 +169,7 @@ function onReport(body) {
 
 server.listen(0, '127.0.0.1', () => {
   const { port } = server.address();
-  profile = fs.mkdtempSync(path.join(os.tmpdir(), 'vactrol-harness-'));
+  profile = fs.mkdtempSync(path.join(os.tmpdir(), 'vactr-harness-'));
   const page = `http://127.0.0.1:${port}/editor/dev-harness/index.html?auto=1`;
   const flags = [
     '--autoplay-policy=no-user-gesture-required',

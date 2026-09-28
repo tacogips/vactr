@@ -1,4 +1,4 @@
-# vactrol Language Reference (working draft)
+# vactr Language Reference (working draft)
 
 Reference code from which the language specification is reverse-engineered.
 Section 1 is the original sketch; the rest is the core language. The two
@@ -32,7 +32,7 @@ Conventions used in the code blocks:
    Failures are reported by the runtime, not values threaded through every
    call and not a type in the language; types are optional annotations, never
    obligations.
-4. **Typed, with inference.** vactrol is statically typed. Every expression
+4. **Typed, with inference.** vactr is statically typed. Every expression
    has a type the checker can name and the LSP shows. Annotations are
    optional because inference makes them unnecessary, not because types are.
    In Live mode a type error is a diagnostic and never stops the music; in
@@ -46,14 +46,14 @@ Conventions used in the code blocks:
    allowed. They are safe because every line of user code runs on one
    evaluator thread; the audio and render threads only ever receive values.
 
-```vactrol
+```vactr
 + 43 32 > * 12 > print        # thought order: 43+32, times 12, print
 * 12 {+ 43 32}               # same value; the group had to be planned
 ```
 
 ## 1. Basics (original sketch)
 
-```vactrol
+```vactr
 # this is a comment
 # A comment line that starts with `#@` is an EDITOR DIRECTIVE;
 # consecutive `#@` lines form one block, which applies to the nearest
@@ -160,7 +160,7 @@ a > fn1 12 > fn2 32 43   # inline, the same thing
 
 ## 2. Literals and Data
 
-```vactrol
+```vactr
 # numbers (author, 2026-09-24): fixed widths, Zig/WGSL style
 #   int     i32        int64    i64
 #   float   f32        float64  f64
@@ -480,7 +480,7 @@ Decisions so far (author, 2026-09-24): iteration is declarative (`map`,
 `break`, and never recursion-based. Function recursion remains allowed for
 recursive data. Everything here is an expression with a value.
 
-```vactrol
+```vactr
 # ---- if ----------------------------------------------------------
 
 # `if` is SUGAR for `match` (author, 2026-09-24). The expander rewrites
@@ -722,7 +722,7 @@ fn flatten-notes tree:
 
 ## 4. State, Redefinition, Modules
 
-```vactrol
+```vactr
 # live parameters: a top-level `var` referenced by a bound pattern is
 # late-bound and read at each event (`design-music.md`, section 1)
 var cutoff 800
@@ -773,22 +773,22 @@ upd base 62                                  # line and d1's pattern update;
 # Decided (author): the requirement. Recommended: the Salsa-style graph.
 
 # ---- modules and packages (author, 2026-09-24; supersedes "no modules") --
-# External Vactrol libraries are imported by repository path, Go style.
+# External Vactr libraries are imported by repository path, Go style.
 # A package is a git repository (or a directory of one) with a
-# `vactrol.toml` manifest and `.vact` files; it can provide instruments,
+# `vactr.toml` manifest and `.vact` files; it can provide instruments,
 # effects (chains of builtins), patterns, looks, and sample assets.
-import github.com/someone/vactrol-pads                  # qualified: pads.warm
-import github.com/someone/vactrol-pads as pd            # alias
-import github.com/someone/vactrol-pads open             # names unqualified
+import github.com/someone/vactr-pads                  # qualified: pads.warm
+import github.com/someone/vactr-pads as pd            # alias
+import github.com/someone/vactr-pads open             # names unqualified
 s pads.warm > note [:c3] > d1
 # qualified name = identifier "." identifier; the reader accepts it only
 # after an import bound the prefix. Unqualified opening is for the live
 # set; the LSP warns on a collision with the prelude or another package.
-# Versions: git tags (semver); `vactrol get` resolves and records them in
-# `vactrol.lock` (minimal version selection, as Go); packages are cached
-# under ~/.vactrol/pkg/<path>@<version>. In the browser the same paths
+# Versions: git tags (semver); `vactr get` resolves and records them in
+# `vactr.lock` (minimal version selection, as Go); packages are cached
+# under ~/.vactr/pkg/<path>@<version>. In the browser the same paths
 # are fetched through a package proxy (no git); the lock file pins the
-# content hash either way. Packages are Vactrol code only in v1 -- no
+# content hash either way. Packages are Vactr code only in v1 -- no
 # native extensions -- so a package can never touch the audio thread
 # except through builtins.
 # Decided (author, 2026-09-24): modules and a GitHub-path package system

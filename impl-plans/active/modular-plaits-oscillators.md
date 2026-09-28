@@ -185,7 +185,7 @@ installation. Tests cover all control responses, deterministic reset,
 distinct finite main/aux and native/browser 44.1/48/96 kHz × 64/256-frame
 allocation-free rendering. Position 8 is `Adaptation` in the public manifest.
 
-The five MIT detune interval constants are retained with notice. Vactrol
+The five MIT detune interval constants are retained with notice. Vactr
 uses analytic oscillator transitions and omits source polyBLEP correction
 and exact block parameter interpolation; no generated resource or waveform
 table is imported. Upstream numerical comparison remains SYN-005E work.
@@ -196,7 +196,7 @@ Pinned MIT chiptune engine, chord bank, arpeggiator, square/triangle
 oscillators and used `stmlib` dependencies were inspected. The NES triangle
 header includes `resources.h` but reads no generated resource symbol.
 `chip-voice` exposes note/frequency, `chip-chord` (source harmonics role),
-timbre/inversion or pattern, morph/shape, `chip-clocked` and the Vactrol
+timbre/inversion or pattern, morph/shape, `chip-clocked` and the Vactr
 extension `chip-rate` in `.vact` and editor metadata. The MIT 11×4 chord
 intervals are retained with notice; no waveform/lookup resource is imported.
 Five square main voices form an unclocked chord; clocked mode uses one
@@ -207,7 +207,7 @@ deterministic reset, scheduled notes, distinct main/aux and native/browser
 44.1/48/96 kHz × 64/256-frame allocation-free rendering.
 
 Position 7 is `Adaptation` in the public manifest. Source external-clock
-state persists across triggers, whereas Vactrol note events create separate
+state persists across triggers, whereas Vactr note events create separate
 voices with an internal clock. Oscillator polyBLEP, parameter interpolation,
 exact inversion and arpeggiator selection also differ; SYN-005E comparison
 remains open.

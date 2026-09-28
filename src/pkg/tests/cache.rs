@@ -82,7 +82,7 @@ fn publishes_a_verified_entry_and_reads_it_back() {
     let files = pads_files();
     assert_eq!(d, tree_digest(&hashed(&as_refs(&files))));
     let entry = cache.entry(&id(PADS), &v("v1.0.0"));
-    assert!(entry.ends_with("github.com/someone/vactrol-pads@v1.0.0"));
+    assert!(entry.ends_with("github.com/someone/vactr-pads@v1.0.0"));
     let stamp = fs::read_to_string(entry.join(STAMP_FILE)).expect("stamp");
     assert_eq!(stamp, format!("{}\n", hex(&d)));
     assert!(staging_is_empty(&cache));

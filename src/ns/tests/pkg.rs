@@ -9,7 +9,7 @@ use crate::value::intern::intern_sym;
 use crate::value::value::Value;
 use crate::vm::tests::Sess;
 
-const PADS: &str = "github.com/someone/vactrol-pads";
+const PADS: &str = "github.com/someone/vactr-pads";
 
 fn pkg(s: &Sess, path: &str, names: &[(&str, i32)]) -> Rc<PkgNs> {
     let p = PkgNs::new(PackageId::new(path), Rc::clone(s.ns.prelude()));
@@ -137,8 +137,8 @@ fn a_fixture_package_loads_and_exposes_its_names_under_the_prefix() {
         PADS,
         &[
             (
-                "vactrol.toml",
-                "[package]\npath = \"github.com/someone/vactrol-pads\"\n",
+                "vactr.toml",
+                "[package]\npath = \"github.com/someone/vactr-pads\"\n",
             ),
             ("b.vact", "let warm + base 2\n"),
             ("a.vact", "let base 1\n"),
@@ -203,14 +203,14 @@ fn re_loading_a_package_replaces_its_namespace() {
 #[test]
 fn a_package_import_resolves_through_the_callers_resolver() {
     let mut s = Sess::new();
-    let base_path = "github.com/someone/vactrol-base";
+    let base_path = "github.com/someone/vactr-base";
     let (base, diags, _) = load(&mut s, &sources(base_path, &[("b.vact", "let x 40\n")]));
     assert!(diags.is_empty(), "{diags:?}");
     let src = sources(
         PADS,
         &[(
             "a.vact",
-            "import github.com/someone/vactrol-base\nlet warm + base.x 2\n",
+            "import github.com/someone/vactr-base\nlet warm + base.x 2\n",
         )],
     );
     let mut asked = Vec::new();

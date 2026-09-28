@@ -303,7 +303,7 @@ impl NativeMidiIn {
     /// `beyond-capability` when MIDI input is unavailable or no port
     /// matches.
     pub fn open(port: Option<&str>, clock: FrameClock) -> Result<Self, Diagnostic> {
-        let input = MidiInput::new("vactrol")
+        let input = MidiInput::new("vactr")
             .map_err(|e| unavailable(format!("MIDI input is not available on this host ({e})")))?;
         let ports = input.ports();
         let chosen =
@@ -320,7 +320,7 @@ impl NativeMidiIn {
         let conn = input
             .connect(
                 &chosen,
-                "vactrol-in",
+                "vactr-in",
                 move |_, bytes, ()| {
                     if let Some(ev) = parse_midi(bytes, clock.now()) {
                         if tx.try_send(ev).is_err() {
@@ -384,7 +384,7 @@ impl NativeMidiOut {
     /// `beyond-capability` when MIDI output is unavailable or no port
     /// matches.
     pub fn open(port: Option<&str>, clock: FrameClock) -> Result<Self, Diagnostic> {
-        let output = MidiOutput::new("vactrol")
+        let output = MidiOutput::new("vactr")
             .map_err(|e| unavailable(format!("MIDI output is not available on this host ({e})")))?;
         let ports = output.ports();
         let chosen =
@@ -395,14 +395,14 @@ impl NativeMidiOut {
                 })
             })?;
         let name = output.port_name(&chosen).unwrap_or_default();
-        let conn = output.connect(&chosen, "vactrol-out").map_err(|e| {
+        let conn = output.connect(&chosen, "vactr-out").map_err(|e| {
             unavailable(format!(
                 "MIDI output port `{name}` is not available on this host ({e})"
             ))
         })?;
         let (tx, rx) = channel();
         let thread = thread::Builder::new()
-            .name("vactrol-midi-out".into())
+            .name("vactr-midi-out".into())
             .spawn(move || sender(conn, &rx, &clock))
             .map_err(|e| unavailable(format!("MIDI output is not available on this host ({e})")))?;
         Ok(Self {

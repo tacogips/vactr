@@ -14,7 +14,7 @@ sample outputs and attack/release flags. Tides2 `ramp_generator.h` and
 `poly_slope_generator.h` expose three ramp modes, four output modes,
 control/audio range, four channels, frequency, pulse width, shape,
 smoothness, shift and clock/gate. Each generation needs its own typed
-manifest and runtime path. Four Tides2 outputs require an explicit Vactrol
+manifest and runtime path. Four Tides2 outputs require an explicit Vactr
 channel contract; stereo downmix alone does not satisfy coverage.
 
 ## Resource Boundary
@@ -23,7 +23,7 @@ Tides1 `resources/wavetables.py` reads `resources/waves.bin`, but the pinned
 default `Generator::Process` has `WAVETABLE_HACK` commented out and uses
 audio/control-rate functions followed by filter/wavefolder. Thus the
 unaudited wave file belongs to an optional hack, not a missing default
-mode. The Vactrol adaptation imports neither that file, generated fold
+mode. The Vactr adaptation imports neither that file, generated fold
 tables nor aggregate `resources.cc`. Tides2 resource tables still need a
 generator-by-generator audit.
 
@@ -36,7 +36,7 @@ pub struct FunctionSpec {
     pub generation: u8,
     pub mode: u8,
     pub output_mode: u8,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub status: Fidelity,
     pub resources: ResourceState,
 }
@@ -76,7 +76,7 @@ comparison.
 Pinned high/control-rate flag paths set EOA as a level after the attack or
 while inactive; AR sustain also holds it. EOR remains high while inactive
 and holds for 48 generator samples after a low-frequency loop wrap, or one
-generator sample above the fixed-point threshold. Vactrol now translates
+generator sample above the fixed-point threshold. Vactr now translates
 these roles with bounded existing voice state and host-rate scaling: about
 1 ms at normal rates or 4 ms in low range below roughly 500/125 Hz,
 respectively. High-range AR sustains at half phase; medium/low use their
@@ -113,7 +113,7 @@ The default host graph/voice/bus remains two-output. An opt-in four-output
 host and `examples/quad-stems.vact` now emit all four lanes as two stereo
 outputs plus two direct stems. The direct stems bypass stereo bus/master FX;
 this remains an adaptation, not a full four-channel source port. Source ratio arrays, generated waveform/fold
-tables and polyBLEP implementation are excluded. Vactrol uses original
+tables and polyBLEP implementation are excluded. Vactr uses original
 continuous shift-to-ratio mapping and clock-edge reset; source external
 ramp synchronization, exact channel voltages, source timing/waveshaping and
 firmware DAC/output-voltage parity remain open. Native/browser, selector/control,
@@ -142,4 +142,4 @@ The pinned first-generation `Generator` declares three modes and three
 ranges, while Tides2 dispatches three ramp modes × four output modes ×
 two ranges (24 combinations) and four channels. Tides1's wavetable
 generator reads an unaudited `waves.bin`. This plan records source scope
-only; no Tides implementation or data has been imported into Vactrol.
+only; no Tides implementation or data has been imported into Vactr.

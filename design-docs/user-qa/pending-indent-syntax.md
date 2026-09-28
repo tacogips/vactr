@@ -23,7 +23,7 @@ but the reader, formatter, and LSP cannot start until it is fixed.
 
 ## Background
 
-vactrol programs are written without most parentheses; the reader reconstructs
+vactr programs are written without most parentheses; the reader reconstructs
 lists from line and indentation structure. Three established families exist.
 
 ## Alternatives

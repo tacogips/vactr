@@ -1,4 +1,4 @@
-// WebSocket transport to `vactrol serve` (command.md: text frames on
+// WebSocket transport to `vactr serve` (command.md: text frames on
 // `ws://127.0.0.1:<port>/session?token=<hex>`). The token lives only in the
 // URL the user pasted: it is never written to localStorage, sessionStorage
 // or any other store. Frames sent before the socket opens are queued.

@@ -1,4 +1,4 @@
-//! The `vactrol` CLI (design 14.5.10, `command.md`): argument parsing
+//! The `vactr` CLI (design 14.5.10, `command.md`): argument parsing
 //! (`args`), the verbs (`repl`, `run`, `serve`, `get`) and the native
 //! session socket (`ws`). Besides `pkg::native` and `lsp`, this is the
 //! only part of the crate that uses `std::process`, `std::net` and
@@ -94,7 +94,7 @@ pub fn main(args: Vec<OsString>) -> i32 {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     match parse(&strings) {
         Ok(Command::Version) => {
-            println!("vactrol {}", env!("CARGO_PKG_VERSION"));
+            println!("vactr {}", env!("CARGO_PKG_VERSION"));
             0
         }
         Ok(Command::Help) => {
@@ -112,7 +112,7 @@ pub fn main(args: Vec<OsString>) -> i32 {
         Ok(Command::Get { target, store }) => get::main(target, store, &cwd),
         Ok(Command::Lsp { session }) => lsp_verb(session),
         Err(UsageError(message)) => {
-            eprintln!("vactrol: {message}");
+            eprintln!("vactr: {message}");
             eprintln!("{}", args::USAGE);
             2
         }
@@ -138,7 +138,7 @@ fn serve_dispatch(
     _bind: std::net::IpAddr,
     _cwd: &Path,
 ) -> i32 {
-    eprintln!("vactrol: `serve` needs the `host-native` feature");
+    eprintln!("vactr: `serve` needs the `host-native` feature");
     1
 }
 
@@ -149,11 +149,11 @@ fn lsp_verb(session: Option<String>) -> i32 {
 
 #[cfg(not(feature = "lsp"))]
 fn lsp_verb(_session: Option<String>) -> i32 {
-    eprintln!("vactrol was built without the lsp feature");
+    eprintln!("vactr was built without the lsp feature");
     1
 }
 
-/// `./vactrol.lock`, when present; a parse error is printed and the
+/// `./vactr.lock`, when present; a parse error is printed and the
 /// session runs unlocked (packages then fail `package-not-locked`).
 fn read_lock(cwd: &Path) -> Option<LockFile> {
     let path = cwd.join(LOCK_FILE);
@@ -161,19 +161,19 @@ fn read_lock(cwd: &Path) -> Option<LockFile> {
     match LockFile::parse(&text) {
         Ok(lock) => Some(lock),
         Err(e) => {
-            eprintln!("vactrol: {}: {e}", path.display());
+            eprintln!("vactr: {}: {e}", path.display());
             None
         }
     }
 }
 
-/// The verified package cache at `$VACTROL_HOME/pkg`; a failure to open
+/// The verified package cache at `$VACTR_HOME/pkg`; a failure to open
 /// it is a warning, and the session runs without a cache (S6).
 fn open_cache() -> Option<Box<dyn CacheBackend>> {
     match FsCache::new(&pkg_cache_root()) {
         Ok(cache) => Some(Box::new(cache)),
         Err(e) => {
-            eprintln!("vactrol: package cache unavailable: {e}");
+            eprintln!("vactr: package cache unavailable: {e}");
             None
         }
     }
@@ -194,7 +194,7 @@ fn build_session(host: HostChoice, cwd: &Path) -> Result<(Session, HostClock), S
             return Err("`--audio-in` requires the `host-native` build feature".into());
         }
         if host == HostChoice::Native {
-            eprintln!("vactrol: built without the `host-native` feature; using `--host noop`");
+            eprintln!("vactr: built without the `host-native` feature; using `--host noop`");
         }
         let mut cfg = SessionConfig::new(CapabilitySet::native());
         cfg.lock = lock;
@@ -240,7 +240,7 @@ fn build_session_native(
             match NativeHosts::open_with_bus_names(&native_cfg, Rc::new(Rc::clone(&reg))) {
                 Ok(native) => {
                     for d in &native.diags {
-                        eprintln!("vactrol: {d}");
+                        eprintln!("vactr: {d}");
                     }
                     let runtime = RuntimeConfig {
                         cell_pool: native.cells.capacity(),
@@ -254,7 +254,7 @@ fn build_session_native(
                     if host == HostChoice::NativeInput {
                         return Err(format!("requested audio input is unavailable: {d}"));
                     }
-                    eprintln!("vactrol: {d}; falling back to `--host noop`");
+                    eprintln!("vactr: {d}; falling back to `--host noop`");
                     (
                         Hosts::noop(),
                         RuntimeConfig::default(),

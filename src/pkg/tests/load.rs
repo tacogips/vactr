@@ -20,7 +20,7 @@ use crate::vm::fail::FailCode;
 fn default_prefixes() {
     assert_eq!(&*default_prefix(&id(PADS)), "pads");
     assert_eq!(&*default_prefix(&id("github.com/a/drums")), "drums");
-    assert_eq!(&*default_prefix(&id("github.com/a/vactrol-")), "");
+    assert_eq!(&*default_prefix(&id("github.com/a/vactr-")), "");
 }
 
 #[test]

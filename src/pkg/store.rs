@@ -1,5 +1,5 @@
 //! The package store capability and the package error (design 5.7,
-//! 14.5.7). Stores run on the IO side (`vactrol get`), never on the
+//! 14.5.7). Stores run on the IO side (`vactr get`), never on the
 //! evaluator; a running session reads only the verified cache.
 
 use std::fmt;
@@ -13,11 +13,11 @@ use crate::pkg::validate::{validate_assets, EntryKind, IntegrityError};
 use crate::types::diag::DiagCode;
 
 /// The manifest file at a package root.
-pub const MANIFEST_FILE: &str = "vactrol.toml";
+pub const MANIFEST_FILE: &str = "vactr.toml";
 /// The lock file next to a root manifest.
-pub const LOCK_FILE: &str = "vactrol.lock";
+pub const LOCK_FILE: &str = "vactr.lock";
 /// The digest stamp of a published cache entry; reserved at a package root.
-pub const STAMP_FILE: &str = ".vactrol-digest";
+pub const STAMP_FILE: &str = ".vactr-digest";
 
 /// A package error, mapped to its 14.5.12 code by [`PkgError::code`].
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -28,7 +28,7 @@ pub enum PkgError {
     Network(String),
     Integrity(IntegrityError),
     Manifest(ManifestError),
-    /// The import is not in `vactrol.lock`.
+    /// The import is not in `vactr.lock`.
     NotLocked(PackageId),
     /// The lock entry has no verified cache entry.
     NotFetched(String),
@@ -72,7 +72,7 @@ impl fmt::Display for PkgError {
             PkgError::Manifest(e) => write!(f, "{MANIFEST_FILE} {e}"),
             PkgError::NotLocked(id) => write!(f, "package `{}` is not in `{LOCK_FILE}`", id.0),
             PkgError::NotFetched(m) => {
-                write!(f, "{m} is locked but not fetched; run `vactrol get`")
+                write!(f, "{m} is locked but not fetched; run `vactr get`")
             }
         }
     }

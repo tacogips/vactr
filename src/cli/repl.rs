@@ -1,4 +1,4 @@
-//! `vactrol repl` (design 14.2, 14.5.10): a stdin reader thread feeding
+//! `vactr repl` (design 14.2, 14.5.10): a stdin reader thread feeding
 //! `session::repl`'s `LineBuffer`/`submit`/`tick` on the main (evaluator)
 //! thread, which never blocks longer than `TICK_PERIOD` so sound keeps
 //! playing between lines.
@@ -12,7 +12,7 @@ use crate::cli::args::HostChoice;
 use crate::cli::{build_session, TICK_PERIOD};
 use crate::session::repl::{submit, tick, LineBuffer};
 
-const PROMPT: &str = "vactrol> ";
+const PROMPT: &str = "vactr> ";
 const CONTINUATION: &str = "....> ";
 
 /// Runs the REPL to EOF (Ctrl-D); always exits 0.
@@ -20,14 +20,14 @@ pub fn main(host: HostChoice, cwd: &Path) -> i32 {
     let (mut session, clock) = match build_session(host, cwd) {
         Ok(session) => session,
         Err(error) => {
-            eprintln!("vactrol: {error}");
+            eprintln!("vactr: {error}");
             return 1;
         }
     };
     let interactive = std::io::stdin().is_terminal();
     let (tx, rx) = mpsc::channel::<String>();
     let spawned = thread::Builder::new()
-        .name("vactrol-repl-stdin".into())
+        .name("vactr-repl-stdin".into())
         .spawn(move || {
             // Bytes, not `lines()`: a line that is not UTF-8 is evaluated
             // (and diagnosed) lossily instead of ending the REPL.
@@ -47,7 +47,7 @@ pub fn main(host: HostChoice, cwd: &Path) -> i32 {
             }
         });
     if spawned.is_err() {
-        eprintln!("vactrol: cannot start the stdin reader thread");
+        eprintln!("vactr: cannot start the stdin reader thread");
         return 1;
     }
 

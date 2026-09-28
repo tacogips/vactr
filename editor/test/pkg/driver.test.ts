@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VactrolHost } from '../../worklet/host.js';
+import { VactrHost } from '../../worklet/host.js';
 import { WasmCore } from '../../src/protocol/wasm';
 import type { PkgReply } from '../../src/protocol/types';
 import {
@@ -20,7 +20,7 @@ function scripted(script: (step: number, req: string) => PkgReply): { fake: Fake
   const fake = new FakeCore();
   const core = new WasmCore();
   core.attach(
-    new VactrolHost(null, fakeNode(), fake.exports, {
+    new VactrHost(null, fakeNode(), fake.exports, {
       wasmUrl: '',
       processorUrl: '',
       init: 'session',
@@ -132,14 +132,14 @@ describe('unresolvedImports', () => {
       file: 'main.vact',
     });
     const diags = [
-      d('package-not-locked', 'package `github.com/test/vactrol-pads` is not in `vactrol.lock`'),
-      d('package-not-fetched', '`github.com/test/drums@1.2.0` is locked but not fetched; run `vactrol get`'),
-      d('package-not-locked', 'package `github.com/test/vactrol-pads` is not in `vactrol.lock`'),
+      d('package-not-locked', 'package `github.com/test/vactr-pads` is not in `vactr.lock`'),
+      d('package-not-fetched', '`github.com/test/drums@1.2.0` is locked but not fetched; run `vactr get`'),
+      d('package-not-locked', 'package `github.com/test/vactr-pads` is not in `vactr.lock`'),
       d('unbound', 'unbound `x`'),
       d('package-not-locked', 'no path here'),
     ];
     expect(unresolvedImports(diags).map((u) => u.path)).toEqual([
-      'github.com/test/vactrol-pads',
+      'github.com/test/vactr-pads',
       'github.com/test/drums',
     ]);
     expect(importPath('package `a/b@` x')).toBe('a/b');

@@ -1,4 +1,4 @@
-//! Rebuild rules (vactrol-core.md TASK-005 rebuild criterion, design 5.6
+//! Rebuild rules (vactr-core.md TASK-005 rebuild criterion, design 5.6
 //! eligibility/effects/transactions/DAG, section 13 tiers and override
 //! migration).
 

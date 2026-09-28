@@ -9,7 +9,7 @@
 
 Deliver triggered FM percussion from the MIT-licensed Peaks DSP, then a
 separate FM/noise/feedback percussion voice after auditing the Faust source
-and its library dependencies. Use Vactrol product names and controls.
+and its library dependencies. Use Vactr product names and controls.
 
 ## Modules
 
@@ -120,7 +120,7 @@ late-start and allocation tests, two-hit, editor and end-to-end control tests
 pass. Quiet native/no-default/wasm checks, strict Clippy, rustfmt, Taplo,
 19 mise task validations and full Cargo tests pass (1,434 passed, one
 ignored). Analytic/float curves, trigger phase, source block-tail pitch
-alignment and Vactrol's separate controls still differ numerically; a
+alignment and Vactr's separate controls still differ numerically; a
 pinned source comparison is pending.
 
 ### Session: 2026-09-27

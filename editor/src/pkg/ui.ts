@@ -6,7 +6,7 @@
 // (driver errors, then the load diagnostics of the next user-started eval).
 // An import runs the driver with the current requirements plus the path at
 // `""` (latest) and then shows "imported; evaluate to load": the pane NEVER
-// sends `eval`. Native tier: the same list with the exact `vactrol get
+// sends `eval`. Native tier: the same list with the exact `vactr get
 // <path>` command text, and no fetching at all.
 
 import { createComponent, createSignal, type Setter } from 'solid-js';
@@ -28,7 +28,7 @@ import { MEMORY_ONLY_HINT, type PkgStore } from './opfs';
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
-export const PROXY_KEY = 'vactrol.pkg.proxy';
+export const PROXY_KEY = 'vactr.pkg.proxy';
 export const IMPORTED_TEXT = 'imported; evaluate to load';
 
 export function defaultStorage(): StorageLike | null {
@@ -40,7 +40,7 @@ export function defaultStorage(): StorageLike | null {
 }
 
 /** The exact native-tier command for `path`. */
-export const getCommand = (path: string): string => `vactrol get ${path}`;
+export const getCommand = (path: string): string => `vactr get ${path}`;
 
 export interface PkgPaneOptions {
   tier: Tier;

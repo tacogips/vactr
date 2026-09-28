@@ -86,7 +86,7 @@ fn envelope(
     value[0]
 }
 
-fn vactrol(
+fn vactr(
     value: &mut [f32],
     excitation: f32,
     trigger: bool,
@@ -134,7 +134,7 @@ fn channel(
     let gain = if kind == EffectKind::StreamEnvelope {
         envelope(state, high, rising, alternate, attack, decay, sr)
     } else {
-        vactrol(
+        vactr(
             state,
             if high { state[5] } else { 0.0 },
             rising,

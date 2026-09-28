@@ -1,7 +1,7 @@
 // @vitest-environment node
 //
 // TASK-010 criterion tests against the REAL host-wasm artifact
-// (`$VACTROL_WASM`; design 15.1.12, vactrol-core.md TASK-010 criteria 1, 2,
+// (`$VACTR_WASM`; design 15.1.12, vactr-core.md TASK-010 criteria 1, 2,
 // 3 (sites) and 11). Every test builds a fresh browser Session with
 // `session_init` (G1) and drives it on a mock audio clock (`session_tick(now)`
 // at chosen times). The worklet is played by answering its install, cell and
@@ -34,11 +34,11 @@ import { RecordingTransport } from '../support/recording';
 import {
   ackSampleInstalls,
   jsonOf,
-  loadVactrolWasm,
+  loadVactrWasm,
   putSample,
   TAG_RENDER,
   TAG_SESSION,
-  type VactrolWasm,
+  type VactrWasm,
   type WasmRecord,
 } from '../support/wasm';
 
@@ -60,7 +60,7 @@ interface Env {
 }
 
 interface Rig {
-  w: VactrolWasm;
+  w: VactrWasm;
   seq: number;
   rev: number;
   epoch: number;
@@ -77,7 +77,7 @@ const TAG_CELL_INIT_ACK = 0x41;
 const TAG_CELL_BATCH_ACK = 0x42;
 
 /** Answers the slot-control and cell records of `records` like the worklet. */
-function ackControls(w: VactrolWasm, records: readonly WasmRecord[]): void {
+function ackControls(w: VactrWasm, records: readonly WasmRecord[]): void {
   const replies: [number, number[]][] = [];
   for (const r of records) {
     const v = new DataView(r.bytes.buffer, r.bytes.byteOffset, r.bytes.byteLength);
@@ -100,7 +100,7 @@ function ackControls(w: VactrolWasm, records: readonly WasmRecord[]): void {
 }
 
 async function start(): Promise<Rig> {
-  const w = await loadVactrolWasm();
+  const w = await loadVactrWasm();
   expect(w.call('session_init', 48000, 0)).toBe(1);
   const rig: Rig = { w, seq: 0, rev: 0, epoch: 0, now: 0 };
   drain(rig);

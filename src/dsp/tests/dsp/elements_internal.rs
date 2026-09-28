@@ -50,14 +50,14 @@ fn voice(model: f32, alternate: f32) -> InstDef {
 fn inventory_includes_bounded_alternate() {
     for (index, row) in resonator_modes().iter().enumerate() {
         assert_eq!(usize::from(row.mode), index);
-        assert_eq!(row.vactrol_template, Some("elements-voice"));
+        assert_eq!(row.vactr_template, Some("elements-voice"));
         assert_eq!(row.coverage, CoverageState::Adaptation);
         assert_eq!(row.resources, ResourceState::Replacement);
         assert!(row.external_blow && row.external_strike);
         assert_eq!(row.external_effect, Some(EffectKind::ElementsBank));
     }
     assert_eq!(ALTERNATE_VOICE.coverage, CoverageState::Adaptation);
-    assert_eq!(ALTERNATE_VOICE.vactrol_template, Some("elements-voice"));
+    assert_eq!(ALTERNATE_VOICE.vactr_template, Some("elements-voice"));
     for rate in [44_100.0, 48_000.0, 96_000.0] {
         assert!((elements_internal::line_len(rate) - 2) as f32 >= rate / 20.0);
     }

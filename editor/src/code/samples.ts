@@ -18,7 +18,7 @@ import { SampleView, type BankView } from './sample-view';
 import type { SampleFrames } from '../app/apis';
 import type { Tier } from '../app/deps';
 
-export const SAMPLE_MAP_KEY = 'vactrol.sampleMap';
+export const SAMPLE_MAP_KEY = 'vactr.sampleMap';
 
 export type SampleMap = Record<string, string[]>;
 

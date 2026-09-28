@@ -515,7 +515,7 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("resonant-bank"),
     dsp("elements-bank"),
     dsp("stream-envelope"),
-    dsp("stream-vactrol"),
+    dsp("stream-vactr"),
     dsp("stream-follower"),
     dsp("stream-compressor"),
     dsp("stream-filter"),

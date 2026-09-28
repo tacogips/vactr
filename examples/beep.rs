@@ -12,15 +12,15 @@ use std::rc::Rc;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::{Duration, Instant};
 
-use vactrol::dsp::caps::CapabilitySet;
-use vactrol::host::caps::InstResolver;
-use vactrol::host::native::{NativeConfig, NativeHosts, TickSource, TICK_PERIOD};
-use vactrol::ns::evaluator::Evaluator;
-use vactrol::ns::insts::InstRegistry;
-use vactrol::ns::namespace::Prelude;
-use vactrol::reader::span::FileId;
-use vactrol::sched::cells::Tier;
-use vactrol::sched::runtime::{Runtime, RuntimeConfig};
+use vactr::dsp::caps::CapabilitySet;
+use vactr::host::caps::InstResolver;
+use vactr::host::native::{NativeConfig, NativeHosts, TickSource, TICK_PERIOD};
+use vactr::ns::evaluator::Evaluator;
+use vactr::ns::insts::InstRegistry;
+use vactr::ns::namespace::Prelude;
+use vactr::reader::span::FileId;
+use vactr::sched::cells::Tier;
+use vactr::sched::runtime::{Runtime, RuntimeConfig};
 
 const RUN_FOR: Duration = Duration::from_secs(2);
 

@@ -1,7 +1,7 @@
 //! The native package cache (design 14.5.7): `<root>/<path>@<version>/`
-//! with the stamp `.vactrol-digest` (hex). Packages are staged under
+//! with the stamp `.vactr-digest` (hex). Packages are staged under
 //! `<root>/.staging/<unique>` (created with `create_dir`, never reused)
-//! and published with one `rename`. The root is `$VACTROL_HOME/pkg`
+//! and published with one `rename`. The root is `$VACTR_HOME/pkg`
 //! (`native::pkg_cache_root`).
 
 use std::collections::BTreeMap;

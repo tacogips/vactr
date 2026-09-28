@@ -131,7 +131,7 @@ feat: implement user authentication system
 
 ## Project Overview
 
-This is vactrol - a Rust project with mise-managed development environment.
+This is vactr - a Rust project with mise-managed development environment.
 
 ## Development Environment
 - **Language**: Rust

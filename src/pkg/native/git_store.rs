@@ -111,7 +111,7 @@ impl PackageStore for GitStore {
     }
 
     fn manifest(&mut self, id: &PackageId, version: &Version) -> Result<PkgManifest, PkgError> {
-        let scratch = ScratchDir::new("vactrol-git-")?;
+        let scratch = ScratchDir::new("vactr-git-")?;
         let dir = scratch.path().join("src");
         self.checkout(id, version, &dir)?;
         let file = dir.join(MANIFEST_FILE);
@@ -134,7 +134,7 @@ impl PackageStore for GitStore {
         version: &Version,
         staging: &mut dyn StagingSink,
     ) -> Result<(), PkgError> {
-        let scratch = ScratchDir::new("vactrol-git-")?;
+        let scratch = ScratchDir::new("vactr-git-")?;
         let dir = scratch.path().join("src");
         self.checkout(id, version, &dir)?;
         write_tree(&dir, &[], &self.limits, staging)

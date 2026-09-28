@@ -1,5 +1,5 @@
 //! Native package stores and the file-system cache (design 14.5.7);
-//! non-wasm32 only. `vactrol get` is the only native fetch path.
+//! non-wasm32 only. `vactr get` is the only native fetch path.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,22 +17,22 @@ pub use dir_store::DirStore;
 pub use fs_cache::FsCache;
 pub use git_store::GitStore;
 
-/// `$VACTROL_HOME`, else `$HOME/.vactrol` (else `.vactrol`).
+/// `$VACTR_HOME`, else `$HOME/.vactr` (else `.vactr`).
 #[must_use]
-pub fn vactrol_home() -> PathBuf {
-    if let Some(h) = std::env::var_os("VACTROL_HOME").filter(|h| !h.is_empty()) {
+pub fn vactr_home() -> PathBuf {
+    if let Some(h) = std::env::var_os("VACTR_HOME").filter(|h| !h.is_empty()) {
         return PathBuf::from(h);
     }
     match std::env::var_os("HOME").filter(|h| !h.is_empty()) {
-        Some(home) => PathBuf::from(home).join(".vactrol"),
-        None => PathBuf::from(".vactrol"),
+        Some(home) => PathBuf::from(home).join(".vactr"),
+        None => PathBuf::from(".vactr"),
     }
 }
 
 /// The package cache root, `<home>/pkg`.
 #[must_use]
 pub fn pkg_cache_root() -> PathBuf {
-    vactrol_home().join("pkg")
+    vactr_home().join("pkg")
 }
 
 pub(crate) fn io(what: &str, path: &Path, e: &std::io::Error) -> PkgError {

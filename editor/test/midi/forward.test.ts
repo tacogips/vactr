@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { VactrolHost } from '../../worklet/host.js';
+import { VactrHost } from '../../worklet/host.js';
 import type { MidiCcEvent } from '../../src/app/apis';
 import { Forwarder, audioTime, forwardable, type OutputClock } from '../../src/midi/forward';
 import { WasmCore } from '../../src/protocol/wasm';
@@ -16,7 +16,7 @@ function wasmCore(): { fake: FakeCore; core: WasmCore } {
   const fake = new FakeCore();
   const core = new WasmCore();
   core.attach(
-    new VactrolHost(null, fakeNode(), fake.exports, {
+    new VactrHost(null, fakeNode(), fake.exports, {
       wasmUrl: '',
       processorUrl: '',
       init: 'session',

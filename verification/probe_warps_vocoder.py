@@ -42,7 +42,7 @@ def main():
     require_clean_tracked_tree(source / "stmlib")
     clang = run(["mise", "which", "clang"], cwd=ROOT).strip()
 
-    with tempfile.TemporaryDirectory(prefix="vactrol-warps-vocoder-") as temp:
+    with tempfile.TemporaryDirectory(prefix="vactr-warps-vocoder-") as temp:
         executable = Path(temp) / "warps_vocoder_reference"
         filter_resource = Path(temp) / "warps_filter_bank_reference.cc"
         resource_text = (source / "warps/resources.cc").read_text()
@@ -86,7 +86,7 @@ def main():
                 } if (release, formant, gate_block) == (0.5, 0.5, 100) else {},
             })
     print(json.dumps({
-        "scope": "raw source vocoder only; no modulator, carrier generator or Vactrol host",
+        "scope": "raw source vocoder only; no modulator, carrier generator or Vactr host",
         "upstream_revision": EURORACK_REVISION,
         "stmlib_revision": STMLIB_REVISION,
         "sample_rate_hz": 96000,

@@ -9,8 +9,8 @@ import { createRoot, createSignal, type Accessor, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
 import { ChevronDown, ChevronLeft, ChevronRight } from './icons';
 
-export const SIDE_KEY = 'vactrol.sideFolded';
-export const SECTION_KEY = (name: string): string => `vactrol.section.${name}.folded`;
+export const SIDE_KEY = 'vactr.sideFolded';
+export const SECTION_KEY = (name: string): string => `vactr.section.${name}.folded`;
 
 /** The side column's sections, in display order, with their labels. */
 export const SECTIONS = [

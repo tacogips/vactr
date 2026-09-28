@@ -1,7 +1,7 @@
 //! Original bounded quality conversion shared by four texture adaptations.
 //!
 //! The published selector uses bit 0 for mono and bit 1 for low fidelity.
-//! Vactrol's low-fidelity path uses host-rate two-sample hold and signed
+//! Vactr's low-fidelity path uses host-rate two-sample hold and signed
 //! 8-bit quantization; it does not copy the source 32/16 kHz SRC filter.
 
 use super::FxState;

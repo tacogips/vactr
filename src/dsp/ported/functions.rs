@@ -12,12 +12,12 @@ pub struct FunctionSpec {
     pub output_mode: u8,
     pub source_path: &'static str,
     pub source_revision: &'static str,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     /// Explicitly loaded four-output template; unavailable on stereo hosts.
     pub opt_in_quad_template: Option<&'static str>,
     pub coverage: CoverageState,
     pub resources: ResourceState,
-    /// Published audio output lanes versus simultaneously routed Vactrol lanes.
+    /// Published audio output lanes versus simultaneously routed Vactr lanes.
     pub source_channels: u8,
     pub simultaneous_channels: u8,
     /// Simultaneous roles are adapted; source timing/numerical parity is open.
@@ -32,7 +32,7 @@ const fn first_generation() -> [FunctionSpec; 9] {
         output_mode: 0,
         source_path: "tides/generator.cc",
         source_revision: TIDES_REVISION,
-        vactrol_template: Some("tidal-voice"),
+        vactr_template: Some("tidal-voice"),
         opt_in_quad_template: Some("tidal-quad-voice"),
         coverage: CoverageState::Adaptation,
         resources: ResourceState::Replacement,
@@ -58,7 +58,7 @@ const fn second_generation() -> [FunctionSpec; 24] {
         output_mode: 0,
         source_path: "tides2/ramp_generator.h",
         source_revision: TIDES_REVISION,
-        vactrol_template: Some("tides2-voice"),
+        vactr_template: Some("tides2-voice"),
         opt_in_quad_template: Some("tides2-quad-voice"),
         coverage: CoverageState::Adaptation,
         resources: ResourceState::Replacement,

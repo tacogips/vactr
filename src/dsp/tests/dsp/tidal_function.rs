@@ -50,7 +50,7 @@ fn two_generations_have_truthful_mode_inventory() {
         assert_eq!(usize::from(row.range), index % 3);
         assert_eq!(row.coverage, CoverageState::Adaptation);
         assert_eq!(row.resources, ResourceState::Replacement);
-        assert_eq!(row.vactrol_template, Some("tidal-voice"));
+        assert_eq!(row.vactr_template, Some("tidal-voice"));
         assert_eq!(row.opt_in_quad_template, Some("tidal-quad-voice"));
         assert_eq!(row.simultaneous_output_coverage, CoverageState::Adaptation);
     }

@@ -51,7 +51,7 @@ pub(super) fn recovers(bad: &str, code: &str) {
     assert_eq!(print_all(&r.nodes), "(#error)\n(print 1)", "{bad:?}");
 }
 
-/// The text of every `vactrol`/`vact` fence in a spec document.
+/// The text of every `vactr`/`vact` fence in a spec document.
 pub(super) fn spec_blocks(doc: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur: Option<String> = None;
@@ -65,7 +65,7 @@ pub(super) fn spec_blocks(doc: &str) -> Vec<String> {
                 text.push_str(line);
                 text.push('\n');
             }
-            None if line == "```vactrol" || line == "```vact" => cur = Some(String::new()),
+            None if line == "```vactr" || line == "```vact" => cur = Some(String::new()),
             None => {}
         }
     }

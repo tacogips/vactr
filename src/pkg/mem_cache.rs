@@ -3,7 +3,7 @@
 //! in memory. `create_staging` never reuses an id; `publish` moves a
 //! staging location to its entry atomically, and a same-stamp republish
 //! succeeds and drops the staging, exactly as `FsCache`'s
-//! `.vactrol-digest` stamp file behaves, but as a plain field instead of
+//! `.vactr-digest` stamp file behaves, but as a plain field instead of
 //! a file. Every operation is synchronous, allocation-only and uses no
 //! `std::{fs,net,process,thread,time}`, so this module is wasm-safe.
 

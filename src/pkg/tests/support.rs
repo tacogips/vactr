@@ -15,8 +15,8 @@ use crate::pkg::semver::Version;
 use crate::pkg::sha256::sha256;
 use crate::pkg::store::{parse_manifest, PackageStore, PkgError, StagingSink, MANIFEST_FILE};
 
-pub(super) const PADS: &str = "github.com/someone/vactrol-pads";
-pub(super) const DRUMS: &str = "github.com/someone/vactrol-drums";
+pub(super) const PADS: &str = "github.com/someone/vactr-pads";
+pub(super) const DRUMS: &str = "github.com/someone/vactr-drums";
 
 pub(super) fn id(path: &str) -> PackageId {
     PackageId::new(path)
@@ -37,7 +37,7 @@ impl TempDir {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
         let dir = std::env::temp_dir().join(format!(
-            "vactrol-pkg-test-{}-{nanos:x}-{n}",
+            "vactr-pkg-test-{}-{nanos:x}-{n}",
             std::process::id()
         ));
         fs::create_dir_all(&dir).expect("create the temp dir");
@@ -125,7 +125,7 @@ pub(super) fn wav(frames: u16) -> Vec<u8> {
     b
 }
 
-/// The `vactrol-pads` fixture sources: a manifest with an asset directory,
+/// The `vactr-pads` fixture sources: a manifest with an asset directory,
 /// one source file and a two-file bank `warm`.
 pub(super) fn pads_files() -> Vec<(String, Vec<u8>)> {
     vec![

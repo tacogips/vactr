@@ -30,7 +30,7 @@ fn git(dir: &Path, args: &[&str]) {
     let out = Command::new("git")
         .args([
             "-c",
-            "user.name=vactrol-test",
+            "user.name=vactr-test",
             "-c",
             "user.email=test@example.invalid",
             "-c",
@@ -121,7 +121,7 @@ fn dir_store_lists_versions_and_reads_manifests() {
     dir_package(&root, PADS, "junk", &[("x", b"")]);
     dir_package(
         &root,
-        "github.com/someone/vactrol-padsx",
+        "github.com/someone/vactr-padsx",
         "v9.0.0",
         &[("x", b"")],
     );
@@ -145,7 +145,7 @@ fn dir_store_lists_versions_and_reads_manifests() {
     // A manifest whose path is not the import path.
     let other = "github.com/someone/other";
     let text = format!("[package]\npath = \"{PADS}\"\n");
-    dir_package(&root, other, "v1.0.0", &[("vactrol.toml", text.as_bytes())]);
+    dir_package(&root, other, "v1.0.0", &[("vactr.toml", text.as_bytes())]);
     let e = store
         .manifest(&id(other), &v("v1.0.0"))
         .expect_err("mismatch");

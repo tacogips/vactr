@@ -13,11 +13,11 @@ use crate::pkg::store::{PkgError, PkgSources};
 use crate::pkg::validate::{validate_assets, EntryKind};
 use crate::value::value::PathVal;
 
-/// The default import prefix: the last path segment without `vactrol-`.
+/// The default import prefix: the last path segment without `vactr-`.
 #[must_use]
 pub fn default_prefix(id: &PackageId) -> Rc<str> {
     let last = id.0.rsplit('/').next().unwrap_or(&id.0);
-    Rc::from(last.strip_prefix("vactrol-").unwrap_or(last))
+    Rc::from(last.strip_prefix("vactr-").unwrap_or(last))
 }
 
 /// The verified cached sources of the locked package `id`. A running

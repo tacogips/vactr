@@ -16,7 +16,7 @@ Rhombus was evaluated as a possible base because it already has an
 extensible, parenthesis-light syntax (Shrubbery) on top of a Lisp macro
 system. Conclusion: borrow ideas, do not adopt the platform.
 
-| Aspect | Rhombus | Relevance to vactrol |
+| Aspect | Rhombus | Relevance to vactr |
 |--------|---------|---------------------|
 | Execution path | Rhombus -> Racket -> Racket CS -> Chez Scheme native | Three layers; slow startup, large distribution |
 | Performance | Between JavaScript and Ruby on "Are We Fast Yet?" | Acceptable, but not controllable from our side |
@@ -52,16 +52,16 @@ because the doc site refuses automated fetches.
 | Extend | `m ++ {"k": v}`, `{& m, "k": v}` | Immutable; `&` splices or binds the rest. |
 | Membership | `"alice" in m` | |
 
-Relevance to vactrol:
+Relevance to vactr:
 
 - Rhombus uses the same `{}` for blocks and maps and disambiguates by
-  position. vactrol disambiguates by content (`{key: value}` vs `{expr}`),
+  position. vactr disambiguates by content (`{key: value}` vs `{expr}`),
   which is simpler for a line-based reader. Recorded in `lang-reference.md`
   section 2 as QA-59.
 - `|`-clause syntax for `cond`/`match` is an alternative to `elif` (QA-41)
   worth revisiting once the block rule is settled.
 - Rhombus `if` needs no parentheses because it has infix operators and
-  `|` delimiters; vactrol gets the same effect from `{}` blocks.
+  `|` delimiters; vactr gets the same effect from `{}` blocks.
 
 ### Deferred: Music-Visual Coupling (2026-09-24)
 
@@ -71,7 +71,7 @@ unchanged. It assumes one machine on the evaluator thread (cycle clock,
 slot table, event stream, instrument/look registry, late-bound names)
 and couples the two domains through values only.
 
-```vactrol
+```vactr
 # ---- music into visuals (author intent 2026-09-24; PROPOSED) ----------
 # Music reaches visuals only through VALUES, never callbacks. Three
 # couplings, plus musical time.

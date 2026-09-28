@@ -55,7 +55,7 @@ fn paths() {
 fn malicious_entries_are_rejected_naming_the_entry() {
     let l = Limits::default();
     let ok = [
-        f("vactrol.toml"),
+        f("vactr.toml"),
         f("pads.vact"),
         (String::from("samples"), EntryKind::Dir, 0),
     ];

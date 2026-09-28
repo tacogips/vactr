@@ -193,22 +193,22 @@ fn get_parses_a_bare_path_a_versioned_path_and_the_store_flag() {
         })
     );
     assert_eq!(
-        parse(&args(&["get", "github.com/test/vactrol-pads"])),
+        parse(&args(&["get", "github.com/test/vactr-pads"])),
         Ok(Command::Get {
-            target: Some((PackageId::new("github.com/test/vactrol-pads"), None)),
+            target: Some((PackageId::new("github.com/test/vactr-pads"), None)),
             store: StoreSpec::Git,
         })
     );
     assert_eq!(
         parse(&args(&[
             "get",
-            "github.com/test/vactrol-pads@v1.0.0",
+            "github.com/test/vactr-pads@v1.0.0",
             "--store",
             "dir:/tmp/store",
         ])),
         Ok(Command::Get {
             target: Some((
-                PackageId::new("github.com/test/vactrol-pads"),
+                PackageId::new("github.com/test/vactr-pads"),
                 Some(Version::new(1, 0, 0)),
             )),
             store: StoreSpec::Dir(PathBuf::from("/tmp/store")),
@@ -219,7 +219,7 @@ fn get_parses_a_bare_path_a_versioned_path_and_the_store_flag() {
 #[test]
 fn get_rejects_an_invalid_path_version_or_store() {
     assert!(parse(&args(&["get", "not-a-path"])).is_err());
-    assert!(parse(&args(&["get", "github.com/test/vactrol-pads@bogus"])).is_err());
+    assert!(parse(&args(&["get", "github.com/test/vactr-pads@bogus"])).is_err());
     assert!(parse(&args(&["get", "--store", "http:nope"])).is_err());
     assert!(parse(&args(&["get", "--store", "dir:"])).is_err());
 }

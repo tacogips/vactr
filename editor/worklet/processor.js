@@ -1,4 +1,4 @@
-// Vactrol AudioWorklet processor: the worklet half (wasm #2, DSP only).
+// Vactr AudioWorklet processor: the worklet half (wasm #2, DSP only).
 // Design: design-docs/specs/design-implementation.md 12.8.10, 16, 16.1.
 //
 // Plain JS, no build step. The main thread posts a COPY of the module bytes
@@ -20,7 +20,7 @@ const SLOTS = 64;
 const STAGING_BYTES = 64 + 65536;
 const REPORT_EVERY = 4;
 
-class VactrolProcessor extends AudioWorkletProcessor {
+class VactrProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
     const o = (options && options.processorOptions) || {};
@@ -159,4 +159,4 @@ class VactrolProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('vactrol-processor', VactrolProcessor);
+registerProcessor('vactr-processor', VactrProcessor);

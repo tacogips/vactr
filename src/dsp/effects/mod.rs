@@ -276,7 +276,7 @@ fn group(kind: EffectKind) -> Group {
         K::TextureStretch => Group::TextureStretch,
         K::TextureLoop => Group::TextureLoop,
         K::TextureSpectral => Group::TextureSpectral,
-        K::StreamEnvelope | K::StreamVactrol => Group::StreamControl,
+        K::StreamEnvelope | K::StreamVactr => Group::StreamControl,
         K::StreamFollower | K::StreamCompressor => Group::StreamDynamics,
         K::StreamFilter | K::StreamLorenz => Group::StreamCv,
         K::ShiftPair => Group::ShiftPair,

@@ -44,7 +44,7 @@ still requires source comparison before complete parity can be claimed.
 The pinned source maps quality bits through `set_quality`: bit zero selects
 mono, bit one selects low fidelity. Its low-fidelity path converts 32 kHz
 processing to 16 kHz and uses 8-bit capture with a generated SRC filter.
-Any first Vactrol selector can be a procedural adaptation; source resampling
+Any first Vactr selector can be a procedural adaptation; source resampling
 and filter parity remain separate verification work.
 
 ### `src/dsp/effects/texture/{granular,stretch,loop,spectral}.rs`
@@ -154,7 +154,7 @@ preflight and allocation-free callbacks.
 The pinned `clouds/dsp/parameters.h` and `granular_processor.cc` show four
 playback modes and twelve common parameter/flag roles. They depend on a
 stereo capture buffer and distinct granular, WSOLA, looper and phase-vocoder
-players. The Vactrol bus effect slot has preallocated stereo memory and an
+players. The Vactr bus effect slot has preallocated stereo memory and an
 effect-local parameter limit of sixteen, so the control envelope is feasible;
 exact memory and FFT sizing remain to be specified by FX-001A.
 

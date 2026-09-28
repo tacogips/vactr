@@ -91,8 +91,8 @@ fn six_cv_rows_separate_firmware_from_digital_audio() {
 }
 
 #[test]
-fn envelope_ad_ar_and_vactrol_damped_plucked_have_distinct_audio() {
-    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactrol] {
+fn envelope_ad_ar_and_vactr_damped_plucked_have_distinct_audio() {
+    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactr] {
         let base = direct(kind, &[("shape", 0.1)], true, true);
         let alt = direct(kind, &[("shape", 0.1), ("alternate", 1.0)], true, true);
         assert!(base.0.iter().chain(&base.1).all(|x| x.is_finite()));
@@ -109,7 +109,7 @@ fn envelope_ad_ar_and_vactrol_damped_plucked_have_distinct_audio() {
 
 #[test]
 fn local_global_link_and_sidechain_controls_have_meaningful_roles() {
-    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactrol] {
+    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactr] {
         let baseline = &[("shape", 0.1), ("response", 0.3)];
         let base = direct(kind, baseline, true, true);
         for (name, value) in [
@@ -179,7 +179,7 @@ fn local_global_link_and_sidechain_controls_have_meaningful_roles() {
 
 #[test]
 fn explicit_trigger_starts_an_event_below_the_audio_detector_threshold() {
-    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactrol] {
+    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactr] {
         let controls = &[("threshold", 1.0), ("alternate", 1.0)];
         let idle = direct(kind, controls, true, false);
         let struck = direct(
@@ -195,7 +195,7 @@ fn explicit_trigger_starts_an_event_below_the_audio_detector_threshold() {
 
 #[test]
 fn native_browser_codec_memory_preflight_and_rates() {
-    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactrol] {
+    for kind in [EffectKind::StreamEnvelope, EffectKind::StreamVactr] {
         assert_eq!(dynamic_control::PARAMS.len(), 14);
         let bus = effect(kind, &[("mix", 0.2)]);
         let template = BusTemplate::from_def(&bus).unwrap();

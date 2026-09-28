@@ -149,19 +149,19 @@ fn import_collision_warns_on_prelude_and_open_overlap() {
     let other: BTreeMap<_, _> = [("warm".into(), info)].into();
     env.qualified.insert("keys".into(), other);
     let m = HostManifest::spec_default();
-    let src = "import github.com/someone/vactrol-pads open";
+    let src = "import github.com/someone/vactr-pads open";
     let r = check_env(src, &env, &m);
     assert_eq!(diag_lines(src, &r), ["import-collision@1"]);
     assert_eq!(r.diags[0].severity, Severity::Warning);
     let src =
-        "import github.com/someone/vactrol-pads open\nimport github.com/someone/vactrol-keys open";
+        "import github.com/someone/vactr-pads open\nimport github.com/someone/vactr-keys open";
     let r = check_env(src, &env, &m);
     assert_eq!(
         diag_lines(src, &r),
         ["import-collision@1", "import-collision@2"]
     );
     assert_eq!(line_of(src, r.diags[1].span.start), 2);
-    let src = "import github.com/someone/vactrol-pads\npads.warm\npads.nope";
+    let src = "import github.com/someone/vactr-pads\npads.warm\npads.nope";
     let r = check_env(src, &env, &m);
     assert_eq!(diag_lines(src, &r), ["undefined-name@3"]);
 }

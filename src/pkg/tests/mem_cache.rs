@@ -131,7 +131,7 @@ fn a_failure_midway_leaves_no_entry() {
         PADS,
         "v1.0.0",
         vec![
-            ("vactrol.toml".into(), b"[deps]\n".to_vec()),
+            ("vactr.toml".into(), b"[deps]\n".to_vec()),
             ("a.vact".into(), b"let a 1\n".to_vec()),
             ("b.vact".into(), b"let b 2\n".to_vec()),
         ],

@@ -29,7 +29,7 @@ fn pads_v11() -> Vec<(String, Vec<u8>)> {
 fn drums() -> Vec<(String, Vec<u8>)> {
     vec![
         (
-            "vactrol.toml".into(),
+            "vactr.toml".into(),
             deps_manifest(Some(DRUMS), &[]).into_bytes(),
         ),
         ("drums.vact".into(), b"let kick 1\n".to_vec()),

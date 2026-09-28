@@ -3,15 +3,15 @@
   "workflowMode": "issue-resolution",
   "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-180",
   "issueReference": {
-    "repository": "tacogips/vactrol",
+    "repository": "tacogips/vactr",
     "number": 2,
-    "url": "https://github.com/tacogips/vactrol/issues/2"
+    "url": "https://github.com/tacogips/vactr/issues/2"
   },
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
   "originalHead": "f27253652c1db420a452c008e11cc0998abe8c99",
-  "parentPlanPath": "impl-plans/active/vactrol-core.md",
+  "parentPlanPath": "impl-plans/active/vactr-core.md",
   "planIndexPath": "impl-plans/README.md",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
@@ -26,23 +26,23 @@
   "evidenceLayout": "tmp/me-middle-20260925-s175/<planId>/attempt-<n>/ holds pre-edit-hashes.txt, intent.md, post-edit-hashes.txt and final-hashes.txt (tmp is gitignored). Cargo logs go to target/fe-logs/<plan>-<check>-s<S>-<n>.log per design 6.5.7.",
   "logRule": "Design 6.5.7: every cargo run writes a new target/fe-logs/<plan>-<check>-s<S>-<n>.log (S = Riela session number; n counts from 1 per check within the session; never overwrite). Run each cargo command as (set -o pipefail; CMD 2>&1 | tee LOG); echo \"exit=$?\" >> LOG. The progress log cites the counting log path and its exit= value, and for nextest and cargo test the run and passed counts (run > 0). A missing log, a log without exit=, or a truncated log fails the check. 'LOG(<plan>-<check>): CMD' in the verification arrays means CMD run under this rule.",
   "commonContract": {
-    "editProtocol": "vactrol-middle-masks.md section 'Edit Protocol (common to every ME plan)': fresh read and sha256 before each edit, intent snapshot before each sharedPath edit, post-edit hash, stop and reapply on drift, keep the tree compiling, never edit files outside writePaths/sharedPaths, rustfmt on owned files only, no git reset/clean/stash/checkout, no branches or worktrees, no commits, final-hashes.txt at the end.",
+    "editProtocol": "vactr-middle-masks.md section 'Edit Protocol (common to every ME plan)': fresh read and sha256 before each edit, intent snapshot before each sharedPath edit, post-edit hash, stop and reapply on drift, keep the tree compiling, never edit files outside writePaths/sharedPaths, rustfmt on owned files only, no git reset/clean/stash/checkout, no branches or worktrees, no commits, final-hashes.txt at the end.",
     "gateContract": "The step6-implement output payload carries planId. The test-integrity and adversarial-review outputs carry NO planId and always carry a findings array (empty when there are none).",
     "parallelSafety": "ME-CHECK, ME-VM and ME-PATTERN run in the same working directory at the same time (and ME-REACTIVE may overlap ME-CHECK/ME-PATTERN). Their writePaths and sharedPaths are disjoint. A build error in another plan's file is waited out and recorded, never fixed by the observer; serial repair happens at the join (reconcile step) and in ME-INTEGRATE.",
-    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/, design-docs/user-qa/, impl-plans/active/, impl-plans/README.md, and tests/fixtures/spec/manifest.toml (it changed together with lang-reference.md line 783 and design-music.md block 2; without it verbatim_cases_appear_in_their_document fails at the checkpoint HEAD). It never stages src/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is in vactrol-middle-finalize.md.",
+    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/, design-docs/user-qa/, impl-plans/active/, impl-plans/README.md, and tests/fixtures/spec/manifest.toml (it changed together with lang-reference.md line 783 and design-music.md block 2; without it verbatim_cases_appear_in_their_document fails at the checkpoint HEAD). It never stages src/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is in vactr-middle-finalize.md.",
     "normativeDesign": "design-implementation.md 5.6, 6.5.8, 7.1 and 10.1 are normative. Where a plan and the design differ, the design wins and the difference goes in that plan's progress log."
   },
   "reviewContext": {
     "issueReference": {
-      "repository": "tacogips/vactrol",
+      "repository": "tacogips/vactr",
       "number": 2,
-      "url": "https://github.com/tacogips/vactrol/issues/2",
+      "url": "https://github.com/tacogips/vactr/issues/2",
       "title": "Implement the language middle end: checker, namespace/compiler/VM, pattern engine (TASK-004..006)",
       "baseCommit": "51c5af700e616e360972bf07a127274127d24384",
-      "implementationPlanPath": "impl-plans/active/vactrol-core.md"
+      "implementationPlanPath": "impl-plans/active/vactr-core.md"
     },
     "constraints": [
-      "Implement exactly the TASK-004/005/006 deliverables and completion criteria in impl-plans/active/vactrol-core.md. design-implementation.md 5.6, 6.5.8, 7.1 and 10.1 are normative and win over the plans.",
+      "Implement exactly the TASK-004/005/006 deliverables and completion criteria in impl-plans/active/vactr-core.md. design-implementation.md 5.6, 6.5.8, 7.1 and 10.1 are normative and win over the plans.",
       "Rust names follow the design type names. Files at 800+ lines are split, with a hard limit of 1000 lines (CLAUDE.md).",
       "No new crate dependencies and no panics on untrusted input. Host I/O for load/sample stays behind NoopHost.",
       "Cargo runs with CARGO_TERM_QUIET=true and writes one complete log per command under target/fe-logs/ with exit= recorded. Evidence lives under tmp/me-middle-20260925-s175/<planId>/attempt-<n>/ (gitignored).",
@@ -84,7 +84,7 @@
       "M6 (multiple let sound-kit lines in one block) and the two open authority questions."
     ],
     "sourcePaths": [
-      "impl-plans/active/vactrol-core.md",
+      "impl-plans/active/vactr-core.md",
       "impl-plans/README.md",
       "design-docs/specs/design-implementation.md",
       "design-docs/specs/architecture.md",
@@ -97,18 +97,18 @@
       "tests/fixtures/spec/manifest.toml",
       "tests/spec_fixtures.rs",
       "src/reader/tests/lexer.rs",
-      "impl-plans/active/vactrol-middle-masks.md",
-      "impl-plans/active/vactrol-middle-frontend.md",
-      "impl-plans/active/vactrol-middle-check.md",
-      "impl-plans/active/vactrol-middle-vm.md",
-      "impl-plans/active/vactrol-middle-pattern.md",
-      "impl-plans/active/vactrol-middle-reactive.md",
-      "impl-plans/active/vactrol-middle-integrate.md",
-      "impl-plans/active/vactrol-middle-finalize.md"
+      "impl-plans/active/vactr-middle-masks.md",
+      "impl-plans/active/vactr-middle-frontend.md",
+      "impl-plans/active/vactr-middle-check.md",
+      "impl-plans/active/vactr-middle-vm.md",
+      "impl-plans/active/vactr-middle-pattern.md",
+      "impl-plans/active/vactr-middle-reactive.md",
+      "impl-plans/active/vactr-middle-integrate.md",
+      "impl-plans/active/vactr-middle-finalize.md"
     ],
-    "userProblem": "Issue #2: implement the Vactrol language middle end (TASK-004 checker, TASK-005 namespace/compiler/VM/tweak slots/reactive graph, TASK-006 pattern engine/signals/clock/visual chains) from impl-plans/active/vactrol-core.md, plus the 2026-09-25 amendments: parent-scope shadowing, path/url literals with load/sample, the sound-kit prelude bindings with the kit: argument, SOUND FIRST with the first-structure rule, midi-notes after s, and the U5 checker diagnostic.",
+    "userProblem": "Issue #2: implement the Vactr language middle end (TASK-004 checker, TASK-005 namespace/compiler/VM/tweak slots/reactive graph, TASK-006 pattern engine/signals/clock/visual chains) from impl-plans/active/vactr-core.md, plus the 2026-09-25 amendments: parent-scope shadowing, path/url literals with load/sample, the sound-kit prelude bindings with the kit: argument, SOUND FIRST with the first-structure rule, midi-notes after s, and the U5 checker diagnostic.",
     "requiredOutcomes": [
-      "Every TASK-004, TASK-005 and TASK-006 completion criterion in vactrol-core.md is checked with evidence, and the statuses are COMPLETED (ME-FINAL).",
+      "Every TASK-004, TASK-005 and TASK-006 completion criterion in vactr-core.md is checked with evidence, and the statuses are COMPLETED (ME-FINAL).",
       "Spec fixtures type-check, compile and run per their classification through read -> expand -> check -> compile -> run (ME-INTEGRATE).",
       "Pattern goldens, sample-region cover equivalence, forcing-mask and reactive-propagation cases pass as tests (ME-PATTERN, ME-VM, ME-REACTIVE).",
       "The checker rejects n [..] > s :x and note [..] > s :x; U5 is diagnosed; same-scope rebinding is an error; a prelude shadow is a hint and a user-parent shadow is a warning (ME-CHECK).",
@@ -136,34 +136,34 @@
   "plans": [
     {
       "planId": "ME-FINAL",
-      "planPath": "impl-plans/active/vactrol-middle-finalize.md",
+      "planPath": "impl-plans/active/vactr-middle-finalize.md",
       "implementsTask": "TASK-004..006 reconciliation, crate-wide fmt, plan bookkeeping",
       "wave": 6,
       "status": "ready",
       "dispatchNote": "RECON-S184-1 review-pass redispatch on the unchanged tree. The session-183 bookkeeping is done (see completion); the redispatch re-runs the gate on the current tree and must not rewrite plan documents or this manifest unless a review finding requires it. The step6-implement payload carries planId. The step7-adversarial-review output carries a findings array ([] when none) and NO planId. Evidence goes to tmp/me-middle-20260925-s175/ME-FINAL/attempt-2/.",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-middle-finalize.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-middle-finalize.md#progress-log",
       "writePaths": [
-        "impl-plans/active/vactrol-core.md",
+        "impl-plans/active/vactr-core.md",
         "impl-plans/README.md",
         "impl-plans/active/me-middle-20260925-s175-dispatch.json",
         "impl-plans/completed/fe-frontend-20260925-s165-dispatch.json",
         "design-docs/specs/design-implementation.md",
-        "impl-plans/active/vactrol-middle-finalize.md"
+        "impl-plans/active/vactr-middle-finalize.md"
       ],
       "sharedPaths": [
-        "impl-plans/active/vactrol-middle-masks.md",
-        "impl-plans/active/vactrol-middle-frontend.md",
-        "impl-plans/active/vactrol-middle-check.md",
-        "impl-plans/active/vactrol-middle-vm.md",
-        "impl-plans/active/vactrol-middle-reactive.md",
-        "impl-plans/active/vactrol-middle-pattern.md",
-        "impl-plans/active/vactrol-middle-integrate.md"
+        "impl-plans/active/vactr-middle-masks.md",
+        "impl-plans/active/vactr-middle-frontend.md",
+        "impl-plans/active/vactr-middle-check.md",
+        "impl-plans/active/vactr-middle-vm.md",
+        "impl-plans/active/vactr-middle-reactive.md",
+        "impl-plans/active/vactr-middle-pattern.md",
+        "impl-plans/active/vactr-middle-integrate.md"
       ],
       "acceptanceCriteria": [
         "Join integrity is checked against every plan's final-hashes.txt, and each mismatch is explained.",
         "V1-V13 pass, including crate-wide cargo fmt --check, with logs cited.",
-        "vactrol-core.md marks TASK-004/005/006 COMPLETED with every criterion checked and evidenced; an unmet criterion is reported, never checked.",
+        "vactr-core.md marks TASK-004/005/006 COMPLETED with every criterion checked and evidenced; an unmet criterion is reported, never checked.",
         "Module Status, Dependencies, the module sketches, the progress log and the README index are updated.",
         "The ME plans are marked Completed with archiving noted; the dispatch statuses are set; the FE dispatch closure note is added.",
         "The commit staging list is recorded (explicit paths; six-section message; no attribution lines)."
@@ -186,7 +186,7 @@
         "jq . impl-plans/active/me-middle-20260925-s175-dispatch.json > /dev/null",
         "git status --short"
       ],
-      "completion": "Completed session 183: join integrity checked (tmp/me-middle-20260925-s175/ME-FINAL/attempt-1/join-integrity.txt, every mismatch explained); target/fe-logs/final-{build,clippy,fmt,nextest,cargotest,fixtures,wasm32,wasm32-hostwasm}-s183-1.log all exit=0 (nextest 489 passed, 1 skipped; cargo test lib 479 + spec_fixtures 10 passed, 1 ignored); vactrol-core.md TASK-004..006 bookkeeping done; formal review and the workflow commit pending."
+      "completion": "Completed session 183: join integrity checked (tmp/me-middle-20260925-s175/ME-FINAL/attempt-1/join-integrity.txt, every mismatch explained); target/fe-logs/final-{build,clippy,fmt,nextest,cargotest,fixtures,wasm32,wasm32-hostwasm}-s183-1.log all exit=0 (nextest 489 passed, 1 skipped; cargo test lib 479 + spec_fixtures 10 passed, 1 ignored); vactr-core.md TASK-004..006 bookkeeping done; formal review and the workflow commit pending."
     }
   ],
   "session177Amendment": {
@@ -194,7 +194,7 @@
     "removedPlans": [
       {
         "planId": "ME-MASKS",
-        "planPath": "impl-plans/active/vactrol-middle-masks.md",
+        "planPath": "impl-plans/active/vactr-middle-masks.md",
         "writePaths": [
           "src/types/ty.rs",
           "src/types/masks.rs",
@@ -206,12 +206,12 @@
           "src/types/tests/ty.rs",
           "src/types/tests/masks.rs",
           "src/types/tests/natives.rs",
-          "impl-plans/active/vactrol-middle-masks.md"
+          "impl-plans/active/vactr-middle-masks.md"
         ]
       },
       {
         "planId": "ME-FRONTEND",
-        "planPath": "impl-plans/active/vactrol-middle-frontend.md",
+        "planPath": "impl-plans/active/vactr-middle-frontend.md",
         "writePaths": [
           "src/reader/pathlit.rs",
           "src/reader/lexer.rs",
@@ -225,7 +225,7 @@
           "src/value/access.rs",
           "src/value/tests/pathval.rs",
           "src/value/tests/mod.rs",
-          "impl-plans/active/vactrol-middle-frontend.md"
+          "impl-plans/active/vactr-middle-frontend.md"
         ]
       }
     ]
@@ -244,7 +244,7 @@
     "removedPlans": [
       {
         "planId": "ME-CHECK",
-        "planPath": "impl-plans/active/vactrol-middle-check.md",
+        "planPath": "impl-plans/active/vactr-middle-check.md",
         "writePaths": [
           "src/types/infer.rs",
           "src/types/unify.rs",
@@ -258,7 +258,7 @@
           "src/types/tests/diags.rs",
           "src/types/tests/deps.rs",
           "src/types/tests/no_abort.rs",
-          "impl-plans/active/vactrol-middle-check.md"
+          "impl-plans/active/vactr-middle-check.md"
         ],
         "sharedPaths": [
           "src/types/mod.rs",
@@ -267,7 +267,7 @@
       },
       {
         "planId": "ME-VM",
-        "planPath": "impl-plans/active/vactrol-middle-vm.md",
+        "planPath": "impl-plans/active/vactr-middle-vm.md",
         "writePaths": [
           "src/compile/compiler.rs",
           "src/compile/matchc.rs",
@@ -301,7 +301,7 @@
           "src/ns/tests/namespace.rs",
           "src/ns/tests/pkg.rs",
           "src/ns/tests/stage.rs",
-          "impl-plans/active/vactrol-middle-vm.md"
+          "impl-plans/active/vactr-middle-vm.md"
         ],
         "sharedPaths": [
           "src/compile/mod.rs",
@@ -311,7 +311,7 @@
       },
       {
         "planId": "ME-PATTERN",
-        "planPath": "impl-plans/active/vactrol-middle-pattern.md",
+        "planPath": "impl-plans/active/vactr-middle-pattern.md",
         "writePaths": [
           "src/pattern/pat.rs",
           "src/pattern/step.rs",
@@ -351,7 +351,7 @@
           "src/tex/uniforms.rs",
           "src/tex/tests/mod.rs",
           "src/tex/tests/goldens.rs",
-          "impl-plans/active/vactrol-middle-pattern.md"
+          "impl-plans/active/vactr-middle-pattern.md"
         ],
         "sharedPaths": [
           "src/lib.rs",
@@ -362,7 +362,7 @@
     ]
   },
   "session179Amendment": {
-    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-REACTIVE was accepted in session 178 (adversarial review 0 blocking, integration review accepted). ME-INTEGRATE then implemented and verified green (integrate-nextest-s180-1.log 489/489, cargotest, fixtures, both wasm32 builds exit 0) but its progress gate reported implementation_blocked with a single riela fanout observation: content-or-mode-drift on impl-plans/active/vactrol-middle-reactive.md (the ME-REACTIVE attempt-2 progress-log entry written after that branch's snapshot). As a single-branch wave this ended the session as implementation-blocked. Recovery as before: ME-REACTIVE is removed from plans[] and dependsOn; ME-INTEGRATE is re-dispatched on the unchanged tree (review pass), then ME-FINAL. Workers MUST NOT edit plan documents outside their own writePaths/sharedPaths; ME-FINAL owns the cross-plan bookkeeping.",
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-REACTIVE was accepted in session 178 (adversarial review 0 blocking, integration review accepted). ME-INTEGRATE then implemented and verified green (integrate-nextest-s180-1.log 489/489, cargotest, fixtures, both wasm32 builds exit 0) but its progress gate reported implementation_blocked with a single riela fanout observation: content-or-mode-drift on impl-plans/active/vactr-middle-reactive.md (the ME-REACTIVE attempt-2 progress-log entry written after that branch's snapshot). As a single-branch wave this ended the session as implementation-blocked. Recovery as before: ME-REACTIVE is removed from plans[] and dependsOn; ME-INTEGRATE is re-dispatched on the unchanged tree (review pass), then ME-FINAL. Workers MUST NOT edit plan documents outside their own writePaths/sharedPaths; ME-FINAL owns the cross-plan bookkeeping.",
     "repairScope": "ME-INTEGRATE attempt-1 left two completion criteria open on repair requests R1 (src/value/dict.rs put must merge a dict element, design 7.1.4 / design-music sound kits) and R2 (src/compile/matchc.rs shape_of must bind a match name that does not name the variant, design 20 Q1) because those files were outside its paths (tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-1/repair-requests.md). A review-only re-dispatch would block again and leave ME-FINAL unable to check every TASK-004..006 criterion, so the session-179 checkpoint adds both files to ME-INTEGRATE sharedPaths as serial repairs (the plan already makes this wave the serial-repair point; no other plan in plans[] touches them) and ME-INTEGRATE attempt-2 applies them, removes blocked_by/defect_run_fails, and re-verifies. originalHead moves from 4a50479 to f7a937c (session-179 intake, the session-178 plan checkpoint); workflowExecutionId moves to session-179.",
     "acceptedOutsideManifest": [
       "ME-MASKS",
@@ -375,7 +375,7 @@
     "removedPlans": [
       {
         "planId": "ME-REACTIVE",
-        "planPath": "impl-plans/active/vactrol-middle-reactive.md",
+        "planPath": "impl-plans/active/vactr-middle-reactive.md",
         "writePaths": [
           "src/ns/depgraph.rs",
           "src/ns/journal.rs",
@@ -387,7 +387,7 @@
           "src/ns/tests/rebuild.rs",
           "src/ns/tests/evaluator.rs",
           "src/ns/tests/load.rs",
-          "impl-plans/active/vactrol-middle-reactive.md"
+          "impl-plans/active/vactr-middle-reactive.md"
         ],
         "sharedPaths": [
           "src/ns/mod.rs",
@@ -416,7 +416,7 @@
     "removedPlans": [
       {
         "planId": "ME-INTEGRATE",
-        "planPath": "impl-plans/active/vactrol-middle-integrate.md"
+        "planPath": "impl-plans/active/vactr-middle-integrate.md"
       }
     ]
   }

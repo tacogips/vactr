@@ -9,7 +9,7 @@
 
 This continues the Plaits engine coverage after `modular-plaits-engines.md`,
 which has reached its ten-task limit. Implement positions 18–20 from the pinned
-MIT source with neutral Vactrol names, all exposed controls, and separately
+MIT source with neutral Vactr names, all exposed controls, and separately
 addressable main and auxiliary audio. A source-stage translation remains
 distinct from a verified source port. No generated waveform, ROM or patch
 asset is eligible without an individual provenance audit.
@@ -107,7 +107,7 @@ fails installation. Native/browser graph codecs, zero-allocation renders,
 distinct main/aux and 64/256-frame tests pass. Two scheduled hits create
 two playable voices. Position 19 moves to `Adaptation` in the manifest.
 
-This is not source-stage-complete: Vactrol's per-event voice lifecycle cannot
+This is not source-stage-complete: Vactr's per-event voice lifecycle cannot
 reproduce the source's persistent rotation and pitch-history transfer among
 three shared strings. It uses linear rather than Hermite interpolation,
 one-pole rather than source SVF excitation/damping, simplified bridge and
@@ -148,7 +148,7 @@ codecs and 44.1/48/96 kHz × 64/256-frame rendering are tested without
 callback allocation. Position 18 moves from Pending to Adaptation in the
 public manifest. The source's seven-stage 8192-word granular diffuser,
 dirty-frequency SVF, global RNG and exact per-block impulse scheduling are
-not reproduced; Vactrol uses a two-line analytic diffuser, TPT filters and
+not reproduced; Vactr uses a two-line analytic diffuser, TPT filters and
 per-voice RNG. Source comparison and exact numerical parity remain open.
 
 ### Session: 2026-09-27

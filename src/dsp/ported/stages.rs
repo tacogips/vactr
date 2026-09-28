@@ -1,5 +1,5 @@
 //! Stages ProcessFn inventory at the pinned Eurorack revision.
-//! Runnable roles are analytic Vactrol adaptations, not source ports.
+//! Runnable roles are analytic Vactr adaptations, not source ports.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StageCoverage {
@@ -16,7 +16,7 @@ pub struct StageFunctionSpec {
     pub source_function: &'static str,
     pub role: &'static str,
     pub coverage: StageCoverage,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
 }
 
 const fn cell(
@@ -36,7 +36,7 @@ const fn cell(
         } else {
             StageCoverage::Pending
         },
-        vactrol_template: if runnable { Some("stage-voice") } else { None },
+        vactr_template: if runnable { Some("stage-voice") } else { None },
     }
 }
 
@@ -67,14 +67,14 @@ pub const STAGES_OTHER: [StageFunctionSpec; 5] = [
         source_function: "MultiSegment",
         role: "one six-segment module with value/phase outputs",
         coverage: StageCoverage::Adaptation,
-        vactrol_template: Some("stage-chain-voice"),
+        vactr_template: Some("stage-chain-voice"),
     },
     StageFunctionSpec {
         cell: 17,
         source_function: "Sequencer",
         role: "immutable director-plus-step list; seven event-local traversal modes, value/position outputs",
         coverage: StageCoverage::Adaptation,
-        vactrol_template: Some("stage-sequencer-voice"),
+        vactr_template: Some("stage-sequencer-voice"),
     },
     cell(18, "Slave", "linked slave segment", false),
     cell(
@@ -88,7 +88,7 @@ pub const STAGES_OTHER: [StageFunctionSpec; 5] = [
         source_function: "MultiSegment",
         role: "immutable 1–36 segment event-local chain; source serial grouping and slave remain pending",
         coverage: StageCoverage::Adaptation,
-        vactrol_template: Some("stage-linked-voice"),
+        vactr_template: Some("stage-linked-voice"),
     },
 ];
 
@@ -101,5 +101,5 @@ pub fn stages_coverage_summary() -> String {
         .iter()
         .filter(|row| row.coverage == StageCoverage::Adaptation)
         .count();
-    format!("Stages: {runnable}/16 registered ProcessFn cells, one six-scalar chain, one opt-in immutable 1–36 segment chain and a source-shaped seven-mode Sequencer have original Vactrol adaptations; two silent Zero cells are excluded; source serial grouping and Slave remain pending")
+    format!("Stages: {runnable}/16 registered ProcessFn cells, one six-scalar chain, one opt-in immutable 1–36 segment chain and a source-shaped seven-mode Sequencer have original Vactr adaptations; two silent Zero cells are excluded; source serial grouping and Slave remain pending")
 }

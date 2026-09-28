@@ -1,4 +1,4 @@
-//! Conversions between Vactrol source positions and LSP types (design
+//! Conversions between Vactr source positions and LSP types (design
 //! 14.5.11): byte offsets to LSP `Position`s (UTF-16 columns) and back,
 //! and checker or runtime diagnostics to `lsp_types::Diagnostic`.
 
@@ -8,7 +8,7 @@ use crate::session::protocol::WireDiag;
 use crate::types::diag::{Diagnostic, Severity};
 
 /// The `source` of every published diagnostic.
-pub const SOURCE: &str = "vactrol";
+pub const SOURCE: &str = "vactr";
 
 /// The LSP position of byte `offset` in `text`. An offset past the end
 /// clamps to the end; an offset inside a UTF-8 sequence rounds down to

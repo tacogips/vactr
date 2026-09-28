@@ -13,7 +13,7 @@ This plan began with four unavailable positions from
 registers `SpeechEngine`, whose naive/SAM/LPC architecture includes
 source word data described as extracted from TI speech ROMs. Neither
 bundled bank nor extracted word sequence is cleared for inclusion in
-Vactrol. A runnable replacement may use original operator configurations
+Vactr. A runnable replacement may use original operator configurations
 and original phoneme/word definitions, or a user-provided data contract;
 its coverage must remain `Adaptation`/`Replacement` until source fidelity
 and resource status are independently established.
@@ -75,7 +75,7 @@ fidelity remain open outside these original replacement criteria.
 
 `speech-voice` covers naive pulse/formant, SAM-like reset formants, and an
 LPC-like reflection filter with procedural excitation. Its upper selector
-range contains four original Vactrol syllable tokens (`ava`, `omi`, `era`,
+range contains four original Vactr syllable tokens (`ava`, `omi`, `era`,
 `unu`) generated from authored analytic vowel trajectories; it never aliases
 or imports the TI word banks. Pitch, `speech-harmonics` model/token selection,
 `timbre`, `morph`, `velocity`, and `speech-sustain` are codeable and
@@ -126,7 +126,7 @@ brightness, `morph` controls envelope/LFO scrub, `accent` supplies
 velocity, and note/trigger select pitch and gate behavior. Its source
 currently writes the same soft-clipped mix to main and aux; replacement
 tests should retain this documented output relationship unless an
-intentional Vactrol extension is declared. The source uses multiple
+intentional Vactr extension is declared. The source uses multiple
 staggered FM voices and a proprietary-format factory-patch payload;
 neither patch bytes nor patch-derived ratios/levels will be copied.
 
@@ -134,7 +134,7 @@ neither patch bytes nor patch-derived ratios/levels will be copied.
 models for the lower range, then selects LPC phonemes and word banks in
 the upper range. `morph` and `timbre` are passed to all three model
 renderers, while `accent` is passed to LPC word replay. A replacement
-can offer original phoneme definitions and a clearly separate Vactrol
+can offer original phoneme definitions and a clearly separate Vactr
 word set, but must not silently stand in for the excluded TI-derived
 word banks. Before implementation, audit the naive/SAM/LPC transitive
 data files individually and define the exact available `harmonics`

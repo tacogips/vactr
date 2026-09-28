@@ -3656,7 +3656,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "vactrol-editor"
+name = "vactr-editor"
 version = "0.1.0"
 dependencies = [
  "tauri",

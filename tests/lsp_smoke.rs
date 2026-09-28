@@ -1,4 +1,4 @@
-//! `vactrol lsp` stdio smoke test (design 14.5.11): the binary speaks LSP
+//! `vactr lsp` stdio smoke test (design 14.5.11): the binary speaks LSP
 //! over pipes with Content-Length framing, publishes diagnostics for a
 //! lang-reference spec block, answers hover with the checker's type, and
 //! exits 0 after `shutdown`/`exit`.
@@ -55,13 +55,13 @@ fn read_frame(r: &mut impl BufRead) -> Option<Value> {
 
 impl Server {
     fn start() -> Server {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_vactrol"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_vactr"))
             .arg("lsp")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
-            .expect("spawn vactrol lsp");
+            .expect("spawn vactr lsp");
         let stdin = child.stdin.take();
         let stdout = child.stdout.take().expect("stdout");
         let (tx, rx) = mpsc::channel();
@@ -146,7 +146,7 @@ impl Server {
     fn open(&mut self, uri: &str, text: &str) {
         self.notify(
             "textDocument/didOpen",
-            json!({"textDocument": {"uri": uri, "languageId": "vactrol", "version": 1, "text": text}}),
+            json!({"textDocument": {"uri": uri, "languageId": "vactr", "version": 1, "text": text}}),
         );
     }
 }
@@ -216,7 +216,7 @@ fn lsp_over_stdio_publishes_diagnostics_hovers_and_exits_cleanly() {
         }
         assert!(
             Instant::now() < deadline,
-            "vactrol lsp did not exit within {TIMEOUT:?}"
+            "vactr lsp did not exit within {TIMEOUT:?}"
         );
         thread::sleep(Duration::from_millis(20));
     };

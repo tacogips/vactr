@@ -6,18 +6,18 @@ use crate::reader::{prescan_imports, read, AliasEnv, NodeKind, TriviaKind};
 #[test]
 fn import_forms() {
     reads_as(
-        "import github.com/someone/vactrol-pads",
-        "(#import \"github.com/someone/vactrol-pads\")",
+        "import github.com/someone/vactr-pads",
+        "(#import \"github.com/someone/vactr-pads\")",
     );
     reads_as(
-        "import github.com/someone/vactrol-pads as pd",
-        "(#import \"github.com/someone/vactrol-pads\" as pd)",
+        "import github.com/someone/vactr-pads as pd",
+        "(#import \"github.com/someone/vactr-pads\" as pd)",
     );
     reads_as(
-        "import github.com/someone/vactrol-pads open",
-        "(#import \"github.com/someone/vactrol-pads\" open)",
+        "import github.com/someone/vactr-pads open",
+        "(#import \"github.com/someone/vactr-pads\" open)",
     );
-    let r = rd("import github.com/someone/vactrol-pads as pd open  # comment");
+    let r = rd("import github.com/someone/vactr-pads as pd open  # comment");
     match &r.nodes[0].kind {
         NodeKind::Import(decl) => {
             assert_eq!(&*decl.prefix, "pd");
@@ -26,7 +26,7 @@ fn import_forms() {
         }
         other => panic!("not an import: {other:?}"),
     }
-    let plain = rd("import github.com/someone/vactrol-pads");
+    let plain = rd("import github.com/someone/vactr-pads");
     match &plain.nodes[0].kind {
         NodeKind::Import(decl) => {
             assert_eq!(&*decl.prefix, "pads");
@@ -39,21 +39,21 @@ fn import_forms() {
 #[test]
 fn fresh_document_binds_its_own_imports() {
     reads_as(
-        "import github.com/someone/vactrol-pads\nnote [:c3] > s pads.warm > d1",
-        "(#import \"github.com/someone/vactrol-pads\")\n(d1 (s (note [:c3]) pads.warm))",
+        "import github.com/someone/vactr-pads\nnote [:c3] > s pads.warm > d1",
+        "(#import \"github.com/someone/vactr-pads\")\n(d1 (s (note [:c3]) pads.warm))",
     );
     reads_as(
-        "import github.com/someone/vactrol-pads as pd\nnote [:c3] > s pd.warm > d1",
-        "(#import \"github.com/someone/vactrol-pads\" as pd)\n(d1 (s (note [:c3]) pd.warm))",
+        "import github.com/someone/vactr-pads as pd\nnote [:c3] > s pd.warm > d1",
+        "(#import \"github.com/someone/vactr-pads\" as pd)\n(d1 (s (note [:c3]) pd.warm))",
     );
     // A session alias from the caller's environment also binds.
     let mut env = AliasEnv::new();
-    env.bind("pads".into(), "github.com/someone/vactrol-pads".into());
+    env.bind("pads".into(), "github.com/someone/vactr-pads".into());
     let r = read("s pads.warm", super::FILE, &env);
     assert!(r.diags.is_empty());
     // The caller's environment is not changed by `read`.
     let r2 = read(
-        "import github.com/a/vactrol-b\nb.c",
+        "import github.com/a/vactr-b\nb.c",
         super::FILE,
         &AliasEnv::new(),
     );
@@ -65,7 +65,7 @@ fn import_errors() {
     assert_eq!(codes("s pads.warm"), ["unbound-qualifier"]);
     // Use before the import is unbound.
     assert_eq!(
-        codes("s pads.warm\nimport github.com/someone/vactrol-pads"),
+        codes("s pads.warm\nimport github.com/someone/vactr-pads"),
         ["unbound-qualifier"]
     );
     for bad in [
@@ -87,8 +87,8 @@ fn import_errors() {
     );
     // `_` is a path character (6.5.4), not a name character.
     reads_as(
-        "import github.com/some_one/vactrol-pads",
-        "(#import \"github.com/some_one/vactrol-pads\")",
+        "import github.com/some_one/vactr-pads",
+        "(#import \"github.com/some_one/vactr-pads\")",
     );
     // A failed import binds nothing.
     assert_eq!(
@@ -99,7 +99,7 @@ fn import_errors() {
 
 #[test]
 fn prescan_finds_every_top_level_import() {
-    let doc = "import github.com/a/vactrol-pads\n\
+    let doc = "import github.com/a/vactr-pads\n\
                # comment\n\
                import github.com/b/drums as dr open\n\
                s [:bd] > d1\n\

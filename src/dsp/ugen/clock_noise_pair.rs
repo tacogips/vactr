@@ -2,7 +2,7 @@
 //!
 //! Informed by MIT Plaits `noise_engine.cc`, `clocked_noise.h`, and MIT stmlib
 //! BLEP/SVF helpers. No global RNG, generated table or audio asset is used.
-//! The Vactrol clock uses the source's patched-trigger pitch range; its RNG,
+//! The Vactr clock uses the source's patched-trigger pitch range; its RNG,
 //! host-rate timing and exact filter coefficients remain numerical differences.
 
 use std::f32::consts::PI;

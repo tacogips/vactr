@@ -1,4 +1,4 @@
-// Vactrol main-thread host: the main half (wasm #1, evaluator + scheduler).
+// Vactr main-thread host: the main half (wasm #1, evaluator + scheduler).
 // Design: design-docs/specs/design-implementation.md 12.8.10, 16, 16.1.
 //
 // Plain JS module, no build step. `startHost` fetches the module bytes,
@@ -39,7 +39,7 @@ const EXPORTS = {
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-export class VactrolHost {
+export class VactrHost {
   constructor(ctx, node, x, opts) {
     this.ctx = ctx;
     this.node = node;
@@ -252,7 +252,7 @@ export async function startHost(opts) {
   const init = opts.init === 'session' ? EXPORTS.session.init : EXPORTS.main.init;
   x[init](ctx.sampleRate, opts.arenaBytes ?? 0);
   const outputChannels = opts.outputChannels === 4 ? 4 : 2;
-  const node = new AudioWorkletNode(ctx, 'vactrol-processor', {
+  const node = new AudioWorkletNode(ctx, 'vactr-processor', {
     numberOfInputs: 1,
     numberOfOutputs: 1,
     channelCount: 2,
@@ -273,7 +273,7 @@ export async function startHost(opts) {
   } else {
     node.connect(ctx.destination);
   }
-  const host = new VactrolHost(ctx, node, x, opts);
+  const host = new VactrHost(ctx, node, x, opts);
   host.quadSplitter = quadSplitter;
   host.flush();
   const copy = bytes.slice(0);

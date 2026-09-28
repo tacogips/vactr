@@ -1,5 +1,5 @@
 //! The local-directory store (design 14.5.7): `<root>/<path>@<version>/`,
-//! used by fixtures and by `vactrol get --store dir:<root>`.
+//! used by fixtures and by `vactr get --store dir:<root>`.
 
 use std::fs;
 use std::path::{Path, PathBuf};

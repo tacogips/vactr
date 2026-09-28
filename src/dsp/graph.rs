@@ -425,7 +425,7 @@ effect_kinds! {
     ResonantBank => "resonant-bank",
     ElementsBank => "elements-bank",
     StreamEnvelope => "stream-envelope",
-    StreamVactrol => "stream-vactrol",
+    StreamVactr => "stream-vactr",
     StreamFollower => "stream-follower",
     StreamCompressor => "stream-compressor",
     StreamFilter => "stream-filter",

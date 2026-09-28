@@ -12,7 +12,7 @@ chain; named-argument binding, including the positional/named proposal
 already tracked for the author; directive attachment and the 13.5
 vocabulary, which is tracked as authority questions in
 `tests/fixtures/directives/vocabulary.toml`; the Go-style package model
-with MVS, `vactrol.lock` and the canonical digest; Q3 and Q4; and
+with MVS, `vactr.lock` and the canonical digest; Q3 and Q4; and
 `use-clock :link` staying a diagnostic.
 
 ## S1. When does `capture :bus cycles` record?
@@ -55,7 +55,7 @@ Keywords cannot contain `.`, so "package-qualified keywords" (design
 5.7) needs a concrete spelling.
 
 - Recommendation: `:<name>-<bank>`, where `<name>` is the package's
-  default prefix (the last path segment without `vactrol-`) and
+  default prefix (the last path segment without `vactr-`) and
   `<bank>` is an asset subdirectory. For example, `:pads-warm`. A clash
   gives `import-collision` (a warning), and the first registration wins.
 - Alternative: expose banks only through package code, for example

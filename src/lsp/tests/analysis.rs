@@ -15,10 +15,8 @@ impl TempDir {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
-        let dir = std::env::temp_dir().join(format!(
-            "vactrol-lsp-{tag}-{}-{nanos:x}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("vactr-lsp-{tag}-{}-{nanos:x}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("temp dir");
         TempDir(dir)
     }
@@ -182,7 +180,7 @@ fn an_unfetched_import_is_a_warning_and_nothing_is_fetched_or_written() {
     let digest = "0".repeat(64);
     std::fs::write(
         root.join(LOCK_FILE),
-        format!("# vactrol.lock v1\ngithub.com/acme/pads v1.0.0 sha256:{digest}\n"),
+        format!("# vactr.lock v1\ngithub.com/acme/pads v1.0.0 sha256:{digest}\n"),
     )
     .expect("lock");
     let pkgs = PkgConfig::load(Some(&root), &cache);
@@ -204,7 +202,7 @@ fn an_unfetched_import_is_a_warning_and_nothing_is_fetched_or_written() {
         d.severity,
         Some(tower_lsp::lsp_types::DiagnosticSeverity::WARNING)
     );
-    assert_eq!(d.source.as_deref(), Some("vactrol"));
+    assert_eq!(d.source.as_deref(), Some("vactr"));
     assert!(p
         .diagnostics
         .iter()

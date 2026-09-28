@@ -10,7 +10,7 @@
 Split FX-003 in `modular-audio-effects.md`. The pinned MIT `streams`
 firmware computes gain and frequency CV for external analog VCA/VCF hardware.
 Its six processor functions are control algorithms, not firmware audio DSP.
-Vactrol should translate the control behavior and pair it with a separately
+Vactr should translate the control behavior and pair it with a separately
 specified digital gain/filter stage where an audible bus effect is useful.
 Do not describe such a stage as a source audio port or claim analog hardware
 parity. Source `resources.cc` and generated tables require individual audit;
@@ -41,7 +41,7 @@ source under 1000 lines.
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
 | STR-001 | Audit six source modes, parameter mappings, control-rate and analog boundary | FX-003 | Completed |
-| STR-002 | Envelope and plucked/damped vactrol control with digital gain/filter adaptation | STR-001 | Completed (adaptation) |
+| STR-002 | Envelope and plucked/damped vactr control with digital gain/filter adaptation | STR-001 | Completed (adaptation) |
 | STR-003 | Follower and compressor controls with stereo digital gain/filter adaptation | STR-001 | Completed (adaptation) |
 | STR-004 | Filter controller and Lorenz control generator with explicit audio placement | STR-001 | Completed (adaptation) |
 | STR-005 | Independent source-control comparisons and provenance review | STR-002..004 | Not started |
@@ -49,10 +49,10 @@ source under 1000 lines.
 
 ## Source Map
 
-| Source at pinned revision | Control output | Vactrol scope |
+| Source at pinned revision | Control output | Vactr scope |
 |---|---|---|
 | `streams/envelope.{h,cc}` | Gain and frequency envelopes | Control translation plus digital audio adaptation |
-| `streams/vactrol.{h,cc}` | Gain and frequency pluck/ring curves | Control translation plus digital audio adaptation |
+| `streams/vactr.{h,cc}` | Gain and frequency pluck/ring curves | Control translation plus digital audio adaptation |
 | `streams/follower.{h,cc}` | Signal level to gain and frequency | Control translation plus digital audio adaptation |
 | `streams/compressor.{h,cc}` | Level-dependent gain and reduction | Control translation plus digital audio adaptation |
 | `streams/filter_controller.h` | Excitation to frequency CV | Control translation plus digital audio adaptation |
@@ -73,7 +73,7 @@ source under 1000 lines.
 
 `stream-filter` is an original stereo low-pass with neutral gain, driven by
 source-role offset and signed nonlinear amount applied to a selected self or
-right-sidechain excitation. Vactrol adds scalar excite, cutoff bounds and
+right-sidechain excitation. Vactr adds scalar excite, cutoff bounds and
 mix. Source `FilterController` instead emits gain CV=0 and frequency CV for
 analog hardware; its `Configure` ignores alternate/globals.
 
@@ -95,7 +95,7 @@ source processor timing and physical two-pair I/O remain for STR-005/006.
 `stream-follower` now uses three independently tracked frequency bands for
 level and spectral centroid control; its alternate mode holds digital gain
 neutral and maps centroid/frequency control to the digital filter cutoff.
-This is a Vactrol filter-only adaptation of the source CV role, not the
+This is a Vactr filter-only adaptation of the source CV role, not the
 source's analog CV remapping. `stream-compressor` uses attack/release RMS
 detection, threshold, ratio/makeup amount, hard/soft knee alternates and
 source-style linked global substitution. Both run as authored stereo digital
@@ -103,7 +103,7 @@ audio effects with optional right-input sidechain detection; source firmware
 outputs CV to analog hardware. Their input/output, filters, table-free
 coefficients, ratio and knee curves are numerical adaptations. The source
 compressor has a five-second sidechain-present detector and falls back to
-`audio` when `excite` falls quiet; Vactrol uses immediate quiet-input
+`audio` when `excite` falls quiet; Vactr uses immediate quiet-input
 fallback. Both effect kinds are appended to the wire ordinal list and rows
 2–3 of the six-function manifest are Adaptation/Replacement. Rows 4–5 remain
 pending. Focused tests cover every parameter's role, local/global
@@ -116,11 +116,11 @@ path fixes gain at unity and retains CV-controlled cutoff; a focused
 regression holds both cutoff bounds equal to prove CV cannot alter gain,
 then separates them to prove the cutoff responds.
 
-### Session: 2026-09-28 — envelope and vactrol digital effects
+### Session: 2026-09-28 — envelope and vactr digital effects
 
 The first two source-ordered roles now run as `stream-envelope` and
-`stream-vactrol` stereo bus/master effects. A public six-row manifest keeps
-firmware gain/frequency CV distinct from Vactrol's original digital gain and
+`stream-vactr` stereo bus/master effects. A public six-row manifest keeps
+firmware gain/frequency CV distinct from Vactr's original digital gain and
 low-pass processing; rows 2–5 remain pending. Each effect exposes local
 shape and response, linked global attack/decay, alternate AD/AR or
 damped/plucked behavior, independent or shared excitation, optional right
@@ -133,7 +133,7 @@ The bus has two audio channels rather than the source's two independent
 audio/excite pairs. The optional right-channel detector is shared sidechain
 control while the right audio output remains independent; separate external
 excite for each lane is not available. The digital low-pass/gain stage is
-authored for Vactrol and is not the upstream analog hardware. Exact source
+authored for Vactr and is not the upstream analog hardware. Exact source
 CV curves, source lookup numerics and full two-pair I/O remain for STR-005.
 
 ### Session: 2026-09-28 — source boundary audit

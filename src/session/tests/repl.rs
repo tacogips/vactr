@@ -66,7 +66,7 @@ fn the_session_survives_every_failure_class() {
 + 1 \"a\"\n\
 / 1 0\n\
 s :no-such-sound > d1\n\
-import github.com/nobody/vactrol-nothing\n\
+import github.com/nobody/vactr-nothing\n\
 \xff\xfe garbage \x00\n\
 {{{{\n\
 + 2 2\n";

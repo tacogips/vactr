@@ -170,16 +170,16 @@ diag_codes! {
     ReservedKey => "reserved-key",
     // Session layer: packages (5.7, 14.5.7).
     /// Warning: "package `<path>@<version>` is locked but not fetched; run
-    /// `vactrol get`".
+    /// `vactr get`".
     PackageNotFetched => "package-not-fetched",
-    /// "package `<path>` is not in `vactrol.lock`".
+    /// "package `<path>` is not in `vactr.lock`".
     PackageNotLocked => "package-not-locked",
     /// "package `<path>@<version>` digest mismatch: expected <a>, got <b>"
     /// (or an unsafe archive entry, named).
     PackageIntegrity => "package-integrity",
     /// "package `<path>` failed to load: <reason>".
     PackageLoadFailed => "package-load-failed",
-    /// "cannot resolve `<path>`: <reason>" (`vactrol get`: an unresolvable
+    /// "cannot resolve `<path>`: <reason>" (`vactr get`: an unresolvable
     /// version or a store or network error).
     PackageResolve => "package-resolve",
 }

@@ -3,15 +3,15 @@
   "workflowMode": "issue-resolution",
   "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-188",
   "issueReference": {
-    "repository": "tacogips/vactrol",
+    "repository": "tacogips/vactr",
     "number": 5,
-    "url": "https://github.com/tacogips/vactrol/issues/5"
+    "url": "https://github.com/tacogips/vactr/issues/5"
   },
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
   "originalHead": "f345e62fc4c447ecf0c1934dd998db89a5e5e9ca",
-  "parentPlanPath": "impl-plans/active/vactrol-core.md",
+  "parentPlanPath": "impl-plans/active/vactr-core.md",
   "planIndexPath": "impl-plans/README.md",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
@@ -23,41 +23,41 @@
   ],
   "evidenceRoot": "tmp/ed-editor-20260926-s186",
   "evidenceLayout": "tmp/ed-editor-20260926-s186/<planId>/attempt-<n>/ holds pre-edit-hashes.txt, intent.md, post-edit-hashes.txt, notes.md and final-hashes.txt (tmp is gitignored). Logs go to target/fe-logs/ed-<wave>-<check>-s<S>-<n>.log per design 6.5.7. The per-plan wasm artifact copy is target/ed-wasm/<planId>.wasm.",
-  "logRule": "Design 6.5.7: every run writes a new log (S = Riela session number; n counts from 1 per check within the session; never overwrite). Every row runs from the repository root with ROOT exported: export ROOT=\"$(git rev-parse --show-toplevel)\" (the first row of each array). LOG is the ABSOLUTE path \"$ROOT/target/fe-logs/ed-<wave>-<check>-s<S>-<n>.log\", and each row runs as (set -o pipefail; (CMD) 2>&1 | tee \"$LOG\"); echo \"exit=$?\" >> \"$LOG\". The inner subshell keeps a 'cd editor && ...' CMD from changing the directory tee resolves the log in. The progress log cites the counting log path and its exit= value, and for nextest, cargo test and vitest the run and passed counts (non-zero). A missing log, a log without exit=, or a truncated log fails the check. 'LOG(<name>): CMD' in the verification arrays means CMD run under this rule with <name> as the log stem. Rows run in array order: wasm32 before wasm32-hostwasm, then the artifact copy, then the editor npm steps with VACTROL_WASM pointing at the copy.",
+  "logRule": "Design 6.5.7: every run writes a new log (S = Riela session number; n counts from 1 per check within the session; never overwrite). Every row runs from the repository root with ROOT exported: export ROOT=\"$(git rev-parse --show-toplevel)\" (the first row of each array). LOG is the ABSOLUTE path \"$ROOT/target/fe-logs/ed-<wave>-<check>-s<S>-<n>.log\", and each row runs as (set -o pipefail; (CMD) 2>&1 | tee \"$LOG\"); echo \"exit=$?\" >> \"$LOG\". The inner subshell keeps a 'cd editor && ...' CMD from changing the directory tee resolves the log in. The progress log cites the counting log path and its exit= value, and for nextest, cargo test and vitest the run and passed counts (non-zero). A missing log, a log without exit=, or a truncated log fails the check. 'LOG(<name>): CMD' in the verification arrays means CMD run under this rule with <name> as the log stem. Rows run in array order: wasm32 before wasm32-hostwasm, then the artifact copy, then the editor npm steps with VACTR_WASM pointing at the copy.",
   "commonContract": {
-    "editProtocol": "vactrol-editor-scaffold.md section 'Common Contract (every ED plan)' / 'Edit Protocol': fresh read and sha256 before each edit, intent snapshot before the first edit of any file the plan did not create and of every handed-off file, post-edit hash, stop and re-apply on drift, never edit files outside writePaths/sharedPaths, rustfmt on owned .rs files only, no crate-wide cargo fmt, no git reset/clean/stash/checkout, no branches or worktrees, no commits, Rust through the rust-coding agent followed by check-and-test-after-modify, final-hashes.txt at the end.",
+    "editProtocol": "vactr-editor-scaffold.md section 'Common Contract (every ED plan)' / 'Edit Protocol': fresh read and sha256 before each edit, intent snapshot before the first edit of any file the plan did not create and of every handed-off file, post-edit hash, stop and re-apply on drift, never edit files outside writePaths/sharedPaths, rustfmt on owned .rs files only, no crate-wide cargo fmt, no git reset/clean/stash/checkout, no branches or worktrees, no commits, Rust through the rust-coding agent followed by check-and-test-after-modify, final-hashes.txt at the end.",
     "ownershipRule": "Design 15.1.3/15.1.12 and 14.5.3: one writer per file per wave. Sequential handoffs only: each editor/src/<area>/mount.ts stub (ED-SCAFFOLD -> area owner: code ED-CODE, midi ED-MIDI, visual ED-VISUAL, bind ED-BIND, params ED-PARAMS, pkg ED-PKG) and editor/src/app/main.ts, editor/src/app/layout.ts (ED-SCAFFOLD -> ED-FINAL); the ED plan files themselves (each plan -> ED-FINAL for the status line and closing note). Both plans list every handed-off file. editor/package.json and editor/package-lock.json are owned by ED-SCAFFOLD only; no later plan adds an npm dependency. editor/src/app/apis.ts (cross-plan API contracts) and editor/src/protocol/types.ts are written only by ED-SCAFFOLD. Rust files are owned only by ED-WIRE (session, directives attach, sched render, pkg driver/mem_cache, ns/insts iterator) and ED-WASM (host/wasm session half). No two plans of one wave share a file. writePaths list regular files only.",
     "gateContract": "The step6-implement output payload carries planId, changedFiles is an ARRAY of path strings, and verificationGaps is EMPTY when every automated command passed (manual checks go under residualRisks; a Tauri check BLOCKED under E1 is a verification gap, never empty). Test-integrity and adversarial-review outputs carry NO planId; the adversarial-review output always carries a findings array (empty when none) whose items use only findingId, severity, category, file, line, message, evidence. The integration-review output is the envelope {\"when\": {needs_revision, redispatch_required, repair_in_place, plans_remaining}, \"payload\": {needs_revision, loopGate, acceptedPlanIds, findings, recoveryDiagnostic, ...}} with payload an OBJECT, and acceptedPlanIds lists only plans present in plans[] of this manifest.",
     "parallelSafety": "Plans of one wave run in the same working directory with pairwise-disjoint writePaths and no sharedPaths. An editor-wide (tsc, vitest) or crate-wide check failing only because of a sibling in-flight file is recorded as sibling-caused in the progress log, never fixed by the observer; the join (later waves and ED-FINAL) re-verifies. Shared build outputs are isolated or serialized, never assumed safe because source ownership is disjoint: (1) WASM ARTIFACT: each plan copies the host-wasm artifact to $ROOT/target/ed-wasm/<planId>.wasm right after its own wasm32-hostwasm build and runs the npm steps against that copy, so a sibling default-feature wasm32 build cannot swap the artifact mid-run. (2) editor/node_modules: `npm ci` (which deletes and reinstalls node_modules) runs ONLY in ED-SCAFFOLD (wave 1, alone, after its npm install) and ED-FINAL (serial). Every other plan replaces it with the read-only `cd editor && npm ls --depth=0`, which must exit 0 to show the installed tree matches the ED-SCAFFOLD lockfile. No other plan runs npm ci, npm install or npm update, or deletes or modifies node_modules. A missing or mismatched node_modules is a dependency blocker for the operator, not something a worker repairs. (3) editor/dist: every plan except ED-TAURI and ED-FINAL builds with `npm run build -- --outDir $ROOT/target/ed-dist/<planId> --emptyOutDir` and checks its evidence in that directory. ED-TAURI (the only wave-4 writer of editor/dist, which tauri generate_context! embeds) and ED-FINAL (serial) keep the default editor/dist. The whole-tree gate of issue #5 (npm ci && npm run check && npm run test && npm run build in editor/) is run by ED-FINAL.",
-    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/design-implementation.md, design-docs/specs/command.md, design-docs/user-qa/pending-editor-questions.md, design-docs/user-qa/README.md, impl-plans/active/vactrol-editor-*.md, impl-plans/active/ed-editor-20260926-s186-dispatch.json, impl-plans/README.md. It never stages src/, editor/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is recorded by ED-FINAL. ED-FINAL never edits this manifest. node_modules/, dist/, editor/src-tauri/target/ and tmp/ are never staged.",
-    "normativeDesign": "design-implementation.md 15.1 (with 9, 11.7, 12.5, 13, 13.5, 14.4, 14.5, 16, 17) and command.md are normative. Where a plan and the design differ, the design wins and the difference goes in that plan's progress log. The vite build checks the session_init export only when VACTROL_REQUIRE_SESSION_ABI=1 (set by ED-WASM and ED-FINAL), because the export lands in wave 3 while earlier plans must build. Design 15.1.3 was amended to state this (step-4 rerun, session 186), and the real-wasm tests never skip.",
-    "commonVerification": "Every plan runs the common rows of vactrol-editor-scaffold.md: ROOT export and log dirs, build, clippy, nextest, plain cargo test, fmt --check, wasm32, wasm32-hostwasm, artifact copy, .rs line count, node/npm versions. Then E1: npm ci in ED-SCAFFOLD and ED-FINAL only, npm ls --depth=0 elsewhere. Then npm run check and npm run test. Then npm run build: to $ROOT/target/ed-dist/<planId> except for ED-TAURI and ED-FINAL, which build to editor/dist. Then the build-output existence check and the .ts line count. Rust-touching plans (ED-WIRE, ED-WASM, ED-FINAL) add build-lsp, clippy-lsp and the wasm32 dependency trees."
+    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/design-implementation.md, design-docs/specs/command.md, design-docs/user-qa/pending-editor-questions.md, design-docs/user-qa/README.md, impl-plans/active/vactr-editor-*.md, impl-plans/active/ed-editor-20260926-s186-dispatch.json, impl-plans/README.md. It never stages src/, editor/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is recorded by ED-FINAL. ED-FINAL never edits this manifest. node_modules/, dist/, editor/src-tauri/target/ and tmp/ are never staged.",
+    "normativeDesign": "design-implementation.md 15.1 (with 9, 11.7, 12.5, 13, 13.5, 14.4, 14.5, 16, 17) and command.md are normative. Where a plan and the design differ, the design wins and the difference goes in that plan's progress log. The vite build checks the session_init export only when VACTR_REQUIRE_SESSION_ABI=1 (set by ED-WASM and ED-FINAL), because the export lands in wave 3 while earlier plans must build. Design 15.1.3 was amended to state this (step-4 rerun, session 186), and the real-wasm tests never skip.",
+    "commonVerification": "Every plan runs the common rows of vactr-editor-scaffold.md: ROOT export and log dirs, build, clippy, nextest, plain cargo test, fmt --check, wasm32, wasm32-hostwasm, artifact copy, .rs line count, node/npm versions. Then E1: npm ci in ED-SCAFFOLD and ED-FINAL only, npm ls --depth=0 elsewhere. Then npm run check and npm run test. Then npm run build: to $ROOT/target/ed-dist/<planId> except for ED-TAURI and ED-FINAL, which build to editor/dist. Then the build-output existence check and the .ts line count. Rust-touching plans (ED-WIRE, ED-WASM, ED-FINAL) add build-lsp, clippy-lsp and the wasm32 dependency trees."
   },
   "reviewContext": {
     "issueReference": {
-      "repository": "tacogips/vactrol",
+      "repository": "tacogips/vactr",
       "number": 5,
-      "url": "https://github.com/tacogips/vactrol/issues/5",
+      "url": "https://github.com/tacogips/vactr/issues/5",
       "title": "Implement the editor: browser + Tauri, visual feedback, controller binding (TASK-010)",
       "baseCommit": "f345e62fc4c447ecf0c1934dd998db89a5e5e9ca",
-      "implementationPlanPath": "impl-plans/active/vactrol-core.md"
+      "implementationPlanPath": "impl-plans/active/vactr-core.md"
     },
     "userProblem": "TASK-001..009 deliver the language, runtime, audio hosts and the session layer, but there is no editor: editor/ holds only the TASK-008 worklet glue and dev harness, and the browser wasm main half wraps Evaluator+Runtime rather than Session, so no Session Protocol v1 path exists in the browser (issue #5).",
     "requiredOutcomes": [
-      "Every TASK-010 completion criterion in impl-plans/active/vactrol-core.md checked with evidence; hearing worklet audio, the real-browser visual pane and the Tauri app run recorded as pending user confirmation with automated proxies.",
+      "Every TASK-010 completion criterion in impl-plans/active/vactr-core.md checked with evidence; hearing worklet audio, the real-browser visual pane and the Tauri app run recorded as pending user confirmation with automated proxies.",
       "Vitest suites (mock clock, recording transport, real wasm) pass for the protocol client, highlighting/edit reconciliation, slider panel and binding round trip, parameter-editor write-back, display-only grid/roll structural assertions, directive round trip, mode-scoped saving, multi-site BindingKey independence, reactive display batches, sampler waveform editor and visual pane.",
       "npm ci, npm run check, npm run test and npm run build exit 0 in editor/; cargo check of editor/src-tauri exits 0 (or BLOCKED under E1, reported as a gap).",
       "Rust build, clippy -D warnings, fmt --check, nextest, cargo test and both wasm32 builds exit 0.",
       "Per-wave plans marked Completed and impl-plans/README.md updated; a single commit on main with the six-section message and no attribution lines."
     ],
     "supportedEdgeCases": [
-      "Debounce-race writes: doc-changed flushed before any write; stale-binding reasons handled (vactrol-editor-bind.md).",
-      "UTF-8 vs UTF-16 offsets with non-ASCII text (vactrol-editor-scaffold.md, vactrol-editor-code.md).",
-      "Provisional or rolled-back values never rendered; one repaint per bindings batch (vactrol-editor-bind.md reactive.test.ts).",
-      "Write-back declines on text drift; directive-edit applied only after expected-text verification (vactrol-editor-bind.md).",
-      "A shader compile failure keeps the previous program; hush clears to black (vactrol-editor-visual.md).",
-      "Malicious or tampered package bodies rejected by the Rust pipeline and OPFS entries deleted (vactrol-editor-pkg.md, vactrol-editor-wire.md driver tests).",
-      "No WebMIDI (Tauri) and no WebGL2 report not available; MIDI access only on a user action (vactrol-editor-midi.md, vactrol-editor-visual.md)."
+      "Debounce-race writes: doc-changed flushed before any write; stale-binding reasons handled (vactr-editor-bind.md).",
+      "UTF-8 vs UTF-16 offsets with non-ASCII text (vactr-editor-scaffold.md, vactr-editor-code.md).",
+      "Provisional or rolled-back values never rendered; one repaint per bindings batch (vactr-editor-bind.md reactive.test.ts).",
+      "Write-back declines on text drift; directive-edit applied only after expected-text verification (vactr-editor-bind.md).",
+      "A shader compile failure keeps the previous program; hush clears to black (vactr-editor-visual.md).",
+      "Malicious or tampered package bodies rejected by the Rust pipeline and OPFS entries deleted (vactr-editor-pkg.md, vactr-editor-wire.md driver tests).",
+      "No WebMIDI (Tauri) and no WebGL2 report not available; MIDI access only on a user action (vactr-editor-midi.md, vactr-editor-visual.md)."
     ],
     "outOfScopeEdgeCases": [
       "Browser self-analysis taps, browser MIDI out and raw-frame oscilloscope taps (E2).",
@@ -83,7 +83,7 @@
     ],
     "intentionalTradeoffs": [
       "Waves: SCAFFOLD -> {WIRE, CODE, MIDI} -> {WASM, BIND, VISUAL} -> {PARAMS, PKG, TAURI} -> FINAL; ED-WIRE depends on ED-SCAFFOLD only for its npm verification rows. Session-187 rerun: SCAFFOLD, CODE, MIDI, VISUAL and PKG are accepted outside the manifest, leaving {WIRE, BIND, TAURI} -> WASM (after WIRE), PARAMS (after BIND) -> FINAL.",
-      "The build-time session_init export check is gated by VACTROL_REQUIRE_SESSION_ABI=1 (ED-WASM, ED-FINAL).",
+      "The build-time session_init export check is gated by VACTR_REQUIRE_SESSION_ABI=1 (ED-WASM, ED-FINAL).",
       "Plan files are archived in a separate docs commit after the workflow commit, as in issues #3 and #4."
     ],
     "nonGoals": [
@@ -100,58 +100,58 @@
       "E5 node engines >= 20, no mise pin."
     ],
     "sourcePaths": [
-      "impl-plans/active/vactrol-core.md",
+      "impl-plans/active/vactr-core.md",
       "design-docs/specs/design-implementation.md",
       "design-docs/specs/command.md",
       "design-docs/user-qa/pending-editor-questions.md",
-      "impl-plans/active/vactrol-editor-scaffold.md",
-      "impl-plans/active/vactrol-editor-wire.md",
-      "impl-plans/active/vactrol-editor-code.md",
-      "impl-plans/active/vactrol-editor-midi.md",
-      "impl-plans/active/vactrol-editor-wasm.md",
-      "impl-plans/active/vactrol-editor-bind.md",
-      "impl-plans/active/vactrol-editor-visual.md",
-      "impl-plans/active/vactrol-editor-params.md",
-      "impl-plans/active/vactrol-editor-pkg.md",
-      "impl-plans/active/vactrol-editor-tauri.md",
-      "impl-plans/active/vactrol-editor-finalize.md"
+      "impl-plans/active/vactr-editor-scaffold.md",
+      "impl-plans/active/vactr-editor-wire.md",
+      "impl-plans/active/vactr-editor-code.md",
+      "impl-plans/active/vactr-editor-midi.md",
+      "impl-plans/active/vactr-editor-wasm.md",
+      "impl-plans/active/vactr-editor-bind.md",
+      "impl-plans/active/vactr-editor-visual.md",
+      "impl-plans/active/vactr-editor-params.md",
+      "impl-plans/active/vactr-editor-pkg.md",
+      "impl-plans/active/vactr-editor-tauri.md",
+      "impl-plans/active/vactr-editor-finalize.md"
     ]
   },
   "plans": [
     {
       "planId": "ED-FINAL",
-      "planPath": "impl-plans/active/vactrol-editor-finalize.md",
-      "implementsTask": "TASK-010 serial reconciliation: join integrity, real-wasm criterion tests (criteria 1, 2, 3, 11 and packages), app wiring fixes, full-tree verification, vactrol-core.md TASK-010 checkboxes with evidence and pending manual gates, README and plan statuses, the commit staging list and six-section message",
+      "planPath": "impl-plans/active/vactr-editor-finalize.md",
+      "implementsTask": "TASK-010 serial reconciliation: join integrity, real-wasm criterion tests (criteria 1, 2, 3, 11 and packages), app wiring fixes, full-tree verification, vactr-core.md TASK-010 checkboxes with evidence and pending manual gates, README and plan statuses, the commit staging list and six-section message",
       "wave": 5,
       "status": "ready",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-editor-finalize.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-editor-finalize.md#progress-log",
       "writePaths": [
         "editor/test/wasm/criteria.test.ts",
         "editor/test/wasm/packages.test.ts",
         "editor/src/app/main.ts",
         "editor/src/app/layout.ts",
-        "impl-plans/active/vactrol-core.md",
+        "impl-plans/active/vactr-core.md",
         "impl-plans/README.md",
         "README.md",
-        "impl-plans/active/vactrol-editor-scaffold.md",
-        "impl-plans/active/vactrol-editor-wire.md",
-        "impl-plans/active/vactrol-editor-code.md",
-        "impl-plans/active/vactrol-editor-midi.md",
-        "impl-plans/active/vactrol-editor-wasm.md",
-        "impl-plans/active/vactrol-editor-bind.md",
-        "impl-plans/active/vactrol-editor-visual.md",
-        "impl-plans/active/vactrol-editor-params.md",
-        "impl-plans/active/vactrol-editor-pkg.md",
-        "impl-plans/active/vactrol-editor-tauri.md",
-        "impl-plans/active/vactrol-editor-finalize.md"
+        "impl-plans/active/vactr-editor-scaffold.md",
+        "impl-plans/active/vactr-editor-wire.md",
+        "impl-plans/active/vactr-editor-code.md",
+        "impl-plans/active/vactr-editor-midi.md",
+        "impl-plans/active/vactr-editor-wasm.md",
+        "impl-plans/active/vactr-editor-bind.md",
+        "impl-plans/active/vactr-editor-visual.md",
+        "impl-plans/active/vactr-editor-params.md",
+        "impl-plans/active/vactr-editor-pkg.md",
+        "impl-plans/active/vactr-editor-tauri.md",
+        "impl-plans/active/vactr-editor-finalize.md"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
         "Join integrity recorded against every plan's final-hashes.txt, each mismatch explained.",
         "criteria.test.ts and packages.test.ts pass against the real host-wasm artifact.",
-        "Final tree: build, build-lsp, clippy (default, lsp, wasm32 host-wasm), fmt, nextest, cargo test, lsp smoke, spec fixtures, both wasm32 builds, npm ci/check/test/build (with VACTROL_REQUIRE_SESSION_ABI=1) and the Tauri cargo check/fmt exit 0 with logs cited; a BLOCKED Tauri check only under E1, reported as a gap.",
-        "vactrol-core.md TASK-010 criteria checked only with evidence; manual gates PENDING USER CONFIRMATION; status COMPLETED only when every automated criterion is evidenced; Module Status updated.",
+        "Final tree: build, build-lsp, clippy (default, lsp, wasm32 host-wasm), fmt, nextest, cargo test, lsp smoke, spec fixtures, both wasm32 builds, npm ci/check/test/build (with VACTR_REQUIRE_SESSION_ABI=1) and the Tauri cargo check/fmt exit 0 with logs cited; a BLOCKED Tauri check only under E1, reported as a gap.",
+        "vactr-core.md TASK-010 criteria checked only with evidence; manual gates PENDING USER CONFIRMATION; status COMPLETED only when every automated criterion is evidenced; Module Status updated.",
         "impl-plans/README.md, README.md and the ED plan statuses updated; the staging list and six-section message recorded; this manifest not edited."
       ],
       "verification": [
@@ -165,16 +165,16 @@
         "LOG(ed-final-fmt): CARGO_TERM_QUIET=true cargo fmt --check",
         "LOG(ed-final-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
         "LOG(ed-final-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cp target/wasm32-unknown-unknown/debug/vactrol.wasm target/ed-wasm/ED-FINAL.wasm",
+        "cp target/wasm32-unknown-unknown/debug/vactr.wasm target/ed-wasm/ED-FINAL.wasm",
         "find src tests examples -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo tree -e normal --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "node --version; npm --version",
         "LOG(ed-final-npm-ci): cd editor && npm ci",
         "LOG(ed-final-npm-check): cd editor && npm run check",
-        "LOG(ed-final-npm-test): cd editor && VACTROL_WASM=$ROOT/target/ed-wasm/ED-FINAL.wasm npm run test",
-        "LOG(ed-final-npm-build): cd editor && VACTROL_WASM=$ROOT/target/ed-wasm/ED-FINAL.wasm VACTROL_REQUIRE_SESSION_ABI=1 npm run build",
-        "test -f editor/dist/vactrol.wasm && test -f editor/dist/worklet/processor.js && test -f editor/dist/index.html",
+        "LOG(ed-final-npm-test): cd editor && VACTR_WASM=$ROOT/target/ed-wasm/ED-FINAL.wasm npm run test",
+        "LOG(ed-final-npm-build): cd editor && VACTR_WASM=$ROOT/target/ed-wasm/ED-FINAL.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "test -f editor/dist/vactr.wasm && test -f editor/dist/worklet/processor.js && test -f editor/dist/index.html",
         "find editor/src editor/test -name '*.ts' -exec wc -l {} + | sort -n | tail -5",
         "LOG(ed-final-clippy-wasm32): CARGO_TERM_QUIET=true cargo clippy --target wasm32-unknown-unknown --no-default-features --features host-wasm -- -D warnings",
         "LOG(ed-final-tauri-fetch): CARGO_TERM_QUIET=true cargo fetch --manifest-path editor/src-tauri/Cargo.toml",
@@ -183,7 +183,7 @@
         "git diff --exit-code -- Cargo.toml Cargo.lock",
         "jq -e '.permissions | length == 5' editor/src-tauri/capabilities/default.json",
         "git status --short --ignored editor/src-tauri",
-        "LOG(ed-final-wasm-tests): cd editor && VACTROL_WASM=$ROOT/target/ed-wasm/ED-FINAL.wasm npx vitest run test/wasm",
+        "LOG(ed-final-wasm-tests): cd editor && VACTR_WASM=$ROOT/target/ed-wasm/ED-FINAL.wasm npx vitest run test/wasm",
         "LOG(ed-final-session): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/session::tests/) | test(/pkg::tests/) | test(/directives::tests/) | test(/sched::tests/) | binary(directive_fixtures) | binary(cli)'",
         "LOG(ed-final-lsp-smoke): CARGO_TERM_QUIET=true cargo test --features lsp --test lsp_smoke",
         "LOG(ed-final-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
@@ -207,23 +207,23 @@
     "removedPlans": [
       {
         "planId": "ED-SCAFFOLD",
-        "planPath": "impl-plans/active/vactrol-editor-scaffold.md"
+        "planPath": "impl-plans/active/vactr-editor-scaffold.md"
       },
       {
         "planId": "ED-CODE",
-        "planPath": "impl-plans/active/vactrol-editor-code.md"
+        "planPath": "impl-plans/active/vactr-editor-code.md"
       },
       {
         "planId": "ED-MIDI",
-        "planPath": "impl-plans/active/vactrol-editor-midi.md"
+        "planPath": "impl-plans/active/vactr-editor-midi.md"
       },
       {
         "planId": "ED-VISUAL",
-        "planPath": "impl-plans/active/vactrol-editor-visual.md"
+        "planPath": "impl-plans/active/vactr-editor-visual.md"
       },
       {
         "planId": "ED-PKG",
-        "planPath": "impl-plans/active/vactrol-editor-pkg.md"
+        "planPath": "impl-plans/active/vactr-editor-pkg.md"
       }
     ]
   },
@@ -244,23 +244,23 @@
     "removedPlans": [
       {
         "planId": "ED-WIRE",
-        "planPath": "impl-plans/active/vactrol-editor-wire.md"
+        "planPath": "impl-plans/active/vactr-editor-wire.md"
       },
       {
         "planId": "ED-WASM",
-        "planPath": "impl-plans/active/vactrol-editor-wasm.md"
+        "planPath": "impl-plans/active/vactr-editor-wasm.md"
       },
       {
         "planId": "ED-BIND",
-        "planPath": "impl-plans/active/vactrol-editor-bind.md"
+        "planPath": "impl-plans/active/vactr-editor-bind.md"
       },
       {
         "planId": "ED-PARAMS",
-        "planPath": "impl-plans/active/vactrol-editor-params.md"
+        "planPath": "impl-plans/active/vactr-editor-params.md"
       },
       {
         "planId": "ED-TAURI",
-        "planPath": "impl-plans/active/vactrol-editor-tauri.md"
+        "planPath": "impl-plans/active/vactr-editor-tauri.md"
       }
     ]
   }

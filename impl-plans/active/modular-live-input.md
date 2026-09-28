@@ -138,7 +138,7 @@ the master accumulator after clear and before effects. `AudioSide` accepts
 exact interleaved stereo or mono frames (duplicated in fixed scratch);
 malformed/nonfinite input is silenced and diagnosed. The worklet now exposes
 one stereo Web Audio input, copies planar samples into a fixed wasm array,
-and clears absent channels each quantum. `VactrolHost.connectInput(source)`
+and clears absent channels each quantum. `VactrHost.connectInput(source)`
 connects a Web Audio source to that node. Channels 3/4 remain direct stems.
 Tests cover `.vact`-authored resonant master processing, native/browser
 rate/block stereo separation, quad isolation, host mono mapping and zero

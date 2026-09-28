@@ -1,4 +1,4 @@
-//! The tower-lsp `LanguageServer` of `vactrol lsp` (design 14.5.11) and
+//! The tower-lsp `LanguageServer` of `vactr lsp` (design 14.5.11) and
 //! the optional session-socket attach client.
 //!
 //! Handlers hold only `Send` values: the analysis thread's request sender
@@ -99,7 +99,7 @@ impl LanguageServer for Backend {
                 ..ServerCapabilities::default()
             },
             server_info: Some(ServerInfo {
-                name: "vactrol".into(),
+                name: "vactr".into(),
                 version: Some(env!("CARGO_PKG_VERSION").into()),
             }),
         })
@@ -220,10 +220,10 @@ pub async fn forward_runtime_diags(
 /// The OS refused to start the thread.
 pub fn attach(url: String, out: tmpsc::UnboundedSender<DiagBody>) -> std::io::Result<()> {
     thread::Builder::new()
-        .name("vactrol-lsp-attach".into())
+        .name("vactr-lsp-attach".into())
         .spawn(move || {
             if let Err(e) = attach_loop(&url, &out) {
-                eprintln!("vactrol lsp: session attach to {url} ended: {e}; continuing standalone");
+                eprintln!("vactr lsp: session attach to {url} ended: {e}; continuing standalone");
             }
         })
         .map(|_| ())

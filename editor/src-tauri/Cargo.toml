@@ -1,12 +1,12 @@
 [package]
-name = "vactrol-editor"
+name = "vactr-editor"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.83"
 publish = false
-description = "Tauri shell wrapping the Vactrol editor frontend"
+description = "Tauri shell wrapping the Vactr editor frontend"
 
-# Standalone crate: the root vactrol crate never builds it.
+# Standalone crate: the root vactr crate never builds it.
 [workspace]
 
 [build-dependencies]

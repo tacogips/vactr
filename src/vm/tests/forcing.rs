@@ -1,4 +1,4 @@
-//! Forcing-mask tests (vactrol-core.md TASK-005 forcing criterion, design
+//! Forcing-mask tests (vactr-core.md TASK-005 forcing criterion, design
 //! 5.5). Each case counts runs of an effectful thunk through a `var`.
 
 use super::*;

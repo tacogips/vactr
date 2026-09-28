@@ -1,6 +1,8 @@
-# Vactrol
+# Vactr
 
-Vactrol is a live-coding language for music and visuals: declarative,
+[Japanese documentation](README.jd.md)
+
+Vactr is a live-coding language for music and visuals: declarative,
 statically typed with inference, written in Rust, targeting the browser
 (Wasm), macOS, iPad, and iPhone. See `design-docs/specs/` for the
 specification.
@@ -8,10 +10,10 @@ specification.
 ## Status
 
 The language front end, middle end, runtime back end, session layer and
-editor are implemented (`impl-plans/active/vactrol-core.md` TASK-001..010).
+editor are implemented (`impl-plans/active/vactr-core.md` TASK-001..010).
 Every top-level form goes read -> expand -> check -> compile -> run, and
 bound patterns are scheduled into audio, MIDI and OSC sinks. The
-`vactrol` binary provides `repl`, `run`, `serve`, `get` and `lsp`. The
+`vactr` binary provides `repl`, `run`, `serve`, `get` and `lsp`. The
 editor lives in `editor/` (see "Editor" below).
 
 Front end (TASK-001..003):
@@ -79,12 +81,12 @@ Session layer (TASK-009):
   contains the edit-epoch and doc-revision write authority, the
   `ClientMsg`/`ServerMsg` JSON protocol (v1), and the REPL console.
 - `src/pkg/`: Go-style packages (`import github.com/owner/name`). It
-  covers `vactrol.toml`, `vactrol.lock`, git-tag semver with minimal
+  covers `vactr.toml`, `vactr.lock`, git-tag semver with minimal
   version selection, the canonical length-prefixed sha256 digest,
   archive safety checks (traversal, absolute paths, escaping symlinks,
   case-fold duplicates, size limits) and atomic cache staging. Native
-  git and local-directory stores and the `~/.vactrol/pkg` cache live in
-  `pkg/native/`. A running session never fetches; `vactrol get` does.
+  git and local-directory stores and the `~/.vactr/pkg` cache live in
+  `pkg/native/`. A running session never fetches; `vactr get` does.
 - `src/directives/`: `#@` directive comments. It covers block
   attachment, labels (`#@ name X`, `label:`), addressed `label.param`
   directives, `BindingKey`, and both binding persistence modes.
@@ -97,10 +99,10 @@ Session layer (TASK-009):
   Offline `render` never mutates the live runtime. Taps and render need
   the native tier. The browser tier and builds without `host-native`
   fail the call with `beyond-capability`.
-- `src/cli/`: the `vactrol` verbs and the native session socket
+- `src/cli/`: the `vactr` verbs and the native session socket
   (loopback only, token in the URL, HTTP 401 on a bad token or path, at
   most 8 connections, 1 MiB frames).
-- `src/lsp/`: `vactrol lsp` over stdio (tower-lsp, `lsp` feature). It can
+- `src/lsp/`: `vactr lsp` over stdio (tower-lsp, `lsp` feature). It can
   attach to a running `serve` socket with `--session`.
 
 The CLI and the session protocol are specified in
@@ -118,7 +120,7 @@ Solid.js views. One frontend speaks Session Protocol v1 over two transports:
   thread (`src/host/wasm/session_half.rs`) and audio runs in the
   AudioWorklet (`editor/worklet/`).
 - Native tier: open the page with `?session=<ws-url>`, using the URL that
-  `vactrol serve` prints (token included). The page then drives the
+  `vactr serve` prints (token included). The page then drives the
   native engine over the loopback WebSocket.
 
 The transport, code mount point, slider and directive rows, parameter pane
@@ -157,14 +159,14 @@ cd editor
 npm ci
 npm run dev        # http://localhost:5173
 npm run check      # tsc
-npm run test       # vitest (real-wasm suites read $VACTROL_WASM)
-VACTROL_REQUIRE_SESSION_ABI=1 npm run build   # editor/dist
+npm run test       # vitest (real-wasm suites read $VACTR_WASM)
+VACTR_REQUIRE_SESSION_ABI=1 npm run build   # editor/dist
 ```
 
-`VACTROL_WASM` overrides the artifact path (the default is
-`target/wasm32-unknown-unknown/debug/vactrol.wasm`). Build with `--lib`.
+`VACTR_WASM` overrides the artifact path (the default is
+`target/wasm32-unknown-unknown/debug/vactr.wasm`). Build with `--lib`.
 Without it, the binary target can overwrite that path with a stub that
-has no `session_init` export. With `VACTROL_REQUIRE_SESSION_ABI=1`,
+has no `session_init` export. With `VACTR_REQUIRE_SESSION_ABI=1`,
 `npm run build` refuses that stub.
 
 The Tauri shell (`editor/src-tauri/`) is a standalone crate that wraps
@@ -177,19 +179,12 @@ real-browser visual pane, and the Tauri app run.
 
 ## Name
 
-A **vactrol** is an electronic component: an LED sealed together with a
-photoresistor, so that light controls resistance. It gives Buchla-style
+**Vactr** takes its name from an optical component: an LED sealed together
+with a photoresistor, so that light controls resistance. It gives Buchla-style
 low-pass gates their organic decay and lives inside optical compressors
 and tremolos. Light controlling sound is the right picture for a language
-that is half patterns and half visuals. The command is `vactrol`; source
+that is half patterns and half visuals. The command is `vactr`; source
 files use the `.vact` extension.
-
-**Vactrol**（バクトロール）は電子部品の名前です。LED とフォトレジスタを
-一体に封じたもので、光で抵抗を制御します。Buchla 系のローパスゲートに
-独特の減衰を与え、光学式コンプレッサーやトレモロの中にも入っています。
-「光が音を制御する」という構図を、パターンとビジュアルを半々に持つこの
-言語の名前にしました。実行コマンドは `vactrol`、ソースファイルの拡張子は
-`.vact` です。
 
 ## Development
 
@@ -199,22 +194,22 @@ Usage (see `design-docs/specs/command.md` for flags, exit codes and the
 protocol):
 
 ```sh
-vactrol repl [--host native|noop]
-vactrol run <file.vact> [--host native|noop] [--cycles N]
-vactrol serve [<file.vact>] [--host native|noop] [--port P] [--bind 127.0.0.1]
-vactrol get [github.com/<owner>/<name>[@vX.Y.Z]] [--store dir:<root>]
-vactrol lsp [--session <ws-url>]    # needs --features lsp
+vactr repl [--host native|noop]
+vactr run <file.vact> [--host native|noop] [--cycles N]
+vactr serve [<file.vact>] [--host native|noop] [--port P] [--bind 127.0.0.1]
+vactr get [github.com/<owner>/<name>[@vX.Y.Z]] [--store dir:<root>]
+vactr lsp [--session <ws-url>]    # needs --features lsp
 ```
 
 `--host` defaults to `native`. If the audio device fails to open, the
 CLI warns and falls back to `noop`. `run --host noop --cycles N` uses a
 virtual clock and ends deterministically. `serve` prints its connect
 URL, token included, once to stderr. The package cache lives under
-`$VACTROL_HOME/pkg` (default `~/.vactrol/pkg`). From a checkout:
+`$VACTR_HOME/pkg` (default `~/.vactr/pkg`). From a checkout:
 
 ```sh
-CARGO_TERM_QUIET=true cargo run --bin vactrol -- repl --host noop
-CARGO_TERM_QUIET=true cargo run --features lsp --bin vactrol -- lsp
+CARGO_TERM_QUIET=true cargo run --bin vactr -- repl --host noop
+CARGO_TERM_QUIET=true cargo run --features lsp --bin vactr -- lsp
 ```
 
 Verification:
@@ -249,7 +244,7 @@ Cargo features:
 - `host-native` (the default): cpal audio, midir MIDI, the session socket
   (tungstenite) and its token (getrandom).
 - `host-wasm`: the browser host ABI.
-- `lsp`: `vactrol lsp` (tower-lsp, tokio). It implies `host-native`.
+- `lsp`: `vactr lsp` (tower-lsp, tokio). It implies `host-native`.
 
 The native-only crates are in the non-wasm32 target table, so both wasm32
 builds stay clean. To build for a Wasm host, run

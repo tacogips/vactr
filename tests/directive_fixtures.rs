@@ -9,12 +9,12 @@ mod support;
 
 use support::toml_subset::{self, Table};
 use support::{multiset, root};
-use vactrol::directives::build_table;
-use vactrol::directives::key::BindingIdent;
-use vactrol::reader::span::FileId;
-use vactrol::reader::{read, AliasEnv};
-use vactrol::types::diag::Severity;
-use vactrol::types::HostManifest;
+use vactr::directives::build_table;
+use vactr::directives::key::BindingIdent;
+use vactr::reader::span::FileId;
+use vactr::reader::{read, AliasEnv};
+use vactr::types::diag::Severity;
+use vactr::types::HostManifest;
 
 const FILE: FileId = FileId::new(9);
 

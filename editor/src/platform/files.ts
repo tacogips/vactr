@@ -78,9 +78,9 @@ export interface DialogFilter {
   extensions: string[];
 }
 
-export const VACT_FILTER: DialogFilter = { name: 'Vactrol source (.vact)', extensions: ['vact'] };
+export const VACT_FILTER: DialogFilter = { name: 'Vactr source (.vact)', extensions: ['vact'] };
 export const BINDINGS_FILTER: DialogFilter = {
-  name: 'Vactrol bindings (.bindings.json)',
+  name: 'Vactr bindings (.bindings.json)',
   extensions: ['json'],
 };
 
@@ -174,9 +174,9 @@ interface FsAccessWindow {
   showSaveFilePicker?: (opts: { suggestedName: string; types: PickerType[] }) => Promise<FileHandleLike>;
 }
 
-const VACT_TYPE: PickerType = { description: 'Vactrol source', accept: { 'text/plain': ['.vact'] } };
+const VACT_TYPE: PickerType = { description: 'Vactr source', accept: { 'text/plain': ['.vact'] } };
 const BINDINGS_TYPE: PickerType = {
-  description: 'Vactrol bindings',
+  description: 'Vactr bindings',
   accept: { 'application/json': ['.json'] },
 };
 

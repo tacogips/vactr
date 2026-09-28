@@ -13,7 +13,7 @@ import { Store } from '../../src/protocol/store';
 import type { EvalResultBody, TempoBody, WirePlaying } from '../../src/protocol/types';
 import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
-import { ackSampleInstalls, jsonOf, loadVactrolWasm, TAG_SESSION, type VactrolWasm, type WasmRecord } from '../support/wasm';
+import { ackSampleInstalls, jsonOf, loadVactrWasm, TAG_SESSION, type VactrWasm, type WasmRecord } from '../support/wasm';
 
 const FILE = 'main.vact';
 
@@ -35,7 +35,7 @@ interface Env {
 }
 
 interface Rig {
-  w: VactrolWasm;
+  w: VactrWasm;
   seq: number;
   rev: number;
   epoch: number;
@@ -52,7 +52,7 @@ const TAG_CELL_INIT_ACK = 0x41;
 const TAG_CELL_BATCH_ACK = 0x42;
 
 /** Answers the slot-control and cell records of `records` like the worklet. */
-function ackControls(w: VactrolWasm, records: readonly WasmRecord[]): void {
+function ackControls(w: VactrWasm, records: readonly WasmRecord[]): void {
   const replies: [number, number[]][] = [];
   for (const r of records) {
     const v = new DataView(r.bytes.buffer, r.bytes.byteOffset, r.bytes.byteLength);
@@ -75,7 +75,7 @@ function ackControls(w: VactrolWasm, records: readonly WasmRecord[]): void {
 }
 
 async function start(): Promise<Rig> {
-  const w = await loadVactrolWasm();
+  const w = await loadVactrWasm();
   expect(w.call('session_init', 48000, 0)).toBe(1);
   const rig: Rig = { w, seq: 0, rev: 0, epoch: 0, now: 0 };
   drain(rig);

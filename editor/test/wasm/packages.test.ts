@@ -1,5 +1,5 @@
 // TASK-010 criterion 3, package half, against the REAL host-wasm artifact
-// (`$VACTROL_WASM`; design 15.1.10, 15.1.2 G6, 15.1.12). ED-PKG's pane and
+// (`$VACTR_WASM`; design 15.1.10, 15.1.2 G6, 15.1.12). ED-PKG's pane and
 // driver (`importPackages`, `restorePackages`) run over a `WasmCore` bound to
 // the real exports through `worklet/host.js`, with the editor's `Client`
 // over `WasmTransport`. The proxy is `FakeProxy` serving zips built by
@@ -8,7 +8,7 @@
 // `node:fs` read still works, and the pane needs a document.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VactrolHost, type HostExports } from '../../worklet/host.js';
+import { VactrHost, type HostExports } from '../../worklet/host.js';
 import type { EditorDeps } from '../../src/app/deps';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
@@ -23,12 +23,12 @@ import { MockClock } from '../support/clock';
 import { fakeNode } from '../support/fake-core';
 import { FakeProxy } from '../support/fetch';
 import { fakeStorage } from '../support/opfs';
-import { loadVactrolWasm } from '../support/wasm';
+import { loadVactrWasm } from '../support/wasm';
 import { buildZip } from '../support/zip';
 
 const FILE = 'main.vact';
 const PROXY = 'https://proxy.test';
-const PADS = 'github.com/test/vactrol-pads';
+const PADS = 'github.com/test/vactr-pads';
 const VERSION = 'v1.0.0';
 const DIR = `${PROXY}/${PADS}/@v`;
 const MANIFEST = `[package]\npath = "${PADS}"\n\n[deps]\n`;
@@ -41,7 +41,7 @@ function fixtureProxy(): FakeProxy {
     version: VERSION,
     toml: MANIFEST,
     files: [
-      { name: 'vactrol.toml', data: MANIFEST },
+      { name: 'vactr.toml', data: MANIFEST },
       { name: 'mod.vact', data: 'let level 42\n' },
     ],
   });
@@ -49,9 +49,9 @@ function fixtureProxy(): FakeProxy {
 
 /** A `WasmCore` over the real artifact, in session mode, behind the real host glue. */
 async function realCore(): Promise<WasmCore> {
-  const w = await loadVactrolWasm();
+  const w = await loadVactrWasm();
   const core = new WasmCore();
-  const host = new VactrolHost(null, fakeNode(), w.exports as HostExports, {
+  const host = new VactrHost(null, fakeNode(), w.exports as HostExports, {
     wasmUrl: '',
     processorUrl: '',
     init: 'session',
@@ -143,7 +143,7 @@ describe('package import over the real driver (criterion 3, package half)', () =
     proxy.serve(
       `${DIR}/${VERSION}.zip`,
       buildZip([
-        { name: 'vactrol.toml', data: MANIFEST },
+        { name: 'vactr.toml', data: MANIFEST },
         { name: '../evil.vact', data: 'let level 1\n' },
       ]),
     );
@@ -174,7 +174,7 @@ describe('package import over the real driver (criterion 3, package half)', () =
     // The stored zip body is replaced by a different, still valid archive.
     const zipUrl = `${DIR}/${VERSION}.zip`;
     const bodies = new Map(done.bodies);
-    bodies.set(zipUrl, buildZip([{ name: 'vactrol.toml', data: `${MANIFEST}# tampered\n` }]));
+    bodies.set(zipUrl, buildZip([{ name: 'vactr.toml', data: `${MANIFEST}# tampered\n` }]));
     const store = new MemoryStore();
     await store.save({ requirements: { [PADS]: VERSION }, lock: done.lock, bodies });
 

@@ -294,7 +294,7 @@ impl Lexer<'_> {
                         DiagCode::ParenForm,
                         i,
                         i + 1,
-                        "`( )` is not Vactrol syntax; use `{}`",
+                        "`( )` is not Vactr syntax; use `{}`",
                     );
                     i += 1;
                 }
@@ -306,7 +306,7 @@ impl Lexer<'_> {
                             DiagCode::ParenForm,
                             i,
                             i + 1,
-                            "`( )` is not Vactrol syntax; use `{}`",
+                            "`( )` is not Vactr syntax; use `{}`",
                         );
                     }
                     i += 1;

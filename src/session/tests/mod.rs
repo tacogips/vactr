@@ -1,4 +1,4 @@
-//! SS-SESSION tests (design 14.5; vactrol-session-core.md "Required
+//! SS-SESSION tests (design 14.5; vactr-session-core.md "Required
 //! Tests"): the codec, the eval pipeline, reactive publication (every
 //! TASK-005 trace), write authority, tiers, packages through the session,
 //! directives, the REPL and the self-analysis surfaces.

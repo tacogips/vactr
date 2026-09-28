@@ -171,7 +171,7 @@ fn comparator(modulator: f32, carrier: f32, timbre: f32) -> f32 {
 }
 
 // Source ProcessXmod passes modulator first, carrier second. Fold and
-// vocoder remain Vactrol adaptations; timbre is ignored in source modes
+// vocoder remain Vactr adaptations; timbre is ignored in source modes
 // where it has no role only after their own source parameter mapping.
 fn mode(n: usize, carrier: f32, modulator: f32, timbre: f32) -> f32 {
     match n {
@@ -360,11 +360,11 @@ pub fn process(
                 },
             )
         } else if wave < 4.5 {
-            // The public pulse selector remains a Vactrol extension.
+            // The public pulse selector remains a Vactr extension.
             let raw = if phase < 0.5 { 1.0 } else { -1.0 };
             (raw, raw)
         } else if wave < 5.5 {
-            // A Vactrol-generated low-passed noise carrier.
+            // A Vactr-generated low-passed noise carrier.
             let a = 1.0 - (-TAU * freq / sr).exp();
             noise_lp += a * (st.rng.bipolar() - noise_lp);
             (noise_lp, noise_lp)

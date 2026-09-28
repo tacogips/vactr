@@ -2,7 +2,7 @@
 //
 // The browser Session over the raw wasm ABI (ED-WASM; design 15.1.2 G1,
 // G5, G6; command.md "Browser transport (raw wasm ABI, TASK-010)"),
-// against the REAL host-wasm artifact (`$VACTROL_WASM`). Every test builds
+// against the REAL host-wasm artifact (`$VACTR_WASM`). Every test builds
 // a fresh instance with `session_init` and drives it on a mock audio clock
 // (`session_tick(now)` at chosen times), playing the worklet's install acks
 // through `session_inbox`, and reads the framed outbox.
@@ -14,14 +14,14 @@ import {
   ackSampleInstalls,
   consoleLines,
   jsonOf,
-  loadVactrolWasm,
+  loadVactrWasm,
   putSample,
   recordJson,
   TAG_CONSOLE,
   TAG_PKG,
   TAG_RENDER,
   TAG_SESSION,
-  type VactrolWasm,
+  type VactrWasm,
   type WasmRecord,
 } from '../support/wasm';
 import { buildZip } from '../support/zip';
@@ -40,7 +40,7 @@ interface Env {
 }
 
 interface Rig {
-  w: VactrolWasm;
+  w: VactrWasm;
   seq: number;
   rev: number;
   now: number;
@@ -49,7 +49,7 @@ interface Rig {
 }
 
 async function start(): Promise<Rig> {
-  const w = await loadVactrolWasm();
+  const w = await loadVactrWasm();
   expect(w.call('session_init', 48000, 0)).toBe(1);
   const rig: Rig = { w, seq: 0, rev: 0, now: 0, all: [] };
   drain(rig);
@@ -267,7 +267,7 @@ describe('session ABI (real host-wasm artifact)', () => {
     const PROXY = 'https://proxy.test';
     const PATH = 'github.com/test/pads';
     const files = [
-      { name: 'vactrol.toml', data: '[deps]\n' },
+      { name: 'vactr.toml', data: '[deps]\n' },
       { name: 'a.vact', data: 'let a 1\n' },
     ];
     const proxy = new FakeProxy(PROXY).add({ path: PATH, version: 'v1.0.0', toml: '[deps]\n', files });
@@ -310,7 +310,7 @@ describe('session ABI (real host-wasm artifact)', () => {
       expect(line).toContain('v1.0.0');
       expect(line).toContain(sha);
       // Restore of that lock against a tampered (still valid) zip: only the digest catches it.
-      supply(rig, zipUrl, 200, buildZip([{ name: 'vactrol.toml', data: '[deps]\n# tampered\n' }]));
+      supply(rig, zipUrl, 200, buildZip([{ name: 'vactr.toml', data: '[deps]\n# tampered\n' }]));
       const [again, bad] = drive(rig, { proxy: PROXY, lock: d.lock });
       expect(again).toEqual([]);
       expect(bad).toMatchObject({ status: 'error', code: 'package-integrity' });

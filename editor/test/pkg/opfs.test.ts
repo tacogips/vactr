@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VactrolHost } from '../../worklet/host.js';
+import { VactrHost } from '../../worklet/host.js';
 import { WasmCore } from '../../src/protocol/wasm';
 import type { PkgReply } from '../../src/protocol/types';
 import { restorePackages } from '../../src/pkg/driver';
@@ -21,17 +21,17 @@ import { FakeProxy } from '../support/fetch';
 import { FakeDir, fakeStorage } from '../support/opfs';
 
 const PROXY = 'https://proxy.test';
-const PADS_ZIP = `${PROXY}/github.com/test/vactrol-pads/@v/1.0.0.zip`;
-const PADS_TOML = `${PROXY}/github.com/test/vactrol-pads/@v/1.0.0.toml`;
+const PADS_ZIP = `${PROXY}/github.com/test/vactr-pads/@v/1.0.0.zip`;
+const PADS_TOML = `${PROXY}/github.com/test/vactr-pads/@v/1.0.0.toml`;
 const DRUMS_ZIP = `${PROXY}/github.com/test/drums/@v/2.0.0.zip`;
-const LOCK = 'github.com/test/vactrol-pads 1.0.0 aa\ngithub.com/test/drums 2.0.0 bb\n';
+const LOCK = 'github.com/test/vactr-pads 1.0.0 aa\ngithub.com/test/drums 2.0.0 bb\n';
 const enc = new TextEncoder();
 
 function scripted(reply: (req: string) => PkgReply): { fake: FakeCore; core: WasmCore } {
   const fake = new FakeCore();
   const core = new WasmCore();
   core.attach(
-    new VactrolHost(null, fakeNode(), fake.exports, {
+    new VactrHost(null, fakeNode(), fake.exports, {
       wasmUrl: '',
       processorUrl: '',
       init: 'session',
@@ -46,7 +46,7 @@ async function seeded(): Promise<{ root: FakeDir; store: OpfsStore }> {
   const storage = fakeStorage();
   const store = (await openPkgStore(storage)) as OpfsStore;
   await store.save({
-    requirements: { 'github.com/test/vactrol-pads': '', 'github.com/test/drums': '2.0.0' },
+    requirements: { 'github.com/test/vactr-pads': '', 'github.com/test/drums': '2.0.0' },
     lock: LOCK,
     bodies: new Map([
       [PADS_ZIP, enc.encode('pads-zip')],
@@ -58,12 +58,12 @@ async function seeded(): Promise<{ root: FakeDir; store: OpfsStore }> {
 }
 
 describe('OpfsStore', () => {
-  it('round-trips requirements, lock and bodies under vactrol-pkg/', async () => {
+  it('round-trips requirements, lock and bodies under vactr-pkg/', async () => {
     const { root, store } = await seeded();
     expect(store.persistent).toBe(true);
     expect(root.text(DIR_NAME, LOCK_FILE)).toBe(LOCK);
     expect(JSON.parse(root.text(DIR_NAME, REQUIREMENTS_FILE) ?? '')).toEqual({
-      'github.com/test/vactrol-pads': '',
+      'github.com/test/vactr-pads': '',
       'github.com/test/drums': '2.0.0',
     });
     const index = JSON.parse(root.text(DIR_NAME, INDEX_FILE) ?? '') as Record<string, string>;
@@ -75,7 +75,7 @@ describe('OpfsStore', () => {
     const again = await openPkgStore(fakeStorage(root));
     const loaded = await again.load();
     expect(loaded?.lock).toBe(LOCK);
-    expect(loaded?.requirements).toEqual({ 'github.com/test/vactrol-pads': '', 'github.com/test/drums': '2.0.0' });
+    expect(loaded?.requirements).toEqual({ 'github.com/test/vactr-pads': '', 'github.com/test/drums': '2.0.0' });
     expect([...(loaded?.bodies.keys() ?? [])].sort()).toEqual([DRUMS_ZIP, PADS_TOML, PADS_ZIP].sort());
     expect(new TextDecoder().decode(loaded?.bodies.get(DRUMS_ZIP))).toBe('drums-zip');
 
@@ -109,7 +109,7 @@ describe('restorePackages', () => {
 
   it('deletes the offending stored bodies and the lock on package-integrity', async () => {
     const { root, store } = await seeded();
-    const message = 'unsafe package entry `github.com/test/vactrol-pads@1.0.0`: digest mismatch: expected aa, got cc';
+    const message = 'unsafe package entry `github.com/test/vactr-pads@1.0.0`: digest mismatch: expected aa, got cc';
     const { core } = scripted(() => ({ status: 'error', code: 'package-integrity', message }));
     const r = await restorePackages(core, store, PROXY, new FakeProxy(PROXY).fetch);
     expect(r).toMatchObject({ status: 'error', code: 'package-integrity', message });

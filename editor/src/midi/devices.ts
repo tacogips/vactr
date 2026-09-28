@@ -6,7 +6,7 @@
 
 import type { MidiAccessLike, MidiInputLike, MidiMessageLike } from './access';
 
-export const STORAGE_KEY = 'vactrol.midi.active-inputs';
+export const STORAGE_KEY = 'vactr.midi.active-inputs';
 
 export interface ActiveMessage {
   input: MidiInputLike;

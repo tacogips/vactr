@@ -4,12 +4,22 @@ This document describes system architecture and design decisions.
 
 ## Overview
 
-vactrol is a live-coding scripting language and its LSP server, implemented in Rust.
+vactr is a live-coding scripting language and its LSP server, implemented in Rust.
 The surface syntax is indent-based and desugars into S-expressions; the core is a
 small Lisp. It runs as an interpreter first and is designed so that a JIT and a
 Wasm backend can be added without changing the language.
 
 Design priorities, in order: simplicity, ease of writing, then everything else.
+
+## Product identifier contract
+
+The public product name is **Vactr**. The Rust package, library and executable,
+editor package, Tauri application, repository slug, local checkout directory,
+configuration and lock filenames, cache directory, environment-variable prefix,
+and user-facing documentation use the corresponding `vactr` or `VACTR`
+spelling. The source language keeps its existing `.vact` extension and syntax.
+References to the physical optical component describe it by function rather
+than treating the product name as a component name.
 
 ---
 
@@ -57,7 +67,7 @@ Design priorities, in order: simplicity, ease of writing, then everything else.
 | 2026-09-24 | Implementation language | Rust core; Swift for the Apple shell only (one SwiftUI app for macOS/iPadOS/iOS via UniFFI bindings); TS shell for the browser. Swift-for-the-core, Zig, C++/JUCE, TypeScript evaluated. | Decided |
 | 2026-09-24 | Effects | Builtin effect catalog (dynamics, EQ/filters, delay, reverb, saturation, modulation, lo-fi, resonator, spatial, restoration, utility, analyzers) usable as pattern controls, inst ugens, and bus chains (`bus`, `master`). | Decided |
 | 2026-09-24 | Synthesis models | Sampler, analog modeling, digital (FM, phase distortion, additive), wavetable, granular: all definable in code as `inst` chains over builtin ugens, each also a prelude template. | Decided |
-| 2026-09-24 | Packages | Go-style GitHub-path imports, git-tag versions, lock file, cache, browser proxy; packages are Vactrol code only. Supersedes "no module system in v1". | Decided |
+| 2026-09-24 | Packages | Go-style GitHub-path imports, git-tag versions, lock file, cache, browser proxy; packages are Vactr code only. Supersedes "no module system in v1". | Decided |
 | 2026-09-24 | Editor: sliders and MIDI | Right-pane slider panel over every numeric site (chosen from all candidates), mouse drag on numbers, MIDI in (learn, `cc` signal, note input), MIDI out sink, MIDI clock/transport sync in and out (Link planned). No syntax for any of it. | Decided |
 | 2026-09-24 | Host tiers | Browser tier (Wasm core, AudioWorklet, Web MIDI) first; native tier (same core inside the Tauri app on macOS/iOS, CoreAudio/CoreMIDI) second. Features may differ by tier behind capability traits; the language is identical; a missing capability is a diagnostic. Swift is glue only. | Decided |
 | 2026-09-24 | Editor: DAW-style parameter editors | Effect/instrument call sites get meaning-matched editors (EQ curve with bands and live spectrum, filter response, dynamics transfer curve, envelope shape, delay taps, sampler waveform, wavetable frames, granular region, LFO shape, XY pad, euclid ring with hits/steps/rotation). Sequences are edited in code only; step grid and piano roll are displays. All write back to the same numeric sites; all MIDI-learnable; nothing in the code. | Decided |
@@ -70,7 +80,7 @@ Design priorities, in order: simplicity, ease of writing, then everything else.
 ### Execution Modes
 
 Live coding requires runtime redefinition; Wasm and JIT want a closed program.
-Rather than choosing one, vactrol defines two modes over the same core language.
+Rather than choosing one, vactr defines two modes over the same core language.
 
 | Mode | Purpose | `eval` / REPL | Redefinition | Backend |
 |------|---------|---------------|--------------|---------|
@@ -159,7 +169,7 @@ by construction, exactly as in JavaScript, Hydra, and Strudel.
 | Render (GPU, per frame) | the shader a visual chain compiles to | never; receives uniforms (`time`, `fft`, `amp`, `beat`, `hits`, signal parameters) |
 | I/O | editor/LSP transport, MIDI, OSC | no |
 
-Invariant: a vactrol closure is never evaluated on the audio or render
+Invariant: a vactr closure is never evaluated on the audio or render
 thread. A function-of-time parameter is evaluated at control rate on
 the evaluator thread and pushed as a value. Visuals therefore need no
 multithreading of user code; the GPU is the parallelism. In Wasm the
@@ -366,12 +376,12 @@ not tooling around it. Requirements from the author:
 
 ### Packages (DECIDED, 2026-09-24)
 
-External Vactrol libraries are imported by repository path, Go style:
+External Vactr libraries are imported by repository path, Go style:
 `import github.com/owner/name`, versions by git tag with minimal version
-selection, `vactrol.lock` pinning version and content hash, a cache
-under `~/.vactrol/pkg`, and a package proxy for the browser build (no
-git there). A package is Vactrol code plus assets (samples, tables) and
-a `vactrol.toml` manifest; native extensions are out of v1, so a package
+selection, `vactr.lock` pinning version and content hash, a cache
+under `~/.vactr/pkg`, and a package proxy for the browser build (no
+git there). A package is Vactr code plus assets (samples, tables) and
+a `vactr.toml` manifest; native extensions are out of v1, so a package
 cannot reach the audio thread except through builtins. This supersedes
 the earlier "no module system in v1" decision. Builtin catalogs that
 packages build on: effects, synthesis models (sampler, analog, FM,
@@ -385,7 +395,7 @@ sections 4-6).
 - No assumption of OS threads in the core; concurrency is scheduler-driven.
 - All I/O and platform access goes through capability traits.
 - Live mode in the browser runs the interpreter/VM compiled to Wasm; Frozen
-  mode emits Wasm from vactrol programs and is a later milestone.
+  mode emits Wasm from vactr programs and is a later milestone.
 
 ### Realtime Validation
 
@@ -408,12 +418,12 @@ What the language guarantees to make this possible:
 
 Consequences for the toolchain: the LSP server and the live session share
 one process (or a socket), because runtime diagnostics originate in the
-scheduler. `vactrol` therefore runs both; an external editor connects to
+scheduler. `vactr` therefore runs both; an external editor connects to
 the same session the console shows.
 
 ### Typing
 
-vactrol is statically typed with inference (principle 4 in
+vactr is statically typed with inference (principle 4 in
 `lang-reference.md`). Every expression has a type the checker can name;
 annotations are optional because inference usually makes them
 unnecessary. Annotations go in `fn` headers, `let`/`var` bindings,

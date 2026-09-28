@@ -32,7 +32,7 @@ impl TickSource {
         let stop = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&stop);
         let thread = thread::Builder::new()
-            .name("vactrol-tick".into())
+            .name("vactr-tick".into())
             .spawn(move || {
                 while !flag.load(Ordering::Acquire) {
                     thread::park_timeout(period);

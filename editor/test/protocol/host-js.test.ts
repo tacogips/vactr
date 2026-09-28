@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VactrolHost, startHost } from '../../worklet/host.js';
+import { VactrHost, startHost } from '../../worklet/host.js';
 import { FakeCore, fakeNode } from '../support/fake-core';
 
 const bytes = (b: unknown): number[] => [...new Uint8Array(b as ArrayBuffer)];
 
 function host(fake: FakeCore, opts: Record<string, unknown> = {}) {
   const node = fakeNode();
-  const h = new VactrolHost(null, node, fake.exports, { wasmUrl: '', processorUrl: '', ...opts });
+  const h = new VactrHost(null, node, fake.exports, { wasmUrl: '', processorUrl: '', ...opts });
   return { h, node };
 }
 
@@ -81,7 +81,7 @@ describe('worklet/host.js', () => {
   it('delivers each editor record once when onRecord re-enters wasm', () => {
     const fake = new FakeCore();
     const seen: string[] = [];
-    let h: VactrolHost | null = null;
+    let h: VactrHost | null = null;
     fake.on('session_apply', () => fake.emit(0x71, 'reply'));
     ({ h } = host(fake, {
       init: 'session',

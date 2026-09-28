@@ -1,18 +1,18 @@
-//! `vactrol.toml`: the strict subset, rendering, round trips and errors.
+//! `vactr.toml`: the strict subset, rendering, round trips and errors.
 
 use std::rc::Rc;
 
 use crate::pkg::manifest::{parse, render, valid_package_path, PackageMeta, PkgManifest};
 use crate::pkg::tests::support::{id, v, DRUMS, PADS};
 
-const FULL: &str = "# the pads package\n[package]\npath = \"github.com/someone/vactrol-pads\" # trailing\nvactrol = \"v0.1.0\"\nassets = [\"samples\", \"wt/#1\",]\n\n[deps]\n\"github.com/someone/vactrol-drums\" = \"v1.2.0\"\n\"github.com/a/b\" = \"v0.3.1-rc.1\"\n";
+const FULL: &str = "# the pads package\n[package]\npath = \"github.com/someone/vactr-pads\" # trailing\nvactr = \"v0.1.0\"\nassets = [\"samples\", \"wt/#1\",]\n\n[deps]\n\"github.com/someone/vactr-drums\" = \"v1.2.0\"\n\"github.com/a/b\" = \"v0.3.1-rc.1\"\n";
 
 #[test]
 fn parses_the_subset() {
     let m = parse(FULL).expect("parses");
     let p = m.package.as_ref().expect("[package]");
     assert_eq!(p.path, id(PADS));
-    assert_eq!(p.vactrol, Some(v("v0.1.0")));
+    assert_eq!(p.vactr, Some(v("v0.1.0")));
     let assets: Vec<&str> = p.assets.iter().map(|a| &**a).collect();
     assert_eq!(assets, ["samples", "wt/#1"]);
     // Sorted by path.
@@ -52,7 +52,7 @@ fn add_or_raise_keeps_the_maximum() {
     assert_eq!(m.deps[1].1, v("v1.3.0"));
     let meta = PackageMeta {
         path: id(PADS),
-        vactrol: None,
+        vactr: None,
         assets: vec![Rc::from("s\"q")],
     };
     let with = PkgManifest {
@@ -78,7 +78,7 @@ fn rejects_malformed_input_with_a_line_number() {
         ("[deps]\n\"github.com/a/b\" = { v = \"v1.0.0\" }\n", 2),
         ("[deps]\n\"github.com/a/b\" = 'v1.0.0'\n", 2),
         ("[deps]\n\"github.com/a/b\" = \"v1.0.0\" extra\n", 2),
-        ("[package]\nvactrol = \"v0.1.0\"\n", 1),
+        ("[package]\nvactr = \"v0.1.0\"\n", 1),
         ("[deps]\n[deps]\n", 2),
         ("[deps]\n\"github.com/a/b\" = \"v1.0.0\n", 2),
         (

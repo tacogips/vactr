@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! Tauri shell for the Vactrol editor.
+//! Tauri shell for the Vactr editor.
 //!
 //! This binary wraps the identical Vite frontend build (`../dist`) in a native window. It
 //! defines no custom `invoke` commands: file open/save go through the `dialog` and `fs`
@@ -12,5 +12,5 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .run(tauri::generate_context!())
-        .expect("error while running the Vactrol Tauri shell");
+        .expect("error while running the Vactr Tauri shell");
 }

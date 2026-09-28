@@ -5,10 +5,10 @@ use std::fmt::Write;
 /// The upstream Eurorack revision used for every row in this manifest.
 pub const PLAITS_REVISION: &str = "08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4";
 
-/// Fidelity describes Vactrol behavior, not the upstream file's license.
+/// Fidelity describes Vactr behavior, not the upstream file's license.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CoverageState {
-    /// No Vactrol renderer yet.
+    /// No Vactr renderer yet.
     Pending,
     /// Runnable independent architecture with known source-stage gaps.
     Adaptation,
@@ -25,7 +25,7 @@ pub enum CoverageState {
 pub enum ResourceState {
     /// No engine-specific external resource identified in the pinned source.
     None,
-    /// Vactrol uses cleared, original or analytic replacements.
+    /// Vactr uses cleared, original or analytic replacements.
     Replacement,
     /// The engine's exact assets still require a separate provenance audit.
     NeedsAudit,
@@ -97,7 +97,7 @@ pub struct PortedAlgorithm {
     pub source_engine: &'static str,
     pub source_path: &'static str,
     pub source_revision: &'static str,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub controls: CommonControls,
     /// Number of independently emitted upstream main channels (one).
     pub main_outputs: u8,
@@ -121,7 +121,7 @@ const fn implemented(
         source_engine: engine,
         source_path: path,
         source_revision: PLAITS_REVISION,
-        vactrol_template: Some(template),
+        vactr_template: Some(template),
         controls,
         main_outputs: 1,
         aux_outputs: 1,
@@ -186,7 +186,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
     },
     {
         // Upstream modes 5-7 read unaudited wav_integrated_waves/waves.bin;
-        // Vactrol uses original procedural surfaces, retaining source provenance.
+        // Vactr uses original procedural surfaces, retaining source provenance.
         let mut row = implemented(
             5,
             "wave_terrain_engine",
@@ -257,7 +257,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         CoverageState::SourceStage,
     ),
     {
-        // Upstream reads unaudited waves.bin; the runnable Vactrol grid is
+        // Upstream reads unaudited waves.bin; the runnable Vactr grid is
         // original procedural audio, with no wave data imported.
         let mut row = implemented(
             13,

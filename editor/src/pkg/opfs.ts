@@ -1,17 +1,17 @@
 // Package persistence in the browser (design 15.1.10 "OPFS").
 //
-// Under `navigator.storage.getDirectory()` / `vactrol-pkg/`:
+// Under `navigator.storage.getDirectory()` / `vactr-pkg/`:
 //   requirements.json   the root requirements `{path: version | ""}`
-//   vactrol.lock        the lock text of the last `done`
+//   vactr.lock        the lock text of the last `done`
 //   index.json          `{url: file}` for every stored proxy body
 //   bodies/<sha256(url)> the raw proxy response bodies
 // OPFS holds raw bytes only, never a trusted tree: a restore hands them to
 // the Rust pipeline (validation, digest, staged publication) again. Without
 // OPFS the store is memory-only and the pane shows `MEMORY_ONLY_HINT`.
 
-export const DIR_NAME = 'vactrol-pkg';
+export const DIR_NAME = 'vactr-pkg';
 export const REQUIREMENTS_FILE = 'requirements.json';
-export const LOCK_FILE = 'vactrol.lock';
+export const LOCK_FILE = 'vactr.lock';
 export const INDEX_FILE = 'index.json';
 export const BODIES_DIR = 'bodies';
 export const MEMORY_ONLY_HINT = 'packages are kept for this session only';
@@ -117,7 +117,7 @@ function parseRecord(text: string | null): Record<string, string> {
   }
 }
 
-/** The OPFS-backed store under `vactrol-pkg/`. */
+/** The OPFS-backed store under `vactr-pkg/`. */
 export class OpfsStore implements PkgStore {
   readonly persistent = true;
   private readonly dir: DirHandleLike;

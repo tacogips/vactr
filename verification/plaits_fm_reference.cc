@@ -1,6 +1,6 @@
 // Local verification probe for a separate, pinned Eurorack checkout.
 // This original driver contains no Mutable Instruments DSP or resource data.
-// It is never linked into Vactrol's library, binary, or browser build.
+// It is never linked into Vactr's library, binary, or browser build.
 
 #include <cmath>
 #include <cstdio>

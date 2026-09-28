@@ -55,7 +55,7 @@ fn resonant_bank_all_controls_compile_from_vact_and_last_mix_changes_audio() {
 #[test]
 fn stream_control_effects_and_all_parameters_are_codeable() {
     let controls = "shape: 0.2 response: 0.8 global-attack: 0.3 global-decay: 0.6 alternate: 1 linked: 1 excite-source: 0 excite: 0.3 trigger: 0 gate: 1 threshold: 0.1 cutoff-min: 100 cutoff-max: 9000";
-    for name in ["stream-envelope", "stream-vactrol"] {
+    for name in ["stream-envelope", "stream-vactr"] {
         let editor = crate::types::manifest::HostManifest::spec_default()
             .editor_decl(name)
             .unwrap();

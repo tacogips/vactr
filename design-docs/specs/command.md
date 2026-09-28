@@ -1,6 +1,6 @@
 # Command Design
 
-This document specifies the `vactrol` command-line interface and the
+This document specifies the `vactr` command-line interface and the
 editor-runtime session protocol on the wire. The behavior rules behind
 them (the eval pipeline, reactive publication, write authority,
 packages, directives, the socket's security rules) are in
@@ -8,7 +8,7 @@ packages, directives, the socket's security rules) are in
 
 ## Overview
 
-`vactrol` is a single binary. The `lsp` verb needs the `lsp` cargo
+`vactr` is a single binary. The `lsp` verb needs the `lsp` cargo
 feature; every other verb is in the default build (`host-native`).
 Every verb runs one `Session` on the main thread (design 14.5.4).
 
@@ -20,21 +20,21 @@ Every verb runs one `Session` on the main thread (design 14.5.4).
 
 | Item | Value |
 |------|-------|
-| Language | Vactrol (renamed from nagamu; a vactrol is an LED coupled to a photoresistor: light controlling sound) |
-| Binary and crate | `vactrol` |
+| Language | Vactr (inspired by an LED coupled to a photoresistor: light controlling sound) |
+| Binary and crate | `vactr` |
 | Source file extension | `.vact` |
-| Repository | https://github.com/tacogips/vactrol |
+| Repository | https://github.com/tacogips/vactr |
 
 ### Subcommands
 
 | Verb | Synopsis | Behavior |
 |------|----------|----------|
-| `repl` | `vactrol repl [--host H] [--audio-in]` | Interactive console over one session (design 14.2, 14.5.10). Sound keeps playing between lines. Completed expressions bind `_1`, `_2`, …; a failed one binds nothing. EOF (Ctrl-D) exits. |
-| `run` | `vactrol run <file.vact> [--host H] [--audio-in] [--cycles N]` | Evaluates the whole document once (packages from `vactrol.lock` + cache). Prints diagnostics and console output, then keeps ticking: until interrupted, or for N cycles when `--cycles` is given. |
-| `serve` | `vactrol serve [<file.vact>] [--host H] [--audio-in] [--port P] [--bind 127.0.0.1]` | Starts the session socket, optionally evaluating a file first, and prints the connect URL with the token once to stderr. Serves until interrupted. |
-| `get` | `vactrol get [<package-path>[@<version>]] [--store dir:<root>]` | With a path: adds or raises the requirement in `./vactrol.toml` (created with only `[deps]` if absent). Then, and also with no path: runs minimal version selection, fetches and verifies every selected package into the cache, and writes `./vactrol.lock`. The default store is git; `--store dir:<root>` uses a local-directory store (`<root>/<path>@<version>/`). |
-| `lsp` | `vactrol lsp [--session <ws-url>]` | Language server over stdio (design 14.3, 14.5.11). With `--session` it attaches to a running `serve` socket for runtime diagnostics. A build without the `lsp` feature prints an error and exits 1. |
-| (none) | `vactrol --version`, `vactrol help` | Prints the version or the usage. |
+| `repl` | `vactr repl [--host H] [--audio-in]` | Interactive console over one session (design 14.2, 14.5.10). Sound keeps playing between lines. Completed expressions bind `_1`, `_2`, …; a failed one binds nothing. EOF (Ctrl-D) exits. |
+| `run` | `vactr run <file.vact> [--host H] [--audio-in] [--cycles N]` | Evaluates the whole document once (packages from `vactr.lock` + cache). Prints diagnostics and console output, then keeps ticking: until interrupted, or for N cycles when `--cycles` is given. |
+| `serve` | `vactr serve [<file.vact>] [--host H] [--audio-in] [--port P] [--bind 127.0.0.1]` | Starts the session socket, optionally evaluating a file first, and prints the connect URL with the token once to stderr. Serves until interrupted. |
+| `get` | `vactr get [<package-path>[@<version>]] [--store dir:<root>]` | With a path: adds or raises the requirement in `./vactr.toml` (created with only `[deps]` if absent). Then, and also with no path: runs minimal version selection, fetches and verifies every selected package into the cache, and writes `./vactr.lock`. The default store is git; `--store dir:<root>` uses a local-directory store (`<root>/<path>@<version>/`). |
+| `lsp` | `vactr lsp [--session <ws-url>]` | Language server over stdio (design 14.3, 14.5.11). With `--session` it attaches to a running `serve` socket for runtime diagnostics. A build without the `lsp` feature prints an error and exits 1. |
+| (none) | `vactr --version`, `vactr help` | Prints the version or the usage. |
 
 A package path is `github.com/<owner>/<name>` (lowercase), and a
 version is a git tag `vMAJOR.MINOR.PATCH[-pre]`. With no version given,
@@ -56,8 +56,8 @@ version is a git tag `vMAJOR.MINOR.PATCH[-pre]`. With no version given,
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VACTROL_HOME` | No | `~/.vactrol` | Root for the package cache `$VACTROL_HOME/pkg/<path>@<version>` and its staging area `$VACTROL_HOME/pkg/.staging/`. |
-| `HOME` | Yes when `VACTROL_HOME` is unset | (OS) | Used to derive the default `VACTROL_HOME`. |
+| `VACTR_HOME` | No | `~/.vactr` | Root for the package cache `$VACTR_HOME/pkg/<path>@<version>` and its staging area `$VACTR_HOME/pkg/.staging/`. |
+| `HOME` | Yes when `VACTR_HOME` is unset | (OS) | Used to derive the default `VACTR_HOME`. |
 
 The git store runs `git` with `GIT_TERMINAL_PROMPT=0` and
 `GIT_CONFIG_NOSYSTEM=1` set for that child process only. No verb reads
@@ -77,8 +77,8 @@ printed URL.
 
 | File | Written by | Format |
 |------|------------|--------|
-| `vactrol.toml` | the user; `get` adds `[deps]` entries | TOML subset: `[package]` (`path`, `vactrol`, `assets`) and `[deps]` (`"<path>" = "<version>"`); design 14.5.7 |
-| `vactrol.lock` | `get` | `# vactrol.lock v1`, then one `<path> <version> sha256:<hex>` per line, sorted by path |
+| `vactr.toml` | the user; `get` adds `[deps]` entries | TOML subset: `[package]` (`path`, `vactr`, `assets`) and `[deps]` (`"<path>" = "<version>"`); design 14.5.7 |
+| `vactr.lock` | `get` | `# vactr.lock v1`, then one `<path> <version> sha256:<hex>` per line, sorted by path |
 | `<doc>.bindings.json` | the editor, ExternalFile persistence mode only | `{"v": 1, "bindings": [...]}`; design 14.5.8 |
 
 ---
@@ -185,7 +185,7 @@ editor record.
 
 The editor saves `.vact` as the buffer text. In ExternalFile mode it
 also writes `<doc>.bindings.json`, in the format of the Files table
-above. The browser stores package data in OPFS under `vactrol-pkg/`:
+above. The browser stores package data in OPFS under `vactr-pkg/`:
 the root requirements, the lock text, and the proxy response bodies
 keyed by URL. Nothing is trusted from OPFS without validation and a
 digest check (design 15.1.10). The proxy URL is kept in `localStorage`,

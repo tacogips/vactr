@@ -84,7 +84,7 @@ function readString(stream: StringStream, state: State): VactToken {
 }
 
 export const vactParser: StreamParser<State> = {
-  name: 'vactrol',
+  name: 'vactr',
   startState: () => ({ inString: false }),
   token(stream, state): VactToken | null {
     if (state.inString) return readString(stream, state);

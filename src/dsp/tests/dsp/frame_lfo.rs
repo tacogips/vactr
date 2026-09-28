@@ -68,11 +68,11 @@ fn delta(a: &[f32], b: &[f32]) -> f32 {
 fn inventory_separates_firmware_control_from_analog_audio() {
     let paths = frames_paths();
     assert_eq!(paths[0].coverage, FramesCoverage::Adaptation);
-    assert_eq!(paths[0].simultaneous_vactrol_channels, 2);
+    assert_eq!(paths[0].simultaneous_vactr_channels, 2);
     assert_eq!(paths[0].opt_in_quad_template, Some("frame-lfo-quad-voice"));
     assert!(paths[0].source_generated_wave_table);
     assert_eq!(paths[1].coverage, FramesCoverage::Adaptation);
-    assert_eq!(paths[1].vactrol_template, Some("frame-keyframe-voice"));
+    assert_eq!(paths[1].vactr_template, Some("frame-keyframe-voice"));
     assert_eq!(
         paths[1].opt_in_quad_template,
         Some("frame-keyframe-quad-voice")

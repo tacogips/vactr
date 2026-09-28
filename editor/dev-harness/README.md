@@ -1,4 +1,4 @@
-# Vactrol dev harness (TASK-008 real-worklet checks)
+# Vactr dev harness (TASK-008 real-worklet checks)
 
 The standalone browser harness for the two TASK-008 criteria that only a real AudioWorklet can prove (design
 `design-docs/specs/design-implementation.md` 12.8.11, 16.1): criterion 8 (control-cell transport and
@@ -7,7 +7,7 @@ substitute for these checks.
 
 The page loads the `host-wasm` module twice: on the main thread (`editor/worklet/host.js`, wasm #1: evaluator
 and scheduler) and in the `AudioWorkletProcessor` (`editor/worklet/processor.js`, wasm #2: DSP only). It drives
-the main half with Vactrol source, injects faults on the record path between the halves (the host's `filter`
+the main half with Vactr source, injects faults on the record path between the halves (the host's `filter`
 hook can hold, drop, replace or reorder any record), and reads the worklet's report counters.
 
 ## Build
@@ -16,8 +16,8 @@ hook can hold, drop, replace or reorder any record), and reads the worklet's rep
 CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm
 ```
 
-The module is `target/wasm32-unknown-unknown/debug/vactrol.wasm`. The `vactrol` bin target links to the same
-uplifted file name, so when the bin overwrote it the runner serves the cdylib from `.../debug/deps/vactrol.wasm`
+The module is `target/wasm32-unknown-unknown/debug/vactr.wasm`. The `vactr` bin target links to the same
+uplifted file name, so when the bin overwrote it the runner serves the cdylib from `.../debug/deps/vactr.wasm`
 instead (or build the library alone with `cargo build --lib ...`).
 
 ## Run headless (primary)

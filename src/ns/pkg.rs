@@ -20,7 +20,7 @@ use crate::types::manifest::HostManifest;
 use crate::value::intern::{intern_sym, SymId};
 use crate::vm::vm::Vm;
 
-/// A package path such as `github.com/owner/vactrol-pads`.
+/// A package path such as `github.com/owner/vactr-pads`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PackageId(pub Rc<str>);
 

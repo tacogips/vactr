@@ -27,7 +27,7 @@ source `Part` boundary.
 packages `hit_01.wav` through `hit_09.wav` and `noise.wav` into generated
 sample data. Those recordings have no individually verified redistribution
 grant in the inspected tree. Do not import that generator, the recordings,
-or the sample arrays embedded in aggregate `resources.cc` into Vactrol's
+or the sample arrays embedded in aggregate `resources.cc` into Vactr's
 MIT core. Inspect source tables individually; use original procedural
 exciters or a user-provided sample contract with clear diagnostics.
 The inspected DSP source headers carry Emilie Gillet's MIT terms, which
@@ -41,7 +41,7 @@ does not settle rights in those distinct resource files.
 pub struct ElementsSpec {
     pub mode: u8,
     pub source_name: &'static str,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub status: Fidelity,
     pub resources: ResourceState,
 }
@@ -113,7 +113,7 @@ sensitivity, silence, all-control response, codec/editor, native/browser
 rate/block and callback-allocation tests cover this adaptation.
 
 The source `Part` takes two mono excitation inputs and uses a different
-exciter/filter/reverb topology. The Vactrol stereo bus mapping is explicit;
+exciter/filter/reverb topology. The Vactr stereo bus mapping is explicit;
 the source numerical topology remains Pending. Opt-in named instrument-graph
 external ports are runnable. No GPL generator, bundled WAV or aggregate
 resource enters the DSP.
@@ -152,5 +152,5 @@ At revision `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`, the DSP
 strike inputs plus main and aux outputs. `voice.h` registers three
 resonator models. The sample generator carries a GPL-3.0-or-later header;
 the bundled WAV recordings were not individually cleared. No Elements
-source or data has been imported into Vactrol. Further implementation
+source or data has been imported into Vactr. Further implementation
 must keep the MIT DSP code and resource rights separate.

@@ -24,7 +24,7 @@ pub struct PortedAlgorithm {
     pub source_engine: &'static str,
     pub source_path: &'static str,
     pub source_revision: &'static str,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub controls: CommonControls,
     pub main_outputs: u8,
     pub aux_outputs: u8,
@@ -69,31 +69,31 @@ contracts, not a demand for parallel registries.
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
 | MOD-001 | Pin source revision and audit every included file/resource and `stmlib` dependency | none | Not started |
-| MOD-002 | Establish neutral user-facing names and upstream-to-Vactrol mode/parameter matrix | MOD-001 | Not started |
+| MOD-002 | Establish neutral user-facing names and upstream-to-Vactr mode/parameter matrix | MOD-001 | Not started |
 | MOD-003 | Deliver typed arbitrary instrument controls end to end, removing silent skips | MOD-002 | Completed for scalar audio parameters |
 | MOD-004 | Add dual-input/dual-output graph and host wire contract with compatibility tests | MOD-003 | Stereo bus/effect and bounded voice main/aux path complete; arbitrary stereo edges pending |
 | MOD-005 | Define preallocated state, memory budgets and rate/block adaptation | MOD-004 | Bounded host contract complete; broader per-engine parity pending |
 | MOD-006 | Add deterministic comparison harness, coverage report and editor metadata checks | MOD-005 | 24-position inventory and editor/graph checks complete; FM position-10 three-scenario raw-kernel baseline and source-stage follow-up measured, other comparisons pending |
-| MOD-006A | Local pinned Plaits FM raw-kernel reference probe and metric-only comparison against Vactrol position 10 | MOD-006 inventory | Completed and independently verified; source parity not claimed |
+| MOD-006A | Local pinned Plaits FM raw-kernel reference probe and metric-only comparison against Vactr position 10 | MOD-006 inventory | Completed and independently verified; source parity not claimed |
 
 ### MOD-006A comparison contract
 
 **Deliverables**: `verification/plaits_fm_reference.cc` (original external
-probe source), `examples/fm_pair_reference.rs` (Vactrol raw-kernel probe),
+probe source), `examples/fm_pair_reference.rs` (Vactr raw-kernel probe),
 `verification/compare_plaits_fm.py` (revision and clean-source checks, isolated build/run,
 metrics), a `mise` task with pinned Clang/Python, and a recorded comparison
 result in this progress log. The probe
 entry points accept fixed 48 kHz, 24-frame-block scenarios with note 69 and
 three harmonics/timbre/morph settings, including 0.5/0.5/0.5, for carrier/sub
-output. Vactrol frequency must
+output. Vactr frequency must
 account for the pinned source's 47,872.34 Hz corrected-note constant and its
 four phase advances per output sample after a two-octave note shift: note 69
 maps to `440 × 48,000 / 47,872.34` Hz at the output.
 
 **Completion Criteria**:
 - [x] Reject the wrong upstream Eurorack or `stmlib` revisions.
-- [x] Compile and execute the external probe from the user's separate checkout without copying upstream code, resources, audio, or generated artifacts into Vactrol.
-- [x] Render both Vactrol raw-kernel outputs under the documented control mapping and report per-channel RMS, correlation and normalized error after a fixed warm-up.
+- [x] Compile and execute the external probe from the user's separate checkout without copying upstream code, resources, audio, or generated artifacts into Vactr.
+- [x] Render both Vactr raw-kernel outputs under the documented control mapping and report per-channel RMS, correlation and normalized error after a fixed warm-up.
 - [x] Keep the manifest at `Adaptation`; state clearly that the result is a kernel comparison, not full voice/LPG/trigger or `.vact` parity.
 - [x] Quiet Cargo checks, strict Clippy, tests, format and diff checks pass after Rust changes; independent Rust review is complete.
 
@@ -132,11 +132,11 @@ Python 3.12.14. It verifies Eurorack revision
 `e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`, compiles the separate
 upstream FM engine into a temporary executable, and compares 2,376 frames
 after one 24-frame warm-up block at 48 kHz. Run it as
-`VACTROL_MI_REFERENCE=/path/to/eurorack mise run compare-plaits-fm`.
+`VACTR_MI_REFERENCE=/path/to/eurorack mise run compare-plaits-fm`.
 Both probes use note 69, common
-controls 0.5 and independent carrier/sub output; the Vactrol probe accounts
+controls 0.5 and independent carrier/sub output; the Vactr probe accounts
 for the source's four phase advances and corrected note constant. Before
-SYN-002C2, main reference/Vactrol RMS was 0.6667/0.7072, correlation
+SYN-002C2, main reference/Vactr RMS was 0.6667/0.7072, correlation
 -0.0945 and normalized RMS error 1.5250. Aux RMS is 0.6695/0.7342,
 correlation 0.8473 and normalized RMS error 0.5868. The same pitch mapping
 was checked against the pinned source before recording these values. The
@@ -144,7 +144,7 @@ baseline waveform gap is substantial; it does not support a `SourcePort` claim.
 The comparison is raw-kernel only, with no `.vact` event, trigger, LPG,
 host-output or browser pathway. The separate checkout's generated resources
 are compiled only for the local reference process; no upstream object,
-audio, table or sample is stored in Vactrol. More parameter points, isolated
+audio, table or sample is stored in Vactr. More parameter points, isolated
 spectral comparisons and the other engines remain MOD-006 work.
 Independent review reproduced the metrics, verified the fixed note mapping
 against the pinned source and passed 1,420 Rust tests (one ignored), native,

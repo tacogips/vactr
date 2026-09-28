@@ -1,4 +1,4 @@
-//! BE-SCHED tests (design 11.3-11.6, 10.3, 10.4; vactrol-core.md TASK-007
+//! BE-SCHED tests (design 11.3-11.6, 10.3, 10.4; vactr-core.md TASK-007
 //! criteria 1-5, 8-11 and TASK-008 criteria 5-6 diagnostic half).
 //!
 //! Every test drives a real `Evaluator` + `Runtime` with a mock clock and

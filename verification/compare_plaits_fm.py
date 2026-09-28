@@ -81,7 +81,7 @@ def metrics(reference, candidate):
         raise ValueError("comparison output has zero reference or variance")
     return {
         "reference_rms": math.sqrt(ref_energy / size),
-        "vactrol_rms": math.sqrt(got_energy / size),
+        "vactr_rms": math.sqrt(got_energy / size),
         "correlation": covariance / math.sqrt(ref_variance * got_variance),
         "normalized_rms_error": math.sqrt(error_energy / ref_energy),
     }
@@ -101,7 +101,7 @@ def main():
     require_clean_tracked_tree(source / "stmlib")
     clang = run(["mise", "which", "clang"], cwd=ROOT).strip()
 
-    with tempfile.TemporaryDirectory(prefix="vactrol-plaits-fm-") as temp:
+    with tempfile.TemporaryDirectory(prefix="vactr-plaits-fm-") as temp:
         executable = Path(temp) / "plaits_fm_reference"
         cxx_library = "-lc++" if sys.platform == "darwin" else "-lstdc++"
         run([
@@ -119,16 +119,16 @@ def main():
             controls = [str(harmonics), str(timbre), str(morph)]
             upstream = parse_channels(
                 run([str(executable), *controls]), "upstream")
-            vactrol = parse_channels(run(
+            vactr = parse_channels(run(
                 ["cargo", "run", "-q", "--example", "fm_pair_reference", "--", *controls],
                 cwd=ROOT, env=cargo_env,
-            ), "vactrol")
+            ), "vactr")
             comparisons.append({
                 "harmonics": harmonics,
                 "timbre": timbre,
                 "morph": morph,
-                "main": metrics(upstream[0], vactrol[0]),
-                "aux": metrics(upstream[1], vactrol[1]),
+                "main": metrics(upstream[0], vactr[0]),
+                "aux": metrics(upstream[1], vactr[1]),
             })
     print(json.dumps({
         "scope": "raw Plaits position-10 FM carrier/sub kernels; no LPG, trigger, voice or .vact host",

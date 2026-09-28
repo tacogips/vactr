@@ -12,7 +12,7 @@ export type Layout = Record<PaneName, HTMLElement>;
 /** Builds the panes under `root` (idempotent: existing panes are reused). */
 export function buildLayout(root: HTMLElement): Layout {
   const doc = root.ownerDocument;
-  root.classList.add('vactrol-editor');
+  root.classList.add('vactr-editor');
   const get = (name: PaneName, parent: HTMLElement): HTMLElement => {
     const found = root.querySelector<HTMLElement>(`[data-pane="${name}"]`);
     if (found) return found;

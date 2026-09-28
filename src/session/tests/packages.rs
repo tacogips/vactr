@@ -36,11 +36,11 @@ use crate::value::intern::{intern_kw, intern_sym, KwId};
 use crate::value::value::PathVal;
 use crate::vm::fail::{FailCode, Failure};
 
-const PADS: &str = "github.com/someone/vactrol-pads";
-const DRUMS: &str = "github.com/someone/vactrol-drums";
-const CLASH: &str = "github.com/someone/vactrol-clash";
-const BD: &str = "github.com/someone/vactrol-bd";
-const BROKEN: &str = "github.com/someone/vactrol-broken";
+const PADS: &str = "github.com/someone/vactr-pads";
+const DRUMS: &str = "github.com/someone/vactr-drums";
+const CLASH: &str = "github.com/someone/vactr-clash";
+const BD: &str = "github.com/someone/vactr-bd";
+const BROKEN: &str = "github.com/someone/vactr-broken";
 
 /// A unique directory under the system temp dir, removed on drop.
 struct TempDir(PathBuf);
@@ -50,7 +50,7 @@ impl TempDir {
         static N: AtomicU64 = AtomicU64::new(0);
         let n = N.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(
-            "vactrol-session-test-{}-{n}-{:x}",
+            "vactr-session-test-{}-{n}-{:x}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -112,7 +112,7 @@ fn store(tmp: &TempDir) -> PathBuf {
             PADS,
             ver,
             &[
-                ("vactrol.toml", &manifest(PADS, true, &[])),
+                ("vactr.toml", &manifest(PADS, true, &[])),
                 (
                     "pads.vact",
                     &format!("let warm s :pads-warm\nlet lvl {level}\n"),
@@ -126,7 +126,7 @@ fn store(tmp: &TempDir) -> PathBuf {
         DRUMS,
         "v1.0.0",
         &[
-            ("vactrol.toml", &manifest(DRUMS, false, &[(PADS, "v1.1.0")])),
+            ("vactr.toml", &manifest(DRUMS, false, &[(PADS, "v1.1.0")])),
             ("drums.vact", "let kick s :analog\n"),
         ],
     );
@@ -135,7 +135,7 @@ fn store(tmp: &TempDir) -> PathBuf {
         CLASH,
         "v1.0.0",
         &[
-            ("vactrol.toml", &manifest(CLASH, false, &[])),
+            ("vactr.toml", &manifest(CLASH, false, &[])),
             ("clash.vact", "let fast 3\nlet mine 4\n"),
         ],
     );
@@ -144,7 +144,7 @@ fn store(tmp: &TempDir) -> PathBuf {
         BD,
         "v1.0.0",
         &[
-            ("vactrol.toml", &manifest(BD, true, &[])),
+            ("vactr.toml", &manifest(BD, true, &[])),
             ("bd.vact", "let one 1\n"),
             ("samples/haus/a.wav", "RIFF"),
         ],
@@ -154,7 +154,7 @@ fn store(tmp: &TempDir) -> PathBuf {
         BROKEN,
         "v1.0.0",
         &[
-            ("vactrol.toml", &manifest(BROKEN, false, &[])),
+            ("vactr.toml", &manifest(BROKEN, false, &[])),
             ("broken.vact", "let x / 1 0\nlet y 2\n"),
         ],
     );
@@ -260,7 +260,7 @@ fn collisions_are_import_collision_warnings() {
         .expect("an opened name collides with the prelude `fast`");
     assert_eq!(clash.severity, "warning");
     assert_eq!(last_value(&r).as_deref(), Some("4"));
-    // `vactrol-bd`'s bank `haus` is `:bd-haus`, a builtin sound.
+    // `vactr-bd`'s bank `haus` is `:bd-haus`, a builtin sound.
     let (r, _) = rig.eval(&format!("import {BD}\nbd.one\n"), 2, 0);
     let d = r
         .diagnostics
@@ -451,7 +451,7 @@ fn load_failures_are_diagnostics_at_the_import_while_a_slot_plays() {
     let (mut rig, _) = session(&tmp, lock.clone());
     let c = while_playing(&mut rig, &format!("import {DRUMS}\ndrums.kick\n"));
     assert!(c.contains(&"package-not-locked".to_string()), "{c:?}");
-    // An unresolvable version fails `vactrol get` with `package-resolve`.
+    // An unresolvable version fails `vactr get` with `package-resolve`.
     let mut s = DirStore::new(&store(&tmp));
     let mut cache = FsCache::new(&tmp.join("cache")).expect("cache");
     let e = get_all(

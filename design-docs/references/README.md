@@ -52,7 +52,7 @@ This directory contains reference materials for system design and implementation
 | eseq Machinedrum design | https://github.com/universalsequences/eseq/blob/main/docs/machinedrum.md | GPL-3.0 synth design; research reference only, source excluded from MIT code-port scope |
 | MAME Machinedrum skeleton | https://github.com/mamedev/mame/blob/master/src/mame/elektron/elektronmono.cpp | BSD-3-Clause hardware driver, but no self-contained drum DSP to port and no rights to Elektron firmware |
 | 0x808 synthesis engine | https://github.com/averagenative/0x808 | MIT-declared general four-operator FM synthesizer; a candidate for future source review, not a dedicated FM drum port |
-| stmlib license | https://github.com/pichenettes/stmlib/blob/master/LICENSE | Mostly MIT, with separately licensed ST and serial-programming subtrees that must not enter Vactrol's audio code |
+| stmlib license | https://github.com/pichenettes/stmlib/blob/master/LICENSE | Mostly MIT, with separately licensed ST and serial-programming subtrees that must not enter Vactr's audio code |
 
 ## Reference Documents
 

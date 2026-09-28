@@ -23,7 +23,7 @@ pub fn manifest() -> toml_subset::Manifest {
     toml_subset::parse(&text).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// The text of every fence whose info string is `vactrol` or `vact`, in
+/// The text of every fence whose info string is `vactr` or `vact`, in
 /// document order (ordinal 1 is the first).
 pub fn spec_blocks(doc: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -38,7 +38,7 @@ pub fn spec_blocks(doc: &str) -> Vec<String> {
                 text.push_str(line);
                 text.push('\n');
             }
-            None if line == "```vactrol" || line == "```vact" => cur = Some(String::new()),
+            None if line == "```vactr" || line == "```vact" => cur = Some(String::new()),
             None => {}
         }
     }

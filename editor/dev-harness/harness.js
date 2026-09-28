@@ -1,7 +1,7 @@
-// Vactrol dev harness: the TASK-008 real-worklet checks (design 12.8.11).
+// Vactr dev harness: the TASK-008 real-worklet checks (design 12.8.11).
 //
 // Loads the host-wasm module into the main thread (wasm #1: evaluator and
-// scheduler) and an AudioWorklet (wasm #2: DSP), drives them with Vactrol
+// scheduler) and an AudioWorklet (wasm #2: DSP), drives them with Vactr
 // source and with fault injection on the record path between the halves
 // (hold, drop, replace, reorder: the host's `filter` hook), and reads the
 // worklet's report counters. Each check is {id, pass, detail}; the page
@@ -584,7 +584,7 @@ async function run() {
   const t0 = performance.now();
   try {
     host = await startHost({
-      wasmUrl: '/vactrol.wasm',
+      wasmUrl: '/vactr.wasm',
       processorUrl: '/editor/worklet/processor.js',
       arenaBytes: ARENA,
       voices: 64,

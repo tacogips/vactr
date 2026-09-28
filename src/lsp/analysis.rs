@@ -1,4 +1,4 @@
-//! The ONE analysis thread of `vactrol lsp` (design 14.5.11).
+//! The ONE analysis thread of `vactr lsp` (design 14.5.11).
 //!
 //! Every `!Send` value (interned names, `Rc` nodes, types, the lock and
 //! the package cache) lives in an `Analyzer` owned by one `std::thread`.
@@ -41,7 +41,7 @@ use crate::types::natives::NativeTable;
 use crate::types::ty::KeySet;
 
 /// The lock file name in the workspace root.
-pub const LOCK_FILE: &str = "vactrol.lock";
+pub const LOCK_FILE: &str = "vactr.lock";
 
 /// One document's diagnostics, ready for `textDocument/publishDiagnostics`.
 #[derive(Clone, Debug, PartialEq)]
@@ -105,7 +105,7 @@ pub struct PkgConfig {
 }
 
 impl PkgConfig {
-    /// `<root>/vactrol.lock` when it exists and parses, and the package
+    /// `<root>/vactr.lock` when it exists and parses, and the package
     /// cache at `cache_root` only when it and its staging directory
     /// already exist, so opening it creates nothing.
     #[must_use]
@@ -291,7 +291,7 @@ impl Analyzer {
         Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
-                value: format!("```vactrol\n{text}\n```"),
+                value: format!("```vactr\n{text}\n```"),
             }),
             range: Some(range(&d.text, start as usize, end as usize)),
         })
@@ -502,7 +502,7 @@ impl Analyzer {
 pub fn spawn() -> std::io::Result<(mpsc::Sender<AnalysisReq>, thread::JoinHandle<()>)> {
     let (tx, rx) = mpsc::channel::<AnalysisReq>();
     let handle = thread::Builder::new()
-        .name("vactrol-lsp-analysis".into())
+        .name("vactr-lsp-analysis".into())
         .spawn(move || {
             let mut an = Analyzer::new(PkgConfig::default());
             while let Ok(req) = rx.recv() {

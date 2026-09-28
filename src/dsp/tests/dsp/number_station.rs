@@ -77,7 +77,7 @@ fn asset_flag_and_both_roles_are_truthful() {
     assert!(row.upstream_digit_asset);
     assert_eq!(row.coverage, CoverageState::Adaptation);
     assert_eq!(row.resources, ResourceState::Replacement);
-    assert_eq!(row.vactrol_template, Some("number-station-voice"));
+    assert_eq!(row.vactr_template, Some("number-station-voice"));
     let tone = signal(0.0, &[], 34);
     let speech = signal(1.0, &[], 34);
     assert!(rms(&tone) > 1.0e-4 && rms(&speech) > 1.0e-5);

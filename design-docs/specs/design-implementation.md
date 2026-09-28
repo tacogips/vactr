@@ -1,6 +1,6 @@
-# Vactrol Implementation Design
+# Vactr Implementation Design
 
-Supporting document to `architecture.md`: how the Vactrol processor is
+Supporting document to `architecture.md`: how the Vactr processor is
 built. It designs the reader, static checker, bytecode VM, scheduler,
 pattern engine, DSP graph, LSP, REPL, the Tauri/web/Wasm editor, visual
 feedback, and controller binding, and it specifies every internal data
@@ -12,7 +12,7 @@ decision log in `architecture.md` is binding. Where this document names
 a surface form it is quoting those specifications. The four open
 questions at the end carry **recommendations, not decisions** (section 20).
 
-Implementation plan: `impl-plans/active/vactrol-core.md`.
+Implementation plan: `impl-plans/active/vactr-core.md`.
 
 ---
 
@@ -45,7 +45,7 @@ Implementation plan: `impl-plans/active/vactrol-core.md`.
 - Packages (architecture.md Packages, lang-reference.md modules —
   Decided, superseding "no module system in v1"): Go-style GitHub-path
   imports, git-tag versions with minimal version selection,
-  `vactrol.lock`, a cache, and a browser package proxy (section 5.7).
+  `vactr.lock`, a cache, and a browser package proxy (section 5.7).
 - The Decided synthesis models (sampler, analog, FM, phase
   distortion, additive, wavetable, granular), the builtin effect
   catalog with `bus`/`master` chains, and the analyzer signals
@@ -85,7 +85,7 @@ Implementation plan: `impl-plans/active/vactrol-core.md`.
 
 ## 2. Current State and Evidence
 
-- `Cargo.toml` is a single empty package `vactrol` (lib + bin), no
+- `Cargo.toml` is a single empty package `vactr` (lib + bin), no
   dependencies. `src/lib.rs` / `src/main.rs` are scaffold stubs. There
   is no code to migrate; compatibility constraints come only from the
   specifications.
@@ -93,7 +93,7 @@ Implementation plan: `impl-plans/active/vactrol-core.md`.
   respect; the indent-syntax question is resolved piecemeal in
   `lang-reference.md` (see `user-qa/pending-indent-syntax.md`,
   superseded).
-- Binary/crate name `vactrol`, source extension `.vact` (`command.md`).
+- Binary/crate name `vactr`, source extension `.vact` (`command.md`).
 
 ## 3. System Overview
 
@@ -120,7 +120,7 @@ because runtime diagnostics originate in the scheduler.
 
 ## 4. Crate and Module Layout
 
-One core crate `vactrol` (the existing package), feature-gated hosts.
+One core crate `vactr` (the existing package), feature-gated hosts.
 No workspace split in v1; the editor frontend is TypeScript under
 `editor/` and consumes the core through the raw wasm export ABI of
 12.8.10 (wasm-bindgen was dropped in issue #3) or the session socket.
@@ -936,19 +936,19 @@ Scopes form the chain `prelude -> session -> fn/block`.
 Implements the Decided package system (architecture.md Packages;
 lang-reference.md modules): Go-style repository-path imports, git-tag
 semver versions, minimal version selection, a lock file, a cache, and
-a browser proxy. Packages are Vactrol code plus assets only — no
+a browser proxy. Packages are Vactr code plus assets only — no
 native extensions — so a package can never reach the audio thread
 except through builtins.
 
 ```rust
 pub struct PackageId(Rc<str>);         // "github.com/owner/name", lowercase path
-pub struct PkgManifest {               // vactrol.toml — fields DEFINED here, as the
+pub struct PkgManifest {               // vactr.toml — fields DEFINED here, as the
     package: PackageId,                // spec delegates them to this design
-    vactrol: Option<Rc<str>>,          // minimum language version (semver)
+    vactr: Option<Rc<str>>,          // minimum language version (semver)
     deps: Vec<(PackageId, Rc<str>)>,   // path -> version requirement ("v1.2.0"-style tags)
     assets: Vec<Rc<str>> }             // sample/wavetable directories, relative
 pub struct LockEntry { id: PackageId, version: Rc<str>, sha256: [u8; 32] }
-pub struct LockFile { entries: Vec<LockEntry> }   // vactrol.lock, sorted by path
+pub struct LockFile { entries: Vec<LockEntry> }   // vactr.lock, sorted by path
 pub trait PackageStore {               // host capability — IO side, never evaluator-blocking
     fn resolve(&mut self, roots: &[(PackageId, Rc<str>)]) -> Result<Vec<LockEntry>, HostError>;
     fn fetch(&mut self, e: &LockEntry) -> Result<PkgSources, HostError>; }
@@ -956,13 +956,13 @@ pub struct PkgNs { id: PackageId, ns: Namespace }     // one child namespace per
 pub struct ImportBinding { prefix: SymId, pkg: PackageId, open: bool }
 ```
 
-- **Resolution.** `vactrol get` (CLI) and the editor's import action
+- **Resolution.** `vactr get` (CLI) and the editor's import action
   run MINIMAL VERSION SELECTION exactly as Go: collect every
   requirement reachable from the roots, pick the MAXIMUM of the
-  MINIMUM required versions per path, write `vactrol.lock` with the
+  MINIMUM required versions per path, write `vactr.lock` with the
   chosen version and the CANONICAL CONTENT DIGEST below.
   Native `PackageStore`: shallow git fetch of the tag (or a local
-  directory), cached under `~/.vactrol/pkg/<path>@<version>`.
+  directory), cached under `~/.vactr/pkg/<path>@<version>`.
   Browser `PackageStore`: HTTPS to a package proxy, Go-proxy-shaped
   (`{proxy}/{path}/@v/list`, `{proxy}/{path}/@v/{version}.zip`), same
   cache semantics in IndexedDB/OPFS. Either way the fetched content
@@ -1034,7 +1034,7 @@ pub struct ImportBinding { prefix: SymId, pkg: PackageId, open: bool }
   live in `PkgNs` and are late-bound like any other, but a package is
   not live-edited: re-import replaces the whole `PkgNs`.
 - **Names, and SAME-FILE frontend ordering.** `import path` binds the
-  default prefix (the last path segment minus a `vactrol-` prefix:
+  default prefix (the last path segment minus a `vactr-` prefix:
   `pads`); `as pd` binds an alias; `open` additionally splices the
   package's public names into the session's OPEN-IMPORT list.
   Qualified name `pads.warm` is `identifier "." identifier`,
@@ -1050,7 +1050,7 @@ pub struct ImportBinding { prefix: SymId, pkg: PackageId, open: bool }
   - Phase 2 (form-by-form read): each form is read against
     `AliasEnv` = session aliases + the imports declared in EARLIER
     forms of this document, threaded form by form — so
-    `import ... vactrol-pads` on line 1 makes `pads.warm` readable
+    `import ... vactr-pads` on line 1 makes `pads.warm` readable
     on line 2 of the same fresh-session file. An import whose
     package failed to load leaves its prefix bound-but-broken:
     qualified uses read fine and become load-diagnostic references,
@@ -1189,7 +1189,7 @@ applies, and it is binding for TASK-001..003.
   `None` means the lazy open range).
 - Cargo features: `default = ["host-native"]`; `host-native`, `host-wasm`
   and `lsp` start empty. No dependency is added, including dev-dependencies.
-- `src/main.rs` prints only `vactrol <version>`, because the placeholder
+- `src/main.rs` prints only `vactr <version>`, because the placeholder
   `hello()` it calls is removed. The CLI belongs to TASK-009.
 
 #### 6.5.2 Interner scope
@@ -1441,7 +1441,7 @@ rule:
   allowed only at the top level; elsewhere it is `import-not-top-level`.
   - `PATH` is lowercase ASCII `[a-z0-9._-]` segments joined by `/`,
     with at least one `/`. No segment may be empty, `.` or `..`.
-  - The prefix is `ALIAS`, or else the last segment with any `vactrol-`
+  - The prefix is `ALIAS`, or else the last segment with any `vactr-`
     prefix removed. It must match the identifier rule.
   - A violation is `bad-import`.
 - `let`, `var` and `upd` read `Call[head, TARGET, EXPR]`. `TARGET` is
@@ -1647,7 +1647,7 @@ The runner is `tests/spec_fixtures.rs`. It reads the spec documents from
 `CARGO_MANIFEST_DIR`.
 
 - A `[[block]]` entry has these fields:
-  - `doc` and `ordinal`: the 1-based index of the `vactrol` fence in the
+  - `doc` and `ordinal`: the 1-based index of the `vactr` fence in the
     document. The runner extracts the block text itself, so the source
     is never copied.
   - `section`.
@@ -1659,7 +1659,7 @@ The runner is `tests/spec_fixtures.rs`. It reads the spec documents from
     `diagnostic`, `illustrative-excluded` or `authority-question`.
   - `note`.
 
-  Every `vactrol` block in `lang-reference.md` and in `design-music.md`
+  Every `vactr` block in `lang-reference.md` and in `design-music.md`
   has an entry. The runner compares the diagnostic multisets exactly.
 - A `[[case]]` entry has these fields:
   - `id`, `doc`, `source` (a literal string), and
@@ -3692,7 +3692,7 @@ implementation follows each recommendation until it is answered.
 #### 12.8.1 Scope boundary
 
 In scope: every TASK-007 and TASK-008 deliverable and completion
-criterion of `impl-plans/active/vactrol-core.md`, with these
+criterion of `impl-plans/active/vactr-core.md`, with these
 boundary decisions:
 
 - **No `Session` yet.** `Session` is TASK-009. TASK-007 adds
@@ -3997,7 +3997,7 @@ an event-local `Failure(too-many-controls)`.
   `host/native` compiled only under `all(feature = "host-native",
   not(target_arch = "wasm32"))`, so both wasm32 builds stay green.
   `host-wasm` pulls NO crates (next point). `[lib] crate-type =
-  ["rlib", "cdylib"]` so the wasm32 build emits `vactrol.wasm`.
+  ["rlib", "cdylib"]` so the wasm32 build emits `vactr.wasm`.
   Version policy: the highest cpal/midir releases whose
   `rust-version` and whole resolved tree build on 1.83 (cargo 1.83
   has no MSRV-aware resolver, so transitive crates are pinned with
@@ -4064,7 +4064,7 @@ an event-local `Failure(too-many-controls)`.
   --user-data-dir=<tmp>`, receives the page's JSON report by POST,
   writes it to `target/fe-logs/be-wasm-harness-s<session>-<n>.json`,
   and exits 0 when every check passes, 1 on a failed check or a
-  missing `target/wasm32-unknown-unknown/debug/vactrol.wasm` (built
+  missing `target/wasm32-unknown-unknown/debug/vactr.wasm` (built
   by the `wasm32-hostwasm` check first), and 2 when blocked (Chrome
   missing, or the realtime `AudioContext` never reaches `running`),
   with a 120 s timeout.
@@ -4087,9 +4087,9 @@ an event-local `Failure(too-many-controls)`.
 "not available on this host". `FailCode`: `inst-failed`,
 `too-many-controls`. CONTRACTS adds them all in one edit, as in 7.1.3.
 
-**Waves.** Plans `impl-plans/active/vactrol-backend-<wave>.md`; each
+**Waves.** Plans `impl-plans/active/vactr-backend-<wave>.md`; each
 lists its own plan file in its manifest `writePaths`, and only FINAL
-edits `vactrol-core.md`, `impl-plans/README.md` and the spec fixture
+edits `vactr-core.md`, `impl-plans/README.md` and the spec fixture
 manifest (it never edits the dispatch manifest).
 
 | Wave | Content | Depends on |
@@ -4547,7 +4547,7 @@ that slot succeeds.
 
 ### 14.2 REPL
 
-`vactrol repl`: line editor over the same `Session`, console transcript
+`vactr repl`: line editor over the same `Session`, console transcript
 semantics: `_1`, `_2`, … are console-only registers (reader accepts
 them only for `FileId::Console`), written only by expressions that
 complete. `print` returns its argument. The REPL is the first
@@ -4555,7 +4555,7 @@ deliverable that plays sound: it drives the native host directly.
 
 ### 14.3 LSP
 
-`vactrol lsp` (feature `lsp`): tower-lsp server wrapping the SAME
+`vactr lsp` (feature `lsp`): tower-lsp server wrapping the SAME
 reader + checker modules — diagnostics, hover (types from `TypedInfo`),
 completion (prelude, namespace, keyword sets from the host manifest),
 formatting. It connects to the live session's socket when one is
@@ -4658,18 +4658,18 @@ implementation follows each recommendation until it is answered.
 #### 14.5.1 Scope boundary
 
 In scope: every TASK-009 deliverable and completion criterion of
-`impl-plans/active/vactrol-core.md` plus the 12.3 amendment surfaces.
+`impl-plans/active/vactr-core.md` plus the 12.3 amendment surfaces.
 These are the boundary decisions:
 
 - **Session wraps, never re-implements.** `Session` owns one `Evaluator`
   and one `sched::Runtime` (12.8.1) and adds document state, package
   state, directive tables, console registers, write authority and the
   outbox. It adds no second evaluator loop and no second scheduler.
-- **Fetching happens only in `vactrol get`.** A running session reads
-  packages from `vactrol.lock` and the verified cache and never touches
+- **Fetching happens only in `vactr get`.** A running session reads
+  packages from `vactr.lock` and the verified cache and never touches
   the network, so the evaluator can never block on it (5.7 failure
   contract). If an import is not in the lock, the result is a load
-  diagnostic that says to run `vactrol get`. The editor's import action
+  diagnostic that says to run `vactr get`. The editor's import action
   (TASK-010) calls the same resolve-and-fetch code on its IO side.
 - **Browser package store: Rust half only.** TASK-009 implements the
   proxy protocol, validation, digest and staged publication against
@@ -4699,13 +4699,13 @@ These are the boundary decisions:
 | `miniz_oxide` | regular | raw-deflate inflate for proxy zips. Pure Rust, wasm32-clean. The zip container reader is in-crate |
 | `tungstenite` (default features, no TLS) | `host-native`, non-wasm32 target table | session socket server and the LSP attach client |
 | `getrandom` | `host-native`, non-wasm32 | session token. Already in tungstenite's tree |
-| `tower-lsp`, `tokio` (rt, io-std, macros, sync) | `lsp`, non-wasm32 | `vactrol lsp` |
+| `tower-lsp`, `tokio` (rt, io-std, macros, sync) | `lsp`, non-wasm32 | `vactr lsp` |
 
 - `lsp = ["host-native", "dep:tower-lsp", "dep:tokio"]`, because the LSP
   attach client uses tungstenite.
 - SHA-256 is in-crate (`pkg/sha256.rs`) and is tested against the FIPS
   180-4 vectors: empty, `abc`, the 448-bit message and one million `a`.
-- `vactrol.toml` uses an in-crate TOML subset parser (14.5.7).
+- `vactr.toml` uses an in-crate TOML subset parser (14.5.7).
 - No git library, no HTTP client, no zip crate, no CLI-parser crate and
   no line-editor crate.
 - Versions follow the 12.8.10 policy: the highest releases whose whole
@@ -4771,7 +4771,7 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
 - **Construction.** `Session::new(cfg: SessionConfig, hosts: Hosts) ->
   Session`. The config holds:
   - the `CapabilitySet` tier;
-  - the project root, where `vactrol.toml` and `vactrol.lock` live;
+  - the project root, where `vactr.toml` and `vactr.lock` live;
   - the package cache;
   - the `PersistenceMode` (`Directive` by default, 13.5).
 
@@ -4929,31 +4929,31 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
 
 #### 14.5.7 Packages
 
-- **`vactrol.toml`** is an in-crate strict TOML subset: tables
+- **`vactr.toml`** is an in-crate strict TOML subset: tables
   `[package]` and `[deps]`, basic strings, string arrays and `#`
   comments. Anything else is a manifest parse error.
   - `[package]` keys: `path` (the `PackageId`, which must equal the
-    import path it was fetched as), `vactrol` (the minimum language
+    import path it was fetched as), `vactr` (the minimum language
     semver) and `assets` (relative directories).
   - `[deps]`: `"github.com/o/n" = "v1.2.0"`.
-  - A set's ROOT manifest may omit `[package]`. `vactrol get` creates
-    `./vactrol.toml` with only `[deps]` when none exists.
-- **`vactrol.lock`** is line-based and deterministic. The first line is
-  `# vactrol.lock v1`, followed by one line per package,
+  - A set's ROOT manifest may omit `[package]`. `vactr get` creates
+    `./vactr.toml` with only `[deps]` when none exists.
+- **`vactr.lock`** is line-based and deterministic. The first line is
+  `# vactr.lock v1`, followed by one line per package,
   `<path> <version> sha256:<64 lowercase hex>`, sorted bytewise by path.
   An unknown header version or a malformed line is a load diagnostic.
 - **Semver and MVS.** Versions are tags `vMAJOR.MINOR.PATCH[-pre]` with
   semver 2.0 precedence; other tags are ignored. MVS follows 5.7: a
   breadth-first walk of the requirement graph over each visited
   version's manifest, then the maximum of the minimums per path. With
-  no version given, `vactrol get` picks the highest non-prerelease tag.
+  no version given, `vactr get` picks the highest non-prerelease tag.
   Semantic-import-versioning (`/v2` paths) is not in v1: majors compare
   like any other version (S5).
 - **Stores (`PackageStore`, IO side, never on the evaluator).** The
   trait has `list_versions(id)`, `manifest(id, version)` and
   `fetch_into(id, version, staging)`.
   - LOCAL-DIRECTORY store: `<root>/<path>@<version>/`, used by fixtures
-    and by `vactrol get --store dir:<root>`.
+    and by `vactr get --store dir:<root>`.
   - GIT store: runs the `git` binary with fixed argv arrays (no shell),
     `--` before operands, the environment `GIT_TERMINAL_PROMPT=0` and
     `GIT_CONFIG_NOSYSTEM=1`, and `-c core.hooksPath=/dev/null
@@ -4998,13 +4998,13 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
 - **Staged, atomic publication (`cache.rs`).** The sequence is: fetch or
   extract into `<cache>/.staging/<random>` (created with
   `create_dir`, never reused), validate, digest, compare with the lock
-  (or record the digest when `vactrol get` writes the lock), write the
-  stamp `<entry>/.vactrol-digest`, and finally `rename` into
+  (or record the digest when `vactr get` writes the lock), write the
+  stamp `<entry>/.vactr-digest`, and finally `rename` into
   `<cache>/<path>@<version>`. Any earlier failure removes the staging
   directory. On a verified read, the stamp must equal the lock digest.
   A mismatch is `package-integrity` and the session never re-hashes
-  while it plays. The cache root is `$VACTROL_HOME/pkg`, with
-  `VACTROL_HOME` defaulting to `~/.vactrol`. An interrupted-extraction
+  while it plays. The cache root is `$VACTR_HOME/pkg`, with
+  `VACTR_HOME` defaulting to `~/.vactr`. An interrupted-extraction
   test injects a failure after half the entries and asserts that no
   entry path exists.
 - **Loading (`ns/pkg.rs`, `pkg/load.rs`).** A package's `.vact` files,
@@ -5226,12 +5226,12 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
     names, manifest keywords, package prefixes and qualified names.
   - Formatting: only strips trailing whitespace and ensures one final
     newline. This keeps every comment and directive byte-identical.
-- **Attach.** `vactrol lsp --session <url>` connects to a running
+- **Attach.** `vactr lsp --session <url>` connects to a running
   `serve` socket, subscribes to diagnostics, and merges runtime `diag`s
   into the matching document's diagnostics. Standalone, it serves
   static diagnostics only (14.3).
 - **Smoke test.** `tests/lsp_smoke.rs`, under
-  `#![cfg(feature = "lsp")]`, starts `CARGO_BIN_EXE_vactrol lsp` over
+  `#![cfg(feature = "lsp")]`, starts `CARGO_BIN_EXE_vactr lsp` over
   pipes with Content-Length framing. It sends `initialize`, `didOpen`
   of a lang-reference spec block, and a `hover` over a bound name, and
   asserts one `publishDiagnostics` for the URI and a hover whose
@@ -5245,15 +5245,15 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
   `ambiguous-selector`, `cc-out-of-range`, `reserved-key`.
 - `DiagCode`, packages: `package-not-locked`, `package-not-fetched`
   (w), `package-integrity`, `package-load-failed`, `package-resolve`
-  (from `vactrol get`: an unresolvable version or a store or network
+  (from `vactr get`: an unresolvable version or a store or network
   error).
 - `FailCode`: `capture-pending`, `beyond-capability`.
 - Protocol `protocol-error` codes and `stale-binding` reasons are
   protocol strings (14.5.6), not `DiagCode`s.
 
-**Waves.** Plans are `impl-plans/active/vactrol-session-<wave>.md`.
+**Waves.** Plans are `impl-plans/active/vactr-session-<wave>.md`.
 Each lists its own plan file in its manifest `writePaths`. Only FINAL
-edits `vactrol-core.md` and `impl-plans/README.md`, and FINAL never
+edits `vactr-core.md` and `impl-plans/README.md`, and FINAL never
 edits the dispatch manifest.
 
 | Wave | Content | Depends on |
@@ -5263,7 +5263,7 @@ edits the dispatch manifest.
 | DIRECTIVES | `directives/`, `tests/directive_fixtures.rs`, `tests/fixtures/directives/vocabulary.toml` | CONTRACTS |
 | ANALYSIS | the 14.5.9 files, plus repinning design-music ordinal 2 in the spec manifest | CONTRACTS |
 | SESSION | `session/` (every file except `changes.rs`), `ns/eval_doc.rs`: pipeline, publication, authority, codec, console, REPL loop, and the protocol, publication, stale-write, package-through-session and recording-host tests | PKG, DIRECTIVES, ANALYSIS |
-| CLI | `src/main.rs`, `cli/` (including `cli/ws.rs`), `tests/cli.rs` (the binary with `--host noop`: `run --cycles`, `repl` over piped stdin, `get --store dir:` in a temp `VACTROL_HOME`, and `serve` with a token-checked client round trip) | SESSION |
+| CLI | `src/main.rs`, `cli/` (including `cli/ws.rs`), `tests/cli.rs` (the binary with `--host noop`: `run --cycles`, `repl` over piped stdin, `get --store dir:` in a temp `VACTR_HOME`, and `serve` with a token-checked client round trip) | SESSION |
 | LSP | `lsp/`, `tests/lsp_smoke.rs` | SESSION |
 | FINAL | reclassify lang-reference ordinal 5 (evaluated through `Session`, `tests/support/eval.rs`); core-plan TASK-009 checkboxes, progress log and the pending audible gate; README; archive | CLI, LSP |
 
@@ -5327,7 +5327,7 @@ runtime machinery above:
 | MIDI input: `cc` signal, note input (`midi-notes`), MIDI learn | 11.7, 10.1, 10.5 |
 | MIDI clock/transport sync in and out (Link planned, diagnostic in v1) | 11.1, 11.7 |
 | Analyzer meters and scopes (level, spectrum, spectrogram, oscilloscope, …) | 12.5 analysis cells over telemetry |
-| Package import (`vactrol get`, proxy in the browser), package diagnostics | 5.7 |
+| Package import (`vactr get`, proxy in the browser), package diagnostics | 5.7 |
 | Visual output panes o0..o3 | visual pipeline (9), WebGL2 RenderHost in the TS shell |
 
 The editor may show visual feedback about music (steps, events,
@@ -5348,13 +5348,13 @@ implementation follows each recommendation until it is answered.
 #### 15.1.1 Scope boundary
 
 In scope: every TASK-010 deliverable and completion criterion of
-`impl-plans/active/vactrol-core.md`, plus the two items TASK-009 moved
+`impl-plans/active/vactr-core.md`, plus the two items TASK-009 moved
 here, with the dispositions below.
 
 - **One frontend, two transports.** The editor speaks Session Protocol
   v1 only. The browser tier runs a `Session` inside wasm #1 and passes
   the same JSON text through the raw ABI (15.1.2 G1). The native tier
-  connects to `vactrol serve` over the WebSocket. No UI component knows
+  connects to `vactr serve` over the WebSocket. No UI component knows
   which transport it has, except the four tier-dependent features
   listed in 15.1.4.
 - **Rust changes only where the protocol cannot express a criterion.**
@@ -5535,14 +5535,14 @@ to end (15.1.12).
   - `build`: `vite build`.
   - `dev`: `vite`, which is not part of verification.
 - **Wasm artifact.**
-  - The editor uses `$VACTROL_WASM`, else
-    `../target/wasm32-unknown-unknown/debug/vactrol.wasm`, the output
+  - The editor uses `$VACTR_WASM`, else
+    `../target/wasm32-unknown-unknown/debug/vactr.wasm`, the output
     of the mandatory `--features host-wasm` build.
-  - `vite build` copies it to `dist/vactrol.wasm`, and
+  - `vite build` copies it to `dist/vactr.wasm`, and
     `worklet/processor.js` to `dist/worklet/`.
   - The build FAILS if the file is missing, and the real-wasm tests fail
     (never skip) if it is missing or lacks the `session_init` export.
-    The build's own export check runs when `VACTROL_REQUIRE_SESSION_ABI=1`,
+    The build's own export check runs when `VACTR_REQUIRE_SESSION_ABI=1`,
     which the plans that land or join G1 set (the export arrives in a
     later wave than the scaffold).
   - `vite build` honors `--outDir`, so parallel plans build into their
@@ -5627,7 +5627,7 @@ to end (15.1.12).
     browser only. The native tier shows static diagnostics from
     `eval-result`.
   - package import: browser only. The native tier shows the
-    `vactrol get <path>` command to run, because a running session
+    `vactr get <path>` command to run, because a running session
     never fetches (14.5.1).
   - highlight timing: the browser schedules on
     `AudioContext.currentTime`, which is the session's clock. The
@@ -5890,7 +5890,7 @@ to end (15.1.12).
 - **OPFS.**
   - The root requirements, the lock text and every successful proxy
     response body, keyed by URL, are stored under
-    `vactrol-pkg/`.
+    `vactr-pkg/`.
   - On load, the editor supplies the stored bodies and runs
     `pkg_resolve({proxy, lock})`. That restore re-validates and
     compares every digest with the lock.
@@ -5901,12 +5901,12 @@ to end (15.1.12).
     tree.
   - Without OPFS, packages are memory-only and a hint is shown.
 - **Native tier.** The UI shows the diagnostics and the exact
-  `vactrol get <path>` command. It never fetches (14.5.1).
+  `vactr get <path>` command. It never fetches (14.5.1).
 
 #### 15.1.11 Tauri shell
 
 - **Crate.** `editor/src-tauri/` holds a standalone crate
-  (`vactrol-editor`, `publish = false`) with its own empty `[workspace]`
+  (`vactr-editor`, `publish = false`) with its own empty `[workspace]`
   table, `Cargo.lock` and `target/`. The root crate has no
   `[workspace]` and never builds it. Root `cargo build`, `clippy`,
   `fmt` and `nextest` are unaffected.
@@ -5985,13 +5985,13 @@ them.
   and `test`. The app run is manual.
 
 **Waves.**
-- The plans are `impl-plans/active/vactrol-editor-<wave>.md`. The
+- The plans are `impl-plans/active/vactr-editor-<wave>.md`. The
   manifest is `impl-plans/active/ed-editor-20260926-s186-dispatch.json`.
   Evidence goes to
   `target/fe-logs/ed-<wave>-<check>-s<session>-<n>.log`, with the exit
   status recorded in each log.
 - Each plan lists its own plan file in `writePaths`.
-- Only FINAL edits `vactrol-core.md`, `impl-plans/README.md` and the
+- Only FINAL edits `vactr-core.md`, `impl-plans/README.md` and the
   root `README.md`, and FINAL never edits the manifest.
 
 | Wave | Content | Depends on |
@@ -6031,7 +6031,7 @@ Manual gates, pending user confirmation with automated proxies:
 - `cargo tauri build` and running the app.
 
 Rollback is a `git revert` of the single implementation commit. OPFS
-data is namespaced under `vactrol-pkg/` and can be deleted, and
+data is namespaced under `vactr-pkg/` and can be deleted, and
 nothing migrates.
 
 ### 15.2 Editor UI on Solid.js, audio start, icons, foldable pane (author, 2026-09-26)
@@ -6321,4 +6321,4 @@ control table (11.4).
   realtime validation (authoritative).
 - `design-docs/specs/notes.md` — deferred music-visual coupling; Rhombus findings.
 - `design-docs/references/README.md` — external references index.
-- Implementation plan: `impl-plans/active/vactrol-core.md`.
+- Implementation plan: `impl-plans/active/vactr-core.md`.

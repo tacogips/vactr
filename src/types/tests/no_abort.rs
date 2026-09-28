@@ -19,7 +19,7 @@ use crate::types::ty::CheckEnv;
 const LANG_REFERENCE: &str = include_str!("../../../design-docs/specs/lang-reference.md");
 const DESIGN_MUSIC: &str = include_str!("../../../design-docs/specs/design-music.md");
 
-/// The code fences of a spec document (```` ```vactrol ```` and
+/// The code fences of a spec document (```` ```vactr ```` and
 /// ```` ```vact ````).
 fn fences(doc: &str) -> Vec<String> {
     let mut out = Vec::new();

@@ -1,4 +1,4 @@
-//! `vactrol.lock` (design 14.5.7): the header `# vactrol.lock v1`, then one
+//! `vactr.lock` (design 14.5.7): the header `# vactr.lock v1`, then one
 //! line `<path> <version> sha256:<64 lowercase hex>` per package, sorted
 //! bytewise by path. Deterministic and line-based.
 
@@ -8,7 +8,7 @@ use crate::pkg::manifest::{package_id, ManifestError};
 use crate::pkg::semver::Version;
 
 /// The first line of every lock file.
-pub const LOCK_HEADER: &str = "# vactrol.lock v1";
+pub const LOCK_HEADER: &str = "# vactr.lock v1";
 
 /// One locked package.
 #[derive(Clone, PartialEq, Eq, Debug)]

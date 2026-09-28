@@ -19,7 +19,7 @@ fn outputs_are_kernel_and_sugar_is_not() {
         let r = rd(src);
         assert!(!is_kernel(&r.nodes[0]), "{src:?} is sugar");
     }
-    let r = rd("import github.com/someone/vactrol-pads");
+    let r = rd("import github.com/someone/vactr-pads");
     assert!(is_kernel(&r.nodes[0]), "import at the root");
 }
 

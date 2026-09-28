@@ -1,6 +1,6 @@
 //! Stereo variable-delay and frozen-loop adaptation informed by MIT Clouds.
 //! Host-rate glide, original four-point cubic reads and pitch-aware wrap
-//! crossfade translate the looping player's playback roles. Vactrol retains
+//! crossfade translate the looping player's playback roles. Vactr retains
 //! live pitch, texture and quality extensions; source SRC, processor mix and
 //! generated tables remain excluded. See THIRD_PARTY_NOTICES.md.
 

@@ -76,10 +76,10 @@ fn delta(a: &[f32], b: &[f32]) -> f32 {
 fn bounded_chain_manifest_does_not_claim_cross_module_parity() {
     assert_eq!(STAGES_OTHER[0].source_function, "MultiSegment");
     assert_eq!(STAGES_OTHER[0].coverage, StageCoverage::Adaptation);
-    assert_eq!(STAGES_OTHER[0].vactrol_template, Some("stage-chain-voice"));
+    assert_eq!(STAGES_OTHER[0].vactr_template, Some("stage-chain-voice"));
     assert_eq!(STAGES_OTHER[1].coverage, StageCoverage::Adaptation);
     assert_eq!(
-        STAGES_OTHER[1].vactrol_template,
+        STAGES_OTHER[1].vactr_template,
         Some("stage-sequencer-voice")
     );
     assert_eq!(STAGES_OTHER[2].coverage, StageCoverage::Pending);

@@ -146,7 +146,7 @@ pub fn pipe(src: Rc<TexNode>, op: TexNode, span: Option<Span>) -> TexNode {
 }
 
 impl TexKind {
-    /// The non-payload kind named by a Hydra/vactrol operator name
+    /// The non-payload kind named by a Hydra/vactr operator name
     /// (`design-visual.md`): sources, geometry and color operators. `text`,
     /// `src`, the blend family, the modulate family and the chain pipe are
     /// built directly since they carry extra data.

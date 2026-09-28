@@ -1,4 +1,4 @@
-//! Sample-region goldens (design 10.1, vactrol-core TASK-006).
+//! Sample-region goldens (design 10.1, vactr-core TASK-006).
 
 use std::rc::Rc;
 

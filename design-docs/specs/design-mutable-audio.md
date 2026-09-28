@@ -1,7 +1,7 @@
-# Published Modular Audio DSP in Vactrol
+# Published Modular Audio DSP in Vactr
 
 This specification covers ports of the publicly released Mutable Instruments
-Eurorack audio DSP into Vactrol. It is linked from `design-music.md` section
+Eurorack audio DSP into Vactr. It is linked from `design-music.md` section
 4.2. The source inventory is the official `pichenettes/eurorack` tree at
 commit `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`; any later source
 revision requires a new audit.
@@ -13,7 +13,7 @@ with MIT-compatible source. Include discontinued modules. Exclude hardware,
 panel/UI firmware, MIDI routing, sequencer-only firmware, and control-only
 modules that have no audio DSP. Keep upstream names in attribution and
 engineering references only; user-facing instruments and effects have
-Vactrol names. The official repository says STM32 code is MIT, AVR code is
+Vactr names. The official repository says STM32 code is MIT, AVR code is
 GPL-3.0, and the hardware has a separate license. Every ported file and
 resource needs an individual provenance check, including `stmlib` and any
 generated data. Preserve copyright and MIT notices for ported material.
@@ -72,7 +72,7 @@ slots for the 63 core definitions and opt-in instruments; an Elements pattern
 may override its authored `el-gate 1` and input-level defaults. This is an authored event-local
 adaptation and does not expose arbitrary bus taps or source-equivalent DSP.
 
-| Source family | Vactrol target | Coverage requirement |
+| Source family | Vactr target | Coverage requirement |
 |---|---|---|
 | `plaits/dsp` | Multi-engine instrument | All 24 registered engines, both output channels, trigger/LPG behavior, and all engine-specific parameters; audit FM patches, speech words, wave resources separately |
 | `braids` | Multi-model oscillator | Every accessible macro-oscillator shape, both timbre parameters, trigger/sync behavior and model resources |
@@ -82,7 +82,7 @@ adaptation and does not expose arbitrary bus taps or source-equivalent DSP.
 | `warps/dsp` | Dual-input modulation effect | All seven published algorithms (crossfade, fold, analog/digital ring modulation, XOR, comparator, vocoder), continuous transitions, internal carrier and auxiliary output controls; audit the spectral Easter egg separately |
 | `tides`, `tides2` | Audio-rate function instruments | Tides1 AD/loop/AR × three ranges and Tides2 24 ramp/output/range roles runnable as original adaptations; each has two default selected outputs or four opt-in outputs, with Tides1 EOA level and host-rate-scaled EOR hold adaptations |
 | `peaks/drums` and audio-rate modulation | Percussion instruments and modulation units | Bass, snare, FM drum, hi-hat and audio-rate control generators with all controls |
-| `streams` | Control algorithms plus digital audio adaptations | Envelope, vactrol, follower, compressor, filter controller and chaos controls; distinguish firmware CV from Vactrol's digital gain/filter path |
+| `streams` | Control algorithms plus digital audio adaptations | Envelope, vactr, follower, compressor, filter controller and chaos controls; distinguish firmware CV from Vactr's digital gain/filter path |
 | `stages`, `frames` | Audio-rate segments and control-to-audio adaptations | Stages' segment oscillator paths and Frames' keyframe/poly-LFO CV roles; distinguish Frames' analog VCA mix path from firmware DSP |
 
 The runnable `dual-mod` effect and separate `shift-pair` Easter-egg effect
@@ -98,14 +98,14 @@ analog/digital ring, XOR and comparator signal equations and continuous
 mode transitions using analytic functions. The crossfade shape may be
 derived from its individually MIT-noticed generator; do not import its
 lookup array. Keep the independent fold and the translated 20-band
-source-rate vocoder, Vactrol's seven `.vact` controls, stereo bus main/aux contract
+source-rate vocoder, Vactr's seven `.vact` controls, stereo bus main/aux contract
 and fixed callback state. The sixfold XMOD FIR conversion is translated
 separately below. Exact amplifier smoothing, carrier oscillator numerics,
 host-rate equivalence and generated
 fold/vocoder resources remain explicit parity gaps rather than a complete
 Warps port.
 
-Vactrol's `algorithm` 0..8 control maps onto the source's 0..1 modulation
+Vactr's `algorithm` 0..8 control maps onto the source's 0..1 modulation
 range. Adjacent XMOD modes occupy positions 0..5; the comparator-to-vocoder
 end passes through the source's raw-modulator transition around 5.4..5.8.
 The source's modulation-parameter skew is applied before the cleared scalar
@@ -129,7 +129,7 @@ shape pairs: sine/triangle/saw in XMOD, saw/pulse/noise in vocoder, with
 the source balance between carrier roles near the transition. It
 translates the oscillator's table-free two-sample BLEP corrections for
 triangle, saw and pulse, while generating sine analytically and retaining
-Vactrol's fixed-state noise filter. Carrier options 4..6 remain authored
+Vactr's fixed-state noise filter. Carrier options 4..6 remain authored
 extensions. All carrier frequency and shape controls stay codeable in
 `.vact`; exact sine lookup, source SVF, block interpolation, host-rate FIR parity and
 hardware output scaling remain open fidelity gaps.
@@ -206,7 +206,7 @@ delay around the internal 60-frame staging; tests bound the measured
 impulse onset and verify unity, pitch and alias rejection at rate extremes.
 Rendering performs no allocation or trigonometric coefficient work.
 At 96 kHz, the boundary is bypassed exactly to retain the measured
-source-rate sequence. Generated host FIR coefficients are Vactrol data,
+source-rate sequence. Generated host FIR coefficients are Vactr data,
 not upstream wave tables. Host-rate filtering, carrier generation,
 amplifier smoothing and source hardware scaling remain numerical
 adaptations, not firmware parity claims.
@@ -227,14 +227,14 @@ six distinct formant/chorus/ensemble/short-reverb FX selections. All four
 Patch controls and the event-local performance controls are codeable. Its
 two-output state uses 20,402/22,196/44,276 floats at 44.1/48/96 kHz and
 tracks the root comb period down to 20 Hz. The source uses 12 divide-down
-oscillators and up to four rotating groups; Vactrol's four event-local voices,
+oscillators and up to four rotating groups; Vactr's four event-local voices,
 short FX, and channel-independent processing are distinct adaptations.
 The separate `resonant-bank` stereo bus/master effect now sums L/R input to a
 mono external exciter, matching the source `Part::Process` mono input role, and
 emits distinct main/aux on L/R. Its 17 codeable controls cover the six model
 roles and explicit internal/external mixing, gate and dry/wet mix. The effect
 uses four rate-sized comb lines and original modal/FM formulas; stereo summing,
-the four-line limit and numerical behavior are Vactrol adaptations, not a
+the four-line limit and numerical behavior are Vactr adaptations, not a
 source port. No generated Rings resources, registration array or chord table
 is imported. Opt-in `rings-external-voice` now reads both validated host
 input channels and averages them for its mono exciter; arbitrary bus taps
@@ -289,7 +289,7 @@ numeric parameter curves. Thus all 47 positions are runnable adaptations,
 with source fidelity comparisons still open.
 Upstream wave-bank positions 37–40
 retain an explicit unaudited-wave-asset flag, though no such asset is in the
-Vactrol implementation. A true per-sample external sync input and source
+Vactr implementation. A true per-sample external sync input and source
 numeric comparisons remain open.
 The upstream `braids/resources/waveforms.py` reads both `data/waves.bin` and
 `data/map.bin`; neither binary asset has an individual provenance decision. The runnable
@@ -300,7 +300,7 @@ The current `texture-grain`, `texture-stretch`, `texture-loop` and
 `texture-spectral` bus/master effects cover all four published mode roles
 as bounded stereo adaptations with thirteen codeable controls each. Their
 `quality` selector uses source bit roles (bit 0 mono, bit 1 low fidelity)
-through Vactrol dual-mono summing, host-rate half-sample hold and original
+through Vactr dual-mono summing, host-rate half-sample hold and original
 8-bit quantization. Source 32/16 kHz conversion, generated SRC filter,
 exact diffuser/correlator/pitch-shifter, spectral history and phase
 behavior remain unported. Generated
@@ -308,7 +308,7 @@ source tables are not imported.
 For `texture-loop`, translate the pinned looping player's delay glide,
 trigger tap synchronization, freeze loop point/duration, pitch-dependent
 64-frame wrap crossfade and four-point cubic capture reads with a bounded,
-original interpolator. Preserve Vactrol's thirteen control names, stereo
+original interpolator. Preserve Vactr's thirteen control names, stereo
 capture and host-rate memory preflight. Its separate live pitch shifter,
 density diffusion, texture filter, reverb, gate, quality conversion and
 source 32 kHz timing remain disclosed adaptations rather than complete
@@ -318,13 +318,13 @@ the build.
 Streams' published STM32 firmware has six control processor functions, but
 the processor returns gain and frequency CV to DAC/PWM outputs for external
 analog VCA/VCF hardware. Its firmware does not contain that analog audio
-path. Vactrol may translate the MIT control algorithms and add its own
+path. Vactr may translate the MIT control algorithms and add its own
 digital stereo gain/filter stage, but that combined effect is an adaptation,
 not a port of source audio DSP or a complete model of the physical module.
 The source `audio` and `excite` inputs, alternate mode, channel linking and
 global/local parameters remain part of the control coverage contract; see
 `impl-plans/active/modular-streams-controls.md`.
-The first two Vactrol effects, `stream-envelope` and `stream-vactrol`, are
+The first two Vactr effects, `stream-envelope` and `stream-vactr`, are
 original stereo gain/filter adaptations with AD/AR and damped/plucked modes.
 Their optional right-input detector controls both lanes while preserving
 separate left/right audio output. The stereo bus cannot yet accept the two
@@ -333,7 +333,7 @@ scalar excite/trigger controls and right sidechain are a bounded substitute.
 The `stream-follower` and `stream-compressor` adaptations add three-band
 tracking/filter-only routing and hard/soft-knee compression, respectively.
 Linked globals replace local timing or threshold/amount roles. The firmware
-still emits CV, and Vactrol's filters, ratio curves and two-channel sidechain
+still emits CV, and Vactr's filters, ratio curves and two-channel sidechain
 mapping are independent digital audio designs. The remaining
 `stream-filter` and `stream-lorenz` effects use independently written stereo
 filter and bounded chaos DSP to make the source CV roles audible. The filter
@@ -391,7 +391,7 @@ choices and per-lane digital response, and independently selects two lanes
 by default. The quad example uses four bounded keyframe payload slots, one
 per generated lane.
 The list has no structured editor yet, and the numeric DAC/VCA response is
-not source-equivalent. Its mixer/VCA audio path is analog, outside the firmware. A Vactrol
+not source-equivalent. Its mixer/VCA audio path is analog, outside the firmware. A Vactr
 digital mixer driven by translated frame controls is therefore an original
 audio adaptation, not a source audio DSP port. Stages does contain a
 segment generator with an explicit audio-rate oscillator path. The
@@ -433,14 +433,14 @@ or port that implementation into the MIT codebase. A separate, independently
 written chiptune oscillator may cover its musical function, but is not an
 Edges code port. `beads` has no published source in the audited official
 tree, so no source port can be claimed. Analog-only Blades, Blinds, Ripples,
-Shelves, and Veils have no firmware DSP to port; Vactrol may model their
+Shelves, and Veils have no firmware DSP to port; Vactr may model their
 audio behavior separately, but that is a new design rather than a code port.
 
 The Peaks FM drum is the first concrete vertical slice. Its published source
 has a twelve-position function registry. The current public Peaks inventory
 marks envelope, LFO and tap-LFO as original analytic adaptations through
 `peak-motion-voice`, with full/half controls, edge-triggered tap/sync and two
-Vactrol output roles. It also counts three drum adaptations and the FM drum
+Vactr output roles. It also counts three drum adaptations and the FM drum
 source-stage translation; none is a source-equivalent port. Pulse shaper,
 pulse randomizer and bouncing ball run as separate modes of
 `peak-pulse-voice`: shaper delay/duration/
@@ -456,7 +456,7 @@ voice uses analytic waves/curves and seeded noise, never Peaks generated
 waveforms or binary data; output phase and numerical behavior differ.
 
 The Peaks FM drum is the first concrete percussion vertical slice. Its published source
-exposes frequency, FM amount, decay and noise/drive. Vactrol must expose
+exposes frequency, FM amount, decay and noise/drive. Vactr must expose
 those controls separately where the source combines them, along with the
 trigger and envelope state; no hidden fixed preset may replace a user-settable
 control. A second FM/noise/feedback percussion voice has been located in an
@@ -466,7 +466,7 @@ described synthesis structure independently. Both voices need distinct
 `.vact` names and parameter schemas.
 For the Peaks FM drum fidelity pass, preserve the source's single sine phase,
 FM and auxiliary pitch envelopes, amplitude envelope, delayed pitch feedback,
-noise mix and soft overdrive stages. Keep Vactrol's separately authored
+noise mix and soft overdrive stages. Keep Vactr's separately authored
 `fm-amount`, `pitch-sweep`, `decay`, `drum-noise` and `drive` controls and
 event reset; expose each through `.vact`. Recreate only continuous analytic
 curves from the individually MIT-noticed Peaks generators, never copy their
@@ -495,19 +495,19 @@ discussion are useful research references for an original FM percussion
 family. The thesis covers bass drum, snare, tom, clap, rimshot, cowbell and
 cymbal designs and discusses FM signal flow. Treat the papers and posted
 diagrams as explanatory material: do not copy diagrams, assembly, tables,
-presets or sample data into Vactrol. Implement and test original Rust DSP with
-Vactrol parameter names, and attribute the research references in the design
+presets or sample data into Vactr. Implement and test original Rust DSP with
+Vactr parameter names, and attribute the research references in the design
 record. Do not imply an official Elektron implementation or endorsement.
 The official Elektron manual describes the EFM family at product level; it
 does not license firmware or sound assets. `feedback-metal-drum` is a distinct
-Vactrol coupled-FM percussion voice: an analytic carrier and self-feedback
+Vactr coupled-FM percussion voice: an analytic carrier and self-feedback
 modulator, separate body/modulator/noise decays, noise excitation, filter and
 drive. Every declared sound parameter is `.vact`-codeable. It is neither a
 translation of the thesis' assembly/diagrams nor a hardware emulation.
 
 The Gearmulator Machinedrum emulator is GPL-3.0 and requires separately
 copyrighted original firmware images to reproduce the machine. Its source and
-firmware cannot be incorporated into Vactrol's MIT DSP core. The `eseq`
+firmware cannot be incorporated into Vactr's MIT DSP core. The `eseq`
 Machinedrum-oriented work is likewise GPL-3.0. Both may be studied as public
 documentation, but neither supplies a permissively licensed emulator port.
 The EFM-inspired family is an independent synthesizer implementation, not a
@@ -516,13 +516,13 @@ MAME's Machinedrum file is a BSD-3-Clause skeleton hardware driver, not a
 standalone drum synthesis engine; its permissive header does not make the
 original firmware redistributable or provide a DSP voice to port.
 
-## Vactrol interface and execution
+## Vactr interface and execution
 
-An instrument is triggered by `s :<vactrol-name>` in a pattern; an effect
+An instrument is triggered by `s :<vactr-name>` in a pattern; an effect
 can be placed in an `inst` graph, a bus, or `master` as appropriate. Stereo
 processors retain two audio inputs and two outputs. Engine/model selection is
 an explicit typed parameter. Every sound-relevant knob, mode, trigger,
-external modulation input, and secondary output has a named Vactrol port or
+external modulation input, and secondary output has a named Vactr port or
 parameter. The editor obtains the same schema used by the checker and event
 commit; unknown or unsupported controls cause diagnostics. Pattern and live
 cell values reach the correct engine without silent drops.
@@ -540,7 +540,7 @@ silently omit it.
 ## Completeness evidence
 
 For each source engine/mode, keep a mapping from upstream file and revision
-to a Vactrol instrument/effect, parameter manifest, resource provenance,
+to a Vactr instrument/effect, parameter manifest, resource provenance,
 and tests. Compare deterministic output properties (finite samples, trigger
 response, parameter effect, channel behavior) with the upstream engine where
 legal resources are available. Audible review supplements automated checks.
@@ -554,12 +554,12 @@ in the pinned Plaits `Voice::Init` order, with separate fidelity and asset
 statuses. `dsp::ported::plaits_coverage_summary()` provides a readable count.
 Run `CARGO_TERM_QUIET=true cargo run -q --example plaits_coverage` to print it.
 The MOD-006 source comparison runs pinned upstream DSP from a separate local
-checkout, never from the shipped Vactrol binary. A first, repeatable Plaits
+checkout, never from the shipped Vactr binary. A first, repeatable Plaits
 position-10 probe compares raw FM carrier/sub kernels at 48 kHz in 24-frame
 blocks for the same note and control values. The upstream probe may compile
 its local aggregate resource object, but the harness must neither copy that
 object nor its generated tables, presets or output samples into this
-repository. The Vactrol side runs its current independent FM kernel. Report
+repository. The Vactr side runs its current independent FM kernel. Report
 both channels' level and waveform error after warm-up; mismatches are
 measured gaps, not an automatic test failure or evidence of source parity.
 This kernel comparison does not verify the outer Plaits voice, LPG, trigger
@@ -576,7 +576,7 @@ resources may be translated individually with their MIT attribution; do not
 import the aggregate `resources.cc`, generated sine wavetable, DX7 bank or
 other embedded data. Translate the source's ratio interpolation, frequency
 and amount curves, signed feedback, four phase advances and two-output FIR
-state into preallocated Vactrol state. Keep analytic sine and document its
+state into preallocated Vactr state. Keep analytic sine and document its
 remaining interpolation difference, as well as host-rate and outer-voice
 behavior. The source's 24-frame parameter-interpolation period at 48 kHz
 must retain its roughly 0.5 ms duration at other host rates and continue
@@ -593,7 +593,7 @@ FM banks (`six-bank-{a,b,c}-voice`), each with 32 procedural configurations,
 as Adaptation/Replacement. The upstream DX7 preset banks remain excluded,
 and the DX7 flags in the manifest record source provenance only. Position 15
 now provides `speech-voice`, an Adaptation/Replacement with three procedural
-naive/SAM/LPC-like modes and four original upper-range Vactrol syllable
+naive/SAM/LPC-like modes and four original upper-range Vactr syllable
 tokens (`ava`, `omi`, `era`, `unu`). Its TI ROM flag records upstream
 provenance only; no speech-ROM words or source phoneme tables are imported.
 All 24 Plaits positions are runnable adaptations or source-stage
@@ -635,13 +635,13 @@ Position 14 `chord-layer-voice` provides a four-note/five-slot inversion
 chord with divide-down registration blended into fifteen original analytic
 timbres. Main carries the full chord and aux emphasizes selected inversion
 notes. The source's fifteen integrated waves come from unaudited
-`waves.bin`; Vactrol imports none. The manifest marks the runnable voice
+`waves.bin`; Vactr imports none. The manifest marks the runnable voice
 `Adaptation`/`Replacement` and retains WAVES as upstream provenance.
 
 Position 13 `wave-grid-voice` scans an original analytic 8×8×3 wave
 family with mirrored z navigation, a continuous main path and a 1/32-step
 auxiliary. The source reads `wav_integrated_waves` from unaudited
-`waves.bin`; Vactrol imports neither and marks its runnable implementation
+`waves.bin`; Vactr imports neither and marks its runnable implementation
 `Adaptation`/`Replacement`, retaining WAVES solely as upstream
 provenance. Custom/user wave mapping is unavailable pending a data contract.
 
@@ -656,7 +656,7 @@ until a cleared user-data contract exists; no upstream table is imported.
 Position 6 `string-machine-voice` is a runnable four-voice divide-down
 chord and stereo ensemble adaptation. Its source does not read the
 integrated-wave assets despite broad `resources.h` includes. The ensemble
-indirectly reads the generated sine table through `SineRaw`; Vactrol uses
+indirectly reads the generated sine table through `SineRaw`; Vactr uses
 analytic sine instead. The manifest clears the wave-asset flag and labels
 the bounded implementation `Adaptation` because registration, filters,
 oscillator antialiasing and ensemble topology differ.
@@ -680,7 +680,7 @@ interpolation. Source VOSIM is commented out and not rendered. Numerical
 comparison and full voice/LPG parity remain before `SourcePort`.
 
 Position 19 `string-voice` is a bounded three-string adaptation with filtered
-noise/dust excitation and two outputs. Vactrol's per-event voices cannot
+noise/dust excitation and two outputs. Vactr's per-event voices cannot
 preserve upstream shared-string rotation and pitch history across events;
 the manifest labels it `Adaptation` until that lifecycle difference and DSP
 details are addressed.

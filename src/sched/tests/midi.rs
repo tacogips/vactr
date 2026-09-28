@@ -1,4 +1,4 @@
-//! BE-MIDI tests (design 11.7; vactrol-core.md TASK-007 criteria 6, 7 and
+//! BE-MIDI tests (design 11.7; vactr-core.md TASK-007 criteria 6, 7 and
 //! the open-input half of 10).
 //!
 //! Every test drives a real `Evaluator` + `Runtime` on a mock clock with

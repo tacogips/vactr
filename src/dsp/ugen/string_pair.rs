@@ -1,6 +1,6 @@
 //! Three bounded strings with source-inspired excitation and nonlinearity.
 //!
-//! Vactrol events own their voices, so the active string is selected per event
+//! Vactr events own their voices, so the active string is selected per event
 //! instead of using the source's persistent cross-event rotation. This is an
 //! adaptation; see THIRD_PARTY_NOTICES.md.
 

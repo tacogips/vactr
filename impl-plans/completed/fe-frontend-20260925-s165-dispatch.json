@@ -4,7 +4,7 @@
   "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-172",
   "session172Revision": {
     "originalHead": "39aad1e28be3e7e9f7c095a348812e206782ed41",
-    "note": "Session 172 plan-checkpoint rerun for issue tacogips/vactrol#1 after integration review (session 171, integration-review-attempt-1-exec-197) returned two mid findings. RECON3-1: the fanout dispatched only FE-VALUE (failed validationRejected '$.planId additional property is not allowed') and never ran the FE-READER review-only rerun. The carried finding: FE-READER has no adversarial review verdict. No design or plan requirement changed. This checkpoint commits the session-172 dispatch amendment (FE-READER dependsOn cleared, each plan owns its planPath), the narrowed FE-VALUE gate-contract note, the session-171 FE-VALUE re-verification entry, and the FE-READER review-verdict criterion. The source tree stays uncommitted and must be preserved (no reset or clean) until the workflow commit step.",
+    "note": "Session 172 plan-checkpoint rerun for issue tacogips/vactr#1 after integration review (session 171, integration-review-attempt-1-exec-197) returned two mid findings. RECON3-1: the fanout dispatched only FE-VALUE (failed validationRejected '$.planId additional property is not allowed') and never ran the FE-READER review-only rerun. The carried finding: FE-READER has no adversarial review verdict. No design or plan requirement changed. This checkpoint commits the session-172 dispatch amendment (FE-READER dependsOn cleared, each plan owns its planPath), the narrowed FE-VALUE gate-contract note, the session-171 FE-VALUE re-verification entry, and the FE-READER review-verdict criterion. The source tree stays uncommitted and must be preserved (no reset or clean) until the workflow commit step.",
     "intakeTreeCheck": "HEAD is 39aad1e on main. The intake status shows unstaged changes only. tmp/fe-frontend-20260925-s165/reconcile-implementations/attempt-3/fe-reader-final-hashes-recheck.log shows 20/20 OK with exit=0, and reconcile attempt-3 found no source written in session 171 (all 42 FE-VALUE snapshot paths match). The redispatched FE-READER reviewer must re-run the shasum check first.",
     "dispatchState": {
       "FE-VALUE": "accepted (session 170). The dispatcher restarts from plan-checkpoint with acceptedPlanIds=[], so FE-VALUE may be dispatched again. If so it is re-verification only: no source edits, new s172 logs, planId only in the step6-implement payload, and review outputs carry a findings array with no planId.",
@@ -19,7 +19,7 @@
   },
   "session171Revision": {
     "originalHead": "6e35f7cda73e87ace5a2d6d7d8554570947e80e5",
-    "note": "Session 171 resumes issue tacogips/vactrol#1 after integration review (session 170, integration-review-attempt-1-exec-186) returned one mid finding. The FE-READER branch failed at step7-adversarial-review with validationRejected ($.findings missing), so FE-READER has no review verdict. There is also no after:step7 snapshot under tmp/riela-fanout/B5649614-9AE5-48A0-AD47-344A09DDBB53/. No design or plan requirement changed. This checkpoint commits the session-170 implementer progress entries in the FE-VALUE and FE-READER plans. Consistent with earlier checkpoints, the plan progress logs are committed and the source tree is not. It also records the redispatch: FE-READER reruns only step7 adversarial review on the unchanged tree. The FE-VALUE and FE-READER source tree stays uncommitted and must be preserved (no reset or clean). It goes into the single front-end commit at the workflow commit step.",
+    "note": "Session 171 resumes issue tacogips/vactr#1 after integration review (session 170, integration-review-attempt-1-exec-186) returned one mid finding. The FE-READER branch failed at step7-adversarial-review with validationRejected ($.findings missing), so FE-READER has no review verdict. There is also no after:step7 snapshot under tmp/riela-fanout/B5649614-9AE5-48A0-AD47-344A09DDBB53/. No design or plan requirement changed. This checkpoint commits the session-170 implementer progress entries in the FE-VALUE and FE-READER plans. Consistent with earlier checkpoints, the plan progress logs are committed and the source tree is not. It also records the redispatch: FE-READER reruns only step7 adversarial review on the unchanged tree. The FE-VALUE and FE-READER source tree stays uncommitted and must be preserved (no reset or clean). It goes into the single front-end commit at the workflow commit step.",
     "intakeTreeCheck": "At checkpoint time, HEAD is 6e35f7c on main and nothing is staged. tmp/fe-frontend-20260925-s165/reconcile-implementations/attempt-2/fe-reader-final-hashes-recheck.log shows 20/20 OK with exit=0. Every FE-READER-owned file and shared file has an mtime earlier than final-hashes.txt (09:38). The redispatched reviewer must re-run the shasum check before reviewing.",
     "dispatchState": {
       "FE-VALUE": "accepted (session 170 reconcile attempt-1). Do not redispatch. Its tests still pass in reconcile attempt-2. Two post-edit-hash mismatches (src/reader/mod.rs, src/types/diag.rs) are intended FE-READER shared-path edits.",
@@ -27,16 +27,16 @@
       "FE-EXPAND": "not started; waits for an accepted FE-READER verdict.",
       "FE-FINAL": "not started; waits for FE-EXPAND."
     },
-    "carriedFinding": "[mid] impl-plans/active/vactrol-frontend-reader.md: FE-READER (TASK-002) has no adversarial review verdict. Redispatch FE-READER to rerun only the review on the unchanged tree after checking final-hashes.txt. It must produce a schema-valid verdict (a findings array, empty if none) that covers RECON2-2 (empty-pipe) and RECON2-3 (the `:7` spec conflict)."
+    "carriedFinding": "[mid] impl-plans/active/vactr-frontend-reader.md: FE-READER (TASK-002) has no adversarial review verdict. Redispatch FE-READER to rerun only the review on the unchanged tree after checking final-hashes.txt. It must produce a schema-valid verdict (a findings array, empty if none) that covers RECON2-2 (empty-pipe) and RECON2-3 (the `:7` spec conflict)."
   },
   "session170Revision": {
     "originalHead": "e7e072dfaf08a545a48fbe72d8c6191e49cca559",
-    "note": "Session 170 resumes issue tacogips/vactrol#1. The FE-VALUE tree is still uncommitted and must be preserved. Commit granularity is settled: there is no separate FE-VALUE commit. The whole front end is one commit on main at the workflow commit step, staged by the explicit path list in FE-VALUE Edit Protocol item 5. FE-VALUE gains a V3t criterion. FE-FINAL gains V3f. The accepted low findings for reader bad-pair and expander U5 read string are folded into the plan texts."
+    "note": "Session 170 resumes issue tacogips/vactr#1. The FE-VALUE tree is still uncommitted and must be preserved. Commit granularity is settled: there is no separate FE-VALUE commit. The whole front end is one commit on main at the workflow commit step, staged by the explicit path list in FE-VALUE Edit Protocol item 5. FE-VALUE gains a V3t criterion. FE-FINAL gains V3f. The accepted low findings for reader bad-pair and expander U5 read string are folded into the plan texts."
   },
   "resumedFrom": {
     "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-168",
     "originalHead": "1fd6faccc037759d7e4085f1129bfe3345c993fc",
-    "note": "Session 169 resumes the same task under GitHub issue tacogips/vactrol#1. Session 168 implemented FE-VALUE, but it is uncommitted in the working tree: Cargo.toml, src/lib.rs and src/main.rs are modified, and src/{compile,dsp,ns,pattern,reader,sched,tex,types,value,vm}/ are untracked. The branch-local gate blocked FE-VALUE because a rerun overwrote the clippy log and two deviations were open. Commit 7c72f23 adopted both deviations into the design. Session 169 adds design 6.5.7 'Verification evidence' (per-run logs with exit= lines) and revises the four plans to follow it. FE-VALUE must be re-verified with session-169 logs; the uncommitted tree must be preserved (no reset or clean). FE-READER, FE-EXPAND and FE-FINAL have not started."
+    "note": "Session 169 resumes the same task under GitHub issue tacogips/vactr#1. Session 168 implemented FE-VALUE, but it is uncommitted in the working tree: Cargo.toml, src/lib.rs and src/main.rs are modified, and src/{compile,dsp,ns,pattern,reader,sched,tex,types,value,vm}/ are untracked. The branch-local gate blocked FE-VALUE because a rerun overwrote the clippy log and two deviations were open. Commit 7c72f23 adopted both deviations into the design. Session 169 adds design 6.5.7 'Verification evidence' (per-run logs with exit= lines) and revises the four plans to follow it. FE-VALUE must be re-verified with session-169 logs; the uncommitted tree must be preserved (no reset or clean). FE-READER, FE-EXPAND and FE-FINAL have not started."
   },
   "implementationBranch": "main",
   "baseBranch": "main",
@@ -50,25 +50,25 @@
     "design-docs/user-qa/pending-frontend-questions.md",
     "design-docs/user-qa/README.md"
   ],
-  "parentPlanPath": "impl-plans/active/vactrol-core.md",
+  "parentPlanPath": "impl-plans/active/vactr-core.md",
   "planIndexPath": "impl-plans/README.md",
   "evidenceRoot": "tmp/fe-frontend-20260925-s165",
   "evidenceLayout": "tmp/fe-frontend-20260925-s165/<planId>/attempt-<n>/ (untracked; tmp is gitignored). Cargo logs go to target/fe-logs/<plan>-<check>-s<S>-<n>.log per design 6.5.7.",
   "logRule": "Design 6.5.7: every cargo run writes a new target/fe-logs/<plan>-<check>-s<S>-<n>.log (S = session number, n counts from 1 per check within the session; never overwrite an existing file). Run each cargo command as (set -o pipefail; CMD 2>&1 | tee LOG); echo \"exit=$?\" >> LOG. The progress log cites the counting log path and its exit= value, plus the nextest run and passed counts (run > 0). A missing log, a log with no exit= line, or a truncated log fails the check. In the verification arrays below, 'LOG(<plan>-<check>): CMD' means CMD run under this rule.",
   "reviewContext": {
     "issueReference": {
-      "repository": "tacogips/vactrol",
+      "repository": "tacogips/vactr",
       "number": 1,
-      "url": "https://github.com/tacogips/vactrol/issues/1"
+      "url": "https://github.com/tacogips/vactr/issues/1"
     },
-    "userProblem": "The user asked (in Japanese: 'claude riela design impl workflowで実装を進めて') for implementation to go ahead through the Riela design-and-implement workflow. The Vactrol crate is still a scaffold (src/lib.rs has a placeholder hello()). The language front end, TASK-001..003 in impl-plans/active/vactrol-core.md, needs to be implemented.",
+    "userProblem": "The user asked (in Japanese: 'claude riela design impl workflowで実装を進めて') for implementation to go ahead through the Riela design-and-implement workflow. The Vactr crate is still a scaffold (src/lib.rs has a placeholder hello()). The language front end, TASK-001..003 in impl-plans/active/vactr-core.md, needs to be implemented.",
     "requiredOutcomes": [
       "TASK-001 core value model: Value tagging, structural equality, a dict as a sorted map (BTreeMap) with key-ordered iteration and put semantics, exact self-reducing Ratio64 arithmetic, and int/float widening rules (FE-VALUE).",
       "TASK-002 reader: every construct in lang-reference.md sections 1-3 and in the design-music.md sections 1-3 samples reads to the documented S-expression form. '( )' is rejected. Pipe continuation lines work. '#@' directive comments are kept as trivia with spans (FE-READER).",
       "TASK-003 expander: if/elif sugar becomes match and for sugar becomes map. The output contains kernel forms only. Malformed forms produce diagnostics with their origin span (FE-EXPAND).",
       "CARGO_TERM_QUIET=true cargo build succeeds, and cargo clippy --all-targets -- -D warnings is clean.",
       "cargo nextest passes with the quiet environment settings.",
-      "vactrol-core.md marks TASK-001..003 complete, with their criteria checked, module status updated, and a progress-log entry. No other task is touched (FE-FINAL).",
+      "vactr-core.md marks TASK-001..003 complete, with their criteria checked, module status updated, and a progress-log entry. No other task is touched (FE-FINAL).",
       "No Rust source file reaches 1000 lines, and the crate layout matches design-implementation.md section 4."
     ],
     "nonGoals": [
@@ -87,17 +87,17 @@
       "Core modules use no std::thread, fs, time, net or process.",
       "Design 6.5.4 and 6.5.5 are normative. When a plan and the design differ, the design wins and the difference goes in the progress log.",
       "Commits use the AGENTS.md six-section message with no AI attribution or Co-Authored-By line. Work on main. No PRs.",
-      "Only FE-FINAL edits vactrol-core.md, impl-plans/README.md and design-implementation.md (one sentence in 6.5.4, and the section 5.6 kick-sound wording fix)."
+      "Only FE-FINAL edits vactr-core.md, impl-plans/README.md and design-implementation.md (one sentence in 6.5.4, and the section 5.6 kick-sound wording fix)."
     ],
     "designDecisionsAndRationale": [
       "The front end is split into four strictly serial plans: FE-VALUE, then FE-READER, then FE-EXPAND, then FE-FINAL. Each depends on the types from the previous one. Shared indexes are edited only in the final serial reconciliation wave.",
       "Shell types (Closure, Pat, Sig, TexNode, VarSlotRef) derive only Debug (VarSlotRef also derives Clone, design 6.5.1, amended in 7c72f23) and have no constructors. This keeps the section 4 layout and Value variants complete without implementing later tasks.",
       "Diagnostics use a closed DiagCode enum with kebab-case names: 26 reader codes and 11 expander codes. misplaced-arrow is the plan's code for '->' inside '[..]', and FE-FINAL records it in 6.5.4.",
-      "The spec fixture manifest (tests/fixtures/spec/manifest.toml, 11 blocks from the 'vactrol' and 'vact' fences) pins reader and expander behavior against the spec documents, parsed by an in-repo TOML subset (no dependency).",
+      "The spec fixture manifest (tests/fixtures/spec/manifest.toml, 11 blocks from the 'vactr' and 'vact' fences) pins reader and expander behavior against the spec documents, parsed by an in-repo TOML subset (no dependency).",
       "User-QA U1-U5 are answered (2026-09-25) and binding: U1, the wasm32 target is installed and both wasm32 builds must pass; U2, a line-initial '>' is decided by indentation; U3, the escapes are \\\" \\\\ \\n \\t \\{ \\}; U4, fn bodies are block form only, and an inline body is malformed-fn (decided case, verbatim=false); U5, the bare-variant binding-if desugaring is kept (decided case), and the checker (TASK-004) must diagnose it."
     ],
     "intentionalTradeoffs": [
-      "The vactrol-core.md progress entry is condensed so the file stays under 1000 lines (992 lines at plan time).",
+      "The vactr-core.md progress entry is condensed so the file stays under 1000 lines (992 lines at plan time).",
       "rustfmt runs per plan on owned files only. A crate-wide cargo fmt is deferred to FE-FINAL V4."
     ],
     "supportedEdgeCases": [
@@ -119,18 +119,18 @@
       "design-docs/specs/lang-reference.md",
       "design-docs/specs/design-music.md",
       "design-docs/user-qa/pending-frontend-questions.md",
-      "impl-plans/active/vactrol-core.md",
-      "impl-plans/active/vactrol-frontend-value.md",
-      "impl-plans/active/vactrol-frontend-reader.md",
-      "impl-plans/active/vactrol-frontend-expander.md",
-      "impl-plans/active/vactrol-frontend-finalize.md",
+      "impl-plans/active/vactr-core.md",
+      "impl-plans/active/vactr-frontend-value.md",
+      "impl-plans/active/vactr-frontend-reader.md",
+      "impl-plans/active/vactr-frontend-expander.md",
+      "impl-plans/active/vactr-frontend-finalize.md",
       ".agents/skills/rust-coding-standards/SKILL.md",
       "AGENTS.md"
     ],
     "acceptedReviewFindings": [
-      "Low: in impl-plans/active/vactrol-frontend-reader.md:126, the bad-pair example ('once gain:' followed by '> d1') is not reachable under the 6.5.4 colon rules. Pick an input that 6.5.4 actually reaches, or record that no reachable example exists. Do not change the lexer to fit the test.",
-      "Low: in impl-plans/active/vactrol-frontend-value.md:38, src/value/value.rs triggers clippy::module_inception. Put #[allow(clippy::module_inception)] on that one mod declaration in src/value/mod.rs and record it in the progress log.",
-      "Low: in impl-plans/active/vactrol-frontend-expander.md:124, the u5-bare-variant-binding-if case gives no 'read' string, but the case runner compares 'read' for every case. Use the 6.5.4 read form '(-> (if x none) 1)' and record it in the progress log."
+      "Low: in impl-plans/active/vactr-frontend-reader.md:126, the bad-pair example ('once gain:' followed by '> d1') is not reachable under the 6.5.4 colon rules. Pick an input that 6.5.4 actually reaches, or record that no reachable example exists. Do not change the lexer to fit the test.",
+      "Low: in impl-plans/active/vactr-frontend-value.md:38, src/value/value.rs triggers clippy::module_inception. Put #[allow(clippy::module_inception)] on that one mod declaration in src/value/mod.rs and record it in the progress log.",
+      "Low: in impl-plans/active/vactr-frontend-expander.md:124, the u5-bare-variant-binding-if case gives no 'read' string, but the case runner compares 'read' for every case. Use the 6.5.4 read form '(-> (if x none) 1)' and record it in the progress log."
     ],
     "openReviewItems": [
       "RECON2-2 (empty-pipe): FE-READER added DiagCode EmptyPipe ('empty-pipe') for a pipe '>' with no call after it (for example 'print 1 >'). 6.5.4 has no code for this, and the FE-VALUE code-count test changed from 37 to 38. The reviewer decides whether the code is justified or an existing 6.5.4 code covers the case. FE-FINAL records an accepted code in 6.5.4 next to misplaced-arrow.",
@@ -139,7 +139,7 @@
     "planCheckpoint": {
       "reviewStep": "step5-impl-plan-review-attempt-1-exec-166",
       "checkpointStep": "plan-checkpoint (session 171)",
-      "session171Decision": "The plans are unchanged in requirements since the session-170 acceptance (exec-166). The only plan diffs are the session-170 implementer progress entries and criteria checkboxes in vactrol-frontend-value.md and vactrol-frontend-reader.md. The integration-review mid finding is process-only, so no design or plan revision is needed. It is handled by the review-only FE-READER redispatch below.",
+      "session171Decision": "The plans are unchanged in requirements since the session-170 acceptance (exec-166). The only plan diffs are the session-170 implementer progress entries and criteria checkboxes in vactr-frontend-value.md and vactr-frontend-reader.md. The integration-review mid finding is process-only, so no design or plan revision is needed. It is handled by the review-only FE-READER redispatch below.",
       "previousCheckpoint": "plan-checkpoint (session 170) at 6e35f7c; before that session 169, review step5-impl-plan-review-attempt-1-exec-152",
       "accepted": true,
       "needsRevision": false,
@@ -167,13 +167,13 @@
   "plans": [
     {
       "planId": "FE-VALUE",
-      "planPath": "impl-plans/active/vactrol-frontend-value.md",
+      "planPath": "impl-plans/active/vactr-frontend-value.md",
       "implementsTask": "TASK-001",
       "wave": 1,
       "dispatchMode": "accepted",
       "dispatchNote": "Session 171: accepted in session 170 (reconcile attempt-1). Do not redispatch. | Session 172: the dispatcher restarts with acceptedPlanIds=[] and may dispatch FE-VALUE anyway. If dispatched, re-verify only: check post-edit-hashes.txt (40 OK plus the 2 intended FE-READER shared-path edits), make no source edits, write new s172 logs, put planId in the step6-implement payload only, and give review outputs a findings array with no planId.",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-frontend-value.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-frontend-value.md#progress-log",
       "writePaths": [
         "Cargo.toml",
         "src/main.rs",
@@ -217,7 +217,7 @@
         "src/dsp/mod.rs",
         "src/dsp/graph.rs",
         "src/reader/mod.rs",
-        "impl-plans/active/vactrol-frontend-value.md"
+        "impl-plans/active/vactr-frontend-value.md"
       ],
       "sharedPaths": [
         "src/reader/mod.rs",
@@ -251,13 +251,13 @@
     },
     {
       "planId": "FE-READER",
-      "planPath": "impl-plans/active/vactrol-frontend-reader.md",
+      "planPath": "impl-plans/active/vactr-frontend-reader.md",
       "implementsTask": "TASK-002",
       "wave": 2,
       "dispatchMode": "review-only",
       "dispatchNote": "Session 171: do not re-implement. First run 'shasum -a 256 -c tmp/fe-frontend-20260925-s165/FE-READER/attempt-1/final-hashes.txt' and require 20/20 OK. On any mismatch, stop and report blocked. Then rerun only the step7 adversarial review on the unchanged tree. Write evidence to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. The verdict must be schema-valid, with a findings array (empty if none), and must cover RECON2-2 (empty-pipe) and RECON2-3 (the ':7' spec conflict) from reviewContext.openReviewItems. If the review changes any file, re-run every verification row with new s171 logs. | Session-172 amendment: dependsOn cleared because FE-VALUE is implemented, verified and accepted in the working tree (session 170, 0 blocking findings) and a rerun from plan-checkpoint restarts with acceptedPlanIds=[]; FE-VALUE and FE-READER may run in the same review-only wave. Both are read-only on the source tree. | Session 172: step6 re-verification logs and any post-review re-runs use s172 (not s171). Write review evidence to tmp/fe-frontend-20260925-s165/FE-READER/attempt-2/. Do not put planId in the test-integrity or adversarial-review outputs.",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-frontend-reader.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-frontend-reader.md#progress-log",
       "writePaths": [
         "src/reader/node.rs",
         "src/reader/lexer.rs",
@@ -276,7 +276,7 @@
         "tests/support/mod.rs",
         "tests/support/toml_subset.rs",
         "tests/fixtures/spec/manifest.toml",
-        "impl-plans/active/vactrol-frontend-reader.md"
+        "impl-plans/active/vactr-frontend-reader.md"
       ],
       "sharedPaths": [
         "src/reader/mod.rs",
@@ -307,13 +307,13 @@
     },
     {
       "planId": "FE-EXPAND",
-      "planPath": "impl-plans/active/vactrol-frontend-expander.md",
+      "planPath": "impl-plans/active/vactr-frontend-expander.md",
       "implementsTask": "TASK-003",
       "wave": 3,
       "dependsOn": [
         "FE-READER"
       ],
-      "progressFile": "impl-plans/active/vactrol-frontend-expander.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-frontend-expander.md#progress-log",
       "writePaths": [
         "src/expand/mod.rs",
         "src/expand/expander.rs",
@@ -325,7 +325,7 @@
         "src/expand/tests/small_sugar.rs",
         "src/expand/tests/kernel.rs",
         "src/expand/tests/diagnostics.rs",
-        "impl-plans/active/vactrol-frontend-expander.md"
+        "impl-plans/active/vactr-frontend-expander.md"
       ],
       "sharedPaths": [
         "src/lib.rs",
@@ -354,7 +354,7 @@
     },
     {
       "planId": "FE-FINAL",
-      "planPath": "impl-plans/active/vactrol-frontend-finalize.md",
+      "planPath": "impl-plans/active/vactr-frontend-finalize.md",
       "implementsTask": "TASK-001..003 reconciliation",
       "wave": 4,
       "dependsOn": [
@@ -362,24 +362,24 @@
         "FE-READER",
         "FE-EXPAND"
       ],
-      "progressFile": "impl-plans/active/vactrol-frontend-finalize.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-frontend-finalize.md#progress-log",
       "writePaths": [
-        "impl-plans/active/vactrol-core.md",
+        "impl-plans/active/vactr-core.md",
         "impl-plans/README.md",
         "design-docs/specs/design-implementation.md",
-        "impl-plans/active/vactrol-frontend-finalize.md"
+        "impl-plans/active/vactr-frontend-finalize.md"
       ],
       "sharedPaths": [
-        "impl-plans/active/vactrol-frontend-value.md",
-        "impl-plans/active/vactrol-frontend-reader.md",
-        "impl-plans/active/vactrol-frontend-expander.md",
-        "impl-plans/active/vactrol-frontend-finalize.md",
+        "impl-plans/active/vactr-frontend-value.md",
+        "impl-plans/active/vactr-frontend-reader.md",
+        "impl-plans/active/vactr-frontend-expander.md",
+        "impl-plans/active/vactr-frontend-finalize.md",
         "design-docs/specs/design-implementation.md"
       ],
       "acceptanceCriteria": [
-        "vactrol-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, the Verification lint command and the progress log are updated. No other task changed (V7).",
+        "vactr-core.md: TASK-001..003 status, checkboxes, Module Status rows, Dependencies rows, the Verification lint command and the progress log are updated. No other task changed (V7).",
         "impl-plans/README.md and the FE-* plan headers are updated.",
-        "vactrol-core.md stays under 1000 lines.",
+        "vactr-core.md stays under 1000 lines.",
         "V1-V6 (including V3t and V3f), V8, V9a, V9b, V10 and V11 pass.",
         "design-implementation.md differs from 67ecd5a by exactly the two FE-FINAL edits.",
         "The final commit on main uses the AGENTS.md six-section message, with no AI attribution or Co-Authored-By line. It is made by the workflow commit step, staged by the explicit path list in FE-VALUE Edit Protocol item 5, and leaves no untracked path under src/ or tests/."
@@ -394,17 +394,17 @@
         "LOG(final-fmt): CARGO_TERM_QUIET=true cargo fmt -- --check",
         "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
         "ls src",
-        "git diff -U0 -- impl-plans/active/vactrol-core.md | grep -n 'TASK-00[4-9]\\|TASK-010' || echo none",
+        "git diff -U0 -- impl-plans/active/vactr-core.md | grep -n 'TASK-00[4-9]\\|TASK-010' || echo none",
         "git diff 6500f37 -- Cargo.toml",
         "LOG(final-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
         "LOG(final-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "wc -l impl-plans/active/vactrol-core.md",
+        "wc -l impl-plans/active/vactr-core.md",
         "grep -n 'fn kick-sound: :bd-tek' design-docs/specs/design-implementation.md || echo none"
       ]
     }
   ],
   "session172Amendment": {
-    "note": "Bounded checkpoint amendment (operator, 2026-09-25) after dispatch-plans refused redispatch twice: integration-review mid findings named impl-plans/active/vactrol-frontend-reader.md and this manifest, which no pending plan owned. Each plan now owns its own planPath in writePaths, so review findings on a plan document route to that plan. FE-READER no longer dependsOn FE-VALUE at dispatch time (see its dispatchNote). The FE-VALUE gate-contract note was narrowed: planId goes only in the step6-implement payload, never in the test-integrity or adversarial-review outputs (their contracts reject additional properties; session-171 failed on this). Source tree stays uncommitted until the workflow commit step."
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25) after dispatch-plans refused redispatch twice: integration-review mid findings named impl-plans/active/vactr-frontend-reader.md and this manifest, which no pending plan owned. Each plan now owns its own planPath in writePaths, so review findings on a plan document route to that plan. FE-READER no longer dependsOn FE-VALUE at dispatch time (see its dispatchNote). The FE-VALUE gate-contract note was narrowed: planId goes only in the step6-implement payload, never in the test-integrity or adversarial-review outputs (their contracts reject additional properties; session-171 failed on this). Source tree stays uncommitted until the workflow commit step."
   },
   "closure": {
     "date": "2026-09-25",

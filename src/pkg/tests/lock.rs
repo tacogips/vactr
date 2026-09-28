@@ -1,4 +1,4 @@
-//! `vactrol.lock`: header, ordering, round trips and rejections.
+//! `vactr.lock`: header, ordering, round trips and rejections.
 
 use crate::pkg::digest::hex;
 use crate::pkg::lock::{LockEntry, LockFile, LOCK_HEADER};
@@ -42,7 +42,7 @@ fn renders_sorted_with_the_header_and_round_trips() {
 fn rejects_unknown_headers_and_malformed_lines() {
     let good = format!("{PADS} v1.1.0 sha256:{}", hex(&[7; 32]));
     let cases: Vec<(String, u32)> = vec![
-        (format!("# vactrol.lock v2\n{good}\n"), 1),
+        (format!("# vactr.lock v2\n{good}\n"), 1),
         (format!("{good}\n"), 1),
         (format!("{LOCK_HEADER}\n{PADS} v1.1.0\n"), 2),
         (

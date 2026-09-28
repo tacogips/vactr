@@ -45,12 +45,12 @@ describe('zip writer', () => {
   it('writes entries that parse back with valid CRCs', () => {
     const bin = new Uint8Array([0, 1, 2, 255, 128]);
     const zip = buildZip([
-      { name: 'pkg/vactrol.toml', data: '[package]\npath = "a/b"\n' },
+      { name: 'pkg/vactr.toml', data: '[package]\npath = "a/b"\n' },
       { name: 'pkg/src/lib.vact', data: 'let x = 1 # é\n' },
       { name: 'pkg/bin', data: bin },
     ]);
     const entries = readZip(zip);
-    expect(entries.map((e) => e.name)).toEqual(['pkg/vactrol.toml', 'pkg/src/lib.vact', 'pkg/bin']);
+    expect(entries.map((e) => e.name)).toEqual(['pkg/vactr.toml', 'pkg/src/lib.vact', 'pkg/bin']);
     for (const e of entries) expect(crc32(e.data)).toBe(e.crc);
     expect(dec.decode(entries[1]?.data)).toBe('let x = 1 # é\n');
     expect([...(entries[2]?.data ?? [])]).toEqual([...bin]);

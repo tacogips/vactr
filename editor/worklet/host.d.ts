@@ -40,7 +40,7 @@ export interface WorkletNodeLike {
   port: WorkletPortLike;
 }
 
-export class VactrolHost {
+export class VactrHost {
   constructor(ctx: AudioContext | null, node: WorkletNodeLike, x: HostExports, opts: HostOptions);
   ctx: AudioContext;
   node: WorkletNodeLike;
@@ -75,4 +75,4 @@ export class VactrolHost {
   sent(i: number): { time: number; slot: number; kind: number; value: number } | null;
 }
 
-export function startHost(opts: HostOptions): Promise<VactrolHost>;
+export function startHost(opts: HostOptions): Promise<VactrHost>;

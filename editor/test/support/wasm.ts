@@ -1,8 +1,8 @@
 // The real host-wasm artifact for node tests (design 15.1.2 G1; command.md
 // "Browser transport (raw wasm ABI, TASK-010)").
 //
-// `loadVactrolWasm()` reads `$VACTROL_WASM`, else
-// `../target/wasm32-unknown-unknown/debug/vactrol.wasm` relative to editor/
+// `loadVactrWasm()` reads `$VACTR_WASM`, else
+// `../target/wasm32-unknown-unknown/debug/vactr.wasm` relative to editor/
 // (vitest's working directory), and instantiates it with no imports. It
 // THROWS when the file is missing or the module has no `session_init`, so a
 // test using it fails rather than skips. The helpers write inputs into
@@ -22,7 +22,7 @@ interface NodeProcess {
 
 const proc = (globalThis as unknown as { process: NodeProcess }).process;
 
-export const DEFAULT_WASM = '../target/wasm32-unknown-unknown/debug/vactrol.wasm';
+export const DEFAULT_WASM = '../target/wasm32-unknown-unknown/debug/vactr.wasm';
 
 export const TAG_CONSOLE = 0x70;
 export const TAG_SESSION = 0x71;
@@ -40,7 +40,7 @@ type Export = (...args: number[]) => number | bigint | void;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-export interface VactrolWasm {
+export interface VactrWasm {
   readonly path: string;
   readonly exports: Record<string, unknown>;
   /** Calls export `name` with numeric arguments. */
@@ -58,7 +58,7 @@ function joinPath(root: string, p: string): string {
   return `${root.replace(/[\\/]+$/, '')}/${p}`;
 }
 
-// One compile per artifact path; every `loadVactrolWasm()` gets a fresh
+// One compile per artifact path; every `loadVactrWasm()` gets a fresh
 // instance (fresh memory, fresh thread-local state).
 const compiled = new Map<string, Promise<WebAssembly.Module>>();
 
@@ -72,15 +72,15 @@ async function compile(path: string): Promise<WebAssembly.Module> {
     throw new Error(
       `the wasm artifact ${path} is missing: build it with ` +
         '`cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` ' +
-        'or set VACTROL_WASM',
+        'or set VACTR_WASM',
     );
   }
   return WebAssembly.compile(bytes);
 }
 
 /** Loads and instantiates the real artifact; throws on any problem. */
-export async function loadVactrolWasm(): Promise<VactrolWasm> {
-  const path = joinPath(proc.cwd(), proc.env.VACTROL_WASM || DEFAULT_WASM);
+export async function loadVactrWasm(): Promise<VactrWasm> {
+  const path = joinPath(proc.cwd(), proc.env.VACTR_WASM || DEFAULT_WASM);
   let mod = compiled.get(path);
   if (!mod) {
     mod = compile(path);
@@ -89,8 +89,8 @@ export async function loadVactrolWasm(): Promise<VactrolWasm> {
   const instance = await WebAssembly.instantiate(await mod, {});
   const x = instance.exports as Record<string, unknown>;
   if (typeof x.session_init !== 'function') {
-    // The `vactrol` bin and cdylib share the uplifted file name on wasm32;
-    // the cdylib is always `target/wasm32-unknown-unknown/debug/deps/vactrol.wasm`.
+    // The `vactr` bin and cdylib share the uplifted file name on wasm32;
+    // the cdylib is always `target/wasm32-unknown-unknown/debug/deps/vactr.wasm`.
     throw new Error(`${path} does not export session_init (not the host-wasm cdylib)`);
   }
   const fn = (name: string): Export => {
@@ -150,7 +150,7 @@ const TAG_INSTALLED = 0x46;
  * `SliceOk { resource, offset }`, framed and handed to `session_inbox`.
  * Returns the number of replies.
  */
-export function ackSampleInstalls(w: VactrolWasm, records: readonly WasmRecord[]): number {
+export function ackSampleInstalls(w: VactrWasm, records: readonly WasmRecord[]): number {
   const replies: number[][] = [];
   for (const r of records) {
     if (r.tag !== TAG_SAMPLE_BEGIN && r.tag !== TAG_SAMPLE_SLICE) continue;
@@ -172,7 +172,7 @@ export function ackSampleInstalls(w: VactrolWasm, records: readonly WasmRecord[]
 }
 
 /** `session_sample_put` of `frames` (interleaved f32) under `key`; its result. */
-export function putSample(w: VactrolWasm, key: string, frames: Float32Array, rate: number, channels: number): number {
+export function putSample(w: VactrWasm, key: string, frames: Float32Array, rate: number, channels: number): number {
   const data = new Uint8Array(frames.buffer, frames.byteOffset, frames.byteLength);
   return w.withBytes(enc.encode(key), (kp, kn) =>
     w.withBytes(data, (dp) => w.call('session_sample_put', kp, kn, dp, frames.length, rate, channels)),

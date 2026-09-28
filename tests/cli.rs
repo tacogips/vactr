@@ -1,4 +1,4 @@
-//! Integration tests for the `vactrol` binary (design 14.5.10,
+//! Integration tests for the `vactr` binary (design 14.5.10,
 //! `command.md`): every verb runs against `--host noop`, with every fixture
 //! built in a temp directory at runtime (nothing on disk beyond this file)
 //! and no network access. Every spawned child is waited on or killed.
@@ -19,7 +19,7 @@ impl TempDir {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
         let path = std::env::temp_dir().join(format!(
-            "vactrol-cli-test-{tag}-{}-{nanos}-{n}",
+            "vactr-cli-test-{tag}-{}-{nanos}-{n}",
             std::process::id()
         ));
         std::fs::create_dir_all(&path).expect("create a temp directory");
@@ -52,10 +52,10 @@ impl Drop for KillOnDrop {
     }
 }
 
-fn vactrol(cwd: &Path, home: &Path) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_vactrol"));
+fn vactr(cwd: &Path, home: &Path) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_vactr"));
     cmd.current_dir(cwd);
-    cmd.env("VACTROL_HOME", home);
+    cmd.env("VACTR_HOME", home);
     cmd
 }
 
@@ -63,10 +63,10 @@ fn vactrol(cwd: &Path, home: &Path) -> Command {
 fn version_exits_zero_and_prints_the_version() {
     let home = TempDir::new("version-home");
     let cwd = TempDir::new("version-cwd");
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .arg("--version")
         .output()
-        .expect("run `vactrol --version`");
+        .expect("run `vactr --version`");
     assert!(out.status.success(), "{out:?}");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains(env!("CARGO_PKG_VERSION")), "{stdout}");
@@ -77,10 +77,10 @@ fn run_with_noop_host_and_cycles_exits_zero() {
     let home = TempDir::new("run-ok-home");
     let cwd = TempDir::new("run-ok-cwd");
     std::fs::write(cwd.join("a.vact"), "s [:bd :sd] > d1\n").expect("write a.vact");
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .args(["run", "a.vact", "--host", "noop", "--cycles", "2"])
         .output()
-        .expect("run `vactrol run`");
+        .expect("run `vactr run`");
     assert!(out.status.success(), "{out:?}");
 }
 
@@ -89,10 +89,10 @@ fn run_with_a_type_error_exits_three_and_prints_the_code() {
     let home = TempDir::new("run-err-home");
     let cwd = TempDir::new("run-err-cwd");
     std::fs::write(cwd.join("b.vact"), "+ 1 \"a\"\n").expect("write b.vact");
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .args(["run", "b.vact", "--host", "noop", "--cycles", "1"])
         .output()
-        .expect("run `vactrol run` (type error)");
+        .expect("run `vactr run` (type error)");
     assert_eq!(out.status.code(), Some(3), "{out:?}");
     let combined = format!(
         "{}{}",
@@ -106,13 +106,13 @@ fn run_with_a_type_error_exits_three_and_prints_the_code() {
 fn repl_with_noop_host_evaluates_piped_stdin() {
     let home = TempDir::new("repl-home");
     let cwd = TempDir::new("repl-cwd");
-    let mut child = vactrol(cwd.path(), home.path())
+    let mut child = vactr(cwd.path(), home.path())
         .args(["repl", "--host", "noop"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn `vactrol repl`");
+        .expect("spawn `vactr repl`");
     {
         let stdin = child.stdin.as_mut().expect("repl stdin");
         stdin
@@ -144,14 +144,14 @@ fn write_pkg_fixture(store: &Path, path: &str, version: &str, body: &str) {
     let dir = store.join(format!("{path}@{version}"));
     std::fs::create_dir_all(&dir).expect("mkdir the fixture package");
     std::fs::write(
-        dir.join("vactrol.toml"),
+        dir.join("vactr.toml"),
         format!("[package]\npath = \"{path}\"\n\n[deps]\n"),
     )
-    .expect("write the fixture vactrol.toml");
+    .expect("write the fixture vactr.toml");
     std::fs::write(dir.join("pads.vact"), body).expect("write the fixture source");
 }
 
-const PADS: &str = "github.com/test/vactrol-pads";
+const PADS: &str = "github.com/test/vactr-pads";
 
 fn lock_line_prefix(path: &str, version: &str) -> String {
     format!("{path} {version} sha256:")
@@ -174,31 +174,31 @@ fn get_with_dir_store_writes_manifest_and_lock_then_raises_the_version() {
     write_pkg_fixture(store.path(), PADS, "v1.1.0", "let warm 3\n");
     let store_arg = format!("dir:{}", store.path().display());
 
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .args(["get", &format!("{PADS}@v1.0.0"), "--store", &store_arg])
         .output()
-        .expect("run `vactrol get` v1.0.0");
+        .expect("run `vactr get` v1.0.0");
     assert!(out.status.success(), "{out:?}");
 
-    let toml = std::fs::read_to_string(cwd.join("vactrol.toml")).expect("read vactrol.toml");
+    let toml = std::fs::read_to_string(cwd.join("vactr.toml")).expect("read vactr.toml");
     assert!(toml.contains(PADS) && toml.contains("v1.0.0"), "{toml}");
 
-    let lock = std::fs::read_to_string(cwd.join("vactrol.lock")).expect("read vactrol.lock");
-    assert!(lock.starts_with("# vactrol.lock v1"), "{lock}");
+    let lock = std::fs::read_to_string(cwd.join("vactr.lock")).expect("read vactr.lock");
+    assert!(lock.starts_with("# vactr.lock v1"), "{lock}");
     assert!(lock_has_valid_entry(&lock, PADS, "v1.0.0"), "{lock}");
 
-    let out2 = vactrol(cwd.path(), home.path())
+    let out2 = vactr(cwd.path(), home.path())
         .args(["get", &format!("{PADS}@v1.1.0"), "--store", &store_arg])
         .output()
-        .expect("run `vactrol get` v1.1.0");
+        .expect("run `vactr get` v1.1.0");
     assert!(out2.status.success(), "{out2:?}");
 
-    let toml2 = std::fs::read_to_string(cwd.join("vactrol.toml")).expect("read vactrol.toml (2)");
+    let toml2 = std::fs::read_to_string(cwd.join("vactr.toml")).expect("read vactr.toml (2)");
     assert!(
         toml2.contains("v1.1.0") && !toml2.contains("v1.0.0"),
         "{toml2}"
     );
-    let lock2 = std::fs::read_to_string(cwd.join("vactrol.lock")).expect("read vactrol.lock (2)");
+    let lock2 = std::fs::read_to_string(cwd.join("vactr.lock")).expect("read vactr.lock (2)");
     assert!(lock_has_valid_entry(&lock2, PADS, "v1.1.0"), "{lock2}");
 }
 
@@ -211,12 +211,12 @@ fn get_without_a_version_picks_the_latest_release() {
     write_pkg_fixture(store.path(), PADS, "v1.1.0", "let warm 3\n");
     let store_arg = format!("dir:{}", store.path().display());
 
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .args(["get", PADS, "--store", &store_arg])
         .output()
-        .expect("run `vactrol get` with no version");
+        .expect("run `vactr get` with no version");
     assert!(out.status.success(), "{out:?}");
-    let lock = std::fs::read_to_string(cwd.join("vactrol.lock")).expect("read vactrol.lock");
+    let lock = std::fs::read_to_string(cwd.join("vactr.lock")).expect("read vactr.lock");
     assert!(lock_has_valid_entry(&lock, PADS, "v1.1.0"), "{lock}");
 }
 
@@ -226,21 +226,21 @@ fn get_with_a_corrupted_fixture_exits_one_with_package_integrity() {
     let home = TempDir::new("get-bad-home");
     let cwd = TempDir::new("get-bad-cwd");
     let store = TempDir::new("get-bad-store");
-    let bad_path = "github.com/test/vactrol-bad";
+    let bad_path = "github.com/test/vactr-bad";
     let dir = store.join(&format!("{bad_path}@v1.0.0"));
     std::fs::create_dir_all(&dir).expect("mkdir the bad fixture");
     std::fs::write(
-        dir.join("vactrol.toml"),
+        dir.join("vactr.toml"),
         format!("[package]\npath = \"{bad_path}\"\n\n[deps]\n"),
     )
-    .expect("write the bad fixture vactrol.toml");
+    .expect("write the bad fixture vactr.toml");
     std::os::unix::fs::symlink("../../..", dir.join("evil")).expect("create the traversal symlink");
     let store_arg = format!("dir:{}", store.path().display());
 
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .args(["get", &format!("{bad_path}@v1.0.0"), "--store", &store_arg])
         .output()
-        .expect("run `vactrol get` on a corrupted fixture");
+        .expect("run `vactr get` on a corrupted fixture");
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("package-integrity"), "{stderr}");
@@ -251,14 +251,14 @@ fn get_with_a_corrupted_fixture_exits_one_with_package_integrity() {
 fn lsp_without_the_feature_exits_one() {
     let home = TempDir::new("lsp-home");
     let cwd = TempDir::new("lsp-cwd");
-    let out = vactrol(cwd.path(), home.path())
+    let out = vactr(cwd.path(), home.path())
         .arg("lsp")
         .output()
-        .expect("run `vactrol lsp`");
+        .expect("run `vactr lsp`");
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("vactrol was built without the lsp feature"),
+        stderr.contains("vactr was built without the lsp feature"),
         "{stderr}"
     );
 }
@@ -315,13 +315,13 @@ mod serve_tests {
     fn serve_with_noop_host_round_trips_over_the_session_socket() {
         let home = TempDir::new("serve-home");
         let cwd = TempDir::new("serve-cwd");
-        let child = super::vactrol(cwd.path(), home.path())
+        let child = super::vactr(cwd.path(), home.path())
             .args(["serve", "--host", "noop", "--port", "0"])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("spawn `vactrol serve`");
+            .expect("spawn `vactr serve`");
         let mut guard = KillOnDrop(child);
 
         let stderr = guard.0.stderr.take().expect("serve stderr");

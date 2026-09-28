@@ -8,7 +8,7 @@
 // replies to their listeners. `WasmTransport` is the `Transport` over
 // `session_apply` and the `0x71` records. Only `app/main.ts` builds these.
 
-import { startHost, type HostOptions, type VactrolHost } from '../../worklet/host.js';
+import { startHost, type HostOptions, type VactrHost } from '../../worklet/host.js';
 import type { Transport } from './transport';
 import {
   TAG_PKG,
@@ -29,7 +29,7 @@ export type WasmStartOptions = Omit<HostOptions, 'init' | 'onRecord'>;
 type Fn = (...args: number[]) => unknown;
 
 export class WasmCore {
-  private hostRef: VactrolHost | null = null;
+  private hostRef: VactrHost | null = null;
   private readonly sessionListeners: ((text: string) => void)[] = [];
   private readonly renderListeners: ((r: RenderRecord) => void)[] = [];
   private readonly pkgListeners: ((r: PkgReply) => void)[] = [];
@@ -45,11 +45,11 @@ export class WasmCore {
   }
 
   /** Binds an already constructed host (tests construct one over fake exports). */
-  attach(host: VactrolHost): void {
+  attach(host: VactrHost): void {
     this.hostRef = host;
   }
 
-  get host(): VactrolHost {
+  get host(): VactrHost {
     if (!this.hostRef) throw new Error('wasm core not started');
     return this.hostRef;
   }

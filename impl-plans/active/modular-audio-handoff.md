@@ -8,7 +8,7 @@
 
 ## Current boundary
 
-Vactrol has runnable versions of all 24 Plaits positions and all 47
+Vactr has runnable versions of all 24 Plaits positions and all 47
 accessible Braids shapes. This is breadth of independent adaptations and
 source-stage translations, not complete source-port fidelity: Plaits has
 15 adaptations, nine source-stage translations and zero verified full

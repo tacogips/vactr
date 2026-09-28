@@ -9,7 +9,7 @@
 
 Port every eligible published audio effect and audio-processing mode from
 Clouds, Warps, Streams, Rings, Elements and the audio-rate utility modules.
-Stereo and sidechain behavior must survive Vactrol's graph and bus paths.
+Stereo and sidechain behavior must survive Vactr's graph and bus paths.
 
 ## Modules
 
@@ -164,7 +164,7 @@ fidelity paragraph; pinned MIT `warps/dsp/modulator.cc`,
 
 **Deliverables**: Refine `src/dsp/effects/cross_mod.rs` with source-shaped
 analytic crossfade, analog/digital ring, XOR and four-way comparator
-equations, preserving Vactrol's original fold/vocoder implementations,
+equations, preserving Vactr's original fold/vocoder implementations,
 five named controls, continuous algorithm position, preallocated state,
 dual bus outputs and existing codec/editor schema. Do not import generated
 fold, sine, crossfade, oscillator or other lookup arrays.
@@ -229,7 +229,7 @@ saw/pulse/noise. Independent fixed oscillator state carries phase, pending
 two-sample BLEP correction, filters and noise-ducking energy. The pinned
 table-free BLEP, triangle integrator, saw/pulse filtering and carrier
 transition gains are translated. Analytic sine replaces the source table;
-noise uses Vactrol's RNG and one-pole filter; settings 4..6 remain
+noise uses Vactr's RNG and one-pole filter; settings 4..6 remain
 authored extensions. The previous amplifier-gate time scaling was also
 corrected from 32 kHz to the pinned application rate of 96 kHz, and the
 triangle integrator avoids double host-rate scaling. Tests cover BLEP
@@ -278,7 +278,7 @@ The public algorithm position 0..6 now maps to the pinned source's 0..0.75
 XMOD/vocoder range. XMOD timbre follows the source skew and adjacent mode
 interpolation; its last slot balances comparator with NOP/raw modulator.
 The source's triangular raw-modulator bridge is continuous through the
-5.4, 5.6 and 5.8 transition points into Vactrol's independent vocoder.
+5.4, 5.6 and 5.8 transition points into Vactr's independent vocoder.
 Five controls, seven endpoint modes, stereo main/aux, `.vact` and browser
 routing remain available. Tests cover scalar boundaries, audible transition,
 native/browser rates and blocks, late starts and armed zero callback

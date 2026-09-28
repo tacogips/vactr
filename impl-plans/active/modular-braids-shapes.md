@@ -11,7 +11,7 @@ Split SYN-004 in `modular-synth-engines.md`. The pinned MIT Braids
 `settings.h` enumerates 47 accessible shapes before the question-mark
 sentinel. `macro_oscillator.cc` dispatches analog and digital oscillator
 implementations, with two timbre parameters, pitch and strike/sync. Every
-shape needs a stable Vactrol position, `.vact` and editor controls, resource
+shape needs a stable Vactr position, `.vact` and editor controls, resource
 provenance and test evidence. Do not import aggregate `resources.cc` tables
 until each generator/data input is audited; independently synthesized wave
 families must be labeled replacements, not source ports.
@@ -27,7 +27,7 @@ unaudited, so positions 37–40 retain an upstream data dependency.
 pub struct ShapeSpec {
     pub position: u8,
     pub source_name: &'static str,
-    pub vactrol_name: &'static str,
+    pub vactr_name: &'static str,
     pub status: Fidelity,
     pub resources: ResourceState,
 }
@@ -160,7 +160,7 @@ both timbres, strike and local sync alter every mode. Failed budget checks
 leave an already installed native voice playable. This is an original
 adaptation: upstream pluck rotates multiple delay voices and varies update
 and oversampling with pitch; bow, reed and flute use separate waveguides and
-lookup-driven excitation/body filters. Vactrol uses one delay per event,
+lookup-driven excitation/body filters. Vactr uses one delay per event,
 clamps pitch below 20 Hz and imports none of those tables. Rows 0–31 are
 Adaptation/Replacement, 32–46 Pending/NeedsAudit. Source numerical and
 polyphony parity remain open.
@@ -250,7 +250,7 @@ Added a public ordered 47-row manifest at the pinned revision. Positions
 positions 5–46 remain Pending/NeedsAudit. The source's first-five path
 reads generated pitch, sine, folding, cutoff and overdrive data; none was
 imported. Upstream wave-bank positions 37–40 retain an unaudited asset flag.
-The Vactrol voice exposes pitch, two timbres, an event-onset strike transient
+The Vactr voice exposes pitch, two timbres, an event-onset strike transient
 and an event-local generated hard-sync clock. Neither per-sample external
 sync nor fixed-point/source-table numerical parity is claimed. Focused tests
 cover distinct shape/control response, installed `.vact` editor IDs,
@@ -266,5 +266,5 @@ entry is a sentinel, not a playable shape. The accessible set spans 17
 analog/compound, 11 digital/formant/FM, nine physical/drum, four wave-bank,
 and six noise/granular/modulation positions. `macro_oscillator.h` exposes
 two timbre values, pitch, strike and a sync buffer. No Braids source or
-resources have yet been imported into Vactrol. A per-file data audit is
+resources have yet been imported into Vactr. A per-file data audit is
 required before BRA-002..006 can be called a port.

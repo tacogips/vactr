@@ -1,12 +1,12 @@
-//! Raw Vactrol position-10 FM kernel probe for a separate source comparison.
+//! Raw Vactr position-10 FM kernel probe for a separate source comparison.
 //! Run with `CARGO_TERM_QUIET=true cargo run -q --example fm_pair_reference`.
 
 use std::io::{self, BufWriter, Write};
 
-use vactrol::dsp::arena::SampleStore;
-use vactrol::dsp::caps::CapabilitySet;
-use vactrol::dsp::effects::FxStats;
-use vactrol::dsp::ugen::{fm_pair, Inp, Kx, NodeState, MAX_PORTS};
+use vactr::dsp::arena::SampleStore;
+use vactr::dsp::caps::CapabilitySet;
+use vactr::dsp::effects::FxStats;
+use vactr::dsp::ugen::{fm_pair, Inp, Kx, NodeState, MAX_PORTS};
 
 const SAMPLE_RATE: f32 = 48_000.0;
 const BLOCK_FRAMES: usize = 24;
@@ -43,7 +43,7 @@ fn controls() -> io::Result<[f32; 3]> {
 
 fn run(mut output: impl Write, controls: [f32; 3]) -> io::Result<()> {
     // Match the pinned source's audible note-69 carrier after its calibrated
-    // NoteToFrequency conversion and fourfold phase advance. The raw Vactrol
+    // NoteToFrequency conversion and fourfold phase advance. The raw Vactr
     // kernel takes hertz.
     let carrier_hz: f32 = 440.0 * 48_000.0 / 47_872.34;
     if !carrier_hz.is_finite() || carrier_hz <= 0.0 {

@@ -1,4 +1,4 @@
-# vactrol Visual Specification (working draft)
+# vactr Visual Specification (working draft)
 
 Supporting document to `lang-reference.md`: visuals as Hydra-style
 texture chains. Music and visuals are specified separately (author,
@@ -9,7 +9,7 @@ Conventions are those of `lang-reference.md` (`# Decided`, `# => v`).
 
 ## 1. Visuals (Hydra model)
 
-```vactrol
+```vactr
 # hydra style: source -> transforms -> output. A chain fits directly,
 # and `out o0` is the sink (the visual counterpart of `d1`), so no
 # wrapper form is needed. `out` returns the chain it bound.
@@ -45,7 +45,7 @@ osc {range sine 10 30}
 
 # audio-reactive (Hydra-native): the host supplies audio input analysis
 # as signals; `fft n` is a band level (0..1), `amp` overall amplitude.
-# Coupling to vactrol's own music slots is a separate, deferred topic
+# Coupling to vactr's own music slots is a separate, deferred topic
 # (notes.md, "music-visual coupling").
 shape 4
 	> scale {+ 1 {fft 0}}            # bass band, 0..1

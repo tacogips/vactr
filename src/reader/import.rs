@@ -12,7 +12,7 @@ pub struct ImportDecl {
     pub path: Rc<str>,
     pub alias: Option<Rc<str>>,
     pub open: bool,
-    /// `ALIAS`, or the last path segment without a `vactrol-` prefix.
+    /// `ALIAS`, or the last path segment without a `vactr-` prefix.
     pub prefix: Rc<str>,
     pub span: Span,
 }
@@ -92,7 +92,7 @@ pub(crate) fn parse_import(text: &str, span: Span) -> Result<ImportDecl, &'stati
         Some(a) => Rc::clone(a),
         None => {
             let last = path.rsplit('/').next().unwrap_or(path);
-            let name = last.strip_prefix("vactrol-").unwrap_or(last);
+            let name = last.strip_prefix("vactr-").unwrap_or(last);
             if !is_identifier(name) {
                 return Err("the import prefix is not an identifier; add `as ALIAS`");
             }

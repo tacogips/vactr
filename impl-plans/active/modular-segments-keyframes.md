@@ -13,7 +13,7 @@ types, loops, per-segment primary/secondary controls, phase/value outputs
 and an explicit `ProcessOscillator(audio_rate, ...)` path. The pinned
 Frames firmware evaluates four-channel keyframe or poly-LFO DAC controls;
 the physical mixer/VCA audio path is analog and absent from firmware DSP.
-A digital keyframe-controlled audio mixer in Vactrol is therefore an
+A digital keyframe-controlled audio mixer in Vactr is therefore an
 adaptation, not a source mixer port.
 
 ## Modules
@@ -23,7 +23,7 @@ adaptation, not a source mixer port.
 ```rust
 pub struct SegmentSpec {
     pub source_type: u8,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub status: Fidelity,
 }
 pub fn segment_modes() -> &'static [SegmentSpec; 4];
@@ -63,7 +63,7 @@ after individual provenance review; otherwise use analytic shapes.
 `stages/segment_generator.h` declares four segment types and an
 audio-rate oscillator processor. `frames/frames.cc` writes four DAC values
 from `Keyframer` or `PolyLfo`; it does not implement the analog mixer/VCA
-audio path. No Stages or Frames source/data has been imported into Vactrol.
+audio path. No Stages or Frames source/data has been imported into Vactr.
 
 ### Session: 2026-09-28 — Stages bounded audio adaptation
 

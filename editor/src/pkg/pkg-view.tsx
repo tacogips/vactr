@@ -30,7 +30,7 @@ export function PkgView(props: {
       <li data-pkg-path={item.path} title={item.message}>
         <span class="pkg-path">{item.path}</span>
         {props.tier === 'native' ?
-          <code data-pkg="get-command">{`vactrol get ${item.path}`}</code> :
+          <code data-pkg="get-command">{`vactr get ${item.path}`}</code> :
           <button type="button" class="vact-icon-button" data-pkg-action="import" disabled={props.model().busy}
             aria-label={`Import ${item.path}`} title={`Import ${item.path}`} on:click={() => props.onImport(item.path)}><Download /></button>}
       </li>

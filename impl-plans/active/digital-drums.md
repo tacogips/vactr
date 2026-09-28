@@ -7,12 +7,12 @@
 
 ## Design Document Reference
 
-Implement Vactrol's original digital drum kit and make all of its declared
+Implement Vactr's original digital drum kit and make all of its declared
 sound parameters addressable in `.vact`. The external repository is a research
 reference for an MIT-compatible drum DSP design. DaisySP code may be ported
 only with its applicable MIT copyright and license notices. No third-party
 wave tables, samples, presets, lookup data, or asset-derived traces may be
-reused. The product and templates use Vactrol names.
+reused. The product and templates use Vactr names.
 
 ## Modules and interfaces
 
@@ -59,7 +59,7 @@ metadata without weakening existing generic synthesis templates.
 
 | Task | Deliverable | Depends on | Status |
 |------|-------------|------------|--------|
-| DDRUM-001 | Inventory original sound controls and map sequencer/host controls to Vactrol constructs | none | Partial; per-voice controls exist, kit-wide inventory open |
+| DDRUM-001 | Inventory original sound controls and map sequencer/host controls to Vactr constructs | none | Partial; per-voice controls exist, kit-wide inventory open |
 | DDRUM-002 | Route, validate, and publish arbitrary declared instrument controls; reject overflows | DDRUM-001 | Implemented by MOD-003 typed parameter routing |
 | DDRUM-003 | Build and test tonal drum and snare graphs with all applicable controls | DDRUM-002 | Several neutral tonal/snare voices runnable; unified kit pending |
 | DDRUM-004 | Build and test metallic and hat graphs with all applicable controls | DDRUM-002 | Several neutral metallic/hat voices runnable; unified kit pending |
@@ -84,7 +84,7 @@ metadata without weakening existing generic synthesis templates.
 
 ## Completion Criteria
 
-- [ ] Every original sound-control category has a documented Vactrol mapping.
+- [ ] Every original sound-control category has a documented Vactr mapping.
 - [ ] Any ported DaisySP code retains applicable MIT notices; no third-party wave table, sample, preset, or lookup data enters the implementation.
 - [ ] Every exposed voice knob accepts `.vact` pattern and live-cell values.
 - [ ] Tonal drum, snare, cymbal, and hat render finite, audible audio.

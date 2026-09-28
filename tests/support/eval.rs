@@ -4,23 +4,23 @@
 //! read -> expand -> check -> compile -> run. Blocks that need package
 //! loading run through a `Session` instead (`session_eval`).
 
-use vactrol::dsp::caps::CapabilitySet;
-use vactrol::expand::{expand, ExpandCx};
-use vactrol::host::caps::Hosts;
-use vactrol::ns::evaluator::Evaluator;
-use vactrol::ns::load::NoopHost;
-use vactrol::ns::namespace::Prelude;
-use vactrol::ns::stage::RecordingSink;
-use vactrol::pattern::{query, InputCells, QueryCtx, QueryResult, TimeSpan};
-use vactrol::reader::span::FileId;
-use vactrol::reader::{read, AliasEnv, Node};
-use vactrol::session::session::{Session, SessionConfig};
-use vactrol::types::check;
-use vactrol::types::diag::{Diagnostic, Severity};
-use vactrol::types::ty::CheckEnv;
-use vactrol::types::HostManifest;
-use vactrol::value::value::Value;
-use vactrol::vm::{Failure, VmQuery};
+use vactr::dsp::caps::CapabilitySet;
+use vactr::expand::{expand, ExpandCx};
+use vactr::host::caps::Hosts;
+use vactr::ns::evaluator::Evaluator;
+use vactr::ns::load::NoopHost;
+use vactr::ns::namespace::Prelude;
+use vactr::ns::stage::RecordingSink;
+use vactr::pattern::{query, InputCells, QueryCtx, QueryResult, TimeSpan};
+use vactr::reader::span::FileId;
+use vactr::reader::{read, AliasEnv, Node};
+use vactr::session::session::{Session, SessionConfig};
+use vactr::types::check;
+use vactr::types::diag::{Diagnostic, Severity};
+use vactr::types::ty::CheckEnv;
+use vactr::types::HostManifest;
+use vactr::value::value::Value;
+use vactr::vm::{Failure, VmQuery};
 
 use super::multiset;
 
@@ -145,7 +145,7 @@ pub struct SessionRun {
     pub fails: Vec<String>,
 }
 
-/// Evaluates `text` as one document through `vactrol::session::Session`
+/// Evaluates `text` as one document through `vactr::session::Session`
 /// over `NoopHost` hosts with no lock and no package cache: the path of
 /// blocks that need package loading (`eval_via = "session"`).
 pub fn session_eval(text: &str) -> SessionRun {

@@ -1,4 +1,4 @@
-//! Streams' six ordered firmware CV processors and Vactrol audio adaptations.
+//! Streams' six ordered firmware CV processors and Vactr audio adaptations.
 
 use super::{CoverageState, ResourceState};
 
@@ -12,7 +12,7 @@ pub struct StreamsFunctionSpec {
     pub source_revision: &'static str,
     /// All six upstream processors emit gain/frequency control voltages.
     pub firmware_output: &'static str,
-    /// Vactrol-authored digital stereo audio effect, when runnable.
+    /// Vactr-authored digital stereo audio effect, when runnable.
     pub digital_effect: Option<&'static str>,
     pub coverage: CoverageState,
     pub resources: ResourceState,
@@ -53,9 +53,9 @@ pub const STREAMS_FUNCTIONS: [StreamsFunctionSpec; 6] = [
     ),
     row(
         1,
-        "Vactrol",
-        "streams/vactrol.cc",
-        Some("stream-vactrol"),
+        "Vactr",
+        "streams/vactr.cc",
+        Some("stream-vactr"),
         CoverageState::Adaptation,
         ResourceState::Replacement,
         "damped / plucked",
@@ -105,5 +105,5 @@ pub fn streams_functions() -> &'static [StreamsFunctionSpec; 6] {
 
 #[must_use]
 pub fn streams_coverage_summary() -> &'static str {
-    "Streams: six firmware gain/frequency CV processors; Vactrol provides original stereo digital adaptations for all six control roles, including filter controller and Lorenz. Alternate/linked settings are ignored by the source's final two Configure methods and are not placebo controls. No source audio port, two-pair hardware I/O or analog hardware equivalence is claimed."
+    "Streams: six firmware gain/frequency CV processors; Vactr provides original stereo digital adaptations for all six control roles, including filter controller and Lorenz. Alternate/linked settings are ignored by the source's final two Configure methods and are not placebo controls. No source audio port, two-pair hardware I/O or analog hardware equivalence is claimed."
 }

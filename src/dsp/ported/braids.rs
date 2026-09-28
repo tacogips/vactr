@@ -1,4 +1,4 @@
-//! Published Braids registration order and truthful Vactrol coverage.
+//! Published Braids registration order and truthful Vactr coverage.
 
 use super::{CoverageState, ResourceState};
 
@@ -12,7 +12,7 @@ pub struct BraidsShapeSpec {
     pub source_name: &'static str,
     pub source_path: &'static str,
     pub source_revision: &'static str,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub coverage: CoverageState,
     pub resources: ResourceState,
     /// The upstream wave-bank family has an unaudited data dependency.
@@ -81,7 +81,7 @@ const fn rows() -> [BraidsShapeSpec; 47] {
         source_name: "",
         source_path: "braids/macro_oscillator.cc",
         source_revision: BRAIDS_REVISION,
-        vactrol_template: None,
+        vactr_template: None,
         coverage: CoverageState::Pending,
         resources: ResourceState::NeedsAudit,
         upstream_wave_assets: false,
@@ -100,7 +100,7 @@ const fn rows() -> [BraidsShapeSpec; 47] {
             result[i].source_path = "braids/digital_oscillator.cc";
         }
         result[i].upstream_wave_assets = i >= 37 && i <= 40;
-        result[i].vactrol_template = Some(if i < 5 {
+        result[i].vactr_template = Some(if i < 5 {
             "macro-five-voice"
         } else if i < 9 {
             "macro-sub-sync-voice"

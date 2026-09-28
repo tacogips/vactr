@@ -34,7 +34,7 @@ count as an audio synth or effect port.
 pub struct PeaksFunctionSpec {
     pub function: u8,
     pub source_name: &'static str,
-    pub vactrol_name: Option<&'static str>,
+    pub vactr_name: Option<&'static str>,
     pub audio_role: bool,
     pub status: Fidelity,
     pub resources: ResourceState,
@@ -73,7 +73,7 @@ an adaptation. Keep the callback bounded and allocation-free.
 
 `processors.h` and `processors.cc` at revision
 `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4` register twelve
-functions. Four drum architectural adaptations already exist in Vactrol;
+functions. Four drum architectural adaptations already exist in Vactr;
 their source-level parity is unverified. The `digits.bin` asset has not
 been cleared and is excluded. No additional Peaks source/data was
 imported by this inventory step.
@@ -83,7 +83,7 @@ imported by this inventory step.
 `peaks_functions()` inventories all twelve source registrations. Positions
 0–2 use `peak-motion-voice`: full ADSR / half AD, full LFO shape/parameter/
 reset and half seven-preset LFO, plus tapped-period LFO with half/full roles.
-The two host outputs are an analytic main and a Vactrol bipolar/quarter-cycle
+The two host outputs are an analytic main and a Vactr bipolar/quarter-cycle
 auxiliary extension; they are not claimed to match simultaneous Peaks output
 timing or phase exactly. `peak-trigger`, `peak-gate`, `peak-tap`, and
 `peak-sync` are event-local controls; tap tempo requires two rising edges in
@@ -103,7 +103,7 @@ follow the source control-role mappings. The half shaper derives interval from
 duration; the half randomizer fixes acceptance and delay randomness; the half
 ball fixes height and initial velocity. Separate gate and trigger rising edges
 can restart an event-local function. Main emits gate/height, while auxiliary
-emits a short onset/impact pulse as a Vactrol extension. Source 32-pulse
+emits a short onset/impact pulse as a Vactr extension. Source 32-pulse
 overlap queues, tick-rate quantization, generated delay/gravity LUTs and
 random sequence are not translated: one new trigger replaces the current
 bounded pulse train, timing is host-rate analytic, and randomness is seeded
@@ -118,7 +118,7 @@ ten accessible; optional event-local automatic selection applies the exposed
 transition probability. `station-tone`, `station-noise`, `station-drive`,
 gate and trigger are codeable, while half mode fixes noise/drive to their
 source middle-control roles. Main emits processed audio and auxiliary emits
-the dry generated tone/voice as a Vactrol extension. These original formant
+the dry generated tone/voice as a Vactr extension. These original formant
 trajectories are not a reconstruction of the recorded source digits, language
 timing, offsets or timbres. No `digits.bin`, `wav_digits`, generated sine/fold
 table or source digit offset is imported. The coverage row is

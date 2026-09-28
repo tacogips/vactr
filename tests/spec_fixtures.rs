@@ -9,10 +9,10 @@ use std::collections::BTreeMap;
 use support::eval::{check_diags, check_errors, clean_forms, query_cycle, run, session_eval};
 use support::toml_subset::{self, Table};
 use support::{manifest, multiset, spec_blocks, spec_doc};
-use vactrol::expand::{expand, is_kernel, ExpandCx};
-use vactrol::reader::span::FileId;
-use vactrol::reader::{print_all, read, AliasEnv, Node, ReadResult};
-use vactrol::types::diag::{DiagCode, Diagnostic};
+use vactr::expand::{expand, is_kernel, ExpandCx};
+use vactr::reader::span::FileId;
+use vactr::reader::{print_all, read, AliasEnv, Node, ReadResult};
+use vactr::types::diag::{DiagCode, Diagnostic};
 
 const DOCS: [&str; 2] = ["lang-reference.md", "design-music.md"];
 
@@ -108,7 +108,7 @@ fn every_spec_block_has_exactly_one_entry() {
     let mut expected = BTreeMap::new();
     for doc in DOCS {
         let count = spec_blocks(&spec_doc(doc)).len();
-        assert!(count > 0, "{doc}: no vactrol blocks");
+        assert!(count > 0, "{doc}: no vactr blocks");
         for ordinal in 1..=count {
             let ordinal = i64::try_from(ordinal).expect("small ordinal");
             expected.insert((doc.to_string(), ordinal), 1usize);

@@ -88,7 +88,7 @@ fn twelve_rows_are_ordered_and_truthful() {
     }
     for row in &rows[..3] {
         assert_eq!(row.coverage, CoverageState::Adaptation);
-        assert_eq!(row.vactrol_template, Some("peak-motion-voice"));
+        assert_eq!(row.vactr_template, Some("peak-motion-voice"));
     }
     for row in &rows[3..6] {
         assert_eq!(row.coverage, CoverageState::Adaptation);

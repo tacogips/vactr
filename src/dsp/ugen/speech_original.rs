@@ -2,7 +2,7 @@
 //!
 //! Naive formant, SAM-like reset formants, and LPC-like excitation/filter
 //! roles are independent implementations. Upper-range words are four original
-//! Vactrol syllable tokens, not TI ROM words or upstream phoneme data.
+//! Vactr syllable tokens, not TI ROM words or upstream phoneme data.
 
 use std::f32::consts::{PI, TAU};
 
@@ -10,7 +10,7 @@ use super::{Inp, Kx, NodeState, MAX_PORTS};
 
 /// Oscillator, deterministic excitation, three resonators and lattice state.
 pub const STATE_FLOATS: usize = 20;
-/// Original upper-range Vactrol syllable tokens: ava, omi, era, unu.
+/// Original upper-range Vactr syllable tokens: ava, omi, era, unu.
 pub const ORIGINAL_WORDS: usize = 4;
 
 fn unit(value: f32, fallback: f32) -> f32 {

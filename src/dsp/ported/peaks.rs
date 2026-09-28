@@ -1,6 +1,6 @@
 //! Peaks' twelve registered functions, in `processors.h` order.
 //!
-//! Runnable entries are Vactrol adaptations or source-stage translations,
+//! Runnable entries are Vactr adaptations or source-stage translations,
 //! never validated source ports. The original
 //! Number Station digit binary and generated waveform tables are excluded.
 
@@ -21,12 +21,12 @@ pub struct PeaksFunctionSpec {
     pub source_name: &'static str,
     pub source_path: &'static str,
     pub source_revision: &'static str,
-    pub vactrol_template: Option<&'static str>,
+    pub vactr_template: Option<&'static str>,
     pub role: PeaksRole,
     pub coverage: CoverageState,
     pub resources: ResourceState,
     pub alternate: &'static str,
-    /// The upstream position references unaudited digit recordings; Vactrol
+    /// The upstream position references unaudited digit recordings; Vactr
     /// does not import them, including when an original replacement runs.
     pub upstream_digit_asset: bool,
 }
@@ -36,7 +36,7 @@ const fn row(
     position: u8,
     source_name: &'static str,
     source_path: &'static str,
-    vactrol_template: Option<&'static str>,
+    vactr_template: Option<&'static str>,
     role: PeaksRole,
     coverage: CoverageState,
     resources: ResourceState,
@@ -47,7 +47,7 @@ const fn row(
         source_name,
         source_path,
         source_revision: PEAKS_REVISION,
-        vactrol_template,
+        vactr_template,
         role,
         coverage,
         resources,

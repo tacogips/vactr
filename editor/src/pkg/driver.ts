@@ -207,7 +207,7 @@ export interface UnresolvedImport {
 /**
  * The package path of a `package-not-locked`/`package-not-fetched`
  * diagnostic. Rule: the first backticked token of the message (Rust
- * `PkgError` Display: "package `<path>` is not in `vactrol.lock`",
+ * `PkgError` Display: "package `<path>` is not in `vactr.lock`",
  * "`<path>[@<version>]` is locked but not fetched; ..."), cut at its first
  * `@`. Null when the message carries no backticked token.
  */

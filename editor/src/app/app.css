@@ -8,7 +8,7 @@ body {
   font: 13px/1.4 system-ui, sans-serif;
 }
 
-.vactrol-editor {
+.vactr-editor {
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -252,16 +252,16 @@ body {
 
 /* The side column folded to a rail: only the fold button stays visible.
    Areas stay mounted (hidden, not removed). */
-.vactrol-editor[data-side-folded='true'] .pane-side {
+.vactr-editor[data-side-folded='true'] .pane-side {
   flex: 0 0 38px;
   min-width: 38px;
 }
 
-.vactrol-editor[data-side-folded='true'] .pane-side > :not(.pane-side-bar) {
+.vactr-editor[data-side-folded='true'] .pane-side > :not(.pane-side-bar) {
   display: none;
 }
 
-.vactrol-editor[data-side-folded='true'] .pane-side-bar {
+.vactr-editor[data-side-folded='true'] .pane-side-bar {
   border-bottom: 0;
 }
 

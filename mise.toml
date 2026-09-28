@@ -97,12 +97,12 @@ run = "mise run lint && mise run test && mise run build"
 
 [tasks.compare-plaits-fm]
 description = "Compare raw FM kernels against a separate pinned Mutable Instruments checkout"
-run = 'python3 verification/compare_plaits_fm.py --source "${VACTROL_MI_REFERENCE:?set VACTROL_MI_REFERENCE to the pinned Eurorack checkout}"'
+run = 'python3 verification/compare_plaits_fm.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
 [tasks.probe-warps-vocoder]
 description = "Measure the source Warps vocoder in a separate pinned Mutable Instruments checkout"
-run = 'python3 verification/probe_warps_vocoder.py --source "${VACTROL_MI_REFERENCE:?set VACTROL_MI_REFERENCE to the pinned Eurorack checkout}"'
+run = 'python3 verification/probe_warps_vocoder.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
 [tasks.install-git-hooks]

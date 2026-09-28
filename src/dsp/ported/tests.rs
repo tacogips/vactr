@@ -63,7 +63,7 @@ fn braids_registry_is_ordered_and_truthful() {
         let editor = manifest.editor_decl(core).expect("registered core editor");
         assert_eq!(row.coverage, CoverageState::Adaptation);
         assert_eq!(row.resources, ResourceState::Replacement);
-        assert_eq!(row.vactrol_template, Some(template));
+        assert_eq!(row.vactr_template, Some(template));
         for name in [
             row.pitch_control,
             row.color_control,
@@ -109,7 +109,7 @@ fn implemented_rows_have_registered_templates_and_editor_controls() {
     let mut adaptations = 0;
     let mut source_stages = 0;
     for row in rows {
-        if let Some(name) = row.vactrol_template {
+        if let Some(name) = row.vactr_template {
             assert!(
                 TEMPLATE_NAMES.contains(&name),
                 "{name}: prelude registration"
@@ -151,11 +151,11 @@ fn implemented_rows_have_registered_templates_and_editor_controls() {
     }
     assert_eq!((adaptations, source_stages), (15, 9));
     assert_eq!(rows[10].coverage, CoverageState::SourceStage);
-    assert_eq!(rows[10].vactrol_template, Some("fm-pair-voice"));
+    assert_eq!(rows[10].vactr_template, Some("fm-pair-voice"));
     assert_eq!(rows[11].coverage, CoverageState::SourceStage);
-    assert_eq!(rows[11].vactrol_template, Some("grain-pair-voice"));
+    assert_eq!(rows[11].vactr_template, Some("grain-pair-voice"));
     assert_eq!(rows[17].coverage, CoverageState::SourceStage);
-    assert_eq!(rows[17].vactrol_template, Some("clock-noise-voice"));
+    assert_eq!(rows[17].vactr_template, Some("clock-noise-voice"));
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn resource_blocked_positions_are_not_reported_as_ports() {
         assert_eq!(row.coverage, CoverageState::Adaptation);
         assert_eq!(row.resources, ResourceState::Replacement);
         assert!(row.resource_flags.dx7_rom);
-        assert!(row.vactrol_template.is_some());
+        assert!(row.vactr_template.is_some());
     }
     assert_eq!(rows[5].resources, ResourceState::Replacement);
     assert!(rows[5].resource_flags.wave_assets);
@@ -187,7 +187,7 @@ fn resource_blocked_positions_are_not_reported_as_ports() {
     assert_eq!(rows[15].coverage, CoverageState::Adaptation);
     assert_eq!(rows[15].resources, ResourceState::Replacement);
     assert!(rows[15].resource_flags.ti_rom);
-    assert_eq!(rows[15].vactrol_template, Some("speech-voice"));
+    assert_eq!(rows[15].vactr_template, Some("speech-voice"));
     assert!(rows
         .iter()
         .all(|row| row.coverage != CoverageState::SourcePort));
@@ -196,7 +196,7 @@ fn resource_blocked_positions_are_not_reported_as_ports() {
         .filter(|row| row.resources == ResourceState::RightsBlocked)
     {
         assert_eq!(row.coverage, CoverageState::Unavailable);
-        assert!(row.vactrol_template.is_none());
+        assert!(row.vactr_template.is_none());
         assert!(row.resource_flags.dx7_rom || row.resource_flags.ti_rom);
     }
     let summary = plaits_coverage_summary();

@@ -166,7 +166,7 @@ pub fn fetch_and_publish(
     r
 }
 
-/// `vactrol get`'s core: MVS over the root manifest's requirements, then
+/// `vactr get`'s core: MVS over the root manifest's requirements, then
 /// fetch and publish every selected version, then the lock.
 ///
 /// # Errors

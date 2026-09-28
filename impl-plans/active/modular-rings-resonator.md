@@ -72,7 +72,7 @@ adaptations rather than source-equivalent shared Part behavior.
 ### Session: 2026-09-28 — external audio resonator bus adaptation
 
 Added `resonant-bank` as a stereo bus/master effect. Source `Part::Process`
-accepts mono excitation; Vactrol sums L/R input, then returns resonator main
+accepts mono excitation; Vactr sums L/R input, then returns resonator main
 and auxiliary channels on L/R. Six model roles, structure, brightness,
 damping, position, note/tonic/FM, chord, polyphony, strum, the three internal
 performance flags, external mix, gate and dry/wet mix are codeable. The 17th
@@ -98,13 +98,13 @@ bus path. No source tables or binary assets are imported.
 Added `string-choir-voice`/`string-choir-core` and a separate
 `StringSynthSpec` row. The source has twelve oscillators, up to four
 persistent rotating groups, original registration/chord arrays, and six FX
-selections. Vactrol independently authors four analytic chord/comb voices,
+selections. Vactr independently authors four analytic chord/comb voices,
 original registration/interval arithmetic and six distinct bounded FX
 formulas: two formant colors, chorus, ensemble, and two short feedback
 reverbs. All four Patch values, note/tonic/FM, chord, polyphony, strum,
 internal performance flags and FX selection fit the 16-port interface.
 The source `internal_*` flags are not consumed directly in
-`StringSynthPart::Process`; Vactrol gives them documented event-local roles.
+`StringSynthPart::Process`; Vactr gives them documented event-local roles.
 
 Memory is allocated before the callback: 20,402/22,196/44,276 floats per
 two-output voice at 44.1/48/96 kHz. A seeded rendered root-comb recurrence
@@ -155,7 +155,7 @@ sympathetic-string, and string-with-reverb models. `Patch` carries four
 continuous values; `PerformanceState` carries strum, internal input/note
 selection, tonic/note/FM and chord. The source headers carry Emilie
 Gillet's MIT terms. This is a source map only: no Rings kernel, routing,
-data or source-parity port has yet landed in Vactrol.
+data or source-parity port has yet landed in Vactr.
 
 The source dependency pass finds generated lookup calls in
 `resonator.cc` (`lut_stiffness`, `lut_4_decades`), `string.cc`

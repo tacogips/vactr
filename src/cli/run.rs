@@ -1,4 +1,4 @@
-//! `vactrol run <file.vact>` (design 14.5.10, `command.md`): evaluates the
+//! `vactr run <file.vact>` (design 14.5.10, `command.md`): evaluates the
 //! whole document once, prints its diagnostics, console output and form
 //! failures, then ticks until interrupted or for `--cycles N`.
 
@@ -17,14 +17,14 @@ pub fn main(file: &Path, host: HostChoice, cycles: Option<u64>, cwd: &Path) -> i
     let text = match std::fs::read_to_string(file) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("vactrol: cannot read `{}`: {e}", file.display());
+            eprintln!("vactr: cannot read `{}`: {e}", file.display());
             return 1;
         }
     };
     let (mut session, clock) = match build_session(host, cwd) {
         Ok(session) => session,
         Err(error) => {
-            eprintln!("vactrol: {error}");
+            eprintln!("vactr: {error}");
             return 1;
         }
     };

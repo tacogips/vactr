@@ -403,10 +403,10 @@ fn zip_of(files: &[(&str, &[u8])]) -> Vec<u8> {
 
 #[test]
 fn drive_packages_resolves_over_the_proxy_and_the_import_then_loads() {
-    const PATH: &str = "github.com/someone/vactrol-wire-fixture";
+    const PATH: &str = "github.com/someone/vactr-wire-fixture";
     let manifest = format!("[package]\npath = \"{PATH}\"\n\n[deps]\n").into_bytes();
     let module = b"let greeting 42\n".to_vec();
-    let files: Vec<(&str, &[u8])> = vec![("vactrol.toml", &manifest), ("mod.vact", &module)];
+    let files: Vec<(&str, &[u8])> = vec![("vactr.toml", &manifest), ("mod.vact", &module)];
     let list_url = format!("/{PATH}/@v/list");
     let toml_url = format!("/{PATH}/@v/v1.0.0.toml");
     let zip_url = format!("/{PATH}/@v/v1.0.0.zip");

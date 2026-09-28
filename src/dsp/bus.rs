@@ -384,7 +384,7 @@ impl BusGraph {
                         | EffectKind::ResonantBank
                         | EffectKind::ElementsBank
                         | EffectKind::StreamEnvelope
-                        | EffectKind::StreamVactrol
+                        | EffectKind::StreamVactr
                         | EffectKind::StreamFollower
                         | EffectKind::StreamCompressor
                         | EffectKind::StreamFilter

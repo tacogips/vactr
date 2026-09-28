@@ -8,7 +8,7 @@
 ## Design Document Reference
 
 Port every eligible published oscillator, physical-model, percussion, and
-audio-rate function engine. Use neutral Vactrol names, the shared parameter
+audio-rate function engine. Use neutral Vactr names, the shared parameter
 manifest, and only cleared code/resources. `modular-audio-foundation.md` is
 the prerequisite; `modular-fm-drums.md` owns the Peaks FM drum slice.
 Plaits-specific engine slices and fidelity work are tracked in
@@ -101,7 +101,7 @@ resources and disclose the resulting sonic difference.
 
 ### Session: 2026-09-27, SYN-007 analytic percussion slice
 
-**Source audit**: At revision `08460a69`, the MIT-covered bass header exposes frequency, punch, tone, decay; snare exposes frequency, tone, snappy, decay. High-hat `Configure` is empty; its four Vactrol controls are extensions. The three implementations use original floating-point oscillators, envelopes, filters and seeded noise. They import no Peaks, `stmlib`, resource or wave-table code/data. The copyright/MIT notice is in `THIRD_PARTY_NOTICES.md`.
+**Source audit**: At revision `08460a69`, the MIT-covered bass header exposes frequency, punch, tone, decay; snare exposes frequency, tone, snappy, decay. High-hat `Configure` is empty; its four Vactr controls are extensions. The three implementations use original floating-point oscillators, envelopes, filters and seeded noise. They import no Peaks, `stmlib`, resource or wave-table code/data. The copyright/MIT notice is in `THIRD_PARTY_NOTICES.md`.
 **Implementation**: One fixed-state percussion UGen has three selected architectures; distinct `low-drum`, `wire-drum`, and `metal-hat` `.vact` templates expose all named controls through MOD-003's typed scalar parameter path. The graph codec carries the mode and parameters unchanged on native and browser tiers.
 **Dependency rationale**: Each node uses existing preallocated `NodeState` and no variable-size delay/resource memory, so this narrow slice does not require the broader MOD-005 memory-budget contract. It does not establish parity for all Peaks modes or any other Mutable engine.
 **Verification**: End-to-end control-response, editor schema, native/browser codec render and zero-allocation callback checks pass. `CARGO_TERM_QUIET=true cargo check -q`, strict Clippy, full `cargo test -q` (1001 library tests and integration suites), rustfmt and diff checks pass.

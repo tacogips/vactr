@@ -1,4 +1,4 @@
-//! `vactrol serve` (design 14.5.10, 17): binds the loopback session
+//! `vactr serve` (design 14.5.10, 17): binds the loopback session
 //! socket, optionally evaluating a file first, and serves until killed.
 //! `Session` stays on this (the main) thread; [`crate::cli::ws`] only
 //! hands it parsed text frames and connection lifecycle events over
@@ -23,7 +23,7 @@ pub fn main(file: Option<PathBuf>, host: HostChoice, port: u16, bind: IpAddr, cw
     let (mut session, clock) = match build_session(host, cwd) {
         Ok(session) => session,
         Err(error) => {
-            eprintln!("vactrol: {error}");
+            eprintln!("vactr: {error}");
             return 1;
         }
     };
@@ -35,7 +35,7 @@ pub fn main(file: Option<PathBuf>, host: HostChoice, port: u16, bind: IpAddr, cw
                 print_eval_outcome(&session, &outcome, &mut std::io::stderr());
             }
             Err(e) => {
-                eprintln!("vactrol: cannot read `{}`: {e}", path.display());
+                eprintln!("vactr: cannot read `{}`: {e}", path.display());
                 return 1;
             }
         }
@@ -44,21 +44,21 @@ pub fn main(file: Option<PathBuf>, host: HostChoice, port: u16, bind: IpAddr, cw
     let listener = match TcpListener::bind((bind, port)) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("vactrol: cannot bind {bind}:{port}: {e}");
+            eprintln!("vactr: cannot bind {bind}:{port}: {e}");
             return 1;
         }
     };
     let local = match listener.local_addr() {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("vactrol: cannot read the bound address: {e}");
+            eprintln!("vactr: cannot read the bound address: {e}");
             return 1;
         }
     };
     let token = match ws::new_token() {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("vactrol: {e}");
+            eprintln!("vactr: {e}");
             return 1;
         }
     };

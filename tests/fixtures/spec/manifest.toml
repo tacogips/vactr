@@ -1,5 +1,5 @@
 # Spec fixture manifest (design 6.5.6). Parsed by tests/support/toml_subset.rs.
-# [[block]]: one entry per `vactrol`/`vact` fence, found by ordinal per document;
+# [[block]]: one entry per `vactr`/`vact` fence, found by ordinal per document;
 #   reader_diags is the exact multiset of reader codes, `code@line` with the line
 #   counted within the block. `expand_diags` is the exact multiset of expander codes,
 #   `code@line`; forms with a reader error are skipped (the runner asserts that they
@@ -8,7 +8,7 @@
 #   the block as one document, `code@line`) and `run_fails` (failing forms,
 #   `code@first line`, one fresh Evaluator); deferred blocks name `deferred_to` and
 #   pin `check_diags` when `pin_check`; `eval_via = "session"` runs a block
-#   through `vactrol::session::Session` instead (package loading; check_diags
+#   through `vactr::session::Session` instead (package loading; check_diags
 #   are then the session's reported codes); `blocked_by` + `defect_run_fails` mark
 #   failures caused only by a recorded implementation defect (asserted to reproduce
 #   exactly, so the repair must update them).
@@ -81,7 +81,7 @@ eval = "diagnostic"
 eval_via = "session"
 check_diags = ["package-not-locked@55", "package-not-locked@56", "package-not-locked@57", "read-error-present@99", "stray-char@100", "undefined-name@58", "undefined-name@81", "unknown-keyword@23", "upd-immutable@33"]
 run_fails = ["arity@14", "arity@14", "host-unavailable@80", "undefined-name@58", "undefined-name@81", "unknown-sound@23", "upd-immutable@33"]
-note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 100) is `..` plus a stray `.`; it is not a path, since its third character is not `/` (6.5.8). Eval (SS-FINAL, TASK-009): Needs package loading, so the block runs as ONE document through `vactrol::session::Session` (`eval_via = \"session\"`: NoopHost hosts, native caps, no `vactrol.lock`, no package cache). check_diags are the session's reported errors and warnings (reader, expander, checker, load, package); run_fails are failing forms at their first line plus drain faults at their site. The three `import github.com/someone/vactrol-pads` forms are package-not-locked@55-57 (a running session never fetches, 14.5.7), so `pads.warm` stays undefined-name@58; `load ./soundpack/..` is host-unavailable@80 under NoopHost, so `my-pack` is unbound at @81 (undefined-name, check and run); `fn pluck` with its stray-char@100 body is read-error-present@99 (the session reports reader and expander codes with the checker's); `:not-a-sample` is the annotated unknown-keyword@23 and the dropped event's unknown-sound@23 fault (the slot keeps playing); `upd base 62` of `let base 60` is upd-immutable@33 (the example upd's a `let`, which the Decided rule forbids: a spec text erratum). The second `fn kick-sound` is live redefinition in a session (no rebinding). The runtime calls a fn-valued pattern parameter with the event time (a param may be a fn of time), so the zero-parameter `fn kick-sound:` of line 12/15 faults arity@14 on each dry run (bind and the redefinition's re-evaluation): recorded for the language author, not changed here."
+note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 100) is `..` plus a stray `.`; it is not a path, since its third character is not `/` (6.5.8). Eval (SS-FINAL, TASK-009): Needs package loading, so the block runs as ONE document through `vactr::session::Session` (`eval_via = \"session\"`: NoopHost hosts, native caps, no `vactr.lock`, no package cache). check_diags are the session's reported errors and warnings (reader, expander, checker, load, package); run_fails are failing forms at their first line plus drain faults at their site. The three `import github.com/someone/vactr-pads` forms are package-not-locked@55-57 (a running session never fetches, 14.5.7), so `pads.warm` stays undefined-name@58; `load ./soundpack/..` is host-unavailable@80 under NoopHost, so `my-pack` is unbound at @81 (undefined-name, check and run); `fn pluck` with its stray-char@100 body is read-error-present@99 (the session reports reader and expander codes with the checker's); `:not-a-sample` is the annotated unknown-keyword@23 and the dropped event's unknown-sound@23 fault (the slot keeps playing); `upd base 62` of `let base 60` is upd-immutable@33 (the example upd's a `let`, which the Decided rule forbids: a spec text erratum). The second `fn kick-sound` is live redefinition in a session (no rebinding). The runtime calls a fn-valued pattern parameter with the event time (a param may be a fn of time), so the zero-parameter `fn kick-sound:` of line 12/15 faults arity@14 on each dry run (bind and the redefinition's re-evaluation): recorded for the language author, not changed here."
 
 [[block]]
 doc = "design-music.md"
@@ -728,9 +728,9 @@ id = "import-default-prefix"
 doc = "lang-reference.md"
 file = "file"
 verbatim = true
-source = 'import github.com/someone/vactrol-pads'
-read = '(#import "github.com/someone/vactrol-pads")'
-expand = '(#import "github.com/someone/vactrol-pads")'
+source = 'import github.com/someone/vactr-pads'
+read = '(#import "github.com/someone/vactr-pads")'
+expand = '(#import "github.com/someone/vactr-pads")'
 diags = []
 annotation = "# qualified: pads.warm"
 
@@ -739,9 +739,9 @@ id = "import-alias"
 doc = "lang-reference.md"
 file = "file"
 verbatim = true
-source = 'import github.com/someone/vactrol-pads as pd'
-read = '(#import "github.com/someone/vactrol-pads" as pd)'
-expand = '(#import "github.com/someone/vactrol-pads" as pd)'
+source = 'import github.com/someone/vactr-pads as pd'
+read = '(#import "github.com/someone/vactr-pads" as pd)'
+expand = '(#import "github.com/someone/vactr-pads" as pd)'
 diags = []
 annotation = "# alias"
 
@@ -750,9 +750,9 @@ id = "import-open"
 doc = "lang-reference.md"
 file = "file"
 verbatim = true
-source = 'import github.com/someone/vactrol-pads open'
-read = '(#import "github.com/someone/vactrol-pads" open)'
-expand = '(#import "github.com/someone/vactrol-pads" open)'
+source = 'import github.com/someone/vactr-pads open'
+read = '(#import "github.com/someone/vactr-pads" open)'
+expand = '(#import "github.com/someone/vactr-pads" open)'
 diags = []
 annotation = "# names unqualified"
 
@@ -762,13 +762,13 @@ doc = "lang-reference.md"
 file = "file"
 verbatim = false
 source = '''
-import github.com/someone/vactrol-pads
+import github.com/someone/vactr-pads
 s pads.warm > note [:c3] > d1'''
 read = '''
-(#import "github.com/someone/vactrol-pads")
+(#import "github.com/someone/vactr-pads")
 (d1 (note (s pads.warm) [:c3]))'''
 expand = '''
-(#import "github.com/someone/vactrol-pads")
+(#import "github.com/someone/vactr-pads")
 (d1 (note (s pads.warm) [:c3]))'''
 diags = []
 note = "Import-then-use in one fresh document (5.7 two-phase frontend)."
@@ -779,13 +779,13 @@ doc = "lang-reference.md"
 file = "file"
 verbatim = false
 source = '''
-import github.com/someone/vactrol-pads as pd
+import github.com/someone/vactr-pads as pd
 s pd.warm > note [:c3] > d1'''
 read = '''
-(#import "github.com/someone/vactrol-pads" as pd)
+(#import "github.com/someone/vactr-pads" as pd)
 (d1 (note (s pd.warm) [:c3]))'''
 expand = '''
-(#import "github.com/someone/vactrol-pads" as pd)
+(#import "github.com/someone/vactr-pads" as pd)
 (d1 (note (s pd.warm) [:c3]))'''
 diags = []
 

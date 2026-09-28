@@ -1,4 +1,4 @@
-# vactrol Music Specification (working draft)
+# vactr Music Specification (working draft)
 
 Supporting document to `lang-reference.md`: time, sound, and patterns.
 Modeled on TidalCycles/Strudel and Overtone. Music and visuals are
@@ -9,7 +9,7 @@ Conventions are those of `lang-reference.md` (`# Decided`, `# => v`).
 
 ## 1. Time (Tidal / Overtone model)
 
-```vactrol
+```vactr
 # Time is data (principle 5). There is no `sleep`, no `sync`, no loop
 # that waits: every sound is placed at a position in a cycle by a
 # pattern, and the scheduler plays whatever the bound patterns say.
@@ -80,7 +80,7 @@ hush                             # silence every slot; the session stays alive
 
 ## 2. Sound (Overtone / Tidal model)
 
-```vactrol
+```vactr
 # Instruments (Overtone `definst`): a named signal chain over unit
 # generators, the audio counterpart of a Hydra chain. The chain's value
 # is the instrument's output.
@@ -197,12 +197,12 @@ s {midi 1} > note [:c :e :g] > d1   # MIDI channel 1 as the instrument
 
 ## 3. Patterns (TidalCycles / Strudel model)
 
-```vactrol
+```vactr
 # A pattern is a function of time to events. Patterns are lazy and
 # infinite; nothing sounds until a pattern is bound to an output slot.
 
 # ---- sequences: no strings (author, 2026-09-24) ---------------------
-# Tidal's mini-notation lives in strings; vactrol has no string
+# Tidal's mini-notation lives in strings; vactr has no string
 # notation. A LIST given where a pattern is expected is one cycle of
 # steps; a nested list subdivides its step; nil is a rest. Steps are
 # keywords (checked against the host's sample or synth set, so a typo
@@ -383,8 +383,8 @@ bass drum, snare drum, and hi-hat modules are compatible starting points for
 DSP study or a documented Rust port. If their code is used, retain the
 applicable MIT copyright and license notices. Do not import a third-party
 wave table, sample, preset, numeric lookup table, or asset-derived trace.
-Design Vactrol's tables (if any), defaults, kit layout, and naming
-independently. Product text describes Vactrol's digital drum synth.
+Design Vactr's tables (if any), defaults, kit layout, and naming
+independently. Product text describes Vactr's digital drum synth.
 
 Each lane is an ordinary named `inst` with an explicit signal graph. The
 prelude provides `digital-drum`, `digital-snare`, `digital-metal`, and
@@ -412,10 +412,10 @@ the authoritative inventory: every exposed knob has a type, unit, range,
 default, enum domain where applicable, editor label, and voice destination.
 
 The instrument inventory also includes audio-output selection and MIDI-note
-assignment. Vactrol represents those as pattern bus/slot routing and MIDI
+assignment. Vactr represents those as pattern bus/slot routing and MIDI
 input mapping, not per-voice DSP parameters. Sequencer step volume,
 probability, note, Euclidean length/steps, pattern selection, shuffle, tempo,
-and automation map to existing Vactrol pattern and clock concepts; these
+and automation map to existing Vactr pattern and clock concepts; these
 must remain expressible in `.vact` alongside the kit. This separation makes
 the full musical configuration codeable without inventing dead audio knobs.
 
@@ -450,7 +450,7 @@ The complete source and license inventory, module coverage matrix, audio
 interface, and verification rules are in
 [`design-mutable-audio.md`](design-mutable-audio.md). The target is every
 published Eurorack **audio DSP** engine whose source can be included under
-Vactrol's MIT distribution terms. Each engine's meaningful controls must be
+Vactr's MIT distribution terms. Each engine's meaningful controls must be
 available in `.vact`; upstream brand and module names are provenance only,
 not product names. This effort supersedes using one external drum machine as
 the design basis for the digital percussion kit above.

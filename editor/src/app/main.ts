@@ -1,7 +1,7 @@
 // The editor entry (design 15.1.1, 15.1.3, 15.1.4).
 //
 // `boot` builds the dependencies from the page URL: `?session=<ws-url>`
-// selects the native tier (a WebSocket to `vactrol serve`; the token stays
+// selects the native tier (a WebSocket to `vactr serve`; the token stays
 // in that URL and is never stored), anything else the browser tier (wasm
 // #1 in session mode plus the worklet). This is the ONLY place a transport
 // is chosen. `createEditor` mounts every area in a fixed order; an area's
@@ -86,7 +86,7 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   } else {
     const base = win.document.baseURI;
     const core = await WasmCore.start({
-      wasmUrl: new URL('vactrol.wasm', base).href,
+      wasmUrl: new URL('vactr.wasm', base).href,
       processorUrl: new URL('worklet/processor.js', base).href,
     });
     const client = new Client(new WasmTransport(core), { store });
@@ -100,8 +100,8 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   return editor;
 }
 
-// Page entry: only the editor page carries #vactrol-app.
-const appRoot = typeof document === 'undefined' ? null : document.getElementById('vactrol-app');
+// Page entry: only the editor page carries #vactr-app.
+const appRoot = typeof document === 'undefined' ? null : document.getElementById('vactr-app');
 if (appRoot) {
   boot(appRoot).catch((e: unknown) => {
     // Design 15.2: boot failures are shown, never only logged.

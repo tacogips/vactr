@@ -1,11 +1,11 @@
 //! Packages (design 5.7, 14.5.7): Go-style repository-path imports, git-tag
-//! semver versions with minimal version selection, `vactrol.toml`,
-//! `vactrol.lock`, the canonical injective content digest, archive safety,
+//! semver versions with minimal version selection, `vactr.toml`,
+//! `vactr.lock`, the canonical injective content digest, archive safety,
 //! and staged atomic cache publication.
 //!
 //! Everything here except `native` (file system, `git`) is wasm-safe: no
 //! file system, network, process or thread use. Fetching happens only in
-//! `vactrol get` (`cache::get_all`); a running session reads the verified
+//! `vactr get` (`cache::get_all`); a running session reads the verified
 //! cache (`load::locked_sources`) and evaluates the sources into a `PkgNs`
 //! (`ns::pkg::PkgNs::load`).
 

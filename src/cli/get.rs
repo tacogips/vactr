@@ -1,7 +1,7 @@
-//! `vactrol get [<path>[@version]] [--store dir:<root>]` (design 14.5.7,
-//! `command.md`): adds or raises a requirement in `./vactrol.toml`, then
+//! `vactr get [<path>[@version]] [--store dir:<root>]` (design 14.5.7,
+//! `command.md`): adds or raises a requirement in `./vactr.toml`, then
 //! resolves, fetches and verifies every selected package into the cache
-//! and writes `./vactrol.lock`.
+//! and writes `./vactr.lock`.
 
 use std::path::Path;
 
@@ -25,7 +25,7 @@ pub fn main(target: Option<(PackageId, Option<Version>)>, store: StoreSpec, cwd:
         Ok(text) => match manifest::parse(&text) {
             Ok(m) => m,
             Err(e) => {
-                eprintln!("vactrol: {MANIFEST_FILE}: {e}");
+                eprintln!("vactr: {MANIFEST_FILE}: {e}");
                 return 1;
             }
         },
@@ -68,11 +68,11 @@ pub fn main(target: Option<(PackageId, Option<Version>)>, store: StoreSpec, cwd:
     };
 
     if let Err(e) = write_atomic(&manifest_path, &manifest::render(&pkg_manifest)) {
-        eprintln!("vactrol: cannot write `{MANIFEST_FILE}`: {e}");
+        eprintln!("vactr: cannot write `{MANIFEST_FILE}`: {e}");
         return 1;
     }
     if let Err(e) = write_atomic(&cwd.join(LOCK_FILE), &lock.render()) {
-        eprintln!("vactrol: cannot write `{LOCK_FILE}`: {e}");
+        eprintln!("vactr: cannot write `{LOCK_FILE}`: {e}");
         return 1;
     }
     print_resolved(&lock);
@@ -93,7 +93,7 @@ fn print_resolved(lock: &LockFile) {
 }
 
 fn print_pkg_error(e: &PkgError) {
-    eprintln!("vactrol: error[{}]: {e}", e.code());
+    eprintln!("vactr: error[{}]: {e}", e.code());
 }
 
 /// Writes `contents` to `path` through a temp file and a same-directory

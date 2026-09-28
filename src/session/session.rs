@@ -63,7 +63,7 @@ pub struct SessionConfig {
     pub caps: CapabilitySet,
     /// Scheduler settings (the cell tier lives here).
     pub runtime: RuntimeConfig,
-    /// The contents of `vactrol.lock`, when the project has one.
+    /// The contents of `vactr.lock`, when the project has one.
     pub lock: Option<LockFile>,
     /// The verified package cache.
     pub cache: Option<Box<dyn CacheBackend>>,

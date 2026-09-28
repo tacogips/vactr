@@ -1,7 +1,7 @@
 //! Original dual-FM/spatial alternate for Elements roles.
 //!
 //! Fourfold analytic sine generation and a one-pole anti-alias low-pass are
-//! Vactrol designs. No upstream 101-tap FIR, LUT, sample or ratio array is
+//! Vactr designs. No upstream 101-tap FIR, LUT, sample or ratio array is
 //! imported. State is caller-owned fixed memory, never callback-allocated.
 
 use std::f32::consts::TAU;

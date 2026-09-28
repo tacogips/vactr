@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VactrolHost } from '../../worklet/host.js';
+import { VactrHost } from '../../worklet/host.js';
 import type { EditorDeps } from '../../src/app/deps';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
@@ -15,7 +15,7 @@ import { fakeStorage } from '../support/opfs';
 import { RecordingTransport } from '../support/recording';
 
 const PROXY = 'https://proxy.test';
-const PADS = 'github.com/test/vactrol-pads';
+const PADS = 'github.com/test/vactr-pads';
 const dec = new TextDecoder();
 
 /**
@@ -85,7 +85,7 @@ function evalResult(diagnostics: Diagnostic[]) {
   };
 }
 
-const NOT_LOCKED = diag('package-not-locked', `package \`${PADS}\` is not in \`vactrol.lock\``);
+const NOT_LOCKED = diag('package-not-locked', `package \`${PADS}\` is not in \`vactr.lock\``);
 
 interface Setup {
   root: HTMLElement;
@@ -104,7 +104,7 @@ async function setup(tier: 'browser' | 'native', proxy = new FakeProxy(PROXY)): 
   proxy.add({
     path: PADS,
     version: '1.0.0',
-    toml: 'name = "vactrol-pads"\n',
+    toml: 'name = "vactr-pads"\n',
     files: [{ name: 'pads.vact', data: '(def pad 1)\n' }],
   });
   const root = document.createElement('div');
@@ -115,7 +115,7 @@ async function setup(tier: 'browser' | 'native', proxy = new FakeProxy(PROXY)): 
   simulatedResolver(fake);
   const core = new WasmCore();
   core.attach(
-    new VactrolHost(null, fakeNode(), fake.exports, { wasmUrl: '', processorUrl: '', init: 'session', onRecord: core.onRecord }),
+    new VactrHost(null, fakeNode(), fake.exports, { wasmUrl: '', processorUrl: '', init: 'session', onRecord: core.onRecord }),
   );
   const deps: EditorDeps = {
     client: new Client(transport, { store }),
@@ -188,12 +188,12 @@ describe('package pane (criterion 3, package half)', () => {
     expect(transport.sent).toEqual([]);
   });
 
-  it('native tier: shows `vactrol get <path>` and performs no fetch', async () => {
+  it('native tier: shows `vactr get <path>` and performs no fetch', async () => {
     const { root, transport, proxy, fake } = await setup('native');
     transport.emit(evalResult([NOT_LOCKED]));
     expect(imports(root)).toEqual([PADS]);
     const cmd = root.querySelector('[data-pkg="get-command"]');
-    expect(cmd?.textContent).toBe(`vactrol get ${PADS}`);
+    expect(cmd?.textContent).toBe(`vactr get ${PADS}`);
     expect(root.querySelector('[data-pkg-action="import"]')).toBeNull();
     expect(root.querySelector<HTMLElement>('[data-pkg="proxy"]')?.closest('label')?.hidden).toBe(true);
     expect(proxy.requested).toEqual([]);

@@ -1,9 +1,9 @@
 {
-  "name": "vactrol-editor",
+  "name": "vactr-editor",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Vactrol editor: browser and Tauri frontend speaking Session Protocol v1",
+  "description": "Vactr editor: browser and Tauri frontend speaking Session Protocol v1",
   "engines": {
     "node": ">=20"
   },

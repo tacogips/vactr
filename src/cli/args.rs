@@ -1,5 +1,5 @@
 //! Hand-written argument parsing (design 14.5.10, `command.md`): the verbs
-//! and flags of `vactrol`, with no external CLI-parser crate.
+//! and flags of `vactr`, with no external CLI-parser crate.
 //!
 //! Every parse error becomes a `UsageError` (exit 2). Flags accept both
 //! `--flag value` and `--flag=value`.
@@ -77,7 +77,7 @@ fn usage(message: impl Into<String>) -> UsageError {
 /// The usage text printed on `help`/`--help`/no arguments (exit 0) and
 /// alongside a usage error on stderr (exit 2).
 pub const USAGE: &str = "\
-usage: vactrol <verb> [options]
+usage: vactr <verb> [options]
 
 verbs:
   repl [--host native|noop] [--audio-in]

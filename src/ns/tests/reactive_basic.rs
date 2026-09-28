@@ -1,4 +1,4 @@
-//! Reactive propagation (vactrol-core.md TASK-005 reactive criterion, design
+//! Reactive propagation (vactr-core.md TASK-005 reactive criterion, design
 //! 5.6 revised), and the evaluator harness the other reactive tests share.
 
 use std::cell::RefCell;

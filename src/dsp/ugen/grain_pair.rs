@@ -2,7 +2,7 @@
 //!
 //! Source-stage translation of Emilie Gillet's MIT Plaits position 11
 //! oscillators and stmlib one-pole high-pass. Analytic sine replaces the
-//! generated sine table. Per-sample Vactrol controls replace source block
+//! generated sine table. Per-sample Vactr controls replace source block
 //! interpolation, so the output is not numerically identical.
 
 use super::{Inp, Kx, NodeState, MAX_PORTS};

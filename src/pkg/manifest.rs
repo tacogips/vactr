@@ -1,4 +1,4 @@
-//! `vactrol.toml` (design 14.5.7): a strict in-crate TOML subset.
+//! `vactr.toml` (design 14.5.7): a strict in-crate TOML subset.
 //!
 //! Accepted: the tables `[package]` and `[deps]`, `key = value` lines whose
 //! key is bare (`[A-Za-z0-9_-]+`) or a basic string, values that are basic
@@ -7,12 +7,12 @@
 //!
 //! ```toml
 //! [package]
-//! path = "github.com/someone/vactrol-pads"
-//! vactrol = "v0.1.0"
+//! path = "github.com/someone/vactr-pads"
+//! vactr = "v0.1.0"
 //! assets = ["samples"]
 //!
 //! [deps]
-//! "github.com/someone/vactrol-drums" = "v1.2.0"
+//! "github.com/someone/vactr-drums" = "v1.2.0"
 //! ```
 
 use std::fmt;
@@ -27,12 +27,12 @@ pub struct PackageMeta {
     /// Must equal the import path the package was fetched as.
     pub path: PackageId,
     /// The minimum language version.
-    pub vactrol: Option<Version>,
+    pub vactr: Option<Version>,
     /// Sample directories, relative to the package root.
     pub assets: Vec<Rc<str>>,
 }
 
-/// A `vactrol.toml`. A set's root manifest may omit `[package]`.
+/// A `vactr.toml`. A set's root manifest may omit `[package]`.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct PkgManifest {
     pub package: Option<PackageMeta>,
@@ -58,7 +58,7 @@ impl PkgManifest {
     }
 }
 
-/// A `vactrol.toml` or `vactrol.lock` parse error (lines count from 1).
+/// A `vactr.toml` or `vactr.lock` parse error (lines count from 1).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ManifestError {
     pub line: u32,
@@ -246,7 +246,7 @@ impl Line<'_> {
 #[derive(Default)]
 struct PackageDraft {
     path: Option<PackageId>,
-    vactrol: Option<Version>,
+    vactr: Option<Version>,
     assets: Option<Vec<Rc<str>>>,
 }
 
@@ -259,7 +259,7 @@ fn version(text: &str) -> Result<Version, String> {
     })
 }
 
-/// Parses a `vactrol.toml`.
+/// Parses a `vactr.toml`.
 ///
 /// # Errors
 /// The first error, with its line number.
@@ -334,17 +334,15 @@ pub fn parse(text: &str) -> Result<PkgManifest, ManifestError> {
                         dup(d.path.is_some())?;
                         d.path = Some(package_id(&s).map_err(err)?);
                     }
-                    ("vactrol", Val::Str(s)) => {
-                        dup(d.vactrol.is_some())?;
-                        d.vactrol = Some(version(&s).map_err(err)?);
+                    ("vactr", Val::Str(s)) => {
+                        dup(d.vactr.is_some())?;
+                        d.vactr = Some(version(&s).map_err(err)?);
                     }
                     ("assets", Val::Arr(items)) => {
                         dup(d.assets.is_some())?;
                         d.assets = Some(items.iter().map(|s| Rc::from(s.as_str())).collect());
                     }
-                    ("path" | "vactrol", _) => {
-                        return Err(err(format!("`{key}` must be a string")))
-                    }
+                    ("path" | "vactr", _) => return Err(err(format!("`{key}` must be a string"))),
                     ("assets", _) => {
                         return Err(err("`assets` must be an array of strings".into()))
                     }
@@ -370,7 +368,7 @@ pub fn parse(text: &str) -> Result<PkgManifest, ManifestError> {
             path: d
                 .path
                 .ok_or_else(|| ManifestError::at(package_line, "`[package]` has no `path`"))?,
-            vactrol: d.vactrol,
+            vactr: d.vactr,
             assets: d.assets.unwrap_or_default(),
         }),
     };
@@ -405,8 +403,8 @@ pub fn render(m: &PkgManifest) -> String {
     if let Some(p) = &m.package {
         out.push_str("[package]\n");
         out.push_str(&format!("path = {}\n", quote(&p.path.0)));
-        if let Some(v) = &p.vactrol {
-            out.push_str(&format!("vactrol = {}\n", quote(&v.to_string())));
+        if let Some(v) = &p.vactr {
+            out.push_str(&format!("vactr = {}\n", quote(&v.to_string())));
         }
         if !p.assets.is_empty() {
             let items: Vec<String> = p.assets.iter().map(|a| quote(a)).collect();

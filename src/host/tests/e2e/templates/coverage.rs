@@ -17,7 +17,7 @@ fn reported_templates_realize_independent_main_and_aux_paths() {
         voice_mem: 24_000,
     };
     for row in plaits_algorithms() {
-        let Some(name) = row.vactrol_template else {
+        let Some(name) = row.vactr_template else {
             continue;
         };
         let entry = registry

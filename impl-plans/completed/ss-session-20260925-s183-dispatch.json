@@ -9,20 +9,20 @@
   "rerunContext": {
     "session": 184,
     "checkpointParent": "432c30d492bcbd7d3e5dc2a59f285799fb0aef36",
-    "priorFindingResolved": "session-183 step3 finding 1 (session/ws.rs ownership contradiction, design-implementation.md:4737) is resolved in the accepted design and plans: the socket server is src/cli/ws.rs, owned wholly by SS-CLI (design 14.5.3 file table line 4764, CLI wave row line 5266, vactrol-session-cli.md); SS-SESSION's session/mod.rs declares no ws module.",
+    "priorFindingResolved": "session-183 step3 finding 1 (session/ws.rs ownership contradiction, design-implementation.md:4737) is resolved in the accepted design and plans: the socket server is src/cli/ws.rs, owned wholly by SS-CLI (design 14.5.3 file table line 4764, CLI wave row line 5266, vactr-session-cli.md); SS-SESSION's session/mod.rs declares no ws module.",
     "contractsAttempt1": "SS-CONTRACTS attempt 1 (session 183) implemented items 1-13 and blocked on two E0004 exhaustive matches outside every writePaths: src/sched/tests/sched.rs (Sound::Buffer) and src/host/wasm/messages.rs (SampleSrc::Buffer). Per the plan's resume criterion both paths are now in SS-CONTRACTS writePaths; the working tree already carries one-arm repairs in both files. The rerun worker uses attempt-2 under the evidence root, re-verifies V1-V9 and C1-C3 on the shared tree, and records the result in its progress log.",
     "preservedWorkingTree": "The uncommitted SS-CONTRACTS source edits (src/, Cargo.toml, Cargo.lock) are the rerun's starting tree and are not part of this checkpoint commit."
   },
   "issueReference": {
-    "repository": "tacogips/vactrol",
+    "repository": "tacogips/vactr",
     "number": 4,
-    "url": "https://github.com/tacogips/vactrol/issues/4"
+    "url": "https://github.com/tacogips/vactr/issues/4"
   },
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
   "originalHead": "e5d213038c7b90bc21d1a461f226ea0c40b4f062",
-  "parentPlanPath": "impl-plans/active/vactrol-core.md",
+  "parentPlanPath": "impl-plans/active/vactr-core.md",
   "planIndexPath": "impl-plans/README.md",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
@@ -36,42 +36,42 @@
   "evidenceLayout": "tmp/ss-session-20260925-s183/<planId>/attempt-<n>/ holds pre-edit-hashes.txt, intent.md, post-edit-hashes.txt, notes.md and final-hashes.txt (tmp is gitignored). Cargo logs go to target/fe-logs/ss-<wave>-<check>-s<S>-<n>.log per design 6.5.7.",
   "logRule": "Design 6.5.7: every run writes a new target/fe-logs/ss-<wave>-<check>-s<S>-<n>.log (S = Riela session number; n counts from 1 per check within the session; never overwrite). Run each command as (set -o pipefail; CMD 2>&1 | tee LOG); echo \"exit=$?\" >> LOG. The progress log cites the counting log path and its exit= value, and for nextest and cargo test the run and passed counts (run > 0). A missing log, a log without exit=, or a truncated log fails the check. 'LOG(<name>): CMD' in the verification arrays means CMD run under this rule with <name> as the log stem.",
   "commonContract": {
-    "editProtocol": "vactrol-session-contracts.md section 'Edit Protocol (common to every SS plan)': fresh read and sha256 before each edit, an intent snapshot before the first edit of any file the plan did not create and of every conditional or shared path, post-edit hash, stop and re-apply on drift, keep the tree compiling, never edit files outside writePaths/sharedPaths, rustfmt on owned files only, no git reset/clean/stash/checkout, no branches or worktrees, no commits, Rust written through the rust-coding agent followed by check-and-test-after-modify, final-hashes.txt at the end.",
+    "editProtocol": "vactr-session-contracts.md section 'Edit Protocol (common to every SS plan)': fresh read and sha256 before each edit, an intent snapshot before the first edit of any file the plan did not create and of every conditional or shared path, post-edit hash, stop and re-apply on drift, keep the tree compiling, never edit files outside writePaths/sharedPaths, rustfmt on owned files only, no git reset/clean/stash/checkout, no branches or worktrees, no commits, Rust written through the rust-coding agent followed by check-and-test-after-modify, final-hashes.txt at the end.",
     "ownershipRule": "Design 14.5.3: one writer per file per wave. A file passes between SEQUENTIAL waves only as a CONTRACTS seed or stub filled later: session/mod.rs (CONTRACTS -> SS-SESSION), ns/eval_doc.rs (CONTRACTS -> SS-SESSION), value/sample.rs (CONTRACTS -> SS-ANALYSIS), host/native/tap.rs (CONTRACTS -> SS-ANALYSIS), and the pkg/, directives/, cli/ and lsp/ mod.rs stubs (CONTRACTS -> owner; lsp/mod.rs carries the seeded run_stdio signature used by SS-CLI). Files CONTRACTS may touch conditionally for exhaustive-match arms (sched/runtime.rs, sched/commit.rs, ns/insts.rs, host/native/loader.rs, host/testing.rs, ...) are later owned by exactly one wave-2 plan. Both plans list every handed-off file. No two plans of one wave share a file.",
     "gateContract": "The step6-implement output payload carries planId and leaves verificationGaps EMPTY when every automated command passed (manual checks go under residualRisks). The test-integrity and adversarial-review outputs carry NO planId; the adversarial-review output always carries a findings array (empty when none) whose items use only findingId, severity, category, file, line, message, evidence. The integration-review output is a plain object carrying needs_revision and loopGate and lists in acceptedPlanIds only plans present in plans[] of this manifest.",
     "parallelSafety": "Wave 2 (SS-PKG, SS-DIRECTIVES, SS-ANALYSIS) and wave 4 (SS-CLI, SS-LSP) run in the same working directory at the same time with pairwise-disjoint writePaths and no sharedPaths. A build or test error in another plan's in-flight file is recorded as sibling-caused, never fixed by the observer; serial repair happens at the SS-SESSION join and in SS-FINAL.",
-    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/design-implementation.md, design-docs/specs/command.md, design-docs/user-qa/pending-session-questions.md, design-docs/user-qa/README.md, impl-plans/active/vactrol-session-*.md, impl-plans/active/ss-session-20260925-s183-dispatch.json, impl-plans/README.md. It never stages src/, tests/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is in vactrol-session-finalize.md. SS-FINAL never edits this manifest.",
+    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/design-implementation.md, design-docs/specs/command.md, design-docs/user-qa/pending-session-questions.md, design-docs/user-qa/README.md, impl-plans/active/vactr-session-*.md, impl-plans/active/ss-session-20260925-s183-dispatch.json, impl-plans/README.md. It never stages src/, tests/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is in vactr-session-finalize.md. SS-FINAL never edits this manifest.",
     "normativeDesign": "design-implementation.md 5.7, 13.5, 14, 14.5 and 17 plus command.md are normative. Where a plan and the design differ, the design wins and the difference goes in that plan's progress log.",
-    "commonVerification": "Every plan runs rows V1 build, V1l build-lsp, V2 clippy, V2l clippy-lsp, V3 nextest, V3t plain cargo test, V3f spec fixtures, V6a wasm32, V6b wasm32 host-wasm, V7 fmt --check, V4 line count, V5 std-IO grep, V9 wasm32 dependency tree, as specified in vactrol-session-contracts.md."
+    "commonVerification": "Every plan runs rows V1 build, V1l build-lsp, V2 clippy, V2l clippy-lsp, V3 nextest, V3t plain cargo test, V3f spec fixtures, V6a wasm32, V6b wasm32 host-wasm, V7 fmt --check, V4 line count, V5 std-IO grep, V9 wasm32 dependency tree, as specified in vactr-session-contracts.md."
   },
   "reviewContext": {
     "issueReference": {
-      "repository": "tacogips/vactrol",
+      "repository": "tacogips/vactr",
       "number": 4,
-      "url": "https://github.com/tacogips/vactrol/issues/4",
+      "url": "https://github.com/tacogips/vactr/issues/4",
       "title": "Implement the session layer: Session, protocol, packages, directives, REPL, LSP, CLI (TASK-009)",
       "baseCommit": "e5d213038c7b90bc21d1a461f226ea0c40b4f062",
-      "implementationPlanPath": "impl-plans/active/vactrol-core.md"
+      "implementationPlanPath": "impl-plans/active/vactr-core.md"
     },
     "userProblem": "TASK-001..008 (commits 0bee1fb, 3ab64b6, 04afe7d) produce a language, scheduler and audio engine, but there is no Session, protocol, package loading, directive machinery, REPL, LSP or CLI: src/main.rs only prints the version (issue #4).",
     "requiredOutcomes": [
-      "Every TASK-009 completion criterion in impl-plans/active/vactrol-core.md is checked with evidence and the task is COMPLETED; the audible REPL gate is recorded as pending user confirmation with the recording-host test as its automated proxy.",
+      "Every TASK-009 completion criterion in impl-plans/active/vactr-core.md is checked with evidence and the task is COMPLETED; the audible REPL gate is recorded as pending user confirmation with the recording-host test as its automated proxy.",
       "Protocol round-trip, reactive bindings publication (all TASK-005 traces), package (MVS, lock, digest portability and injectivity, archive safety, atomic staging, local HTTP proxy fixture), directive (attachment, labels, vocabulary, BindingKey, both persistence modes) and stale-write tests pass.",
-      "vactrol repl, run <file.vact>, serve and get <path> work against NoopHost; the vactrol lsp stdio smoke test passes with --features lsp.",
+      "vactr repl, run <file.vact>, serve and get <path> work against NoopHost; the vactr lsp stdio smoke test passes with --features lsp.",
       "The self-analysis surfaces (scope, spectrum, capture, render, rms, peak) are typed by the checker and callable from the REPL.",
       "design-docs/specs/command.md documents the CLI and protocol (done at design time).",
       "On the final tree: build, build --features lsp, clippy --all-targets -D warnings, fmt --check, nextest, cargo test and both wasm32 builds exit 0.",
       "Per-wave plans are marked Completed and impl-plans/README.md is updated; a single commit on main with the six-section message and no attribution lines."
     ],
     "supportedEdgeCases": [
-      "Malicious but correctly hashed packages (traversal, absolute path, escaping symlink, case-fold duplicates, over-limit archive): rejected naming the entry, no cache mutation (vactrol-session-pkg.md).",
-      "An interrupted extraction leaves no partial cache entry (vactrol-session-pkg.md cache.rs).",
-      "Newline-in-filename digest forgery: rejected by validation, and the canonical bytes differ (vactrol-session-pkg.md digest.rs).",
-      "Debounce-race writes, edit invalidation, composed change-set mapping, superseded definitions, and a mismatched base revision (vactrol-session-core.md authority.rs).",
-      "Provisional rollback, late failure and abort/retry never leak provisional values to subscribers or hosts (vactrol-session-core.md publish.rs).",
-      "Duplicate or ambiguous labels and selectors fall back to positional provenance; reordered same-named sites migrate, and broken mappings are marked stale (vactrol-session-directives.md).",
-      "A missing audio device falls back to noop with a warning (S6); a socket with a bad token or path gets 401 (vactrol-session-cli.md).",
-      "Offline render never runs one-shots or mutates the live runtime; the browser tier and builds without host-native report beyond-capability at the call (vactrol-session-analysis.md)."
+      "Malicious but correctly hashed packages (traversal, absolute path, escaping symlink, case-fold duplicates, over-limit archive): rejected naming the entry, no cache mutation (vactr-session-pkg.md).",
+      "An interrupted extraction leaves no partial cache entry (vactr-session-pkg.md cache.rs).",
+      "Newline-in-filename digest forgery: rejected by validation, and the canonical bytes differ (vactr-session-pkg.md digest.rs).",
+      "Debounce-race writes, edit invalidation, composed change-set mapping, superseded definitions, and a mismatched base revision (vactr-session-core.md authority.rs).",
+      "Provisional rollback, late failure and abort/retry never leak provisional values to subscribers or hosts (vactr-session-core.md publish.rs).",
+      "Duplicate or ambiguous labels and selectors fall back to positional provenance; reordered same-named sites migrate, and broken mappings are marked stale (vactr-session-directives.md).",
+      "A missing audio device falls back to noop with a warning (S6); a socket with a bad token or path gets 401 (vactr-session-cli.md).",
+      "Offline render never runs one-shots or mutates the live runtime; the browser tier and builds without host-native report beyond-capability at the call (vactr-session-analysis.md)."
     ],
     "outOfScopeEdgeCases": [
       "The browser fetch()/OPFS package backend and browser taps (TASK-010).",
@@ -91,7 +91,7 @@
       "Session wraps Evaluator + Runtime; the eval pipeline drains per form so later forms see finished captures and renders (14.5.4).",
       "One bindings batch per completed pass is built from the returned PassReport, so mid-pass publication is impossible by construction (14.5.5).",
       "eval carries the full document text and edit_epoch; reconciled epoch per document; the seven authority rules (14.5.6).",
-      "A running session never fetches; vactrol get is the only native fetch path; validation runs before the digest; staged atomic publication (14.5.7).",
+      "A running session never fetches; vactr get is the only native fetch path; validation runs before the digest; staged atomic publication (14.5.7).",
       "AnalysisCx rides on the SourceLoader hook (SourceLoader::analysis), so no new VM field is added (14.5.9; plan-level refinement of 'registered like register_load').",
       "The session socket lives in cli/ws.rs (loopback, 32-byte token, 401, 8 connections, 1 MiB frames) (14.5.10)."
     ],
@@ -106,7 +106,7 @@
       "Native HTTPS proxy client, TLS, non-loopback socket."
     ],
     "decisionsNotToReopen": [
-      "Scope chain and shadowing, named-argument binding, directive attachment and the 13.5 vocabulary (PROPOSED, tracked), the Go-style package model with MVS / vactrol.lock / canonical digest, Q3/Q4, use-clock :link as a diagnostic."
+      "Scope chain and shadowing, named-argument binding, directive attachment and the 13.5 vocabulary (PROPOSED, tracked), the Go-style package model with MVS / vactr.lock / canonical digest, Q3/Q4, use-clock :link as a diagnostic."
     ],
     "openUserQa": [
       "S1 capture timing (next N cycles).",
@@ -117,29 +117,29 @@
       "S6 native host falls back to noop."
     ],
     "sourcePaths": [
-      "impl-plans/active/vactrol-core.md",
+      "impl-plans/active/vactr-core.md",
       "design-docs/specs/design-implementation.md",
       "design-docs/specs/command.md",
       "design-docs/user-qa/pending-session-questions.md",
-      "impl-plans/active/vactrol-session-contracts.md",
-      "impl-plans/active/vactrol-session-pkg.md",
-      "impl-plans/active/vactrol-session-directives.md",
-      "impl-plans/active/vactrol-session-analysis.md",
-      "impl-plans/active/vactrol-session-core.md",
-      "impl-plans/active/vactrol-session-cli.md",
-      "impl-plans/active/vactrol-session-lsp.md",
-      "impl-plans/active/vactrol-session-finalize.md"
+      "impl-plans/active/vactr-session-contracts.md",
+      "impl-plans/active/vactr-session-pkg.md",
+      "impl-plans/active/vactr-session-directives.md",
+      "impl-plans/active/vactr-session-analysis.md",
+      "impl-plans/active/vactr-session-core.md",
+      "impl-plans/active/vactr-session-cli.md",
+      "impl-plans/active/vactr-session-lsp.md",
+      "impl-plans/active/vactr-session-finalize.md"
     ]
   },
   "plans": [
     {
       "planId": "SS-PKG",
-      "planPath": "impl-plans/active/vactrol-session-pkg.md",
-      "implementsTask": "TASK-009 packages: vactrol.toml, vactrol.lock, semver + MVS, in-crate SHA-256, canonical digest, entry validation, zip reader, PackageStore (dir, git, proxy), staged atomic cache publication, package evaluation into PkgNs, asset banks",
+      "planPath": "impl-plans/active/vactr-session-pkg.md",
+      "implementsTask": "TASK-009 packages: vactr.toml, vactr.lock, semver + MVS, in-crate SHA-256, canonical digest, entry validation, zip reader, PackageStore (dir, git, proxy), staged atomic cache publication, package evaluation into PkgNs, asset banks",
       "wave": 2,
       "status": "ready",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-session-pkg.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-pkg.md#progress-log",
       "writePaths": [
         "src/pkg/mod.rs",
         "src/pkg/semver.rs",
@@ -176,7 +176,7 @@
         "src/ns/pkg.rs",
         "src/ns/tests/pkg.rs",
         "src/host/native/loader.rs",
-        "impl-plans/active/vactrol-session-pkg.md"
+        "impl-plans/active/vactr-session-pkg.md"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
@@ -209,12 +209,12 @@
     },
     {
       "planId": "SS-DIRECTIVES",
-      "planPath": "impl-plans/active/vactrol-session-directives.md",
+      "planPath": "impl-plans/active/vactr-session-directives.md",
       "implementsTask": "TASK-009 directives: #@ parse (13.5 PROPOSED vocabulary), attachment, LabelRegistry, selector resolution, BindingKey + migration, Directive and ExternalFile BindingPersistence, learned-CC write-back, vocabulary authority-question fixtures",
       "wave": 2,
       "status": "ready",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-session-directives.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-directives.md#progress-log",
       "writePaths": [
         "src/directives/mod.rs",
         "src/directives/parse.rs",
@@ -234,7 +234,7 @@
         "src/directives/tests/writeback.rs",
         "tests/directive_fixtures.rs",
         "tests/fixtures/directives/vocabulary.toml",
-        "impl-plans/active/vactrol-session-directives.md"
+        "impl-plans/active/vactr-session-directives.md"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
@@ -267,12 +267,12 @@
     },
     {
       "planId": "SS-ANALYSIS",
-      "planPath": "impl-plans/active/vactrol-session-analysis.md",
+      "planPath": "impl-plans/active/vactr-session-analysis.md",
       "implementsTask": "TASK-009 / 12.3 amendment: scope, spectrum, capture, render, rms, peak; sample buffers and their playback; native live taps and capture; offline render; native offline_render capability; design-music ordinal 2 repin",
       "wave": 2,
       "status": "ready",
       "dependsOn": [],
-      "progressFile": "impl-plans/active/vactrol-session-analysis.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-analysis.md#progress-log",
       "writePaths": [
         "src/value/sample.rs",
         "src/types/natives_domain.rs",
@@ -310,7 +310,7 @@
         "src/host/native/tests/mod.rs",
         "src/host/native/tests/tap.rs",
         "tests/fixtures/spec/manifest.toml",
-        "impl-plans/active/vactrol-session-analysis.md"
+        "impl-plans/active/vactr-session-analysis.md"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
@@ -343,7 +343,7 @@
     },
     {
       "planId": "SS-SESSION",
-      "planPath": "impl-plans/active/vactrol-session-core.md",
+      "planPath": "impl-plans/active/vactr-session-core.md",
       "implementsTask": "TASK-009 Session: eval pipeline, reactive bindings publication, JSON codec, write authority and coalescing, console registers, REPL loop, packages/directives/analysis through the session, and the end-to-end criterion tests",
       "wave": 3,
       "status": "ready",
@@ -352,7 +352,7 @@
         "SS-DIRECTIVES",
         "SS-ANALYSIS"
       ],
-      "progressFile": "impl-plans/active/vactrol-session-core.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-core.md#progress-log",
       "writePaths": [
         "src/session/mod.rs",
         "src/session/session.rs",
@@ -376,7 +376,7 @@
         "src/session/tests/analysis.rs",
         "src/ns/eval_doc.rs",
         "src/types/manifest.rs",
-        "impl-plans/active/vactrol-session-core.md"
+        "impl-plans/active/vactr-session-core.md"
       ],
       "sharedPaths": [
         "src/pkg/mod.rs",
@@ -436,14 +436,14 @@
     },
     {
       "planId": "SS-CLI",
-      "planPath": "impl-plans/active/vactrol-session-cli.md",
-      "implementsTask": "TASK-009 CLI: vactrol repl|run|serve|get|lsp in src/main.rs + src/cli/, the loopback token-checked session socket in src/cli/ws.rs",
+      "planPath": "impl-plans/active/vactr-session-cli.md",
+      "implementsTask": "TASK-009 CLI: vactr repl|run|serve|get|lsp in src/main.rs + src/cli/, the loopback token-checked session socket in src/cli/ws.rs",
       "wave": 4,
       "status": "ready",
       "dependsOn": [
         "SS-SESSION"
       ],
-      "progressFile": "impl-plans/active/vactrol-session-cli.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-cli.md#progress-log",
       "writePaths": [
         "src/main.rs",
         "src/cli/mod.rs",
@@ -457,12 +457,12 @@
         "src/cli/tests/args.rs",
         "src/cli/tests/ws.rs",
         "tests/cli.rs",
-        "impl-plans/active/vactrol-session-cli.md"
+        "impl-plans/active/vactr-session-cli.md"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
-        "Verbs, flags and exit codes exactly as command.md; wasm32 main is empty; lsp verb calls the seeded vactrol::lsp::run_stdio under the lsp feature, else exits 1.",
-        "tests/cli.rs: run --host noop --cycles 2 exits 0 (3 on document errors); repl over piped stdin binds registers only on success; get --store dir: writes vactrol.toml and vactrol.lock and rejects a corrupted fixture with package-integrity; serve prints the token URL, answers eval with eval-result and garbage with protocol-error, and refuses a wrong token with 401.",
+        "Verbs, flags and exit codes exactly as command.md; wasm32 main is empty; lsp verb calls the seeded vactr::lsp::run_stdio under the lsp feature, else exits 1.",
+        "tests/cli.rs: run --host noop --cycles 2 exits 0 (3 on document errors); repl over piped stdin binds registers only on success; get --store dir: writes vactr.toml and vactr.lock and rejects a corrupted fixture with package-integrity; serve prints the token URL, answers eval with eval-result and garbage with protocol-error, and refuses a wrong token with 401.",
         "Socket rules: loopback only, constant-time token compare, 8 connections, 1 MiB frames, token never written to disk.",
         "V1-V9 and L1 pass with logs cited."
       ],
@@ -487,14 +487,14 @@
     },
     {
       "planId": "SS-LSP",
-      "planPath": "impl-plans/active/vactrol-session-lsp.md",
-      "implementsTask": "TASK-009 LSP: vactrol lsp over stdio (tower-lsp, lsp feature): diagnostics incl. directive lint, hover, completion, whitespace formatting, optional session attach, stdio smoke test",
+      "planPath": "impl-plans/active/vactr-session-lsp.md",
+      "implementsTask": "TASK-009 LSP: vactr lsp over stdio (tower-lsp, lsp feature): diagnostics incl. directive lint, hover, completion, whitespace formatting, optional session attach, stdio smoke test",
       "wave": 4,
       "status": "ready",
       "dependsOn": [
         "SS-SESSION"
       ],
-      "progressFile": "impl-plans/active/vactrol-session-lsp.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-lsp.md#progress-log",
       "writePaths": [
         "src/lsp/mod.rs",
         "src/lsp/server.rs",
@@ -503,7 +503,7 @@
         "src/lsp/tests/mod.rs",
         "src/lsp/tests/analysis.rs",
         "tests/lsp_smoke.rs",
-        "impl-plans/active/vactrol-session-lsp.md"
+        "impl-plans/active/vactr-session-lsp.md"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
@@ -534,31 +534,31 @@
     },
     {
       "planId": "SS-FINAL",
-      "planPath": "impl-plans/active/vactrol-session-finalize.md",
-      "implementsTask": "TASK-009 serial reconciliation: join integrity, lang-reference ordinal 5 reclassification, final-tree checks, vactrol-core.md TASK-009 bookkeeping, README, plan statuses, commit staging list and six-section message",
+      "planPath": "impl-plans/active/vactr-session-finalize.md",
+      "implementsTask": "TASK-009 serial reconciliation: join integrity, lang-reference ordinal 5 reclassification, final-tree checks, vactr-core.md TASK-009 bookkeeping, README, plan statuses, commit staging list and six-section message",
       "wave": 5,
       "status": "ready",
       "dependsOn": [
         "SS-CLI",
         "SS-LSP"
       ],
-      "progressFile": "impl-plans/active/vactrol-session-finalize.md#progress-log",
+      "progressFile": "impl-plans/active/vactr-session-finalize.md#progress-log",
       "writePaths": [
         "tests/fixtures/spec/manifest.toml",
         "tests/support/eval.rs",
         "tests/spec_fixtures.rs",
-        "impl-plans/active/vactrol-core.md",
+        "impl-plans/active/vactr-core.md",
         "impl-plans/README.md",
-        "impl-plans/active/vactrol-session-finalize.md"
+        "impl-plans/active/vactr-session-finalize.md"
       ],
       "sharedPaths": [
-        "impl-plans/active/vactrol-session-contracts.md",
-        "impl-plans/active/vactrol-session-pkg.md",
-        "impl-plans/active/vactrol-session-directives.md",
-        "impl-plans/active/vactrol-session-analysis.md",
-        "impl-plans/active/vactrol-session-core.md",
-        "impl-plans/active/vactrol-session-cli.md",
-        "impl-plans/active/vactrol-session-lsp.md",
+        "impl-plans/active/vactr-session-contracts.md",
+        "impl-plans/active/vactr-session-pkg.md",
+        "impl-plans/active/vactr-session-directives.md",
+        "impl-plans/active/vactr-session-analysis.md",
+        "impl-plans/active/vactr-session-core.md",
+        "impl-plans/active/vactr-session-cli.md",
+        "impl-plans/active/vactr-session-lsp.md",
         "Cargo.toml",
         "src/lib.rs",
         "src/main.rs",
@@ -645,7 +645,7 @@
         "Join integrity checked against every SS plan's final-hashes.txt, each mismatch explained.",
         "lang-reference ordinal 5 reclassified from deferred to diagnostic through Session; grep -c 'deferred_to = \"TASK-009\"' prints 0; fixtures green.",
         "Final tree: build, build --features lsp, clippy -D warnings (default and lsp), fmt --check, nextest, cargo test, the lsp smoke test, both wasm32 builds and cargo build --example beep exit 0 with logs cited.",
-        "vactrol-core.md TASK-009 checkboxes checked only with evidence (criterion 8 audible gate pending user confirmation with the recording-host proxy), status COMPLETED, deliverable text amended with the 14.5.1 divergences; README and SS plan statuses updated.",
+        "vactr-core.md TASK-009 checkboxes checked only with evidence (criterion 8 audible gate pending user confirmation with the recording-host proxy), status COMPLETED, deliverable text amended with the 14.5.1 divergences; README and SS plan statuses updated.",
         "Commit staging list and six-section message (no attribution lines) recorded; this manifest is not edited."
       ],
       "verification": [
@@ -685,7 +685,7 @@
     "removedPlans": [
       {
         "planId": "SS-CONTRACTS",
-        "planPath": "impl-plans/active/vactrol-session-contracts.md"
+        "planPath": "impl-plans/active/vactr-session-contracts.md"
       }
     ]
   }

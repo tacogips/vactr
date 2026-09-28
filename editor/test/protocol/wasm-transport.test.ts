@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VactrolHost } from '../../worklet/host.js';
+import { VactrHost } from '../../worklet/host.js';
 import { Client } from '../../src/protocol/client';
 import { WasmCore, WasmTransport } from '../../src/protocol/wasm';
 import type { PkgReply, RenderRecord } from '../../src/protocol/types';
@@ -9,7 +9,7 @@ function setup(): { fake: FakeCore; core: WasmCore; node: ReturnType<typeof fake
   const fake = new FakeCore();
   const node = fakeNode();
   const core = new WasmCore();
-  core.attach(new VactrolHost(null, node, fake.exports, {
+  core.attach(new VactrHost(null, node, fake.exports, {
     wasmUrl: '',
     processorUrl: '',
     init: 'session',

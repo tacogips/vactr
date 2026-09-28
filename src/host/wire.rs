@@ -16,7 +16,10 @@ use crate::sched::slots::{CtlId, SlotId};
 use crate::vm::fail::{FailCode, Failure};
 
 /// The most resolved controls one event carries (design 12.8.7).
-pub const MAX_CTLS: usize = 24;
+/// Changing this changes `AudioEvent::ENCODED_LEN`. Native peers and both
+/// browser wasm instances must come from the same build; this byte layout is
+/// not a versioned persistence or cross-release protocol.
+pub const MAX_CTLS: usize = 32;
 
 /// A control value: a constant, or a late-bound cell read at voice start
 /// (control-rate parameters read it continuously) (design 11.4).

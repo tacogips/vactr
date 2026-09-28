@@ -187,6 +187,7 @@ pub struct Voice {
     /// Template-default cells re-read every block.
     pcell: [Option<crate::dsp::cells::CellId>; MAX_PARAMS],
     post: PostFx,
+    post_r: PostFx,
     pub seed: u32,
     nodes: Box<[NodeState]>,
     fx: Box<[FxUnit]>,
@@ -217,6 +218,7 @@ impl Voice {
             pvals: [0.0; MAX_PARAMS],
             pcell: [None; MAX_PARAMS],
             post: PostFx::default(),
+            post_r: PostFx::default(),
             seed: 0,
             nodes: vec![NodeState::default(); NODE_CAP].into_boxed_slice(),
             fx: vec![FxUnit::empty(); MAX_VOICE_FX].into_boxed_slice(),
@@ -312,6 +314,7 @@ impl Voice {
         self.delay_send = get(DELAY).unwrap_or(0.0).clamp(0.0, 1.0);
         self.release = get(RELEASE).unwrap_or(0.1).max(1.0e-3);
         self.post = PostFx::from_event(ev, cells);
+        self.post_r = self.post;
         self.gate_left = if self.open {
             usize::MAX
         } else {
@@ -381,11 +384,18 @@ pub struct RenderCtx<'a, C: CellRead + ?Sized> {
     pub bufs: &'a mut [f32],
     /// `max_block` floats: the voice output.
     pub out: &'a mut [f32],
+    /// `max_block` floats: the separately routed auxiliary output.
+    pub out_r: &'a mut [f32],
+    /// Direct, independently addressable channels three and four.
+    pub out_3: &'a mut [f32],
+    pub out_4: &'a mut [f32],
     /// `2 * max_block` floats: effect-node right channel and dry scratch.
     pub tmp: &'a mut [f32],
     pub dry: &'a mut [f32],
     pub cells: &'a C,
     pub store: &'a SampleStore,
+    /// Validated interleaved stereo host input for this engine block.
+    pub host_input: Option<&'a [f32]>,
     pub fx: FxCtx<'a>,
 }
 
@@ -401,6 +411,9 @@ pub fn render<C: CellRead + ?Sized>(
     let off = v.delay.min(frames);
     v.delay = 0;
     let m = frames - off;
+    rc.out_r[..m].fill(0.0);
+    rc.out_3[..m].fill(0.0);
+    rc.out_4[..m].fill(0.0);
     let mb = rc.max_block;
     for (k, cell) in v.pcell.iter().enumerate().take(t.n_params) {
         if let Some(c) = cell {
@@ -430,6 +443,61 @@ pub fn render<C: CellRead + ?Sized>(
         }
         let (moff, mlen) = region(spec, v.mem.len());
         let mem = &mut v.mem[moff..moff + mlen];
+        if matches!(spec.node, Node::AuxOut) {
+            for (k, right) in rc.out_r[..m].iter_mut().enumerate() {
+                *right += ins[0].at(k);
+            }
+            out.fill(0.0);
+            continue;
+        }
+        if matches!(spec.node, Node::HostInputL | Node::HostInputR) {
+            let channel = usize::from(matches!(spec.node, Node::HostInputR));
+            if let Some(input) = rc.host_input {
+                for (frame, sample) in out.iter_mut().enumerate() {
+                    *sample = input[(off + frame) * 2 + channel];
+                }
+            } else {
+                out.fill(0.0);
+            }
+            continue;
+        }
+        if matches!(spec.node, Node::Out3 | Node::Out4) {
+            let stem = if matches!(spec.node, Node::Out3) {
+                &mut rc.out_3
+            } else {
+                &mut rc.out_4
+            };
+            for (k, sample) in stem[..m].iter_mut().enumerate() {
+                *sample += ins[0].at(k);
+            }
+            out.fill(0.0);
+            continue;
+        }
+        if let Node::FrameKeyframe { slot } = spec.node {
+            if let Some(data) = t.frame_payloads.get(usize::from(slot)) {
+                ugen::frame_keyframe::render(data, &ins, out);
+            } else {
+                out.fill(0.0);
+            }
+            continue;
+        }
+        if let Node::StageLinked { slot } = spec.node {
+            if let Some(data) = t.stage_payloads.get(usize::from(slot)) {
+                let kx = Kx {
+                    sr: rc.sr,
+                    gate,
+                    bank: v.bank,
+                    store: rc.store,
+                    caps: rc.fx.caps,
+                    stats: rc.fx.stats,
+                    seed: v.seed.wrapping_add(u32::try_from(i).unwrap_or(0)),
+                };
+                ugen::stage_linked::render(data, &ins, &mut v.nodes[i], mem, out, &kx);
+            } else {
+                out.fill(0.0);
+            }
+            continue;
+        }
         if let Node::Effect { fx, .. } = spec.node {
             let unit = &mut v.fx[usize::from(fx)];
             for (p, src) in spec.inputs.iter().enumerate().skip(1) {
@@ -470,7 +538,7 @@ pub fn render<C: CellRead + ?Sized>(
     }
     let implicit = t.envs == 0 && t.players == 0;
     let step = 1.0 / (v.release * rc.sr);
-    for (k, a) in y.iter_mut().enumerate() {
+    for (k, (a, right)) in y.iter_mut().zip(rc.out_r[..m].iter_mut()).enumerate() {
         let mut g = v.amp;
         if implicit {
             if k >= gate {
@@ -486,8 +554,16 @@ pub fn render<C: CellRead + ?Sized>(
             *left = left.saturating_sub(1);
         }
         *a = if a.is_finite() { *a * g } else { 0.0 };
+        *right = if right.is_finite() { *right * g } else { 0.0 };
+        let third = &mut rc.out_3[k];
+        let fourth = &mut rc.out_4[k];
+        *third = if third.is_finite() { *third * g } else { 0.0 };
+        *fourth = if fourth.is_finite() { *fourth * g } else { 0.0 };
     }
     v.post.run(y, rc.sr);
+    if t.has_aux {
+        v.post_r.run(&mut rc.out_r[..m], rc.sr);
+    }
     if v.gate_left != usize::MAX {
         v.gate_left -= gate;
     }

@@ -14,14 +14,70 @@
 //! buffer; `voice.rs` walks a template in order. Effect nodes run a voice
 //! `FxUnit` (`voice.rs`).
 
+mod build_helpers;
+use build_helpers::{mem_need, topo_order};
+
 pub mod additive;
+pub mod analog_pair;
+pub mod analog_percussion;
+pub mod braids_cloud;
+pub mod braids_digital;
+pub mod braids_filter;
+pub mod braids_five;
+pub mod braids_fm;
+pub mod braids_formant;
+pub mod braids_noise;
+pub mod braids_percussion;
+pub mod braids_physical;
+pub mod braids_struck;
+pub mod braids_subsync;
+pub mod braids_triple;
+pub mod braids_wave_bank;
+pub mod braids_wave_line;
 pub mod catalog;
+pub mod chip_pair;
+pub mod chord_pair;
+pub mod clock_noise_pair;
+pub mod dual_kick;
+pub mod elements_internal;
 pub mod env;
+pub mod feedback_metal;
 pub mod filter;
 pub mod fm;
+pub mod fm_drum;
+pub mod fm_pair;
+pub mod frame_keyframe;
+pub mod frame_lfo;
+pub mod fusion_drum;
+pub mod grain_pair;
+pub mod hat_pair;
 pub mod mixer;
+pub mod modal_pair;
+pub mod number_station;
 pub mod osc;
+pub mod particle_pair;
+pub mod peak_function;
+pub mod peak_pulse;
+pub mod phase_pair;
+pub mod rings_part;
 pub mod sample;
+pub mod shape_pair;
+pub mod six_op_original;
+pub mod snare_pair;
+pub mod spectrum_pair;
+pub mod speech_original;
+pub mod stage_chain;
+pub mod stage_linked;
+pub mod stage_segment;
+pub mod string_choir;
+pub mod string_machine_pair;
+pub mod string_pair;
+pub mod swarm_pair;
+pub mod table_terrain_pair;
+pub mod terrain_pair;
+pub mod tidal_function;
+pub mod tidal_poly;
+pub mod va_filter;
 pub mod wavetable;
 
 use crate::dsp::arena::SampleStore;
@@ -67,6 +123,8 @@ pub enum Node {
     Pulse,
     Tri,
     WhiteNoise,
+    HostInputL,
+    HostInputR,
     Lpf,
     Hpf,
     Bpf,
@@ -88,6 +146,69 @@ pub enum Node {
     Svf,
     FmOp,
     FmMod,
+    FmDrum,
+    FeedbackMetal,
+    AnalogPercussion,
+    VaSource,
+    VaFilter,
+    PhasePair,
+    FmPair,
+    SixOpOriginal,
+    SpeechOriginal,
+    RingsPart,
+    StringChoir,
+    ElementsInternal,
+    TidalFunction,
+    TidalPoly,
+    PeakFunction,
+    StageSegment,
+    StageChain,
+    StageLinked {
+        slot: u8,
+    },
+    FrameLfo,
+    FrameKeyframe {
+        slot: u8,
+    },
+    PeakPulse,
+    NumberStation,
+    SpectrumPair,
+    ClockNoisePair,
+    DualKick,
+    SnarePair,
+    HatPair,
+    SwarmPair,
+    ParticlePair,
+    ModalPair,
+    StringPair,
+    ChipPair,
+    AnalogPair,
+    GrainPair,
+    ShapePair,
+    StringMachinePair,
+    TerrainPair,
+    TableTerrainPair,
+    ChordPair,
+    BraidsFive,
+    BraidsSubSync,
+    BraidsTriple,
+    BraidsDigital,
+    BraidsFilter,
+    BraidsFormant,
+    BraidsFm,
+    BraidsPhysical,
+    BraidsStruck,
+    BraidsPercussion,
+    BraidsWaveBank,
+    BraidsWaveLine,
+    BraidsNoise,
+    BraidsCloud,
+    AuxOut,
+    Out3,
+    Out4,
+    FeedbackDrum,
+    NoiseDrum,
+    SineDrum,
     PhaseDistortion,
     Additive {
         partials_max: u8,
@@ -101,6 +222,8 @@ pub enum Node {
     },
 }
 
+pub use mixer::run;
+
 impl Node {
     /// The node of a spec (an effect's parameters are not included).
     #[must_use]
@@ -111,7 +234,46 @@ impl Node {
     /// True for the envelope nodes that decide when a voice ends.
     #[must_use]
     pub const fn is_env(&self) -> bool {
-        matches!(self, Node::EnvPerc | Node::EnvAdsr)
+        matches!(
+            self,
+            Node::EnvPerc
+                | Node::EnvAdsr
+                | Node::FmDrum
+                | Node::FeedbackMetal
+                | Node::AnalogPercussion
+                | Node::DualKick
+                | Node::SnarePair
+                | Node::HatPair
+                | Node::SwarmPair
+                | Node::ParticlePair
+                | Node::ModalPair
+                | Node::StringPair
+                | Node::ChipPair
+                | Node::AnalogPair
+                | Node::GrainPair
+                | Node::ShapePair
+                | Node::StringMachinePair
+                | Node::TerrainPair
+                | Node::TableTerrainPair
+                | Node::ChordPair
+                | Node::BraidsFive
+                | Node::BraidsSubSync
+                | Node::BraidsTriple
+                | Node::BraidsDigital
+                | Node::BraidsFilter
+                | Node::BraidsFormant
+                | Node::BraidsFm
+                | Node::BraidsPhysical
+                | Node::BraidsStruck
+                | Node::BraidsPercussion
+                | Node::BraidsWaveBank
+                | Node::BraidsWaveLine
+                | Node::BraidsNoise
+                | Node::BraidsCloud
+                | Node::FeedbackDrum
+                | Node::NoiseDrum
+                | Node::SineDrum
+        )
     }
 }
 
@@ -221,6 +383,8 @@ pub enum BuildError {
     BadEdge,
     Cycle,
     Empty,
+    BadFrameData,
+    BadStageData,
     /// The per-voice memory cannot hold the template's fixed state.
     MemExceeded,
 }
@@ -237,6 +401,8 @@ impl BuildError {
             BuildError::BadEdge => "a connection names a missing node or port",
             BuildError::Cycle => "the graph has a cycle",
             BuildError::Empty => "the graph has no nodes",
+            BuildError::BadFrameData => "invalid keyframe data",
+            BuildError::BadStageData => "invalid Stages segment data",
             BuildError::MemExceeded => "the instrument state exceeds the voice memory",
         }
     }
@@ -254,6 +420,10 @@ pub struct RawGraph {
     pub node_params: [(u16, CtlId, Ctl); MAX_NODE_PARAMS],
     pub n_params: usize,
     pub params: [(CtlId, Ctl); MAX_PARAMS],
+    pub n_frame_payloads: usize,
+    pub frame_payloads: [frame_keyframe::FrameData; frame_keyframe::MAX_PAYLOADS],
+    pub n_stage_payloads: usize,
+    pub stage_payloads: [stage_linked::StageData; stage_linked::MAX_PAYLOADS],
 }
 
 impl RawGraph {
@@ -274,6 +444,10 @@ impl RawGraph {
             node_params: [(0, CtlId::new(0), Ctl::Const(0.0)); MAX_NODE_PARAMS],
             n_params: 0,
             params: [(CtlId::new(0), Ctl::Const(0.0)); MAX_PARAMS],
+            n_frame_payloads: 0,
+            frame_payloads: [frame_keyframe::FrameData::EMPTY; frame_keyframe::MAX_PAYLOADS],
+            n_stage_payloads: 0,
+            stage_payloads: [stage_linked::StageData::EMPTY; stage_linked::MAX_PAYLOADS],
         })
     }
 
@@ -283,6 +457,8 @@ impl RawGraph {
         self.n_edges = 0;
         self.n_node_params = 0;
         self.n_params = 0;
+        self.n_frame_payloads = 0;
+        self.n_stage_payloads = 0;
     }
 
     /// Appends a node.
@@ -350,7 +526,22 @@ impl RawGraph {
             return Err(BuildError::TooManyNodes);
         }
         for spec in def.nodes.iter() {
-            let i = self.push_node(Node::from_spec(spec))?;
+            let node = if let UGenSpec::FrameKeyframe { data: Some(data) } = spec {
+                data.validate().map_err(|_| BuildError::BadFrameData)?;
+                let slot = self.push_frame_payload(**data)?;
+                Node::FrameKeyframe { slot }
+            } else if matches!(spec, UGenSpec::FrameKeyframe { data: None }) {
+                return Err(BuildError::BadFrameData);
+            } else if let UGenSpec::StageLinked { data: Some(data) } = spec {
+                data.validate().map_err(|_| BuildError::BadStageData)?;
+                let slot = self.push_stage_payload(**data)?;
+                Node::StageLinked { slot }
+            } else if matches!(spec, UGenSpec::StageLinked { data: None }) {
+                return Err(BuildError::BadStageData);
+            } else {
+                Node::from_spec(spec)
+            };
+            let i = self.push_node(node)?;
             if let UGenSpec::Effect(e) = spec {
                 for &(id, ctl) in e.params.iter() {
                     self.push_node_param(i, id, ctl)?;
@@ -367,6 +558,29 @@ impl RawGraph {
             self.push_param(id, ctl)?;
         }
         Ok(())
+    }
+
+    pub fn push_frame_payload(
+        &mut self,
+        data: frame_keyframe::FrameData,
+    ) -> Result<u8, BuildError> {
+        let slot = self.n_frame_payloads;
+        *self
+            .frame_payloads
+            .get_mut(slot)
+            .ok_or(BuildError::TooManyParams)? = data;
+        self.n_frame_payloads += 1;
+        u8::try_from(slot).map_err(|_| BuildError::TooManyParams)
+    }
+
+    pub fn push_stage_payload(&mut self, data: stage_linked::StageData) -> Result<u8, BuildError> {
+        let slot = self.n_stage_payloads;
+        *self
+            .stage_payloads
+            .get_mut(slot)
+            .ok_or(BuildError::TooManyParams)? = data;
+        self.n_stage_payloads += 1;
+        u8::try_from(slot).map_err(|_| BuildError::TooManyParams)
     }
 }
 
@@ -391,8 +605,16 @@ pub struct Template {
     pub n_params: usize,
     /// Every control the template reads, with its default.
     pub params: [(CtlId, Ctl); MAX_PARAMS],
+    pub n_frame_payloads: usize,
+    pub frame_payloads: [frame_keyframe::FrameData; frame_keyframe::MAX_PAYLOADS],
+    pub n_stage_payloads: usize,
+    pub stage_payloads: [stage_linked::StageData; stage_linked::MAX_PAYLOADS],
     pub n_sinks: usize,
     pub sinks: [u16; MAX_SINKS],
+    /// An `aux-out` node is present; the voice writes independent L/R.
+    pub has_aux: bool,
+    /// Direct channels three/four are present and need a four-channel host.
+    pub has_quad: bool,
     pub n_fx: usize,
     /// Explicit parameters of each effect node.
     pub fx_params: [[(CtlId, Ctl); MAX_FX_PARAMS]; MAX_VOICE_FX],
@@ -419,8 +641,14 @@ impl Template {
             nodes: [NodeSpec::EMPTY; NODE_CAP],
             n_params: 0,
             params: [(CtlId::new(0), Ctl::Const(0.0)); MAX_PARAMS],
+            n_frame_payloads: 0,
+            frame_payloads: [frame_keyframe::FrameData::EMPTY; frame_keyframe::MAX_PAYLOADS],
+            n_stage_payloads: 0,
+            stage_payloads: [stage_linked::StageData::EMPTY; stage_linked::MAX_PAYLOADS],
             n_sinks: 0,
             sinks: [0; MAX_SINKS],
+            has_aux: false,
+            has_quad: false,
             n_fx: 0,
             fx_params: [[(CtlId::new(0), Ctl::Const(0.0)); MAX_FX_PARAMS]; MAX_VOICE_FX],
             fx_n: [0; MAX_VOICE_FX],
@@ -542,9 +770,15 @@ impl Template {
         self.inst = raw.inst;
         self.n_nodes = n;
         self.n_params = 0;
+        self.n_frame_payloads = raw.n_frame_payloads;
+        self.frame_payloads = raw.frame_payloads;
+        self.n_stage_payloads = raw.n_stage_payloads;
+        self.stage_payloads = raw.stage_payloads;
         self.n_fx = 0;
         self.n_refs = 0;
         self.n_sinks = 0;
+        self.has_aux = false;
+        self.has_quad = false;
         self.envs = 0;
         self.players = 0;
         for &(id, ctl) in &raw.params[..raw.n_params.min(MAX_PARAMS)] {
@@ -576,6 +810,9 @@ impl Template {
     ) -> Result<(), BuildError> {
         let mut node = raw.nodes[old];
         let mut inputs = [Src::Default(0.0); MAX_PORTS];
+        if catalog::port_count(&node) > MAX_PORTS {
+            return Err(BuildError::TooManyParams);
+        }
         if let Node::Effect { kind, .. } = node {
             if self.n_fx >= MAX_VOICE_FX {
                 return Err(BuildError::TooManyEffects);
@@ -600,7 +837,16 @@ impl Template {
         }
         match node {
             Node::Param(ctl) => inputs[0] = Src::Param(self.param_slot(ctl)?),
-            Node::EnvPerc | Node::EnvAdsr => self.envs += 1,
+            Node::AuxOut => self.has_aux = true,
+            Node::Out3 | Node::Out4 => self.has_quad = true,
+            Node::EnvPerc
+            | Node::EnvAdsr
+            | Node::FmDrum
+            | Node::FeedbackMetal
+            | Node::AnalogPercussion
+            | Node::FeedbackDrum
+            | Node::NoiseDrum
+            | Node::SineDrum => self.envs += 1,
             Node::SamplePlay(b) => {
                 self.players += 1;
                 self.add_ref(b.get());
@@ -687,57 +933,3 @@ impl Template {
         Ok(())
     }
 }
-
-/// `(fixed, clampable)` memory a node wants, in floats.
-fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize) {
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let secs = |s: f32| (s * env.sr) as usize;
-    match node {
-        Node::Vco { unison_max } => (usize::from((*unison_max).max(1)) * 2, 0),
-        Node::Additive { partials_max } => (usize::from((*partials_max).max(1)), 0),
-        Node::Delay => (0, secs(0.5)),
-        Node::Comb => (0, secs(0.1)),
-        Node::Granular(_) => (0, crate::dsp::granular::ugen_mem_len(env.sr, &env.caps)),
-        Node::Effect { kind, .. } => (0, effects::mem_len(*kind, env.sr, &env.caps)),
-        _ => (0, 0),
-    }
-}
-
-/// Kahn's algorithm over fixed arrays.
-fn topo_order(n: usize, edges: &[crate::dsp::graph::Edge]) -> Result<[u16; NODE_CAP], BuildError> {
-    let mut indeg = [0u16; NODE_CAP];
-    for e in edges {
-        let (from, to) = (usize::from(e.from), usize::from(e.to));
-        if from >= n || to >= n {
-            return Err(BuildError::BadEdge);
-        }
-        indeg[to] += 1;
-    }
-    let mut order = [0u16; NODE_CAP];
-    let mut len = 0;
-    for (i, d) in indeg.iter().enumerate().take(n) {
-        if *d == 0 {
-            order[len] = u16::try_from(i).map_err(|_| BuildError::TooManyNodes)?;
-            len += 1;
-        }
-    }
-    let mut head = 0;
-    while head < len {
-        let v = order[head];
-        head += 1;
-        for e in edges.iter().filter(|e| e.from == v) {
-            let to = usize::from(e.to);
-            indeg[to] -= 1;
-            if indeg[to] == 0 {
-                order[len] = e.to;
-                len += 1;
-            }
-        }
-    }
-    if len < n {
-        return Err(BuildError::Cycle);
-    }
-    Ok(order)
-}
-
-pub use mixer::run;

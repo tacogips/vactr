@@ -17,8 +17,9 @@ use crate::sched::slots::CtlId;
 
 use super::{BuildError, Node, RawGraph};
 
-/// The most input ports a node has (`granular` has ten).
-pub const MAX_PORTS: usize = 10;
+/// The most input ports a node has (Elements: frequency, twenty Patch fields,
+/// four performance controls, model and output selection).
+pub const MAX_PORTS: usize = 30;
 
 /// One input port: its name and constant default.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -33,6 +34,9 @@ const fn p(name: &'static str, default: f32) -> Port {
 
 const FREQ: Port = p("freq", 440.0);
 const IN: Port = p("in", 0.0);
+// The inert call argument lets the generic DSP function syntax construct a
+// host-input source node; channel selection is fixed by the node name.
+const HOST_INPUT: &[Port] = &[p("source", 0.0)];
 
 const OSC: &[Port] = &[FREQ];
 const PULSE: &[Port] = &[FREQ, p("width", 0.5)];
@@ -57,6 +61,7 @@ pub const SAMPLE: &[Port] = &[
     p("loop", 0.0),
 ];
 const MUL: &[Port] = &[p("a", 1.0), p("b", 1.0)];
+const AUX_OUT: &[Port] = &[IN];
 const ADD: &[Port] = &[p("a", 0.0), p("b", 0.0)];
 const VCO: &[Port] = &[
     FREQ,
@@ -68,6 +73,52 @@ const VCO: &[Port] = &[
 ];
 const FM_OP: &[Port] = &[FREQ, p("ratio", 1.0), p("index", 1.0), p("mod", 0.0)];
 const FM_MOD: &[Port] = &[IN, p("mod", 0.0), p("index", 1.0)];
+const FM_DRUM: &[Port] = &[
+    p("freq", 110.0),
+    p("fm-amount", 1.5),
+    p("pitch-sweep", 0.5),
+    p("decay", 0.4),
+    p("drum-noise", 0.0),
+    p("drive", 0.0),
+];
+mod voice_ports;
+use voice_ports::*;
+
+const FEEDBACK_DRUM: &[Port] = &[
+    p("velocity", 1.0),
+    p("fb-delay", 100.0),
+    p("fb-feedback", 0.99),
+    p("fb-decay", 0.5),
+    p("fb-cutoff", 5000.0),
+    p("fb-q", 1.0),
+    p("fb-velocity", 1.0),
+    p("fb-level", -6.0),
+];
+const NOISE_DRUM: &[Port] = &[
+    p("velocity", 1.0),
+    p("noise-attack", 0.001),
+    p("noise-hold", 0.0),
+    p("noise-decay", 0.5),
+    p("noise-cutoff", 5000.0),
+    p("noise-q", 1.0),
+    p("noise-pitch-env", 0.0),
+    p("noise-velocity", 1.0),
+    p("noise-level", -6.0),
+];
+const SINE_DRUM: &[Port] = &[
+    FREQ,
+    p("velocity", 1.0),
+    p("fm-tuning", 440.0),
+    p("fm-keytrack", 0.0),
+    p("fm-ratio", 1.0),
+    p("fm-index", 0.0),
+    p("fm-attack", 0.002),
+    p("fm-hold", 0.0),
+    p("fm-decay", 1.5),
+    p("fm-pitch-env", 0.0),
+    p("fm-velocity", 1.0),
+    p("fm-level", -6.0),
+];
 const PD: &[Port] = &[FREQ, p("shape", 0.5)];
 const ADDITIVE: &[Port] = &[FREQ, p("count", 8.0), p("tilt", 1.0)];
 const WAVETABLE: &[Port] = &[FREQ, p("position", 0.0)];
@@ -85,6 +136,24 @@ pub const GRANULAR: &[Port] = &[
     p("stereo-spray", 0.0),
 ];
 const NONE: &[Port] = &[];
+const FRAME_KEYFRAME: &[Port] = &[
+    p("frame-position", 0.0),
+    p("frame-ease1", 1.0),
+    p("frame-ease2", 1.0),
+    p("frame-ease3", 1.0),
+    p("frame-ease4", 1.0),
+    p("frame-response1", 0.0),
+    p("frame-response2", 0.0),
+    p("frame-response3", 0.0),
+    p("frame-response4", 0.0),
+    p("frame-channel", 0.0),
+];
+const STAGE_LINKED: &[Port] = &[
+    FREQ,
+    p("chain-gate", 1.0),
+    p("chain-trigger", 0.0),
+    p("chain-channel", 0.0),
+];
 
 /// The ports of a node kind (effects: see `effect_port`).
 #[must_use]
@@ -93,6 +162,7 @@ pub fn ports(node: &Node) -> &'static [Port] {
         Node::SinOsc | Node::Saw | Node::Tri | Node::SubOsc => OSC,
         Node::Pulse => PULSE,
         Node::WhiteNoise | Node::Const(_) | Node::Param(_) | Node::Effect { .. } => NONE,
+        Node::HostInputL | Node::HostInputR => HOST_INPUT,
         Node::Lpf | Node::Hpf | Node::Bpf | Node::Ladder => FILTER,
         Node::Svf => SVF,
         Node::Delay => DELAY,
@@ -102,10 +172,67 @@ pub fn ports(node: &Node) -> &'static [Port] {
         Node::Line => LINE,
         Node::SamplePlay(_) => SAMPLE,
         Node::Mul => MUL,
+        Node::AuxOut | Node::Out3 | Node::Out4 => AUX_OUT,
         Node::Add => ADD,
         Node::Vco { .. } => VCO,
         Node::FmOp => FM_OP,
         Node::FmMod => FM_MOD,
+        Node::FmDrum => FM_DRUM,
+        Node::FeedbackMetal => FEEDBACK_METAL,
+        Node::AnalogPercussion => ANALOG_PERCUSSION,
+        Node::VaSource => VA_SOURCE,
+        Node::VaFilter => VA_FILTER,
+        Node::PhasePair => PHASE_PAIR,
+        Node::FmPair => FM_PAIR,
+        Node::SixOpOriginal => SIX_OP_ORIGINAL,
+        Node::SpeechOriginal => SPEECH_ORIGINAL,
+        Node::RingsPart => RINGS_PART,
+        Node::StringChoir => STRING_CHOIR,
+        Node::ElementsInternal => ELEMENTS_INTERNAL,
+        Node::TidalFunction => TIDAL_FUNCTION,
+        Node::TidalPoly => TIDAL_POLY,
+        Node::PeakFunction => PEAK_FUNCTION,
+        Node::StageSegment => STAGE_SEGMENT,
+        Node::StageChain => STAGE_CHAIN,
+        Node::StageLinked { .. } => STAGE_LINKED,
+        Node::FrameLfo => FRAME_LFO,
+        Node::FrameKeyframe { .. } => FRAME_KEYFRAME,
+        Node::PeakPulse => PEAK_PULSE,
+        Node::NumberStation => NUMBER_STATION,
+        Node::SpectrumPair => SPECTRUM_PAIR,
+        Node::ClockNoisePair => CLOCK_NOISE_PAIR,
+        Node::DualKick => DUAL_KICK,
+        Node::SnarePair => SNARE_PAIR,
+        Node::HatPair => HAT_PAIR,
+        Node::SwarmPair => SWARM_PAIR,
+        Node::ParticlePair => PARTICLE_PAIR,
+        Node::ModalPair => MODAL_PAIR,
+        Node::StringPair => STRING_PAIR,
+        Node::ChipPair => CHIP_PAIR,
+        Node::AnalogPair => ANALOG_PAIR,
+        Node::GrainPair => GRAIN_PAIR,
+        Node::ShapePair => SHAPE_PAIR,
+        Node::BraidsFive => BRAIDS_FIVE,
+        Node::BraidsSubSync => BRAIDS_FIVE,
+        Node::BraidsTriple => BRAIDS_FIVE,
+        Node::BraidsDigital => BRAIDS_FIVE,
+        Node::BraidsFilter => BRAIDS_FIVE,
+        Node::BraidsFormant => BRAIDS_FIVE,
+        Node::BraidsFm => BRAIDS_FIVE,
+        Node::BraidsPhysical => BRAIDS_FIVE,
+        Node::BraidsStruck => BRAIDS_FIVE,
+        Node::BraidsPercussion => BRAIDS_FIVE,
+        Node::BraidsWaveBank => BRAIDS_FIVE,
+        Node::BraidsWaveLine => BRAIDS_FIVE,
+        Node::BraidsNoise => BRAIDS_FIVE,
+        Node::BraidsCloud => BRAIDS_FIVE,
+        Node::StringMachinePair => STRING_MACHINE_PAIR,
+        Node::TerrainPair => TERRAIN_PAIR,
+        Node::TableTerrainPair => TABLE_TERRAIN_PAIR,
+        Node::ChordPair => CHORD_PAIR,
+        Node::FeedbackDrum => FEEDBACK_DRUM,
+        Node::NoiseDrum => NOISE_DRUM,
+        Node::SineDrum => SINE_DRUM,
         Node::PhaseDistortion => PD,
         Node::Additive { .. } => ADDITIVE,
         Node::Wavetable(_) => WAVETABLE,
@@ -172,6 +299,8 @@ pub fn ugen_name(spec: &UGenSpec) -> &'static str {
         UGenSpec::Pulse => "pulse",
         UGenSpec::Tri => "tri",
         UGenSpec::WhiteNoise => "white-noise",
+        UGenSpec::HostInputL => "host-in-l",
+        UGenSpec::HostInputR => "host-in-r",
         UGenSpec::Lpf => "lpf",
         UGenSpec::Hpf => "hpf",
         UGenSpec::Bpf => "bpf",
@@ -191,6 +320,65 @@ pub fn ugen_name(spec: &UGenSpec) -> &'static str {
         UGenSpec::Svf => "svf",
         UGenSpec::FmOp => "fm-op",
         UGenSpec::FmMod => "fm-mod",
+        UGenSpec::FmDrum => "fm-drum",
+        UGenSpec::FeedbackMetal => "feedback-metal-core",
+        UGenSpec::AnalogPercussion => "analog-percussion",
+        UGenSpec::VaSource => "va-source",
+        UGenSpec::VaFilter => "va-filter",
+        UGenSpec::PhasePair => "phase-pair",
+        UGenSpec::FmPair => "fm-pair",
+        UGenSpec::SixOpOriginal => "six-op-original",
+        UGenSpec::SpeechOriginal => "speech-original",
+        UGenSpec::RingsPart => "rings-part-core",
+        UGenSpec::StringChoir => "string-choir-core",
+        UGenSpec::ElementsInternal => "elements-internal-core",
+        UGenSpec::TidalFunction => "tidal-function-core",
+        UGenSpec::TidalPoly => "tidal-poly-core",
+        UGenSpec::PeakFunction => "peak-function-core",
+        UGenSpec::StageSegment => "stage-segment-core",
+        UGenSpec::StageChain => "stage-chain-core",
+        UGenSpec::StageLinked { .. } => "stage-linked-core",
+        UGenSpec::FrameLfo => "frame-lfo-core",
+        UGenSpec::FrameKeyframe { .. } => "frame-keyframe-core",
+        UGenSpec::PeakPulse => "peak-pulse-core",
+        UGenSpec::NumberStation => "number-station-core",
+        UGenSpec::SpectrumPair => "spectrum-pair",
+        UGenSpec::ClockNoisePair => "clock-noise-pair",
+        UGenSpec::DualKick => "dual-kick-core",
+        UGenSpec::SnarePair => "snare-pair-core",
+        UGenSpec::HatPair => "hat-pair-core",
+        UGenSpec::SwarmPair => "swarm-pair-core",
+        UGenSpec::ParticlePair => "particle-pair-core",
+        UGenSpec::ModalPair => "modal-pair-core",
+        UGenSpec::StringPair => "string-pair-core",
+        UGenSpec::ChipPair => "chip-pair-core",
+        UGenSpec::AnalogPair => "analog-pair-core",
+        UGenSpec::GrainPair => "grain-pair-core",
+        UGenSpec::ShapePair => "shape-pair-core",
+        UGenSpec::StringMachinePair => "string-machine-core",
+        UGenSpec::TerrainPair => "terrain-pair-core",
+        UGenSpec::TableTerrainPair => "wave-grid-core",
+        UGenSpec::ChordPair => "chord-layer-core",
+        UGenSpec::BraidsFive => "macro-five-core",
+        UGenSpec::BraidsSubSync => "macro-sub-sync-core",
+        UGenSpec::BraidsTriple => "macro-triple-core",
+        UGenSpec::BraidsDigital => "macro-digital-core",
+        UGenSpec::BraidsFilter => "macro-filter-core",
+        UGenSpec::BraidsFormant => "macro-formant-core",
+        UGenSpec::BraidsFm => "macro-fm-core",
+        UGenSpec::BraidsPhysical => "macro-physical-core",
+        UGenSpec::BraidsStruck => "macro-struck-core",
+        UGenSpec::BraidsPercussion => "macro-percussion-core",
+        UGenSpec::BraidsWaveBank => "macro-wave-grid-core",
+        UGenSpec::BraidsWaveLine => "macro-wave-line-core",
+        UGenSpec::BraidsNoise => "macro-noise-core",
+        UGenSpec::BraidsCloud => "macro-cloud-core",
+        UGenSpec::AuxOut => "aux-out",
+        UGenSpec::Out3 => "out-3",
+        UGenSpec::Out4 => "out-4",
+        UGenSpec::FeedbackDrum => "feedback-drum",
+        UGenSpec::NoiseDrum => "noise-drum",
+        UGenSpec::SineDrum => "sine-drum",
         UGenSpec::PhaseDistortion => "phase-distortion",
         UGenSpec::Additive { .. } => "additive",
         UGenSpec::Wavetable(_) => "wavetable",
@@ -206,6 +394,8 @@ pub const UGEN_NAMES: &[&str] = &[
     "pulse",
     "tri",
     "white-noise",
+    "host-in-l",
+    "host-in-r",
     "lpf",
     "hpf",
     "bpf",
@@ -221,6 +411,65 @@ pub const UGEN_NAMES: &[&str] = &[
     "svf",
     "fm-op",
     "fm-mod",
+    "fm-drum",
+    "feedback-metal-core",
+    "analog-percussion",
+    "va-source",
+    "va-filter",
+    "phase-pair",
+    "fm-pair",
+    "six-op-original",
+    "speech-original",
+    "rings-part-core",
+    "string-choir-core",
+    "elements-internal-core",
+    "tidal-function-core",
+    "tidal-poly-core",
+    "peak-function-core",
+    "stage-segment-core",
+    "stage-chain-core",
+    "stage-linked-core",
+    "frame-lfo-core",
+    "frame-keyframe-core",
+    "peak-pulse-core",
+    "number-station-core",
+    "spectrum-pair",
+    "clock-noise-pair",
+    "dual-kick-core",
+    "snare-pair-core",
+    "hat-pair-core",
+    "swarm-pair-core",
+    "particle-pair-core",
+    "modal-pair-core",
+    "string-pair-core",
+    "chip-pair-core",
+    "analog-pair-core",
+    "grain-pair-core",
+    "shape-pair-core",
+    "string-machine-core",
+    "terrain-pair-core",
+    "wave-grid-core",
+    "chord-layer-core",
+    "macro-five-core",
+    "macro-sub-sync-core",
+    "macro-triple-core",
+    "macro-digital-core",
+    "macro-filter-core",
+    "macro-formant-core",
+    "macro-fm-core",
+    "macro-physical-core",
+    "macro-struck-core",
+    "macro-percussion-core",
+    "macro-wave-grid-core",
+    "macro-wave-line-core",
+    "macro-noise-core",
+    "macro-cloud-core",
+    "aux-out",
+    "out-3",
+    "out-4",
+    "feedback-drum",
+    "noise-drum",
+    "sine-drum",
     "phase-distortion",
     "additive",
     "wavetable",
@@ -232,10 +481,66 @@ pub const TEMPLATE_NAMES: &[&str] = &[
     "sampler",
     "analog",
     "fm",
+    "phase-drum",
+    "feedback-metal-drum",
+    "low-drum",
+    "wire-drum",
+    "metal-hat",
+    "filter-voice",
+    "phase-pair-voice",
+    "fm-pair-voice",
+    "six-bank-a-voice",
+    "six-bank-b-voice",
+    "six-bank-c-voice",
+    "speech-voice",
+    "rings-voice",
+    "string-choir-voice",
+    "elements-voice",
+    "spectrum-voice",
+    "clock-noise-voice",
+    "dual-kick-voice",
+    "dual-snare-voice",
+    "dual-hat-voice",
+    "swarm-voice",
+    "particle-voice",
+    "modal-voice",
+    "string-voice",
+    "chip-voice",
+    "analog-pair-voice",
+    "grain-pair-voice",
+    "shape-voice",
+    "string-machine-voice",
+    "terrain-voice",
+    "wave-grid-voice",
+    "chord-layer-voice",
+    "macro-five-voice",
+    "macro-sub-sync-voice",
+    "macro-triple-voice",
+    "macro-digital-voice",
+    "macro-filter-voice",
+    "macro-formant-voice",
+    "macro-fm-voice",
+    "macro-physical-voice",
+    "macro-struck-voice",
+    "macro-percussion-voice",
+    "macro-wave-grid-voice",
+    "macro-wave-line-voice",
+    "macro-noise-voice",
+    "macro-cloud-voice",
+    "fusion-drum",
     "pd",
     "additive",
     "wavetable",
     "granular",
+    "tidal-voice",
+    "tides2-voice",
+    "peak-motion-voice",
+    "stage-voice",
+    "stage-chain-voice",
+    "frame-lfo-voice",
+    "frame-keyframe-voice",
+    "peak-pulse-voice",
+    "number-station-voice",
 ];
 
 /// The node of a spec (an effect's parameters are not included).
@@ -247,6 +552,8 @@ pub fn node_of(spec: &UGenSpec) -> Node {
         UGenSpec::Pulse => Node::Pulse,
         UGenSpec::Tri => Node::Tri,
         UGenSpec::WhiteNoise => Node::WhiteNoise,
+        UGenSpec::HostInputL => Node::HostInputL,
+        UGenSpec::HostInputR => Node::HostInputR,
         UGenSpec::Lpf => Node::Lpf,
         UGenSpec::Hpf => Node::Hpf,
         UGenSpec::Bpf => Node::Bpf,
@@ -268,6 +575,65 @@ pub fn node_of(spec: &UGenSpec) -> Node {
         UGenSpec::Svf => Node::Svf,
         UGenSpec::FmOp => Node::FmOp,
         UGenSpec::FmMod => Node::FmMod,
+        UGenSpec::FmDrum => Node::FmDrum,
+        UGenSpec::FeedbackMetal => Node::FeedbackMetal,
+        UGenSpec::AnalogPercussion => Node::AnalogPercussion,
+        UGenSpec::VaSource => Node::VaSource,
+        UGenSpec::VaFilter => Node::VaFilter,
+        UGenSpec::PhasePair => Node::PhasePair,
+        UGenSpec::FmPair => Node::FmPair,
+        UGenSpec::SixOpOriginal => Node::SixOpOriginal,
+        UGenSpec::SpeechOriginal => Node::SpeechOriginal,
+        UGenSpec::RingsPart => Node::RingsPart,
+        UGenSpec::StringChoir => Node::StringChoir,
+        UGenSpec::ElementsInternal => Node::ElementsInternal,
+        UGenSpec::TidalFunction => Node::TidalFunction,
+        UGenSpec::TidalPoly => Node::TidalPoly,
+        UGenSpec::PeakFunction => Node::PeakFunction,
+        UGenSpec::StageSegment => Node::StageSegment,
+        UGenSpec::StageChain => Node::StageChain,
+        UGenSpec::StageLinked { .. } => Node::StageLinked { slot: 0 },
+        UGenSpec::FrameLfo => Node::FrameLfo,
+        UGenSpec::FrameKeyframe { .. } => Node::FrameKeyframe { slot: 0 },
+        UGenSpec::PeakPulse => Node::PeakPulse,
+        UGenSpec::NumberStation => Node::NumberStation,
+        UGenSpec::SpectrumPair => Node::SpectrumPair,
+        UGenSpec::ClockNoisePair => Node::ClockNoisePair,
+        UGenSpec::DualKick => Node::DualKick,
+        UGenSpec::SnarePair => Node::SnarePair,
+        UGenSpec::HatPair => Node::HatPair,
+        UGenSpec::SwarmPair => Node::SwarmPair,
+        UGenSpec::ParticlePair => Node::ParticlePair,
+        UGenSpec::ModalPair => Node::ModalPair,
+        UGenSpec::StringPair => Node::StringPair,
+        UGenSpec::ChipPair => Node::ChipPair,
+        UGenSpec::AnalogPair => Node::AnalogPair,
+        UGenSpec::GrainPair => Node::GrainPair,
+        UGenSpec::ShapePair => Node::ShapePair,
+        UGenSpec::StringMachinePair => Node::StringMachinePair,
+        UGenSpec::TerrainPair => Node::TerrainPair,
+        UGenSpec::TableTerrainPair => Node::TableTerrainPair,
+        UGenSpec::ChordPair => Node::ChordPair,
+        UGenSpec::BraidsFive => Node::BraidsFive,
+        UGenSpec::BraidsSubSync => Node::BraidsSubSync,
+        UGenSpec::BraidsTriple => Node::BraidsTriple,
+        UGenSpec::BraidsDigital => Node::BraidsDigital,
+        UGenSpec::BraidsFilter => Node::BraidsFilter,
+        UGenSpec::BraidsFormant => Node::BraidsFormant,
+        UGenSpec::BraidsFm => Node::BraidsFm,
+        UGenSpec::BraidsPhysical => Node::BraidsPhysical,
+        UGenSpec::BraidsStruck => Node::BraidsStruck,
+        UGenSpec::BraidsPercussion => Node::BraidsPercussion,
+        UGenSpec::BraidsWaveBank => Node::BraidsWaveBank,
+        UGenSpec::BraidsWaveLine => Node::BraidsWaveLine,
+        UGenSpec::BraidsNoise => Node::BraidsNoise,
+        UGenSpec::BraidsCloud => Node::BraidsCloud,
+        UGenSpec::AuxOut => Node::AuxOut,
+        UGenSpec::Out3 => Node::Out3,
+        UGenSpec::Out4 => Node::Out4,
+        UGenSpec::FeedbackDrum => Node::FeedbackDrum,
+        UGenSpec::NoiseDrum => Node::NoiseDrum,
+        UGenSpec::SineDrum => Node::SineDrum,
         UGenSpec::PhaseDistortion => Node::PhaseDistortion,
         UGenSpec::Additive { partials_max } => Node::Additive {
             partials_max: *partials_max,
@@ -281,193 +647,5 @@ pub fn node_of(spec: &UGenSpec) -> Node {
     }
 }
 
-// ---- node byte encoding (the graph codec's node layer, arena.rs) ----------
-
-/// A little-endian graph-encoding writer.
-pub(crate) struct Out<'a>(pub(crate) &'a mut Vec<u8>);
-
-impl Out<'_> {
-    pub(crate) fn u8(&mut self, x: u8) {
-        self.0.push(x);
-    }
-    pub(crate) fn u16(&mut self, x: u16) {
-        self.0.extend_from_slice(&x.to_le_bytes());
-    }
-    pub(crate) fn u32(&mut self, x: u32) {
-        self.0.extend_from_slice(&x.to_le_bytes());
-    }
-    pub(crate) fn f32(&mut self, x: f32) {
-        self.u32(x.to_bits());
-    }
-    pub(crate) fn ctl(&mut self, id: CtlId, c: Ctl) {
-        self.u16(id.get());
-        match c {
-            Ctl::Const(v) => {
-                self.u8(0);
-                self.f32(v);
-            }
-            Ctl::Cell(cell) => {
-                self.u8(1);
-                self.u32(cell.get());
-            }
-        }
-    }
-    pub(crate) fn len16(&mut self, n: usize) -> Result<(), BuildError> {
-        self.u16(u16::try_from(n).map_err(|_| BuildError::TooManyNodes)?);
-        Ok(())
-    }
-}
-
-/// The catalog index of an effect kind.
-pub(crate) fn effect_index(k: EffectKind) -> u8 {
-    EffectKind::ALL
-        .iter()
-        .position(|x| *x == k)
-        .and_then(|i| u8::try_from(i).ok())
-        .unwrap_or(0)
-}
-
-/// Encodes one node spec.
-pub(crate) fn put_spec(o: &mut Out<'_>, spec: &UGenSpec) -> Result<(), BuildError> {
-    let (tag, payload): (u8, u32) = match spec {
-        UGenSpec::SinOsc => (0, 0),
-        UGenSpec::Saw => (1, 0),
-        UGenSpec::Pulse => (2, 0),
-        UGenSpec::Tri => (3, 0),
-        UGenSpec::WhiteNoise => (4, 0),
-        UGenSpec::Lpf => (5, 0),
-        UGenSpec::Hpf => (6, 0),
-        UGenSpec::Bpf => (7, 0),
-        UGenSpec::Delay => (8, 0),
-        UGenSpec::Comb => (9, 0),
-        UGenSpec::EnvPerc => (10, 0),
-        UGenSpec::EnvAdsr => (11, 0),
-        UGenSpec::Line => (12, 0),
-        UGenSpec::SamplePlay(b) => (13, b.get()),
-        UGenSpec::Mul => (14, 0),
-        UGenSpec::Add => (15, 0),
-        UGenSpec::Const(v) => (16, v.to_bits()),
-        UGenSpec::Param(c) => (17, u32::from(c.get())),
-        UGenSpec::Vco { unison_max } => (18, u32::from(*unison_max)),
-        UGenSpec::SubOsc => (19, 0),
-        UGenSpec::Ladder => (20, 0),
-        UGenSpec::Svf => (21, 0),
-        UGenSpec::FmOp => (22, 0),
-        UGenSpec::FmMod => (23, 0),
-        UGenSpec::PhaseDistortion => (24, 0),
-        UGenSpec::Additive { partials_max } => (25, u32::from(*partials_max)),
-        UGenSpec::Wavetable(t) => (26, t.get()),
-        UGenSpec::Granular(GranSrc::Sample(b)) => (27, b.get()),
-        UGenSpec::Granular(GranSrc::Table(t)) => (28, t.get()),
-        UGenSpec::Granular(GranSrc::Bus) => (29, 0),
-        UGenSpec::Effect(e) => {
-            o.u8(30);
-            o.u8(effect_index(e.kind));
-            o.len16(e.params.len())?;
-            for &(id, c) in e.params.iter() {
-                o.ctl(id, c);
-            }
-            return Ok(());
-        }
-    };
-    o.u8(tag);
-    o.u32(payload);
-    Ok(())
-}
-
-/// A bounds-checked graph-encoding reader.
-pub(crate) struct In<'a> {
-    pub(crate) b: &'a [u8],
-    pub(crate) pos: usize,
-}
-
-impl In<'_> {
-    pub(crate) fn take<const N: usize>(&mut self) -> Result<[u8; N], FaultCode> {
-        let s = self
-            .b
-            .get(self.pos..self.pos + N)
-            .ok_or(FaultCode::BadRecord)?;
-        self.pos += N;
-        let mut a = [0; N];
-        a.copy_from_slice(s);
-        Ok(a)
-    }
-    pub(crate) fn u8(&mut self) -> Result<u8, FaultCode> {
-        Ok(self.take::<1>()?[0])
-    }
-    pub(crate) fn u16(&mut self) -> Result<u16, FaultCode> {
-        Ok(u16::from_le_bytes(self.take()?))
-    }
-    pub(crate) fn u32(&mut self) -> Result<u32, FaultCode> {
-        Ok(u32::from_le_bytes(self.take()?))
-    }
-    pub(crate) fn ctl(&mut self) -> Result<(CtlId, Ctl), FaultCode> {
-        let id = CtlId::new(self.u16()?);
-        let c = match self.u8()? {
-            0 => Ctl::Const(f32::from_bits(self.u32()?)),
-            1 => Ctl::Cell(CellId::new(self.u32()?)),
-            _ => return Err(FaultCode::BadRecord),
-        };
-        Ok((id, c))
-    }
-}
-
-/// Decodes one node into `raw`.
-pub(crate) fn get_node(i: &mut In<'_>, raw: &mut RawGraph) -> Result<(), FaultCode> {
-    let tag = i.u8()?;
-    if tag == 30 {
-        let kind = *EffectKind::ALL
-            .get(usize::from(i.u8()?))
-            .ok_or(FaultCode::BadRecord)?;
-        let n = raw
-            .push_node(Node::Effect { kind, fx: 0 })
-            .map_err(|_| FaultCode::GraphTooLarge)?;
-        for _ in 0..i.u16()? {
-            let (id, c) = i.ctl()?;
-            raw.push_node_param(n, id, c)
-                .map_err(|_| FaultCode::GraphTooLarge)?;
-        }
-        return Ok(());
-    }
-    let p = i.u32()?;
-    let small = u8::try_from(p).unwrap_or(u8::MAX);
-    let node = match tag {
-        0 => Node::SinOsc,
-        1 => Node::Saw,
-        2 => Node::Pulse,
-        3 => Node::Tri,
-        4 => Node::WhiteNoise,
-        5 => Node::Lpf,
-        6 => Node::Hpf,
-        7 => Node::Bpf,
-        8 => Node::Delay,
-        9 => Node::Comb,
-        10 => Node::EnvPerc,
-        11 => Node::EnvAdsr,
-        12 => Node::Line,
-        13 => Node::SamplePlay(BankRef::new(p)),
-        14 => Node::Mul,
-        15 => Node::Add,
-        16 => Node::Const(f32::from_bits(p)),
-        17 => Node::Param(CtlId::new(
-            u16::try_from(p).map_err(|_| FaultCode::BadRecord)?,
-        )),
-        18 => Node::Vco { unison_max: small },
-        19 => Node::SubOsc,
-        20 => Node::Ladder,
-        21 => Node::Svf,
-        22 => Node::FmOp,
-        23 => Node::FmMod,
-        24 => Node::PhaseDistortion,
-        25 => Node::Additive {
-            partials_max: small,
-        },
-        26 => Node::Wavetable(TableRef::new(p)),
-        27 => Node::Granular(GranSrc::Sample(BankRef::new(p))),
-        28 => Node::Granular(GranSrc::Table(TableRef::new(p))),
-        29 => Node::Granular(GranSrc::Bus),
-        _ => return Err(FaultCode::BadRecord),
-    };
-    raw.push_node(node).map_err(|_| FaultCode::GraphTooLarge)?;
-    Ok(())
-}
+mod codec;
+pub(crate) use codec::{effect_index, get_node, put_spec, In, Out};

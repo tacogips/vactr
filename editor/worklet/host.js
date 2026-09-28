@@ -43,6 +43,7 @@ export class VactrolHost {
   constructor(ctx, node, x, opts) {
     this.ctx = ctx;
     this.node = node;
+    this.quadSplitter = null;
     this.x = x;
     this.opts = opts;
     this.now = 0;
@@ -159,6 +160,12 @@ export class VactrolHost {
     this.node.port.postMessage(buf, [buf]);
   }
 
+  // Connect a Web Audio source to the worklet's stereo master-effect input.
+  // The worklet duplicates a mono source and silences disconnected input.
+  connectInput(source) {
+    source.connect(this.node);
+  }
+
   // Calls a worklet probe export (`worklet_probe_*`, `worklet_reset_watch`).
   workletCall(name, ...args) {
     this.node.port.postMessage({ type: 'call', name, args });
@@ -244,14 +251,30 @@ export async function startHost(opts) {
   await ctx.audioWorklet.addModule(opts.processorUrl);
   const init = opts.init === 'session' ? EXPORTS.session.init : EXPORTS.main.init;
   x[init](ctx.sampleRate, opts.arenaBytes ?? 0);
+  const outputChannels = opts.outputChannels === 4 ? 4 : 2;
   const node = new AudioWorkletNode(ctx, 'vactrol-processor', {
-    numberOfInputs: 0,
+    numberOfInputs: 1,
     numberOfOutputs: 1,
-    outputChannelCount: [2],
-    processorOptions: { arenaBytes: opts.arenaBytes ?? 0, voices: opts.voices ?? 0 },
+    channelCount: 2,
+    channelCountMode: 'explicit',
+    outputChannelCount: [outputChannels],
+    processorOptions: { arenaBytes: opts.arenaBytes ?? 0, voices: opts.voices ?? 0, outputChannels },
   });
-  node.connect(ctx.destination);
+  let quadSplitter = null;
+  if (outputChannels === 4) {
+    // Keep direct stems 3/4 separate. The caller can connect splitter outputs
+    // 2 and 3 to an explicit capture or external four-channel destination.
+    quadSplitter = ctx.createChannelSplitter(4);
+    const stereo = ctx.createChannelMerger(2);
+    node.connect(quadSplitter);
+    quadSplitter.connect(stereo, 0, 0);
+    quadSplitter.connect(stereo, 1, 1);
+    stereo.connect(ctx.destination);
+  } else {
+    node.connect(ctx.destination);
+  }
   const host = new VactrolHost(ctx, node, x, opts);
+  host.quadSplitter = quadSplitter;
   host.flush();
   const copy = bytes.slice(0);
   node.port.postMessage({ type: 'module', bytes: copy }, [copy]);

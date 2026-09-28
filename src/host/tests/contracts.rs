@@ -121,7 +121,7 @@ fn every_host_msg() -> Vec<HostMsg> {
 }
 
 #[test]
-fn audio_event_with_24_controls_round_trips() {
+fn audio_event_with_max_controls_round_trips() {
     let ev = full_event();
     assert_eq!(ev.controls().len(), MAX_CTLS);
     let mut buf = [0u8; AudioEvent::ENCODED_LEN];
@@ -131,7 +131,7 @@ fn audio_event_with_24_controls_round_trips() {
 }
 
 #[test]
-fn a_25th_control_is_too_many_controls() {
+fn a_control_beyond_the_max_is_too_many_controls() {
     let mut ev = full_event();
     let err = ev
         .push_ctl(CtlId::new(99), Ctl::Const(1.0))
@@ -193,7 +193,7 @@ fn bad_tags_and_fields_are_wire_errors() {
     assert_eq!(CtlMsg::decode(&buf[..n]), Err(WireError::BadValue));
     let mut ev = [0u8; AudioEvent::ENCODED_LEN];
     let n = full_event().encode(&mut ev);
-    ev[1 + 24] = 25; // n_ctl above MAX_CTLS
+    ev[1 + 24] = u8::try_from(MAX_CTLS + 1).expect("fits wire field");
     assert_eq!(AudioEvent::decode(&ev[..n]), Err(WireError::BadValue));
 }
 

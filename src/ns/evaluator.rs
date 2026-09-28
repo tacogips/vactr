@@ -304,7 +304,7 @@ impl Evaluator {
         let checked = check(
             std::slice::from_ref(form),
             &self.ns.check_env(),
-            &HostManifest::spec_default(),
+            &self.dynamic_manifest(&HostManifest::spec_default()),
         );
         let gen = self.next_gen();
         let bad = self.durable_bad();
@@ -646,6 +646,9 @@ impl Evaluator {
         bad: BTreeSet<FormId>,
     ) -> Attempt {
         let mut cx = CompileCx::new(&self.ns, gen);
+        if let Some(insts) = &self.vm.dsp.registry {
+            cx.custom_controls.extend(insts.borrow().declared_names());
+        }
         let compiled = compile(form, &mut cx);
         let mut diags = std::mem::take(&mut cx.diags);
         let sites = std::mem::take(&mut cx.sites);

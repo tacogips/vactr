@@ -26,6 +26,7 @@ class VactrolProcessor extends AudioWorkletProcessor {
     const o = (options && options.processorOptions) || {};
     this.arenaBytes = o.arenaBytes | 0;
     this.voices = o.voices | 0;
+    this.outputChannels = o.outputChannels === 4 ? 4 : 2;
     this.x = null;
     this.slots = new Array(SLOTS).fill(null);
     this.head = 0;
@@ -60,7 +61,11 @@ class VactrolProcessor extends AudioWorkletProcessor {
     try {
       const { instance } = await WebAssembly.instantiate(bytes, {});
       const x = instance.exports;
-      x.worklet_init(sampleRate, this.arenaBytes, this.voices);
+      if (this.outputChannels === 4) {
+        x.worklet_init_quad(sampleRate, this.arenaBytes, this.voices);
+      } else {
+        x.worklet_init(sampleRate, this.arenaBytes, this.voices);
+      }
       this.bind(x);
       this.x = x;
       this.port.postMessage({ type: 'ready', memory: x.memory.buffer.byteLength });
@@ -75,6 +80,8 @@ class VactrolProcessor extends AudioWorkletProcessor {
     this.mem = x.memory.buffer;
     this.u8 = new Uint8Array(this.mem);
     this.staging = x.staging_ptr();
+    this.inputPtr = x.input_ptr();
+    this.input = new Float32Array(this.mem, this.inputPtr, 2 * 512);
     this.report = new Float64Array(this.mem, x.report_ptr(), x.report_len());
     this.planarPtr = -1;
   }
@@ -108,14 +115,22 @@ class VactrolProcessor extends AudioWorkletProcessor {
         this.count -= 1;
       }
       const frames = out[0].length;
+      const incoming = inputs[0] || [];
+      const left = incoming[0];
+      const right = incoming[1] || left;
+      for (let frame = 0; frame < frames; frame++) {
+        const l = left && frame < left.length ? left[frame] : 0;
+        const r = right && frame < right.length ? right[frame] : 0;
+        this.input[2 * frame] = Number.isFinite(l) ? l : 0;
+        this.input[2 * frame + 1] = Number.isFinite(r) ? r : 0;
+      }
       const p = x.process(frames);
-      if (p !== this.planarPtr || !this.planar || this.planar.length !== 2 * frames) {
-        this.planar = new Float32Array(this.mem, p, 2 * frames);
+      if (p !== this.planarPtr || !this.planar || this.planar.length !== this.outputChannels * frames) {
+        this.planar = new Float32Array(this.mem, p, this.outputChannels * frames);
         this.planarPtr = p;
       }
-      out[0].set(this.planar.subarray(0, frames));
-      if (out.length > 1) {
-        out[1].set(this.planar.subarray(frames, 2 * frames));
+      for (let ch = 0; ch < this.outputChannels && ch < out.length; ch++) {
+        out[ch].set(this.planar.subarray(ch * frames, (ch + 1) * frames));
       }
       let o = null;
       const len = x.outbox_len();

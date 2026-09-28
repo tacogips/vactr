@@ -37,9 +37,6 @@ const CONSUMERS: [&str; 8] = [
     "last",
 ];
 
-/// Chord qualities (7.1.4, Decided 2026-09-25).
-const CHORD_QUALITIES: [&str; 4] = ["maj7", "m7", "dom7", "sus4"];
-
 /// The arguments of a call, split: positional, named pairs, and whether a
 /// splat makes the positional count unknown.
 pub(crate) struct Args<'n> {
@@ -501,11 +498,11 @@ impl Checker<'_> {
                 let kw = |c: &Node| matches!(c.kind, NodeKind::Atom(Atom::Keyword(_)));
                 if n.children.len() == 2 && n.children.iter().all(kw) {
                     if let NodeKind::Atom(Atom::Keyword(q)) = &n.children[1].kind {
-                        if !CHORD_QUALITIES.contains(&&**q) {
+                        if !crate::types::chords::is_chord_quality(q) {
                             self.emit(
                                 DiagCode::UnknownKeyword,
                                 n.children[1].span,
-                                format!("`:{q}` is not a chord quality (`:maj7 :m7 :dom7 :sus4`)"),
+                                format!("`:{q}` is not a chord quality (for example `:maj :m :dom7 :maj9 :sus4`)"),
                             );
                         }
                     }

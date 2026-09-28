@@ -9,6 +9,7 @@
 //! `types::masks::infer_masks`, with or without the diagnostics pass.
 //! The only compile failure is `nesting-too-deep` (7.1.5).
 
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 pub(crate) use crate::compile::matchc::{binder_name, literal};
@@ -48,6 +49,8 @@ pub struct CompileCx<'a> {
     /// The tweak sites of this form, in source order (also recorded in the
     /// namespace's tweak table).
     pub sites: Vec<TweakSite>,
+    /// Installed instrument header names accepted as pattern steps.
+    pub custom_controls: BTreeSet<Rc<str>>,
     env: Option<CheckEnv>,
 }
 
@@ -63,6 +66,7 @@ impl<'a> CompileCx<'a> {
             stack_budget: DEFAULT_STACK_BUDGET,
             diags: Vec::new(),
             sites: Vec::new(),
+            custom_controls: BTreeSet::new(),
             env: None,
         }
     }

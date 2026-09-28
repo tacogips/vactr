@@ -108,6 +108,7 @@ struct Worklet {
     ack_rx: AckConsumer,
     staging: Box<[u8]>,
     out: Box<[f32]>,
+    input: Box<[f32]>,
     planar: Box<[f32]>,
     report: Box<[f64; REPORT_LEN]>,
     quanta: u64,
@@ -137,6 +138,16 @@ fn memory_bytes() -> f64 {
 /// the browser tier's 64. Returns 1.
 #[no_mangle]
 pub extern "C" fn worklet_init(sample_rate: f32, arena_bytes: u32, voices: u32) -> u32 {
+    init_with_outputs(sample_rate, arena_bytes, voices, 2)
+}
+
+/// Opt-in four-channel worklet initialization; the stereo ABI stays intact.
+#[no_mangle]
+pub extern "C" fn worklet_init_quad(sample_rate: f32, arena_bytes: u32, voices: u32) -> u32 {
+    init_with_outputs(sample_rate, arena_bytes, voices, 4)
+}
+
+fn init_with_outputs(sample_rate: f32, arena_bytes: u32, voices: u32, channels: u8) -> u32 {
     let mut caps = CapabilitySet::browser();
     if voices > 0 {
         caps.max_voices = u16::try_from(voices).unwrap_or(u16::MAX);
@@ -146,7 +157,8 @@ pub extern "C" fn worklet_init(sample_rate: f32, arena_bytes: u32, voices: u32) 
     } else {
         arena_bytes as usize
     };
-    let cfg = EngineConfig::new(&caps, sample_rate, QUANTUM, StoreKind::Arena { bytes });
+    let mut cfg = EngineConfig::new(&caps, sample_rate, QUANTUM, StoreKind::Arena { bytes });
+    cfg.output_channels = channels;
     let (ev_tx, ev_rx) = EventRing::split(EVENT_CAPACITY);
     let (ack_tx, ack_rx) = SpscRing::<HostMsg>::split(1024);
     fix_outbox(OUTBOX_BYTES);
@@ -159,8 +171,9 @@ pub extern "C" fn worklet_init(sample_rate: f32, arena_bytes: u32, voices: u32) 
         ack_tx,
         ack_rx,
         staging: vec![0; INBOX_SLOT_BYTES].into_boxed_slice(),
-        out: vec![0.0; 2 * MAX_FRAMES].into_boxed_slice(),
-        planar: vec![0.0; 2 * MAX_FRAMES].into_boxed_slice(),
+        out: vec![0.0; 4 * MAX_FRAMES].into_boxed_slice(),
+        input: vec![0.0; 2 * MAX_FRAMES].into_boxed_slice(),
+        planar: vec![0.0; 4 * MAX_FRAMES].into_boxed_slice(),
         report: Box::new([0.0; REPORT_LEN]),
         quanta: 0,
         staged_now: 0,
@@ -188,6 +201,16 @@ pub extern "C" fn staging_ptr() -> *mut u8 {
         s.borrow_mut()
             .as_mut()
             .map_or(std::ptr::null_mut(), |w| w.staging.as_mut_ptr())
+    })
+}
+
+/// Fixed interleaved L/R input staging, filled from planar worklet channels.
+#[no_mangle]
+pub extern "C" fn input_ptr() -> *mut f32 {
+    WORKLET.with(|s| {
+        s.borrow_mut()
+            .as_mut()
+            .map_or(std::ptr::null_mut(), |w| w.input.as_mut_ptr())
     })
 }
 
@@ -322,8 +345,16 @@ impl Worklet {
             cells: &mut self.cells,
             garbage: None,
         };
-        let out = &mut self.out[..2 * frames];
-        self.engine.process(&mut io, out, frames);
+        let channels = usize::from(self.engine.config().output_channels);
+        let out = &mut self.out[..channels * frames];
+        if channels == 4 {
+            self.engine
+                .process_four_with_input(&mut io, &self.input[..2 * frames], out, frames);
+        } else {
+            self.engine
+                .process_with_input(&mut io, &self.input[..2 * frames], out, frames);
+        }
+        self.input[..2 * frames].fill(0.0);
         self.forward();
         self.observe(frames);
         self.quanta += 1;
@@ -383,10 +414,12 @@ impl Worklet {
     /// Planar output, the level watch and the report.
     fn observe(&mut self, frames: usize) {
         let mut energy = 0.0f64;
+        let channels = usize::from(self.engine.config().output_channels);
         for k in 0..frames {
-            let (l, rr) = (self.out[2 * k], self.out[2 * k + 1]);
-            self.planar[k] = l;
-            self.planar[frames + k] = rr;
+            let (l, rr) = (self.out[channels * k], self.out[channels * k + 1]);
+            for ch in 0..channels {
+                self.planar[ch * frames + k] = self.out[channels * k + ch];
+            }
             energy += f64::from(0.5 * (l + rr)).powi(2);
         }
         let rms = (energy / frames.max(1) as f64).sqrt();

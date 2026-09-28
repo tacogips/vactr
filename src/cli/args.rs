@@ -16,6 +16,7 @@ use crate::pkg::semver::Version;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum HostChoice {
     Native,
+    NativeInput,
     Noop,
 }
 
@@ -79,9 +80,9 @@ pub const USAGE: &str = "\
 usage: vactrol <verb> [options]
 
 verbs:
-  repl [--host native|noop]
-  run <file.vact> [--host native|noop] [--cycles N]
-  serve [<file.vact>] [--host native|noop] [--port P] [--bind ADDR]
+  repl [--host native|noop] [--audio-in]
+  run <file.vact> [--host native|noop] [--audio-in] [--cycles N]
+  serve [<file.vact>] [--host native|noop] [--audio-in] [--port P] [--bind ADDR]
   get [<path>[@version]] [--store dir:<root>]
   lsp [--session <ws-url>]
   version | --version
@@ -117,6 +118,14 @@ fn parse_host(v: &str) -> Result<HostChoice, UsageError> {
     }
 }
 
+fn with_audio_in(host: HostChoice, audio_in: bool) -> Result<HostChoice, UsageError> {
+    match (host, audio_in) {
+        (HostChoice::Noop, true) => Err(usage("`--audio-in` requires `--host native`")),
+        (_, true) => Ok(HostChoice::NativeInput),
+        (host, false) => Ok(host),
+    }
+}
+
 fn parse_store(v: &str) -> Result<StoreSpec, UsageError> {
     match v.strip_prefix("dir:") {
         Some(root) if !root.is_empty() => Ok(StoreSpec::Dir(PathBuf::from(root))),
@@ -147,17 +156,22 @@ fn parse_target(s: &str) -> Result<(PackageId, Option<Version>), UsageError> {
 
 fn parse_repl(args: &[String]) -> Result<Command, UsageError> {
     let mut host = HostChoice::Native;
+    let mut audio_in = false;
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
         if flag_matches(a, "--host") {
             host = parse_host(&take_value(args, &mut i, "--host")?)?;
+        } else if a == "--audio-in" {
+            audio_in = true;
         } else {
             return Err(usage(format!("unknown flag `{a}` for `repl`")));
         }
         i += 1;
     }
-    Ok(Command::Repl { host })
+    Ok(Command::Repl {
+        host: with_audio_in(host, audio_in)?,
+    })
 }
 
 fn parse_cycles(v: &str) -> Result<u64, UsageError> {
@@ -172,6 +186,7 @@ fn parse_cycles(v: &str) -> Result<u64, UsageError> {
 
 fn parse_run(args: &[String]) -> Result<Command, UsageError> {
     let mut host = HostChoice::Native;
+    let mut audio_in = false;
     let mut cycles = None;
     let mut file: Option<PathBuf> = None;
     let mut i = 0;
@@ -179,6 +194,8 @@ fn parse_run(args: &[String]) -> Result<Command, UsageError> {
         let a = args[i].as_str();
         if flag_matches(a, "--host") {
             host = parse_host(&take_value(args, &mut i, "--host")?)?;
+        } else if a == "--audio-in" {
+            audio_in = true;
         } else if flag_matches(a, "--cycles") {
             cycles = Some(parse_cycles(&take_value(args, &mut i, "--cycles")?)?);
         } else if let Some(stripped) = a.strip_prefix("--") {
@@ -191,11 +208,16 @@ fn parse_run(args: &[String]) -> Result<Command, UsageError> {
         i += 1;
     }
     let file = file.ok_or_else(|| usage("`run` needs a file argument"))?;
-    Ok(Command::Run { file, host, cycles })
+    Ok(Command::Run {
+        file,
+        host: with_audio_in(host, audio_in)?,
+        cycles,
+    })
 }
 
 fn parse_serve(args: &[String]) -> Result<Command, UsageError> {
     let mut host = HostChoice::Native;
+    let mut audio_in = false;
     let mut port: u16 = 0;
     let mut bind: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
     let mut file: Option<PathBuf> = None;
@@ -204,6 +226,8 @@ fn parse_serve(args: &[String]) -> Result<Command, UsageError> {
         let a = args[i].as_str();
         if flag_matches(a, "--host") {
             host = parse_host(&take_value(args, &mut i, "--host")?)?;
+        } else if a == "--audio-in" {
+            audio_in = true;
         } else if flag_matches(a, "--port") {
             let v = take_value(args, &mut i, "--port")?;
             port = v
@@ -229,7 +253,7 @@ fn parse_serve(args: &[String]) -> Result<Command, UsageError> {
     }
     Ok(Command::Serve {
         file,
-        host,
+        host: with_audio_in(host, audio_in)?,
         port,
         bind,
     })

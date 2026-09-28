@@ -493,15 +493,27 @@ impl Session {
     }
 
     fn manifest_body(&self) -> ManifestBody {
+        let registry = self.ev.insts();
+        let dynamic = registry.as_ref().map(|r| r.borrow());
+        let manifest = dynamic.as_ref().map_or_else(
+            || self.manifest.clone(),
+            |r| self.manifest.with_controls(r.declared_names()),
+        );
+        let mut editors = crate::session::editors::editor_decls();
+        if let Some(r) = &dynamic {
+            let installed = crate::session::editors::instrument_decls(r);
+            editors.retain(|decl| !installed.iter().any(|custom| custom.name == decl.name));
+            editors.extend(installed);
+        }
         let list = |k: &KeySet| match k {
             KeySet::Open => Vec::new(),
             KeySet::Of(set) => set.iter().map(ToString::to_string).collect(),
         };
         ManifestBody {
-            sounds: list(&self.manifest.sounds),
-            synths: list(&self.manifest.synths),
-            controls: list(&self.manifest.controls),
-            editors: Some(crate::session::editors::editor_decls()),
+            sounds: list(&manifest.sounds),
+            synths: list(&manifest.synths),
+            controls: list(&manifest.controls),
+            editors: Some(editors),
         }
     }
 }

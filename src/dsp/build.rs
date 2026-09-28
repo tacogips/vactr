@@ -36,10 +36,9 @@ use crate::dsp::cells::CellId;
 use crate::dsp::controls::{self, CtlDomain};
 use crate::dsp::effects;
 use crate::dsp::graph::{
-    BankRef, BusDef, BusId, Edge, EffectKind, EffectSpec, GranSrc, InstDef, InstId, TableRef,
-    UGenInput, UGenKind, UGenNode, UGenSpec, NODE_CAP,
+    BusDef, BusId, Edge, EffectKind, EffectSpec, InstDef, InstId, UGenInput, UGenKind, UGenNode,
+    UGenSpec, NODE_CAP,
 };
-use crate::dsp::ugen::catalog;
 use crate::host::caps::SignalInput;
 use crate::host::wire::Ctl;
 use crate::pattern::signal::Sig;
@@ -49,275 +48,13 @@ use crate::types::diag::{DiagCode, Diagnostic};
 use crate::value::intern::{name_of_kw, KwId};
 use crate::vm::fail::{FailCode, Failure};
 
-/// The first port of a named input that is not in the kind's port list.
-pub const NAMED_PORT: u8 = 64;
-/// The first synthetic parameter of a signal input.
-pub const SIGNAL_CTL_BASE: u16 = 0x4000;
-/// The first id of a parameter name outside the control table.
-pub const EXTRA_CTL_BASE: u16 = 64;
+mod names;
 
-/// Ugen named parameters outside the control table, `EXTRA_CTL_BASE + i`.
-pub const EXTRA_PARAMS: &[&str] = &[
-    "in",
-    "width",
-    "time",
-    "feedback",
-    "mix",
-    "threshold",
-    "knee",
-    "makeup",
-    "ceiling",
-    "drive",
-    "depth",
-    "rate",
-    "mode",
-    "kind",
-    "start",
-    "dur",
-    "partials",
-    "bands",
-    "amount",
-    "tone",
-    "q",
-    "low",
-    "mid",
-    "high",
-    "damping",
-    "predelay",
-    "taps",
-    "bits",
-    "factor",
-    "level",
-    "carrier",
-    "modulator",
-    "section",
-    "channels",
-    "order",
-    "hz",
-    "on",
-    "offset",
-];
-
-/// Every named argument a ugen or effect takes (kept equal to
-/// `EXTRA_PARAMS` + the control table by a test).
-pub const DSP_KEYWORDS: &[&str] = &[
-    "freq",
-    "amp",
-    "gain",
-    "note",
-    "n",
-    "pan",
-    "speed",
-    "velocity",
-    "begin",
-    "end",
-    "attack",
-    "decay",
-    "sustain",
-    "release",
-    "cutoff",
-    "res",
-    "wave",
-    "unison",
-    "detune",
-    "drift",
-    "ratio",
-    "index",
-    "algorithm",
-    "position",
-    "table",
-    "bank",
-    "loop",
-    "density",
-    "spray",
-    "pitch",
-    "pitch-spray",
-    "envelope",
-    "reverse",
-    "freeze",
-    "stereo-spray",
-    "source",
-    "resonance",
-    "room",
-    "size",
-    "shape",
-    "in",
-    "width",
-    "time",
-    "feedback",
-    "mix",
-    "threshold",
-    "knee",
-    "makeup",
-    "ceiling",
-    "drive",
-    "depth",
-    "rate",
-    "mode",
-    "kind",
-    "start",
-    "dur",
-    "partials",
-    "bands",
-    "amount",
-    "tone",
-    "q",
-    "low",
-    "mid",
-    "high",
-    "damping",
-    "predelay",
-    "taps",
-    "bits",
-    "factor",
-    "level",
-    "carrier",
-    "modulator",
-    "section",
-    "channels",
-    "order",
-    "hz",
-    "on",
-    "offset",
-];
-
-/// `svf` filter modes (`svf lowpass cutoff res`).
-pub const SVF_MODES: &[&str] = &["lowpass", "highpass", "bandpass"];
-const CODEC_KINDS: &[&str] = &["mp3", "gsm", "sbc", "atrac", "g726"];
-const RADIO_KINDS: &[&str] = &["am", "fm", "sw"];
-
-/// Every ugen name and the node it builds (design-music section 2, 4, 6).
-pub const UGENS: &[(&str, UGenSpec)] = &[
-    ("sin-osc", UGenSpec::SinOsc),
-    ("saw", UGenSpec::Saw),
-    ("pulse", UGenSpec::Pulse),
-    ("tri", UGenSpec::Tri),
-    ("white-noise", UGenSpec::WhiteNoise),
-    ("lpf", UGenSpec::Lpf),
-    ("hpf", UGenSpec::Hpf),
-    ("bpf", UGenSpec::Bpf),
-    ("delay", UGenSpec::Delay),
-    ("comb", UGenSpec::Comb),
-    ("env-perc", UGenSpec::EnvPerc),
-    ("env-adsr", UGenSpec::EnvAdsr),
-    ("line", UGenSpec::Line),
-    ("sample-play", UGenSpec::SamplePlay(BankRef::new(0))),
-    ("vco", UGenSpec::Vco { unison_max: 1 }),
-    ("sub-osc", UGenSpec::SubOsc),
-    ("ladder", UGenSpec::Ladder),
-    ("svf", UGenSpec::Svf),
-    ("fm-op", UGenSpec::FmOp),
-    ("fm-mod", UGenSpec::FmMod),
-    ("phase-distortion", UGenSpec::PhaseDistortion),
-    ("additive", UGenSpec::Additive { partials_max: 0 }),
-    ("wavetable", UGenSpec::Wavetable(TableRef::new(0))),
-    (
-        "granular",
-        UGenSpec::Granular(GranSrc::Sample(BankRef::new(0))),
-    ),
-];
-
-/// The ugen named `name`.
-#[must_use]
-pub fn ugen_named(name: &str) -> Option<UGenSpec> {
-    UGENS
-        .iter()
-        .find(|(n, _)| *n == name)
-        .map(|(_, s)| s.clone())
-}
-
-/// True for a ugen whose first positional input is an audio input.
-#[must_use]
-pub fn is_processor(spec: &UGenSpec) -> bool {
-    matches!(
-        spec,
-        UGenSpec::Lpf
-            | UGenSpec::Hpf
-            | UGenSpec::Bpf
-            | UGenSpec::Delay
-            | UGenSpec::Comb
-            | UGenSpec::Ladder
-            | UGenSpec::Svf
-            | UGenSpec::FmMod
-            | UGenSpec::Mul
-            | UGenSpec::Add
-    )
-}
-
-/// The positional ports of a ugen, in order.
-#[must_use]
-pub fn ports(spec: &UGenSpec) -> &'static [&'static str] {
-    match spec {
-        UGenSpec::SinOsc | UGenSpec::Saw | UGenSpec::Tri | UGenSpec::SubOsc => &["freq"],
-        UGenSpec::Pulse => &["freq", "width"],
-        UGenSpec::Lpf | UGenSpec::Hpf | UGenSpec::Bpf | UGenSpec::Ladder => {
-            &["in", "cutoff", "res"]
-        }
-        UGenSpec::Delay | UGenSpec::Comb => &["in", "time", "feedback"],
-        UGenSpec::EnvPerc => &["attack", "release"],
-        UGenSpec::EnvAdsr => &["attack", "decay", "sustain", "release"],
-        UGenSpec::Line => &["start", "end", "dur"],
-        UGenSpec::SamplePlay(_) => &["bank", "n", "rate", "begin", "end", "loop"],
-        UGenSpec::Mul | UGenSpec::Add => &["in", "amount"],
-        UGenSpec::Vco { .. } => &["wave", "freq", "unison", "detune", "drift"],
-        UGenSpec::Svf => &["in", "mode", "cutoff", "res"],
-        UGenSpec::FmOp => &["freq", "ratio", "index"],
-        UGenSpec::FmMod => &["carrier", "modulator"],
-        UGenSpec::PhaseDistortion => &["freq", "shape"],
-        UGenSpec::Additive { .. } => &["freq", "partials"],
-        UGenSpec::Wavetable(_) => &["table", "freq", "position"],
-        // R2: an unlisted name overflows a non-effect ugen's port array.
-        UGenSpec::Granular(_) => &[
-            "source",
-            "position",
-            "density",
-            "size",
-            "spray",
-            "pitch",
-            "pitch-spray",
-            "envelope",
-            "reverse",
-            "freeze",
-            "stereo-spray",
-        ],
-        _ => &[],
-    }
-}
-
-/// True for a voice-level resource argument (R2a), skipped before `input()`.
-fn is_resource_arg(spec: &UGenSpec, name: &str) -> bool {
-    match spec {
-        UGenSpec::SamplePlay(_) => matches!(name, "bank" | "n"),
-        UGenSpec::Wavetable(_) => name == "table",
-        UGenSpec::Granular(_) => name == "source",
-        _ => false,
-    }
-}
-
-/// The runtime catalog's name for `name`, when it differs (R2a).
-fn catalog_alias<'a>(spec: &UGenSpec, name: &'a str) -> &'a str {
-    match (spec, name) {
-        (UGenSpec::SamplePlay(_), "rate") => "speed",
-        (UGenSpec::Line, "start") => "from",
-        (UGenSpec::Line, "end") => "to",
-        (UGenSpec::FmMod, "carrier") => "in",
-        (UGenSpec::FmMod, "modulator") => "mod",
-        (UGenSpec::Mul | UGenSpec::Add, "in") => "a",
-        (UGenSpec::Mul | UGenSpec::Add, "amount") => "b",
-        _ => name,
-    }
-}
-
-/// `name`'s index in the RUNTIME catalog port list, after the alias; `None`
-/// when it names no runtime port of this ugen.
-fn catalog_port(spec: &UGenSpec, name: &str) -> Option<u8> {
-    let alias = catalog_alias(spec, name);
-    let node = catalog::node_of(spec);
-    catalog::ports(&node)
-        .iter()
-        .position(|p| p.name == alias)
-        .and_then(|i| u8::try_from(i).ok())
-}
+use names::{catalog_port, is_resource_arg, CODEC_KINDS, RADIO_KINDS};
+pub use names::{
+    is_processor, ports, ugen_named, DSP_KEYWORDS, EXTRA_CTL_BASE, EXTRA_PARAMS, NAMED_PORT,
+    SIGNAL_CTL_BASE, SVF_MODES, UGENS,
+};
 
 /// The parameters an effect's positional arguments (after its subject)
 /// name, in order.
@@ -705,6 +442,14 @@ impl Graph<'_> {
                 continue;
             }
             let listed = port_list.iter().position(|p| **p == *pname);
+            if (matches!(spec, UGenSpec::FrameKeyframe { .. }) && &*pname == "frames")
+                || (matches!(spec, UGenSpec::StageLinked { .. }) && &*pname == "segments")
+            {
+                if !matches!(inp, UGenInput::List(_)) {
+                    return Err(LowerError::ty("payload requires a constant numeric list"));
+                }
+                continue;
+            }
             // A list input (`partials:`) never becomes an edge (it lands in
             // `node_params`, addressed by `id_of`, below): it needs no port.
             let port = if matches!(inp, UGenInput::List(_)) {
@@ -757,6 +502,22 @@ impl Graph<'_> {
                 .map(|(_, v)| v)
         };
         match spec {
+            UGenSpec::FrameKeyframe { data } => {
+                let Some(UGenInput::List(xs)) = arg("frames") else {
+                    return Err(LowerError::ty("frames: requires a constant numeric list"));
+                };
+                let parsed = crate::dsp::ugen::frame_keyframe::FrameData::from_flat(xs)
+                    .map_err(LowerError::ty)?;
+                *data = Some(Box::new(parsed));
+            }
+            UGenSpec::StageLinked { data } => {
+                let Some(UGenInput::List(xs)) = arg("segments") else {
+                    return Err(LowerError::ty("segments: requires a constant numeric list"));
+                };
+                let parsed = crate::dsp::ugen::stage_linked::StageData::from_flat(xs)
+                    .map_err(LowerError::ty)?;
+                *data = Some(Box::new(parsed));
+            }
             UGenSpec::Vco { unison_max } => {
                 *unison_max = match arg("unison") {
                     Some(UGenInput::Const(v)) => clamp_u8(*v, 1, 16),

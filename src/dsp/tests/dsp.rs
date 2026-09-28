@@ -2,19 +2,88 @@
 //! engine. Every `Engine::process` call runs inside `alloc_probe::armed`
 //! and asserts zero allocations (`Rig::step`).
 
+mod analog_pair;
 mod analyzer;
 mod arena;
+mod braids_cloud;
+mod braids_digital;
+mod braids_filter;
+mod braids_five;
+mod braids_fm;
+mod braids_formant;
+mod braids_noise;
+mod braids_percussion;
+mod braids_physical;
+mod braids_struck;
+mod braids_subsync;
+mod braids_triple;
+mod braids_wave_bank;
+mod braids_wave_line;
 mod bus;
 mod caps;
 mod catalog;
 mod cells;
+mod chip_pair;
+mod chord_pair;
+mod clock_noise_pair;
+mod cross_mod;
+mod dual_kick;
+mod dynamic_control;
 mod effects;
+mod elements_bank;
+mod elements_internal;
+mod feedback_metal;
+mod fm_drum;
+mod fm_pair;
+mod frame_keyframe;
+mod frame_lfo;
+mod grain_pair;
 mod granular;
+mod hat_pair;
+mod live_input;
+mod modal_pair;
+mod number_station;
+mod particle_pair;
+mod peak_function;
+mod peak_pulse;
+mod phase_pair;
+mod quad_outputs;
+mod rate_contract;
 mod region;
 mod release;
 mod render;
+mod resonant_bank;
+mod rings_part;
+mod shape_pair;
+mod shift_pair;
+mod six_op_original;
+mod snare_pair;
+mod spectrum_pair;
+mod speech_original;
+mod stage_chain;
+mod stage_linked;
+mod stage_segment;
+mod stereo_contract;
+mod stream_cv;
+mod stream_dynamics;
+mod string_choir;
+mod string_machine_pair;
+mod string_pair;
+mod swarm_pair;
+mod table_terrain_pair;
 mod templates;
+mod terrain_pair;
+mod texture;
+mod texture_loop;
+mod texture_quality;
+mod texture_spectral;
+mod texture_stretch;
+mod tidal_function;
+mod tidal_poly;
 mod ugens;
+mod va_filter;
+mod voice_input;
+mod voice_stereo;
 
 use std::sync::Arc;
 
@@ -123,6 +192,7 @@ fn rig<C: CellStore, S: ControlSource>(engine: Engine, controls: S, cells: C) ->
     let (acks_tx, acks_rx) = SpscRing::split(4096);
     let (garbage_tx, garbage_rx) = SpscRing::split(256);
     let block = engine.config().max_block;
+    let channels = usize::from(engine.config().output_channels);
     Rig {
         engine,
         events,
@@ -133,7 +203,7 @@ fn rig<C: CellStore, S: ControlSource>(engine: Engine, controls: S, cells: C) ->
         garbage_tx,
         garbage_rx,
         cells,
-        buf: vec![0.0; 2 * block],
+        buf: vec![0.0; channels * block],
         next_resource: 1,
     }
 }
@@ -210,6 +280,10 @@ impl BrowserRig {
         rig(Engine::with_config(cfg), ByteInbox::new(), Mirror::new(64))
     }
 
+    pub(super) fn browser_with(cfg: EngineConfig) -> Self {
+        rig(Engine::with_config(cfg), ByteInbox::new(), Mirror::new(64))
+    }
+
     /// Queues one encoded record.
     pub(super) fn push(&mut self, rec: &[u8]) {
         assert!(self.controls.push(rec), "inbox accepts the record");
@@ -244,8 +318,37 @@ impl<C: CellStore, S: ControlSource> Rig<C, S> {
         };
         let engine = &mut self.engine;
         let buf = &mut self.buf;
-        let ((), allocs) = armed(|| engine.process(&mut io, buf, block));
-        assert_eq!(allocs, 0, "Engine::process allocated");
+        let ((), allocs) = armed(|| {
+            if engine.config().output_channels == 4 {
+                engine.process_four(&mut io, buf, block);
+            } else {
+                engine.process(&mut io, buf, block);
+            }
+        });
+        assert_eq!(allocs, 0, "Engine rendering allocated");
+        &self.buf
+    }
+
+    /// Same allocation-probed callback with exact interleaved external L/R.
+    pub(super) fn step_with_input(&mut self, input: &[f32]) -> &[f32] {
+        let block = self.engine.config().max_block;
+        let mut io = EngineIo {
+            events: &mut self.events_rx,
+            controls: &mut self.controls,
+            acks: &mut self.acks_tx,
+            cells: &mut self.cells,
+            garbage: Some(&mut self.garbage_tx),
+        };
+        let engine = &mut self.engine;
+        let buf = &mut self.buf;
+        let ((), allocs) = armed(|| {
+            if engine.config().output_channels == 4 {
+                engine.process_four_with_input(&mut io, input, buf, block);
+            } else {
+                engine.process_with_input(&mut io, input, buf, block);
+            }
+        });
+        assert_eq!(allocs, 0, "Engine input rendering allocated");
         &self.buf
     }
 
@@ -259,6 +362,20 @@ impl<C: CellStore, S: ControlSource> Rig<C, S> {
             r.extend(b.iter().skip(1).step_by(2));
         }
         (l, r)
+    }
+
+    /// Renders four independently addressable output lanes.
+    pub(super) fn run_four(&mut self, blocks: usize) -> [Vec<f32>; 4] {
+        assert_eq!(self.engine.config().output_channels, 4);
+        let mut lanes = std::array::from_fn(|_| Vec::new());
+        for _ in 0..blocks {
+            for frame in self.step().chunks_exact(4) {
+                for (lane, &sample) in lanes.iter_mut().zip(frame) {
+                    lane.push(sample);
+                }
+            }
+        }
+        lanes
     }
 
     /// Sends an event.

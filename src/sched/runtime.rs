@@ -355,6 +355,17 @@ impl Runtime {
                 let site = ev.ns().tweaks().borrow().get(id).cloned();
                 if let Some(site) = site {
                     self.cells.write_slot(&site.slot);
+                    if let Some(registry) = ev.insts() {
+                        for entry in registry.borrow().entries() {
+                            for (cell, slot) in &entry.cells {
+                                if slot.id() == site.slot.id() {
+                                    if let Some(value) = entry.default_cell_value(*cell) {
+                                        self.cells.write_external(*cell, value);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 self.invalidate_uncommitted();
             }
@@ -379,10 +390,17 @@ impl Runtime {
             StagedEffect::Install(g) => {
                 // Cell-backed defaults are initialized with the install.
                 if let GraphHandle::Inst { def, .. } = &g {
+                    let registry = ev.insts();
+                    let registry = registry.as_ref().map(|r| r.borrow());
+                    let entry = registry.as_ref().and_then(|r| r.entry(def.id));
                     for (ctl, c) in def.params.iter() {
                         if let Ctl::Cell(cell) = c {
-                            let v =
-                                crate::dsp::controls::row_by_id(*ctl).map_or(0.0, |r| r.default);
+                            let v = entry
+                                .filter(|entry| entry.def.as_ref() == def.as_ref())
+                                .and_then(|entry| entry.default_cell_value(*cell))
+                                .unwrap_or_else(|| {
+                                    crate::dsp::controls::row_by_id(*ctl).map_or(0.0, |r| r.default)
+                                });
                             self.cells.ensure_external(*cell, v);
                         }
                     }

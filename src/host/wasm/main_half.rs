@@ -229,6 +229,7 @@ fn fault_code(b: u8) -> FaultCode {
         1 => FaultCode::InstallQueueOverflow,
         2 => FaultCode::GraphTooLarge,
         3 => FaultCode::BadResource,
+        5 => FaultCode::OutputChannels,
         _ => FaultCode::BadRecord,
     }
 }

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
+use crate::dsp::controls::DeclaredParam;
 use crate::dsp::graph::{BusDef, BusId, InstDef, InstId};
 use crate::host::noop::NoopHost;
 use crate::host::wire::{AudioEvent, CtlMsg, HostMsg, SlotControl};
@@ -168,6 +169,11 @@ pub trait InstResolver {
     fn route(&self, sound: &Sound) -> Result<Route, Failure>;
     /// An installed instrument template.
     fn inst(&self, id: InstId) -> Option<Arc<InstDef>>;
+    /// A parameter declared by this instrument, including names that have
+    /// no global control-table row. Stub resolvers may return `None`.
+    fn declared_param(&self, _id: InstId, _name: KwId) -> Option<DeclaredParam> {
+        None
+    }
     /// The signals installed instruments read as control cells (12.8.6);
     /// the scheduler samples each once per tick.
     fn signal_inputs(&self) -> Vec<SignalInput>;

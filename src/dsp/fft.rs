@@ -93,6 +93,24 @@ impl Fft {
         }
     }
 
+    /// Inverse transform in place, normalized by the transform length.
+    /// The caller provides the same preallocated real/imaginary buffers as
+    /// `forward`; no scratch allocation is needed.
+    pub fn inverse(&self, re: &mut [f32], im: &mut [f32]) {
+        if re.len() < self.n || im.len() < self.n {
+            return;
+        }
+        for value in &mut im[..self.n] {
+            *value = -*value;
+        }
+        self.forward(re, im);
+        let scale = 1.0 / self.n as f32;
+        for (real, imaginary) in re[..self.n].iter_mut().zip(&mut im[..self.n]) {
+            *real *= scale;
+            *imaginary *= -scale;
+        }
+    }
+
     /// The magnitude spectrum of `input` (Hann-windowed) into `mags`
     /// (`n / 2` bins), using `re`/`im` as scratch of `n` floats each.
     pub fn magnitudes(&self, input: &[f32], re: &mut [f32], im: &mut [f32], mags: &mut [f32]) {

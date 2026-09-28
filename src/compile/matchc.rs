@@ -10,6 +10,7 @@ use crate::compile::proto::{
     field_params, fn_params, struct_fields, Arity, Fb, FbKind, Param, Shape,
 };
 use crate::compile::sites::SiteCtx;
+use crate::dsp::controls::ScalarType;
 use crate::ns::namespace::{SlotKind, VarSlotRef};
 use crate::reader::node::{Atom, Node, NodeKind, Op as NodeOp};
 use crate::types::diag::{DiagCode, Diagnostic, Severity};
@@ -463,6 +464,7 @@ impl Compiler<'_, '_> {
             .count();
         let mut entries = Vec::with_capacity(order.len());
         let mut names: Vec<KwId> = Vec::with_capacity(order.len());
+        let mut scalar_types: Vec<ScalarType> = Vec::with_capacity(order.len());
         let mut defaults = Vec::new();
         self.fbs.push(Fb::new(name, f.span, FbKind::Func));
         let r = (|| {
@@ -471,6 +473,12 @@ impl Compiler<'_, '_> {
                 let p = &params[*k];
                 entries.push(mask.0.get(*k).cloned().unwrap_or(MaskEntry::Value));
                 names.push(intern_kw(p.name.as_deref().unwrap_or("")));
+                scalar_types.push(match p.node.children.get(1).and_then(Node::sym_name) {
+                    Some("int" | "int64") => ScalarType::Int,
+                    Some("bool") => ScalarType::Bool,
+                    Some("float" | "float64" | "ratio") | None => ScalarType::Float,
+                    _ => ScalarType::Unsupported,
+                });
                 if let Some(d) = p.default {
                     defaults.push(d);
                 }
@@ -483,6 +491,7 @@ impl Compiler<'_, '_> {
             fb.arity = Arity {
                 fixed: u8::try_from(fixed).map_err(|_| too_deep(f))?,
                 names: names.clone().into_boxed_slice(),
+                scalar_types: scalar_types.into_boxed_slice(),
                 keys: u8::try_from(order.len() - fixed).map_err(|_| too_deep(f))?,
             };
             for (node, slot) in prologue {
@@ -752,8 +761,9 @@ impl Compiler<'_, '_> {
         if slot.is_bound() {
             return None;
         }
-        let row = crate::dsp::controls::row(name)?;
-        (row.route == crate::dsp::controls::CtlRoute::InstParam).then(|| Rc::clone(name))
+        let builtin = crate::dsp::controls::row(name)
+            .is_some_and(|row| row.route == crate::dsp::controls::CtlRoute::InstParam);
+        (builtin || self.cx.custom_controls.contains(name)).then(|| Rc::clone(name))
     }
 
     /// The prelude slot and signature of the `"inst control"` native, next

@@ -56,7 +56,7 @@ const TRIGGERS: &[(&str, DiagCode, usize, Severity)] = &[
         E,
     ),
     ("use-clock :link", C::ClockSourceUnavailable, 1, E),
-    ("s :piano > chord [:c :maj9] > d1", C::UnknownKeyword, 1, E),
+    ("s :piano > chord [:c :maj99] > d1", C::UnknownKeyword, 1, E),
 ];
 
 #[test]
@@ -92,7 +92,10 @@ fn clean_counterparts_do_not_trigger() {
 fn chord_qualities_are_the_letter_first_set() {
     assert_clean("s :piano > chord {alt [:c :maj7] [:d :m7] [:g :dom7] [:a :sus4]} > voicing > d1");
     assert_clean("s :piano > chord [:c :m7] > arp :up > d1");
-    assert_diags("s :piano > chord [:c :maj9] > d1", &["unknown-keyword@1"]);
+    // The full vocabulary (2026-09-27): triads, sixths, sevenths, ninths,
+    // elevenths, thirteenths, sus and added tones.
+    assert_clean("s :piano > chord {alt [:c :maj] [:a :m] [:f :maj9] [:g :dom13] [:b :m7f5] [:e :dom7s9] [:d :sus2] [:c :add9]} > voicing > d1");
+    assert_diags("s :piano > chord [:c :maj99] > d1", &["unknown-keyword@1"]);
     assert_diags(
         "s :piano > chord {alt [:c :maj7] [:g :seven]} > d1",
         &["unknown-keyword@1"],

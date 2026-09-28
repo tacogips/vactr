@@ -145,6 +145,13 @@ s [:bd-haus :sn-dub] > room 0.3 > size 0.8 > delay 0.25 > d1
 s :pluck > n [0 2 4] > scale :c :minor > d1
 s :piano > chord {alt [:c :maj7] [:d :m7] [:g :dom7]} > voicing > d1
 # Decided (2026-09-25): chord qualities are letter-first keywords (:maj7 :m7 :dom7 :sus4), never :7
+# Decided (2026-09-27): the full vocabulary is built in (src/types/chords.rs, one table for
+#   the checker and the runtime): triads :maj :m :dim :aug :sus2 :sus4 :five; sixths :six
+#   :m6 :six9 :m69; sevenths :maj7 :dom7 :m7 :mmaj7 :m7f5 :dim7 :aug7 :augmaj7 :m7s5
+#   :dom7f5 :dom7sus2 :dom7sus4; ninths :add9 :madd9 :maj9 :dom9 :m9 :mmaj9 :dom7f9
+#   :dom7s9 :m7f9 :dom9sus4 :dom9s5; elevenths :add11 :maj11 :dom11 :m11 :dom7s11
+#   :maj7s11; thirteenths :add13 :maj13 :dom13 :m13; aliases :major :min :minor.
+#   Naming: m minor, maj major-seventh family, dom dominant family, s sharp, f flat.
 s :piano > chord [:c :m7] > arp :up > d1
 
 # sound parameters available on any pattern:
@@ -365,6 +372,88 @@ s :wt > note [:c3 :e3] > position {range sine 0 1} > d1
 Templates shipped in the prelude: `sampler`, `analog`, `fm`, `pd`,
 `additive`, `wavetable`, `granular` (section 6). Parameters are pattern
 controls like any other, so every knob of every model is patternable.
+
+### 4.1 Programmable digital drums (author, 2026-09-27)
+
+The generic FM/phase-distortion/noise/effect graph above is a foundation for
+digital drums, but the current seven templates do not provide a dedicated
+programmable drum synth. Add an original digital percussion kit with tonal,
+noise, metallic, and hat voice families. DaisySP's MIT-licensed synthetic
+bass drum, snare drum, and hi-hat modules are compatible starting points for
+DSP study or a documented Rust port. If their code is used, retain the
+applicable MIT copyright and license notices. Do not import a third-party
+wave table, sample, preset, numeric lookup table, or asset-derived trace.
+Design Vactrol's tables (if any), defaults, kit layout, and naming
+independently. Product text describes Vactrol's digital drum synth.
+
+Each lane is an ordinary named `inst` with an explicit signal graph. The
+prelude provides `digital-drum`, `digital-snare`, `digital-metal`, and
+`digital-hat` templates. A kit maps ordinary sound keywords to those
+instruments. Patterns
+trigger the voices and set **every declared sound parameter** by name, with
+constant, per-event, signal, or cell-backed values. A parameter absent from an
+event retains the instrument default. An unsupported name is a diagnostic,
+not a silently ignored control. Names should describe the audio function
+rather than expose firmware `PAR_*` numbers.
+
+The shared parameter surface is `freq`, `amp`, `pan`, `velocity`, `wave`,
+`coarse`, `fine`, `amp-attack`, `amp-decay`, `amp-slope`, `filter-type`,
+`cutoff`, `res`, `filter-drive`, `drive`, `decimation`, `volume-velocity`,
+`velocity-depth`, `velocity-target`, `transient-wave`, `transient-freq`,
+`transient-level`, `lfo-wave`, `lfo-rate`, `lfo-depth`, `lfo-target`,
+`lfo-retrigger`, `lfo-sync`, and `lfo-offset`. The tonal drum and snare
+families additionally expose `mod-wave`, `mod-freq`, `mod-level`, `fm-depth`,
+`pitch-decay`, `pitch-depth`, `pitch-slope`, and `osc-mix`. The snare adds
+`noise-freq` and `noise-mix`; cymbal and hat provide a second modulator via
+`mod2-wave`, `mod2-freq`, and `mod2-level`. Family-specific controls such as
+retrigger/repeat, open and closed hat decays, and modulation-envelope shape
+are named in each template's parameter metadata. The parameter manifest is
+the authoritative inventory: every exposed knob has a type, unit, range,
+default, enum domain where applicable, editor label, and voice destination.
+
+The instrument inventory also includes audio-output selection and MIDI-note
+assignment. Vactrol represents those as pattern bus/slot routing and MIDI
+input mapping, not per-voice DSP parameters. Sequencer step volume,
+probability, note, Euclidean length/steps, pattern selection, shuffle, tempo,
+and automation map to existing Vactrol pattern and clock concepts; these
+must remain expressible in `.vact` alongside the kit. This separation makes
+the full musical configuration codeable without inventing dead audio knobs.
+
+The control pipeline must resolve an event key against the selected `InstDef`'s
+declared parameter names before falling back to the built-in global control
+table. Its per-instrument name-to-wire-ID map, type/domain validation, cell
+support, and editor metadata must share one parameter manifest. No control
+may be silently truncated by the fixed 48-parameter voice template or the
+128-cell instrument-default pool. Registration and commit must report capacity
+errors before audio is changed. LFO target selection should use typed target
+names from the same manifest, and modulation must run in the audio engine at
+the declared rate. All voice DSP remains bounded and allocation-free in the
+audio callback. Native and browser hosts should render the same kit graph.
+
+Example target usage (the names become live when the kit is implemented):
+
+```text
+s :digital-drum > note [:c2 :g2] > fm-depth [0.1 0.7] > d1
+s :digital-snare > noise-mix {range sine 0.2 0.8} > d2
+s :digital-hat > amp-decay [0.05 0.25] > d3
+```
+
+Completion requires a checked inventory of the original design's controls,
+real audio differences for every exposed parameter
+family, editor visibility, and end-to-end `.vact` rendering of the four
+templates. Existing FM/PD/additive/wavetable support alone does not satisfy
+this section.
+
+### 4.2 Published modular audio DSP ports (author, 2026-09-27)
+
+The complete source and license inventory, module coverage matrix, audio
+interface, and verification rules are in
+[`design-mutable-audio.md`](design-mutable-audio.md). The target is every
+published Eurorack **audio DSP** engine whose source can be included under
+Vactrol's MIT distribution terms. Each engine's meaningful controls must be
+available in `.vact`; upstream brand and module names are provenance only,
+not product names. This effort supersedes using one external drum machine as
+the design basis for the digital percussion kit above.
 
 ## 5. Effects (builtin catalog; author, 2026-09-24)
 

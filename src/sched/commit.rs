@@ -459,13 +459,52 @@ fn audio_events(
     }
     for (k, e) in controls {
         let name = name_of_kw(*k);
-        let Some(row) = controls::row(&name) else {
-            continue; // a control nobody takes is ignored (12.8.7)
+        let row = controls::row(&name);
+        if row.is_none() {
+            if &*name == "speed-fit" {
+                continue; // consumed above by sample speed resolution
+            }
+            let param = cx.resolver.declared_param(inst, *k).ok_or_else(|| {
+                Failure::new(
+                    FailCode::Type,
+                    format!("unknown instrument control `{name}`"),
+                )
+            })?;
+            let value = match &e.1 {
+                Some(slot) => {
+                    let v = param.encode(&slot.get())?;
+                    cx.cells.ctl_for(
+                        CellKey::Site {
+                            slot: slot.id(),
+                            ctl: param.ctl,
+                        },
+                        None,
+                        CellMap::Direct,
+                        v,
+                        cx.diags,
+                    )
+                }
+                None => Ctl::Const(param.encode(&e.0)?),
+            };
+            base.push_ctl(param.ctl, value)?;
+            continue;
+        }
+        let Some(row) = row else {
+            unreachable!("custom controls were handled above")
         };
         if row.route == CtlRoute::Scheduler
             || matches!(row.name, "note" | "n" | "bank" | "table" | "source")
         {
             continue;
+        }
+        if let Some(param) = cx.resolver.declared_param(inst, *k) {
+            if matches!(
+                row.domain,
+                crate::dsp::controls::CtlDomain::Float | crate::dsp::controls::CtlDomain::Bool
+            ) && param.ty != crate::dsp::controls::ScalarType::Unsupported
+            {
+                param.encode(&current(e))?;
+            }
         }
         let ctl = match &e.1 {
             Some(slot) => {

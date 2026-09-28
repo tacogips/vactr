@@ -1,0 +1,32 @@
+# Opt-in four-lane Frames and Tides adaptations. Load this file only in a
+# four-output host. Channels 1/2 use the stereo bus/master; 3/4 are direct
+# post-voice-gain stems. The default two-output prelude remains unchanged.
+
+inst frame-keyframe-quad-voice frames: [float] = [0 0.1 0.3 0.5 0.7 1 0.2 0.4 0.6 0.8] frame-position: float = 0.37 frame-ease1: float = 1 frame-ease2: float = 1 frame-ease3: float = 1 frame-ease4: float = 1 frame-response1: float = 0 frame-response2: float = 0 frame-response3: float = 0 frame-response4: float = 0:
+	frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: 0 > * amp
+		> + {frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: 1 > * amp > aux-out}
+		> + {frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: 2 > * amp > out-3}
+		> + {frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: 3 > * amp > out-4}
+
+inst frame-lfo-quad-voice frame-shape: float = 0 frame-spread: float = 0.75 frame-shape-spread: float = 0.5 frame-coupling: float = 0.5 frame-offset: float = 0:
+	frame-lfo-core freq frame-shape: frame-shape frame-spread: frame-spread frame-shape-spread: frame-shape-spread frame-coupling: frame-coupling frame-offset: frame-offset frame-channel: 0 > * amp
+		> + {frame-lfo-core freq frame-shape: frame-shape frame-spread: frame-spread frame-shape-spread: frame-shape-spread frame-coupling: frame-coupling frame-offset: frame-offset frame-channel: 1 > * amp > aux-out}
+		> + {frame-lfo-core freq frame-shape: frame-shape frame-spread: frame-spread frame-shape-spread: frame-shape-spread frame-coupling: frame-coupling frame-offset: frame-offset frame-channel: 2 > * amp > out-3}
+		> + {frame-lfo-core freq frame-shape: frame-shape frame-spread: frame-spread frame-shape-spread: frame-shape-spread frame-coupling: frame-coupling frame-offset: frame-offset frame-channel: 3 > * amp > out-4}
+
+# Four sample-aligned Tides1 roles. EOA is a level; EOR is held while
+# idle or briefly after a loop wrap. Source timing remains approximate.
+fn tidal-quad-lane hz shape slope smoothness ratio sync gate clock freeze mode range pitch output:
+	tidal-function-core hz tide-shape: shape tide-slope: slope tide-smoothness: smoothness tide-ratio: ratio tide-sync: sync tide-gate: gate tide-clock: clock tide-freeze: freeze tide-mode: mode tide-range: range tide-pitch: pitch tide-output: output
+
+inst tidal-quad-voice tide-shape: float = 0.5 tide-slope: float = 0.5 tide-smoothness: float = 0.5 tide-ratio: float = 1 tide-sync: float = 0 tide-gate: float = 1 tide-clock: float = 0 tide-freeze: float = 0 tide-mode: float = 1 tide-range: float = 0 tide-pitch: float = 0:
+	tidal-quad-lane freq tide-shape tide-slope tide-smoothness tide-ratio tide-sync tide-gate tide-clock tide-freeze tide-mode tide-range tide-pitch 0 > * amp
+		> + {tidal-quad-lane freq tide-shape tide-slope tide-smoothness tide-ratio tide-sync tide-gate tide-clock tide-freeze tide-mode tide-range tide-pitch 1 > * amp > aux-out}
+		> + {tidal-quad-lane freq tide-shape tide-slope tide-smoothness tide-ratio tide-sync tide-gate tide-clock tide-freeze tide-mode tide-range tide-pitch 2 > * amp > out-3}
+		> + {tidal-quad-lane freq tide-shape tide-slope tide-smoothness tide-ratio tide-sync tide-gate tide-clock tide-freeze tide-mode tide-range tide-pitch 3 > * amp > out-4}
+
+inst tides2-quad-voice poly-width: float = 0.5 poly-shape: float = 0.5 poly-smoothness: float = 0.5 poly-shift: float = 0.8 poly-gate: float = 1 poly-clock: float = 0 poly-mode: float = 1 poly-output-mode: float = 2 poly-range: float = 1:
+	tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: 0 > * amp
+		> + {tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: 1 > * amp > aux-out}
+		> + {tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: 2 > * amp > out-3}
+		> + {tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: 3 > * amp > out-4}

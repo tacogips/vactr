@@ -1,0 +1,44 @@
+# Ode to Joy: the main theme of Beethoven's Symphony No. 9 (1824, public domain)
+# in C major, one bar per cycle. The arrangement (bass, broken chords) is new.
+#
+# How the notes are written:
+# - a list is one cycle; a nested list splits its step ([:e5 :f5] = two eighths)
+# - {hold :e5 3} weights a step, so [{hold :e5 3} :d5 {hold :d5 4}] is
+#   dotted quarter, eighth, half
+# - note names: c5 is middle C, s = sharp, f/b = flat (fs4, bb3)
+
+use-bpm 108
+
+# the 16-bar theme as four 4-bar phrases (each phrase is one list of bars)
+let a1 [[:e5 :e5 :f5 :g5] [:g5 :f5 :e5 :d5] [:c5 :c5 :d5 :e5] [{hold :e5 3} :d5 {hold :d5 4}]]
+let a2 [[:e5 :e5 :f5 :g5] [:g5 :f5 :e5 :d5] [:c5 :c5 :d5 :e5] [{hold :d5 3} :c5 {hold :c5 4}]]
+let b [[:d5 :d5 :e5 :c5] [:d5 [:e5 :f5] :e5 :c5] [:d5 [:e5 :f5] :e5 :d5] [:c5 :d5 {hold :g4 2}]]
+
+# harmony, one bar per list element: root and fifth as half notes
+let bass-a1 [[:c3 :g3] [:g2 :d3] [:c3 :g3] [:g2 :d3]]
+let bass-a2 [[:c3 :g3] [:g2 :d3] [:c3 :g3] [:g2 :c3]]
+let bass-b [[:g2 :d3] [:c3 :g3] [:g2 :d3] [:c3 :g2]]
+
+# broken chords in eighths: C = c e g, G = b d g
+let c-arp [:c4 :e4 :g4 :e4 :c4 :e4 :g4 :e4]
+let g-arp [:b3 :d4 :g4 :d4 :b3 :d4 :g4 :d4]
+let arp-a1 [c-arp g-arp c-arp g-arp]
+let arp-a2 [c-arp g-arp c-arp [:b3 :d4 :g4 :d4 :c4 :e4 :g4 :e4]]
+let arp-b [g-arp c-arp g-arp [:c4 :e4 :g4 :e4 :b3 :d4 :g4 :d4]]
+
+# the three voices as patterns: cat plays the phrases in order, one phrase
+# per cycle; `slow 4` below stretches that to one bar per cycle.
+# (Bind them with let: in braces, `note {cat ..}` would be a function of time
+# that is sampled once per cycle, not a sequence of steps.)
+let melody cat [a1 a2 b a2]
+let bass cat [bass-a1 bass-a2 bass-b bass-a2]
+let keys cat [arp-a1 arp-a2 arp-b arp-a2]
+
+# melody: a soft fm bell
+s :fm > note melody > slow 4 > ratio 2 > index 1.5 > decay 0.4 > sustain 0.4 > release 0.3 > room 0.35 > size 0.7 > gain 0.55 > d1
+
+# bass: a warm analog saw under a closed filter
+s :analog > note bass > slow 4 > wave :saw > cutoff 700 > res 0.2 > release 0.3 > gain 0.45 > d2
+
+# accompaniment: phase-distortion keys, quiet, panned slightly right
+s :pd > note keys > slow 4 > attack 0.01 > decay 0.2 > release 0.15 > pan 0.62 > gain 0.22 > d3

@@ -4,8 +4,9 @@
 //! event ring and the priority control channel, the ack and garbage
 //! consumers, the shared `AtomicCells`, and the frame clock. `AudioSide` is
 //! the audio half: the `Engine` and the consumer ends. The cpal callback
-//! owns the `AudioSide` and only calls `AudioSide::render`, which runs
-//! `Engine::process` over preallocated buffers and then stores the frame
+//! owns the `AudioSide` and calls `AudioSide::render` or, with `audio_in`,
+//! the bounded input-queue bridge and `render_with_input`. Both run over
+//! preallocated buffers and then store the frame
 //! counter and the host signals in atomics, and copies each block into the
 //! live tap rings and armed captures (`tap.rs`, 14.5.9). It allocates
 //! nothing and takes no lock (17 invariant 3).
@@ -38,11 +39,12 @@ use crate::host::caps::{
     AudioHost, CaptureId, CapturePoll, GraphHandle, HostSigs, InstResolver, SampleData, TapReader,
     TapSrc,
 };
+use crate::host::native::capture::{self, CaptureCounters, CaptureStats, InputConsumer};
 use crate::host::native::tap::{self, NativeTapReader, TapShared};
 use crate::host::native::{unavailable, NativeConfig};
 use crate::host::wire::{AudioEvent, CtlMsg, HostMsg, SlotControl};
 use crate::reader::span::{FileId, Span};
-use crate::types::diag::{DiagCode, Diagnostic};
+use crate::types::diag::{DiagCode, Diagnostic, Severity};
 use crate::vm::fail::Failure;
 
 /// The engine block: longer callbacks render in pieces of this size.
@@ -139,21 +141,62 @@ pub struct AudioSide {
     taps: Arc<TapShared>,
     /// Interleaved stereo for devices that are not stereo.
     scratch: Box<[f32]>,
+    /// Fixed stereo staging for a mono external source.
+    input_scratch: Box<[f32]>,
 }
 
 impl AudioSide {
+    #[cfg(test)]
+    pub(crate) fn has_template(&self, id: crate::dsp::graph::InstId) -> bool {
+        self.engine.has_template(id)
+    }
+
     /// The callback body: fills `out` (interleaved, `channels` per frame).
     /// Stereo renders in place; mono takes the mid signal; wider devices
     /// get left and right on their first two channels and silence on the
     /// rest.
     pub fn render(&mut self, out: &mut [f32], channels: usize) {
-        if channels == 2 {
+        self.render_impl(None, out, channels);
+    }
+
+    /// Renders with live external audio. Exactly one input sample per frame
+    /// is duplicated to L/R; exactly two are interpreted as interleaved L/R.
+    /// Any other input length or nonfinite sample is silenced and faulted.
+    pub fn render_with_input(&mut self, input: &[f32], out: &mut [f32], channels: usize) {
+        self.render_impl(Some(input), out, channels);
+    }
+
+    fn render_impl(&mut self, input: Option<&[f32]>, out: &mut [f32], channels: usize) {
+        let total = if channels == 0 {
+            0
+        } else {
+            out.len() / channels
+        };
+        let input_block = |done: usize, n: usize| match input {
+            None => InputBlock::None,
+            Some(samples) if samples.len() == total * 2 => {
+                InputBlock::Stereo(&samples[2 * done..2 * (done + n)])
+            }
+            Some(samples) if samples.len() == total => InputBlock::Mono(&samples[done..done + n]),
+            Some(_) => InputBlock::Bad,
+        };
+        if channels == 4 && self.engine.config().output_channels == 4 {
+            let mut done = 0;
+            while done < total {
+                let n = (total - done).min(MAX_BLOCK);
+                self.process_quad(&mut out[4 * done..4 * (done + n)], n, input_block(done, n));
+                done += n;
+            }
+        } else if channels == 2 {
             // Engine-block pieces, so every bus block reaches the taps.
-            let total = out.len() / 2;
             let mut done = 0;
             loop {
                 let n = (total - done).min(MAX_BLOCK);
-                self.process(Target::Out(&mut out[2 * done..2 * (done + n)]), n);
+                self.process(
+                    Target::Out(&mut out[2 * done..2 * (done + n)]),
+                    n,
+                    input_block(done, n),
+                );
                 done += n;
                 if done >= total {
                     break;
@@ -162,11 +205,10 @@ impl AudioSide {
         } else if channels == 0 {
             out.fill(0.0);
         } else {
-            let total = out.len() / channels;
             let mut done = 0;
             while done < total {
                 let n = (total - done).min(MAX_BLOCK);
-                self.process(Target::Scratch, n);
+                self.process(Target::Scratch, n, input_block(done, n));
                 let frames = &mut out[done * channels..(done + n) * channels];
                 for (f, lr) in frames
                     .chunks_exact_mut(channels)
@@ -186,7 +228,7 @@ impl AudioSide {
         self.sigs.store(&self.engine.host_sigs());
     }
 
-    fn process(&mut self, target: Target<'_>, frames: usize) {
+    fn process(&mut self, target: Target<'_>, frames: usize, input: InputBlock<'_>) {
         let Self {
             engine,
             events,
@@ -196,6 +238,7 @@ impl AudioSide {
             cells,
             clock,
             scratch,
+            input_scratch,
             taps,
             ..
         } = self;
@@ -211,8 +254,63 @@ impl AudioSide {
             Target::Scratch => &mut scratch[..],
         };
         let at = clock.frames();
-        engine.process(&mut io, buf, frames);
+        match input {
+            InputBlock::None => engine.process(&mut io, buf, frames),
+            InputBlock::Stereo(samples) => engine.process_with_input(&mut io, samples, buf, frames),
+            InputBlock::Mono(samples) => {
+                for (dst, &sample) in input_scratch[..2 * frames].chunks_exact_mut(2).zip(samples) {
+                    dst.fill(sample);
+                }
+                engine.process_with_input(&mut io, &input_scratch[..2 * frames], buf, frames);
+            }
+            InputBlock::Bad => engine.process_with_input(&mut io, &[], buf, frames),
+        }
         taps.record(buf, frames, at, engine.buses());
+        clock.advance(frames as u64);
+    }
+
+    fn process_quad(&mut self, out: &mut [f32], frames: usize, input: InputBlock<'_>) {
+        let Self {
+            engine,
+            events,
+            controls,
+            acks,
+            garbage,
+            cells,
+            clock,
+            scratch,
+            input_scratch,
+            taps,
+            ..
+        } = self;
+        let mut io = EngineIo {
+            events,
+            controls,
+            acks,
+            cells,
+            garbage: Some(garbage),
+        };
+        let at = clock.frames();
+        match input {
+            InputBlock::None => engine.process_four(&mut io, out, frames),
+            InputBlock::Stereo(samples) => {
+                engine.process_four_with_input(&mut io, samples, out, frames);
+            }
+            InputBlock::Mono(samples) => {
+                for (dst, &sample) in input_scratch[..2 * frames].chunks_exact_mut(2).zip(samples) {
+                    dst.fill(sample);
+                }
+                engine.process_four_with_input(&mut io, &input_scratch[..2 * frames], out, frames);
+            }
+            InputBlock::Bad => engine.process_four_with_input(&mut io, &[], out, frames),
+        }
+        for (pair, quad) in scratch[..2 * frames]
+            .chunks_exact_mut(2)
+            .zip(out.chunks_exact(4))
+        {
+            pair.copy_from_slice(&quad[..2]);
+        }
+        taps.record(&scratch[..2 * frames], frames, at, engine.buses());
         clock.advance(frames as u64);
     }
 }
@@ -220,6 +318,34 @@ impl AudioSide {
 enum Target<'a> {
     Out(&'a mut [f32]),
     Scratch,
+}
+
+enum InputBlock<'a> {
+    None,
+    Stereo(&'a [f32]),
+    Mono(&'a [f32]),
+    Bad,
+}
+
+/// Shared by the hardware callback and deterministic capture-queue tests.
+pub(crate) fn render_captured(
+    side: &mut AudioSide,
+    input: &mut InputConsumer,
+    scratch: &mut [f32; 2 * MAX_BLOCK],
+    output: &mut [f32],
+    channels: usize,
+) {
+    if channels == 0 {
+        output.fill(0.0);
+        return;
+    }
+    let complete = output.len() / channels * channels;
+    for chunk in output[..complete].chunks_mut(channels * MAX_BLOCK) {
+        let frames = chunk.len() / channels;
+        input.fill(&mut scratch[..2 * frames]);
+        side.render_with_input(&scratch[..2 * frames], chunk, channels);
+    }
+    output[complete..].fill(0.0);
 }
 
 /// The evaluator half of the native audio host.
@@ -238,6 +364,9 @@ pub struct NativeAudioHost {
     diags: Vec<Diagnostic>,
     stream_errors: Arc<AtomicU32>,
     stream: Option<cpal::Stream>,
+    input_stream: Option<cpal::Stream>,
+    capture_counters: Option<Arc<CaptureCounters>>,
+    capture_reported: CaptureStats,
     taps: Arc<TapShared>,
     /// Resolves bus keywords for bus taps and captures (`set_bus_names`).
     bus_names: Option<Rc<dyn InstResolver>>,
@@ -250,28 +379,83 @@ impl NativeAudioHost {
     /// `beyond-capability` ("not available on this host") when there is no
     /// output device, no f32 configuration, or the stream cannot start.
     pub fn open(cfg: &NativeConfig) -> Result<Self, Diagnostic> {
+        Self::open_with_outputs(cfg, 2)
+    }
+
+    /// Opens a four-channel output device for the opt-in direct-stem contract.
+    ///
+    /// # Errors
+    /// The default f32 output device cannot provide four channels.
+    pub fn open_quad(cfg: &NativeConfig) -> Result<Self, Diagnostic> {
+        Self::open_with_outputs(cfg, 4)
+    }
+
+    fn open_with_outputs(cfg: &NativeConfig, output_channels: u8) -> Result<Self, Diagnostic> {
         let host = cpal::default_host();
         let device = host.default_output_device().ok_or_else(|| {
             unavailable("audio output is not available on this host (no output device)")
         })?;
         let supported = f32_config(&device)?;
         let channels = usize::from(supported.channels());
+        if output_channels == 4 && channels != 4 {
+            return Err(unavailable(
+                "quad output needs a four-channel default device configuration",
+            ));
+        }
         let rate = supported.sample_rate().0;
         let config = supported.config();
         #[allow(clippy::cast_precision_loss)]
-        let engine = EngineConfig::new(
+        let mut engine = EngineConfig::new(
             &CapabilitySet::native(),
             rate as f32,
             MAX_BLOCK,
             StoreKind::NativeArc,
         );
+        engine.output_channels = output_channels;
         let (mut this, mut side) = Self::pair(engine, AtomicCells::new(cfg.cells));
+        let capture = if cfg.audio_in {
+            let input_device = host.default_input_device().ok_or_else(|| {
+                unavailable("audio input was requested but no default input device is available")
+            })?;
+            let input_config = input_f32_config(&input_device, rate)?;
+            let input_channels = usize::from(input_config.channels());
+            let (mut producer, consumer, counters) = capture::pair();
+            let input_errors = Arc::clone(&this.stream_errors);
+            let input_stream = input_device
+                .build_input_stream(
+                    &input_config.config(),
+                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                        producer.push_interleaved(data, input_channels);
+                    },
+                    move |_| {
+                        input_errors.fetch_add(1, Ordering::Relaxed);
+                    },
+                    None,
+                )
+                .map_err(|e| {
+                    unavailable(format!(
+                        "audio input was requested but its stream cannot open ({e})"
+                    ))
+                })?;
+            Some((input_stream, consumer, counters))
+        } else {
+            None
+        };
         let errors = Arc::clone(&this.stream_errors);
+        let (input_stream, mut input_consumer, counters) = match capture {
+            Some((stream, consumer, counters)) => (Some(stream), Some(consumer), Some(counters)),
+            None => (None, None, None),
+        };
+        let mut input_scratch = [0.0; 2 * MAX_BLOCK];
         let stream = device
             .build_output_stream(
                 &config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    side.render(data, channels);
+                    if let Some(consumer) = &mut input_consumer {
+                        render_captured(&mut side, consumer, &mut input_scratch, data, channels);
+                    } else {
+                        side.render(data, channels);
+                    }
                 },
                 move |_| {
                     errors.fetch_add(1, Ordering::Relaxed);
@@ -281,10 +465,19 @@ impl NativeAudioHost {
             .map_err(|e| {
                 unavailable(format!("audio output is not available on this host ({e})"))
             })?;
+        if let Some(input) = &input_stream {
+            input.play().map_err(|e| {
+                unavailable(format!(
+                    "audio input was requested but its stream cannot start ({e})"
+                ))
+            })?;
+        }
         stream.play().map_err(|e| {
             unavailable(format!("audio output is not available on this host ({e})"))
         })?;
         this.stream = Some(stream);
+        this.input_stream = input_stream;
+        this.capture_counters = counters;
         Ok(this)
     }
 
@@ -294,6 +487,16 @@ impl NativeAudioHost {
     pub fn headless(sample_rate: u32, caps: CapabilitySet, cells: usize) -> (Self, AudioSide) {
         #[allow(clippy::cast_precision_loss)]
         let engine = EngineConfig::new(&caps, sample_rate as f32, MAX_BLOCK, StoreKind::NativeArc);
+        Self::pair(engine, AtomicCells::new(cells))
+    }
+
+    /// A headless four-channel host for offline stems and tests.
+    #[must_use]
+    pub fn headless_quad(sample_rate: u32, caps: CapabilitySet, cells: usize) -> (Self, AudioSide) {
+        #[allow(clippy::cast_precision_loss)]
+        let mut engine =
+            EngineConfig::new(&caps, sample_rate as f32, MAX_BLOCK, StoreKind::NativeArc);
+        engine.output_channels = 4;
         Self::pair(engine, AtomicCells::new(cells))
     }
 
@@ -319,6 +522,7 @@ impl NativeAudioHost {
             sigs: Arc::clone(&sigs),
             taps: Arc::clone(&taps),
             scratch: vec![0.0; 2 * MAX_BLOCK].into_boxed_slice(),
+            input_scratch: vec![0.0; 2 * MAX_BLOCK].into_boxed_slice(),
         };
         let host = NativeAudioHost {
             events,
@@ -335,6 +539,9 @@ impl NativeAudioHost {
             diags: Vec::new(),
             stream_errors: Arc::new(AtomicU32::new(0)),
             stream: None,
+            input_stream: None,
+            capture_counters: None,
+            capture_reported: CaptureStats::default(),
             taps,
             bus_names: None,
         };
@@ -372,9 +579,43 @@ impl NativeAudioHost {
         self.stream_errors.load(Ordering::Relaxed)
     }
 
+    /// Input callback counters. `None` when capture is disabled.
+    #[must_use]
+    pub fn capture_stats(&self) -> Option<CaptureStats> {
+        self.capture_counters.as_ref().map(|c| c.snapshot())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn attach_capture_counters(&mut self, counters: Arc<CaptureCounters>) {
+        self.capture_counters = Some(counters);
+    }
+
     /// Host diagnostics (`ring-overflow`, `graph-too-large`) since the last
     /// call.
     pub fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
+        if let Some(now) = self.capture_stats() {
+            let before = self.capture_reported;
+            for (label, count) in [
+                ("underrun", now.underrun.saturating_sub(before.underrun)),
+                ("overrun", now.overrun.saturating_sub(before.overrun)),
+                ("nonfinite", now.nonfinite.saturating_sub(before.nonfinite)),
+                ("short frame", now.short.saturating_sub(before.short)),
+                ("stale frame", now.stale.saturating_sub(before.stale)),
+            ] {
+                if count != 0 {
+                    self.diags.push(Diagnostic {
+                        span: Span::new(FileId::CONSOLE, 0, 0),
+                        severity: Severity::Warning,
+                        code: DiagCode::RingOverflow,
+                        message: format!(
+                            "audio input {label}: {count} frame samples since last report"
+                        ),
+                        origin: None,
+                    });
+                }
+            }
+            self.capture_reported = now;
+        }
         std::mem::take(&mut self.diags)
     }
 
@@ -543,4 +784,37 @@ fn f32_config(device: &cpal::Device) -> Result<SupportedStreamConfig, Diagnostic
     fallback.ok_or_else(|| {
         unavailable("audio output is not available on this host (no f32 output format)")
     })
+}
+
+/// A f32 input configuration at the already chosen output rate. Prefer
+/// stereo, then mono; wider devices use their first two channels.
+fn input_f32_config(device: &cpal::Device, rate: u32) -> Result<SupportedStreamConfig, Diagnostic> {
+    let ranges = device.supported_input_configs().map_err(|e| {
+        unavailable(format!(
+            "audio input was requested but its formats are unavailable ({e})"
+        ))
+    })?;
+    ranges
+        .filter(|r| {
+            r.sample_format() == SampleFormat::F32
+                && capture_channel_rank(r.channels()).is_some()
+                && r.min_sample_rate().0 <= rate
+                && rate <= r.max_sample_rate().0
+        })
+        .min_by_key(|r| capture_channel_rank(r.channels()))
+        .map(|r| r.with_sample_rate(cpal::SampleRate(rate)))
+        .ok_or_else(|| {
+            unavailable(format!(
+                "audio input was requested but no f32 input supports the output rate {rate} Hz"
+            ))
+        })
+}
+
+pub(crate) const fn capture_channel_rank(channels: u16) -> Option<u8> {
+    match channels {
+        0 => None,
+        2 => Some(0),
+        1 => Some(1),
+        _ => Some(2),
+    }
 }

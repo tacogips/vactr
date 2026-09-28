@@ -113,3 +113,28 @@ fn transforms_run_through_the_vm() {
     let r = h.query(&p, 6);
     assert!(r.faults.is_empty(), "{:?}", r.faults);
 }
+
+#[test]
+fn a_var_list_inside_a_list_or_cat_is_a_nested_step_list() {
+    // Regression (2026-09-27): a late-bound `var` used as a step, or as an
+    // element of `cat`, was one event carrying the whole list instead of a
+    // subdivision.
+    let mut h = Ev::new();
+    h.run("var bar [:c5 :d5 :e5 :f5]");
+    let two = h.last("s :fm > note [bar bar]").expect("pattern");
+    assert_eq!(h.values(&two, 0).len(), 8);
+    h.run("let seq cat [bar [:g5 :a5]]");
+    let played = h.last("s :fm > note seq").expect("pattern");
+    assert_eq!(
+        h.values(&played, 0).len(),
+        4,
+        "cycle 0 plays the var's four notes"
+    );
+    assert_eq!(
+        h.values(&played, 1).len(),
+        2,
+        "cycle 1 plays the literal pair"
+    );
+    let r = h.query(&played, 0);
+    assert!(r.faults.is_empty(), "{:?}", r.faults);
+}

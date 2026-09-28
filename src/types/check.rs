@@ -127,6 +127,10 @@ impl<'a> Checker<'a> {
                 .template_params()
                 .into_iter()
                 .map(Rc::from)
+                .chain(match &manifest.declared_controls {
+                    KeySet::Of(names) => names.iter().cloned().collect::<Vec<_>>(),
+                    KeySet::Open => Vec::new(),
+                })
                 .collect(),
             kit_keys: manifest.sound_kit_keys(),
             mute: 0,

@@ -24,6 +24,9 @@ pub struct HostManifest {
     pub synths: KeySet,
     /// Pattern control names.
     pub controls: KeySet,
+    /// Installed instrument header names, distinct from general controls
+    /// because only these may stand in for an unbound call head.
+    pub declared_controls: KeySet,
     /// The capabilities this host has (`beyond-capability`).
     pub caps: BTreeSet<HostCap>,
 }
@@ -68,6 +71,7 @@ impl HostManifest {
             sounds: KeySet::of(SPEC_SOUNDS),
             synths: KeySet::of(SPEC_SYNTHS),
             controls: KeySet::of(CONTROLS.iter().copied().chain(["n", "note"])),
+            declared_controls: KeySet::of([] as [&str; 0]),
             caps: [
                 HostCap::MidiIn,
                 HostCap::MidiOut,
@@ -132,6 +136,22 @@ impl HostManifest {
     {
         HostManifest {
             sounds: self.sounds.union(&KeySet::of(extra)),
+            ..self.clone()
+        }
+    }
+
+    /// Extend accepted pattern-control names with installed instrument
+    /// parameters. The checker and compiler then recognize the same names.
+    #[must_use]
+    pub fn with_controls<I, S>(&self, extra: I) -> HostManifest
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let names = KeySet::of(extra);
+        HostManifest {
+            controls: self.controls.union(&names),
+            declared_controls: self.declared_controls.union(&names),
             ..self.clone()
         }
     }

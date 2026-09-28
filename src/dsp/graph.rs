@@ -40,6 +40,37 @@ id_newtype!(
 /// `graph-too-large`.
 pub const NODE_CAP: usize = 256;
 
+/// The number of independent audio channels entering and leaving a graph
+/// processing boundary. Bus effect chains use two channels throughout;
+/// instrument UGen nodes currently remain mono.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct AudioPortShape {
+    pub inputs: u8,
+    pub outputs: u8,
+}
+
+impl EffectKind {
+    /// Shape when installed in a bus/master chain. All existing effect
+    /// kernels accept two independent slices and write two independent
+    /// slices; voice-local effect nodes currently downmix to mono.
+    #[must_use]
+    pub const fn bus_port_shape(self) -> AudioPortShape {
+        let _ = self;
+        AudioPortShape::STEREO
+    }
+}
+
+impl AudioPortShape {
+    pub const MONO: Self = Self {
+        inputs: 1,
+        outputs: 1,
+    };
+    pub const STEREO: Self = Self {
+        inputs: 2,
+        outputs: 2,
+    };
+}
+
 /// What a granular ugen reads (design 12.6).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GranSrc {
@@ -58,6 +89,10 @@ pub enum UGenSpec {
     Pulse,
     Tri,
     WhiteNoise,
+    /// Left channel of the validated host input for the current render block.
+    HostInputL,
+    /// Right channel of the validated host input for the current render block.
+    HostInputR,
     Lpf,
     Hpf,
     Bpf,
@@ -80,6 +115,73 @@ pub enum UGenSpec {
     Svf,
     FmOp,
     FmMod,
+    FmDrum,
+    FeedbackMetal,
+    AnalogPercussion,
+    VaSource,
+    VaFilter,
+    PhasePair,
+    FmPair,
+    SixOpOriginal,
+    SpeechOriginal,
+    RingsPart,
+    StringChoir,
+    ElementsInternal,
+    TidalFunction,
+    TidalPoly,
+    PeakFunction,
+    StageSegment,
+    StageChain,
+    StageLinked {
+        data: Option<Box<crate::dsp::ugen::stage_linked::StageData>>,
+    },
+    FrameLfo,
+    FrameKeyframe {
+        data: Option<Box<crate::dsp::ugen::frame_keyframe::FrameData>>,
+    },
+    PeakPulse,
+    NumberStation,
+    SpectrumPair,
+    ClockNoisePair,
+    DualKick,
+    SnarePair,
+    HatPair,
+    SwarmPair,
+    ParticlePair,
+    ModalPair,
+    StringPair,
+    ChipPair,
+    AnalogPair,
+    GrainPair,
+    ShapePair,
+    StringMachinePair,
+    TerrainPair,
+    TableTerrainPair,
+    ChordPair,
+    BraidsFive,
+    BraidsSubSync,
+    BraidsTriple,
+    BraidsDigital,
+    BraidsFilter,
+    BraidsFormant,
+    BraidsFm,
+    BraidsPhysical,
+    BraidsStruck,
+    BraidsPercussion,
+    BraidsWaveBank,
+    BraidsWaveLine,
+    BraidsNoise,
+    BraidsCloud,
+    /// Sends its input to the voice's auxiliary output and contributes
+    /// silence to the ordinary mono graph result.
+    AuxOut,
+    /// Diverts a graph branch to direct output channel three.
+    Out3,
+    /// Diverts a graph branch to direct output channel four.
+    Out4,
+    FeedbackDrum,
+    NoiseDrum,
+    SineDrum,
     PhaseDistortion,
     Additive {
         partials_max: u8,
@@ -167,6 +269,14 @@ macro_rules! effect_kinds {
             /// The granular effect (design-music 6).
             Granulate,
             Analyzer(AnalyzerKind),
+            /// Stereo capture and granular playback adaptation.
+            TextureGrain,
+            /// Stereo overlap-add stretch adaptation.
+            TextureStretch,
+            /// Stereo variable-delay and frozen-loop adaptation.
+            TextureLoop,
+            /// Bounded stereo spectral texture adaptation.
+            TextureSpectral,
         }
 
         impl EffectKind {
@@ -182,6 +292,10 @@ macro_rules! effect_kinds {
                 EffectKind::Analyzer(AnalyzerKind::Oscilloscope),
                 EffectKind::Analyzer(AnalyzerKind::PitchMeter),
                 EffectKind::Analyzer(AnalyzerKind::StereoMeter),
+                EffectKind::TextureGrain,
+                EffectKind::TextureStretch,
+                EffectKind::TextureLoop,
+                EffectKind::TextureSpectral,
             ];
 
             /// The catalog name (kebab-case).
@@ -191,6 +305,10 @@ macro_rules! effect_kinds {
                     $(EffectKind::$variant => $name,)*
                     EffectKind::Granulate => "granulate",
                     EffectKind::Analyzer(a) => a.name(),
+                    EffectKind::TextureGrain => "texture-grain",
+                    EffectKind::TextureStretch => "texture-stretch",
+                    EffectKind::TextureLoop => "texture-loop",
+                    EffectKind::TextureSpectral => "texture-spectral",
                 }
             }
         }
@@ -302,7 +420,17 @@ effect_kinds! {
     DryWet => "dry-wet",
     Section => "section",
     ChannelDivider => "channel-divider",
+    CrossMod => "dual-mod",
     FirCrossover => "fir-crossover",
+    ResonantBank => "resonant-bank",
+    ElementsBank => "elements-bank",
+    StreamEnvelope => "stream-envelope",
+    StreamVactrol => "stream-vactrol",
+    StreamFollower => "stream-follower",
+    StreamCompressor => "stream-compressor",
+    StreamFilter => "stream-filter",
+    StreamLorenz => "stream-lorenz",
+    ShiftPair => "shift-pair",
 }
 
 impl EffectKind {

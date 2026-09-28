@@ -26,6 +26,232 @@ inst fm algorithm: int = 5 ratio: float = 14 index: float = 2:
 		> * {env-adsr attack decay sustain release}
 		> * amp
 
+# Analytic triggered FM percussion; every sound control can be patterned.
+inst phase-drum fm-amount: float = 1.5 pitch-sweep: float = 0.5 decay: float = 0.4 drum-noise: float = 0 drive: float = 0:
+	fm-drum freq fm-amount: fm-amount pitch-sweep: pitch-sweep decay: decay drum-noise: drum-noise drive: drive
+		> * amp
+
+# Original coupled-FM percussion with modulator feedback and noise excitation.
+inst feedback-metal-drum metal-ratio: float = 2.4 metal-index: float = 3 metal-feedback: float = 0.35 metal-mod-decay: float = 0.16 metal-body-decay: float = 0.42 metal-pitch-drop: float = 0.5 metal-noise-level: float = 0.18 metal-noise-decay: float = 0.075 metal-noise-color: float = 5000 metal-noise-to-fm: float = 0.45 metal-cutoff: float = 1800 metal-resonance: float = 1.5 metal-drive: float = 0.22:
+	feedback-metal-core freq velocity metal-ratio: metal-ratio metal-index: metal-index metal-feedback: metal-feedback metal-mod-decay: metal-mod-decay metal-body-decay: metal-body-decay metal-pitch-drop: metal-pitch-drop metal-noise-level: metal-noise-level metal-noise-decay: metal-noise-decay metal-noise-color: metal-noise-color metal-noise-to-fm: metal-noise-to-fm metal-cutoff: metal-cutoff metal-resonance: metal-resonance metal-drive: metal-drive
+		> * amp
+
+# Analytic struck-resonator percussion: four bass controls from the
+# referenced design, with neutral Vactrol names.
+inst low-drum kick-frequency: float = 60 kick-punch: float = 0.5 kick-tone: float = 0.5 kick-decay: float = 0.45:
+	analog-percussion kick-frequency punch: kick-punch tone: kick-tone decay: kick-decay mode: 0
+		> * amp
+
+# Two resonant body modes plus a noise spring; four authored controls.
+inst wire-drum snare-frequency: float = 180 snare-tone: float = 0.5 snare-snappy: float = 0.5 snare-decay: float = 0.25:
+	analog-percussion snare-frequency tone: snare-tone snappy: snare-snappy decay: snare-decay mode: 1
+		> * amp
+
+# The referenced high-hat exposes no authored controls. These four knobs
+# are Vactrol extensions for its analytic metallic/noise architecture.
+inst metal-hat hat-frequency: float = 3900 hat-tone: float = 0.5 hat-decay: float = 0.12 hat-metal: float = 0.7:
+	analog-percussion hat-frequency tone: hat-tone decay: hat-decay metal: hat-metal mode: 2
+		> * amp
+
+# Analytic variable-spectrum oscillator and paired filters. The two source
+# nodes start in phase; aux-out sends the high-pass path to the right channel.
+inst filter-voice morph: float = 0.5 timbre: float = 0.5 filter-harmonics: float = 0.5:
+	va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 0 > * amp
+		> + {va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 1 > * amp > aux-out}
+
+# Table-free phase distortion: synchronized main and free-running auxiliary.
+# The harmonics role uses a distinct name because harmonics is an effect.
+inst phase-pair-voice phase-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	phase-pair freq phase-harmonics: phase-harmonics timbre: timbre morph: morph mode: 0 > * amp
+		> + {phase-pair freq phase-harmonics: phase-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Fourfold analytic two-operator FM. Main is carrier; aux is a sub oscillator.
+# Morph ranges from negative phase feedback to positive modulator feedback.
+inst fm-pair-voice fm-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0 > * amp
+		> + {fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Original 32-configuration six-operator banks. Main and aux intentionally
+# duplicate the same signal, matching the source engine's output relationship.
+inst six-bank-a-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0:
+	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 0 > * amp
+		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 0 > * amp > aux-out}
+
+inst six-bank-b-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0:
+	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 1 > * amp
+		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 1 > * amp > aux-out}
+
+inst six-bank-c-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0:
+	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp
+		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp > aux-out}
+
+# Original naive/SAM/LPC-like speech models and four Vactrol syllable tokens.
+# Harmonics 0..1/3 blends the three models; above 1/3 selects token ava,
+# omi, era or unu. Main is formant voice, auxiliary is excitation.
+inst speech-voice speech-harmonics: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 speech-sustain: float = 0:
+	speech-original freq speech-harmonics: speech-harmonics timbre: timbre morph: morph velocity: velocity speech-sustain: speech-sustain mode: 0 > * amp
+		> + {speech-original freq speech-harmonics: speech-harmonics timbre: timbre morph: morph velocity: velocity speech-sustain: speech-sustain mode: 1 > * amp > aux-out}
+
+# Integer-series main and organ-series auxiliary additive spectra.
+# Timbre sets centroid, morph slope, spectrum-bumps the harmonic emphasis.
+inst spectrum-voice timbre: float = 0.5 morph: float = 0.5 spectrum-bumps: float = 0.5:
+	spectrum-pair freq timbre: timbre morph: morph spectrum-bumps: spectrum-bumps mode: 0 > * amp
+		> + {spectrum-pair freq timbre: timbre morph: morph spectrum-bumps: spectrum-bumps mode: 1 > * amp > aux-out}
+
+# Event-start-reset clocked noise. Main blends LP/HP; aux sums two bandpasses.
+inst clock-noise-voice noise-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	clock-noise-pair freq noise-harmonics: noise-harmonics timbre: timbre morph: morph mode: 0 > * amp
+		> + {clock-noise-pair freq noise-harmonics: noise-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Triggered dual bass drum: analog main, synthetic auxiliary.
+# Event velocity is the accent. A new note retriggers both paths.
+inst dual-kick-voice kick-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 kick-sustain: float = 0:
+	dual-kick-core freq kick-harmonics: kick-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 kick-sustain: kick-sustain > * amp
+		> + {dual-kick-core freq kick-harmonics: kick-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 kick-sustain: kick-sustain > * amp > aux-out}
+
+# Plaits position 22 snare stages, analog main and synthetic auxiliary.
+# Event velocity supplies accent; a new note retriggers both paths.
+inst dual-snare-voice snare-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 snare-sustain: float = 0:
+	snare-pair-core freq snare-harmonics: snare-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 snare-sustain: snare-sustain > * amp
+		> + {snare-pair-core freq snare-harmonics: snare-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 snare-sustain: snare-sustain > * amp > aux-out}
+
+# Plaits position 23 hi-hat stages: square-noise main, ring-mod auxiliary.
+# Event velocity supplies accent and each note retriggers both envelopes.
+inst dual-hat-voice hat-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 hat-sustain: float = 0:
+	hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 hat-sustain: hat-sustain > * amp
+		> + {hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 hat-sustain: hat-sustain > * amp > aux-out}
+
+# Eight ranked grain voices; burst on each event or continuous cloud.
+# Main is BLEP saw, auxiliary is analytic sine.
+inst swarm-voice swarm-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.5 swarm-continuous: float = 0:
+	swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 0 swarm-continuous: swarm-continuous > * amp
+		> + {swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 1 swarm-continuous: swarm-continuous > * amp > aux-out}
+
+# Plaits position 8 roles: variable square/saw main, sync difference aux.
+inst analog-pair-voice analog-detune: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 0 > * amp
+		> + {analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Four-note chord with inversion and fifteen original procedural timbres.
+inst chord-layer-voice layer-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 0 > * amp
+		> + {chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Five original analytic oscillator shapes selected by braids-shape (0..4).
+# Strike adds a short overtone transient; sync adds an event-local hard-sync clock.
+inst macro-five-voice braids-shape: float = 0 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-five-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original analytic sub-octave and dual-sync shapes, source positions 5..8.
+inst macro-sub-sync-voice braids-shape: float = 5 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-sub-sync-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Three independent same-shape oscillators, source positions 9..12.
+# Color and timbre independently detune the two companion oscillators.
+inst macro-triple-voice braids-shape: float = 9 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-triple-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original analytic ring, swarm, comb and stepped digital shapes, positions 13..16.
+inst macro-digital-voice braids-shape: float = 13 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-digital-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Procedural phase-reset digital-filter roles, positions 17..20.
+inst macro-filter-voice braids-shape: float = 17 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-filter-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original procedural formant and harmonic roles, positions 21..24.
+inst macro-formant-voice braids-shape: float = 21 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-formant-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original analytic FM roles, positions 25..27.
+inst macro-fm-voice braids-shape: float = 25 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-fm-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original procedural string/wind resonator roles, positions 28..31.
+inst macro-physical-voice braids-shape: float = 28 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-physical-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Additive struck bell/drum roles, positions 32..33.
+inst macro-struck-voice braids-shape: float = 32 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-struck-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original kick, cymbal and snare roles, positions 34..36.
+inst macro-percussion-voice braids-shape: float = 34 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-percussion-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original procedural bank scan and 16x16 map, Braids positions 37..38.
+inst macro-wave-grid-voice braids-shape: float = 37 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-wave-grid-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original line scan and four-voice chord, Braids positions 39..40.
+inst macro-wave-line-voice braids-shape: float = 39 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-wave-line-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original filtered, twin-peak and clocked noise, Braids positions 41..43.
+inst macro-noise-voice braids-shape: float = 41 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-noise-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original four-grain, resonant-particle and I/Q symbols, positions 44..46.
+inst macro-cloud-voice braids-shape: float = 44 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
+	macro-cloud-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+
+# Original analytic 8x8x3 wave grid; quantized auxiliary output.
+inst wave-grid-voice wave-bank: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	wave-grid-core freq wave-bank: wave-bank timbre: timbre morph: morph mode: 0 > * amp
+		> + {wave-grid-core freq wave-bank: wave-bank timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Eight default wave terrains; modes 5-7 use original procedural surfaces.
+inst terrain-voice terrain-select: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	terrain-pair-core freq terrain-select: terrain-select timbre: timbre morph: morph mode: 0 > * amp
+		> + {terrain-pair-core freq terrain-select: terrain-select timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Four divide-down chord voices, filtered and sent through a stereo ensemble.
+inst string-machine-voice machine-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	string-machine-core freq machine-chord: machine-chord timbre: timbre morph: morph mode: 0 > * amp
+		> + {string-machine-core freq machine-chord: machine-chord timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Analytic slope folding main and sine/overtone auxiliary.
+inst shape-voice shape-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	shape-pair-core freq shape-harmonics: shape-harmonics timbre: timbre morph: morph mode: 0 > * amp
+		> + {shape-pair-core freq shape-harmonics: shape-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Two grainlet oscillators on main; independent Z oscillator on aux.
+inst grain-pair-voice grain-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	grain-pair-core freq grain-harmonics: grain-harmonics timbre: timbre morph: morph mode: 0 > * amp
+		> + {grain-pair-core freq grain-harmonics: grain-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Three independently controlled components: delayed feedback noise,
+# Five-square chord or internally clocked arpeggio, with stepped bass aux.
+inst chip-voice chip-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5 chip-clocked: float = 0 chip-rate: float = 8:
+	chip-pair-core freq chip-chord: chip-chord timbre: timbre morph: morph mode: 0 chip-clocked: chip-clocked chip-rate: chip-rate > * amp
+		> + {chip-pair-core freq chip-chord: chip-chord timbre: timbre morph: morph mode: 1 chip-clocked: chip-clocked chip-rate: chip-rate > * amp > aux-out}
+
+# Three independently controlled components: delayed feedback noise,
+# Three bounded strings per event: resonator main, filtered noise/dust aux.
+inst string-voice string-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 string-sustain: float = 0:
+	string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 0 string-sustain: string-sustain > * amp
+		> + {string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 1 string-sustain: string-sustain > * amp > aux-out}
+
+# Three independently controlled components: delayed feedback noise,
+# Twenty-four resonant modes: main body, auxiliary filtered mallet or dust.
+inst modal-voice modal-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 modal-sustain: float = 0:
+	modal-pair-core freq modal-structure: modal-structure timbre: timbre morph: morph velocity: velocity mode: 0 modal-sustain: modal-sustain > * amp
+		> + {modal-pair-core freq modal-structure: modal-structure timbre: timbre morph: morph velocity: velocity mode: 1 modal-sustain: modal-sustain > * amp > aux-out}
+
+# Three independently controlled components: delayed feedback noise,
+# Six resonant impulse particles; main is short-diffused, aux is impulses.
+inst particle-voice particle-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+	particle-pair-core freq particle-spread: particle-spread timbre: timbre morph: morph mode: 0 > * amp
+		> + {particle-pair-core freq particle-spread: particle-spread timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+
+# Three independently controlled components: delayed feedback noise,
+# a filtered noise transient, and a tracked sine-FM transient.
+inst fusion-drum fb-delay: float = 100 fb-feedback: float = 0.99 fb-decay: float = 0.5 fb-cutoff: float = 5000 fb-q: float = 1 fb-velocity: float = 1 fb-level: float = -6 noise-attack: float = 0.001 noise-hold: float = 0 noise-decay: float = 0.5 noise-cutoff: float = 5000 noise-q: float = 1 noise-pitch-env: float = 0 noise-velocity: float = 1 noise-level: float = -6 fm-tuning: float = 440 fm-keytrack: float = 0 fm-ratio: float = 1 fm-index: float = 0 fm-attack: float = 0.002 fm-hold: float = 0 fm-decay: float = 1.5 fm-pitch-env: float = 0 fm-velocity: float = 1 fm-level: float = -6:
+	feedback-drum velocity fb-delay: fb-delay fb-feedback: fb-feedback fb-decay: fb-decay fb-cutoff: fb-cutoff fb-q: fb-q fb-velocity: fb-velocity fb-level: fb-level
+		> + {noise-drum velocity noise-attack: noise-attack noise-hold: noise-hold noise-decay: noise-decay noise-cutoff: noise-cutoff noise-q: noise-q noise-pitch-env: noise-pitch-env noise-velocity: noise-velocity noise-level: noise-level}
+		> + {sine-drum freq velocity fm-tuning: fm-tuning fm-keytrack: fm-keytrack fm-ratio: fm-ratio fm-index: fm-index fm-attack: fm-attack fm-hold: fm-hold fm-decay: fm-decay fm-pitch-env: fm-pitch-env fm-velocity: fm-velocity fm-level: fm-level}
+		> * amp
+
 # phase distortion
 inst pd shape: float = 0.5:
 	phase-distortion freq shape: shape
@@ -50,3 +276,76 @@ inst granular source: keyword = :pad-loop size: float = 0.08 density: float = 24
 	granular source size: size density: density position: position spray: spray pitch: pitch pitch-spray: pitch-spray envelope: envelope reverse: reverse freeze: freeze
 		> * {env-adsr attack decay sustain release}
 		> * amp
+
+# Event-local original adaptations of the six Rings Part model roles.
+# External audio excitation and shared voice-stealing are not available here.
+inst rings-voice rings-model: float = 0 rings-structure: float = 0.5 rings-brightness: float = 0.5 rings-damping: float = 0.5 rings-position: float = 0.5 rings-strum: float = 1 rings-internal-exciter: float = 1 rings-internal-strum: float = 1 rings-internal-note: float = 1 rings-tonic: float = 0 rings-note: float = 0 rings-fm: float = 0 rings-chord: float = 0 rings-polyphony: float = 1:
+	rings-part-core freq rings-model: rings-model rings-structure: rings-structure rings-brightness: rings-brightness rings-damping: rings-damping rings-position: rings-position rings-strum: rings-strum rings-internal-exciter: rings-internal-exciter rings-internal-strum: rings-internal-strum rings-internal-note: rings-internal-note rings-tonic: rings-tonic rings-note: rings-note rings-fm: rings-fm rings-chord: rings-chord rings-polyphony: rings-polyphony mode: 0 > * amp
+		> + {rings-part-core freq rings-model: rings-model rings-structure: rings-structure rings-brightness: rings-brightness rings-damping: rings-damping rings-position: rings-position rings-strum: rings-strum rings-internal-exciter: rings-internal-exciter rings-internal-strum: rings-internal-strum rings-internal-note: rings-internal-note rings-tonic: rings-tonic rings-note: rings-note rings-fm: rings-fm rings-chord: rings-chord rings-polyphony: rings-polyphony mode: 1 > * amp > aux-out}
+
+# Original four-voice string choir, separate from the six resonator models.
+# FX 0..5: formant, chorus, short reverb, alternate formant, ensemble, alternate reverb.
+inst string-choir-voice choir-structure: float = 0.5 choir-brightness: float = 0.5 choir-damping: float = 0.5 choir-position: float = 0.5 choir-strum: float = 1 choir-internal-exciter: float = 1 choir-internal-strum: float = 1 choir-internal-note: float = 1 choir-tonic: float = 0 choir-note: float = 0 choir-fm: float = 0 choir-chord: float = 0 choir-polyphony: float = 1 choir-fx: float = 4:
+	string-choir-core freq choir-structure: choir-structure choir-brightness: choir-brightness choir-damping: choir-damping choir-position: choir-position choir-strum: choir-strum choir-internal-exciter: choir-internal-exciter choir-internal-strum: choir-internal-strum choir-internal-note: choir-internal-note choir-tonic: choir-tonic choir-note: choir-note choir-fm: choir-fm choir-chord: choir-chord choir-polyphony: choir-polyphony choir-fx: choir-fx mode: 0 > * amp
+		> + {string-choir-core freq choir-structure: choir-structure choir-brightness: choir-brightness choir-damping: choir-damping choir-position: choir-position choir-strum: choir-strum choir-internal-exciter: choir-internal-exciter choir-internal-strum: choir-internal-strum choir-internal-note: choir-internal-note choir-tonic: choir-tonic choir-note: choir-note choir-fm: choir-fm choir-chord: choir-chord choir-polyphony: choir-polyphony choir-fx: choir-fx mode: 1 > * amp > aux-out}
+
+# Original procedural internal bow/blow/strike and three resonator roles.
+# External blow/strike inputs and alternate voice are not part of this template.
+inst elements-voice el-env-shape: float = 0.5 el-bow-level: float = 0 el-bow-timbre: float = 0.5 el-blow-level: float = 0 el-blow-meta: float = 0.5 el-blow-timbre: float = 0.5 el-strike-level: float = 0.8 el-strike-meta: float = 0.5 el-strike-timbre: float = 0.5 el-signature: float = 0.5 el-geometry: float = 0.5 el-brightness: float = 0.5 el-damping: float = 0.5 el-position: float = 0.5 el-res-mod-frequency: float = 0.5 el-res-mod-offset: float = 0.5 el-reverb-diffusion: float = 0.5 el-reverb-lp: float = 0.5 el-space: float = 0.5 el-modulation-frequency: float = 0.5 el-gate: float = 1 el-note: float = 0 el-modulation: float = 0 el-strength: float = 1 el-model: float = 0 el-alternate: float = 0:
+	elements-internal-core freq el-env-shape: el-env-shape el-bow-level: el-bow-level el-bow-timbre: el-bow-timbre el-blow-level: el-blow-level el-blow-meta: el-blow-meta el-blow-timbre: el-blow-timbre el-strike-level: el-strike-level el-strike-meta: el-strike-meta el-strike-timbre: el-strike-timbre el-signature: el-signature el-geometry: el-geometry el-brightness: el-brightness el-damping: el-damping el-position: el-position el-res-mod-frequency: el-res-mod-frequency el-res-mod-offset: el-res-mod-offset el-reverb-diffusion: el-reverb-diffusion el-reverb-lp: el-reverb-lp el-space: el-space el-modulation-frequency: el-modulation-frequency el-gate: el-gate el-note: el-note el-modulation: el-modulation el-strength: el-strength el-model: el-model el-alternate: el-alternate mode: 0 > * amp
+		> + {elements-internal-core freq el-env-shape: el-env-shape el-bow-level: el-bow-level el-bow-timbre: el-bow-timbre el-blow-level: el-blow-level el-blow-meta: el-blow-meta el-blow-timbre: el-blow-timbre el-strike-level: el-strike-level el-strike-meta: el-strike-meta el-strike-timbre: el-strike-timbre el-signature: el-signature el-geometry: el-geometry el-brightness: el-brightness el-damping: el-damping el-position: el-position el-res-mod-frequency: el-res-mod-frequency el-res-mod-offset: el-res-mod-offset el-reverb-diffusion: el-reverb-diffusion el-reverb-lp: el-reverb-lp el-space: el-space el-modulation-frequency: el-modulation-frequency el-gate: el-gate el-note: el-note el-modulation: el-modulation el-strength: el-strength el-model: el-model el-alternate: el-alternate mode: 1 > * amp > aux-out}
+
+# Original analytic first-generation Tides function adaptation. Output 0 is
+# unipolar; 1 is bipolar; 2 is an attack-complete level and 3 a
+# rate-scaled release hold (continuously high while idle).
+inst tidal-voice tide-shape: float = 0.5 tide-slope: float = 0.5 tide-smoothness: float = 0.5 tide-ratio: float = 1 tide-sync: float = 0 tide-gate: float = 1 tide-clock: float = 0 tide-freeze: float = 0 tide-mode: float = 1 tide-range: float = 0 tide-pitch: float = 0 tide-output: float = 0:
+	tidal-function-core freq tide-shape: tide-shape tide-slope: tide-slope tide-smoothness: tide-smoothness tide-ratio: tide-ratio tide-sync: tide-sync tide-gate: tide-gate tide-clock: tide-clock tide-freeze: tide-freeze tide-mode: tide-mode tide-range: tide-range tide-pitch: tide-pitch tide-output: tide-output > * amp
+		> + {tidal-function-core freq tide-shape: tide-shape tide-slope: tide-slope tide-smoothness: tide-smoothness tide-ratio: tide-ratio tide-sync: tide-sync tide-gate: tide-gate tide-clock: tide-clock tide-freeze: tide-freeze tide-mode: tide-mode tide-range: tide-range tide-pitch: tide-pitch tide-output: 1 > * amp > aux-out}
+
+# Original Tides2 ramp adaptation; main/aux independently select any two of
+# four computed lanes. Simultaneous four-channel routing is not available.
+inst tides2-voice poly-width: float = 0.5 poly-shape: float = 0.5 poly-smoothness: float = 0.5 poly-shift: float = 0.5 poly-gate: float = 1 poly-clock: float = 0 poly-mode: float = 1 poly-output-mode: float = 2 poly-range: float = 1 poly-main-channel: float = 0 poly-aux-channel: float = 1:
+	tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: poly-main-channel > * amp
+		> + {tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: poly-aux-channel > * amp > aux-out}
+
+# Original Stages single-segment and oscillator role adaptation. Main is
+# unipolar value; aux is bipolar phase/wave, each with event-local state.
+inst stage-voice stage-type: float = 0 stage-primary: float = 0.5 stage-secondary: float = 0.5 stage-loop: float = 1 stage-gate: float = 1 stage-trigger: float = 0 stage-clock: float = 0 stage-function: float = 7:
+	stage-segment-core freq stage-type: stage-type stage-primary: stage-primary stage-secondary: stage-secondary stage-loop: stage-loop stage-gate: stage-gate stage-trigger: stage-trigger stage-clock: stage-clock stage-function: stage-function stage-channel: 0 > * amp
+		> + {stage-segment-core freq stage-type: stage-type stage-primary: stage-primary stage-secondary: stage-secondary stage-loop: stage-loop stage-gate: stage-gate stage-trigger: stage-trigger stage-clock: stage-clock stage-function: stage-function stage-channel: 1 > * amp > aux-out}
+
+# Six-stage event-local chain; each segment's four controls are codeable.
+# Main is value and aux is bipolar phase.
+inst stage-chain-voice chain-count: float = 3 chain-gate: float = 1 chain-trigger: float = 0 chain1-type: float = 0 chain1-loop: float = 0 chain1-primary: float = 0.2 chain1-secondary: float = 0.5 chain2-type: float = 2 chain2-loop: float = 1 chain2-primary: float = 0.7 chain2-secondary: float = 0.5 chain3-type: float = 0 chain3-loop: float = 0 chain3-primary: float = 0.2 chain3-secondary: float = 0.5 chain4-type: float = 0 chain4-loop: float = 0 chain4-primary: float = 0.2 chain4-secondary: float = 0.5 chain5-type: float = 0 chain5-loop: float = 0 chain5-primary: float = 0.2 chain5-secondary: float = 0.5 chain6-type: float = 0 chain6-loop: float = 0 chain6-primary: float = 0.2 chain6-secondary: float = 0.5:
+	stage-chain-core freq chain-count: chain-count chain-gate: chain-gate chain-trigger: chain-trigger chain1-type: chain1-type chain1-loop: chain1-loop chain1-primary: chain1-primary chain1-secondary: chain1-secondary chain2-type: chain2-type chain2-loop: chain2-loop chain2-primary: chain2-primary chain2-secondary: chain2-secondary chain3-type: chain3-type chain3-loop: chain3-loop chain3-primary: chain3-primary chain3-secondary: chain3-secondary chain4-type: chain4-type chain4-loop: chain4-loop chain4-primary: chain4-primary chain4-secondary: chain4-secondary chain5-type: chain5-type chain5-loop: chain5-loop chain5-primary: chain5-primary chain5-secondary: chain5-secondary chain6-type: chain6-type chain6-loop: chain6-loop chain6-primary: chain6-primary chain6-secondary: chain6-secondary chain-channel: 0 > * amp
+		> + {stage-chain-core freq chain-count: chain-count chain-gate: chain-gate chain-trigger: chain-trigger chain1-type: chain1-type chain1-loop: chain1-loop chain1-primary: chain1-primary chain1-secondary: chain1-secondary chain2-type: chain2-type chain2-loop: chain2-loop chain2-primary: chain2-primary chain2-secondary: chain2-secondary chain3-type: chain3-type chain3-loop: chain3-loop chain3-primary: chain3-primary chain3-secondary: chain3-secondary chain4-type: chain4-type chain4-loop: chain4-loop chain4-primary: chain4-primary chain4-secondary: chain4-secondary chain5-type: chain5-type chain5-loop: chain5-loop chain5-primary: chain5-primary chain5-secondary: chain5-secondary chain6-type: chain6-type chain6-loop: chain6-loop chain6-primary: chain6-primary chain6-secondary: chain6-secondary chain-channel: 1 > * amp > aux-out}
+
+# Original analytic four-lane Frames poly-LFO role. Each event can choose two
+# lanes simultaneously; no source wavetable or analog VCA path is used.
+inst frame-lfo-voice frame-shape: float = 0 frame-spread: float = 0.75 frame-shape-spread: float = 0.5 frame-coupling: float = 0.5 frame-offset: float = 0 frame-main-channel: float = 0 frame-aux-channel: float = 1:
+	frame-lfo-core freq frame-shape: frame-shape frame-spread: frame-spread frame-shape-spread: frame-shape-spread frame-coupling: frame-coupling frame-offset: frame-offset frame-channel: frame-main-channel > * amp
+		> + {frame-lfo-core freq frame-shape: frame-shape frame-spread: frame-spread frame-shape-spread: frame-shape-spread frame-coupling: frame-coupling frame-offset: frame-offset frame-channel: frame-aux-channel > * amp > aux-out}
+
+# Immutable stride-5 keyframes: [time lane1 lane2 lane3 lane4 ...], up to 64.
+# Main and auxiliary independently select one of four digital control lanes.
+inst frame-keyframe-voice frames: [float] = [0 0 0.2 0.4 0.6 1 1 0.8 0.6 0.4] frame-position: float = 0.5 frame-ease1: float = 1 frame-ease2: float = 1 frame-ease3: float = 1 frame-ease4: float = 1 frame-response1: float = 0 frame-response2: float = 0 frame-response3: float = 0 frame-response4: float = 0 frame-main-channel: float = 0 frame-aux-channel: float = 1:
+	frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: frame-main-channel > * amp
+		> + {frame-keyframe-core frames: frames frame-position: frame-position frame-ease1: frame-ease1 frame-ease2: frame-ease2 frame-ease3: frame-ease3 frame-ease4: frame-ease4 frame-response1: frame-response1 frame-response2: frame-response2 frame-response3: frame-response3 frame-response4: frame-response4 frame-channel: frame-aux-channel > * amp > aux-out}
+
+# Original Peaks envelope/LFO/tap-LFO roles; half selects source alternate
+# layout. Main is processor lane 0, aux is a Vactrol phase/bipolar lane.
+inst peak-motion-voice peak-attack: float = 0.2 peak-decay: float = 0.3 peak-sustain: float = 0.5 peak-release: float = 0.3 peak-rate: float = 0.5 peak-shape: float = 0 peak-color: float = 0 peak-reset-phase: float = 0 peak-level: float = 1 peak-half: float = 0 peak-gate: float = 1 peak-trigger: float = 0 peak-tap: float = 0 peak-sync: float = 0 peak-mode: float = 1 peak-preset: float = 0:
+	peak-function-core freq peak-attack: peak-attack peak-decay: peak-decay peak-sustain: peak-sustain peak-release: peak-release peak-rate: peak-rate peak-shape: peak-shape peak-color: peak-color peak-reset-phase: peak-reset-phase peak-level: peak-level peak-half: peak-half peak-gate: peak-gate peak-trigger: peak-trigger peak-tap: peak-tap peak-sync: peak-sync peak-mode: peak-mode peak-channel: 0 peak-preset: peak-preset > * amp
+		> + {peak-function-core freq peak-attack: peak-attack peak-decay: peak-decay peak-sustain: peak-sustain peak-release: peak-release peak-rate: peak-rate peak-shape: peak-shape peak-color: peak-color peak-reset-phase: peak-reset-phase peak-level: peak-level peak-half: peak-half peak-gate: peak-gate peak-trigger: peak-trigger peak-tap: peak-tap peak-sync: peak-sync peak-mode: peak-mode peak-channel: 1 peak-preset: peak-preset > * amp > aux-out}
+
+# Original analytic Peaks pulse/ball roles. Main is gate/height; aux is a
+# short onset/impact pulse. Each event supports one replaceable pulse train.
+inst peak-pulse-voice pulse-mode: float = 0 pulse-half: float = 0 pulse-gate: float = 0 pulse-trigger: float = 1 pulse-delay: float = 0 pulse-duration: float = 0.2 pulse-interval: float = 0.4 pulse-repeats: float = 2 pulse-accept: float = 1 pulse-repeat-prob: float = 0.4 pulse-randomness: float = 0.4 pulse-gravity: float = 0.5 pulse-loss: float = 0.6 pulse-amplitude: float = 0.9 pulse-velocity: float = 0:
+	peak-pulse-core freq pulse-mode: pulse-mode pulse-half: pulse-half pulse-gate: pulse-gate pulse-trigger: pulse-trigger pulse-delay: pulse-delay pulse-duration: pulse-duration pulse-interval: pulse-interval pulse-repeats: pulse-repeats pulse-accept: pulse-accept pulse-repeat-prob: pulse-repeat-prob pulse-randomness: pulse-randomness pulse-gravity: pulse-gravity pulse-loss: pulse-loss pulse-amplitude: pulse-amplitude pulse-velocity: pulse-velocity pulse-channel: 0 > * amp
+		> + {peak-pulse-core freq pulse-mode: pulse-mode pulse-half: pulse-half pulse-gate: pulse-gate pulse-trigger: pulse-trigger pulse-delay: pulse-delay pulse-duration: pulse-duration pulse-interval: pulse-interval pulse-repeats: pulse-repeats pulse-accept: pulse-accept pulse-repeat-prob: pulse-repeat-prob pulse-randomness: pulse-randomness pulse-gravity: pulse-gravity pulse-loss: pulse-loss pulse-amplitude: pulse-amplitude pulse-velocity: pulse-velocity pulse-channel: 1 > * amp > aux-out}
+
+# Original tone and ten procedural syllables; no upstream digit recording.
+# Main is processed/noisy, aux is the authored dry tone/voice.
+inst number-station-voice station-voice: float = 0 station-half: float = 0 station-tone: float = 0.5 station-transition: float = 0.5 station-noise: float = 0.5 station-drive: float = 0.5 station-digit: float = 0 station-auto: float = 0 station-gate: float = 1 station-trigger: float = 0:
+	number-station-core freq station-voice: station-voice station-half: station-half station-tone: station-tone station-transition: station-transition station-noise: station-noise station-drive: station-drive station-digit: station-digit station-auto: station-auto station-gate: station-gate station-trigger: station-trigger station-channel: 0 > * amp
+		> + {number-station-core freq station-voice: station-voice station-half: station-half station-tone: station-tone station-transition: station-transition station-noise: station-noise station-drive: station-drive station-digit: station-digit station-auto: station-auto station-gate: station-gate station-trigger: station-trigger station-channel: 1 > * amp > aux-out}

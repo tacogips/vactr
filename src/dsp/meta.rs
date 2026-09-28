@@ -81,56 +81,8 @@ pub struct EditorDecl {
 
 /// The template header parameters (design-music sections 4 and 6), each a
 /// control-table row.
-const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
-    (
-        "sampler",
-        &[
-            "bank", "n", "speed", "begin", "end", "loop", "attack", "release",
-        ],
-    ),
-    (
-        "analog",
-        &[
-            "wave", "cutoff", "res", "unison", "detune", "drift", "attack", "decay", "sustain",
-            "release",
-        ],
-    ),
-    (
-        "fm",
-        &[
-            "algorithm",
-            "ratio",
-            "index",
-            "attack",
-            "decay",
-            "sustain",
-            "release",
-        ],
-    ),
-    ("pd", &["shape", "attack", "release"]),
-    ("additive", &["amp", "attack", "release"]),
-    (
-        "wavetable",
-        &[
-            "table", "position", "cutoff", "res", "attack", "decay", "sustain", "release",
-        ],
-    ),
-    (
-        "granular",
-        &[
-            "source",
-            "size",
-            "density",
-            "position",
-            "spray",
-            "pitch",
-            "pitch-spray",
-            "envelope",
-            "reverse",
-            "freeze",
-        ],
-    ),
-];
+mod templates;
+use templates::TEMPLATE_PARAMS;
 
 fn unit_of(name: &str, unit: &str) -> Unit {
     match unit {
@@ -139,8 +91,12 @@ fn unit_of(name: &str, unit: &str) -> Unit {
         "ms" => Unit::Millis,
         "Hz" => Unit::Hz,
         _ => match name {
-            "freq" | "cutoff" | "lpf" | "hpf" | "density" => Unit::Hz,
-            "attack" | "decay" | "release" | "size" | "time" | "dur" | "delaytime" => Unit::Seconds,
+            "freq" | "cutoff" | "lpf" | "hpf" | "density" | "fb-cutoff" | "noise-cutoff"
+            | "fm-tuning" => Unit::Hz,
+            "attack" | "decay" | "release" | "size" | "time" | "dur" | "delaytime" | "fb-decay"
+            | "noise-attack" | "noise-hold" | "noise-decay" | "fm-attack" | "fm-hold"
+            | "fm-decay" => Unit::Seconds,
+            "fb-level" | "noise-level" | "fm-level" => Unit::Db,
             "pitch" | "semitones" => Unit::Semitones,
             _ => Unit::None,
         },
@@ -184,12 +140,160 @@ fn row_meta(name: &'static str) -> Option<ParamMeta> {
     Some(meta(name, row.ctl, row.range, "", stepped))
 }
 
+fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
+    row_meta(name).or_else(|| {
+        let node = match template {
+            "feedback-metal-drum" => Node::FeedbackMetal,
+            "six-bank-a-voice" | "six-bank-b-voice" | "six-bank-c-voice" => Node::SixOpOriginal,
+            "speech-voice" => Node::SpeechOriginal,
+            "rings-voice" => Node::RingsPart,
+            "string-choir-voice" => Node::StringChoir,
+            "elements-voice" => Node::ElementsInternal,
+            "tidal-voice" => Node::TidalFunction,
+            "tides2-voice" => Node::TidalPoly,
+            "peak-motion-voice" => Node::PeakFunction,
+            "stage-voice" => Node::StageSegment,
+            "stage-chain-voice" => Node::StageChain,
+            "frame-lfo-voice" => Node::FrameLfo,
+            "frame-keyframe-voice" => Node::FrameKeyframe { slot: 0 },
+            "peak-pulse-voice" => Node::PeakPulse,
+            "number-station-voice" => Node::NumberStation,
+            _ => return None,
+        };
+        ucat::ports(&node)
+            .iter()
+            .position(|port| {
+                port.name == name
+                    || (template == "frame-lfo-voice"
+                        && matches!(name, "frame-main-channel" | "frame-aux-channel")
+                        && port.name == "frame-channel")
+                    || (template == "frame-keyframe-voice"
+                        && matches!(name, "frame-main-channel" | "frame-aux-channel")
+                        && port.name == "frame-channel")
+                    || (template == "tides2-voice"
+                        && matches!(name, "poly-main-channel" | "poly-aux-channel")
+                        && port.name == "poly-channel")
+            })
+            .and_then(|port| ucat::port_ctl(&node, port))
+            .map(|ctl| {
+                if template != "rings-voice"
+                    && template != "feedback-metal-drum"
+                    && template != "string-choir-voice"
+                    && template != "elements-voice"
+                    && template != "tidal-voice"
+                    && template != "tides2-voice"
+                    && template != "peak-motion-voice"
+                    && template != "stage-voice"
+                    && template != "stage-chain-voice"
+                    && template != "frame-lfo-voice"
+                    && template != "frame-keyframe-voice"
+                    && template != "peak-pulse-voice"
+                    && template != "number-station-voice"
+                {
+                    return meta(name, ctl, (0.0, 1.0), "", false);
+                }
+                let (range, stepped) = match name {
+                    "metal-ratio" => ((0.25, 12.0), false),
+                    "metal-index" => ((0.0, 12.0), false),
+                    "metal-feedback" => ((0.0, 0.95), false),
+                    "metal-mod-decay" => ((0.002, 4.0), false),
+                    "metal-body-decay" => ((0.01, 8.0), false),
+                    "metal-pitch-drop" => ((0.0, 4.0), false),
+                    "metal-noise-level" => ((0.0, 1.0), false),
+                    "metal-noise-decay" => ((0.002, 3.0), false),
+                    "metal-noise-color" => ((100.0, 20_000.0), false),
+                    "metal-noise-to-fm" => ((0.0, 3.0), false),
+                    "metal-cutoff" => ((40.0, 20_000.0), false),
+                    "metal-resonance" => ((0.3, 12.0), false),
+                    "metal-drive" => ((0.0, 1.0), false),
+                    "rings-model" | "choir-fx" => ((0.0, 5.0), true),
+                    "el-model" => ((0.0, 2.0), true),
+                    "el-alternate" => ((0.0, 1.0), true),
+                    "el-space" => ((0.0, 2.0), false),
+                    "tide-mode" | "tide-range" => ((0.0, 2.0), true),
+                    "tide-output" => ((0.0, 3.0), true),
+                    "tide-ratio" => ((0.125, 8.0), false),
+                    "tide-pitch" => ((-48.0, 48.0), false),
+                    "tide-sync" | "tide-gate" | "tide-clock" | "tide-freeze" => ((0.0, 1.0), true),
+                    "poly-mode" => ((0.0, 2.0), true),
+                    "poly-output-mode" | "poly-main-channel" | "poly-aux-channel" => {
+                        ((0.0, 3.0), true)
+                    }
+                    "poly-range" | "poly-gate" | "poly-clock" => ((0.0, 1.0), true),
+                    "peak-mode" => ((0.0, 2.0), true),
+                    "stage-type" => ((0.0, 3.0), true),
+                    "stage-function" => ((0.0, 9.0), true),
+                    "chain-count" => ((1.0, 6.0), true),
+                    "frame-main-channel" | "frame-aux-channel" => ((0.0, 3.0), true),
+                    "frame-ease1" | "frame-ease2" | "frame-ease3" | "frame-ease4" => {
+                        ((0.0, 5.0), true)
+                    }
+                    "chain1-type" | "chain2-type" | "chain3-type" | "chain4-type"
+                    | "chain5-type" | "chain6-type" => ((0.0, 3.0), true),
+                    "chain-gate" | "chain-trigger" | "chain-channel" | "chain1-loop"
+                    | "chain2-loop" | "chain3-loop" | "chain4-loop" | "chain5-loop"
+                    | "chain6-loop" => ((0.0, 1.0), true),
+                    "stage-loop" | "stage-gate" | "stage-trigger" | "stage-clock"
+                    | "stage-channel" => ((0.0, 1.0), true),
+                    "pulse-mode" => ((0.0, 2.0), true),
+                    "pulse-half" | "pulse-gate" | "pulse-trigger" => ((0.0, 1.0), true),
+                    "pulse-repeats" => ((0.0, 7.0), true),
+                    "pulse-velocity" => ((-1.0, 1.0), false),
+                    "station-digit" => ((0.0, 9.0), true),
+                    "station-voice" | "station-half" | "station-auto" | "station-gate"
+                    | "station-trigger" => ((0.0, 1.0), true),
+                    "peak-shape" => ((0.0, 4.0), true),
+                    "peak-preset" => ((0.0, 6.0), true),
+                    "peak-color" => ((-1.0, 1.0), false),
+                    "peak-half" | "peak-gate" | "peak-trigger" | "peak-tap" | "peak-sync" => {
+                        ((0.0, 1.0), true)
+                    }
+                    "el-note" => ((-48.0, 48.0), false),
+                    "el-modulation" => ((-1.0, 1.0), false),
+                    "rings-chord" | "choir-chord" => ((0.0, 10.0), true),
+                    "rings-polyphony" | "choir-polyphony" => ((1.0, 4.0), true),
+                    "rings-tonic" | "rings-note" | "rings-fm" | "choir-tonic" | "choir-note"
+                    | "choir-fm" => ((-48.0, 48.0), false),
+                    "rings-internal-exciter"
+                    | "rings-internal-strum"
+                    | "rings-internal-note"
+                    | "choir-internal-exciter"
+                    | "choir-internal-strum"
+                    | "choir-internal-note" => ((0.0, 1.0), true),
+                    _ => ((0.0, 1.0), false),
+                };
+                let mut result = meta(name, ctl, range, "", stepped);
+                if matches!(
+                    name,
+                    "rings-tonic"
+                        | "rings-note"
+                        | "rings-fm"
+                        | "choir-tonic"
+                        | "choir-note"
+                        | "choir-fm"
+                        | "el-note"
+                ) {
+                    result.unit = Unit::Semitones;
+                }
+                result
+            })
+    })
+}
+
 fn effect_meta(kind: EffectKind) -> Box<[ParamMeta]> {
     effects::params(kind)
         .iter()
         .filter_map(|d: &ParamDef| {
             let ctl = effects::param_ctl(kind, d.name)?;
-            let stepped = matches!(d.name, "kind" | "mode" | "count" | "stages" | "bits" | "id");
+            let stepped = matches!(d.name, "kind" | "mode" | "count" | "stages" | "bits" | "id")
+                || (d.name == "quality"
+                    && matches!(
+                        kind,
+                        EffectKind::TextureGrain
+                            | EffectKind::TextureStretch
+                            | EffectKind::TextureLoop
+                            | EffectKind::TextureSpectral
+                    ));
             Some(meta(d.name, ctl, (d.min, d.max), d.unit, stepped))
         })
         .collect()
@@ -241,7 +345,11 @@ fn effect_editor(kind: EffectKind) -> EditorKind {
         | K::SpatialMap
         | K::Matrix => EditorKind::StereoField,
         K::Pan | K::Doppler => EditorKind::XyPad,
-        K::Granulate => EditorKind::GranularRegion,
+        K::Granulate
+        | K::TextureGrain
+        | K::TextureStretch
+        | K::TextureLoop
+        | K::TextureSpectral => EditorKind::GranularRegion,
         K::Analyzer(AnalyzerKind::Spectrum | AnalyzerKind::Spectrogram) => EditorKind::EqCurve,
         _ => EditorKind::Scalar,
     }
@@ -254,6 +362,8 @@ fn ugen_node(name: &str) -> Option<Node> {
         "pulse" => Node::Pulse,
         "tri" => Node::Tri,
         "white-noise" => Node::WhiteNoise,
+        "host-in-l" => Node::HostInputL,
+        "host-in-r" => Node::HostInputR,
         "lpf" => Node::Lpf,
         "hpf" => Node::Hpf,
         "bpf" => Node::Bpf,
@@ -269,6 +379,65 @@ fn ugen_node(name: &str) -> Option<Node> {
         "svf" => Node::Svf,
         "fm-op" => Node::FmOp,
         "fm-mod" => Node::FmMod,
+        "fm-drum" => Node::FmDrum,
+        "feedback-metal-core" => Node::FeedbackMetal,
+        "analog-percussion" => Node::AnalogPercussion,
+        "va-source" => Node::VaSource,
+        "va-filter" => Node::VaFilter,
+        "phase-pair" => Node::PhasePair,
+        "fm-pair" => Node::FmPair,
+        "six-op-original" => Node::SixOpOriginal,
+        "speech-original" => Node::SpeechOriginal,
+        "rings-part-core" => Node::RingsPart,
+        "string-choir-core" => Node::StringChoir,
+        "elements-internal-core" => Node::ElementsInternal,
+        "tidal-function-core" => Node::TidalFunction,
+        "tidal-poly-core" => Node::TidalPoly,
+        "peak-function-core" => Node::PeakFunction,
+        "stage-segment-core" => Node::StageSegment,
+        "stage-chain-core" => Node::StageChain,
+        "stage-linked-core" => Node::StageLinked { slot: 0 },
+        "frame-lfo-core" => Node::FrameLfo,
+        "frame-keyframe-core" => Node::FrameKeyframe { slot: 0 },
+        "peak-pulse-core" => Node::PeakPulse,
+        "number-station-core" => Node::NumberStation,
+        "spectrum-pair" => Node::SpectrumPair,
+        "clock-noise-pair" => Node::ClockNoisePair,
+        "dual-kick-core" => Node::DualKick,
+        "snare-pair-core" => Node::SnarePair,
+        "hat-pair-core" => Node::HatPair,
+        "swarm-pair-core" => Node::SwarmPair,
+        "particle-pair-core" => Node::ParticlePair,
+        "modal-pair-core" => Node::ModalPair,
+        "string-pair-core" => Node::StringPair,
+        "chip-pair-core" => Node::ChipPair,
+        "analog-pair-core" => Node::AnalogPair,
+        "grain-pair-core" => Node::GrainPair,
+        "shape-pair-core" => Node::ShapePair,
+        "string-machine-core" => Node::StringMachinePair,
+        "terrain-pair-core" => Node::TerrainPair,
+        "wave-grid-core" => Node::TableTerrainPair,
+        "chord-layer-core" => Node::ChordPair,
+        "macro-five-core" => Node::BraidsFive,
+        "macro-sub-sync-core" => Node::BraidsSubSync,
+        "macro-triple-core" => Node::BraidsTriple,
+        "macro-digital-core" => Node::BraidsDigital,
+        "macro-filter-core" => Node::BraidsFilter,
+        "macro-formant-core" => Node::BraidsFormant,
+        "macro-fm-core" => Node::BraidsFm,
+        "macro-physical-core" => Node::BraidsPhysical,
+        "macro-struck-core" => Node::BraidsStruck,
+        "macro-percussion-core" => Node::BraidsPercussion,
+        "macro-wave-grid-core" => Node::BraidsWaveBank,
+        "macro-wave-line-core" => Node::BraidsWaveLine,
+        "macro-noise-core" => Node::BraidsNoise,
+        "macro-cloud-core" => Node::BraidsCloud,
+        "aux-out" => Node::AuxOut,
+        "out-3" => Node::Out3,
+        "out-4" => Node::Out4,
+        "feedback-drum" => Node::FeedbackDrum,
+        "noise-drum" => Node::NoiseDrum,
+        "sine-drum" => Node::SineDrum,
         "phase-distortion" => Node::PhaseDistortion,
         "additive" => Node::Additive { partials_max: 64 },
         "wavetable" => Node::Wavetable(crate::dsp::graph::TableRef::new(0)),
@@ -280,7 +449,17 @@ fn ugen_node(name: &str) -> Option<Node> {
 fn ugen_editor(name: &str) -> EditorKind {
     match name {
         "lpf" | "hpf" | "bpf" | "ladder" | "svf" | "comb" => EditorKind::FilterResponse,
-        "env-perc" | "env-adsr" | "line" => EditorKind::EnvelopeShape,
+        "env-perc"
+        | "env-adsr"
+        | "line"
+        | "fm-drum"
+        | "phase-drum"
+        | "feedback-drum"
+        | "noise-drum"
+        | "sine-drum"
+        | "fusion-drum"
+        | "feedback-metal-core"
+        | "feedback-metal-drum" => EditorKind::EnvelopeShape,
         "delay" => EditorKind::DelayTaps,
         "sample-play" | "sampler" => EditorKind::SamplerWave,
         "wavetable" => EditorKind::WavetableFrames,
@@ -342,7 +521,7 @@ fn build() -> Vec<EditorDecl> {
             .find(|(n, _)| *n == name)
             .map_or(&[][..], |(_, p)| *p)
             .iter()
-            .filter_map(|p| row_meta(p))
+            .filter_map(|p| template_meta(name, p))
             .collect();
         push(EditorDecl {
             name,

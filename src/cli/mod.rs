@@ -181,7 +181,7 @@ fn open_cache() -> Option<Box<dyn CacheBackend>> {
 
 /// Builds the session every verb (`repl`, `run`, `serve`) evaluates
 /// against, and the host timebase it ticks on.
-fn build_session(host: HostChoice, cwd: &Path) -> (Session, HostClock) {
+fn build_session(host: HostChoice, cwd: &Path) -> Result<(Session, HostClock), String> {
     let lock = read_lock(cwd);
     let cache = open_cache();
     #[cfg(feature = "host-native")]
@@ -190,16 +190,19 @@ fn build_session(host: HostChoice, cwd: &Path) -> (Session, HostClock) {
     }
     #[cfg(not(feature = "host-native"))]
     {
+        if host == HostChoice::NativeInput {
+            return Err("`--audio-in` requires the `host-native` build feature".into());
+        }
         if host == HostChoice::Native {
             eprintln!("vactrol: built without the `host-native` feature; using `--host noop`");
         }
         let mut cfg = SessionConfig::new(CapabilitySet::native());
         cfg.lock = lock;
         cfg.cache = cache;
-        (
+        Ok((
             Session::new(cfg, Hosts::noop()),
             HostClock::Virtual(Cell::new(0.0)),
-        )
+        ))
     }
 }
 
@@ -209,7 +212,7 @@ fn build_session_native(
     cwd: &Path,
     lock: Option<LockFile>,
     cache: Option<Box<dyn CacheBackend>>,
-) -> (Session, HostClock) {
+) -> Result<(Session, HostClock), String> {
     use std::rc::Rc;
 
     use crate::host::native::{NativeConfig, NativeHosts, NativeSampleLoader};
@@ -217,6 +220,7 @@ fn build_session_native(
     use crate::sched::cells::Tier;
 
     let native_cfg = NativeConfig {
+        audio_in: host == HostChoice::NativeInput,
         base: cwd.to_path_buf(),
         sample_roots: vec![cwd.to_path_buf()],
         ..NativeConfig::default()
@@ -232,7 +236,7 @@ fn build_session_native(
     // instrument registry the evaluator installs into (14.5.9).
     let reg = InstRegistry::shared();
     let (hosts, runtime, clock) = match host {
-        HostChoice::Native => {
+        HostChoice::Native | HostChoice::NativeInput => {
             match NativeHosts::open_with_bus_names(&native_cfg, Rc::new(Rc::clone(&reg))) {
                 Ok(native) => {
                     for d in &native.diags {
@@ -247,6 +251,9 @@ fn build_session_native(
                     (native.hosts, runtime, HostClock::Native(native.clock))
                 }
                 Err(d) => {
+                    if host == HostChoice::NativeInput {
+                        return Err(format!("requested audio input is unavailable: {d}"));
+                    }
                     eprintln!("vactrol: {d}; falling back to `--host noop`");
                     (
                         Hosts::noop(),
@@ -268,7 +275,7 @@ fn build_session_native(
     cfg.cache = cache;
     cfg.loader = loader;
     cfg.insts = Some(reg);
-    (Session::new(cfg, hosts), clock)
+    Ok((Session::new(cfg, hosts), clock))
 }
 
 /// Prints one `eval`'s diagnostics, drained faults, console output and

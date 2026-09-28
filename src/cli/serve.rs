@@ -20,7 +20,13 @@ use crate::session::{Dest, Outgoing, Session};
 /// Exit 1 (cannot read the file, or cannot bind); otherwise runs until
 /// killed.
 pub fn main(file: Option<PathBuf>, host: HostChoice, port: u16, bind: IpAddr, cwd: &Path) -> i32 {
-    let (mut session, clock) = build_session(host, cwd);
+    let (mut session, clock) = match build_session(host, cwd) {
+        Ok(session) => session,
+        Err(error) => {
+            eprintln!("vactrol: {error}");
+            return 1;
+        }
+    };
     if let Some(path) = &file {
         match std::fs::read_to_string(path) {
             Ok(text) => {

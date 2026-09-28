@@ -16,7 +16,7 @@
 //! left its built-in default, confirmed before R6 by a routed and an
 //! unrouted voice rendering bit-identical peaks.
 
-use super::E2e;
+use super::{rms, E2e};
 
 fn peak(samples: &[f32]) -> f32 {
     samples.iter().fold(0.0_f32, |m, v| m.max(v.abs()))
@@ -25,6 +25,180 @@ fn peak(samples: &[f32]) -> f32 {
 /// `10^(db / 20)`: the linear amplitude ratio of a dB gain.
 fn db_ratio(db: f32) -> f32 {
     10.0_f32.powf(db / 20.0)
+}
+
+#[test]
+fn resonant_bank_all_controls_compile_from_vact_and_last_mix_changes_audio() {
+    let mut wet = E2e::new();
+    wet.eval("bus :rings:\n\tresonant-bank model: 2 structure: 0.7 brightness: 0.8 damping: 0.4 position: 0.6 note: 2 tonic: 1 fm: 0 chord: 3 polyphony: 3 strum: 0 internal-exciter: 0 internal-strum: 1 internal-note: 1 external-mix: 1 gate: 1 mix: 1");
+    wet.eval("s :analog > note [:c4] > bus :rings > once");
+    let wet_audio = wet.run_for(0.25);
+    assert!(wet.faults.is_empty());
+    assert!(rms(&wet_audio) > 1.0e-5);
+
+    let mut dry = E2e::new();
+    dry.eval("bus :rings:\n\tresonant-bank model: 2 structure: 0.7 brightness: 0.8 damping: 0.4 position: 0.6 note: 2 tonic: 1 fm: 0 chord: 3 polyphony: 3 strum: 0 internal-exciter: 0 internal-strum: 1 internal-note: 1 external-mix: 1 gate: 1 mix: 0");
+    dry.eval("s :analog > note [:c4] > bus :rings > once");
+    let dry_audio = dry.run_for(0.25);
+    assert!(dry.faults.is_empty());
+    let difference: f32 = wet_audio
+        .iter()
+        .zip(&dry_audio)
+        .map(|(a, b)| (a - b).abs())
+        .sum();
+    assert!(
+        difference > 0.1,
+        "17th effect parameter reaches the render path"
+    );
+}
+
+#[test]
+fn stream_control_effects_and_all_parameters_are_codeable() {
+    let controls = "shape: 0.2 response: 0.8 global-attack: 0.3 global-decay: 0.6 alternate: 1 linked: 1 excite-source: 0 excite: 0.3 trigger: 0 gate: 1 threshold: 0.1 cutoff-min: 100 cutoff-max: 9000";
+    for name in ["stream-envelope", "stream-vactrol"] {
+        let editor = crate::types::manifest::HostManifest::spec_default()
+            .editor_decl(name)
+            .unwrap();
+        for param in crate::dsp::effects::dynamic_control::PARAMS {
+            assert!(
+                editor.params.iter().any(|p| p.name == param.name),
+                "{name}/{}",
+                param.name
+            );
+        }
+        let mut wet = E2e::new();
+        wet.eval(&format!("bus :stream:\n\t{name} {controls} mix: 1"));
+        wet.eval("s :analog > note [:c4] > bus :stream > once");
+        let wet_audio = wet.run_for(0.3);
+        assert!(wet.faults.is_empty(), "{name}: {:?}", wet.faults);
+        assert!(rms(&wet_audio) > 1.0e-6, "{name}");
+        let mut dry = E2e::new();
+        dry.eval(&format!("bus :stream:\n\t{name} {controls} mix: 0"));
+        dry.eval("s :analog > note [:c4] > bus :stream > once");
+        let dry_audio = dry.run_for(0.3);
+        assert!(dry.faults.is_empty());
+        let delta: f32 = wet_audio
+            .iter()
+            .zip(&dry_audio)
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(delta > 0.1, "{name} last mix control reaches audio");
+    }
+}
+
+#[test]
+fn stream_follower_and_compressor_controls_compile_and_mix_reaches_audio() {
+    for (name, controls) in [
+        ("stream-follower", "shape: 0.2 response: 0.8 global-attack: 0.3 global-decay: 0.6 alternate: 1 linked: 1 excite-source: 0 excite: 0.3 cutoff-min: 100 cutoff-max: 9000"),
+        ("stream-compressor", "threshold: 0.4 amount: 0.7 global-attack: 0.3 global-decay: 0.6 global-threshold: 0.4 global-amount: 0.7 alternate: 1 linked: 1 excite-source: 0 excite: 0.3"),
+    ] {
+        let editor = crate::types::manifest::HostManifest::spec_default()
+            .editor_decl(name)
+            .unwrap();
+        let defs = crate::dsp::effects::params(
+            crate::dsp::graph::EffectKind::from_name(name).unwrap(),
+        );
+        for param in defs {
+            assert!(editor.params.iter().any(|p| p.name == param.name), "{name}/{}", param.name);
+        }
+        let mut wet = E2e::new();
+        wet.eval(&format!("bus :stream:\n\t{name} {controls} mix: 1"));
+        wet.eval("s :analog > note [:c4] > bus :stream > once");
+        let wet_audio = wet.run_for(0.3);
+        assert!(wet.faults.is_empty(), "{name}: {:?}", wet.faults);
+        assert!(rms(&wet_audio) > 1.0e-6, "{name}");
+        let mut dry = E2e::new();
+        dry.eval(&format!("bus :stream:\n\t{name} {controls} mix: 0"));
+        dry.eval("s :analog > note [:c4] > bus :stream > once");
+        let dry_audio = dry.run_for(0.3);
+        assert!(dry.faults.is_empty());
+        let delta: f32 = wet_audio.iter().zip(&dry_audio).map(|(a, b)| (a - b).abs()).sum();
+        assert!(delta > 0.1, "{name} mix reaches audio");
+    }
+}
+
+#[test]
+fn final_streams_filter_and_lorenz_controls_compile_from_vact() {
+    for (name, controls) in [
+        (
+            "stream-filter",
+            "offset: 0.6 amount: 0.8 excite-source: 0 excite: 0.2 cutoff-min: 120 cutoff-max: 9000",
+        ),
+        (
+            "stream-lorenz",
+            "rate: 0.7 balance: 0.3 excite-source: 0 excite: 0.2 cutoff-min: 120 cutoff-max: 9000",
+        ),
+    ] {
+        let editor = crate::types::manifest::HostManifest::spec_default()
+            .editor_decl(name)
+            .unwrap();
+        let defs =
+            crate::dsp::effects::params(crate::dsp::graph::EffectKind::from_name(name).unwrap());
+        for param in defs {
+            assert!(
+                editor.params.iter().any(|p| p.name == param.name),
+                "{name}/{}",
+                param.name
+            );
+        }
+        assert!(!editor
+            .params
+            .iter()
+            .any(|p| p.name == "alternate" || p.name == "linked"));
+        let mut wet = E2e::new();
+        wet.eval(&format!("bus :stream:\n\t{name} {controls} mix: 1"));
+        wet.eval("s :analog > note [:c4] > bus :stream > once");
+        let wet_audio = wet.run_for(0.3);
+        assert!(wet.faults.is_empty(), "{name}: {:?}", wet.faults);
+        assert!(rms(&wet_audio) > 1.0e-6);
+        let mut dry = E2e::new();
+        dry.eval(&format!("bus :stream:\n\t{name} {controls} mix: 0"));
+        dry.eval("s :analog > note [:c4] > bus :stream > once");
+        let dry_audio = dry.run_for(0.3);
+        assert!(dry.faults.is_empty());
+        let delta: f32 = wet_audio
+            .iter()
+            .zip(&dry_audio)
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(delta > 0.1, "{name} mix reaches audio");
+    }
+}
+
+#[test]
+fn elements_bank_patch_and_performance_controls_compile_from_vact() {
+    let controls = "el-env-shape: 0.4 el-bow-level: 0.2 el-bow-timbre: 0.6 el-blow-level: 0.7 el-blow-meta: 0.4 el-blow-timbre: 0.8 el-strike-level: 0.6 el-strike-meta: 0.3 el-strike-timbre: 0.7 el-signature: 0.4 el-geometry: 0.6 el-brightness: 0.8 el-damping: 0.4 el-position: 0.6 el-res-mod-frequency: 0.3 el-res-mod-offset: 0.7 el-reverb-diffusion: 0.5 el-reverb-lp: 0.6 el-space: 0.4 el-modulation-frequency: 0.5 el-gate: 1 el-note: 2 el-modulation: 0.2 el-strength: 0.8 el-model: 0 external-blend: 1";
+    let mut wet = E2e::new();
+    wet.eval(&format!(
+        "bus :elements:\n\telements-bank {controls} mix: 1"
+    ));
+    wet.eval("s :analog > note [:c4] > bus :elements > once");
+    let wet_audio = wet.run_for(0.25);
+    assert!(wet.faults.is_empty());
+    assert!(rms(&wet_audio) > 1.0e-6);
+    let mut dry = E2e::new();
+    dry.eval(&format!(
+        "bus :elements:\n\telements-bank {controls} mix: 0"
+    ));
+    dry.eval("s :analog > note [:c4] > bus :elements > once");
+    let dry_audio = dry.run_for(0.25);
+    assert!(dry.faults.is_empty());
+    let delta: f32 = wet_audio
+        .iter()
+        .zip(&dry_audio)
+        .map(|(a, b)| (a - b).abs())
+        .sum();
+    assert!(delta > 0.1, "final mix control reaches audio");
+}
+
+#[test]
+fn elements_alternate_and_space_freeze_compile_from_vact() {
+    let mut e = E2e::new();
+    e.eval("bus :elements-alt:\n\telements-bank el-alternate: 1 el-space: 1.9 el-bow-level: 0.4 external-blend: 0 mix: 1");
+    e.eval("s :analog > note [:c4] > bus :elements-alt > once");
+    let audio = e.run_for(0.25);
+    assert!(e.faults.is_empty());
+    assert!(rms(&audio) > 1.0e-6);
 }
 
 #[test]
@@ -177,4 +351,238 @@ fn room_maps_onto_the_bus_unit_parameter() {
         tail_energy(&wet_out),
         tail_energy(&zero_out)
     );
+}
+
+#[test]
+fn dual_mod_bus_is_exposed_in_vact() {
+    fn render(algorithm: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!("bus :mod:\n\tdual-mod algorithm: {algorithm} timbre: 0.7 drive: 0.6 carrier-wave: 2 carrier-frequency: 330"));
+        e.eval("s :phase-drum > pan 0.3 > bus :mod > once");
+        let output = e.run_for(1.0);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(e.committed > 0);
+        assert!(output.iter().all(|x| x.is_finite()));
+        output
+    }
+    let a = render(0.0);
+    let b = render(3.0);
+    let vocoder = render(6.0);
+    let frozen = render(8.0);
+    let delta = a.iter().zip(&b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32;
+    assert!(
+        delta > 1.0e-4,
+        "algorithm control changes routed audio: {delta}"
+    );
+    let upper_delta = vocoder
+        .iter()
+        .zip(&frozen)
+        .map(|(x, y)| (x - y).abs())
+        .sum::<f32>()
+        / vocoder.len() as f32;
+    assert!(
+        upper_delta > 1.0e-4,
+        "algorithm 8 reaches the frozen vocoder path: {upper_delta}"
+    );
+}
+
+#[test]
+fn dual_mod_channel_drives_are_codeable_in_vact() {
+    fn render(carrier: f32, modulator: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "bus :mod:\n\tdual-mod algorithm: 0 timbre: 0.5 drive: 1 carrier-wave: 0 carrier-frequency: 330 carrier-drive: {carrier} modulator-drive: {modulator}"
+        ));
+        e.eval("s :phase-drum > pan 0.3 > bus :mod > once");
+        let output = e.run_for(1.0);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(e.committed > 0);
+        assert!(output.iter().all(|x| x.is_finite()));
+        output
+    }
+    let both = render(1.0, 1.0);
+    let carrier_off = render(0.0, 1.0);
+    let modulator_off = render(1.0, 0.0);
+    let delta = |a: &[f32], b: &[f32]| {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32
+    };
+    assert!(delta(&both, &carrier_off) > 1.0e-4);
+    assert!(delta(&both, &modulator_off) > 1.0e-4);
+}
+
+#[test]
+fn dual_mod_source_carrier_pairs_are_codeable_in_vact() {
+    fn render(algorithm: f32, wave: u8) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "bus :mod:\n\tdual-mod algorithm: {algorithm} timbre: 0.5 drive: 0.8 carrier-wave: {wave} carrier-frequency: 330 carrier-drive: 1 modulator-drive: 1"
+        ));
+        e.eval("s :phase-drum > pan 0.3 > bus :mod > once");
+        let output = e.run_for(0.5);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(e.committed > 0);
+        assert!(output.iter().all(|x| x.is_finite()));
+        output
+    }
+    for wave in 1..=3 {
+        let xmod = render(0.0, wave);
+        let vocoder = render(7.0, wave);
+        let delta = xmod
+            .iter()
+            .zip(&vocoder)
+            .map(|(x, y)| (x - y).abs())
+            .sum::<f32>()
+            / xmod.len() as f32;
+        assert!(delta > 1.0e-4, "wave {wave} selects distinct source roles");
+    }
+}
+
+#[test]
+fn shift_pair_bus_controls_and_editor_metadata_are_codeable() {
+    let name = "shift-pair";
+    let decl = crate::types::manifest::HostManifest::spec_default()
+        .editor_decl(name)
+        .unwrap();
+    for param in crate::dsp::effects::shift_pair::PARAMS {
+        assert!(
+            decl.params.iter().any(|p| p.name == param.name),
+            "{}",
+            param.name
+        );
+    }
+    let render = |shift: f32, mix: f32| {
+        let mut e = E2e::new();
+        e.eval(&format!("bus :shift:\n\tshift-pair carrier-wave: 1 shift-pot: {shift} shift-cv: 0 phase-shift: 0 timbre: 1 feedback: 0.2 dry-wet: 1 mix: {mix}"));
+        e.eval("s :analog > note [:c4] > pan 0.3 > bus :shift > once");
+        let out = e.run_for(0.5);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(rms(&out) > 1.0e-6);
+        out
+    };
+    let dry = render(0.5, 0.0);
+    let centered = render(0.5, 1.0);
+    let shifted = render(0.6, 1.0);
+    let delta = |a: &[f32], b: &[f32]| {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32
+    };
+    assert!(delta(&dry, &centered) > 1.0e-4);
+    assert!(delta(&centered, &shifted) > 1.0e-4);
+}
+
+#[test]
+fn texture_grain_bus_controls_reach_stereo_audio_from_vact() {
+    fn render(position: f32, mix: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "bus :texture:\n\ttexture-grain position: {position} size: 0.3 pitch: 0 density: 0.9 texture: 0.7 stereo-spread: 0.5 feedback: 0.1 reverb: 0.2 mix: {mix} freeze: 0 trigger: 0 gate: 1"
+        ));
+        e.eval("s :analog > note [:c4] > legato 1 > bus :texture > once");
+        let audio = e.run_for(0.7);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(audio.iter().all(|x| x.is_finite()));
+        audio
+    }
+    let dry = render(0.5, 0.0);
+    let wet = render(0.5, 1.0);
+    let moved = render(0.05, 1.0);
+    let difference = |a: &[f32], b: &[f32]| {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32
+    };
+    assert!(difference(&dry, &wet) > 1.0e-5, "mix affects output");
+    assert!(difference(&wet, &moved) > 1.0e-6, "position affects output");
+}
+
+#[test]
+fn texture_stretch_bus_controls_reach_audio_from_vact() {
+    fn render(position: f32, mix: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "bus :stretch:\n\ttexture-stretch position: {position} size: 0.4 pitch: 0 density: 0.8 texture: 0.7 stereo-spread: 0.5 feedback: 0.1 reverb: 0.2 mix: {mix} freeze: 0 trigger: 0 gate: 1"
+        ));
+        e.eval("s :analog > note [:c4] > legato 1 > bus :stretch > once");
+        let audio = e.run_for(0.7);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(audio.iter().all(|x| x.is_finite()));
+        audio
+    }
+    let dry = render(0.5, 0.0);
+    let wet = render(0.5, 1.0);
+    let moved = render(0.05, 1.0);
+    let difference = |a: &[f32], b: &[f32]| {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32
+    };
+    assert!(difference(&dry, &wet) > 1.0e-5, "mix affects output");
+    assert!(difference(&wet, &moved) > 1.0e-6, "position affects output");
+}
+
+#[test]
+fn texture_loop_bus_controls_reach_audio_from_vact() {
+    fn render(position: f32, mix: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "bus :loop:\n\ttexture-loop position: {position} size: 0.4 pitch: 0 density: 0.8 texture: 0.7 stereo-spread: 0.5 feedback: 0.1 reverb: 0.2 mix: {mix} freeze: 0 trigger: 0 gate: 1"
+        ));
+        e.eval("s :analog > note [:c4] > legato 1 > bus :loop > once");
+        let audio = e.run_for(0.7);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(audio.iter().all(|x| x.is_finite()));
+        audio
+    }
+    let dry = render(0.5, 0.0);
+    let wet = render(0.5, 1.0);
+    let moved = render(0.05, 1.0);
+    let difference = |a: &[f32], b: &[f32]| {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32
+    };
+    assert!(difference(&dry, &wet) > 1.0e-5, "mix affects output");
+    assert!(difference(&wet, &moved) > 1.0e-6, "position affects output");
+}
+
+#[test]
+fn texture_spectral_bus_controls_reach_audio_from_vact() {
+    fn render(position: f32, mix: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "bus :spectral:\n\ttexture-spectral position: {position} size: 0.4 pitch: 0 density: 0.8 texture: 0.7 stereo-spread: 0.5 feedback: 0.1 reverb: 0.2 mix: {mix} freeze: 0 trigger: 0 gate: 1"
+        ));
+        e.eval("s :analog > note [:c4] > legato 1 > bus :spectral > once");
+        let audio = e.run_for(0.7);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(audio.iter().all(|x| x.is_finite()));
+        audio
+    }
+    let dry = render(0.5, 0.0);
+    let wet = render(0.5, 1.0);
+    let moved = render(0.05, 1.0);
+    let difference = |a: &[f32], b: &[f32]| {
+        a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / a.len() as f32
+    };
+    assert!(difference(&dry, &wet) > 1.0e-5, "mix affects output");
+    assert!(difference(&wet, &moved) > 1.0e-6, "position affects output");
+}
+
+#[test]
+fn all_texture_quality_values_are_codeable_on_every_bus_mode() {
+    for effect in [
+        "texture-grain",
+        "texture-stretch",
+        "texture-loop",
+        "texture-spectral",
+    ] {
+        for quality in 0..4 {
+            let mut e = E2e::new();
+            e.eval(&format!(
+                "bus :texture-quality:\n\t{effect} position: 0.5 size: 0.4 pitch: 0 density: 0.8 texture: 0.7 stereo-spread: 0.5 feedback: 0.1 reverb: 0.2 mix: 1 freeze: 0 trigger: 0 gate: 1 quality: {quality}"
+            ));
+            e.eval("s :analog > note [:c4] > legato 1 > bus :texture-quality > once");
+            let audio = e.run_for(0.35);
+            assert!(
+                e.faults.is_empty(),
+                "{effect} quality {quality}: {:?}",
+                e.faults
+            );
+            assert!(audio.iter().all(|x| x.is_finite()));
+            assert!(rms(&audio) > 1.0e-6, "{effect} quality {quality}: audible");
+        }
+    }
 }

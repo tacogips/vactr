@@ -17,6 +17,8 @@ export interface HostOptions {
   processorUrl: string;
   arenaBytes?: number;
   voices?: number;
+  /** Opt-in direct stems on channels 3/4; defaults to stereo. */
+  outputChannels?: 2 | 4;
   sampleRate?: number;
   tickEvery?: number;
   /** `'main'` (default: the dev harness) or `'session'` (the editor). */
@@ -42,6 +44,8 @@ export class VactrolHost {
   constructor(ctx: AudioContext | null, node: WorkletNodeLike, x: HostExports, opts: HostOptions);
   ctx: AudioContext;
   node: WorkletNodeLike;
+  /** Four-channel splitter; outputs 2/3 expose direct stems when enabled. */
+  quadSplitter: ChannelSplitterNode | null;
   x: HostExports;
   opts: HostOptions;
   /** The worklet's last posted frame time (audio seconds). */
@@ -59,6 +63,8 @@ export class VactrolHost {
   withBytes<T>(bytes: Uint8Array, f: (ptr: number, len: number) => T): T;
   flush(): void;
   postRaw(buf: ArrayBuffer): void;
+  /** Connects a Web Audio source to the stereo master-effect input. */
+  connectInput(source: AudioNode): void;
   workletCall(name: string, ...args: unknown[]): void;
   release(order?: (held: ArrayBuffer[]) => ArrayBuffer[]): void;
   eval(text: string): number;

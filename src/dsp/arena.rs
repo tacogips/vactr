@@ -88,6 +88,10 @@ pub enum FaultCode {
     BadResource,
     /// Undecodable install bytes.
     BadRecord,
+    /// The graph needs four host output channels but this engine has two.
+    OutputChannels,
+    /// External audio input is short, malformed, or nonfinite.
+    InputBuffer,
 }
 
 impl FaultCode {
@@ -98,7 +102,10 @@ impl FaultCode {
             FaultCode::ArenaExhausted => DiagCode::ArenaExhausted,
             FaultCode::InstallQueueOverflow => DiagCode::InstallQueueOverflow,
             FaultCode::GraphTooLarge => DiagCode::GraphTooLarge,
-            FaultCode::BadResource | FaultCode::BadRecord => DiagCode::HostTransport,
+            FaultCode::BadResource | FaultCode::BadRecord | FaultCode::InputBuffer => {
+                DiagCode::HostTransport
+            }
+            FaultCode::OutputChannels => DiagCode::BeyondCapability,
         }
     }
 }

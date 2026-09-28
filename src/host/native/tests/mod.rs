@@ -3,6 +3,7 @@
 //! with the test driving `AudioSide::render`.
 
 mod audio;
+mod capture;
 mod midi;
 mod tap;
 mod tick;

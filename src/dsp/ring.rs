@@ -686,6 +686,8 @@ pub struct EngineConfig {
     pub caps: CapabilitySet,
     pub sample_rate: f32,
     pub max_block: usize,
+    /// Two-channel master or opt-in four-channel direct-stem output.
+    pub output_channels: u8,
     pub store: StoreKind,
     pub template_slots: usize,
     pub bus_slots: usize,
@@ -699,20 +701,36 @@ pub struct EngineConfig {
     pub event_capacity: usize,
 }
 
+/// A host configuration that cannot be represented by the preallocated DSP core.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfigError {
+    SampleRate,
+    BlockSize,
+    StateBudget,
+    OutputChannels,
+}
+
 impl EngineConfig {
+    /// Supported host rates and callback quantum sizes. Longer callbacks are
+    /// processed in `max_block` chunks, without growing callback buffers.
+    pub const MIN_SAMPLE_RATE: f32 = 8_000.0;
+    pub const MAX_SAMPLE_RATE: f32 = 192_000.0;
+    pub const MAX_BLOCK: usize = 8_192;
+    /// Per-voice and per-bus delay-state ceiling, in float samples.
+    pub const MAX_STATE_SAMPLES: f32 = 2_000_000.0;
+
     /// The defaults of 12.8.9 for a tier.
     #[must_use]
     pub fn new(caps: &CapabilitySet, sample_rate: f32, max_block: usize, store: StoreKind) -> Self {
         Self {
             caps: *caps,
-            sample_rate: if sample_rate > 0.0 {
-                sample_rate
-            } else {
-                48_000.0
-            },
-            max_block: max_block.max(1),
+            sample_rate,
+            max_block,
+            output_channels: 2,
             store,
-            template_slots: 64,
+            // The core prelude currently installs 63 definitions. Leave
+            // bounded room for opt-in input and quad instruments.
+            template_slots: 72,
             bus_slots: DEFAULT_BUS_SLOTS,
             bus_seconds: 4.0,
             voice_seconds: 0.5,
@@ -721,6 +739,37 @@ impl EngineConfig {
             analysis_cells: 4096,
             event_capacity: EVENT_CAPACITY,
         }
+    }
+
+    /// Validates the rate, quantum and per-voice state before any buffers are
+    /// allocated. The per-voice budget is measured in `f32` samples.
+    ///
+    /// # Errors
+    /// A rate, block size or state budget outside the supported range.
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if !self.sample_rate.is_finite()
+            || !(Self::MIN_SAMPLE_RATE..=Self::MAX_SAMPLE_RATE).contains(&self.sample_rate)
+        {
+            return Err(ConfigError::SampleRate);
+        }
+        if !(1..=Self::MAX_BLOCK).contains(&self.max_block) {
+            return Err(ConfigError::BlockSize);
+        }
+        if !matches!(self.output_channels, 2 | 4) {
+            return Err(ConfigError::OutputChannels);
+        }
+        let valid_seconds = |seconds: f32| {
+            seconds.is_finite()
+                && seconds >= 0.0
+                && seconds * self.sample_rate <= Self::MAX_STATE_SAMPLES
+        };
+        if !valid_seconds(self.voice_seconds)
+            || !valid_seconds(self.bus_seconds)
+            || !valid_seconds(self.orbit_delay_seconds)
+        {
+            return Err(ConfigError::StateBudget);
+        }
+        Ok(())
     }
 }
 

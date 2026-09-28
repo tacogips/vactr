@@ -25,7 +25,7 @@ use crate::compile::{compile, CompileCx};
 use crate::dsp::build::{lower_inst, LowerError, Lowering};
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
-use crate::dsp::controls::{self, CtlDomain};
+use crate::dsp::controls::{self, CtlDomain, DeclaredParam, ScalarType};
 use crate::dsp::graph::{BusDef, BusId, InstDef, InstId, UGenKind, UGenNode, UGenSpec};
 use crate::host::caps::{GraphHandle, InstResolver, Route, SampleSrc, SignalInput};
 use crate::host::wire::Ctl;
@@ -46,15 +46,71 @@ use crate::vm::vm::Vm;
 pub const TEMPLATES: &str = include_str!("../prelude/templates.vact");
 /// The file id the template source reads under.
 pub const TEMPLATE_FILE: FileId = FileId::new(u32::MAX - 1);
-/// The seven template names, in source order.
-pub const TEMPLATE_NAMES: [&str; 7] = [
+/// The prelude template names, in source order.
+pub const TEMPLATE_NAMES: [&str; 63] = [
     "sampler",
     "analog",
     "fm",
+    "phase-drum",
+    "feedback-metal-drum",
+    "low-drum",
+    "wire-drum",
+    "metal-hat",
+    "filter-voice",
+    "phase-pair-voice",
+    "fm-pair-voice",
+    "six-bank-a-voice",
+    "six-bank-b-voice",
+    "six-bank-c-voice",
+    "speech-voice",
+    "rings-voice",
+    "string-choir-voice",
+    "elements-voice",
+    "spectrum-voice",
+    "clock-noise-voice",
+    "dual-kick-voice",
+    "dual-snare-voice",
+    "dual-hat-voice",
+    "swarm-voice",
+    "particle-voice",
+    "modal-voice",
+    "string-voice",
+    "chip-voice",
+    "analog-pair-voice",
+    "grain-pair-voice",
+    "shape-voice",
+    "string-machine-voice",
+    "terrain-voice",
+    "wave-grid-voice",
+    "chord-layer-voice",
+    "macro-five-voice",
+    "macro-sub-sync-voice",
+    "macro-triple-voice",
+    "macro-digital-voice",
+    "macro-filter-voice",
+    "macro-formant-voice",
+    "macro-fm-voice",
+    "macro-physical-voice",
+    "macro-struck-voice",
+    "macro-percussion-voice",
+    "macro-wave-grid-voice",
+    "macro-wave-line-voice",
+    "macro-noise-voice",
+    "macro-cloud-voice",
+    "fusion-drum",
     "pd",
     "additive",
     "wavetable",
     "granular",
+    "tidal-voice",
+    "tides2-voice",
+    "peak-motion-voice",
+    "stage-voice",
+    "stage-chain-voice",
+    "frame-lfo-voice",
+    "frame-keyframe-voice",
+    "peak-pulse-voice",
+    "number-station-voice",
 ];
 
 /// The control cells the registry hands out (inst defaults that are tweak
@@ -81,6 +137,8 @@ pub struct DspCx {
 pub struct InstEntry {
     pub name: KwId,
     pub def: Arc<InstDef>,
+    /// Instrument-local control schema used by commit and editor metadata.
+    pub params: Vec<DeclaredParam>,
     /// Cell-backed defaults and the tweak slots that feed them.
     pub cells: Vec<(CellId, VarSlotRef)>,
     pub signals: Vec<SignalInput>,
@@ -89,6 +147,25 @@ pub struct InstEntry {
     /// (R2b, serial repair of the BE-FINAL STOP finding): `route` resolves
     /// it to a `SampleSrc::Bank`, the same way a raw host-bank sound does.
     pub resource: Option<KwId>,
+}
+
+impl InstEntry {
+    /// The evaluated header-site value for an instrument-owned default cell.
+    /// Invalid later tweak values leave the last valid audio value in place.
+    #[must_use]
+    pub fn default_cell_value(&self, cell: CellId) -> Option<f32> {
+        let (_, slot) = self.cells.iter().find(|(id, _)| *id == cell)?;
+        let ctl = self
+            .def
+            .params
+            .iter()
+            .find_map(|(ctl, value)| (*value == Ctl::Cell(cell)).then_some(*ctl))?;
+        self.params
+            .iter()
+            .find(|param| param.ctl == ctl)?
+            .encode(&slot.get())
+            .ok()
+    }
 }
 
 /// One installed bus (or `master`).
@@ -172,6 +249,15 @@ impl InstRegistry {
         self.insts.values()
     }
 
+    /// Parameter names of installed instruments, for checking and compiling
+    /// pattern steps in subsequent forms.
+    pub fn declared_names(&self) -> impl Iterator<Item = Rc<str>> + '_ {
+        self.insts
+            .values()
+            .flat_map(|entry| entry.params.iter())
+            .map(|param| name_of_kw(param.name))
+    }
+
     /// The bus declared as `name`.
     #[must_use]
     pub fn bus(&self, name: KwId) -> Option<&BusEntry> {
@@ -211,12 +297,31 @@ impl InstRegistry {
 
     /// The wire id of a header parameter: its control-table row, else a
     /// per-registry custom id.
-    pub fn ctl_of(&mut self, name: KwId) -> CtlId {
+    pub fn ctl_of(&mut self, name: KwId) -> Result<CtlId, Failure> {
         if let Some(r) = controls::row(&name_of_kw(name)) {
-            return r.ctl;
+            return Ok(r.ctl);
         }
-        let next = CUSTOM_CTL_BASE + u16::try_from(self.custom.len()).unwrap_or(0);
-        *self.custom.entry(name).or_insert(CtlId::new(next))
+        if let Some(id) = self.custom.get(&name) {
+            return Ok(*id);
+        }
+        let offset = u16::try_from(self.custom.len()).map_err(|_| {
+            Failure::new(
+                FailCode::TooManyControls,
+                "too many custom instrument parameter names",
+            )
+        })?;
+        let next = CUSTOM_CTL_BASE
+            .checked_add(offset)
+            .filter(|id| *id < crate::dsp::build::SIGNAL_CTL_BASE)
+            .ok_or_else(|| {
+                Failure::new(
+                    FailCode::TooManyControls,
+                    "custom instrument parameter ids are exhausted",
+                )
+            })?;
+        let id = CtlId::new(next);
+        self.custom.insert(name, id);
+        Ok(id)
     }
 
     /// A control cell from the registry's range; `None` when it is used up
@@ -356,6 +461,15 @@ impl InstResolver for InstRegistry {
         self.insts.get(&id).map(|e| Arc::clone(&e.def))
     }
 
+    fn declared_param(&self, id: InstId, name: KwId) -> Option<DeclaredParam> {
+        self.insts
+            .get(&id)?
+            .params
+            .iter()
+            .find(|p| p.name == name)
+            .copied()
+    }
+
     fn signal_inputs(&self) -> Vec<SignalInput> {
         let insts = self.insts.values().flat_map(|e| e.signals.iter());
         let buses = self.buses.values().chain(self.master.iter());
@@ -379,6 +493,10 @@ impl InstResolver for Rc<RefCell<InstRegistry>> {
 
     fn inst(&self, id: InstId) -> Option<Arc<InstDef>> {
         self.borrow().inst(id)
+    }
+
+    fn declared_param(&self, id: InstId, name: KwId) -> Option<DeclaredParam> {
+        self.borrow().declared_param(id, name)
     }
 
     fn signal_inputs(&self) -> Vec<SignalInput> {
@@ -482,6 +600,7 @@ pub fn realize_inst(
     let fixed = usize::from(c.proto.arity.fixed);
     let ncap = usize::from(c.proto.captures);
     let mut header = Vec::new();
+    let mut params = Vec::new();
     let mut cells = Vec::new();
     // R2b: the default keyword of a `CtlDomain::Resource` header parameter
     // (`bank`, `table` or `source`), if this instrument declares one.
@@ -497,7 +616,42 @@ pub fn realize_inst(
         let v = match default {
             Some(list @ Value::List(_)) => list.clone(),
             _ => {
-                let ctl = r.ctl_of(*pname);
+                if header.len() >= crate::dsp::ugen::MAX_PARAMS {
+                    return Err(inst_failed(
+                        name,
+                        "the instrument declares too many parameters",
+                        None,
+                    ));
+                }
+                let ctl = r
+                    .ctl_of(*pname)
+                    .map_err(|e| inst_failed(name, &e.message, None))?;
+                let ty = c
+                    .proto
+                    .arity
+                    .scalar_types
+                    .get(k)
+                    .copied()
+                    .unwrap_or(ScalarType::Float);
+                let row = controls::row_by_id(ctl);
+                let param = DeclaredParam {
+                    name: *pname,
+                    ctl,
+                    ty,
+                    range: row.map(|r| r.range),
+                };
+                if row.is_none() {
+                    let v = match default {
+                        Some(Value::VarRef(slot)) => slot.get(),
+                        Some(v) => v.clone(),
+                        None => Value::Nil,
+                    };
+                    if ty != ScalarType::Unsupported && !matches!(v, Value::Nil) {
+                        param
+                            .encode(&v)
+                            .map_err(|e| inst_failed(name, &e.message, None))?;
+                    }
+                }
                 if let (Some(row), Some(Value::Keyword(rkw))) = (controls::row_by_id(ctl), default)
                 {
                     if row.domain == CtlDomain::Resource {
@@ -505,6 +659,7 @@ pub fn realize_inst(
                     }
                 }
                 header.push((ctl, default_ctl(&mut r, ctl, default, &mut cells)));
+                params.push(param);
                 param_node(ctl)
             }
         };
@@ -542,6 +697,7 @@ pub fn realize_inst(
         InstEntry {
             name,
             def: Arc::clone(&def),
+            params,
             cells,
             signals: extras.signals,
             resource,

@@ -19,17 +19,27 @@ use crate::types::check::check;
 use crate::types::manifest::HostManifest;
 
 impl Evaluator {
+    /// Add installed instrument header names to the checker manifest.
+    #[must_use]
+    pub fn dynamic_manifest(&self, base: &HostManifest) -> HostManifest {
+        self.insts().map_or_else(
+            || base.clone(),
+            |insts| base.with_controls(insts.borrow().declared_names()),
+        )
+    }
+
     /// `eval_form`, with the form checked against `manifest` instead of the
     /// spec default.
     pub fn eval_form_in(&mut self, form: &Node, manifest: &HostManifest) -> FormOutcome {
-        let spec = HostManifest::spec_default();
-        if *manifest == spec {
+        let spec = self.dynamic_manifest(&HostManifest::spec_default());
+        let manifest = self.dynamic_manifest(manifest);
+        if manifest == spec {
             return self.eval_form(form);
         }
         let env = self.ns().check_env();
         let forms = std::slice::from_ref(form);
         let default_len = check(forms, &env, &spec).diags.len();
-        let mut diags = check(forms, &env, manifest).diags;
+        let mut diags = check(forms, &env, &manifest).diags;
         let mut out = self.eval_form(form);
         let rest = out.diags.split_off(default_len.min(out.diags.len()));
         diags.extend(rest);

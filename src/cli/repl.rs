@@ -17,7 +17,13 @@ const CONTINUATION: &str = "....> ";
 
 /// Runs the REPL to EOF (Ctrl-D); always exits 0.
 pub fn main(host: HostChoice, cwd: &Path) -> i32 {
-    let (mut session, clock) = build_session(host, cwd);
+    let (mut session, clock) = match build_session(host, cwd) {
+        Ok(session) => session,
+        Err(error) => {
+            eprintln!("vactrol: {error}");
+            return 1;
+        }
+    };
     let interactive = std::io::stdin().is_terminal();
     let (tx, rx) = mpsc::channel::<String>();
     let spawned = thread::Builder::new()

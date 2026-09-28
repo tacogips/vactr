@@ -14,6 +14,7 @@ use crate::pattern::build::{alt as alt_steps, param_of, pattern_of};
 use crate::pattern::combinators::input::midi_notes as midi_notes_node;
 use crate::pattern::combinators::{pattern_value, random, region, structure, time};
 use crate::pattern::pat::{PParam, Pat, SliceCuts};
+use crate::pattern::step::{steps, Step};
 use crate::value::intern::{name_of_kw, KwId};
 use crate::value::value::Value;
 use crate::vm::call::{kind_name, NativeCx};
@@ -114,7 +115,13 @@ fn pats_of_list(v: &Value, what: &str) -> Result<Vec<Pat>, Failure> {
     };
     l.items
         .iter()
-        .map(|x| pattern_of(x, None).map(|p| (*p).clone()))
+        .map(|x| match x {
+            // A late name (`cat [bar ..]`): a one-step list whose step is the
+            // name, so its value is read per query and a list value
+            // subdivides the cycle like a list literal would.
+            Value::VarRef(_) => Ok(steps(Box::new([Step::bare(x.clone())]), None)),
+            _ => pattern_of(x, None).map(|p| (*p).clone()),
+        })
         .collect()
 }
 

@@ -29,9 +29,9 @@ Every verb runs one `Session` on the main thread (design 14.5.4).
 
 | Verb | Synopsis | Behavior |
 |------|----------|----------|
-| `repl` | `vactrol repl [--host H]` | Interactive console over one session (design 14.2, 14.5.10). Sound keeps playing between lines. Completed expressions bind `_1`, `_2`, …; a failed one binds nothing. EOF (Ctrl-D) exits. |
-| `run` | `vactrol run <file.vact> [--host H] [--cycles N]` | Evaluates the whole document once (packages from `vactrol.lock` + cache). Prints diagnostics and console output, then keeps ticking: until interrupted, or for N cycles when `--cycles` is given. |
-| `serve` | `vactrol serve [<file.vact>] [--host H] [--port P] [--bind 127.0.0.1]` | Starts the session socket, optionally evaluating a file first, and prints the connect URL with the token once to stderr. Serves until interrupted. |
+| `repl` | `vactrol repl [--host H] [--audio-in]` | Interactive console over one session (design 14.2, 14.5.10). Sound keeps playing between lines. Completed expressions bind `_1`, `_2`, …; a failed one binds nothing. EOF (Ctrl-D) exits. |
+| `run` | `vactrol run <file.vact> [--host H] [--audio-in] [--cycles N]` | Evaluates the whole document once (packages from `vactrol.lock` + cache). Prints diagnostics and console output, then keeps ticking: until interrupted, or for N cycles when `--cycles` is given. |
+| `serve` | `vactrol serve [<file.vact>] [--host H] [--audio-in] [--port P] [--bind 127.0.0.1]` | Starts the session socket, optionally evaluating a file first, and prints the connect URL with the token once to stderr. Serves until interrupted. |
 | `get` | `vactrol get [<package-path>[@<version>]] [--store dir:<root>]` | With a path: adds or raises the requirement in `./vactrol.toml` (created with only `[deps]` if absent). Then, and also with no path: runs minimal version selection, fetches and verifies every selected package into the cache, and writes `./vactrol.lock`. The default store is git; `--store dir:<root>` uses a local-directory store (`<root>/<path>@<version>/`). |
 | `lsp` | `vactrol lsp [--session <ws-url>]` | Language server over stdio (design 14.3, 14.5.11). With `--session` it attaches to a running `serve` socket for runtime diagnostics. A build without the `lsp` feature prints an error and exits 1. |
 | (none) | `vactrol --version`, `vactrol help` | Prints the version or the usage. |
@@ -45,6 +45,7 @@ version is a git tag `vMAJOR.MINOR.PATCH[-pre]`. With no version given,
 | Flag | Verbs | Type | Default | Description |
 |------|-------|------|---------|-------------|
 | `--host` | repl, run, serve | `native` \| `noop` | `native` | Audio/MIDI host. If the native device fails to open, the CLI warns on stderr and falls back to `noop`. |
+| `--audio-in` | repl, run, serve | switch | off | Request the default f32 input device at the output sample rate. Requires native host; a missing or incompatible input exits 1 rather than falling back to `noop`. Mono is duplicated, stereo is preserved, and wider input uses its first two channels. A bounded callback queue silences underruns and trims stale backlog; independent device clocks can drift. |
 | `--cycles` | run | positive int | (run until interrupted) | Stop after N cycles. With `--host noop` a virtual clock is used, so the run ends immediately and deterministically. |
 | `--port` | serve | u16 | `0` (OS-assigned) | TCP port. The chosen port is printed in the connect URL. |
 | `--bind` | serve | IP address | `127.0.0.1` | Only loopback addresses are accepted; anything else is a usage error. |

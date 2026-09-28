@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::dsp::alloc_probe::armed;
 use crate::dsp::caps::CapabilitySet;
-use crate::dsp::graph::{InstDef, InstId, UGenSpec};
+use crate::dsp::graph::{Edge, InstDef, InstId, UGenSpec};
 use crate::dsp::ring::EVENT_CAPACITY;
 use crate::host::caps::{AudioHost, GraphHandle, SampleData};
 use crate::host::native::audio::{AudioSide, GRAPH_RESOURCE_BASE, MAX_BLOCK};
@@ -47,6 +47,69 @@ fn dc(id: u32) -> InstDef {
         nodes: Box::new([UGenSpec::Const(1.0)]),
         edges: Box::new([]),
         node_params: Box::new([]),
+    }
+}
+
+fn quad_dc(id: u32) -> InstDef {
+    InstDef {
+        id: InstId::new(id),
+        params: Box::new([]),
+        nodes: Box::new([
+            UGenSpec::Const(0.1),
+            UGenSpec::Const(0.2),
+            UGenSpec::Const(0.3),
+            UGenSpec::Const(0.4),
+            UGenSpec::AuxOut,
+            UGenSpec::Out3,
+            UGenSpec::Out4,
+        ]),
+        edges: Box::new([
+            Edge {
+                from: 1,
+                to: 4,
+                port: 0,
+            },
+            Edge {
+                from: 2,
+                to: 5,
+                port: 0,
+            },
+            Edge {
+                from: 3,
+                to: 6,
+                port: 0,
+            },
+        ]),
+        node_params: Box::new([]),
+    }
+}
+
+#[test]
+fn headless_quad_callback_emits_four_distinct_lanes_without_allocation() {
+    let caps = CapabilitySet {
+        max_voices: 8,
+        ..CapabilitySet::native()
+    };
+    let (mut h, mut side) = NativeAudioHost::headless_quad(SR, caps, 64);
+    h.swap_graph(GraphHandle::Inst {
+        id: InstId::new(1),
+        def: Arc::new(quad_dc(1)),
+    });
+    let _ = render(&mut side, 128, 4);
+    assert!(drained(&mut h)
+        .iter()
+        .any(|msg| matches!(msg, HostMsg::Installed { .. })));
+    h.send(AudioEvent::new(h.now(), SlotId::new(1), 1, InstId::new(1)));
+    let out = render(&mut side, 256, 4);
+    for lane in 0..4 {
+        let energy = out
+            .chunks_exact(4)
+            .map(|frame| frame[lane].abs())
+            .sum::<f32>();
+        assert!(energy > 0.01, "lane {lane} is silent");
+    }
+    for pair in out.chunks_exact(4) {
+        assert!((pair[2] - pair[3]).abs() > 0.001);
     }
 }
 

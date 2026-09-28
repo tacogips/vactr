@@ -202,6 +202,16 @@ fn step_events(
                     Ok(())
                 }
                 Value::Nil => Ok(()),
+                // A late name whose value is a list (`let bar [..]`, then
+                // `[bar bar]` or `cat [bar ..]`) is a nested step list, like
+                // the list literal itself; atomic positions keep it whole.
+                Value::List(l) if !atomic_lists => {
+                    let nested = steps_of_list(&l);
+                    let Some(part) = sect(whole, piece) else {
+                        return Ok(());
+                    };
+                    subdivide(&nested, p, whole, part, c, st, out)
+                }
                 other => {
                     let mark = out.len();
                     atomic(other, src, whole, piece, p, st, out)?;

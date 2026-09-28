@@ -9,6 +9,51 @@
 //! `bank`/`table`/`source` header default in `src/ns/insts.rs` /
 //! `src/sched/commit.rs`): all seven templates now render audible output.
 
+mod analog_pair;
+mod braids_cloud;
+mod braids_digital;
+mod braids_filter;
+mod braids_five;
+mod braids_fm;
+mod braids_formant;
+mod braids_noise;
+mod braids_percussion;
+mod braids_physical;
+mod braids_struck;
+mod braids_subsync;
+mod braids_triple;
+mod braids_wave_bank;
+mod braids_wave_line;
+mod chip;
+mod chord_pair;
+mod coverage;
+mod elements;
+mod feedback_metal;
+mod frame_keyframe;
+mod frame_lfo;
+mod grain_pair;
+mod modal;
+mod number_station;
+mod particle;
+mod peak_function;
+mod peak_pulse;
+mod quad_stems;
+mod rings_part;
+mod shape_pair;
+mod six_op_original;
+mod speech_original;
+mod stage_chain;
+mod stage_linked;
+mod stage_segment;
+mod string_choir;
+mod string_machine_pair;
+mod string_voice;
+mod table_terrain_pair;
+mod terrain_pair;
+mod tidal_function;
+mod tidal_poly;
+mod voice_engines;
+
 use std::sync::Arc;
 
 use super::{all_finite, rms, E2e};
@@ -119,6 +164,406 @@ fn a_template_parameter_is_an_ordinary_pattern_control() {
         high_hf > low_hf * 3.0,
         "cutoff changes the output: low cutoff hf={low_hf}, high cutoff hf={high_hf}"
     );
+}
+
+/// A user-authored name absent from the global control table is compiled as
+/// a pattern step, encoded through the installed header schema, and heard.
+#[test]
+fn custom_header_parameter_reaches_audio() {
+    fn render(bias: f32) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval("inst custom-voice pitch-bias: float = 1:\n\tsin-osc {* freq pitch-bias} > * {env-perc 0.001 0.2} > * amp");
+        e.eval(&format!(
+            "s :custom-voice > freq 220 > pitch-bias {bias} > once"
+        ));
+        let output = e.run_for(1.0);
+        assert!(e.faults.is_empty(), "{:?}", e.faults);
+        assert!(e.committed > 0);
+        assert!(all_finite(&output));
+        assert!(rms(&output) > 1.0e-4);
+        output
+    }
+    let low = render(1.0);
+    let high = render(2.0);
+    let delta: f32 = low.iter().zip(&high).map(|(a, b)| (a - b).abs()).sum();
+    assert!(
+        delta / low.len() as f32 > 1.0e-3,
+        "custom control changes audio"
+    );
+}
+
+#[test]
+fn vact_instrument_routes_independent_main_and_aux() {
+    let mut e = E2e::new();
+    e.eval("inst two-out:\n\tsin-osc freq > + {aux-out {tri freq}}");
+    e.eval("s :two-out > freq 220 > pan 0 > once");
+    let (main, aux) = e.run_stereo_for(0.8);
+    assert!(e.faults.is_empty(), "{:?}", e.faults);
+    assert!(e.committed > 0);
+    assert!(all_finite(&main) && all_finite(&aux));
+    assert!(rms(&main) > 1.0e-3 && rms(&aux) > 1.0e-3);
+    let delta = main
+        .iter()
+        .zip(&aux)
+        .map(|(a, b)| (a - b).abs())
+        .sum::<f32>()
+        / main.len() as f32;
+    assert!(delta > 1.0e-2, "main/aux are distinct: {delta}");
+}
+
+#[test]
+fn three_analytic_percussion_instruments_respond_to_every_control() {
+    fn hit(instrument: &str, control: &str) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!("s :{instrument} > {control} > once"));
+        let output = e.run_for(0.8);
+        assert!(
+            e.faults.is_empty(),
+            "{instrument} {control}: {:?}",
+            e.faults
+        );
+        assert!(e.committed > 0, "{instrument} {control}: committed");
+        assert!(all_finite(&output));
+        assert!(rms(&output) > 1.0e-4, "{instrument} {control}: audible");
+        output
+    }
+    for (instrument, baseline, variants) in [
+        (
+            "low-drum",
+            "kick-frequency 60",
+            &[
+                "kick-frequency 110",
+                "kick-punch 0.9",
+                "kick-tone 0.9",
+                "kick-decay 1.0",
+            ][..],
+        ),
+        (
+            "wire-drum",
+            "snare-frequency 180",
+            &[
+                "snare-frequency 280",
+                "snare-tone 0.9",
+                "snare-snappy 0.9",
+                "snare-decay 0.8",
+            ][..],
+        ),
+        (
+            "metal-hat",
+            "hat-frequency 3900",
+            &[
+                "hat-frequency 6000",
+                "hat-tone 0.9",
+                "hat-decay 0.5",
+                "hat-metal 0.1",
+            ][..],
+        ),
+    ] {
+        let base = hit(instrument, baseline);
+        for control in variants {
+            let changed = hit(instrument, control);
+            let difference = base
+                .iter()
+                .zip(&changed)
+                .map(|(a, b)| (a - b).abs())
+                .sum::<f32>()
+                / base.len() as f32;
+            assert!(
+                difference > 1.0e-4,
+                "{instrument} {control}: response {difference}"
+            );
+        }
+    }
+}
+
+#[test]
+fn analytic_percussion_editor_schema_includes_every_header_knob() {
+    let e = E2e::new();
+    let reg = e.reg.borrow();
+    let decls = crate::session::editors::instrument_decls(&reg);
+    for (name, params) in [
+        (
+            "low-drum",
+            &["kick-frequency", "kick-punch", "kick-tone", "kick-decay"][..],
+        ),
+        (
+            "wire-drum",
+            &[
+                "snare-frequency",
+                "snare-tone",
+                "snare-snappy",
+                "snare-decay",
+            ][..],
+        ),
+        (
+            "metal-hat",
+            &["hat-frequency", "hat-tone", "hat-decay", "hat-metal"][..],
+        ),
+    ] {
+        let decl = decls
+            .iter()
+            .find(|d| d.name == name)
+            .expect("installed editor declaration");
+        for param in params {
+            assert!(
+                decl.params
+                    .iter()
+                    .any(|p| p.name == *param && p.ctl.is_some()),
+                "{name} {param}"
+            );
+        }
+    }
+}
+
+#[test]
+fn custom_header_rejects_wrong_value_type() {
+    let mut e = E2e::new();
+    e.eval("inst typed-voice pitch-bias: float = 1:\n\tsin-osc {* freq pitch-bias} > * {env-perc 0.001 0.2} > * amp");
+    e.eval("s :typed-voice > pitch-bias true > once");
+    e.run_for(1.0);
+    assert!(e.faults.iter().any(|f| f.code == FailCode::Type));
+    assert_eq!(e.committed, 0);
+}
+
+#[test]
+fn event_control_capacity_is_an_error() {
+    let mut e = E2e::new();
+    let header = (0..33)
+        .map(|i| format!("p{i}: float = 0"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    e.eval(&format!(
+        "inst wide-voice {header}:\n\tsin-osc freq > * {{env-perc 0.001 0.2}} > * amp"
+    ));
+    let steps = (0..33)
+        .map(|i| format!("p{i} 1"))
+        .collect::<Vec<_>>()
+        .join(" > ");
+    e.eval(&format!("s :wide-voice > {steps} > once"));
+    e.run_for(1.0);
+    assert!(e.faults.iter().any(|f| f.code == FailCode::TooManyControls));
+    assert_eq!(e.committed, 0);
+}
+
+#[test]
+fn undeclared_instrument_control_is_not_silent() {
+    let mut e = E2e::new();
+    e.eval("inst donor extra-knob: float = 1:\n\tsin-osc freq > * {env-perc 0.001 0.2} > * amp");
+    e.eval("inst recipient:\n\tsin-osc freq > * {env-perc 0.001 0.2} > * amp");
+    e.eval("s :recipient > extra-knob 2 > once");
+    e.run_for(1.0);
+    assert!(e
+        .faults
+        .iter()
+        .any(|f| f.code == FailCode::Type && f.message.contains("extra-knob")));
+    assert_eq!(e.committed, 0);
+}
+
+#[test]
+fn declared_type_overrides_global_control_domain() {
+    let mut e = E2e::new();
+    e.eval("inst typed-cutoff cutoff: int = 100:\n\tsin-osc freq > * {env-perc 0.001 0.2} > * amp");
+    e.eval("s :typed-cutoff > cutoff 100.5 > once");
+    e.run_for(1.0);
+    assert!(e
+        .faults
+        .iter()
+        .any(|f| f.code == FailCode::Type && f.message.contains("cutoff")));
+    assert_eq!(e.committed, 0);
+}
+
+/// A pattern control reaches every independent FM percussion port through
+/// evaluation, scheduling, graph installation, and the audio callback.
+#[test]
+fn fm_drum_pattern_controls_change_the_render() {
+    fn hit(control: &str) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!("s :phase-drum > note [:a2] > {control} > once"));
+        let output = e.run_for(1.0);
+        assert!(e.faults.is_empty(), "{control}: {:?}", e.faults);
+        assert!(e.committed > 0, "{control}: event committed");
+        assert!(all_finite(&output));
+        assert!(rms(&output) > 1.0e-3, "{control}: audible");
+        output
+    }
+
+    let base = hit("freq 110");
+    for control in [
+        "freq 240",
+        "fm-amount 9",
+        "pitch-sweep 3",
+        "decay 1.2",
+        "drum-noise 0.8",
+        "drive 0.9",
+    ] {
+        let changed = hit(control);
+        let difference: f32 = base
+            .iter()
+            .zip(&changed)
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>()
+            / base.len() as f32;
+        assert!(difference > 1.0e-4, "{control}: response {difference}");
+    }
+}
+
+/// The three independent percussion components retain their own parameter
+/// sets through the entire `.vact` to audio path. The muted components stay
+/// installed, so this also exercises the full graph and its control table.
+#[test]
+fn fusion_drum_component_controls_change_the_render() {
+    fn hit(mute: &str, control: &str) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(&format!(
+            "s :fusion-drum > note [:a4] > velocity 0.5 > fm-index 4 > fm-keytrack 1 > {mute} > {control} > once"
+        ));
+        let output = e.run_for(1.0);
+        assert!(e.faults.is_empty(), "{control}: {:?}", e.faults);
+        assert!(e.committed > 0, "{control}: committed");
+        assert!(all_finite(&output), "{control}: finite");
+        assert!(rms(&output) > 1.0e-5, "{control}: audible");
+        output
+    }
+
+    for (mute, controls) in [
+        (
+            "noise-level -90 > fm-level -90",
+            &[
+                "fb-delay 5",
+                "fb-feedback 0.9",
+                "fb-decay 1.2",
+                "fb-cutoff 800",
+                "fb-q 12",
+                "fb-velocity 0",
+                "fb-level -30",
+            ][..],
+        ),
+        (
+            "fb-level -90 > fm-level -90",
+            &[
+                "noise-attack 0.08",
+                "noise-hold 0.2",
+                "noise-decay 1.2",
+                "noise-cutoff 500",
+                "noise-q 12",
+                "noise-pitch-env 2400",
+                "noise-velocity 0",
+                "noise-level -30",
+            ][..],
+        ),
+        (
+            "fb-level -90 > noise-level -90",
+            &[
+                "fm-tuning 220",
+                "fm-keytrack -1",
+                "fm-ratio 8",
+                "fm-index 0",
+                "fm-attack 0.08",
+                "fm-hold 0.2",
+                "fm-decay 0.15",
+                "fm-pitch-env 2400",
+                "fm-velocity 0",
+                "fm-level -30",
+            ][..],
+        ),
+    ] {
+        let base = hit(mute, "freq 440");
+        for control in controls {
+            let changed = hit(mute, control);
+            #[allow(clippy::cast_precision_loss)]
+            let difference = base
+                .iter()
+                .zip(&changed)
+                .map(|(a, b)| (a - b).abs())
+                .sum::<f32>()
+                / base.len() as f32;
+            assert!(difference > 1.0e-6, "{control}: response {difference}");
+        }
+    }
+}
+
+#[test]
+fn fusion_drum_accepts_every_component_control_on_one_event() {
+    let mut e = E2e::new();
+    let controls = [
+        "velocity 0.7",
+        "fb-delay 120",
+        "fb-feedback 0.96",
+        "fb-decay 0.3",
+        "fb-cutoff 4000",
+        "fb-q 2",
+        "fb-velocity 0.8",
+        "fb-level -12",
+        "noise-attack 0.01",
+        "noise-hold 0.02",
+        "noise-decay 0.4",
+        "noise-cutoff 3500",
+        "noise-q 2",
+        "noise-pitch-env 600",
+        "noise-velocity 0.8",
+        "noise-level -12",
+        "fm-tuning 220",
+        "fm-keytrack 1",
+        "fm-ratio 2",
+        "fm-index 4",
+        "fm-attack 0.01",
+        "fm-hold 0.02",
+        "fm-decay 0.4",
+        "fm-pitch-env 600",
+        "fm-velocity 0.8",
+        "fm-level -12",
+    ];
+    e.eval(&format!(
+        "s :fusion-drum > note [:a4] > {} > once",
+        controls.join(" > ")
+    ));
+    let output = e.run_for(1.0);
+    assert!(e.faults.is_empty(), "{:?}", e.faults);
+    assert!(e.committed > 0);
+    assert!(all_finite(&output));
+    assert!(rms(&output) > 1.0e-4);
+
+    let manifest = HostManifest::spec_default();
+    let editor = manifest
+        .editor_decl("fusion-drum")
+        .expect("fusion-drum editor");
+    for control in controls {
+        let name = control.split_whitespace().next().expect("control name");
+        assert!(
+            editor.params.iter().any(|p| p.name == name),
+            "{name}: editor parameter"
+        );
+    }
+}
+
+#[test]
+fn fusion_drum_note_velocity_and_gain_reach_audio() {
+    fn render(source: &str) -> Vec<f32> {
+        let mut e = E2e::new();
+        e.eval(source);
+        let output = e.run_for(1.0);
+        assert!(e.faults.is_empty(), "{source}: {:?}", e.faults);
+        assert!(all_finite(&output));
+        output
+    }
+    let base =
+        render("s :fusion-drum > note [:a4] > velocity 0.5 > fm-keytrack 1 > fm-index 4 > once");
+    let variants = [
+        ("velocity", "s :fusion-drum > note [:a4] > velocity 1 > fm-keytrack 1 > fm-index 4 > once"),
+        ("gain", "s :fusion-drum > note [:a4] > velocity 0.5 > fm-keytrack 1 > fm-index 4 > gain 0.2 > once"),
+        ("note", "s :fusion-drum > note [:a3] > velocity 0.5 > fm-keytrack 1 > fm-index 4 > once"),
+    ];
+    for (name, source) in variants {
+        let changed = render(source);
+        #[allow(clippy::cast_precision_loss)]
+        let difference = base
+            .iter()
+            .zip(&changed)
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>()
+            / base.len() as f32;
+        assert!(difference > 1.0e-5, "{name}: response {difference}");
+    }
 }
 
 /// `HostManifest::spec_default` declares an `EditorDecl` (design 13.5) for

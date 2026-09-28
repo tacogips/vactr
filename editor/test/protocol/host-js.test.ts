@@ -41,6 +41,13 @@ describe('worklet/host.js', () => {
     expect(fake.callsOf('sample_put')).toHaveLength(1);
   });
 
+  it('connects an external Web Audio source to the input-enabled node', () => {
+    const { h, node } = host(new FakeCore());
+    const connect = vi.fn();
+    h.connectInput({ connect } as unknown as AudioNode);
+    expect(connect).toHaveBeenCalledWith(node);
+  });
+
   it("init 'session': session exports, and 0x71-0x73 never reach the port", () => {
     const fake = new FakeCore();
     const records: [number, string][] = [];
@@ -90,8 +97,15 @@ describe('worklet/host.js', () => {
     expect(seen).toEqual(['first', 'reply', 'second']);
   });
 
-  function stubPlatform(fake: FakeCore): { ctxs: unknown[] } {
-    const ctxs: unknown[] = [];
+  function stubPlatform(fake: FakeCore): { connections: Array<[string, string, number, number]>; nodeOptions: Array<Record<string, unknown>> } {
+    const connections: Array<[string, string, number, number]> = [];
+    const nodeOptions: Array<Record<string, unknown>> = [];
+    const part = (name: string) => ({
+      name,
+      connect(to: { name: string }, from = 0, input = 0) {
+        connections.push([name, to.name, from, input]);
+      },
+    });
     vi.stubGlobal('fetch', async () => new Response(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0])));
     vi.spyOn(WebAssembly, 'instantiate').mockResolvedValue({
       instance: { exports: fake.exports as unknown as WebAssembly.Exports },
@@ -101,10 +115,15 @@ describe('worklet/host.js', () => {
       'AudioContext',
       class {
         sampleRate = 48000;
-        destination = {};
+        destination = part('destination');
         audioWorklet = { addModule: async () => {} };
-        constructor() {
-          ctxs.push(this);
+        createChannelSplitter(channels: number) {
+          expect(channels).toBe(4);
+          return part('splitter');
+        }
+        createChannelMerger(channels: number) {
+          expect(channels).toBe(2);
+          return part('merger');
         }
       },
     );
@@ -112,10 +131,15 @@ describe('worklet/host.js', () => {
       'AudioWorkletNode',
       class {
         port = { postMessage: () => {}, onmessage: null };
-        connect() {}
+        constructor(_ctx: unknown, _name: string, options: Record<string, unknown>) {
+          nodeOptions.push(options);
+        }
+        connect(to: { name: string }, from = 0, input = 0) {
+          connections.push(['node', to.name, from, input]);
+        }
       },
     );
-    return { ctxs };
+    return { connections, nodeOptions };
   }
 
   it('startHost calls main_init by default', async () => {
@@ -132,6 +156,26 @@ describe('worklet/host.js', () => {
     await startHost({ wasmUrl: 'x.wasm', processorUrl: 'p.js', init: 'session', arenaBytes: 1024 });
     expect(fake.callsOf('session_init')[0]?.args).toEqual([48000, 1024]);
     expect(fake.callsOf('main_init')).toHaveLength(0);
+  });
+
+  it('routes opt-in quad worklet outputs through a splitter while session init stays available', async () => {
+    const fake = new FakeCore();
+    const platform = stubPlatform(fake);
+    const h = await startHost({ wasmUrl: 'x.wasm', processorUrl: 'p.js', init: 'session', outputChannels: 4 });
+    expect(fake.callsOf('session_init')[0]?.args).toEqual([48000, 0]);
+    expect(fake.callsOf('main_init')).toHaveLength(0);
+    expect(platform.nodeOptions[0]?.outputChannelCount).toEqual([4]);
+    expect(platform.nodeOptions[0]?.numberOfInputs).toBe(1);
+    expect(platform.nodeOptions[0]?.channelCount).toBe(2);
+    expect(platform.nodeOptions[0]?.processorOptions).toMatchObject({ outputChannels: 4 });
+    expect(h.quadSplitter).not.toBeNull();
+    expect(platform.connections).toEqual([
+      ['node', 'splitter', 0, 0],
+      ['splitter', 'merger', 0, 0],
+      ['splitter', 'merger', 1, 1],
+      ['merger', 'destination', 0, 0],
+    ]);
+    expect(platform.connections.some(([from, , output]) => from === 'splitter' && output >= 2)).toBe(false);
   });
 
   it('keeps the main-mode eval helper working', () => {

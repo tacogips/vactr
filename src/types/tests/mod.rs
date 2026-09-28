@@ -12,6 +12,7 @@ use crate::types::ty::CheckEnv;
 
 mod analysis;
 mod check_basic;
+mod chords;
 mod deps;
 mod diags;
 mod inst;

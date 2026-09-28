@@ -18,7 +18,9 @@
 //! not by `name` alone.
 
 use crate::dsp::meta::{self, Curve, EditorDecl, EditorKind, ParamMeta, Unit};
+use crate::ns::insts::InstRegistry;
 use crate::session::protocol::{WireEditorDecl, WireParamMeta};
+use crate::value::intern::name_of_kw;
 
 fn kind_name(k: EditorKind) -> &'static str {
     match k {
@@ -142,4 +144,53 @@ pub fn editor_decls() -> Vec<WireEditorDecl> {
         out.push(pattern_decl(name, "lfo-shape", Vec::new()));
     }
     out
+}
+
+/// Editor declarations for installed user instruments. Their header schema
+/// is the same schema the scheduler uses to encode event controls.
+#[must_use]
+pub fn instrument_decls(registry: &InstRegistry) -> Vec<WireEditorDecl> {
+    registry
+        .entries()
+        .filter(|entry| {
+            meta::decl_for(&name_of_kw(entry.name)).is_none()
+                || entry
+                    .params
+                    .iter()
+                    .any(|param| crate::dsp::controls::row(&name_of_kw(param.name)).is_none())
+        })
+        .map(|entry| {
+            let name = name_of_kw(entry.name).to_string();
+            let mut params: Vec<WireParamMeta> = entry
+                .params
+                .iter()
+                .map(|param| WireParamMeta {
+                    name: name_of_kw(param.name).to_string(),
+                    ctl: Some(param.ctl.get()),
+                    range: param
+                        .range
+                        .map_or([f32::MIN, f32::MAX], |(lo, hi)| [lo, hi]),
+                    curve: "linear".to_string(),
+                    unit: "none".to_string(),
+                    group: 0,
+                })
+                .collect();
+            if name == "stage-linked-voice" {
+                params.push(WireParamMeta {
+                    name: "segments".to_string(),
+                    ctl: None,
+                    range: [1.0, 36.0],
+                    curve: "immutable-list".to_string(),
+                    unit: "stride4".to_string(),
+                    group: 1,
+                });
+            }
+            WireEditorDecl {
+                name,
+                kind: "scalar".to_string(),
+                multiband: None,
+                params,
+            }
+        })
+        .collect()
 }

@@ -19,7 +19,7 @@ use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellRead;
 use crate::dsp::effects::prim::DelayLine;
 use crate::dsp::effects::{self, FxCtx, FxUnit, MAX_FX_PARAMS};
-use crate::dsp::graph::{BusDef, BusId, EffectKind};
+use crate::dsp::graph::{AudioPortShape, BusDef, BusId, EffectKind};
 use crate::dsp::ugen::BuildError;
 use crate::host::wire::Ctl;
 use crate::sched::slots::CtlId;
@@ -51,6 +51,14 @@ impl Default for BusTemplate {
 }
 
 impl BusTemplate {
+    /// A bus chain receives and emits independent left/right channels.
+    /// The shape is derived from the graph kind on both native and browser
+    /// tiers; no extra serialized flag can disagree with the effect kind.
+    #[must_use]
+    pub const fn port_shape(&self) -> AudioPortShape {
+        AudioPortShape::STEREO
+    }
+
     /// An empty chain.
     #[must_use]
     pub const fn new() -> Self {
@@ -351,6 +359,44 @@ impl BusGraph {
         let Some(free) = self.slots.iter().position(|s| s.state == SlotState::Free) else {
             return false;
         };
+        // Effects with fixed, required state reject a short region before
+        // retiring the live chain. Capture effects also require capture
+        // allowance; ordinary effects keep their clamped-memory behavior.
+        let total = self.slots[free].mem.len();
+        let room = effects::mem_len(EffectKind::Room, sr, caps).min(total / 4);
+        let mut remaining = total - room;
+        for kind in t.kinds.iter().take(t.n.min(MAX_CHAIN)) {
+            let want = effects::mem_len(*kind, sr, caps);
+            let capture_effect = matches!(
+                *kind,
+                EffectKind::TextureGrain
+                    | EffectKind::TextureStretch
+                    | EffectKind::TextureLoop
+                    | EffectKind::TextureSpectral
+            );
+            if capture_effect && caps.max_capture_seconds < effects::texture::CAPTURE_SECONDS {
+                return false;
+            }
+            if (capture_effect
+                || matches!(
+                    *kind,
+                    EffectKind::CrossMod
+                        | EffectKind::ResonantBank
+                        | EffectKind::ElementsBank
+                        | EffectKind::StreamEnvelope
+                        | EffectKind::StreamVactrol
+                        | EffectKind::StreamFollower
+                        | EffectKind::StreamCompressor
+                        | EffectKind::StreamFilter
+                        | EffectKind::StreamLorenz
+                        | EffectKind::ShiftPair
+                ))
+                && want > remaining
+            {
+                return false;
+            }
+            remaining = remaining.saturating_sub(want);
+        }
         for s in self.slots.iter_mut() {
             let same = if master {
                 s.master

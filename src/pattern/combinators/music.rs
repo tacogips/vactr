@@ -37,14 +37,7 @@ const SCALES: &[(&str, &[i64])] = &[
     ("chromatic", &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
 ];
 
-/// Chord qualities (design 7.1.4, Decided 2026-09-25): letter-first
-/// keywords. Adding a quality means adding a row.
-pub const CHORD_QUALITIES: &[(&str, &[i64])] = &[
-    ("maj7", &[0, 4, 7, 11]),
-    ("m7", &[0, 3, 7, 10]),
-    ("dom7", &[0, 4, 7, 10]),
-    ("sus4", &[0, 5, 7]),
-];
+pub use crate::types::chords::CHORD_QUALITIES;
 
 fn type_err(m: impl Into<String>) -> Failure {
     Failure::new(FailCode::Type, m)
@@ -110,10 +103,7 @@ pub fn chord_notes(v: &Value) -> Result<Vec<i64>, Failure> {
         return Err(type_err("a chord quality is a keyword"));
     };
     let qname = name_of_kw(*qk);
-    let intervals = CHORD_QUALITIES
-        .iter()
-        .find(|(n, _)| **n == *qname)
-        .map(|(_, s)| *s)
+    let intervals = crate::types::chords::chord_intervals(&qname)
         .ok_or_else(|| type_err(format!("unknown chord quality :{qname}")))?;
     intervals
         .iter()

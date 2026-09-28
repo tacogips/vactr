@@ -4,6 +4,7 @@
 //! host manifest and the advisory dependency edges.
 
 pub mod check;
+pub mod chords;
 pub mod deps;
 pub mod diag;
 pub mod infer;

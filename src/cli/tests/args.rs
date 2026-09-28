@@ -53,6 +53,41 @@ fn repl_parses_with_and_without_host() {
 }
 
 #[test]
+fn audio_input_is_opt_in_and_requires_a_native_host() {
+    assert_eq!(
+        parse(&args(&["repl", "--audio-in"])),
+        Ok(Command::Repl {
+            host: HostChoice::NativeInput
+        })
+    );
+    assert_eq!(
+        parse(&args(&["run", "a.vact", "--audio-in"])),
+        Ok(Command::Run {
+            file: PathBuf::from("a.vact"),
+            host: HostChoice::NativeInput,
+            cycles: None
+        })
+    );
+    assert_eq!(
+        parse(&args(&["serve", "--audio-in"])),
+        Ok(Command::Serve {
+            file: None,
+            host: HostChoice::NativeInput,
+            port: 0,
+            bind: IpAddr::V4(Ipv4Addr::LOCALHOST)
+        })
+    );
+    for verb in ["repl", "run", "serve"] {
+        let mut invocation = vec![verb];
+        if verb == "run" {
+            invocation.push("a.vact");
+        }
+        invocation.extend(["--host", "noop", "--audio-in"]);
+        assert!(parse(&args(&invocation)).is_err(), "{verb}");
+    }
+}
+
+#[test]
 fn repl_rejects_an_unknown_flag() {
     assert!(parse(&args(&["repl", "--bogus"])).is_err());
 }

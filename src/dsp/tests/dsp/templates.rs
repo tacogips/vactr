@@ -1,5 +1,5 @@
 //! Headless renders of every synthesis model (design 12.4, design-music 4
-//! and 6) as hand-built `InstDef`s shaped like the seven prelude
+//! and 6) as hand-built `InstDef`s shaped like the prelude
 //! templates: `sampler`, `analog`, `fm`, `pd`, `additive`, `wavetable`,
 //! `granular`. Each renders non-silent, finite audio with zero callback
 //! allocation, on both tiers (the browser tier through the install byte
@@ -36,7 +36,7 @@ fn row(name: &str) -> CtlId {
     crate::dsp::controls::row(name).unwrap().ctl
 }
 
-/// The seven models, by template name.
+/// The models, by template name.
 fn models() -> Vec<(&'static str, InstDef)> {
     use UGenSpec as U;
     vec![
@@ -86,6 +86,58 @@ fn models() -> Vec<(&'static str, InstDef)> {
                     (0, row("ratio"), Ctl::Const(14.0)),
                     (0, row("index"), Ctl::Const(2.0)),
                 ],
+            ),
+        ),
+        ("phase-drum", def(vec![U::FmDrum], vec![], vec![])),
+        (
+            "feedback-metal-drum",
+            def(vec![U::FeedbackMetal], vec![], vec![]),
+        ),
+        (
+            "low-drum",
+            def(
+                vec![U::Const(60.0), U::Const(0.0), U::AnalogPercussion],
+                vec![e(0, 2, 0), e(1, 2, 6)],
+                vec![],
+            ),
+        ),
+        (
+            "wire-drum",
+            def(
+                vec![U::Const(180.0), U::Const(1.0), U::AnalogPercussion],
+                vec![e(0, 2, 0), e(1, 2, 6)],
+                vec![],
+            ),
+        ),
+        (
+            "metal-hat",
+            def(
+                vec![U::Const(3900.0), U::Const(2.0), U::AnalogPercussion],
+                vec![e(0, 2, 0), e(1, 2, 6)],
+                vec![],
+            ),
+        ),
+        (
+            "fusion-drum",
+            def(
+                vec![
+                    U::FeedbackDrum,
+                    U::NoiseDrum,
+                    U::Add,
+                    U::SineDrum,
+                    U::Add,
+                    U::Param(ctl::AMP),
+                    U::Mul,
+                ],
+                vec![
+                    e(0, 2, 0),
+                    e(1, 2, 1),
+                    e(2, 4, 0),
+                    e(3, 4, 1),
+                    e(4, 6, 0),
+                    e(5, 6, 1),
+                ],
+                vec![],
             ),
         ),
         (

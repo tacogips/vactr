@@ -14,6 +14,7 @@
 
 mod beep;
 mod buses;
+mod live_input;
 mod regions;
 mod sched_gaps;
 mod templates;
@@ -156,6 +157,28 @@ impl E2e {
             rendered += BLOCK;
         }
         left
+    }
+
+    /// Renders both output channels, retaining the callback allocation probe.
+    pub(super) fn run_stereo_for(&mut self, seconds: f64) -> (Vec<f32>, Vec<f32>) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let frames_total = (seconds * f64::from(SR)).round() as usize;
+        let mut left = Vec::with_capacity(frames_total);
+        let mut right = Vec::with_capacity(frames_total);
+        let mut rendered = 0usize;
+        while rendered < frames_total {
+            let now = self.clock.now();
+            let rep = self.rt.tick(&mut self.ev, now);
+            self.committed += rep.committed;
+            self.faults.extend(rep.faults);
+            let mut buf = vec![0.0f32; BLOCK * 2];
+            let (_, allocs) = armed(|| self.side.render(&mut buf, 2));
+            assert_eq!(allocs, 0, "the audio callback allocated");
+            left.extend(buf.chunks_exact(2).map(|f| f[0]));
+            right.extend(buf.chunks_exact(2).map(|f| f[1]));
+            rendered += BLOCK;
+        }
+        (left, right)
     }
 }
 

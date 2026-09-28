@@ -21,7 +21,13 @@ pub fn main(file: &Path, host: HostChoice, cycles: Option<u64>, cwd: &Path) -> i
             return 1;
         }
     };
-    let (mut session, clock) = build_session(host, cwd);
+    let (mut session, clock) = match build_session(host, cwd) {
+        Ok(session) => session,
+        Err(error) => {
+            eprintln!("vactrol: {error}");
+            return 1;
+        }
+    };
     let file_name = file.to_string_lossy().into_owned();
     let (outcome, _batches) = session.eval(&text, &file_name, 1, 1, None);
     let mut out = std::io::stdout();

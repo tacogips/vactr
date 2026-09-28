@@ -5,6 +5,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::compile::compiler::binder_name;
+use crate::dsp::controls::ScalarType;
 use crate::ns::namespace::{FormGen, SlotKind, VarSlotRef};
 use crate::reader::node::{Atom, Node, NodeKind, Op as NodeOp};
 use crate::reader::span::Span;
@@ -24,6 +25,8 @@ pub struct Arity {
     /// Every parameter name in header order (positional ones may also be
     /// passed by name, like struct fields).
     pub names: Box<[KwId]>,
+    /// Scalar annotations in the same order as `names`.
+    pub scalar_types: Box<[ScalarType]>,
     /// Keyword parameters, after the positional ones.
     pub keys: u8,
 }
@@ -35,6 +38,7 @@ impl Arity {
         Arity {
             fixed,
             names: Box::new([]),
+            scalar_types: Box::new([]),
             keys: 0,
         }
     }

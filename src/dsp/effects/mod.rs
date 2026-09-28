@@ -18,17 +18,29 @@
 
 pub mod analyzer;
 pub mod catalog;
+pub mod cross_mod;
 pub mod delay;
+pub mod dynamic_control;
 pub mod dynamics;
+pub mod elements_bank;
 pub mod eq;
 pub mod lofi;
 pub mod modulation;
 pub mod prim;
+pub mod resonant_bank;
 pub mod resonator;
 pub mod restoration;
 pub mod reverb;
 pub mod saturation;
+pub mod shift_pair;
 pub mod spatial;
+pub mod stream_cv;
+pub mod stream_dynamics;
+pub mod texture;
+pub mod texture_loop;
+mod texture_quality;
+pub mod texture_spectral;
+pub mod texture_stretch;
 pub mod utility;
 
 use crate::dsp::arena::SampleStore;
@@ -44,7 +56,7 @@ use self::prim::{Biquad, DelayLine, Follower, Lfo, OnePole, Rng};
 /// The first effect-local parameter id.
 pub const EFFECT_PARAM_BASE: u16 = 0x4000;
 /// The most parameters one effect kind has.
-pub const MAX_FX_PARAMS: usize = 16;
+pub const MAX_FX_PARAMS: usize = 28;
 
 /// One named effect parameter.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -157,6 +169,17 @@ enum Group {
     Utility,
     Granular,
     Analyzer,
+    CrossMod,
+    ResonantBank,
+    ElementsBank,
+    Texture,
+    TextureStretch,
+    TextureLoop,
+    TextureSpectral,
+    StreamControl,
+    StreamDynamics,
+    StreamCv,
+    ShiftPair,
 }
 
 fn group(kind: EffectKind) -> Group {
@@ -246,6 +269,17 @@ fn group(kind: EffectKind) -> Group {
         | K::ChannelDivider
         | K::FirCrossover => Group::Utility,
         K::Granulate => Group::Granular,
+        K::CrossMod => Group::CrossMod,
+        K::ResonantBank => Group::ResonantBank,
+        K::ElementsBank => Group::ElementsBank,
+        K::TextureGrain => Group::Texture,
+        K::TextureStretch => Group::TextureStretch,
+        K::TextureLoop => Group::TextureLoop,
+        K::TextureSpectral => Group::TextureSpectral,
+        K::StreamEnvelope | K::StreamVactrol => Group::StreamControl,
+        K::StreamFollower | K::StreamCompressor => Group::StreamDynamics,
+        K::StreamFilter | K::StreamLorenz => Group::StreamCv,
+        K::ShiftPair => Group::ShiftPair,
         K::Analyzer(_) => Group::Analyzer,
     }
 }
@@ -267,6 +301,23 @@ pub fn params(kind: EffectKind) -> &'static [ParamDef] {
         Group::Utility => utility::params(kind),
         Group::Granular => crate::dsp::granular::PARAMS,
         Group::Analyzer => analyzer::params(kind),
+        Group::CrossMod => cross_mod::PARAMS,
+        Group::ResonantBank => resonant_bank::PARAMS,
+        Group::ElementsBank => elements_bank::PARAMS,
+        Group::Texture => texture::PARAMS,
+        Group::TextureStretch => texture::PARAMS,
+        Group::TextureLoop => texture::PARAMS,
+        Group::TextureSpectral => texture::PARAMS,
+        Group::StreamControl => dynamic_control::PARAMS,
+        Group::StreamDynamics => match kind {
+            EffectKind::StreamFollower => stream_dynamics::FOLLOWER_PARAMS,
+            _ => stream_dynamics::COMPRESSOR_PARAMS,
+        },
+        Group::StreamCv => match kind {
+            EffectKind::StreamFilter => stream_cv::FILTER_PARAMS,
+            _ => stream_cv::LORENZ_PARAMS,
+        },
+        Group::ShiftPair => shift_pair::PARAMS,
     }
 }
 
@@ -288,6 +339,17 @@ pub fn mem_len(kind: EffectKind, sr: f32, caps: &CapabilitySet) -> usize {
         Group::Utility => utility::mem_len(kind, sr),
         Group::Granular => crate::dsp::granular::effect_mem_len(sr, caps),
         Group::Analyzer => analyzer::mem_len(kind, sr),
+        Group::CrossMod => cross_mod::mem_len(sr),
+        Group::ResonantBank => resonant_bank::mem_len(sr),
+        Group::ElementsBank => elements_bank::mem_len(sr),
+        Group::Texture => texture::mem_len(sr),
+        Group::TextureStretch => texture_stretch::mem_len(sr),
+        Group::TextureLoop => texture_loop::mem_len(sr),
+        Group::TextureSpectral => texture_spectral::mem_len(sr),
+        Group::StreamControl => dynamic_control::MEM_LEN,
+        Group::StreamDynamics => stream_dynamics::MEM_LEN,
+        Group::StreamCv => stream_cv::MEM_LEN,
+        Group::ShiftPair => shift_pair::MEM_LEN,
     }
 }
 
@@ -308,6 +370,17 @@ pub fn init(kind: EffectKind, st: &mut FxState, mem: &mut [f32], sr: f32, caps: 
         Group::Utility => utility::init(kind, st, n, sr),
         Group::Granular => crate::dsp::granular::effect_init(st, mem, sr, caps),
         Group::Analyzer => analyzer::init(kind, st, n, sr),
+        Group::CrossMod => cross_mod::init(st, mem, sr),
+        Group::ResonantBank => resonant_bank::init(st, mem),
+        Group::ElementsBank => elements_bank::init(st, mem),
+        Group::Texture => texture::init(st, mem),
+        Group::TextureStretch => texture_stretch::init(st, mem),
+        Group::TextureLoop => texture_loop::init(st, mem),
+        Group::TextureSpectral => texture_spectral::init(st, mem),
+        Group::StreamControl => dynamic_control::init(st, mem),
+        Group::StreamDynamics => stream_dynamics::init(st, mem),
+        Group::StreamCv => stream_cv::init(kind, st, mem),
+        Group::ShiftPair => shift_pair::init(st, mem),
     }
 }
 
@@ -336,6 +409,17 @@ pub fn process(
         Group::Utility => utility::process(kind, p, st, mem, l, r, ctx),
         Group::Granular => crate::dsp::granular::effect_process(p, st, mem, l, r, ctx),
         Group::Analyzer => analyzer::process(kind, p, st, mem, l, r, ctx),
+        Group::CrossMod => cross_mod::process(p, st, mem, l, r, ctx),
+        Group::ResonantBank => resonant_bank::process(p, st, mem, l, r, ctx),
+        Group::ElementsBank => elements_bank::process(p, st, mem, l, r, ctx),
+        Group::Texture => texture::process(p, st, mem, l, r, ctx),
+        Group::TextureStretch => texture_stretch::process(p, st, mem, l, r, ctx),
+        Group::TextureLoop => texture_loop::process(p, st, mem, l, r, ctx),
+        Group::TextureSpectral => texture_spectral::process(p, st, mem, l, r, ctx),
+        Group::StreamControl => dynamic_control::process(kind, p, st, mem, l, r, ctx),
+        Group::StreamDynamics => stream_dynamics::process(kind, p, st, mem, l, r, ctx),
+        Group::StreamCv => stream_cv::process(kind, p, st, mem, l, r, ctx),
+        Group::ShiftPair => shift_pair::process(p, st, mem, l, r, ctx),
     }
 }
 
@@ -502,6 +586,13 @@ impl FxUnit {
         }
         let frames = l.len().min(r.len());
         let mix = mix_index(self.kind).map(|i| self.vals[i].clamp(0.0, 1.0));
+        if texture_quality::mono(self.kind, &self.vals[..n]) {
+            for (left, right) in l[..frames].iter_mut().zip(r[..frames].iter_mut()) {
+                let mid = (*left + *right) * 0.5;
+                *left = mid;
+                *right = mid;
+            }
+        }
         if mix == Some(0.0) || frames == 0 {
             return;
         }

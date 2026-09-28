@@ -172,3 +172,73 @@ fn the_fft_finds_a_sines_bin() {
     assert_eq!(peak, 8);
     assert!((mags[8] - 128.0).abs() < 1.0e-2);
 }
+
+#[test]
+fn inverse_fft_round_trips_real_audio_without_scratch_allocation() {
+    let fft = Fft::new(512);
+    let mut re = [0.0; 512];
+    let mut im = [0.0; 512];
+    for (i, sample) in re.iter_mut().enumerate() {
+        *sample = (i as f32 * 0.137).sin() * 0.4 + (i as f32 * 0.071).cos() * 0.2;
+    }
+    let original = re;
+    fft.forward(&mut re, &mut im);
+    fft.inverse(&mut re, &mut im);
+    for (want, (real, imaginary)) in original.iter().zip(re.iter().zip(im.iter())) {
+        assert!((want - real).abs() < 1.0e-4);
+        assert!(imaginary.abs() < 1.0e-4);
+    }
+}
+
+#[test]
+fn complex_fft_round_trips_impulses_and_mixed_signals_at_multiple_sizes() {
+    for n in [2, 8, 64, 512] {
+        let fft = Fft::new(n);
+        for impulse in [true, false] {
+            let mut re = vec![0.0; n];
+            let mut im = vec![0.0; n];
+            if impulse {
+                re[n / 3] = 1.0;
+                im[n / 3] = -0.25;
+            } else {
+                for i in 0..n {
+                    #[allow(clippy::cast_precision_loss)]
+                    let x = i as f32;
+                    re[i] = (x * 0.137).sin() * 0.4 + (x * 0.071).cos() * 0.2;
+                    im[i] = (x * 0.193).cos() * 0.3 - (x * 0.047).sin() * 0.1;
+                }
+            }
+            let original_re = re.clone();
+            let original_im = im.clone();
+            fft.forward(&mut re, &mut im);
+            if impulse {
+                let want = 1.0625_f32.sqrt();
+                for (&real, &imaginary) in re.iter().zip(&im) {
+                    assert!(((real * real + imaginary * imaginary).sqrt() - want).abs() < 1.0e-4);
+                }
+            }
+            fft.inverse(&mut re, &mut im);
+            for i in 0..n {
+                assert!((re[i] - original_re[i]).abs() < 1.0e-4, "real n={n} i={i}");
+                assert!((im[i] - original_im[i]).abs() < 1.0e-4, "imag n={n} i={i}");
+            }
+        }
+    }
+}
+
+#[test]
+fn undersized_complex_fft_buffers_are_left_unchanged() {
+    let fft = Fft::new(8);
+    for (real_len, imag_len) in [(7, 8), (8, 7)] {
+        let mut re = vec![0.25; real_len];
+        let mut im = vec![-0.5; imag_len];
+        let expected_re = re.clone();
+        let expected_im = im.clone();
+        fft.forward(&mut re, &mut im);
+        assert_eq!(re, expected_re);
+        assert_eq!(im, expected_im);
+        fft.inverse(&mut re, &mut im);
+        assert_eq!(re, expected_re);
+        assert_eq!(im, expected_im);
+    }
+}

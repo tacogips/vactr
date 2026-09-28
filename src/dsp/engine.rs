@@ -68,11 +68,16 @@ pub struct Engine {
     deferred: [(Option<AudioEvent>, Option<VoiceTag>); MAX_DEFERRED_STARTS],
     bufs: Box<[f32]>,
     vout: Box<[f32]>,
+    vout_r: Box<[f32]>,
+    vout_3: Box<[f32]>,
+    vout_4: Box<[f32]>,
     tmp: Box<[f32]>,
     dry: Box<[f32]>,
     fx_scratch: Box<[f32]>,
     mix_l: Box<[f32]>,
     mix_r: Box<[f32]>,
+    mix_3: Box<[f32]>,
+    mix_4: Box<[f32]>,
     analysis: Box<[f32]>,
     shadow: Box<[f32]>,
     publish_at: usize,
@@ -96,6 +101,20 @@ impl Engine {
     /// Allocates everything the callback will ever use.
     #[must_use]
     pub fn with_config(cfg: EngineConfig) -> Self {
+        assert!(cfg.validate().is_ok(), "unsupported DSP host configuration");
+        Self::allocate(cfg)
+    }
+
+    /// Validates a host configuration before allocating callback state.
+    ///
+    /// # Errors
+    /// An unsupported rate, block size or state budget.
+    pub fn try_with_config(cfg: EngineConfig) -> Result<Self, crate::dsp::ring::ConfigError> {
+        cfg.validate()?;
+        Ok(Self::allocate(cfg))
+    }
+
+    fn allocate(cfg: EngineConfig) -> Self {
         let sr = cfg.sample_rate;
         let mb = cfg.max_block;
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -129,11 +148,16 @@ impl Engine {
             deferred: [(None, None); MAX_DEFERRED_STARTS],
             bufs: vec![0.0; NODE_CAP * mb].into_boxed_slice(),
             vout: vec![0.0; mb].into_boxed_slice(),
+            vout_r: vec![0.0; mb].into_boxed_slice(),
+            vout_3: vec![0.0; mb].into_boxed_slice(),
+            vout_4: vec![0.0; mb].into_boxed_slice(),
             tmp: vec![0.0; 2 * mb].into_boxed_slice(),
             dry: vec![0.0; 2 * mb].into_boxed_slice(),
             fx_scratch: vec![0.0; (4 * mb).max(4 * FFT_SIZE)].into_boxed_slice(),
             mix_l: vec![0.0; mb].into_boxed_slice(),
             mix_r: vec![0.0; mb].into_boxed_slice(),
+            mix_3: vec![0.0; mb].into_boxed_slice(),
+            mix_4: vec![0.0; mb].into_boxed_slice(),
             analysis: vec![0.0; cfg.analysis_cells].into_boxed_slice(),
             shadow: vec![0.0; cfg.analysis_cells].into_boxed_slice(),
             publish_at: 0,
@@ -224,6 +248,11 @@ impl Engine {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn has_template(&self, id: crate::dsp::graph::InstId) -> bool {
+        self.templates.live(id).is_some()
+    }
+
     /// Takes the oldest install fault (the host reports its diagnostic).
     pub fn pop_fault(&mut self) -> Option<Fault> {
         let i = self.faults.iter().position(Option::is_some)?;
@@ -246,12 +275,78 @@ impl Engine {
         out: &mut [f32],
         frames: usize,
     ) {
-        let frames = frames.min(out.len() / 2);
+        self.process_channels(io, None, out, frames, 2);
+    }
+
+    /// Renders stereo output while adding exact interleaved L/R input to the
+    /// master bus before its effects. Invalid input is silenced and faulted.
+    pub fn process_with_input<C: CellStore, S: ControlSource>(
+        &mut self,
+        io: &mut EngineIo<'_, C, S>,
+        input_interleaved: &[f32],
+        out: &mut [f32],
+        frames: usize,
+    ) {
+        self.process_channels(io, Some(input_interleaved), out, frames, 2);
+    }
+
+    /// Renders four interleaved output lanes. Channels one/two pass through
+    /// the stereo bus/master; channels three/four are direct post-voice stems.
+    pub fn process_four<C: CellStore, S: ControlSource>(
+        &mut self,
+        io: &mut EngineIo<'_, C, S>,
+        out: &mut [f32],
+        frames: usize,
+    ) {
+        self.process_channels(io, None, out, frames, 4);
+    }
+
+    /// Renders stereo master plus two direct stems with stereo input routed
+    /// only through the master bus, never into direct stems.
+    pub fn process_four_with_input<C: CellStore, S: ControlSource>(
+        &mut self,
+        io: &mut EngineIo<'_, C, S>,
+        input_interleaved: &[f32],
+        out: &mut [f32],
+        frames: usize,
+    ) {
+        self.process_channels(io, Some(input_interleaved), out, frames, 4);
+    }
+
+    fn process_channels<C: CellStore, S: ControlSource>(
+        &mut self,
+        io: &mut EngineIo<'_, C, S>,
+        input: Option<&[f32]>,
+        out: &mut [f32],
+        frames: usize,
+        channels: usize,
+    ) {
+        if usize::from(self.cfg.output_channels) != channels {
+            out.fill(0.0);
+            self.fault(FaultCode::OutputChannels, 0);
+            return;
+        }
+        let frames = frames.min(out.len() / channels);
+        let input = input.and_then(|samples| {
+            if samples.len() == frames * 2 && samples.iter().all(|v| v.is_finite()) {
+                Some(samples)
+            } else {
+                self.fault(FaultCode::InputBuffer, 0);
+                None
+            }
+        });
         self.controls(io);
         let mut done = 0;
         while done < frames {
             let n = (frames - done).min(self.cfg.max_block);
-            self.block(io, &mut out[2 * done..2 * (done + n)], n);
+            let input_block = input.map(|samples| &samples[2 * done..2 * (done + n)]);
+            self.block(
+                io,
+                input_block,
+                &mut out[channels * done..channels * (done + n)],
+                n,
+                channels,
+            );
             done += n;
         }
         self.retire(io);
@@ -395,6 +490,16 @@ impl Engine {
     ) -> Result<(), FaultCode> {
         match decode_graph(bytes, &mut self.raw, &mut self.bus_tmp)? {
             GraphKind::Inst => {
+                if self.cfg.output_channels == 2
+                    && self.raw.nodes[..self.raw.n_nodes].iter().any(|n| {
+                        matches!(
+                            n,
+                            crate::dsp::ugen::Node::Out3 | crate::dsp::ugen::Node::Out4
+                        )
+                    })
+                {
+                    return Err(FaultCode::OutputChannels);
+                }
                 let env = self.build_env();
                 self.templates.build(&self.raw, &env, id, gen)
             }
@@ -420,10 +525,17 @@ impl Engine {
                 resource,
                 gen,
                 template,
-            } => match self.templates.adopt(template, resource, gen) {
-                Ok(()) => (resource, gen, true),
-                Err(t) => {
-                    push_garbage(garbage, Garbage::Template(t));
+            } => match self.cfg.output_channels == 4 || !template.has_quad {
+                true => match self.templates.adopt(template, resource, gen) {
+                    Ok(()) => (resource, gen, true),
+                    Err(t) => {
+                        push_garbage(garbage, Garbage::Template(t));
+                        (resource, gen, false)
+                    }
+                },
+                false => {
+                    push_garbage(garbage, Garbage::Template(template));
+                    self.fault(FaultCode::OutputChannels, resource);
                     (resource, gen, false)
                 }
             },
@@ -526,8 +638,10 @@ impl Engine {
     fn block<C: CellStore, S: ControlSource>(
         &mut self,
         io: &mut EngineIo<'_, C, S>,
+        input: Option<&[f32]>,
         out: &mut [f32],
         n: usize,
+        channels: usize,
     ) {
         for i in 0..MAX_DEFERRED_STARTS {
             if self.pool.free().is_none() {
@@ -571,12 +685,27 @@ impl Engine {
             };
             self.start(&ev, None, delay, io.cells);
         }
-        self.render(io.cells, out, n);
+        self.render(io.cells, input, out, n, channels);
         self.frame += n as u64;
     }
 
-    fn render<C: CellRead + ?Sized>(&mut self, cells: &C, out: &mut [f32], n: usize) {
+    fn render<C: CellRead + ?Sized>(
+        &mut self,
+        cells: &C,
+        input: Option<&[f32]>,
+        out: &mut [f32],
+        n: usize,
+        channels: usize,
+    ) {
         self.buses.clear(n);
+        if let Some(input) = input {
+            let master = self.buses.master();
+            let slot = &mut self.buses.slots[master];
+            for (frame, lr) in input.chunks_exact(2).enumerate() {
+                slot.l[frame] = lr[0];
+                slot.r[frame] = lr[1];
+            }
+        }
         for o in self.orbits.iter_mut() {
             o.clear(n);
         }
@@ -589,6 +718,9 @@ impl Engine {
             tags,
             bufs,
             vout,
+            vout_r,
+            vout_3,
+            vout_4,
             tmp,
             dry,
             fx_scratch,
@@ -599,6 +731,8 @@ impl Engine {
             sr,
             mix_l,
             mix_r,
+            mix_3,
+            mix_4,
             ..
         } = self;
         let mut rc = RenderCtx {
@@ -606,10 +740,14 @@ impl Engine {
             max_block: cfg.max_block,
             bufs,
             out: vout,
+            out_r: vout_r,
+            out_3: vout_3,
+            out_4: vout_4,
             tmp,
             dry,
             cells,
             store,
+            host_input: input,
             fx: FxCtx {
                 sr: *sr,
                 store,
@@ -620,6 +758,8 @@ impl Engine {
                 stats: &mut stats,
             },
         };
+        mix_3[..n].fill(0.0);
+        mix_4[..n].fill(0.0);
         for (vi, v) in pool.voices.iter_mut().enumerate() {
             if !v.active {
                 continue;
@@ -633,10 +773,17 @@ impl Engine {
             let bus = &mut buses.slots[v.bus];
             let orbit = &mut orbits[v.orbit.min(orbits.len() - 1)];
             for (k, y) in rc.out[..n - off].iter().enumerate() {
-                bus.l[off + k] += y * gl;
-                bus.r[off + k] += y * gr;
-                orbit.in_l[off + k] += y * gl * v.delay_send;
-                orbit.in_r[off + k] += y * gr * v.delay_send;
+                let (left, right) = if t.has_aux {
+                    (*y, rc.out_r[k])
+                } else {
+                    (*y * gl, *y * gr)
+                };
+                bus.l[off + k] += left;
+                bus.r[off + k] += right;
+                orbit.in_l[off + k] += left * v.delay_send;
+                orbit.in_r[off + k] += right * v.delay_send;
+                mix_3[off + k] += rc.out_3[k];
+                mix_4[off + k] += rc.out_4[k];
             }
             if ended {
                 v.active = false;
@@ -661,11 +808,15 @@ impl Engine {
         let mut energy = 0.0;
         for k in 0..n {
             let (l, r) = (guard(self.mix_l[k]), guard(self.mix_r[k]));
-            if let Some(o) = out.get_mut(2 * k) {
+            if let Some(o) = out.get_mut(channels * k) {
                 *o = l;
             }
-            if let Some(o) = out.get_mut(2 * k + 1) {
+            if let Some(o) = out.get_mut(channels * k + 1) {
                 *o = r;
+            }
+            if channels == 4 {
+                out[4 * k + 2] = guard(self.mix_3[k]);
+                out[4 * k + 3] = guard(self.mix_4[k]);
             }
             let mono = 0.5 * (l + r);
             energy += mono * mono;

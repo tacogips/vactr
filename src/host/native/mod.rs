@@ -15,6 +15,7 @@
 //! `examples/`); the rest of the crate stays I/O-free for wasm32.
 
 pub mod audio;
+pub(crate) mod capture;
 pub mod loader;
 pub mod midi;
 pub mod tap;
@@ -27,6 +28,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 pub use audio::{AudioSide, FrameClock, NativeAudioHost};
+pub use capture::CaptureStats;
 pub use loader::{parse_wav, NativeSampleLoader};
 pub use midi::{parse_midi, MidiOutQueue, NativeMidiIn, NativeMidiOut};
 pub use tick::{TickSource, TICK_PERIOD};
@@ -51,6 +53,8 @@ pub(crate) fn unavailable(message: impl Into<String>) -> Diagnostic {
 pub struct NativeConfig {
     /// Control cells shared with the runtime (`RuntimeConfig::cell_pool`).
     pub cells: usize,
+    /// Opt in to the default f32 input device at the output sample rate.
+    pub audio_in: bool,
     /// Open MIDI input / output at all.
     pub midi_in: bool,
     pub midi_out: bool,
@@ -70,6 +74,7 @@ impl Default for NativeConfig {
         let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         Self {
             cells: 1024,
+            audio_in: false,
             midi_in: true,
             midi_out: true,
             midi_in_port: None,

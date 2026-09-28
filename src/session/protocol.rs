@@ -394,9 +394,9 @@ pub struct WireParamMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ctl: Option<u16>,
     pub range: [f32; 2],
-    /// `linear`, `log` or `stepped`.
+    /// `linear`, `log`, `stepped`, or a read-only payload marker.
     pub curve: String,
-    /// `none`, `db`, `s`, `ms`, `hz` or `st`.
+    /// `none`, `db`, `s`, `ms`, `hz`, `st`, or a payload stride label.
     pub unit: String,
     /// Parameters drawn together (bands of a multiband unit share one).
     pub group: u32,

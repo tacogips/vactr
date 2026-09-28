@@ -39,6 +39,26 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
+| [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; prioritized TODOs after the WV-004 stopping point | design-mutable-audio.md; design-music.md 4.1 | 2026-09-28 |
+| [modular-audio-foundation.md](active/modular-audio-foundation.md) | Planning; source and license inventory in progress | design-mutable-audio.md | 2026-09-27 |
+| [modular-fm-drums.md](active/modular-fm-drums.md) | In progress; three percussion voices, Peaks FM source stages verified, numerical parity and broader EFM family pending | design-mutable-audio.md | 2026-09-28 |
+| [modular-synth-engines.md](active/modular-synth-engines.md) | Planning; all eligible voice and oscillator engines | design-mutable-audio.md | 2026-09-27 |
+| [modular-plaits-engines.md](active/modular-plaits-engines.md) | In progress; public 24-position inventory, fifteen adaptations, nine source-stage translations, zero full ports | design-mutable-audio.md | 2026-09-28 |
+| [modular-live-input.md](active/modular-live-input.md) | In progress; host stereo input for bus effects, device and instrument ports pending | design-mutable-audio.md | 2026-09-28 |
+| [modular-plaits-resonant-noise.md](active/modular-plaits-resonant-noise.md) | In progress; positions 18–20 particle, string and modal engines | design-mutable-audio.md | 2026-09-27 |
+| [modular-plaits-oscillators.md](active/modular-plaits-oscillators.md) | In progress; positions 7–9 and 11 oscillator modes | design-mutable-audio.md | 2026-09-27 |
+| [modular-plaits-wave-replacements.md](active/modular-plaits-wave-replacements.md) | In progress; positions 5, 6, 13 and 14, with original wave replacements | design-mutable-audio.md | 2026-09-28 |
+| [modular-plaits-cleared-replacements.md](active/modular-plaits-cleared-replacements.md) | Ready; original FM banks and speech data for four blocked positions | design-mutable-audio.md | 2026-09-28 |
+| [modular-braids-shapes.md](active/modular-braids-shapes.md) | Ready; 47 accessible macro-oscillator shapes and resource audit | design-mutable-audio.md | 2026-09-28 |
+| [modular-rings-resonator.md](active/modular-rings-resonator.md) | Ready; six resonator models, string synth and external excitation | design-mutable-audio.md | 2026-09-28 |
+| [modular-elements-model.md](active/modular-elements-model.md) | Ready; twenty patch controls, three resonators and sample-rights boundary | design-mutable-audio.md | 2026-09-28 |
+| [modular-tides-functions.md](active/modular-tides-functions.md) | Ready; two generations, 24 Tides2 combinations and Tides1 wave audit | design-mutable-audio.md | 2026-09-28 |
+| [modular-segments-keyframes.md](active/modular-segments-keyframes.md) | Ready; Stages audio segments and Frames analog boundary | design-mutable-audio.md | 2026-09-28 |
+| [modular-peaks-functions.md](active/modular-peaks-functions.md) | Ready; twelve published functions, four drums and digits asset boundary | design-mutable-audio.md | 2026-09-28 |
+| [modular-clouds-texture.md](active/modular-clouds-texture.md) | In progress; four stereo texture adaptations, source parity pending | design-mutable-audio.md | 2026-09-28 |
+| [modular-streams-controls.md](active/modular-streams-controls.md) | Ready; six control functions and explicit analog audio boundary | design-mutable-audio.md | 2026-09-28 |
+| [modular-audio-effects.md](active/modular-audio-effects.md) | In progress; audio effects and XMOD SRC | design-mutable-audio.md | 2026-09-28 |
+| [digital-drums.md](active/digital-drums.md) | Planning; Vactrol digital percussion kit | design-music.md 4.1 | 2026-09-27 |
 | [vactrol-core.md](active/vactrol-core.md) | Completed (implementation, TASK-001..010, 2026-09-26; manual audible/browser/Tauri confirmations pending user sign-off) | design-docs/specs/design-implementation.md | 2026-09-26 |
 | [vactrol-editor-scaffold.md](completed/vactrol-editor-scaffold.md) | Completed (ED-SCAFFOLD, issue #5 TASK-010, wave 1; npm project, protocol client, store, transports, host.js options; holds the common ED contract; final-tree evidence `target/fe-logs/ed-final-*-s188-1.log`; accepted; archived 2026-09-26) | design-implementation.md 15.1.3, 15.1.4, 15.1.6 | 2026-09-26 |
 | [vactrol-editor-wire.md](completed/vactrol-editor-wire.md) | Completed (ED-WIRE, wave 2; Rust G2-G6; final-tree evidence `target/fe-logs/ed-final-*-s188-1.log`; accepted; archived 2026-09-26) | design-implementation.md 15.1.2 | 2026-09-26 |
@@ -75,6 +95,7 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
+| [modular-warps-vocoder.md](completed/modular-warps-vocoder.md) | 2026-09-28 (WV-001..004, 96-kHz source-rate stages and generated 8–192-kHz host boundary; full firmware parity remains outside this plan) | design-mutable-audio.md vocoder fidelity |
 | [vactrol-session-contracts.md](completed/vactrol-session-contracts.md) | 2026-09-26 (SS-CONTRACTS, issue #4 TASK-009, wave 1; archived in f345e62) | design-implementation.md 14.5.2, 14.5.3, 14.5.6, 14.5.9, 14.5.12 |
 | [vactrol-session-pkg.md](completed/vactrol-session-pkg.md) | 2026-09-26 (SS-PKG, wave 2; archived in f345e62) | design-implementation.md 5.7, 14.5.7 |
 | [vactrol-session-directives.md](completed/vactrol-session-directives.md) | 2026-09-26 (SS-DIRECTIVES, wave 2; archived in f345e62) | design-implementation.md 13.5, 14.5.8 |

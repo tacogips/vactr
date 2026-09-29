@@ -1511,20 +1511,76 @@ A-kernel ... mode: 0 > * amp
 
 A migrated MOD-004 template is changed in the same way, around
 `{p :main} > * amp > + {{p :aux} > * amp > ... > aux-out}`. Position 7
-also passes `clocked: chip-clocked`. The node order is then: every
-existing node up to and including the aux `*`, then the new param/const
-nodes and the aux gate, then `aux-out`, `+` and the root gate. Every
-kernel keeps its index, and therefore its seed. Only `aux-out` and `+`
-move, and neither is seeded. `vactrol-gate` in `off` mode copies its
-input exactly. `amp` is a per-voice constant, so applying the gate after
-`* amp` is the same linear stage upstream applies to raw engine output.
+also passes `clocked: chip-clocked`. In the lowered `InstDef` the node
+order is: every existing node up to and including the aux `*`, then the
+new param/const nodes and the aux gate, then `aux-out`, `+` and the root
+gate. `vactrol-gate` in `off` mode copies its input exactly. `amp` is a
+per-voice constant, so applying the gate after `* amp` is the same
+linear stage upstream applies to raw engine output.
+
+**Lowering order is not the seed order.** `Template::build` reorders the
+lowered nodes with Kahn's algorithm (`topo_order` in
+`src/dsp/ugen/build_helpers.rs`): every source node (no inputs: params
+and constants) comes first, in lowering order, and the rest follow in
+queue order. A kernel's seed is `voice.seed + compiled index`
+(`src/dsp/voice.rs`, both `Kx` sites). The new gate-only source nodes
+(`lpg-mode`, `lpg-decay`, `lpg-color`, and `velocity` or `slot`/`lane`
+constants when no existing node shares them) therefore push every
+non-source node, including every kernel, to a later compiled index.
+Appending the gates after the existing nodes keeps lowering indices but
+not compiled indices. This is why session 205 changed the render
+digests of the eight templates whose kernels read `kx.seed`
+(`clock-noise`, `dual-hat`, `dual-kick`, `dual-snare`, `particle`,
+`speech`, `string`, `swarm`), while seed-free kernels were unaffected.
+Its seed test compared `InstDef` indices and so missed the shift.
+
+**Gate-elided seed order (required).** Each compiled node carries a
+*seed ordinal*, and both `Kx` sites use `voice.seed + seed ordinal`
+instead of the compiled index. The ordinal is the node's position in
+`topo_order` of the *gate-elided graph*, derived from the same raw graph
+at build time:
+
+1. Remove every `vactrol-gate` node. Each edge that leaves a gate is
+   redirected to the gate's port-0 (subject) source, meaning that edge's
+   `from` node and output index, and keeps its place in the edge list.
+2. Remove every source node that has at least one out-edge and whose
+   out-edges all end at a non-subject port (port 1 or higher) of a
+   `vactrol-gate` node. A node that feeds a gate's port 0 is that gate's
+   subject and is never removed, even when it is a source such as
+   `white-noise`. Edges into a removed gate are dropped.
+3. Run `topo_order` on what remains, with the surviving nodes in their
+   original relative order. Each surviving node's ordinal is its
+   position there. A removed node keeps its compiled index as its
+   ordinal; `vactrol-gate` reads no seed.
+
+When the graph has no `vactrol-gate`, the ordinal equals the compiled
+index. This is checked directly, so every graph without a gate, including
+every non-Plaits template, keeps its seeds by construction. For a
+template wired by the edit rule, the gate-elided graph has the same
+nodes in the same lowering order, and the same edges in the same order,
+as the pre-wiring template. Its ordinals are therefore exactly the
+pre-wiring compiled indices. A shared source such as `freq`, a
+`velocity` param that a kernel also reads, or a `slot`/`lane` constant
+that deduplicates with a kernel's `mode:` constant is not gate-only. It
+is kept, and it already existed in the pre-wiring graph at the same
+lowering position. The rule applies to any graph, so a user who appends
+`vactrol-gate` to their own instrument also keeps its kernel seeds.
+`decay-mod` is not elided: it feeds a kernel input, so it is opt-in and
+may change that kernel's seed, as stated under `decay-mod`.
+
+The build uses fixed `NODE_CAP`/`MAX_EDGES` arrays, with no allocation
+and no new graph traversal in the callback, and one extra bounded
+`topo_order` pass per build. Native and browser installs share
+`Template::build`, so both get the same ordinals.
 
 The graph digest lines for the 24 templates in `golden_digests.txt`
 change, and are updated with this section as the reason. No render line
-may change. `migrated_pairs.rs` and `select_output.rs` fixtures are
-updated only where they embed the template text. Their old two-node
-comparison forms stay valid, and at default settings the two forms stay
-bitwise equal.
+may change. If the bless output differs in any render line, that is a
+defect to fix, not a fixture to update. `migrated_pairs.rs` and
+`select_output.rs` fixtures are updated only where they embed the
+template text. Their old two-node comparison forms stay valid, and at
+default settings the two forms stay bitwise equal, because the
+seed-order rule preserves kernel seeds.
 
 #### Voice lifetime
 
@@ -1547,13 +1603,48 @@ records the gate count. The lifetime check moves into a new
 
 #### Real-time, capacity and invariance
 
-Each gate needs about 16 floats of state and `decay-mod` needs about 4.
-The state lives in the node's fixed `NodeState` or `mem_need` region. The
-callback allocates nothing and runs no graph traversal. The math is plain
-`f32` using the same std operations as existing kernels, so native and
-wasm32 share one code path. A template adds at most two gate nodes and
-five parameter/constant nodes, well within `NODE_CAP`, `MAX_PORTS` and
-`MAX_AUDIO_BUFFERS`.
+As delivered in PLV-20, each gate latches its mode, slot, lane, gain and
+bypass flags in `NodeState`. It keeps `GATE_STATE_FLOATS` (16) floats in
+its fixed `mem_need` region, and `decay-mod` keeps
+`DECAY_MOD_STATE_FLOATS` (4). This layout is not changed. Fixed needs are
+carved in the first `assign_mem` pass, before any flexible delay line.
+So each wired template's `mem_total` grows by exactly
+`2 * GATE_STATE_FLOATS` (32 floats), including in `off` mode. This must
+be memory only. A kernel's region offset may move if a gate is compiled
+before it, and at the test budget (24 000) and the production budget
+(`voice_seconds * sr`) no flexible delay line may be clamped by the
+extra 32 floats. The unchanged golden render lines are the check.
+
+Existing tests that pin a wired template's `mem_total` must change. Each
+is updated to its old figure plus `2 * vactrol_gate::GATE_STATE_FLOATS`,
+and its "budget minus one" `MemExceeded` boundary moves with it. These
+are the only intended `mem_total` expectation changes. The files, all
+under `src/host/tests/e2e/templates/`, are `analog_pair.rs`, `chip.rs`, `chord_pair.rs`, `grain_pair.rs`,
+`modal.rs`, `particle.rs`, `shape_pair.rs`, `six_op_original.rs`,
+`speech_original.rs`, `string_machine_pair.rs`, `string_voice.rs`,
+`table_terrain_pair.rs`, `terrain_pair.rs` and `voice_engines.rs`. In
+`voice_engines.rs`, spectrum 96, clock-noise 0, dual-kick 48,
+dual-snare 48, dual-hat 32 and swarm 224 each become +32; the
+clock-noise message "node state is inline" is reworded to name the gate
+state. The plan that owns the template wiring lists all 14 files in its
+writePaths and records this reason. Session 205 missed all but the first
+of these files because nextest stopped at the first failure.
+
+One structural expectation also changes. In
+`src/types/tests/inst/templates.rs`, `templates_realize_at_session_start`
+asserts the last lowered node of every template is `mul` or `add`. For the
+24 Plaits templates the last lowered node becomes `vactrol-gate` (the root
+gate), so that test expects `vactrol-gate` for them. Non-Plaits templates
+keep their current expectation. Together with the 14 `mem_total` files,
+this is the only intended test-expectation change outside the new
+voice-layer tests. The plan that owns the template wiring lists this file
+in its writePaths and records this reason.
+
+The callback allocates nothing and runs no graph traversal. The math is
+plain `f32` using the same std operations as existing kernels, so native
+and wasm32 share one code path. A template adds at most two gate nodes
+and five parameter/constant nodes, well within `NODE_CAP`, `MAX_PORTS`,
+`MAX_PARAMS` and `MAX_AUDIO_BUFFERS`.
 
 #### Provenance
 
@@ -1597,7 +1688,10 @@ clean, and objects and outputs stay under `tmp/`. The probe reports:
    `d` in {0.2, 0.5, 0.8}, `h` in {0, 0.5, 1}, notes 48 and 69 (using the
    same 47,872.34/48,000 note correction as `compare-plaits-osc`),
    velocity in {1, 0.5}, and a finite gate. Upstream is aligned at its
-   detected rising-edge block, after its 5-block trigger delay.
+   detected rising-edge block. That block lags the raised trigger by 4
+   blocks (1 ms): `kTriggerDelay` is 5, but `stmlib::DelayLine::Write`
+   decrements the write pointer before `Read(5)`, so the read returns
+   the sample written four blocks earlier.
 2. **Audio path**: upstream `LowPassGate` plus the post stage, against
    Vactr's lane path. Both get the same deterministic harness signal and
    the recorded trajectories. It covers gains 0.8, 0.6, -1 and -2.
@@ -1625,9 +1719,11 @@ the measured result.
 
 ### Intentional divergences from upstream
 
-1. There is no 1 ms trigger delay. Upstream delays the trigger 5 blocks
-   (1.25 ms) to cover CV lag. Vactr events carry pitch and onset
-   together, sample-accurately.
+1. There is no trigger delay. Upstream delays the trigger by an
+   effective 4 blocks (1 ms, `kTriggerDelay = 5` read after write) to
+   cover CV lag. Vactr events carry pitch and onset together,
+   sample-accurately, so a voice-layer onset sits at the voice's first
+   sample and default render timing does not move.
 2. The 0.3/0.1 trigger hysteresis is not applied, because the event gate
    is boolean.
 3. `off` mode skips the upstream post gain, limiter and clip, even though
@@ -1667,6 +1763,19 @@ the measured result.
 - `off` identity: for all 24 templates, each golden render digest is
   unchanged. For several templates, the `off` render with explicit
   `lpg-mode :off` is bitwise equal to the render with no control.
+- Seed order: a graph with no gate gets ordinal == compiled index for
+  every node. A graph with a seeded kernel (for example the clock-noise
+  pair) followed by the gate pattern of the edit rule, including
+  gate-only params and constants, gives that kernel the same ordinal as
+  its gate-free copy has compiled index, and renders bitwise equal in
+  `off` mode. At the prelude level, for `clock-noise-voice`,
+  `dual-snare-voice`, `swarm-voice` and `speech-voice`, the *compiled*
+  seed ordinal of every kernel equals the compiled index in a
+  test-local copy of the pre-wiring template text. The test must use
+  compiled `Template` values, not `InstDef` indices.
+- Memory: the 14 pinned `mem_total` expectations listed under
+  "Real-time, capacity and invariance" read old + 32 and keep their
+  `MemExceeded` boundary.
 - Mode behavior: `ping` output rises and decays with `lpg-decay` and
   darkens with a low `lpg-color`. `level` output tracks velocity and
   releases after the gate. Enveloped positions stay unfiltered, with
@@ -1695,15 +1804,55 @@ the measured result.
 
 ### Rollout
 
-The work order is: the pure `voice_layer.rs` and the probe files, which
-can run in parallel; then the serialized registry work, which touches
-the node kinds, catalog, codec, names, checker domain, controls, editor
-metadata, manifest, template lifetime, `templates.vact`, golden graph
-lines, inventory, notices and `mise.toml`; then the evidence and plan
-updates. Record the probe results in `modular-plaits-engines.md` and its
-subplans. In `modular-audio-handoff.md`, mark MOD-004 stereo edges done
-under priority 7 and record this priority-4 progress. Write evidence
-logs under `tmp/`.
+Delivered in `f5e623b`: the pure `voice_layer.rs` (PLV-10), the manifest
+registration tuples and `voice_layer` state (PLV-12), the `vactrol-gate`
+and `decay-mod` kinds with their registry, controls and checker entries
+(PLV-20), and the probe files with the `compare-plaits-voice` task
+(PLV-21). These are accepted dependencies and are not redone.
+
+The remaining work runs as three **serial** plans. Session 205 ran
+lifetime and wiring in parallel with split ownership of the shared
+compile path, and each stopped on a failure in the other's files. Each
+path below has exactly one owner:
+
+1. **PLV-30, voice lifetime and seed order.** It owns
+   `src/dsp/ugen/template.rs` (gate count, per-node seed ordinal),
+   `src/dsp/ugen/build_helpers.rs` (the gate-elided order helper),
+   `src/dsp/voice.rs` (both `Kx` seed sites, the `implicit` predicate
+   and `finished` delegation), the new `src/dsp/voice/lifetime.rs`, and
+   its own test modules under `src/dsp/tests/dsp/`. It changes no
+   template text, so every golden line, graph and render, must stay
+   unchanged after it.
+2. **PLV-31, template wiring.** It depends on PLV-30. It owns
+   `src/prelude/templates.vact`, `src/dsp/meta/templates.rs` and the new
+   `src/dsp/meta/templates/plaits.rs`, the 24 Plaits graph lines of
+   `golden_digests.txt`, the 14 `mem_total` test files listed above,
+   `src/types/tests/inst/templates.rs` (the final-node expectation of the
+   24 Plaits templates),
+   `src/host/tests/e2e/templates.rs` (one module line), the new
+   `src/host/tests/e2e/templates/voice_layer.rs`, and
+   `examples/voice-layer.vact`. It owns `migrated_pairs.rs` and
+   `select_output.rs` only where they embed template text. Its golden
+   bless must show 24 graph changes and zero render changes. Any render
+   difference is a blocker to diagnose, not a fixture edit.
+3. **PLV-40, evidence closeout.** It depends on PLV-31. It runs
+   `compare-plaits-voice` and `audit-upstream` against the pinned
+   checkout and sets the `voice_layer` labels in
+   `src/dsp/ported/manifest.rs` from the measured thresholds. It updates
+   `verification/upstream_inventory.toml` and `THIRD_PARTY_NOTICES.md`,
+   records the results in `modular-plaits-engines.md` and its four
+   subplans, and in `modular-audio-handoff.md` marks MOD-004 stereo
+   edges done under priority 7 and records this priority-4 progress. It
+   also adds a status note to this section.
+
+The dispatch manifest for this run lists only these three plans, with
+PLV-10, PLV-12, PLV-20 and PLV-21 as accepted dependencies, and runs
+them in three single-plan waves. writePaths and sharedPaths are concrete
+files only. A full-suite nextest run that fails is re-run with
+`--no-fail-fast` so that every failing test is listed before any repair.
+Session 205 saw only the first of its 14 `mem_total` failures. Write
+evidence logs under `tmp/`. The saved session-205 attempt
+(`tmp/plv-wave3-saved/`) is reference only.
 
 ## References
 

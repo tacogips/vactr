@@ -463,6 +463,13 @@ license = "MIT"
 kind = "generator"
 use = "source"
 
+[[file]]
+path = "peaks/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated SVF cutoff/damp, envelope and oscillator-increment tables plus sine/overdrive waveforms; Vactr keeps analytic replacements. Compiled locally only by the drum-comparison reference probe from a separate checkout, never imported."
+
 # --- plaits
 [[file]]
 path = "plaits/dsp/chords/chord_bank.cc"
@@ -1118,6 +1125,12 @@ reason = "Compiled only by the local comparison probes in a separate checkout; n
 
 [[file]]
 path = "stmlib/utils/random.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/utils/random.cc"
 license = "MIT"
 kind = "code"
 use = "source"

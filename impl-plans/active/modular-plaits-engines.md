@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-27
-**Last Updated**: 2026-09-27
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -235,12 +235,12 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
-| SYN-002A | Implement position 0 oscillator/filter slice with main/aux and control-response tests | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; LPG/fidelity pending |
-| SYN-002B | Implement position 1 phase-distortion slice with two outputs and cleared quantizer | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity/LPG pending |
+| SYN-002A | Implement position 0 oscillator/filter slice with main/aux and control-response tests | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; raw comparison measured gap; LPG/full voice parity pending |
+| SYN-002B | Implement position 1 phase-distortion slice with two outputs and cleared quantizer | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; raw comparison measured gap; source parity/LPG pending |
 | SYN-002C | Implement position 10 two-operator FM with carrier/sub and signed feedback | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity/LPG pending |
 | SYN-002C2 | Translate individually audited MIT FM quantizer/FIR and source control, feedback and downsampling stages; compare raw outputs | SYN-002C, MOD-006A | Completed and independently verified; full voice/LPG/source parity remains separate |
 | SYN-002D | Implement position 12 additive integer/organ main/aux voice | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity/LPG pending |
-| SYN-002D2 | Translate position 12 amplitude stages and verify main/aux response | SYN-002D | Source-stage adaptation complete; source numerical comparison and LPG remain separate tasks |
+| SYN-002D2 | Translate position 12 amplitude stages and verify main/aux response | SYN-002D | Source-stage adaptation complete; raw comparison measured gap; LPG/full voice parity pending |
 | SYN-003A | Implement position 17 clocked-noise main/aux with event reset | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
 | SYN-003A2 | Translate position 17 BLEP clocks and three SVF signal paths | SYN-003A | Completed and independently verified; numerical comparison and voice/LPG parity remain separate |
 | SYN-003B | Implement position 21 dual bass-drum main/aux with accent and retrigger | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
@@ -275,6 +275,45 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 - [ ] Native/browser tests pass with bounded callback state and no allocation.
 
 ## Progress Log
+
+### Session: 2026-09-29, positions 0/1/12 raw-kernel comparison
+
+Added `verification/plaits_osc_reference.cc`,
+`verification/compare_plaits_osc.py` and
+`examples/plaits_osc_reference.rs`, with `mise run compare-plaits-osc`.
+The C++ process compiles only against the clean pinned checkout at Eurorack
+`08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4` and stmlib
+`e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`, including local-only
+`resources.cc`; all objects and output remain temporary. Each engine gets
+note 69 and four 48 kHz, 24-frame-block scenarios: `(harmonics, timbre,
+morph, accent, trigger)` = `(0.1,0.25,0.2,0.8,1)`,
+`(0.5,0.5,0.5,0.8,1)`, `(0.9,0.75,0.8,0.8,1)`, and
+`(0.5,0.5,0.5,0.3,0)`. At note 69 the Vactr frequency is
+`440 × 48,000 / 47,872.34 = 441.173337 Hz`. Accent is set in upstream
+`EngineParameters` but these three oscillator engines do not consume it;
+trigger is likewise unused for positions 0, 1 and 12.
+
+Mappings are `filter-harmonics`→position-0 harmonics (with separate
+`va-source`/filter nodes), `phase-harmonics`→position-1 harmonics, and
+`spectrum-bumps`→position-12 harmonics; note maps to Hz, while timbre and
+morph retain their documented source roles. Position 12 maps source timbre
+to Vactr centroid. All comparisons discard 24 warm-up frames. The table
+shows the middle `(0.5,0.5,0.5)` case as reference/Vactr RMS, zero-lag to
+aligned normalized RMS error, aligned correlation, spectral centroid and
+autocorrelation fundamental (Hz); the JSON output reports those metrics for
+each channel in all four scenarios.
+
+| Position | Main: RMS; NRMSE; r; centroid; f0 | Aux: RMS; NRMSE; r; centroid; f0 | Classification |
+|---|---|---|---|
+| 0 | .360/.022; 1.028→.945; .924; 527/456; 441.4/441.5 | .069/.654; 9.451→9.238; .314; 6804/703; 441.0/441.2 | Measured gap: low-pass level and auxiliary spectrum differ substantially. |
+| 1 | .750/.651; 1.311→1.112; .369; 2678/558; 441.2/441.2 | .701/.707; 1.438→1.433; -.018; 3453/468; 445.1/458.9 | Measured gap: original ratio quantizer and oscillator/downsampling behavior differ. |
+| 12 | .274/.274; 1.292→.258; .967; 5467/5467; 441.1/441.1 | .323/.324; 1.288→.648; .790; 2244/2243; 882.4/882.4 | Measured gap: aligned spectra/levels are close, but phase and amplitude-state recurrences leave waveform error. |
+
+The close threshold is aligned normalized RMS error below 0.10 and
+correlation at least 0.99 on every scenario and channel; no position here
+meets it. These are raw engine/kernel comparisons, not Plaits voice, LPG,
+trigger-host or `.vact` parity. No kernel correction was justified by the
+measurement, and no coverage label changed.
 
 ### Session: 2026-09-29, SYN-003C/D/E positions 21-23 raw-kernel comparison
 

@@ -742,6 +742,13 @@ does not linearly interpolate oscillator amplitude across source blocks.
 It is a source-stage adaptation, not bit-exact firmware; voice-level
 trigger/LPG behavior remains open.
 
+`verification/compare_plaits_osc.py` provides an opt-in raw-kernel comparison
+for positions 0, 1, 7, 8, 9, 11 and 12. It compiles the pinned engine sources
+and aggregate `resources.cc` from a separate clean checkout into a temporary
+local executable only; Vactr imports no upstream code, generated resource,
+audio sample or reference output. The probe's four scenarios and parameter
+conversions are recorded in the Plaits implementation plans.
+
 ## Plaits position 17 clocked-noise source-stage translation
 
 `clock-noise-voice` and `src/dsp/ugen/clock_noise_pair.rs` translate the two

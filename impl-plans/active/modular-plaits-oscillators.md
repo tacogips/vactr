@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-27
-**Last Updated**: 2026-09-27
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -70,7 +70,7 @@ audit their source and all dependencies before implementation.
 | SYN-005C | Position 9 waveshaping pair with cleared fold math | MOD-001, MOD-003–005 | Bounded adaptation complete; spectral/source parity pending |
 | SYN-005D | Position 11 grain-oscillator pair with audited sources | MOD-001, MOD-003–005 | Bounded adaptation complete; BLEP/filter parity pending |
 | SYN-005D2 | Translate position 11 grainlet/Z BLEP resets and output high-pass stages | SYN-005D | Completed and independently verified; block interpolation and voice/LPG parity remain separate |
-| SYN-005E | Source comparison and fidelity classification | SYN-005A–D, MOD-006 | Not started |
+| SYN-005E | Source comparison and fidelity classification | SYN-005A–D, MOD-006 | Completed: positions 7/8/9/11 numerically measured; 7 not comparable for clock semantics, 8/9/11 measured gaps |
 
 ### SYN-005D2 grain source-stage translation
 
@@ -117,6 +117,34 @@ never import `lut_sine`, `resources.cc`, waveform or other audio asset.
 - [ ] Quiet cargo check, strict Clippy, full tests, rustfmt and diff checks pass.
 
 ## Progress Log
+
+### Session: 2026-09-29, positions 7/8/9/11 raw-kernel comparison
+
+The shared Plaits oscillator probe now drives positions 7, 8, 9 and 11
+directly alongside the positions recorded in `modular-plaits-engines.md`.
+It evaluates note 69, 48 kHz, 24-frame blocks, 24 warm-up frames and four
+control settings: `(harmonics,timbre,morph,accent,trigger)` of
+`(0.1,0.25,0.2,0.8,1)`, `(0.5,0.5,0.5,0.8,1)`,
+`(0.9,0.75,0.8,0.8,1)` and `(0.5,0.5,0.5,0.3,0)`. The fixed
+Vactr pitch is 441.173337 Hz after conversion from the source note. The
+middle setting is tabulated as reference/Vactr RMS, zero-lag to aligned
+normalized RMS error, aligned correlation, spectral centroid and estimated
+fundamental in Hz. All channel metrics for all four scenarios are emitted
+by the JSON probe.
+
+| Position | Main: RMS; NRMSE; r; centroid; f0 | Aux: RMS; NRMSE; r; centroid; f0 | Classification |
+|---|---|---|---|
+| 7 | 1.000/1.000; 1.415→1.415; unavailable; 23/1040; unavailable/440.9 | .574/.615; 1.465→1.465; -.000; 1817/264; 1764.9/220.7 | Not comparable: source consumes external trigger edges and retains clock state; Vactr substitutes an internal clock/rate. |
+| 8 | .466/.526; .662→.621; .849; 805/953; 441.1/441.1 | .737/.572; 1.475→.473; .888; 1483/1774; 882.8/440.9 | Measured gap: variable oscillators and sync-difference spectra differ. |
+| 9 | .495/.553; 1.569→1.228; .331; 2166/2098; 441.2/441.2 | .435/.488; 1.832→.915; .634; 3111/2764; 441.1/441.1 | Measured gap: analytic fold/overtone functions and antialiasing differ. |
+| 11 | .369/.368; .725→.031; 1.000; 487/486; 441.5/441.5 | .461/.461; 1.326→.194; .981; 3796/3796; 441.1/441.1 | Measured gap: grainlet main aligns closely, while auxiliary Z/high-pass stages retain error. |
+
+The close threshold is aligned normalized RMS error below 0.10 and
+correlation at least 0.99 on every scenario and channel. Position 7 still
+has numerical measurements but is excluded from like-for-like classification
+because its clock controls have no one-to-one mapping. The kernel files and
+manifest fidelity labels were unchanged; raw signal comparison does not
+validate Plaits voice/LPG or Vactr event behavior.
 
 ### Session: 2026-09-28, SYN-005D2 grain BLEP and filter stages
 

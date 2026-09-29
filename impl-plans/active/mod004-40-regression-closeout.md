@@ -82,9 +82,13 @@ legacy at every rate and block on both tiers, and cross-block equality.
   "Still to do (2026-09-30)" in "Implementation status (2026-09-29)" only
 - `tmp/mod004/MOD004-40/` (evidence; gitignored, stays untracked)
 
-sharedPaths (serial; this plan runs alone): `src` is used only for a
-recorded serial repair and for the one-time `cargo fmt` reconciliation in
-command 1. `src/dsp/tests/dsp.rs` is read-only unless a helper is missing.
+sharedPaths (serial; this plan runs alone) are concrete files only:
+`src/dsp/tests/dsp.rs` (read-only unless a helper is missing) and the
+listed existing test files. Do not declare whole directories such as
+`src`: the Riela fanout snapshot is capped at 512 entries, and `src` alone
+covers about 650 files. Run `cargo fmt --check` only. A formatting or
+repair need outside writePaths is a review blocker to route back, not a
+silent edit.
 
 ## Test Module Layout (prescribed split)
 

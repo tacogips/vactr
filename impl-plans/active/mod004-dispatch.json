@@ -168,7 +168,6 @@
         "tmp/mod004/MOD004-40"
       ],
       "sharedPaths": [
-        "src",
         "src/dsp/tests/dsp.rs",
         "src/dsp/tests/dsp/voice_layout.rs",
         "src/dsp/tests/dsp/fm_pair.rs",

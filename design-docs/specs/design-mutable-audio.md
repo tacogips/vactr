@@ -951,7 +951,10 @@ all of these hold:
 - main and aux use constant complementary selector values.
 
 The migrated form is `let` binding one node, then
-`(p :main) > * amp > + {(p :aux) > * amp > aux-out}`. The voice boundary
+`(p :main) > * amp > + {(p :aux) > * amp > aux-out}`. The bound node keeps
+the main instance's inputs verbatim, including its selector value (`mode: 0`
+or `chain-channel: 0`), so output 0 is exactly the old main signal and
+output 1 the old aux signal. The voice boundary
 still uses `aux-out`, so it is unchanged. Nine templates qualify and
 migrate, each with a render-equivalence test:
 
@@ -1224,11 +1227,19 @@ Commit `85a300a` landed the foundation without changing any render:
 - the `src/dsp/engine/render.rs` split;
 - the paired-output kernel entry points and `sample::play_stereo`.
 
-Still to do: the VM selection call, checker typing and lowering; the
-`b'V'` codec; the slice-based voice runtime, stereo effects and balance
-pan; the nine template migrations; and regression closeout. These are the
-remaining `impl-plans/active/mod004-*.md` plans. The rules above are
-their authority, and nothing in this status note changes them.
+Commit `b6fa077` landed the VM selection call, checker typing and
+lowering (`src/host/tests/e2e/templates/select_output.rs` fixes the source
+form `let p {...}` then `{p :main} > * amp > + {{p :aux} > * amp > aux-out}`),
+the `b'V'` codec, and the slice-based voice runtime with stereo effects and
+balance pan.
+
+Still to do: the nine template migrations (`mod004-30`) and regression
+closeout (`mod004-40`). The nine template bodies are unchanged between
+`cf2ea37` and `b6fa077`, so the `cf2ea37` text is the pre-migration
+reference for the equivalence tests. `va-source` reads no per-node seed,
+so merging the two `filter-voice` sources satisfies the eligibility rule;
+the bitwise equivalence test remains the proof. The rules above are their
+authority, and nothing in this status note changes them.
 
 ## References
 

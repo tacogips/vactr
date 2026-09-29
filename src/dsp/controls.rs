@@ -165,6 +165,8 @@ const LFO_TARGETS: &[&str] = &[
     "transient",
     "decay",
 ];
+/// Low-pass-gate voice mode choices.
+pub const LPG_MODES: &[&str] = &["off", "ping", "level"];
 
 const fn mk(
     name: &'static str,
@@ -534,6 +536,17 @@ pub static ROWS: &[ControlRow] = &[
     // precision) the triggering event began, so `lfo-retrigger: false`
     // voices can derive a shared, host-time-anchored LFO phase.
     param("onset-time", 152, 0.0, (0.0, 3600.0)),
+    // Neutral Plaits voice-layer controls (PLV-001).
+    mk(
+        "lpg-mode",
+        153,
+        0.0,
+        (0.0, 2.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(LPG_MODES),
+    ),
+    param("lpg-decay", 154, 0.5, (0.0, 1.0)),
+    param("lpg-color", 155, 0.5, (0.0, 1.0)),
 ];
 
 /// The row of a control name.

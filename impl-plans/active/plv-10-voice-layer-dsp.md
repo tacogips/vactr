@@ -1,6 +1,6 @@
 # PLV-10: Shared Voice-Layer DSP (pure functions and state)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-10 (wave 1; parallel with PLV-12)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Upstream behavior translated; Control clock and host rate; Audio path per lane)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`
@@ -181,9 +181,9 @@ floats (booleans as 0.0/1.0), so PLV-20 can keep state in the voice
 
 ## Completion Criteria
 
-- [ ] The contract items exist with the exact names, fields, `FLOATS` values and semantics above.
-- [ ] `src/dsp/ugen/mod.rs` differs from its pre-edit version by exactly one `pub mod voice_layer;` line.
-- [ ] Every listed test exists and passes; commands 1-8 pass with logs.
+- [x] The contract items exist with the exact names, fields, `FLOATS` values and semantics above.
+- [x] `src/dsp/ugen/mod.rs` differs from its pre-edit version by exactly one `pub mod voice_layer;` line.
+- [x] Every listed test exists and passes; commands 1-8 pass with logs.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -204,4 +204,49 @@ floats (booleans as 0.0/1.0), so PLV-20 can keep state in the voice
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30 — PLV-10 implementation
+
+**Tasks Completed**: Pure voice-layer math/state types, public module export,
+contract tests, and commands 1-8.
+
+**Files**: Added `src/dsp/ugen/voice_layer.rs` and
+`src/dsp/ugen/voice_layer/tests.rs`; added exactly one public module line in
+`src/dsp/ugen/mod.rs`. The module hash is
+`f2b3fc20f4a6ba8fd9d795be47351b1ed37516d39bd99589e4c985763ed29d22`; the
+test hash is `0761825ebd54df77019454c214108947f5041966863352354e2ebe580b10cc9e`.
+The module-export diff is exactly one insertion.
+
+**Verification**: All final-source commands passed. Focused nextest passed 10
+tests; full nextest passed 1,593 tests with 2 skipped. Rust file line counts
+are 371, 239 and 436, respectively. Complete logs are
+`tmp/plv/PLV-10/1-fmt.log` through `tmp/plv/PLV-10/8-lines.log`.
+
+**Attempt Notes**: The initial formatting check also saw a concurrent,
+unformatted edit in `src/dsp/ported/manifest.rs`; only the assigned voice-layer
+files were formatted, and the check passed after that shared file settled. The
+first focused test run exposed an assertion checking limiter output during its
+initial transient rather than after the specified 20,000 samples. The test was
+corrected to match the plan, and both the focused and full final-source runs
+passed. The 48 kHz limiter now uses the exact specified coefficients.
+
+**Handoff**: PLV-10 owns only pure DSP types and tests. Graph nodes and source
+comparison remain with downstream PLV-20 and PLV-21; no template, controls,
+manifest, provenance, or host integration work was pulled into this plan.
+
+### Session: 2026-09-30 test-integrity repair
+
+**Change**: `VactrolEnvelope::process_ping` in `src/dsp/ugen/voice_layer.rs`
+now clears `ramp_up` on reaching 1.0 and only then selects the `process_lp`
+level (`state` while ramping, otherwise 0), matching upstream Plaits
+`LPGEnvelope::ProcessPing` and the pinned plan semantics. Previously the level
+was captured before clearing, holding the state at 1.0 one extra block and
+shifting the whole decay by one control block. The test
+`ping_reaches_full_opening_then_decays_to_done` in
+`src/dsp/ugen/voice_layer/tests.rs` now asserts state 0.75 with ramp_up set
+after 3 blocks, and after the 4th block ramp_up cleared, state == 1 - short_decay
+and gain == state.
+
+**Verification**: `tmp/plv/PLV-10/repair-1-fmt.log` exit=0;
+`tmp/plv/PLV-10/repair-3-clippy.log` exit=0;
+`tmp/plv/PLV-10/repair-6-focused.log` exit=0 (10 tests run, 10 passed).
+Pre/post-edit hashes are recorded in `tmp/plv/PLV-10/hashes.txt` (REPAIR-1).

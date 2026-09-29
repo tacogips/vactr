@@ -25,6 +25,8 @@ pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize) {
         Node::AnalogPair => (analog_pair::STATE_FLOATS, 0),
         Node::GrainPair => (grain_pair::STATE_FLOATS, 0),
         Node::ShapePair => (shape_pair::STATE_FLOATS, 0),
+        Node::VactrolGate => (vactrol_gate::GATE_STATE_FLOATS, 0),
+        Node::DecayMod => (vactrol_gate::DECAY_MOD_STATE_FLOATS, 0),
         Node::StringMachinePair => (string_machine_pair::STATE_FLOATS, 0),
         Node::TerrainPair => (terrain_pair::STATE_FLOATS, 0),
         Node::TableTerrainPair => (table_terrain_pair::STATE_FLOATS, 0),

@@ -126,9 +126,9 @@ existing sentence. The counts come from `voice_layer`.
 
 ## Completion Criteria
 
-- [ ] All 24 rows carry the registration tuple above, and the tests prove it.
-- [ ] Every row has `voice_layer` Pending; engine `coverage` values are unchanged (`git diff` shows no `CoverageState::` change inside rows).
-- [ ] Commands 1-8 pass with logs.
+- [x] All 24 rows carry the registration tuple above, and the tests prove it.
+- [x] Every row has `voice_layer` Pending; engine `coverage` values are unchanged (`git diff` shows no `CoverageState::` change inside rows).
+- [x] Commands 1-8 pass with logs.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -149,4 +149,41 @@ existing sentence. The counts come from `voice_layer`.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30 — PLV-12 implementation
+
+**Tasks Completed**: Added the shared 24-position registration table and
+`voice_layer` labels, re-exported the registration API, and added coverage
+tests for the pinned tuples, helpers, summary suffix, and unchanged engine
+coverage counts.
+
+**Intent and initial source hashes**: See `tmp/plv/PLV-12/hashes.txt`.
+Final hashes after Rust formatting:
+
+- `src/dsp/ported/manifest.rs`: `ca4b107216d7059f86969cb529907358a20bab0bccc8990b66d3205dacd87a8c`
+- `src/dsp/ported/mod.rs`: `cf1b833bfc26574f35aa0be0228d9b02ce53478e422b268d2abea61f372ad9`
+- `src/dsp/ported/tests.rs`: `7211601131865f5cc9931719e49e1b61fab79af52539b58f57f0017ae3e46caf`
+
+**Verification** (final runs, all exit 0):
+
+1. `CARGO_TERM_QUIET=true cargo fmt --check` — `tmp/plv/PLV-12/1-fmt.log` (contains the initial failure and final successful retry)
+2. `CARGO_TERM_QUIET=true cargo check -q --all-targets` — `tmp/plv/PLV-12/2-check.log`
+3. `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings` — `tmp/plv/PLV-12/3-clippy.log`
+4. `CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib` — `tmp/plv/PLV-12/4-wasm.log`
+5. `CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp` — `tmp/plv/PLV-12/5-lsp.log`
+6. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run ported` — 23 passed; `tmp/plv/PLV-12/6-focused.log`
+7. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` — 1,593 passed, 2 skipped; `tmp/plv/PLV-12/7-nextest.log` (contains the initial failure and final successful retry)
+8. `wc -l src/dsp/ported/manifest.rs src/dsp/ported/tests.rs src/dsp/ported/mod.rs` — 602, 505, 60 lines; `tmp/plv/PLV-12/8-lines.log`
+
+**Retry history**: The first formatter attempt found an in-progress missing
+module in the concurrent voice-layer files; the next attempt found only
+formatting differences in those files. After the concurrent worker completed,
+the final workspace format check passed. The first full nextest attempt
+failed in `dsp::ugen::voice_layer::tests::limiter_has_reference_gain_bounded_output_and_rate_consistent_attack`
+(`tmp/plv/PLV-12/7-nextest.log`, exit 100; 583 passed, 1 failed before
+cancellation). After the plan's shared-worker retry interval, the complete
+successful retry output was appended to that declared canonical log, ending
+with exit 0. The concurrent edits were preserved.
+
+**Result**: Registration-table, pending-label, engine-coverage, formatting,
+build, lint, native/wasm/LSP, focused-test, full-test, and file-length
+criteria are complete. No engine `coverage` row values changed.

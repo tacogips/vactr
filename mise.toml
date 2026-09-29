@@ -125,6 +125,11 @@ description = "Compare raw dual kick/snare/hi-hat kernels against a separate pin
 run = 'python3 verification/compare_plaits_drums.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
+[tasks.compare-plaits-voice]
+description = "Compare the Plaits voice-level trigger and low-pass gate layer against a separate pinned Mutable Instruments checkout"
+run = 'python3 verification/compare_plaits_voice.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
+env = { CARGO_TERM_QUIET = "true" }
+
 [tasks.compare-braids-shapes]
 description = "Compare raw Braids macro-oscillator shape kernels against a separate pinned Mutable Instruments checkout"
 run = 'python3 verification/compare_braids_shapes.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'

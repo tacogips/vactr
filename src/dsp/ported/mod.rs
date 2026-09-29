@@ -52,8 +52,8 @@ pub use functions::{
 };
 
 pub use manifest::{
-    plaits_algorithms, plaits_coverage_summary, CommonControls, CoverageState, PortedAlgorithm,
-    ResourceFlags, ResourceState, PLAITS_REVISION,
+    plaits_algorithms, plaits_coverage_summary, plaits_voice, CommonControls, CoverageState,
+    Enveloped, PortedAlgorithm, ResourceFlags, ResourceState, VoiceRegistration, PLAITS_REVISION,
 };
 
 #[cfg(test)]

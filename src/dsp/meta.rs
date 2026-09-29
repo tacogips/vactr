@@ -533,6 +533,8 @@ fn ugen_node(name: &str) -> Option<Node> {
         "analog-pair-core" => Node::AnalogPair,
         "grain-pair-core" => Node::GrainPair,
         "shape-pair-core" => Node::ShapePair,
+        "vactrol-gate" => Node::VactrolGate,
+        "decay-mod" => Node::DecayMod,
         "string-machine-core" => Node::StringMachinePair,
         "terrain-pair-core" => Node::TerrainPair,
         "wave-grid-core" => Node::TableTerrainPair,

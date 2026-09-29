@@ -90,6 +90,7 @@ mod tidal_function;
 mod tidal_poly;
 mod ugens;
 mod va_filter;
+mod vactrol_gate;
 mod voice_input;
 mod voice_layout;
 mod voice_stereo;

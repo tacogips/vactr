@@ -64,6 +64,175 @@ impl ResourceFlags {
     };
 }
 
+/// Whether an upstream engine already applies its own envelope.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Enveloped {
+    Never,
+    Always,
+    WhenClocked,
+}
+
+/// Per-position voice-level registration copied from upstream `Voice::Init`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VoiceRegistration {
+    pub enveloped: Enveloped,
+    pub out_gain: f32,
+    pub aux_gain: f32,
+}
+
+impl VoiceRegistration {
+    /// Returns the registered gain for lane zero (main) or lane one (aux).
+    #[must_use]
+    pub fn gain(&self, lane: u8) -> f32 {
+        if lane == 0 {
+            self.out_gain
+        } else {
+            self.aux_gain
+        }
+    }
+
+    /// Resolves the registration rule against the engine's clocked state.
+    #[must_use]
+    pub fn is_enveloped(&self, clocked: bool) -> bool {
+        match self.enveloped {
+            Enveloped::Never => false,
+            Enveloped::Always => true,
+            Enveloped::WhenClocked => clocked,
+        }
+    }
+}
+
+static VOICE_REGISTRATIONS: [VoiceRegistration; 24] = [
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 1.0,
+        aux_gain: 1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.7,
+        aux_gain: 0.7,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: 1.0,
+        aux_gain: 1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: 1.0,
+        aux_gain: 1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: 1.0,
+        aux_gain: 1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.7,
+        aux_gain: 0.7,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+    // The chiptune engine sets its enveloped flag when clocked.
+    VoiceRegistration {
+        enveloped: Enveloped::WhenClocked,
+        out_gain: 0.5,
+        aux_gain: 0.5,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.7,
+        aux_gain: 0.6,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.6,
+        aux_gain: 0.6,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.7,
+        aux_gain: 0.6,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.6,
+        aux_gain: 0.6,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+    // This position intentionally follows the accepted design's Never rule.
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: -0.7,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: -3.0,
+        aux_gain: 1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: -1.0,
+        aux_gain: -1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Never,
+        out_gain: -2.0,
+        aux_gain: 1.0,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: -1.0,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: -1.0,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+    VoiceRegistration {
+        enveloped: Enveloped::Always,
+        out_gain: 0.8,
+        aux_gain: 0.8,
+    },
+];
+
+/// Returns the registration tuple for a Plaits position, if it is in range.
+#[must_use]
+pub fn plaits_voice(slot: usize) -> Option<VoiceRegistration> {
+    VOICE_REGISTRATIONS.get(slot).copied()
+}
+
 /// Source common-control role mapped to a `.vact` name, when implemented.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CommonControls {
@@ -91,7 +260,7 @@ const fn controls(
 }
 
 /// One position in the source `Voice::Init` engine registry.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PortedAlgorithm {
     pub position: u8,
     pub source_engine: &'static str,
@@ -104,6 +273,8 @@ pub struct PortedAlgorithm {
     /// Number of independently emitted upstream auxiliary channels (one).
     pub aux_outputs: u8,
     pub coverage: CoverageState,
+    pub voice: VoiceRegistration,
+    pub voice_layer: CoverageState,
     pub resources: ResourceState,
     pub resource_flags: ResourceFlags,
 }
@@ -115,6 +286,7 @@ const fn implemented(
     template: &'static str,
     controls: CommonControls,
     coverage: CoverageState,
+    voice: VoiceRegistration,
 ) -> PortedAlgorithm {
     PortedAlgorithm {
         position,
@@ -126,6 +298,8 @@ const fn implemented(
         main_outputs: 1,
         aux_outputs: 1,
         coverage,
+        voice,
+        voice_layer: CoverageState::Pending,
         resources: ResourceState::Replacement,
         resource_flags: ResourceFlags::NONE,
     }
@@ -139,6 +313,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "filter-voice",
         controls("filter-harmonics", false, None),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[0],
     ),
     implemented(
         1,
@@ -147,6 +322,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "phase-pair-voice",
         controls("phase-harmonics", false, None),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[1],
     ),
     {
         let mut row = implemented(
@@ -156,6 +332,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "six-bank-a-voice",
             controls("six-patch", true, Some("six-sustain")),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[2],
         );
         row.resource_flags = ResourceFlags::DX7;
         row
@@ -168,6 +345,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "six-bank-b-voice",
             controls("six-patch", true, Some("six-sustain")),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[3],
         );
         row.resource_flags = ResourceFlags::DX7;
         row
@@ -180,6 +358,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "six-bank-c-voice",
             controls("six-patch", true, Some("six-sustain")),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[4],
         );
         row.resource_flags = ResourceFlags::DX7;
         row
@@ -194,6 +373,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "terrain-voice",
             controls("terrain-select", false, None),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[5],
         );
         row.resource_flags = ResourceFlags::WAVES;
         row
@@ -207,6 +387,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "string-machine-voice",
         controls("machine-chord", false, None),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[6],
     ),
     implemented(
         7,
@@ -215,6 +396,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "chip-voice",
         controls("chip-chord", false, Some("chip-clocked")),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[7],
     ),
     implemented(
         8,
@@ -223,6 +405,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "analog-pair-voice",
         controls("analog-detune", false, None),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[8],
     ),
     implemented(
         9,
@@ -231,6 +414,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "shape-voice",
         controls("shape-harmonics", false, None),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[9],
     ),
     implemented(
         10,
@@ -239,6 +423,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "fm-pair-voice",
         controls("fm-harmonics", false, None),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[10],
     ),
     implemented(
         11,
@@ -247,6 +432,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "grain-pair-voice",
         controls("grain-harmonics", false, None),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[11],
     ),
     implemented(
         12,
@@ -255,6 +441,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "spectrum-voice",
         controls("spectrum-bumps", false, None),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[12],
     ),
     {
         // Upstream reads unaudited waves.bin; the runnable Vactr grid is
@@ -266,6 +453,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "wave-grid-voice",
             controls("wave-bank", false, None),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[13],
         );
         row.resource_flags = ResourceFlags::WAVES;
         row
@@ -280,6 +468,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "chord-layer-voice",
             controls("layer-chord", false, None),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[14],
         );
         row.resource_flags = ResourceFlags::WAVES;
         row
@@ -292,6 +481,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
             "speech-voice",
             controls("speech-harmonics", true, Some("speech-sustain")),
             CoverageState::Adaptation,
+            VOICE_REGISTRATIONS[15],
         );
         row.resource_flags = ResourceFlags::TI;
         row
@@ -303,6 +493,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "swarm-voice",
         controls("swarm-spread", false, Some("swarm-continuous")),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[16],
     ),
     implemented(
         17,
@@ -311,6 +502,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "clock-noise-voice",
         controls("noise-harmonics", false, None),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[17],
     ),
     implemented(
         18,
@@ -319,6 +511,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "particle-voice",
         controls("particle-spread", false, None),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[18],
     ),
     implemented(
         19,
@@ -327,6 +520,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "string-voice",
         controls("string-structure", true, Some("string-sustain")),
         CoverageState::Adaptation,
+        VOICE_REGISTRATIONS[19],
     ),
     implemented(
         20,
@@ -335,6 +529,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "modal-voice",
         controls("modal-structure", true, Some("modal-sustain")),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[20],
     ),
     implemented(
         21,
@@ -343,6 +538,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "dual-kick-voice",
         controls("kick-harmonics", true, Some("kick-sustain")),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[21],
     ),
     implemented(
         22,
@@ -351,6 +547,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "dual-snare-voice",
         controls("snare-harmonics", true, Some("snare-sustain")),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[22],
     ),
     implemented(
         23,
@@ -359,6 +556,7 @@ static PLAITS: [PortedAlgorithm; 24] = [
         "dual-hat-voice",
         controls("hat-harmonics", true, Some("hat-sustain")),
         CoverageState::SourceStage,
+        VOICE_REGISTRATIONS[23],
     ),
 ];
 
@@ -373,6 +571,8 @@ pub fn plaits_algorithms() -> &'static [PortedAlgorithm] {
 #[must_use]
 pub fn plaits_coverage_summary() -> String {
     let mut counts = [0usize; 5];
+    let mut voice_pending = 0;
+    let mut voice_source_stage = 0;
     let mut dx7 = 0;
     let mut ti = 0;
     let mut wave_audit = 0;
@@ -388,10 +588,15 @@ pub fn plaits_coverage_summary() -> String {
             CoverageState::Unavailable => 4,
         };
         counts[index] += 1;
+        match row.voice_layer {
+            CoverageState::Pending => voice_pending += 1,
+            CoverageState::SourceStage => voice_source_stage += 1,
+            _ => {}
+        }
     }
     let mut summary = String::new();
     let _ = write!(summary,
-        "Plaits: {} positions; {} pending, {} adaptations, {} source-stage translations, {} source ports, {} unavailable (DX7 ROM: {}; TI ROM: {}; upstream wave assets unaudited: {}).",
-        PLAITS.len(), counts[0], counts[1], counts[2], counts[3], counts[4], dx7, ti, wave_audit);
+        "Plaits: {} positions; {} pending, {} adaptations, {} source-stage translations, {} source ports, {} unavailable (DX7 ROM: {}; TI ROM: {}; upstream wave assets unaudited: {}). Voice layer: {} pending, {} source-stage.",
+        PLAITS.len(), counts[0], counts[1], counts[2], counts[3], counts[4], dx7, ti, wave_audit, voice_pending, voice_source_stage);
     summary
 }

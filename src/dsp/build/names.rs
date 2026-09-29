@@ -233,6 +233,8 @@ pub const UGENS: &[(&str, UGenSpec)] = &[
     ("analog-pair-core", UGenSpec::AnalogPair),
     ("grain-pair-core", UGenSpec::GrainPair),
     ("shape-pair-core", UGenSpec::ShapePair),
+    ("vactrol-gate", UGenSpec::VactrolGate),
+    ("decay-mod", UGenSpec::DecayMod),
     ("string-machine-core", UGenSpec::StringMachinePair),
     ("terrain-pair-core", UGenSpec::TerrainPair),
     ("wave-grid-core", UGenSpec::TableTerrainPair),
@@ -288,6 +290,7 @@ pub fn is_processor(spec: &UGenSpec) -> bool {
             | UGenSpec::Ladder
             | UGenSpec::Svf
             | UGenSpec::FmMod
+            | UGenSpec::VactrolGate
             | UGenSpec::Mul
             | UGenSpec::Add
     )

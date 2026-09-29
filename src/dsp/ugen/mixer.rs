@@ -11,7 +11,7 @@ use super::{
     number_station, osc, particle_pair, peak_function, peak_pulse, phase_pair, rings_part, sample,
     shape_pair, six_op_original, snare_pair, spectrum_pair, speech_original, stage_chain,
     stage_segment, string_choir, string_machine_pair, string_pair, swarm_pair, table_terrain_pair,
-    terrain_pair, tidal_function, tidal_poly, va_filter, wavetable,
+    terrain_pair, tidal_function, tidal_poly, va_filter, vactrol_gate, wavetable,
 };
 use super::{Inp, Kx, Node, NodeSpec, NodeState, MAX_PORTS};
 
@@ -98,6 +98,8 @@ pub fn run(
         Node::AnalogPair => analog_pair::render(ins, st, mem, out, kx),
         Node::GrainPair => grain_pair::render(ins, st, mem, out, kx),
         Node::ShapePair => shape_pair::render(ins, st, mem, out, kx),
+        Node::VactrolGate => vactrol_gate::render_gate(ins, st, mem, out, kx),
+        Node::DecayMod => vactrol_gate::render_decay_mod(ins, st, mem, out, kx),
         Node::StringMachinePair => string_machine_pair::render(ins, st, mem, out, kx),
         Node::TerrainPair => terrain_pair::render(ins, st, mem, out, kx),
         Node::TableTerrainPair => table_terrain_pair::render(ins, st, mem, out, kx),

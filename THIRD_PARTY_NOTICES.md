@@ -712,6 +712,28 @@ assets are excluded. Filter, phoneme, prosody, timing and numeric fidelity
 differ. This is an Adaptation/Replacement, not a source port. The MIT
 permission and warranty notice is reproduced below.
 
+## Plaits voice-level layer (trigger, decay, low-pass gate, limiter)
+
+`src/dsp/ugen/voice_layer.rs` and the `vactrol-gate` and `decay-mod` nodes
+in `src/dsp/ugen/vactrol_gate.rs` are original fixed-state Rust informed by
+the voice-level stages of Mutable Instruments Plaits at Eurorack revision
+`08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. The sources are
+`plaits/dsp/voice.{h,cc}` (trigger detection, decay and gate envelopes,
+level and accent handling, output limiting), `plaits/dsp/envelope.h`,
+`plaits/dsp/fx/low_pass_gate.h`, `plaits/dsp/engine/engine.h` and
+`plaits/dsp/dsp.h` (engine parameter and rate conventions), and `stmlib`'s
+`dsp/limiter.h`, `dsp/filter.h` and `dsp/parameter_interpolator.h` at
+revision `e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`. These files carry Emilie
+Gillet's MIT notice, whose permission and warranty terms are reproduced
+under "Peaks FM drum design reference". No upstream code, lookup table,
+sample, preset or generated resource is imported.
+
+`verification/compare_plaits_voice.py` builds the pinned voice layer from a
+separate local checkout, solely for numerical comparison. Its temporary
+build also compiles `plaits/user_data.h`,
+`stmlib/system/flash_programming.h` and `stmlib/utils/buffer_allocator.h`.
+Nothing from them enters Vactr.
+
 ## Plaits position 10 FM architectural reference
 
 `fm-pair-voice` and `src/dsp/ugen/fm_pair.rs` translate the

@@ -1,6 +1,6 @@
 # PLV-20: `vactrol-gate` and `decay-mod` UGen Kinds, Controls and Registry
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-20 (wave 2; parallel with PLV-21)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Modules and nodes; Controls and editor metadata; Event mapping; Audio path per lane; `decay-mod`; Real-time, capacity and invariance)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`
@@ -221,12 +221,12 @@ PLV-31 (template wiring) build on the contract below.
 
 ## Completion Criteria
 
-- [ ] Both kinds are registered in every kind table that lists `ShapePair` outside tests (`graph.rs`, `graph/shape.rs` where exhaustive, `ugen/mod.rs`, `catalog.rs`, `catalog/voice_ports.rs`, `catalog/codec.rs`, `mixer.rs`, `build_helpers.rs`, `build/names.rs`, `build/names/table.rs`, `meta.rs`) and in `types/natives_domain.rs`, with wire tags 96 and 97 and the contract port orders. `src/dsp/voice.rs` `run_pair` keeps its wildcard and is not edited.
-- [ ] The kernel flags `u[0..=3]` follow the contract, as the tests show.
-- [ ] The three control rows exist with the pinned ids, domains and defaults.
-- [ ] `no_user_facing_name_carries_an_upstream_module_token` in `src/dsp/ported/tests.rs` also asserts `vactrol-gate` and `decay-mod` are neutral names, with no other edit in that file (verification command 6 already includes the `ported` filter).
-- [ ] `golden_digests.txt` is untouched, and the golden tests pass.
-- [ ] Commands 1-8 pass with logs.
+- [x] Both kinds are registered in every kind table that lists `ShapePair` outside tests (`graph.rs`, `graph/shape.rs` where exhaustive, `ugen/mod.rs`, `catalog.rs`, `catalog/voice_ports.rs`, `catalog/codec.rs`, `mixer.rs`, `build_helpers.rs`, `build/names.rs`, `build/names/table.rs`, `meta.rs`) and in `types/natives_domain.rs`, with wire tags 96 and 97 and the contract port orders. `src/dsp/voice.rs` `run_pair` keeps its wildcard and is not edited.
+- [x] The kernel flags `u[0..=3]` follow the contract, as the tests show.
+- [x] The three control rows exist with the pinned ids, domains and defaults.
+- [x] `no_user_facing_name_carries_an_upstream_module_token` in `src/dsp/ported/tests.rs` also asserts `vactrol-gate` and `decay-mod` are neutral names, with no other edit in that file (verification command 6 already includes the `ported` filter).
+- [x] `golden_digests.txt` is untouched, and the golden tests pass.
+- [x] Commands 1-8 pass with logs.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -251,4 +251,41 @@ PLV-31 (template wiring) build on the contract below.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30 PLV-20 implementation
+
+**Tasks Completed**: PLV-20 gate nodes, registry, controls, tests and verification.
+
+**Changes**:
+- Added fixed-state mono `vactrol-gate` and `decay-mod` kernels in `src/dsp/ugen/vactrol_gate.rs`; gate state uses 16 floats and decay-mod uses 4. The gate latches mode/slot/lane/clocked, preserves off/invalid identity bits, applies registered gain/limiter/clipping, persists its control clock, and reports the assigned lifetime flags.
+- Registered both node kinds, exact port orders, codec tags 96/97, editor names, lowering names, mono dispatch/memory requirements, and DSP native names. Added controls `lpg-mode` (153, off/ping/level), `lpg-decay` (154, 0.5) and `lpg-color` (155, 0.5).
+- Added focused contract tests in `src/dsp/tests/dsp/vactrol_gate.rs`; extended only the neutral-name assertion in `src/dsp/ported/tests.rs`. The gate lowering test builds a `UGenNode` tree and confirms argument edges land on ports 0, 1, 2, 6 and 7.
+- Left `src/dsp/voice.rs`, `src/host/tests/e2e/templates/golden_digests.txt`, templates and manifest rows unchanged. Verified the voice and golden digest files have no diff.
+
+**Verification**:
+- Commands 1-5 passed: `tmp/plv/PLV-20/1-fmt.log` through `5-lsp.log`.
+- Command 6 final attempt passed 36/36 selected tests (1,568 filtered): `tmp/plv/PLV-20/6-focused.log`. Earlier attempts exposed and corrected two test expectations; their outputs remain in the same log.
+- Command 7 passed 1,602/1,602 tests, 2 skipped: `tmp/plv/PLV-20/7-nextest.log`.
+- Command 8 passed; all listed Rust files are below 1,000 lines (largest is the new test module at 532): `tmp/plv/PLV-20/8-lines.log`.
+- The initial all-target check and Clippy attempts failed during integration; the final attempts end with `exit=0` in `2-check.log` and `3-clippy.log`. Clippy's transient diagnostics included the concurrent PLV-21 example and a test helper; both were resolved before its passing rerun. The first focused run failed two assertions; the final focused rerun is fully passing.
+
+**Downstream**: formal test-integrity/adversarial/integration review and any review-dependent shared documentation, staging, commit and push remain owned by later workflow steps.
+
+### Session: 2026-09-30 PLV-20 final-source self-check
+
+**Tasks Completed**: Closed the negative-slot rounding edge case and refreshed the required verification set against the final source.
+
+**Changes**:
+- `rounded_slot` rejects raw negative values before rounding; the invalid-slot identity test now covers `-0.1`, `24.0` and `NaN`.
+
+**Final-source verification**:
+- Command 1 `cargo fmt --check`: exit 0, `tmp/plv/PLV-20/review-final-fmt.log`.
+- Command 2 `cargo check -q --all-targets`: exit 0, `tmp/plv/PLV-20/postcheck-final-check.log`.
+- Command 3 `cargo clippy -q --all-targets -- -D warnings`: exit 0, `tmp/plv/PLV-20/review-final-clippy.log`.
+- Command 4 wasm32 lib check: exit 0, `tmp/plv/PLV-20/review-final-wasm.log`.
+- Command 5 LSP feature check: exit 0, `tmp/plv/PLV-20/review-final-lsp.log`.
+- Command 6 focused `vactrol_gate golden ported`: 36/36 passed, exit 0, `tmp/plv/PLV-20/postcheck-final-focused.log`.
+- Command 7 full nextest: 1,602/1,602 passed, 2 skipped, exit 0, `tmp/plv/PLV-20/review-final-nextest.log`.
+- Command 8 line counts: exit 0, all touched Rust files below 1,000 lines; maximum 723, `tmp/plv/PLV-20/review-final-lines.log`.
+- `git diff --check` passed; `src/dsp/voice.rs` and `golden_digests.txt` remain unchanged. Final post-edit hashes are in `tmp/plv/PLV-20/hashes.txt`.
+
+**Downstream**: formal integrity/adversarial and serial integration review, review-dependent shared documentation, staging, commit and push remain owned by later workflow steps.

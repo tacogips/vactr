@@ -612,6 +612,12 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "plaits/dsp/dsp.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
 path = "plaits/dsp/engine/additive_engine.cc"
 license = "MIT"
 kind = "code"
@@ -643,6 +649,12 @@ use = "source"
 
 [[file]]
 path = "plaits/dsp/engine/chord_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/engine.h"
 license = "MIT"
 kind = "code"
 use = "source"
@@ -882,6 +894,12 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "plaits/dsp/envelope.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
 path = "plaits/dsp/fx/diffuser.h"
 license = "MIT"
 kind = "code"
@@ -895,6 +913,12 @@ use = "source"
 
 [[file]]
 path = "plaits/dsp/fx/fx_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/fx/low_pass_gate.h"
 license = "MIT"
 kind = "code"
 use = "source"
@@ -1047,8 +1071,13 @@ use = "source"
 path = "plaits/dsp/voice.cc"
 license = "MIT"
 kind = "code"
-use = "excluded"
-reason = "Consulted only for the 24-position engine registry order recorded by the Plaits manifest; no code is translated."
+use = "source"
+
+[[file]]
+path = "plaits/dsp/voice.h"
+license = "MIT"
+kind = "code"
+use = "source"
 
 [[file]]
 path = "plaits/resources.cc"
@@ -1076,6 +1105,13 @@ license = "none"
 kind = "asset"
 use = "excluded"
 reason = "Unaudited wave binary behind wav_integrated_waves; positions 5, 13 and 14 use original replacements."
+
+[[file]]
+path = "plaits/user_data.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
 
 # --- rings
 [[file]]
@@ -1218,6 +1254,12 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "stmlib/dsp/limiter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
 path = "stmlib/dsp/parameter_interpolator.h"
 license = "MIT"
 kind = "code"
@@ -1243,11 +1285,25 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "stmlib/system/flash_programming.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
 path = "stmlib/ui/event_queue.h"
 license = "GPL-3.0-or-later"
 kind = "code"
 use = "excluded"
 reason = "GPL-3.0 UI event queue reached only through frames/ui.h from the cited Frames firmware main; UI code is out of scope and never translated."
+
+[[file]]
+path = "stmlib/utils/buffer_allocator.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
 
 [[file]]
 path = "stmlib/utils/dsp.h"

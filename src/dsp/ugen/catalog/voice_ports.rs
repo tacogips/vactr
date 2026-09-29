@@ -2,6 +2,22 @@
 
 use super::{p, Port, FREQ, IN};
 
+/// The Plaits voice-layer processor, in the stable kernel port order.
+pub(super) const VACTROL_GATE: &[Port] = &[
+    IN,
+    FREQ,
+    p("velocity", 1.0),
+    p("lpg-mode", 0.0),
+    p("lpg-decay", 0.5),
+    p("lpg-color", 0.5),
+    p("slot", 0.0),
+    p("lane", 0.0),
+    p("clocked", 0.0),
+];
+
+/// The trigger-patched Plaits decay modulation helper.
+pub(super) const DECAY_MOD: &[Port] = &[p("lpg-decay", 0.5), p("amount", 0.0), p("target", 0.0)];
+
 /// Original coupled-FM percussion; every sound parameter has its own port.
 pub(super) const FEEDBACK_METAL: &[Port] = &[
     p("freq", 180.0),

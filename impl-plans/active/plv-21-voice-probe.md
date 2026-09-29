@@ -206,10 +206,10 @@ checkout, revision, compile or run failure.
 
 ## Completion Criteria
 
-- [ ] The three new files and the `mise.toml` task exist with the pinned interfaces.
-- [ ] Commands 1-5, 7, 10 and 11 pass. Command 9 completes with JSON covering scenarios A-E, or is recorded as BLOCKED with the reason. The `trigger_state_` self-check passes (harness exit 0) for at least one ping and one level run in scenario A.
-- [ ] The JSON and the Progress Log record, per scenario, the metrics and whether it `meets_threshold`. Gaps are reported, not hidden.
-- [ ] `git status` shows no files under `verification/` other than the two new ones, and no build products in the repository.
+- [x] The three new files and the `mise.toml` task exist with the pinned interfaces.
+- [x] Commands 1-5, 7, 10 and 11 pass. Command 9 completes with JSON covering scenarios A-E, or is recorded as BLOCKED with the reason. The `trigger_state_` self-check passes (harness exit 0) for at least one ping and one level run in scenario A.
+- [x] The JSON and the Progress Log record, per scenario, the metrics and whether it `meets_threshold`. Gaps are reported, not hidden.
+- [x] `git status` shows no files under `verification/` other than the two new ones, and no build products in the repository.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -231,4 +231,92 @@ checkout, revision, compile or run failure.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30 PLV-21 implementation
+
+**Tasks Completed**: Comparison harness, Python orchestrator, Rust reference
+example, and `compare-plaits-voice` mise task.
+
+**Intent recorded before edits**: `tmp/plv/PLV-21/edit-intents.txt`; initial
+`mise.toml` SHA-256 was `927796be0a4635fed147cb80a0fb5bd344b3e5ff583ee37a24f8ed613d829c4f`.
+
+**Implementation**:
+- Added `verification/plaits_voice_reference.cc` to run the pinned
+  `plaits::Voice`, expose trajectory/raw/output rows, check
+  `trigger_state_` after blocks 19 and 20, and run direct LPG/limiter/bypass
+  paths.
+- Added `verification/compare_plaits_voice.py` to verify Eurorack revision
+  `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`, stmlib revision
+  `e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`, and clean tracked trees; it
+  compiles in a temporary directory and reports scenarios A-E as JSON.
+- Added `examples/plaits_voice_reference.rs` for `traj`, `audio`, `bypass`,
+  and `lane`; it uses the existing `voice_layer` API and registration tuples.
+- Added the pinned `[tasks.compare-plaits-voice]` entry immediately after
+  `[tasks.compare-plaits-drums]` in `mise.toml`.
+- Probe source paths named or collected at runtime: `plaits/dsp/voice.h`,
+  `plaits/dsp/voice.cc`, `plaits/dsp/fx/low_pass_gate.h`,
+  `plaits/dsp/envelope.h`, `stmlib/dsp/limiter.h`,
+  `stmlib/utils/buffer_allocator.h`, all `*.cc` files under `plaits/dsp`,
+  `plaits/resources.cc`, `stmlib/dsp/units.cc`, and
+  `stmlib/utils/random.cc`. The five harness header paths match the PLV-40
+  inventory contract; no upstream files are copied or modified.
+
+**Probe outcome**: `tmp/plv/PLV-21/9-probe.json` is valid JSON with all five
+scenarios, and `tmp/plv/PLV-21/9-probe.log` ends in `exit=0`.
+`voice_layer_label_eligible` is `true` for this measured probe; PLV-40 owns
+any manifest-label update.
+
+- **A, trajectory**: 54 runs, `meets_threshold: true`. Worst max-absolute
+  errors were gain `4.02336e-5`, frequency `1.51996e-5`, and HF bleed
+  `6.9888e-6` (threshold `1e-4`). Decay-envelope max-absolute error was
+  `6.76518e-5`, also below `1e-4`. Ping and level harness self-checks both
+  observed `trigger_state_ == false` after block 19 and `true` after block
+  20; harness exit was 0 for both.
+- **B, audio path**: 4 gain runs, `meets_threshold: true`; minimum
+  correlation `0.9999999999999538`, maximum max-absolute error
+  `4.768e-7`, maximum RMS error `3.90806e-8`.
+- **C, end to end**: 8 engine/mode/lane runs, `meets_threshold: true`;
+  minimum correlation `0.9999994412791641`, maximum max-absolute error
+  `3.06963e-5`, maximum RMS error `1.82431e-5`.
+- **D, bypass**: `meets_threshold: true`; correlation `0.999999990200391`,
+  max-absolute error `3.051761e-5`, RMS error `1.76261e-5` over 14,400
+  samples.
+- **E, host rate**: `meets_threshold: true`. At 44.1 kHz, errors for gain
+  crossings 0.5 / 0.01 were `0.017574 ms` / `0.007937 ms`, below the
+  `0.272676 ms` tolerance. At 96 kHz both were `0 ms`, below the
+  `0.260417 ms` tolerance.
+
+**Verification** (all final-source exits 0):
+- Command 1: `CARGO_TERM_QUIET=true cargo fmt --check`,
+  `tmp/plv/PLV-21/1-fmt.log`.
+- Command 2: `CARGO_TERM_QUIET=true cargo check -q --all-targets`,
+  `tmp/plv/PLV-21/2-check.log`.
+- Command 3: `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings`,
+  `tmp/plv/PLV-21/3-clippy.log`.
+- Command 4: `CARGO_TERM_QUIET=true cargo check -q --target
+  wasm32-unknown-unknown --lib`, `tmp/plv/PLV-21/4-wasm.log`.
+- Command 5: `CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp`,
+  `tmp/plv/PLV-21/5-lsp.log`.
+- Command 7: configured full `cargo nextest run`,
+  `tmp/plv/PLV-21/7-nextest.log`; 1,602 run, 1,602 passed, 2 skipped.
+- Command 9: `mise run compare-plaits-voice` with the pinned checkout,
+  `tmp/plv/PLV-21/9-probe.json` and `tmp/plv/PLV-21/9-probe.log`.
+- Command 10: Python byte-compilation,
+  `tmp/plv/PLV-21/10-pycompile.log`.
+- Command 11: the planned ping trajectory smoke command, appended to
+  `tmp/plv/PLV-21/2-check.log`; exit 0 and 20 `T` rows.
+- Cargo build output was isolated under `tmp/plv/PLV-21/target`.
+  `git status --short -- verification` lists only the two new probe files;
+  no repository build products were created outside `tmp/`.
+
+**Corrections and preserved earlier attempts**: The first format attempt
+encountered a missing concurrently added PLV-20 test module; the rerun passed
+after it appeared. The first clippy run found probe helper argument-count
+warnings and a PLV-20 test helper warning; local probe annotations and the
+concurrent test correction were followed by a passing full clippy run. The
+first E run did not render long enough to reach 0.01; its horizon was extended
+to 6,000 blocks. Initial trajectory output exposed a doubled Rust decay
+coefficient; the example now passes `short_decay` once to the helper that
+applies the upstream factor of two internally. Full prior JSON attempts are
+preserved in `tmp/plv/PLV-21/9-probe.log` before the final result.
+
+**Post-edit source hashes** are recorded in `tmp/plv/PLV-21/hashes.txt`.

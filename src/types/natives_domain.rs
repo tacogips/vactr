@@ -405,6 +405,8 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("analog-pair-core"),
     dsp("grain-pair-core"),
     dsp("shape-pair-core"),
+    dsp("vactrol-gate"),
+    dsp("decay-mod"),
     dsp("string-machine-core"),
     dsp("terrain-pair-core"),
     dsp("wave-grid-core"),

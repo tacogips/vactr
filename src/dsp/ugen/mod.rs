@@ -79,6 +79,8 @@ pub mod terrain_pair;
 pub mod tidal_function;
 pub mod tidal_poly;
 pub mod va_filter;
+pub mod vactrol_gate;
+pub mod voice_layer;
 pub mod wavetable;
 
 use crate::dsp::arena::SampleStore;
@@ -191,6 +193,8 @@ pub enum Node {
     AnalogPair,
     GrainPair,
     ShapePair,
+    VactrolGate,
+    DecayMod,
     StringMachinePair,
     TerrainPair,
     TableTerrainPair,

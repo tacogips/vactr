@@ -165,6 +165,8 @@ pub enum UGenSpec {
     AnalogPair,
     GrainPair,
     ShapePair,
+    VactrolGate,
+    DecayMod,
     StringMachinePair,
     TerrainPair,
     TableTerrainPair,

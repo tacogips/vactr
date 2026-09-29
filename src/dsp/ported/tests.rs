@@ -1,5 +1,6 @@
 use super::{
-    plaits_algorithms, plaits_coverage_summary, CoverageState, ResourceState, PLAITS_REVISION,
+    plaits_algorithms, plaits_coverage_summary, plaits_voice, CoverageState, Enveloped,
+    ResourceState, VoiceRegistration, PLAITS_REVISION,
 };
 use crate::dsp::graph::EffectKind;
 use crate::ns::insts::TEMPLATE_NAMES;
@@ -104,12 +105,67 @@ fn plaits_registry_is_complete_ordered_and_source_pinned() {
 }
 
 #[test]
+fn plaits_voice_registrations_match_all_24_pinned_rows() {
+    let expected = [
+        (Enveloped::Never, 1.0, 1.0),
+        (Enveloped::Never, 0.7, 0.7),
+        (Enveloped::Always, 1.0, 1.0),
+        (Enveloped::Always, 1.0, 1.0),
+        (Enveloped::Always, 1.0, 1.0),
+        (Enveloped::Never, 0.7, 0.7),
+        (Enveloped::Never, 0.8, 0.8),
+        (Enveloped::WhenClocked, 0.5, 0.5),
+        (Enveloped::Never, 0.8, 0.8),
+        (Enveloped::Never, 0.7, 0.6),
+        (Enveloped::Never, 0.6, 0.6),
+        (Enveloped::Never, 0.7, 0.6),
+        (Enveloped::Never, 0.8, 0.8),
+        (Enveloped::Never, 0.6, 0.6),
+        (Enveloped::Never, 0.8, 0.8),
+        (Enveloped::Never, -0.7, 0.8),
+        (Enveloped::Never, -3.0, 1.0),
+        (Enveloped::Never, -1.0, -1.0),
+        (Enveloped::Never, -2.0, 1.0),
+        (Enveloped::Always, -1.0, 0.8),
+        (Enveloped::Always, -1.0, 0.8),
+        (Enveloped::Always, 0.8, 0.8),
+        (Enveloped::Always, 0.8, 0.8),
+        (Enveloped::Always, 0.8, 0.8),
+    ];
+    let rows = plaits_algorithms();
+    for (position, (enveloped, out_gain, aux_gain)) in expected.into_iter().enumerate() {
+        let registration = VoiceRegistration {
+            enveloped,
+            out_gain,
+            aux_gain,
+        };
+        assert_eq!(plaits_voice(position), Some(registration));
+        assert_eq!(rows[position].voice, registration);
+        assert_eq!(rows[position].voice_layer, CoverageState::Pending);
+        assert_ne!(rows[position].coverage, CoverageState::SourcePort);
+    }
+    assert_eq!(plaits_voice(24), None);
+
+    assert_eq!(plaits_voice(9).unwrap().gain(0), 0.7);
+    assert_eq!(plaits_voice(9).unwrap().gain(1), 0.6);
+    assert_eq!(plaits_voice(17).unwrap().gain(0), -1.0);
+    assert_eq!(plaits_voice(17).unwrap().gain(1), -1.0);
+    assert!(!plaits_voice(7).unwrap().is_enveloped(false));
+    assert!(plaits_voice(7).unwrap().is_enveloped(true));
+    assert!(plaits_voice(21).unwrap().is_enveloped(false));
+    assert!(plaits_voice(21).unwrap().is_enveloped(true));
+    assert!(!plaits_voice(0).unwrap().is_enveloped(false));
+    assert!(!plaits_voice(0).unwrap().is_enveloped(true));
+}
+
+#[test]
 fn implemented_rows_have_registered_templates_and_editor_controls() {
     let manifest = HostManifest::spec_default();
     let rows = plaits_algorithms();
     let mut adaptations = 0;
     let mut source_stages = 0;
     for row in rows {
+        assert_eq!(row.voice_layer, CoverageState::Pending);
         if let Some(name) = row.vactr_template {
             assert!(
                 TEMPLATE_NAMES.contains(&name),
@@ -208,6 +264,7 @@ fn resource_blocked_positions_are_not_reported_as_ports() {
     assert!(summary.contains("0 source ports"));
     assert!(summary.contains("0 unavailable"));
     assert!(summary.contains("upstream wave assets unaudited: 3"));
+    assert!(summary.ends_with(" Voice layer: 24 pending, 0 source-stage."));
 }
 
 // --- MOD-002: cross-family neutral-naming and template/effect matrix ---
@@ -256,6 +313,8 @@ fn no_user_facing_name_carries_an_upstream_module_token() {
     for kind in EffectKind::ALL {
         assert_neutral_name(kind.name());
     }
+    assert_neutral_name("vactrol-gate");
+    assert_neutral_name("decay-mod");
     let manifest = HostManifest::spec_default();
     for decl in manifest.editor_decls() {
         assert_neutral_name(decl.name);

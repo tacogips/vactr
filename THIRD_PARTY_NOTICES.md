@@ -135,6 +135,21 @@ fixed-point arithmetic differ. All 47 positions are runnable adaptations,
 not source-equivalent ports; upstream wave-asset
 flags 37–40 remain true as provenance facts, not runtime dependencies.
 
+An opt-in local verification probe, `verification/braids_shapes_reference.cc`
+plus `verification/compare_braids_shapes.py`, compiles the pinned
+`braids/macro_oscillator.{h,cc}`, `braids/analog_oscillator.{h,cc}`,
+`braids/digital_oscillator.{h,cc}`, `braids/resources.{h,cc}` and
+`stmlib/utils/random.{h,cc}` only into a separate, local, temporary
+executable built from the user's own pinned checkout; it is never linked
+into Vactr's library, binary, or browser build, and no upstream object,
+table, or audio sample is copied into this repository. It measures raw
+kernel RMS, correlation, normalized RMS error, an approximate spectral
+centroid and a fundamental-frequency estimate against
+`examples/braids_shapes_reference.rs`, which dispatches every one of the 47
+source positions to the Vactr family kernel that owns it. Measured gaps are
+comparison results, not evidence of source parity; they never change any
+coverage manifest label.
+
 ## Clouds granular texture architectural adaptation
 
 `texture-grain` and `src/dsp/effects/texture.rs` adapt the stereo capture,

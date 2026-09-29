@@ -100,6 +100,11 @@ description = "Compare raw FM kernels against a separate pinned Mutable Instrume
 run = 'python3 verification/compare_plaits_fm.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
+[tasks.compare-braids-shapes]
+description = "Compare raw Braids macro-oscillator shape kernels against a separate pinned Mutable Instruments checkout"
+run = 'python3 verification/compare_braids_shapes.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
+env = { CARGO_TERM_QUIET = "true" }
+
 [tasks.probe-warps-vocoder]
 description = "Measure the source Warps vocoder in a separate pinned Mutable Instruments checkout"
 run = 'python3 verification/probe_warps_vocoder.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'

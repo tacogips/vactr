@@ -45,6 +45,12 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "braids/digital_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
 path = "braids/macro_oscillator.cc"
 license = "MIT"
 kind = "code"
@@ -62,6 +68,13 @@ license = "MIT"
 kind = "aggregate-resource"
 use = "excluded"
 reason = "Generated aggregate tables; Braids shapes use original analytic or procedural replacements."
+
+[[file]]
+path = "braids/resources.h"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Declarations for the excluded aggregate Braids resource tables."
 
 [[file]]
 path = "braids/resources/waveforms.py"
@@ -1105,6 +1118,12 @@ reason = "GPL-3.0 UI event queue reached only through frames/ui.h from the cited
 
 [[file]]
 path = "stmlib/utils/dsp.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/utils/random.cc"
 license = "MIT"
 kind = "code"
 use = "source"

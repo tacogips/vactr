@@ -214,6 +214,13 @@ reason = "Generated windows, sine and SRC tables; Clouds textures use Vactr-auth
 
 # --- elements
 [[file]]
+path = "elements/dsp/dsp.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Consulted only for the firmware sample rate and block size used by the local comparison probe; no code is translated."
+
+[[file]]
 path = "elements/dsp/exciter.cc"
 license = "MIT"
 kind = "code"
@@ -221,6 +228,18 @@ use = "source"
 
 [[file]]
 path = "elements/dsp/exciter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/multistage_envelope.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/multistage_envelope.h"
 license = "MIT"
 kind = "code"
 use = "source"
@@ -268,6 +287,30 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "elements/dsp/string.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/string.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/tube.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/tube.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
 path = "elements/dsp/voice.cc"
 license = "MIT"
 kind = "code"
@@ -278,6 +321,13 @@ path = "elements/dsp/voice.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "elements/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated aggregate tables embed strike/blow samples from the GPL-3.0-or-later samples.py generator; compiled only in a temporary local comparison probe and never imported into Vactr."
 
 [[file]]
 path = "elements/resources/samples.py"

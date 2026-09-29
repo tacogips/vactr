@@ -61,9 +61,9 @@ fn table_terrain_pair_controls_reach_audio_editor_and_aux_graph() {
     };
     let template = Template::from_inst(&entry.def, &env).expect("wave-grid graph");
     assert!(template.has_aux);
-    assert_eq!(template.mem_total, 2 * table_terrain_pair::STATE_FLOATS);
+    assert_eq!(template.mem_total, table_terrain_pair::STATE_FLOATS);
     let low_budget = BuildEnv {
-        voice_mem: 2 * table_terrain_pair::STATE_FLOATS - 1,
+        voice_mem: table_terrain_pair::STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(

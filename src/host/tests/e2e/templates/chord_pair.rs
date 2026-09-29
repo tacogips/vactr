@@ -61,9 +61,9 @@ fn chord_pair_controls_reach_audio_editor_and_aux_graph() {
     };
     let template = Template::from_inst(&entry.def, &env).expect("chord-layer graph");
     assert!(template.has_aux);
-    assert_eq!(template.mem_total, 2 * chord_pair::STATE_FLOATS);
+    assert_eq!(template.mem_total, chord_pair::STATE_FLOATS);
     let low_budget = BuildEnv {
-        voice_mem: 2 * chord_pair::STATE_FLOATS - 1,
+        voice_mem: chord_pair::STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(

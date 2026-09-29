@@ -60,10 +60,15 @@ fn filter_voice_controls_and_note_reach_audio_and_editor() {
     assert!(entry.def.edges.iter().any(|edge| edge.port == 4
         && matches!(
             entry.def.nodes[usize::from(edge.from)],
-            crate::dsp::graph::UGenSpec::Const(1.0)
+            crate::dsp::graph::UGenSpec::Const(0.0)
         )
         && matches!(
             entry.def.nodes[usize::from(edge.to)],
+            crate::dsp::graph::UGenSpec::VaFilter
+        )));
+    assert!(entry.def.edges.iter().any(|edge| edge.output == 1
+        && matches!(
+            entry.def.nodes[usize::from(edge.from)],
             crate::dsp::graph::UGenSpec::VaFilter
         )));
 }
@@ -195,10 +200,15 @@ fn fm_pair_voice_controls_and_note_reach_audio_and_editor() {
     assert!(entry.def.edges.iter().any(|edge| edge.port == 4
         && matches!(
             entry.def.nodes[usize::from(edge.from)],
-            crate::dsp::graph::UGenSpec::Const(1.0)
+            crate::dsp::graph::UGenSpec::Const(0.0)
         )
         && matches!(
             entry.def.nodes[usize::from(edge.to)],
+            crate::dsp::graph::UGenSpec::FmPair
+        )));
+    assert!(entry.def.edges.iter().any(|edge| edge.output == 1
+        && matches!(
+            entry.def.nodes[usize::from(edge.from)],
             crate::dsp::graph::UGenSpec::FmPair
         )));
 }

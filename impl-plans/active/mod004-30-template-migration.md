@@ -1,6 +1,6 @@
 # MOD004-30: Migrate the Nine Simultaneous-output Templates
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: MOD004-30 (session-194 wave 1, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Migration eligibility; list of nine; exclusion table; Implementation status)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004E)
@@ -189,11 +189,11 @@ a pass.
 
 ## Completion Criteria
 
-- [ ] The nine templates are migrated to one `let`-bound node; `git diff` shows no other template changed.
-- [ ] Main and aux of each migrated template are bit-identical to the old two-node form at the default and one non-default control, and both channels are non-silent.
-- [ ] Render digests are unchanged; the fixture diff is exactly the nine `graph` lines.
-- [ ] `phase-pair-voice` and `resonator-voice` still have two kernel nodes.
-- [ ] Commands 1-10 pass, with exit statuses and log paths recorded.
+- [x] The nine templates are migrated to one `let`-bound node; `git diff` shows no other template changed.
+- [x] Main and aux of each migrated template are bit-identical to the old two-node form at the default and one non-default control, and both channels are non-silent.
+- [x] Render digests are unchanged; the fixture diff is exactly the nine `graph` lines.
+- [x] `phase-pair-voice` and `resonator-voice` still have two kernel nodes.
+- [x] Commands 1-10 pass, with exit statuses and log paths recorded; the audit script passed with the mise-managed Python 3.12 interpreter after the task's ambient `python3` resolved to system Python 3.9.
 
 ## Execution Protocol
 
@@ -210,4 +210,28 @@ a pass.
 
 ## Progress Log
 
-(empty)
+### Session: 2026-09-29 MOD004-30 implementation
+
+**Tasks Completed**: Migrated all nine eligible templates; added render-equivalence and structural tests; updated only structural expectations made stale by the reduction to one kernel state; updated nine golden graph digests; completed plan verification.
+
+**Source changes**:
+- `src/prelude/templates.vact`: migrated `filter-voice`, `fm-pair-voice`, `analog-pair-voice`, `chord-layer-voice`, `wave-grid-voice`, `terrain-voice`, `string-machine-voice`, `shape-voice`, and `stage-chain-voice` to one `let p` node retaining the original main selector (`mode: 0` or `chain-channel: 0`), with output 0 through the existing main amp path and output 1 through the existing aux amp/`aux-out` path. `filter-voice` now uses one `va-source` and one `va-filter`. Only those nine bodies and their directly-above comment text changed; `git diff --stat` is recorded in `tmp/mod004/MOD004-30/18-template-diff-stat.log`.
+- `src/host/tests/e2e/templates/migrated_pairs.rs`: added legacy inline definitions and default/non-default per-channel bitwise render comparisons, non-silence checks, one-node/output-index structural checks, and excluded `phase-pair-voice`/`resonator-voice` checks.
+- Structural-only updates permitted by this plan: `analog_pair.rs`, `chord_pair.rs`, `shape_pair.rs`, `string_machine_pair.rs`, `terrain_pair.rs`, and `table_terrain_pair.rs` now expect one engine's memory total and test a budget one float below that state size. `voice_engines.rs` now expects the migrated filter/FM node's retained selector value 0 and its output-1 edge. Audio assertions were preserved. Failure evidence and per-edit snapshots/intents are retained under `tmp/mod004/MOD004-30/`.
+- `src/host/tests/e2e/templates/golden_digests.txt`: exactly nine graph lines changed. No render digest or other template record changed (`17-fixture-exactness.log`, exit 0).
+
+**Pre-edit hashes**: `src/prelude/templates.vact` `698fb8d0ec6941413469d74a8e523161b3cab08872fb8d287a29cc75cfb5f7ed`; `golden_digests.txt` `c6fa58041b994f8eef9e4ff861d23a4937e02c88eba7376cea83718e7546ead0`; stub `migrated_pairs.rs` `fcd36e64c90ea45e5ba1e318dcc832094d3f62e0cdf09664d6ff79a0e467d0d5` (`01-pre-edit-hashes.txt`).
+
+**Final hashes and Rust line counts**: `40-final-hashes.txt`; all touched Rust files are below 1000 lines (`40-rust-line-counts.log`, exit 0; largest is `voice_engines.rs` at 781 lines).
+
+**Verification**:
+- `CARGO_TERM_QUIET=true cargo check -q --all-targets`: exit 0, `tmp/mod004/MOD004-30/30-checker-cargo-check.log` (quiet output is empty).
+- `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings`: exit 0, `32-clippy.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run migrated_pairs golden templates`: final exit 0, 149 passed, 0 failed, `31-focused-nextest-final.log`. Earlier focused attempts and structural assertion findings are retained in logs `08`, `10`, `13`, `16`, `21`, `24`, and `27` with exit records where captured; each mapped to the allowed one-node structural changes above.
+- Fixture exactness shell command: exit 0, `17-fixture-exactness.log`; `git diff --stat -- src/prelude/templates.vact` and `git diff --check` both exit 0, `18-template-diff-stat.log` and `18-diff-check.log`.
+- Full nextest command: exit 0, 1573 passed, 0 failed, 2 skipped, `33-full-nextest.log`.
+- Exact-file `rustfmt --edition 2021 --check` over all touched Rust files: exit 0, `34-rustfmt.log`.
+- `VACTR_MI_REFERENCE=… mise run audit-upstream` first exited 1 because that task resolved ambient `python3` to system Python 3.9 (`tomllib` unavailable), `35-audit-upstream.log`. The same audit script under the repository's mise-managed Python 3.12 exited 0 and reported `warnings: []`, `errors: []`, `36-audit-upstream-managed-python.log`. The task was not modified because it is outside this plan's write paths.
+- Golden graph-only bless (permitted solely to obtain graph lines): exit 0, `06-bless-graph-lines.log`; no render records were accepted from a re-bless.
+
+**Notes**: The first bless attempt (`05-bless-graph-lines.log`) overlapped the test worker's temporary replacement of the reserved stub and failed compilation; it did not change the fixture. The succeeding bless run used the completed test module. No runtime, codec, lowering, checker, kernel, unrelated template, or git-state changes were made. Commit and formal review remain downstream workflow steps.

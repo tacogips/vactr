@@ -98,11 +98,11 @@ inst metal-hat hat-frequency: float = 3900 hat-tone: float = 0.5 hat-decay: floa
 	analog-percussion hat-frequency tone: hat-tone decay: hat-decay metal: hat-metal mode: 2
 		> * amp
 
-# Analytic variable-spectrum oscillator and paired filters. The two source
-# nodes start in phase; aux-out sends the high-pass path to the right channel.
+# Analytic variable-spectrum oscillator and paired filters. One bound node
+# provides both outputs; aux-out sends the high-pass path to the right channel.
 inst filter-voice morph: float = 0.5 timbre: float = 0.5 filter-harmonics: float = 0.5:
-	va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 0 > * amp
-		> + {va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 1 > * amp > aux-out}
+	let p {va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
 # Table-free phase distortion: synchronized main and free-running auxiliary.
 # The harmonics role uses a distinct name because harmonics is an effect.
@@ -111,10 +111,10 @@ inst phase-pair-voice phase-harmonics: float = 0.5 timbre: float = 0.5 morph: fl
 		> + {phase-pair freq phase-harmonics: phase-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
 
 # Fourfold analytic two-operator FM. Main is carrier; aux is a sub oscillator.
-# Morph ranges from negative phase feedback to positive modulator feedback.
+# Morph ranges from negative phase feedback to positive modulator feedback. One bound node provides both outputs.
 inst fm-pair-voice fm-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0 > * amp
-		> + {fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
 # Original 32-configuration six-operator banks. Main and aux intentionally
 # duplicate the same signal, matching the source engine's output relationship.
@@ -172,15 +172,15 @@ inst swarm-voice swarm-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.
 	swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 0 swarm-continuous: swarm-continuous > * amp
 		> + {swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 1 swarm-continuous: swarm-continuous > * amp > aux-out}
 
-# Plaits position 8 roles: variable square/saw main, sync difference aux.
+# Plaits position 8 roles: variable square/saw main, sync difference aux. One bound node provides both outputs.
 inst analog-pair-voice analog-detune: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 0 > * amp
-		> + {analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
-# Four-note chord with inversion and fifteen original procedural timbres.
+# Four-note chord with inversion and fifteen original procedural timbres. One bound node provides both outputs.
 inst chord-layer-voice layer-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 0 > * amp
-		> + {chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
 # Five original analytic oscillator shapes selected by macro-shape (0..4).
 # Strike adds a short overtone transient; sync adds an event-local hard-sync clock.
@@ -240,25 +240,25 @@ inst macro-noise-voice macro-shape: float = 41 macro-color: float = 0.5 macro-ti
 inst macro-cloud-voice macro-shape: float = 44 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
 	macro-cloud-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
-# Original analytic 8x8x3 wave grid; quantized auxiliary output.
+# Original analytic 8x8x3 wave grid; quantized auxiliary output. One bound node provides both outputs.
 inst wave-grid-voice wave-bank: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	wave-grid-core freq wave-bank: wave-bank timbre: timbre morph: morph mode: 0 > * amp
-		> + {wave-grid-core freq wave-bank: wave-bank timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {wave-grid-core freq wave-bank: wave-bank timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
-# Eight default wave terrains; modes 5-7 use original procedural surfaces.
+# Eight default wave terrains; modes 5-7 use original procedural surfaces. One bound node provides both outputs.
 inst terrain-voice terrain-select: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	terrain-pair-core freq terrain-select: terrain-select timbre: timbre morph: morph mode: 0 > * amp
-		> + {terrain-pair-core freq terrain-select: terrain-select timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {terrain-pair-core freq terrain-select: terrain-select timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
-# Four divide-down chord voices, filtered and sent through a stereo ensemble.
+# Four divide-down chord voices, filtered and sent through a stereo ensemble. One bound node provides both outputs.
 inst string-machine-voice machine-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	string-machine-core freq machine-chord: machine-chord timbre: timbre morph: morph mode: 0 > * amp
-		> + {string-machine-core freq machine-chord: machine-chord timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {string-machine-core freq machine-chord: machine-chord timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
-# Analytic slope folding main and sine/overtone auxiliary.
+# Analytic slope folding main and sine/overtone auxiliary. One bound node provides both outputs.
 inst shape-voice shape-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
-	shape-pair-core freq shape-harmonics: shape-harmonics timbre: timbre morph: morph mode: 0 > * amp
-		> + {shape-pair-core freq shape-harmonics: shape-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+	let p {shape-pair-core freq shape-harmonics: shape-harmonics timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
 # Two grainlet oscillators on main; independent Z oscillator on aux.
 inst grain-pair-voice grain-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
@@ -360,10 +360,10 @@ inst stage-voice stage-type: float = 0 stage-primary: float = 0.5 stage-secondar
 		> + {stage-segment-core freq stage-type: stage-type stage-primary: stage-primary stage-secondary: stage-secondary stage-loop: stage-loop stage-gate: stage-gate stage-trigger: stage-trigger stage-clock: stage-clock stage-function: stage-function stage-channel: 1 > * amp > aux-out}
 
 # Six-stage event-local chain; each segment's four controls are codeable.
-# Main is value and aux is bipolar phase.
+# Main is value and aux is bipolar phase. One bound node provides both outputs.
 inst stage-chain-voice chain-count: float = 3 chain-gate: float = 1 chain-trigger: float = 0 chain1-type: float = 0 chain1-loop: float = 0 chain1-primary: float = 0.2 chain1-secondary: float = 0.5 chain2-type: float = 2 chain2-loop: float = 1 chain2-primary: float = 0.7 chain2-secondary: float = 0.5 chain3-type: float = 0 chain3-loop: float = 0 chain3-primary: float = 0.2 chain3-secondary: float = 0.5 chain4-type: float = 0 chain4-loop: float = 0 chain4-primary: float = 0.2 chain4-secondary: float = 0.5 chain5-type: float = 0 chain5-loop: float = 0 chain5-primary: float = 0.2 chain5-secondary: float = 0.5 chain6-type: float = 0 chain6-loop: float = 0 chain6-primary: float = 0.2 chain6-secondary: float = 0.5:
-	stage-chain-core freq chain-count: chain-count chain-gate: chain-gate chain-trigger: chain-trigger chain1-type: chain1-type chain1-loop: chain1-loop chain1-primary: chain1-primary chain1-secondary: chain1-secondary chain2-type: chain2-type chain2-loop: chain2-loop chain2-primary: chain2-primary chain2-secondary: chain2-secondary chain3-type: chain3-type chain3-loop: chain3-loop chain3-primary: chain3-primary chain3-secondary: chain3-secondary chain4-type: chain4-type chain4-loop: chain4-loop chain4-primary: chain4-primary chain4-secondary: chain4-secondary chain5-type: chain5-type chain5-loop: chain5-loop chain5-primary: chain5-primary chain5-secondary: chain5-secondary chain6-type: chain6-type chain6-loop: chain6-loop chain6-primary: chain6-primary chain6-secondary: chain6-secondary chain-channel: 0 > * amp
-		> + {stage-chain-core freq chain-count: chain-count chain-gate: chain-gate chain-trigger: chain-trigger chain1-type: chain1-type chain1-loop: chain1-loop chain1-primary: chain1-primary chain1-secondary: chain1-secondary chain2-type: chain2-type chain2-loop: chain2-loop chain2-primary: chain2-primary chain2-secondary: chain2-secondary chain3-type: chain3-type chain3-loop: chain3-loop chain3-primary: chain3-primary chain3-secondary: chain3-secondary chain4-type: chain4-type chain4-loop: chain4-loop chain4-primary: chain4-primary chain4-secondary: chain4-secondary chain5-type: chain5-type chain5-loop: chain5-loop chain5-primary: chain5-primary chain5-secondary: chain5-secondary chain6-type: chain6-type chain6-loop: chain6-loop chain6-primary: chain6-primary chain6-secondary: chain6-secondary chain-channel: 1 > * amp > aux-out}
+	let p {stage-chain-core freq chain-count: chain-count chain-gate: chain-gate chain-trigger: chain-trigger chain1-type: chain1-type chain1-loop: chain1-loop chain1-primary: chain1-primary chain1-secondary: chain1-secondary chain2-type: chain2-type chain2-loop: chain2-loop chain2-primary: chain2-primary chain2-secondary: chain2-secondary chain3-type: chain3-type chain3-loop: chain3-loop chain3-primary: chain3-primary chain3-secondary: chain3-secondary chain4-type: chain4-type chain4-loop: chain4-loop chain4-primary: chain4-primary chain4-secondary: chain4-secondary chain5-type: chain5-type chain5-loop: chain5-loop chain5-primary: chain5-primary chain5-secondary: chain5-secondary chain6-type: chain6-type chain6-loop: chain6-loop chain6-primary: chain6-primary chain6-secondary: chain6-secondary chain-channel: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 
 # Original analytic four-lane Frames poly-LFO role. Each event can choose two
 # lanes simultaneously; no source wavetable or analog VCA path is used.

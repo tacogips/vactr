@@ -59,9 +59,9 @@ fn shape_pair_controls_reach_audio_editor_and_aux_graph() {
     };
     let template = Template::from_inst(&entry.def, &env).expect("shape graph");
     assert!(template.has_aux);
-    assert_eq!(template.mem_total, 2 * shape_pair::STATE_FLOATS);
+    assert_eq!(template.mem_total, shape_pair::STATE_FLOATS);
     let low_budget = BuildEnv {
-        voice_mem: 2 * shape_pair::STATE_FLOATS - 1,
+        voice_mem: shape_pair::STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(

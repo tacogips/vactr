@@ -1233,13 +1233,40 @@ form `let p {...}` then `{p :main} > * amp > + {{p :aux} > * amp > aux-out}`),
 the `b'V'` codec, and the slice-based voice runtime with stereo effects and
 balance pan.
 
-Still to do: the nine template migrations (`mod004-30`) and regression
-closeout (`mod004-40`). The nine template bodies are unchanged between
-`cf2ea37` and `b6fa077`, so the `cf2ea37` text is the pre-migration
-reference for the equivalence tests. `va-source` reads no per-node seed,
-so merging the two `filter-voice` sources satisfies the eligibility rule;
-the bitwise equivalence test remains the proof. The rules above are their
-authority, and nothing in this status note changes them.
+Commit `0a15742` landed the nine template migrations (`mod004-30`). Each
+one is proven bit-identical in main and aux against its old two-node form
+by `src/host/tests/e2e/templates/migrated_pairs.rs`. Only the nine graph
+lines in `golden_digests.txt` changed; no render digest changed.
+`va-source` reads no per-node seed, so merging the two `filter-voice`
+sources satisfies the eligibility rule, and the bitwise test is the proof.
+
+Still to do (2026-09-30): regression closeout (`mod004-40`), which adds
+`src/dsp/tests/dsp/multi_output.rs` for the native and browser end-to-end,
+orbit and rate/block items of the test strategy above. Two points of
+that strategy are made precise here:
+
+- **Rate/block contract.** The existing contract has two parts. Events are
+  sample-accurate: the engine starts a voice at
+  `round((time - block start) * rate)` inside the block. Every stateful
+  kernel renders finite, non-silent output at 44 100, 48 000 and 96 000 Hz
+  with any `max_block`. The MOD-004 addition is this: a multi-output node
+  renders bitwise equal to its legacy two-node form at every rate and
+  block, on native and browser. `multi_output.rs` also checks that the
+  frames `[2048, 2048 + 8192)` are bitwise equal across blocks 64, 256 and
+  97. That check may fail if the legacy two-node form differs across
+  blocks in the same way at that rate, because such a difference predates
+  MOD-004. It is then recorded as a finding and the engine is not changed.
+  If the pair differs from the legacy form, or only the pair differs
+  across blocks, the test fails and the cause is a MOD-004 regression.
+- **Orbit channel independence.** `OrbitDelay::run` in `src/dsp/bus.rs`
+  keeps separate L and R delay lines with per-channel feedback and no
+  cross-feed. Voices send `left * delay_send` and `right * delay_send`
+  separately (`src/dsp/engine/render.rs`). So with the default bus, a
+  stereo voice whose right channel is exactly 0.0 keeps R exactly 0.0
+  through the orbit send.
+
+The rules above are the authority for this work; this status note does not
+change them.
 
 ## References
 

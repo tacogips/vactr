@@ -1,209 +1,463 @@
 # MOD004-40: Cross-path Regression, Allocation, Rate/Block Invariance, Plan Closeout
 
 **Status**: Ready
-**Plan ID**: MOD004-40 (session-194 wave 2, final serial reconciliation)
-**Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy; Voice buffers and channel mapping; Capacity, real-time, and invariance; Implementation status)
+**Plan ID**: MOD004-40 (session-200, single plan, runs alone)
+**Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy; Voice buffers and channel mapping; Capacity, real-time, and invariance; Implementation status, including its "Rate/block contract" and "Orbit channel independence" bullets)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004F and plan closeout)
-**Baseline**: `b6fa077` plus the accepted MOD004-30 working-tree changes
+**Baseline**: `0a15742` (MOD004-00/10/11/12 in `85a300a`, MOD004-20/21/22 in `b6fa077`, MOD004-30 in `0a15742`; all accepted dependencies)
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-29 (refined for session 194: baseline `b6fa077`, concrete exemplars, block-invariance window, design status edit)
+**Last Updated**: 2026-09-30 (refined for session 200: baseline `0a15742`, prescribed test-module split, exact graph builders, rate/block protocol and fallback rule from the design, orbit exact-zero rule, closeout lines, evidence commands 1-12)
 
 ## Intent and Context
 
-The last wave proves the acceptance signals that span plans, then closes
-MOD-004 in the plan set:
-- native and browser install identical compiled shapes and render
-  bit-identically for mono, multi-mono and stereo graphs;
-- channels stay independent through intermediate mono and stereo effects,
+MOD-004 (stereo and multi-output UGen edges) is implemented and committed.
+This last plan adds regression coverage that spans the earlier plans, and
+then marks MOD-004 complete in the plan set. It covers:
+- native and browser install the same compiled shapes, and their renders
+  are bit-identical, for mono, multi-mono, stereo and FM-pair graphs;
+- channels stay independent through intermediate stereo effects, `Mul`,
   pan/balance and orbit sends;
-- callback allocation probes pass with multi-output nodes and stereo voice
-  effects;
-- stateful multi-output renders keep the rate and block-partition
-  contract.
+- callback allocation probes pass while multi-output nodes and stereo
+  voice effects run;
+- stateful multi-output renders keep the rate/block contract as the design
+  defines it.
 
-Existing coverage to build on, not duplicate:
-- `src/dsp/tests/dsp/voice_layout.rs`: native-only balance/equal-power
-  pan, stereo effect/`Mul`/`Add` channel preservation, `va-filter` pair vs
-  two legacy nodes, output-0 sample downmix, slice capacity.
-- `src/dsp/tests/dsp/codec_shapes.rs`: exact byte fixtures and round trips.
-- `src/host/tests/e2e/templates/select_output.rs` and `migrated_pairs.rs`
-  (MOD004-30): `.vact` selection and template equivalence.
+This plan does not duplicate existing coverage. Read these files, but do
+not edit them:
+- `src/dsp/tests/dsp/voice_layout.rs`: native-only pan and balance,
+  stereo effect and `Mul` channel preservation, `va-filter` pair vs legacy
+  (native, 48 kHz only), slice capacity.
+- `src/dsp/tests/dsp/codec_shapes.rs`: exact byte fixtures and round
+  trips.
+- `src/host/tests/e2e/templates/select_output.rs` and `migrated_pairs.rs`:
+  `.vact` selection and template equivalence.
+- `src/host/tests/e2e/templates/golden.rs` and `golden_digests.txt`:
+  every prelude template, bit-identical.
 
-This plan adds what those do not cover: native vs browser equality,
-orbit routing, and rate/block partition invariance for multi-output nodes.
-
-Evidence rule: every verification command writes its full output to
-`tmp/mod004/MOD004-40/<n>-<name>.log`, and its exit status goes into the
-Progress Log next to the log path. A missing or truncated log is not a
-pass. `tmp/` is gitignored and must stay untracked.
+The new coverage is: native vs browser equality, orbit routing, pair vs
+legacy at every rate and block on both tiers, and cross-block equality.
 
 ## Non-goals
 
-- No feature work. If a check fails because of a defect in another plan's
-  code, fix it here serially, record the file, cause and fix in the
-  Progress Log, and never weaken a test to pass.
-- No new public API, no test-helper refactor in `src/dsp/tests/dsp.rs`
-  unless a needed helper is missing (then add only that helper and record
-  it).
-- No archiving to `impl-plans/completed/`: MOD-005/006 are not done, so the
-  parent plan stays in `impl-plans/active/`.
-- No edits to `voice_layout.rs`, `codec_shapes.rs`, `select_output.rs` or
-  `migrated_pairs.rs` except as a recorded serial repair.
+- No feature work. No change to engine, codec, lowering, checker or kernel
+  code, except a recorded serial repair (see "Serial repair rule").
+- No new public API. No refactor of test helpers in
+  `src/dsp/tests/dsp.rs`. Add a helper there only if one is missing and
+  cannot live in `multi_output.rs`, and record it.
+- No archiving to `impl-plans/completed/`. MOD-005/006 are not done, so the
+  parent plan and every `mod004-*.md` stay in `impl-plans/active/`.
+- No edits to `voice_layout.rs`, `codec_shapes.rs`, `select_output.rs`,
+  `migrated_pairs.rs`, `golden.rs` or `golden_digests.txt`, except as a
+  recorded serial repair. Never re-bless golden digests.
+- Do not edit `impl-plans/active/mod004-dispatch.json` (orchestrator
+  owned). Do not edit any `mod004-*.md` beyond the header `**Status**:`
+  line on line 3.
+- Do not change the in-body historical `**Status**` lines at
+  `mod004-00-baseline.md:191` and `mod004-20-select-lowering.md:281`.
+- Do not reopen the owner decisions of 2026-09-29.
 
 ## Dependencies
 
-- **dependsOn**: MOD004-30 (accepted committed dependencies: MOD004-00, -10, -11, -12, -20, -21, -22)
+- **dependsOn**: none in this dispatch.
+- **acceptedDependsOn**: MOD004-00, -10, -11, -12 (`85a300a`), MOD004-20,
+  -21, -22 (`b6fa077`), MOD004-30 (`0a15742`).
 
 ## writePaths
 
-- `src/dsp/tests/dsp/multi_output.rs` (currently a one-line stub; already
-  declared by `mod multi_output;` in `src/dsp/tests/dsp.rs`). If it would
-  reach 1000 lines, split into `src/dsp/tests/dsp/multi_output/`
-  submodules declared from `multi_output.rs`.
-- `impl-plans/active/modular-audio-foundation.md`: MOD-004 table row,
-  MOD-004 fanout paragraph, MOD-004A..F Status lines and criteria, a new
-  Progress Log session
+- `src/dsp/tests/dsp/multi_output.rs` (today a one-line stub, already
+  declared by `mod multi_output;` at `src/dsp/tests/dsp.rs:50`)
+- `src/dsp/tests/dsp/multi_output/cross_path.rs` (new)
+- `src/dsp/tests/dsp/multi_output/invariance.rs` (new)
+- `impl-plans/active/modular-audio-foundation.md`: the lines named in
+  "Closeout Edits" only
 - `impl-plans/active/mod004-20-select-lowering.md`,
   `impl-plans/active/mod004-21-codec.md`,
   `impl-plans/active/mod004-22-voice-runtime.md`,
-  `impl-plans/active/mod004-30-template-migration.md`: the header
-  `**Status**:` line (line 3) only
-- `impl-plans/README.md`: the modular-audio-foundation row only
-- `design-docs/specs/design-mutable-audio.md`: the "Implementation status
-  (2026-09-29)" subsection only
-- This plan's Progress Log and Status line
-- `tmp/mod004/MOD004-40/` (evidence)
+  `impl-plans/active/mod004-30-template-migration.md`: line 3 only
+- `impl-plans/active/mod004-40-regression-closeout.md` (this plan: Status
+  line, completion checkboxes, Progress Log)
+- `impl-plans/README.md`: the modular-audio-foundation row (line 43) only
+- `design-docs/specs/design-mutable-audio.md`: the paragraph beginning
+  "Still to do (2026-09-30)" in "Implementation status (2026-09-29)" only
+- `tmp/mod004/MOD004-40/` (evidence; gitignored, stays untracked)
 
-sharedPaths (serial, this wave runs alone): `src` for recorded serial
-repairs and the one-time `cargo fmt` reconciliation.
+sharedPaths (serial; this plan runs alone): `src` is used only for a
+recorded serial repair and for the one-time `cargo fmt` reconciliation in
+command 1. `src/dsp/tests/dsp.rs` is read-only unless a helper is missing.
 
-## Test Cases (`src/dsp/tests/dsp/multi_output.rs`)
+## Test Module Layout (prescribed split)
 
-Exemplars to imitate:
-- `src/dsp/tests/dsp/analog_pair.rs:browser_analog_pair_codec_survives_rates_and_blocks`
-  (native `Template::from_inst` vs `encode_inst` -> `decode_graph` ->
-  `Template::boxed().build(&raw, &env)`, and `BrowserRig::browser_with`
-  plus `encode_graph_record` per rate/block);
-- `src/dsp/tests/dsp/voice_layout.rs` (`graph`, `edge(from, to, port,
-  output)`, `stereo_sample_graph`, `va_filter_graph(pair)`, `render(def,
-  pan)`) for hand-built graphs; copy small builders, do not import private
-  ones;
-- `src/dsp/tests/dsp/templates.rs:247` (`encode_sample_begin`,
-  `encode_slice`) for browser sample installs and `NativeRig::sample` for
-  native ones;
-- `src/dsp/tests/dsp/effects.rs:orbit_delay_sends_echo_into_master` for the
-  orbit delay send controls (`CtlId::new(38)`, `39`, `40`).
+Split the tests into three files so that none nears 1000 lines. Target
+size is under 450 lines each.
 
-`Rig::step` (and so `Rig::run`) asserts zero callback allocations; every
-render in this file must go through it.
+- `src/dsp/tests/dsp/multi_output.rs`: a module doc line, then
+  `mod cross_path;` and `mod invariance;`, then the shared builders and
+  render helpers, all `pub(super)`. It holds no `#[test]`.
+- `multi_output/cross_path.rs`: shape parity, render parity, channel
+  independence, pan/balance and orbit tests.
+- `multi_output/invariance.rs`: the rate/block matrix.
 
-Graphs (hand-built `InstDef`s):
-- (a) mono: `SinOsc` -> `Mul` by `amp`.
-- (b) multi-mono: `VaSource` -> `VaFilter` (`mode` 0); output 0 -> `Mul`
-  sink; output 1 -> `Mul` -> `AuxOut`.
-- (c) stereo: `SamplePlay` output 1 (`:stereo`) -> a stereo voice-local
-  `Effect` (same spec as `voice_layout.rs:stereo_effect_and_mul_preserve_each_sample_channel`)
-  -> `Mul` by `amp`, with a two-channel resource.
-- (d) fm pair: one `FmPair` (`mode` 0) with output 1 -> `AuxOut`, and its
-  legacy twin with two `FmPair` nodes (`mode` 0 and 1).
+### Shared builders (in `multi_output.rs`)
 
-Cases (`situation -> expected`):
-- Cross-path shapes: for (a), (b), (c), (d) -> native and decoded
-  templates have equal `nodes()` (includes `outs` and `shape`), `stereo`,
-  `has_aux` and `n_slices`; (a) is `stereo == false && has_aux == false`,
-  (b) and (d) `has_aux == true`, (c) `stereo == true`.
-- Cross-path renders: each graph rendered on `NativeRig` and
-  `BrowserRig` with the same event -> L and R equal by `to_bits`, and
-  both non-silent where the graph has a signal on that side.
-- Channel independence, stereo: (c) with a resource whose right channel is
-  all 0.0 -> R is exactly 0.0 on native and browser; with left all 0.0 ->
-  L exactly 0.0.
-- Channel independence, main/aux: (b) with the main branch multiplied by
-  `Const(0.0)` -> L is exactly 0.0 and R equals R of unmodified (b) by
-  `to_bits`.
-- Pan/balance cross-path: (b) and (c) at pan 0.0 and 1.0, (a) at pan 0.2
-  -> native == browser by `to_bits`, and each channel equals the center-pan
-  render scaled by `balance_gains(p)` ((b), (c)) or matches `pan_gains`
-  ((a)) within the tolerance `voice_layout.rs` uses.
-- Orbit: (b) and (c) with a nonzero orbit delay send -> native == browser
-  by `to_bits`, output finite, and echo energy present after the dry burst
-  (window as in `orbit_delay_sends_echo_into_master`). Also for (c) with a
-  right-zero resource: if the orbit delay processes L and R without
-  cross-feed (read `src/dsp/effects/` to confirm), assert R stays exactly
-  0.0; if it cross-feeds, do not assert that, and record the reason in the
+Copy small builders into this file. Do not import private items from
+`voice_layout.rs` or `fm_pair.rs`, because they are private to those
+modules. Every def uses `InstId::new(1)`. Graph id 1 is used on the
+browser and sample resource 41 on both tiers.
+
+- `graph(nodes, edges) -> InstDef`, `graph_with_params(nodes, edges,
+  params)`, `edge(from, to, port, output) -> Edge`: copy
+  `voice_layout.rs:11-38`.
+- `mono_graph() -> InstDef`, graph (a): `[SinOsc, Param(CtlId::new(90)),
+  Mul]` with edges `edge(0,2,0,0)` and `edge(1,2,1,0)`, and params
+  `[(CtlId::new(90), Ctl::Const(0.5))]`. Check the `SinOsc` spelling in
+  `src/dsp/graph.rs` `UGenSpec`. If `SinOsc` needs a frequency input, use
+  the same form that `chain(1, vec![UGenSpec::SinOsc, ...])` uses in
+  existing tests.
+- `va_filter_graph(pair: bool, main_gain: f32) -> InstDef`, graph (b):
+  copy `voice_layout.rs:283-335` exactly, including the node_params
+  (`CtlId::new(79)` 0.5 on node 0, VaFilter ports 1 and 2 at 0.5, port 4
+  = 1.0 on the second legacy filter). Add one change: the main branch
+  multiplies by a `Const(main_gain)` node through a `Mul` before the `Add`
+  sink. Do this in both the pair and the legacy form, so the node lists
+  stay structurally parallel. `main_gain = 1.0` is the normal case, and
+  `0.0` is the main/aux independence case. The `Add` single-input sink
+  stays as in the exemplar.
+- `fm_graph(pair: bool) -> InstDef`, graph (d). Both forms use a
+  single-input `Add` main sink, like `va_filter_graph`, so the two stay
+  structurally parallel. The pair form is `[FmPair, Add, AuxOut]` with
+  `edge(0,1,0,0)` (main output 0 into the `Add` sink) and `edge(0,2,0,1)`
+  (output 1 into `AuxOut`), and no mode param. The legacy form keeps the
+  two-`FmPair` structure of `fm_pair.rs:11-31`: `[FmPair, FmPair, Add,
+  AuxOut]` with `edge(0,2,0,0)` and `edge(1,3,0,0)`, and node 1 port 4 =
+  `catalog::port_ctl(&Node::FmPair, 4)` = `Ctl::Const(1.0)`. Node index 1
+  is unchanged.
+- `stereo_graph() -> InstDef`, graph (c): `[SamplePlay(BankRef::new(41)),
+  Effect(gain), Param(CtlId::new(90)), Mul]`, where `gain =
+  effect_spec(EffectKind::Gain, &[("gain", Ctl::Const(-6.0206))])` (as at
+  `voice_layout.rs:112`). Edges are `edge(0,1,0,1)` (stereo sample output
+  into the effect), `edge(1,3,0,0)` and `edge(2,3,1,0)`. Params are
+  `[(CtlId::new(90), Ctl::Const(0.5))]`.
+- `stereo_frames(left_zero: bool, right_zero: bool) -> Vec<f32>`: 16 384
+  interleaved frames. L is `noise(16_384, 0.5, 3)`, R is `noise(16_384,
+  0.5, 7)`, and a side is all `0.0` when its flag is set. `noise` is in
+  `src/dsp/tests/dsp.rs:439`.
+
+### Shared render helpers (in `multi_output.rs`)
+
+All rendering goes through `Rig::run` / `Rig::step`, which assert zero
+callback allocations (`src/dsp/tests/dsp.rs:319-339`). Never call
+`engine.process*` directly.
+
+- `native_rig(rate: f32, block: usize) -> NativeRig`: `config(&caps(),
+  StoreKind::NativeArc)` with `sample_rate` and `max_block` set, then
+  `NativeRig::native_with(cfg)`.
+- `browser_rig(rate, block) -> BrowserRig`: the same with
+  `StoreKind::Arena { bytes: 4 << 20 }` and `BrowserRig::browser_with`.
+- `load_native(rig, def, frames: Option<&[f32]>)`: when `frames` is Some,
+  call `rig.sample(41, frames.to_vec(), 2)` first, then
+  `rig.install(def)`. Samples go before the install, as at
+  `voice_layout.rs:100-108`.
+- `load_browser(rig, def, frames)`: when `frames` is Some, push
+  `encode_sample_begin(41, 1, frames_per_channel, 2, 48_000)`, then
+  `encode_slice` records in 16 384-sample chunks with offsets in samples,
+  as at `templates.rs:247-257`. `frames_per_channel` is
+  `frames.len() / 2`. `SampleStore::begin` sizes `frames * channels`
+  (`src/dsp/arena.rs:308-325`), and slices carry interleaved samples.
+  Then call `encode_inst(def, &mut bytes)` and push
+  `encode_graph_record(1, 1, &bytes, &mut rec)`, as at
+  `analog_pair.rs:118-134`.
+- `render_windowed(rig, ctls: &[(CtlId, f32)], rate: f32, block: usize)
+  -> (Vec<f32>, Vec<f32>)`. Send `event(1, 2048.0 / f64::from(rate),
+  ctls)` before any render. Then run `(2048 + 8192).div_ceil(block)`
+  blocks and return `L[2048..10240]` and `R[2048..10240]`. The event is
+  absolute-timed at frame 2048. The engine starts it at `round((time -
+  block start) * rate)` inside its block (`src/dsp/engine.rs:717`), so
+  every block partition starts the voice at frame 2048. The install is
+  applied in block 0, before the event is due.
+- `bits(x: &[f32]) -> Vec<u32>`: returns `to_bits` of each sample. Use
+  `assert_eq!(bits(a), bits(b), "<context>")` for every bitwise claim.
+- `default_ctls() = [(ctl::FREQ, 220.0), (ctl::LEGATO, 10.0)]`. Pan tests
+  append `(ctl::PAN, p)`.
+
+## Test Cases
+
+Each `situation -> expected` bullet is one `#[test]` function, or one loop
+inside a named test. Name tests after the claim, for example
+`native_and_browser_multi_mono_render_bitwise_equal`.
+
+### `cross_path.rs` (default rate 48 000, block 128, unless stated)
+
+- Shapes, native vs decoded, for (a), (b pair), (c), (d pair) ->
+  `Template::from_inst(&def, &env)` and the result of `encode_inst` ->
+  `decode_graph` -> `Template::boxed().build(&raw, &env)` have equal
+  `nodes()`, `stereo`, `has_aux` and `n_slices`. Get `env` from
+  `NativeRig::native().engine.build_env()` (`analog_pair.rs:113-125`).
+  Also (a) has `!stereo && !has_aux`, (b) and (d) have `has_aux`, and (c)
+  has `stereo`.
+- Renders, native vs browser, for (a), (b pair), (c) with
+  `stereo_frames(false,false)`, and (d pair) -> `render_windowed` on both
+  tiers gives equal L and R by `bits`. The window is finite. `rms(L) >
+  1e-5`. `rms(R) > 1e-5` for (b), (c) and (d), where R carries a distinct
+  signal.
+- Stereo channel independence, (c) with `stereo_frames(false, true)` ->
+  every R sample `== 0.0` on native and browser. With
+  `stereo_frames(true, false)`, every L sample `== 0.0`. The live side has
+  `rms > 1e-5`. Use `==`, not `to_bits`, for the zero checks, because the
+  mix may produce `-0.0`.
+- Main/aux independence, (b pair) with `main_gain = 0.0` -> every L sample
+  `== 0.0`, and R equals R of (b pair) with `main_gain = 1.0` by `bits`.
+  Check on native and on browser.
+- Balance pan, stereo and main/aux. For (b pair) and (c), at pan 0.0,
+  0.25 and 1.0, compared with pan 0.5 on the same tier: `L_p[i] == L_c[i]
+  * balance_gains(p).0` and `R_p[i] == R_c[i] * balance_gains(p).1` for
+  every i. The gains 1.0, 0.5 and 0.0 are exact, so this uses exact `==`.
+  Native equals browser by `bits` at each pan.
+- Equal-power pan, mono. For (a), at pan 0.2 and pan 0.0 (gains
+  `(1.0, 0.0)`): `|L_0.2[i] - L_0[i] * pan_gains(0.2).0| <= 1e-6` and
+  `|R_0.2[i] - L_0[i] * pan_gains(0.2).1| <= 1e-6`. Native equals browser
+  by `bits`.
+- Orbit send, for (b pair) and (c) with `stereo_frames(false,false)`.
+  Controls: `ATTACK 0.0, DECAY 0.005, RELEASE 0.001, CtlId::new(38) 0.8,
+  CtlId::new(39) 0.1, CtlId::new(40) 0.3`, copied from
+  `effects.rs:85-106`. Also render a no-send twin with `CtlId::new(38)`
+  at 0.0. Send the event at `rig.engine.now()` after one `step()`, and run
+  80 blocks as in the exemplar. Expected results:
+  - native equals browser by `bits` for the send render;
+  - all output is finite;
+  - `rms(send_L[4_800..5_200]) > 1e-3`;
+  - `rms(nosend_L[4_800..5_200]) < 1e-6`, so the dry signal is gone and
+    the energy is echo;
+  - for (b), the same echo check holds on R, which carries aux.
+- Orbit right-zero, (c) with `stereo_frames(false, true)` and the send
+  controls above -> every R sample `== 0.0` on native and browser. This
+  holds because `OrbitDelay::run` has no L/R cross-feed
+  (`src/dsp/bus.rs:557-567`). Use the default bus: do not set `ctl::ROOM`
+  and do not call `install_bus`.
+- Allocation. There is no separate test. Every render above goes through
+  `Rig::step`, which asserts `allocs == 0`. State this in the module doc.
+
+### `invariance.rs`
+
+Matrix: rate in {44 100, 48 000, 96 000} x block in {64, 256, 97} x tier
+in {native, browser}. The graphs are:
+- (b) pair vs (b) legacy, both with `main_gain = 1.0`;
+- (d) pair vs (d) legacy;
+- (c) with `stereo_frames(false,false)`.
+
+Render each with `render_windowed(default_ctls)`.
+
+- (1) Pair vs legacy -> at every rate, block and tier, the (b) pair
+  equals the (b) legacy by `bits` on L and on R. The same holds for (d).
+  This is the MOD-004 contract, and there is no fallback for it.
+- (2) Cross-tier -> at every rate and block, native equals browser by
+  `bits` for (b pair), (d pair) and (c).
+- (3) Cross-block -> at each rate and tier, the windows for blocks 64, 256
+  and 97 are bitwise equal, for (b pair), (d pair) and (c). Always check
+  that each window is finite, that `rms(L) > 1e-5`, and that `rms(R) >
+  1e-5`.
+- Fallback for (3), from the design "Rate/block contract". Run the same
+  cross-block comparison on the legacy form, and on (c) as rendered.
+  - The (3) failure may be recorded as a finding only if, for the same
+    rate and tier, the legacy two-node form shows the same cross-block
+    difference, and (1) passes at every block.
+  - Keep that case enforced in code. Assert (1), (2), finiteness and rms,
+    and assert that the pair and legacy cross-block differences are
+    bitwise identical. Do not delete the check.
+  - Record the evidence in the Progress Log as a finding: rate, tier,
+    first differing frame, legacy vs pair.
+  - For (c), which has no legacy twin, (3) may be relaxed only if a
+    single-output reference behaves the same way:
+    `[SamplePlay(41), Param, Mul]` using output 0, rendered with the same
+    resource. Otherwise (3) is a failure.
+  - If the pair differs from legacy anywhere, or only the pair varies
+    across blocks, that is a MOD-004 regression. Follow "Serial repair
+    rule".
+- Runtime: about 90 renders of 10 240 frames. Record the nextest time for
+  `multi_output` in the Progress Log. It is not an acceptance gate.
+
+## Key Pitfalls (read before coding)
+
+- The event time is absolute seconds. Use `2048.0 / f64::from(rate)`, not
+  `rig.engine.now() + ...`. Otherwise the start frame differs per block.
+- Include the first rendered block in the frame count. Do not call a
+  discarded `step()` before `render_windowed`, or the window shifts by
+  `max_block`.
+- Browser samples: `frames` in `encode_sample_begin` is per channel, and
+  slice offsets and lengths are in samples. Keep chunk sizes even so that
+  interleaving holds.
+- The native `sample()` hard-codes rate 48 000 (`dsp.rs:262-273`). Use
+  48 000 in `encode_sample_begin` too, or the tiers will differ.
+- Compare `-0.0` safely: use `==` for value claims and `bits` only for
+  path-equality claims between two renders.
+- Clippy `-D warnings`: use `u32::try_from(..).unwrap()` and
+  `#[allow(clippy::cast_precision_loss)]` locally, as in `dsp.rs:449`. No
+  `as` casts without the allow.
+- A node with any outgoing edge is not a voice sink
+  (`src/dsp/ugen/template.rs:405-411`). A pair node whose output 1 is
+  consumed needs an explicit main-path edge into a sink node (the
+  single-input `Add`), as in `va_filter_graph`. A silent main channel in a
+  pair form is a test-builder bug, not an engine defect, and must not
+  trigger a serial repair.
+- If `stereo_graph()` or `mono_graph()` fails to lower or build, first
+  re-read the builders used in `voice_layout.rs` and `fm_pair.rs`. Do
+  not change graph semantics to make a test pass. A build failure of a
+  design-valid graph is a finding and follows "Serial repair rule".
+
+## Serial repair rule
+
+A failure is fixed only when it is a defect in earlier MOD-004 code. For
+example: native vs browser divergence, pair vs legacy divergence, or a
+design-valid graph rejected. The fix is the smallest one in `src/`
+(non-test) that makes the design-stated behavior hold.
+- Record the file, the cause, the fix, and the pre and post sha256 in the
   Progress Log.
-- Rate/block invariance for (b) pair vs legacy two-node, (d) pair vs
-  legacy, and (c), at 44 100, 48 000 and 96 000 Hz with `max_block` 64,
-  256 and 97, native and browser:
-  - install, `step()` once, send the event at time `2048.0 / rate`
-    seconds, then `run` until at least `2048 + 8192` frames have been
-    rendered in total; compare only frames `[2048, 2048 + 8192)` (the
-    first `step()` output is frames `[0, max_block)`);
-  - (1) at each rate and block, pair render == legacy render by
-    `to_bits`, on native and on browser;
-  - (2) at each rate, the window is bitwise equal across blocks 64, 256
-    and 97.
-  - If (2) also fails for the legacy two-node form, the dependence
-    predates MOD-004: record the evidence, keep (1) plus finite and
-    `rms > 1e-5` checks, and file the finding in the Progress Log. Do not
-    hide it and do not change engine code for it.
+- Never weaken, delete or loosen an assertion.
+- Never change `golden_digests.txt`.
+- If the fix would change a golden render digest, or needs engine changes
+  for block dependence that predates MOD-004, stop. Record a blocker
+  instead.
 
-## Closeout Edits
+## Closeout Edits (after commands 1-12 pass)
+
+Use the execution date `2026-09-30`, or the actual date if it is later,
+in every new entry. Line numbers below are those at `0a15742`. If an
+earlier edit shifts them, find the line by its quoted text.
 
 `impl-plans/active/modular-audio-foundation.md`:
-- MOD-004 table row: Status `Completed 2026-09-29 (fanout plans
-  impl-plans/active/mod004-*.md)`; keep MOD-005/006 rows untouched.
-- Fanout paragraph: state that MOD004-20/21/22 are committed in `b6fa077`
-  and MOD004-30/40 complete in this session.
-- MOD-004A..F: set `**Status**: COMPLETED`, check each criterion that the
-  listed tests prove, and name the delivering plan per subtask.
-- Add a dated Progress Log session `### Session: 2026-09-29, MOD-004
-  closeout` with the nextest pass count and the exit status of commands
-  1-10 below.
+- Line 72, the MOD-004 table row, Status cell: `Completed 2026-09-30
+  (fanout plans impl-plans/active/mod004-*.md)`. Do not change the
+  MOD-005 and MOD-006 rows.
+- Lines 83-87, the fanout paragraph: state that MOD004-00/10/11/12 are
+  committed in `85a300a`, MOD004-20/21/22 in `b6fa077`, MOD004-30 in
+  `0a15742`, and that MOD004-40 completed on the execution date. Keep the
+  sentence about which plans are authoritative.
+- MOD-004A..F (lines 106, 122, 140, 157, 173, 190): set each `**Status**`
+  to `COMPLETED`. Add a `**Delivered by**:` line naming the plans:
+  - A: MOD004-10, -20
+  - B: MOD004-22
+  - C: MOD004-22
+  - D: MOD004-21
+  - E: MOD004-12, -20, -30
+  - F: MOD004-00, -30, -40
 
-Status lines: `mod004-20`, `-21`, `-22` -> `**Status**: Completed
-(committed in b6fa077)`; `mod004-30` and this plan -> `**Status**:
-Completed`. Change no other line in those files.
+  Check a criterion only after you have found the test that proves it.
+  Grep the named plan's Progress Log or the test files, and cite the test
+  name in the Progress Log. If a criterion lacks evidence, leave it
+  unchecked, leave the subtask `IN_PROGRESS`, and record a finding. Do not
+  mark it COMPLETED.
+- Line 247, parent Completion Criteria: check it, and drop the parenthetical
+  "arbitrary multi-output UGen edges remain pending". Only do this if
+  MOD-004A..F are all COMPLETED.
+- Add a Progress Log session directly under `## Progress Log`, titled
+  `### Session: 2026-09-30, MOD-004 closeout (MOD004-40)`. It lists:
+  - the tests added;
+  - the nextest pass count from command 6;
+  - the exit status and log path of commands 1-12;
+  - the result of rate/block check (3): passed, or the recorded finding;
+  - any serial repair.
 
-`impl-plans/README.md`: the modular-audio-foundation row says MOD-004
-complete, MOD-005/006 pending, date 2026-09-29.
+Header line 3 in these files:
+- `mod004-20-select-lowering.md`, `mod004-21-codec.md`,
+  `mod004-22-voice-runtime.md`: `**Status**: Completed (committed in
+  b6fa077)`
+- `mod004-30-template-migration.md`: `**Status**: Completed (committed in
+  0a15742)`
+- this plan: `**Status**: Completed`
 
-`design-docs/specs/design-mutable-audio.md`: in "Implementation status
-(2026-09-29)", replace the "Still to do" paragraph with one saying the
-nine migrations and regression closeout are complete, naming
-`migrated_pairs.rs` and `multi_output.rs`. Change nothing else in the
-design.
+Change no other line in those files.
 
-## Verification Commands (the full acceptance set; logs in `tmp/mod004/MOD004-40/`)
+`impl-plans/README.md` line 43: change the status cell to `In progress;
+MOD-001 inventory/audit, MOD-002 neutral names and MOD-004 stereo and
+multi-output edges complete; MOD-005/006 pending`, and change the date to
+the execution date.
 
-1. `CARGO_TERM_QUIET=true cargo fmt --check` -> exit 0. If it fails, run
-   `CARGO_TERM_QUIET=true cargo fmt` once (serial formatting
-   reconciliation), record the files it changed, then rerun -> exit 0.
-2. `CARGO_TERM_QUIET=true cargo check -q --all-targets` -> exit 0
-3. `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings` -> exit 0
-4. `CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib` -> exit 0
-5. `CARGO_TERM_QUIET=true cargo check -q --features lsp` -> exit 0
-6. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` -> exit 0; record the pass count
-7. `VACTR_MI_REFERENCE=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack mise run audit-upstream` -> errors []
-8. `git diff --name-only cf2ea37 -- '*.rs' | xargs wc -l` and `git ls-files --others --exclude-standard -- '*.rs' | xargs wc -l` -> every touched or new Rust file below 1000 lines
-9. `git diff --check` -> exit 0
-10. `git status --short` -> only paths under `src/`, `design-docs/` and
-    `impl-plans/` (no `tmp/` entries, since `tmp/` is ignored)
+`design-docs/specs/design-mutable-audio.md`: replace only the paragraph
+that begins "Still to do (2026-09-30): regression closeout" (the two
+lines ending "made precise here:"). The new paragraph says that
+regression closeout (`mod004-40`) completed on the execution date. It
+names `src/host/tests/e2e/templates/migrated_pairs.rs` and
+`src/dsp/tests/dsp/multi_output.rs` (with `multi_output/cross_path.rs`
+and `multi_output/invariance.rs`). It states the result of check (3):
+either "bitwise equal across blocks 64, 256 and 97", or "pre-MOD-004
+block dependence recorded in
+impl-plans/active/modular-audio-foundation.md Progress Log". It ends with
+"The two points below define the contract the tests enforce:". Keep both
+bullets and the closing sentence unchanged.
+
+## Verification Commands (logs in `tmp/mod004/MOD004-40/`)
+
+Run each command in the foreground, from the repo root. Redirect full
+output with `> tmp/mod004/MOD004-40/<n>-<name>.log 2>&1`, then append
+`exit=<status>` to the same log. Record the command, exit status and log
+path in this Progress Log. A missing log, a truncated log, or a log
+without `exit=` is not a pass. Run `mkdir -p tmp/mod004/MOD004-40` first.
+
+1. `CARGO_TERM_QUIET=true cargo fmt --check` (`1-fmt.log`) -> exit 0. If
+   it fails, run `CARGO_TERM_QUIET=true cargo fmt` once, record the files
+   it changed, and rerun into `1-fmt-rerun.log` -> exit 0.
+2. `CARGO_TERM_QUIET=true cargo check -q --all-targets` (`2-check.log`)
+   -> exit 0
+3. `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings`
+   (`3-clippy.log`) -> exit 0
+4. `CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown
+   --lib` (`4-wasm.log`) -> exit 0
+5. `CARGO_TERM_QUIET=true cargo check -q --features lsp` (`5-lsp.log`) ->
+   exit 0
+6. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final
+   NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` (`6-nextest.log`) ->
+   exit 0. Record "N tests run: N passed" from the summary line, and
+   confirm that the `multi_output::` tests appear in the run with
+   `cargo nextest list multi_output` (`6b-list.log`).
+7. `test -d
+   /private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack
+   && VACTR_MI_REFERENCE=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack
+   mise run audit-upstream` (`7-audit.log`) -> exit 0 and `errors []`. If
+   the directory is missing, the check is BLOCKED. Record it as blocked,
+   not passed.
+8. `{ git diff --name-only cf2ea37 -- '*.rs'; git ls-files -o
+   --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f
+   "$f" ] && wc -l "$f"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'`
+   (`8-lines.log`) -> exit 0
+9. `git diff --check` (`9-diffcheck.log`) -> exit 0
+10. `test -z "$(git status --short | grep -vE '^.. (src/|design-docs/|impl-plans/)')"`
+    (`10-status.log`, and also log `git status --short`) -> exit 0
+11. `git diff --exit-code 0a15742 -- src/host/tests/e2e/templates/golden_digests.txt`
+    (`11-golden.log`) -> exit 0, so golden digests are unchanged
+12. `git diff --exit-code 0a15742 -- src/dsp/tests/dsp/voice_layout.rs
+    src/dsp/tests/dsp/codec_shapes.rs
+    src/host/tests/e2e/templates/select_output.rs
+    src/host/tests/e2e/templates/migrated_pairs.rs`
+    (`12-protected.log`) -> exit 0, unless a serial repair is recorded
+    for the file
 
 ## Completion Criteria
 
-- [ ] `multi_output.rs` covers cross-path shapes and renders, stereo and main/aux channel independence, pan/balance, orbit, allocation (via `Rig::step`) and rate/block invariance.
-- [ ] Commands 1-10 pass, with exit statuses and log paths recorded.
-- [ ] Parent MOD-004A..F are COMPLETED with checked criteria and a dated Progress Log session; the README row, the five Status lines and the design status note are updated.
-- [ ] Every serial repair is listed with file, cause and fix.
+- [ ] `multi_output.rs`, `multi_output/cross_path.rs` and
+  `multi_output/invariance.rs` exist, each under 1000 lines. Together
+  they cover cross-path shapes and renders, stereo and main/aux channel
+  independence, balance and equal-power pan, orbit send and orbit
+  right-zero, allocation via `Rig::step`, and the rate/block matrix
+  (1)-(3).
+- [ ] Commands 1-12 pass, and each has its exit status and log path
+  recorded. Command 7 is either passed, or reported as BLOCKED.
+- [ ] Parent MOD-004A..F are COMPLETED, with checked criteria backed by
+  cited tests. Line 247 and the Progress Log session are updated, along
+  with the README row, the five Status lines and the design status
+  paragraph.
+- [ ] Every serial repair and finding is listed with file, cause and fix,
+  or with its evidence.
 
 ## Execution Protocol
 
-This wave runs alone after MOD004-30 is accepted. Do not change git state
-(no commit, stash, checkout, reset, branch or worktree); the orchestrator
-commits afterwards. Record pre/post `shasum -a 256` of every edited file,
-re-read each file just before editing, stop on unexpected drift, and log
-every command in this Progress Log.
+This plan runs alone. Do not change git state: no commit, stash,
+checkout, reset, branch or worktree. The orchestrator commits afterwards.
+
+Before each edit, re-read the file, record `shasum -a 256 <file>` and a
+one-line intent in the Progress Log, and stop if the file changed
+unexpectedly since the last read. Record the post-edit sha256.
+
+Do the work in this order: tests, then commands 1-12, then the closeout
+edits, then a rerun of commands 9 and 10.
 
 ## Progress Log
 

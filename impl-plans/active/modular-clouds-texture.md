@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -67,7 +67,7 @@ native/browser caps. No effect may allocate or fetch audio inside callback.
 | FX-001C | Stretch/WSOLA playback and texture filter | FX-001A | Two-window bounded alignment adaptation implemented; source comparison pending |
 | FX-001D | Looping delay with pitch and feedback | FX-001A | Bounded stereo live/frozen-loop adaptation implemented; source comparison pending |
 | FX-001E | Spectral phase-vocoder mode with native/browser FFT caps | FX-001A | Bounded 512-point STFT adaptation implemented; source comparison pending |
-| FX-001F | Source comparison, quality selector, all controls and four-mode provenance/fidelity review | FX-001B–E, MOD-006 | Quality selector adaptation and tests implemented; source comparison pending |
+| FX-001F | Source comparison, quality selector, all controls and four-mode provenance/fidelity review | FX-001B–E, MOD-006 | Completed: four modes measured and classified; source parity remains open |
 | FX-001G | Translate loop transport, delay glide, cubic reads and freeze wrap from pinned player | FX-001D | Completed and independently verified; full Clouds processor parity remains separate |
 
 ### FX-001G looping playback stages
@@ -113,7 +113,7 @@ quality mode, bus/editor/wire compatibility and bounded install memory.
 - [ ] Every common control and mode-specific role is addressable from `.vact` and editor.
 - [ ] Freeze, trigger, gate, dry/wet, feedback and stereo spread are tested.
 - [ ] Native/browser rates/blocks, capacity rejects and allocation-free callbacks pass.
-- [ ] Source/resource notices and fidelity comparisons are recorded.
+- [x] Source/resource notices and fidelity comparisons are recorded.
 - [ ] Quiet Cargo check, strict Clippy, tests, rustfmt and diff checks pass.
 
 ## Progress Log
@@ -226,3 +226,65 @@ Focused complex forward/inverse tests now cover sizes 2, 8, 64 and 512,
 complex impulses, mixed real/imaginary signals, normalization and
 undersized-buffer no-op behavior. This pins down the allocation-free
 inverse independently of spectral-effect audio tests.
+
+### Session: 2026-09-29 — FX-001F pinned Clouds source comparison
+
+Added `verification/clouds_texture_reference.cc`,
+`verification/compare_clouds_texture.py` and
+`examples/clouds_texture_reference.rs`, plus the `compare-clouds-texture`
+mise task. The probe validates Eurorack `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`
+and stmlib `e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`, compiles the upstream
+processor and `clouds/resources.cc` into a temporary directory, and feeds both
+implementations the same Python-generated three-second stereo input (two
+distinct tone mixtures plus a click train for two seconds, followed by one
+second of silence). `clouds/clouds.cc` calls `codec.Init(..., 32000)` and
+`codec.Start(32, ...)`, and `clouds/dsp/frame.h` sets `kMaxBlockSize` to 32.
+The upstream buffers match firmware declarations `block_mem[118784]` and
+`block_ccm[65536 - 128]`. Upstream and Vactr run at 32 kHz in 32-frame blocks.
+The source converts normalized input to signed `ShortFrame`; quality 2/3 activates
+its 32-to-16 kHz SRC. Vactr runs its effect kernels directly at 32 kHz and
+retains its host-rate two-sample hold/quantization adaptation for low quality.
+The source uses an equal-power dry/wet lookup; the raw Vactr kernels are
+wrapped in the host `dry + (wet - dry) * mix` bus convention. Trigger pulses
+occur every 1024 frames, gate stays open, and freeze begins at frame 32,000
+when enabled.
+
+Every mode ran three documented control settings, freeze off/on, and all four
+quality settings (24 cases per mode, 96 total). Metrics below are medians over
+the 24 cases. In the L/R RMS column, each pair is Clouds/Vactr. Correlation
+uses a regular 16:1 decimation for long signals; RMS, stereo width and tail
+windows use full-rate samples. Spectral bands use 8:1 decimation to a 4 kHz
+analysis rate. The JSON report contains per-channel values and all six
+octave-band ratios for every case.
+
+| Mode | Classification | Median correlation / normalized RMS error | L/R RMS Clouds → Vactr | Centroid Clouds → Vactr | Stereo correlation Clouds → Vactr | Width RMS Clouds → Vactr | Dry RMS ratio Clouds → Vactr | Tail to −40 dB Clouds → Vactr | Lag Clouds → Vactr |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Granular | Measured gap | 0.228 / 2.990 | 0.030/0.070; 0.027/0.071 | 431 / 499 Hz | 0.104 / 0.678 | 0.030 / 0.041 | 0.159 / 0.391 | 0.20 / 0.68 s | 0 / −10.25 ms |
+| Stretch | Measured gap | 0.100 / 5.778 | 0.020/0.120; 0.017/0.098 | 434 / 639 Hz | 0.104 / 0.701 | 0.020 / 0.056 | 0.103 / 0.623 | not reached / 0.45 s | 0 / −7.75 ms |
+| Looping delay | Measured gap | 0.081 / 3.470 | 0.040/0.141; 0.039/0.132 | 460 / 333 Hz | 0.094 / 0.985 | 0.035 / 0.057 | 0.217 / 0.777 | 0.56 / 0.15 s | 0 / 18.0 ms |
+| Spectral | Measured gap | 0.046 / 2.056 | 0.072/0.165; 0.067/0.157 | 748 / 1071 Hz | 0.111 / 0.576 | 0.083 / 0.042 | 0.391 / 0.914 | 0.33 / 0.78 s | 0 / −29.75 ms |
+
+Median octave-band energy ratios in order 31.25–62.5 / 62.5–125 / 125–250 /
+250–500 / 500–1000 / 1000–2000 Hz were:
+
+- Granular: Clouds 0 / .001 / .504 / .173 / .216 / .009; Vactr 0 / .001 / .294 / .295 / .181 / .006.
+- Stretch: Clouds 0 / .001 / .395 / .387 / .209 / .008; Vactr 0 / .001 / .292 / .231 / .193 / .069.
+- Looping delay: Clouds 0 / .001 / .265 / .149 / .155 / .073; Vactr 0 / 0 / .224 / .211 / .128 / .002.
+- Spectral: Clouds .001 / .002 / .043 / .136 / .169 / .422; Vactr .018 / .027 / .030 / .074 / .156 / .539.
+
+Thresholds classify a mode as close only at median correlation
+≥0.95 and normalized RMS error ≤0.20; all four are measurable gaps. These
+results show response differences under this input and mapping; random grain
+scheduling means correlation alone is not a parity test. No texture kernel fix
+was justified by a clear translation error, and no coverage label changed.
+The quality/resource notices describe the local-only build and non-import.
+
+Independent review (2026-09-29) found that Vactr's 2–5× higher median
+output level is not a probe scaling artifact. The per-scenario ratios range
+from about 0.8× to 6×, and they follow documented DSP differences: host-rate
+quality reduction instead of source 32→16 kHz conversion, linear instead of
+equal-power dry/wet, stochastic grain scheduling, and analytic replacements
+for generated windows. The probe's int16 input (×32767) and output (÷32768)
+conversions differ by only 0.003%. Matching level structure is a fidelity
+task, not a probe fix.
+

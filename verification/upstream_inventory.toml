@@ -98,6 +98,13 @@ use = "source"
 
 # --- clouds
 [[file]]
+path = "clouds/clouds.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Consulted only for the firmware sample rate and block size used by the local comparison probe; no code is translated."
+
+[[file]]
 path = "clouds/dsp/audio_buffer.h"
 license = "MIT"
 kind = "code"
@@ -114,6 +121,13 @@ path = "clouds/dsp/correlator.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "clouds/dsp/frame.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Consulted only for the firmware sample rate and block size used by the local comparison probe; no code is translated."
 
 [[file]]
 path = "clouds/dsp/fx/pitch_shifter.h"
@@ -150,6 +164,13 @@ path = "clouds/dsp/looping_sample_player.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "clouds/dsp/mu_law.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local Clouds texture comparison probe in a separate checkout; no source code or tables enter Vactr."
 
 [[file]]
 path = "clouds/dsp/parameters.h"
@@ -1121,6 +1142,13 @@ kind = "code"
 use = "source"
 
 # --- stmlib
+[[file]]
+path = "stmlib/dsp/atan.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local Clouds texture comparison probe in a separate checkout; no lookup table enters Vactr."
+
 [[file]]
 path = "stmlib/dsp/cosine_oscillator.h"
 license = "MIT"

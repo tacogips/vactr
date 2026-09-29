@@ -248,6 +248,13 @@ published 32-to-16 kHz conversion, generated sample-rate-conversion filter,
 or exact source storage formats. No Clouds resource table or source audio
 asset is imported; quality remains an adaptation rather than source parity.
 
+`verification/compare_clouds_texture.py` and its original C++ driver compile
+the pinned `GranularProcessor` and `clouds/resources.cc` only in a temporary
+directory for a local comparison. They use a Python-generated deterministic
+stereo signal and report per-mode signal, spectrum, stereo, mix, latency and
+tail metrics across parameter, freeze and quality scenarios. No upstream code,
+resource, generated table or audio sample is copied into or linked with Vactr.
+
 ## Plaits position 14 chord-layer architectural adaptation
 
 `chord-layer-voice` and `src/dsp/ugen/chord_pair.rs` adapt the four-note

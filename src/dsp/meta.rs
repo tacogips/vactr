@@ -92,12 +92,13 @@ fn unit_of(name: &str, unit: &str) -> Unit {
         "Hz" => Unit::Hz,
         _ => match name {
             "freq" | "cutoff" | "lpf" | "hpf" | "density" | "fb-cutoff" | "noise-cutoff"
-            | "fm-tuning" => Unit::Hz,
+            | "fm-tuning" | "transient-freq" | "noise-freq" | "lfo-rate" => Unit::Hz,
             "attack" | "decay" | "release" | "size" | "time" | "dur" | "delaytime" | "fb-decay"
             | "noise-attack" | "noise-hold" | "noise-decay" | "fm-attack" | "fm-hold"
-            | "fm-decay" => Unit::Seconds,
+            | "fm-decay" | "amp-attack" | "amp-decay" | "pitch-decay" | "mod-decay"
+            | "repeat-time" | "open-decay" | "closed-decay" => Unit::Seconds,
             "fb-level" | "noise-level" | "fm-level" => Unit::Db,
-            "pitch" | "semitones" => Unit::Semitones,
+            "pitch" | "semitones" | "coarse" | "pitch-depth" => Unit::Semitones,
             _ => Unit::None,
         },
     }
@@ -146,11 +147,11 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
             "feedback-metal-drum" => Node::FeedbackMetal,
             "six-bank-a-voice" | "six-bank-b-voice" | "six-bank-c-voice" => Node::SixOpOriginal,
             "speech-voice" => Node::SpeechOriginal,
-            "rings-voice" => Node::RingsPart,
+            "resonator-voice" => Node::RingsPart,
             "string-choir-voice" => Node::StringChoir,
-            "elements-voice" => Node::ElementsInternal,
+            "exciter-voice" => Node::ElementsInternal,
             "tidal-voice" => Node::TidalFunction,
-            "tides2-voice" => Node::TidalPoly,
+            "tidal-poly-voice" => Node::TidalPoly,
             "peak-motion-voice" => Node::PeakFunction,
             "stage-voice" => Node::StageSegment,
             "stage-chain-voice" => Node::StageChain,
@@ -170,18 +171,18 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     || (template == "frame-keyframe-voice"
                         && matches!(name, "frame-main-channel" | "frame-aux-channel")
                         && port.name == "frame-channel")
-                    || (template == "tides2-voice"
+                    || (template == "tidal-poly-voice"
                         && matches!(name, "poly-main-channel" | "poly-aux-channel")
                         && port.name == "poly-channel")
             })
             .and_then(|port| ucat::port_ctl(&node, port))
             .map(|ctl| {
-                if template != "rings-voice"
+                if template != "resonator-voice"
                     && template != "feedback-metal-drum"
                     && template != "string-choir-voice"
-                    && template != "elements-voice"
+                    && template != "exciter-voice"
                     && template != "tidal-voice"
-                    && template != "tides2-voice"
+                    && template != "tidal-poly-voice"
                     && template != "peak-motion-voice"
                     && template != "stage-voice"
                     && template != "stage-chain-voice"
@@ -206,10 +207,10 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     "metal-cutoff" => ((40.0, 20_000.0), false),
                     "metal-resonance" => ((0.3, 12.0), false),
                     "metal-drive" => ((0.0, 1.0), false),
-                    "rings-model" | "choir-fx" => ((0.0, 5.0), true),
-                    "el-model" => ((0.0, 2.0), true),
-                    "el-alternate" => ((0.0, 1.0), true),
-                    "el-space" => ((0.0, 2.0), false),
+                    "reso-model" | "choir-fx" => ((0.0, 5.0), true),
+                    "ex-model" => ((0.0, 2.0), true),
+                    "ex-alternate" => ((0.0, 1.0), true),
+                    "ex-space" => ((0.0, 2.0), false),
                     "tide-mode" | "tide-range" => ((0.0, 2.0), true),
                     "tide-output" => ((0.0, 3.0), true),
                     "tide-ratio" => ((0.125, 8.0), false),
@@ -248,15 +249,15 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     "peak-half" | "peak-gate" | "peak-trigger" | "peak-tap" | "peak-sync" => {
                         ((0.0, 1.0), true)
                     }
-                    "el-note" => ((-48.0, 48.0), false),
-                    "el-modulation" => ((-1.0, 1.0), false),
-                    "rings-chord" | "choir-chord" => ((0.0, 10.0), true),
-                    "rings-polyphony" | "choir-polyphony" => ((1.0, 4.0), true),
-                    "rings-tonic" | "rings-note" | "rings-fm" | "choir-tonic" | "choir-note"
+                    "ex-note" => ((-48.0, 48.0), false),
+                    "ex-modulation" => ((-1.0, 1.0), false),
+                    "reso-chord" | "choir-chord" => ((0.0, 10.0), true),
+                    "reso-polyphony" | "choir-polyphony" => ((1.0, 4.0), true),
+                    "reso-tonic" | "reso-note" | "reso-fm" | "choir-tonic" | "choir-note"
                     | "choir-fm" => ((-48.0, 48.0), false),
-                    "rings-internal-exciter"
-                    | "rings-internal-strum"
-                    | "rings-internal-note"
+                    "reso-internal-exciter"
+                    | "reso-internal-strum"
+                    | "reso-internal-note"
                     | "choir-internal-exciter"
                     | "choir-internal-strum"
                     | "choir-internal-note" => ((0.0, 1.0), true),
@@ -265,13 +266,13 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                 let mut result = meta(name, ctl, range, "", stepped);
                 if matches!(
                     name,
-                    "rings-tonic"
-                        | "rings-note"
-                        | "rings-fm"
+                    "reso-tonic"
+                        | "reso-note"
+                        | "reso-fm"
                         | "choir-tonic"
                         | "choir-note"
                         | "choir-fm"
-                        | "el-note"
+                        | "ex-note"
                 ) {
                     result.unit = Unit::Semitones;
                 }
@@ -381,6 +382,10 @@ fn ugen_node(name: &str) -> Option<Node> {
         "fm-mod" => Node::FmMod,
         "fm-drum" => Node::FmDrum,
         "feedback-metal-core" => Node::FeedbackMetal,
+        "digital-drum-core" => Node::DigitalDrumCore,
+        "digital-snare-core" => Node::DigitalSnareCore,
+        "digital-metal-core" => Node::DigitalMetalCore,
+        "digital-hat-core" => Node::DigitalHatCore,
         "analog-percussion" => Node::AnalogPercussion,
         "va-source" => Node::VaSource,
         "va-filter" => Node::VaFilter,
@@ -388,9 +393,9 @@ fn ugen_node(name: &str) -> Option<Node> {
         "fm-pair" => Node::FmPair,
         "six-op-original" => Node::SixOpOriginal,
         "speech-original" => Node::SpeechOriginal,
-        "rings-part-core" => Node::RingsPart,
+        "resonator-part-core" => Node::RingsPart,
         "string-choir-core" => Node::StringChoir,
-        "elements-internal-core" => Node::ElementsInternal,
+        "exciter-core" => Node::ElementsInternal,
         "tidal-function-core" => Node::TidalFunction,
         "tidal-poly-core" => Node::TidalPoly,
         "peak-function-core" => Node::PeakFunction,
@@ -459,7 +464,15 @@ fn ugen_editor(name: &str) -> EditorKind {
         | "sine-drum"
         | "fusion-drum"
         | "feedback-metal-core"
-        | "feedback-metal-drum" => EditorKind::EnvelopeShape,
+        | "feedback-metal-drum"
+        | "digital-drum-core"
+        | "digital-snare-core"
+        | "digital-metal-core"
+        | "digital-hat-core"
+        | "digital-drum"
+        | "digital-snare"
+        | "digital-metal"
+        | "digital-hat" => EditorKind::EnvelopeShape,
         "delay" => EditorKind::DelayTaps,
         "sample-play" | "sampler" => EditorKind::SamplerWave,
         "wavetable" => EditorKind::WavetableFrames,

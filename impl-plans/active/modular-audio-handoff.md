@@ -4,7 +4,7 @@
 **Design Reference**: `design-docs/specs/design-mutable-audio.md` and
 `design-docs/specs/design-music.md#41-programmable-digital-drums-author-2026-09-27`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-29
 
 ## Current boundary
 
@@ -32,7 +32,7 @@ current goal changes; preserve it when resuming.
 
 | Priority | TODO | Plan and completion evidence |
 |---|---|---|
-| 1 | Finish the exact source/resource/license inventory for each included component and exclude uncleared DX7, TI speech, wave-map and recorded assets; keep MIT notices with translations. | `modular-audio-foundation.md` MOD-001/MOD-002; `modular-plaits-cleared-replacements.md`; `design-docs/references/README.md`; `THIRD_PARTY_NOTICES.md` |
+| 1 | Source/resource/license inventory is complete and checked (MOD-001, 2026-09-29: 217 files, `mise run audit-upstream`). MOD-002 is complete (2026-09-29): neutral names and Clouds/Warps inventories, with naming tests. The wave, map and digit binaries stay excluded until their origin is established. | `modular-audio-foundation.md` MOD-001/MOD-002; `verification/upstream_inventory.toml`; `THIRD_PARTY_NOTICES.md` |
 | 2 | Complete original digital kit mapping across tonal, snare, metallic and hat voices, including every declared `.vact` and live-cell parameter, kit/editor API, diagnostics, and native/browser end-to-end tests. | `digital-drums.md` DDRUM-001, 003–006; four family control/response and allocation checks |
 | 3 | Finish FM drum source comparisons and broader original EFM-inspired family, without restricted firmware, patch banks or unlicensed Faust dependencies. | `modular-fm-drums.md` FMD-006/007; pinned raw-kernel metrics, stereo/control/rate tests, truthful fidelity status |
 | 4 | Complete Plaits voice-level trigger/LPG, engine-specific parity and resource-safe replacements; compare all 24 positions independently. | `modular-plaits-engines.md` and its engine subplans; dual-output, parameter, source-metric and native/browser matrix |

@@ -62,7 +62,7 @@ filter, diffuser and generated-resource behavior.
 
 ### Session: 2026-09-28 — opt-in instrument graph excitation
 
-`rings-external-voice` routes the validated host L/R average through
+`resonator-external-voice` routes the validated host L/R average through
 `host-in-l/r` source nodes to appended Part port 16. Existing control indices
 and the default internal template remain unchanged. Native/browser codec and
 rate/block tests cover both input lanes, distinct main/aux and event start
@@ -128,7 +128,7 @@ source's eight-string network; below 20 Hz still clamps.
 
 ### Session: 2026-09-28 — first six-model internal instrument slice
 
-Added `rings-voice`, `rings-part-core`, and `src/dsp/ported/rings.rs` with
+Added `resonator-voice`, `resonator-part-core`, and `src/dsp/ported/rings.rs` with
 six ordered `Adaptation` rows and independent main/aux output. The graph's
 fixed port array grew from 12 to 16 to carry all Part `Patch` values, four
 `PerformanceState` flags, pitch/tonic/FM, chord, polyphony and model without

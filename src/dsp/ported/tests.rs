@@ -1,6 +1,7 @@
 use super::{
     plaits_algorithms, plaits_coverage_summary, CoverageState, ResourceState, PLAITS_REVISION,
 };
+use crate::dsp::graph::EffectKind;
 use crate::ns::insts::TEMPLATE_NAMES;
 use crate::types::manifest::HostManifest;
 
@@ -207,4 +208,231 @@ fn resource_blocked_positions_are_not_reported_as_ports() {
     assert!(summary.contains("0 source ports"));
     assert!(summary.contains("0 unavailable"));
     assert!(summary.contains("upstream wave assets unaudited: 3"));
+}
+
+// --- MOD-002: cross-family neutral-naming and template/effect matrix ---
+//
+// design-docs/specs/design-mutable-audio.md's "Scope and license boundary"
+// requires every user-facing instrument/effect/control to carry a neutral
+// Vactr name; upstream Mutable Instruments module names are attribution
+// and engineering references only, never user-facing tokens.
+
+/// Upstream Mutable Instruments module identifiers. No user-facing name
+/// may contain one of these as a whole hyphen-separated token. Singular
+/// common words such as "stream", "peak", "stage", "tidal" and "frame" are
+/// not module identifiers and stay allowed.
+const BANNED_MODULE_TOKENS: &[&str] = &[
+    "plaits", "braids", "clouds", "rings", "elements", "warps", "tides", "tides2", "peaks",
+    "streams", "stages", "frames", "marbles", "beads", "blades", "edges", "yarns", "grids",
+    "shelves", "ripples", "veils", "links", "kinks", "branches", "shades", "volts", "ears", "el",
+];
+
+/// `"stages"` is a coincidental collision: the `phaser` effect's `stages`
+/// control (`src/dsp/effects/modulation.rs`) counts allpass filter stages,
+/// ordinary audio-engineering vocabulary predating and unrelated to any
+/// Mutable Instruments module; it names no upstream source and needs no
+/// MOD-002 rename. Braids' five user-facing controls were renamed to
+/// `macro-*` (matching the existing `macro-*-voice` templates), so they no
+/// longer need an exception here.
+const KNOWN_PRE_EXISTING_EXCEPTIONS: &[&str] = &["stages"];
+
+fn assert_neutral_name(name: &str) {
+    if KNOWN_PRE_EXISTING_EXCEPTIONS.contains(&name) {
+        return;
+    }
+    for token in name.split('-') {
+        assert!(
+            !BANNED_MODULE_TOKENS.contains(&token),
+            "{name}: contains banned upstream module token {token:?}"
+        );
+    }
+}
+
+#[test]
+fn no_user_facing_name_carries_an_upstream_module_token() {
+    for name in TEMPLATE_NAMES {
+        assert_neutral_name(name);
+    }
+    for kind in EffectKind::ALL {
+        assert_neutral_name(kind.name());
+    }
+    let manifest = HostManifest::spec_default();
+    for decl in manifest.editor_decls() {
+        assert_neutral_name(decl.name);
+        for param in decl.params.iter() {
+            assert_neutral_name(param.name);
+        }
+    }
+}
+
+/// `.vact` sources of templates that are registered only after an explicit
+/// opt-in load (quad-stem, external-voice and linked-segment templates),
+/// so they are absent from the default `TEMPLATE_NAMES`. Ported inventory
+/// rows may still name them; this checks the name is real, not a typo,
+/// without duplicating the full `E2e`/registry load these examples' own
+/// end-to-end tests already perform.
+const OPT_IN_TEMPLATE_SOURCES: &[&str] = &[
+    include_str!("../../../examples/quad-stems.vact"),
+    include_str!("../../../examples/live-external-voices.vact"),
+    include_str!("../../../examples/stage-linked.vact"),
+];
+
+fn is_opt_in_template(name: &str) -> bool {
+    let needle = format!("inst {name} ");
+    OPT_IN_TEMPLATE_SOURCES
+        .iter()
+        .any(|source| source.contains(needle.as_str()))
+}
+
+fn resolves_to_template_or_effect(name: &str) -> bool {
+    TEMPLATE_NAMES.contains(&name)
+        || EffectKind::from_name(name).is_some()
+        || is_opt_in_template(name)
+}
+
+#[test]
+fn every_ported_family_template_or_effect_name_resolves() {
+    for row in plaits_algorithms() {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "plaits: {name}");
+        }
+    }
+    for row in super::braids_shapes() {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "braids: {name}");
+        }
+    }
+    for row in super::resonator_modes() {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "elements: {name}");
+        }
+    }
+    let alternate = super::ALTERNATE_VOICE.vactr_template.expect("named");
+    assert!(
+        resolves_to_template_or_effect(alternate),
+        "elements alternate: {alternate}"
+    );
+    for row in super::frames_paths() {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "frames: {name}");
+        }
+        if let Some(name) = row.opt_in_quad_template {
+            assert!(
+                resolves_to_template_or_effect(name),
+                "frames opt-in: {name}"
+            );
+        }
+    }
+    let (tides1, tides2) = super::functions();
+    for row in tides1.iter().chain(tides2.iter()) {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "tides: {name}");
+        }
+        if let Some(name) = row.opt_in_quad_template {
+            assert!(resolves_to_template_or_effect(name), "tides opt-in: {name}");
+        }
+    }
+    for row in super::peaks_functions() {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "peaks: {name}");
+        }
+    }
+    for row in super::resonator_models() {
+        if let Some(name) = row.voice_template {
+            assert!(resolves_to_template_or_effect(name), "rings: {name}");
+        }
+    }
+    let string_synth = super::string_synth_path().voice_template;
+    assert!(
+        resolves_to_template_or_effect(string_synth),
+        "rings string synth: {string_synth}"
+    );
+    for row in super::stages_cells() {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "stages: {name}");
+        }
+    }
+    for row in super::STAGES_OTHER {
+        if let Some(name) = row.vactr_template {
+            assert!(resolves_to_template_or_effect(name), "stages other: {name}");
+        }
+    }
+    for row in super::streams_functions() {
+        if let Some(name) = row.digital_effect {
+            assert!(resolves_to_template_or_effect(name), "streams: {name}");
+        }
+    }
+    for row in super::clouds_modes() {
+        assert!(
+            resolves_to_template_or_effect(row.vactr_effect),
+            "clouds: {}",
+            row.vactr_effect
+        );
+    }
+    for row in super::warps_algorithms() {
+        assert!(
+            resolves_to_template_or_effect(row.vactr_effect),
+            "warps: {}",
+            row.vactr_effect
+        );
+    }
+}
+
+#[test]
+fn clouds_modes_are_ordered_pinned_and_never_source_port() {
+    let rows = super::clouds_modes();
+    assert_eq!(rows.len(), 4);
+    for (mode, row) in rows.iter().enumerate() {
+        assert_eq!(usize::from(row.mode), mode);
+        assert_eq!(row.source_revision, super::CLOUDS_REVISION);
+        assert_ne!(row.coverage, CoverageState::SourcePort);
+        assert!(resolves_to_template_or_effect(row.vactr_effect));
+        assert_eq!(row.coverage, CoverageState::Adaptation);
+        assert_eq!(row.resources, ResourceState::Replacement);
+    }
+    assert_eq!(rows[0].vactr_effect, "texture-grain");
+    assert_eq!(rows[1].vactr_effect, "texture-stretch");
+    assert_eq!(rows[2].vactr_effect, "texture-loop");
+    assert_eq!(rows[3].vactr_effect, "texture-spectral");
+    assert_eq!(rows[0].source_path, "clouds/dsp/granular_sample_player.h");
+    assert_eq!(rows[1].source_path, "clouds/dsp/wsola_sample_player.h");
+    assert_eq!(rows[2].source_path, "clouds/dsp/looping_sample_player.h");
+    assert_eq!(rows[3].source_path, "clouds/dsp/pvoc/phase_vocoder.cc");
+    let summary = super::clouds_coverage_summary();
+    assert!(summary.contains("4/4"));
+    assert!(summary.contains("0 source-stage translations, 0 source ports"));
+}
+
+#[test]
+fn warps_algorithms_are_ordered_pinned_and_never_source_port() {
+    let rows = super::warps_algorithms();
+    assert_eq!(rows.len(), 8);
+    for (position, row) in rows.iter().enumerate() {
+        assert_eq!(usize::from(row.position), position);
+        assert_eq!(row.source_revision, super::WARPS_REVISION);
+        assert_ne!(row.coverage, CoverageState::SourcePort);
+        assert!(resolves_to_template_or_effect(row.vactr_effect));
+    }
+    for row in &rows[0..7] {
+        assert_eq!(row.vactr_effect, "dual-mod");
+    }
+    assert_eq!(rows[7].vactr_effect, "shift-pair");
+    // "The fold equation remains authored": fold is the one XMOD row that
+    // is an adaptation rather than a translated source equation.
+    assert_eq!(rows[1].coverage, CoverageState::Adaptation);
+    for position in [0usize, 2, 3, 4, 5, 6] {
+        assert_eq!(
+            rows[position].coverage,
+            CoverageState::SourceStage,
+            "position {position}"
+        );
+    }
+    assert_eq!(rows[7].coverage, CoverageState::Adaptation);
+    assert_eq!(rows[7].resources, ResourceState::None);
+    for row in &rows[0..=6] {
+        assert_eq!(row.resources, ResourceState::Replacement);
+    }
+    let summary = super::warps_coverage_summary();
+    assert!(summary.contains("6 source-stage translations"));
+    assert!(summary.contains("0 source ports"));
 }

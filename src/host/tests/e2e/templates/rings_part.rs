@@ -8,7 +8,9 @@ use crate::value::intern::name_of_kw;
 
 fn render(controls: &str) -> Vec<f32> {
     let mut e = E2e::new();
-    e.eval(&format!("s :rings-voice > note [:a3] > {controls} > once"));
+    e.eval(&format!(
+        "s :resonator-voice > note [:a3] > {controls} > once"
+    ));
     let output = e.run_for(0.3);
     assert!(e.faults.is_empty(), "{controls}: {:?}", e.faults);
     assert!(e.committed > 0, "{controls}");
@@ -21,29 +23,29 @@ fn render(controls: &str) -> Vec<f32> {
 fn all_six_roles_and_exposed_sound_controls_reach_audio() {
     let mut previous: Option<Vec<f32>> = None;
     for model in 0..=5 {
-        let controls = format!("rings-model {model} > rings-structure 0.4 > rings-brightness 0.5 > rings-damping 0.3 > rings-position 0.4 > rings-strum 0.7 > rings-internal-exciter 1 > rings-internal-strum 1 > rings-internal-note 1 > rings-tonic 0 > rings-note 4 > rings-fm 0 > rings-chord 3 > rings-polyphony 2");
+        let controls = format!("reso-model {model} > reso-structure 0.4 > reso-brightness 0.5 > reso-damping 0.3 > reso-position 0.4 > reso-strum 0.7 > reso-internal-exciter 1 > reso-internal-strum 1 > reso-internal-note 1 > reso-tonic 0 > reso-note 4 > reso-fm 0 > reso-chord 3 > reso-polyphony 2");
         let baseline = render(&controls);
         if let Some(prior) = &previous {
             assert_ne!(*prior, baseline, "model {model}");
         }
         previous = Some(baseline);
     }
-    let controls = "rings-model 4 > rings-structure 0.4 > rings-brightness 0.5 > rings-damping 0.3 > rings-position 0.4 > rings-strum 0.7 > rings-internal-exciter 1 > rings-internal-strum 1 > rings-internal-note 1 > rings-tonic 0 > rings-note 4 > rings-fm 0 > rings-chord 3 > rings-polyphony 2";
+    let controls = "reso-model 4 > reso-structure 0.4 > reso-brightness 0.5 > reso-damping 0.3 > reso-position 0.4 > reso-strum 0.7 > reso-internal-exciter 1 > reso-internal-strum 1 > reso-internal-note 1 > reso-tonic 0 > reso-note 4 > reso-fm 0 > reso-chord 3 > reso-polyphony 2";
     let baseline = render(controls);
     for changed in [
         "freq 330",
-        "rings-structure 0.8",
-        "rings-brightness 0.9",
-        "rings-damping 0.85",
-        "rings-position 0.8",
-        "rings-strum 0.2",
-        "rings-internal-strum 0",
-        "rings-internal-note 0",
-        "rings-tonic 5",
-        "rings-note 9",
-        "rings-fm 5",
-        "rings-chord 8",
-        "rings-polyphony 4",
+        "reso-structure 0.8",
+        "reso-brightness 0.9",
+        "reso-damping 0.85",
+        "reso-position 0.8",
+        "reso-strum 0.2",
+        "reso-internal-strum 0",
+        "reso-internal-note 0",
+        "reso-tonic 5",
+        "reso-note 9",
+        "reso-fm 5",
+        "reso-chord 8",
+        "reso-polyphony 4",
         "gain 0.4",
     ] {
         let output = render(&format!("{controls} > {changed}"));
@@ -58,7 +60,7 @@ fn all_six_roles_and_exposed_sound_controls_reach_audio() {
     }
     let mut muted = E2e::new();
     muted.eval(&format!(
-        "s :rings-voice > note [:a3] > {controls} > rings-internal-exciter 0 > once"
+        "s :resonator-voice > note [:a3] > {controls} > reso-internal-exciter 0 > once"
     ));
     let silence = muted.run_for(0.3);
     assert!(rms(&silence) < rms(&baseline) * 0.01);
@@ -70,27 +72,27 @@ fn editor_exposes_all_controls_and_memory_is_preflighted() {
     let registry = e.reg.borrow();
     let entry = registry
         .entries()
-        .find(|entry| *name_of_kw(entry.name) == *"rings-voice")
+        .find(|entry| *name_of_kw(entry.name) == *"resonator-voice")
         .unwrap();
     let editor = instrument_decls(&registry)
         .into_iter()
-        .find(|decl| decl.name == "rings-voice")
+        .find(|decl| decl.name == "resonator-voice")
         .unwrap();
     for name in [
-        "rings-model",
-        "rings-structure",
-        "rings-brightness",
-        "rings-damping",
-        "rings-position",
-        "rings-strum",
-        "rings-internal-exciter",
-        "rings-internal-strum",
-        "rings-internal-note",
-        "rings-tonic",
-        "rings-note",
-        "rings-fm",
-        "rings-chord",
-        "rings-polyphony",
+        "reso-model",
+        "reso-structure",
+        "reso-brightness",
+        "reso-damping",
+        "reso-position",
+        "reso-strum",
+        "reso-internal-exciter",
+        "reso-internal-strum",
+        "reso-internal-note",
+        "reso-tonic",
+        "reso-note",
+        "reso-fm",
+        "reso-chord",
+        "reso-polyphony",
     ] {
         assert!(
             editor
@@ -137,15 +139,17 @@ fn editor_exposes_all_controls_and_memory_is_preflighted() {
 
 #[test]
 fn successive_events_reset_deterministic_excitation() {
-    let controls = "rings-model 2 > rings-strum 0.8 > rings-polyphony 1";
+    let controls = "reso-model 2 > reso-strum 0.8 > reso-polyphony 1";
     let first = render(controls);
     assert_eq!(first, render(controls));
     let mut one = E2e::new();
-    one.eval(&format!("s :rings-voice > note [:a3] > {controls} > once"));
+    one.eval(&format!(
+        "s :resonator-voice > note [:a3] > {controls} > once"
+    ));
     let one_out = one.run_for(1.1);
     let mut two = E2e::new();
     two.eval(&format!(
-        "s :rings-voice > note [:a3 :a3] > {controls} > once"
+        "s :resonator-voice > note [:a3 :a3] > {controls} > once"
     ));
     let two_out = two.run_for(1.1);
     assert!(one.faults.is_empty() && two.faults.is_empty());

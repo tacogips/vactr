@@ -40,7 +40,7 @@ const fn rows() -> [ResonatorSpec; 6] {
         source_name: "",
         source_path: "rings/dsp/part.cc",
         source_revision: RINGS_REVISION,
-        voice_template: Some("rings-voice"),
+        voice_template: Some("resonator-voice"),
         coverage: CoverageState::Adaptation,
         resources: ResourceState::Replacement,
         main_outputs: 1,
@@ -71,7 +71,7 @@ pub fn rings_coverage_summary() -> String {
     for row in MODELS {
         let _ = writeln!(
             out,
-            "{}: {} -> rings-voice / resonant-bank (Adaptation, analytic resources)",
+            "{}: {} -> resonator-voice / resonant-bank (Adaptation, analytic resources)",
             row.model, row.source_name
         );
     }

@@ -103,7 +103,7 @@ blocks, codec, budget, distinct outputs and callback allocation.
 
 ### Session: 2026-09-28 — second-generation four-lane adaptation
 
-Added `tides2-voice` as a separate original 16-float-per-node ramp kernel.
+Added `tidal-poly-voice` as a separate original 16-float-per-node ramp kernel.
 All three ramp modes, four output-mode roles and two ranges (24 combinations)
 are runnable and inventoried as `Adaptation/Replacement`. The template
 exposes frequency, pulse width, shape, smoothness, shift, gate, clock,

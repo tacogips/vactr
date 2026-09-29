@@ -144,6 +144,10 @@ diag_codes! {
     /// Warning: the commit lead widened after late events (12.8.4).
     LatencyWidened => "latency-widened",
     ArenaExhausted => "arena-exhausted",
+    /// The instrument-default or signal-input cell pool is exhausted: a
+    /// tweak-site or signal-backed default fell back to a fixed constant
+    /// instead of a live cell (DDRUM-002A).
+    CellCapacity => "cell-capacity",
     InstallQueueOverflow => "install-queue-overflow",
     /// Warning: sustained grain skipping (12.6).
     GrainSkip => "grain-skip",
@@ -269,14 +273,14 @@ mod tests {
 
     #[test]
     fn code_names_are_unique_kebab_case() {
-        assert_eq!(DiagCode::ALL.len(), 87);
+        assert_eq!(DiagCode::ALL.len(), 88);
         let mut names: Vec<&str> = DiagCode::ALL.iter().map(|c| c.as_str()).collect();
         assert!(names
             .iter()
             .all(|n| n.chars().all(|c| c.is_ascii_lowercase() || c == '-')));
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 87);
+        assert_eq!(names.len(), 88);
         assert_eq!(DiagCode::MisplacedArrow.as_str(), "misplaced-arrow");
     }
 

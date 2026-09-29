@@ -167,19 +167,15 @@ fn final_streams_filter_and_lorenz_controls_compile_from_vact() {
 
 #[test]
 fn elements_bank_patch_and_performance_controls_compile_from_vact() {
-    let controls = "el-env-shape: 0.4 el-bow-level: 0.2 el-bow-timbre: 0.6 el-blow-level: 0.7 el-blow-meta: 0.4 el-blow-timbre: 0.8 el-strike-level: 0.6 el-strike-meta: 0.3 el-strike-timbre: 0.7 el-signature: 0.4 el-geometry: 0.6 el-brightness: 0.8 el-damping: 0.4 el-position: 0.6 el-res-mod-frequency: 0.3 el-res-mod-offset: 0.7 el-reverb-diffusion: 0.5 el-reverb-lp: 0.6 el-space: 0.4 el-modulation-frequency: 0.5 el-gate: 1 el-note: 2 el-modulation: 0.2 el-strength: 0.8 el-model: 0 external-blend: 1";
+    let controls = "ex-env-shape: 0.4 ex-bow-level: 0.2 ex-bow-timbre: 0.6 ex-blow-level: 0.7 ex-blow-meta: 0.4 ex-blow-timbre: 0.8 ex-strike-level: 0.6 ex-strike-meta: 0.3 ex-strike-timbre: 0.7 ex-signature: 0.4 ex-geometry: 0.6 ex-brightness: 0.8 ex-damping: 0.4 ex-position: 0.6 ex-res-mod-frequency: 0.3 ex-res-mod-offset: 0.7 ex-reverb-diffusion: 0.5 ex-reverb-lp: 0.6 ex-space: 0.4 ex-modulation-frequency: 0.5 ex-gate: 1 ex-note: 2 ex-modulation: 0.2 ex-strength: 0.8 ex-model: 0 external-blend: 1";
     let mut wet = E2e::new();
-    wet.eval(&format!(
-        "bus :elements:\n\telements-bank {controls} mix: 1"
-    ));
+    wet.eval(&format!("bus :elements:\n\texciter-bank {controls} mix: 1"));
     wet.eval("s :analog > note [:c4] > bus :elements > once");
     let wet_audio = wet.run_for(0.25);
     assert!(wet.faults.is_empty());
     assert!(rms(&wet_audio) > 1.0e-6);
     let mut dry = E2e::new();
-    dry.eval(&format!(
-        "bus :elements:\n\telements-bank {controls} mix: 0"
-    ));
+    dry.eval(&format!("bus :elements:\n\texciter-bank {controls} mix: 0"));
     dry.eval("s :analog > note [:c4] > bus :elements > once");
     let dry_audio = dry.run_for(0.25);
     assert!(dry.faults.is_empty());
@@ -194,8 +190,8 @@ fn elements_bank_patch_and_performance_controls_compile_from_vact() {
 #[test]
 fn elements_alternate_and_space_freeze_compile_from_vact() {
     let mut e = E2e::new();
-    e.eval("bus :elements-alt:\n\telements-bank el-alternate: 1 el-space: 1.9 el-bow-level: 0.4 external-blend: 0 mix: 1");
-    e.eval("s :analog > note [:c4] > bus :elements-alt > once");
+    e.eval("bus :exciter-alt:\n\texciter-bank ex-alternate: 1 ex-space: 1.9 ex-bow-level: 0.4 external-blend: 0 mix: 1");
+    e.eval("s :analog > note [:c4] > bus :exciter-alt > once");
     let audio = e.run_for(0.25);
     assert!(e.faults.is_empty());
     assert!(rms(&audio) > 1.0e-6);

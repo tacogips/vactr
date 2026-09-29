@@ -46,7 +46,7 @@ fn six_position_inventory_is_ordered_and_candid() {
     for (index, row) in resonator_models().iter().enumerate() {
         assert_eq!(usize::from(row.model), index);
         assert_eq!(row.coverage, CoverageState::Adaptation);
-        assert_eq!(row.voice_template, Some("rings-voice"));
+        assert_eq!(row.voice_template, Some("resonator-voice"));
         assert_eq!((row.main_outputs, row.aux_outputs), (1, 1));
         assert!(row.external_excitation);
         assert_eq!(

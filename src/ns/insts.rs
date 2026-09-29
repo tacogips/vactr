@@ -47,12 +47,16 @@ pub const TEMPLATES: &str = include_str!("../prelude/templates.vact");
 /// The file id the template source reads under.
 pub const TEMPLATE_FILE: FileId = FileId::new(u32::MAX - 1);
 /// The prelude template names, in source order.
-pub const TEMPLATE_NAMES: [&str; 63] = [
+pub const TEMPLATE_NAMES: [&str; 67] = [
     "sampler",
     "analog",
     "fm",
     "phase-drum",
     "feedback-metal-drum",
+    "digital-drum",
+    "digital-snare",
+    "digital-metal",
+    "digital-hat",
     "low-drum",
     "wire-drum",
     "metal-hat",
@@ -63,9 +67,9 @@ pub const TEMPLATE_NAMES: [&str; 63] = [
     "six-bank-b-voice",
     "six-bank-c-voice",
     "speech-voice",
-    "rings-voice",
+    "resonator-voice",
     "string-choir-voice",
-    "elements-voice",
+    "exciter-voice",
     "spectrum-voice",
     "clock-noise-voice",
     "dual-kick-voice",
@@ -103,7 +107,7 @@ pub const TEMPLATE_NAMES: [&str; 63] = [
     "wavetable",
     "granular",
     "tidal-voice",
-    "tides2-voice",
+    "tidal-poly-voice",
     "peak-motion-voice",
     "stage-voice",
     "stage-chain-voice",
@@ -532,11 +536,21 @@ pub fn param_node(ctl: CtlId) -> Value {
 
 /// A header default as a control: a tweak site is a cell (13), anything
 /// else a constant encoded through the control's row.
+///
+/// A tweak site that cannot get a cell (the instrument-default pool is
+/// exhausted, DDRUM-002A) still installs, with that one default frozen at
+/// its current value, but reports a `cell-capacity` diagnostic instead of
+/// silently dropping the tweak site.
+#[allow(clippy::too_many_arguments)]
 fn default_ctl(
     reg: &mut InstRegistry,
+    inst_name: KwId,
+    param_name: KwId,
+    span: Span,
     ctl: CtlId,
     default: Option<&Value>,
     cells: &mut Vec<(CellId, VarSlotRef)>,
+    diags: &mut Vec<Diagnostic>,
 ) -> Ctl {
     let row = controls::row_by_id(ctl);
     let fallback = row.map_or(0.0, |r| r.default);
@@ -547,7 +561,19 @@ fn default_ctl(
                 cells.push((cell, slot.clone()));
                 Ctl::Cell(cell)
             }
-            None => Ctl::Const(number(&slot.get()).unwrap_or(fallback)),
+            None => {
+                diags.push(Diagnostic::error(
+                    crate::types::diag::DiagCode::CellCapacity,
+                    span,
+                    format!(
+                        "`{}`'s `{}` default has no free instrument-default cell; it is frozen \
+                         at its current value",
+                        name_of_kw(inst_name),
+                        name_of_kw(param_name)
+                    ),
+                ));
+                Ctl::Const(number(&slot.get()).unwrap_or(fallback))
+            }
         },
         Some(Value::VarRef(slot)) => Ctl::Const(number(&slot.get()).unwrap_or(fallback)),
         Some(v) => Ctl::Const(match (row, v) {
@@ -602,6 +628,7 @@ pub fn realize_inst(
     let mut header = Vec::new();
     let mut params = Vec::new();
     let mut cells = Vec::new();
+    let mut default_diags: Vec<Diagnostic> = Vec::new();
     // R2b: the default keyword of a `CtlDomain::Resource` header parameter
     // (`bank`, `table` or `source`), if this instrument declares one.
     let mut resource: Option<KwId> = None;
@@ -658,7 +685,19 @@ pub fn realize_inst(
                         resource = Some(*rkw);
                     }
                 }
-                header.push((ctl, default_ctl(&mut r, ctl, default, &mut cells)));
+                header.push((
+                    ctl,
+                    default_ctl(
+                        &mut r,
+                        name,
+                        *pname,
+                        span,
+                        ctl,
+                        default,
+                        &mut cells,
+                        &mut default_diags,
+                    ),
+                ));
                 params.push(param);
                 param_node(ctl)
             }
@@ -669,6 +708,7 @@ pub fn realize_inst(
             kw.push((*pname, v));
         }
     }
+    vm.dsp.diags.extend(default_diags);
     vm.dsp.inst += 1;
     let out = vm.call_value(ns, &Value::Fn(Rc::clone(&c)), args, kw);
     vm.dsp.inst -= 1;

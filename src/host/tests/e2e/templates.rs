@@ -27,6 +27,8 @@ mod braids_wave_line;
 mod chip;
 mod chord_pair;
 mod coverage;
+mod digital_drum;
+mod digital_metal;
 mod elements;
 mod feedback_metal;
 mod frame_keyframe;

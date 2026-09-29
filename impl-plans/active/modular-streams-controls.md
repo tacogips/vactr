@@ -41,7 +41,7 @@ source under 1000 lines.
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
 | STR-001 | Audit six source modes, parameter mappings, control-rate and analog boundary | FX-003 | Completed |
-| STR-002 | Envelope and plucked/damped vactr control with digital gain/filter adaptation | STR-001 | Completed (adaptation) |
+| STR-002 | Envelope and plucked/damped vactrol control with digital gain/filter adaptation | STR-001 | Completed (adaptation) |
 | STR-003 | Follower and compressor controls with stereo digital gain/filter adaptation | STR-001 | Completed (adaptation) |
 | STR-004 | Filter controller and Lorenz control generator with explicit audio placement | STR-001 | Completed (adaptation) |
 | STR-005 | Independent source-control comparisons and provenance review | STR-002..004 | Not started |
@@ -52,7 +52,7 @@ source under 1000 lines.
 | Source at pinned revision | Control output | Vactr scope |
 |---|---|---|
 | `streams/envelope.{h,cc}` | Gain and frequency envelopes | Control translation plus digital audio adaptation |
-| `streams/vactr.{h,cc}` | Gain and frequency pluck/ring curves | Control translation plus digital audio adaptation |
+| `streams/vactrol.{h,cc}` | Gain and frequency pluck/ring curves | Control translation plus digital audio adaptation |
 | `streams/follower.{h,cc}` | Signal level to gain and frequency | Control translation plus digital audio adaptation |
 | `streams/compressor.{h,cc}` | Level-dependent gain and reduction | Control translation plus digital audio adaptation |
 | `streams/filter_controller.h` | Excitation to frequency CV | Control translation plus digital audio adaptation |

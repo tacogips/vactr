@@ -69,7 +69,7 @@ excitation by averaging L/R and Elements' separate left blow/right strike.
 Its templates become editor-discoverable after loading the file; the default
 internal templates remain available. The default preallocated pool has 72
 slots for the 63 core definitions and opt-in instruments; an Elements pattern
-may override its authored `el-gate 1` and input-level defaults. This is an authored event-local
+may override its authored `ex-gate 1` and input-level defaults. This is an authored event-local
 adaptation and does not expose arbitrary bus taps or source-equivalent DSP.
 
 | Source family | Vactr target | Coverage requirement |
@@ -212,7 +212,7 @@ amplifier smoothing and source hardware scaling remain numerical
 adaptations, not firmware parity claims.
 
 Rings `Part` has six registered models. `src/dsp/ported/rings.rs` publishes
-their pinned order; `rings-voice` runs original fixed-state adaptations of
+their pinned order; `resonator-voice` runs original fixed-state adaptations of
 modal, sympathetic-string, string, FM, quantized sympathetic-string and
 string-with-short-diffuser roles. Its 14 authored controls plus event pitch and
 main/aux selection occupy 16 UGen ports, and all appear in `.vact`/editor.
@@ -236,7 +236,7 @@ roles and explicit internal/external mixing, gate and dry/wet mix. The effect
 uses four rate-sized comb lines and original modal/FM formulas; stereo summing,
 the four-line limit and numerical behavior are Vactr adaptations, not a
 source port. No generated Rings resources, registration array or chord table
-is imported. Opt-in `rings-external-voice` now reads both validated host
+is imported. Opt-in `resonator-external-voice` now reads both validated host
 input channels and averages them for its mono exciter; arbitrary bus taps
 and source-equivalent shared voice state remain open.
 
@@ -346,7 +346,7 @@ source CV numerics, analog hardware and full two-pair I/O still outside
 coverage.
 
 Elements' DSP `Patch` has twenty controls and its `Part` has separate blow
-and strike inputs and main/aux outputs. The neutral `elements-voice` now
+and strike inputs and main/aux outputs. The neutral `exciter-voice` now
 exposes all twenty Patch fields, gate/note/modulation/strength, three
 published internal resonator roles and a separate alternate selector through
 a 30-port two-output node contract including optional host blow/strike.
@@ -357,12 +357,12 @@ exciter/resonator/reverb numerics and sample playback differ. Separate
 external blow/strike inputs are now available to opt-in instrument graphs. A
 distinct original fourfold-oversampled dual-FM/spatial alternate replaces
 the source eightfold/101-tap voice in the same template. A separate stereo
-bus/master `elements-bank` adaptation now
+bus/master `exciter-bank` adaptation now
 routes left audio to blow and right audio to strike excitation, then returns
 main/aux on left/right. It exposes the same twenty Patch and four performance
 roles, model, external/internal blend and dry/wet mix. It uses four bounded
 rate-sized comb lines and procedural modal/reverb stages; its alternate
-selector shares the authored FM/spatial kernel. `el-space` extends to 2
+selector shares the authored FM/spatial kernel. `ex-space` extends to 2
 and freezes the bounded echo at or above 1.75. Exact source spatial/filter and
 oversampling numerics remain pending.
 The bundled `elements/resources/samples.py` generator
@@ -548,6 +548,49 @@ Every declared parameter must be settable from `.vact` and shown by editor
 metadata. A coverage report lists ported, independently substituted, and
 unavailable entries; the project cannot call this task complete while an
 eligible engine or control remains unaccounted for.
+
+Source and resource rights are recorded per file in
+`verification/upstream_inventory.toml`. Each upstream file that Vactr
+names has its license (read from the pinned header), a kind (code,
+generator, aggregate resource or binary asset) and a use: `source` for
+consulted or translated MIT files named in a notice, `partial` for an
+aggregate resource of which only the listed tables are translated, and
+`excluded`, with a reason, for everything else. Run
+`VACTR_MI_REFERENCE=/path/to/eurorack mise run audit-upstream` against a
+separate checkout at the pinned Eurorack and `stmlib` revisions. The audit
+fails when the checkout is modified, or when a declared license differs
+from its header. It also fails in each of these cases:
+
+- a non-MIT file or binary asset is used;
+- Vactr names an upstream path that is missing from the pinned tree or
+  from the inventory;
+- a used file is named by no notice;
+- a non-MIT file in the transitive `#include` closure, including
+  `stmlib`, is not explicitly excluded;
+- a tracked Vactr file is a byte-identical upstream copy;
+- a numeric window from an excluded or partial resource table or binary
+  asset appears among Vactr's literals without a declared import.
+
+Floating-point windows are six values long. Integer and byte windows are
+twelve values long, so that short musical interval lists do not match by
+chance. The only declared table import is the twenty `fb_*` Warps
+vocoder filter rows. The only non-MIT file in the closure is the
+GPL-3.0 `stmlib/ui/event_queue.h`. It is reached through `frames/ui.h`
+from the cited Frames firmware main, and it is excluded. The GPL-3.0
+`elements/resources/samples.py`, all `waves.bin`, `map.bin` and
+`digits.bin` assets, and the aggregate Braids, Clouds, Plaits and Tides
+resources are excluded. The audit is a provenance and non-import check.
+It does not establish that the unaudited wave assets are cleared, and it
+does not establish source fidelity.
+
+User-facing names must not reuse upstream module names.
+`src/dsp/ported/tests.rs` rejects any template, effect or
+editor-declared control whose hyphen tokens include a Mutable Instruments
+module name. Thus Elements, Rings and Tides2 surface as `exciter-*`,
+`resonator-*`/`reso-*` and `tidal-poly-*`, and Braids controls as
+`macro-*`. Every published audio family has an ordered inventory in
+`dsp::ported`, including Clouds (`texture-*`) and Warps (`dual-mod`,
+`shift-pair`). Each inventory row must resolve to a registered name.
 
 The first checked inventory is `dsp::ported::plaits_algorithms()`: 24 entries
 in the pinned Plaits `Voice::Init` order, with separate fidelity and asset

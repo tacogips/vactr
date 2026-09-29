@@ -53,6 +53,7 @@ This directory contains reference materials for system design and implementation
 | MAME Machinedrum skeleton | https://github.com/mamedev/mame/blob/master/src/mame/elektron/elektronmono.cpp | BSD-3-Clause hardware driver, but no self-contained drum DSP to port and no rights to Elektron firmware |
 | 0x808 synthesis engine | https://github.com/averagenative/0x808 | MIT-declared general four-operator FM synthesizer; a candidate for future source review, not a dedicated FM drum port |
 | stmlib license | https://github.com/pichenettes/stmlib/blob/master/LICENSE | Mostly MIT, with separately licensed ST and serial-programming subtrees that must not enter Vactr's audio code |
+| Upstream file inventory | `verification/upstream_inventory.toml` | Per-file license, kind and use for every Mutable Instruments and `stmlib` file Vactr names; checked by `mise run audit-upstream` against a pinned checkout. `elements/resources/samples.py` and `stmlib/ui/event_queue.h` are GPL-3.0 and excluded |
 
 ## Reference Documents
 

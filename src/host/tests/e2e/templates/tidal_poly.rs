@@ -8,7 +8,9 @@ use crate::value::intern::name_of_kw;
 
 fn render(extra: &str) -> Vec<f32> {
     let mut e = E2e::new();
-    e.eval(&format!("s :tides2-voice > note [:a3] > {extra} > once"));
+    e.eval(&format!(
+        "s :tidal-poly-voice > note [:a3] > {extra} > once"
+    ));
     let audio = e.run_for(0.3);
     assert!(e.faults.is_empty(), "{extra}: {:?}", e.faults);
     assert!(e.committed > 0);
@@ -51,7 +53,7 @@ fn all_modes_and_sound_controls_are_codeable_and_responsive() {
 #[test]
 fn both_channel_selectors_and_gate_clock_reach_editor_and_graph() {
     let editor = HostManifest::spec_default()
-        .editor_decl("tides2-voice")
+        .editor_decl("tidal-poly-voice")
         .unwrap();
     for name in [
         "freq",
@@ -77,11 +79,11 @@ fn both_channel_selectors_and_gate_clock_reach_editor_and_graph() {
     let registry = e.reg.borrow();
     let entry = registry
         .entries()
-        .find(|entry| *name_of_kw(entry.name) == *"tides2-voice")
+        .find(|entry| *name_of_kw(entry.name) == *"tidal-poly-voice")
         .unwrap();
     let declared = instrument_decls(&registry)
         .into_iter()
-        .find(|decl| decl.name == "tides2-voice")
+        .find(|decl| decl.name == "tidal-poly-voice")
         .unwrap();
     for name in [
         "poly-main-channel",

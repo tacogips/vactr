@@ -117,6 +117,14 @@ pub enum UGenSpec {
     FmMod,
     FmDrum,
     FeedbackMetal,
+    /// The original tonal digital drum core (design-music 4.1, DDRUM-003).
+    DigitalDrumCore,
+    /// The original digital snare core (design-music 4.1, DDRUM-003).
+    DigitalSnareCore,
+    /// The original digital metal/cymbal core (design-music 4.1, DDRUM-004).
+    DigitalMetalCore,
+    /// The original digital hat core (design-music 4.1, DDRUM-004).
+    DigitalHatCore,
     AnalogPercussion,
     VaSource,
     VaFilter,
@@ -423,7 +431,7 @@ effect_kinds! {
     CrossMod => "dual-mod",
     FirCrossover => "fir-crossover",
     ResonantBank => "resonant-bank",
-    ElementsBank => "elements-bank",
+    ElementsBank => "exciter-bank",
     StreamEnvelope => "stream-envelope",
     StreamVactr => "stream-vactr",
     StreamFollower => "stream-follower",

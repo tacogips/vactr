@@ -18,13 +18,17 @@ excluded. Its repository driver contains no upstream DSP, coefficients,
 oscillator waves, audio samples or output recording. It reports source-only
 metrics for direct numerical comparison; the probe alone is not evidence
 that Vactr's vocoder matches the source.
+`verification/audit_upstream.py` reads the same separate checkout to check
+`verification/upstream_inventory.toml`: license headers, notice coverage,
+the transitive include closure and the absence of excluded resource data
+in Vactr. It compiles nothing and copies no upstream file or value.
 
 ## Streams control-algorithm research reference
 
 `stream-envelope`, `stream-vactr`, `stream-follower`, `stream-compressor`,
 `stream-filter` and `stream-lorenz`
 and the six-function coverage inventory refer to `streams/processor.{h,cc}`,
-`envelope.{h,cc}`, `vactr.{h,cc}`, `follower.{h,cc}` and
+`envelope.{h,cc}`, `vactrol.{h,cc}`, `follower.{h,cc}` and
 `compressor.{h,cc}`, `filter_controller.h` and
 `lorenz_generator.{h,cc}`
 from `pichenettes/eurorack` revision
@@ -946,7 +950,7 @@ fixed-point edges, exact block timing or numerical flag duration; outputs
 3/4 bypass bus/master FX.
 Tides2 is not implemented by this template.
 
-`tides2-voice` separately adapts the 2017 Emilie Gillet MIT DSP architecture
+`tidal-poly-voice` separately adapts the 2017 Emilie Gillet MIT DSP architecture
 in `tides2/{ramp_generator,ramp_shaper,poly_slope_generator}.h` at the same
 pinned Eurorack revision. It runs original analytic AD/loop/AR ramps, four
 output-mode roles (gates, amplitude, phase, frequency) and two rate ranges.
@@ -961,9 +965,10 @@ master FX. Source output voltages, waveshaping and timing are not reproduced.
 
 ## Elements internal instrument architectural reference
 
-`elements-voice` is an original procedural adaptation of the bow, blow,
+`exciter-voice` is an original procedural adaptation of the bow, blow,
 strike and three resonator roles in Mutable Instruments
-`elements/dsp/{patch,part,voice,exciter,resonator}.{h,cc}` at Eurorack
+`elements/dsp/patch.h` and
+`elements/dsp/{part,voice,exciter,resonator}.{h,cc}` at Eurorack
 revision `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. Those DSP files
 carry copyright 2014 Emilie Gillet and the MIT permission and warranty
 notice reproduced above. Vactr uses authored noise, oscillators, modal
@@ -973,24 +978,24 @@ The source's `elements/resources/samples.py` is GPL-3.0-or-later and bundles
 WAV recordings with unverified individual rights; neither the generator nor
 those WAV bytes are used. The source five-string topology, its exact DSP,
 separate external blow/strike source-DSP behavior remains pending. The
-opt-in `elements-external-voice` now routes validated host left/right to
+opt-in `exciter-external-voice` now routes validated host left/right to
 named blow/strike instrument ports using the existing authored kernel.
-The separate `elements-bank` bus/master effect
+The separate `exciter-bank` bus/master effect
 maps its left input to blow and right input to strike excitation and outputs
 main and auxiliary channels on left/right. It uses distinct authored filters,
 four-string/modal states and short feedback space, not source numerical DSP.
 It imports no GPL generator, bundled WAV, lookup or aggregate resource.
 Both paths now provide an authored alternate dual-FM/spatial voice selected
-by `el-alternate`. This replaces, rather than translates, the source
+by `ex-alternate`. This replaces, rather than translates, the source
 `elements/dsp/ominous_voice.{h,cc}` eightfold oversampling, 101-tap FIR,
 lookup oscillators and multimode filters with fourfold analytic oscillators,
-a bounded one-pole antialias stage and a short spatial echo. `el-space`
+a bounded one-pole antialias stage and a short spatial echo. `ex-space`
 accepts 0..2 and freezes echo writes from 1.75 upward. Source spatial,
 filter and freeze numerics are not reproduced.
 
 ## Rings Part architectural reference
 
-`rings-voice` and `src/dsp/ugen/rings_part.rs` are original bounded
+`resonator-voice` and `src/dsp/ugen/rings_part.rs` are original bounded
 adaptations of the six model roles in Mutable Instruments
 `rings/dsp/part.{h,cc}`, `resonator`, `string`, and `fm_voice`, at Eurorack
 revision `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. Those source files
@@ -1001,7 +1006,7 @@ feedback diffuser. It does not import Rings' source chord arrays, generated
 lookup tables, wave/sample content, source noise sequences, or aggregate
 resources. Source shared voice allocation and numerical/model fidelity remain
 outstanding. The voice is an adaptation, not a source-equivalent port.
-The opt-in `rings-external-voice` averages validated host L/R into a named
+The opt-in `resonator-external-voice` averages validated host L/R into a named
 event-local mono excitation port. This routing and its numerical response
 are Vactr adaptations; the source's shared Part state remains unmatched.
 
@@ -1032,7 +1037,7 @@ External audio input remains pending. This is not a source-equivalent port.
 ## Stages-inspired analytic segment and oscillator adaptation
 
 `stage-voice` uses the published Stages `segment_generator.{h,cc}` and
-`variable_shape_oscillator.{h,cc}` at Eurorack revision
+`variable_shape_oscillator.h` at Eurorack revision
 `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4` as architectural references.
 These sources carry Emilie Gillet's MIT notice and permission/warranty terms
 reproduced above. Vactr implements original analytic curves, deterministic

@@ -4,6 +4,7 @@
 //! coverage or source-equivalent audio ports.
 
 mod braids;
+mod clouds;
 mod elements;
 mod frames;
 mod functions;
@@ -12,6 +13,14 @@ mod peaks;
 mod rings;
 mod stages;
 mod streams;
+mod warps;
+
+pub use clouds::{
+    clouds_coverage_summary, clouds_modes, CloudsModeSpec, CLOUDS_MODES, CLOUDS_REVISION,
+};
+pub use warps::{
+    warps_algorithms, warps_coverage_summary, WarpsAlgorithmSpec, WARPS_ALGORITHMS, WARPS_REVISION,
+};
 
 pub use frames::{
     frames_coverage_summary, frames_paths, FramesCoverage, FramesPathSpec, EASING_OPTIONS,

@@ -275,6 +275,10 @@ fn bus_param(
     })
 }
 
+/// A signal input needs a live cell (the scheduler writes it once per
+/// tick); with the instrument-default pool exhausted (DDRUM-002A), the
+/// input still installs, frozen at `0.0`, but reports a `cell-capacity`
+/// diagnostic instead of silently dropping the signal.
 fn signal_cell(s: &Rc<Sig>, lw: &mut Lowering<'_>, extras: &mut Extras) -> Ctl {
     match (lw.alloc)() {
         Some(cell) => {
@@ -284,7 +288,14 @@ fn signal_cell(s: &Rc<Sig>, lw: &mut Lowering<'_>, extras: &mut Extras) -> Ctl {
             });
             Ctl::Cell(cell)
         }
-        None => Ctl::Const(0.0),
+        None => {
+            extras.diags.push(Diagnostic::error(
+                DiagCode::CellCapacity,
+                lw.span,
+                "a signal input has no free instrument-default cell; it is frozen at 0.0",
+            ));
+            Ctl::Const(0.0)
+        }
     }
 }
 

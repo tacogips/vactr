@@ -32,21 +32,21 @@ fn opt_in_external_voice_templates_compile_and_are_discoverable() {
         assert!(cfg.template_slots >= definitions);
     }
     let decls = instrument_decls(&e.reg.borrow());
-    for name in ["rings-external-voice", "elements-external-voice"] {
+    for name in ["resonator-external-voice", "exciter-external-voice"] {
         assert!(decls.iter().any(|decl| decl.name == name), "{name}");
     }
     let rings = decls
         .iter()
-        .find(|decl| decl.name == "rings-external-voice")
+        .find(|decl| decl.name == "resonator-external-voice")
         .unwrap();
     for name in [
-        "rings-model",
-        "rings-structure",
-        "rings-brightness",
-        "rings-damping",
-        "rings-position",
-        "rings-fm",
-        "rings-polyphony",
+        "reso-model",
+        "reso-structure",
+        "reso-brightness",
+        "reso-damping",
+        "reso-position",
+        "reso-fm",
+        "reso-polyphony",
     ] {
         assert!(
             rings.params.iter().any(|param| param.name == name),
@@ -55,18 +55,18 @@ fn opt_in_external_voice_templates_compile_and_are_discoverable() {
     }
     let elements = decls
         .iter()
-        .find(|decl| decl.name == "elements-external-voice")
+        .find(|decl| decl.name == "exciter-external-voice")
         .unwrap();
     let registry = e.reg.borrow();
     let entry = registry
         .entries()
-        .find(|entry| &*name_of_kw(entry.name) == "elements-external-voice")
+        .find(|entry| &*name_of_kw(entry.name) == "exciter-external-voice")
         .unwrap();
     for (name, expected) in [
-        ("el-gate", 1.0),
-        ("el-blow-level", 1.0),
-        ("el-strike-level", 1.0),
-        ("el-brightness", 0.5),
+        ("ex-gate", 1.0),
+        ("ex-blow-level", 1.0),
+        ("ex-strike-level", 1.0),
+        ("ex-brightness", 0.5),
     ] {
         let declared = entry
             .params
@@ -91,32 +91,32 @@ fn opt_in_external_voice_templates_compile_and_are_discoverable() {
         );
     }
     for name in [
-        "el-env-shape",
-        "el-bow-level",
-        "el-bow-timbre",
-        "el-blow-level",
-        "el-blow-meta",
-        "el-blow-timbre",
-        "el-strike-level",
-        "el-strike-meta",
-        "el-strike-timbre",
-        "el-signature",
-        "el-geometry",
-        "el-brightness",
-        "el-damping",
-        "el-position",
-        "el-res-mod-frequency",
-        "el-res-mod-offset",
-        "el-reverb-diffusion",
-        "el-reverb-lp",
-        "el-space",
-        "el-modulation-frequency",
-        "el-gate",
-        "el-note",
-        "el-modulation",
-        "el-strength",
-        "el-model",
-        "el-alternate",
+        "ex-env-shape",
+        "ex-bow-level",
+        "ex-bow-timbre",
+        "ex-blow-level",
+        "ex-blow-meta",
+        "ex-blow-timbre",
+        "ex-strike-level",
+        "ex-strike-meta",
+        "ex-strike-timbre",
+        "ex-signature",
+        "ex-geometry",
+        "ex-brightness",
+        "ex-damping",
+        "ex-position",
+        "ex-res-mod-frequency",
+        "ex-res-mod-offset",
+        "ex-reverb-diffusion",
+        "ex-reverb-lp",
+        "ex-space",
+        "ex-modulation-frequency",
+        "ex-gate",
+        "ex-note",
+        "ex-modulation",
+        "ex-strength",
+        "ex-model",
+        "ex-alternate",
     ] {
         assert!(
             elements.params.iter().any(|param| param.name == name),
@@ -135,12 +135,12 @@ fn authored_header_default_tweak_refreshes_the_audio_cell() {
         let registry = e.reg.borrow();
         let entry = registry
             .entries()
-            .find(|entry| &*name_of_kw(entry.name) == "elements-external-voice")
+            .find(|entry| &*name_of_kw(entry.name) == "exciter-external-voice")
             .unwrap();
         let declared = entry
             .params
             .iter()
-            .find(|param| &*name_of_kw(param.name) == "el-brightness")
+            .find(|param| &*name_of_kw(param.name) == "ex-brightness")
             .unwrap();
         let crate::host::wire::Ctl::Cell(cell) = entry
             .def
@@ -182,7 +182,7 @@ fn voice_with_input(name: &str, lane: usize, connected: bool) -> Vec<f32> {
     e.eval(include_str!(
         "../../../../examples/live-external-voices.vact"
     ));
-    let installed_ids: Vec<_> = ["rings-external-voice", "elements-external-voice"]
+    let installed_ids: Vec<_> = ["resonator-external-voice", "exciter-external-voice"]
         .iter()
         .map(|target| {
             e.reg
@@ -201,14 +201,14 @@ fn voice_with_input(name: &str, lane: usize, connected: bool) -> Vec<f32> {
         let (_, allocations) = armed(|| e.side.render(&mut out, 2));
         assert_eq!(allocations, 0);
     }
-    for (target, id) in ["rings-external-voice", "elements-external-voice"]
+    for (target, id) in ["resonator-external-voice", "exciter-external-voice"]
         .iter()
         .zip(installed_ids)
     {
         assert!(e.side.has_template(id), "{target} did not install");
     }
-    let controls = if name == "elements-external-voice" {
-        " > el-bow-level 0.3 > el-modulation 0.4 > el-model 0"
+    let controls = if name == "exciter-external-voice" {
+        " > ex-bow-level 0.3 > ex-modulation 0.4 > ex-model 0"
     } else {
         ""
     };
@@ -245,7 +245,7 @@ fn voice_with_input(name: &str, lane: usize, connected: bool) -> Vec<f32> {
 
 #[test]
 fn external_voices_respond_to_host_lanes() {
-    for name in ["rings-external-voice", "elements-external-voice"] {
+    for name in ["resonator-external-voice", "exciter-external-voice"] {
         let quiet = voice_with_input(name, 0, false);
         for lane in 0..2 {
             let wet = voice_with_input(name, lane, true);
@@ -269,8 +269,8 @@ fn external_voices_respond_to_host_lanes() {
             assert!(wet.iter().all(|x| x.is_finite()));
         }
     }
-    let blow = voice_with_input("elements-external-voice", 0, true);
-    let strike = voice_with_input("elements-external-voice", 1, true);
+    let blow = voice_with_input("exciter-external-voice", 0, true);
+    let strike = voice_with_input("exciter-external-voice", 1, true);
     let distinction: f32 = blow.iter().zip(&strike).map(|(a, b)| (a - b).abs()).sum();
     assert!(
         distinction > 0.1,
@@ -390,7 +390,7 @@ fn step_browser(
 
 #[test]
 fn authored_external_voices_survive_browser_codec_in_stereo_and_quad() {
-    for name in ["rings-external-voice", "elements-external-voice"] {
+    for name in ["resonator-external-voice", "exciter-external-voice"] {
         for quad in [false, true] {
             let left = browser_voice(name, 0, quad);
             let right = browser_voice(name, 1, quad);

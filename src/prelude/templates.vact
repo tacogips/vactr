@@ -36,6 +36,51 @@ inst feedback-metal-drum metal-ratio: float = 2.4 metal-index: float = 3 metal-f
 	feedback-metal-core freq velocity metal-ratio: metal-ratio metal-index: metal-index metal-feedback: metal-feedback metal-mod-decay: metal-mod-decay metal-body-decay: metal-body-decay metal-pitch-drop: metal-pitch-drop metal-noise-level: metal-noise-level metal-noise-decay: metal-noise-decay metal-noise-color: metal-noise-color metal-noise-to-fm: metal-noise-to-fm metal-cutoff: metal-cutoff metal-resonance: metal-resonance metal-drive: metal-drive
 		> * amp
 
+# Original programmable digital drum kit: tonal voice (design-music 4.1,
+# DDRUM-001/003). Every parameter of `digital-drum-core` is a header
+# control, so it is patternable, cell-backed and editor-visible; `cps` and
+# `onset-time` are hidden implicit controls the commit stage fills for
+# `lfo-sync`/`lfo-retrigger: false` (see `dsp::ugen::digital_drum`).
+# `filter-type` defaults to `:lp` (not `:off`), so `cutoff`/`res` and the
+# `velocity-target`/`lfo-target` routes to them are live out of the box;
+# `:off` remains one keyword away for a fully unfiltered voice.
+inst digital-drum wave: keyword = :sine coarse: float = 0 fine: float = 0 amp-attack: float = 0.001 amp-decay: float = 0.3 amp-slope: float = 0.6 mod-wave: keyword = :sine mod-freq: float = 2 mod-level: float = 0.5 fm-depth: float = 1 pitch-decay: float = 0.05 pitch-depth: float = 12 pitch-slope: float = 0.5 osc-mix: float = 0.5 mod-decay: float = 0.15 mod-slope: float = 0.5 transient-wave: keyword = :click transient-freq: float = 4000 transient-level: float = 0.3 filter-type: keyword = :lp cutoff: float = 1200 res: float = 0.3 filter-drive: float = 0 drive: float = 0 decimation: float = 0 volume-velocity: float = 1 velocity-depth: float = 0 velocity-target: keyword = :none lfo-wave: keyword = :sine lfo-rate: float = 4 lfo-depth: float = 0 lfo-offset: float = 0 lfo-target: keyword = :none lfo-retrigger: bool = true lfo-sync: bool = false repeat-count: int = 0 repeat-time: float = 0.1:
+	digital-drum-core freq velocity wave coarse: coarse fine: fine mod-wave: mod-wave mod-freq: mod-freq mod-level: mod-level fm-depth: fm-depth pitch-decay: pitch-decay pitch-depth: pitch-depth pitch-slope: pitch-slope osc-mix: osc-mix mod-decay: mod-decay mod-slope: mod-slope transient-wave: transient-wave transient-freq: transient-freq transient-level: transient-level filter-type: filter-type cutoff: cutoff res: res filter-drive: filter-drive drive: drive decimation: decimation amp-attack: amp-attack amp-decay: amp-decay amp-slope: amp-slope volume-velocity: volume-velocity velocity-depth: velocity-depth velocity-target: velocity-target lfo-wave: lfo-wave lfo-rate: lfo-rate lfo-depth: lfo-depth lfo-offset: lfo-offset lfo-target: lfo-target lfo-retrigger: lfo-retrigger lfo-sync: lfo-sync repeat-count: repeat-count repeat-time: repeat-time
+		> * amp
+
+# Original programmable digital drum kit: snare voice (design-music 4.1,
+# DDRUM-001/003). The tonal surface plus band-passed noise (`noise-freq`,
+# `noise-mix`); shares `digital_drum`'s kernel module with `digital-drum`.
+inst digital-snare wave: keyword = :sine coarse: float = 0 fine: float = 0 amp-attack: float = 0.001 amp-decay: float = 0.3 amp-slope: float = 0.6 mod-wave: keyword = :sine mod-freq: float = 2 mod-level: float = 0.5 fm-depth: float = 1 pitch-decay: float = 0.05 pitch-depth: float = 12 pitch-slope: float = 0.5 osc-mix: float = 0.5 mod-decay: float = 0.15 mod-slope: float = 0.5 noise-freq: float = 2500 noise-mix: float = 0.3 transient-wave: keyword = :click transient-freq: float = 4000 transient-level: float = 0.3 filter-type: keyword = :lp cutoff: float = 1200 res: float = 0.3 filter-drive: float = 0 drive: float = 0 decimation: float = 0 volume-velocity: float = 1 velocity-depth: float = 0 velocity-target: keyword = :none lfo-wave: keyword = :sine lfo-rate: float = 4 lfo-depth: float = 0 lfo-offset: float = 0 lfo-target: keyword = :none lfo-retrigger: bool = true lfo-sync: bool = false repeat-count: int = 0 repeat-time: float = 0.1:
+	digital-snare-core freq velocity wave coarse: coarse fine: fine mod-wave: mod-wave mod-freq: mod-freq mod-level: mod-level fm-depth: fm-depth pitch-decay: pitch-decay pitch-depth: pitch-depth pitch-slope: pitch-slope osc-mix: osc-mix mod-decay: mod-decay mod-slope: mod-slope noise-freq: noise-freq noise-mix: noise-mix transient-wave: transient-wave transient-freq: transient-freq transient-level: transient-level filter-type: filter-type cutoff: cutoff res: res filter-drive: filter-drive drive: drive decimation: decimation amp-attack: amp-attack amp-decay: amp-decay amp-slope: amp-slope volume-velocity: volume-velocity velocity-depth: velocity-depth velocity-target: velocity-target lfo-wave: lfo-wave lfo-rate: lfo-rate lfo-depth: lfo-depth lfo-offset: lfo-offset lfo-target: lfo-target lfo-retrigger: lfo-retrigger lfo-sync: lfo-sync repeat-count: repeat-count repeat-time: repeat-time
+		> * amp
+
+# Original programmable digital drum kit: metal/cymbal voice (design-music
+# 4.1, DDRUM-001/004). An inharmonic oscillator bank (its own ratio set,
+# spread by `metal-spread`) FM'd by two modulators (`mod*`, `mod2*`) with
+# `fm-depth` and a modulation envelope (`mod-decay`, `mod-slope`), plus
+# high-passed noise; shares the shared chain with `digital-drum`/
+# `digital-snare` (`dsp::ugen::digital_drum::chain`). `filter-type`
+# defaults to `:bp`, so `cutoff`/`res` and their velocity/LFO routes are
+# live out of the box.
+inst digital-metal wave: keyword = :sine coarse: float = 0 fine: float = 0 amp-attack: float = 0.001 amp-decay: float = 0.3 amp-slope: float = 0.6 mod-wave: keyword = :sine mod-freq: float = 2 mod-level: float = 0.5 mod2-wave: keyword = :sine mod2-freq: float = 3 mod2-level: float = 0.3 fm-depth: float = 1 mod-decay: float = 0.15 mod-slope: float = 0.5 metal-spread: float = 0.3 transient-wave: keyword = :click transient-freq: float = 4000 transient-level: float = 0.3 filter-type: keyword = :bp cutoff: float = 1200 res: float = 0.3 filter-drive: float = 0 drive: float = 0 decimation: float = 0 volume-velocity: float = 1 velocity-depth: float = 0 velocity-target: keyword = :none lfo-wave: keyword = :sine lfo-rate: float = 4 lfo-depth: float = 0 lfo-offset: float = 0 lfo-target: keyword = :none lfo-retrigger: bool = true lfo-sync: bool = false repeat-count: int = 0 repeat-time: float = 0.1:
+	digital-metal-core freq velocity wave coarse: coarse fine: fine mod-wave: mod-wave mod-freq: mod-freq mod-level: mod-level mod2-wave: mod2-wave mod2-freq: mod2-freq mod2-level: mod2-level fm-depth: fm-depth mod-decay: mod-decay mod-slope: mod-slope metal-spread: metal-spread transient-wave: transient-wave transient-freq: transient-freq transient-level: transient-level filter-type: filter-type cutoff: cutoff res: res filter-drive: filter-drive drive: drive decimation: decimation amp-attack: amp-attack amp-decay: amp-decay amp-slope: amp-slope volume-velocity: volume-velocity velocity-depth: velocity-depth velocity-target: velocity-target lfo-wave: lfo-wave lfo-rate: lfo-rate lfo-depth: lfo-depth lfo-offset: lfo-offset lfo-target: lfo-target lfo-retrigger: lfo-retrigger lfo-sync: lfo-sync repeat-count: repeat-count repeat-time: repeat-time
+		> * amp
+
+# Original programmable digital drum kit: hat voice (design-music 4.1,
+# DDRUM-001/004). A fixed inharmonic oscillator bank (a distinct original
+# ratio set, no `metal-spread`) FM'd by two modulators, plus high-passed
+# noise. `hat-open` selects `open-decay` (ringing) or `closed-decay`
+# (tight) as the base tail, which `amp-decay` then scales relative to its
+# own default, so `amp-decay`/`open-decay`/`closed-decay`/`hat-open` are
+# all independently audible (see `dsp::ugen::digital_drum::metal`'s module
+# doc comment). Open/closed choke uses the existing `cut` group control,
+# not a control declared here. `filter-type` defaults to `:hp`, so
+# `cutoff`/`res` and their velocity/LFO routes are live out of the box.
+inst digital-hat wave: keyword = :sine coarse: float = 0 fine: float = 0 amp-attack: float = 0.001 amp-decay: float = 0.3 amp-slope: float = 0.6 mod-wave: keyword = :sine mod-freq: float = 2 mod-level: float = 0.5 mod2-wave: keyword = :sine mod2-freq: float = 3 mod2-level: float = 0.3 fm-depth: float = 1 mod-decay: float = 0.15 transient-wave: keyword = :click transient-freq: float = 4000 transient-level: float = 0.3 filter-type: keyword = :hp cutoff: float = 1200 res: float = 0.3 filter-drive: float = 0 drive: float = 0 decimation: float = 0 volume-velocity: float = 1 velocity-depth: float = 0 velocity-target: keyword = :none lfo-wave: keyword = :sine lfo-rate: float = 4 lfo-depth: float = 0 lfo-offset: float = 0 lfo-target: keyword = :none lfo-retrigger: bool = true lfo-sync: bool = false open-decay: float = 0.6 closed-decay: float = 0.08 hat-open: bool = false:
+	digital-hat-core freq velocity wave coarse: coarse fine: fine mod-wave: mod-wave mod-freq: mod-freq mod-level: mod-level mod2-wave: mod2-wave mod2-freq: mod2-freq mod2-level: mod2-level fm-depth: fm-depth mod-decay: mod-decay transient-wave: transient-wave transient-freq: transient-freq transient-level: transient-level filter-type: filter-type cutoff: cutoff res: res filter-drive: filter-drive drive: drive decimation: decimation amp-attack: amp-attack amp-decay: amp-decay amp-slope: amp-slope volume-velocity: volume-velocity velocity-depth: velocity-depth velocity-target: velocity-target lfo-wave: lfo-wave lfo-rate: lfo-rate lfo-depth: lfo-depth lfo-offset: lfo-offset lfo-target: lfo-target lfo-retrigger: lfo-retrigger lfo-sync: lfo-sync open-decay: open-decay closed-decay: closed-decay hat-open: hat-open
+		> * amp
+
 # Analytic struck-resonator percussion: four bass controls from the
 # referenced design, with neutral Vactr names.
 inst low-drum kick-frequency: float = 60 kick-punch: float = 0.5 kick-tone: float = 0.5 kick-decay: float = 0.45:
@@ -137,63 +182,63 @@ inst chord-layer-voice layer-chord: float = 0.5 timbre: float = 0.5 morph: float
 	chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 0 > * amp
 		> + {chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 1 > * amp > aux-out}
 
-# Five original analytic oscillator shapes selected by braids-shape (0..4).
+# Five original analytic oscillator shapes selected by macro-shape (0..4).
 # Strike adds a short overtone transient; sync adds an event-local hard-sync clock.
-inst macro-five-voice braids-shape: float = 0 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-five-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-five-voice macro-shape: float = 0 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-five-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original analytic sub-octave and dual-sync shapes, source positions 5..8.
-inst macro-sub-sync-voice braids-shape: float = 5 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-sub-sync-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-sub-sync-voice macro-shape: float = 5 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-sub-sync-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Three independent same-shape oscillators, source positions 9..12.
 # Color and timbre independently detune the two companion oscillators.
-inst macro-triple-voice braids-shape: float = 9 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-triple-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-triple-voice macro-shape: float = 9 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-triple-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original analytic ring, swarm, comb and stepped digital shapes, positions 13..16.
-inst macro-digital-voice braids-shape: float = 13 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-digital-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-digital-voice macro-shape: float = 13 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-digital-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Procedural phase-reset digital-filter roles, positions 17..20.
-inst macro-filter-voice braids-shape: float = 17 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-filter-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-filter-voice macro-shape: float = 17 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-filter-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original procedural formant and harmonic roles, positions 21..24.
-inst macro-formant-voice braids-shape: float = 21 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-formant-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-formant-voice macro-shape: float = 21 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-formant-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original analytic FM roles, positions 25..27.
-inst macro-fm-voice braids-shape: float = 25 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-fm-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-fm-voice macro-shape: float = 25 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-fm-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original procedural string/wind resonator roles, positions 28..31.
-inst macro-physical-voice braids-shape: float = 28 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-physical-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-physical-voice macro-shape: float = 28 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-physical-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Additive struck bell/drum roles, positions 32..33.
-inst macro-struck-voice braids-shape: float = 32 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-struck-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-struck-voice macro-shape: float = 32 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-struck-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original kick, cymbal and snare roles, positions 34..36.
-inst macro-percussion-voice braids-shape: float = 34 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-percussion-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-percussion-voice macro-shape: float = 34 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-percussion-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original procedural bank scan and 16x16 map, Braids positions 37..38.
-inst macro-wave-grid-voice braids-shape: float = 37 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-wave-grid-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-wave-grid-voice macro-shape: float = 37 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-wave-grid-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original line scan and four-voice chord, Braids positions 39..40.
-inst macro-wave-line-voice braids-shape: float = 39 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-wave-line-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-wave-line-voice macro-shape: float = 39 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-wave-line-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original filtered, twin-peak and clocked noise, Braids positions 41..43.
-inst macro-noise-voice braids-shape: float = 41 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-noise-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-noise-voice macro-shape: float = 41 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-noise-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original four-grain, resonant-particle and I/Q symbols, positions 44..46.
-inst macro-cloud-voice braids-shape: float = 44 braids-color: float = 0.5 braids-timbre: float = 0.5 braids-strike: float = 0 braids-sync: float = 0:
-	macro-cloud-core freq braids-shape: braids-shape braids-color: braids-color braids-timbre: braids-timbre braids-strike: braids-strike braids-sync: braids-sync > * amp
+inst macro-cloud-voice macro-shape: float = 44 macro-color: float = 0.5 macro-timbre: float = 0.5 macro-strike: float = 0 macro-sync: float = 0:
+	macro-cloud-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original analytic 8x8x3 wave grid; quantized auxiliary output.
 inst wave-grid-voice wave-bank: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
@@ -279,9 +324,9 @@ inst granular source: keyword = :pad-loop size: float = 0.08 density: float = 24
 
 # Event-local original adaptations of the six Rings Part model roles.
 # External audio excitation and shared voice-stealing are not available here.
-inst rings-voice rings-model: float = 0 rings-structure: float = 0.5 rings-brightness: float = 0.5 rings-damping: float = 0.5 rings-position: float = 0.5 rings-strum: float = 1 rings-internal-exciter: float = 1 rings-internal-strum: float = 1 rings-internal-note: float = 1 rings-tonic: float = 0 rings-note: float = 0 rings-fm: float = 0 rings-chord: float = 0 rings-polyphony: float = 1:
-	rings-part-core freq rings-model: rings-model rings-structure: rings-structure rings-brightness: rings-brightness rings-damping: rings-damping rings-position: rings-position rings-strum: rings-strum rings-internal-exciter: rings-internal-exciter rings-internal-strum: rings-internal-strum rings-internal-note: rings-internal-note rings-tonic: rings-tonic rings-note: rings-note rings-fm: rings-fm rings-chord: rings-chord rings-polyphony: rings-polyphony mode: 0 > * amp
-		> + {rings-part-core freq rings-model: rings-model rings-structure: rings-structure rings-brightness: rings-brightness rings-damping: rings-damping rings-position: rings-position rings-strum: rings-strum rings-internal-exciter: rings-internal-exciter rings-internal-strum: rings-internal-strum rings-internal-note: rings-internal-note rings-tonic: rings-tonic rings-note: rings-note rings-fm: rings-fm rings-chord: rings-chord rings-polyphony: rings-polyphony mode: 1 > * amp > aux-out}
+inst resonator-voice reso-model: float = 0 reso-structure: float = 0.5 reso-brightness: float = 0.5 reso-damping: float = 0.5 reso-position: float = 0.5 reso-strum: float = 1 reso-internal-exciter: float = 1 reso-internal-strum: float = 1 reso-internal-note: float = 1 reso-tonic: float = 0 reso-note: float = 0 reso-fm: float = 0 reso-chord: float = 0 reso-polyphony: float = 1:
+	resonator-part-core freq reso-model: reso-model reso-structure: reso-structure reso-brightness: reso-brightness reso-damping: reso-damping reso-position: reso-position reso-strum: reso-strum reso-internal-exciter: reso-internal-exciter reso-internal-strum: reso-internal-strum reso-internal-note: reso-internal-note reso-tonic: reso-tonic reso-note: reso-note reso-fm: reso-fm reso-chord: reso-chord reso-polyphony: reso-polyphony mode: 0 > * amp
+		> + {resonator-part-core freq reso-model: reso-model reso-structure: reso-structure reso-brightness: reso-brightness reso-damping: reso-damping reso-position: reso-position reso-strum: reso-strum reso-internal-exciter: reso-internal-exciter reso-internal-strum: reso-internal-strum reso-internal-note: reso-internal-note reso-tonic: reso-tonic reso-note: reso-note reso-fm: reso-fm reso-chord: reso-chord reso-polyphony: reso-polyphony mode: 1 > * amp > aux-out}
 
 # Original four-voice string choir, separate from the six resonator models.
 # FX 0..5: formant, chorus, short reverb, alternate formant, ensemble, alternate reverb.
@@ -291,9 +336,9 @@ inst string-choir-voice choir-structure: float = 0.5 choir-brightness: float = 0
 
 # Original procedural internal bow/blow/strike and three resonator roles.
 # External blow/strike inputs and alternate voice are not part of this template.
-inst elements-voice el-env-shape: float = 0.5 el-bow-level: float = 0 el-bow-timbre: float = 0.5 el-blow-level: float = 0 el-blow-meta: float = 0.5 el-blow-timbre: float = 0.5 el-strike-level: float = 0.8 el-strike-meta: float = 0.5 el-strike-timbre: float = 0.5 el-signature: float = 0.5 el-geometry: float = 0.5 el-brightness: float = 0.5 el-damping: float = 0.5 el-position: float = 0.5 el-res-mod-frequency: float = 0.5 el-res-mod-offset: float = 0.5 el-reverb-diffusion: float = 0.5 el-reverb-lp: float = 0.5 el-space: float = 0.5 el-modulation-frequency: float = 0.5 el-gate: float = 1 el-note: float = 0 el-modulation: float = 0 el-strength: float = 1 el-model: float = 0 el-alternate: float = 0:
-	elements-internal-core freq el-env-shape: el-env-shape el-bow-level: el-bow-level el-bow-timbre: el-bow-timbre el-blow-level: el-blow-level el-blow-meta: el-blow-meta el-blow-timbre: el-blow-timbre el-strike-level: el-strike-level el-strike-meta: el-strike-meta el-strike-timbre: el-strike-timbre el-signature: el-signature el-geometry: el-geometry el-brightness: el-brightness el-damping: el-damping el-position: el-position el-res-mod-frequency: el-res-mod-frequency el-res-mod-offset: el-res-mod-offset el-reverb-diffusion: el-reverb-diffusion el-reverb-lp: el-reverb-lp el-space: el-space el-modulation-frequency: el-modulation-frequency el-gate: el-gate el-note: el-note el-modulation: el-modulation el-strength: el-strength el-model: el-model el-alternate: el-alternate mode: 0 > * amp
-		> + {elements-internal-core freq el-env-shape: el-env-shape el-bow-level: el-bow-level el-bow-timbre: el-bow-timbre el-blow-level: el-blow-level el-blow-meta: el-blow-meta el-blow-timbre: el-blow-timbre el-strike-level: el-strike-level el-strike-meta: el-strike-meta el-strike-timbre: el-strike-timbre el-signature: el-signature el-geometry: el-geometry el-brightness: el-brightness el-damping: el-damping el-position: el-position el-res-mod-frequency: el-res-mod-frequency el-res-mod-offset: el-res-mod-offset el-reverb-diffusion: el-reverb-diffusion el-reverb-lp: el-reverb-lp el-space: el-space el-modulation-frequency: el-modulation-frequency el-gate: el-gate el-note: el-note el-modulation: el-modulation el-strength: el-strength el-model: el-model el-alternate: el-alternate mode: 1 > * amp > aux-out}
+inst exciter-voice ex-env-shape: float = 0.5 ex-bow-level: float = 0 ex-bow-timbre: float = 0.5 ex-blow-level: float = 0 ex-blow-meta: float = 0.5 ex-blow-timbre: float = 0.5 ex-strike-level: float = 0.8 ex-strike-meta: float = 0.5 ex-strike-timbre: float = 0.5 ex-signature: float = 0.5 ex-geometry: float = 0.5 ex-brightness: float = 0.5 ex-damping: float = 0.5 ex-position: float = 0.5 ex-res-mod-frequency: float = 0.5 ex-res-mod-offset: float = 0.5 ex-reverb-diffusion: float = 0.5 ex-reverb-lp: float = 0.5 ex-space: float = 0.5 ex-modulation-frequency: float = 0.5 ex-gate: float = 1 ex-note: float = 0 ex-modulation: float = 0 ex-strength: float = 1 ex-model: float = 0 ex-alternate: float = 0:
+	exciter-core freq ex-env-shape: ex-env-shape ex-bow-level: ex-bow-level ex-bow-timbre: ex-bow-timbre ex-blow-level: ex-blow-level ex-blow-meta: ex-blow-meta ex-blow-timbre: ex-blow-timbre ex-strike-level: ex-strike-level ex-strike-meta: ex-strike-meta ex-strike-timbre: ex-strike-timbre ex-signature: ex-signature ex-geometry: ex-geometry ex-brightness: ex-brightness ex-damping: ex-damping ex-position: ex-position ex-res-mod-frequency: ex-res-mod-frequency ex-res-mod-offset: ex-res-mod-offset ex-reverb-diffusion: ex-reverb-diffusion ex-reverb-lp: ex-reverb-lp ex-space: ex-space ex-modulation-frequency: ex-modulation-frequency ex-gate: ex-gate ex-note: ex-note ex-modulation: ex-modulation ex-strength: ex-strength ex-model: ex-model ex-alternate: ex-alternate mode: 0 > * amp
+		> + {exciter-core freq ex-env-shape: ex-env-shape ex-bow-level: ex-bow-level ex-bow-timbre: ex-bow-timbre ex-blow-level: ex-blow-level ex-blow-meta: ex-blow-meta ex-blow-timbre: ex-blow-timbre ex-strike-level: ex-strike-level ex-strike-meta: ex-strike-meta ex-strike-timbre: ex-strike-timbre ex-signature: ex-signature ex-geometry: ex-geometry ex-brightness: ex-brightness ex-damping: ex-damping ex-position: ex-position ex-res-mod-frequency: ex-res-mod-frequency ex-res-mod-offset: ex-res-mod-offset ex-reverb-diffusion: ex-reverb-diffusion ex-reverb-lp: ex-reverb-lp ex-space: ex-space ex-modulation-frequency: ex-modulation-frequency ex-gate: ex-gate ex-note: ex-note ex-modulation: ex-modulation ex-strength: ex-strength ex-model: ex-model ex-alternate: ex-alternate mode: 1 > * amp > aux-out}
 
 # Original analytic first-generation Tides function adaptation. Output 0 is
 # unipolar; 1 is bipolar; 2 is an attack-complete level and 3 a
@@ -304,7 +349,7 @@ inst tidal-voice tide-shape: float = 0.5 tide-slope: float = 0.5 tide-smoothness
 
 # Original Tides2 ramp adaptation; main/aux independently select any two of
 # four computed lanes. Simultaneous four-channel routing is not available.
-inst tides2-voice poly-width: float = 0.5 poly-shape: float = 0.5 poly-smoothness: float = 0.5 poly-shift: float = 0.5 poly-gate: float = 1 poly-clock: float = 0 poly-mode: float = 1 poly-output-mode: float = 2 poly-range: float = 1 poly-main-channel: float = 0 poly-aux-channel: float = 1:
+inst tidal-poly-voice poly-width: float = 0.5 poly-shape: float = 0.5 poly-smoothness: float = 0.5 poly-shift: float = 0.5 poly-gate: float = 1 poly-clock: float = 0 poly-mode: float = 1 poly-output-mode: float = 2 poly-range: float = 1 poly-main-channel: float = 0 poly-aux-channel: float = 1:
 	tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: poly-main-channel > * amp
 		> + {tidal-poly-core freq poly-width: poly-width poly-shape: poly-shape poly-smoothness: poly-smoothness poly-shift: poly-shift poly-gate: poly-gate poly-clock: poly-clock poly-mode: poly-mode poly-output-mode: poly-output-mode poly-range: poly-range poly-channel: poly-aux-channel > * amp > aux-out}
 

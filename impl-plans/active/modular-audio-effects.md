@@ -44,7 +44,7 @@ host capabilities; no audio callback allocates or fetches resources.
 | FX-002E | Translate source internal carrier shape pairs and table-free BLEP oscillator stages | FX-002D | Completed; sine table, noise SVF and SRC parity remain open |
 | FX-002F | Port the MIT-noticed 6×/48-tap Warps XMOD sample-rate conversion path | FX-002E | Completed; vocoder filter bank and host-rate equivalence remain open |
 | FX-003 | Translate Streams' six control functions and add clearly labeled digital audio adaptations | MOD-004 | Source boundary audited; see `modular-streams-controls.md` |
-| FX-004 | Expose Rings resonator and Elements exciter/effect paths as processors | SYN-005, SYN-006 | `resonant-bank` and `elements-bank` adaptations runnable; source parity pending |
+| FX-004 | Expose Rings resonator and Elements exciter/effect paths as processors | SYN-005, SYN-006 | `resonant-bank` and `exciter-bank` adaptations runnable; source parity pending |
 | FX-005 | Translate Stages audio segments and Frames controls; implement a labeled digital mixer adaptation | SYN-008 | Source boundary audited; see `modular-segments-keyframes.md` |
 | FX-006 | Validate bus/master/per-voice placement and native/browser parity | FX-001..FX-005 | Not started |
 

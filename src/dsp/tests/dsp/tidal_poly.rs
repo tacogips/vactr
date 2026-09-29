@@ -93,9 +93,9 @@ fn all_twenty_four_roles_and_output_budget_are_truthful() {
         assert_eq!(usize::from(row.range), index % 2);
         assert_eq!(row.coverage, CoverageState::Adaptation);
         assert_eq!(row.resources, ResourceState::Replacement);
-        assert_eq!(row.vactr_template, Some("tides2-voice"));
+        assert_eq!(row.vactr_template, Some("tidal-poly-voice"));
         assert_eq!((row.source_channels, row.simultaneous_channels), (4, 2));
-        assert_eq!(row.opt_in_quad_template, Some("tides2-quad-voice"));
+        assert_eq!(row.opt_in_quad_template, Some("tidal-poly-quad-voice"));
         assert_eq!(row.simultaneous_output_coverage, CoverageState::Adaptation);
     }
 }

@@ -1,0 +1,1346 @@
+# Upstream files named by Vactr, audited by verification/audit_upstream.py.
+# Run: VACTR_MI_REFERENCE=/path/to/eurorack mise run audit-upstream
+#
+# license: header in the pinned file (MIT, GPL-3.0-or-later, none for binary).
+# kind:    code | generator | aggregate-resource | asset.
+# use:     source   - consulted or translated; named in a notice;
+#          partial  - only the listed `imports` tables are translated;
+#          excluded - no code or data enters Vactr (`reason` required).
+
+[revisions]
+eurorack = "08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4"
+stmlib = "e3bd7c9cc00e4364166f9905c0509b6ffd0535ec"
+
+# --- braids
+[[file]]
+path = "braids/analog_oscillator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "braids/analog_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "braids/data/map.bin"
+license = "none"
+kind = "asset"
+use = "excluded"
+reason = "Unaudited wave-map binary read by waveforms.py; positions 37-38 use original procedural content."
+
+[[file]]
+path = "braids/data/waves.bin"
+license = "none"
+kind = "asset"
+use = "excluded"
+reason = "Unaudited wave binary read by waveforms.py; positions 37-40 use original procedural content."
+
+[[file]]
+path = "braids/digital_oscillator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "braids/macro_oscillator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "braids/macro_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "braids/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated aggregate tables; Braids shapes use original analytic or procedural replacements."
+
+[[file]]
+path = "braids/resources/waveforms.py"
+license = "MIT"
+kind = "generator"
+use = "excluded"
+reason = "Generator that converts the unaudited waves.bin and map.bin; nothing is translated."
+
+[[file]]
+path = "braids/settings.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+# --- clouds
+[[file]]
+path = "clouds/dsp/audio_buffer.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/correlator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/correlator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/fx/pitch_shifter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/grain.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/granular_processor.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/granular_processor.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/granular_sample_player.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/looping_sample_player.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/parameters.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/pvoc/frame_transformation.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/pvoc/frame_transformation.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/pvoc/phase_vocoder.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/pvoc/phase_vocoder.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/pvoc/stft.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/pvoc/stft.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/window.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/dsp/wsola_sample_player.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "clouds/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated windows, sine and SRC tables; Clouds textures use Vactr-authored windows and filters."
+
+# --- elements
+[[file]]
+path = "elements/dsp/exciter.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/exciter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/ominous_voice.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/ominous_voice.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/part.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/part.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/patch.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/resonator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/resonator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/voice.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/dsp/voice.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "elements/resources/samples.py"
+license = "GPL-3.0-or-later"
+kind = "generator"
+use = "excluded"
+reason = "GPL-3.0-or-later generator bundling recorded exciter samples; not MIT and not used."
+
+# --- frames
+[[file]]
+path = "frames/frames.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "frames/keyframer.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "frames/keyframer.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "frames/poly_lfo.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "frames/poly_lfo.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "frames/ui.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Frames panel UI header included by frames/frames.cc; it links the GPL-3.0 stmlib event queue and is never translated."
+
+# --- peaks
+[[file]]
+path = "peaks/data/digits.bin"
+license = "none"
+kind = "asset"
+use = "excluded"
+reason = "Unaudited digit recordings; number-station-voice uses original procedural formants."
+
+[[file]]
+path = "peaks/drums/bass_drum.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/bass_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/excitation.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/fm_drum.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/fm_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/high_hat.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/high_hat.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/snare_drum.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/snare_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/drums/svf.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/modulations/bouncing_ball.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/modulations/lfo.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/modulations/lfo.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/modulations/mini_sequencer.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Sequencer-only function listed in the Peaks coverage inventory as out of audio scope; not implemented."
+
+[[file]]
+path = "peaks/modulations/multistage_envelope.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/modulations/multistage_envelope.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/number_station/number_station.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/number_station/number_station.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/processors.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/pulse_processor/pulse_randomizer.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/pulse_processor/pulse_randomizer.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/pulse_processor/pulse_shaper.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/pulse_processor/pulse_shaper.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "peaks/resources/lookup_tables.py"
+license = "MIT"
+kind = "generator"
+use = "source"
+
+[[file]]
+path = "peaks/resources/waveforms.py"
+license = "MIT"
+kind = "generator"
+use = "source"
+
+# --- plaits
+[[file]]
+path = "plaits/dsp/chords/chord_bank.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/chords/chord_bank.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/drums/analog_bass_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/drums/analog_snare_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/drums/hi_hat.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/drums/synthetic_bass_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/drums/synthetic_snare_drum.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/additive_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/additive_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/bass_drum_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/bass_drum_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/chord_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/chord_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/fm_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/fm_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/grain_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/grain_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/hi_hat_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/hi_hat_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/modal_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/modal_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/noise_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/noise_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/particle_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/particle_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/snare_drum_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/snare_drum_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/speech_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/speech_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/string_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/string_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/swarm_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/swarm_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/virtual_analog_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/virtual_analog_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/waveshaping_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/waveshaping_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/wavetable_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine/wavetable_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/arpeggiator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/chiptune_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/chiptune_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/phase_distortion_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/phase_distortion_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/six_op_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/six_op_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/string_machine_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/string_machine_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/virtual_analog_vcf_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/virtual_analog_vcf_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/wave_terrain_engine.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/engine2/wave_terrain_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/fx/diffuser.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/fx/ensemble.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/fx/fx_engine.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/fx/overdrive.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/noise/clocked_noise.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/noise/dust.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/noise/particle.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/grainlet_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/harmonic_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/nes_triangle_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/sine_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/string_synth_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/super_square_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/variable_saw_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/variable_shape_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/wavetable_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/oscillator/z_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/delay_line.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/modal_voice.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/modal_voice.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/resonator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/resonator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/string.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/string.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/string_voice.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/physical_modelling/string_voice.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "plaits/dsp/voice.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Consulted only for the 24-position engine registry order recorded by the Plaits manifest; no code is translated."
+
+[[file]]
+path = "plaits/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated aggregate tables, DX7 banks and TI speech data; individual MIT generator formulas are used instead."
+
+[[file]]
+path = "plaits/resources.h"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Declarations for the excluded aggregate Plaits resource tables."
+
+[[file]]
+path = "plaits/resources/lookup_tables.py"
+license = "MIT"
+kind = "generator"
+use = "source"
+
+[[file]]
+path = "plaits/resources/waves.bin"
+license = "none"
+kind = "asset"
+use = "excluded"
+reason = "Unaudited wave binary behind wav_integrated_waves; positions 5, 13 and 14 use original replacements."
+
+# --- rings
+[[file]]
+path = "rings/dsp/fx/chorus.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/fx/ensemble.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/fx/reverb.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/part.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/part.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/string_synth_envelope.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/string_synth_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/string_synth_part.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/string_synth_part.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/string_synth_voice.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+# --- stages
+[[file]]
+path = "stages/segment_generator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stages/segment_generator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stages/variable_shape_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+# --- stmlib
+[[file]]
+path = "stmlib/dsp/cosine_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/dsp/dsp.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/dsp/filter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/dsp/parameter_interpolator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/dsp/polyblep.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/dsp/units.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
+path = "stmlib/dsp/units.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/ui/event_queue.h"
+license = "GPL-3.0-or-later"
+kind = "code"
+use = "excluded"
+reason = "GPL-3.0 UI event queue reached only through frames/ui.h from the cited Frames firmware main; UI code is out of scope and never translated."
+
+[[file]]
+path = "stmlib/utils/dsp.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "stmlib/utils/random.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+# --- streams
+[[file]]
+path = "streams/compressor.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/compressor.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/envelope.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/envelope.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/filter_controller.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/follower.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/follower.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/lorenz_generator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/lorenz_generator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/processor.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/processor.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/vactrol.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "streams/vactrol.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+# --- tides
+[[file]]
+path = "tides/generator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "tides/generator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "tides/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated aggregate tables; tide functions use analytic curves."
+
+[[file]]
+path = "tides/resources/waves.bin"
+license = "none"
+kind = "asset"
+use = "excluded"
+reason = "Unaudited wave binary; Tides1 waves are replaced by analytic curves."
+
+# --- tides2
+[[file]]
+path = "tides2/poly_slope_generator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "tides2/ramp_generator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "tides2/ramp_shaper.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+# --- warps
+[[file]]
+path = "warps/dsp/filter_bank.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/filter_bank.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/limiter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/modulator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/modulator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/oscillator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/parameters.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/quadrature_oscillator.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/quadrature_transform.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/sample_rate_conversion_filters.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/sample_rate_converter.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/vocoder.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/dsp/vocoder.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "warps/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "partial"
+imports = ["fb_*"]
+reason = "Only the twenty seven-scalar fb_* vocoder filter rows are translated with notice; oscillator waves and other lookups are excluded."
+
+[[file]]
+path = "warps/resources/filter_bank.py"
+license = "MIT"
+kind = "generator"
+use = "source"
+
+[[file]]
+path = "warps/resources/lookup_tables.py"
+license = "MIT"
+kind = "generator"
+use = "source"

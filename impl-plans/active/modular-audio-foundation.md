@@ -1,9 +1,9 @@
 # Modular Audio DSP Foundation Implementation Plan
 
-**Status**: In Progress
+**Status**: In Progress (MOD-001 and MOD-002 complete)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md`
 **Created**: 2026-09-27
-**Last Updated**: 2026-09-27
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -68,8 +68,8 @@ contracts, not a demand for parallel registries.
 
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
-| MOD-001 | Pin source revision and audit every included file/resource and `stmlib` dependency | none | Not started |
-| MOD-002 | Establish neutral user-facing names and upstream-to-Vactr mode/parameter matrix | MOD-001 | Not started |
+| MOD-001 | Pin source revision and audit every included file/resource and `stmlib` dependency | none | Completed; `verification/upstream_inventory.toml` and `mise run audit-upstream` |
+| MOD-002 | Establish neutral user-facing names and upstream-to-Vactr mode/parameter matrix | MOD-001 | Completed; neutral renames, Clouds/Warps inventories, cross-family naming and resolution tests |
 | MOD-003 | Deliver typed arbitrary instrument controls end to end, removing silent skips | MOD-002 | Completed for scalar audio parameters |
 | MOD-004 | Add dual-input/dual-output graph and host wire contract with compatibility tests | MOD-003 | Stereo bus/effect and bounded voice main/aux path complete; arbitrary stereo edges pending |
 | MOD-005 | Define preallocated state, memory budgets and rate/block adaptation | MOD-004 | Bounded host contract complete; broader per-engine parity pending |
@@ -101,7 +101,8 @@ maps to `440 × 48,000 / 47,872.34` Hz at the output.
 
 | Module | File path | Status | Tests |
 |---|---|---|---|
-| Provenance manifest | `src/dsp/ported/manifest.rs` | Plaits inventory complete; other family inventories pending | Ordered positions, resource flags, template/editor and graph checks |
+| Upstream file inventory | `verification/upstream_inventory.toml`, `verification/audit_upstream.py` | 217 files audited at the pinned revisions | Negative check: a nonexistent upstream path fails the audit |
+| Provenance manifest | `src/dsp/ported/*.rs` | Inventories for Plaits, Braids, Elements, Rings, Tides, Peaks, Streams, Stages, Frames, Clouds and Warps | Ordered positions, resource flags, template/editor and graph checks |
 | Parameter pipeline | `src/ns/insts.rs`, `src/sched/commit.rs` | Scalar controls complete | Custom audio response, type and capacity faults |
 | Stereo audio graph | `src/dsp/graph.rs`, `src/dsp/bus.rs`, `src/dsp/voice.rs` | Bus/effect boundary and explicit voice aux output | Native/browser serialized Matrix and voice routing |
 | Metadata and tests | `src/types/manifest.rs`, `src/host/tests/e2e/` | Scalar control metadata complete | End-to-end custom and global-name tests |
@@ -115,7 +116,7 @@ maps to `440 × 48,000 / 47,872.34` Hz at the output.
 
 ## Completion Criteria
 
-- [ ] Source and resource rights are recorded per included component.
+- [x] Source and resource rights are recorded per included component (per file; unaudited wave, map and digit assets stay excluded).
 - [x] Finite scalar declared instrument controls reach audio through the shared native/browser event layout.
 - [ ] Stereo input/output survives every graph and install/wire path (bus effects and voice main/aux output verified; arbitrary multi-output UGen edges remain pending).
 - [x] Per-event control capacity failures produce faults without truncation.
@@ -123,6 +124,110 @@ maps to `440 × 48,000 / 47,872.34` Hz at the output.
 - [ ] Cargo check, clippy and targeted tests pass with `CARGO_TERM_QUIET=true`.
 
 ## Progress Log
+
+### Session: 2026-09-29, MOD-002 neutral names and mode matrix
+
+**Tasks Completed**:
+- User-facing names no longer reuse upstream module names. The user
+  approved each mapping below. Upstream paths and internal Rust
+  identifiers keep their engineering names, and no aliases were kept.
+
+  | Old | New |
+  |---|---|
+  | `elements-voice` | `exciter-voice` |
+  | `elements-external-voice` | `exciter-external-voice` |
+  | `elements-bank` | `exciter-bank` |
+  | `elements-internal-core` | `exciter-core` |
+  | `rings-voice` | `resonator-voice` |
+  | `rings-external-voice` | `resonator-external-voice` |
+  | `rings-part-core` | `resonator-part-core` |
+  | `tides2-voice` | `tidal-poly-voice` |
+  | `tides2-quad-voice` | `tidal-poly-quad-voice` |
+  | `el-*` controls | `ex-*` |
+  | `rings-*` controls | `reso-*` |
+  | `braids-{color,shape,strike,sync,timbre}` | `macro-*` |
+
+- New checked inventories: `src/dsp/ported/clouds.rs` and
+  `src/dsp/ported/warps.rs`.
+  - Clouds: the four `PlaybackMode` positions map to
+    `texture-{grain,stretch,loop,spectral}`, all Adaptation/Replacement.
+  - Warps: positions 0–6 of the `modulation_algorithm` range map to
+    `dual-mod`. Crossfade, both ring modulations, XOR, comparator and
+    vocoder are SourceStage; fold is Adaptation. The hidden frequency
+    shifter maps to `shift-pair` as Adaptation.
+  - No row claims SourcePort.
+- Every published audio family now has an ordered upstream-mode to
+  Vactr-name inventory.
+- New tests in `src/dsp/ported/tests.rs`:
+  - No template, effect, or editor-declared instrument name or parameter
+    has a hyphen token equal to an upstream module name. The only
+    exemption is the phaser's `stages` control, a DSP term unrelated to
+    the module.
+  - Every template or effect named by any family inventory resolves to a
+    registered template, an effect, or an opt-in example template.
+  - Clouds and Warps rows are ordered, pinned, and claim no SourcePort.
+
+**Verification**: independent check-and-test review confirmed:
+- nextest: 1,487 passed, 1 skipped;
+- quiet check, strict Clippy, rustfmt, the wasm32 library check: pass;
+- upstream audit: zero errors;
+- the grep for old user-facing names: no hits.
+
+**Remaining**: The per-parameter matrix covers each engine's common
+controls and mode selectors. Exact per-knob source equivalence is still
+tracked in each family plan.
+
+### Session: 2026-09-29, MOD-001 upstream file inventory and audit
+
+**Tasks Completed**: Added `verification/upstream_inventory.toml`. It covers
+all 217 Eurorack and `stmlib` files that Vactr's sources, notices, active
+plans, specs and verification scripts name. Each entry records the license
+read from the pinned header, a kind (code, generator, aggregate resource or
+binary asset), and a use: 199 `source`, 1 `partial` and 17 `excluded` with
+reasons. `verification/audit_upstream.py` (`mise run audit-upstream`,
+pinned Python) runs against a separate clean checkout at Eurorack
+`08460a69` and `stmlib` `e3bd7c9c`. It fails when a declared license
+differs from its header. It also fails in these cases:
+
+- a non-MIT file or asset is used;
+- Vactr names an upstream path that is absent upstream or from the
+  inventory (notice names are resolved per section, with full brace
+  expansion);
+- a used file lacks a notice;
+- a non-MIT transitive `#include` is not explicitly excluded;
+- a tracked file is a byte-identical upstream copy;
+- six-float or twelve-integer windows from excluded or partial resource
+  tables and binary assets appear in Vactr literals without a declared
+  import.
+
+**Findings**:
+- The product rename had corrupted three upstream facts. Streams' source
+  file `streams/vactrol.{h,cc}` and class `Vactrol` had become `vactr` in
+  the notice, the Streams plan and the `src/dsp/ported/streams.rs`
+  manifest row. These are restored. The user-facing `stream-vactr` name is
+  unchanged.
+- The Stages notice claimed a nonexistent `variable_shape_oscillator.cc`.
+  The Elements notice claimed a nonexistent `patch.cc`. Both are corrected.
+- `elements/resources/samples.py` is GPL-3.0 and remains excluded.
+- The only non-MIT file in the transitive closure is the GPL-3.0
+  `stmlib/ui/event_queue.h`, reached through `frames/ui.h` from the cited
+  Frames firmware main. Both are excluded.
+- The used `stmlib` closure otherwise contains only MIT files.
+- The only matched table import is the twenty declared Warps `fb_*` rows.
+  No other generated table, DX7 or TI data, wave, map or digit asset
+  appears in Vactr.
+
+**Verification**:
+- Negative check: restoring the damaged Streams source path in
+  `streams.rs` makes the audit fail.
+- Independent check-and-test review of the Rust change passed: quiet
+  check, strict Clippy, rustfmt, the wasm32 library check, diff check,
+  and nextest (1,483 passed, 1 skipped).
+
+**Remaining**: MOD-002. The origins of `waves.bin`, `map.bin` and
+`digits.bin` are still unknown, so they stay excluded. The audit proves
+non-import and notice coverage, not source fidelity. Re-run it after any
+new upstream reference, and after any revision change.
 
 ### Session: 2026-09-28, MOD-006A Plaits FM raw-kernel comparison
 

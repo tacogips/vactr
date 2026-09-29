@@ -132,6 +132,39 @@ pub mod orbit {
 const WAVES: &[&str] = &["saw", "pulse", "square", "tri", "sine"];
 const ENVELOPES: &[&str] = &["hann", "tri", "trapezoid", "expo"];
 const VOWELS: &[&str] = &["a", "e", "i", "o", "u"];
+/// Digital drum family filter response (design-music 4.1, DDRUM-001).
+const FILTER_TYPES: &[&str] = &["off", "lp", "bp", "hp", "notch"];
+/// Digital drum family per-voice LFO shape.
+const LFO_WAVES: &[&str] = &["sine", "tri", "saw", "ramp", "square", "random"];
+/// Digital drum family onset transient generator shape.
+const TRANSIENT_WAVES: &[&str] = &["click", "snap", "noise", "sweep"];
+/// Digital drum family `velocity-depth` destination.
+const VELOCITY_TARGETS: &[&str] = &[
+    "none",
+    "pitch",
+    "mod",
+    "cutoff",
+    "decay",
+    "transient",
+    "drive",
+];
+/// Digital drum family per-voice LFO destination. The core is mono (no
+/// aux/stereo path, DDRUM-003), so `pan` is deliberately not a target: a
+/// mono amplitude stand-in for panning would be a misleading, not merely
+/// dead, knob. A later family with a real stereo path (DDRUM-004+) can add
+/// it back with genuine panning.
+const LFO_TARGETS: &[&str] = &[
+    "none",
+    "pitch",
+    "mod",
+    "cutoff",
+    "res",
+    "amp",
+    "drive",
+    "decimation",
+    "transient",
+    "decay",
+];
 
 const fn mk(
     name: &'static str,
@@ -371,6 +404,136 @@ pub static ROWS: &[ControlRow] = &[
     param("terrain-select", 106, 0.5, (0.0, 1.0)),
     param("wave-bank", 107, 0.5, (0.0, 1.0)),
     param("layer-chord", 108, 0.5, (0.0, 1.0)),
+    // Programmable digital drums (design-music 4.1, DDRUM-001/002A). Enum
+    // rows first, then the shared scalar surface, then family additions
+    // (tonal/snare/metal/hat), in the plan's inventory order.
+    mk(
+        "filter-type",
+        109,
+        0.0,
+        (0.0, 4.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(FILTER_TYPES),
+    ),
+    mk(
+        "mod-wave",
+        110,
+        4.0,
+        (0.0, 4.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(WAVES),
+    ),
+    mk(
+        "mod2-wave",
+        111,
+        4.0,
+        (0.0, 4.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(WAVES),
+    ),
+    mk(
+        "lfo-wave",
+        112,
+        0.0,
+        (0.0, 5.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(LFO_WAVES),
+    ),
+    mk(
+        "transient-wave",
+        113,
+        0.0,
+        (0.0, 3.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(TRANSIENT_WAVES),
+    ),
+    mk(
+        "velocity-target",
+        114,
+        0.0,
+        (0.0, 6.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(VELOCITY_TARGETS),
+    ),
+    mk(
+        "lfo-target",
+        115,
+        0.0,
+        (0.0, 9.0),
+        CtlRoute::InstParam,
+        CtlDomain::Enum(LFO_TARGETS),
+    ),
+    param("coarse", 116, 0.0, (-24.0, 24.0)),
+    param("fine", 117, 0.0, (-100.0, 100.0)),
+    param("amp-attack", 118, 0.001, (0.0, 2.0)),
+    param("amp-decay", 119, 0.3, (0.005, 8.0)),
+    param("amp-slope", 120, 0.6, (0.0, 1.0)),
+    param("filter-drive", 121, 0.0, (0.0, 1.0)),
+    param("decimation", 122, 0.0, (0.0, 1.0)),
+    param("volume-velocity", 123, 1.0, (0.0, 1.0)),
+    param("velocity-depth", 124, 0.0, (-1.0, 1.0)),
+    param("transient-freq", 125, 4000.0, (20.0, 12_000.0)),
+    param("transient-level", 126, 0.3, (0.0, 1.0)),
+    param("lfo-rate", 127, 4.0, (0.01, 50.0)),
+    param("lfo-depth", 128, 0.0, (-1.0, 1.0)),
+    param("lfo-offset", 129, 0.0, (0.0, 1.0)),
+    mk(
+        "lfo-retrigger",
+        130,
+        1.0,
+        (0.0, 1.0),
+        CtlRoute::InstParam,
+        CtlDomain::Bool,
+    ),
+    mk(
+        "lfo-sync",
+        131,
+        0.0,
+        (0.0, 1.0),
+        CtlRoute::InstParam,
+        CtlDomain::Bool,
+    ),
+    // Tonal drum and snare additions.
+    param("mod-freq", 132, 2.0, (0.1, 16.0)),
+    param("mod-level", 133, 0.5, (0.0, 1.0)),
+    param("fm-depth", 134, 1.0, (0.0, 8.0)),
+    param("pitch-decay", 135, 0.05, (0.001, 2.0)),
+    param("pitch-depth", 136, 12.0, (-48.0, 48.0)),
+    param("pitch-slope", 137, 0.5, (0.0, 1.0)),
+    param("osc-mix", 138, 0.5, (0.0, 1.0)),
+    param("mod-decay", 139, 0.15, (0.001, 4.0)),
+    param("mod-slope", 140, 0.5, (0.0, 1.0)),
+    param("repeat-count", 141, 0.0, (0.0, 8.0)),
+    param("repeat-time", 142, 0.1, (0.0, 2.0)),
+    // Snare additions.
+    param("noise-freq", 143, 2500.0, (200.0, 8000.0)),
+    param("noise-mix", 144, 0.3, (0.0, 1.0)),
+    // Metal/cymbal additions beyond the tonal set (DDRUM-004 reserves these
+    // rows now so the shared enum domains above already cover every
+    // family; the metal/hat cores land in a later task).
+    param("mod2-freq", 145, 3.0, (0.1, 16.0)),
+    param("mod2-level", 146, 0.3, (0.0, 1.0)),
+    param("metal-spread", 147, 0.3, (0.0, 1.0)),
+    // Hat additions beyond the metal set.
+    param("open-decay", 148, 0.6, (0.05, 4.0)),
+    param("closed-decay", 149, 0.08, (0.01, 1.0)),
+    mk(
+        "hat-open",
+        150,
+        0.0,
+        (0.0, 1.0),
+        CtlRoute::InstParam,
+        CtlDomain::Bool,
+    ),
+    // Hidden implicit controls (not a declared header, not user-facing):
+    // `lfo-sync`'s host-tempo path, DDRUM-002A/003 (see `sched::commit`).
+    // A core ugen with a `cps`-named port reads the event's cycles-per-second
+    // automatically; a template never declares it as a header.
+    param("cps", 151, 0.5, (0.03, 50.0)),
+    // The host-time (seconds, wrapped to a one-hour period for f32
+    // precision) the triggering event began, so `lfo-retrigger: false`
+    // voices can derive a shared, host-time-anchored LFO phase.
+    param("onset-time", 152, 0.0, (0.0, 3600.0)),
 ];
 
 /// The row of a control name.

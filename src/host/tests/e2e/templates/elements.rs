@@ -7,31 +7,31 @@ use crate::session::editors::instrument_decls;
 use crate::value::intern::name_of_kw;
 
 const PATCH: [&str; 20] = [
-    "el-env-shape",
-    "el-bow-level",
-    "el-bow-timbre",
-    "el-blow-level",
-    "el-blow-meta",
-    "el-blow-timbre",
-    "el-strike-level",
-    "el-strike-meta",
-    "el-strike-timbre",
-    "el-signature",
-    "el-geometry",
-    "el-brightness",
-    "el-damping",
-    "el-position",
-    "el-res-mod-frequency",
-    "el-res-mod-offset",
-    "el-reverb-diffusion",
-    "el-reverb-lp",
-    "el-space",
-    "el-modulation-frequency",
+    "ex-env-shape",
+    "ex-bow-level",
+    "ex-bow-timbre",
+    "ex-blow-level",
+    "ex-blow-meta",
+    "ex-blow-timbre",
+    "ex-strike-level",
+    "ex-strike-meta",
+    "ex-strike-timbre",
+    "ex-signature",
+    "ex-geometry",
+    "ex-brightness",
+    "ex-damping",
+    "ex-position",
+    "ex-res-mod-frequency",
+    "ex-res-mod-offset",
+    "ex-reverb-diffusion",
+    "ex-reverb-lp",
+    "ex-space",
+    "ex-modulation-frequency",
 ];
 
 fn render(extra: &str) -> Vec<f32> {
     let mut e = E2e::new();
-    e.eval(&format!("s :elements-voice > note [:a3] > el-bow-level 0.3 > el-blow-level 0.3 > el-strike-level 0.6 > el-modulation 0.4 > {extra} > once"));
+    e.eval(&format!("s :exciter-voice > note [:a3] > ex-bow-level 0.3 > ex-blow-level 0.3 > ex-strike-level 0.6 > ex-modulation 0.4 > {extra} > once"));
     let output = e.run_for(0.3);
     assert!(e.faults.is_empty(), "{extra}: {:?}", e.faults);
     assert!(e.committed > 0, "{extra}");
@@ -42,33 +42,33 @@ fn render(extra: &str) -> Vec<f32> {
 
 #[test]
 fn all_patch_controls_and_three_models_change_audio() {
-    let base = render("el-model 0");
+    let base = render("ex-model 0");
     for model in 1..=2 {
-        let output = render(&format!("el-model {model}"));
+        let output = render(&format!("ex-model {model}"));
         assert_ne!(base, output, "model {model}");
     }
     for control in PATCH {
-        let output = render(&format!("el-model 0 > {control} 0.9"));
+        let output = render(&format!("ex-model 0 > {control} 0.9"));
         let difference: f32 = base.iter().zip(&output).map(|(a, b)| (a - b).abs()).sum();
         assert!(difference > 1.0e-6, "{control}: {difference}");
     }
     for (name, value) in [
-        ("el-gate", 0.0),
-        ("el-note", 12.0),
-        ("el-modulation", 0.9),
-        ("el-strength", 0.2),
+        ("ex-gate", 0.0),
+        ("ex-note", 12.0),
+        ("ex-modulation", 0.9),
+        ("ex-strength", 0.2),
     ] {
-        let output = render(&format!("el-model 0 > {name} {value}"));
+        let output = render(&format!("ex-model 0 > {name} {value}"));
         assert_ne!(base, output, "{name}");
     }
 }
 
 #[test]
 fn alternate_and_extended_space_are_codeable() {
-    let normal = render("el-alternate 0");
-    let alternate = render("el-alternate 1");
+    let normal = render("ex-alternate 0");
+    let alternate = render("ex-alternate 1");
     assert_ne!(normal, alternate);
-    let frozen = render("el-alternate 1 > el-space 1.9");
+    let frozen = render("ex-alternate 1 > ex-space 1.9");
     assert_ne!(alternate, frozen);
 }
 
@@ -78,19 +78,19 @@ fn editor_exposes_last_port_and_install_budget_is_explicit() {
     let registry = e.reg.borrow();
     let entry = registry
         .entries()
-        .find(|entry| *name_of_kw(entry.name) == *"elements-voice")
+        .find(|entry| *name_of_kw(entry.name) == *"exciter-voice")
         .unwrap();
     let editor = instrument_decls(&registry)
         .into_iter()
-        .find(|decl| decl.name == "elements-voice")
+        .find(|decl| decl.name == "exciter-voice")
         .unwrap();
     for name in PATCH.into_iter().chain([
-        "el-gate",
-        "el-note",
-        "el-modulation",
-        "el-strength",
-        "el-model",
-        "el-alternate",
+        "ex-gate",
+        "ex-note",
+        "ex-modulation",
+        "ex-strength",
+        "ex-model",
+        "ex-alternate",
     ]) {
         assert!(
             editor

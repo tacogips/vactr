@@ -27,6 +27,8 @@ mod chip_pair;
 mod chord_pair;
 mod clock_noise_pair;
 mod cross_mod;
+mod digital_drum;
+mod digital_metal;
 mod dual_kick;
 mod dynamic_control;
 mod effects;

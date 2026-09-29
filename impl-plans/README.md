@@ -40,7 +40,7 @@ Large features are split into multiple related plans with cross-references.
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
 | [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; prioritized TODOs after the WV-004 stopping point | design-mutable-audio.md; design-music.md 4.1 | 2026-09-28 |
-| [modular-audio-foundation.md](active/modular-audio-foundation.md) | Planning; source and license inventory in progress | design-mutable-audio.md | 2026-09-27 |
+| [modular-audio-foundation.md](active/modular-audio-foundation.md) | In progress; MOD-001 inventory/audit and MOD-002 neutral names complete, MOD-004 arbitrary stereo edges next | design-mutable-audio.md | 2026-09-29 |
 | [modular-fm-drums.md](active/modular-fm-drums.md) | In progress; three percussion voices, Peaks FM source stages verified, numerical parity and broader EFM family pending | design-mutable-audio.md | 2026-09-28 |
 | [modular-synth-engines.md](active/modular-synth-engines.md) | Planning; all eligible voice and oscillator engines | design-mutable-audio.md | 2026-09-27 |
 | [modular-plaits-engines.md](active/modular-plaits-engines.md) | In progress; public 24-position inventory, fifteen adaptations, nine source-stage translations, zero full ports | design-mutable-audio.md | 2026-09-28 |

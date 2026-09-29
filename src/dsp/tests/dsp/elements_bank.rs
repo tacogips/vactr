@@ -82,18 +82,18 @@ fn direct(values: &[(&str, f32)], left_on: bool, right_on: bool) -> (Vec<f32>, V
 #[test]
 fn independent_blow_and_strike_inputs_and_three_models() {
     let silence = direct(
-        &[("external-blend", 1.0), ("el-bow-level", 0.0)],
+        &[("external-blend", 1.0), ("ex-bow-level", 0.0)],
         false,
         false,
     );
     assert!(rms(&silence.0) + rms(&silence.1) < 1.0e-8);
     let blow = direct(
-        &[("external-blend", 1.0), ("el-bow-level", 0.0)],
+        &[("external-blend", 1.0), ("ex-bow-level", 0.0)],
         true,
         false,
     );
     let strike = direct(
-        &[("external-blend", 1.0), ("el-bow-level", 0.0)],
+        &[("external-blend", 1.0), ("ex-bow-level", 0.0)],
         false,
         true,
     );
@@ -101,7 +101,7 @@ fn independent_blow_and_strike_inputs_and_three_models() {
     assert!(difference(&blow.0, &strike.0) > 1.0e-4);
     assert!(difference(&blow.0, &blow.1) > 1.0e-5);
     for model in 0..=2 {
-        let (main, aux) = direct(&[("el-model", model as f32)], true, true);
+        let (main, aux) = direct(&[("ex-model", model as f32)], true, true);
         assert!(main.iter().chain(&aux).all(|x| x.is_finite()));
         assert!(rms(&main) > 1.0e-5 && rms(&aux) > 1.0e-5);
         assert!(difference(&main, &aux) > 1.0e-5);
@@ -110,7 +110,7 @@ fn independent_blow_and_strike_inputs_and_three_models() {
 
 #[test]
 fn alternate_has_distinct_spatial_outputs_and_independent_external_inputs() {
-    let opts = [("el-alternate", 1.0), ("external-blend", 1.0)];
+    let opts = [("ex-alternate", 1.0), ("external-blend", 1.0)];
     let silent = direct(&opts, false, false);
     let blow = direct(&opts, true, false);
     let strike = direct(&opts, false, true);
@@ -119,7 +119,7 @@ fn alternate_has_distinct_spatial_outputs_and_independent_external_inputs() {
     assert!(rms(&blow.0) > 1.0e-6 && rms(&strike.0) > 1.0e-6);
     assert!(difference(&blow.0, &strike.0) > 1.0e-5);
     assert!(difference(&blow.0, &blow.1) > 1.0e-5);
-    let normal = direct(&[("el-alternate", 0.0)], true, true);
+    let normal = direct(&[("ex-alternate", 0.0)], true, true);
     let alternate = direct(&opts, true, true);
     assert!(difference(&normal.0, &alternate.0) > 1.0e-5);
     assert!(alternate
@@ -131,15 +131,15 @@ fn alternate_has_distinct_spatial_outputs_and_independent_external_inputs() {
 
 #[test]
 fn alternate_patch_and_performance_controls_reach_audio() {
-    let base = direct(&[("el-alternate", 1.0)], true, true);
+    let base = direct(&[("ex-alternate", 1.0)], true, true);
     for param in elements_bank::PARAMS.iter().take(24) {
         let value = match param.name {
-            "el-note" => 12.0,
-            "el-modulation" => 0.9,
-            "el-gate" => 0.0,
+            "ex-note" => 12.0,
+            "ex-modulation" => 0.9,
+            "ex-gate" => 0.0,
             _ => 0.9,
         };
-        let rendered = direct(&[("el-alternate", 1.0), (param.name, value)], true, true);
+        let rendered = direct(&[("ex-alternate", 1.0), (param.name, value)], true, true);
         let delta = difference(&base.0, &rendered.0) + difference(&base.1, &rendered.1);
         assert!(delta > 1.0e-8, "{}: {delta}", param.name);
     }
@@ -267,7 +267,7 @@ fn final_parameter_codec_editor_and_memory_preflight() {
         29
     );
     let decl = crate::types::manifest::HostManifest::spec_default()
-        .editor_decl("elements-bank")
+        .editor_decl("exciter-bank")
         .unwrap();
     for param in elements_bank::PARAMS {
         assert!(
@@ -291,7 +291,7 @@ fn final_parameter_codec_editor_and_memory_preflight() {
         crate::dsp::effects::EFFECT_PARAM_BASE + 26
     );
     let mut last_bytes = Vec::new();
-    encode_bus(&effect(&[("el-alternate", 1.0)]), false, &mut last_bytes).unwrap();
+    encode_bus(&effect(&[("ex-alternate", 1.0)]), false, &mut last_bytes).unwrap();
     let mut last = BusTemplate::new();
     decode_graph(&last_bytes, &mut raw, &mut last).unwrap();
     assert_eq!(last.params[0][0].1, Ctl::Const(1.0));
@@ -330,7 +330,7 @@ fn native_browser_render_at_supported_rates_and_blocks_without_allocation() {
                 let mut native = NativeRig::native_with(cfg);
                 native.install(&chain(1, vec![UGenSpec::Saw]));
                 native.install_bus(
-                    &effect(&[("el-model", 0.0), ("el-alternate", alternate)]),
+                    &effect(&[("ex-model", 0.0), ("ex-alternate", alternate)]),
                     false,
                 );
                 native.install_bus(&bus_def(0, vec![]), true);
@@ -358,7 +358,7 @@ fn native_browser_render_at_supported_rates_and_blocks_without_allocation() {
                 encode_graph_record(10, 1, &payload, &mut record);
                 browser.push(&record);
                 for (resource, bus, master) in [
-                    (11, effect(&[("el-alternate", alternate)]), false),
+                    (11, effect(&[("ex-alternate", alternate)]), false),
                     (12, bus_def(0, vec![]), true),
                 ] {
                     payload.clear();

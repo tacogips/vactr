@@ -132,10 +132,10 @@ const fn rows() -> [BraidsShapeSpec; 47] {
         result[i].coverage = CoverageState::Adaptation;
         result[i].resources = ResourceState::Replacement;
         result[i].pitch_control = Some("freq");
-        result[i].color_control = Some("braids-color");
-        result[i].timbre_control = Some("braids-timbre");
-        result[i].strike_control = Some("braids-strike");
-        result[i].sync_control = Some("braids-sync");
+        result[i].color_control = Some("macro-color");
+        result[i].timbre_control = Some("macro-timbre");
+        result[i].strike_control = Some("macro-strike");
+        result[i].sync_control = Some("macro-sync");
         i += 1;
     }
     result

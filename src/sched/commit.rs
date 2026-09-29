@@ -520,6 +520,38 @@ fn audio_events(
         };
         base.push_ctl(row.ctl, ctl)?;
     }
+    // DDRUM-002A/003/004: a digital drum family voice reads `cps` and
+    // `onset-time` as hidden implicit controls (never a declared header,
+    // so never a dead knob) to give `lfo-sync`/`lfo-retrigger: false` a
+    // host-tempo and host-time anchor. `dsp::ugen::digital_drum` documents
+    // the exact use. An explicit event control of the same name (unusual,
+    // but not forbidden) is left alone.
+    let wants_tempo_anchor = cx.resolver.inst(inst).is_some_and(|def| {
+        def.nodes.iter().any(|n| {
+            matches!(
+                n,
+                crate::dsp::graph::UGenSpec::DigitalDrumCore
+                    | crate::dsp::graph::UGenSpec::DigitalSnareCore
+                    | crate::dsp::graph::UGenSpec::DigitalMetalCore
+                    | crate::dsp::graph::UGenSpec::DigitalHatCore
+            )
+        })
+    });
+    if wants_tempo_anchor {
+        if let (Some(row), true) = (controls::row("cps"), entry(controls, "cps").is_none()) {
+            #[allow(clippy::cast_possible_truncation)]
+            let cps = cx.clock.tempo().cps().map(|r| r.to_f64()).unwrap_or(0.5) as f32;
+            base.push_ctl(row.ctl, Ctl::Const(cps))?;
+        }
+        if let (Some(row), true) = (
+            controls::row("onset-time"),
+            entry(controls, "onset-time").is_none(),
+        ) {
+            #[allow(clippy::cast_possible_truncation)]
+            let onset = time.rem_euclid(3600.0) as f32;
+            base.push_ctl(row.ctl, Ctl::Const(onset))?;
+        }
+    }
     let has_freq = entry(controls, "freq").is_some();
     let Some((notes, late)) = notes(controls, bank.is_some()).filter(|_| !has_freq) else {
         return Ok(vec![base]);

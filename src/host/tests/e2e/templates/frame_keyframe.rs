@@ -95,7 +95,7 @@ fn opt_in_quad_vact_examples_compile_to_four_output_graphs() {
         .unwrap();
     assert!(forms.iter().all(|f| f.value.is_ok()), "{forms:?}");
     let registry = e.reg.borrow();
-    for name in ["frame-keyframe-quad-voice", "tides2-quad-voice"] {
+    for name in ["frame-keyframe-quad-voice", "tidal-poly-quad-voice"] {
         let entry = registry
             .entries()
             .find(|entry| &*name_of_kw(entry.name) == name)

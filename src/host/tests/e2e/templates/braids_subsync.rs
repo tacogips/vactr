@@ -24,7 +24,7 @@ fn all_four_shapes_and_controls_reach_audio() {
     let mut previous: Option<Vec<f32>> = None;
     for shape in 5..=8 {
         let baseline = render(&format!(
-            "braids-shape {shape} > braids-color 0.4 > braids-timbre 0.3 > braids-strike 0.4 > braids-sync 0.3"
+            "macro-shape {shape} > macro-color 0.4 > macro-timbre 0.3 > macro-strike 0.4 > macro-sync 0.3"
         ));
         if let Some(prior) = &previous {
             assert_ne!(prior, &baseline, "selector position {shape}");
@@ -32,14 +32,14 @@ fn all_four_shapes_and_controls_reach_audio() {
         previous = Some(baseline.clone());
         for control in [
             "freq 330",
-            "braids-color 0.85",
-            "braids-timbre 0.8",
-            "braids-strike 0.9",
-            "braids-sync 0.8",
+            "macro-color 0.85",
+            "macro-timbre 0.8",
+            "macro-strike 0.9",
+            "macro-sync 0.8",
             "gain 0.4",
         ] {
             let changed = render(&format!(
-                "braids-shape {shape} > braids-color 0.4 > braids-timbre 0.3 > braids-strike 0.4 > braids-sync 0.3 > {control}"
+                "macro-shape {shape} > macro-color 0.4 > macro-timbre 0.3 > macro-strike 0.4 > macro-sync 0.3 > {control}"
             ));
             #[allow(clippy::cast_precision_loss)]
             let delta = baseline
@@ -66,11 +66,11 @@ fn editor_has_real_custom_ids_and_install_rejects_low_memory() {
         .find(|decl| decl.name == "macro-sub-sync-voice")
         .expect("dynamic custom-header editor");
     for name in [
-        "braids-shape",
-        "braids-color",
-        "braids-timbre",
-        "braids-strike",
-        "braids-sync",
+        "macro-shape",
+        "macro-color",
+        "macro-timbre",
+        "macro-strike",
+        "macro-sync",
     ] {
         assert!(
             editor

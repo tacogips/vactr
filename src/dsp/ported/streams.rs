@@ -53,8 +53,8 @@ pub const STREAMS_FUNCTIONS: [StreamsFunctionSpec; 6] = [
     ),
     row(
         1,
-        "Vactr",
-        "streams/vactr.cc",
+        "Vactrol",
+        "streams/vactrol.cc",
         Some("stream-vactr"),
         CoverageState::Adaptation,
         ResourceState::Replacement,

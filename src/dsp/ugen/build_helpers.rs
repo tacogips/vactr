@@ -11,6 +11,8 @@ pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize) {
         Node::Additive { partials_max } => (usize::from((*partials_max).max(1)), 0),
         Node::Delay => (0, secs(0.5)),
         Node::FeedbackDrum => (1001, 0),
+        Node::DigitalDrumCore | Node::DigitalSnareCore => (digital_drum::STATE_FLOATS, 0),
+        Node::DigitalMetalCore | Node::DigitalHatCore => (digital_drum::metal::STATE_FLOATS, 0),
         Node::SpectrumPair => (48, 0),
         Node::DualKick => (dual_kick::STATE_FLOATS, 0),
         Node::SnarePair => (snare_pair::STATE_FLOATS, 0),

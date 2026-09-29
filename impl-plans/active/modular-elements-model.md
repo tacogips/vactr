@@ -15,9 +15,9 @@ The Rust host's 30-port node ceiling carries the 30-port internal instrument
 (twenty Patch fields, four performance fields, model, main/aux selection,
 alternate selection and frequency). The 29-port effect uses one audio port
 plus 28 parameters;
-`elements-bank` maps its stereo L/R bus
+`exciter-bank` maps its stereo L/R bus
 inputs to blow/strike excitation and L/R outputs to main/aux. The instrument
-graph now has named `el-external-blow` and `el-external-strike` ports,
+graph now has named `ex-external-blow` and `ex-external-strike` ports,
 fed by opt-in `host-in-l/r` source UGens. Both paths are adaptations of the
 source `Part` boundary.
 
@@ -78,12 +78,12 @@ replacement `Adaptation` until source comparison.
 ### Session: 2026-09-28 — exact space-freeze boundary
 
 Regression tests now assert that the normal bus echo and alternate FM echo
-stop writing at exactly `el-space=1.75` and resume writing at `1.749`.
+stop writing at exactly `ex-space=1.75` and resume writing at `1.749`.
 The DSP threshold and control mapping were not changed.
 
 ### Session: 2026-09-28 — alternate voice adaptation
 
-Added `el-alternate` to `elements-voice` and `elements-bank`, preserving
+Added `ex-alternate` to `exciter-voice` and `exciter-bank`, preserving
 existing port and effect parameter indices. The fourth manifest row is now
 `Adaptation/Replacement`. An authored two-pair FM oscillator with spatial
 motion and fourfold analytic oversampling uses 320 already preallocated
@@ -92,7 +92,7 @@ sample array or numeric table. All twenty Patch fields and gate/note/
 modulation/strength influence the alternate kernel; the normal resonator
 model selector is intentionally inapplicable while alternate is selected.
 The bus effect retains independent left blow/right strike excitation and
-main/aux outputs. The `el-space` range is 0..2, with bounded echo-write
+main/aux outputs. The `ex-space` range is 0..2, with bounded echo-write
 freeze from 1.75. The source's exact 8×/101-tap antialiasing, multimode
 filter, spatial diffuser and raw-gain regions are not reproduced. Named
 instrument-graph external audio ports and source numerical comparisons
@@ -100,7 +100,7 @@ remain open.
 
 ### Session: 2026-09-28 — independent blow/strike bus effect
 
-Added `elements-bank`, a stereo bus/master effect. Left input excites a
+Added `exciter-bank`, a stereo bus/master effect. Left input excites a
 procedural blow path; right input excites a distinct strike path. The effect
 returns main and auxiliary on left/right and exposes all twenty Patch fields,
 four performance controls, three model choices, external/internal blend and
@@ -120,7 +120,7 @@ resource enters the DSP.
 
 ### Session: 2026-09-28 — opt-in instrument graph excitation
 
-`elements-external-voice` wires validated host L/R to new blow/strike ports
+`exciter-external-voice` wires validated host L/R to new blow/strike ports
 28/29 of the existing internal core. Prior port indices and internal-template
 defaults remain unchanged; `MAX_PORTS=30` permits the last port without
 truncation. Both main and aux react independently in native/browser tests,
@@ -129,7 +129,7 @@ adaptation, not the source `Part` exciter topology.
 
 ### Session: 2026-09-28 — procedural internal voice slice
 
-Added `elements-voice` with twenty Patch controls, gate, note, modulation,
+Added `exciter-voice` with twenty Patch controls, gate, note, modulation,
 strength and three resonator selections in `.vact`/editor. Two fixed-state
 nodes render main and aux independently. A 27-port contract and appended
 graph codec ordinal 76 carry the last output selector without truncation;

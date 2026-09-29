@@ -178,3 +178,49 @@ fn a_signal_input_is_a_control_cell() {
     assert_eq!(inputs.len(), 1);
     assert_eq!(inputs[0].cell, cell);
 }
+
+/// DDRUM-002A: an exhausted instrument-default cell pool no longer drops a
+/// tweak-site header default silently. The instrument still installs, its
+/// one default frozen at the current value, but the defining form reports
+/// a `cell-capacity` diagnostic.
+#[test]
+fn exhausted_default_cells_report_cell_capacity_not_silence() {
+    let mut s = Session::new();
+    for _ in 0..crate::ns::insts::INST_CELL_COUNT {
+        s.reg.borrow_mut().alloc_cell().expect("a free cell");
+    }
+    let out = s.eval("inst pluck2 cutoff: float = 2000:\n\tsaw freq > lpf cutoff > * amp");
+    let o = out.last().expect("a form");
+    assert!(o.value.is_ok(), "{:?}", o.value);
+    assert!(
+        o.diags.iter().any(|d| d.code == DiagCode::CellCapacity),
+        "{:?}",
+        o.diags
+    );
+    assert!(s.reg.borrow().id_of(intern_kw("pluck2")).is_some());
+}
+
+/// The same exhaustion, for a signal input (`dsp::build::signal_cell`):
+/// the input still installs as a frozen `Const(0.0)`, with a diagnostic.
+#[test]
+fn exhausted_default_cells_freeze_a_signal_input_with_a_diagnostic() {
+    let mut s = Session::new();
+    for _ in 0..crate::ns::insts::INST_CELL_COUNT {
+        s.reg.borrow_mut().alloc_cell().expect("a free cell");
+    }
+    let out = s.eval("inst wob:\n\tphase-distortion freq shape: {range sine 0 1}");
+    let o = out.last().expect("a form");
+    assert!(o.value.is_ok(), "{:?}", o.value);
+    assert!(
+        o.diags.iter().any(|d| d.code == DiagCode::CellCapacity),
+        "{:?}",
+        o.diags
+    );
+    let d = s.def("wob");
+    let sig = d
+        .params
+        .iter()
+        .find(|(c, _)| c.get() >= SIGNAL_CTL_BASE)
+        .expect("a signal parameter");
+    assert_eq!(sig.1, Ctl::Const(0.0));
+}

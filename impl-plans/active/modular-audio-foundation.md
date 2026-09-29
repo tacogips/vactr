@@ -46,13 +46,11 @@ other generated or recorded data. A checked inventory can later expand to
 Braids, Clouds, Rings, Elements, Warps and utility audio modules. A report
 must never label a partial adaptation as complete.
 
-### `src/dsp/graph.rs`, `src/dsp/ugen/`, `src/dsp/effects/`
+### MOD-004 graph shape contract
 
-```rust
-pub struct StereoPorts { pub inputs: u8, pub outputs: u8 }
-pub fn port_shape(kind: UGenKind) -> StereoPorts;
-pub fn effect_port_shape(kind: EffectKind) -> StereoPorts;
-```
+MOD-004 adds typed bounded audio output ports and per-edge output selection.
+Implementation signatures are specified in subtasks MOD-004A..MOD-004F
+below; mono graph behavior remains the default.
 
 ### `src/ns/insts.rs`, `src/sched/commit.rs`, `src/types/manifest.rs`
 
@@ -71,10 +69,118 @@ contracts, not a demand for parallel registries.
 | MOD-001 | Pin source revision and audit every included file/resource and `stmlib` dependency | none | Completed; `verification/upstream_inventory.toml` and `mise run audit-upstream` |
 | MOD-002 | Establish neutral user-facing names and upstream-to-Vactr mode/parameter matrix | MOD-001 | Completed; neutral renames, Clouds/Warps inventories, cross-family naming and resolution tests |
 | MOD-003 | Deliver typed arbitrary instrument controls end to end, removing silent skips | MOD-002 | Completed for scalar audio parameters |
-| MOD-004 | Add dual-input/dual-output graph and host wire contract with compatibility tests | MOD-003 | Stereo bus/effect and bounded voice main/aux path complete; arbitrary stereo edges pending |
+| MOD-004 | Add typed mono/stereo UGen outputs, edge output selection, voice routing, and same-revision codec compatibility | MOD-003 | Design in `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004`; arbitrary UGen edges pending |
 | MOD-005 | Define preallocated state, memory budgets and rate/block adaptation | MOD-004 | Bounded host contract complete; broader per-engine parity pending |
 | MOD-006 | Add deterministic comparison harness, coverage report and editor metadata checks | MOD-005 | 24-position inventory and editor/graph checks complete; FM position-10 three-scenario raw-kernel baseline and source-stage follow-up measured, other comparisons pending |
 | MOD-006A | Local pinned Plaits FM raw-kernel reference probe and metric-only comparison against Vactr position 10 | MOD-006 inventory | Completed and independently verified; source parity not claimed |
+
+### MOD-004 subtasks
+
+Design reference: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004`.
+Each subtask is scoped to one implementation session. “Deliverables” lists
+paths and API signatures only; implementation code belongs in source files.
+
+#### MOD-004A: Evaluator graph output shapes and edge selection
+
+**Status**: NOT_STARTED
+**Depends on**: MOD-003
+**Parallelizable**: No
+**Deliverables**:
+- `src/dsp/graph.rs` — `pub struct AudioOutputShape`; `pub struct NodeAudioShape`; `pub struct Edge { from: u16, to: u16, port: u8, output: u8 }`
+- `src/dsp/build.rs` — `pub fn lower_ugen(root: &Rc<UGenNode>) -> Result<InstDef, LowerError>`
+- `src/dsp/build/names.rs` — `pub fn select_output(value: Value, selector: OutputSelector) -> Result<Value, Failure>`
+- `src/ns/insts.rs` — `pub fn validate_ugen_output(node: &UGenNode, output: OutputSelector) -> Result<AudioOutputShape, Failure>`
+
+**Completion Criteria**:
+- [ ] Every node kind declares bounded output count and mono/stereo shape.
+- [ ] Lowering retains selected source-output indexes and validates source index and channel-shape compatibility.
+- [ ] Invalid output selection and shape mismatch produce typed definition-time diagnostics.
+- [ ] Legacy single-output nodes lower as output zero without changing existing graph semantics.
+
+#### MOD-004B: Compiled output buffers and voice routing
+
+**Status**: NOT_STARTED
+**Depends on**: MOD-004A
+**Parallelizable**: No
+**Deliverables**:
+- `src/dsp/ugen/mod.rs` — `pub struct Src`; `pub struct NodeSpec`; `pub const MAX_OUTPUTS_PER_NODE: usize`
+- `src/dsp/ugen/template.rs` — `pub fn build(&mut self, raw: &RawGraph, env: &BuildEnv) -> Result<(), BuildError>`
+- `src/dsp/voice.rs` — `pub fn render<C: CellRead + ?Sized>(voice: &mut Voice, template: &Template, frames: usize, ctx: &mut RenderCtx<'_, C>) -> (usize, bool)`
+- `src/dsp/engine.rs` — `pub struct Engine`
+- `src/dsp/ugen/build_helpers.rs` — `pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize)`
+
+**Completion Criteria**:
+- [ ] Compiled templates assign dense bounded channel-buffer ranges and validate total buffer capacity.
+- [ ] Edges read the chosen output and all declared channels; no callback shape inference or allocation is introduced.
+- [ ] Mono sink pan and stereo/main-aux channel mapping match the design; additional outputs require explicit routing.
+- [ ] Output-buffer and shared-kernel state requirements are included in memory accounting and fail with explicit capacity diagnostics.
+
+#### MOD-004C: Stereo voice-local effects and pan behavior
+
+**Status**: NOT_STARTED
+**Depends on**: MOD-004B
+**Parallelizable**: No
+**Deliverables**:
+- `src/dsp/effects/mod.rs` — `pub fn process(kind: EffectKind, params: &[f32], state: &mut FxState, mem: &mut [f32], left: &mut [f32], right: &mut [f32], ctx: &mut FxCtx<'_>)`
+- `src/dsp/voice.rs` — `pub struct PostFx`; `pub fn render<C: CellRead + ?Sized>(voice: &mut Voice, template: &Template, frames: usize, ctx: &mut RenderCtx<'_, C>) -> (usize, bool)`
+- `src/dsp/engine.rs` — `pub fn render(&mut self, out: &mut [f32], frames: usize)`
+
+**Completion Criteria**:
+- [ ] Stereo voice effect nodes process independent left/right channels with the existing wet/dry semantics and no downmix.
+- [ ] Voice gain, gate, orbit send, and post effects handle all routed channels consistently.
+- [ ] Mono pan remains unchanged; stereo and main/aux pan use the selected documented balance law.
+- [ ] Existing bus/master stereo effect processing remains unchanged.
+- [ ] Stereo and main/aux voices use unity-center balance pan (owner decision, 2026-09-29); mono voices keep equal-power pan.
+
+#### MOD-004D: Graph codec shape and edge encoding
+
+**Status**: NOT_STARTED
+**Depends on**: MOD-004A
+**Parallelizable**: Yes, with MOD-004B and MOD-004C
+**Deliverables**:
+- `src/dsp/arena.rs` — `pub fn encode_inst(def: &InstDef, out: &mut Vec<u8>) -> Result<(), BuildError>`; `pub fn decode_graph(bytes: &[u8], raw: &mut RawGraph, bus: &mut BusTemplate) -> Result<GraphKind, FaultCode>`
+- `src/dsp/ugen/catalog/codec.rs` — `pub(crate) fn put_spec(out: &mut Out<'_>, spec: &UGenSpec) -> Result<(), BuildError>`; `pub(crate) fn get_node(input: &mut In<'_>, raw: &mut RawGraph) -> Result<(), FaultCode>`
+- `src/dsp/ugen/catalog.rs` — `pub const MAX_PORTS: usize`
+
+**Completion Criteria**:
+- [ ] Output shapes and edge source-output indexes have a deterministic encoded representation shared by native and browser.
+- [ ] Same-revision native/browser peers install the same mono, multi-mono, and stereo graphs.
+- [ ] Legacy mono payload decoding is preserved when unambiguous; otherwise a format discriminator and explicit unsupported-version error are defined.
+- [ ] Exact byte fixtures and encode/decode/re-encode round trips cover each graph shape.
+
+#### MOD-004E: `.vact` selector and dual-instance template migration
+
+**Status**: NOT_STARTED
+**Depends on**: MOD-004B, MOD-004C, MOD-004D
+**Parallelizable**: No
+**Deliverables**:
+- `src/prelude/templates.vact` — `filter-voice`, `phase-pair-voice`, eligible simultaneous-output templates
+- `src/dsp/ported/*.rs` — `main_outputs`, `aux_outputs` manifest rows and matching multi-output kernel signatures
+- `src/dsp/build/names.rs` — `pub fn select_output(value: Value, selector: OutputSelector) -> Result<Value, Failure>`
+- `src/dsp/graph.rs` — `pub enum OutputSelector`
+
+**Completion Criteria**:
+- [ ] Calling a multi-output UGen value with an output keyword (`(p :aux)`) or a numeric index (`(p 1)`) selects that output. Selection from a single-output node, an unknown name or an out-of-range index is a definition-time diagnostic (owner decision, 2026-09-29).
+- [ ] True simultaneous dual outputs share one node state; distinct mode configurations remain distinct nodes.
+- [ ] Existing duplicate-node templates remain valid and unchanged unless their migration passes bit-identical output comparison.
+- [ ] Legacy `aux-out`, `out3`, and `out4` templates retain their routing behavior.
+
+#### MOD-004F: Compatibility, callback, and render regression coverage
+
+**Status**: NOT_STARTED
+**Depends on**: MOD-004A, MOD-004B, MOD-004C, MOD-004D, MOD-004E
+**Parallelizable**: No
+**Deliverables**:
+- `src/dsp/tests/dsp/` — unit, codec, allocation-probe, rate/block, and template-render regressions
+- `src/host/tests/e2e/templates/` — native/browser multi-output install and render scenarios
+- `src/dsp/alloc_probe.rs` — `pub fn assert_no_callback_allocations(render: impl FnMut())`
+
+**Completion Criteria**:
+- [ ] Every existing prelude template has fixed-event before/after render coverage; unchanged templates are bit-identical.
+- [ ] Migrated simultaneous-output templates compare main and aux independently against the prior two-node output.
+- [ ] Native and browser e2e coverage verifies channel independence through intermediate effects, voice pan/balance, and orbit routing.
+- [ ] Allocation probes pass with multi-output nodes and stereo voice-local effects active.
+- [ ] Stateful multi-output renders satisfy supported sample-rate and callback-block partition invariance.
 
 ### MOD-006A comparison contract
 

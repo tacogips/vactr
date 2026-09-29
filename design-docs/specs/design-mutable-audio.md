@@ -748,6 +748,265 @@ variable square/saw main and synchronized oscillator-difference auxiliary.
 Its analytic transitions omit source polyBLEP and exact interpolation, so
 the manifest classifies it as an `Adaptation` distinct from position 0.
 
+## Stereo and multi-output UGen edges (MOD-004)
+
+### Problem
+
+The evaluator graph (`dsp/graph.rs`) represents a UGen output as a node
+reference, and `Edge` identifies only `from`, `to`, and destination `port`.
+Lowering in `dsp/build.rs` therefore cannot name which output of a source
+node feeds an input. The compiled template (`dsp/ugen/template.rs`) stores
+one `Src::Node` per input, and `dsp/voice.rs` renders one mono buffer per
+node. `aux-out`, `out3`, and `out4` are special side-routing taps rather
+than ordinary graph outputs.
+
+This makes dual-output engines awkward: templates such as
+`filter-voice`, `phase-pair-voice`, and `resonator-voice` instantiate an
+engine twice, often with separate `mode` values, to recover main and aux
+signals. That duplicates state and work. Stereo sampler output cannot
+remain stereo through UGen edges. Voice-local `FxUnit` nodes accept stereo
+kernel slices but the UGen path copies a mono input to both sides and
+averages the result. A voice with main and aux outputs also bypasses the
+ordinary pan mapping, while its voice-local post effects are applied to
+each side separately only because of the special aux path.
+
+### Goals
+
+- Give every UGen node a bounded, declared set of audio outputs. Each
+  output has a channel shape (`mono` or `stereo`); an edge selects the
+  source output index and connects its whole channel shape to one typed
+  destination audio input.
+- Preserve main/aux and true stereo signals through arbitrary intermediate
+  UGens and voice-local stereo effects without implicit downmixing.
+- Keep mono templates and their current audio, pan, and control behavior
+  unchanged unless a user edits the template to opt into a multi-output
+  source.
+- Keep all output buffers, effect state, and routing storage bounded and
+  allocated before callback execution. Preserve rate and block partition
+  invariance of stateful nodes.
+- Keep native and browser graph installation interoperable when both peers
+  are built from the same revision.
+
+### Non-goals
+
+- Dynamic channel counts, unbounded output lists, arbitrary audio buses per
+  node, or implicit up/downmix matrices. This change caps channels per
+  output at stereo and output ports per node at a fixed compile-time limit.
+- Changing the public host event record or promising compatibility between
+  mixed source revisions. The current host contract explicitly requires
+  native/browser peers from the same revision; mixed revisions are
+  unsupported.
+- Replacing bus/master processing, adding surround layouts, or certifying
+  Mutable source parity for an engine merely because its output topology is
+  represented correctly.
+- Automatically converting every old template to a new sound. Existing
+  mono and explicit `aux-out` graphs remain supported during migration.
+
+### Chosen design
+
+#### Typed outputs and edges
+
+The evaluator and compiled graph should carry a bounded output descriptor
+for each node: output count plus a channel count for each output. A node may
+publish multiple mono outputs (for example, main and aux), or a stereo
+output (for example, a stereo sampler). Audio inputs declare an accepted
+channel shape; control-valued inputs remain scalar and keep the existing
+`MAX_PORTS` control/parameter budget. An edge records the source output
+index in addition to `from`, `to`, and destination input `port`. Lowering
+and template compilation validate that both indexes exist and that channel
+shapes match. A shape mismatch, invalid output index, or output-capacity
+overflow is a definition-time diagnostic; it must never silently select
+output zero or discard a channel.
+
+The initial fixed limits should be four output ports per node, two channels
+per output, the existing `NODE_CAP = 256`, `MAX_PORTS = 48`,
+`MAX_PARAMS = 48`, `MAX_EDGES = 1024`, and `MAX_VOICE_FX = 4`. Set the
+initial engine-wide audio-buffer arena cap to `MAX_AUDIO_BUFFERS = 512`
+channel slices (`NODE_CAP * 2`); at the existing maximum block of 8192
+frames this bounds the arena to 16 MiB of `f32` storage. Keep output-port
+count distinct from channel count:
+`main` plus `aux` is two mono outputs; a stereo sampler is one two-channel
+output. Output buffers are assigned densely at template-build time, with
+the per-template total channel-buffer count checked against a fixed engine
+capacity. Do not reserve the worst-case output count for every node in each
+voice. Report the failing node and required/available count through a
+specific build fault that the language layer can surface as `graph-too-large`
+or a typed graph error. Never fall back to mono on exhaustion.
+
+Every existing mono UGen is described as one mono output and keeps its
+current kernel semantics. Existing `aux-out`, `out3`, and `out4` remain
+legacy graph features during this foundation work; they can be represented
+as compatibility routing nodes or lowered to explicit voice destinations,
+but they must not make ordinary output-index edges ambiguous. Multi-output
+nodes publish all outputs from one state instance per sample. For engines
+whose current templates use `mode: 0` and `mode: 1` instances, a ported node
+must define whether these are genuine outputs of one engine invocation.
+Where they are, expose both as stable named output ports and share state;
+where they are distinct configured modes, keep distinct nodes.
+
+`sample-play` declares its output shape from the sample resource metadata at
+graph build time. A mono resource remains a mono output and follows existing
+mono pan behavior; a stereo resource exposes one stereo output. Both
+channels share one playback cursor, speed, region, and loop state while
+reading their own sample data. A per-event bank override must have the same
+channel shape as the compiled sampler output or fail with an explicit
+resource/shape diagnostic; it cannot change the graph's channel layout at
+voice start.
+
+#### `.vact` selection and template migration
+
+Output selection calls the multi-output UGen value with an output name
+(owner decision, 2026-09-29). This is consistent with how Vactr already
+accesses dicts and variants by calling them with a key, so no new reader
+syntax is needed. Examples are `(p :main)` and `(p :aux)` for
+`let p (phase-pair ...)`, or `(sampler ...) :left`. A numeric index such as
+`(p 1)` is the unambiguous fallback. The selected value remains a UGen
+expression and can be passed through any existing arithmetic, effect, or
+input port. The names `:main`, `:aux`, `:left` and `:right` are valid only
+when a node declares them. The checker rejects selection from a
+single-output node, an unknown output name and an out-of-range index at
+definition time. Using a multi-output node directly, without selection,
+keeps today's meaning: its first output.
+
+For a true dual-output kernel currently called twice only to request
+different output modes, migrate templates to one node and connect its
+`:main` and `:aux` outputs independently. This applies to
+`filter-voice`, `phase-pair-voice`, and those ported engine wrappers whose
+`main_outputs`/`aux_outputs` describe simultaneous output from one engine
+state. `resonator-voice` migrates only if its implementation can produce
+both model outputs in one invocation with equivalent state semantics; if
+the two calls are independent model configurations, retain both nodes.
+The old duplicated form stays valid and preserves its existing sound. It is
+not automatically rewritten; templates may be migrated individually after
+their kernel semantics and output equivalence are verified. `aux-out`
+continues to work for legacy templates through the migration period.
+
+#### Voice buffers and channel mapping
+
+The callback keeps its existing node-buffer arena model but allocates a
+template-validated dense range of channel buffers for each compiled output.
+An edge reads the selected output's one or two slices, and a node writes
+each declared output into its assigned slice(s). Runtime loop bounds come
+from the compiled descriptors; no allocation, lock, graph traversal, or
+shape inference occurs in `process()`.
+
+At the voice boundary, a single mono sink uses the existing equal-power
+`pan` behavior. A stereo sink maps left to left and right to right; `pan`
+acts as stereo balance, attenuating the opposite side while leaving the
+center at unity, so it does not collapse or cross the channels. A declared
+main/aux output pair maps main to left and aux to right; `pan` applies the
+same balance rule to that pair. Additional declared mono outputs require
+explicit routing to the existing direct stem destinations or are rejected
+as unconsumed; they are never folded into stereo implicitly. Voice gain,
+gate/fade, orbit send, and voice post effects apply consistently to all
+voice audio channels. The current special `out3`/`out4` stem behavior stays
+unchanged.
+
+Voice-local effects use their declared audio input shape. A stereo effect
+receives and returns the independent left/right slices, including wet/dry
+blend, exactly as the bus/master path does today; no clone-and-average
+downmix occurs. Mono effects retain mono behavior. Effects whose kernels
+are intrinsically stereo declare stereo input/output shape; a mono source
+must use an explicit pan/mono-to-stereo node if connected to one.
+
+#### Codec and compatibility
+
+Extend the graph codec shared by native and browser (`dsp/arena.rs` and
+`dsp/ugen/catalog/codec.rs`) so output descriptors and selected source
+output indexes are encoded deterministically. The wire schema change must
+be made on the evaluator encoder, native decoder, and browser decoder as
+one same-revision change; add exact byte-layout and decode/re-encode
+round-trip coverage for mono, multi-mono, and stereo-output graphs. Preserve
+the old meaning of every legacy edge as `output_index = 0` when reading a
+legacy graph payload if the decoder can distinguish that payload version
+unambiguously. If it cannot, use a graph-format version discriminator
+rather than guessing from record length. The current same-revision native
+and browser peers remain compatible because they share the updated schema.
+No mixed-revision interoperability is promised, and the existing policy
+that mixed revisions are unsupported remains explicit.
+
+#### Capacity, real-time, and invariance
+
+The compile phase checks node count, output-port count, total channel-buffer
+count, edge count, effect count, and per-voice effect memory before
+installation. Preserve the current 48 input/control slots, 256 node cap,
+1024 edge cap, and `MAX_VOICE_FX` limit unless measured fixed storage
+requires an owner-approved change. Include output scratch and stereo effect
+scratch in engine memory budgeting; reject an install with a capacity
+diagnostic rather than partially compiling it. Memory assigned by
+`mem_need` remains per-node state and must account for any newly shared
+multi-output kernel state once, not once per output.
+
+All storage is allocated or assigned on graph build/install paths. The audio
+callback only clears and processes already assigned channel slices. There
+are no callback allocations and no variable-sized collections. Stateful
+multi-output kernels advance shared state once per sample, regardless of
+how many outputs are consumed. Rendering the same event/control sequence
+at supported sample rates and under different callback block partitions
+must preserve the existing rate/block invariance contract.
+
+### Alternatives considered
+
+- **Continue duplicating dual-output UGens and add more taps**: rejected as
+  the general design because state and work are duplicated, arbitrary
+  intermediate selection remains impossible, and stereo sampler/effect
+  routing still needs a separate mechanism. Kept as a valid legacy idiom.
+- **One stereo buffer for every node**: rejected because mono nodes pay
+  double bandwidth and storage, and main/aux are distinct signals rather
+  than necessarily left/right channels.
+- **Implicitly downmix or upmix at each edge**: rejected because it loses
+  channel identity, hides graph errors, and makes an unchanged template's
+  behavior depend on where a node is connected.
+- **Only retain special `aux-out`/`out3`/`out4` side taps**: rejected as
+  the endpoint because they cannot feed selected outputs into another UGen
+  or preserve stereo through intermediate processing. Keep them for
+  compatibility while migrating templates.
+- **Use a standalone `split`/`channel-split` node for every multi-output
+  source**: rejected as the primary graph representation because the
+  selector should be an edge property and a selector node adds graph nodes,
+  node-cap pressure, and extra copy/work. It remains a possible syntax
+  sugar that lowers to the same source-output index.
+
+### Test strategy
+
+- Unit tests for output descriptors, edge lowering, index/shape validation,
+  sink routing, mixed mono/stereo paths, and typed diagnostics at every
+  capacity boundary.
+- Codec exact-byte fixtures and encode/decode/re-encode round trips for
+  legacy mono graphs, new multi-output graphs, and stereo-output graphs;
+  verify native and browser decoders install identical compiled shapes.
+- Native and browser end-to-end renders that route a dual-output source
+  through intermediate mono and stereo effects, exercise pan/balance and
+  orbit sends, and verify each output remains independent.
+- Callback allocation probes with multi-output nodes and voice-local
+  stereo effects active; no callback allocation is permitted.
+- Render every existing prelude template before and after the graph
+  migration with fixed events, controls, sample rate, and block sequence.
+  Unchanged templates must be bit-identical. Migrated dual-output templates
+  must retain bit-identical main/aux output where the old two instances
+  represented simultaneous outputs; any numerical difference must be
+  isolated, explained by changed kernel state advancement, and approved
+  before the template migration is accepted.
+- Rate/block partition tests for stateful multi-output kernels at the
+  supported host rates and multiple callback sizes.
+
+### Owner decisions (resolved 2026-09-29)
+
+- **`.vact` selector spelling:** call the node value with an output name,
+  such as `(p :aux)`, with a numeric index such as `(p 1)` as the fallback.
+  There is no dot syntax, so the grammar does not change.
+- **Stereo `pan` law:** use unity-center balance for stereo and main/aux
+  pairs. Center leaves both channels at unity, and moving pan attenuates
+  only the opposite side. Mono voices keep equal-power pan.
+- **Migration scope:** migrate only kernels whose main and aux are
+  simultaneous outputs of one engine state. Each migration needs a
+  render-equivalence test. Every other template keeps its duplicate-node
+  form, and the old forms stay valid.
+- **Legacy graph bytes:** no legacy decoder. Graph payloads are exchanged
+  only between native and browser peers built from the same revision, and
+  mixed revisions are unsupported under the existing wire policy. A version
+  discriminator may still be added for diagnostics.
+
 ## References
 
 See `design-docs/references/README.md` for the official source and license.

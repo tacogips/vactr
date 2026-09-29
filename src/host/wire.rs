@@ -69,6 +69,23 @@ impl AudioEvent {
         &self.ctl[..usize::from(self.n_ctl).min(MAX_CTLS)]
     }
 
+    /// The cut group `sched::commit` packed into `voice_hint`
+    /// (`orbit | cut << 8`, design-music.md "cut group":
+    /// `s :break > cut 1 > d1`); 0 means no group. Read by the engine's
+    /// cut-group choke (DDRUM-004B).
+    #[must_use]
+    pub fn cut_group(&self) -> u8 {
+        (self.voice_hint >> 8) as u8
+    }
+
+    /// The orbit `sched::commit` packed into `voice_hint`, read alongside
+    /// `cut_group` to scope choke to voices sharing both. Independent of
+    /// any `orbit`-routed `CtlId` control on the event.
+    #[must_use]
+    pub fn hint_orbit(&self) -> u8 {
+        self.voice_hint as u8
+    }
+
     /// Appends a control.
     ///
     /// # Errors

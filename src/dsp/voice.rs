@@ -178,6 +178,14 @@ pub struct Voice {
     /// Bus slot and orbit.
     pub bus: usize,
     pub orbit: usize,
+    /// Cut group and orbit decoded from `AudioEvent::voice_hint`
+    /// (`AudioEvent::cut_group`/`hint_orbit`); `cut == 0` means no group.
+    /// Read by the engine's cut-group choke (DDRUM-004B), independent of
+    /// `orbit` above (the `orbit` control route is not currently carried
+    /// as a regular event control; `voice_hint` is the only place
+    /// `sched::commit` puts it).
+    pub cut: u8,
+    pub cut_orbit: u8,
     pub delay_send: f32,
     pub amp: f32,
     pub pan: f32,
@@ -210,6 +218,8 @@ impl Voice {
             ienv: 1.0,
             bus: 0,
             orbit: 0,
+            cut: 0,
+            cut_orbit: 0,
             delay_send: 0.0,
             amp: 1.0,
             pan: 0.5,
@@ -311,6 +321,8 @@ impl Voice {
             self.bank = get(BANK).filter(|b| *b >= 0.0).map(|b| b as u32);
             self.orbit = get(ORBIT).unwrap_or(0.0).max(0.0) as usize;
         }
+        self.cut = ev.cut_group();
+        self.cut_orbit = ev.hint_orbit();
         self.delay_send = get(DELAY).unwrap_or(0.0).clamp(0.0, 1.0);
         self.release = get(RELEASE).unwrap_or(0.1).max(1.0e-3);
         self.post = PostFx::from_event(ev, cells);

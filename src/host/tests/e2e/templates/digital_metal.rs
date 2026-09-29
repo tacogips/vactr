@@ -385,19 +385,164 @@ fn every_enum_and_bool_value_differs_from_the_default() {
 }
 
 // Hi-hat choke (design-music 4.1: "Open/closed hat choke uses the existing
-// `cut` group control. It is not a new knob.") was investigated for a
-// verifying e2e test here (a closed hat sharing a ringing open hat's `cut`
-// value should stop it). Source inspection (`src/sched/commit.rs`'s
-// `AudioEvent::voice_hint` construction, `src/host/wire.rs`, and every
-// voice-allocation/steal path in `src/dsp/engine.rs`) found that `cut`'s
-// group bits are encoded into `voice_hint` and sent across the wire but
-// are never read back anywhere: `Engine::start`'s only steal path is the
-// generic "pool full, steal the oldest tagged voice" fallback, unrelated
-// to `cut`. Cut groups do not currently choke voices at all (any
-// instrument, not just this family), so DDRUM-004 does not add a choke
-// test or a choke mechanism here, per the plan's instruction to report
-// this rather than inventing a replacement. `digital-hat`'s `hat-open`
-// still audibly selects the tail via `open-decay`/`closed-decay`
-// (`hat_open_and_closed_decays_differ_and_choose_the_base_tail`,
-// `src/dsp/tests/dsp/digital_metal.rs`), so the two hat articulations are
-// distinguishable even without a live choke.
+// `cut` group control. It is not a new knob."). Source inspection (2026-09-29,
+// DDRUM-004) found `cut`'s group bits encoded into `AudioEvent::voice_hint`
+// (`src/sched/commit.rs`) and carried across the wire (`src/host/wire.rs`)
+// but never read back: `Engine::start`'s only steal path was the generic
+// "pool full, steal the oldest tagged voice" fallback, unrelated to `cut`.
+// DDRUM-004B (`src/dsp/engine.rs::choke_cut_group`, `src/dsp/voice.rs`)
+// fixed this: a new voice with a nonzero cut group now short-gates
+// (`Voice::short_gate`, the same 3 ms click-free fade the pool-exhaustion
+// steal path already used) every other active voice sharing that group and
+// its `voice_hint` orbit. The design documents the group but not its
+// scope; same orbit and same cut group is what DDRUM-004B implements.
+
+fn hat_source(open: bool, cut: bool) -> String {
+    let tail = if open {
+        "hat-open true > open-decay 3"
+    } else {
+        "hat-open false > closed-decay 0.02"
+    };
+    let cut = if cut { " > cut 1" } else { "" };
+    format!("s :digital-hat > note [:a3] > velocity 0.8 > {tail}{cut} > once")
+}
+
+/// An open hat, then (after it has started ringing) a closed hat on the
+/// same orbit; `cut` shares `cut 1` on both hits when `true`. Returns only
+/// the audio rendered after the second hit, the open hat's would-be tail.
+fn open_then_closed_tail(cut: bool) -> Vec<f32> {
+    let mut e = E2e::new();
+    e.eval(&hat_source(true, cut));
+    let _ = e.run_for(0.05);
+    e.eval(&hat_source(false, cut));
+    let tail = e.run_for(0.9);
+    assert!(e.faults.is_empty(), "{:?}", e.faults);
+    assert!(all_finite(&tail), "native tail finite");
+    tail
+}
+
+/// The same two-hit sequence, replayed on a browser-tier `Engine` fed the
+/// exact `digital-hat` `InstDef` a native `.vact` compile produced (the
+/// `authored_browser` pattern of `src/host/tests/e2e/templates/stage_linked.rs`),
+/// with the events built by hand from `src/dsp/controls.rs`'s `digital-hat`
+/// rows (`freq` 0, `open-decay` 148, `closed-decay` 149, `hat-open` 150)
+/// and `voice_hint` encoded exactly as `sched::commit` encodes `cut`.
+fn open_then_closed_tail_browser(cut: bool) -> Vec<f32> {
+    use crate::dsp::arena::{encode_inst, StoreKind};
+    use crate::dsp::caps::CapabilitySet;
+    use crate::dsp::cells::Mirror;
+    use crate::dsp::engine::Engine;
+    use crate::dsp::ring::{
+        encode_graph_record, ByteInbox, EngineConfig, EngineIo, EventRing, SpscRing,
+    };
+    use crate::host::wire::{AudioEvent, Ctl};
+    use crate::sched::slots::{CtlId, SlotId};
+    use crate::value::intern::name_of_kw;
+
+    const FREQ: CtlId = CtlId::new(0);
+    const OPEN_DECAY: CtlId = CtlId::new(148);
+    const CLOSED_DECAY: CtlId = CtlId::new(149);
+    const HAT_OPEN: CtlId = CtlId::new(150);
+
+    let def = E2e::new()
+        .reg
+        .borrow()
+        .entries()
+        .find(|entry| &*name_of_kw(entry.name) == "digital-hat")
+        .expect("digital-hat is a prelude template")
+        .def
+        .clone();
+    let mut bytes = Vec::new();
+    encode_inst(&def, &mut bytes).unwrap();
+    let mut record = Vec::new();
+    encode_graph_record(1, 1, &bytes, &mut record);
+    let mut cfg = EngineConfig::new(
+        &CapabilitySet::browser(),
+        48_000.0,
+        256,
+        StoreKind::Arena { bytes: 4 << 20 },
+    );
+    cfg.template_slots = 8;
+    cfg.bus_slots = 4;
+    cfg.voice_seconds = 4.0;
+    cfg.bus_seconds = 1.0;
+    cfg.orbits = 2;
+    cfg.orbit_delay_seconds = 0.5;
+    cfg.analysis_cells = 1024;
+    cfg.event_capacity = 256;
+    let mut engine = Engine::with_config(cfg);
+    let (mut event_tx, mut event_rx) = EventRing::split(256);
+    let (mut ack_tx, _ack_rx) = SpscRing::split(256);
+    let (mut garbage_tx, _garbage_rx) = SpscRing::split(32);
+    let mut cells = Mirror::new(64);
+    let mut inbox = ByteInbox::new();
+    assert!(inbox.push(&record));
+    let mut process = |engine: &mut Engine| {
+        let mut buffer = [0.0; 512];
+        let mut io = EngineIo {
+            events: &mut event_rx,
+            controls: &mut inbox,
+            acks: &mut ack_tx,
+            cells: &mut cells,
+            garbage: Some(&mut garbage_tx),
+        };
+        let (_, allocations) =
+            crate::dsp::alloc_probe::armed(|| engine.process(&mut io, &mut buffer, 256));
+        assert_eq!(allocations, 0, "browser rendering allocated");
+        buffer
+    };
+    for _ in 0..6 {
+        let _ = process(&mut engine);
+    }
+    let hint = if cut { 1u32 << 8 } else { 0 };
+    let mut open_ev = AudioEvent::new(engine.now(), SlotId::new(1), 1, def.id);
+    open_ev.push_ctl(FREQ, Ctl::Const(4000.0)).unwrap();
+    open_ev.push_ctl(HAT_OPEN, Ctl::Const(1.0)).unwrap();
+    open_ev.push_ctl(OPEN_DECAY, Ctl::Const(3.0)).unwrap();
+    open_ev.voice_hint = hint;
+    assert!(event_tx.push(open_ev).is_ok());
+    for _ in 0..10 {
+        let _ = process(&mut engine);
+    }
+    let mut closed_ev = AudioEvent::new(engine.now(), SlotId::new(1), 1, def.id);
+    closed_ev.push_ctl(FREQ, Ctl::Const(4000.0)).unwrap();
+    closed_ev.push_ctl(HAT_OPEN, Ctl::Const(0.0)).unwrap();
+    closed_ev.push_ctl(CLOSED_DECAY, Ctl::Const(0.02)).unwrap();
+    closed_ev.voice_hint = hint;
+    assert!(event_tx.push(closed_ev).is_ok());
+    let mut tail = Vec::new();
+    for _ in 0..170 {
+        let block = process(&mut engine);
+        tail.extend(block.iter().step_by(2));
+    }
+    tail
+}
+
+#[test]
+fn cut_group_chokes_a_ringing_open_hat_and_without_cut_both_ring() {
+    let choked = open_then_closed_tail(true);
+    let free = open_then_closed_tail(false);
+    assert!(rms(&choked) > 1.0e-4, "the closed hat itself is audible");
+    assert!(
+        rms(&free) > 2.0 * rms(&choked),
+        "without `cut`, the still-ringing open hat keeps far more tail \
+         energy than the choked version: free {} choked {}",
+        rms(&free),
+        rms(&choked)
+    );
+}
+
+#[test]
+fn cut_group_chokes_a_ringing_open_hat_on_the_browser_tier() {
+    let choked = open_then_closed_tail_browser(true);
+    let free = open_then_closed_tail_browser(false);
+    assert!(all_finite(&choked) && all_finite(&free));
+    assert!(rms(&choked) > 1.0e-4, "the closed hat itself is audible");
+    assert!(
+        rms(&free) > 2.0 * rms(&choked),
+        "browser tier: without `cut`, the open hat keeps far more tail \
+         energy than the choked version: free {} choked {}",
+        rms(&free),
+        rms(&choked)
+    );
+}

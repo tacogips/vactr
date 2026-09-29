@@ -1,6 +1,6 @@
 # Programmable Digital Drums Implementation Plan
 
-**Status**: In Progress (DDRUM-001..004 complete 2026-09-29; 004B and 006 open)
+**Status**: In Progress (DDRUM-001..004B complete 2026-09-29; 006 open)
 **Design Reference**: `design-docs/specs/design-music.md#41-programmable-digital-drums-author-2026-09-27`
 **Created**: 2026-09-27
 **Last Updated**: 2026-09-29
@@ -74,7 +74,8 @@ Family additions:
 Open/closed hat choke uses the existing `cut` group control. It is not a
 new knob. As of 2026-09-29, the engine never reads the cut bits in
 `voice_hint`, so `cut` chokes nothing for any instrument. DDRUM-004B fixes
-this in the engine.
+this in the engine: a new voice with a nonzero cut group applies a 3 ms
+fade to every active voice with the same cut group and orbit.
 
 ### Non-DSP controls (codeable elsewhere)
 
@@ -103,7 +104,7 @@ values today; presets remain pattern values or separate `inst` definitions.
 | DDRUM-003 | `digital-drum` and `digital-snare` cores, templates and tests | DDRUM-002A | Completed 2026-09-29 |
 | DDRUM-004 | `digital-metal` and `digital-hat` cores, templates and tests | DDRUM-003 | Completed 2026-09-29 |
 | DDRUM-005 | Shared LFO, velocity targets, transients and repeat inside every core | DDRUM-003, DDRUM-004 | Delivered with 003/004 |
-| DDRUM-004B | Engine choke: make `cut` groups gate same-group voices (currently encoded but never read) | DDRUM-004 | Not started |
+| DDRUM-004B | Engine choke: make `cut` groups gate same-group voices (currently encoded but never read) | DDRUM-004 | Completed 2026-09-29 |
 | DDRUM-006 | `digital-kit`, editor default/label/choices metadata, examples, native/browser e2e | DDRUM-004 | Not started |
 
 ### Shared core contract (DDRUM-003/004)
@@ -136,6 +137,28 @@ values today; presets remain pattern values or separate `inst` definitions.
 - [ ] Quiet Cargo check, strict Clippy, rustfmt, wasm check and full tests pass.
 
 ## Progress Log
+
+### Session: 2026-09-29, DDRUM-004B cut-group choke
+
+**Tasks Completed**:
+- `Engine::start` now calls `choke_cut_group`. It decodes the cut group
+  and orbit from `AudioEvent::voice_hint`, then short-gates every other
+  active voice with the same nonzero group on the same orbit, using the
+  existing 3 ms `Voice::short_gate`.
+- Cut group 0 neither chokes nor is choked.
+- The pass is one bounded, allocation-free scan of the fixed voice pool,
+  and native and browser hosts behave the same.
+- This realizes design-music.md's "cut group: a new event stops the last".
+
+**Tests**:
+- Five engine tests cover the same group and orbit, a different group,
+  group 0 in both roles, and a different orbit.
+- Two `digital-hat` `.vact` end-to-end tests, native and browser: an open
+  hat followed by a closed hat with the same `cut 1` is quieted, while
+  without `cut` both ring.
+- Independent check-and-test review confirmed nextest (1,518 passed,
+  1 skipped), Clippy, fmt, wasm and the diff check. It also confirmed the
+  choke pass is allocation-free and bounded.
 
 ### Session: 2026-09-29, DDRUM-004
 

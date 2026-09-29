@@ -632,6 +632,35 @@ impl Engine {
         if let Some(tag) = tag {
             let _ = self.tags.insert(tag, u32::try_from(vi).unwrap_or(u32::MAX));
         }
+        self.choke_cut_group(vi);
+    }
+
+    /// Cut-group choke (design-music.md "cut group": `s :break > cut 1 >
+    /// d1`; open/closed hat choke, `digital-hat`'s `hat-open`). A voice
+    /// that just started with a nonzero cut group quickly releases every
+    /// other still-sounding voice that shares both that group and its
+    /// orbit, both read from `AudioEvent::voice_hint` (`cut_group`/
+    /// `hint_orbit`) rather than `Voice::orbit`, which the `orbit` control
+    /// does not currently reach (see the field's doc comment). The design
+    /// documents the group but not its scope; same orbit and same cut
+    /// group is chosen here. The release reuses `Voice::short_gate`, the
+    /// same bounded, allocation-free, click-free ~3 ms fade
+    /// (`voice::SHORT_GATE`) the pool-exhaustion steal path already uses,
+    /// so it is deterministic and identical on native and browser, both
+    /// running this same engine core. `cut == 0` means no group: such a
+    /// voice never chokes another voice and is never chokeable.
+    fn choke_cut_group(&mut self, vi: usize) {
+        let v = &self.pool.voices[vi];
+        if v.cut == 0 {
+            return;
+        }
+        let (cut, orbit) = (v.cut, v.cut_orbit);
+        let sr = self.sr;
+        for (i, other) in self.pool.voices.iter_mut().enumerate() {
+            if i != vi && other.active && other.cut == cut && other.cut_orbit == orbit {
+                other.short_gate(sr);
+            }
+        }
     }
 
     /// Dequeues due events and renders one block of `n <= max_block`.

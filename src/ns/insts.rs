@@ -6,7 +6,8 @@
 //! returned tree to an `InstDef` (`dsp::build`), registers it under the
 //! definition's name, rebinds the name to `Sound::Inst(id)` and stages the
 //! `Install` effect. A failing body is `inst-failed` for the defining form,
-//! whose whole-form rollback keeps the previous definition.
+//! except output selection errors which retain their call failure code. The
+//! whole-form rollback keeps the previous definition.
 //!
 //! The registry is shared (`Rc<RefCell<..>>`) by the evaluator side (the VM
 //! reads it for realization, `bus`/`master` and the `s :k` fallback) and the
@@ -39,7 +40,7 @@ use crate::types::diag::Diagnostic;
 use crate::value::intern::{intern_kw, intern_sym, name_of_kw, name_of_sym, KwId};
 use crate::value::value::{Sound, Value};
 use crate::vm::call::kind_name;
-use crate::vm::fail::{FailCode, Failure};
+use crate::vm::fail::{FailCode, Failure, FailureKind};
 use crate::vm::vm::Vm;
 
 /// The prelude template source (design 12.4, 12.8.6).
@@ -516,13 +517,23 @@ impl InstResolver for Rc<RefCell<InstRegistry>> {
 }
 
 fn inst_failed(name: KwId, why: &str, diag: Option<Box<Diagnostic>>) -> LowerError {
+    inst_failure(name, FailCode::InstFailed, why, diag)
+}
+
+fn inst_failure(
+    name: KwId,
+    code: FailCode,
+    why: &str,
+    diag: Option<Box<Diagnostic>>,
+) -> LowerError {
     LowerError {
-        failure: Failure::new(
-            FailCode::InstFailed,
-            format!("`{}` failed: {why}", name_of_kw(name)),
-        ),
+        failure: Failure::new(code, format!("`{}` failed: {why}", name_of_kw(name))),
         diag,
     }
+}
+
+fn is_output_selection_failure(failure: &Failure) -> bool {
+    failure.kind == FailureKind::OutputSelection
 }
 
 /// A `Param` node for a control.
@@ -718,7 +729,14 @@ pub fn realize_inst(
             let why = format!("the body is {}, not a unit generator", kind_name(&other));
             return Err(inst_failed(name, &why, None));
         }
-        Err(f) => return Err(inst_failed(name, &f.message, None)),
+        Err(f) => {
+            let code = if is_output_selection_failure(&f) {
+                f.code
+            } else {
+                FailCode::InstFailed
+            };
+            return Err(inst_failure(name, code, &f.message, None));
+        }
     };
     let mut r = reg.borrow_mut();
     let id = r.peek_id(name);

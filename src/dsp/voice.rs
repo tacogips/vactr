@@ -27,6 +27,7 @@ use crate::dsp::cells::CellRead;
 use crate::dsp::effects::prim::{Biquad, Shape};
 use crate::dsp::effects::{FxCtx, FxUnit};
 use crate::dsp::graph::NODE_CAP;
+use crate::dsp::graph::{decl_for_node, AudioOutputShape, OutputDecl, DISCARD, MAX_AUDIO_BUFFERS};
 use crate::dsp::ugen::{
     self, Inp, Kx, Node, NodeState, Src, Template, AMP, BANK, MAX_PARAMS, MAX_PORTS, MAX_VOICE_FX,
     PAN,
@@ -392,7 +393,7 @@ fn region(spec: &ugen::NodeSpec, mem_len: usize) -> (usize, usize) {
 pub struct RenderCtx<'a, C: CellRead + ?Sized> {
     pub sr: f32,
     pub max_block: usize,
-    /// `NODE_CAP * max_block` node output buffers.
+    /// `(512 + 2) * max_block` dense channel slices and discard slices.
     pub bufs: &'a mut [f32],
     /// `max_block` floats: the voice output.
     pub out: &'a mut [f32],
@@ -439,19 +440,40 @@ pub fn render<C: CellRead + ?Sized>(
     };
     for i in 0..t.n_nodes {
         let spec = &t.nodes[i];
-        let (done, rest) = rc.bufs.split_at_mut(i * mb);
-        let out = &mut rest[..m];
+        let first_slice = usize::from(spec.outs[0]);
+        let (done, tail) = rc.bufs.split_at_mut(first_slice * mb);
+        let (live, discard) = tail.split_at_mut((MAX_AUDIO_BUFFERS - first_slice) * mb);
+        let out0_channels = spec.shape.output(0).map_or(1, AudioOutputShape::channels);
+        let (out0_area, following) = live.split_at_mut(out0_channels * mb);
+        let (out, out0_right) = out0_area.split_at_mut(mb);
+        let out = &mut out[..m];
+        let mut out0_right = (out0_channels == 2).then(|| &mut out0_right[..m]);
         let mut ins = [Inp::Val(0.0); MAX_PORTS];
+        let mut ins_right = [Inp::Val(0.0); MAX_PORTS];
         for (p, src) in spec.inputs.iter().enumerate() {
-            ins[p] = match *src {
-                Src::Default(x) | Src::Const(x) => Inp::Val(x),
-                Src::Param(k) => Inp::Val(v.pvals[usize::from(k)]),
-                Src::Cell(c) => Inp::Val(rc.cells.get(c)),
-                Src::Node(j) => {
-                    let j = usize::from(j) * mb;
-                    Inp::Buf(&done[j..j + m])
+            match *src {
+                Src::Default(x) | Src::Const(x) => {
+                    ins[p] = Inp::Val(x);
+                    ins_right[p] = Inp::Val(x);
                 }
-            };
+                Src::Param(k) => {
+                    ins[p] = Inp::Val(v.pvals[usize::from(k)]);
+                    ins_right[p] = ins[p];
+                }
+                Src::Cell(c) => {
+                    ins[p] = Inp::Val(rc.cells.get(c));
+                    ins_right[p] = ins[p];
+                }
+                Src::Node { slice, stereo } => {
+                    let start = usize::from(slice) * mb;
+                    ins[p] = Inp::Buf(&done[start..start + m]);
+                    ins_right[p] = if stereo {
+                        Inp::Buf(&done[start + mb..start + mb + m])
+                    } else {
+                        ins[p]
+                    };
+                }
+            }
         }
         let (moff, mlen) = region(spec, v.mem.len());
         let mem = &mut v.mem[moff..moff + mlen];
@@ -518,14 +540,23 @@ pub fn render<C: CellRead + ?Sized>(
                 }
             }
             unit.update(rc.cells);
-            let (r, _) = rc.tmp.split_at_mut(m);
-            for (k, (y, x)) in out.iter_mut().zip(r.iter_mut()).enumerate() {
-                *y = ins[0].at(k);
-                *x = *y;
-            }
-            unit.run(mem, out, r, rc.dry, &mut rc.fx);
-            for (y, x) in out.iter_mut().zip(r.iter()) {
-                *y = 0.5 * (*y + *x);
+            if matches!(spec.inputs[0], Src::Node { stereo: true, .. }) {
+                let right = out0_right.as_deref_mut().unwrap_or(&mut discard[..m]);
+                for k in 0..m {
+                    out[k] = ins[0].at(k);
+                    right[k] = ins_right[0].at(k);
+                }
+                unit.run(mem, out, right, rc.dry, &mut rc.fx);
+            } else {
+                let (r, _) = rc.tmp.split_at_mut(m);
+                for (k, (y, x)) in out.iter_mut().zip(r.iter_mut()).enumerate() {
+                    *y = ins[0].at(k);
+                    *x = *y;
+                }
+                unit.run(mem, out, r, rc.dry, &mut rc.fx);
+                for (y, x) in out.iter_mut().zip(r.iter()) {
+                    *y = 0.5 * (*y + *x);
+                }
             }
             continue;
         }
@@ -538,14 +569,91 @@ pub fn render<C: CellRead + ?Sized>(
             stats: rc.fx.stats,
             seed: v.seed.wrapping_add(u32::try_from(i).unwrap_or(0)),
         };
-        ugen::run(spec, &ins, &mut v.nodes[i], mem, out, &mut kx);
+        let has_output1 = spec.outs[1] != DISCARD;
+        let output1_channels = spec.shape.output(1).map_or(0, AudioOutputShape::channels);
+        let output1_area = if has_output1 {
+            let offset = (usize::from(spec.outs[1]) - first_slice - out0_channels) * mb;
+            let (_, after) = following.split_at_mut(offset);
+            Some(&mut after[..output1_channels * mb])
+        } else {
+            None
+        };
+        if has_output1 && is_pair_node(spec.node) {
+            let aux = &mut output1_area.expect("assigned output")[..m];
+            run_pair(spec, &ins, &mut v.nodes[i], mem, out, aux, &mut kx);
+        } else if has_output1 {
+            if let Node::SamplePlay(bank) = spec.node {
+                let output = output1_area.expect("assigned output");
+                let (left, right) = output.split_at_mut(mb);
+                ugen::sample::play_stereo(
+                    bank,
+                    &ins,
+                    &mut v.nodes[i],
+                    out,
+                    &mut left[..m],
+                    &mut right[..m],
+                    &kx,
+                );
+            } else {
+                run_elementwise(
+                    ElementwiseContext {
+                        spec,
+                        left_inputs: &ins,
+                        right_inputs: &ins_right,
+                        state: &mut v.nodes[i],
+                        memory: mem,
+                        kx: &mut kx,
+                    },
+                    ElementwiseOutputs {
+                        left: out,
+                        secondary: output1_area,
+                        right: out0_right,
+                    },
+                );
+            }
+        } else if out0_right.is_some() {
+            run_elementwise(
+                ElementwiseContext {
+                    spec,
+                    left_inputs: &ins,
+                    right_inputs: &ins_right,
+                    state: &mut v.nodes[i],
+                    memory: mem,
+                    kx: &mut kx,
+                },
+                ElementwiseOutputs {
+                    left: out,
+                    secondary: None,
+                    right: out0_right,
+                },
+            );
+        } else {
+            ugen::run(spec, &ins, &mut v.nodes[i], mem, out, &mut kx);
+        }
     }
     let y = &mut rc.out[..m];
     y.fill(0.0);
-    for &s in &t.sinks[..t.n_sinks] {
-        let s = usize::from(s) * mb;
-        for (a, b) in y.iter_mut().zip(&rc.bufs[s..s + m]) {
-            *a += *b;
+    if t.stereo {
+        rc.out_r[..m].fill(0.0);
+        for &sink in &t.sinks[..t.n_sinks] {
+            let sink = &t.nodes[usize::from(sink)];
+            if !matches!(sink.shape.output(0), Some(AudioOutputShape::Stereo)) {
+                continue;
+            }
+            let s = usize::from(sink.outs[0]) * mb;
+            for (a, b) in y.iter_mut().zip(&rc.bufs[s..s + m]) {
+                *a += *b;
+            }
+            for (a, b) in rc.out_r[..m].iter_mut().zip(&rc.bufs[s + mb..s + mb + m]) {
+                *a += *b;
+            }
+        }
+    } else {
+        for &sink in &t.sinks[..t.n_sinks] {
+            let s = usize::from(t.nodes[usize::from(sink)].outs[0]) * mb;
+            for (a, b) in y.iter_mut().zip(&rc.bufs[s..s + m]) {
+                *a += *b;
+            }
         }
     }
     let implicit = t.envs == 0 && t.players == 0;
@@ -573,7 +681,7 @@ pub fn render<C: CellRead + ?Sized>(
         *fourth = if fourth.is_finite() { *fourth * g } else { 0.0 };
     }
     v.post.run(y, rc.sr);
-    if t.has_aux {
+    if t.has_aux || t.stereo {
         v.post_r.run(&mut rc.out_r[..m], rc.sr);
     }
     if v.gate_left != usize::MAX {
@@ -581,6 +689,98 @@ pub fn render<C: CellRead + ?Sized>(
     }
     let ended = matches!(v.fade, Some((0, _))) || v.finished(t);
     (off, ended)
+}
+
+fn is_pair_node(node: Node) -> bool {
+    matches!(
+        decl_for_node(&node),
+        OutputDecl::Fixed { names, .. } if names == ["main", "aux"]
+    )
+}
+
+fn run_pair(
+    spec: &ugen::NodeSpec,
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &mut Kx<'_>,
+) {
+    match spec.node {
+        Node::VaFilter => ugen::va_filter::filter_pair(ins, st, main, aux, kx),
+        Node::FmPair => ugen::fm_pair::render_pair(ins, st, main, aux, kx),
+        Node::AnalogPair => ugen::analog_pair::render_pair(ins, st, mem, main, aux, kx),
+        Node::ChordPair => ugen::chord_pair::render_pair(ins, st, mem, main, aux, kx),
+        Node::TableTerrainPair => {
+            ugen::table_terrain_pair::render_pair(ins, st, mem, main, aux, kx);
+        }
+        Node::TerrainPair => ugen::terrain_pair::render_pair(ins, st, mem, main, aux, kx),
+        Node::StringMachinePair => {
+            ugen::string_machine_pair::render_pair(ins, st, mem, main, aux, kx);
+        }
+        Node::ShapePair => ugen::shape_pair::render_pair(ins, st, mem, main, aux, kx),
+        Node::StageChain => ugen::stage_chain::render_pair(ins, st, mem, main, aux, kx),
+        _ => {
+            debug_assert!(false, "run_pair received a non-pair node");
+            ugen::run(spec, ins, st, mem, main, kx);
+            aux.fill(0.0);
+        }
+    }
+}
+
+struct ElementwiseContext<'a, 'input, 'kx> {
+    spec: &'a ugen::NodeSpec,
+    left_inputs: &'a [Inp<'input>; MAX_PORTS],
+    right_inputs: &'a [Inp<'input>; MAX_PORTS],
+    state: &'a mut NodeState,
+    memory: &'a mut [f32],
+    kx: &'a mut Kx<'kx>,
+}
+
+struct ElementwiseOutputs<'a> {
+    left: &'a mut [f32],
+    secondary: Option<&'a mut [f32]>,
+    right: Option<&'a mut [f32]>,
+}
+
+fn run_elementwise(context: ElementwiseContext<'_, '_, '_>, outputs: ElementwiseOutputs<'_>) {
+    let ElementwiseContext {
+        spec,
+        left_inputs,
+        right_inputs,
+        state,
+        memory,
+        kx,
+    } = context;
+    let ElementwiseOutputs {
+        left,
+        secondary,
+        right,
+    } = outputs;
+    let combine: fn(f32, f32) -> f32 = match spec.node {
+        Node::Mul => |a, b| a * b,
+        Node::Add => |a, b| a + b,
+        _ => {
+            debug_assert!(false, "run_elementwise received a non-elementwise node");
+            ugen::run(spec, left_inputs, state, memory, left, kx);
+            if let Some(output) = secondary {
+                output.fill(0.0);
+            }
+            if let Some(output) = right {
+                output.fill(0.0);
+            }
+            return;
+        }
+    };
+    for (i, out) in left.iter_mut().enumerate() {
+        *out = combine(left_inputs[0].at(i), left_inputs[1].at(i));
+    }
+    if let Some(right) = right {
+        for (i, out) in right.iter_mut().enumerate() {
+            *out = combine(right_inputs[0].at(i), right_inputs[1].at(i));
+        }
+    }
 }
 
 /// The fixed voice pool.

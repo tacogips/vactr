@@ -36,8 +36,9 @@ use crate::dsp::cells::CellId;
 use crate::dsp::controls::{self, CtlDomain};
 use crate::dsp::effects;
 use crate::dsp::graph::{
-    BusDef, BusId, Edge, EffectKind, EffectSpec, InstDef, InstId, UGenInput, UGenKind, UGenNode,
-    UGenSpec, NODE_CAP,
+    assign_slices, decl_for_spec, derive_shapes, voice_layout, BusDef, BusId, Edge, EffectKind,
+    EffectSpec, InstDef, InstId, NodeAudioShape, ShapeError, UGenInput, UGenKind, UGenNode,
+    UGenSpec, MAX_AUDIO_BUFFERS, NODE_CAP,
 };
 use crate::host::caps::SignalInput;
 use crate::host::wire::Ctl;
@@ -138,6 +139,7 @@ pub fn lower_inst(
     header: &[(CtlId, Ctl)],
     lw: Lowering<'_>,
 ) -> Result<(InstDef, Extras), LowerError> {
+    let (root, output) = selected_source(root)?;
     let mut g = Graph {
         lw,
         nodes: Vec::new(),
@@ -149,7 +151,17 @@ pub fn lower_inst(
         consts: HashMap::new(),
         extras: Extras::default(),
     };
-    g.node(root, 0)?;
+    let root = g.node(&root, 0)?;
+    if output > 0 {
+        let sink = g.push(UGenSpec::Add)?;
+        g.edges.push(Edge {
+            from: root,
+            to: sink,
+            port: 0,
+            output,
+        });
+    }
+    validate_inst_shape(g.lw.span, &g.nodes, &g.edges)?;
     let def = InstDef {
         id,
         params: g.params.into_boxed_slice(),
@@ -180,7 +192,9 @@ pub fn lower_bus(
             UGenKind::BusInput => break,
             UGenKind::Effect(k) => *k,
             UGenKind::Output(_) => {
-                return Err(LowerError::ty("output selection is not supported yet"))
+                return Err(LowerError::ty(
+                    "output selection is only valid in an inst body",
+                ))
             }
             UGenKind::Ugen(_) => {
                 return Err(LowerError::ty(
@@ -227,6 +241,86 @@ pub fn lower_bus(
         },
         extras,
     ))
+}
+
+fn selected_source(node: &Rc<UGenNode>) -> Result<(Rc<UGenNode>, u8), LowerError> {
+    match &node.kind {
+        UGenKind::Output(output) => {
+            let [(None, UGenInput::Node(inner))] = node.args.as_ref() else {
+                return Err(LowerError::ty("malformed output selection"));
+            };
+            Ok((Rc::clone(inner), *output))
+        }
+        _ => Ok((Rc::clone(node), 0)),
+    }
+}
+
+fn too_many_buffers(span: Span, need: usize) -> LowerError {
+    let msg = format!(
+        "the instrument needs {need} channel buffers, exceeding the {MAX_AUDIO_BUFFERS}-buffer cap"
+    );
+    LowerError {
+        failure: Failure::new(FailCode::InstFailed, msg.clone()),
+        diag: Some(Box::new(Diagnostic::error(
+            DiagCode::GraphTooLarge,
+            span,
+            msg,
+        ))),
+    }
+}
+
+fn shape_error(span: Span, error: ShapeError, nodes: &[UGenSpec]) -> LowerError {
+    match error {
+        ShapeError::TooManyBuffers { need } => too_many_buffers(span, need),
+        ShapeError::BadOutput { .. } => LowerError::ty("output index out of range"),
+        ShapeError::Mismatch { node, port } => {
+            let spec = &nodes[usize::from(node)];
+            let port_name = match spec {
+                UGenSpec::Effect(_) if port == 0 => "in",
+                UGenSpec::Effect(effect) => effect_ports(effect.kind)
+                    .get(usize::from(port - 1))
+                    .copied()
+                    .unwrap_or("unknown"),
+                _ => ports(spec)
+                    .get(usize::from(port))
+                    .copied()
+                    .unwrap_or("unknown"),
+            };
+            LowerError::ty(format!(
+                "stereo output connected to mono-only input `{port_name}` of `{spec:?}`"
+            ))
+        }
+        ShapeError::StereoAuxOut => LowerError::ty("a stereo voice cannot also use aux-out"),
+        ShapeError::BadEdge { .. } | ShapeError::Cycle => {
+            LowerError::ty("invalid instrument graph")
+        }
+    }
+}
+
+fn validate_inst_shape(span: Span, nodes: &[UGenSpec], edges: &[Edge]) -> Result<(), LowerError> {
+    let mut shapes = [NodeAudioShape::MONO; NODE_CAP];
+    derive_shapes(
+        nodes.len(),
+        |index| decl_for_spec(&nodes[index]),
+        edges,
+        &mut shapes,
+    )
+    .map_err(|error| shape_error(span, error, nodes))?;
+    voice_layout(
+        nodes.len(),
+        |index| decl_for_spec(&nodes[index]),
+        &shapes,
+        edges,
+    )
+    .map_err(|error| shape_error(span, error, nodes))?;
+    let mut order = [0_u16; NODE_CAP];
+    for (index, node) in order.iter_mut().take(nodes.len()).enumerate() {
+        *node = index as u16;
+    }
+    let mut slices = [[u16::MAX; crate::dsp::graph::MAX_OUTPUTS_PER_NODE]; NODE_CAP];
+    assign_slices(&order[..nodes.len()], &shapes, edges, &mut slices)
+        .map_err(|error| shape_error(span, error, nodes))?;
+    Ok(())
 }
 
 fn too_large(span: Span, what: &str) -> LowerError {
@@ -346,7 +440,7 @@ struct Graph<'a> {
 
 /// Where one input comes from.
 enum Src {
-    Node(u16),
+    Node(u16, u8),
     List(Rc<[f32]>),
 }
 
@@ -384,20 +478,23 @@ impl Graph<'_> {
         port: &str,
         depth: usize,
     ) -> Result<Src, LowerError> {
-        Ok(Src::Node(match inp {
-            UGenInput::Node(n) => self.node(n, depth + 1)?,
-            UGenInput::Const(v) => self.konst(*v)?,
-            UGenInput::Param(c) => self.param(*c)?,
-            UGenInput::Keyword(k) => self.konst(keyword(effect, port, *k)?)?,
+        Ok(match inp {
+            UGenInput::Node(n) => {
+                let (inner, output) = selected_source(n)?;
+                Src::Node(self.node(&inner, depth + 1)?, output)
+            }
+            UGenInput::Const(v) => Src::Node(self.konst(*v)?, 0),
+            UGenInput::Param(c) => Src::Node(self.param(*c)?, 0),
+            UGenInput::Keyword(k) => Src::Node(self.konst(keyword(effect, port, *k)?)?, 0),
             UGenInput::List(xs) => return Ok(Src::List(Rc::clone(xs))),
             UGenInput::Signal(s) => {
                 let k = u16::try_from(self.extras.signals.len()).unwrap_or(u16::MAX);
                 let ctl = CtlId::new(SIGNAL_CTL_BASE.saturating_add(k));
                 let cell = signal_cell(s, &mut self.lw, &mut self.extras);
                 self.params.push((ctl, cell));
-                self.param(ctl)?
+                Src::Node(self.param(ctl)?, 0)
             }
-        }))
+        })
     }
 
     /// Lowers one node after its inputs; returns its index.
@@ -420,9 +517,7 @@ impl Graph<'_> {
                 }),
                 Some(*k),
             ),
-            UGenKind::Output(_) => {
-                return Err(LowerError::ty("output selection is not supported yet"))
-            }
+            UGenKind::Output(_) => return Err(LowerError::ty("malformed output selection")),
             UGenKind::BusInput => {
                 return Err(LowerError::ty(
                     "an instrument has no bus input; effects in an `inst` need a subject",
@@ -500,11 +595,11 @@ impl Graph<'_> {
         let me = self.push(spec)?;
         for (src, port, pname) in wires {
             match src {
-                Src::Node(from) => self.edges.push(Edge {
+                Src::Node(from, output) => self.edges.push(Edge {
                     from,
                     to: me,
                     port,
-                    output: 0,
+                    output,
                 }),
                 Src::List(xs) => {
                     let id = match effect {

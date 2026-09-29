@@ -11,6 +11,7 @@
 use std::rc::Rc;
 
 use crate::compile::proto::{ArgKind, Closure};
+use crate::dsp::graph::{select_output, OutputDecl, OutputSelector, UGenInput, UGenKind, UGenNode};
 use crate::ns::namespace::Namespace;
 use crate::ns::stage::StagedEffect;
 use crate::reader::span::Span;
@@ -275,6 +276,11 @@ impl Vm {
                 | Value::Variant(_) => {
                     Failure::new(FailCode::Arity, "a collection takes one index or key")
                 }
+                Value::UGen(_) => Failure::new(
+                    FailCode::Arity,
+                    "a unit generator takes one output name or index",
+                )
+                .output_selection(),
                 _ => not_callable(&callee),
             });
         };
@@ -283,6 +289,51 @@ impl Vm {
             Value::List(_) | Value::Range(_) => index(&callee, &arg),
             Value::Dict(_) | Value::Struct(_) | Value::Variant(_) | Value::Nil => {
                 get(&callee, &arg)
+            }
+            Value::UGen(node) => {
+                let selector = match arg {
+                    Value::Keyword(keyword) => OutputSelector::Name(keyword),
+                    Value::Int(index) => OutputSelector::Index(i64::from(index)),
+                    Value::Int64(index) => OutputSelector::Index(index),
+                    _ => {
+                        return Err(Failure::new(
+                            FailCode::Type,
+                            "select an output with a keyword or an int",
+                        )
+                        .output_selection());
+                    }
+                };
+                match select_output(&node.kind, selector) {
+                    Ok(output) => Ok(Value::UGen(Rc::new(UGenNode {
+                        kind: UGenKind::Output(output),
+                        args: vec![(None, UGenInput::Node(Rc::clone(&node)))].into_boxed_slice(),
+                    }))),
+                    Err(crate::dsp::graph::SelectError::SingleOutput) => {
+                        Err(not_callable(&Value::UGen(node)).output_selection())
+                    }
+                    Err(crate::dsp::graph::SelectError::Unknown) => {
+                        let selector = match selector {
+                            OutputSelector::Name(keyword) => format!(":{}", name_of_kw(keyword)),
+                            OutputSelector::Index(index) => index.to_string(),
+                        };
+                        let names = match &node.kind {
+                            UGenKind::Ugen(spec) => match crate::dsp::graph::decl_for_spec(spec) {
+                                OutputDecl::Fixed { names, .. } => names
+                                    .iter()
+                                    .map(|name| format!(":{name}"))
+                                    .collect::<Vec<_>>()
+                                    .join(", "),
+                                _ => String::new(),
+                            },
+                            _ => String::new(),
+                        };
+                        Err(Failure::new(
+                            FailCode::UnknownField,
+                            format!("unknown output {selector}; declared outputs: {names}"),
+                        )
+                        .output_selection())
+                    }
+                }
             }
             _ => Err(not_callable(&callee)),
         }

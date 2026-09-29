@@ -3,6 +3,10 @@
 //! project's 1000-line-per-file limit.
 
 use super::*;
+use crate::dsp::graph::{
+    assign_slices, decl_for_node, derive_shapes, voice_layout, NodeAudioShape, ShapeError,
+    VoiceLayout, DISCARD, MAX_OUTPUTS_PER_NODE,
+};
 
 /// A flattened instrument graph in fixed-capacity storage.
 #[derive(Clone, Debug)]
@@ -211,6 +215,10 @@ pub struct Template {
     pub sinks: [u16; MAX_SINKS],
     /// An `aux-out` node is present; the voice writes independent L/R.
     pub has_aux: bool,
+    /// The voice sink has two channels from a stereo output.
+    pub stereo: bool,
+    /// Number of densely assigned channel slices used by this graph.
+    pub n_slices: usize,
     /// Direct channels three/four are present and need a four-channel host.
     pub has_quad: bool,
     pub n_fx: usize,
@@ -246,6 +254,8 @@ impl Template {
             n_sinks: 0,
             sinks: [0; MAX_SINKS],
             has_aux: false,
+            stereo: false,
+            n_slices: 0,
             has_quad: false,
             n_fx: 0,
             fx_params: [[(CtlId::new(0), Ctl::Const(0.0)); MAX_FX_PARAMS]; MAX_VOICE_FX],
@@ -361,10 +371,14 @@ impl Template {
         }
         let edges = &raw.edges[..raw.n_edges.min(MAX_EDGES)];
         let order = topo_order(n, edges)?;
-        let mut pos = [0u16; NODE_CAP];
-        for (new, &old) in order[..n].iter().enumerate() {
-            pos[usize::from(old)] = u16::try_from(new).map_err(|_| BuildError::TooManyNodes)?;
-        }
+        let mut shapes = [NodeAudioShape::MONO; NODE_CAP];
+        derive_shapes(n, |i| decl_for_node(&raw.nodes[i]), edges, &mut shapes)
+            .map_err(map_shape_error)?;
+        let layout = voice_layout(n, |i| decl_for_node(&raw.nodes[i]), &shapes, edges)
+            .map_err(map_shape_error)?;
+        let mut outs = [[DISCARD; MAX_OUTPUTS_PER_NODE]; NODE_CAP];
+        let n_slices =
+            assign_slices(&order[..n], &shapes, edges, &mut outs).map_err(map_shape_error)?;
         self.inst = raw.inst;
         self.n_nodes = n;
         self.n_params = 0;
@@ -376,6 +390,8 @@ impl Template {
         self.n_refs = 0;
         self.n_sinks = 0;
         self.has_aux = false;
+        self.stereo = layout == VoiceLayout::Stereo;
+        self.n_slices = n_slices;
         self.has_quad = false;
         self.envs = 0;
         self.players = 0;
@@ -384,7 +400,7 @@ impl Template {
             self.params[k] = (id, ctl);
         }
         for (new, &old) in order[..n].iter().enumerate() {
-            self.compile_node(new, usize::from(old), raw, &pos)?;
+            self.compile_node(new, usize::from(old), raw, &outs, &shapes)?;
         }
         for (new, &old) in order[..n].iter().enumerate() {
             if !edges.iter().any(|e| e.from == old) && self.n_sinks < MAX_SINKS {
@@ -404,7 +420,8 @@ impl Template {
         new: usize,
         old: usize,
         raw: &RawGraph,
-        pos: &[u16; NODE_CAP],
+        outs: &[[u16; MAX_OUTPUTS_PER_NODE]; NODE_CAP],
+        shapes: &[NodeAudioShape; NODE_CAP],
     ) -> Result<(), BuildError> {
         let mut node = raw.nodes[old];
         let mut inputs = [Src::Default(0.0); MAX_PORTS];
@@ -493,11 +510,19 @@ impl Template {
             if port >= catalog::port_count(&node) {
                 return Err(BuildError::BadEdge);
             }
-            inputs[port] = Src::Node(pos[usize::from(e.from)]);
+            let from = usize::from(e.from);
+            let output = usize::from(e.output);
+            let shape = shapes[from].output(output).ok_or(BuildError::BadEdge)?;
+            inputs[port] = Src::Node {
+                slice: outs[from][output],
+                stereo: shape.channels() == 2,
+            };
         }
         self.nodes[new] = NodeSpec {
             node,
             inputs,
+            outs: outs[old],
+            shape: shapes[old],
             mem_off: 0,
             mem_len: 0,
         };
@@ -533,5 +558,16 @@ impl Template {
         }
         self.mem_total = cursor;
         Ok(())
+    }
+}
+
+fn map_shape_error(error: ShapeError) -> BuildError {
+    match error {
+        ShapeError::TooManyBuffers { .. } => BuildError::TooManyBuffers,
+        ShapeError::Cycle => BuildError::Cycle,
+        ShapeError::BadEdge { .. }
+        | ShapeError::BadOutput { .. }
+        | ShapeError::Mismatch { .. }
+        | ShapeError::StereoAuxOut => BuildError::BadEdge,
     }
 }

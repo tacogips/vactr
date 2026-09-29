@@ -22,7 +22,10 @@ use crate::dsp::bus::{BusTemplate, SlotState, MAX_CHAIN};
 use crate::dsp::caps::{Cap, CapabilitySet};
 use crate::dsp::cells::CellId;
 use crate::dsp::effects::MAX_FX_PARAMS;
-use crate::dsp::graph::{BusDef, BusId, Edge, EffectKind, InstDef, InstId};
+use crate::dsp::graph::{
+    decl_for_node, decl_for_spec, derive_shapes, BusDef, BusId, Edge, EffectKind, InstDef, InstId,
+    NodeAudioShape, NODE_CAP,
+};
 use crate::dsp::ugen::catalog::{effect_index, get_node, put_spec, In, Out};
 use crate::dsp::ugen::{BuildEnv, BuildError, RawGraph, Template};
 use crate::dsp::voice::Voice;
@@ -487,7 +490,7 @@ impl SampleStore {
 
 // ---- graph byte codec ------------------------------------------------------
 
-const G_INST: u8 = b'I';
+const G_INST: u8 = b'V';
 const G_BUS: u8 = b'B';
 const G_MASTER: u8 = b'M';
 
@@ -504,6 +507,14 @@ pub enum GraphKind {
 /// # Errors
 /// A capacity `BuildError`.
 pub fn encode_inst(def: &InstDef, out: &mut Vec<u8>) -> Result<(), BuildError> {
+    let mut shapes = [NodeAudioShape::MONO; NODE_CAP];
+    derive_shapes(
+        def.nodes.len(),
+        |index| decl_for_spec(&def.nodes[index]),
+        &def.edges,
+        &mut shapes,
+    )
+    .map_err(|_| BuildError::BadEdge)?;
     out.clear();
     let mut o = Out(out);
     o.u8(G_INST);
@@ -513,14 +524,16 @@ pub fn encode_inst(def: &InstDef, out: &mut Vec<u8>) -> Result<(), BuildError> {
         o.ctl(id, c);
     }
     o.len16(def.nodes.len())?;
-    for spec in def.nodes.iter() {
+    for (index, spec) in def.nodes.iter().enumerate() {
         put_spec(&mut o, spec)?;
+        o.u8(shapes[index].to_byte());
     }
     o.len16(def.edges.len())?;
     for e in def.edges.iter() {
         o.u16(e.from);
         o.u16(e.to);
         o.u8(e.port);
+        o.u8(e.output);
     }
     o.len16(def.node_params.len())?;
     for &(n, id, c) in def.node_params.iter() {
@@ -573,6 +586,7 @@ pub fn decode_graph(
         G_INST => {
             raw.clear();
             raw.inst = InstId::new(id);
+            let mut encoded = [NodeAudioShape::MONO; NODE_CAP];
             for _ in 0..i.u16()? {
                 let (id, c) = i.ctl()?;
                 raw.push_param(id, c)
@@ -580,16 +594,36 @@ pub fn decode_graph(
             }
             for _ in 0..i.u16()? {
                 get_node(&mut i, raw)?;
+                encoded[raw.n_nodes - 1] =
+                    NodeAudioShape::from_byte(i.u8()?).ok_or(FaultCode::BadRecord)?;
             }
             for _ in 0..i.u16()? {
+                let from = i.u16()?;
+                let to = i.u16()?;
+                let port = i.u8()?;
+                let output = i.u8()?;
+                let source = usize::from(from);
+                if source >= raw.n_nodes || usize::from(output) >= encoded[source].count() {
+                    return Err(FaultCode::BadRecord);
+                }
                 let e = Edge {
-                    from: i.u16()?,
-                    to: i.u16()?,
-                    port: i.u8()?,
-
-                    output: 0,
+                    from,
+                    to,
+                    port,
+                    output,
                 };
                 raw.push_edge(e).map_err(|_| FaultCode::GraphTooLarge)?;
+            }
+            let mut derived = [NodeAudioShape::MONO; NODE_CAP];
+            derive_shapes(
+                raw.n_nodes,
+                |index| decl_for_node(&raw.nodes[index]),
+                &raw.edges[..raw.n_edges],
+                &mut derived,
+            )
+            .map_err(|_| FaultCode::BadRecord)?;
+            if derived[..raw.n_nodes] != encoded[..raw.n_nodes] {
+                return Err(FaultCode::BadRecord);
             }
             for _ in 0..i.u16()? {
                 let n = i.u16()?;

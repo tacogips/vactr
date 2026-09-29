@@ -104,6 +104,17 @@ pub struct Failure {
     pub code: FailCode,
     pub message: String,
     pub origin: Origin,
+    /// Identifies failures whose code should pass through instrument lowering.
+    pub kind: FailureKind,
+}
+
+/// The semantic operation that produced a failure when callers need to
+/// distinguish errors with the same public code.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum FailureKind {
+    #[default]
+    General,
+    OutputSelection,
 }
 
 impl Failure {
@@ -114,7 +125,15 @@ impl Failure {
             code,
             message: message.into(),
             origin: Origin::none(),
+            kind: FailureKind::General,
         }
+    }
+
+    /// Mark an error raised while selecting a UGen output.
+    #[must_use]
+    pub const fn output_selection(mut self) -> Self {
+        self.kind = FailureKind::OutputSelection;
+        self
     }
 }
 

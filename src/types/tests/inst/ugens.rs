@@ -67,3 +67,30 @@ fn dsp_keywords_are_the_control_rows_and_the_extra_parameters() {
         );
     }
 }
+
+#[test]
+fn output_selection_has_ugen_type_and_checks_selector_arguments() {
+    let selection = "let p {sin-osc 440}\n{p :main}";
+    assert_clean(selection);
+    assert_eq!(last_type(selection), "ugen");
+
+    for source in [
+        "let p {sin-osc 440}\n{p \"x\"}",
+        "let p {sin-osc 440}\n{p :main :aux}",
+    ] {
+        let result = check_src(source);
+        assert!(
+            result
+                .diags
+                .iter()
+                .any(|diag| diag.code == crate::types::diag::DiagCode::TypeMismatch),
+            "{source}: {:?}",
+            result.diags
+        );
+    }
+}
+
+#[test]
+fn output_selection_accepts_an_unresolved_selector_parameter() {
+    assert_clean("let p {sin-osc 440}\nfn select-output selector:\n\t{p selector}");
+}

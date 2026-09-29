@@ -22,7 +22,7 @@ use crate::dsp::bus::{BusGraph, BusTemplate, OrbitDelay};
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::{CellId, CellRead};
 use crate::dsp::fft::{Fft, FFT_SIZE};
-use crate::dsp::graph::{BusId, InstId, NODE_CAP};
+use crate::dsp::graph::{BusId, InstId};
 use crate::dsp::release::{TagMap, Tombstones};
 use crate::dsp::ring::{
     push_garbage, AckProducer, Budget, ControlSource, Garbage, NativeInstall, Producer, Record,
@@ -146,7 +146,12 @@ impl Engine {
             pending: vec![silent; cfg.event_capacity.max(1)].into_boxed_slice(),
             n_pending: 0,
             deferred: [(None, None); MAX_DEFERRED_STARTS],
-            bufs: vec![0.0; NODE_CAP * mb].into_boxed_slice(),
+            bufs: vec![
+                0.0;
+                (crate::dsp::graph::MAX_AUDIO_BUFFERS + crate::dsp::graph::DISCARD_SLICES)
+                    * mb
+            ]
+            .into_boxed_slice(),
             vout: vec![0.0; mb].into_boxed_slice(),
             vout_r: vec![0.0; mb].into_boxed_slice(),
             vout_3: vec![0.0; mb].into_boxed_slice(),

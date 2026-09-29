@@ -202,7 +202,7 @@ fn custom_header_parameter_reaches_audio() {
 fn vact_instrument_routes_independent_main_and_aux() {
     let mut e = E2e::new();
     e.eval("inst two-out:\n\tsin-osc freq > + {aux-out {tri freq}}");
-    e.eval("s :two-out > freq 220 > pan 0 > once");
+    e.eval("s :two-out > freq 220 > pan 0.5 > once");
     let (main, aux) = e.run_stereo_for(0.8);
     assert!(e.faults.is_empty(), "{:?}", e.faults);
     assert!(e.committed > 0);
@@ -215,6 +215,17 @@ fn vact_instrument_routes_independent_main_and_aux() {
         .sum::<f32>()
         / main.len() as f32;
     assert!(delta > 1.0e-2, "main/aux are distinct: {delta}");
+
+    let mut left = E2e::new();
+    left.eval("inst two-out:\n\tsin-osc freq > + {aux-out {tri freq}}");
+    left.eval("s :two-out > freq 220 > pan 0 > once");
+    let (main_left, aux_left) = left.run_stereo_for(0.8);
+    assert!(left.faults.is_empty(), "{:?}", left.faults);
+    // Owner decision: main/aux pairs use unity-center balance; pan 0 keeps
+    // main at unity and silences aux.
+    assert_eq!(main_left, main);
+    assert!(rms(&main_left) > 1.0e-3);
+    assert!(rms(&aux_left) < 1.0e-5);
 }
 
 #[test]

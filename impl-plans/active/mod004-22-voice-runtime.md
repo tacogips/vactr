@@ -1,12 +1,12 @@
 # MOD004-22: Dense Channel Buffers, Multi-output Dispatch, Stereo Voices, Balance Pan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: MOD004-22 (wave 2; parallel with MOD004-20 and MOD004-21)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Voice buffers and channel mapping; Capacity, real-time, and invariance)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004B, MOD-004C)
 **Baseline**: `85a300a`. MOD004-00/10/11/12 are committed and accepted.
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-29 (refined for session 192: pinned MOD004-12 entry points and current line references)
+**Last Updated**: 2026-09-29 (implemented runtime wiring; focused regression surfaced an out-of-scope test expectation)
 
 ## Baseline Facts at 85a300a (read before editing)
 
@@ -197,6 +197,12 @@ golden test is the gate.
 - `voice.rs` is 718 lines. Move the dispatch into `voice/route.rs` if
   needed, and keep every file under 1000 lines.
 
+## Residual Risk
+
+Template installation still performs repeated node/edge scans, with worst-case
+O(nodes × edges) work. This remains outside the audio callback and is a known
+installation-time cost; do not refactor it as part of this wave.
+
 ## Test Cases (`src/dsp/tests/dsp/voice_layout.rs`)
 
 Imitate `src/dsp/tests/dsp/voice_stereo.rs` and `stereo_contract.rs` for
@@ -251,11 +257,12 @@ allocation-probed `Rig::step`.
 
 ## Completion Criteria
 
-- [ ] Dense slice assignment, validated capacity, and `TooManyBuffers` exist, with no callback shape inference or allocation.
-- [ ] Pair and stereo dispatch are used only when output 1 is consumed; stereo `Mul`/`Add` and stereo voice effects do not downmix.
-- [ ] Stereo and main/aux voices use `balance_gains`, and mono voices keep `pan_gains`.
-- [ ] Golden passes unchanged, and every voice_layout test passes on the native `Rig`.
-- [ ] Checks 1-7 pass, with logs recorded.
+- [x] Dense slice assignment, validated capacity, and `TooManyBuffers` exist, with no callback shape inference or allocation.
+- [x] Pair and stereo dispatch are used only when output 1 is consumed; stereo `Mul`/`Add` and stereo voice effects do not downmix.
+- [x] Stereo and main/aux voices use `balance_gains`, and mono voices keep `pan_gains`.
+- [x] Golden passes unchanged, and every voice_layout test passes on the native `Rig`.
+- [x] Local checks 1-4 and 6-7 pass, including focused stereo/layout and golden tests, formatting, and the under-1,000-line gate.
+- [ ] Full nextest check 5 passes; the coordinator runs it outside the sandbox.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -274,4 +281,36 @@ allocation-probed `Rig::step`.
 
 ## Progress Log
 
-(empty)
+### Session: 2026-09-29 (Riela Step 6, MOD004-22)
+
+**Tasks Completed**: Dense slice compilation, fixed arena capacity, pair/stereo runtime dispatch, channel-preserving effects and arithmetic, balance pan, and all nine native `voice_layout` tests.
+
+**Pre-edit Evidence**: `tmp/mod004/MOD004-22/pre-edit.json` records the checkpoint and SHA-256 hashes; `tmp/mod004/MOD004-22/edit-intents.jsonl` records each intended source hunk.
+
+**Post-edit Evidence**: `tmp/mod004/MOD004-22/post-edit-sha256.txt` contains hashes for all seven owned Rust files. The owned-source diff fingerprint is `2f89bbde0d67862592190bc656a9c7f922a284c4e3251cbb0685f6c11434b419`.
+
+**Source Changes**: `src/dsp/ugen/mod.rs`, `src/dsp/ugen/template.rs`, `src/dsp/voice.rs`, `src/dsp/engine.rs`, `src/dsp/engine/render.rs`, `src/dsp/effects/prim.rs`, and `src/dsp/tests/dsp/voice_layout.rs`.
+
+**Verified**:
+- `CARGO_TERM_QUIET=true cargo check -q --all-targets` exit 0; log `tmp/mod004/MOD004-22/check-all-targets-final.log`.
+- `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings` exit 0; log `tmp/mod004/MOD004-22/clippy-final.log`.
+- `CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib` exit 0; log `tmp/mod004/MOD004-22/check-wasm-lib-final.log`.
+- `voice_layout` focused run: 9 passed, 0 failed; checker log `tmp/mod004/MOD004-22/nextest-voice-layout.log`.
+- Earlier focused selected-set run reached 22 passed and 2 failed because endpoint-pan expectations had not yet been updated to the owner decision.
+- Check 6 passed: all seven touched Rust files are below 1000 lines; log `tmp/mod004/MOD004-22/line-count-final.log`. Check 7 passed for those exact files; log `tmp/mod004/MOD004-22/rustfmt-check-final.log`.
+### Review fixes: 2026-09-29
+
+- Stereo sink aggregation now reads right-channel slices only from declared stereo output 0; mono taps such as `out3` remain independent stems and cannot alias a foreign channel slice.
+- Added a regression for a stereo sampler/gain voice combined with an `out3` tap on a four-channel host. It checks bit-identical L/R output with and without the tap and preserves the tap stem.
+- Pair dispatch now uses the shape declaration table; an unexpected node in elementwise stereo dispatch is unreachable rather than silently producing zero. Added stereo balance endpoint assertions and corrected the old pan-1 tests to assert left silence.
+- Final checks passed: `cargo fmt --check`; `cargo check -q --all-targets`; `cargo clippy -q --all-targets -- -D warnings`; wasm32 lib and LSP feature checks; focused nextest covering `voice_stereo`, `voice_layout`, and `golden` (42 passed, 1,531 skipped across the combined requested filter); all touched Rust files are below 1,000 lines. Cargo checks used `CARGO_TERM_QUIET=true`.
+- The full nextest suite was not run in this sandbox because tests bind to `127.0.0.1`; the coordinator runs that gate outside the sandbox.
+
+### Final review fixes: 2026-09-29
+
+- Rebuilt the stereo voice + `out3` regression with node order `SinOsc`, `Out3`, `SamplePlay`, `Gain`, so the stale/phantom right slice aliases real gain output. It checks exact stereo samples (`0.2`, `0.7`) and compares the `out3` stem to a reference render.
+- Revert-sensitivity proof: with the `output(0)` stereo sink filter temporarily removed, `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(stereo_voice_ignores_mono_out3_sink_when_mixing_right_channel)' --lib` failed as intended at `src/dsp/tests/dsp/voice_layout.rs:174:5` (`with_tap[1]` was not all `0.7`; 0 passed, 1 failed). After restoring the filter, the identical command passed (1 passed, 0 failed).
+- Unexpected pair and elementwise dispatch cases now assert in debug builds and use ordinary `ugen::run` fallback in release, clearing secondary output buffers without allocation.
+- Strict Clippy initially flagged the expanded `run_elementwise` signature; named `ElementwiseContext` and `ElementwiseOutputs` structs now group the arguments without adding callback allocation or work.
+- Final gates after that adjustment all passed with `CARGO_TERM_QUIET=true`: `cargo fmt --check`, `cargo check -q --all-targets`, `cargo clippy -q --all-targets -- -D warnings`, `cargo check -q --target wasm32-unknown-unknown --lib`, and `cargo check -q --features lsp`.
+- Expanded focused nextest passed: 42 passed, 1,531 skipped across `voice_layout`, `voice_stereo`, `select_output`, `ugens`, `codec_shapes`, `golden`, and `templates::vact_instrument_routes`. The full nextest suite remains coordinator-owned.

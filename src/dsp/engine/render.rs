@@ -1,7 +1,7 @@
 use super::{guard, Engine};
 use crate::dsp::bus::{BusSlot, OrbitDelay};
 use crate::dsp::cells::CellRead;
-use crate::dsp::effects::prim::pan_gains;
+use crate::dsp::effects::prim::{balance_gains, pan_gains};
 use crate::dsp::effects::FxCtx;
 use crate::dsp::fft::FFT_SIZE;
 use crate::dsp::ugen::Template;
@@ -152,10 +152,14 @@ fn mix_voice(
     (bus, orbit): (&mut BusSlot, &mut OrbitDelay),
     (mix_3, mix_4): (&mut [f32], &mut [f32]),
 ) {
-    let (gl, gr) = pan_gains(v.pan);
+    let (gl, gr) = if t.has_aux || t.stereo {
+        balance_gains(v.pan)
+    } else {
+        pan_gains(v.pan)
+    };
     for (k, y) in rc.out[..n - off].iter().enumerate() {
-        let (left, right) = if t.has_aux {
-            (*y, rc.out_r[k])
+        let (left, right) = if t.has_aux || t.stereo {
+            (*y * gl, rc.out_r[k] * gr)
         } else {
             (*y * gl, *y * gr)
         };

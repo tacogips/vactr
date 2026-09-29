@@ -624,6 +624,25 @@ impl Checker<'_> {
             }
             Ty::List(e) => Ty::Opt(e),
             Ty::Dict(_, v) => Ty::Opt(v),
+            Ty::UGen => {
+                let a = split_args(args, true);
+                let valid = if a.named.is_empty() && !a.splat && a.positional.len() == 1 {
+                    let selector = self.ty_of(a.positional[0]);
+                    matches!(self.u.shallow(&selector), Ty::KeywordOf(_))
+                        || matches!(self.u.shallow(&selector), Ty::Var(_) | Ty::Any)
+                        || self.int_like(&selector)
+                } else {
+                    false
+                };
+                if !valid {
+                    self.emit(
+                        DiagCode::TypeMismatch,
+                        n.span,
+                        "a ugen is called with one output name or index",
+                    );
+                }
+                Ty::UGen
+            }
             Ty::Named(id) => self.field_access(id, args),
             Ty::Nil => Ty::Nil,
             Ty::Any | Ty::Opt(_) => Ty::Any,

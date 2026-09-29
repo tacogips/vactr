@@ -357,6 +357,14 @@ pub fn pan_gains(pan: f32) -> (f32, f32) {
     (p.cos(), p.sin())
 }
 
+/// Unity-center balance gains for stereo and main/aux voices in 0..1.
+#[inline]
+#[must_use]
+pub fn balance_gains(pan: f32) -> (f32, f32) {
+    let pan = clampf(pan, 0.0, 1.0);
+    ((2.0 * (1.0 - pan)).min(1.0), (2.0 * pan).min(1.0))
+}
+
 /// A seeded xorshift32 stream.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Rng {

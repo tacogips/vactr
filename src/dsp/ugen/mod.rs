@@ -88,7 +88,8 @@ use crate::dsp::controls;
 use crate::dsp::effects::prim::{Biquad, DelayLine};
 use crate::dsp::effects::{self, FxStats, MAX_FX_PARAMS};
 use crate::dsp::graph::{
-    BankRef, EffectKind, GranSrc, InstDef, InstId, TableRef, UGenSpec, NODE_CAP,
+    BankRef, EffectKind, GranSrc, InstDef, InstId, NodeAudioShape, TableRef, UGenSpec, DISCARD,
+    MAX_OUTPUTS_PER_NODE, NODE_CAP,
 };
 use crate::host::wire::Ctl;
 use crate::sched::slots::CtlId;
@@ -291,8 +292,11 @@ impl Node {
 pub enum Src {
     /// Nothing feeds the port: its constant default.
     Default(f32),
-    /// The output buffer of an earlier node (topological index).
-    Node(u16),
+    /// A selected output slice of an earlier node.
+    Node {
+        slice: u16,
+        stereo: bool,
+    },
     Const(f32),
     /// The voice's value of template control `k` (`Template::params`).
     Param(u8),
@@ -305,6 +309,10 @@ pub enum Src {
 pub struct NodeSpec {
     pub node: Node,
     pub inputs: [Src; MAX_PORTS],
+    /// First channel slice for each output, or the shared discard slice.
+    pub outs: [u16; MAX_OUTPUTS_PER_NODE],
+    /// Declared output shapes, resolved at template build time.
+    pub shape: NodeAudioShape,
     /// Delay memory inside the voice region.
     pub mem_off: u32,
     pub mem_len: u32,
@@ -314,6 +322,8 @@ impl NodeSpec {
     const EMPTY: NodeSpec = NodeSpec {
         node: Node::Const(0.0),
         inputs: [Src::Default(0.0); MAX_PORTS],
+        outs: [DISCARD; MAX_OUTPUTS_PER_NODE],
+        shape: NodeAudioShape::MONO,
         mem_off: 0,
         mem_len: 0,
     };

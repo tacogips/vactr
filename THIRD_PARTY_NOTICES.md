@@ -1015,8 +1015,10 @@ fixed-point edges, exact block timing or numerical flag duration; outputs
 Tides2 is not implemented by this template.
 
 `tidal-poly-voice` separately adapts the 2017 Emilie Gillet MIT DSP architecture
-in `tides2/{ramp_generator,ramp_shaper,poly_slope_generator}.h` at the same
-pinned Eurorack revision. It runs original analytic AD/loop/AR ramps, four
+in `tides2/{poly_slope_generator.cc,poly_slope_generator.h,ramp_generator.h,ramp_shaper.h}`
+and the timing/block contract from `tides2/tides.cc` at the same pinned
+Eurorack revision. Its use of `stmlib/utils/gate_flags.h` follows the same
+MIT notice. It runs original analytic AD/loop/AR ramps, four
 output-mode roles (gates, amplitude, phase, frequency) and two rate ranges.
 It does not import the source ratio arrays, generated shape/fold tables,
 polyBLEP code or aggregate resources. Its frequency-mode ratios are original
@@ -1026,6 +1028,16 @@ lanes are each codeable with `poly-main-channel` and `poly-aux-channel`.
 The separate `examples/quad-stems.vact` opt-in template emits four lanes on
 a four-output host; channels 3/4 are direct stems that bypass stereo bus and
 master FX. Source output voltages, waveshaping and timing are not reproduced.
+
+The local TID-006 probe in `verification/compare_tides_poly.py` compiles
+the pinned Tides1 and Tides2 generators and their aggregate resources only
+into temporary comparison executables, and compares all 24 Tides2
+mode/output/range combinations at four separate lanes, including two extra
+looping settings. It also compares the default WAVETABLE_HACK-disabled Tides1
+unipolar/bipolar function outputs where their roles correspond to
+`tidal_function`. Both comparisons report waveform and timing metrics;
+measured gaps are not evidence of source parity. The probe imports no upstream
+code, resources or audio into Vactr.
 
 ## Elements internal instrument architectural reference
 

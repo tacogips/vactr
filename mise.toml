@@ -100,6 +100,11 @@ description = "Compare raw FM kernels against a separate pinned Mutable Instrume
 run = 'python3 verification/compare_plaits_fm.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
+[tasks.compare-tides-poly]
+description = "Compare Tides1 function and Tides2 four-lane kernels against a separate pinned Mutable Instruments checkout"
+run = 'python3 verification/compare_tides_poly.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
+env = { CARGO_TERM_QUIET = "true" }
+
 [tasks.compare-plaits-drums]
 description = "Compare raw dual kick/snare/hi-hat kernels against a separate pinned Mutable Instruments checkout"
 run = 'python3 verification/compare_plaits_drums.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'

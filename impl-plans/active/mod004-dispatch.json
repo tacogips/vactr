@@ -5,6 +5,7 @@
   "baseBranch": "main",
   "remote": "origin",
   "originalHead": "cf2ea3712a79dacaf8e78ff201141c8048b297ab",
+  "priorPlanCheckpoint": "4c0bff873762b744465033599ecd081694e9bb5a (docs-only: design-docs, impl-plans; src/ and verification/ are unchanged from originalHead, so the MOD004-00 precondition still holds)",
   "designDocPaths": [
     "design-docs/specs/design-mutable-audio.md"
   ],
@@ -12,11 +13,25 @@
   "evidenceLayout": "tmp/mod004/<planId>/ holds each plan's logs, as the plans specify (for example tmp/mod004/MOD004-30/golden_digests.txt.orig). Retries go under tmp/mod004/<planId>/attempt-<n>/. tmp/ is gitignored (**/tmp) and must stay untracked.",
   "executionModel": {
     "waves": [
-      ["MOD004-00"],
-      ["MOD004-10", "MOD004-11", "MOD004-12"],
-      ["MOD004-20", "MOD004-21", "MOD004-22"],
-      ["MOD004-30"],
-      ["MOD004-40"]
+      [
+        "MOD004-00"
+      ],
+      [
+        "MOD004-10",
+        "MOD004-11",
+        "MOD004-12"
+      ],
+      [
+        "MOD004-20",
+        "MOD004-21",
+        "MOD004-22"
+      ],
+      [
+        "MOD004-30"
+      ],
+      [
+        "MOD004-40"
+      ]
     ],
     "sameBranchFanout": true,
     "worktrees": false,
@@ -139,10 +154,18 @@
         "impl-plans/active/mod004-00-baseline.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/tests/dsp.rs", "intendedEdit": "Module lines only here; MOD004-10 later adds output: 0 to its Edge literal (line ~408)."},
-        {"path": "src/host/tests/e2e/templates/golden_digests.txt", "intendedEdit": "Created and blessed here from pre-change code; only MOD004-30 may later replace the nine migrated graph lines."},
-        {"path": "src/dsp/tests/dsp/{shape_contract,kernel_pairs,codec_shapes,voice_layout,multi_output}.rs, src/host/tests/e2e/templates/{select_output,migrated_pairs}.rs", "intendedEdit": "Created as one-line //! stubs here; each is filled by its owning plan."},
-        {"path": "src/host/tests/e2e.rs, src/host/tests/e2e/regions.rs, src/host/tests/e2e/templates/coverage.rs", "intendedEdit": "Read-only."}
+        "src/dsp/tests/dsp.rs",
+        "src/host/tests/e2e/templates/golden_digests.txt",
+        "src/dsp/tests/dsp/shape_contract.rs",
+        "src/dsp/tests/dsp/kernel_pairs.rs",
+        "src/dsp/tests/dsp/codec_shapes.rs",
+        "src/dsp/tests/dsp/voice_layout.rs",
+        "src/dsp/tests/dsp/multi_output.rs",
+        "src/host/tests/e2e/templates/select_output.rs",
+        "src/host/tests/e2e/templates/migrated_pairs.rs",
+        "src/host/tests/e2e.rs",
+        "src/host/tests/e2e/regions.rs",
+        "src/host/tests/e2e/templates/coverage.rs"
       ],
       "preconditions": [
         "test -z \"$(git diff --stat cf2ea37 -- src verification)\""
@@ -160,12 +183,32 @@
         "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "rustfmt --edition 2021 --check src/host/tests/e2e/templates.rs src/dsp/tests/dsp.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/tests/dsp.rs",
+          "intendedEdit": "Module lines only here; MOD004-10 later adds output: 0 to its Edge literal (line ~408)."
+        },
+        {
+          "path": "src/host/tests/e2e/templates/golden_digests.txt",
+          "intendedEdit": "Created and blessed here from pre-change code; only MOD004-30 may later replace the nine migrated graph lines."
+        },
+        {
+          "path": "src/dsp/tests/dsp/{shape_contract,kernel_pairs,codec_shapes,voice_layout,multi_output}.rs, src/host/tests/e2e/templates/{select_output,migrated_pairs}.rs",
+          "intendedEdit": "Created as one-line //! stubs here; each is filled by its owning plan."
+        },
+        {
+          "path": "src/host/tests/e2e.rs, src/host/tests/e2e/regions.rs, src/host/tests/e2e/templates/coverage.rs",
+          "intendedEdit": "Read-only."
+        }
       ]
     },
     {
       "planId": "MOD004-10",
       "planPath": "impl-plans/active/mod004-10-shape-contract.md",
-      "dependsOn": ["MOD004-00"],
+      "dependsOn": [
+        "MOD004-00"
+      ],
       "writePaths": [
         "src/dsp/graph.rs",
         "src/dsp/graph/shape.rs",
@@ -224,13 +267,16 @@
         "impl-plans/active/mod004-10-shape-contract.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/build.rs", "intendedEdit": "Only output: 0 in Edge literals plus UGenKind::Output placeholder arms returning LowerError::ty(\"output selection is not supported yet\"); MOD004-20 (wave 2) replaces the placeholders."},
-        {"path": "src/dsp/arena.rs", "intendedEdit": "Only output: 0 in the decoder Edge literal (~line 585); MOD004-21 (wave 2) owns the codec change."},
-        {"path": "src/dsp/ugen/mod.rs", "intendedEdit": "Only the BuildError::TooManyBuffers variant and message; MOD004-22 (wave 2) edits Src and NodeSpec."},
-        {"path": "src/dsp/ugen/template.rs", "intendedEdit": "Only output: 0 in Edge literals (~line 34); MOD004-22 (wave 2) owns the slice build."},
-        {"path": "src/dsp/tests/dsp.rs", "intendedEdit": "Only output: 0 in the Edge literal; MOD004-00 already registered modules."},
-        {"path": "src/compile/tests/inst.rs, src/value/tests/mod.rs, src/ns/insts.rs", "intendedEdit": "Conditional compile fix only: add a UGenKind::Output arm if an exhaustive match fails. Log each touched file in the Progress Log as a writePath addition."},
-        {"path": "src/dsp/ugen/catalog.rs, src/dsp/build/names.rs", "intendedEdit": "Read-only."}
+        "src/dsp/build.rs",
+        "src/dsp/arena.rs",
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/ugen/template.rs",
+        "src/dsp/tests/dsp.rs",
+        "src/compile/tests/inst.rs",
+        "src/value/tests/mod.rs",
+        "src/ns/insts.rs",
+        "src/dsp/ugen/catalog.rs",
+        "src/dsp/build/names.rs"
       ],
       "excludedPaths": [
         "src/dsp/tests/dsp/kernel_pairs.rs",
@@ -253,20 +299,52 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "wc -l src/dsp/graph.rs src/dsp/graph/shape.rs src/dsp/build.rs src/dsp/ugen/mod.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
         "rustfmt --edition 2021 --check src/dsp/graph.rs src/dsp/graph/shape.rs src/dsp/build.rs src/dsp/tests/dsp/shape_contract.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/build.rs",
+          "intendedEdit": "Only output: 0 in Edge literals plus UGenKind::Output placeholder arms returning LowerError::ty(\"output selection is not supported yet\"); MOD004-20 (wave 2) replaces the placeholders."
+        },
+        {
+          "path": "src/dsp/arena.rs",
+          "intendedEdit": "Only output: 0 in the decoder Edge literal (~line 585); MOD004-21 (wave 2) owns the codec change."
+        },
+        {
+          "path": "src/dsp/ugen/mod.rs",
+          "intendedEdit": "Only the BuildError::TooManyBuffers variant and message; MOD004-22 (wave 2) edits Src and NodeSpec."
+        },
+        {
+          "path": "src/dsp/ugen/template.rs",
+          "intendedEdit": "Only output: 0 in Edge literals (~line 34); MOD004-22 (wave 2) owns the slice build."
+        },
+        {
+          "path": "src/dsp/tests/dsp.rs",
+          "intendedEdit": "Only output: 0 in the Edge literal; MOD004-00 already registered modules."
+        },
+        {
+          "path": "src/compile/tests/inst.rs, src/value/tests/mod.rs, src/ns/insts.rs",
+          "intendedEdit": "Conditional compile fix only: add a UGenKind::Output arm if an exhaustive match fails. Log each touched file in the Progress Log as a writePath addition."
+        },
+        {
+          "path": "src/dsp/ugen/catalog.rs, src/dsp/build/names.rs",
+          "intendedEdit": "Read-only."
+        }
       ]
     },
     {
       "planId": "MOD004-11",
       "planPath": "impl-plans/active/mod004-11-engine-split.md",
-      "dependsOn": ["MOD004-00"],
+      "dependsOn": [
+        "MOD004-00"
+      ],
       "writePaths": [
         "src/dsp/engine.rs",
         "src/dsp/engine/render.rs",
         "impl-plans/active/mod004-11-engine-split.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/engine.rs", "intendedEdit": "Pure move of fn render into engine/render.rs; MOD004-22 (wave 2) later edits only the bufs allocation line."},
-        {"path": "src/dsp/engine/render.rs", "intendedEdit": "Created here with an extracted mix_voice free function; MOD004-22 (wave 2) edits only mix_voice for balance pan."}
+        "src/dsp/engine.rs",
+        "src/dsp/engine/render.rs"
       ],
       "acceptanceCriteria": [
         "render lives in src/dsp/engine/render.rs, with the mix_voice helper extracted.",
@@ -281,12 +359,24 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "wc -l src/dsp/engine.rs src/dsp/engine/render.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
         "rustfmt --edition 2021 --check src/dsp/engine.rs src/dsp/engine/render.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/engine.rs",
+          "intendedEdit": "Pure move of fn render into engine/render.rs; MOD004-22 (wave 2) later edits only the bufs allocation line."
+        },
+        {
+          "path": "src/dsp/engine/render.rs",
+          "intendedEdit": "Created here with an extracted mix_voice free function; MOD004-22 (wave 2) edits only mix_voice for balance pan."
+        }
       ]
     },
     {
       "planId": "MOD004-12",
       "planPath": "impl-plans/active/mod004-12-kernel-pairs.md",
-      "dependsOn": ["MOD004-00"],
+      "dependsOn": [
+        "MOD004-00"
+      ],
       "writePaths": [
         "src/dsp/ugen/va_filter.rs",
         "src/dsp/ugen/fm_pair.rs",
@@ -302,8 +392,8 @@
         "impl-plans/active/mod004-12-kernel-pairs.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/tests/dsp/kernel_pairs.rs", "intendedEdit": "Stub created by MOD004-00; filled only here."},
-        {"path": "src/dsp/tests/dsp/{va_filter,fm_pair,...}.rs", "intendedEdit": "Not edited here; MOD004-10 edits them concurrently."}
+        "src/dsp/tests/dsp/kernel_pairs.rs",
+        "src/dsp/tests/dsp"
       ],
       "acceptanceCriteria": [
         "Ten pair entry points exist with the pinned signatures.",
@@ -319,12 +409,24 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "wc -l src/dsp/ugen/va_filter.rs src/dsp/ugen/fm_pair.rs src/dsp/ugen/analog_pair.rs src/dsp/ugen/chord_pair.rs src/dsp/ugen/table_terrain_pair.rs src/dsp/ugen/terrain_pair.rs src/dsp/ugen/string_machine_pair.rs src/dsp/ugen/shape_pair.rs src/dsp/ugen/stage_chain.rs src/dsp/ugen/sample.rs src/dsp/tests/dsp/kernel_pairs.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
         "rustfmt --edition 2021 --check src/dsp/ugen/va_filter.rs src/dsp/ugen/fm_pair.rs src/dsp/ugen/analog_pair.rs src/dsp/ugen/chord_pair.rs src/dsp/ugen/table_terrain_pair.rs src/dsp/ugen/terrain_pair.rs src/dsp/ugen/string_machine_pair.rs src/dsp/ugen/shape_pair.rs src/dsp/ugen/stage_chain.rs src/dsp/ugen/sample.rs src/dsp/tests/dsp/kernel_pairs.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/tests/dsp/kernel_pairs.rs",
+          "intendedEdit": "Stub created by MOD004-00; filled only here."
+        },
+        {
+          "path": "src/dsp/tests/dsp/{va_filter,fm_pair,...}.rs",
+          "intendedEdit": "Not edited here; MOD004-10 edits them concurrently."
+        }
       ]
     },
     {
       "planId": "MOD004-20",
       "planPath": "impl-plans/active/mod004-20-select-lowering.md",
-      "dependsOn": ["MOD004-10"],
+      "dependsOn": [
+        "MOD004-10"
+      ],
       "writePaths": [
         "src/vm/call.rs",
         "src/types/infer_call.rs",
@@ -335,9 +437,12 @@
         "impl-plans/active/mod004-20-select-lowering.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/build.rs", "intendedEdit": "Replaces the MOD004-10 placeholder arms with wrapper lowering, Src::Node(u16, u8), root Add handling and post-lowering shape/layout/capacity checks."},
-        {"path": "src/types/tests/inst/overloads.rs", "intendedEdit": "Conditional: only if an existing not-callable assertion concerned calling a ugen value with one keyword/int argument; log as a writePath addition with the reason."},
-        {"path": "src/dsp/graph/shape.rs, src/vm/fail.rs, src/value/access.rs, src/ns/insts.rs", "intendedEdit": "Read-only."}
+        "src/dsp/build.rs",
+        "src/types/tests/inst/overloads.rs",
+        "src/dsp/graph/shape.rs",
+        "src/vm/fail.rs",
+        "src/value/access.rs",
+        "src/ns/insts.rs"
       ],
       "acceptanceCriteria": [
         "(p :aux) and (p 1) lower to one node with an output = 1 edge, and unselected uses mean output 0.",
@@ -355,12 +460,28 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "wc -l src/vm/call.rs src/types/infer_call.rs src/dsp/build.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
         "rustfmt --edition 2021 --check src/vm/call.rs src/types/infer_call.rs src/dsp/build.rs src/host/tests/e2e/templates/select_output.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/build.rs",
+          "intendedEdit": "Replaces the MOD004-10 placeholder arms with wrapper lowering, Src::Node(u16, u8), root Add handling and post-lowering shape/layout/capacity checks."
+        },
+        {
+          "path": "src/types/tests/inst/overloads.rs",
+          "intendedEdit": "Conditional: only if an existing not-callable assertion concerned calling a ugen value with one keyword/int argument; log as a writePath addition with the reason."
+        },
+        {
+          "path": "src/dsp/graph/shape.rs, src/vm/fail.rs, src/value/access.rs, src/ns/insts.rs",
+          "intendedEdit": "Read-only."
+        }
       ]
     },
     {
       "planId": "MOD004-21",
       "planPath": "impl-plans/active/mod004-21-codec.md",
-      "dependsOn": ["MOD004-10"],
+      "dependsOn": [
+        "MOD004-10"
+      ],
       "writePaths": [
         "src/dsp/arena.rs",
         "src/dsp/ugen/catalog/codec.rs",
@@ -368,9 +489,10 @@
         "impl-plans/active/mod004-21-codec.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/arena.rs", "intendedEdit": "Owns encode_inst/decode_graph change (tag b'V', shape byte per node, output byte per edge, allocation-free cross-check); encode_bus stays unchanged."},
-        {"path": "src/dsp/ugen/catalog/codec.rs", "intendedEdit": "Only if a helper is needed."},
-        {"path": "src/dsp/graph/shape.rs, src/dsp/ugen/template.rs", "intendedEdit": "Read-only."}
+        "src/dsp/arena.rs",
+        "src/dsp/ugen/catalog/codec.rs",
+        "src/dsp/graph/shape.rs",
+        "src/dsp/ugen/template.rs"
       ],
       "acceptanceCriteria": [
         "The encoder and decoder implement the pinned layout, and the old I tag is rejected with BadRecord.",
@@ -386,12 +508,30 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "wc -l src/dsp/arena.rs src/dsp/ugen/catalog/codec.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
         "rustfmt --edition 2021 --check src/dsp/arena.rs src/dsp/tests/dsp/codec_shapes.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/arena.rs",
+          "intendedEdit": "Owns encode_inst/decode_graph change (tag b'V', shape byte per node, output byte per edge, allocation-free cross-check); encode_bus stays unchanged."
+        },
+        {
+          "path": "src/dsp/ugen/catalog/codec.rs",
+          "intendedEdit": "Only if a helper is needed."
+        },
+        {
+          "path": "src/dsp/graph/shape.rs, src/dsp/ugen/template.rs",
+          "intendedEdit": "Read-only."
+        }
       ]
     },
     {
       "planId": "MOD004-22",
       "planPath": "impl-plans/active/mod004-22-voice-runtime.md",
-      "dependsOn": ["MOD004-10", "MOD004-11", "MOD004-12"],
+      "dependsOn": [
+        "MOD004-10",
+        "MOD004-11",
+        "MOD004-12"
+      ],
       "writePaths": [
         "src/dsp/ugen/mod.rs",
         "src/dsp/ugen/template.rs",
@@ -407,12 +547,12 @@
         "impl-plans/active/mod004-22-voice-runtime.md"
       ],
       "sharedPaths": [
-        {"path": "src/dsp/ugen/mod.rs", "intendedEdit": "Src and NodeSpec only (MOD004-10 already added BuildError::TooManyBuffers)."},
-        {"path": "src/dsp/engine.rs", "intendedEdit": "Only the bufs allocation size ((MAX_AUDIO_BUFFERS + DISCARD_SLICES) * max_block) and the RenderCtx::bufs doc comment."},
-        {"path": "src/dsp/engine/render.rs", "intendedEdit": "Only mix_voice: balance_gains when t.has_aux || t.stereo."},
-        {"path": "src/dsp/ugen/build_helpers.rs", "intendedEdit": "Only if topo_order visibility or mem_need needs touching."},
-        {"path": "existing test files broken only by the Src::Node shape change", "intendedEdit": "Mechanical updates only, each listed in the Progress Log (grep at checkpoint found Src::Node only in src/dsp/ugen/template.rs, src/dsp/voice.rs and build.rs's unrelated local enum)."},
-        {"path": "src/dsp/build.rs, src/dsp/arena.rs", "intendedEdit": "Not touched here (owned by MOD004-20 and MOD004-21 in the same wave)."}
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/engine.rs",
+        "src/dsp/engine/render.rs",
+        "src/dsp/ugen/build_helpers.rs",
+        "src/dsp/build.rs",
+        "src/dsp/arena.rs"
       ],
       "acceptanceCriteria": [
         "Dense slice assignment, validated capacity, and TooManyBuffers exist, with no callback shape inference or allocation.",
@@ -429,12 +569,42 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
         "for f in src/dsp/ugen/mod.rs src/dsp/ugen/template.rs src/dsp/ugen/template/slices.rs src/dsp/ugen/mixer.rs src/dsp/ugen/build_helpers.rs src/dsp/voice.rs src/dsp/voice/route.rs src/dsp/engine.rs src/dsp/engine/render.rs src/dsp/effects/prim.rs src/dsp/tests/dsp/voice_layout.rs; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'",
         "rustfmt --edition 2021 --check src/dsp/ugen/template.rs src/dsp/ugen/mixer.rs src/dsp/voice.rs src/dsp/engine.rs src/dsp/effects/prim.rs src/dsp/tests/dsp/voice_layout.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/dsp/ugen/mod.rs",
+          "intendedEdit": "Src and NodeSpec only (MOD004-10 already added BuildError::TooManyBuffers)."
+        },
+        {
+          "path": "src/dsp/engine.rs",
+          "intendedEdit": "Only the bufs allocation size ((MAX_AUDIO_BUFFERS + DISCARD_SLICES) * max_block) and the RenderCtx::bufs doc comment."
+        },
+        {
+          "path": "src/dsp/engine/render.rs",
+          "intendedEdit": "Only mix_voice: balance_gains when t.has_aux || t.stereo."
+        },
+        {
+          "path": "src/dsp/ugen/build_helpers.rs",
+          "intendedEdit": "Only if topo_order visibility or mem_need needs touching."
+        },
+        {
+          "path": "existing test files broken only by the Src::Node shape change",
+          "intendedEdit": "Mechanical updates only, each listed in the Progress Log (grep at checkpoint found Src::Node only in src/dsp/ugen/template.rs, src/dsp/voice.rs and build.rs's unrelated local enum)."
+        },
+        {
+          "path": "src/dsp/build.rs, src/dsp/arena.rs",
+          "intendedEdit": "Not touched here (owned by MOD004-20 and MOD004-21 in the same wave)."
+        }
       ]
     },
     {
       "planId": "MOD004-30",
       "planPath": "impl-plans/active/mod004-30-template-migration.md",
-      "dependsOn": ["MOD004-20", "MOD004-21", "MOD004-22"],
+      "dependsOn": [
+        "MOD004-20",
+        "MOD004-21",
+        "MOD004-22"
+      ],
       "writePaths": [
         "src/prelude/templates.vact",
         "src/host/tests/e2e/templates/golden_digests.txt",
@@ -451,9 +621,17 @@
         "impl-plans/active/mod004-30-template-migration.md"
       ],
       "sharedPaths": [
-        {"path": "src/prelude/templates.vact", "intendedEdit": "Only the nine template bodies (filter-voice, fm-pair-voice, analog-pair-voice, chord-layer-voice, wave-grid-voice, terrain-voice, string-machine-voice, shape-voice, stage-chain-voice) and their comment lines."},
-        {"path": "src/host/tests/e2e/templates/golden_digests.txt", "intendedEdit": "Only the nine migrated templates' graph lines; no render line may change (guarded by diff against tmp/mod004/MOD004-30/golden_digests.txt.orig)."},
-        {"path": "src/host/tests/e2e/templates/{voice_engines,analog_pair,shape_pair,chord_pair,terrain_pair,table_terrain_pair,string_machine_pair,stage_chain,coverage}.rs", "intendedEdit": "Conditional: only structural assertions that break because a migrated template now has one shared node; never weaken audio assertions; list each change in the Progress Log."}
+        "src/prelude/templates.vact",
+        "src/host/tests/e2e/templates/golden_digests.txt",
+        "src/host/tests/e2e/templates/voice_engines.rs",
+        "src/host/tests/e2e/templates/analog_pair.rs",
+        "src/host/tests/e2e/templates/shape_pair.rs",
+        "src/host/tests/e2e/templates/chord_pair.rs",
+        "src/host/tests/e2e/templates/terrain_pair.rs",
+        "src/host/tests/e2e/templates/table_terrain_pair.rs",
+        "src/host/tests/e2e/templates/string_machine_pair.rs",
+        "src/host/tests/e2e/templates/stage_chain.rs",
+        "src/host/tests/e2e/templates/coverage.rs"
       ],
       "preconditions": [
         "mkdir -p tmp/mod004/MOD004-30 && cp src/host/tests/e2e/templates/golden_digests.txt tmp/mod004/MOD004-30/golden_digests.txt.orig"
@@ -472,12 +650,31 @@
         "sh -c 'd=$(diff -U0 tmp/mod004/MOD004-30/golden_digests.txt.orig src/host/tests/e2e/templates/golden_digests.txt | grep -E \"^[+-]\" | grep -vE \"^(\\+\\+\\+|---) \"); test \"$(printf \"%s\\n\" \"$d\" | grep -cE \"^\\+graph \")\" -eq 9 && test \"$(printf \"%s\\n\" \"$d\" | grep -cE \"^-graph \")\" -eq 9 && ! printf \"%s\\n\" \"$d\" | grep -qvE \"^[+-]graph \"'",
         "git diff --stat -- src/prelude/templates.vact",
         "VACTR_MI_REFERENCE=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack mise run audit-upstream"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/prelude/templates.vact",
+          "intendedEdit": "Only the nine template bodies (filter-voice, fm-pair-voice, analog-pair-voice, chord-layer-voice, wave-grid-voice, terrain-voice, string-machine-voice, shape-voice, stage-chain-voice) and their comment lines."
+        },
+        {
+          "path": "src/host/tests/e2e/templates/golden_digests.txt",
+          "intendedEdit": "Only the nine migrated templates' graph lines; no render line may change (guarded by diff against tmp/mod004/MOD004-30/golden_digests.txt.orig)."
+        },
+        {
+          "path": "src/host/tests/e2e/templates/{voice_engines,analog_pair,shape_pair,chord_pair,terrain_pair,table_terrain_pair,string_machine_pair,stage_chain,coverage}.rs",
+          "intendedEdit": "Conditional: only structural assertions that break because a migrated template now has one shared node; never weaken audio assertions; list each change in the Progress Log."
+        }
       ]
     },
     {
       "planId": "MOD004-40",
       "planPath": "impl-plans/active/mod004-40-regression-closeout.md",
-      "dependsOn": ["MOD004-20", "MOD004-21", "MOD004-22", "MOD004-30"],
+      "dependsOn": [
+        "MOD004-20",
+        "MOD004-21",
+        "MOD004-22",
+        "MOD004-30"
+      ],
       "writePaths": [
         "src/dsp/tests/dsp/multi_output.rs",
         "impl-plans/active/modular-audio-foundation.md",
@@ -493,10 +690,18 @@
         "impl-plans/README.md"
       ],
       "sharedPaths": [
-        {"path": "impl-plans/active/mod004-*.md", "intendedEdit": "Status lines only (each plan's own Progress Log stays owned by that plan)."},
-        {"path": "impl-plans/active/modular-audio-foundation.md", "intendedEdit": "MOD-004 rows, MOD-004A..F criteria and a dated progress log session; MOD-005/006 untouched."},
-        {"path": "impl-plans/README.md", "intendedEdit": "The modular-audio-foundation row only."},
-        {"path": "any src/ file needing a serial cross-plan repair; crate-wide cargo fmt", "intendedEdit": "Serial reconciliation only; each repaired file listed and justified in the Progress Log; never weaken a test."}
+        "impl-plans/active/mod004-00-baseline.md",
+        "impl-plans/active/mod004-10-shape-contract.md",
+        "impl-plans/active/mod004-11-engine-split.md",
+        "impl-plans/active/mod004-12-kernel-pairs.md",
+        "impl-plans/active/mod004-20-select-lowering.md",
+        "impl-plans/active/mod004-21-codec.md",
+        "impl-plans/active/mod004-22-voice-runtime.md",
+        "impl-plans/active/mod004-30-template-migration.md",
+        "impl-plans/active/mod004-40-regression-closeout.md",
+        "impl-plans/active/modular-audio-foundation.md",
+        "impl-plans/README.md",
+        "src"
       ],
       "acceptanceCriteria": [
         "multi_output tests cover cross-path shapes, channel independence, pan/balance, orbit, allocation and rate/block.",
@@ -514,6 +719,24 @@
         "{ git diff --name-only cf2ea37 -- '*.rs'; git ls-files -o --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'",
         "git diff --check",
         "test -z \"$(git status --short | grep -vE '^.. (src/|design-docs/|impl-plans/|tmp/)')\""
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "impl-plans/active/mod004-*.md",
+          "intendedEdit": "Status lines only (each plan's own Progress Log stays owned by that plan)."
+        },
+        {
+          "path": "impl-plans/active/modular-audio-foundation.md",
+          "intendedEdit": "MOD-004 rows, MOD-004A..F criteria and a dated progress log session; MOD-005/006 untouched."
+        },
+        {
+          "path": "impl-plans/README.md",
+          "intendedEdit": "The modular-audio-foundation row only."
+        },
+        {
+          "path": "any src/ file needing a serial cross-plan repair; crate-wide cargo fmt",
+          "intendedEdit": "Serial reconciliation only; each repaired file listed and justified in the Progress Log; never weaken a test."
+        }
       ]
     }
   ]

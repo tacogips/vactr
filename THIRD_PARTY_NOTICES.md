@@ -532,6 +532,12 @@ per-voice seeded randomness replaces the global source stream; exact tangent
 replaces its filter approximation. Envelope and cutoff timing are converted
 to the host rate. This is a source-stage translation, not a bit-exact build.
 
+`verification/compare_plaits_drums.py` can locally compile the pinned
+`hi_hat_engine.{h,cc}` and `drums/hi_hat.h` from a separate checkout solely
+for numerical comparison against `hat_pair::render`. It imports no upstream
+code, table or sample into Vactr; see "Optional local source-comparison
+probe" above for the shared probe terms.
+
 ## Plaits position 22 dual snare-drum MIT translation
 
 `dual-snare-voice` and `src/dsp/ugen/snare_pair/` translate the analog-main
@@ -560,6 +566,13 @@ and exact tangent replaces the source fast filter approximation. Source
 48 kHz timing is converted to the host rate. This is a source-stage
 translation, not a bit-exact firmware build.
 
+`verification/compare_plaits_drums.py` can locally compile the pinned
+`snare_drum_engine.{h,cc}` and `drums/{analog_snare_drum,synthetic_snare_drum}.h`
+from a separate checkout solely for numerical comparison against
+`snare_pair::render`. It imports no upstream code, table or sample into
+Vactr; see "Optional local source-comparison probe" above for the shared
+probe terms.
+
 ## Plaits position 21 dual bass-drum MIT translation
 
 `dual-kick-voice` and `src/dsp/ugen/dual_kick/` translate the analog-main
@@ -584,6 +597,13 @@ stream and converts the source's 48 kHz timing/filter coefficients to host
 rates. The source's dirty-tangent SVF approximation and inter-block pitch
 interpolation and gated sustain-gain smoothing also differ numerically. Thus this is a source-stage translation,
 not a bit-exact firmware build.
+
+`verification/compare_plaits_drums.py` can locally compile the pinned
+`bass_drum_engine.{h,cc}` and `drums/{analog_bass_drum,synthetic_bass_drum}.h`
+from a separate checkout solely for numerical comparison against
+`dual_kick::render`. It imports no upstream code, table or sample into
+Vactr; see "Optional local source-comparison probe" above for the shared
+probe terms.
 
 ## Plaits position 0 architectural reference
 

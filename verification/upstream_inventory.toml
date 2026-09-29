@@ -1110,6 +1110,13 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "stmlib/utils/random.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
 path = "stmlib/utils/random.h"
 license = "MIT"
 kind = "code"

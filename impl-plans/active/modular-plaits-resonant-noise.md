@@ -64,8 +64,8 @@ harmonics, timbre and morph controls.
 |---|---|---|---|
 | SYN-004A | Audit and implement position 18 six-particle voice, with distinct impulse and filtered outputs | MOD-003–005 | Bounded adaptation complete; source diffuser/filter parity pending |
 | SYN-004B | Audit and implement position 19 string voice with both outputs | SYN-004A | Bounded adaptation complete; persistent rotation and DSP parity pending |
-| SYN-004C | Audit and implement position 20 modal voice with both outputs | SYN-004A | Source-stage translation complete; numerical parity pending |
-| SYN-004D | Compare implementations against pinned source behavior and update fidelity metadata | SYN-004A–C, MOD-006 | Not started |
+| SYN-004C | Audit and implement position 20 modal voice with both outputs | SYN-004A | Source-stage translation complete; measured main-path gap recorded, bit parity not claimed |
+| SYN-004D | Compare implementations against pinned source behavior and update fidelity metadata | SYN-004A–C, MOD-006 | Raw-kernel comparison recorded for positions 18–20; measured gaps remain and fidelity labels unchanged |
 
 ## Module Status
 
@@ -88,7 +88,7 @@ harmonics, timbre and morph controls.
 - [x] All three positions have cleared renderers and accurate coverage states (18 and 19 adaptations; 20 source-stage translation).
 - [x] All sound controls are exposed through `.vact` and editor metadata for these bounded implementations.
 - [x] Main and auxiliary outputs, triggers, memory limits and native/browser rendering are tested.
-- [x] Source and numerical differences and notices are recorded; comparison remains under SYN-004D.
+- [x] Source and numerical differences and notices are recorded under SYN-004D; measured gaps remain distinct from source parity.
 - [x] Quiet cargo check, strict Clippy, tests, rustfmt and diff checks pass for the bounded 18–20 implementations.
 
 ## Progress Log
@@ -116,7 +116,7 @@ The fixed 2048-sample main delay also clamps low-note tuning, especially at
 96 kHz (roughly below 47 Hz before correction); the rate matrix checks
 audibility and finiteness, not low-note pitch accuracy.
 The MIT SVF-shift expression is evaluated analytically, with no generated
-resource table. Exact source comparison remains open under SYN-004D.
+resource table. The raw-kernel comparison is recorded under SYN-004D; exact source parity remains open.
 
 ### Session: 2026-09-27, SYN-004C position 20 modal voice
 
@@ -134,7 +134,7 @@ port. The MIT stiffness generator is evaluated analytically without loading
 aggregate `resources.cc`; this differs from interpolation over its 65-entry
 table. Exact tangent, analytic cosine, per-voice RNG, host-rate coefficients
 and absent block harmonics smoothing are additional numerical differences.
-Upstream audio comparison remains open under SYN-004D.
+The raw-kernel comparison is recorded under SYN-004D; full voice and source parity remain open.
 
 ### Session: 2026-09-27, SYN-004A position 18 particle adaptation
 
@@ -157,3 +157,38 @@ The pinned MIT particle source and dependencies were inspected. The engine
 contains six impulse-driven resonant filters, a post-filter and an 8192-word
 granular diffuser. Position 18 has no identified generated audio asset, but
 its dependency audit and implementation remain open.
+
+### Session: 2026-09-29, SYN-004D positions 18–20 raw-kernel comparison
+
+The shared `compare-plaits-physical` task now runs positions 16–20 against
+the pinned source. For positions 18–20 it drives each source engine at note
+69, 48 kHz, 24-frame blocks, and one initial trigger; the three
+harmonics/timbre/morph points are 0.1/0.25/0.2, 0.5/0.5/0.5 and
+0.9/0.75/0.8 at accent 1.0, plus the center point at accent 0.3. The JSON
+reports per-output RMS, aligned early-window correlation and normalized
+error, spectral centroid, band-energy ratios, resonance peak estimates and
+-20/-40 dB decay times. Source-global and Vactr-per-voice random streams
+make sample correlation descriptive; distribution metrics carry more weight.
+
+Representative center-point RMS, correlation/error, centroid and decay:
+
+| Position / output | RMS ref/Vactr | Corr / normalized error | Centroid ref/Vactr (Hz) | -20 dB decay ref/Vactr (ms) | -40 dB decay ref/Vactr (ms) |
+|---|---:|---:|---:|---:|---:|
+| 18 main | 0.0680/0.0027 | —/1.000 | 282/— | 5/5 | 10/5 |
+| 18 aux | 0.0083/0.0027 | —/— | —/— | 5/5 | 5/5 |
+| 19 main | 0.0452/0.0408 | 0.148/1.221 | 631/1151 | 675/860 | —/— |
+| 19 aux | 0.0090/0.0098 | 0.364/1.187 | 1676/7078 | 5/5 | 5/5 |
+| 20 main | 0.1092/0.1023 | 0.075/1.272 | 3382/2885 | 470/715 | —/— |
+| 20 aux | 0.00018/0.00018 | 1.000/0.003 | 2918/2918 | 5/5 | 5/5 |
+
+Classification: positions 18 and 19 are **measured gaps**. Position 18's
+resonant output level is much lower in Vactr and its impulse/diffuser stages
+are explicitly approximate. Position 19 has differing decay and auxiliary
+spectra consistent with its adaptation's different excitation, string
+rotation and stretch behavior. Position 20 is a **measured gap overall**;
+its deterministic auxiliary excitation is close, while main resonator
+centroid and decay differ. No clear single translation error was isolated,
+so the particle/string adaptation labels and modal `SourceStage` label stay
+unchanged. The full metric table and the positions 16–17 results are in
+`modular-plaits-engines.md`, Session 2026-09-29. This raw-kernel comparison
+does not verify the surrounding voice, LPG or complete Plaits source parity.

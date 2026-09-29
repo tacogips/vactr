@@ -522,6 +522,14 @@ host sample rate and block length; pitch control uses the host rate rather
 than the source corrected 47,872.34 Hz constant. This is a source-stage
 translation, not a bit-exact firmware build.
 
+`verification/compare_plaits_physical.py` also compares raw positions 16–20
+against the pinned engines at 48 kHz in 24-frame blocks. Its C++ reference
+driver compiles upstream sources and `plaits/resources.cc` only in a temporary
+local directory; the Vactr example calls the five existing kernels directly,
+and no upstream object, table, audio or sample is imported into Vactr. The
+probe reports waveform and distribution metrics; random-stream differences
+make sample correlation descriptive for noise-driven output.
+
 ## Plaits position 23 dual hi-hat MIT translation
 
 `dual-hat-voice` and `src/dsp/ugen/hat_pair/` translate the square-noise

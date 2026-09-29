@@ -241,13 +241,13 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 | SYN-002C2 | Translate individually audited MIT FM quantizer/FIR and source control, feedback and downsampling stages; compare raw outputs | SYN-002C, MOD-006A | Completed and independently verified; full voice/LPG/source parity remains separate |
 | SYN-002D | Implement position 12 additive integer/organ main/aux voice | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity/LPG pending |
 | SYN-002D2 | Translate position 12 amplitude stages and verify main/aux response | SYN-002D | Source-stage adaptation complete; source numerical comparison and LPG remain separate tasks |
-| SYN-003A | Implement position 17 clocked-noise main/aux with event reset | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
-| SYN-003A2 | Translate position 17 BLEP clocks and three SVF signal paths | SYN-003A | Completed and independently verified; numerical comparison and voice/LPG parity remain separate |
+| SYN-003A | Implement position 17 clocked-noise main/aux with event reset | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; measured numerical gap recorded; voice/LPG parity pending |
+| SYN-003A2 | Translate position 17 BLEP clocks and three SVF signal paths | SYN-003A | Completed and independently verified; raw-kernel comparison recorded; voice/LPG parity remains separate |
 | SYN-003B | Implement position 21 dual bass-drum main/aux with accent and retrigger | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
 | SYN-003C | Replace position 21 approximations with source stages and scheduled retrigger test | SYN-003B | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`), one resonance-Q translation error fixed; bit-exact parity not claimed |
 | SYN-003D | Translate position 22 analog/synthetic snare stages and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`); bit-exact parity not claimed |
 | SYN-003E | Translate position 23 square/ring-mod hi-hat variants and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`); bit-exact parity not claimed |
-| SYN-003F | Translate position 16 eight-voice swarm with saw/sine outputs | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; bit-exact parity not claimed |
+| SYN-003F | Translate position 16 eight-voice swarm with saw/sine outputs | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation and raw-kernel comparison complete; distribution-level close, waveform correlation varies with random streams |
 
 ## Module Status
 
@@ -479,3 +479,49 @@ parity remain open. Main/aux and the 96-float paired install budget remain.
 **Implementation**: `filter-voice` exposes note/frequency, morph, timbre and the original harmonics role as `filter-harmonics` (avoiding the existing `harmonics` effect name). Two synchronized source/filter branches feed low-pass main and high-pass `aux-out`; fixed inline node state is preallocated with voices, and the existing graph codec carries both UGen kinds. Scalar rows and editor metadata include all sound controls.
 **Verification**: Native/browser graph install, codec, distinct finite audible outputs, allocation-free callbacks, end-to-end `.vact` parameter response and editor metadata tests pass. `CARGO_TERM_QUIET=true cargo check`, strict all-target Clippy, full `cargo test` (1016 library tests plus integration suites), rustfmt and diff checks pass; touched Rust files stay below 1000 lines.
 **Remaining**: Plaits' voice-level trigger/LPG behavior, anti-aliasing/filter response parity, and the other 23 Plaits positions are not covered by this adaptation. Generic arbitrary dual-output node edges remain a separate MOD-004 limitation.
+
+### Session: 2026-09-29, MOD-006 physical positions 16–20 comparison
+
+Added `mise run compare-plaits-physical`, an opt-in comparison against clean
+Eurorack `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4` and `stmlib`
+`e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`. The local C++ reference
+compiles Plaits engines and resources in a temporary directory; the Rust
+probe calls the five Vactr kernels directly. Each engine runs at 48 kHz in
+3,000 blocks of 24 frames, note 69, with one rising edge in the first block.
+Scenarios are harmonics/timbre/morph 0.1/0.25/0.2, 0.5/0.5/0.5 and
+0.9/0.75/0.8 at accent 1.0, plus 0.5/0.5/0.5 at accent 0.3. Swarm and
+noise ignore accent in both source and kernel; particle's source and kernel
+also have no accent-dependent path. Correlation and normalized error use an
+early 4,096-frame window with ±32-sample alignment; whole-run RMS and the
+report JSON also includes peak estimates, spectral centroid, fixed octave
+band energy ratios and -20/-40 dB envelope decay times. Stochastic source
+global RNG and Vactr per-voice RNG make waveform correlation descriptive.
+
+Representative center-control metrics (`h/t/m=0.5/0.5/0.5`, accent 1.0):
+RMS is whole-run; centroid and resonance peak are early-window Hz; the
+250–500 Hz field is that band's share of total spectral energy; decay is ms.
+
+| Engine/channel | RMS ref/Vactr | Corr / normalized error | Centroid ref/Vactr | 250–500 Hz share ref/Vactr | Resonance peak ref/Vactr | -20 dB decay ref/Vactr | -40 dB decay ref/Vactr |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| swarm main | 0.1091/0.1069 | 0.080/1.361 | 1142/1231 | 0.341/0.444 | 64/54 | —/— | —/— |
+| swarm aux | 0.1288/0.1263 | 0.067/1.377 | 481/448 | 0.569/0.775 | 86/185 | —/— | —/— |
+| noise main | 0.2789/0.2709 | 0.231/1.106 | 421/439 | 0.938/0.955 | 72/40 | —/— | —/— |
+| noise aux | 0.3705/0.3698 | 0.140/1.144 | 425/437 | 0.931/0.941 | 43/49 | —/285 | —/— |
+| particle main | 0.0680/0.0027 | —/1.000 | 282/— | 0.701/— | —/— | 5/5 | 10/5 |
+| particle aux | 0.0083/0.0027 | —/— | —/— | —/— | —/— | 5/5 | 5/5 |
+| string main | 0.0452/0.0408 | 0.148/1.221 | 631/1151 | 0.323/0.244 | 98/51 | 675/860 | —/— |
+| string aux | 0.0090/0.0098 | 0.364/1.187 | 1676/7078 | 0.079/0.024 | —/— | 5/5 | 5/5 |
+| modal main | 0.1092/0.1023 | 0.075/1.272 | 3382/2885 | 0.005/0.004 | 44/97 | 470/715 | —/— |
+| modal aux | 0.00018/0.00018 | 1.000/0.003 | 2918/2918 | 0.000/0.000 | —/— | 5/5 | 5/5 |
+
+Classifications: position 16 is **close at distribution level** (center
+control RMS differs by under 2%; correlations fall with randomized grains).
+Positions 17, 18 and 19 are **measured gaps**: 17 has spectral/control
+response differences despite close center RMS; 18 has substantially lower
+Vactr resonant level and a different impulse distribution; 19's main decay
+and auxiliary spectrum differ. Position 20 is a **measured gap overall**:
+the deterministic auxiliary excitation is close, while the randomized main
+resonator level, centroid and decay differ. No kernel change was justified
+as an unambiguous translation error; existing manifest fidelity labels stay
+unchanged. These comparisons do not cover Plaits voice/LPG behavior or prove
+full source parity.

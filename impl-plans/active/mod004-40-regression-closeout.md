@@ -1,12 +1,12 @@
 # MOD004-40: Cross-path Regression, Allocation, Rate/Block Invariance, Plan Closeout
 
 **Status**: Ready
-**Plan ID**: MOD004-40 (session-200, single plan, runs alone)
+**Plan ID**: MOD004-40 (session-202, single plan, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy; Voice buffers and channel mapping; Capacity, real-time, and invariance; Implementation status, including its "Rate/block contract" and "Orbit channel independence" bullets)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004F and plan closeout)
-**Baseline**: `0a15742` (MOD004-00/10/11/12 in `85a300a`, MOD004-20/21/22 in `b6fa077`, MOD004-30 in `0a15742`; all accepted dependencies)
+**Baseline**: `0a15742` for code (MOD004-00/10/11/12 in `85a300a`, MOD004-20/21/22 in `b6fa077`, MOD004-30 in `0a15742`; all accepted dependencies). Dispatch HEAD is `a3e4c4a`; `0a15742..a3e4c4a` changes only this plan, `mod004-dispatch.json` and `design-mutable-audio.md`.
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-30 (refined for session 200: baseline `0a15742`, prescribed test-module split, exact graph builders, rate/block protocol and fallback rule from the design, orbit exact-zero rule, closeout lines, evidence commands 1-12)
+**Last Updated**: 2026-09-30 (session 202: dispatch HEAD `a3e4c4a`; exact node indices for the `main_gain` branch; orbit control set pinned without `LEGATO`; parent header Status line added to closeout; stereo sample length stated per channel. Session 200: test-module split, graph builders, rate/block protocol and fallback, orbit exact-zero rule, closeout lines, commands 1-12)
 
 ## Intent and Context
 
@@ -69,7 +69,8 @@ legacy at every rate and block on both tiers, and cross-block equality.
 - `src/dsp/tests/dsp/multi_output/cross_path.rs` (new)
 - `src/dsp/tests/dsp/multi_output/invariance.rs` (new)
 - `impl-plans/active/modular-audio-foundation.md`: the lines named in
-  "Closeout Edits" only
+  "Closeout Edits" only (header line 3, line 72, lines 83-87, MOD-004A..F,
+  line 247, a new Progress Log session)
 - `impl-plans/active/mod004-20-select-lowering.md`,
   `impl-plans/active/mod004-21-codec.md`,
   `impl-plans/active/mod004-22-voice-runtime.md`,
@@ -121,7 +122,18 @@ browser and sample resource 41 on both tiers.
   sink. Do this in both the pair and the legacy form, so the node lists
   stay structurally parallel. `main_gain = 1.0` is the normal case, and
   `0.0` is the main/aux independence case. The `Add` single-input sink
-  stays as in the exemplar.
+  stays as in the exemplar. Append the two new nodes at the END of the
+  node list so the existing indices, and therefore every `node_params`
+  index, stay unchanged:
+  - pair: nodes `[VaSource, VaFilter, Add, AuxOut, Const(main_gain),
+    Mul]`; replace `edge(1,2,0,0)` with `edge(1,5,0,0)`, `edge(4,5,1,0)`,
+    `edge(5,2,0,0)`; keep `edge(0,1,0,0)` and `edge(1,3,0,1)`.
+  - legacy: nodes `[VaSource, VaFilter, VaFilter, Add, AuxOut,
+    Const(main_gain), Mul]`; replace `edge(1,3,0,0)` with `edge(1,6,0,0)`,
+    `edge(5,6,1,0)`, `edge(6,3,0,0)`; keep the other three edges.
+  Every `Const` must have an outgoing edge. A node without one becomes a
+  voice sink (`src/dsp/ugen/template.rs:405-411`) and adds to the main
+  output.
 - `fm_graph(pair: bool) -> InstDef`, graph (d). Both forms use a
   single-input `Add` main sink, like `va_filter_graph`, so the two stay
   structurally parallel. The pair form is `[FmPair, Add, AuxOut]` with
@@ -138,8 +150,10 @@ browser and sample resource 41 on both tiers.
   into the effect), `edge(1,3,0,0)` and `edge(2,3,1,0)`. Params are
   `[(CtlId::new(90), Ctl::Const(0.5))]`.
 - `stereo_frames(left_zero: bool, right_zero: bool) -> Vec<f32>`: 16 384
-  interleaved frames. L is `noise(16_384, 0.5, 3)`, R is `noise(16_384,
-  0.5, 7)`, and a side is all `0.0` when its flag is set. `noise` is in
+  frames per channel, returned as 32 768 interleaved samples `[L0, R0, L1,
+  R1, ...]`. L is `noise(16_384, 0.5, 3)`, R is `noise(16_384, 0.5, 7)`,
+  and a side is all `0.0` when its flag is set. Pass this interleaved
+  vector unchanged to `rig.sample(41, v, 2)`. `noise` is in
   `src/dsp/tests/dsp.rs:439`.
 
 ### Shared render helpers (in `multi_output.rs`)
@@ -217,10 +231,12 @@ inside a named test. Name tests after the claim, for example
   `|R_0.2[i] - L_0[i] * pan_gains(0.2).1| <= 1e-6`. Native equals browser
   by `bits`.
 - Orbit send, for (b pair) and (c) with `stereo_frames(false,false)`.
-  Controls: `ATTACK 0.0, DECAY 0.005, RELEASE 0.001, CtlId::new(38) 0.8,
-  CtlId::new(39) 0.1, CtlId::new(40) 0.3`, copied from
-  `effects.rs:85-106`. Also render a no-send twin with `CtlId::new(38)`
-  at 0.0. Send the event at `rig.engine.now()` after one `step()`, and run
+  Controls: exactly `(ctl::FREQ, 220.0)` plus `ATTACK 0.0, DECAY 0.005,
+  RELEASE 0.001, CtlId::new(38) 0.8, CtlId::new(39) 0.1, CtlId::new(40)
+  0.3`, copied from `effects.rs:85-106`. Do NOT add `ctl::LEGATO` or
+  `ctl::PAN`. `LEGATO` is the hold time in seconds (`src/dsp/voice.rs:334`),
+  so it would keep the dry voice sounding into the echo window. Also
+  render a no-send twin with `CtlId::new(38)` at 0.0. Send the event at `rig.engine.now()` after one `step()`, and run
   80 blocks as in the exemplar. Expected results:
   - native equals browser by `bits` for the send render;
   - all output is finite;
@@ -324,6 +340,8 @@ in every new entry. Line numbers below are those at `0a15742`. If an
 earlier edit shifts them, find the line by its quoted text.
 
 `impl-plans/active/modular-audio-foundation.md`:
+- Line 3, the header: `**Status**: In Progress (MOD-001, MOD-002 and
+  MOD-004 complete)`. Only if MOD-004A..F are all COMPLETED.
 - Line 72, the MOD-004 table row, Status cell: `Completed 2026-09-30
   (fanout plans impl-plans/active/mod004-*.md)`. Do not change the
   MOD-005 and MOD-006 rows.
@@ -441,9 +459,9 @@ without `exit=` is not a pass. Run `mkdir -p tmp/mod004/MOD004-40` first.
 - [ ] Commands 1-12 pass, and each has its exit status and log path
   recorded. Command 7 is either passed, or reported as BLOCKED.
 - [ ] Parent MOD-004A..F are COMPLETED, with checked criteria backed by
-  cited tests. Line 247 and the Progress Log session are updated, along
-  with the README row, the five Status lines and the design status
-  paragraph.
+  cited tests. The parent header line 3, line 247 and the Progress Log
+  session are updated, along with the README row, the five mod004 header
+  Status lines and the design status paragraph.
 - [ ] Every serial repair and finding is listed with file, cause and fix,
   or with its evidence.
 

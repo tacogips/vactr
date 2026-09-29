@@ -4,8 +4,8 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "0a15742b303aa8c3ab1f44a8fc46facf5aa50838",
-  "priorManifest": "Refines the session-194 manifest (originalHead b6fa077). MOD004-30 is removed from plans because it is committed in 0a15742; only MOD004-40 remains.",
+  "originalHead": "a3e4c4a06584e6c11c90e5532b59ab61ef18b9e5",
+  "priorManifest": "Refines the session-200 manifest (originalHead 0a15742). 0a15742..a3e4c4a changes docs only (design-mutable-audio.md, mod004-40-regression-closeout.md, this manifest). Plans still contain only MOD004-40; MOD004-30 is committed in 0a15742.",
   "acceptedDependencies": [
     {
       "planId": "MOD004-00",
@@ -77,7 +77,7 @@
   },
   "dependencyNote": "dependsOn lists only plans in this manifest, so MOD004-40 has none. MOD004-00/10/11/12 (85a300a), MOD004-20/21/22 (b6fa077) and MOD004-30 (0a15742) are accepted committed dependencies listed in acceptedDependsOn and acceptedDependencies; they are not dispatched.",
   "reviewContext": {
-    "issueReference": "local:impl-plans/active/modular-audio-foundation.md#MOD-004 (wave 5: MOD004-40 regression closeout; workflow opus-luna-design-and-implement-review-loop-session-200)",
+    "issueReference": "local:impl-plans/active/modular-audio-foundation.md#MOD-004 (wave 5: MOD004-40 regression closeout; workflow opus-luna-design-and-implement-review-loop-session-202)",
     "userProblem": "MOD-004 lacks native vs browser, orbit, pair-vs-legacy and rate/block regression coverage for multi-output and stereo graphs, and its plans (MOD-004A..F, fanout Status lines, README row, design status) are not closed out.",
     "constraints": [
       "Follow the committed MOD-004 design and the owner decisions resolved 2026-09-29; do not reopen them.",
@@ -207,7 +207,7 @@
         },
         {
           "path": "impl-plans/active/modular-audio-foundation.md",
-          "intendedEdit": "Only: line 72 MOD-004 row status cell; lines 83-87 fanout paragraph; MOD-004A..F Status lines, a Delivered by line each and evidence-backed criteria checks; line 247 parent criterion; a new Progress Log session 2026-09-30. MOD-005/006 untouched."
+          "intendedEdit": "Only: header line 3 (MOD-001, MOD-002 and MOD-004 complete, only if MOD-004A..F are all COMPLETED); line 72 MOD-004 row status cell; lines 83-87 fanout paragraph; MOD-004A..F Status lines, a Delivered by line each and evidence-backed criteria checks; line 247 parent criterion; a new Progress Log session 2026-09-30. MOD-005/006 untouched."
         },
         {
           "path": "impl-plans/active/mod004-20-select-lowering.md",

@@ -1178,6 +1178,12 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "stmlib/utils/gate_flags.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
 path = "stmlib/utils/random.cc"
 license = "MIT"
 kind = "code"
@@ -1287,7 +1293,7 @@ path = "tides/resources.cc"
 license = "MIT"
 kind = "aggregate-resource"
 use = "excluded"
-reason = "Generated aggregate tables; tide functions use analytic curves."
+reason = "Compiled only into a temporary local Tides1 comparison executable; Vactr's tide functions use analytic curves and import no generated tables."
 
 [[file]]
 path = "tides/resources/waves.bin"
@@ -1297,6 +1303,12 @@ use = "excluded"
 reason = "Unaudited wave binary; Tides1 waves are replaced by analytic curves."
 
 # --- tides2
+[[file]]
+path = "tides2/poly_slope_generator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
 [[file]]
 path = "tides2/poly_slope_generator.h"
 license = "MIT"
@@ -1311,6 +1323,26 @@ use = "source"
 
 [[file]]
 path = "tides2/ramp_shaper.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "tides2/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Compiled only into the temporary local Tides2 comparison executable; generated tables are never copied into Vactr."
+
+[[file]]
+path = "tides2/resources.h"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Declarations for generated Tides2 resource tables used only by the temporary local comparison executable."
+
+[[file]]
+path = "tides2/tides.cc"
 license = "MIT"
 kind = "code"
 use = "source"

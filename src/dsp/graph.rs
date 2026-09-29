@@ -11,6 +11,9 @@ use crate::pattern::signal::Sig;
 use crate::sched::slots::CtlId;
 use crate::value::intern::KwId;
 
+mod shape;
+pub use shape::*;
+
 id_newtype!(
     /// An instrument instance.
     InstId(u32)
@@ -206,6 +209,7 @@ pub struct Edge {
     pub from: u16,
     pub to: u16,
     pub port: u8,
+    pub output: u8,
 }
 
 /// An instrument template (design 12.1).
@@ -464,6 +468,9 @@ pub struct UGenNode {
 pub enum UGenKind {
     Ugen(UGenSpec),
     Effect(EffectKind),
+    /// Evaluator-only output selection wrapper; `args[0]` is
+    /// `(None, UGenInput::Node(source))`. It is never lowered to a node.
+    Output(u8),
     /// The implicit subject of a `bus` body: the bus input.
     BusInput,
 }

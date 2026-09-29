@@ -132,10 +132,10 @@ imitate `src/dsp/tests/dsp/va_filter.rs` and `src/dsp/tests/dsp/region.rs`
 
 ## Completion Criteria
 
-- [ ] Ten pair entry points exist with the pinned signatures.
-- [ ] Legacy functions are behavior-identical: golden passes and existing kernel tests pass.
-- [ ] kernel_pairs tests cover every bullet above for all nine kernels and `play_stereo`.
-- [ ] Checks 1-7 pass, with logs recorded.
+- [x] Ten pair entry points exist with the pinned signatures.
+- [x] Legacy functions are behavior-identical: golden passes and existing kernel tests pass.
+- [x] kernel_pairs tests cover every bullet above for all nine kernels and `play_stereo`.
+- [x] Checks 1-7 pass, with logs recorded.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -152,4 +152,14 @@ imitate `src/dsp/tests/dsp/va_filter.rs` and `src/dsp/tests/dsp/region.rs`
 
 ## Progress Log
 
-(empty)
+### Session: 2026-09-29 Step 6 implementation
+
+**Tasks Completed**: Pair entry points and kernel-level equivalence coverage.
+
+**Notes**:
+- Added `filter_pair`, `render_pair` for the eight paired render kernels, and `play_stereo`; the legacy entry points and pair paths share workers so state advances once.
+- `src/dsp/tests/dsp/kernel_pairs.rs` compares selected and complementary outputs bitwise against independent legacy calls for selector 0/1, two parameter sets, four consecutive blocks of both 64 and 97 frames, plus alternating `va_filter` selection and mono/stereo/missing-resource/empty-region sample playback.
+- Pre-edit hashes: `tmp/mod004/MOD004-12/pre-edit-hashes.txt`. Per-file intent and before snapshots: `tmp/mod004/MOD004-12/edit-intent-*.txt` and `before-*.rs`.
+- Final-source check 1: `check-1-final2.log` / `.exit` (0). Check 2: `check-2-final.log` / `.exit` (0); earlier `check-2.log` recorded a temporary concurrent `needless_range_loop` in MOD004-10-owned `src/dsp/tests/dsp/shape_contract.rs:469` (101), and `check-2-retry1` passed after that plan's edit. Check 3: `check-3-final.log` / `.exit` (0). Check 4: `check-4-final.log` / `.exit` (0; 8 passed). Check 5: `check-5-final.log` / `.exit` (0; 1549 passed, 2 skipped). Check 6: `check-6-final.log` / `.exit` (0). Check 7: `check-7-final.log` / `.exit` (0).
+- Rust source hashes after implementation: recorded in `tmp/mod004/MOD004-12/post-edit-hashes.txt`.
+- Formal test-integrity, adversarial and integration review remain downstream workflow steps.

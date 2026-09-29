@@ -23,16 +23,22 @@ fn split_voice() -> InstDef {
                 from: 1,
                 to: 2,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 0,
                 to: 3,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 2,
                 to: 3,
                 port: 1,
+
+                output: 0,
             },
         ]
         .into_boxed_slice(),

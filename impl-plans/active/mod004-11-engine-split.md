@@ -1,6 +1,6 @@
 # MOD004-11: Split the Engine Render Path Out of `engine.rs`
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: MOD004-11 (wave 1; parallel with MOD004-10 and MOD004-12)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Capacity: the engine.rs split)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004B/C prerequisite)
@@ -91,9 +91,9 @@ coding standards in `.agents/skills/rust-coding-standards/`.
 
 ## Completion Criteria
 
-- [ ] `render` lives in `src/dsp/engine/render.rs`, with the `mix_voice` helper extracted.
-- [ ] The golden test passes with no diff to the fixture.
-- [ ] Checks 1-7 pass, with logs recorded.
+- [x] `render` lives in `src/dsp/engine/render.rs`, with the `mix_voice` helper extracted.
+- [x] The golden test passes with no diff to the fixture.
+- [x] Checks 1-7 pass, with logs recorded.
 
 ## Execution Protocol (same-branch fanout)
 
@@ -110,4 +110,14 @@ coding standards in `.agents/skills/rust-coding-standards/`.
 
 ## Progress Log
 
-(empty)
+### Session: 2026-09-29
+
+**Tasks Completed**: MOD004-11 source extraction and required verification.
+
+- Moved `Engine::render` into `src/dsp/engine/render.rs` as `pub(super)` and extracted the per-voice mixing loop into private `mix_voice`. Preserved the `n - off` iteration bound, pan calculation, bus/orbit/main/aux/stem accumulation order, and ended-voice handling.
+- Removed render-only imports from `src/dsp/engine.rs`. No behavior or public API changes; the callback path continues to use borrowed preallocated slices.
+- Final source sizes: `src/dsp/engine.rs` 827 lines; `src/dsp/engine/render.rs` 169 lines. Final SHA-256 values are recorded in `tmp/mod004/MOD004-11/final-source-hashes.txt`.
+- Golden fixture stayed unchanged at the MOD004-00 accepted SHA-256 `c6fa58041b994f8eef9e4ff861d23a4937e02c88eba7376cea83718e7546ead0`; focused golden tests passed.
+- Final required checks all exited 0: `check-all-targets-final.exit`, `clippy-retry-1.exit`, `check-wasm-lib-final.exit`, `focused-nextest.exit` (11 passed, 0 failed), `full-nextest.exit` (1549 passed, 0 failed, 2 skipped), `line-counts-final.exit`, and `rustfmt-final-2.exit`. Complete logs are in `tmp/mod004/MOD004-11/`.
+- Earlier all-targets retries and the first clippy attempt failed while other MOD004 plans were editing shared files. Their diagnostics pointed to `src/dsp/graph/shape.rs`, `src/dsp/tests/dsp/shape_contract.rs`, and `src/dsp/tests/dsp/kernel_pairs.rs`, outside this plan's write paths. After the shared files stabilized, the final all-targets, clippy, focused and full-suite checks passed.
+- A read-only Rust split review found no concrete issues with loop bounds/order, child-module visibility, or callback allocation behavior. Formal adversarial and serial integration review remain downstream workflow steps.

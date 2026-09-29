@@ -35,6 +35,8 @@ impl RawGraph {
                 from: 0,
                 to: 0,
                 port: 0,
+
+                output: 0,
             }; MAX_EDGES],
             n_node_params: 0,
             node_params: [(0, CtlId::new(0), Ctl::Const(0.0)); MAX_NODE_PARAMS],

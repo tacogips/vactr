@@ -186,4 +186,69 @@ Put logs under `tmp/mod004/MOD004-00/`.
 
 ## Progress Log
 
-(empty)
+### Session: 2026-09-29 (MOD004-00 implementation)
+
+**Status**: Implementation complete; awaiting workflow review and finalization.
+
+**Precondition**: At HEAD `f09485e68d7011fa694fc9d9ecb0b96895bd0956`, before the
+first edit, `git diff --stat cf2ea37 -- src verification` returned empty output
+with exit 0 and `git status --short` was empty. Evidence: `tmp/mod004/MOD004-00/precondition.log`.
+Initial hashes of existing write paths are in `tmp/mod004/MOD004-00/pre-edit-hashes.txt`.
+The edit intent snapshot and per-edit intentions are in `edit-intent-001.txt`
+through `edit-intent-008.txt` in the same evidence directory.
+
+**Tasks completed**:
+- Added `golden.rs` to capture sorted FNV-1a render and graph digests for all
+  67 realized prelude templates, center render plus graph per template, pan02
+  for all 31 mono non-quad templates, and mono/stereo sampler resource renders.
+- Blessed the fixture once from the pre-feature tree. It contains 167 records:
+  67 graph, 67 center render, 31 pan02 render, and 2 sampler resource render.
+  `run_stereo_for(0.5)` captures 24,064 frames due to 256-frame callback
+  blocks. The render golden, determinism, and ignored bless tests pass.
+- Registered all seven one-line reserved test modules and the golden module.
+  No production Rust file or runtime behavior changed.
+- Negative check changed one digest character temporarily. The test failed
+  with the expected record key and both expected/recomputed fixture lines
+  (`render additive center`); the fixture was restored byte-for-byte. The
+  before/after fixture SHA-256 is
+  `f692dd2b9c52e02de56e4d5dc608013670ff6c156434a6bfc8d8d7e901a6801b`.
+
+**Verification** (complete logs and exit files are under `tmp/mod004/MOD004-00/`):
+- `VACTR_BLESS_GOLDEN=1 CARGO_TERM_QUIET=true cargo test -q --lib bless_golden_digests -- --ignored` -> exit 0, 1 passed (`bless-retry-2.log`, `bless-retry-2.exit`). The first two compile attempts exposed compiler incompatibilities; their logs and statuses are retained as `bless.log` and `bless-retry-1.log` / `.exit`, and the corrected final attempt passed.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run golden` -> exit 0, 4 passed, 1,536 skipped (`golden-nextest.log`, `golden-nextest.exit`).
+- Negative command `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run golden_renders_match_pre_mod004_baseline` -> expected nextest exit 100, 1 failed from the deliberate fixture mutation; the mismatch diagnostic was verified and the fixture restored (`negative-check.log`, `negative-check.exit`).
+- `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings` -> exit 0 (`clippy.log`, `clippy.exit`).
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` -> exit 0, 1,538 passed, 2 skipped (`full-nextest.log`, `full-nextest.exit`).
+- `rustfmt --edition 2021 --check src/host/tests/e2e/templates/golden.rs src/host/tests/e2e/templates.rs src/host/tests/e2e/templates/select_output.rs src/host/tests/e2e/templates/migrated_pairs.rs src/dsp/tests/dsp.rs src/dsp/tests/dsp/shape_contract.rs src/dsp/tests/dsp/kernel_pairs.rs src/dsp/tests/dsp/codec_shapes.rs src/dsp/tests/dsp/voice_layout.rs src/dsp/tests/dsp/multi_output.rs` -> exit 0 (`rustfmt.log`, `rustfmt.exit`).
+
+**Post-edit hashes** for every source/fixture write path are recorded in
+`tmp/mod004/MOD004-00/post-edit-hashes.txt`. All assigned implementation
+criteria have behavioral evidence above. Formal review, cross-plan closeout,
+and repository-level plan status updates remain downstream workflow work.
+
+### Session: 2026-09-29 (MOD004-00 test-integrity repair 1)
+
+**Finding (mid)**: `RampLoader::load` in `src/host/tests/e2e/templates/golden.rs`
+pushed right = -left for the 2-channel resource. The pre-MOD-004 kernel
+`src/dsp/ugen/sample.rs::play` averages channels to mono, so the mean was
+exactly 0.0 and `render sampler sampler-stereo-res` was the digest of silence
+(identical to a missing resource), so it could not detect stereo resources
+becoming silent or unloaded.
+
+**Change**: one line, `frames.push(-value);` became `frames.push(-0.5 * value);`
+(mono mean 0.25 * value, nonzero, L != R). Nothing else in golden.rs changed.
+
+**Re-bless**: the fixture was re-blessed on the unchanged pre-change production
+tree within this plan (only test files differ from `cf2ea37`; see
+`repair1-precondition.log`). Fixture diff (`repair1-fixture.diff`): only line
+147 changed.
+- old: `render sampler sampler-stereo-res 20c00ffeeec4e325 24064`
+- new: `render sampler sampler-stereo-res 51414a41ecf2ce65 24064`
+The new digest differs from the old one and from sampler-mono-res
+(`e35ec34235992a65`).
+
+**Verification** (logs and exit files under `tmp/mod004/MOD004-00/`):
+- bless -> exit 0 (`bless-repair1.log`, `bless-repair1.exit`)
+- `cargo nextest run golden` -> exit 0, 4 passed (`golden-nextest-repair1.log`, `.exit`)
+- `rustfmt --edition 2021 --check golden.rs` -> exit 0 (`rustfmt-repair1.log`, `.exit`)
+- `cargo clippy -q --all-targets -- -D warnings` -> exit 0 (`clippy-repair1.log`, `.exit`)

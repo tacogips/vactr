@@ -389,6 +389,7 @@ pub enum BuildError {
     TooManyEdges,
     TooManyParams,
     TooManyEffects,
+    TooManyBuffers,
     BadEdge,
     Cycle,
     Empty,
@@ -407,6 +408,9 @@ impl BuildError {
             BuildError::TooManyEdges => "too many connections",
             BuildError::TooManyParams => "too many controls or parameters",
             BuildError::TooManyEffects => "more than 4 effects in one instrument",
+            BuildError::TooManyBuffers => {
+                "the instrument needs more than 512 audio channel buffers"
+            }
             BuildError::BadEdge => "a connection names a missing node or port",
             BuildError::Cycle => "the graph has a cycle",
             BuildError::Empty => "the graph has no nodes",

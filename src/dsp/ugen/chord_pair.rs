@@ -128,8 +128,34 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, mem, out, None, kx);
+}
+
+/// Renders both full-chord and inversion-selected outputs from shared phases.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    let _ = st;
+    render_worker(ins, mem, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -141,7 +167,7 @@ pub fn render(
     let (ratios, amplitudes, mask) = inversion(chord, timbre);
     let registration = (1.0 - morph * 2.15).max(0.0);
     let waveform = ((morph - 0.535) * 2.15).max(0.0);
-    for sample in out.iter_mut() {
+    for (i, sample) in out.iter_mut().enumerate() {
         let mut full = 0.0;
         let mut selected = 0.0;
         for voice in 0..5 {
@@ -159,7 +185,11 @@ pub fn render(
                 selected += tone;
             }
         }
-        *sample = if auxiliary { 3.0 * selected } else { full };
+        let aux_value = 3.0 * selected;
+        *sample = if auxiliary { aux_value } else { full };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if auxiliary { full } else { aux_value };
+        }
     }
 }
 

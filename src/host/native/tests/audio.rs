@@ -68,16 +68,22 @@ fn quad_dc(id: u32) -> InstDef {
                 from: 1,
                 to: 4,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 2,
                 to: 5,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 3,
                 to: 6,
                 port: 0,
+
+                output: 0,
             },
         ]),
         node_params: Box::new([]),

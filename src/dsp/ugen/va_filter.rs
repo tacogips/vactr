@@ -51,6 +51,27 @@ pub fn source(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], k
 /// Two nodes consume the same oscillator and controls, maintaining separate
 /// fixed-size state but producing simultaneous independent graph outputs.
 pub fn filter(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &Kx<'_>) {
+    filter_worker(ins, st, out, None, kx);
+}
+
+/// Renders both filter paths from one state advance per sample.
+pub fn filter_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    filter_worker(ins, st, main, Some(aux), kx);
+}
+
+fn filter_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     let sr = kx.sr.max(1.0);
     let (mut low, mut second) = (st.s[0], st.s[1]);
     for (i, y) in out.iter_mut().enumerate() {
@@ -67,7 +88,11 @@ pub fn filter(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], k
         let stage = (1.0 - harmonics * 1.3).clamp(0.0, 1.0);
         let lp = (low * (1.0 - stage) + second * stage).tanh();
         let hp = (driven - low).tanh();
-        *y = if ins[4].at(i) >= 0.5 { hp } else { lp };
+        let auxiliary = ins[4].at(i) >= 0.5;
+        *y = if auxiliary { hp } else { lp };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if auxiliary { lp } else { hp };
+        }
     }
     st.s[0] = low;
     st.s[1] = second;

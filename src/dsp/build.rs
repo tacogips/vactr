@@ -179,6 +179,9 @@ pub fn lower_bus(
         let kind = match &cur.kind {
             UGenKind::BusInput => break,
             UGenKind::Effect(k) => *k,
+            UGenKind::Output(_) => {
+                return Err(LowerError::ty("output selection is not supported yet"))
+            }
             UGenKind::Ugen(_) => {
                 return Err(LowerError::ty(
                     "a bus chain is a chain of effects over the bus input",
@@ -417,6 +420,9 @@ impl Graph<'_> {
                 }),
                 Some(*k),
             ),
+            UGenKind::Output(_) => {
+                return Err(LowerError::ty("output selection is not supported yet"))
+            }
             UGenKind::BusInput => {
                 return Err(LowerError::ty(
                     "an instrument has no bus input; effects in an `inst` need a subject",
@@ -494,7 +500,12 @@ impl Graph<'_> {
         let me = self.push(spec)?;
         for (src, port, pname) in wires {
             match src {
-                Src::Node(from) => self.edges.push(Edge { from, to: me, port }),
+                Src::Node(from) => self.edges.push(Edge {
+                    from,
+                    to: me,
+                    port,
+                    output: 0,
+                }),
                 Src::List(xs) => {
                     let id = match effect {
                         Some(kind) => effects::param_ctl(kind, &pname).ok_or_else(|| {

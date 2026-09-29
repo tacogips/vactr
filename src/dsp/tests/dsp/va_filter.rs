@@ -29,16 +29,22 @@ fn voice() -> InstDef {
                 from: 0,
                 to: 1,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 2,
                 to: 3,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 3,
                 to: 4,
                 port: 0,
+
+                output: 0,
             },
         ]
         .into_boxed_slice(),

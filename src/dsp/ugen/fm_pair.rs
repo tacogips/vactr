@@ -108,6 +108,27 @@ fn fir_accumulate(head: &mut f32, tail: &mut f32, step: usize, sample: f32) {
 /// 48 kHz), independent of callback partitioning.
 /// No biquad operation is performed.
 pub fn render(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &Kx<'_>) {
+    render_worker(ins, st, out, None, kx);
+}
+
+/// Renders carrier and sub outputs from one FM state advance.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    render_worker(ins, st, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if out.is_empty() {
         return;
     }
@@ -179,11 +200,11 @@ pub fn render(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], k
             fir_accumulate(&mut carrier_head, &mut carrier_tail, step, carrier);
             fir_accumulate(&mut sub_head, &mut sub_tail, step, sub);
         }
-        *output = if ins[4].at(frame) >= 0.5 {
-            sub_head
-        } else {
-            carrier_head
-        };
+        let auxiliary = ins[4].at(frame) >= 0.5;
+        *output = if auxiliary { sub_head } else { carrier_head };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[frame] = if auxiliary { carrier_head } else { sub_head };
+        }
         carrier_head = carrier_tail;
         sub_head = sub_tail;
         period_left -= 1;

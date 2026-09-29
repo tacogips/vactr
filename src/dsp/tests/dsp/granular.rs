@@ -166,6 +166,8 @@ fn live(cfg_caps: CapabilitySet, params: &[(&str, f32)]) -> NativeRig {
             from: 0,
             to: 1,
             port: 0,
+
+            output: 0,
         }]),
         node_params: Box::new([(
             1,

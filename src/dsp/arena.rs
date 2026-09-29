@@ -586,6 +586,8 @@ pub fn decode_graph(
                     from: i.u16()?,
                     to: i.u16()?,
                     port: i.u8()?,
+
+                    output: 0,
                 };
                 raw.push_edge(e).map_err(|_| FaultCode::GraphTooLarge)?;
             }

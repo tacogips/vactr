@@ -69,8 +69,34 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, mem, out, None, kx);
+}
+
+/// Renders both ensemble sides from one shared string-machine state.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    let _ = st;
+    render_worker(ins, mem, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -85,7 +111,7 @@ pub fn render(
     let ensemble = (2.0 * timbre - 1.0).abs();
     let depth = 0.35 + 0.65 * timbre;
     let dry = 1.0 - 0.5 * ensemble;
-    for sample in out.iter_mut() {
+    for (i, sample) in out.iter_mut().enumerate() {
         let mut left = 0.0;
         let mut right_signal = 0.0;
         for (voice_index, interval) in chord.iter().enumerate() {
@@ -117,10 +143,11 @@ pub fn render(
         let lag_r = (base - excursion).clamp(1.0, (DELAY - 2) as f32);
         let wet_l = tap(mem, 16, write, lag_l);
         let wet_r = tap(mem, 16 + DELAY, write, lag_r);
-        *sample = if right {
-            dry * right_signal + ensemble * (0.75 * wet_r + 0.25 * wet_l)
-        } else {
-            dry * left + ensemble * (0.75 * wet_l + 0.25 * wet_r)
-        };
+        let left_value = dry * left + ensemble * (0.75 * wet_l + 0.25 * wet_r);
+        let right_value = dry * right_signal + ensemble * (0.75 * wet_r + 0.25 * wet_l);
+        *sample = if right { right_value } else { left_value };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if right { left_value } else { right_value };
+        }
     }
 }

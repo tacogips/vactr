@@ -62,8 +62,34 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, mem, out, None, kx);
+}
+
+/// Renders terrain and transformed path outputs from shared phase state.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    let _ = st;
+    render_worker(ins, mem, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -80,7 +106,7 @@ pub fn render(
     let mode = position.floor() as usize;
     let blend = position.fract();
     let step = (normalized * 0.5).min(0.12);
-    for sample in out.iter_mut() {
+    for (i, sample) in out.iter_mut().enumerate() {
         let mut main = 0.0;
         let mut aux = 0.0;
         for _ in 0..2 {
@@ -94,10 +120,11 @@ pub fn render(
             main += z;
             aux += y + z;
         }
-        *sample = if auxiliary {
-            sine(1.0 + 0.25 * aux)
-        } else {
-            0.5 * main
-        };
+        let main_value = 0.5 * main;
+        let aux_value = sine(1.0 + 0.25 * aux);
+        *sample = if auxiliary { aux_value } else { main_value };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if auxiliary { main_value } else { aux_value };
+        }
     }
 }

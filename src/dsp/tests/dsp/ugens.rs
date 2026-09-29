@@ -92,11 +92,15 @@ fn malformed_graphs_are_refused() {
             from: 0,
             to: 1,
             port: 0,
+
+            output: 0,
         },
         Edge {
             from: 1,
             to: 0,
             port: 0,
+
+            output: 0,
         },
     ]);
     assert_eq!(
@@ -108,6 +112,8 @@ fn malformed_graphs_are_refused() {
         from: 0,
         to: 5,
         port: 0,
+
+        output: 0,
     }]);
     assert_eq!(
         Template::from_inst(&bad, &env).unwrap_err(),
@@ -118,6 +124,8 @@ fn malformed_graphs_are_refused() {
         from: 0,
         to: 1,
         port: 7,
+
+        output: 0,
     }]);
     assert_eq!(
         Template::from_inst(&port, &env).unwrap_err(),

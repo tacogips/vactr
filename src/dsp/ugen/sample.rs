@@ -44,9 +44,37 @@ pub fn play(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    play_worker(bank, ins, st, out, None, kx);
+}
+
+/// Plays the legacy mono mix and both stereo channels from one cursor.
+pub fn play_stereo(
+    bank: BankRef,
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mono: &mut [f32],
+    left: &mut [f32],
+    right: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    play_worker(bank, ins, st, mono, Some((left, right)), kx);
+}
+
+fn play_worker(
+    bank: BankRef,
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    mut stereo_out: Option<(&mut [f32], &mut [f32])>,
+    kx: &Kx<'_>,
+) {
     let resource = kx.bank.unwrap_or(bank.get());
     let Some(view) = kx.store.get(resource) else {
         out.fill(0.0);
+        if let Some((left, right)) = stereo_out.as_mut() {
+            left.fill(0.0);
+            right.fill(0.0);
+        }
         st.finish();
         return;
     };
@@ -60,6 +88,10 @@ pub fn play(
     let step = if speed.is_finite() { speed * rate } else { 0.0 };
     if stop <= start || step == 0.0 && st.u[1] != 0 && st.u[0] as usize >= stop {
         out.fill(0.0);
+        if let Some((left, right)) = stereo_out.as_mut() {
+            left.fill(0.0);
+            right.fill(0.0);
+        }
         st.finish();
         return;
     }
@@ -79,13 +111,20 @@ pub fn play(
         let s = acc / ch as f32;
         s
     };
+    let channel_frame = |i: usize, channel: usize| -> f32 {
+        view.data.get(i * ch + channel).copied().unwrap_or(0.0)
+    };
     #[allow(clippy::cast_possible_wrap)]
     let (lo, hi) = (start as i64, stop as i64);
     let mut idx = i64::from(st.u[0]);
     let mut frac = st.s[0];
-    for y in out.iter_mut() {
+    for (frame_index, y) in out.iter_mut().enumerate() {
         if st.done() {
             *y = 0.0;
+            if let Some((left, right)) = stereo_out.as_mut() {
+                left[frame_index] = 0.0;
+                right[frame_index] = 0.0;
+            }
             continue;
         }
         if idx < lo || idx >= hi {
@@ -95,6 +134,10 @@ pub fn play(
             } else {
                 st.finish();
                 *y = 0.0;
+                if let Some((left, right)) = stereo_out.as_mut() {
+                    left[frame_index] = 0.0;
+                    right[frame_index] = 0.0;
+                }
                 continue;
             }
         }
@@ -107,6 +150,21 @@ pub fn play(
             let next = if i + 1 < stop { i + 1 } else { i };
             a + (frame(next) - a) * frac
         };
+        if let Some((left, right)) = stereo_out.as_mut() {
+            let left_a = channel_frame(i, 0);
+            let right_channel = usize::from(ch > 1);
+            let right_a = channel_frame(i, right_channel);
+            if frac == 0.0 {
+                left[frame_index] = left_a;
+                right[frame_index] = right_a;
+            } else {
+                let next = if i + 1 < stop { i + 1 } else { i };
+                let left_b = channel_frame(next, 0);
+                let right_b = channel_frame(next, right_channel);
+                left[frame_index] = left_a + (left_b - left_a) * frac;
+                right[frame_index] = right_a + (right_b - right_a) * frac;
+            }
+        }
         let adv = frac + step;
         let whole = adv.floor();
         frac = adv - whole;

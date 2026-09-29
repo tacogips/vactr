@@ -88,8 +88,34 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, mem, out, None, kx);
+}
+
+/// Renders continuous and quantized grid outputs from shared state.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    let _ = st;
+    render_worker(ins, mem, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -102,7 +128,7 @@ pub fn render(
     let pre_z = 1.0 - (-1.0 / (0.06 * sr)).exp();
     let position_rate = (2.0 * freq / sr).clamp(0.01, 0.1);
     let step = (freq / sr).min(0.24);
-    for sample in out.iter_mut() {
+    for (i, sample) in out.iter_mut().enumerate() {
         mem[1] += pre_xy * (x_target - mem[1]);
         mem[2] += pre_xy * (y_target - mem[2]);
         mem[3] += pre_z * (z_target - mem[3]);
@@ -120,11 +146,11 @@ pub fn render(
             mem[5].clamp(0.0, 6.9999),
             mem[6].clamp(0.0, 6.9999),
         );
-        *sample = if auxiliary {
-            (value * 32.0).trunc() / 32.0
-        } else {
-            value
-        };
+        let aux_value = (value * 32.0).trunc() / 32.0;
+        *sample = if auxiliary { aux_value } else { value };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if auxiliary { value } else { aux_value };
+        }
     }
 }
 

@@ -47,8 +47,34 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, mem, out, None, kx);
+}
+
+/// Renders folded and overtone outputs from shared oscillator phases.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    let _ = st;
+    render_worker(ins, mem, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -60,17 +86,17 @@ pub fn render(
     let width = (0.5 + 0.45 * morph).clamp(0.05, 0.95);
     let overtone = timbre * (2.0 - timbre);
     let step = (freq / sr).min(0.24);
-    for sample in out.iter_mut() {
+    for (i, sample) in out.iter_mut().enumerate() {
         mem[0] = (mem[0] + step).fract();
         mem[1] = (mem[1] + step).fract();
         let shaped = shape(slope(mem[0], width), harmonics);
         let folded = fold(shaped, timbre);
         let triangle = slope(mem[1], 0.5);
         let sine = (TAU * (triangle * 0.25 + 0.5)).sin();
-        *sample = if auxiliary {
-            sine + (fold(shaped * 1.7, timbre) - sine) * overtone
-        } else {
-            folded
-        };
+        let aux_value = sine + (fold(shaped * 1.7, timbre) - sine) * overtone;
+        *sample = if auxiliary { aux_value } else { folded };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if auxiliary { folded } else { aux_value };
+        }
     }
 }

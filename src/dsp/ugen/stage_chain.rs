@@ -36,8 +36,44 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, st, mem, out, None, kx);
+}
+
+/// Renders value and phase outputs from one shared stage-chain update.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    render_worker(ins, st, mem, main, Some(aux), kx);
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -136,6 +172,10 @@ pub fn render(
                 mem[2] = target;
             }
         }
-        *sample = if channel { mem[1] * 2.0 - 1.0 } else { target };
+        let phase = mem[1] * 2.0 - 1.0;
+        *sample = if channel { phase } else { target };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[frame] = if channel { target } else { phase };
+        }
     }
 }

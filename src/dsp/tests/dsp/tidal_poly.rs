@@ -22,6 +22,8 @@ fn voice(mode: f32, output_mode: f32, range: f32, main: f32, aux: f32) -> InstDe
             from: 1,
             to: 2,
             port: 0,
+
+            output: 0,
         }]
         .into_boxed_slice(),
         node_params: vec![

@@ -14,6 +14,8 @@ fn source_voice(quad: bool) -> InstDef {
         from: 1,
         to: 2,
         port: 0,
+
+        output: 0,
     }];
     if quad {
         nodes.extend([
@@ -27,11 +29,15 @@ fn source_voice(quad: bool) -> InstDef {
                 from: 3,
                 to: 4,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 5,
                 to: 6,
                 port: 0,
+
+                output: 0,
             },
         ]);
     }
@@ -162,6 +168,8 @@ fn elements_last_external_port_is_encoded_and_next_port_rejects() {
             from: 0,
             to: 1,
             port: 29,
+
+            output: 0,
         }]
         .into_boxed_slice(),
         node_params: Box::new([]),
@@ -183,6 +191,8 @@ fn elements_last_external_port_is_encoded_and_next_port_rejects() {
         from: 0,
         to: 1,
         port: 30,
+
+        output: 0,
     }]
     .into_boxed_slice();
     assert!(matches!(
@@ -210,26 +220,36 @@ fn resonator_input_voice(elements: bool) -> InstDef {
                     from: 0,
                     to: 2,
                     port: 28,
+
+                    output: 0,
                 },
                 Edge {
                     from: 1,
                     to: 2,
                     port: 29,
+
+                    output: 0,
                 },
                 Edge {
                     from: 0,
                     to: 3,
                     port: 28,
+
+                    output: 0,
                 },
                 Edge {
                     from: 1,
                     to: 3,
                     port: 29,
+
+                    output: 0,
                 },
                 Edge {
                     from: 3,
                     to: 4,
                     port: 0,
+
+                    output: 0,
                 },
             ]
             .into_boxed_slice(),
@@ -259,16 +279,22 @@ fn resonator_input_voice(elements: bool) -> InstDef {
                     from: 0,
                     to: 1,
                     port: 16,
+
+                    output: 0,
                 },
                 Edge {
                     from: 0,
                     to: 2,
                     port: 16,
+
+                    output: 0,
                 },
                 Edge {
                     from: 2,
                     to: 3,
                     port: 0,
+
+                    output: 0,
                 },
             ]
             .into_boxed_slice(),

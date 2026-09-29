@@ -96,8 +96,34 @@ pub fn render(
     out: &mut [f32],
     kx: &Kx<'_>,
 ) {
+    render_worker(ins, st, mem, out, None, kx);
+}
+
+/// Renders the main and sync-difference outputs from one oscillator advance.
+pub fn render_pair(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    main: &mut [f32],
+    aux: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    render_worker(ins, st, mem, main, Some(aux), kx);
+}
+
+fn render_worker(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    out: &mut [f32],
+    mut aux_out: Option<&mut [f32]>,
+    kx: &Kx<'_>,
+) {
     if mem.len() < STATE_FLOATS {
         out.fill(0.0);
+        if let Some(aux) = aux_out {
+            aux.fill(0.0);
+        }
         return;
     }
     let sr = kx.sr.max(1.0);
@@ -130,7 +156,7 @@ pub fn render(
         mem[2] = 0.25;
         st.u[0] = 1;
     }
-    for sample in out.iter_mut() {
+    for (i, sample) in out.iter_mut().enumerate() {
         let primary = synced_shape(
             mem,
             0,
@@ -168,10 +194,11 @@ pub fn render(
             },
         );
         let saw = variable_saw(&mut mem[6], auxiliary_freq, saw_pw, saw_shape, sr);
-        *sample = if auxiliary {
-            0.5 * (secondary - primary)
-        } else {
-            normalization * (0.3 * square_gain * square + 0.5 * saw_gain * saw)
-        };
+        let main_value = normalization * (0.3 * square_gain * square + 0.5 * saw_gain * saw);
+        let aux_value = 0.5 * (secondary - primary);
+        *sample = if auxiliary { aux_value } else { main_value };
+        if let Some(aux) = aux_out.as_deref_mut() {
+            aux[i] = if auxiliary { main_value } else { aux_value };
+        }
     }
 }

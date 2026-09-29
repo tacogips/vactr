@@ -23,6 +23,8 @@ fn voice(count: f32) -> InstDef {
             from: 1,
             to: 2,
             port: 0,
+
+            output: 0,
         }]
         .into_boxed_slice(),
         node_params: vec![

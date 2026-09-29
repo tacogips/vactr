@@ -26,6 +26,7 @@ mod cells;
 mod chip_pair;
 mod chord_pair;
 mod clock_noise_pair;
+mod codec_shapes;
 mod cross_mod;
 mod cut_group;
 mod digital_drum;
@@ -43,8 +44,10 @@ mod frame_lfo;
 mod grain_pair;
 mod granular;
 mod hat_pair;
+mod kernel_pairs;
 mod live_input;
 mod modal_pair;
+mod multi_output;
 mod number_station;
 mod particle_pair;
 mod peak_function;
@@ -58,6 +61,7 @@ mod release;
 mod render;
 mod resonant_bank;
 mod rings_part;
+mod shape_contract;
 mod shape_pair;
 mod shift_pair;
 mod six_op_original;
@@ -87,6 +91,7 @@ mod tidal_poly;
 mod ugens;
 mod va_filter;
 mod voice_input;
+mod voice_layout;
 mod voice_stereo;
 
 use std::sync::Arc;
@@ -409,6 +414,8 @@ pub(super) fn chain(id: u32, nodes: Vec<UGenSpec>) -> InstDef {
             from: u16::try_from(i - 1).unwrap(),
             to: u16::try_from(i).unwrap(),
             port: 0,
+
+            output: 0,
         })
         .collect();
     InstDef {

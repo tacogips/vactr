@@ -67,16 +67,22 @@ fn quad(frames: bool) -> InstDef {
                 from: 1,
                 to: 4,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 2,
                 to: 5,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 3,
                 to: 6,
                 port: 0,
+
+                output: 0,
             },
         ]
         .into_boxed_slice(),
@@ -263,16 +269,22 @@ fn function_quad(tides: bool) -> InstDef {
                 from: 1,
                 to: 4,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 2,
                 to: 5,
                 port: 0,
+
+                output: 0,
             },
             Edge {
                 from: 3,
                 to: 6,
                 port: 0,
+
+                output: 0,
             },
         ]
         .into_boxed_slice(),

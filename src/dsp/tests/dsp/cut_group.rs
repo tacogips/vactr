@@ -22,11 +22,15 @@ fn sustaining() -> NativeRig {
             from: 0,
             to: 2,
             port: 0,
+
+            output: 0,
         },
         Edge {
             from: 1,
             to: 2,
             port: 1,
+
+            output: 0,
         },
     ]);
     rig.install(&def);

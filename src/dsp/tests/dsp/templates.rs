@@ -19,7 +19,12 @@ const BANK: u32 = 30;
 const TABLE: u32 = 31;
 
 fn e(from: u16, to: u16, port: u8) -> Edge {
-    Edge { from, to, port }
+    Edge {
+        from,
+        to,
+        port,
+        output: 0,
+    }
 }
 
 fn def(nodes: Vec<UGenSpec>, edges: Vec<Edge>, node_params: Vec<(u16, CtlId, Ctl)>) -> InstDef {

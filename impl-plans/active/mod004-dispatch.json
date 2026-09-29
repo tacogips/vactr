@@ -4,8 +4,8 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "a3e4c4a06584e6c11c90e5532b59ab61ef18b9e5",
-  "priorManifest": "Refines the session-200 manifest (originalHead 0a15742). 0a15742..a3e4c4a changes docs only (design-mutable-audio.md, mod004-40-regression-closeout.md, this manifest). Plans still contain only MOD004-40; MOD004-30 is committed in 0a15742.",
+  "originalHead": "3cdc10865069049bed0c84e0c7ccfbc7e1f5299b",
+  "priorManifest": "Refines the session-202 manifest (originalHead a3e4c4a). a3e4c4a..3cdc108 changes docs only (mod004-40-regression-closeout.md, this manifest). Plans still contain only MOD004-40; MOD004-00..30 are accepted committed dependencies.",
   "acceptedDependencies": [
     {
       "planId": "MOD004-00",
@@ -60,7 +60,7 @@
     "design-docs/specs/design-mutable-audio.md"
   ],
   "evidenceRoot": "tmp/mod004",
-  "evidenceLayout": "tmp/mod004/<planId>/ holds each plan's full command logs, each ending with an exit=<status> line. Each plan's Progress Log records every command, its exit status and its log path. Retries go under tmp/mod004/<planId>/attempt-<n>/. tmp/ is gitignored and must stay untracked. A missing or truncated log is not a pass.",
+  "evidenceLayout": "tmp/mod004/<planId>/ holds each plan's full command logs, one declared file per command, each ending with an exit=<status> line. Each plan's Progress Log records every command, its exit status and its log path. A rerun overwrites its own log and the earlier failure is recorded in Progress Log text. tmp/ is gitignored (**/tmp) and must stay untracked. A missing or truncated log is not a pass.",
   "executionModel": {
     "waves": [
       [
@@ -73,11 +73,11 @@
     "commitOwner": "The orchestrator commits after the run with the AGENTS.md 1-6 section message and no Co-Authored-By or tool attribution line, and does not push. Workers never commit, stash, checkout, reset, branch, push or merge.",
     "retryPolicy": "One plan in one wave, so no concurrent cargo contention is expected. If cargo reports a lock, wait about 60 s and retry, up to 10 times, then record a blocker in the plan's Progress Log.",
     "editProtocol": "Before each edit, re-read the file and record its sha256 and an intent snapshot in the Progress Log. If the file drifted, stop and report. After editing, record the post-edit sha256. Never edit outside writePaths.",
-    "serialReconciliation": "MOD004-40 owns crate-wide cargo fmt, the parent-plan, README and design status updates, the header Status lines of MOD004-20/21/22/30/40, and any recorded cross-plan repair."
+    "serialReconciliation": "MOD004-40 owns the parent-plan, README and design status updates and the header Status lines of MOD004-20/21/22/30/40. Formatting is limited to rustfmt on the three writePaths .rs files. A repair of an earlier MOD-004 defect, or fmt drift, in any file outside writePaths is not done by the worker: it is recorded as a blocker in the MOD004-40 Progress Log and applied serially by the orchestrator review step with file, cause, fix and pre/post sha256. Never golden_digests.txt; never weaken a test."
   },
   "dependencyNote": "dependsOn lists only plans in this manifest, so MOD004-40 has none. MOD004-00/10/11/12 (85a300a), MOD004-20/21/22 (b6fa077) and MOD004-30 (0a15742) are accepted committed dependencies listed in acceptedDependsOn and acceptedDependencies; they are not dispatched.",
   "reviewContext": {
-    "issueReference": "local:impl-plans/active/modular-audio-foundation.md#MOD-004 (wave 5: MOD004-40 regression closeout; workflow opus-luna-design-and-implement-review-loop-session-202)",
+    "issueReference": "workflowInput issue 'MOD-004 wave 5: regression closeout (MOD004-40)' (no GitHub URL or number); local:impl-plans/active/modular-audio-foundation.md#MOD-004; workflow opus-luna-design-and-implement-review-loop-session-203",
     "userProblem": "MOD-004 lacks native vs browser, orbit, pair-vs-legacy and rate/block regression coverage for multi-output and stereo graphs, and its plans (MOD-004A..F, fanout Status lines, README row, design status) are not closed out.",
     "constraints": [
       "Follow the committed MOD-004 design and the owner decisions resolved 2026-09-29; do not reopen them.",
@@ -165,7 +165,22 @@
         "impl-plans/active/mod004-40-regression-closeout.md",
         "impl-plans/README.md",
         "design-docs/specs/design-mutable-audio.md",
-        "tmp/mod004/MOD004-40"
+        "tmp/mod004/MOD004-40/1-fmt.log",
+        "tmp/mod004/MOD004-40/1-fmt-rerun.log",
+        "tmp/mod004/MOD004-40/2-check.log",
+        "tmp/mod004/MOD004-40/3-clippy.log",
+        "tmp/mod004/MOD004-40/4-wasm.log",
+        "tmp/mod004/MOD004-40/5-lsp.log",
+        "tmp/mod004/MOD004-40/6-nextest.log",
+        "tmp/mod004/MOD004-40/6b-list.log",
+        "tmp/mod004/MOD004-40/7-audit.log",
+        "tmp/mod004/MOD004-40/8-lines.log",
+        "tmp/mod004/MOD004-40/9-diffcheck.log",
+        "tmp/mod004/MOD004-40/10-status.log",
+        "tmp/mod004/MOD004-40/11-golden.log",
+        "tmp/mod004/MOD004-40/12-protected.log",
+        "tmp/mod004/MOD004-40/9-diffcheck-final.log",
+        "tmp/mod004/MOD004-40/10-status-final.log"
       ],
       "sharedPaths": [
         "src/dsp/tests/dsp.rs",
@@ -176,10 +191,6 @@
         "src/dsp/tests/dsp/templates.rs"
       ],
       "sharedPathNotes": [
-        {
-          "path": "src",
-          "intendedEdit": "Serial reconciliation only: crate-wide cargo fmt if cargo fmt --check fails, and any recorded serial repair of an earlier MOD-004 defect (file, cause, fix, pre/post sha256). Never golden_digests.txt; never weaken a test."
-        },
         {
           "path": "src/dsp/tests/dsp.rs",
           "intendedEdit": "Read-only unless a needed Rig helper is missing and cannot live in multi_output.rs (then add only that helper and record it). Uses: native_with, browser_with, install, sample, push, step, run, send, event, config, caps, noise, rms, ctl."
@@ -230,6 +241,7 @@
       ],
       "verification": [
         "CARGO_TERM_QUIET=true cargo fmt --check",
+        "rustfmt --edition 2021 src/dsp/tests/dsp/multi_output.rs src/dsp/tests/dsp/multi_output/cross_path.rs src/dsp/tests/dsp/multi_output/invariance.rs (only if cargo fmt --check fails solely in these files; then rerun cargo fmt --check)",
         "CARGO_TERM_QUIET=true cargo check -q --all-targets",
         "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",

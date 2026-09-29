@@ -1,12 +1,12 @@
 # MOD004-40: Cross-path Regression, Allocation, Rate/Block Invariance, Plan Closeout
 
 **Status**: Ready
-**Plan ID**: MOD004-40 (session-202, single plan, runs alone)
+**Plan ID**: MOD004-40 (session-203, single plan, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy; Voice buffers and channel mapping; Capacity, real-time, and invariance; Implementation status, including its "Rate/block contract" and "Orbit channel independence" bullets)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004F and plan closeout)
-**Baseline**: `0a15742` for code (MOD004-00/10/11/12 in `85a300a`, MOD004-20/21/22 in `b6fa077`, MOD004-30 in `0a15742`; all accepted dependencies). Dispatch HEAD is `a3e4c4a`; `0a15742..a3e4c4a` changes only this plan, `mod004-dispatch.json` and `design-mutable-audio.md`.
+**Baseline**: `0a15742` for code (MOD004-00/10/11/12 in `85a300a`, MOD004-20/21/22 in `b6fa077`, MOD004-30 in `0a15742`; all accepted dependencies). Dispatch HEAD is `3cdc108` (plus the session-203 commit of this plan and the manifest); `0a15742..3cdc108` changes only this plan, `mod004-dispatch.json` and `design-mutable-audio.md`, so every `src/` line reference below is still exact.
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-30 (session 202: dispatch HEAD `a3e4c4a`; exact node indices for the `main_gain` branch; orbit control set pinned without `LEGATO`; parent header Status line added to closeout; stereo sample length stated per channel. Session 200: test-module split, graph builders, rate/block protocol and fallback, orbit exact-zero rule, closeout lines, commands 1-12)
+**Last Updated**: 2026-09-30 (session 203: dispatch HEAD `3cdc108`; evidence logs declared as concrete files; FM legacy `node_params` tuple spelled out; formatting scoped to writePaths; serial repair outside writePaths becomes a routed blocker. Session 202: dispatch HEAD `a3e4c4a`; exact node indices for the `main_gain` branch; orbit control set pinned without `LEGATO`; parent header Status line added to closeout; stereo sample length stated per channel. Session 200: test-module split, graph builders, rate/block protocol and fallback, orbit exact-zero rule, closeout lines, commands 1-12)
 
 ## Intent and Context
 
@@ -80,15 +80,21 @@ legacy at every rate and block on both tiers, and cross-block equality.
 - `impl-plans/README.md`: the modular-audio-foundation row (line 43) only
 - `design-docs/specs/design-mutable-audio.md`: the paragraph beginning
   "Still to do (2026-09-30)" in "Implementation status (2026-09-29)" only
-- `tmp/mod004/MOD004-40/` (evidence; gitignored, stays untracked)
+- Evidence logs (gitignored by `**/tmp`, stay untracked), one file each:
+  `tmp/mod004/MOD004-40/1-fmt.log`, `1-fmt-rerun.log`, `2-check.log`,
+  `3-clippy.log`, `4-wasm.log`, `5-lsp.log`, `6-nextest.log`,
+  `6b-list.log`, `7-audit.log`, `8-lines.log`, `9-diffcheck.log`,
+  `10-status.log`, `11-golden.log`, `12-protected.log`,
+  `9-diffcheck-final.log`, `10-status-final.log`. A rerun overwrites its
+  own log; the Progress Log records the earlier failure in text.
 
 sharedPaths (serial; this plan runs alone) are concrete files only:
 `src/dsp/tests/dsp.rs` (read-only unless a helper is missing) and the
 listed existing test files. Do not declare whole directories such as
 `src`: the Riela fanout snapshot is capped at 512 entries, and `src` alone
-covers about 650 files. Run `cargo fmt --check` only. A formatting or
-repair need outside writePaths is a review blocker to route back, not a
-silent edit.
+covers about 650 files. Never run crate-wide `cargo fmt`; format only the
+three writePaths `.rs` files (command 1). A formatting or repair need
+outside writePaths is a review blocker to route back, not a silent edit.
 
 ## Test Module Layout (prescribed split)
 
@@ -144,9 +150,10 @@ browser and sample resource 41 on both tiers.
   `edge(0,1,0,0)` (main output 0 into the `Add` sink) and `edge(0,2,0,1)`
   (output 1 into `AuxOut`), and no mode param. The legacy form keeps the
   two-`FmPair` structure of `fm_pair.rs:11-31`: `[FmPair, FmPair, Add,
-  AuxOut]` with `edge(0,2,0,0)` and `edge(1,3,0,0)`, and node 1 port 4 =
-  `catalog::port_ctl(&Node::FmPair, 4)` = `Ctl::Const(1.0)`. Node index 1
-  is unchanged.
+  AuxOut]` with `edge(0,2,0,0)` and `edge(1,3,0,0)`, and one
+  `node_params` entry `(1, catalog::port_ctl(&Node::FmPair, 4).unwrap(),
+  Ctl::Const(1.0))`, as at `fm_pair.rs:24-28` (`port_ctl` returns
+  `Option<CtlId>`). Node index 1 is unchanged.
 - `stereo_graph() -> InstDef`, graph (c): `[SamplePlay(BankRef::new(41)),
   Effect(gain), Param(CtlId::new(90)), Mul]`, where `gain =
   effect_spec(EffectKind::Gain, &[("gain", Ctl::Const(-6.0206))])` (as at
@@ -329,8 +336,12 @@ A failure is fixed only when it is a defect in earlier MOD-004 code. For
 example: native vs browser divergence, pair vs legacy divergence, or a
 design-valid graph rejected. The fix is the smallest one in `src/`
 (non-test) that makes the design-stated behavior hold.
-- Record the file, the cause, the fix, and the pre and post sha256 in the
-  Progress Log.
+- The worker does NOT edit any file outside writePaths. It records a
+  blocker in the Progress Log (failing test name, first differing frame,
+  suspected file and cause, proposed smallest fix) and stops. The
+  orchestrator's review step applies the repair serially and records the
+  file, the cause, the fix, and the pre and post sha256 in the Progress
+  Log.
 - Never weaken, delete or loosen an assertion.
 - Never change `golden_digests.txt`.
 - If the fix would change a golden render digest, or needs engine changes
@@ -415,8 +426,13 @@ path in this Progress Log. A missing log, a truncated log, or a log
 without `exit=` is not a pass. Run `mkdir -p tmp/mod004/MOD004-40` first.
 
 1. `CARGO_TERM_QUIET=true cargo fmt --check` (`1-fmt.log`) -> exit 0. If
-   it fails, run `CARGO_TERM_QUIET=true cargo fmt` once, record the files
-   it changed, and rerun into `1-fmt-rerun.log` -> exit 0.
+   it fails only in the three writePaths `.rs` files, run `rustfmt
+   --edition 2021 src/dsp/tests/dsp/multi_output.rs
+   src/dsp/tests/dsp/multi_output/cross_path.rs
+   src/dsp/tests/dsp/multi_output/invariance.rs` once, and rerun the check
+   into `1-fmt-rerun.log` -> exit 0. If it fails in any other file, that
+   is a blocker (see "Serial repair rule"); do not run crate-wide
+   `cargo fmt`.
 2. `CARGO_TERM_QUIET=true cargo check -q --all-targets` (`2-check.log`)
    -> exit 0
 3. `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings`
@@ -479,7 +495,8 @@ one-line intent in the Progress Log, and stop if the file changed
 unexpectedly since the last read. Record the post-edit sha256.
 
 Do the work in this order: tests, then commands 1-12, then the closeout
-edits, then a rerun of commands 9 and 10.
+edits, then a rerun of commands 9 and 10 into `9-diffcheck-final.log` and
+`10-status-final.log`.
 
 ## Progress Log
 

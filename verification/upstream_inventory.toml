@@ -974,6 +974,19 @@ reason = "Unaudited wave binary behind wav_integrated_waves; positions 5, 13 and
 
 # --- rings
 [[file]]
+path = "rings/dsp/dsp.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/fm_voice.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
 path = "rings/dsp/fx/chorus.h"
 license = "MIT"
 kind = "code"
@@ -1004,6 +1017,20 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "rings/dsp/resonator.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
+path = "rings/dsp/string.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
 path = "rings/dsp/string_synth_envelope.h"
 license = "MIT"
 kind = "code"
@@ -1032,6 +1059,13 @@ path = "rings/dsp/string_synth_voice.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "rings/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
 
 # --- stages
 [[file]]
@@ -1108,6 +1142,13 @@ path = "stmlib/utils/dsp.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "stmlib/utils/random.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
 
 [[file]]
 path = "stmlib/utils/random.h"

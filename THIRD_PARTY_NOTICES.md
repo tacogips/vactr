@@ -1034,6 +1034,21 @@ differ. The source has twelve oscillators and persistent rotating groups;
 Vactr has four event-local voices and independent main/aux calculations.
 External audio input remains pending. This is not a source-equivalent port.
 
+The opt-in RNG-006 comparison probe (`verification/rings_part_reference.cc`,
+run through `mise run compare-rings-part`) links the pinned `rings::Part`
+and `rings::StringSynthPart` classes directly against a separate local
+Eurorack checkout, together with their `rings/dsp/resonator.cc`,
+`rings/dsp/string.cc`, `rings/dsp/fm_voice.cc` and `rings/resources.cc`
+dependencies and `stmlib/dsp/units.cc`/`stmlib/utils/random.cc`, and reads
+the confirmed
+source rate and block size from `rings/dsp/dsp.h`. This probe compiles
+those upstream sources only inside the task's own temporary build
+directory; it never links into Vactr's library, binary, or browser build,
+and no object code, generated table, or output sample it produces is
+copied into this repository. Its measured metrics are recorded in
+`impl-plans/active/modular-rings-resonator.md` as a raw-kernel comparison,
+not a source-parity claim.
+
 ## Stages-inspired analytic segment and oscillator adaptation
 
 `stage-voice` uses the published Stages `segment_generator.{h,cc}` and

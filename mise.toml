@@ -105,6 +105,11 @@ description = "Measure the source Warps vocoder in a separate pinned Mutable Ins
 run = 'python3 verification/probe_warps_vocoder.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
+[tasks.compare-rings-part]
+description = "Compare raw Rings Part/StringSynthPart kernels against a separate pinned Mutable Instruments checkout"
+run = 'python3 verification/compare_rings_part.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
+env = { CARGO_TERM_QUIET = "true" }
+
 [tasks.audit-upstream]
 description = "Audit upstream source, license and resource inventory against a separate pinned Mutable Instruments checkout"
 run = 'python3 verification/audit_upstream.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'

@@ -4,8 +4,9 @@
 **Plan ID**: MOD004-21 (wave 2; parallel with MOD004-20 and MOD004-22)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Codec and compatibility)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004D)
+**Baseline**: `85a300a`. MOD004-00/10/11/12 are committed and accepted. At the baseline, `src/dsp/arena.rs:490` still has `const G_INST: u8 = b'I'`; the decoder builds `Edge { .., output: 0 }`; `NodeAudioShape::{to_byte, from_byte}` exist in `src/dsp/graph/shape.rs` (bits 0-1 = count - 1, bits 2-5 = stereo mask, bits 6-7 rejected).
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-29
+**Last Updated**: 2026-09-29 (refined for session 192: baseline facts)
 
 ## Intent and Context
 
@@ -94,7 +95,17 @@ decoder's `map_err(|_| FaultCode::GraphTooLarge)` style.
   unchanged. The shape byte comes after the whole node record, including
   its payload.
 - Do not change `encode_bus`.
-- `arena.rs` is 778 lines. Keep it under 1000.
+- `arena.rs` is 780 lines. Keep it under 1000.
+- `decode_graph` runs on the native engine install path too
+  (`src/dsp/engine.rs:491`, `install_bytes`). Allocation-freedom applies
+  to both.
+- Tests that install through bytes (for example
+  `src/dsp/tests/dsp/stage_linked.rs`, `cross_mod.rs`, `chip_pair.rs`)
+  call `encode_inst` and so pick up the new tag automatically. No test or
+  example embeds literal `b'I'` payload bytes (checked with
+  `grep -rn "b'I'" src`, which finds only `arena.rs:490`), so none needs
+  regenerating. If one appears, it is outside writePaths: record it as a
+  blocker.
 
 ## Test Cases (`src/dsp/tests/dsp/codec_shapes.rs`)
 

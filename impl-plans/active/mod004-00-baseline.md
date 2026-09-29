@@ -1,6 +1,6 @@
 # MOD004-00: Golden Render Baseline and Test Scaffolding
 
-**Status**: Ready
+**Status**: Completed (committed in 85a300a)
 **Plan ID**: MOD004-00 (wave 0, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy; Lowering invariant)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004)

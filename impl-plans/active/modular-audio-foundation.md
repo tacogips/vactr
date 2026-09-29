@@ -80,8 +80,10 @@ Design reference: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-ou
 Each subtask is scoped to one implementation session. “Deliverables” lists
 paths and API signatures only; implementation code belongs in source files.
 
-**Fanout execution (2026-09-29).** MOD-004 runs as eight plans with
-disjoint write paths. Those plans are authoritative for file-level scope;
+**Fanout execution (2026-09-29).** MOD-004 runs as nine plans with
+disjoint write paths. MOD004-00, -10, -11 and -12 are committed in
+`85a300a`. The remaining plans (MOD004-20/21/22, then 30, then 40) are
+dispatched by `impl-plans/active/mod004-dispatch.json`. Those plans are authoritative for file-level scope;
 the subtasks below keep the acceptance view.
 
 | Wave | Plan | Covers |

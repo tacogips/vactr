@@ -4,8 +4,43 @@
 **Plan ID**: MOD004-22 (wave 2; parallel with MOD004-20 and MOD004-21)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Voice buffers and channel mapping; Capacity, real-time, and invariance)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004B, MOD-004C)
+**Baseline**: `85a300a`. MOD004-00/10/11/12 are committed and accepted.
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-29
+**Last Updated**: 2026-09-29 (refined for session 192: pinned MOD004-12 entry points and current line references)
+
+## Baseline Facts at 85a300a (read before editing)
+
+- The pair entry points committed by MOD004-12 (in `src/dsp/ugen/`):
+  - `(ins, st, mem, main, aux, kx)`: `analog_pair::render_pair`,
+    `chord_pair::render_pair`, `table_terrain_pair::render_pair`,
+    `terrain_pair::render_pair`, `string_machine_pair::render_pair`,
+    `shape_pair::render_pair` and `stage_chain::render_pair`;
+  - `(ins, st, main, aux, kx)` with no `mem`: `fm_pair::render_pair` and
+    `va_filter::filter_pair`.
+  Re-read each signature before calling it, and pass exactly what the
+  legacy call for the same `Node` passes today.
+  - `sample::play_stereo(bank, ins, st, mono, left, right, kx)`.
+  Map node kinds to these through the same `Node` match that
+  `ugen::run` (= `mixer::run`, `src/dsp/ugen/mod.rs:230`) uses for the
+  legacy calls.
+- `ugen::Src::Node(u16)` is used only in `src/dsp/ugen/template.rs:496`
+  and `src/dsp/voice.rs:450`. `src/dsp/build.rs` has its own private
+  `Src` (MOD004-20's), which is unrelated. Do not touch it.
+- `src/dsp/voice.rs::render` (line 417):
+  - the per-node loop splits `rc.bufs` at `i * mb` (line 442);
+  - the voice-local effect copies and averages at lines 513-531 (keep
+    that exact code for mono subjects);
+  - the sink sum is at lines 543-549, over `t.sinks[..t.n_sinks]`, which
+    is used only here;
+  - `post_r` runs only when `t.has_aux` (line 576).
+- `src/dsp/engine.rs:149` allocates `bufs` as `NODE_CAP * mb`.
+- `src/dsp/engine/render.rs::mix_voice` (line 146) computes
+  `pan_gains(v.pan)` and bypasses it when `t.has_aux`.
+- `src/dsp/effects/spatial.rs:108` already has a *private*
+  `balance_gains(b)` over `-1..1`. Do not reuse, rename or change it. The
+  new public `prim::balance_gains(pan)` takes `0..1`.
+  `spatial.rs` imports named items from `prim`, not a glob, so there is
+  no name clash.
 
 ## Intent and Context
 

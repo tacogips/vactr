@@ -1,6 +1,6 @@
 # MOD004-12: Simultaneous Main/Aux Kernels and Stereo Sample Playback
 
-**Status**: Ready
+**Status**: Completed (committed in 85a300a)
 **Plan ID**: MOD004-12 (wave 1; parallel with MOD004-10 and MOD004-11)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (declaration table; output 0 and output 1 semantics; `sample-play`)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004E kernel part)

@@ -4,18 +4,27 @@
 **Plan ID**: MOD004-30 (wave 3, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Migration eligibility; list of nine; exclusion table)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004E)
+**Baseline**: `85a300a`, plus the wave-3 plans MOD004-20/21/22, which must be accepted before this plan starts.
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-29
+**Last Updated**: 2026-09-29 (refined for session 192: `.vact` source syntax, filter-voice source merge)
 
 ## Intent and Context
 
 Owner decision (2026-09-29): migrate only templates whose main and aux are
 simultaneous outputs of one engine state, each with a render-equivalence
 test. The design lists exactly nine. Each migrated template uses one
-kernel node, binds it with `let`, and routes `(p :main)` to the main path
-and `(p :aux)` through the unchanged `aux-out` tap. Its L and R output
-must be bit-identical to the old two-node form, and the golden render
-digests must not change.
+kernel node, binds it with `let`, and routes its main output to the main
+path and its aux output through the unchanged `aux-out` tap. Its L and R
+output must be bit-identical to the old two-node form, and the golden
+render digests must not change.
+
+The design writes the selection as `(p :main)`, which is s-expression
+notation. In `.vact` source `( )` is rejected by the lexer
+(`paren-form`), so the source form is `{p :main}`. Use the exact form
+that MOD004-20's `select_output.rs` `sel-a` test proved to parse and
+lower: `let p {...}` and `{p :main} > * amp > + {{p :aux} > * amp > aux-out}`.
+If MOD004-20's Progress Log records a different working form, use that
+one.
 
 ## Non-goals
 
@@ -68,12 +77,18 @@ tab indentation, keep every argument of today's main line, and drop the
 duplicated aux line:
 
 ```
-	let p (fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0)
-	(p :main) > * amp > + {(p :aux) > * amp > aux-out}
+	let p {fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
 ```
 
 - For `filter-voice`, the `let` binds the `va-filter` node, fed by a
-  single `va-source`.
+  single `va-source`:
+  `let p {va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 0}`.
+  The old form (`src/prelude/templates.vact:104-105`) has **two**
+  `va-source` nodes with identical inputs, one per branch. Merging them
+  is part of this migration, and the design treats it as eligible. The
+  bitwise equivalence test decides: if main or aux differs from the old
+  form, stop and report. Do not keep two sources.
 - Update the comment line above each migrated template to say one node
   provides both outputs.
 
@@ -86,6 +101,11 @@ duplicated aux line:
   selector. Verify this for each template before deleting the line, and
   stop if not.
 - `* amp` must stay on both branches, and `aux-out` stays the aux route.
+- Never write `(p :main)` in `templates.vact` or in a test string.
+- The prelude is loaded through the checker. The migrated bodies must add
+  no new diagnostics (for example `shadows-prelude` for the name `p`). If
+  one appears, rename the binding (for example to `pair`) consistently
+  across all nine templates, and record the change.
 - The render digests for the nine templates must still match. If one
   differs, the migration is wrong. Do not edit `render` lines.
 - Updating the fixture: before editing `templates.vact`, copy

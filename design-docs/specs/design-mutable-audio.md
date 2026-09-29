@@ -897,6 +897,14 @@ the table above (`:left`/`:right` in the owner-decision examples are
 illustrative; no node in this scope declares them). Using a multi-output
 node directly, without selection, keeps today's meaning: its first output.
 
+Notation: this section writes calls in s-expression form, such as
+`(p :aux)`. In `.vact` source, `( )` is not syntax; the lexer reports
+`paren-form`. The same call is written `p :aux`, or `{p :aux}` where
+grouping is needed, just as a dict key call is written `{d :gain}`. So the
+migrated form below is, in source,
+`{p :main} > * amp > + {{p :aux} > * amp > aux-out}`, with the node bound
+by `let p {...}`.
+
 Selection data flow:
 
 - **VM**: calling a `Value::UGen` is added to the existing
@@ -914,13 +922,24 @@ Selection data flow:
   - `arity` for zero or more than one argument.
 - **Static checker**: a `ugen`-typed callee with one keyword or int
   argument has type `ugen`. The checker does not know which kind of node it
-  is, so it does not validate names; the VM does.
+  is, so it does not validate names; the VM does. Any other argument count
+  or type is a `type-mismatch` diagnostic, and the result is still `ugen`.
 - **Lowering**: lowering memoizes nodes by source pointer. `(p :main)` and
   `(p :aux)` therefore resolve to the same lowered node and emit edges with
   `output = 0` and `output = 1`. Lowering then checks channel shapes (see
-  above) and the channel-buffer total (see Capacity). A failure is a typed
-  lowering diagnostic on the `inst` definition, which is also definition
-  time.
+  above), the voice layout (see "Voice buffers and channel mapping") and
+  the channel-buffer total (see Capacity). A failure is a typed lowering
+  diagnostic on the `inst` definition, which is also definition time. A
+  buffer-total failure uses the existing `graph-too-large` path.
+- **Selected root**: an `inst` body whose value is a selection of output
+  `k` lowers the source node as usual. If `k = 0`, that node is the root,
+  as if unselected. If `k > 0`, lowering appends one `Add` node fed by
+  output `k` on port 0, with port 1 unconnected. That node is the sink,
+  because a sink contributes only its output 0. This is the only case in
+  which a selection adds a graph node, and that node counts toward
+  `NODE_CAP`.
+- **Bus bodies**: selection is valid only in an `inst` body. A selection
+  reached while lowering a `bus` body is a lowering type error.
 
 **Migration eligibility.** A duplicate main/aux template migrates only if
 all of these hold:
@@ -971,10 +990,16 @@ from the compiled descriptors; no allocation, lock, graph traversal, or
 shape inference occurs in `process()`.
 
 Sinks keep today's rule: a node with no outgoing edge is a sink, and a sink
-contributes its output 0. An output that no edge consumes is still computed
-(its state advances once per sample) and is then discarded; it is neither
-an error nor folded into another channel. The template build fixes one
-voice layout:
+contributes its output 0. An output that no edge consumes is discarded; it
+is neither an error nor folded into another channel. The node's shared
+state still advances exactly once per sample. When a dual-output node's
+output 1 has no consumer, the node runs its existing single-output kernel
+path, unchanged. The paired kernel path (both outputs from one state
+update) runs only when output 1 is consumed. Eligibility guarantees that
+the two paths evolve state identically, and the unchanged path is what
+keeps every unmigrated template bit-identical by construction. The same
+rule applies to `sample-play`: its stereo path runs only when `:stereo` is
+consumed. The template build fixes one voice layout:
 
 - **Mono voice**: every sink's output 0 is mono and there is no
   `aux-out`. It uses today's equal-power `pan`, unchanged.
@@ -994,6 +1019,10 @@ the default `p = 0.5` both gains are exactly `1.0`. This covers today's
 bit-identically at center pan, including templates that read `pan`
 themselves, since those keep the voice at 0.5. At any other pan they now
 attenuate the opposite side, which is the owner-approved behavior change.
+The law is a new public helper beside `pan_gains` in
+`src/dsp/effects/prim.rs` that takes the same `0..1` voice `pan`. It is
+separate from the private `-1..1` balance control of the spatial effects
+in `src/dsp/effects/spatial.rs`, which is unchanged.
 Voice gain, the implicit envelope, the release fade, the nonfinite guard,
 and voice post effects already run on both channel buffers of a
 two-channel voice; the right-channel post effect now runs for stereo voices
@@ -1016,8 +1045,8 @@ indexes are encoded deterministically. The evaluator encoder and the
 single decoder used by both native and browser change together, in one
 same-revision change. The instrument record changes as follows:
 
-- **Record tag**: the instrument record gets a new tag byte, replacing
-  `G_INST = b'I'`. This is the discriminator the owner decision allows. A
+- **Record tag**: the instrument record tag changes from `G_INST = b'I'`
+  to `G_INST = b'V'`. This is the discriminator the owner decision allows. A
   payload carrying the old tag, or any unknown tag, is rejected with
   `FaultCode::BadRecord`. There is no legacy decoder, and nothing is
   guessed from record length.
@@ -1064,11 +1093,15 @@ it with a dedicated `BuildError` variant that maps to
 the arena. Invalid output indexes and shape mismatches that get past
 lowering are `BuildError::BadEdge` at build time.
 
-`src/dsp/engine.rs` is 966 lines. The voice mix and pan code it gains goes
-into a split-out submodule first, per the Rust coding standards. Every
-touched Rust file stays under 1000 lines.
+The voice mix and pan code lives in `src/dsp/engine/render.rs`, which was
+split out of `src/dsp/engine.rs` before the render-path change. Every
+touched Rust file stays under 1000 lines; `src/dsp/voice.rs`,
+`src/dsp/build.rs` and `src/dsp/ugen/template.rs` move new helpers into
+submodules if they would otherwise pass that limit.
 
-All storage is allocated or assigned on graph build/install paths. The audio
+All storage is allocated before the engine runs. `decode_graph` and
+template build run inside the engine on install, so they derive and check
+shapes and slices in fixed-size arrays and do not allocate. The audio
 callback only clears and processes already assigned channel slices. There
 are no callback allocations and no variable-sized collections. Stateful
 multi-output kernels advance shared state once per sample, regardless of
@@ -1176,6 +1209,26 @@ the owner decisions above without reopening them. The corrections are:
   that an unselected use means output 0. The voice layout rules are now
   explicit, and legacy `aux-out` voices get balance pan, bit-identical at
   center.
+
+### Implementation status (2026-09-29)
+
+Commit `85a300a` landed the foundation without changing any render:
+
+- the golden render and graph digests, recorded at `cf2ea37`, in
+  `src/host/tests/e2e/templates/golden.rs` and `golden_digests.txt`;
+- the output-shape contract in `src/dsp/graph/shape.rs`: the declaration
+  table, `select_output`, `derive_shapes`, `voice_layout`,
+  `assign_slices`, the shape byte, `MAX_AUDIO_BUFFERS` and the discard
+  slices. It also added `Edge.output`, the evaluator-only
+  `UGenKind::Output` wrapper and `BuildError::TooManyBuffers`;
+- the `src/dsp/engine/render.rs` split;
+- the paired-output kernel entry points and `sample::play_stereo`.
+
+Still to do: the VM selection call, checker typing and lowering; the
+`b'V'` codec; the slice-based voice runtime, stereo effects and balance
+pan; the nine template migrations; and regression closeout. These are the
+remaining `impl-plans/active/mod004-*.md` plans. The rules above are
+their authority, and nothing in this status note changes them.
 
 ## References
 

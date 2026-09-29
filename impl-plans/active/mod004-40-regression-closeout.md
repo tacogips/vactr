@@ -4,8 +4,21 @@
 **Plan ID**: MOD004-40 (wave 4, final serial reconciliation)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004F and plan closeout)
+**Baseline**: `85a300a`, plus the accepted MOD004-20/21/22/30.
 **Created**: 2026-09-29
-**Last Updated**: 2026-09-29
+**Last Updated**: 2026-09-29 (refined for session 192: Status-line scope, evidence rule)
+
+Notes for session 192:
+- The Status lines of `mod004-00-baseline.md` and
+  `mod004-12-kernel-pairs.md` were set to `Completed (committed in
+  85a300a)` during planning. This plan updates only the Status lines of
+  MOD004-20/21/22/30/40.
+- Evidence rule: every verification command writes its full output to
+  `tmp/mod004/MOD004-40/<n>-<name>.log`, and its exit status to the
+  Progress Log next to that log path. A missing or truncated log does not
+  count as a pass. `tmp/` is gitignored and must stay untracked.
+- `.vact` strings in this plan's tests use source form (`{p :aux}`), never
+  `(p :aux)`. See MOD004-20.
 
 ## Intent and Context
 

@@ -25,6 +25,13 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "braids/braids.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Consulted only for the firmware sample rate and block size used by the local comparison probe; no code is translated."
+
+[[file]]
 path = "braids/data/map.bin"
 license = "none"
 kind = "asset"
@@ -40,6 +47,12 @@ reason = "Unaudited wave binary read by waveforms.py; positions 37-40 use origin
 
 [[file]]
 path = "braids/digital_oscillator.cc"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "braids/digital_oscillator.h"
 license = "MIT"
 kind = "code"
 use = "source"
@@ -62,6 +75,13 @@ license = "MIT"
 kind = "aggregate-resource"
 use = "excluded"
 reason = "Generated aggregate tables; Braids shapes use original analytic or procedural replacements."
+
+[[file]]
+path = "braids/resources.h"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Declarations for the excluded aggregate Braids resource tables."
 
 [[file]]
 path = "braids/resources/waveforms.py"
@@ -373,6 +393,13 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "peaks/io_buffer.h"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Consulted only for the firmware sample rate and block size used by the local comparison probe; no code is translated."
+
+[[file]]
 path = "peaks/modulations/bouncing_ball.h"
 license = "MIT"
 kind = "code"
@@ -462,6 +489,13 @@ path = "peaks/resources/waveforms.py"
 license = "MIT"
 kind = "generator"
 use = "source"
+
+[[file]]
+path = "peaks/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Generated SVF cutoff/damp, envelope and oscillator-increment tables plus sine/overdrive waveforms; Vactr keeps analytic replacements. Compiled locally only by the drum-comparison reference probe from a separate checkout, never imported."
 
 # --- plaits
 [[file]]
@@ -974,6 +1008,19 @@ reason = "Unaudited wave binary behind wav_integrated_waves; positions 5, 13 and
 
 # --- rings
 [[file]]
+path = "rings/dsp/dsp.h"
+license = "MIT"
+kind = "code"
+use = "source"
+
+[[file]]
+path = "rings/dsp/fm_voice.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
 path = "rings/dsp/fx/chorus.h"
 license = "MIT"
 kind = "code"
@@ -1004,6 +1051,20 @@ kind = "code"
 use = "source"
 
 [[file]]
+path = "rings/dsp/resonator.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
+path = "rings/dsp/string.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
+
+[[file]]
 path = "rings/dsp/string_synth_envelope.h"
 license = "MIT"
 kind = "code"
@@ -1032,6 +1093,13 @@ path = "rings/dsp/string_synth_voice.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "rings/resources.cc"
+license = "MIT"
+kind = "aggregate-resource"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
 
 # --- stages
 [[file]]
@@ -1108,6 +1176,13 @@ path = "stmlib/utils/dsp.h"
 license = "MIT"
 kind = "code"
 use = "source"
+
+[[file]]
+path = "stmlib/utils/random.cc"
+license = "MIT"
+kind = "code"
+use = "excluded"
+reason = "Compiled only by the local comparison probes in a separate checkout; not part of Vactr."
 
 [[file]]
 path = "stmlib/utils/random.h"

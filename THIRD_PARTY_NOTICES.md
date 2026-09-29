@@ -135,6 +135,21 @@ fixed-point arithmetic differ. All 47 positions are runnable adaptations,
 not source-equivalent ports; upstream wave-asset
 flags 37–40 remain true as provenance facts, not runtime dependencies.
 
+An opt-in local verification probe, `verification/braids_shapes_reference.cc`
+plus `verification/compare_braids_shapes.py`, compiles the pinned
+`braids/macro_oscillator.{h,cc}`, `braids/analog_oscillator.{h,cc}`,
+`braids/digital_oscillator.{h,cc}`, `braids/resources.{h,cc}` and
+`stmlib/utils/random.{h,cc}` only into a separate, local, temporary
+executable built from the user's own pinned checkout; it is never linked
+into Vactr's library, binary, or browser build, and no upstream object,
+table, or audio sample is copied into this repository. It measures raw
+kernel RMS, correlation, normalized RMS error, an approximate spectral
+centroid and a fundamental-frequency estimate against
+`examples/braids_shapes_reference.rs`, which dispatches every one of the 47
+source positions to the Vactr family kernel that owns it. Measured gaps are
+comparison results, not evidence of source parity; they never change any
+coverage manifest label.
+
 ## Clouds granular texture architectural adaptation
 
 `texture-grain` and `src/dsp/effects/texture.rs` adapt the stereo capture,
@@ -532,6 +547,12 @@ per-voice seeded randomness replaces the global source stream; exact tangent
 replaces its filter approximation. Envelope and cutoff timing are converted
 to the host rate. This is a source-stage translation, not a bit-exact build.
 
+`verification/compare_plaits_drums.py` can locally compile the pinned
+`hi_hat_engine.{h,cc}` and `drums/hi_hat.h` from a separate checkout solely
+for numerical comparison against `hat_pair::render`. It imports no upstream
+code, table or sample into Vactr; see "Optional local source-comparison
+probe" above for the shared probe terms.
+
 ## Plaits position 22 dual snare-drum MIT translation
 
 `dual-snare-voice` and `src/dsp/ugen/snare_pair/` translate the analog-main
@@ -560,6 +581,13 @@ and exact tangent replaces the source fast filter approximation. Source
 48 kHz timing is converted to the host rate. This is a source-stage
 translation, not a bit-exact firmware build.
 
+`verification/compare_plaits_drums.py` can locally compile the pinned
+`snare_drum_engine.{h,cc}` and `drums/{analog_snare_drum,synthetic_snare_drum}.h`
+from a separate checkout solely for numerical comparison against
+`snare_pair::render`. It imports no upstream code, table or sample into
+Vactr; see "Optional local source-comparison probe" above for the shared
+probe terms.
+
 ## Plaits position 21 dual bass-drum MIT translation
 
 `dual-kick-voice` and `src/dsp/ugen/dual_kick/` translate the analog-main
@@ -584,6 +612,13 @@ stream and converts the source's 48 kHz timing/filter coefficients to host
 rates. The source's dirty-tangent SVF approximation and inter-block pitch
 interpolation and gated sustain-gain smoothing also differ numerically. Thus this is a source-stage translation,
 not a bit-exact firmware build.
+
+`verification/compare_plaits_drums.py` can locally compile the pinned
+`bass_drum_engine.{h,cc}` and `drums/{analog_bass_drum,synthetic_bass_drum}.h`
+from a separate checkout solely for numerical comparison against
+`dual_kick::render`. It imports no upstream code, table or sample into
+Vactr; see "Optional local source-comparison probe" above for the shared
+probe terms.
 
 ## Plaits position 0 architectural reference
 
@@ -777,6 +812,19 @@ map, or generated resource. It keeps separately authored noise, drive and
 pitch-sweep controls, and its floating-point and host-rate timing differ
 from the source; numerical source parity is not claimed.
 
+An opt-in local comparison probe, `verification/peaks_drums_reference.cc`
+(compiled against `peaks/drums/fm_drum.{h,cc}` and the aggregate
+`peaks/resources.cc` from a separate pinned checkout, never linked into
+Vactr) and `examples/peaks_drums_reference.rs`, drives one triggered hit of
+the source `FmDrum` and Vactr's `fm-drum` kernel at the source's own 48 kHz
+rate for three documented control settings. `verification/compare_peaks_drums.py`
+reports RMS, peak, correlation and normalized RMS error after onset
+alignment, spectral centroid and -20/-40 dB decay times; it compiles the
+upstream sources only into a local temporary executable and stores no
+upstream code, table or output sample in this repository. The measured
+gaps (documented in `impl-plans/active/modular-fm-drums.md`) do not
+establish source parity and do not change the `SourceStage` manifest label.
+
 Copyright 2013–2014 Emilie Gillet.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -807,12 +855,28 @@ informed by the signal families and control roles in
 are copyright 2013 Emilie Gillet and carry the MIT permission and warranty
 notice reproduced above. The original bass/snare files depend on Peaks
 `excitation.h` and `svf.h`, `stmlib/utils/dsp.h`, and (for snare)
-`stmlib/utils/random.h`; the high-hat uses those filter/excitation and
+`stmlib/utils/random.{h,cc}`; the high-hat uses those filter/excitation and
 random utilities too. Vactr imports none of those implementations,
 `peaks/resources.*`, lookup tables, sample data, or presets. In the original
 high-hat, `Configure` has no authored controls; Vactr's hat frequency,
 tone, decay, and metal knobs are extensions. These are architectural
 adaptations, not sample-exact copies of the original firmware.
+
+An opt-in local comparison probe, `verification/peaks_drums_reference.cc`
+(compiled against `peaks/drums/bass_drum.{h,cc}`, `snare_drum.{h,cc}` and
+`high_hat.{h,cc}` and the aggregate `peaks/resources.cc` from a separate
+pinned checkout, never linked into Vactr) and `examples/peaks_drums_reference.rs`,
+drives one triggered hit of each source drum and the matching Vactr
+`analog-percussion` mode (0/1/2) at the source's own 48 kHz rate for three
+documented control settings; the source high-hat's `Configure` takes no
+controls, so its three settings vary only on the Vactr side against one
+fixed source render. `verification/compare_peaks_drums.py` reports RMS,
+peak, correlation and normalized RMS error after onset alignment, spectral
+centroid and -20/-40 dB decay times; it compiles the upstream sources only
+into a local temporary executable and stores no upstream code, table or
+output sample in this repository. The measured gaps (documented in
+`impl-plans/active/modular-peaks-functions.md`) do not establish source
+parity and do not change the `Adaptation` manifest labels.
 
 ## Three-component percussion design reference
 
@@ -1033,6 +1097,21 @@ are represented but their numerical effect and source cross-channel paths
 differ. The source has twelve oscillators and persistent rotating groups;
 Vactr has four event-local voices and independent main/aux calculations.
 External audio input remains pending. This is not a source-equivalent port.
+
+The opt-in RNG-006 comparison probe (`verification/rings_part_reference.cc`,
+run through `mise run compare-rings-part`) links the pinned `rings::Part`
+and `rings::StringSynthPart` classes directly against a separate local
+Eurorack checkout, together with their `rings/dsp/resonator.cc`,
+`rings/dsp/string.cc`, `rings/dsp/fm_voice.cc` and `rings/resources.cc`
+dependencies and `stmlib/dsp/units.cc`/`stmlib/utils/random.cc`, and reads
+the confirmed
+source rate and block size from `rings/dsp/dsp.h`. This probe compiles
+those upstream sources only inside the task's own temporary build
+directory; it never links into Vactr's library, binary, or browser build,
+and no object code, generated table, or output sample it produces is
+copied into this repository. Its measured metrics are recorded in
+`impl-plans/active/modular-rings-resonator.md` as a raw-kernel comparison,
+not a source-parity claim.
 
 ## Stages-inspired analytic segment and oscillator adaptation
 

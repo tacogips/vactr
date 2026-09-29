@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -45,12 +45,12 @@ unavailable; never silently substitute or mark an adaptation as source parity.
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
 | BRA-001 | Enumerate 47 accessible shapes, dispatcher, parameters and resources | SYN-004 | 47-position runtime manifest complete; per-shape dependency audit for 5–46 open |
-| BRA-002 | Analog and compound oscillator shapes 0–16 | BRA-001 | 0–16 runnable analytic adaptations; source comparisons open |
-| BRA-003 | Digital filter, formant, harmonics and FM shapes 17–27 | BRA-001 | 17–27 runnable adaptations; source comparisons open |
-| BRA-004 | Physical-model and drum shapes 28–36 | BRA-001 | 28–36 runnable adaptations; source comparisons open |
-| BRA-005 | Wave-bank/map/line/paraphonic shapes 37–40 with cleared or original data | BRA-001 | 37–40 runnable replacements; source comparisons open |
-| BRA-006 | Noise, granular, particle and digital modulation shapes 41–46 | BRA-001 | 41–46 runnable adaptations; source comparisons open |
-| BRA-007 | Source-control and deterministic signal comparisons per shape | BRA-002..006 | Not started |
+| BRA-002 | Analog and compound oscillator shapes 0–16 | BRA-001 | 0–16 runnable analytic adaptations; source comparisons measured, all "measured gap" (see BRA-007) |
+| BRA-003 | Digital filter, formant, harmonics and FM shapes 17–27 | BRA-001 | 17–27 runnable adaptations; source comparisons measured, all "measured gap" (see BRA-007) |
+| BRA-004 | Physical-model and drum shapes 28–36 | BRA-001 | 28–36 runnable adaptations; source comparisons measured, all "measured gap" (see BRA-007) |
+| BRA-005 | Wave-bank/map/line/paraphonic shapes 37–40 with cleared or original data | BRA-001 | 37–40 runnable replacements; source comparisons measured, classified "replacement" as expected (see BRA-007) |
+| BRA-006 | Noise, granular, particle and digital modulation shapes 41–46 | BRA-001 | 41–46 runnable adaptations; source comparisons measured, all "measured gap" (see BRA-007) |
+| BRA-007 | Source-control and deterministic signal comparisons per shape | BRA-002..006 | Comparison harness complete and run for all 47 positions (see Session: 2026-09-29 below); zero positions classified "close" or "not comparable" |
 | BRA-008 | Native/browser, capacity, callback and metadata verification | BRA-002..007 | Not started |
 
 ## Completion Criteria
@@ -58,11 +58,139 @@ unavailable; never silently substitute or mark an adaptation as source parity.
 - [x] All 47 accessible source positions have stable, truthful coverage entries.
 - [ ] Each runnable shape exposes pitch, timbre pair, strike and supported sync in `.vact` and editor metadata.
 - [ ] Wave/data provenance is audited or replaced with original procedures; notices are complete.
-- [ ] Separate shape response and source comparisons cover every runnable position.
+- [x] Separate shape response and source comparisons cover every runnable position.
 - [ ] Native/browser rates, bounded state and zero callback allocations pass.
 - [ ] Quiet Cargo check, strict Clippy, tests, rustfmt and diff checks pass.
 
 ## Progress Log
+
+### Session: 2026-09-29 — per-shape source comparison (BRA-007)
+
+Added an opt-in local verification harness that never enters Vactr's
+library, binary, or browser build:
+`verification/braids_shapes_reference.cc` (an original driver that
+`#include`s the pinned upstream `braids::MacroOscillator` directly and is
+generic across all 47 shape indices via argv), `verification/compare_braids_shapes.py`
+(revision and clean-source checks, isolated temporary build/run, metrics),
+`examples/braids_shapes_reference.rs` (a Vactr raw-kernel probe that
+dispatches every source position to the family kernel
+`src/dsp/ported/braids.rs` maps it to — `braids_five`, `braids_subsync`,
+`braids_triple`, `braids_digital`, `braids_filter`, `braids_formant`,
+`braids_fm`, `braids_physical`, `braids_struck`, `braids_percussion`,
+`braids_wave_bank`, `braids_wave_line`, `braids_noise`, `braids_cloud` —
+passing the absolute source position through each kernel's own
+shape-select input, per the uniform port layout pitch/shape/color/timbre/
+strike/sync already used by their existing tests), and a `mise run
+compare-braids-shapes` task. Run it as `VACTR_MI_REFERENCE=/path/to/eurorack
+mise run compare-braids-shapes`.
+
+**Rate/block and pitch**: both probes render at the pinned firmware's own
+96 kHz / 24-frame-block configuration (`sys.Init(F_CPU / 96000 - 1, true)`
+and `const size_t kBlockSize = 24` in `braids/braids.cc`). The fixed pitch
+is MIDI note 60 (middle C): the upstream probe uses Braids pitch code
+`60 << 7 = 7680`, which is the literal expression the reference firmware's
+own default quantizer target uses (`(60 + settings.quantizer_root()) << 7`,
+root 0, in `RenderBlock`) in its 128-units-per-semitone pitch code; the
+Vactr probe uses the corresponding standard equal-tempered
+261.625565 Hz. 200 blocks (4800 frames, one 24-frame warm-up block
+skipped) were rendered per scenario; three (timbre, color) pairs — (0.15,
+0.25), (0.50, 0.50), (0.85, 0.75) — were used for every shape, with
+strike fired once at the first block and sync at zero (an all-zero sync
+buffer upstream, matching the Vactr probe's `sync = 0`), giving 141
+upstream/Vactr comparisons.
+
+**Metrics**: per shape/scenario RMS (both sides), correlation, normalized
+RMS error after warm-up, an approximate Goertzel log-spaced-bin spectral
+centroid, and a coarse-to-fine normalized-autocorrelation fundamental
+estimate (reported only above a confidence floor, and discounted further
+at the searched 40–2000 Hz band's edges, to avoid claiming a pitch for
+noise-like output). Each of the 47 positions is classified from the
+median correlation/NRMSE across its three scenarios: "close"
+(correlation ≥ 0.9 and NRMSE ≤ 0.35), "measured gap" (computable but
+below that bar), "replacement" (positions 37–40, whose Vactr kernels are
+original procedural substitutes for the upstream wave-bank/map/line/chord
+data path by design), or "not comparable" (no scenario produced usable
+output). The full run:
+
+| Pos | Name | Class | Median corr | Median NRMSE |
+|---|---|---|---|---|
+| 0 | CSAW | measured gap | -0.17 | 1.08 |
+| 1 | MORPH | measured gap | -0.26 | 1.34 |
+| 2 | SAW_SQUARE | measured gap | -0.71 | 1.54 |
+| 3 | SINE_TRIANGLE | measured gap | 0.12 | 1.32 |
+| 4 | BUZZ | measured gap | 0.64 | 0.81 |
+| 5 | SQUARE_SUB | measured gap | -0.54 | 1.39 |
+| 6 | SAW_SUB | measured gap | -0.71 | 1.76 |
+| 7 | SQUARE_SYNC | measured gap | -0.57 | 1.63 |
+| 8 | SAW_SYNC | measured gap | 0.59 | 0.91 |
+| 9 | TRIPLE_SAW | measured gap | 0.30 | 1.07 |
+| 10 | TRIPLE_SQUARE | measured gap | -0.28 | 1.52 |
+| 11 | TRIPLE_TRIANGLE | measured gap | 0.29 | 1.13 |
+| 12 | TRIPLE_SINE | measured gap | -0.11 | 1.46 |
+| 13 | TRIPLE_RING_MOD | measured gap | 0.03 | 3.11 |
+| 14 | SAW_SWARM | measured gap | -0.00 | 1.10 |
+| 15 | SAW_COMB | measured gap | 0.67 | 0.76 |
+| 16 | TOY | measured gap | -0.68 | 2.42 |
+| 17 | DIGITAL_FILTER_LP | measured gap | 0.36 | 0.81 |
+| 18 | DIGITAL_FILTER_PK | measured gap | 0.24 | 0.82 |
+| 19 | DIGITAL_FILTER_BP | measured gap | 0.00 | 1.29 |
+| 20 | DIGITAL_FILTER_HP | measured gap | 0.00 | 1.17 |
+| 21 | VOSIM | measured gap | -0.13 | 1.08 |
+| 22 | VOWEL | measured gap | 0.16 | 1.75 |
+| 23 | VOWEL_FOF | measured gap | -0.29 | 1.67 |
+| 24 | HARMONICS | measured gap | 0.00 | 1.42 |
+| 25 | FM | measured gap | -0.01 | 1.38 |
+| 26 | FEEDBACK_FM | measured gap | 0.23 | 1.21 |
+| 27 | CHAOTIC_FEEDBACK_FM | measured gap | 0.01 | 1.36 |
+| 28 | PLUCKED | measured gap | 0.03 | 1.32 |
+| 29 | BOWED | measured gap | -0.02 | 5.40 |
+| 30 | BLOWN | measured gap | -0.01 | 11.15 |
+| 31 | FLUTED | measured gap | 0.09 | 1.02 |
+| 32 | STRUCK_BELL | measured gap | 0.03 | 1.15 |
+| 33 | STRUCK_DRUM | measured gap | 0.01 | 1.10 |
+| 34 | KICK | measured gap | -0.10 | 3.05 |
+| 35 | CYMBAL | measured gap | -0.04 | 1.01 |
+| 36 | SNARE | measured gap | 0.04 | 1.33 |
+| 37 | WAVETABLES | replacement | -0.06 | 1.34 |
+| 38 | WAVE_MAP | replacement | -0.06 | 1.13 |
+| 39 | WAVE_LINE | replacement | -0.02 | 1.41 |
+| 40 | WAVE_PARAPHONIC | replacement | 0.14 | 1.39 |
+| 41 | FILTERED_NOISE | measured gap | 0.19 | 1.21 |
+| 42 | TWIN_PEAKS_NOISE | measured gap | 0.05 | 3.85 |
+| 43 | CLOCKED_NOISE | measured gap | 0.02 | 1.42 |
+| 44 | GRANULAR_CLOUD | measured gap | -0.57 | 1.36 |
+| 45 | PARTICLE_NOISE | measured gap | -0.03 | 10.07 |
+| 46 | DIGITAL_MODULATION | measured gap | -0.12 | 1.17 |
+
+43 positions are "measured gap" and 4 (37–40) are "replacement" as
+expected; zero positions are "close" and zero are "not comparable" (all
+141 scenario runs produced finite, comparable output). This is consistent
+with every Vactr Braids kernel already being labeled Adaptation or
+Replacement, never SourcePort: correlations cluster near zero (occasionally
+negative) and NRMSE is frequently at or above 1.0 (some percussion/physical
+shapes exceed 5–11, reflecting very different transient timing and
+envelope shape rather than a shared waveform being merely mis-scaled).
+The fundamental-estimate metric cross-checks the harness itself: for
+steady oscillator shapes both sides independently converge on ~261.6 Hz
+(MIDI 60), confirming the pitch mapping and comparison pipeline are sound
+even though waveform shape, brightness and (for transient shapes) decay
+timing differ substantially. **What this does and does not show**: it
+confirms both probes render finite audio at the documented rate/pitch and
+quantifies how far each independent Vactr kernel's raw output sits from
+the pinned firmware's raw output under matched pitch/timbre/color/strike/
+sync inputs. It is a raw-kernel-only comparison with no envelope, trigger,
+LPG, `.vact` host, or true per-sample external sync path on either side,
+does not exercise BRA-008's native/browser/capacity/callback surface, and
+does not and cannot establish source parity; no manifest coverage label
+changed as a result (all Braids positions remain Adaptation/Replacement,
+never SourcePort). No kernel file needed a fidelity fix from this pass —
+observed gaps trace to differences in each kernel's own analytic design
+versus the source's table-driven synthesis, not to a translation bug.
+Independent verification: `cargo fmt --check`, quiet `cargo check`, strict
+Clippy (`--all-targets -- -D warnings`), a wasm32-unknown-unknown library
+check, the full `cargo nextest run` suite, the new mise task end-to-end
+against the pinned checkout, `mise tasks validate`, and
+`verification/audit_upstream.py` (0 errors) all pass.
 
 ### Session: 2026-09-28 — grain, particle and symbol shapes 44–46
 

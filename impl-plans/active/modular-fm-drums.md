@@ -55,9 +55,9 @@ algorithm and parameter list only after source and dependency rights pass.
 | FMD-003 | Expose first FM drum through `.vact`, metadata, and native/browser rendering | FMD-002 | Completed for first voice |
 | FMD-004 | Audit separate Faust percussion voice and standard-library rights | none | Completed; no Faust library code used |
 | FMD-005 | Independently implement second FM/noise/feedback voice | FMD-004, MOD-003 | Completed as `:fusion-drum` |
-| FMD-006 | Integration, parameter-response, allocation, and parity tests | FMD-003, FMD-005 | Partial: integration and parameter response pass; upstream parity remains |
+| FMD-006 | Integration, parameter-response, allocation, and parity tests | FMD-003, FMD-005 | Integration, parameter response and allocation pass; a numeric `compare-peaks-drums` upstream-parity probe now exists and ran (measured gaps, no full parity claimed) |
 | FMD-007 | Design original EFM-inspired voice family from thesis signal-flow research without copying protected expression | FMD-001, MOD-003 | First bounded member implemented as `feedback-metal-drum`; broader family pending |
-| FMD-008 | Translate Peaks FM drum signal stages with analytic wave/curve replacements and separate controls | FMD-002, FMD-006 | Completed and independently verified; source numerical comparison remains separate |
+| FMD-008 | Translate Peaks FM drum signal stages with analytic wave/curve replacements and separate controls | FMD-002, FMD-006 | Completed and independently verified; a source numerical comparison now runs under FMD-006 (`compare-peaks-drums`) |
 
 ### FMD-008 source-stage fidelity pass
 
@@ -105,6 +105,45 @@ Update Peaks coverage and notices to the verified fidelity level.
 - [x] `CARGO_TERM_QUIET=true` cargo check, clippy and tests pass.
 
 ## Progress Log
+
+### Session: 2026-09-29 (FMD-006 upstream-parity comparison probe)
+
+The upstream-parity part of FMD-006 is now covered by an opt-in
+`mise run compare-peaks-drums` task, shared with `modular-peaks-functions.md`
+PKS-002 since it also compares the bass/snare/hat drums.
+`verification/peaks_drums_reference.cc` triggers the pinned `peaks/drums/
+fm_drum.{h,cc}` once at the source's own 48 kHz rate (compiled locally
+against the aggregate `peaks/resources.cc`, never linked into Vactr) and
+`examples/peaks_drums_reference.rs` drives `fm_drum::render` directly with
+the matching Vactr controls; `verification/compare_peaks_drums.py` reports
+RMS, peak, correlation and normalized RMS error after onset alignment,
+spectral centroid, and -20/-40 dB decay times for three scenarios (`clean`,
+`noisy`, `driven`) that span frequency, `fm-amount`, decay, and the
+source's single dual-purpose `noise` parameter (mapped to Vactr's separate
+`drum-noise`/`drive` at each end and their shared midpoint boundary).
+`pitch-sweep` has no source counterpart and stays at its 0.5 default in
+every scenario.
+
+Measured results: RMS tracks within about 20% on `clean`/`noisy` and
+crosses over on `driven` (source 0.315 vs. Vactr 0.255); correlation after
+onset alignment is low (0.307/-0.037/0.048); spectral centroid is close on
+`clean` (202 vs. 197 Hz) and within about 25-5% on `noisy`/`driven`; -20 dB
+decay matches exactly on `noisy` (0.215 s both) and is within 1.4x
+elsewhere; -40 dB decay is within 1.5x on every scenario. The `clean`
+scenario also shows the source's 3-sample excitation-delay onset that
+Vactr's kernel starts immediately, a known, already-documented difference
+(`THIRD_PARTY_NOTICES.md` notes trigger-phase and block-tail pitch
+alignment differ). Full metrics and the mapping/unit-conversion notes are
+recorded in `modular-peaks-functions.md`'s 2026-09-29 session and in
+`verification/compare_peaks_drums.py`'s module docstring. These are
+measured gaps, not full source parity; `fm-drum`'s manifest row stays
+`SourceStage`, not `SourcePort`. No kernel change was made: the gaps are
+consistent with the already-documented analytic/floating-point and
+host-rate-timing differences rather than an implementation bug.
+`CARGO_TERM_QUIET=true cargo fmt --check`, `cargo check -q`, strict
+Clippy, `cargo check -q --target wasm32-unknown-unknown --lib`,
+`cargo nextest run`, `mise run compare-peaks-drums`, `mise tasks validate`
+and `mise run audit-upstream` (219 files, zero errors) pass.
 
 ### Session: 2026-09-28 (FMD-008 Peaks FM drum stages)
 

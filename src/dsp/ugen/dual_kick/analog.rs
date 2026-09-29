@@ -105,7 +105,9 @@ pub(super) fn tick(
     let self_fm = (harmonics * 4.0 - 1.0).clamp(0.0, 1.0);
     let punch = 0.7 + diode(10.0 * m[LP_OUT] - 1.0);
     let f = (f0 * (1.0 + m[FM_LP] * 1.7 * attack_fm + punch * 0.08 * self_fm)).clamp(0.0, 0.4);
-    let q = 1.0 + 1500.0 * 2.0_f32.powf(decay * 80.0 / 12.0) * f0;
+    // Source computes q from the per-sample FM-modulated frequency `f`, not
+    // the unmodulated `f0`.
+    let q = 1.0 + 1500.0 * 2.0_f32.powf(decay * 80.0 / 12.0) * f;
     let (resonator, low) = if sustain {
         m[SUSTAIN_GAIN] +=
             rate_pole(0.01, sr) * ((if gate { accent * decay } else { 0.0 }) - m[SUSTAIN_GAIN]);

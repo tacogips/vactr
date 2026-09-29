@@ -244,9 +244,9 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 | SYN-003A | Implement position 17 clocked-noise main/aux with event reset | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
 | SYN-003A2 | Translate position 17 BLEP clocks and three SVF signal paths | SYN-003A | Completed and independently verified; numerical comparison and voice/LPG parity remain separate |
 | SYN-003B | Implement position 21 dual bass-drum main/aux with accent and retrigger | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
-| SYN-003C | Replace position 21 approximations with source stages and scheduled retrigger test | SYN-003B | Source-stage translation complete; bit-exact parity not claimed |
-| SYN-003D | Translate position 22 analog/synthetic snare stages and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; bit-exact parity not claimed |
-| SYN-003E | Translate position 23 square/ring-mod hi-hat variants and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; bit-exact parity not claimed |
+| SYN-003C | Replace position 21 approximations with source stages and scheduled retrigger test | SYN-003B | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`), one resonance-Q translation error fixed; bit-exact parity not claimed |
+| SYN-003D | Translate position 22 analog/synthetic snare stages and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`); bit-exact parity not claimed |
+| SYN-003E | Translate position 23 square/ring-mod hi-hat variants and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`); bit-exact parity not claimed |
 | SYN-003F | Translate position 16 eight-voice swarm with saw/sine outputs | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; bit-exact parity not claimed |
 
 ## Module Status
@@ -275,6 +275,88 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 - [ ] Native/browser tests pass with bounded callback state and no allocation.
 
 ## Progress Log
+
+### Session: 2026-09-29, SYN-003C/D/E positions 21-23 raw-kernel comparison
+
+Added an opt-in `mise run compare-plaits-drums` task (pinned Clang and
+Python, same pattern as `compare-plaits-fm`) that drives the pinned
+`plaits/dsp/engine/{bass_drum,snare_drum,hi_hat}_engine.{h,cc}` (which
+`#include` `plaits/dsp/drums/*.h`) directly at the source's 48 kHz/24-frame
+block via `verification/plaits_drums_reference.cc`, and compares them
+against Vactr's `dual_kick::render`, `snare_pair::render` and
+`hat_pair::render` via `examples/plaits_drums_reference.rs`. Each engine is
+driven with a single rising-edge trigger at the first sample of a 3000-block
+(72,000-frame, 1.5 s) run, three harmonics/timbre/morph settings
+(0.1/0.25/0.2, 0.5/0.5/0.5, 0.9/0.75/0.8, each at accent 1.0) plus one
+accent-only variation (0.5/0.5/0.5 at accent 0.3), for both main and
+auxiliary output nodes. `verification/compare_plaits_drums.py` reports, per
+channel: RMS, peak, Pearson correlation, normalized RMS error after a
+±32-sample onset-alignment search, a Hann-windowed 512-sample spectral
+centroid, and -20/-40 dB envelope decay time (null when not reached inside
+the window). Run it as
+`VACTR_MI_REFERENCE=/path/to/eurorack mise run compare-plaits-drums`.
+`stmlib/utils/random.cc` is newly named in `verification/upstream_inventory.toml`
+(`excluded`, compiled only by the local probe); every other compiled file was
+already inventoried from the SYN-003C/D/E translations. `plaits/resources.cc`
+is compiled only for the local reference process, as `compare-plaits-fm`
+already does; nothing from it enters Vactr.
+
+**Kernel fix (position 21, analog main path)**: `src/dsp/ugen/dual_kick/analog.rs`
+computed the state-variable resonator's Q from the unmodulated base
+frequency `f0`, but the pinned `analog_bass_drum.h` computes it from the
+per-sample FM-modulated frequency `f`
+(`resonator_.set_f_q<FREQUENCY_DIRTY>(f, 1.0f + q * f)`). Comparing `f`
+against `f0` in the fix is a direct, line-by-line read against the pinned
+source, not a metric-driven guess. Fixing the resonance argument to use `f`
+took the analog main channel from a measured gap to effectively exact
+agreement against this raw-kernel probe:
+
+| Scenario (h/t/m, accent) | main correlation before → after | main normalized RMS error before → after |
+|---|---|---|
+| 0.1/0.25/0.2, 1.0 | 0.9994 → 1.0000 | 0.0869 → 0.0000 |
+| 0.5/0.5/0.5, 1.0 | 0.9604 → 1.0000 | 0.2697 → 0.0001 |
+| 0.9/0.75/0.8, 1.0 | 0.6501 → 1.0000 | 0.7956 → 0.0003 |
+| 0.5/0.5/0.5, 0.3 | 0.9887 → 1.0000 | 0.1770 → 0.0001 |
+
+The analog aux channel (mode input only selects main vs. aux per node; the
+fix is isolated to the main/analog path) and all other channels are
+unaffected by this fix (unchanged before/after). The manifest coverage
+label for position 21 stays `SourceStage`; this fix does not establish
+bit-exact parity, only removes one measured translation error in the
+resonator drive.
+
+**Metrics after the fix** (0.5/0.5/0.5 accent-1.0 scenario, representative
+of the full 4-scenario x 3-engine x 2-channel table the task prints as
+JSON): kick main correlation 1.0000/normalized RMS error 0.0001, kick aux
+0.8640/0.2528; snare main 0.2788/1.1724, snare aux 0.5768/0.9115; hihat main
+0.7599/0.6969, hihat aux 0.2782/1.0671. Spectral centroids track closely
+across every scenario (within roughly 1-5% of the reference), and -20/-40 dB
+decay times mostly agree to within one 64-sample envelope block, showing
+that the ported filter cutoffs, resonance register and envelope decay rates
+are in the right range even where sample-level correlation is low.
+Sample-level correlation and normalized RMS error fall sharply as
+harmonics/decay push more weight onto noise (`snare-harmonics`/snappy,
+hi-hat clocked-noise blend) or onto RNG-seeded oscillator paths (the
+synthetic kick/snare), because Vactr's per-voice seeded RNG and the pinned
+`stmlib::Random` global stream necessarily diverge sample-by-sample; this
+was already documented for all three positions as an expected, not fixable
+without abandoning per-voice determinism, translation difference. The
+analytic-sine-vs-LUT, host-rate filter coefficient conversion and
+exact-tangent-vs-dirty-tangent differences already recorded for these
+positions also remain and were not re-measured in isolation here.
+
+**Scope and limits**: this is a raw main/aux kernel comparison only. It
+exercises no LPG, voice envelope, `.vact` host, event scheduling or browser
+codec path, and a single trigger is not a retrigger/sustain-mode test (those
+remain covered by the existing focused Rust tests). It does not establish or
+claim bit-exact firmware parity for any of the three positions; the
+manifest keeps all three at `SourceStage`. `CARGO_TERM_QUIET=true cargo fmt
+--check`, `cargo check -q`, strict all-target Clippy, `cargo check -q
+--target wasm32-unknown-unknown --lib`, the full `cargo nextest run` suite,
+`mise run compare-plaits-drums`, `mise tasks validate` and
+`python3 verification/audit_upstream.py --source <checkout>` (0 errors) all
+pass after this change. `src/dsp/ugen/dual_kick/analog.rs` remains well
+under the 1000-line file limit.
 
 ### Session: 2026-09-28, SYN-002C2 FM source-stage translation
 

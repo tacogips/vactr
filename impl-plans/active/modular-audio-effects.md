@@ -36,7 +36,7 @@ host capabilities; no audio callback allocates or fetches resources.
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
 | FX-001 | Port Clouds granular, stretch, looping delay and spectral modes | MOD-004, MOD-005 | Four runnable adaptations; source parity review pending |
-| FX-002 | Adapt seven Warps modulation modes, morph and internal carrier; audit spectral Easter egg | MOD-004 stereo bus boundary | Seven-mode and Easter-egg adaptations runnable; XMOD and 96-kHz vocoder stages translated with host-rate FIR boundary, full parity pending |
+| FX-002 | Adapt seven Warps modulation modes, morph and internal carrier; audit spectral Easter egg | MOD-004 stereo bus boundary | All comparable XMOD positions now measure close after startup-ramp and aux-gain fixes; fold remains Adaptation; full parity pending |
 | FX-002A | Translate cleared Warps cross-modulation equations and analytic mode crossfade | FX-002 | Completed; oversampling, fold/vocoder and full parity remain separate |
 | FX-002B | Translate source algorithm-to-vocoder transition and XMOD parameter skew | FX-002A | Completed; vocoder kernel and carrier remain adaptations |
 | FX-002C | Expose the remaining vocoder release/freeze algorithm range | FX-002B | Completed; vocoder filter-bank parity remains open |
@@ -205,6 +205,94 @@ fold, sine, crossfade, oscillator or other lookup arrays.
 - [ ] Quiet cargo check, clippy and tests pass.
 
 ## Progress Log
+
+### Session: 2026-09-29, FX-002G Warps XMOD numeric comparison
+
+Added `verification/warps_xmod_reference.cc`,
+`verification/compare_warps_xmod.py`,
+`examples/warps_xmod_reference.rs` and `mise run compare-warps-xmod`. The
+reference compiles the pinned upstream `Modulator::Process` and its local
+dependencies in a temporary directory; the Vactr probe calls
+`cross_mod::process` directly. Both consume the same Python-generated 96 kHz
+stereo float32 carrier sine (220 Hz) and noise-free modulator saw (137 Hz),
+processed in 60-frame blocks for 12,000 frames. The source's normalized
+algorithm value is the XMOD position divided by eight; Vactr's public
+algorithm position is unchanged. The 264 scenarios cover positions 0..5 in
+half-step increments, three timbres, two independent-drive pairs, and
+external plus internal carrier shapes 1..3. The internal source note is 48.
+
+Classification uses the mean main-output metrics over the 24 timbre/drive/
+carrier scenarios at each position: close means NRMSE <= 0.10 and correlation
+>= 0.95; measured gap means the translated stage exceeds either threshold.
+Positions 0.5, 1.0 and 1.5 are not comparable because they include Vactr's
+authored fold contribution. The source scales every aux output by 0.5 when
+converted to signed 16-bit samples (`output->r = Clip16(aux * 16384)`). The
+original aux gap was only for internal carriers: external-carrier Vactr aux
+already averages its raw inputs, matching the source's summed aux followed by
+half output gain.
+
+| XMOD position | Classification | Main NRMSE | Main correlation | Aux NRMSE | Aux correlation | Estimated latency, main / aux (samples) |
+|---:|---|---:|---:|---:|---:|---:|
+| 0.0 | Close | 0.045 | 0.997 | 0.757 | 0.997 | -7..0 / -7..0 |
+| 0.5 | Not comparable | 1.044 | 0.508 | 0.757 | 0.997 | -28..48 / -7..0 |
+| 1.0 | Not comparable | 1.392 | 0.099 | 0.757 | 0.997 | -48..48 / -7..0 |
+| 1.5 | Not comparable | 0.864 | 0.678 | 0.757 | 0.997 | 0..1 / -7..0 |
+| 2.0 | Close | 0.074 | 0.995 | 0.757 | 0.997 | 0..0 / -7..0 |
+| 2.5 | Measured gap | 0.106 | 0.991 | 0.757 | 0.997 | -5..0 / -7..0 |
+| 3.0 | Close | 0.093 | 0.992 | 0.757 | 0.997 | -4..0 / -7..0 |
+| 3.5 | Measured gap | 0.104 | 0.991 | 0.757 | 0.997 | -2..0 / -7..0 |
+| 4.0 | Measured gap | 0.134 | 0.984 | 0.757 | 0.997 | -5..0 / -7..0 |
+| 4.5 | Measured gap | 0.110 | 0.990 | 0.757 | 0.997 | -5..0 / -7..0 |
+| 5.0 | Close | 0.097 | 0.991 | 0.757 | 0.997 | -4..0 / -7..0 |
+
+RMS, correlation, latency, spectral centroid, harmonic-energy ratio and
+intermodulation-energy ratio are emitted separately for main and aux in every
+scenario. In this initial run, position 2.0 main RMS was 0.562/0.562
+(source/Vactr), centroid was 422.2/421.6 Hz, harmonic ratio 0.494/0.494 and
+intermodulation ratio 0.358/0.357. At position 0.0, main RMS was
+0.326/0.326 and centroid was 350.9/350.7 Hz. The initial metrics identified
+two translated-stage gaps documented and fixed in the next session entry;
+fold-containing positions remain incomparable. These scenarios do not
+demonstrate full firmware parity or arbitrary-input fidelity.
+
+### Session: 2026-09-29 (start-up ramp and aux gain)
+
+Translated the upstream oscillator's 100 Hz initial phase increment and
+linear ramp to the target over 60/96,000 seconds. The elapsed duration stays
+constant at 44.1, 48 and 96 kHz, with completion on the first available host
+sample and fixed progress state preserved across callback partitions. The
+internal-carrier aux now returns half the raw carrier, matching the source's
+half-gain signed-16-bit output conversion; this is an intentional -6 dB
+user-audible change. External-carrier aux was already at the correct level.
+The reference `Modulator` now has static storage so its amplifier state is
+zero-initialized before `Init`.
+
+The table compares per-position means over the same 24 scenarios. Each cell
+shows normalized RMS error / correlation. The initial main metrics exposed the
+startup phase offset; the initial aux metrics exposed only the internal
+carrier gain mismatch.
+
+| XMOD position | Main before | Main after | Aux before | Aux after |
+|---:|---:|---:|---:|---:|
+| 0.0 | 0.045 / 0.997 | 0.003035 / 0.999995 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 2.0 | 0.074 / 0.995 | 0.000282 / 1.000000 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 2.5 | 0.106 / 0.991 | 0.000340 / 1.000000 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 3.0 | 0.093 / 0.992 | 0.000265 / 1.000000 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 3.5 | 0.104 / 0.991 | 0.000818 / 0.999999 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 4.0 | 0.134 / 0.984 | 0.001789 / 0.999997 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 4.5 | 0.110 / 0.990 | 0.001230 / 0.999999 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+| 5.0 | 0.097 / 0.991 | 0.000545 / 1.000000 | 0.757 / 0.997 | 0.000306 / 1.000000 |
+
+All comparable positions now meet the existing main-channel close rule; aux
+is close at all eight positions as well. Fold positions 0.5, 1.0 and 1.5
+remain not comparable because Vactr's fold is an adaptation. Keep positions
+0, 2, 3, 4 and 5 at `SourceStage`, never `SourcePort`; the fold remains
+`Adaptation`. The comparison validates these measured signals only, not full
+firmware parity, arbitrary-input behavior or every host-rate operating mode.
+The startup ramp and aux gain tests pass at 44.1/48/96 kHz and across saved
+state partitions. `cargo fmt --check`, `cargo check -q`, strict Clippy and the
+wasm library check pass. Nextest ran 1,008 tests: 1,006 passed, one was
+skipped, and two HTTP fixtures could not bind loopback under the sandbox.
 
 ### Session: 2026-09-28, FX-002F XMOD sample-rate conversion
 

@@ -960,8 +960,13 @@ sine/triangle/saw with vocoder saw/pulse/noise. The table-free two-frame
 BLEP corrections and oscillator filters are translated into fixed Rust
 state. Sine is analytic instead of using `lut_sin`; noise uses a Vactr
 random stream and one-pole filter instead of the source SVF. The extra
-carrier settings 4..6 are original extensions. Oscillator smoothing and
-hardware auxiliary scaling are not source-equivalent.
+carrier settings 4..6 are original extensions. Internal oscillator phase
+increment starts at 100 Hz and ramps to its target across the source's
+60/96,000-second startup period at every host rate; later smoothing and other
+blockwise control interpolation remain different. Warps applies half gain to
+every auxiliary output. Vactr's external-carrier average already follows that
+level; internal-carrier aux now returns half the raw carrier, an intentional
+-6 dB user-audible change.
 The XMOD path imports the 24-coefficient symmetric halves of the pinned
 six-times/48-tap up and down FIRs from the individually MIT-noticed
 `sample_rate_conversion_filters.h` (copyright 2015 Emilie Gillet; its
@@ -971,7 +976,7 @@ Vactr's streaming Rust converter uses fixed effect memory; these FIR
 coefficients are anti-aliasing filter data, not oscillator wavetables.
 The XMOD FIR runs at the host rate, while the vocoder bank runs internally
 at 96 kHz. Source blockwise parameter interpolation is not reproduced
-at the host control boundary.
+at the host control boundary beyond the translated oscillator startup ramp.
 The vocoder output limiter translates the fixed peak follower, pre/post
 gain and `stmlib/dsp/dsp.h` soft-limit equation from the individually
 MIT-noticed `warps/dsp/limiter.h` (copyright 2015 Emilie Gillet). Its
@@ -1005,6 +1010,11 @@ bounded feedback. It imports no source quadrature poles, sine/crossfade
 lookups or generated oscillator waveforms. Its 63-sample latency, shift
 curve, low-frequency rejection and feedback numerics differ from source;
 this is an adaptation, not a source-equivalent port.
+
+The XMOD numeric comparison compiles `warps/dsp/modulator.cc` and its
+dependencies only in a temporary directory against the separate pinned
+checkout. Its Python-generated inputs and measured outputs import no upstream
+source, tables or audio into Vactr beyond the already-declared `fb_*` rows.
 
 ## Tides first-generation function architectural reference
 

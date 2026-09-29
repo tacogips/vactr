@@ -1066,7 +1066,7 @@ code, resources or audio into Vactr.
 `exciter-voice` is an original procedural adaptation of the bow, blow,
 strike and three resonator roles in Mutable Instruments
 `elements/dsp/patch.h` and
-`elements/dsp/{part,voice,exciter,resonator}.{h,cc}` at Eurorack
+`elements/dsp/{part,voice,exciter,resonator,multistage_envelope,string,tube}.{h,cc}` at Eurorack
 revision `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. Those DSP files
 carry copyright 2014 Emilie Gillet and the MIT permission and warranty
 notice reproduced above. Vactr uses authored noise, oscillators, modal
@@ -1083,6 +1083,11 @@ maps its left input to blow and right input to strike excitation and outputs
 main and auxiliary channels on left/right. It uses distinct authored filters,
 four-string/modal states and short feedback space, not source numerical DSP.
 It imports no GPL generator, bundled WAV, lookup or aggregate resource.
+The local `elements-model` probe compares the pinned `Part::Process` interface
+at its 32 kHz, 16-frame source block against `exciter-core` using documented
+`ex-*` controls. Its temporary build compiles upstream `elements/resources.cc`
+only for the local reference run; the probe imports no upstream code, resource,
+or audio into Vactr.
 Both paths now provide an authored alternate dual-FM/spatial voice selected
 by `ex-alternate`. This replaces, rather than translates, the source
 `elements/dsp/ominous_voice.{h,cc}` eightfold oversampling, 101-tap FIR,

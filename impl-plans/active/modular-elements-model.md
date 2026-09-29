@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -62,7 +62,7 @@ replacement `Adaptation` until source comparison.
 | ELM-003 | Bow, blow, strike and envelope source roles with original cleared excitation | ELM-002 | Procedural internal exciters runnable; source sample and exact exciter parity pending |
 | ELM-004 | Modal/string/strings resonators and main/aux paths | ELM-002 | Three original roles and separate outputs runnable; five-string source parity pending |
 | ELM-005 | Diffuser/reverb, modulation and alternate voice/effect placement | ELM-003..004 | Procedural alternate FM/spatial voice runnable in instrument and bus; source FX/oversampling parity pending |
-| ELM-006 | Source comparisons, notices, native/browser and allocation verification | ELM-003..005 | Internal adaptation notices and native/browser/allocation checks passed; source comparisons and pending paths remain |
+| ELM-006 | Source comparisons, notices, native/browser and allocation verification | ELM-003..005 | Completed local Part comparison for all three resonator models; 9 bow-only measured gaps and 6 sample-dependent replacements; no parity claimed |
 
 ## Completion Criteria
 
@@ -72,6 +72,7 @@ replacement `Adaptation` until source comparison.
 - [x] GPL sample generator and uncleared recordings are excluded from the internal adaptation.
 - [x] Native/browser rates, capacity and zero callback allocation pass for the internal adaptation.
 - [x] Quiet Cargo check, strict Clippy, tests, rustfmt and diff checks pass for the internal adaptation.
+- [x] Source comparison covers MODAL, STRING and STRINGS with three bow-only and two sample-dependent scenarios each; metrics are recorded without claiming source parity.
 
 ## Progress Log
 
@@ -154,3 +155,53 @@ resonator models. The sample generator carries a GPL-3.0-or-later header;
 the bundled WAV recordings were not individually cleared. No Elements
 source or data has been imported into Vactr. Further implementation
 must keep the MIT DSP code and resource rights separate.
+
+### Session: 2026-09-29 — ELM-006 Part source comparison
+
+Added a local `Part::Process` reference driver and an `exciter-core` raw-kernel
+probe. The pinned source rate is 32 kHz and `elements/dsp/dsp.h` sets a
+16-frame maximum block, also used by the device callback. Each run held gate on
+at note 60/C4 with fixed strength and compared the main and auxiliary outputs.
+The twenty Patch controls were mapped in the `exciter-core` `ex-*` order.
+Each resonator has three sample-independent bow-only patch settings and two
+sample-dependent strike/blow settings. `elements/resources.cc` was compiled
+only for the temporary local reference executable because source exciter
+symbols depend on its aggregate tables; it and the GPL-3.0-or-later sample
+generator remain excluded from Vactr.
+
+| Model | Scenario | Classification | Main RMS ref/Vactr | Aux RMS ref/Vactr | Main/aux correlation | Main/aux normalized RMS error |
+|---|---|---|---:|---:|---:|---:|
+| MODAL | bow-warm | measured gap | 0.086/0.490 | 0.086/0.112 | 0.091/-0.017 | 5.692/1.658 |
+| MODAL | bow-bright | measured gap | 0.086/0.655 | 0.082/0.310 | 0.010/-0.046 | 7.627/3.945 |
+| MODAL | bow-muted | measured gap | 0.225/0.526 | 0.225/0.444 | -0.147/-0.189 | 2.674/2.375 |
+| MODAL | sample-blow | replacement | 0.460/0.371 | 0.421/0.323 | -0.006/0.003 | 1.289/1.258 |
+| MODAL | sample-strike | replacement | 0.074/0.190 | 0.063/0.158 | 0.016/0.018 | 2.751/2.660 |
+| STRING | bow-warm | measured gap | 0.039/0.104 | 0.039/0.077 | -0.036/-0.040 | 2.894/2.272 |
+| STRING | bow-bright | measured gap | 0.127/0.760 | 0.127/0.459 | 0.005/0.009 | 6.083/3.742 |
+| STRING | bow-muted | measured gap | 0.211/0.092 | 0.211/0.076 | -0.014/-0.022 | 1.096/1.070 |
+| STRING | sample-blow | replacement | 0.534/0.057 | 0.534/0.070 | -0.002/-0.005 | 1.006/1.009 |
+| STRING | sample-strike | replacement | 0.070/0.146 | 0.070/0.067 | 0.069/0.006 | 2.279/1.390 |
+| STRINGS | bow-warm | measured gap | 0.035/0.008 | 0.037/0.031 | 0.002/0.012 | 1.023/1.294 |
+| STRINGS | bow-bright | measured gap | 0.092/0.051 | 0.103/0.162 | 0.017/0.002 | 1.133/1.858 |
+| STRINGS | bow-muted | measured gap | 0.070/0.010 | 0.071/0.041 | -0.004/0.007 | 1.010/1.152 |
+| STRINGS | sample-blow | replacement | 0.317/0.014 | 0.358/0.061 | -0.002/0.002 | 1.001/1.014 |
+| STRINGS | sample-strike | replacement | 0.035/0.095 | 0.036/0.022 | 0.031/0.072 | 2.888/1.141 |
+
+The comparison script additionally reports per-channel spectral centroid,
+normalized octave-band power ratios, -20/-40 dB decay times, and a
+fixed-note-range autocorrelation fundamental estimate. The nine bow-only
+cases all classify as measured gaps; their aligned correlations range from
+-0.189 to 0.091 and normalized errors from 1.010 to 7.627. The six
+sample-dependent cases are classified `replacement - not expected to match`.
+These results show substantial numerical and spectral differences at the
+raw kernel boundary and do not establish full graph, effect, resource, or
+source parity. No kernel fix was justified as a clear translation error;
+Elements coverage labels remain `Adaptation`/`Replacement`, with no
+`SourcePort` label.
+
+Verification for this session passed rustfmt, native Cargo check, strict
+Clippy, wasm32 library check, `mise tasks validate`, the comparison task, and
+the upstream audit (240 inventoried files, no warnings or errors). Nextest
+reported 1,000 passed, 2 failed, 1 skipped, and 530 not run: the two failures
+were loopback HTTP fixture tests whose `127.0.0.1` bind returned
+`PermissionDenied` in this sandbox.

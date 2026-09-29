@@ -165,68 +165,148 @@ period/frequency estimate, peak/trough and 10–90% rise/fall times. Alignment
 searches ±256 samples; a 16-sample average precedes period estimation to
 reduce Tides1 render-block artifacts.
 
-**Tides2 measured metrics**: Values below are medians across all four lanes
-and each row's settings (the three Looping settings are pooled). RMS is the
-Vactr/reference RMS ratio. `--` means the level/correlation metrics are
-undefined because the baseline reference and candidate lane are silent.
+### TID-006 corrected pinned source comparison
 
-| Mode / output | Range | Settings | Class | RMS ratio | Correlation | Aligned NRMSE | Reference / Vactr estimated Hz |
+The comparison harness converts Tides2 source voltages to each source lane's
+own normalized range before computing level metrics: unipolar lanes map to
+0..1 and bipolar lanes to -1..1. Correlation remains scale invariant.
+Ordinary phase-aligned NRMSE uses these unit-converted samples. The diagnostic
+gain-normalized NRMSE fits both a least-squares gain and offset after phase
+alignment, then reports those fitted values per lane and the residual error;
+this affine fit separates overall gain and DC offset from residual waveform
+shape. Classification continues to use correlation >= 0.90 and ordinary
+unit-converted NRMSE <= 0.35; the affine-fit metric is diagnostic only.
+
+The per-mode/lane conversion is:
+
+| Tides2 source output | Source path and voltage range | Conversion to normalized source lane |
+|---|---|---|
+| GATES lane 0, AD/AR | `Fold` multiplied by signed shift, -8..+8 V | divide by 8 (-1..1) |
+| GATES lane 1, AD/AR | `Scale`, 0..8 V | divide by 8 (0..1) |
+| GATES, lanes 0-1, LOOPING | `Fold`/`Scale`, -5..5 V | divide by 5 (-1..1) |
+| GATES, lanes 2-3, all modes | EOA/EOR outputs multiplied by 8, 0..8 V | divide by 8 (0..1) |
+| AMPLITUDE, all lanes, AD/AR | `Fold`, 0..8 V | divide by 8 (0..1) |
+| AMPLITUDE, all lanes, LOOPING | `Fold`, -5..5 V | divide by 5 (-1..1) |
+| PHASE and FREQUENCY, all lanes, AD/AR | `Fold`, 0..8 V | divide by 8 (0..1) |
+| PHASE and FREQUENCY, all lanes, LOOPING | `Fold`, -5..5 V | divide by 5 (-1..1) |
+
+The pinned source implements signed GATES lane 0 at `poly_slope_generator.h:295-299` (AD/AR spans -8..+8 V because shift is signed),
+EOA/EOR lanes 2-3 at `:300-303`, AMPLITUDE at `:304-320`, PHASE at `:321-336`,
+and FREQUENCY at `:337-345`. Its shared `Fold` and `Scale` voltage ranges are
+explicit at `:369-393`. Vactr's `tidal_poly.rs:111-143` computes normalized
+values clamped to -1..1; source unipolar lanes are normalized to 0..1 without
+an offset, so polarity/offset differences remain visible in the comparison.
+Tides1 needs no additional conversion: pinned `GeneratorSample` stores
+`uint16_t unipolar` and `int16_t bipolar` (`tides/generator.h:67-69`), and the
+C++ probe normalizes by 65535 and 32767 before printing
+(`verification/tides_poly_reference.cc:120-124`).
+
+The comparison covers all 24 Tides2 mode/output/range combinations at 48 kHz,
+24-frame blocks, 24,000 frames and the same initial 24-frame gate. The eight
+LOOPING mode/output/range rows pool three settings each (baseline plus two
+PW/shape/smoothness/shift extras). AD/AR AMPLITUDE also retain the separate
+shift-0.75 frame-zero triggered follow-up. In that follow-up, lane 0 is marked
+not comparable because the source shift interpolator starts at zero and
+creates an approximately 0.3 ms startup artifact (`poly_slope_generator.h:102,
+233-234`); lane 3 is not comparable because its source gain is zero at shift
+0.75. Only lanes 1-2 contribute to each follow-up classification. Tides1
+covers AD, LOOPING and AR at
+12 Hz, shape/slope/smoothness 0.5, high range, and both normalized sample
+roles. Values below are medians across four lanes and, for LOOPING, its three
+settings. RMS is Vactr/source; `--` means the baseline reference lane is
+silent and its NRMSE is undefined. Gain+offset NRMSE is the residual after an
+affine least-squares fit; the fitted gain and offset are present per lane in
+the JSON.
+
+| Mode / output | Range | Settings | Class | Vactr/source RMS | Correlation | Unit NRMSE | Gain+offset NRMSE |
 |---|---|---:|---|---:|---:|---:|---:|
-| AD / GATES | control | 1 | measured gap | 0.1502 | 0.8400 | 0.8997 | -- / -- |
-| AD / GATES | audio | 1 | measured gap | 0.1502 | 0.8400 | 0.8997 | -- / -- |
-| AD / AMPLITUDE | control | 1 | not comparable | -- | -- | -- | -- / -- |
-| AD / AMPLITUDE | audio | 1 | not comparable | -- | -- | -- | -- / -- |
-| AD / PHASE | control | 1 | measured gap | 0.2859 | 0.8443 | 0.9947 | -- / -- |
-| AD / PHASE | audio | 1 | measured gap | 0.2859 | 0.8443 | 0.9947 | -- / -- |
-| AD / FREQUENCY | control | 1 | measured gap | 0.1178 | 0.5202 | 0.9539 | -- / -- |
-| AD / FREQUENCY | audio | 1 | measured gap | 0.1178 | 0.5202 | 0.9539 | -- / -- |
-| LOOPING / GATES | control | 3 | measured gap | 0.2272 | 0.0765 | 0.9964 | 5.00 / 5.00 |
-| LOOPING / GATES | audio | 3 | measured gap | 0.2272 | 0.4360 | 0.9658 | 5.00 / 5.00 |
-| LOOPING / AMPLITUDE | control | 3 | measured gap | 0.9051 | 0.1107 | 1.3863 | 14.90 / 5.00 |
-| LOOPING / AMPLITUDE | audio | 3 | measured gap | 0.5260 | -0.0088 | 1.0640 | 48.57 / 5.00 |
-| LOOPING / PHASE | control | 3 | measured gap | 0.1846 | 0.5765 | 1.0142 | 5.00 / 5.00 |
-| LOOPING / PHASE | audio | 3 | measured gap | 0.1929 | 0.5397 | 0.8981 | 16.67 / 5.00 |
-| LOOPING / FREQUENCY | control | 3 | measured gap | 0.1872 | 0.0454 | 0.9905 | 8.75 / 5.36 |
-| LOOPING / FREQUENCY | audio | 3 | measured gap | 0.2115 | 0.0471 | 1.0197 | 22.65 / 5.36 |
-| AR / GATES | control | 1 | measured gap | 0.1350 | 0.9761 | 0.8793 | -- / -- |
-| AR / GATES | audio | 1 | measured gap | 0.1350 | 0.9761 | 0.8793 | -- / -- |
-| AR / AMPLITUDE | control | 1 | not comparable | -- | -- | -- | -- / -- |
-| AR / AMPLITUDE | audio | 1 | not comparable | -- | -- | -- | -- / -- |
-| AR / PHASE | control | 1 | measured gap | 0.6204 | 0.9672 | 1.1058 | -- / -- |
-| AR / PHASE | audio | 1 | measured gap | 0.6204 | 0.9672 | 1.1058 | -- / -- |
-| AR / FREQUENCY | control | 1 | measured gap | 0.1659 | -0.5746 | 1.1133 | -- / -- |
-| AR / FREQUENCY | audio | 1 | measured gap | 0.1659 | -0.5746 | 1.1133 | -- / -- |
+| AD / GATES | control | 1 | measured gap | 1.2013 | 0.8400 | 0.8705 | 0.2329 |
+| AD / GATES | audio | 1 | measured gap | 1.2013 | 0.8400 | 0.8705 | 0.2329 |
+| AD / AMPLITUDE | control | 1 | not comparable | -- | -- | -- | -- |
+| AD / AMPLITUDE | audio | 1 | not comparable | -- | -- | -- | -- |
+| AD / PHASE | control | 1 | measured gap | 2.2868 | 0.8443 | 2.3420 | 0.3865 |
+| AD / PHASE | audio | 1 | measured gap | 2.2868 | 0.8443 | 2.3420 | 0.3865 |
+| AD / FREQUENCY | control | 1 | measured gap | 0.9425 | 0.5202 | 1.0279 | 0.7185 |
+| AD / FREQUENCY | audio | 1 | measured gap | 0.9425 | 0.5202 | 1.0279 | 0.7185 |
+| LOOPING / GATES | control | 3 | measured gap | 1.3578 | 0.0765 | 1.7576 | 0.8052 |
+| LOOPING / GATES | audio | 3 | measured gap | 1.4100 | 0.4360 | 1.4536 | 0.7730 |
+| LOOPING / AMPLITUDE | control | 3 | measured gap | 4.5256 | 0.1107 | 4.5681 | 0.8874 |
+| LOOPING / AMPLITUDE | audio | 3 | measured gap | 2.6298 | -0.0088 | 2.7227 | 0.9202 |
+| LOOPING / PHASE | control | 3 | measured gap | 0.9231 | 0.5765 | 1.3456 | 0.6991 |
+| LOOPING / PHASE | audio | 3 | measured gap | 0.9644 | 0.5397 | 1.0262 | 0.7326 |
+| LOOPING / FREQUENCY | control | 3 | measured gap | 0.9362 | 0.0454 | 1.2794 | 0.7240 |
+| LOOPING / FREQUENCY | audio | 3 | measured gap | 1.0574 | 0.0471 | 1.4721 | 0.9781 |
+| AR / GATES | control | 1 | measured gap | 1.0797 | 0.9761 | 0.4673 | 0.0780 |
+| AR / GATES | audio | 1 | measured gap | 1.0797 | 0.9761 | 0.4673 | 0.0780 |
+| AR / AMPLITUDE | control | 1 | not comparable | -- | -- | -- | -- |
+| AR / AMPLITUDE | audio | 1 | not comparable | -- | -- | -- | -- |
+| AR / PHASE | control | 1 | measured gap | 4.9632 | 0.9672 | 4.9316 | 0.1406 |
+| AR / PHASE | audio | 1 | measured gap | 4.9632 | 0.9672 | 4.9316 | 0.1406 |
+| AR / FREQUENCY | control | 1 | measured gap | 1.3268 | -0.5746 | 2.1125 | 0.7564 |
+| AR / FREQUENCY | audio | 1 | measured gap | 1.3268 | -0.5746 | 2.1125 | 0.7564 |
 
-The baseline AD/AR AMPLITUDE rows are not comparable because the source
-amplitude lanes are silent at shift 0.5. Independent review (2026-09-29)
-found that this is a limitation of the probe design, not a DSP property.
-The gate is high for only the first 24-frame block, and the comparison
-window starts after a 48-frame warm-up, so it covers only the post-decay
-tail. These four rows are therefore unmeasured. A follow-up scenario with
-no warm-up, or with a gate held or retriggered inside the window, is still
-needed before they can be classified. Twenty other combinations are
-measured gaps and none are classified close. The source and Vactr looping
-GATES/PHASE estimates are both about 5 Hz at baseline; several other output
-roles estimate different periodic rates. Across every lane, the raw JSON
-emitted by the comparison task also records source/candidate peak and trough
-levels and 10–90% rise/fall times; aggregate waveform metrics cannot establish
-matching control curves or all phase behavior.
+Baseline Tides2 has 20 measured-gap rows and four not-comparable AD/AR
+AMPLITUDE rows because their source lanes are silent at shift 0.5. The four
+separate gate-window follow-ups (AD/AR × control/audio, shift 0.75, frame zero
+through frame 23,999) are measured gaps based on lanes 1-2. Lane 0's startup
+artifact and lane 3's zero source gain are excluded as described above:
 
-**Tides1 measured metrics**: Six mode/lane rows compare source unipolar and
-bipolar samples with the corresponding `tidal_function` selectors.
+| Mode / range | RMS source / Vactr | Correlation | Unit NRMSE | Gain+offset NRMSE |
+|---|---:|---:|---:|---:|
+| AD / control | 0.1823 / 0.3334 | 0.8400 | 2.0381 | 0.3918 |
+| AD / audio | 0.2725 / 0.3334 | 0.8399 | 1.5918 | 0.3918 |
+| AR / control | 0.1298 / 0.3650 | 0.9688 | 2.8856 | 0.1457 |
+| AR / audio | 0.1939 / 0.3650 | 0.9695 | 2.1527 | 0.1428 |
 
-| Mode / lane | Class | Source / Vactr RMS | Correlation | Aligned NRMSE | Source / Vactr Hz | Source / Vactr peak; trough | Source / Vactr rise / fall ms |
-|---|---|---:|---:|---:|---:|---|---|
-| AD / unipolar | close | 0.2359 / 0.2223 | 0.9427 | 0.3121 | -- / -- | 1.000 / 0.835; 0.000 / 0.000 | 33.33 / 31.48; 41.65 / 35.40 |
-| AD / bipolar | close | 0.9424 / 0.9293 | 0.9427 | 0.1563 | -- / -- | 0.999 / 0.670; -1.000 / -1.000 | 33.33 / 31.48; 41.65 / 35.40 |
-| LOOPING / unipolar | measured gap | 0.5779 / 0.5490 | 0.8206 | 0.2850 | 12.00 / 12.00 | 1.000 / 0.837; 0.000 / 0.001 | 33.33 / 31.48; 41.65 / -- |
-| LOOPING / bipolar | measured gap | 0.5762 / 0.4695 | 0.8206 | 0.5718 | 12.00 / 12.00 | 0.999 / 0.674; -0.999 / -0.998 | 33.33 / 31.48; 41.65 / -- |
-| AR / unipolar | measured gap | 0.2359 / 0.1373 | 0.6307 | 0.6473 | -- / -- | 1.000 / 0.605; 0.000 / 0.000 | 33.33 / 9.44; 41.65 / 30.15 |
-| AR / bipolar | measured gap | 0.9424 / 0.9532 | 0.6308 | 0.3254 | -- / -- | 0.999 / 0.211; -1.000 / -1.000 | 33.33 / 9.44; 41.65 / 30.15 |
+For Tides1, the two AD roles remain close and the other four roles remain
+measured gaps. RMS is source / Vactr:
 
-The Tides1 AD sample roles are close at these settings, while Looping and AR
-remain measured gaps. The matching Looping frequency estimate does not imply
-waveform or flag parity. These probes exercise raw kernels only: they do not
-verify `.vact` event routing, editor controls, host graph/bus behavior,
-browser execution or listening quality. The results do not justify changing
-any fidelity label to `SourceStage` or `SourcePort`.
+| Mode / lane | Class | Source / Vactr RMS | Correlation | Unit NRMSE | Gain+offset NRMSE |
+|---|---|---:|---:|---:|---:|
+| AD / unipolar | close | 0.2359 / 0.2223 | 0.9427 | 0.3121 | 0.3120 |
+| AD / bipolar | close | 0.9424 / 0.9293 | 0.9427 | 0.1563 | 0.1562 |
+| LOOPING / unipolar | measured gap | 0.5779 / 0.5490 | 0.8206 | 0.2850 | 0.2849 |
+| LOOPING / bipolar | measured gap | 0.5762 / 0.4695 | 0.8206 | 0.5718 | 0.5715 |
+| AR / unipolar | measured gap | 0.2359 / 0.1373 | 0.6307 | 0.6473 | 0.6016 |
+| AR / bipolar | measured gap | 0.9424 / 0.9532 | 0.6308 | 0.3254 | 0.3024 |
+
+### Behavior gaps identified by independent review
+
+These are measured comparison gaps, not kernel changes:
+
+- Vactr AMPLITUDE lanes have a `0.04 + 0.02 * lane` floor, so they remain
+  non-silent where source gains are zero (`tidal_poly.rs:131-135`).
+- AR FREQUENCY correlation is negative, ranging from -0.48 to -0.65 across
+  the reviewed comparisons.
+- LOOPING FREQUENCY lane 3 correlation is -0.22.
+- The Vactr LOOPING GATES EOR lane is almost never high.
+- Source GATES lane 0 is silent at shift 0.5 (`shift * 2 - 1 = 0`), so AD/AR
+  GATES lane 0 is not compared in the baseline classification.
+
+### Session: 2026-09-29 (unit correction)
+
+Coordinator review identified that Tides2 source `OutputSample` channels are
+voltages, while Vactr `tidal_poly` lanes are normalized. Direct comparison had
+made source RMS, peaks/troughs and NRMSE invalid and made the previous Tides2
+classification unreliable; correlation itself is scale invariant. The
+harness now applies the per-mode/lane voltage conversions above before all
+level metrics, and reports both unit-converted NRMSE and least-squares
+gain-and-offset-normalized NRMSE with fitted parameters per lane. Source
+references and Vactr ranges are cited above.
+Tides1 was checked separately: its source sample types are integer levels and
+the C++ probe already normalizes those to 0..1 and -1..1, so no extra scale
+was needed. Classification counts after correcting units are 20 Tides2
+baseline measured gaps, four silent baseline rows not comparable, and four
+separate gate-window follow-up measured gaps; Tides1 remains two close and
+four measured gaps. Before correction the plan's combined Tides2 headline
+reported 24 measured gaps by folding the four triggered AMPLITUDE results into
+those rows; this correction separates the silent baselines from their
+follow-ups. No fidelity labels changed and no kernel files changed. The
+corrected GATES rows also make a possible polarity translation difference
+measurable: source EOA/EOR lanes normalize to 0/1 (`:300-303`), while Vactr
+GATES lanes 2/3 emit -1/+1 (`tidal_poly.rs:115-128`). This is reported as an
+adaptation gap only; no kernel behavior was changed. The updated comparison runs from the existing `compare-tides-poly` task
+against the pinned checkout. Formatting, native cargo check, strict Clippy,
+wasm library check, `mise tasks validate` (28 tasks), and the upstream audit
+passed; the audit reported zero errors. Independent verification:
+nextest 1532 passed, 1 skipped.

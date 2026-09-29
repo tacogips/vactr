@@ -35,6 +35,11 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.bind-select {
+  width: 100%;
+  font: inherit;
+}
+
 .bind-value,
 .bind-name-value {
   font-variant-numeric: tabular-nums;

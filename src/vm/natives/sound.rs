@@ -36,6 +36,7 @@ pub(super) fn register(p: &mut Prelude) {
     let kit = default_sound_kit();
     p.register_value("default-sound-kit", kit.clone());
     p.register_value("sound-kit", kit);
+    p.register_value("digital-kit", digital_kit());
 }
 
 /// The builtin kit: one `Sound::Builtin(k)` per key of the host manifest's
@@ -48,6 +49,29 @@ pub fn default_sound_kit() -> Value {
             let kw = intern_kw(&k);
             kit.insert(Key::Kw(kw), Value::Sound(Rc::new(Sound::Builtin(kw))));
         }
+    }
+    Value::dict(kit)
+}
+
+/// `digital-kit` (design-music 4.1, DDRUM-006): a prelude dict of pure
+/// aliases from ordinary sound keywords to the four digital-drum-family
+/// templates, usable as `s :bd kit: digital-kit`. Each alias is a
+/// `Sound::Builtin` of the template's own name, resolved by the instrument
+/// registry exactly the way a direct `s :digital-drum` is (12.8.6), so the
+/// alias carries no preset control values of its own.
+#[must_use]
+pub fn digital_kit() -> Value {
+    let mut kit = BTreeMap::new();
+    for (alias, template) in [
+        ("bd", "digital-drum"),
+        ("sd", "digital-snare"),
+        ("cy", "digital-metal"),
+        ("hh", "digital-hat"),
+    ] {
+        kit.insert(
+            Key::Kw(intern_kw(alias)),
+            Value::Sound(Rc::new(Sound::Builtin(intern_kw(template)))),
+        );
     }
     Value::dict(kit)
 }

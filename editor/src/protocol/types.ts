@@ -95,6 +95,12 @@ export interface ParamMeta {
   curve: ParamCurve;
   unit: ParamUnit;
   group: number;
+  /** The instrument/template default (DDRUM-006 addition; an old session omits it). */
+  default?: number;
+  /** Human-readable editor label (DDRUM-006 addition; an old session omits it). */
+  label?: string;
+  /** Enum domain names in index order; absent for a non-enum parameter (DDRUM-006 addition). */
+  choices?: string[];
 }
 
 /** One builtin's parameter-editor declaration (TASK-010, G2). */

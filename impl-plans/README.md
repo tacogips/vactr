@@ -58,7 +58,7 @@ Large features are split into multiple related plans with cross-references.
 | [modular-clouds-texture.md](active/modular-clouds-texture.md) | In progress; four stereo texture adaptations, source parity pending | design-mutable-audio.md | 2026-09-28 |
 | [modular-streams-controls.md](active/modular-streams-controls.md) | Ready; six control functions and explicit analog audio boundary | design-mutable-audio.md | 2026-09-28 |
 | [modular-audio-effects.md](active/modular-audio-effects.md) | In progress; audio effects and XMOD SRC | design-mutable-audio.md | 2026-09-28 |
-| [digital-drums.md](active/digital-drums.md) | Planning; Vactr digital percussion kit | design-music.md 4.1 | 2026-09-27 |
+| [digital-drums.md](active/digital-drums.md) | Completed 2026-09-29; four digital drum families, kit and editor metadata (audible review pending) | design-music.md 4.1 | 2026-09-29 |
 | [vactr-core.md](active/vactr-core.md) | Completed (implementation, TASK-001..010, 2026-09-26; manual audible/browser/Tauri confirmations pending user sign-off) | design-docs/specs/design-implementation.md | 2026-09-26 |
 | [vactr-editor-scaffold.md](completed/vactr-editor-scaffold.md) | Completed (ED-SCAFFOLD, issue #5 TASK-010, wave 1; npm project, protocol client, store, transports, host.js options; holds the common ED contract; final-tree evidence `target/fe-logs/ed-final-*-s188-1.log`; accepted; archived 2026-09-26) | design-implementation.md 15.1.3, 15.1.4, 15.1.6 | 2026-09-26 |
 | [vactr-editor-wire.md](completed/vactr-editor-wire.md) | Completed (ED-WIRE, wave 2; Rust G2-G6; final-tree evidence `target/fe-logs/ed-final-*-s188-1.log`; accepted; archived 2026-09-26) | design-implementation.md 15.1.2 | 2026-09-26 |

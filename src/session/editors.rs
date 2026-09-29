@@ -17,8 +17,10 @@
 //! signal entry) — a client keys `manifest.editors` by `(name, kind)`,
 //! not by `name` alone.
 
+use crate::dsp::controls::{self, CtlDomain, DeclaredParam};
 use crate::dsp::meta::{self, Curve, EditorDecl, EditorKind, ParamMeta, Unit};
-use crate::ns::insts::InstRegistry;
+use crate::host::wire::Ctl;
+use crate::ns::insts::{InstEntry, InstRegistry};
 use crate::session::protocol::{WireEditorDecl, WireParamMeta};
 use crate::value::intern::name_of_kw;
 
@@ -70,6 +72,9 @@ fn param_wire(p: &ParamMeta) -> WireParamMeta {
         curve: curve_name(p.curve).to_string(),
         unit: unit_name(p.unit).to_string(),
         group: u32::from(p.group),
+        default: Some(p.default),
+        label: Some(p.label.clone()),
+        choices: p.choices.iter().map(|s| (*s).to_string()).collect(),
     }
 }
 
@@ -84,7 +89,7 @@ fn decl_wire(d: &EditorDecl) -> WireEditorDecl {
 }
 
 /// A pattern-function parameter: no `ctl` (no control-table row).
-fn pattern_param(name: &'static str, range: [f32; 2]) -> WireParamMeta {
+fn pattern_param(name: &'static str, range: [f32; 2], default: f32) -> WireParamMeta {
     WireParamMeta {
         name: name.to_string(),
         ctl: None,
@@ -92,6 +97,9 @@ fn pattern_param(name: &'static str, range: [f32; 2]) -> WireParamMeta {
         curve: "linear".to_string(),
         unit: "none".to_string(),
         group: 0,
+        default: Some(default),
+        label: Some(meta::label_of(name)),
+        choices: Vec::new(),
     }
 }
 
@@ -121,29 +129,87 @@ pub fn editor_decls() -> Vec<WireEditorDecl> {
         "euclid",
         "euclid-ring",
         vec![
-            pattern_param("hits", [0.0, 16.0]),
-            pattern_param("steps", [1.0, 16.0]),
-            pattern_param("rotation", [0.0, 16.0]),
+            pattern_param("hits", [0.0, 16.0], 3.0),
+            pattern_param("steps", [1.0, 16.0], 8.0),
+            pattern_param("rotation", [0.0, 16.0], 0.0),
         ],
     ));
     for name in ["maybe", "degrade-by"] {
         out.push(pattern_decl(
             name,
             "probability-dial",
-            vec![pattern_param("probability", [0.0, 1.0])],
+            vec![pattern_param("probability", [0.0, 1.0], 0.5)],
         ));
     }
     for name in ["hold", "fast", "slow"] {
         out.push(pattern_decl(
             name,
             "length-handle",
-            vec![pattern_param("factor", [0.0, 8.0])],
+            vec![pattern_param("factor", [0.0, 8.0], 2.0)],
         ));
     }
     for name in ["sine", "saw", "tri", "square", "rand", "perlin"] {
         out.push(pattern_decl(name, "lfo-shape", Vec::new()));
     }
     out
+}
+
+/// The default of a declared header parameter, per the live registry: the
+/// instrument's own `Ctl::Const`, the current value of its `Ctl::Cell`
+/// tweak site, or (with neither) the control row's default (DDRUM-006: a
+/// user `inst` header's default must be ITS default, not the shared row's).
+fn instance_default(entry: &InstEntry, param: &DeclaredParam, fallback: f32) -> f32 {
+    entry
+        .def
+        .params
+        .iter()
+        .find_map(|(ctl, v)| (*ctl == param.ctl).then_some(*v))
+        .map_or(fallback, |v| match v {
+            Ctl::Const(c) => c,
+            Ctl::Cell(cell) => entry.default_cell_value(cell).unwrap_or(fallback),
+        })
+}
+
+/// One header parameter's wire metadata: full metadata (range, default,
+/// label, enum choices) when its name is a control-table row, else the
+/// declared bounds only (DDRUM-006).
+fn declared_param_wire(entry: &InstEntry, param: &DeclaredParam) -> WireParamMeta {
+    let pname = name_of_kw(param.name);
+    let Some(row) = controls::row(&pname) else {
+        return WireParamMeta {
+            name: pname.to_string(),
+            ctl: Some(param.ctl.get()),
+            range: param
+                .range
+                .map_or([f32::MIN, f32::MAX], |(lo, hi)| [lo, hi]),
+            curve: "linear".to_string(),
+            unit: "none".to_string(),
+            group: 0,
+            default: None,
+            label: Some(meta::label_of(&pname)),
+            choices: Vec::new(),
+        };
+    };
+    let choices: Vec<String> = match row.domain {
+        CtlDomain::Enum(names) => names.iter().map(|s| (*s).to_string()).collect(),
+        _ => Vec::new(),
+    };
+    let curve = if matches!(row.domain, CtlDomain::Float) {
+        "linear"
+    } else {
+        "stepped"
+    };
+    WireParamMeta {
+        name: pname.to_string(),
+        ctl: Some(param.ctl.get()),
+        range: [row.range.0, row.range.1],
+        curve: curve.to_string(),
+        unit: "none".to_string(),
+        group: 0,
+        default: Some(instance_default(entry, param, row.default)),
+        label: Some(meta::label_of(&pname)),
+        choices,
+    }
 }
 
 /// Editor declarations for installed user instruments. Their header schema
@@ -164,16 +230,7 @@ pub fn instrument_decls(registry: &InstRegistry) -> Vec<WireEditorDecl> {
             let mut params: Vec<WireParamMeta> = entry
                 .params
                 .iter()
-                .map(|param| WireParamMeta {
-                    name: name_of_kw(param.name).to_string(),
-                    ctl: Some(param.ctl.get()),
-                    range: param
-                        .range
-                        .map_or([f32::MIN, f32::MAX], |(lo, hi)| [lo, hi]),
-                    curve: "linear".to_string(),
-                    unit: "none".to_string(),
-                    group: 0,
-                })
+                .map(|param| declared_param_wire(entry, param))
                 .collect();
             if name == "stage-linked-voice" {
                 params.push(WireParamMeta {
@@ -183,6 +240,9 @@ pub fn instrument_decls(registry: &InstRegistry) -> Vec<WireEditorDecl> {
                     curve: "immutable-list".to_string(),
                     unit: "stride4".to_string(),
                     group: 1,
+                    default: None,
+                    label: Some("Segments".to_string()),
+                    choices: Vec::new(),
                 });
             }
             WireEditorDecl {

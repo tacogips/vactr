@@ -18,6 +18,12 @@ export interface SiteRowState {
   min: number;
   max: number;
   step: string;
+  /** The parameter's editor label (`ParamMeta.label`), when known (DDRUM-006). */
+  paramLabel?: string;
+  /** The parameter's instrument default, when known (DDRUM-006). */
+  paramDefault?: number;
+  /** Enum choice names, in index order; empty when the parameter is not an enum (DDRUM-006). */
+  choices: string[];
 }
 
 export interface NameRowState {
@@ -34,19 +40,38 @@ export function SiteRow(props: {
   onCommit: () => void;
   onLearn: () => void;
 }): JSX.Element {
+  const paramTitle = (): string | undefined => {
+    const label = props.state().paramLabel;
+    if (!label) return undefined;
+    const def = props.state().paramDefault;
+    return def === undefined ? label : `${label} (default ${def})`;
+  };
   return (
     <div class="bind-row" data-binding={props.id} data-mode={props.state().mode} data-state={props.state().state}>
-      <span class="bind-label">{props.state().label}</span>
-      <input
-        type="range"
-        class="bind-slider"
-        min={props.state().min}
-        max={props.state().max}
-        step={props.state().step}
-        value={props.state().rawValue}
-        disabled={props.state().state !== 'bound'}
-        on:input={(event) => props.onInput(Number(event.currentTarget.value))}
-      />
+      <span class="bind-label" title={paramTitle()}>{props.state().label}</span>
+      {props.state().choices.length > 0 ? (
+        <select
+          class="bind-select"
+          disabled={props.state().state !== 'bound'}
+          value={String(Math.round(props.state().rawValue))}
+          on:change={(event) => props.onInput(Number(event.currentTarget.value))}
+        >
+          {props.state().choices.map((choice, index) => (
+            <option value={String(index)}>{choice}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="range"
+          class="bind-slider"
+          min={props.state().min}
+          max={props.state().max}
+          step={props.state().step}
+          value={props.state().rawValue}
+          disabled={props.state().state !== 'bound'}
+          on:input={(event) => props.onInput(Number(event.currentTarget.value))}
+        />
+      )}
       <span class="bind-value">{props.state().value}</span>
       <span class="bind-tier" data-tier={props.state().tierKind}>{props.state().tier}</span>
       <button type="button" class="bind-mode" onClick={props.onMode}>{props.state().mode}</button>

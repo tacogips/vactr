@@ -60,7 +60,7 @@ pub enum Unit {
 }
 
 /// One parameter's editor metadata.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct ParamMeta {
     pub name: &'static str,
     pub ctl: CtlId,
@@ -69,6 +69,17 @@ pub struct ParamMeta {
     pub unit: Unit,
     /// Parameters drawn together (bands of a multiband unit share one).
     pub group: u8,
+    /// The instrument/template default (design-music 4.1, DDRUM-006): the
+    /// control row's default, unless `TEMPLATE_DEFAULT_OVERRIDES` names a
+    /// different default for this (template, param) pair (a prelude
+    /// template's header default differs from the row's, e.g.
+    /// `digital-drum`'s `filter-type` header defaults to `:lp`, not the
+    /// row's `:off`).
+    pub default: f32,
+    /// Human-readable editor label ("Amp decay" for `amp-decay`).
+    pub label: String,
+    /// Enum domain names, in index order; empty for a non-enum parameter.
+    pub choices: &'static [&'static str],
 }
 
 /// The editor of one builtin.
@@ -124,7 +135,76 @@ fn group_of(name: &str) -> u8 {
     }
 }
 
-fn meta(name: &'static str, ctl: CtlId, range: (f32, f32), unit: &str, stepped: bool) -> ParamMeta {
+/// A human-readable editor label from a kebab-case control name: the first
+/// word capitalized, the rest lowercase, hyphens become spaces
+/// (`"amp-decay"` -> `"Amp decay"`, DDRUM-006).
+pub(crate) fn label_of(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for (i, word) in name.split('-').enumerate() {
+        if i > 0 {
+            out.push(' ');
+        }
+        if i == 0 {
+            let mut chars = word.chars();
+            if let Some(c) = chars.next() {
+                out.extend(c.to_uppercase());
+            }
+            out.push_str(chars.as_str());
+        } else {
+            out.push_str(word);
+        }
+    }
+    out
+}
+
+/// Header defaults of the four digital-drum-family templates (design-music
+/// 4.1, DDRUM-006) that differ from their shared control row's default: the
+/// row's default fits the row's general purpose (`wave`'s row default is
+/// `saw`; a control-table default of `off` suits `filter-type` generally),
+/// while every digital-drum-family header starts each voice on `sine` and
+/// its own filter response (`src/prelude/templates.vact`). `(template,
+/// param, header default keyword)`; resolved against the row's own enum
+/// domain, so a reordering of that domain cannot silently desync this
+/// table (tested against the live registry in
+/// `src/dsp/tests/meta_defaults.rs`).
+const TEMPLATE_DEFAULT_OVERRIDES: &[(&str, &str, &str)] = &[
+    ("digital-drum", "wave", "sine"),
+    ("digital-drum", "filter-type", "lp"),
+    ("digital-snare", "wave", "sine"),
+    ("digital-snare", "filter-type", "lp"),
+    ("digital-metal", "wave", "sine"),
+    ("digital-metal", "filter-type", "bp"),
+    ("digital-hat", "wave", "sine"),
+    ("digital-hat", "filter-type", "hp"),
+];
+
+fn template_default_override(
+    template: &str,
+    name: &str,
+    row: &controls::ControlRow,
+) -> Option<f32> {
+    let &(.., kw) = TEMPLATE_DEFAULT_OVERRIDES
+        .iter()
+        .find(|(t, n, _)| *t == template && *n == name)?;
+    match row.domain {
+        controls::CtlDomain::Enum(names) =>
+        {
+            #[allow(clippy::cast_precision_loss)]
+            names.iter().position(|n| *n == kw).map(|i| i as f32)
+        }
+        _ => None,
+    }
+}
+
+fn meta(
+    name: &'static str,
+    ctl: CtlId,
+    range: (f32, f32),
+    unit: &str,
+    stepped: bool,
+    default: f32,
+    choices: &'static [&'static str],
+) -> ParamMeta {
     ParamMeta {
         name,
         ctl,
@@ -132,17 +212,40 @@ fn meta(name: &'static str, ctl: CtlId, range: (f32, f32), unit: &str, stepped: 
         curve: curve_of(range, stepped),
         unit: unit_of(name, unit),
         group: group_of(name),
+        default,
+        label: label_of(name),
+        choices,
     }
 }
 
 fn row_meta(name: &'static str) -> Option<ParamMeta> {
     let row = controls::row(name)?;
     let stepped = !matches!(row.domain, controls::CtlDomain::Float);
-    Some(meta(name, row.ctl, row.range, "", stepped))
+    let choices = match row.domain {
+        controls::CtlDomain::Enum(names) => names,
+        _ => &[],
+    };
+    Some(meta(
+        name,
+        row.ctl,
+        row.range,
+        "",
+        stepped,
+        row.default,
+        choices,
+    ))
 }
 
 fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
-    row_meta(name).or_else(|| {
+    if let Some(mut m) = row_meta(name) {
+        if let Some(row) = controls::row(name) {
+            if let Some(v) = template_default_override(template, name, row) {
+                m.default = v;
+            }
+        }
+        return Some(m);
+    }
+    {
         let node = match template {
             "feedback-metal-drum" => Node::FeedbackMetal,
             "six-bank-a-voice" | "six-bank-b-voice" | "six-bank-c-voice" => Node::SixOpOriginal,
@@ -161,7 +264,8 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
             "number-station-voice" => Node::NumberStation,
             _ => return None,
         };
-        ucat::ports(&node)
+        let ports = ucat::ports(&node);
+        ports
             .iter()
             .position(|port| {
                 port.name == name
@@ -175,8 +279,9 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                         && matches!(name, "poly-main-channel" | "poly-aux-channel")
                         && port.name == "poly-channel")
             })
-            .and_then(|port| ucat::port_ctl(&node, port))
-            .map(|ctl| {
+            .and_then(|index| ucat::port_ctl(&node, index).map(|ctl| (index, ctl)))
+            .map(|(index, ctl)| {
+                let default = ports[index].default;
                 if template != "resonator-voice"
                     && template != "feedback-metal-drum"
                     && template != "string-choir-voice"
@@ -191,7 +296,7 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     && template != "peak-pulse-voice"
                     && template != "number-station-voice"
                 {
-                    return meta(name, ctl, (0.0, 1.0), "", false);
+                    return meta(name, ctl, (0.0, 1.0), "", false, default, &[]);
                 }
                 let (range, stepped) = match name {
                     "metal-ratio" => ((0.25, 12.0), false),
@@ -263,7 +368,7 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     | "choir-internal-note" => ((0.0, 1.0), true),
                     _ => ((0.0, 1.0), false),
                 };
-                let mut result = meta(name, ctl, range, "", stepped);
+                let mut result = meta(name, ctl, range, "", stepped, default, &[]);
                 if matches!(
                     name,
                     "reso-tonic"
@@ -278,7 +383,7 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                 }
                 result
             })
-    })
+    }
 }
 
 fn effect_meta(kind: EffectKind) -> Box<[ParamMeta]> {
@@ -295,7 +400,15 @@ fn effect_meta(kind: EffectKind) -> Box<[ParamMeta]> {
                             | EffectKind::TextureLoop
                             | EffectKind::TextureSpectral
                     ));
-            Some(meta(d.name, ctl, (d.min, d.max), d.unit, stepped))
+            Some(meta(
+                d.name,
+                ctl,
+                (d.min, d.max),
+                d.unit,
+                stepped,
+                d.default,
+                &[],
+            ))
         })
         .collect()
 }
@@ -499,6 +612,8 @@ fn ugen_meta(node: &Node) -> Box<[ParamMeta]> {
                     (0.0, hi),
                     "",
                     matches!(p.name, "mode" | "count"),
+                    p.default,
+                    &[],
                 )
             }))
         })

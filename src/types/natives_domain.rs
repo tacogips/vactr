@@ -112,6 +112,8 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     f("midi", 1, 1, &["fn int -> sound"], &[V]).needs(&[HostCap::MidiOut]),
     NativeSig::value("default-sound-kit", KIT),
     NativeSig::value("sound-kit", KIT),
+    // The digital-drum-family kit alias dict (design-music 4.1, DDRUM-006).
+    NativeSig::value("digital-kit", KIT),
     // Structure-giving steps after `s` (10.1 first-structure rule, 11.7).
     control("n"),
     control("note"),

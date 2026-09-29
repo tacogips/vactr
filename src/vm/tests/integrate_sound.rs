@@ -74,6 +74,28 @@ fn a_kit_argument_resolves_keys_outside_the_default_kit() {
 }
 
 #[test]
+fn digital_kit_aliases_each_resolve_to_their_digital_drum_family() {
+    // `digital-kit` (design-music 4.1, DDRUM-006): `bd`/`sd`/`cy`/`hh` are
+    // pure aliases to the four digital-drum-family templates, usable as
+    // `s :bd kit: digital-kit`. `bd`/`sd`/`hh` collide with the default
+    // kit's own unrelated sample-bank keys, so this only resolves the
+    // intended family under `kit: digital-kit`, never the default kit.
+    let mut h = Ev::new();
+    let out = h.run("s [:bd :sd :cy :hh] kit: digital-kit > d1");
+    assert!(Ev::codes(&out).is_empty(), "{out:?}");
+    assert!(out.iter().all(|o| o.value.is_ok()), "{out:?}");
+    assert_eq!(
+        d1_sounds(&mut h),
+        [
+            "builtin :digital-drum",
+            "builtin :digital-snare",
+            "builtin :digital-metal",
+            "builtin :digital-hat",
+        ]
+    );
+}
+
+#[test]
 fn a_var_kit_changed_with_upd_is_heard_at_the_next_query() {
     let mut h = Ev::new();
     h.run("var my-kit [bd: {sample ./a.wav}]\ns :bd kit: my-kit > d1");

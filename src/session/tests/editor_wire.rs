@@ -75,6 +75,252 @@ fn manifest_editors_cover_the_known_kinds_with_command_md_field_names() {
     );
 }
 
+/// DDRUM-006: `ParamMeta`/`WireParamMeta` carry `default`, `label` and
+/// `choices`, derived from the control-row manifest; `default` is a plain
+/// row default for an ordinary builtin. (`lpf` names both a pattern-control
+/// row-backed ugen AND a bus/orbit effect with its own, different `cutoff`
+/// default, so `sin-osc`/`freq` is used here instead, unambiguous.)
+#[test]
+fn param_meta_carries_default_label_and_choices_from_the_control_row() {
+    let mut rig = Rig::new();
+    let out = rig.send(ClientMsg::ManifestReq(Empty {}));
+    let ServerMsg::Manifest(m) = &out[0] else {
+        panic!("{out:?}")
+    };
+    let editors = m.editors.as_ref().expect("editors present");
+    let sin_osc = editors
+        .iter()
+        .find(|d| d.name == "sin-osc")
+        .expect("sin-osc");
+    let freq = sin_osc
+        .params
+        .iter()
+        .find(|p| p.name == "freq")
+        .expect("sin-osc/freq");
+    let row = crate::dsp::controls::row("freq").expect("freq is a row");
+    assert_eq!(freq.default, Some(row.default));
+    assert_eq!(
+        freq.label.as_deref(),
+        Some(crate::dsp::meta::label_of("freq").as_str())
+    );
+    assert!(freq.choices.is_empty(), "freq is not an enum");
+
+    let sampler = editors
+        .iter()
+        .find(|d| d.name == "sampler")
+        .expect("sampler");
+    let envelope = sampler.params.iter().find(|p| p.name == "envelope");
+    // `sampler`'s header list (`bank, n, speed, begin, end, loop, attack,
+    // release`) has no `envelope`; use `granular`'s instead, whose enum
+    // `envelope` row carries named choices in domain order.
+    assert!(envelope.is_none(), "sampler has no `envelope` header");
+    let granular = editors
+        .iter()
+        .find(|d| d.name == "granular")
+        .expect("granular");
+    let envelope = granular
+        .params
+        .iter()
+        .find(|p| p.name == "envelope")
+        .expect("granular/envelope");
+    assert_eq!(envelope.choices, vec!["hann", "tri", "trapezoid", "expo"]);
+    assert_eq!(
+        envelope.default,
+        Some(0.0),
+        "the row's default, index 0 (hann)"
+    );
+    assert_eq!(envelope.label.as_deref(), Some("Envelope"));
+}
+
+/// DDRUM-006: the four digital-drum-family prelude templates each start
+/// every voice on the `sine` waveform and their own filter response
+/// (`src/prelude/templates.vact`'s literal header defaults), not the
+/// shared control row's general-purpose default (`saw`/`off`). The
+/// manifest's static `EditorDecl` must show the TEMPLATE's own default,
+/// cross-checked here against the same instrument registry's realized
+/// header default so `dsp::meta::TEMPLATE_DEFAULT_OVERRIDES` cannot
+/// silently drift from the prelude source.
+#[test]
+fn digital_drum_family_templates_show_their_own_header_default_not_the_shared_row() {
+    use crate::host::wire::Ctl;
+    use crate::value::intern::name_of_kw;
+
+    let mut rig = Rig::new();
+    let out = rig.send(ClientMsg::ManifestReq(Empty {}));
+    let ServerMsg::Manifest(m) = &out[0] else {
+        panic!("{out:?}")
+    };
+    let editors = m.editors.as_ref().expect("editors present").clone();
+    let registry = rig
+        .s
+        .evaluator()
+        .insts()
+        .expect("a registry")
+        .borrow()
+        .entries()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    for (template, filter_default_kw, filter_default_index) in [
+        ("digital-drum", "lp", 1.0_f32),
+        ("digital-snare", "lp", 1.0_f32),
+        ("digital-metal", "bp", 2.0_f32),
+        ("digital-hat", "hp", 3.0_f32),
+    ] {
+        let decl = editors
+            .iter()
+            .find(|d| d.name == template)
+            .unwrap_or_else(|| panic!("no `{template}` editor decl"));
+        let wave = decl
+            .params
+            .iter()
+            .find(|p| p.name == "wave")
+            .unwrap_or_else(|| panic!("{template}/wave"));
+        assert_eq!(
+            wave.choices,
+            vec!["saw", "pulse", "square", "tri", "sine"],
+            "{template}"
+        );
+        assert_eq!(
+            wave.default,
+            Some(4.0),
+            "{template}: `sine` (its own header default), not the row's `saw`"
+        );
+        let filter = decl
+            .params
+            .iter()
+            .find(|p| p.name == "filter-type")
+            .unwrap_or_else(|| panic!("{template}/filter-type"));
+        assert_eq!(
+            filter.choices,
+            vec!["off", "lp", "bp", "hp", "notch"],
+            "{template}"
+        );
+        assert_eq!(
+            filter.default,
+            Some(filter_default_index),
+            "{template}: its own header default, not the row's `off`"
+        );
+        assert_eq!(
+            filter.choices[filter_default_index as usize],
+            filter_default_kw
+        );
+
+        // Cross-check against the realized header default the prelude's
+        // `.vact` source actually installed.
+        let entry = registry
+            .iter()
+            .find(|e| &*name_of_kw(e.name) == template)
+            .unwrap_or_else(|| panic!("`{template}` is a prelude template"));
+        for (name, want) in [("wave", wave.default), ("filter-type", filter.default)] {
+            let row = crate::dsp::controls::row(name).expect("a control row");
+            let live = entry
+                .def
+                .params
+                .iter()
+                .find_map(|(ctl, v)| (*ctl == row.ctl).then_some(*v))
+                .map(|v| match v {
+                    Ctl::Const(c) => c,
+                    Ctl::Cell(_) => panic!("{template}/{name}: unexpectedly a tweak site"),
+                });
+            assert_eq!(
+                live, want,
+                "{template}/{name}: the editor default matches the realized header default"
+            );
+        }
+    }
+}
+
+/// DDRUM-006: an ordinary user `inst` header whose name is a control row
+/// (`filter-type`, an enum; `cutoff`, a plain float) carries the header's
+/// OWN default (not the shared row's), a human label and, for the enum,
+/// the domain's choice names, exactly like the prelude templates above.
+#[test]
+fn a_user_inst_header_named_after_a_control_row_carries_its_own_default_and_choices() {
+    let mut rig = Rig::new();
+    rig.ok(
+        "inst my-filtered-osc filter-type: keyword = :bp cutoff: float = 900:\n\tsin-osc 220\n",
+        1,
+    );
+    let out = rig.send(ClientMsg::ManifestReq(Empty {}));
+    let ServerMsg::Manifest(m) = &out[0] else {
+        panic!("{out:?}")
+    };
+    let editors = m.editors.as_ref().expect("editors present");
+    let decl = editors
+        .iter()
+        .find(|d| d.name == "my-filtered-osc")
+        .expect("my-filtered-osc editor decl");
+    let filter_type = decl
+        .params
+        .iter()
+        .find(|p| p.name == "filter-type")
+        .expect("filter-type param");
+    assert_eq!(
+        filter_type.default,
+        Some(2.0),
+        "the header's own `:bp` default (index 2), not the row's `:off`"
+    );
+    assert_eq!(filter_type.choices, vec!["off", "lp", "bp", "hp", "notch"]);
+    assert_eq!(filter_type.label.as_deref(), Some("Filter type"));
+    let cutoff = decl
+        .params
+        .iter()
+        .find(|p| p.name == "cutoff")
+        .expect("cutoff param");
+    assert_eq!(cutoff.default, Some(900.0));
+    assert_eq!(cutoff.range, [20.0, 20_000.0]);
+    assert!(cutoff.choices.is_empty());
+}
+
+/// DDRUM-006: the new `default`/`label`/`choices` fields round-trip
+/// through JSON and an old payload lacking them still decodes (protocol
+/// backward compatibility: new optional fields, `v` stays 1).
+#[test]
+fn param_meta_new_fields_round_trip_and_stay_backward_compatible() {
+    use crate::session::protocol::WireParamMeta;
+
+    let meta = WireParamMeta {
+        name: "filter-type".to_string(),
+        ctl: Some(109),
+        range: [0.0, 4.0],
+        curve: "stepped".to_string(),
+        unit: "none".to_string(),
+        group: 0,
+        default: Some(1.0),
+        label: Some("Filter type".to_string()),
+        choices: vec![
+            "off".to_string(),
+            "lp".to_string(),
+            "bp".to_string(),
+            "hp".to_string(),
+            "notch".to_string(),
+        ],
+    };
+    let json = serde_json::to_value(&meta).expect("json");
+    assert_eq!(json["default"], 1.0);
+    assert_eq!(json["label"], "Filter type");
+    assert_eq!(json["choices"][1], "lp");
+    let back: WireParamMeta = serde_json::from_value(json).expect("decodes");
+    assert_eq!(back, meta);
+
+    let old = serde_json::json!({
+        "name": "cutoff",
+        "range": [20.0, 20_000.0],
+        "curve": "log",
+        "unit": "hz",
+        "group": 0,
+    });
+    let decoded: WireParamMeta = serde_json::from_value(old).expect("an old payload decodes");
+    assert_eq!(decoded.default, None);
+    assert_eq!(decoded.label, None);
+    assert!(decoded.choices.is_empty());
+    let re_encoded = serde_json::to_value(&decoded).expect("json");
+    assert!(re_encoded.get("default").is_none(), "{re_encoded}");
+    assert!(re_encoded.get("label").is_none(), "{re_encoded}");
+    assert!(re_encoded.get("choices").is_none(), "{re_encoded}");
+}
+
 #[test]
 fn a_chained_call_gives_its_sites_call_identity_and_ordinal() {
     let mut rig = Rig::new();

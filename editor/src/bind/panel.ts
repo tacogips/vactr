@@ -265,6 +265,9 @@ export class SliderPanel {
         : name?.state === 'blocked' ? `blocked on ${name.blocked_on ?? '?'}` : '',
       min: row.range[0], max: row.range[1],
       step: isIntegerLiteral(entry.literalText) || meta?.curve === 'stepped' ? '1' : 'any',
+      paramLabel: meta?.label,
+      paramDefault: meta?.default,
+      choices: meta?.choices ?? [],
     };
   }
 

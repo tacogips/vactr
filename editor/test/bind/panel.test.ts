@@ -4,6 +4,7 @@
 // set-tweak with no eval; learn maps a CC to it and later CCs move it.
 
 import { afterEach, describe, expect, it } from 'vitest';
+import type { EditorDecl } from '../../src/protocol/types';
 import { cleanup, fakeMidi, FILE, q, settle, setup, site, spanOf } from './fixtures';
 
 afterEach(cleanup);
@@ -97,5 +98,69 @@ describe('slider panel (criterion 3)', () => {
     expect(h.deps.bind?.mode(1)).toBe('source-edit');
     expect(h.deps.bind?.mode(2)).toBe('overlay');
     expect(commit.hidden).toBe(true);
+  });
+});
+
+// DDRUM-006: the manifest's `ParamMeta.label`/`default`/`choices` show up
+// in the panel as the label's title and, for an enum, a selector in place
+// of the slider.
+const FILTER_TYPE_EDITORS: EditorDecl[] = [
+  {
+    name: 'digital-drum',
+    kind: 'envelope-shape',
+    params: [
+      {
+        name: 'filter-type',
+        ctl: 109,
+        range: [0, 4],
+        curve: 'stepped',
+        unit: 'none',
+        group: 0,
+        default: 1,
+        label: 'Filter type',
+        choices: ['off', 'lp', 'bp', 'hp', 'notch'],
+      },
+    ],
+  },
+];
+
+describe('parameter label, default and enum choices (DDRUM-006)', () => {
+  const TEXT = 's :bd > filter-type 1 > d1';
+  const callOf = (text: string) => ({
+    name: 'digital-drum',
+    head: spanOf(text, 'filter-type'),
+    ordinal: 1,
+    arg: 0,
+    param: 'filter-type',
+  });
+
+  it('shows an enum select (not a slider) with the choices in domain order, and the label/default as a title', () => {
+    const h = setup(TEXT, { editors: FILTER_TYPE_EDITORS });
+    h.evalResult([site(TEXT, '1', 1, { call: callOf(TEXT) })]);
+    expect(h.row(1).querySelector('input.bind-slider')).toBeNull();
+    const select = h.row(1).querySelector('select.bind-select') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    expect([...select.options].map((o) => o.value)).toEqual(['0', '1', '2', '3', '4']);
+    expect([...select.options].map((o) => o.textContent)).toEqual(['off', 'lp', 'bp', 'hp', 'notch']);
+    expect(select.value).toBe('1');
+    const label = h.row(1).querySelector('.bind-label') as HTMLElement;
+    expect(label.title).toBe('Filter type (default 1)');
+  });
+
+  it('selecting a choice writes its index the same way the slider writes a value', () => {
+    const h = setup(TEXT, { editors: FILTER_TYPE_EDITORS });
+    h.evalResult([site(TEXT, '1', 1, { call: callOf(TEXT) })]);
+    const select = h.row(1).querySelector('select.bind-select') as HTMLSelectElement;
+    select.value = '3';
+    select.dispatchEvent(new Event('change'));
+    expect(h.transport.of('set-tweak')[0]?.body).toMatchObject({ id: 1, value: 3 });
+  });
+
+  it('a parameter with no editors metadata still shows the ordinary slider', () => {
+    const text = 's :bd > gain 0.5 > d1';
+    const h = setup(text);
+    h.evalResult([site(text, '0.5', 1)]);
+    expect(h.row(1).querySelector('select.bind-select')).toBeNull();
+    expect(h.row(1).querySelector('input.bind-slider')).not.toBeNull();
   });
 });

@@ -28,6 +28,7 @@ mod chip;
 mod chord_pair;
 mod coverage;
 mod digital_drum;
+mod digital_kit;
 mod digital_metal;
 mod elements;
 mod feedback_metal;

@@ -1,6 +1,6 @@
 # Programmable Digital Drums Implementation Plan
 
-**Status**: In Progress (DDRUM-001..004B complete 2026-09-29; 006 open)
+**Status**: Completed 2026-09-29 (audible review pending user)
 **Design Reference**: `design-docs/specs/design-music.md#41-programmable-digital-drums-author-2026-09-27`
 **Created**: 2026-09-27
 **Last Updated**: 2026-09-29
@@ -105,7 +105,7 @@ values today; presets remain pattern values or separate `inst` definitions.
 | DDRUM-004 | `digital-metal` and `digital-hat` cores, templates and tests | DDRUM-003 | Completed 2026-09-29 |
 | DDRUM-005 | Shared LFO, velocity targets, transients and repeat inside every core | DDRUM-003, DDRUM-004 | Delivered with 003/004 |
 | DDRUM-004B | Engine choke: make `cut` groups gate same-group voices (currently encoded but never read) | DDRUM-004 | Completed 2026-09-29 |
-| DDRUM-006 | `digital-kit`, editor default/label/choices metadata, examples, native/browser e2e | DDRUM-004 | Not started |
+| DDRUM-006 | `digital-kit`, editor default/label/choices metadata, examples, native/browser e2e | DDRUM-004 | Completed 2026-09-29 |
 
 ### Shared core contract (DDRUM-003/004)
 
@@ -128,15 +128,44 @@ values today; presets remain pattern values or separate `inst` definitions.
 ## Completion Criteria
 
 - [x] Every original sound-control category has a documented Vactr mapping (DDRUM-001).
-- [ ] Any ported DaisySP code retains applicable MIT notices; no third-party wave table, sample, preset, or lookup data enters the implementation (`mise run audit-upstream` stays clean).
-- [ ] Every exposed voice knob accepts `.vact` pattern and live-cell values.
-- [ ] Tonal drum, snare, cymbal, and hat render finite, audible audio.
-- [ ] Every exposed parameter produces a measurable sound difference (per-parameter test).
-- [ ] Unknown controls, enum values outside the domain, port/param capacity and cell exhaustion produce diagnostics.
-- [ ] Editor metadata covers every declared parameter, with default, range, unit, label and enum choices.
-- [ ] Quiet Cargo check, strict Clippy, rustfmt, wasm check and full tests pass.
+- [x] Any ported DaisySP code retains applicable MIT notices; no third-party wave table, sample, preset, or lookup data enters the implementation (`mise run audit-upstream` stays clean).
+- [x] Every exposed voice knob accepts `.vact` pattern and live-cell values.
+- [x] Tonal drum, snare, cymbal, and hat render finite, audible audio.
+- [x] Every exposed parameter produces a measurable sound difference (per-parameter test).
+- [x] Unknown controls, enum values outside the domain, port/param capacity and cell exhaustion produce diagnostics.
+- [x] Editor metadata covers every declared parameter, with default, range, unit, label and enum choices.
+- [x] Quiet Cargo check, strict Clippy, rustfmt, wasm check and full tests pass.
 
 ## Progress Log
+
+### Session: 2026-09-29, DDRUM-006 kit, editor metadata and example
+
+**Tasks Completed**:
+- `digital-kit` is a prelude dict (`bd`, `sd`, `cy`, `hh`) that the
+  checker types as a kit. Each alias renders bit-identical audio to its
+  template.
+- `ParamMeta` and the wire `WireParamMeta` carry `default`, `label` and
+  enum `choices`. These are optional wire fields, so the protocol stays at
+  version 1 and old payloads still decode.
+- The four templates' `wave` and `filter-type` defaults differ from their
+  global rows. They live in `TEMPLATE_DEFAULT_OVERRIDES`, and a session
+  test cross-checks that table against the realized prelude.
+- User `inst` headers named after control rows report their own realized
+  default and choices.
+- The editor parameter panel shows an enum `<select>`, the label, and the
+  default.
+- `examples/digital-kit.vact` is evaluated and rendered by a test. It
+  covers all four families, pattern, per-event and signal values, and a
+  cut-group hat choke.
+
+**Verification**: independent check-and-test review confirmed:
+- nextest: 1,525 passed, 1 skipped;
+- editor: `npm run check` clean and 356 tests passed;
+- Clippy, fmt, the wasm32 and `lsp` checks, the diff check and the
+  upstream audit: clean.
+
+**Remaining**: none in this plan. Audible review of the example is
+still to be done by the user.
 
 ### Session: 2026-09-29, DDRUM-004B cut-group choke
 

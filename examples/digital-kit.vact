@@ -1,0 +1,21 @@
+# digital-kit: the original programmable digital drum kit's four voice
+# families (design-music.md 4.1, DDRUM-006), reached through the prelude's
+# `digital-kit` alias dict: `bd` -> digital-drum, `sd` -> digital-snare,
+# `cy` -> digital-metal, `hh` -> digital-hat. Evaluate the whole file, then
+# re-evaluate any line while it plays.
+
+use-bpm 120
+
+# tonal drum: a pattern of note and fm-depth values
+s :bd kit: digital-kit > note [:c2 :g2] > fm-depth [0.1 0.7] > d1
+
+# snare: a per-event constant plus a signal-driven amp-decay
+s :sd kit: digital-kit > note [:d3] > noise-mix 0.6 > amp-decay {range sine 0.08 0.35} > d2
+
+# metal/cymbal: a pattern mod-freq and a constant spread
+s :cy kit: digital-kit > note [:e5] > mod-freq [3 6.5] > metal-spread 0.5 > d3
+
+# hat: an open hit followed by a closed hit sharing a cut group, so the
+# closed hat chokes the still-ringing open hat (design-music 4.1's cut
+# group, DDRUM-004B)
+s :hh kit: digital-kit > note [:a5 :a5] > hat-open [true false] > open-decay 0.5 > cut 1 > d4

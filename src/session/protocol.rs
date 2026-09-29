@@ -400,6 +400,18 @@ pub struct WireParamMeta {
     pub unit: String,
     /// Parameters drawn together (bands of a multiband unit share one).
     pub group: u32,
+    /// The instrument/template default (DDRUM-006 addition; an old session
+    /// omits it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<f32>,
+    /// Human-readable editor label (DDRUM-006 addition; an old session
+    /// omits it, so a client falls back to prettifying `name` itself).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Enum domain names in index order (DDRUM-006 addition); omitted, not
+    /// merely empty, for a non-enum parameter, to keep the payload small.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<String>,
 }
 
 /// One builtin's editor declaration (`manifest.editors`, TASK-010 G2).

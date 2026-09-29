@@ -391,9 +391,17 @@ choices and per-lane digital response, and independently selects two lanes
 by default. The quad example uses four bounded keyframe payload slots, one
 per generated lane.
 The list has no structured editor yet, and the numeric DAC/VCA response is
-not source-equivalent. Its mixer/VCA audio path is analog, outside the firmware. A Vactr
-digital mixer driven by translated frame controls is therefore an original
-audio adaptation, not a source audio DSP port. Stages does contain a
+not source-equivalent. Frames' mixer/VCA audio path is analog and outside
+firmware DSP. The original `keyframe-mixer` bus/master effect adapts the
+four-lane analytic poly-LFO control role to digital gain mixing; it does not
+use the keyframe payload. The stereo bus input supplies correlated lanes
+`L`, `R`, `M=(L+R)/2`, and `S=(L-R)/2`. Poly-LFO values `g0..g3` drive the
+wet recombination `L'=(g0*L+g2*M+g3*S)/2`,
+`R'=(g1*R+g2*M-g3*S)/2`. All-one gains preserve stereo input, and `mix`
+applies the usual dry/wet blend. These four derived lanes come from two
+inputs, not four independently routable sources. The effect reuses Vactr's
+existing poly-LFO implementation and does not model the analog mixer/VCA.
+It is an original audio adaptation, not a source audio DSP port. Stages does contain a
 segment generator with an explicit audio-rate oscillator path. The
 `stage-voice` adaptation exposes four segment types and selectable decay,
 timed-pulse, gate, sample/hold, free/tap LFO and free/PLL audio oscillator

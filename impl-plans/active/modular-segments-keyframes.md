@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-29
 
 ## Design Document Reference
 
@@ -43,15 +43,16 @@ after individual provenance review; otherwise use analytic shapes.
 | SGF-002 | Stages four segment types, audio-rate looping, CV delay, six-scalar and opt-in 36-record chains, value/phase output | SGF-001 | Bounded original adaptations runnable; source serial/slave and timing parity pending |
 | SGF-002B | Detect source-shaped director-plus-step lists in the 36-record chain and adapt seven sequencer traversal modes | SGF-002 | Original event-local adaptation runnable; source numerics, slave and output quantization remain separate |
 | SGF-003 | Frames four-channel keyframe interpolation and poly-LFO controls | SGF-001 | Poly-LFO and 64-keyframe analytic adaptations runnable; opt-in quad direct stems available, structured list editor pending |
-| SGF-004 | Original digital four-input gain/mixer adaptation driven by Frames controls | SGF-003 | Not started |
-| SGF-005 | `.vact`/editor routing, capacity and native/browser tests | SGF-002..004 | Stages/Frames adaptations covered; planned digital mixer and structured list editor remain |
+| SGF-004 | Original digital four-input gain/mixer adaptation driven by Frames controls | SGF-003 | Original `keyframe-mixer` adaptation implemented using the shared four-lane poly-LFO control path; mixer lanes derive from stereo L/R/mid/side |
+| SGF-005 | `.vact`/editor routing, capacity and native/browser tests | SGF-002..004 | Mixer `.vact` routing, editor metadata, bounded parameter capacity, unknown-control diagnostic, native/browser rendering and callback-allocation coverage implemented; structured keyframe list editor remains |
 | SGF-006 | Source comparisons, resource notices and fidelity review | SGF-002..005 | Not started |
 
 ## Completion Criteria
 
 - [x] Four Stages types, loops and audio-rate path have truthful adaptation coverage and control schemas.
 - [x] Four Frames outputs, easing/keyframes and poly-LFO controls are codeable without claiming analog VCA DSP; the structured list editor and source numerical parity remain open.
-- [ ] Original mixer adaptation, if implemented, exposes its digital input/output and gain contract.
+- [x] Original `keyframe-mixer` adaptation exposes its stereo-derived L/R/mid/side input lanes, four poly-LFO gains, stereo recombination, and dry/wet contract.
+- [x] The mixer is codeable and discoverable through `.vact` and editor metadata, reports unknown controls, stays within effect parameter capacity, and has native/browser rendering coverage.
 - [x] Stages slice resource provenance, bounded memory and zero callback allocation are verified.
 - [x] Stages slice native/browser, quiet Cargo check, strict Clippy, tests, rustfmt and diff checks pass.
 - [x] Source-shaped Stages step lists traverse up/down/ping-pong/alternating/random/no-repeat/addressable with event-local deterministic state, `.vact` controls, value/position outputs, and no callback allocation.
@@ -191,3 +192,18 @@ Channels 3/4 bypass stereo bus/master effects. Native/browser quad graph
 and `.vact` template tests cover distinct lanes, exact four-node state
 budget and one-short rejection. Source DAC calibration and analog VCA
 remain outside this digital adaptation.
+
+### Session: 2026-09-29 — original Frames-controlled digital mixer
+
+`keyframe-mixer` is an original stereo-bus gain adaptation. It uses the
+existing analytic four-lane poly-LFO implementation for `rate`, `shape`,
+`spread`, `shape-spread`, `coupling` and `offset`; `mix` is the existing
+dry/wet control. Its four correlated inputs are derived as `L`, `R`,
+`M=(L+R)/2`, `S=(L-R)/2`. Wet outputs are
+`L'=(g0*L+g2*M+g3*S)/2` and
+`R'=(g1*R+g2*M-g3*S)/2`. All-one gains preserve stereo. The bus boundary
+still has only two independent audio inputs; four separately routable
+sources and the physical analog mixer/VCA are not modeled. Kernel,
+parameter-capacity, public `.vact`, browser/native codec, unknown-control,
+and Frames-inventory coverage were added. The keyframe payload remains a
+voice-template feature; this mixer uses the alternative poly-LFO role.

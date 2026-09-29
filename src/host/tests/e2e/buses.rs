@@ -87,6 +87,81 @@ fn stream_control_effects_and_all_parameters_are_codeable() {
 }
 
 #[test]
+fn keyframe_mixer_is_public_vact_code_and_reports_unknown_controls() {
+    let control_text =
+        "rate: 4 shape: 0.3 spread: 0.8 shape-spread: 0.7 coupling: 0.2 offset: 0.15 mix: 1";
+    let editor = crate::types::manifest::HostManifest::spec_default()
+        .editor_decl("keyframe-mixer")
+        .unwrap();
+    let kind = crate::dsp::graph::EffectKind::KeyframeMixer;
+    for param in crate::dsp::effects::params(kind) {
+        let meta = editor
+            .params
+            .iter()
+            .find(|meta| meta.name == param.name)
+            .unwrap();
+        assert_eq!(meta.default, param.default, "{} default", param.name);
+        assert_eq!(meta.label, crate::dsp::meta::label_of(param.name));
+    }
+    assert_eq!(editor.params.len(), crate::dsp::effects::params(kind).len());
+
+    let mut wet = E2e::new();
+    wet.eval(&format!("bus :quad:\n\tkeyframe-mixer {control_text}"));
+    let parsed_bus = wet
+        .reg
+        .borrow()
+        .buses()
+        .find_map(|(_, entry)| {
+            entry
+                .def
+                .chain
+                .iter()
+                .any(|effect| effect.kind == kind)
+                .then(|| (*entry.def).clone())
+        })
+        .expect("the source-defined bus is registered");
+    wet.eval("s :analog > note [:c4] > bus :quad > once");
+    let wet_audio = wet.run_for(0.3);
+    assert!(wet.faults.is_empty(), "{:?}", wet.faults);
+    assert!(rms(&wet_audio) > 1.0e-6);
+
+    let browser_audio = crate::dsp::tests::dsp::quad_mixer::render_browser_bus(&parsed_bus);
+    assert!(browser_audio
+        .0
+        .iter()
+        .chain(&browser_audio.1)
+        .all(|sample| sample.is_finite()));
+    assert!(rms(&browser_audio.0) + rms(&browser_audio.1) > 1.0e-6);
+
+    let mut dry = E2e::new();
+    dry.eval("bus :quad:\n\tkeyframe-mixer rate: 4 shape: 0.3 spread: 0.8 shape-spread: 0.7 coupling: 0.2 offset: 0.15 mix: 0");
+    dry.eval("s :analog > note [:c4] > bus :quad > once");
+    let dry_audio = dry.run_for(0.3);
+    assert!(dry.faults.is_empty(), "{:?}", dry.faults);
+    let difference: f32 = wet_audio
+        .iter()
+        .zip(&dry_audio)
+        .map(|(a, b)| (a - b).abs())
+        .sum();
+    assert!(difference > 0.1, "mix controls conventional wet/dry blend");
+
+    let mut unknown = E2e::new();
+    assert!(unknown
+        .ev
+        .eval_str(
+            "bus :bad:\n\tkeyframe-mixer rate: 4 mystery: 0.3",
+            crate::host::tests::e2e::SOURCE
+        )
+        .unwrap()
+        .iter()
+        .any(|outcome| outcome
+            .value
+            .as_ref()
+            .err()
+            .is_some_and(|failure| { failure.message.contains("unknown parameter `mystery:`") })));
+}
+
+#[test]
 fn stream_follower_and_compressor_controls_compile_and_mix_reaches_audio() {
     for (name, controls) in [
         ("stream-follower", "shape: 0.2 response: 0.8 global-attack: 0.3 global-decay: 0.6 alternate: 1 linked: 1 excite-source: 0 excite: 0.3 cutoff-min: 100 cutoff-max: 9000"),

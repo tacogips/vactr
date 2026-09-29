@@ -27,6 +27,7 @@ pub mod eq;
 pub mod lofi;
 pub mod modulation;
 pub mod prim;
+pub mod quad_mixer;
 pub mod resonant_bank;
 pub mod resonator;
 pub mod restoration;
@@ -180,6 +181,7 @@ enum Group {
     StreamDynamics,
     StreamCv,
     ShiftPair,
+    KeyframeMixer,
 }
 
 fn group(kind: EffectKind) -> Group {
@@ -280,6 +282,7 @@ fn group(kind: EffectKind) -> Group {
         K::StreamFollower | K::StreamCompressor => Group::StreamDynamics,
         K::StreamFilter | K::StreamLorenz => Group::StreamCv,
         K::ShiftPair => Group::ShiftPair,
+        K::KeyframeMixer => Group::KeyframeMixer,
         K::Analyzer(_) => Group::Analyzer,
     }
 }
@@ -318,6 +321,7 @@ pub fn params(kind: EffectKind) -> &'static [ParamDef] {
             _ => stream_cv::LORENZ_PARAMS,
         },
         Group::ShiftPair => shift_pair::PARAMS,
+        Group::KeyframeMixer => quad_mixer::PARAMS,
     }
 }
 
@@ -350,6 +354,7 @@ pub fn mem_len(kind: EffectKind, sr: f32, caps: &CapabilitySet) -> usize {
         Group::StreamDynamics => stream_dynamics::MEM_LEN,
         Group::StreamCv => stream_cv::MEM_LEN,
         Group::ShiftPair => shift_pair::MEM_LEN,
+        Group::KeyframeMixer => 0,
     }
 }
 
@@ -381,6 +386,7 @@ pub fn init(kind: EffectKind, st: &mut FxState, mem: &mut [f32], sr: f32, caps: 
         Group::StreamDynamics => stream_dynamics::init(st, mem),
         Group::StreamCv => stream_cv::init(kind, st, mem),
         Group::ShiftPair => shift_pair::init(st, mem),
+        Group::KeyframeMixer => quad_mixer::init(st, mem),
     }
 }
 
@@ -420,6 +426,7 @@ pub fn process(
         Group::StreamDynamics => stream_dynamics::process(kind, p, st, mem, l, r, ctx),
         Group::StreamCv => stream_cv::process(kind, p, st, mem, l, r, ctx),
         Group::ShiftPair => shift_pair::process(p, st, mem, l, r, ctx),
+        Group::KeyframeMixer => quad_mixer::process(p, st, l, r, ctx.sr),
     }
 }
 

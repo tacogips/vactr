@@ -69,6 +69,15 @@ pub fn effect_ports(kind: EffectKind) -> &'static [&'static str] {
         EffectKind::Pan | EffectKind::Balance => &["pan"],
         EffectKind::Room => &["room", "size"],
         EffectKind::Width => &["width"],
+        EffectKind::KeyframeMixer => &[
+            "rate",
+            "shape",
+            "spread",
+            "shape-spread",
+            "coupling",
+            "offset",
+            "mix",
+        ],
         _ => &["amount"],
     }
 }

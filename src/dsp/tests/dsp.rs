@@ -50,6 +50,7 @@ mod particle_pair;
 mod peak_function;
 mod peak_pulse;
 mod phase_pair;
+pub(crate) mod quad_mixer;
 mod quad_outputs;
 mod rate_contract;
 mod region;

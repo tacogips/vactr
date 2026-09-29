@@ -313,6 +313,12 @@ fn every_ported_family_template_or_effect_name_resolves() {
         "elements alternate: {alternate}"
     );
     for row in super::frames_paths() {
+        if let Some(name) = row.vactr_effect {
+            assert!(
+                resolves_to_template_or_effect(name),
+                "frames effect: {name}"
+            );
+        }
         if let Some(name) = row.vactr_template {
             assert!(resolves_to_template_or_effect(name), "frames: {name}");
         }
@@ -323,6 +329,10 @@ fn every_ported_family_template_or_effect_name_resolves() {
             );
         }
     }
+    assert_eq!(
+        EffectKind::from_name("keyframe-mixer"),
+        Some(EffectKind::KeyframeMixer)
+    );
     let (tides1, tides2) = super::functions();
     for row in tides1.iter().chain(tides2.iter()) {
         if let Some(name) = row.vactr_template {

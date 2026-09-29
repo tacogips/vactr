@@ -439,6 +439,7 @@ effect_kinds! {
     StreamFilter => "stream-filter",
     StreamLorenz => "stream-lorenz",
     ShiftPair => "shift-pair",
+    KeyframeMixer => "keyframe-mixer",
 }
 
 impl EffectKind {

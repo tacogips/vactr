@@ -449,7 +449,8 @@ fn effect_editor(kind: EffectKind) -> EditorKind {
         | K::AutoPan
         | K::Rotary
         | K::WowFlutter
-        | K::Vibrato => EditorKind::LfoShape,
+        | K::Vibrato
+        | K::KeyframeMixer => EditorKind::LfoShape,
         K::Width
         | K::Balance
         | K::MultibandBalance

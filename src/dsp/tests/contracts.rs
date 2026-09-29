@@ -310,7 +310,7 @@ fn tombstones_drop_a_note_on_after_its_release() {
 fn effect_catalog_names_round_trip() {
     let names: BTreeSet<&str> = EffectKind::ALL.iter().map(|k| k.name()).collect();
     assert_eq!(names.len(), EffectKind::ALL.len());
-    assert_eq!(EffectKind::ALL.len(), 102 + 7 + AnalyzerKind::ALL.len());
+    assert_eq!(EffectKind::ALL.len(), 103 + 7 + AnalyzerKind::ALL.len());
     for k in EffectKind::ALL {
         assert_eq!(EffectKind::from_name(k.name()), Some(*k));
     }

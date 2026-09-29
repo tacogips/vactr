@@ -527,6 +527,7 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("stream-filter"),
     dsp("stream-lorenz"),
     dsp("shift-pair"),
+    dsp("keyframe-mixer"),
     dsp("fir-crossover"),
     dsp("granulate"),
     dsp("texture-grain"),

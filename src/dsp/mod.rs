@@ -28,4 +28,4 @@ pub mod voice;
 pub(crate) mod alloc_probe;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

@@ -1160,3 +1160,9 @@ four simultaneous poly-LFO or keyframe digital lanes on an opt-in
 four-output host, with 3/4 as direct stems. The frame list is authored in `.vact` but is not yet editable
 through scalar sliders.
 Frames' analog mixer/VCA audio path is outside firmware DSP and is not ported.
+Vactr's `keyframe-mixer` is an original digital stereo-bus adaptation: it
+derives left, right, mid and side lanes from the host's stereo input and
+uses Vactr's existing analytic poly-LFO controls to set their gains before
+stereo recombination. The four lanes are derived from two inputs, not four
+independent hardware inputs, and the source analog mixer/VCA behavior is not
+reproduced.

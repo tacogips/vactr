@@ -139,6 +139,16 @@ fn crossfade(modulator: f32, carrier: f32, timbre: f32) -> f32 {
     (modulator * angle.sin() + carrier * angle.cos()) * FRAC_1_SQRT_2
 }
 
+fn auxiliary_output(wave: f32, carrier_raw: f32, raw_modulator: f32) -> f32 {
+    if wave < 0.5 {
+        (carrier_raw + raw_modulator) * 0.5
+    } else if wave < 3.5 {
+        carrier_raw * 0.5
+    } else {
+        carrier_raw
+    }
+}
+
 // The MIT Warps diode approximation cites Julian Parker's DAFx-11 model.
 fn diode(x: f32) -> f32 {
     let dead = (x.abs() - 0.667).max(0.0);
@@ -311,8 +321,9 @@ pub fn process(
     let mut noise_lp = st.s[1];
     let mut carrier_amp = [st.s[2], st.s[3], st.s[4], st.s[5]];
     let mut modulator_amp = [st.s[6], st.s[7], st.s[8], st.s[9]];
-    let mut xmod_osc = osc::Oscillator::load(&st.s, osc::XMOD_OFFSET);
-    let mut vocoder_osc = osc::Oscillator::load(&st.s, osc::VOCODER_OFFSET);
+    let mut xmod_osc = osc::Oscillator::load(&st.s, osc::XMOD_OFFSET, osc::XMOD_STARTUP_OFFSET);
+    let mut vocoder_osc =
+        osc::Oscillator::load(&st.s, osc::VOCODER_OFFSET, osc::VOCODER_STARTUP_OFFSET);
     let mut src_cursor = st.s[24] as usize;
     let mut source_write = st.s[26] as usize;
     let mut source_read = st.s[27] as usize;
@@ -412,18 +423,14 @@ pub fn process(
             0.0
         };
         *main = bridge(xmod, voc, modulator, vocoder_amount).clamp(-1.0, 1.0);
-        *aux = if wave < 0.5 {
-            (carrier_raw + raw_modulator) * 0.5
-        } else {
-            carrier_raw
-        };
+        *aux = auxiliary_output(wave, carrier_raw, raw_modulator);
     }
     st.s[0] = phase;
     st.s[1] = noise_lp;
     st.s[2..6].copy_from_slice(&carrier_amp);
     st.s[6..10].copy_from_slice(&modulator_amp);
-    xmod_osc.save(&mut st.s, osc::XMOD_OFFSET);
-    vocoder_osc.save(&mut st.s, osc::VOCODER_OFFSET);
+    xmod_osc.save(&mut st.s, osc::XMOD_OFFSET, osc::XMOD_STARTUP_OFFSET);
+    vocoder_osc.save(&mut st.s, osc::VOCODER_OFFSET, osc::VOCODER_STARTUP_OFFSET);
     st.s[24] = src_cursor as f32;
     st.s[26] = source_write as f32;
     st.s[27] = source_read as f32;
@@ -433,16 +440,16 @@ pub fn process(
 #[cfg(test)]
 mod tests {
     use super::{
-        amplifier_gains, amplify, bridge, comparator, crossfade, diode, internal_pair, mode, osc,
-        skewed_timbre, soft_limit, source_soft_clip, vocoder_amount, vocoder_release, xmod_output,
-        xor_sample, CarrierControl,
+        amplifier_gains, amplify, auxiliary_output, bridge, comparator, crossfade, diode,
+        internal_pair, mode, osc, skewed_timbre, soft_limit, source_soft_clip, vocoder_amount,
+        vocoder_release, xmod_output, xor_sample, CarrierControl,
     };
     use std::f32::consts::FRAC_1_SQRT_2;
 
     #[test]
     fn source_internal_carrier_pair_routes_raw_aux_and_gain_at_transition() {
-        let mut x = osc::Oscillator::load(&[0.0; 32], 0);
-        let mut v = osc::Oscillator::load(&[0.0; 32], 0);
+        let mut x = osc::Oscillator::load(&[0.0; 32], 0, 28);
+        let mut v = osc::Oscillator::load(&[0.0; 32], 0, 28);
         let mut rng = super::super::prim::Rng::new(7);
         let (carrier, raw) = internal_pair(
             &mut x,
@@ -456,16 +463,16 @@ mod tests {
                 amount: 0.25,
             },
         );
-        let mut x_ref = osc::Oscillator::load(&[0.0; 32], 0);
-        let mut v_ref = osc::Oscillator::load(&[0.0; 32], 0);
+        let mut x_ref = osc::Oscillator::load(&[0.0; 32], 0, 28);
+        let mut v_ref = osc::Oscillator::load(&[0.0; 32], 0, 28);
         let sine = x_ref.sine(0.01, 0.2, 48_000.0);
         let saw = v_ref.polyblep(2, 0.01, 0.2, 48_000.0).0;
         assert!((raw - 0.5 * (sine + saw)).abs() < 1.0e-6);
         assert!((carrier - (0.25 * sine + 0.5 * saw)).abs() < 1.0e-6);
 
         for wave in 1..=3 {
-            let mut x = osc::Oscillator::load(&[0.0; 32], 0);
-            let mut v = osc::Oscillator::load(&[0.0; 32], 0);
+            let mut x = osc::Oscillator::load(&[0.0; 32], 0, 28);
+            let mut v = osc::Oscillator::load(&[0.0; 32], 0, 28);
             let mut rng = super::super::prim::Rng::new(7);
             let mut xmod_energy = 0.0;
             let mut vocoder_energy = 0.0;
@@ -503,6 +510,23 @@ mod tests {
             }
             assert!(xmod_energy > 1.0 && vocoder_energy > 1.0, "wave {wave}");
         }
+    }
+
+    #[test]
+    fn internal_carrier_auxiliary_is_half_gain_while_external_routing_is_unchanged() {
+        let carrier = 0.75;
+        let modulator = -0.25;
+        for wave in 1..=3 {
+            assert_eq!(
+                auxiliary_output(wave as f32, carrier, modulator),
+                carrier * 0.5
+            );
+        }
+        assert_eq!(
+            auxiliary_output(0.0, carrier, modulator),
+            (carrier + modulator) * 0.5
+        );
+        assert_eq!(auxiliary_output(4.0, carrier, modulator), carrier);
     }
 
     #[test]

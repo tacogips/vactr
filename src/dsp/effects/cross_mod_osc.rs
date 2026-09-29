@@ -9,6 +9,14 @@ use super::super::prim::Rng;
 const WORDS: usize = 7;
 pub(super) const XMOD_OFFSET: usize = 10;
 pub(super) const VOCODER_OFFSET: usize = XMOD_OFFSET + WORDS;
+pub(super) const XMOD_STARTUP_OFFSET: usize = 28;
+pub(super) const VOCODER_STARTUP_OFFSET: usize = 30;
+const STARTUP_RAMP_SECONDS: f32 = 60.0 / 96_000.0;
+const STARTUP_FREQUENCY_HZ: f32 = 100.0;
+
+fn startup_ramp_frames(sr: f32) -> f32 {
+    STARTUP_RAMP_SECONDS * sr
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct Oscillator {
@@ -19,10 +27,12 @@ pub(super) struct Oscillator {
     hp: f32,
     high: bool,
     external_level: f32,
+    startup_target: f32,
+    startup_progress: f32,
 }
 
 impl Oscillator {
-    pub(super) fn load(state: &[f32; 32], offset: usize) -> Self {
+    pub(super) fn load(state: &[f32; 32], offset: usize, startup_offset: usize) -> Self {
         Self {
             phase: state[offset],
             increment: state[offset + 1],
@@ -31,10 +41,12 @@ impl Oscillator {
             hp: state[offset + 4],
             high: state[offset + 5] != 0.0,
             external_level: state[offset + 6],
+            startup_target: state[startup_offset],
+            startup_progress: state[startup_offset + 1],
         }
     }
 
-    pub(super) fn save(self, state: &mut [f32; 32], offset: usize) {
+    pub(super) fn save(self, state: &mut [f32; 32], offset: usize, startup_offset: usize) {
         state[offset] = self.phase;
         state[offset + 1] = self.increment;
         state[offset + 2] = self.next;
@@ -42,11 +54,22 @@ impl Oscillator {
         state[offset + 4] = self.hp;
         state[offset + 5] = f32::from(u8::from(self.high));
         state[offset + 6] = self.external_level;
+        state[startup_offset] = self.startup_target;
+        state[startup_offset + 1] = self.startup_progress;
     }
 
     fn next_phase(&mut self, base: f32, sr: f32) -> f32 {
-        if self.increment <= 0.0 {
-            self.increment = base;
+        let ramp_frames = startup_ramp_frames(sr);
+        if self.startup_target == 0.0 {
+            self.increment = STARTUP_FREQUENCY_HZ / sr;
+            self.startup_target = base;
+            self.startup_progress = 0.0;
+        }
+        if self.startup_progress < ramp_frames {
+            self.startup_progress += 1.0;
+            let start = STARTUP_FREQUENCY_HZ / sr;
+            let position = (self.startup_progress / ramp_frames).min(1.0);
+            self.increment = start + (self.startup_target - start) * position;
         } else {
             let smooth = 1.0 - (-1.0 / (0.00075 * sr)).exp();
             self.increment += smooth * (base - self.increment);
@@ -139,7 +162,7 @@ mod tests {
     use super::{next_blep, this_blep, Oscillator};
 
     fn fresh() -> Oscillator {
-        Oscillator::load(&[0.0; 32], 0)
+        Oscillator::load(&[0.0; 32], 0, 28)
     }
 
     #[test]
@@ -209,5 +232,68 @@ mod tests {
             ducked_energy += (sample - 0.5).abs();
         }
         assert!(ducked_energy < free_energy * 0.5);
+    }
+
+    #[test]
+    fn startup_increment_ramp_preserves_sixty_at_96khz_duration_at_host_rates() {
+        for sr in [44_100.0, 48_000.0, 96_000.0] {
+            let mut osc = fresh();
+            let target = 130.81 / sr;
+            let first = osc.next_phase(target, sr);
+            let duration_frames = super::startup_ramp_frames(sr);
+            let expected_first = 100.0 / sr + (target - 100.0 / sr) / duration_frames;
+            assert!((first - expected_first).abs() < 1.0e-8);
+            let ramp_samples = duration_frames.ceil() as usize;
+            for _ in 1..ramp_samples {
+                osc.next_phase(target, sr);
+            }
+            assert!((osc.increment - target).abs() < 1.0e-8);
+            assert_eq!(osc.startup_progress, ramp_samples as f32);
+            assert!((ramp_samples as f32 / sr - super::STARTUP_RAMP_SECONDS).abs() < 1.0 / sr);
+        }
+    }
+
+    #[test]
+    fn startup_increment_ramp_survives_arbitrary_state_partitions() {
+        for sr in [44_100.0, 48_000.0, 96_000.0] {
+            let target = 130.81 / sr;
+            let mut whole = fresh();
+            let ramp_samples = super::startup_ramp_frames(sr).ceil() as usize;
+            let whole_increments: Vec<_> = (0..ramp_samples)
+                .map(|_| whole.next_phase(target, sr))
+                .collect();
+
+            let mut partitioned = fresh();
+            let mut state = [0.0; 32];
+            let mut partitioned_increments = Vec::with_capacity(ramp_samples);
+            for chunk_len in [7, 17, ramp_samples - 24] {
+                for _ in 0..chunk_len {
+                    partitioned_increments.push(partitioned.next_phase(target, sr));
+                }
+                partitioned.save(&mut state, 0, 28);
+                partitioned = Oscillator::load(&state, 0, 28);
+            }
+            assert_eq!(partitioned_increments, whole_increments);
+            assert_eq!(partitioned.increment, whole.increment);
+            assert_eq!(partitioned.startup_progress, whole.startup_progress);
+            assert_eq!(partitioned.startup_target, whole.startup_target);
+            assert_eq!(whole_increments.last(), Some(&target));
+        }
+    }
+
+    #[test]
+    fn post_startup_increment_tracks_the_current_frequency_target() {
+        let sr = 48_000.0;
+        let mut osc = fresh();
+        let initial_target = 130.81 / sr;
+        let ramp_samples = super::startup_ramp_frames(sr).ceil() as usize;
+        for _ in 0..ramp_samples {
+            osc.next_phase(initial_target, sr);
+        }
+
+        let changed_target = 220.0 / sr;
+        let smooth = 1.0 - (-1.0 / (0.00075 * sr)).exp();
+        let expected = osc.increment + smooth * (changed_target - osc.increment);
+        assert_eq!(osc.next_phase(changed_target, sr), expected);
     }
 }

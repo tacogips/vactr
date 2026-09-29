@@ -50,6 +50,13 @@ Large features are split into multiple related plans with cross-references.
 | [mod004-22-voice-runtime.md](active/mod004-22-voice-runtime.md) | Completed (b6fa077); wave 2 dense buffers, stereo voices, balance pan | design-mutable-audio.md MOD-004 | 2026-09-30 |
 | [mod004-30-template-migration.md](active/mod004-30-template-migration.md) | Completed (0a15742); wave 3 nine-template migration | design-mutable-audio.md MOD-004 | 2026-09-30 |
 | [mod004-40-regression-closeout.md](active/mod004-40-regression-closeout.md) | Completed; wave 4 cross-path regression and MOD-004A..F closeout | design-mutable-audio.md MOD-004 | 2026-09-30 |
+| [plv-10-voice-layer-dsp.md](active/plv-10-voice-layer-dsp.md) | Ready; wave 1 pure shared voice-layer DSP | design-mutable-audio.md PLV-001 | 2026-09-30 |
+| [plv-12-manifest-registration.md](active/plv-12-manifest-registration.md) | Ready; wave 1 manifest voice registration and voice-layer label | design-mutable-audio.md PLV-001 | 2026-09-30 |
+| [plv-20-gate-nodes.md](active/plv-20-gate-nodes.md) | Ready; wave 2 vactrol-gate/decay-mod kinds, controls and registry | design-mutable-audio.md PLV-001 | 2026-09-30 |
+| [plv-21-voice-probe.md](active/plv-21-voice-probe.md) | Ready; wave 2 compare-plaits-voice probe | design-mutable-audio.md PLV-001 | 2026-09-30 |
+| [plv-30-voice-lifetime.md](active/plv-30-voice-lifetime.md) | Ready; wave 3 layer-shaped voice lifetime | design-mutable-audio.md PLV-001 | 2026-09-30 |
+| [plv-31-template-wiring.md](active/plv-31-template-wiring.md) | Ready; wave 3 wiring of the 24 Plaits templates, editor lists and golden graph lines | design-mutable-audio.md PLV-001 | 2026-09-30 |
+| [plv-40-evidence-closeout.md](active/plv-40-evidence-closeout.md) | Ready; wave 4 probe evidence, labels, provenance and plan closeout | design-mutable-audio.md PLV-001 | 2026-09-30 |
 | [modular-fm-drums.md](active/modular-fm-drums.md) | In progress; three percussion voices, Peaks FM source stages verified, numerical parity and broader EFM family pending | design-mutable-audio.md | 2026-09-28 |
 | [modular-synth-engines.md](active/modular-synth-engines.md) | Planning; all eligible voice and oscillator engines | design-mutable-audio.md | 2026-09-27 |
 | [modular-plaits-engines.md](active/modular-plaits-engines.md) | In progress; public 24-position inventory, fifteen adaptations, nine source-stage translations, zero full ports | design-mutable-audio.md | 2026-09-28 |

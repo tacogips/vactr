@@ -615,7 +615,9 @@ both channels' level and waveform error after warm-up; mismatches are
 measured gaps, not an automatic test failure or evidence of source parity.
 This kernel comparison does not verify the outer Plaits voice, LPG, trigger
 or `.vact` event behavior. Extend it to other modes only after matching
-each mode's control and resource boundary.
+each mode's control and resource boundary. The outer voice layer has its
+own design and comparison: see "Plaits voice-level trigger and low-pass
+gate layer (PLV-001)" below.
 
 The FM probe now covers three harmonics/timbre/morph settings with the same
 note and reports each channel separately.
@@ -1270,6 +1272,438 @@ The two points below define the contract the tests enforce:
 
 The rules above are the authority for this work; this status note does not
 change them.
+
+## Plaits voice-level trigger and low-pass gate layer (PLV-001)
+
+Source of the requirement: `impl-plans/active/modular-audio-handoff.md`
+priority 4 and the "voice/LPG parity pending" status of every position in
+`impl-plans/active/modular-plaits-engines.md` and its subplans.
+
+### Problem
+
+The 24 Plaits templates run their engine kernels directly. Upstream wraps
+every engine in `Voice::Render` (`plaits/dsp/voice.cc`, `voice.h`), which
+adds trigger detection, a decay envelope, a vactrol-style low-pass gate
+(`plaits/dsp/envelope.h` `LPGEnvelope`, `plaits/dsp/fx/low_pass_gate.h`),
+level/accent handling, and a per-engine out/aux post stage with gain,
+limiter and clipping. Vactr has none of this. Today each Plaits voice
+sounds for its gate time and then the implicit `release` fade ends it
+(`src/dsp/voice.rs`, `implicit` in `render`), which is not the upstream
+ping or level behavior.
+
+### Goals
+
+- One shared, original-Rust translation of the upstream voice layer that
+  every one of the 24 Plaits templates wires in the same way.
+- Neutral `.vact` controls with editor metadata, and an explicit mapping
+  from Vactr's event model (one event starts one voice, velocity, gate
+  length) to the upstream trigger/level conventions.
+- Default rendering of every existing template stays bit-identical: all
+  golden render digests in
+  `src/host/tests/e2e/templates/golden_digests.txt` are unchanged.
+- A local mise comparison against the pinned upstream voice layer, and
+  truthful manifest, inventory and notice updates.
+
+### Non-goals
+
+- Engine selection, the engine-CV hysteresis quantizer, user-data reload
+  and `previous_note_` averaging. In Vactr each template is one fixed
+  position, so there is nothing to select.
+- Changing any engine kernel, its `velocity` accent mapping, or its
+  existing sustain/continuous/clocked control. The engine-level
+  trigger-unpatched convention stays on those controls.
+- Speech `internal_envelope_amplitude` and the chiptune engine's built-in
+  envelope shape. These are engine-specific and stay recorded gaps.
+- Any `SourcePort` claim. Engine coverage labels do not change.
+
+### Upstream behavior translated
+
+All per-block constants below assume the upstream 12-sample block at
+48 kHz (`kBlockSize`, `kSampleRate` in `plaits/dsp/dsp.h`), so one control
+block is 0.25 ms. `d` is the decay control and `h` the colour control,
+both in `[0, 1]`.
+
+- **Decay timing** (voice.cc): `short_decay = 0.05 * 2^(-8d)` and
+  `decay_tail = 0.005 * 2^(-6d + h) - short_decay`. These are the source
+  `SemitonesToRatio` terms (`-96d`, and `-72d + 12h`). Compute them
+  analytically with `2^x`; do not use the stmlib pitch-ratio tables.
+- **Decay envelope** (`DecayEnvelope`): it is set to 1 on a trigger and
+  multiplied by `1 - 2 * short_decay` once per block.
+- **Vactrol envelope** (`LPGEnvelope`): state `s` starts at 0. Each block
+  it moves toward the input level with coefficient 0.6 when rising, and
+  `short_decay + (1 - s^4) * decay_tail` when falling. Its outputs are
+  `gain = s`, `frequency = 0.003 + 0.3 s^4 + 0.04 h`, and
+  `hf_bleed = (t^2 + (1 - t^2) h) h^2` with `t = 1 - s`. In ping mode a
+  trigger sets `ramp_up`. While `ramp_up` is set, `s` grows by `attack`
+  per block, clamped at 1, which clears `ramp_up`. The level input is
+  `s` while ramping and 0 afterwards. Upstream `attack` is
+  `NoteToFrequency(note) * 24`; with Vactr's Hz input this is
+  `24 * freq / 48000` per block.
+- **Low-pass gate** (`LowPassGate`): the gain is linearly interpolated
+  across the block from the previous block's target
+  (`ParameterInterpolator`). The input is multiplied by that gain and fed
+  to a low-pass `stmlib::Svf` with `FREQUENCY_DIRTY` and `q = 0.4`. The
+  dirty tangent is `g = f * (pi + 0.3736 * pi^3 * f^2)`, from
+  `OnePole::tan` in `stmlib/dsp/filter.h`. The output is
+  `lp + (s - lp) * hf_bleed`.
+- **Level** (voice.cc): `compressed = clamp(1.3 l / (0.3 + |l|), 0, 1)`.
+  When level is patched, it drives `ProcessLP` directly, and the vactrol
+  is not pinged.
+- **Bypass rule** (voice.cc): the LPG is bypassed when the engine is
+  already enveloped, or when neither trigger nor level is patched.
+- **Post stage** (`ChannelPostProcessor` in voice.h): a negative
+  registered gain `G` first runs `stmlib::Limiter` (`stmlib/dsp/limiter.h`)
+  with pre-gain `-G`, then uses a post gain of 1. A positive `G` is the
+  post gain. The LPG gain is multiplied by the post gain, and the result
+  is clipped to int16.
+- **Registration** (`Voice::Init`): each position has an
+  `(already_enveloped, out_gain, aux_gain)` tuple:
+
+| Positions | Already enveloped | Out gain | Aux gain |
+|---|---|---|---|
+| 0 | no | 1.0 | 1.0 |
+| 1, 5 | no | 0.7 | 0.7 |
+| 2, 3, 4 | yes | 1.0 | 1.0 |
+| 6, 8, 12, 14 | no | 0.8 | 0.8 |
+| 7 | when clocked (the engine sets it at runtime) | 0.5 | 0.5 |
+| 9, 11 | no | 0.7 | 0.6 |
+| 10, 13 | no | 0.6 | 0.6 |
+| 15 | no (see divergences) | -0.7 | 0.8 |
+| 16 | no | -3.0 | 1.0 |
+| 17 | no | -1.0 | -1.0 |
+| 18 | no | -2.0 | 1.0 |
+| 19, 20 | yes | -1.0 | 0.8 |
+| 21, 22, 23 | yes | 0.8 | 0.8 |
+
+### Chosen design
+
+#### Modules and nodes
+
+- `src/dsp/ugen/voice_layer.rs`: pure, allocation-free DSP structs and
+  functions. It contains the control clock, decay-timing function,
+  decay envelope, vactrol envelope, level compression, low-pass gate SVF
+  with gain interpolation, the post limiter, and the per-lane post stage.
+  It has no graph or catalog knowledge, so it can be unit-tested and
+  implemented in parallel.
+- `src/dsp/ugen/vactrol_gate.rs`: the kernels for two new mono UGen kinds
+  that wrap `voice_layer.rs`:
+  - `vactrol-gate`. Ports, in order: subject `in` (audio), `freq`,
+    `velocity`, `lpg-mode`, `lpg-decay`, `lpg-color`, `slot` (constant
+    Plaits position 0..23), `lane` (constant 0 = main, 1 = aux), and
+    `clocked` (default 0). It has one mono output.
+  - `decay-mod`. Ports: `lpg-decay`, `amount` (-1..1, default 0),
+    `target` (0 = unit offset, 1 = pitch ratio). It has one mono output.
+- Neither kind is a multi-output kernel, so both fall under the MOD-004
+  row "every kind not listed: 0 mono". Each gets a new wire tag, a
+  catalog entry, a checker domain entry and editor port metadata.
+- The registration tuples live in `src/dsp/ported/manifest.rs` as a new
+  per-row `voice` field (an enveloped rule of never, always or when
+  clocked, plus the signed out and aux gains). `vactrol-gate` reads them
+  by `slot`, so the upstream constants exist in exactly one place.
+
+#### Controls and editor metadata
+
+Three new instrument-parameter rows go in `src/dsp/controls.rs`, with
+neutral names:
+
+| Control | Domain | Default | Meaning |
+|---|---|---|---|
+| `lpg-mode` | enum `off`, `ping`, `level` | `off` | Voice-layer mode (below) |
+| `lpg-decay` | float 0..1 | 0.5 | Upstream `decay` |
+| `lpg-color` | float 0..1 | 0.5 | Upstream `lpg_colour` |
+
+The spelling `color` follows the existing `macro-color` and `peak-color`
+controls. All 24 Plaits templates declare the three controls in their
+headers with these defaults (`lpg-mode: keyword = :off`). They are listed
+in each template's editor metadata (`src/dsp/meta/templates.rs`,
+`src/dsp/ugen/catalog/voice_ports.rs`, `src/dsp/build/names/table.rs`)
+with label, default and, for `lpg-mode`, choices. The naming test in
+`src/dsp/ported/tests.rs` covers the new template controls and the UGen
+names `vactrol-gate` and `decay-mod`. The mode is latched once, at the
+voice's first control block. Changing `lpg-mode` affects the next event,
+not a sounding voice. `lpg-decay` and `lpg-color` are read at every
+control block.
+
+#### Event mapping
+
+A Vactr voice start is the trigger's rising edge, at the voice's
+sample-accurate start offset. The trigger stays high while the gate is
+held (`legato`, or `attack + decay`, or until an open voice is released).
+It goes low when the gate closes. The level input is
+`compressed(velocity)` while the gate is held and 0 after it closes.
+`velocity` is the voice's resolved control: the event value, else the
+template or control-table default.
+
+| `lpg-mode` | Upstream state represented | Vactrol | Post stage |
+|---|---|---|---|
+| `off` (default) | trigger and level unpatched: LPG bypass | none; output is the input bit for bit | none: no gain, limiter or clip |
+| `ping` | trigger patched, level unpatched | pinged at voice start; `ProcessPing` each block | registered gain or limiter, then clip to [-1, 1] |
+| `level` | trigger and level patched | `ProcessLP(level)` each block | registered gain or limiter, then clip to [-1, 1] |
+
+In `ping` and `level`, a lane is bypassed when its position is already
+enveloped. For that lane, `clocked >= 0.5` counts as enveloped at
+position 7. A bypassed lane applies only the post stage. For every
+position, the engine's own trigger convention stays on its existing
+template control (`*-sustain`, `swarm-continuous`, `chip-clocked`). So
+the upstream trigger-unpatched engine state is reached by setting that
+control, independently of `lpg-mode`. Accent stays the kernels' existing
+`velocity` port. The voice layer does not change engine accent.
+
+#### Control clock and host rate
+
+Each `vactrol-gate` and `decay-mod` instance keeps a persistent control
+clock of 0.25 ms (`12 * sr / 48000` samples, fractional). It is anchored
+at the voice's first sample and carried across callbacks. It uses the
+same approach as the FM position-10 interpolation clock. The envelope,
+vactrol and decay terms update at each tick, so the per-block
+coefficients stay identical at every host rate. Gain interpolation runs
+over the integer length of the current tick. The SVF frequency is
+converted as `f_host = f * 48000 / sr`, following the existing Plaits
+comparison convention that upstream normalized frequencies refer to
+nominal 48 kHz. Tick boundaries depend only on voice time, never on the
+callback size, so output is partition-invariant.
+
+#### Audio path per lane
+
+For each sample `x` in a non-bypassed `ping` or `level` lane:
+
+1. If `G < 0`, `x` passes through the limiter with pre-gain `-G`, and
+   `P = 1`. Otherwise `P = G`.
+2. `s = x * (interpolated vactrol gain * P)`.
+3. `y = lp + (s - lp) * hf_bleed`, where `lp` is the SVF low-pass of `s`.
+4. The output is `y` clamped to [-1, 1].
+
+A bypassed lane outputs `clamp(limited_or_x * P, -1, 1)`. The limiter
+peak starts at 0.5 in each voice. Its per-sample slope coefficients
+(0.05 attack, 0.00002 release at 48 kHz) are converted to the host rate
+by equal time constant. The upstream `-32767` int16 scale and polarity
+inversion are omitted, because Vactr works in float at unit full scale.
+
+#### `decay-mod`
+
+`decay-mod` computes the decay envelope from voice start with the same
+control clock. It shapes its amount as upstream `ApplyModulations` does:
+`a' = 1.05 * a * max(|a| - 0.05, 0.05)`. Target 0 outputs `a' * e`,
+which is added to a 0..1 control such as `timbre` or `morph`. Target 1
+outputs the ratio `2^(a' * e^2 * 48 / 12)`, which multiplies `freq`. It
+is opt-in and not pre-wired into the 24 templates, because wiring it
+before a kernel would shift that kernel's node index and seed (see the
+next section). The example `examples/voice-layer.vact` shows it
+modulating one Plaits kernel's `timbre` together with `vactrol-gate`,
+and an e2e test renders that example.
+
+#### Template wiring and seed preservation
+
+Lowering is post-order (`src/dsp/build.rs`), and a kernel's seed is
+`voice.seed + node index` (`src/dsp/voice.rs`). The gates must therefore
+be appended after every existing node. Each template keeps its current
+body and changes in two places. The aux path becomes
+`... > * amp > vactrol-gate ... lane: 1 > aux-out`. The whole existing
+main expression is then piped into
+`> vactrol-gate ... lane: 0` as the new root. In source form, a legacy
+duplicate template becomes:
+
+```
+A-kernel ... mode: 0 > * amp
+	> + {B-kernel ... mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: N lane: 1 > aux-out}
+	> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: N lane: 0
+```
+
+A migrated MOD-004 template is changed in the same way, around
+`{p :main} > * amp > + {{p :aux} > * amp > ... > aux-out}`. Position 7
+also passes `clocked: chip-clocked`. The node order is then: every
+existing node up to and including the aux `*`, then the new param/const
+nodes and the aux gate, then `aux-out`, `+` and the root gate. Every
+kernel keeps its index, and therefore its seed. Only `aux-out` and `+`
+move, and neither is seeded. `vactrol-gate` in `off` mode copies its
+input exactly. `amp` is a per-voice constant, so applying the gate after
+`* amp` is the same linear stage upstream applies to raw engine output.
+
+The graph digest lines for the 24 templates in `golden_digests.txt`
+change, and are updated with this section as the reason. No render line
+may change. `migrated_pairs.rs` and `select_output.rs` fixtures are
+updated only where they embed the template text. Their old two-node
+comparison forms stay valid, and at default settings the two forms stay
+bitwise equal.
+
+#### Voice lifetime
+
+A voice is *layer-shaped* when its template contains at least one
+`vactrol-gate` and every gate in it has latched a non-bypassed `ping` or
+`level` mode. For a layer-shaped voice:
+
+- the implicit gate fade (`ienv`) is not applied, because the vactrol
+  already shapes the tail;
+- the voice ends once the gate has closed and every gate reports done
+  (vactrol state and interpolated gain both below 1e-4, and no pending
+  ping attack).
+
+Every other voice keeps today's rules, including `off` voices and voices
+whose lanes are all bypassed for already-enveloped positions. Cut-group
+and steal fades still apply to all voices. `src/dsp/ugen/template.rs`
+records the gate count. The lifetime check moves into a new
+`src/dsp/voice/lifetime.rs` submodule, because `src/dsp/voice.rs`
+(918 lines) must stay under 1000 lines.
+
+#### Real-time, capacity and invariance
+
+Each gate needs about 16 floats of state and `decay-mod` needs about 4.
+The state lives in the node's fixed `NodeState` or `mem_need` region. The
+callback allocates nothing and runs no graph traversal. The math is plain
+`f32` using the same std operations as existing kernels, so native and
+wasm32 share one code path. A template adds at most two gate nodes and
+five parameter/constant nodes, well within `NODE_CAP`, `MAX_PORTS` and
+`MAX_AUDIO_BUFFERS`.
+
+#### Provenance
+
+`verification/upstream_inventory.toml` changes as follows:
+
+- `plaits/dsp/voice.cc` changes to `use = "source"`, and its
+  registry-only reason is removed.
+- New `source` entries: `plaits/dsp/voice.h`, `plaits/dsp/envelope.h`,
+  `plaits/dsp/fx/low_pass_gate.h`, `stmlib/dsp/limiter.h`, and
+  `plaits/dsp/engine/engine.h` (for `NoteToFrequency`, the trigger flags
+  and the post-processing settings). Add `plaits/dsp/dsp.h` only if Vactr
+  names it.
+- The existing `stmlib/dsp/filter.h` and `parameter_interpolator.h`
+  entries already cover the SVF and interpolator.
+
+Making `voice.cc` a used file brings `plaits/user_data.h` and
+`stmlib/system/flash_programming.h` into the audited `#include` closure.
+Any non-MIT file reached this way must get an explicit `excluded` entry.
+Rerun the audit until it reports 0 errors.
+
+`THIRD_PARTY_NOTICES.md` gets one new section, "Plaits voice-level
+trigger and low-pass gate translation". It names these files with their
+pinned copyright lines (voice, envelope and engine 2016; low-pass gate
+2014; limiter 2015) and the MIT notice. No lookup table, resource or
+`resources.cc` data is imported.
+
+#### Comparison probe
+
+Add `verification/plaits_voice_reference.cc`,
+`verification/compare_plaits_voice.py`, `examples/plaits_voice_reference.rs`
+and the mise task `compare-plaits-voice`. The task follows the
+`compare-plaits-*` pattern, requires `VACTR_MI_REFERENCE`, and sets
+`CARGO_TERM_QUIET=true`. The C++ side compiles the unmodified pinned
+`Voice` in a temporary compilation unit, as the existing probes do. It
+may use a probe-local accessor to read `lpg_envelope_`,
+`decay_envelope_` and the raw engine buffers. The checkout must stay
+clean, and objects and outputs stay under `tmp/`. The probe reports:
+
+1. **Control trajectories** at 48 kHz: per-block vactrol gain,
+   frequency, hf_bleed and decay value. It runs `ping` and `level` at
+   `d` in {0.2, 0.5, 0.8}, `h` in {0, 0.5, 1}, notes 48 and 69 (using the
+   same 47,872.34/48,000 note correction as `compare-plaits-osc`),
+   velocity in {1, 0.5}, and a finite gate. Upstream is aligned at its
+   detected rising-edge block, after its 5-block trigger delay.
+2. **Audio path**: upstream `LowPassGate` plus the post stage, against
+   Vactr's lane path. Both get the same deterministic harness signal and
+   the recorded trajectories. It covers gains 0.8, 0.6, -1 and -2.
+3. **Bypass**: an already-enveloped position (19 or 21) in both modes,
+   where only the post stage runs.
+4. **Host rate** (Vactr-only): trajectory timing at 44.1 and 96 kHz
+   against 48 kHz.
+
+Metrics are max-abs and RMS error and correlation, per lane. The voice
+layer may be labeled `SourceStage` only when, at 48 kHz, the trajectory
+max-abs error is at most 1e-4 and the audio-path correlation is at least
+0.999 in every scenario. Otherwise the measured gap is recorded and the
+label stays `Pending`.
+
+#### Fidelity labels
+
+Each row of `src/dsp/ported/manifest.rs` gets a `voice_layer:
+CoverageState`. It starts at `Pending` and moves to `SourceStage` for all
+24 rows only when the probe meets the thresholds above. It is never
+`SourcePort`, because the event-model differences below remain.
+`plaits_coverage_summary()` also reports the voice-layer count. The
+existing engine `coverage` values are unchanged. The
+"voice/LPG parity pending" wording in the Plaits plans is replaced with
+the measured result.
+
+### Intentional divergences from upstream
+
+1. There is no 1 ms trigger delay. Upstream delays the trigger 5 blocks
+   (1.25 ms) to cover CV lag. Vactr events carry pitch and onset
+   together, sample-accurately.
+2. The 0.3/0.1 trigger hysteresis is not applied, because the event gate
+   is boolean.
+3. `off` mode skips the upstream post gain, limiter and clip, even though
+   upstream applies them in its unpatched state. This keeps existing
+   template levels and digests.
+4. The int16 scale, the polarity inversion and the Clip16 one-LSB offset
+   are omitted. `ping` and `level` clip at ±1.
+5. The control block is anchored at voice start, lasts 0.25 ms at every
+   rate, and scales the SVF frequency to the host rate.
+6. Level is velocity times gate, not a continuous CV. The
+   trigger-unpatched level-patched state and the trigger-patched
+   level-patched state behave the same at the LPG, so both use `level`.
+7. The internal decay-envelope modulation of note, timbre and morph is
+   the opt-in `decay-mod` node, not pre-wired, to keep kernel seeds.
+8. Position 15 is treated as never enveloped, because Vactr's procedural
+   token mode has no source prosody replay. Position 7 is enveloped when
+   `chip-clocked` is at least 0.5, but has no source chiptune envelope.
+9. The limiter resets for each voice. Upstream resets only the out-lane
+   limiter, and only on an engine change.
+10. A layer-shaped voice's tail is governed by the vactrol decay, not by
+    the implicit `release` fade.
+11. Engine accent is unchanged. Upstream sets the engine accent to the
+    compressed level when level is patched, and to 0.8 otherwise. Vactr
+    kernels keep their existing `velocity` accent port in every mode.
+12. `decay-mod` models only the trigger-patched branch of
+    `ApplyModulations`. The upstream trigger-unpatched constant offset
+    (`default_internal_modulation = 1` for the note) is not reproduced,
+    because a Vactr event always triggers.
+
+### Test strategy
+
+- Unit tests (`voice_layer.rs`): decay timing at d = 0, 0.5 and 1; ping
+  attack reaching 1 and clearing `ramp_up`; the level compression curve;
+  rise and fall coefficients; SVF DC gain and stability; gain
+  interpolation endpoints; limiter peak behavior; bypass and `off`
+  identity.
+- `off` identity: for all 24 templates, each golden render digest is
+  unchanged. For several templates, the `off` render with explicit
+  `lpg-mode :off` is bitwise equal to the render with no control.
+- Mode behavior: `ping` output rises and decays with `lpg-decay` and
+  darkens with a low `lpg-color`. `level` output tracks velocity and
+  releases after the gate. Enveloped positions stay unfiltered, with
+  only gain applied. Main and aux lanes use their own gains and limiters.
+- Lifetime: a `ping` voice outlives its default gate by the vactrol tail
+  and ends once it is done. An `off` voice keeps its implicit fade. A cut
+  group still chokes.
+- Partition and rate: bitwise-equal output across blocks 64, 256 and 97
+  at 44.1, 48 and 96 kHz. A native/browser render matches for one
+  `ping` template. The alloc probe shows no callback allocation.
+- Codec and editor: round trip of both new kinds, template metadata
+  listing the three controls with `lpg-mode` choices, and the naming
+  test.
+- The example `examples/voice-layer.vact` loads and renders finite,
+  non-silent audio.
+
+### Deferred, non-blocking items
+
+- Speech `internal_envelope_amplitude`, the speech prosody/speed CV roles,
+  and the chiptune built-in envelope shape remain engine-specific gaps in
+  the per-engine plans.
+- Pre-wiring `decay-mod` into the 24 templates would need a seed-stable
+  wiring or a documented digest change. It is left to a separate decision.
+- Audible review is outside automated verification and is recorded as
+  pending in the handoff.
+
+### Rollout
+
+The work order is: the pure `voice_layer.rs` and the probe files, which
+can run in parallel; then the serialized registry work, which touches
+the node kinds, catalog, codec, names, checker domain, controls, editor
+metadata, manifest, template lifetime, `templates.vact`, golden graph
+lines, inventory, notices and `mise.toml`; then the evidence and plan
+updates. Record the probe results in `modular-plaits-engines.md` and its
+subplans. In `modular-audio-handoff.md`, mark MOD-004 stereo edges done
+under priority 7 and record this priority-4 progress. Write evidence
+logs under `tmp/`.
 
 ## References
 

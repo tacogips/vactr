@@ -80,16 +80,34 @@ Design reference: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-ou
 Each subtask is scoped to one implementation session. “Deliverables” lists
 paths and API signatures only; implementation code belongs in source files.
 
+**Fanout execution (2026-09-29).** MOD-004 runs as eight plans with
+disjoint write paths. Those plans are authoritative for file-level scope;
+the subtasks below keep the acceptance view.
+
+| Wave | Plan | Covers |
+|---|---|---|
+| 0 | `mod004-00-baseline.md` (MOD004-00) | Golden render/graph digests at the pre-change code; test module scaffolding |
+| 1 | `mod004-10-shape-contract.md` (MOD004-10) | MOD-004A contract: shapes, `Edge.output`, `UGenKind::Output`, shared derivation |
+| 1 | `mod004-11-engine-split.md` (MOD004-11) | `engine.rs` split before MOD-004B/C |
+| 1 | `mod004-12-kernel-pairs.md` (MOD004-12) | MOD-004E kernels: nine pair entry points, `sample::play_stereo` |
+| 2 | `mod004-20-select-lowering.md` (MOD004-20) | MOD-004A lowering, MOD-004E selector (VM, checker, lowering) |
+| 2 | `mod004-21-codec.md` (MOD004-21) | MOD-004D |
+| 2 | `mod004-22-voice-runtime.md` (MOD004-22) | MOD-004B, MOD-004C |
+| 3 | `mod004-30-template-migration.md` (MOD004-30) | MOD-004E template migration |
+| 4 | `mod004-40-regression-closeout.md` (MOD004-40) | MOD-004F and closeout |
+
+Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
+{20, 21, 22} -> 30 -> 40.
+
 #### MOD-004A: Evaluator graph output shapes and edge selection
 
 **Status**: NOT_STARTED
 **Depends on**: MOD-003
 **Parallelizable**: No
 **Deliverables**:
-- `src/dsp/graph.rs` — `pub struct AudioOutputShape`; `pub struct NodeAudioShape`; `pub struct Edge { from: u16, to: u16, port: u8, output: u8 }`
-- `src/dsp/build.rs` — `pub fn lower_ugen(root: &Rc<UGenNode>) -> Result<InstDef, LowerError>`
-- `src/dsp/build/names.rs` — `pub fn select_output(value: Value, selector: OutputSelector) -> Result<Value, Failure>`
-- `src/ns/insts.rs` — `pub fn validate_ugen_output(node: &UGenNode, output: OutputSelector) -> Result<AudioOutputShape, Failure>`
+- `src/dsp/graph.rs` + `src/dsp/graph/shape.rs` — `pub enum AudioOutputShape`; `pub struct NodeAudioShape`; `pub struct Edge { from: u16, to: u16, port: u8, output: u8 }`; `UGenKind::Output(u8)`; `pub enum OutputSelector`; `pub fn select_output(kind: &UGenKind, sel: OutputSelector) -> Result<u8, SelectError>` (the single owner, MOD004-10); `derive_shapes`, `voice_layout`, `assign_slices`
+- `src/dsp/build.rs` — `lower_inst` lowers the `UGenKind::Output` wrapper to edge output indexes and checks shapes, layout and capacity (MOD004-20)
+- `src/vm/call.rs`, `src/types/infer_call.rs` — calling a UGen value selects an output (MOD004-20). `src/ns/insts.rs` is unchanged: selection is validated in the VM, so no `validate_ugen_output` is needed.
 
 **Completion Criteria**:
 - [ ] Every node kind declares bounded output count and mono/stereo shape.
@@ -121,7 +139,7 @@ paths and API signatures only; implementation code belongs in source files.
 **Depends on**: MOD-004B
 **Parallelizable**: No
 **Deliverables**:
-- `src/dsp/effects/mod.rs` — `pub fn process(kind: EffectKind, params: &[f32], state: &mut FxState, mem: &mut [f32], left: &mut [f32], right: &mut [f32], ctx: &mut FxCtx<'_>)`
+- `src/dsp/effects/prim.rs` — `pub fn balance_gains(pan: f32) -> (f32, f32)`. `src/dsp/effects/mod.rs` is unchanged: the voice effect unit already takes left/right slices, and only the voice-side downmix goes away.
 - `src/dsp/voice.rs` — `pub struct PostFx`; `pub fn render<C: CellRead + ?Sized>(voice: &mut Voice, template: &Template, frames: usize, ctx: &mut RenderCtx<'_, C>) -> (usize, bool)`
 - `src/dsp/engine.rs` — `pub fn render(&mut self, out: &mut [f32], frames: usize)`
 
@@ -145,7 +163,7 @@ paths and API signatures only; implementation code belongs in source files.
 **Completion Criteria**:
 - [ ] Output shapes and edge source-output indexes have a deterministic encoded representation shared by native and browser.
 - [ ] Same-revision native/browser peers install the same mono, multi-mono, and stereo graphs.
-- [ ] Legacy mono payload decoding is preserved when unambiguous; otherwise a format discriminator and explicit unsupported-version error are defined.
+- [ ] No legacy decoder (owner decision, 2026-09-29): the instrument record tag changes from `I` to `V`, and an old-tag or malformed shape payload is rejected with `BadRecord`.
 - [ ] Exact byte fixtures and encode/decode/re-encode round trips cover each graph shape.
 
 #### MOD-004E: `.vact` selector and dual-instance template migration
@@ -154,10 +172,10 @@ paths and API signatures only; implementation code belongs in source files.
 **Depends on**: MOD-004B, MOD-004C, MOD-004D
 **Parallelizable**: No
 **Deliverables**:
-- `src/prelude/templates.vact` — `filter-voice`, `phase-pair-voice`, eligible simultaneous-output templates
-- `src/dsp/ported/*.rs` — `main_outputs`, `aux_outputs` manifest rows and matching multi-output kernel signatures
-- `src/dsp/build/names.rs` — `pub fn select_output(value: Value, selector: OutputSelector) -> Result<Value, Failure>`
-- `src/dsp/graph.rs` — `pub enum OutputSelector`
+- `src/prelude/templates.vact` — the nine eligible templates listed in the design: `filter-voice`, `fm-pair-voice`, `analog-pair-voice`, `chord-layer-voice`, `wave-grid-voice`, `terrain-voice`, `string-machine-voice`, `shape-voice`, `stage-chain-voice`. `phase-pair-voice` is not eligible because its mode changes state.
+- `src/dsp/ugen/{va_filter,fm_pair,analog_pair,chord_pair,table_terrain_pair,terrain_pair,string_machine_pair,shape_pair,stage_chain}.rs` — `*_pair(…, main, aux, …)` entry points; `src/dsp/ugen/sample.rs` — `play_stereo`
+- The manifest `main_outputs`/`aux_outputs` fields in `src/dsp/ported/*.rs` are unchanged: they describe the upstream module.
+- `select_output`/`OutputSelector` are owned by MOD-004A (MOD004-10). MOD-004E only uses them from `.vact`.
 
 **Completion Criteria**:
 - [ ] Calling a multi-output UGen value with an output keyword (`(p :aux)`) or a numeric index (`(p 1)`) selects that output. Selection from a single-output node, an unknown name or an out-of-range index is a definition-time diagnostic (owner decision, 2026-09-29).
@@ -172,8 +190,8 @@ paths and API signatures only; implementation code belongs in source files.
 **Parallelizable**: No
 **Deliverables**:
 - `src/dsp/tests/dsp/` — unit, codec, allocation-probe, rate/block, and template-render regressions
-- `src/host/tests/e2e/templates/` — native/browser multi-output install and render scenarios
-- `src/dsp/alloc_probe.rs` — `pub fn assert_no_callback_allocations(render: impl FnMut())`
+- `src/host/tests/e2e/templates/` — golden digests, `.vact` selection, and migrated-template equivalence (this directory exists)
+- `src/dsp/alloc_probe.rs` is unchanged: the existing `Rig::step` and `E2e::run_stereo_for` probes already assert zero callback allocations.
 
 **Completion Criteria**:
 - [ ] Every existing prelude template has fixed-event before/after render coverage; unchanged templates are bit-identical.

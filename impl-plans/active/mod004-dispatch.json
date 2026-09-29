@@ -1,0 +1,520 @@
+{
+  "taskId": "mod004",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "cf2ea3712a79dacaf8e78ff201141c8048b297ab",
+  "designDocPaths": [
+    "design-docs/specs/design-mutable-audio.md"
+  ],
+  "evidenceRoot": "tmp/mod004",
+  "evidenceLayout": "tmp/mod004/<planId>/ holds each plan's logs, as the plans specify (for example tmp/mod004/MOD004-30/golden_digests.txt.orig). Retries go under tmp/mod004/<planId>/attempt-<n>/. tmp/ is gitignored (**/tmp) and must stay untracked.",
+  "executionModel": {
+    "waves": [
+      ["MOD004-00"],
+      ["MOD004-10", "MOD004-11", "MOD004-12"],
+      ["MOD004-20", "MOD004-21", "MOD004-22"],
+      ["MOD004-30"],
+      ["MOD004-40"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "orchestrator commits after each wave or at the end; workers never commit, stash, checkout, reset, branch, push or merge",
+    "retryPolicy": "If cargo fails inside another concurrent plan's files, wait about 60 s and retry, up to 10 times, then record a blocker in the plan's Progress Log",
+    "serialReconciliation": "MOD004-40 owns cargo fmt, the parent-plan and README updates, plan Status lines and any cross-plan repair"
+  },
+  "reviewContext": {
+    "issueReference": "local:impl-plans/active/modular-audio-foundation.md#MOD-004 (MOD-004: arbitrary stereo and multi-output UGen edges; workflow opus-luna-design-and-implement-review-loop-session-189, plan review comm-002455)",
+    "userProblem": "Edge carries only from/to/port, so lowering cannot name which output of a source node feeds an input. Each compiled node renders one mono buffer. As a result, 36 prelude templates instantiate an engine twice to recover main and aux, stereo sampler output cannot stay stereo through UGen edges, voice-local effects downmix stereo, and main/aux voices bypass ordinary pan mapping (design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004, Problem).",
+    "requiredOutcomes": [
+      "Every UGen node declares bounded typed outputs (mono or stereo, up to 4 outputs, up to 2 channels each), and Edge gains an output index (MOD004-10).",
+      ".vact selects outputs by calling the node value with an output keyword (p :aux) or an index (p 1). Invalid selection is a definition-time diagnostic, and an unselected use means output 0. The static checker types (ugen kw|int) as ugen (MOD004-20).",
+      "Shape, voice-layout and 512-slice capacity errors are definition-time lowering errors (MOD004-20), and template build returns BuildError::TooManyBuffers (MOD004-22).",
+      "Dense, bounded channel-slice voice buffers. Pair kernels and sample::play_stereo are used only when output 1 is consumed. Stereo Mul/Add and stereo voice-local effects do not downmix. Stereo and main/aux voices use unity-center balance pan; mono voices keep equal-power pan (MOD004-11, MOD004-12, MOD004-22).",
+      "The graph codec uses the new instrument tag b'V', one shape byte per node and one output byte per edge, and cross-checks shapes on decode with no allocation. The old tag b'I' is rejected with BadRecord (MOD004-21).",
+      "Exactly nine simultaneous-output templates migrate to one node with (p :main)/(p :aux), each bit-identical to its old two-node form (MOD004-30).",
+      "Every unmigrated prelude template renders bit-identically to the golden digests captured at cf2ea37 (MOD004-00 baseline, re-checked in every wave).",
+      "Native and browser installs give identical compiled shapes and renders. Callback allocation probes pass, and the rate/block invariance tests pass (MOD004-40).",
+      "MOD-004A..F criteria are checked off in impl-plans/active/modular-audio-foundation.md with a dated progress log (MOD004-40)."
+    ],
+    "nonGoals": [
+      "Dynamic channel counts, unbounded output lists, surround layouts or implicit up/downmix matrices.",
+      "A legacy graph-payload decoder, or mixed-revision native/browser compatibility.",
+      "Changes to bus/master processing, out3/out4 stems, or mono pan.",
+      "Grammar or reader changes (no dot syntax), and a validate_ugen_output in src/ns/insts.rs.",
+      "Migrating any template beyond the nine listed. phase-pair-voice, resonator-voice and the other excluded templates stay byte-for-byte unchanged.",
+      "Mutable source parity certification, and archiving the parent plan (MOD-005/006 remain)."
+    ],
+    "constraints": [
+      "Follow the committed design and the owner decisions resolved on 2026-09-29; do not reopen them.",
+      "Write only under src/, tests/, examples/, design-docs/, impl-plans/, verification/ and tmp/, and only within each plan's writePaths.",
+      "The audio callback stays allocation-free and bounded. decode_graph and template build must not allocate. Native and wasm32 behave identically.",
+      "Every touched Rust file stays under 1000 lines.",
+      "Use CARGO_TERM_QUIET=true for cargo and NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 for nextest.",
+      "Commits use the AGENTS.md numbered 1-6 sections with no Co-Authored-By or tool attribution; do not push.",
+      "The golden fixture is blessed once in MOD004-00. Only MOD004-30 may regenerate it, and only the nine migrated templates' graph lines; no plan may change a render line."
+    ],
+    "designDecisionsAndRationale": [
+      "Selector spelling is a call with a keyword or index, because it needs no grammar change. The evaluator-only UGenKind::Output(k) wrapper lowers to edge output k, and memoizing the inner node by Rc pointer makes (p :main) and (p :aux) one node.",
+      "Shapes are always derived from per-kind OutputDecl (Fixed, FollowSubject, Elementwise, Control, Tap) and never stored in InstDef or RawGraph. One shared set of allocation-free functions (derive_shapes, voice_layout, assign_slices) in src/dsp/graph/shape.rs keeps lowering, decoder and template build in agreement.",
+      "Balance pan is unity at center (balance_gains(0.5) == (1.0, 1.0)), so legacy aux-out voices stay bit-identical at center pan.",
+      "Pair kernels run only when output 1 is consumed. Otherwise the unchanged legacy function runs, so unmigrated templates stay bit-identical by construction.",
+      "A new instrument tag (b'V') is the permitted discriminator, so old payloads fail with BadRecord instead of being misparsed.",
+      "sample-play's shape is fixed per kind ([mono, stereo]) and not derived from the resource, so the per-event bank choice in the prelude sampler keeps its sound.",
+      "Voice-local effects follow the subject's shape, so existing mono voice effects stay bit-identical. Unconsumed outputs go to discard slices instead of being rejected."
+    ],
+    "intentionalTradeoffs": [
+      "Same-branch fanout without worktrees. Concurrent workers in waves 1 and 2 may briefly break crate-wide compilation; this is mitigated by the retry protocol and serial reconciliation in MOD004-40.",
+      "The engine.rs render path is split first (MOD004-11) purely to keep files under 1000 lines, at the cost of one extra wave-1 plan.",
+      "Old template forms stay valid, and duplicate-node templates outside the nine keep duplicated state and work.",
+      "If block-partition bit-identity (MOD004-40 case 2) also fails for the legacy two-node form, the result is recorded as pre-existing, and the plan asserts equivalence plus the existing rate_contract bounds instead."
+    ],
+    "supportedEdgeCases": [
+      "Index 0 selection still returns a wrapper, so selecting from a selection ((p :aux) :main) fails with not-callable.",
+      "A root (p :aux) lowers to an identity Add sink fed by output 1.",
+      "(s :stereo) + {x > aux-out}: derive_shapes accepts it, and voice_layout rejects it with StereoAuxOut.",
+      "A stereo source into a mono-only port (for example lpf) is a definition-time Mismatch error.",
+      "Control (Const/Param) and Tap sources broadcast to both channels of an Elementwise stereo node.",
+      "An unconsumed VaFilter aux writes to discard slices, and the legacy path is used.",
+      "Capacity: 205-node SamplePlay/Add tree (513 slices) gives TooManyBuffers; 203 nodes (508 slices) build as a stereo voice; 256 mono nodes build.",
+      "Codec: shape byte with bit 6 set, a shape that disagrees with the kind, edge output out of range, and stereo into Lpf all give BadRecord.",
+      "play_stereo with a 1-channel resource writes mono to both sides; a missing resource zero-fills all outputs and finishes like play."
+    ],
+    "outOfScopeEdgeCases": [
+      "Mixed-revision peers exchanging graph bytes.",
+      "More than 4 outputs per node, or more than 2 channels per output.",
+      "Output selection inside bus bodies (rejected with a lowering error, not supported).",
+      "phase_pair, spectrum_pair, grain_pair and seeded kernels as multi-output nodes."
+    ],
+    "knownLowFindings": [
+      "impl-plans/active/modular-audio-foundation.md:83 says 'eight plans' where nine exist (wording only; MOD004-40 may correct it during closeout).",
+      "impl-plans/active/mod004-20-select-lowering.md:123 allows changing not-callable assertions in files outside writePaths (for example src/types/tests/inst/overloads.rs); any such change must be logged as a writePath addition.",
+      "impl-plans/active/mod004-00-baseline.md:81: the pan02 golden variant skips has_quad templates.",
+      "impl-plans/active/mod004-40-regression-closeout.md:66: the channel-independence bullet is worded ambiguously."
+    ],
+    "residualRisks": [
+      "Bitwise equivalence of the migrated templates requires every other seeded node to keep its index. migrated_pairs and golden will detect a violation, and MOD004-30 stops and reports."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-mutable-audio.md",
+      "impl-plans/active/modular-audio-foundation.md",
+      "src/dsp/graph.rs",
+      "src/dsp/build.rs",
+      "src/dsp/arena.rs",
+      "src/dsp/ugen/mod.rs",
+      "src/dsp/ugen/template.rs",
+      "src/dsp/ugen/mixer.rs",
+      "src/dsp/ugen/catalog.rs",
+      "src/dsp/voice.rs",
+      "src/dsp/engine.rs",
+      "src/dsp/effects/prim.rs",
+      "src/vm/call.rs",
+      "src/types/infer_call.rs",
+      "src/ns/insts.rs",
+      "src/prelude/templates.vact",
+      "src/host/tests/e2e.rs",
+      "src/host/tests/e2e/templates/coverage.rs"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "MOD004-00",
+      "planPath": "impl-plans/active/mod004-00-baseline.md",
+      "dependsOn": [],
+      "writePaths": [
+        "src/host/tests/e2e/templates/golden.rs",
+        "src/host/tests/e2e/templates/golden/",
+        "src/host/tests/e2e/templates/golden_digests.txt",
+        "src/host/tests/e2e/templates.rs",
+        "src/dsp/tests/dsp.rs",
+        "src/dsp/tests/dsp/shape_contract.rs",
+        "src/dsp/tests/dsp/kernel_pairs.rs",
+        "src/dsp/tests/dsp/codec_shapes.rs",
+        "src/dsp/tests/dsp/voice_layout.rs",
+        "src/dsp/tests/dsp/multi_output.rs",
+        "src/host/tests/e2e/templates/select_output.rs",
+        "src/host/tests/e2e/templates/migrated_pairs.rs",
+        "impl-plans/active/mod004-00-baseline.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/tests/dsp.rs", "intendedEdit": "Module lines only here; MOD004-10 later adds output: 0 to its Edge literal (line ~408)."},
+        {"path": "src/host/tests/e2e/templates/golden_digests.txt", "intendedEdit": "Created and blessed here from pre-change code; only MOD004-30 may later replace the nine migrated graph lines."},
+        {"path": "src/dsp/tests/dsp/{shape_contract,kernel_pairs,codec_shapes,voice_layout,multi_output}.rs, src/host/tests/e2e/templates/{select_output,migrated_pairs}.rs", "intendedEdit": "Created as one-line //! stubs here; each is filled by its owning plan."},
+        {"path": "src/host/tests/e2e.rs, src/host/tests/e2e/regions.rs, src/host/tests/e2e/templates/coverage.rs", "intendedEdit": "Read-only."}
+      ],
+      "preconditions": [
+        "test -z \"$(git diff --stat cf2ea37 -- src verification)\""
+      ],
+      "acceptanceCriteria": [
+        "The precondition diff is empty and recorded.",
+        "The fixture covers every prelude template (render center plus graph), pan02 for every mono non-quad template, and both sampler resource variants.",
+        "The golden and determinism tests pass; the negative check is recorded.",
+        "All seven stub test files exist and are registered, and clippy is clean.",
+        "The full nextest suite passes."
+      ],
+      "verification": [
+        "test -s src/host/tests/e2e/templates/golden_digests.txt && grep -q '^render ' src/host/tests/e2e/templates/golden_digests.txt && grep -q '^graph ' src/host/tests/e2e/templates/golden_digests.txt",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run golden",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "rustfmt --edition 2021 --check src/host/tests/e2e/templates.rs src/dsp/tests/dsp.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-10",
+      "planPath": "impl-plans/active/mod004-10-shape-contract.md",
+      "dependsOn": ["MOD004-00"],
+      "writePaths": [
+        "src/dsp/graph.rs",
+        "src/dsp/graph/shape.rs",
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/build.rs",
+        "src/dsp/arena.rs",
+        "src/dsp/ugen/template.rs",
+        "src/vm/natives/dsp.rs",
+        "src/host/native/tests/audio.rs",
+        "src/sched/tests/midi.rs",
+        "src/dsp/tests/dsp.rs",
+        "src/dsp/tests/dsp/shape_contract.rs",
+        "src/dsp/tests/dsp/analog_pair.rs",
+        "src/dsp/tests/dsp/chip_pair.rs",
+        "src/dsp/tests/dsp/chord_pair.rs",
+        "src/dsp/tests/dsp/clock_noise_pair.rs",
+        "src/dsp/tests/dsp/cut_group.rs",
+        "src/dsp/tests/dsp/dual_kick.rs",
+        "src/dsp/tests/dsp/elements_internal.rs",
+        "src/dsp/tests/dsp/fm_pair.rs",
+        "src/dsp/tests/dsp/frame_keyframe.rs",
+        "src/dsp/tests/dsp/frame_lfo.rs",
+        "src/dsp/tests/dsp/grain_pair.rs",
+        "src/dsp/tests/dsp/granular.rs",
+        "src/dsp/tests/dsp/hat_pair.rs",
+        "src/dsp/tests/dsp/modal_pair.rs",
+        "src/dsp/tests/dsp/number_station.rs",
+        "src/dsp/tests/dsp/particle_pair.rs",
+        "src/dsp/tests/dsp/peak_function.rs",
+        "src/dsp/tests/dsp/peak_pulse.rs",
+        "src/dsp/tests/dsp/phase_pair.rs",
+        "src/dsp/tests/dsp/quad_outputs.rs",
+        "src/dsp/tests/dsp/release.rs",
+        "src/dsp/tests/dsp/rings_part.rs",
+        "src/dsp/tests/dsp/shape_pair.rs",
+        "src/dsp/tests/dsp/six_op_original.rs",
+        "src/dsp/tests/dsp/snare_pair.rs",
+        "src/dsp/tests/dsp/spectrum_pair.rs",
+        "src/dsp/tests/dsp/speech_original.rs",
+        "src/dsp/tests/dsp/stage_chain.rs",
+        "src/dsp/tests/dsp/stage_linked.rs",
+        "src/dsp/tests/dsp/stage_segment.rs",
+        "src/dsp/tests/dsp/string_choir.rs",
+        "src/dsp/tests/dsp/string_machine_pair.rs",
+        "src/dsp/tests/dsp/string_pair.rs",
+        "src/dsp/tests/dsp/swarm_pair.rs",
+        "src/dsp/tests/dsp/table_terrain_pair.rs",
+        "src/dsp/tests/dsp/templates.rs",
+        "src/dsp/tests/dsp/terrain_pair.rs",
+        "src/dsp/tests/dsp/tidal_function.rs",
+        "src/dsp/tests/dsp/tidal_poly.rs",
+        "src/dsp/tests/dsp/ugens.rs",
+        "src/dsp/tests/dsp/va_filter.rs",
+        "src/dsp/tests/dsp/voice_input.rs",
+        "src/dsp/tests/dsp/voice_stereo.rs",
+        "impl-plans/active/mod004-10-shape-contract.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/build.rs", "intendedEdit": "Only output: 0 in Edge literals plus UGenKind::Output placeholder arms returning LowerError::ty(\"output selection is not supported yet\"); MOD004-20 (wave 2) replaces the placeholders."},
+        {"path": "src/dsp/arena.rs", "intendedEdit": "Only output: 0 in the decoder Edge literal (~line 585); MOD004-21 (wave 2) owns the codec change."},
+        {"path": "src/dsp/ugen/mod.rs", "intendedEdit": "Only the BuildError::TooManyBuffers variant and message; MOD004-22 (wave 2) edits Src and NodeSpec."},
+        {"path": "src/dsp/ugen/template.rs", "intendedEdit": "Only output: 0 in Edge literals (~line 34); MOD004-22 (wave 2) owns the slice build."},
+        {"path": "src/dsp/tests/dsp.rs", "intendedEdit": "Only output: 0 in the Edge literal; MOD004-00 already registered modules."},
+        {"path": "src/compile/tests/inst.rs, src/value/tests/mod.rs, src/ns/insts.rs", "intendedEdit": "Conditional compile fix only: add a UGenKind::Output arm if an exhaustive match fails. Log each touched file in the Progress Log as a writePath addition."},
+        {"path": "src/dsp/ugen/catalog.rs, src/dsp/build/names.rs", "intendedEdit": "Read-only."}
+      ],
+      "excludedPaths": [
+        "src/dsp/tests/dsp/kernel_pairs.rs",
+        "src/dsp/ugen/{va_filter,fm_pair,analog_pair,chord_pair,table_terrain_pair,terrain_pair,string_machine_pair,shape_pair,stage_chain,sample}.rs",
+        "src/dsp/engine.rs",
+        "src/dsp/engine/"
+      ],
+      "acceptanceCriteria": [
+        "The contract items exist with the exact signatures pinned in the plan.",
+        "Every Edge literal carries output: 0; there is no behavior change and golden passes.",
+        "The shape_contract tests cover every rule bullet in the plan.",
+        "Checks 1-8 pass, with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "CARGO_TERM_QUIET=true cargo check -q --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run shape_contract golden",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/dsp/graph.rs src/dsp/graph/shape.rs src/dsp/build.rs src/dsp/ugen/mod.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
+        "rustfmt --edition 2021 --check src/dsp/graph.rs src/dsp/graph/shape.rs src/dsp/build.rs src/dsp/tests/dsp/shape_contract.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-11",
+      "planPath": "impl-plans/active/mod004-11-engine-split.md",
+      "dependsOn": ["MOD004-00"],
+      "writePaths": [
+        "src/dsp/engine.rs",
+        "src/dsp/engine/render.rs",
+        "impl-plans/active/mod004-11-engine-split.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/engine.rs", "intendedEdit": "Pure move of fn render into engine/render.rs; MOD004-22 (wave 2) later edits only the bufs allocation line."},
+        {"path": "src/dsp/engine/render.rs", "intendedEdit": "Created here with an extracted mix_voice free function; MOD004-22 (wave 2) edits only mix_voice for balance pan."}
+      ],
+      "acceptanceCriteria": [
+        "render lives in src/dsp/engine/render.rs, with the mix_voice helper extracted.",
+        "The golden test passes with no diff to the fixture.",
+        "Checks 1-7 pass, with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run golden voice_stereo stereo_contract rate_contract",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/dsp/engine.rs src/dsp/engine/render.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
+        "rustfmt --edition 2021 --check src/dsp/engine.rs src/dsp/engine/render.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-12",
+      "planPath": "impl-plans/active/mod004-12-kernel-pairs.md",
+      "dependsOn": ["MOD004-00"],
+      "writePaths": [
+        "src/dsp/ugen/va_filter.rs",
+        "src/dsp/ugen/fm_pair.rs",
+        "src/dsp/ugen/analog_pair.rs",
+        "src/dsp/ugen/chord_pair.rs",
+        "src/dsp/ugen/table_terrain_pair.rs",
+        "src/dsp/ugen/terrain_pair.rs",
+        "src/dsp/ugen/string_machine_pair.rs",
+        "src/dsp/ugen/shape_pair.rs",
+        "src/dsp/ugen/stage_chain.rs",
+        "src/dsp/ugen/sample.rs",
+        "src/dsp/tests/dsp/kernel_pairs.rs",
+        "impl-plans/active/mod004-12-kernel-pairs.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/tests/dsp/kernel_pairs.rs", "intendedEdit": "Stub created by MOD004-00; filled only here."},
+        {"path": "src/dsp/tests/dsp/{va_filter,fm_pair,...}.rs", "intendedEdit": "Not edited here; MOD004-10 edits them concurrently."}
+      ],
+      "acceptanceCriteria": [
+        "Ten pair entry points exist with the pinned signatures.",
+        "Legacy functions are behavior-identical: golden passes and existing kernel tests pass.",
+        "kernel_pairs tests cover every plan bullet for all nine kernels and play_stereo.",
+        "Checks 1-7 pass, with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run kernel_pairs golden",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/dsp/ugen/va_filter.rs src/dsp/ugen/fm_pair.rs src/dsp/ugen/analog_pair.rs src/dsp/ugen/chord_pair.rs src/dsp/ugen/table_terrain_pair.rs src/dsp/ugen/terrain_pair.rs src/dsp/ugen/string_machine_pair.rs src/dsp/ugen/shape_pair.rs src/dsp/ugen/stage_chain.rs src/dsp/ugen/sample.rs src/dsp/tests/dsp/kernel_pairs.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
+        "rustfmt --edition 2021 --check src/dsp/ugen/va_filter.rs src/dsp/ugen/fm_pair.rs src/dsp/ugen/analog_pair.rs src/dsp/ugen/chord_pair.rs src/dsp/ugen/table_terrain_pair.rs src/dsp/ugen/terrain_pair.rs src/dsp/ugen/string_machine_pair.rs src/dsp/ugen/shape_pair.rs src/dsp/ugen/stage_chain.rs src/dsp/ugen/sample.rs src/dsp/tests/dsp/kernel_pairs.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-20",
+      "planPath": "impl-plans/active/mod004-20-select-lowering.md",
+      "dependsOn": ["MOD004-10"],
+      "writePaths": [
+        "src/vm/call.rs",
+        "src/types/infer_call.rs",
+        "src/dsp/build.rs",
+        "src/dsp/build/select.rs",
+        "src/types/tests/inst/ugens.rs",
+        "src/host/tests/e2e/templates/select_output.rs",
+        "impl-plans/active/mod004-20-select-lowering.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/build.rs", "intendedEdit": "Replaces the MOD004-10 placeholder arms with wrapper lowering, Src::Node(u16, u8), root Add handling and post-lowering shape/layout/capacity checks."},
+        {"path": "src/types/tests/inst/overloads.rs", "intendedEdit": "Conditional: only if an existing not-callable assertion concerned calling a ugen value with one keyword/int argument; log as a writePath addition with the reason."},
+        {"path": "src/dsp/graph/shape.rs, src/vm/fail.rs, src/value/access.rs, src/ns/insts.rs", "intendedEdit": "Read-only."}
+      ],
+      "acceptanceCriteria": [
+        "(p :aux) and (p 1) lower to one node with an output = 1 edge, and unselected uses mean output 0.",
+        "Every failure code in the design occurs at inst definition.",
+        "The checker types (ugen kw|int) as ugen.",
+        "Shape, voice-layout and capacity errors are definition-time lowering errors.",
+        "Golden graph and render digests are unchanged. Checks 1-8 pass, with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "CARGO_TERM_QUIET=true cargo check -q --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run select_output ugens golden",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/vm/call.rs src/types/infer_call.rs src/dsp/build.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
+        "rustfmt --edition 2021 --check src/vm/call.rs src/types/infer_call.rs src/dsp/build.rs src/host/tests/e2e/templates/select_output.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-21",
+      "planPath": "impl-plans/active/mod004-21-codec.md",
+      "dependsOn": ["MOD004-10"],
+      "writePaths": [
+        "src/dsp/arena.rs",
+        "src/dsp/ugen/catalog/codec.rs",
+        "src/dsp/tests/dsp/codec_shapes.rs",
+        "impl-plans/active/mod004-21-codec.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/arena.rs", "intendedEdit": "Owns encode_inst/decode_graph change (tag b'V', shape byte per node, output byte per edge, allocation-free cross-check); encode_bus stays unchanged."},
+        {"path": "src/dsp/ugen/catalog/codec.rs", "intendedEdit": "Only if a helper is needed."},
+        {"path": "src/dsp/graph/shape.rs, src/dsp/ugen/template.rs", "intendedEdit": "Read-only."}
+      ],
+      "acceptanceCriteria": [
+        "The encoder and decoder implement the pinned layout, and the old I tag is rejected with BadRecord.",
+        "The decoder cross-checks shapes and edge outputs without allocating.",
+        "Exact byte fixtures plus decode and re-encode round trips pass for mono, multi-mono and stereo graphs.",
+        "Bus and master bytes are unchanged, and checks 1-7 pass with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run codec_shapes arena stage_linked golden",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/dsp/arena.rs src/dsp/ugen/catalog/codec.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
+        "rustfmt --edition 2021 --check src/dsp/arena.rs src/dsp/tests/dsp/codec_shapes.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-22",
+      "planPath": "impl-plans/active/mod004-22-voice-runtime.md",
+      "dependsOn": ["MOD004-10", "MOD004-11", "MOD004-12"],
+      "writePaths": [
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/ugen/template.rs",
+        "src/dsp/ugen/template/slices.rs",
+        "src/dsp/ugen/mixer.rs",
+        "src/dsp/ugen/build_helpers.rs",
+        "src/dsp/voice.rs",
+        "src/dsp/voice/route.rs",
+        "src/dsp/engine.rs",
+        "src/dsp/engine/render.rs",
+        "src/dsp/effects/prim.rs",
+        "src/dsp/tests/dsp/voice_layout.rs",
+        "impl-plans/active/mod004-22-voice-runtime.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/dsp/ugen/mod.rs", "intendedEdit": "Src and NodeSpec only (MOD004-10 already added BuildError::TooManyBuffers)."},
+        {"path": "src/dsp/engine.rs", "intendedEdit": "Only the bufs allocation size ((MAX_AUDIO_BUFFERS + DISCARD_SLICES) * max_block) and the RenderCtx::bufs doc comment."},
+        {"path": "src/dsp/engine/render.rs", "intendedEdit": "Only mix_voice: balance_gains when t.has_aux || t.stereo."},
+        {"path": "src/dsp/ugen/build_helpers.rs", "intendedEdit": "Only if topo_order visibility or mem_need needs touching."},
+        {"path": "existing test files broken only by the Src::Node shape change", "intendedEdit": "Mechanical updates only, each listed in the Progress Log (grep at checkpoint found Src::Node only in src/dsp/ugen/template.rs, src/dsp/voice.rs and build.rs's unrelated local enum)."},
+        {"path": "src/dsp/build.rs, src/dsp/arena.rs", "intendedEdit": "Not touched here (owned by MOD004-20 and MOD004-21 in the same wave)."}
+      ],
+      "acceptanceCriteria": [
+        "Dense slice assignment, validated capacity, and TooManyBuffers exist, with no callback shape inference or allocation.",
+        "Pair and stereo dispatch are used only when output 1 is consumed; stereo Mul/Add and stereo voice effects do not downmix.",
+        "Stereo and main/aux voices use balance_gains, and mono voices keep pan_gains.",
+        "Golden passes unchanged, and every voice_layout test passes on the native Rig.",
+        "Checks 1-7 pass, with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run voice_layout golden voice_stereo stereo_contract quad_outputs rate_contract",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "for f in src/dsp/ugen/mod.rs src/dsp/ugen/template.rs src/dsp/ugen/template/slices.rs src/dsp/ugen/mixer.rs src/dsp/ugen/build_helpers.rs src/dsp/voice.rs src/dsp/voice/route.rs src/dsp/engine.rs src/dsp/engine/render.rs src/dsp/effects/prim.rs src/dsp/tests/dsp/voice_layout.rs; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'",
+        "rustfmt --edition 2021 --check src/dsp/ugen/template.rs src/dsp/ugen/mixer.rs src/dsp/voice.rs src/dsp/engine.rs src/dsp/effects/prim.rs src/dsp/tests/dsp/voice_layout.rs"
+      ]
+    },
+    {
+      "planId": "MOD004-30",
+      "planPath": "impl-plans/active/mod004-30-template-migration.md",
+      "dependsOn": ["MOD004-20", "MOD004-21", "MOD004-22"],
+      "writePaths": [
+        "src/prelude/templates.vact",
+        "src/host/tests/e2e/templates/golden_digests.txt",
+        "src/host/tests/e2e/templates/migrated_pairs.rs",
+        "src/host/tests/e2e/templates/voice_engines.rs",
+        "src/host/tests/e2e/templates/analog_pair.rs",
+        "src/host/tests/e2e/templates/shape_pair.rs",
+        "src/host/tests/e2e/templates/chord_pair.rs",
+        "src/host/tests/e2e/templates/terrain_pair.rs",
+        "src/host/tests/e2e/templates/table_terrain_pair.rs",
+        "src/host/tests/e2e/templates/string_machine_pair.rs",
+        "src/host/tests/e2e/templates/stage_chain.rs",
+        "src/host/tests/e2e/templates/coverage.rs",
+        "impl-plans/active/mod004-30-template-migration.md"
+      ],
+      "sharedPaths": [
+        {"path": "src/prelude/templates.vact", "intendedEdit": "Only the nine template bodies (filter-voice, fm-pair-voice, analog-pair-voice, chord-layer-voice, wave-grid-voice, terrain-voice, string-machine-voice, shape-voice, stage-chain-voice) and their comment lines."},
+        {"path": "src/host/tests/e2e/templates/golden_digests.txt", "intendedEdit": "Only the nine migrated templates' graph lines; no render line may change (guarded by diff against tmp/mod004/MOD004-30/golden_digests.txt.orig)."},
+        {"path": "src/host/tests/e2e/templates/{voice_engines,analog_pair,shape_pair,chord_pair,terrain_pair,table_terrain_pair,string_machine_pair,stage_chain,coverage}.rs", "intendedEdit": "Conditional: only structural assertions that break because a migrated template now has one shared node; never weaken audio assertions; list each change in the Progress Log."}
+      ],
+      "preconditions": [
+        "mkdir -p tmp/mod004/MOD004-30 && cp src/host/tests/e2e/templates/golden_digests.txt tmp/mod004/MOD004-30/golden_digests.txt.orig"
+      ],
+      "acceptanceCriteria": [
+        "The nine templates are migrated, and the others are unchanged.",
+        "Main and aux of each migrated template are bit-identical to the old two-node form (two control settings each).",
+        "Golden render digests are unchanged, and only the nine graph lines changed.",
+        "The full suite and the upstream audit pass, with logs recorded."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run migrated_pairs golden templates",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "sh -c 'd=$(diff -U0 tmp/mod004/MOD004-30/golden_digests.txt.orig src/host/tests/e2e/templates/golden_digests.txt | grep -E \"^[+-]\" | grep -vE \"^(\\+\\+\\+|---) \"); test \"$(printf \"%s\\n\" \"$d\" | grep -cE \"^\\+graph \")\" -eq 9 && test \"$(printf \"%s\\n\" \"$d\" | grep -cE \"^-graph \")\" -eq 9 && ! printf \"%s\\n\" \"$d\" | grep -qvE \"^[+-]graph \"'",
+        "git diff --stat -- src/prelude/templates.vact",
+        "VACTR_MI_REFERENCE=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack mise run audit-upstream"
+      ]
+    },
+    {
+      "planId": "MOD004-40",
+      "planPath": "impl-plans/active/mod004-40-regression-closeout.md",
+      "dependsOn": ["MOD004-20", "MOD004-21", "MOD004-22", "MOD004-30"],
+      "writePaths": [
+        "src/dsp/tests/dsp/multi_output.rs",
+        "impl-plans/active/modular-audio-foundation.md",
+        "impl-plans/active/mod004-00-baseline.md",
+        "impl-plans/active/mod004-10-shape-contract.md",
+        "impl-plans/active/mod004-11-engine-split.md",
+        "impl-plans/active/mod004-12-kernel-pairs.md",
+        "impl-plans/active/mod004-20-select-lowering.md",
+        "impl-plans/active/mod004-21-codec.md",
+        "impl-plans/active/mod004-22-voice-runtime.md",
+        "impl-plans/active/mod004-30-template-migration.md",
+        "impl-plans/active/mod004-40-regression-closeout.md",
+        "impl-plans/README.md"
+      ],
+      "sharedPaths": [
+        {"path": "impl-plans/active/mod004-*.md", "intendedEdit": "Status lines only (each plan's own Progress Log stays owned by that plan)."},
+        {"path": "impl-plans/active/modular-audio-foundation.md", "intendedEdit": "MOD-004 rows, MOD-004A..F criteria and a dated progress log session; MOD-005/006 untouched."},
+        {"path": "impl-plans/README.md", "intendedEdit": "The modular-audio-foundation row only."},
+        {"path": "any src/ file needing a serial cross-plan repair; crate-wide cargo fmt", "intendedEdit": "Serial reconciliation only; each repaired file listed and justified in the Progress Log; never weaken a test."}
+      ],
+      "acceptanceCriteria": [
+        "multi_output tests cover cross-path shapes, channel independence, pan/balance, orbit, allocation and rate/block.",
+        "Commands 1-10 pass, with logs recorded.",
+        "The parent plan's MOD-004A..F criteria are checked, with a dated progress entry; the README row is updated."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "CARGO_TERM_QUIET=true cargo check -q --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "VACTR_MI_REFERENCE=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack mise run audit-upstream",
+        "{ git diff --name-only cf2ea37 -- '*.rs'; git ls-files -o --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'",
+        "git diff --check",
+        "test -z \"$(git status --short | grep -vE '^.. (src/|design-docs/|impl-plans/|tmp/)')\""
+      ]
+    }
+  ]
+}

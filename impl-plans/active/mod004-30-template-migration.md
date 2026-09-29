@@ -1,6 +1,6 @@
 # MOD004-30: Migrate the Nine Simultaneous-output Templates
 
-**Status**: Completed
+**Status**: Completed (committed in 0a15742)
 **Plan ID**: MOD004-30 (session-194 wave 1, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Migration eligibility; list of nine; exclusion table; Implementation status)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004E)

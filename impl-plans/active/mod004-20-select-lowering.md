@@ -1,6 +1,6 @@
 # MOD004-20: `.vact` Output Selection, Checker Typing and Lowering
 
-**Status**: Ready
+**Status**: Completed (committed in b6fa077)
 **Plan ID**: MOD004-20 (wave 2; parallel with MOD004-21 and MOD004-22)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (`.vact` selection and template migration: Notation, selection data flow, Selected root, Bus bodies; Capacity)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004A lowering part, MOD-004E selector part)
@@ -258,7 +258,7 @@ In `src/types/tests/inst/ugens.rs`:
 - [x] Shape, voice-layout and capacity errors are definition-time lowering errors.
 - [x] Golden graph and render digests are unchanged in the focused golden tests.
 - [x] Local checks 1-5 and 7-8 pass, including focused source-form tests and formatting.
-- [ ] Full nextest check 6 passes; the coordinator runs it outside the sandbox.
+- [x] Full nextest check 6 passes; the coordinator runs it outside the sandbox. (2026-09-30: 1582/1582 passed, 2 skipped, exit 0 on the final MOD-004 tree, `tmp/mod004/MOD004-40/review/step7-full-nextest.log`.)
 
 ## Execution Protocol (same-branch fanout)
 

@@ -1,6 +1,6 @@
 # MOD004-22: Dense Channel Buffers, Multi-output Dispatch, Stereo Voices, Balance Pan
 
-**Status**: In Progress
+**Status**: Completed (committed in b6fa077)
 **Plan ID**: MOD004-22 (wave 2; parallel with MOD004-20 and MOD004-21)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Voice buffers and channel mapping; Capacity, real-time, and invariance)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004B, MOD-004C)
@@ -262,7 +262,7 @@ allocation-probed `Rig::step`.
 - [x] Stereo and main/aux voices use `balance_gains`, and mono voices keep `pan_gains`.
 - [x] Golden passes unchanged, and every voice_layout test passes on the native `Rig`.
 - [x] Local checks 1-4 and 6-7 pass, including focused stereo/layout and golden tests, formatting, and the under-1,000-line gate.
-- [ ] Full nextest check 5 passes; the coordinator runs it outside the sandbox.
+- [x] Full nextest check 5 passes; the coordinator runs it outside the sandbox. (2026-09-30: 1582/1582 passed, 2 skipped, exit 0 on the final MOD-004 tree, `tmp/mod004/MOD004-40/review/step7-full-nextest.log`.)
 
 ## Execution Protocol (same-branch fanout)
 

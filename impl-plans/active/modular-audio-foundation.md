@@ -1,6 +1,6 @@
 # Modular Audio DSP Foundation Implementation Plan
 
-**Status**: In Progress (MOD-001 and MOD-002 complete)
+**Status**: In Progress (MOD-001, MOD-002 and MOD-004 complete)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md`
 **Created**: 2026-09-27
 **Last Updated**: 2026-09-29
@@ -69,7 +69,7 @@ contracts, not a demand for parallel registries.
 | MOD-001 | Pin source revision and audit every included file/resource and `stmlib` dependency | none | Completed; `verification/upstream_inventory.toml` and `mise run audit-upstream` |
 | MOD-002 | Establish neutral user-facing names and upstream-to-Vactr mode/parameter matrix | MOD-001 | Completed; neutral renames, Clouds/Warps inventories, cross-family naming and resolution tests |
 | MOD-003 | Deliver typed arbitrary instrument controls end to end, removing silent skips | MOD-002 | Completed for scalar audio parameters |
-| MOD-004 | Add typed mono/stereo UGen outputs, edge output selection, voice routing, and same-revision codec compatibility | MOD-003 | Design in `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004`; arbitrary UGen edges pending |
+| MOD-004 | Add typed mono/stereo UGen outputs, edge output selection, voice routing, and same-revision codec compatibility | MOD-003 | Completed 2026-09-30 (fanout plans impl-plans/active/mod004-*.md) |
 | MOD-005 | Define preallocated state, memory budgets and rate/block adaptation | MOD-004 | Bounded host contract complete; broader per-engine parity pending |
 | MOD-006 | Add deterministic comparison harness, coverage report and editor metadata checks | MOD-005 | 24-position inventory and editor/graph checks complete; FM position-10 three-scenario raw-kernel baseline and source-stage follow-up measured, other comparisons pending |
 | MOD-006A | Local pinned Plaits FM raw-kernel reference probe and metric-only comparison against Vactr position 10 | MOD-006 inventory | Completed and independently verified; source parity not claimed |
@@ -82,8 +82,8 @@ paths and API signatures only; implementation code belongs in source files.
 
 **Fanout execution (2026-09-29).** MOD-004 runs as nine plans with
 disjoint write paths. MOD004-00, -10, -11 and -12 are committed in
-`85a300a`. The remaining plans (MOD004-20/21/22, then 30, then 40) are
-dispatched by `impl-plans/active/mod004-dispatch.json`. Those plans are authoritative for file-level scope;
+`85a300a`, MOD004-20, -21 and -22 in `b6fa077`, and MOD004-30 in
+`0a15742`. MOD004-40 completed on 2026-09-30. Those plans are authoritative for file-level scope;
 the subtasks below keep the acceptance view.
 
 | Wave | Plan | Covers |
@@ -103,7 +103,8 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 
 #### MOD-004A: Evaluator graph output shapes and edge selection
 
-**Status**: NOT_STARTED
+**Status**: COMPLETED
+**Delivered by**: MOD004-10, MOD004-20
 **Depends on**: MOD-003
 **Parallelizable**: No
 **Deliverables**:
@@ -112,14 +113,15 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 - `src/vm/call.rs`, `src/types/infer_call.rs` — calling a UGen value selects an output (MOD004-20). `src/ns/insts.rs` is unchanged: selection is validated in the VM, so no `validate_ugen_output` is needed.
 
 **Completion Criteria**:
-- [ ] Every node kind declares bounded output count and mono/stereo shape.
-- [ ] Lowering retains selected source-output indexes and validates source index and channel-shape compatibility.
-- [ ] Invalid output selection and shape mismatch produce typed definition-time diagnostics.
-- [ ] Legacy single-output nodes lower as output zero without changing existing graph semantics.
+- [x] Every node kind declares bounded output count and mono/stereo shape.
+- [x] Lowering retains selected source-output indexes and validates source index and channel-shape compatibility.
+- [x] Invalid output selection and shape mismatch produce typed definition-time diagnostics.
+- [x] Legacy single-output nodes lower as output zero without changing existing graph semantics.
 
 #### MOD-004B: Compiled output buffers and voice routing
 
-**Status**: NOT_STARTED
+**Status**: COMPLETED
+**Delivered by**: MOD004-22
 **Depends on**: MOD-004A
 **Parallelizable**: No
 **Deliverables**:
@@ -130,14 +132,15 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 - `src/dsp/ugen/build_helpers.rs` — `pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize)`
 
 **Completion Criteria**:
-- [ ] Compiled templates assign dense bounded channel-buffer ranges and validate total buffer capacity.
-- [ ] Edges read the chosen output and all declared channels; no callback shape inference or allocation is introduced.
-- [ ] Mono sink pan and stereo/main-aux channel mapping match the design; additional outputs require explicit routing.
-- [ ] Output-buffer and shared-kernel state requirements are included in memory accounting and fail with explicit capacity diagnostics.
+- [x] Compiled templates assign dense bounded channel-buffer ranges and validate total buffer capacity.
+- [x] Edges read the chosen output and all declared channels; no callback shape inference or allocation is introduced.
+- [x] Mono sink pan and stereo/main-aux channel mapping match the design; additional outputs require explicit routing.
+- [x] Output-buffer and shared-kernel state requirements are included in memory accounting and fail with explicit capacity diagnostics.
 
 #### MOD-004C: Stereo voice-local effects and pan behavior
 
-**Status**: NOT_STARTED
+**Status**: COMPLETED
+**Delivered by**: MOD004-22
 **Depends on**: MOD-004B
 **Parallelizable**: No
 **Deliverables**:
@@ -146,15 +149,16 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 - `src/dsp/engine.rs` — `pub fn render(&mut self, out: &mut [f32], frames: usize)`
 
 **Completion Criteria**:
-- [ ] Stereo voice effect nodes process independent left/right channels with the existing wet/dry semantics and no downmix.
-- [ ] Voice gain, gate, orbit send, and post effects handle all routed channels consistently.
-- [ ] Mono pan remains unchanged; stereo and main/aux pan use the selected documented balance law.
-- [ ] Existing bus/master stereo effect processing remains unchanged.
-- [ ] Stereo and main/aux voices use unity-center balance pan (owner decision, 2026-09-29); mono voices keep equal-power pan.
+- [x] Stereo voice effect nodes process independent left/right channels with the existing wet/dry semantics and no downmix.
+- [x] Voice gain, gate, orbit send, and post effects handle all routed channels consistently.
+- [x] Mono pan remains unchanged; stereo and main/aux pan use the selected documented balance law.
+- [x] Existing bus/master stereo effect processing remains unchanged.
+- [x] Stereo and main/aux voices use unity-center balance pan (owner decision, 2026-09-29); mono voices keep equal-power pan.
 
 #### MOD-004D: Graph codec shape and edge encoding
 
-**Status**: NOT_STARTED
+**Status**: COMPLETED
+**Delivered by**: MOD004-21
 **Depends on**: MOD-004A
 **Parallelizable**: Yes, with MOD-004B and MOD-004C
 **Deliverables**:
@@ -163,14 +167,15 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 - `src/dsp/ugen/catalog.rs` — `pub const MAX_PORTS: usize`
 
 **Completion Criteria**:
-- [ ] Output shapes and edge source-output indexes have a deterministic encoded representation shared by native and browser.
-- [ ] Same-revision native/browser peers install the same mono, multi-mono, and stereo graphs.
-- [ ] No legacy decoder (owner decision, 2026-09-29): the instrument record tag changes from `I` to `V`, and an old-tag or malformed shape payload is rejected with `BadRecord`.
-- [ ] Exact byte fixtures and encode/decode/re-encode round trips cover each graph shape.
+- [x] Output shapes and edge source-output indexes have a deterministic encoded representation shared by native and browser.
+- [x] Same-revision native/browser peers install the same mono, multi-mono, and stereo graphs.
+- [x] No legacy decoder (owner decision, 2026-09-29): the instrument record tag changes from `I` to `V`, and an old-tag or malformed shape payload is rejected with `BadRecord`.
+- [x] Exact byte fixtures and encode/decode/re-encode round trips cover each graph shape.
 
 #### MOD-004E: `.vact` selector and dual-instance template migration
 
-**Status**: NOT_STARTED
+**Status**: COMPLETED
+**Delivered by**: MOD004-12, MOD004-20, MOD004-30
 **Depends on**: MOD-004B, MOD-004C, MOD-004D
 **Parallelizable**: No
 **Deliverables**:
@@ -180,14 +185,15 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 - `select_output`/`OutputSelector` are owned by MOD-004A (MOD004-10). MOD-004E only uses them from `.vact`.
 
 **Completion Criteria**:
-- [ ] Calling a multi-output UGen value with an output keyword (`(p :aux)`) or a numeric index (`(p 1)`) selects that output. Selection from a single-output node, an unknown name or an out-of-range index is a definition-time diagnostic (owner decision, 2026-09-29).
-- [ ] True simultaneous dual outputs share one node state; distinct mode configurations remain distinct nodes.
-- [ ] Existing duplicate-node templates remain valid and unchanged unless their migration passes bit-identical output comparison.
-- [ ] Legacy `aux-out`, `out3`, and `out4` templates retain their routing behavior.
+- [x] Calling a multi-output UGen value with an output keyword (`(p :aux)`) or a numeric index (`(p 1)`) selects that output. Selection from a single-output node, an unknown name or an out-of-range index is a definition-time diagnostic (owner decision, 2026-09-29).
+- [x] True simultaneous dual outputs share one node state; distinct mode configurations remain distinct nodes.
+- [x] Existing duplicate-node templates remain valid and unchanged unless their migration passes bit-identical output comparison.
+- [x] Legacy `aux-out`, `out3`, and `out4` templates retain their routing behavior.
 
 #### MOD-004F: Compatibility, callback, and render regression coverage
 
-**Status**: NOT_STARTED
+**Status**: COMPLETED
+**Delivered by**: MOD004-00, MOD004-30, MOD004-40
 **Depends on**: MOD-004A, MOD-004B, MOD-004C, MOD-004D, MOD-004E
 **Parallelizable**: No
 **Deliverables**:
@@ -196,11 +202,11 @@ Dependencies: 00 -> {10, 11, 12}; 10 -> {20, 21}; {10, 11, 12} -> 22;
 - `src/dsp/alloc_probe.rs` is unchanged: the existing `Rig::step` and `E2e::run_stereo_for` probes already assert zero callback allocations.
 
 **Completion Criteria**:
-- [ ] Every existing prelude template has fixed-event before/after render coverage; unchanged templates are bit-identical.
-- [ ] Migrated simultaneous-output templates compare main and aux independently against the prior two-node output.
-- [ ] Native and browser e2e coverage verifies channel independence through intermediate effects, voice pan/balance, and orbit routing.
-- [ ] Allocation probes pass with multi-output nodes and stereo voice-local effects active.
-- [ ] Stateful multi-output renders satisfy supported sample-rate and callback-block partition invariance.
+- [x] Every existing prelude template has fixed-event before/after render coverage; unchanged templates are bit-identical.
+- [x] Migrated simultaneous-output templates compare main and aux independently against the prior two-node output.
+- [x] Native and browser e2e coverage verifies channel independence through intermediate effects, voice pan/balance, and orbit routing.
+- [x] Allocation probes pass with multi-output nodes and stereo voice-local effects active.
+- [x] Stateful multi-output renders satisfy supported sample-rate and callback-block partition invariance.
 
 ### MOD-006A comparison contract
 
@@ -244,12 +250,65 @@ maps to `440 × 48,000 / 47,872.34` Hz at the output.
 
 - [x] Source and resource rights are recorded per included component (per file; unaudited wave, map and digit assets stay excluded).
 - [x] Finite scalar declared instrument controls reach audio through the shared native/browser event layout.
-- [ ] Stereo input/output survives every graph and install/wire path (bus effects and voice main/aux output verified; arbitrary multi-output UGen edges remain pending).
+- [x] Stereo input/output survives every graph and install/wire path (bus effects and voice main/aux output verified).
 - [x] Per-event control capacity failures produce faults without truncation.
 - [x] Callback allocation and rate/block behavior are verified for the FM drum on native and browser tiers at 44.1/48/96 kHz and 64/256-frame quanta.
 - [ ] Cargo check, clippy and targeted tests pass with `CARGO_TERM_QUIET=true`.
 
 ## Progress Log
+
+### Session: 2026-09-30, MOD-004 closeout (MOD004-40)
+
+**Tasks Completed**: MOD004-40 regression coverage and the MOD-004A..F
+closeout. MOD-004 is complete; MOD-005 and MOD-006 stay pending.
+
+**Tests Added** (`src/dsp/tests/dsp/multi_output.rs` shared builders,
+`multi_output/cross_path.rs`, `multi_output/invariance.rs`; 286, 353 and
+257 lines): `native_and_decoded_templates_keep_multi_output_shapes`,
+`native_and_browser_multi_output_renders_are_bitwise_equal`,
+`stereo_input_channels_remain_independent_on_both_tiers`,
+`main_and_aux_outputs_are_independent_on_both_tiers`,
+`stereo_and_main_aux_balance_pan_use_unity_center`,
+`mono_voice_keeps_equal_power_pan`,
+`orbit_send_is_cross_tier_and_aux_channel_independent`,
+`orbit_does_not_cross_feed_stereo_right_zero` and
+`multi_output_rate_block_pair_tier_and_partition_contract`. Every render
+goes through `Rig::step`/`Rig::run`, which assert zero callback
+allocations.
+
+**Verification** (combined tree at HEAD `24dcbc1` plus the MOD004-40
+working-tree changes; logs in `tmp/mod004/MOD004-40/reconcile/`, each
+ending with `exit=<status>`):
+- 1 `cargo fmt --check`: exit 0, `1-fmt.log`.
+- 2 `cargo check -q --all-targets`: exit 0, `2-check.log`.
+- 3 `cargo clippy -q --all-targets -- -D warnings`: exit 0, `3-clippy.log`.
+- 4 `cargo check -q --target wasm32-unknown-unknown --lib`: exit 0, `4-wasm.log`.
+- 5 `cargo check -q --features lsp`: exit 0, `5-lsp.log`.
+- 6 full `cargo nextest run`: exit 0, 1582 tests run: 1582 passed, 2 skipped, `6-nextest.log`; the 11 `multi_output` test entries are listed in `6b-list.log`.
+- 7 `mise run audit-upstream` with the pinned reference: exit 0, `errors []`, `7-audit.log` (mise-managed Python 3.12 on PATH; the earlier worker run was BLOCKED by system Python 3.9, see the MOD004-40 plan).
+- 8 Rust line limit: exit 0, `8-lines.log`.
+- 9 `git diff --check`: exit 0, `9-diffcheck-final.log`.
+- 10 allowed-path status check: exit 0, `10-status-final.log`.
+- 11 `golden_digests.txt` unchanged from `0a15742`: exit 0, `11-golden.log`.
+- 12 protected tests unchanged from `0a15742`: exit 0, `12-protected.log`.
+
+**Rate/block check (3)**: bitwise equal across blocks 64, 256 and 97 at
+44 100, 48 000 and 96 000 Hz on native and browser; the recorded-finding
+fallback does not fire. Check (1), pair == legacy by `to_bits`, holds at
+every rate, block and tier.
+
+**Evidence per subtask** (test names):
+- MOD-004A: `shape_contract.rs` (`output_declarations_match_the_mod004_table`, `every_constructible_spec_matches_its_compiled_node_declaration`, `derive_shapes_propagates_stereo_and_checks_inputs_edges_and_cycles`); `select_output.rs` (`keyword_and_index_selection_share_one_node_and_unselected_means_zero`, `invalid_selections_fail_at_instrument_definition`, `selected_root_and_stereo_layout_are_checked_at_definition`); `codec_shapes.rs::stereo_output_cannot_feed_a_mono_node`; legacy output zero by `golden.rs::golden_renders_match_pre_mod004_baseline` and `voice_layout.rs::unconsumed_pair_aux_keeps_legacy_single_output_dispatch`.
+- MOD-004B: `voice_layout.rs` (`dense_slice_capacity_accepts_508_rejects_513_and_keeps_256_mono_nodes`, `selected_va_filter_pair_matches_two_legacy_nodes_bitwise`, `stereo_voice_ignores_mono_out3_sink_when_mixing_right_channel`, `main_aux_voice_uses_unity_center_balance`); `shape_contract.rs::slice_assignment_is_dense_bounded_and_discards_unconsumed_outputs`; `select_output.rs::channel_buffer_cap_is_a_definition_time_graph_too_large_error`. Shared kernel state is counted once per node by `mem_need` (`src/dsp/ugen/build_helpers.rs`).
+- MOD-004C: `voice_layout.rs` (`stereo_effect_and_mul_preserve_each_sample_channel`, `stereo_add_sums_left_and_right_without_downmix`, `balance_pan_is_unity_center_and_mono_keeps_equal_power`, `stereo_voice_off_center_pan_silences_the_opposite_channel`); `cross_path.rs` (`stereo_and_main_aux_balance_pan_use_unity_center`, `mono_voice_keeps_equal_power_pan`, both orbit tests); bus/master unchanged by `codec_shapes.rs::bus_and_master_records_keep_their_existing_layout`, `stereo_contract.rs` and the golden renders.
+- MOD-004D: `codec_shapes.rs` (`exact_mono_fixture_round_trips`, `exact_multi_mono_fixture_round_trips`, `exact_stereo_fixture_round_trips`, `old_unknown_and_malformed_shape_or_output_records_are_rejected`); same-revision peers by `cross_path.rs::native_and_decoded_templates_keep_multi_output_shapes` and `native_and_browser_multi_output_renders_are_bitwise_equal`.
+- MOD-004E: `select_output.rs` selection and diagnostics tests; `kernel_pairs.rs::nine_pair_kernels_match_both_legacy_selectors_over_consecutive_blocks`; `migrated_pairs.rs` (`migrated_pairs_match_the_legacy_two_node_renders`, `migrated_and_excluded_template_graphs_keep_their_expected_shapes`); legacy `aux-out`/`out3`/`out4` by `quad_outputs.rs::four_lanes_native_browser_and_stereo_rejection`, `direct_stems_ignore_other_voices_and_master_effects` and the golden renders.
+- MOD-004F: `golden.rs::golden_renders_match_pre_mod004_baseline` (every prelude template, bit-identical renders); `migrated_pairs.rs::migrated_pairs_match_the_legacy_two_node_renders`; the eight `cross_path.rs` tests (native and browser channel independence through the stereo `Gain` voice effect, pan/balance, orbit); allocation probes through `Rig::step` in every `multi_output` test; `invariance.rs::multi_output_rate_block_pair_tier_and_partition_contract`.
+
+**Repairs and Findings**:
+- No non-test `src/` repair. `golden_digests.txt` and the protected tests are unchanged.
+- Test fixture repair (MOD004-40 review): `render_windowed` sends its event at `2048.25/rate`. At `2048.0/rate` with block 256 at 48/96 kHz the onset landed at frame 2047. The cause is the engine's f64 block-end accumulation in `src/dsp/engine.rs:696-718`, which predates MOD-004 (`04afe7d`): an event on an exact block boundary can start one frame early. It is not a multi-output block dependence. It is tracked outside MOD-004.
+- The orbit send test for the stereo graph uses a 256-frame-per-channel prefix of the stereo fixture, because the envelope-free sample would otherwise still play inside the echo window.
 
 ### Session: 2026-09-29, MOD-002 neutral names and mode matrix
 

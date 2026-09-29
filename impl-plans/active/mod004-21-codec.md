@@ -1,6 +1,6 @@
 # MOD004-21: Graph Codec Shape Bytes, Edge Output Index, New Record Tag
 
-**Status**: In Progress
+**Status**: Completed (committed in b6fa077)
 **Plan ID**: MOD004-21 (wave 2; parallel with MOD004-20 and MOD004-22)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Codec and compatibility)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004D)
@@ -158,7 +158,7 @@ Do not paste encoder output.
 - [x] Exact byte fixtures plus decode and re-encode round trips pass for mono, multi-mono and stereo graphs.
 - [x] Bus and master bytes are unchanged in the focused codec fixtures.
 - [x] Local checks 1-4 and 6-7 pass, including focused codec and golden tests and formatting.
-- [ ] Full nextest check 5 passes; the coordinator runs it outside the sandbox.
+- [x] Full nextest check 5 passes; the coordinator runs it outside the sandbox. (2026-09-30: 1582/1582 passed, 2 skipped, exit 0 on the final MOD-004 tree, `tmp/mod004/MOD004-40/review/step7-full-nextest.log`.)
 
 ## Execution Protocol (same-branch fanout)
 

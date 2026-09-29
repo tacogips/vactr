@@ -165,11 +165,18 @@ Put logs under `tmp/mod004/MOD004-00/`.
 
 ## Completion Criteria
 
-- [ ] The precondition diff is empty and recorded.
-- [ ] The fixture covers every prelude template (`render center` plus `graph`), `pan02` for every mono non-quad template, and both sampler resource variants.
-- [ ] The golden and determinism tests pass; the negative check is recorded.
-- [ ] All seven stub test files exist and are registered, and clippy is clean.
-- [ ] The full nextest suite passes.
+- [x] The precondition diff is empty and recorded.
+- [x] The fixture covers every prelude template (`render center` plus `graph`), `pan02` for every mono non-quad template, and both sampler resource variants.
+- [x] The golden and determinism tests pass; the negative check is recorded.
+- [x] All seven stub test files exist and are registered, and clippy is clean.
+- [x] The full nextest suite passes.
+
+Evidence (checked 2026-09-30 at MOD-004 closeout): the Progress Log below
+records each item with logs under `tmp/mod004/MOD004-00/`
+(`precondition.log`, 167-record fixture, `golden-nextest.log`,
+`negative-check.log`, `clippy.log`, `full-nextest.log`). The golden fixture
+is unchanged on the final MOD-004 tree
+(`tmp/mod004/MOD004-40/11-golden.log`, exit 0).
 
 ## Execution Protocol (same-branch fanout)
 

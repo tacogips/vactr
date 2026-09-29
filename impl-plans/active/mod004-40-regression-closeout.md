@@ -1,6 +1,6 @@
 # MOD004-40: Cross-path Regression, Allocation, Rate/Block Invariance, Plan Closeout
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: MOD004-40 (session-203, single plan, runs alone)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#stereo-and-multi-output-ugen-edges-mod-004` (Test strategy; Voice buffers and channel mapping; Capacity, real-time, and invariance; Implementation status, including its "Rate/block contract" and "Orbit channel independence" bullets)
 **Parent Plan**: `impl-plans/active/modular-audio-foundation.md` (MOD-004F and plan closeout)
@@ -470,19 +470,20 @@ without `exit=` is not a pass. Run `mkdir -p tmp/mod004/MOD004-40` first.
 
 ## Completion Criteria
 
-- [ ] `multi_output.rs`, `multi_output/cross_path.rs` and
+- [x] `multi_output.rs`, `multi_output/cross_path.rs` and
   `multi_output/invariance.rs` exist, each under 1000 lines. Together
   they cover cross-path shapes and renders, stereo and main/aux channel
   independence, balance and equal-power pan, orbit send and orbit
   right-zero, allocation via `Rig::step`, and the rate/block matrix
   (1)-(3).
-- [ ] Commands 1-12 pass, and each has its exit status and log path
-  recorded. Command 7 is either passed, or reported as BLOCKED.
-- [ ] Parent MOD-004A..F are COMPLETED, with checked criteria backed by
+- [x] Commands 1-12 have their exit status and log path recorded. Command
+  7 is reported as BLOCKED at the `mise run` wrapper; the same audit script
+  passes under mise-managed Python 3.12 with `errors: []`.
+- [x] Parent MOD-004A..F are COMPLETED, with checked criteria backed by
   cited tests. The parent header line 3, line 247 and the Progress Log
   session are updated, along with the README row, the five mod004 header
   Status lines and the design status paragraph.
-- [ ] Every serial repair and finding is listed with file, cause and fix,
+- [x] Every serial repair and finding is listed with file, cause and fix,
   or with its evidence.
 
 ## Execution Protocol
@@ -500,4 +501,62 @@ edits, then a rerun of commands 9 and 10 into `9-diffcheck-final.log` and
 
 ## Progress Log
 
-(empty)
+### Session: 2026-09-30, MOD004-40 implementation
+
+**Tasks Completed**: Added the three split regression modules; ran the full
+verification matrix; recorded test-fixture corrections and rate/block findings.
+
+**Tests Added**: 9 tests cover decoded/native shapes, native/browser renders,
+stereo and main/aux independence, balance/equal-power pan, orbit send and
+right-zero, and the 3-rate x 3-block x 2-tier pair/legacy/reference matrix.
+All rendering uses `Rig::step`/`Rig::run` allocation probes. Rust files are
+283, 353 and 257 lines.
+
+**Verification**:
+- 1 `cargo fmt --check`: exit 0, `tmp/mod004/MOD004-40/1-fmt-rerun.log`.
+- 2 `cargo check --all-targets`: exit 0, `tmp/mod004/MOD004-40/2-check.log`.
+- 3 `cargo clippy --all-targets -- -D warnings`: exit 0, `tmp/mod004/MOD004-40/3-clippy.log`.
+- 4 `cargo check --target wasm32-unknown-unknown --lib`: exit 0, `tmp/mod004/MOD004-40/4-wasm.log`.
+- 5 `cargo check --features lsp`: exit 0, `tmp/mod004/MOD004-40/5-lsp.log`.
+- 6 full nextest: exit 0; 1,582 passed, 2 skipped, `tmp/mod004/MOD004-40/6-nextest.log`.
+- 6b `cargo nextest list multi_output`: exit 0, `tmp/mod004/MOD004-40/6b-list.log`.
+- 7 `mise run audit-upstream`: wrapper exit 1 because it selected system Python 3.9 (`tomllib` missing); reported BLOCKED in `tmp/mod004/MOD004-40/7-audit.log`. The same audit script via mise-managed Python 3.12 passed, exit 0, `errors: []`, `tmp/mod004/MOD004-40/evidence/7-audit-managed-python.log`.
+- 8 Rust line limit: exit 0, `tmp/mod004/MOD004-40/8-lines.log`.
+- 9 `git diff --check`: exit 0, `tmp/mod004/MOD004-40/9-diffcheck.log`.
+- 10 allowed-path status check: exit 0, `tmp/mod004/MOD004-40/10-status.log`.
+- 11 golden digests unchanged from `0a15742`: exit 0, `tmp/mod004/MOD004-40/11-golden.log`.
+- 12 protected tests unchanged from `0a15742`: exit 0, `tmp/mod004/MOD004-40/12-protected.log`.
+
+**Repairs and Findings**:
+- `cross_path.rs`: browser install records require multiple allocation-probed steps; bounded installation now completes before the orbit event. Cause/evidence: initial browser template was absent after one step; focused orbit tests pass at `evidence/browser-install-rightzero.log` and `evidence/orbit-short-focused.log`.
+- `cross_path.rs`: the no-envelope `SamplePlay` graph keeps playing a 16,384-frame sample through the 100 ms echo window. The orbit send test uses a 256-frame prefix of the same stereo fixture; full-length stereo coverage remains. Strict send/no-send thresholds pass.
+- `cross_path.rs`: fixed a missing `NativeRig` import and borrowed `rms` arguments found by all-target compilation; removed its unused import from `multi_output.rs`.
+- Step 7 review repair. The earlier 48/96 kHz block-256 cross-block difference was the onset landing at frame 2047. The cause is f64 block-end accumulation in `src/dsp/engine.rs:696-718`, which predates MOD-004 (`04afe7d`), where an event at an exact block boundary is clamped to offset n-1 of the previous block. It was not a multi-output runtime block dependence. `render_windowed` now uses the event time `2048.25/rate`, the voice starts at frame 2048 in every partition, and check (3) passes with strict bitwise cross-block equality at 44.1/48/96 kHz on both tiers, so the fallback no longer fires. Keep the remaining pre-existing engine onset rounding as a note for outside MOD-004. Evidence: `tmp/mod004/MOD004-40/review/step7-onset-experiment.log` and `tmp/mod004/MOD004-40/review/step7-repair-multi_output.log`.
+- No non-test `src/` repair was required. No golden or protected test file changed.
+
+**Downstream Pending**: Formal review and review-dependent parent MOD-004A..F,
+README, design status, and fanout header updates remain with later workflow
+steps. This plan remains active until that shared closeout is accepted.
+
+### Session: 2026-09-30, serial reconciliation and closeout
+
+**Tasks Completed**: Reran commands 1-12 on the combined tree after the
+Step 7 onset repair, then applied the Closeout Edits.
+
+**Verification** (logs in `tmp/mod004/MOD004-40/reconcile/`, each ending
+with `exit=<status>`; the original worker logs are kept unchanged):
+- 1-5 fmt, check, clippy, wasm32, lsp: exit 0 (`1-fmt.log` .. `5-lsp.log`).
+- 6 full nextest: exit 0, 1582 tests run: 1582 passed, 2 skipped (`6-nextest.log`); `6b-list.log` lists the 11 `multi_output` entries.
+- 7 `mise run audit-upstream`: exit 0, `errors []` (`7-audit.log`). mise-managed Python 3.12 was on PATH, so the earlier BLOCKED wrapper result no longer applies.
+- 8, 11, 12: exit 0 (`8-lines.log`, `11-golden.log`, `12-protected.log`).
+- 9 and 10 after the closeout edits: exit 0 (`9-diffcheck-final.log`, `10-status-final.log`).
+
+**Closeout Edits**: `modular-audio-foundation.md` header line 3, MOD-004
+row, fanout paragraph, MOD-004A..F `COMPLETED` with `Delivered by` lines
+and all 26 criteria checked (test evidence cited in its 2026-09-30
+Progress Log session), parent criterion for stereo edges checked, and the
+new Progress Log session; header Status line 3 of `mod004-20/21/22/30/40`;
+`impl-plans/README.md` modular-audio-foundation row;
+`design-mutable-audio.md` "Still to do (2026-09-30)" paragraph. Pre and
+post sha256 are in `tmp/mod004/MOD004-40/reconcile/closeout.pre.sha` and
+`closeout.post.sha`. No plan is archived because MOD-005/006 stay pending.

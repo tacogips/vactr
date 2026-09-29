@@ -1240,10 +1240,13 @@ lines in `golden_digests.txt` changed; no render digest changed.
 `va-source` reads no per-node seed, so merging the two `filter-voice`
 sources satisfies the eligibility rule, and the bitwise test is the proof.
 
-Still to do (2026-09-30): regression closeout (`mod004-40`), which adds
-`src/dsp/tests/dsp/multi_output.rs` for the native and browser end-to-end,
-orbit and rate/block items of the test strategy above. Two points of
-that strategy are made precise here:
+Regression closeout (`mod004-40`) completed on 2026-09-30.
+`src/host/tests/e2e/templates/migrated_pairs.rs` covers the migrated
+templates, and `src/dsp/tests/dsp/multi_output.rs` (with
+`multi_output/cross_path.rs` and `multi_output/invariance.rs`) covers the
+native and browser end-to-end, orbit and rate/block items of the test
+strategy above. Check (3) is bitwise equal across blocks 64, 256 and 97.
+The two points below define the contract the tests enforce:
 
 - **Rate/block contract.** The existing contract has two parts. Events are
   sample-accurate: the engine starts a voice at

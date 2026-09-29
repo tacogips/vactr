@@ -64,7 +64,15 @@ Back end (TASK-007..008):
 - `src/dsp/`: the DSP engine (voice pool, event ring, graph and bus graph,
   ugen and effect catalogs, synthesis templates, analyzers writing f32
   cells, the granular engine with live-bus capture) with no allocation or
-  locking on the audio callback.
+  locking on the audio callback. UGen nodes declare typed mono or stereo
+  outputs (up to 4 per node). In `.vact`, calling a multi-output node
+  value with an output keyword or index selects that output (`(p :aux)`,
+  `(p 1)`), and an unselected use means the first output. Stereo voices
+  keep both channels through voice-local effects. Stereo and main/aux
+  voices pan with unity-center balance, and mono voices keep equal-power
+  pan. The graph codec carries output shapes and edge output indexes, so
+  native and browser peers of the same revision render the same graph
+  (design `design-docs/specs/design-mutable-audio.md`, MOD-004).
 - `src/host/`: capability traits and `NoopHost`; `native/` (cpal, timer
   tick, midir, WAV loader) behind the `host-native` feature; `wasm/` (raw
   ABI, control-cell mirror protocol, resource lifecycle) behind `host-wasm`

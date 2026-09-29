@@ -120,6 +120,11 @@ description = "Compare raw Peaks bass/snare/hat/fm drum kernels against a separa
 run = 'python3 verification/compare_peaks_drums.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
 env = { CARGO_TERM_QUIET = "true" }
 
+[tasks.compare-rings-part]
+description = "Compare raw Rings Part/StringSynthPart kernels against a separate pinned Mutable Instruments checkout"
+run = 'python3 verification/compare_rings_part.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'
+env = { CARGO_TERM_QUIET = "true" }
+
 [tasks.audit-upstream]
 description = "Audit upstream source, license and resource inventory against a separate pinned Mutable Instruments checkout"
 run = 'python3 verification/audit_upstream.py --source "${VACTR_MI_REFERENCE:?set VACTR_MI_REFERENCE to the pinned Eurorack checkout}"'

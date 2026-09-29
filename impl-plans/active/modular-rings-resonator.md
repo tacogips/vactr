@@ -46,7 +46,7 @@ filter, diffuser and generated-resource behavior.
 | RNG-003 | Sympathetic, quantized and FM bonus modes | RNG-001 | Original bounded adaptations runnable, full source stage comparison pending |
 | RNG-004 | String-plus-reverb and separate string-synth path | RNG-001 | Short-diffuser Part and separate four-voice StringSynthPart adaptations runnable; source parity pending |
 | RNG-005 | External-excitation effect routing, strum, polyphony, note/FM/chord | RNG-002..004 | Stereo bus/master `resonant-bank` and opt-in instrument graph excitation runnable; source parity pending |
-| RNG-006 | Source comparison, notices, all-control and native/browser verification | RNG-002..005 | Adaptation tests/notices present; source output comparison and resource audit pending |
+| RNG-006 | Source comparison, notices, all-control and native/browser verification | RNG-002..005 | Adaptation tests/notices present; opt-in `compare-rings-part` source output comparison landed and run against the pinned checkout (see progress log); resource audit still pending |
 
 ## Completion Criteria
 
@@ -59,6 +59,73 @@ filter, diffuser and generated-resource behavior.
 - [ ] Quiet Cargo check, strict Clippy, tests, rustfmt and diff checks pass.
 
 ## Progress Log
+
+### Session: 2026-09-29 — RNG-006 source output comparison
+
+An opt-in `mise run compare-rings-part` task compiles the pinned upstream
+`rings/dsp/part.{h,cc}` (six `ResonatorModel` values, polyphony fixed to 1)
+and `rings/dsp/string_synth_part.{h,cc}` from a separate local checkout —
+`verification/rings_part_reference.cc` also links `resonator.cc`, `string.cc`,
+`fm_voice.cc`, `rings/resources.cc`, and `stmlib`'s `units.cc`/`random.cc` —
+and compares them against Vactr's `resonator-part-core`/`string-choir-core`
+kernels via `examples/rings_part_reference.rs` and
+`verification/compare_rings_part.py`. Both sides render at the confirmed
+source rate/block (`rings/dsp/dsp.h`: `kSampleRate = 48000`,
+`kMaxBlockSize = 24`) for 2.0 s, with an internal strum/exciter trigger
+firing once at the start and a fixed note (69, i.e. A4/440 Hz with
+tonic/fm at zero, no external excitation). Each of the six models and the
+string-synth path is driven at three structure/brightness/damping/position
+settings (0.15/0.25/0.20/0.30, 0.50/0.50/0.50/0.50, 0.85/0.75/0.80/0.70).
+The script verifies Eurorack revision `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`
+and `stmlib` revision `e3bd7c9cc00e4364166f9905c0509b6ffd0535ec`, requires a
+clean tracked tree, aligns each channel pair on its onset (first sample at
+5% of that channel's peak) before scoring, and reports per-channel reference/
+Vactr RMS, correlation, normalized RMS error, spectral centroid, -20/-40 dB
+decay time and a time-domain-autocorrelation fundamental estimate. Run it as
+`VACTR_MI_REFERENCE=/path/to/eurorack mise run compare-rings-part`.
+
+Verified against a real pinned checkout (cloned to the exact two revisions
+above; `git status` clean) rather than left unexercised: 21 model/scenario
+comparisons (6 models plus string-synth, 3 settings, main and aux) all ran
+and produced finite, non-degenerate audio on both sides. Correlation is
+near zero for every model/scenario (average magnitude well under 0.1,
+several negative), confirming this is not a source-equivalent port at the
+sample level, consistent with `THIRD_PARTY_NOTICES.md`'s existing
+"architectural reference" wording. Per-model classification (averaged over
+the three settings, main and aux):
+
+| Model | Classification | Notes |
+|---|---|---|
+| `MODAL_RESONATOR` | not comparable | Vactr's internal exciter keeps adding a small continuous sine term scaled by a never-zero decaying envelope (`src/dsp/ugen/rings_part.rs`'s `internal` excitation term), so the adaptation sustains rather than freely decaying; source RMS varies over two decades across settings while Vactr's stays within a narrow band. Average normalized RMS error is roughly 37 (source `Resonator` is materially louder and freely decaying; Vactr's four-mode filter bank sustains). |
+| `SYMPATHETIC_STRING` | measured gap | Normalized RMS error is close to 1 (near-total mismatch) with near-zero correlation; the mid-setting fundamental estimate agrees exactly (440.4 Hz both sides) even though the waveform does not. |
+| `STRING` | measured gap | Similar to above; mid-setting fundamentals are close (440.4 Hz source vs 466.0 Hz Vactr, about 6% apart). |
+| `FM_VOICE` | measured gap | Highest average correlation of the six models (~0.07) but still far from source-equivalent; error grows at low structure/brightness/damping/position. |
+| `SYMPATHETIC_STRING_QUANTIZED` | measured gap | Source's quantized-chord fundamental (220.2 Hz at the mid setting, an octave-below reading from the `BRYAN_CHORDS` table) diverges sharply from Vactr's unquantized 440.4 Hz; Vactr's `chord_ratio` is an authored interval map, not the source `chords[]` table, as already documented. |
+| `STRING_AND_REVERB` | measured gap | Source's short diffuser network and `position`-weighted L/R mix give a materially different spectral balance (mid-setting fundamental estimate 888.9 Hz vs Vactr's 466.0 Hz, likely a harmonic pick on the source side given its added reverb tail) from Vactr's four-line network plus 512-sample feedback echo. |
+| `STRING_SYNTH_PART` (string-choir path) | measured gap | Highest average correlation among all seven targets (~0.10) at low settings; mid-setting fundamentals agree exactly (440.4 Hz both sides). Vactr's four analytic chord voices and six authored FX formulas replace the source's twelve-oscillator rotation and `chorus`/`ensemble`/`reverb` FX headers, as already documented. |
+
+No kernel translation error was found while building this comparison:
+`src/dsp/ugen/rings_part.rs` and `src/dsp/ugen/string_choir.rs` are
+unchanged. The `MODAL_RESONATOR` sustain behavior above is a deliberate
+event-local adaptation choice (an always-on, decaying internal exciter
+rather than a one-shot pluck), not an accidental mistranslation, so it was
+left as is and reported as a gap rather than "fixed." This is a raw-kernel
+comparison only: no `.vact` event, host callback, LPG, voice-stealing,
+external-excitation routing, four-voice polyphony, or browser pathway is
+exercised, and no upstream object, table, preset, or audio sample is
+stored in Vactr — `rings/resources.cc` and the other linked upstream `.cc`
+files are compiled only inside the task's temporary build directory.
+`verification/upstream_inventory.toml` gained six sorted entries for the
+upstream files this session newly names (`rings/dsp/dsp.h` as `source`,
+confirmed for its rate/block constants; `rings/dsp/resonator.cc`,
+`rings/dsp/string.cc`, `rings/dsp/fm_voice.cc`, `rings/resources.cc`
+(`aggregate-resource`), and `stmlib/utils/random.cc` as `excluded`,
+probe-only), and `THIRD_PARTY_NOTICES.md`'s "Rings Part architectural
+reference" section gained a paragraph describing the probe. `python3
+verification/audit_upstream.py --source <checkout>` passes with 0 errors
+against the pinned checkout. Independent review of this session's diff,
+including the `mise run compare-rings-part` output above, is recommended
+before closing RNG-006.
 
 ### Session: 2026-09-28 — opt-in instrument graph excitation
 

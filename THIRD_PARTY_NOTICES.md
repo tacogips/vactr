@@ -777,6 +777,19 @@ map, or generated resource. It keeps separately authored noise, drive and
 pitch-sweep controls, and its floating-point and host-rate timing differ
 from the source; numerical source parity is not claimed.
 
+An opt-in local comparison probe, `verification/peaks_drums_reference.cc`
+(compiled against `peaks/drums/fm_drum.{h,cc}` and the aggregate
+`peaks/resources.cc` from a separate pinned checkout, never linked into
+Vactr) and `examples/peaks_drums_reference.rs`, drives one triggered hit of
+the source `FmDrum` and Vactr's `fm-drum` kernel at the source's own 48 kHz
+rate for three documented control settings. `verification/compare_peaks_drums.py`
+reports RMS, peak, correlation and normalized RMS error after onset
+alignment, spectral centroid and -20/-40 dB decay times; it compiles the
+upstream sources only into a local temporary executable and stores no
+upstream code, table or output sample in this repository. The measured
+gaps (documented in `impl-plans/active/modular-fm-drums.md`) do not
+establish source parity and do not change the `SourceStage` manifest label.
+
 Copyright 2013–2014 Emilie Gillet.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -807,12 +820,28 @@ informed by the signal families and control roles in
 are copyright 2013 Emilie Gillet and carry the MIT permission and warranty
 notice reproduced above. The original bass/snare files depend on Peaks
 `excitation.h` and `svf.h`, `stmlib/utils/dsp.h`, and (for snare)
-`stmlib/utils/random.h`; the high-hat uses those filter/excitation and
+`stmlib/utils/random.{h,cc}`; the high-hat uses those filter/excitation and
 random utilities too. Vactr imports none of those implementations,
 `peaks/resources.*`, lookup tables, sample data, or presets. In the original
 high-hat, `Configure` has no authored controls; Vactr's hat frequency,
 tone, decay, and metal knobs are extensions. These are architectural
 adaptations, not sample-exact copies of the original firmware.
+
+An opt-in local comparison probe, `verification/peaks_drums_reference.cc`
+(compiled against `peaks/drums/bass_drum.{h,cc}`, `snare_drum.{h,cc}` and
+`high_hat.{h,cc}` and the aggregate `peaks/resources.cc` from a separate
+pinned checkout, never linked into Vactr) and `examples/peaks_drums_reference.rs`,
+drives one triggered hit of each source drum and the matching Vactr
+`analog-percussion` mode (0/1/2) at the source's own 48 kHz rate for three
+documented control settings; the source high-hat's `Configure` takes no
+controls, so its three settings vary only on the Vactr side against one
+fixed source render. `verification/compare_peaks_drums.py` reports RMS,
+peak, correlation and normalized RMS error after onset alignment, spectral
+centroid and -20/-40 dB decay times; it compiles the upstream sources only
+into a local temporary executable and stores no upstream code, table or
+output sample in this repository. The measured gaps (documented in
+`impl-plans/active/modular-peaks-functions.md`) do not establish source
+parity and do not change the `Adaptation` manifest labels.
 
 ## Three-component percussion design reference
 

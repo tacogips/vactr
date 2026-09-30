@@ -66,6 +66,25 @@ Used by `design-docs/specs/design-formatter-and-syntax.md` sections 2 and 4-5.
 | tree-sitter repository | https://github.com/tree-sitter/tree-sitter | MIT; the C runtime (`lib/`), the CLI, and `lib/binding_web` (web-tree-sitter) |
 | web-tree-sitter (npm) | https://www.npmjs.com/package/web-tree-sitter | The runtime compiled to WASM with a JS API (`Parser`, `Language`, `Query`), pinned at 0.27.0 |
 | tree-sitter-python scanner | https://github.com/tree-sitter/tree-sitter-python/blob/master/src/scanner.c | Reference design for indentation tokens and comment-line handling in a layout-sensitive scanner |
+### Bass Synthesis
+
+These are papers, books and manuals, used for their equations and published
+behaviour only. No emulation source code is consulted or adapted. See
+[`design-bass-voices.md`](../specs/design-bass-voices.md#license-boundary).
+
+| Name | URL | Description |
+|------|-----|-------------|
+| Stinchcombe, Moog ladder and derivative filters (2008) | http://www.timstinchcombe.co.uk/ | Circuit analysis of the transistor ladder and the TB-303 diode ladder; basis for the acid diode-ladder topology |
+| Zavalishin, The Art of VA Filter Design (rev. 2.1.2) | https://www.native-instruments.com/fileadmin/ni_media/downloads/pdf/VAFilterDesign_2.1.2.pdf | TPT integrators, zero-delay feedback solution, transistor and diode ladders |
+| Pirkle, Designing Software Synthesizer Plugins in C++ (2nd ed., 2021) | https://www.willpirkle.com/ | VA diode ladder equations; the book and app-note code is not used |
+| Huovilainen, Non-linear digital Moog ladder (DAFx-04) | https://www.dafx.de/paper-archive/2004/P_061.PDF | Nonlinear ladder model; the kernel uses a single input nonlinearity instead of per-stage nonlinearities |
+| Valimaki and Huovilainen, VA oscillator and filter algorithms (CMJ 30(2), 2006) | https://doi.org/10.1162/comj.2006.30.2.19 | Virtual-analog oscillators and ladder filter survey |
+| Valimaki and Huovilainen, Antialiasing oscillators in subtractive synthesis (IEEE SPM, 2007) | https://doi.org/10.1109/MSP.2007.323276 | polyBLEP saw, pulse and square |
+| Esqueda, Valimaki and Bilbao, Rounding corners with BLAMP (DAFx-16) | https://www.dafx.de/paper-archive/ (DAFx-16 proceedings) | polyBLAMP triangle corners |
+| Chowning, FM synthesis (JAES 21(7), 1973) | https://www.aes.org/e-lib/ (JAES 21(7), 1973) | Frequency-modulation spectra and index envelopes |
+| Tomisawa, US Patent 4,249,447 (1981) | https://patents.google.com/patent/US4249447A | Operator self-feedback FM |
+| Esqueda et al., Lockhart and Serge wavefolders (Applied Sciences 7(12), 2017) | https://doi.org/10.3390/app7121328 | Wavefolding models |
+| Bilbao et al., Antiderivative antialiasing (IEEE SPL 24(7), 2017) | https://doi.org/10.1109/LSP.2017.2675541 | First-order ADAA for the wavefolder |
 
 ## Reference Documents
 

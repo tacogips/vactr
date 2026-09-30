@@ -10,6 +10,10 @@
 //! `src/sched/commit.rs`): all seven templates now render audible output.
 
 mod analog_pair;
+mod bass;
+mod bass_examples;
+mod bass_presets;
+mod bass_render;
 mod braids_cloud;
 mod braids_digital;
 mod braids_filter;

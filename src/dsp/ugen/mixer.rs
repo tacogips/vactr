@@ -3,16 +3,16 @@
 use crate::dsp::effects::{self};
 
 use super::{
-    additive, analog_pair, analog_percussion, braids_cloud, braids_digital, braids_filter,
-    braids_five, braids_fm, braids_formant, braids_noise, braids_percussion, braids_physical,
-    braids_struck, braids_subsync, braids_triple, braids_wave_bank, braids_wave_line, chip_pair,
-    chord_pair, clock_noise_pair, digital_drum, dual_kick, elements_internal, env, feedback_metal,
-    filter, fm, fm_drum, fm_pair, frame_lfo, fusion_drum, grain_pair, hat_pair, modal_pair,
-    musicdsp_synth, number_station, osc, particle_pair, peak_function, peak_pulse, phase_pair,
-    rings_part, sample, shape_pair, six_op_original, snare_pair, spectrum_pair, speech_original,
-    stage_chain, stage_segment, string_choir, string_machine_pair, string_pair, swarm_pair,
-    table_terrain_pair, terrain_pair, tidal_function, tidal_poly, va_filter, vactrol_gate,
-    wavetable,
+    additive, analog_pair, analog_percussion, bass_voice, braids_cloud, braids_digital,
+    braids_filter, braids_five, braids_fm, braids_formant, braids_noise, braids_percussion,
+    braids_physical, braids_struck, braids_subsync, braids_triple, braids_wave_bank,
+    braids_wave_line, chip_pair, chord_pair, clock_noise_pair, digital_drum, dual_kick,
+    elements_internal, env, feedback_metal, filter, fm, fm_drum, fm_pair, frame_lfo, fusion_drum,
+    grain_pair, hat_pair, modal_pair, musicdsp_synth, number_station, osc, particle_pair,
+    peak_function, peak_pulse, phase_pair, rings_part, sample, shape_pair, six_op_original,
+    snare_pair, spectrum_pair, speech_original, stage_chain, stage_segment, string_choir,
+    string_machine_pair, string_pair, swarm_pair, table_terrain_pair, terrain_pair, tidal_function,
+    tidal_poly, va_filter, vactrol_gate, wavetable,
 };
 use super::{Inp, Kx, Node, NodeSpec, NodeState, MAX_PORTS};
 
@@ -72,6 +72,7 @@ pub fn run(
         Node::DigitalSnareCore => digital_drum::render_snare(ins, st, mem, out, kx),
         Node::DigitalMetalCore => digital_drum::metal::render_metal(ins, st, mem, out, kx),
         Node::DigitalHatCore => digital_drum::metal::render_hat(ins, st, mem, out, kx),
+        Node::BassCore => bass_voice::render(ins, st, mem, out, kx),
         Node::AnalogPercussion => analog_percussion::render(ins, st, out, kx),
         Node::VaSource => va_filter::source(ins, st, out, kx),
         Node::VaFilter => va_filter::filter(ins, st, out, kx),

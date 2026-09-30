@@ -305,6 +305,7 @@ pub const UGENS: &[(&str, UGenSpec)] = &[
     ("macro-wave-line-core", UGenSpec::BraidsWaveLine),
     ("macro-noise-core", UGenSpec::BraidsNoise),
     ("macro-cloud-core", UGenSpec::BraidsCloud),
+    ("bass-core", UGenSpec::BassCore),
     ("aux-out", UGenSpec::AuxOut),
     ("out-3", UGenSpec::Out3),
     ("out-4", UGenSpec::Out4),

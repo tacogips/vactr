@@ -419,3 +419,27 @@ inst peak-pulse-voice pulse-mode: float = 0 pulse-half: float = 0 pulse-gate: fl
 inst number-station-voice station-voice: float = 0 station-half: float = 0 station-tone: float = 0.5 station-transition: float = 0.5 station-noise: float = 0.5 station-drive: float = 0.5 station-digit: float = 0 station-auto: float = 0 station-gate: float = 1 station-trigger: float = 0:
 	number-station-core freq station-voice: station-voice station-half: station-half station-tone: station-tone station-transition: station-transition station-noise: station-noise station-drive: station-drive station-digit: station-digit station-auto: station-auto station-gate: station-gate station-trigger: station-trigger station-channel: 0 > * amp
 		> + {number-station-core freq station-voice: station-voice station-half: station-half station-tone: station-tone station-transition: station-transition station-noise: station-noise station-drive: station-drive station-digit: station-digit station-auto: station-auto station-gate: station-gate station-trigger: station-trigger station-channel: 1 > * amp > aux-out}
+
+
+# Dedicated bass voices. `slide-from` is the semitone interval from the prior
+# note and is used with `cut 1`; `gate-length` is measured in sixteenth-steps.
+# Wobble divisions use `lfo-rate`: 1/4 = 4, 1/8 = 8, 1/4T = 6, 1/8T = 12.
+# Unpassed row-named ports use the control-row default (for example lfo-sync
+# defaults to false), while declared bass headers pin their shown defaults.
+inst analog-bass wave: keyword = :saw cutoff: float = 420 res: float = 0.35 env-mod: float = 2.5 env-decay: float = 0.18 accent: float = 0 sub-level: float = 0.35 drive: float = 0.25 gate-length: float = 0.9 amp-attack: float = 0.002 amp-decay: float = 0.4 sustain: float = 0.85 release: float = 0.04 slide-from: float = 0 slide-time: float = 0.06:
+	bass-core freq wave: wave cutoff: cutoff res: res env-mod: env-mod env-decay: env-decay accent: accent sub-level: sub-level drive: drive gate-length: gate-length amp-attack: amp-attack amp-decay: amp-decay sustain: sustain release: release slide-from: slide-from slide-time: slide-time mode: 0 > * amp
+
+inst acid-bass wave: keyword = :saw cutoff: float = 320 res: float = 0.72 env-mod: float = 3.2 env-decay: float = 0.22 accent: float = 0 slide-from: float = 0 slide-time: float = 0.06 drive: float = 0.3 gate-length: float = 0.55 release: float = 0.02:
+	bass-core freq wave: wave cutoff: cutoff res: res env-mod: env-mod env-decay: env-decay accent: accent slide-from: slide-from slide-time: slide-time drive: drive gate-length: gate-length release: release mode: 1 > * amp
+
+inst fm-bass ratio: float = 1 index: float = 2.5 fm-feedback: float = 0.35 fold: float = 0 bit-depth: float = 16 cutoff: float = 2400 res: float = 0.1 env-mod: float = 1 env-decay: float = 0.15 accent: float = 0 drive: float = 0.1 gate-length: float = 0.8 amp-decay: float = 0.25 sustain: float = 0.45 release: float = 0.05 slide-from: float = 0 slide-time: float = 0.05:
+	bass-core freq ratio: ratio index: index fm-feedback: fm-feedback fold: fold bit-depth: bit-depth cutoff: cutoff res: res env-mod: env-mod env-decay: env-decay accent: accent drive: drive gate-length: gate-length amp-decay: amp-decay sustain: sustain release: release slide-from: slide-from slide-time: slide-time mode: 2 > * amp
+
+inst wobble-bass wave: keyword = :saw detune: float = 0.12 sub-level: float = 0.4 cutoff: float = 180 res: float = 0.45 drive: float = 0.35 lfo-wave: keyword = :sine lfo-rate: float = 4 lfo-depth: float = 0.8 lfo-offset: float = 0 lfo-retrigger: bool = true lfo-sync: bool = true gate-length: float = 4 release: float = 0.08 slide-from: float = 0 slide-time: float = 0.08:
+	bass-core freq wave: wave detune: detune sub-level: sub-level cutoff: cutoff res: res drive: drive lfo-wave: lfo-wave lfo-rate: lfo-rate lfo-depth: lfo-depth lfo-offset: lfo-offset lfo-retrigger: lfo-retrigger lfo-sync: lfo-sync gate-length: gate-length release: release slide-from: slide-from slide-time: slide-time mode: 3 > * amp
+
+inst sub-bass wave: keyword = :sine cutoff: float = 300 res: float = 0 drive: float = 0.15 click-level: float = 0.2 gate-length: float = 1.5 amp-attack: float = 0.003 release: float = 0.06 slide-from: float = 0 slide-time: float = 0.05:
+	bass-core freq wave: wave cutoff: cutoff res: res drive: drive click-level: click-level gate-length: gate-length amp-attack: amp-attack release: release slide-from: slide-from slide-time: slide-time mode: 4 > * amp
+
+inst reese-bass wave: keyword = :saw detune: float = 0.18 sub-level: float = 0.3 cutoff: float = 650 res: float = 0.2 env-mod: float = 0.8 env-decay: float = 0.6 drive: float = 0.3 gate-length: float = 3.5 amp-attack: float = 0.01 release: float = 0.12 slide-from: float = 0 slide-time: float = 0.1:
+	bass-core freq wave: wave detune: detune sub-level: sub-level cutoff: cutoff res: res env-mod: env-mod env-decay: env-decay drive: drive gate-length: gate-length amp-attack: amp-attack release: release slide-from: slide-from slide-time: slide-time mode: 5 > * amp

@@ -13,6 +13,7 @@ pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize) {
         Node::FeedbackDrum => (1001, 0),
         Node::DigitalDrumCore | Node::DigitalSnareCore => (digital_drum::STATE_FLOATS, 0),
         Node::DigitalMetalCore | Node::DigitalHatCore => (digital_drum::metal::STATE_FLOATS, 0),
+        Node::BassCore => (bass_voice::STATE_FLOATS, 0),
         Node::SpectrumPair => (48, 0),
         Node::DualKick => (dual_kick::STATE_FLOATS, 0),
         Node::SnarePair => (snare_pair::STATE_FLOATS, 0),

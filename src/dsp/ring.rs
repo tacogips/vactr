@@ -735,8 +735,9 @@ impl EngineConfig {
             max_block,
             output_channels: 2,
             store,
-            // The core prelude currently installs 67 definitions. Leave
-            // bounded room for local song voices and opt-in instruments.
+            // The core prelude installs 73 definitions (67 plus the six bass
+            // templates). Leave bounded room for local song voices and opt-in
+            // instruments.
             template_slots: 96,
             bus_slots: DEFAULT_BUS_SLOTS,
             // Full stereo FDN/shimmer state fits one voice; buses have room

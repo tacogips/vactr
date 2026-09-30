@@ -210,6 +210,8 @@ pub enum UGenSpec {
     AmFormantOsc,
     /// Any builtin effect as a ugen (12.5).
     Effect(EffectSpec),
+    /// Self-enveloped bass voice kernel (six prelude models).
+    BassCore,
 }
 
 /// A connection: node `from`'s output feeds input `port` of node `to`.

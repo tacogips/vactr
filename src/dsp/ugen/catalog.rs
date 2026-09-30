@@ -226,6 +226,7 @@ pub fn ports(node: &Node) -> &'static [Port] {
         Node::DigitalSnareCore => DIGITAL_SNARE,
         Node::DigitalMetalCore => DIGITAL_METAL,
         Node::DigitalHatCore => DIGITAL_HAT,
+        Node::BassCore => BASS_CORE,
         Node::AnalogPercussion => ANALOG_PERCUSSION,
         Node::VaSource => VA_SOURCE,
         Node::VaFilter => VA_FILTER,
@@ -381,6 +382,7 @@ pub fn ugen_name(spec: &UGenSpec) -> &'static str {
         UGenSpec::DigitalSnareCore => "digital-snare-core",
         UGenSpec::DigitalMetalCore => "digital-metal-core",
         UGenSpec::DigitalHatCore => "digital-hat-core",
+        UGenSpec::BassCore => "bass-core",
         UGenSpec::AnalogPercussion => "analog-percussion",
         UGenSpec::VaSource => "va-source",
         UGenSpec::VaFilter => "va-filter",
@@ -547,6 +549,7 @@ pub const UGEN_NAMES: &[&str] = &[
     "additive",
     "wavetable",
     "granular",
+    "bass-core",
 ];
 
 /// The prelude synthesis templates (design 12.4).
@@ -618,6 +621,12 @@ pub const TEMPLATE_NAMES: &[&str] = &[
     "frame-keyframe-voice",
     "peak-pulse-voice",
     "number-station-voice",
+    "analog-bass",
+    "acid-bass",
+    "fm-bass",
+    "wobble-bass",
+    "sub-bass",
+    "reese-bass",
 ];
 
 /// The node of a spec (an effect's parameters are not included).
@@ -664,6 +673,7 @@ pub fn node_of(spec: &UGenSpec) -> Node {
         UGenSpec::DigitalSnareCore => Node::DigitalSnareCore,
         UGenSpec::DigitalMetalCore => Node::DigitalMetalCore,
         UGenSpec::DigitalHatCore => Node::DigitalHatCore,
+        UGenSpec::BassCore => Node::BassCore,
         UGenSpec::AnalogPercussion => Node::AnalogPercussion,
         UGenSpec::VaSource => Node::VaSource,
         UGenSpec::VaFilter => Node::VaFilter,

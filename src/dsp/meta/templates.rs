@@ -1,6 +1,8 @@
 //! Built-in instrument parameter names for editor metadata.
 
+mod bass;
 mod plaits;
+pub(super) use bass::DEFAULT_OVERRIDES as BASS_DEFAULT_OVERRIDES;
 
 pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
     (
@@ -744,4 +746,10 @@ pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
             "freeze",
         ],
     ),
+    ("analog-bass", bass::ANALOG_BASS),
+    ("acid-bass", bass::ACID_BASS),
+    ("fm-bass", bass::FM_BASS),
+    ("wobble-bass", bass::WOBBLE_BASS),
+    ("sub-bass", bass::SUB_BASS),
+    ("reese-bass", bass::REESE_BASS),
 ];

@@ -5,6 +5,10 @@
 mod analog_pair;
 mod analyzer;
 mod arena;
+mod bass_filters;
+mod bass_mods;
+mod bass_sources;
+mod bass_voice;
 mod braids_cloud;
 mod braids_digital;
 mod braids_filter;

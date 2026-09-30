@@ -187,15 +187,28 @@ fn template_default_override(
     name: &str,
     row: &controls::ControlRow,
 ) -> Option<f32> {
-    let &(.., kw) = TEMPLATE_DEFAULT_OVERRIDES
+    let kw = TEMPLATE_DEFAULT_OVERRIDES
         .iter()
-        .find(|(t, n, _)| *t == template && *n == name)?;
+        .find(|(t, n, _)| *t == template && *n == name)
+        .map(|(_, _, value)| *value)
+        .or_else(|| {
+            templates::BASS_DEFAULT_OVERRIDES
+                .iter()
+                .find(|(t, n, _)| *t == template && *n == name)
+                .map(|(_, _, value)| *value)
+        })?;
     match row.domain {
         controls::CtlDomain::Enum(names) =>
         {
             #[allow(clippy::cast_precision_loss)]
             names.iter().position(|n| *n == kw).map(|i| i as f32)
         }
+        controls::CtlDomain::Float => kw.parse().ok(),
+        controls::CtlDomain::Bool => match kw {
+            "true" => Some(1.0),
+            "false" => Some(0.0),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -266,6 +279,9 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
             "frame-keyframe-voice" => Node::FrameKeyframe { slot: 0 },
             "peak-pulse-voice" => Node::PeakPulse,
             "number-station-voice" => Node::NumberStation,
+            "analog-bass" | "acid-bass" | "fm-bass" | "wobble-bass" | "sub-bass" | "reese-bass" => {
+                Node::BassCore
+            }
             _ => return None,
         };
         let ports = ucat::ports(&node);
@@ -285,7 +301,11 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
             })
             .and_then(|index| ucat::port_ctl(&node, index).map(|ctl| (index, ctl)))
             .map(|(index, ctl)| {
-                let default = ports[index].default;
+                let default = templates::BASS_DEFAULT_OVERRIDES
+                    .iter()
+                    .find(|(t, n, _)| *t == template && *n == name)
+                    .and_then(|(_, _, value)| value.parse::<f32>().ok())
+                    .unwrap_or(ports[index].default);
                 if template != "resonator-voice"
                     && template != "feedback-metal-drum"
                     && template != "string-choir-voice"
@@ -299,10 +319,27 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     && template != "frame-keyframe-voice"
                     && template != "peak-pulse-voice"
                     && template != "number-station-voice"
+                    && template != "analog-bass"
+                    && template != "acid-bass"
+                    && template != "fm-bass"
+                    && template != "wobble-bass"
+                    && template != "sub-bass"
+                    && template != "reese-bass"
                 {
                     return meta(name, ctl, (0.0, 1.0), "", false, default, &[]);
                 }
                 let (range, stepped) = match name {
+                    "gate-length" => ((0.05, 64.0), false),
+                    "env-mod" => ((0.0, 8.0), false),
+                    "env-decay" => ((0.01, 4.0), false),
+                    "accent" => ((0.0, 1.0), false),
+                    "slide-from" => ((-24.0, 24.0), false),
+                    "slide-time" => ((0.005, 1.0), false),
+                    "sub-level" => ((0.0, 1.0), false),
+                    "fm-feedback" => ((0.0, 1.0), false),
+                    "fold" => ((0.0, 1.0), false),
+                    "bit-depth" => ((2.0, 16.0), false),
+                    "click-level" => ((0.0, 1.0), false),
                     "metal-ratio" => ((0.25, 12.0), false),
                     "metal-index" => ((0.0, 12.0), false),
                     "metal-feedback" => ((0.0, 0.95), false),
@@ -576,6 +613,7 @@ fn ugen_node(name: &str) -> Option<Node> {
         "frame-keyframe-core" => Node::FrameKeyframe { slot: 0 },
         "peak-pulse-core" => Node::PeakPulse,
         "number-station-core" => Node::NumberStation,
+        "bass-core" => Node::BassCore,
         "spectrum-pair" => Node::SpectrumPair,
         "clock-noise-pair" => Node::ClockNoisePair,
         "dual-kick-core" => Node::DualKick,

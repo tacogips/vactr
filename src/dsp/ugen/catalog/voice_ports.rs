@@ -2,6 +2,42 @@
 
 use super::{p, Port, FREQ, IN};
 
+/// The six-model bass voice kernel with hidden tempo anchors included.
+pub(super) const BASS_CORE: &[Port] = &[
+    p("freq", 55.0),
+    p("mode", 0.0),
+    p("cps", 0.5),
+    p("onset-time", 0.0),
+    p("wave", 0.0),
+    p("cutoff", 800.0),
+    p("res", 0.3),
+    p("drive", 0.2),
+    p("detune", 0.15),
+    p("ratio", 1.0),
+    p("index", 1.0),
+    p("amp-attack", 0.002),
+    p("amp-decay", 0.3),
+    p("sustain", 1.0),
+    p("release", 0.05),
+    p("lfo-wave", 0.0),
+    p("lfo-rate", 4.0),
+    p("lfo-depth", 0.0),
+    p("lfo-offset", 0.0),
+    p("lfo-retrigger", 1.0),
+    p("lfo-sync", 1.0),
+    p("gate-length", 1.0),
+    p("env-mod", 2.0),
+    p("env-decay", 0.2),
+    p("accent", 0.0),
+    p("slide-from", 0.0),
+    p("slide-time", 0.06),
+    p("sub-level", 0.0),
+    p("fm-feedback", 0.0),
+    p("fold", 0.0),
+    p("bit-depth", 16.0),
+    p("click-level", 0.0),
+];
+
 /// The Plaits voice-layer processor, in the stable kernel port order.
 pub(super) const VACTROL_GATE: &[Port] = &[
     IN,

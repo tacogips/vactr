@@ -82,6 +82,20 @@ Back end (TASK-007..008):
   labelled source-stage against the pinned reference by
   `mise run compare-plaits-voice`; it is not a full source port
   (design PLV-001, `examples/voice-layer.vact`).
+- Bass voices ([design](design-docs/specs/design-bass-voices.md)):
+  `analog-bass` (modeled ladder), `acid-bass` (diode ladder), `fm-bass`
+  (feedback FM), `wobble-bass` (tempo-synced filter), `sub-bass` (sine
+  sub) and `reese-bass` (detuned saws), all rendered by one `bass-core`
+  kernel. Acid slide uses `slide-from` semitones with `cut 1`;
+  `gate-length` is measured in sixteenth-steps. Synced wobble divisions
+  use `lfo-rate` cycles per pattern cycle (1 = 1/1, 2 = 1/2, 4 = 1/4,
+  8 = 1/8, 6 = 1/4T, 12 = 1/8T with the default 4-beat cycle) and stay
+  beat-locked over long playback; set `lfo-sync false` for free-rate Hz.
+  See `examples/bass-presets.vact` (19 named patches) and
+  `examples/acid-techno.vact`, `examples/rumble-techno.vact`,
+  `examples/offbeat-bass-techno.vact`, `examples/wobble-techno.vact`.
+  Render one with `vactr run examples/acid-techno.vact --cycles N`
+  (see Development).
 - `src/host/`: capability traits and `NoopHost`; `native/` (cpal, timer
   tick, midir, WAV loader) behind the `host-native` feature; `wasm/` (raw
   ABI, control-cell mirror protocol, resource lifecycle) behind `host-wasm`

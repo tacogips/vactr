@@ -1,0 +1,17 @@
+let x foo
+			> f:
+				s
+#@ label: zero
+	#@ label: one
+		#@ label: two
+			#@ label: three
+				#@ label: four
+					#@ label: five
+						#@ label: six
+let y 2
+let a 1 #@ mute   
+if true:
+	let a 1
+elif false:
+	#@ label: mid
+	let b 2

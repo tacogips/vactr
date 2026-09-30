@@ -29,6 +29,15 @@ pub enum StoreSpec {
     Dir(PathBuf),
 }
 
+/// Input source(s) for `vactr fmt`.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum FmtInput {
+    /// Read one source from stdin.
+    Stdin,
+    /// Read these paths in the order given.
+    Paths(Vec<PathBuf>),
+}
+
 /// A parsed invocation.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Command {
@@ -52,6 +61,10 @@ pub enum Command {
     },
     Lsp {
         session: Option<String>,
+    },
+    Fmt {
+        check: bool,
+        input: FmtInput,
     },
     Version,
     Help,
@@ -85,6 +98,8 @@ verbs:
   serve [<file.vact>] [--host native|noop] [--audio-in] [--port P] [--bind ADDR]
   get [<path>[@version]] [--store dir:<root>]
   lsp [--session <ws-url>]
+  fmt [--check] <PATH>...
+  fmt [--check] -
   version | --version
   help | --help";
 
@@ -294,6 +309,39 @@ fn parse_lsp(args: &[String]) -> Result<Command, UsageError> {
     Ok(Command::Lsp { session })
 }
 
+fn parse_fmt(args: &[String]) -> Result<Command, UsageError> {
+    let mut check = false;
+    let mut saw_stdin = false;
+    let mut paths = Vec::new();
+    for a in args {
+        if a == "--check" {
+            if check {
+                return Err(usage("`--check` may only be given once for `fmt`"));
+            }
+            check = true;
+        } else if a == "-" {
+            if saw_stdin || !paths.is_empty() {
+                return Err(usage("`-` cannot be combined with paths for `fmt`"));
+            }
+            saw_stdin = true;
+        } else if a.starts_with('-') {
+            return Err(usage(format!("unknown flag `{a}` for `fmt`")));
+        } else if saw_stdin {
+            return Err(usage("`-` cannot be combined with paths for `fmt`"));
+        } else {
+            paths.push(PathBuf::from(a));
+        }
+    }
+    let input = if saw_stdin {
+        FmtInput::Stdin
+    } else if paths.is_empty() {
+        return Err(usage("`fmt` needs a path or `-`"));
+    } else {
+        FmtInput::Paths(paths)
+    };
+    Ok(Command::Fmt { check, input })
+}
+
 /// Parses the arguments after the program name (`argv[1..]`, already
 /// lossily converted to UTF-8).
 ///
@@ -312,6 +360,7 @@ pub fn parse(args: &[String]) -> Result<Command, UsageError> {
         "serve" => parse_serve(&args[1..]),
         "get" => parse_get(&args[1..]),
         "lsp" => parse_lsp(&args[1..]),
+        "fmt" => parse_fmt(&args[1..]),
         other => Err(usage(format!("unknown verb `{other}`"))),
     }
 }

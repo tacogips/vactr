@@ -1,6 +1,6 @@
 # FST-23: Editor Highlighting via web-tree-sitter with StreamLanguage Fallback
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-23 (wave 2; parallel with FST-20, FST-21, FST-22)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 4.5, 5.1-5.4, 6
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -239,17 +239,24 @@ syntax?: SyntaxLoader;   // new optional EditorDeps field
 
 ## Completion Criteria
 
-- [ ] The contract is implemented, and `CAPTURE_CLASSES` covers every capture in `highlights.scm`.
-- [ ] The fallback is the default. The tree-sitter path is used only after the loader resolves.
-- [ ] `web-tree-sitter` is pinned at exactly `0.27.0`, and the lockfile was updated by npm.
-- [ ] Verification 1-7 pass, or a BLOCKED network or cache step is recorded for serial rerun.
-- [ ] The Progress Log is updated.
+- [x] The contract is implemented, and `CAPTURE_CLASSES` covers every capture in `highlights.scm`.
+- [x] The fallback is the default. The tree-sitter path is used only after the loader resolves.
+- [x] `web-tree-sitter` is pinned at exactly `0.27.0`, and the lockfile was updated by npm.
+- [x] Verification 1-7 pass, or a BLOCKED network or cache step is recorded for serial rerun.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 222 step 4).
 **Blockers**: Waits for FST-11.
+
+### Session: 2026-09-30 (FST-23 implementation)
+**Tasks Completed**: Added the `web-tree-sitter@0.27.0` loader and capture mapping in `editor/src/code/syntax.ts`; retained StreamLanguage as the initial mode and fallback in `editor/src/code/mount.ts`; wired the optional loader in both `boot()` tiers; emitted and served optional grammar/query/runtime WASM assets through Vite; added real-WASM parse/highlight tests and jsdom fallback/lifecycle tests.
+**Verification**: `mise run ts-build-wasm` (exit 0, `tmp/fst/FST-23/09-ts-build-wasm.log`); `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` (exit 0, `10-wasm-build.log`); `cd editor && npm install --save-exact web-tree-sitter@0.27.0` (exit 0, `03-npm-install.log`); package pin grep (exit 0, `13-package-pin.log`); `npm run check` (exit 0, `12-editor-check-final.log`); `npm test` (59 files, 364 tests passed, exit 0, `08-editor-test-rerun.log`); production build (exit 0, `11-editor-build.log`) and required dist asset listing (exit 0, `14-dist-assets.log`); line-count check (121 and 237 lines, exit 0, `15-line-count.log`).
+**Resolved During Implementation**: An initial strict typecheck found the 0.27.0 `locateFile` callback needed an explicit parameter type. The first editor test run also exposed a combined fixture that produced a grammar ERROR and a check that concatenated two identical keyword predicate lists. Both test/setup issues were corrected; the final check and full editor suite pass.
+**Downstream**: FST-40 owns combined-tree review and final integration gate; no review approval is claimed here.
+**Post-edit SHA256** (`tmp/fst/FST-23/16-post-edit-sha256.txt`): `editor/src/code/mount.ts` 881a60989555df5eb284cd33b9cdad2b1c93ee669f1a5250004015678cac2fa1; `editor/src/app/deps.ts` c0a5f51680991daabc738c9bbb1fe5b8e820305393c8cefff28bf7029ba57f35; `editor/src/app/main.ts` 6b59baf13eeba4404e84698a8f28abe2b8cc36ed3f40315efcee49f50c405f24; `editor/vite.config.ts` 12301700ff31ec9df1bebdd05eb90f4c99ac681f5665a7c58fe53eb1e18a784c; `editor/package.json` ee53ada5f6b09e61f23e3a956506d909c506e886f707541a1fb9f53e5a8a020e; `editor/package-lock.json` 18b27dd32efd167069ab7320d7ae8b59e36adcd7f036f1b465d86c1b4c5c40f4; `editor/src/code/syntax.ts` 60a8d3fa95ef7d13ced1c68b3e1e3248c7ee06973a42e13ec32cc0804d360829; `editor/test/code/syntax.test.ts` afbb9757257604128b8b312dae508c1b8e03b01af491c7e56cd4a57801b50789; `editor/test/code/syntax-fallback.test.ts` dd547b55923183259ae17c6ad5d7c9fb0109f8eb8f5a54a8318abb5d71fb43ef.
 
 ## Related Plans
 

@@ -6,6 +6,8 @@ import type { Store } from '../protocol/store';
 import type { WasmCore } from '../protocol/wasm';
 import type { BindApi, CodeApi, MidiApi, VisualApi } from './apis';
 import type { Clock } from './clock';
+import type { Formatter } from '../code/format';
+import type { SyntaxLoader } from '../code/syntax';
 
 export type Tier = 'browser' | 'native';
 
@@ -17,6 +19,10 @@ export interface EditorDeps {
   files: FileAccess;
   /** The browser tier's wasm core. */
   core?: WasmCore;
+  /** Optional tree-sitter syntax loader; the code area keeps StreamLanguage as fallback. */
+  syntax?: SyntaxLoader;
+  /** Dedicated formatter wasm instance, independent of the session core. */
+  formatter?: Formatter;
   /** Set by the owning area's mount; read at use time. */
   code?: CodeApi;
   midi?: MidiApi;

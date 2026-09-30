@@ -39,15 +39,7 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
-| [fst-10-fmt-core.md](active/fst-10-fmt-core.md) | Ready; wave 1, formatter core `src/fmt` (contract for FST-20/21/22) | design-formatter-and-syntax.md 3.1-3.6, 3.8 | 2026-09-30 |
-| [fst-11-ts-grammar.md](active/fst-11-ts-grammar.md) | Ready; wave 1, `tree-sitter-vact/` grammar, C scanner, queries, WASM build, mise tasks | design-formatter-and-syntax.md 2, 4, 6 | 2026-09-30 |
-| [fst-20-fmt-cli.md](active/fst-20-fmt-cli.md) | Ready; wave 2, `vactr fmt` verb | design-formatter-and-syntax.md 3.7.1; command.md | 2026-09-30 |
-| [fst-21-fmt-lsp.md](active/fst-21-fmt-lsp.md) | Ready; wave 2, LSP formatting on the formatter | design-formatter-and-syntax.md 3.7.2 | 2026-09-30 |
-| [fst-22-fmt-wasm.md](active/fst-22-fmt-wasm.md) | Ready; wave 2, `fmt_source` raw wasm export | design-formatter-and-syntax.md 3.7.3 | 2026-09-30 |
-| [fst-23-editor-syntax.md](active/fst-23-editor-syntax.md) | Ready; wave 2, web-tree-sitter highlighting with StreamLanguage fallback | design-formatter-and-syntax.md 5 | 2026-09-30 |
-| [fst-30-editor-format.md](active/fst-30-editor-format.md) | Ready; wave 3, editor format command (Shift-Alt-f) | design-formatter-and-syntax.md 3.7.4, 5.4 | 2026-09-30 |
-| [fst-40-closeout.md](active/fst-40-closeout.md) | Ready; wave 4, serial reconciliation, full gate, README, archive | design-formatter-and-syntax.md 7-8 | 2026-09-30 |
-| [fst-dispatch.json](active/fst-dispatch.json) | Dispatch manifest for FST-10..40 (waves [10,11] [20,21,22,23] [30] [40]) | - | 2026-09-30 |
+| [fst-dispatch.json](active/fst-dispatch.json) | Dispatch manifest for FST-10..40 (waves [10,11] [20,21,22,23] [30] [40]; all eight plans completed and archived session 222) | - | 2026-09-30 |
 | [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; PLV-001 voice layer measured SourceStage and wired into 24 templates; MOD-004 stereo/multi-output edges complete; remaining audio TODOs prioritized | design-mutable-audio.md; design-music.md 4.1 | 2026-09-30 |
 | [modular-audio-foundation.md](active/modular-audio-foundation.md) | In progress; MOD-001 inventory/audit, MOD-002 neutral names and MOD-004 stereo and multi-output edges complete; MOD-005/006 pending | design-mutable-audio.md | 2026-09-30 |
 | [mod004-00-baseline.md](active/mod004-00-baseline.md) | Completed (85a300a); wave 0 golden digests and test scaffolding | design-mutable-audio.md MOD-004 | 2026-09-30 |
@@ -113,6 +105,14 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
+| [fst-10-fmt-core.md](completed/fst-10-fmt-core.md) | 2026-09-30 (FST-10, formatter core; FST-40 combined gate passed; archived session 222) | design-formatter-and-syntax.md 3.1-3.6, 3.8 |
+| [fst-11-ts-grammar.md](completed/fst-11-ts-grammar.md) | 2026-09-30 (FST-11, C scanner, queries and WASM grammar; FST-40 combined gate passed; archived session 222) | design-formatter-and-syntax.md 2, 4, 6 |
+| [fst-20-fmt-cli.md](completed/fst-20-fmt-cli.md) | 2026-09-30 (FST-20, `vactr fmt`; FST-40 combined gate passed; archived session 222) | design-formatter-and-syntax.md 3.7.1; command.md |
+| [fst-21-fmt-lsp.md](completed/fst-21-fmt-lsp.md) | 2026-09-30 (FST-21, LSP formatting; FST-40 combined gate passed; archived session 222) | design-formatter-and-syntax.md 3.7.2 |
+| [fst-22-fmt-wasm.md](completed/fst-22-fmt-wasm.md) | 2026-09-30 (FST-22, raw WASM formatter ABI; combined export and build gate passed; archived session 222) | design-formatter-and-syntax.md 3.7.3 |
+| [fst-23-editor-syntax.md](completed/fst-23-editor-syntax.md) | 2026-09-30 (FST-23, web-tree-sitter highlighting and StreamLanguage fallback; FST-40 editor gate passed; archived session 222) | design-formatter-and-syntax.md 5 |
+| [fst-30-editor-format.md](completed/fst-30-editor-format.md) | 2026-09-30 (FST-30, Shift-Alt-f editor format command; FST-40 editor gate passed; archived session 222) | design-formatter-and-syntax.md 3.7.4, 5.4 |
+| [fst-40-closeout.md](completed/fst-40-closeout.md) | 2026-09-30 (FST-40, serial reconciliation and full gate; archived session 222) | design-formatter-and-syntax.md 7-8 |
 | [plv-10-voice-layer-dsp.md](completed/plv-10-voice-layer-dsp.md) | 2026-09-30 (PLV-10, wave 1 pure shared voice-layer DSP; f5e623b; archived session 209) | design-mutable-audio.md PLV-001 |
 | [plv-12-manifest-registration.md](completed/plv-12-manifest-registration.md) | 2026-09-30 (PLV-12, voice registration; measured SourceStage label recorded by PLV-40; archived session 209) | design-mutable-audio.md PLV-001 |
 | [plv-20-gate-nodes.md](completed/plv-20-gate-nodes.md) | 2026-09-30 (PLV-20, wave 2 vactrol-gate/decay-mod kinds, controls and registry; f5e623b; archived session 209) | design-mutable-audio.md PLV-001 |

@@ -52,3 +52,7 @@
 tarpaulin-report.html
 
 mise.local.toml
+
+## tree-sitter build outputs
+tree-sitter-vact/*.wasm
+tree-sitter-vact/build/

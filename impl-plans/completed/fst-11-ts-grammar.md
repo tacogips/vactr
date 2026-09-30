@@ -1,6 +1,6 @@
 # FST-11: tree-sitter-vact Grammar, Scanner, Queries, WASM Build, mise Tasks
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-11 (wave 1; parallel with FST-10)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` sections 2, 4.1-4.6, 6
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -241,11 +241,11 @@ The corpus must cover these, each with its expected tree:
 
 ## Completion Criteria
 
-- [ ] All the authored files exist, and the generated files come from CLI 0.27.0.
-- [ ] The contract's node types and captures match exactly; checked with `grep -c` of the capture names in `highlights.scm`.
-- [ ] Verification 1-6 pass, or specific commands are recorded as BLOCKED with the reason, for FST-40 to rerun.
-- [ ] Only the stated blocks changed in `mise.toml` and `.gitignore` (checked with `git diff mise.toml .gitignore`).
-- [ ] The Progress Log is updated.
+- [x] All the authored files exist, and the generated files come from CLI 0.27.0.
+- [x] The contract's node types and captures match exactly; checked by `tmp/fst/FST-11/31-contract-exactness.log`.
+- [x] Verification 1-6 pass; final logs are listed below.
+- [x] Only the stated blocks changed in `mise.toml` and `.gitignore` (checked with `git diff mise.toml .gitignore`).
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
@@ -253,6 +253,31 @@ The corpus must cover these, each with its expected tree:
 **Tasks Completed**: Plan authored (session 222 step 4).
 **Blockers**: None.
 **Notes**: This plan owns `mise.toml` and `.gitignore` for the whole change.
+
+### Session: 2026-09-30 (FST-11 implementation)
+**Tasks Completed**: Added the pinned CLI and four mise tasks; authored `tree-sitter-vact/` grammar, C scanner, queries, five corpus files, highlight sample and parse-all script; generated parser sources with tree-sitter 0.27.0; built and checked the WASM artifact.
+**Blockers**: None for FST-11. `fmt-vact-check` is defined but its execution is owned by FST-20 after the formatter lands.
+**Config edit evidence**:
+- First edit pre-hashes: `mise.toml` `e00a4203cfc39c23206de317282aaf04308cd0275857c3d1d4a55611bce22b3a`; `.gitignore` `4e52ea75747bc792ca111ce3583caf6b62f8fc27f731c0f78c242411afa0dc82`. Intent: add only the CLI pin and four tasks, plus the specified WASM/build ignore block. Post-hashes: `mise.toml` `22006a526103ef9d08ca9b26e92bfacd8c24b0c4429d8579d7a5279a83c81dc1`; `.gitignore` `14ab618838ec0c7615bac7700368c426c5d0e2570c0bdd7082a305c1cca373ca`.
+- Task portability edit pre-hashes: `mise.toml` `22006a526103ef9d08ca9b26e92bfacd8c24b0c4429d8579d7a5279a83c81dc1`; `.gitignore` `14ab618838ec0c7615bac7700368c426c5d0e2570c0bdd7082a305c1cca373ca`. Intent: remove Bash-only process substitution from ts-generate while retaining before/after hash comparison. Post-hashes: `mise.toml` `370b79fdd1559a68f43b4309506eea190412ee7159ae5e56d700e27bee15e12b`; `.gitignore` unchanged at `14ab618838ec0c7615bac7700368c426c5d0e2570c0bdd7082a305c1cca373ca`.
+**Verification**:
+- `tmp/fst/FST-11/20-mise-install-final.log`, `21-tree-sitter-version.log`: CLI installed and reports 0.27.0.
+- `tmp/fst/FST-11/26-tree-sitter-generate-contract.log`, `27-mise-ts-generate-final.log`: CLI generation and reproducibility pass.
+- `tmp/fst/FST-11/34-mise-ts-test-final.log`: 13/13 corpus tests passed, query compiled and produced all capture classes, `parse-all: 10 files ok` after fallback alignment.
+- `tmp/fst/FST-11/29-mise-ts-build-wasm-final.log`: WASM build passed; magic bytes `0061736d`.
+- `tmp/fst/FST-11/33-git-status-tree-sitter.log`: no `.wasm` status entry; ignore rule confirmed by `git check-ignore`.
+- `tmp/fst/FST-11/32-mise-tasks-ls.log`: all four required tasks are listed.
+- `tmp/fst/FST-11/31-contract-exactness.log`: exact 23 named node types, exact eight capture names and HEADS order.
+- `tmp/fst/FST-11/35-parse-all-fallback.log`: with `git ls-files` forced to fail, the specified examples/prelude globs still parse 10 files.
+**Resolved iteration failures**: Early parser-generation conflicts, missing block/comment line handling, scanner continuation/EOF handling, a POSIX shell incompatibility in the generation task, and a stale generated-file check were corrected. Attempts and full logs are retained as `03`–`18` and `25` under `tmp/fst/FST-11/`; the final source-matched runs listed above pass.
+**Notes**: `src/lib.rs` and `src/fmt/` were concurrently changed by another plan and were left untouched. FST-23 editor integration and FST-40 closeout/review remain downstream.
+
+### Session: 2026-09-30 (FST-11 Step 6 verification rerun)
+**Tasks Completed**: Re-ran the CLI pin check, plain generation and reproducibility task, corpus/query/parse-all task, WASM build, contract check, status/ignore check, and task inventory on the current shared source.
+**Verification**: `tmp/fst/FST-11/41-mise-install-rerun.log`, `42-tree-sitter-version-rerun.log`, `45-tree-sitter-generate-rerun.log`, `46-mise-ts-generate-rerun.log`, `47-mise-ts-test-rerun.log` (13/13, zero failures, 10 files), `48-mise-ts-build-wasm-rerun.log` (magic `0061736d`), `49-contract-check-rerun.log` (23 node types, eight captures, HEADS order), `51-git-status-all-rerun.log` (no WASM output), `52-mise-tasks-ls-rerun.log`, and `53-git-check-ignore-rerun.log`.
+**Resolved invocation errors**: `40-mise-install-rerun.log` used zsh's read-only `status` variable before the command ran; `43-tree-sitter-generate-rerun.log` ran at repository root rather than `tree-sitter-vact/`; `44-tree-sitter-generate-rerun.log` used a root-relative append path after changing directories. Corrected runs are recorded as 41 and 45 respectively; these were command invocation errors, not implementation failures.
+**Blockers**: None for FST-11. FST-20's `fmt-vact-check`, FST-23 editor integration, and FST-40 combined review/closeout remain downstream.
+**Notes**: Current branch `wf/syntax-fmt`; no Git state operation performed. Concurrent FST-10 changes were preserved.
 
 ## Related Plans
 

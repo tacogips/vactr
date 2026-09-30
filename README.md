@@ -13,7 +13,7 @@ The language front end, middle end, runtime back end, session layer and
 editor are implemented (`impl-plans/active/vactr-core.md` TASK-001..010).
 Every top-level form goes read -> expand -> check -> compile -> run, and
 bound patterns are scheduled into audio, MIDI and OSC sinks. The
-`vactr` binary provides `repl`, `run`, `serve`, `get` and `lsp`. The
+`vactr` binary provides `repl`, `run`, `serve`, `get`, `fmt` and `lsp`. The
 editor lives in `editor/` (see "Editor" below).
 
 Front end (TASK-001..003):
@@ -120,7 +120,10 @@ Session layer (TASK-009):
   (loopback only, token in the URL, HTTP 401 on a bad token or path, at
   most 8 connections, 1 MiB frames).
 - `src/lsp/`: `vactr lsp` over stdio (tower-lsp, `lsp` feature). It can
-  attach to a running `serve` socket with `--session`.
+  attach to a running `serve` socket with `--session`. Its
+  `textDocument/formatting` uses the formatter in `src/fmt/`.
+- `src/fmt/`: the `.vact` source formatter (layout whitespace only;
+  wasm32-clean), shared by `vactr fmt`, the LSP and the editor.
 
 The CLI and the session protocol are specified in
 `design-docs/specs/command.md`. The audible REPL check (a REPL-bound
@@ -155,7 +158,10 @@ It provides:
   hush and stop; every icon has a tooltip;
 - a side column that folds to a rail (button or `Mod-\\`) with sections
   that fold individually, remembered per browser;
-- the `.vact` mode, eval keybindings and flash, and inline diagnostics;
+- the `.vact` mode (tree-sitter highlighting once `tree-sitter-vact.wasm`
+  loads, the StreamLanguage mode otherwise), eval keybindings and flash,
+  a format command on `Shift-Alt-f` (the wasm formatter), and inline
+  diagnostics;
 - playing-step highlighting on the audio clock, and the transport bar;
 - the right-pane slider panel (source-edit and overlay modes), the
   `#@` directive control panel, drag on literals and WebMIDI learn;
@@ -176,6 +182,7 @@ cd editor
 npm ci
 npm run dev        # http://localhost:5173
 npm run check      # tsc
+mise run ts-build-wasm   # tree-sitter-vact.wasm for the syntax tests and dist
 npm run test       # vitest (real-wasm suites read $VACTR_WASM)
 VACTR_REQUIRE_SESSION_ABI=1 npm run build   # editor/dist
 ```
@@ -193,6 +200,30 @@ of verification. `cargo tauri build` and running the app are manual steps.
 
 Pending user confirmation: hearing worklet audio in a real browser, the
 real-browser visual pane, and the Tauri app run.
+
+## Formatting
+
+`vactr fmt [--check] <PATH>...` formats `.vact` files in place; use
+`vactr fmt [--check] -` to format standard input. Exit status 0 means
+success, 1 means an I/O error or a changed file under `--check`, 2 means
+a usage error, and 3 means at least one input had reader errors and was
+left unchanged. Run `mise run fmt-vact-check` to check all tracked `.vact`
+files.
+
+## Syntax (tree-sitter)
+
+The tree-sitter parser and external scanner are C and can be compiled to
+WASM for browser use; `web-tree-sitter` loads the grammar in the editor.
+See [design-formatter-and-syntax.md, section 2](design-docs/specs/design-formatter-and-syntax.md#2-answer-is-tree-sitter-c-and-does-it-run-as-wasm)
+for the toolchain details. Use `mise run ts-generate` to verify generated
+files, `mise run ts-test` to run the corpus and parse check, and
+`mise run ts-build-wasm` to build `tree-sitter-vact.wasm`. The editor
+uses tree-sitter highlighting when its WASM assets load and falls back
+to the existing StreamLanguage mode if they are unavailable. The code
+pane's `data-syntax` attribute shows which one is active (`tree-sitter`
+or `fallback`). `tree-sitter-vact.wasm` is git-ignored, so run
+`mise run ts-build-wasm` before `npm run test` or `npm run build` on a
+fresh checkout.
 
 ## Name
 
@@ -215,6 +246,7 @@ vactr repl [--host native|noop]
 vactr run <file.vact> [--host native|noop] [--cycles N]
 vactr serve [<file.vact>] [--host native|noop] [--port P] [--bind 127.0.0.1]
 vactr get [github.com/<owner>/<name>[@vX.Y.Z]] [--store dir:<root>]
+vactr fmt [--check] <PATH>... | -
 vactr lsp [--session <ws-url>]    # needs --features lsp
 ```
 

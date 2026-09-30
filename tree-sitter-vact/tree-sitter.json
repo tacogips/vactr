@@ -1,0 +1,20 @@
+{
+  "grammars": [
+    {
+      "name": "vact",
+      "camelcase": "Vact",
+      "scope": "source.vact",
+      "path": ".",
+      "file-types": ["vact"],
+      "highlights": "queries/highlights.scm",
+      "injection-regex": "^vact$"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for the Vact language",
+    "links": { "repository": "https://github.com/tacogips/vactr" }
+  },
+  "bindings": { "c": false, "go": false, "node": false, "python": false, "rust": false, "swift": false }
+}

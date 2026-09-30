@@ -512,53 +512,107 @@ pub fn spawn() -> std::io::Result<(mpsc::Sender<AnalysisReq>, thread::JoinHandle
     Ok((tx, handle))
 }
 
-fn is_blank(c: char) -> bool {
-    c == ' ' || c == '\t'
-}
-
-/// Whitespace-only formatting (14.5.11): strips trailing spaces and tabs
-/// and ends the text with exactly one newline. A line containing `#@`
-/// stays byte-identical, and nothing else changes.
+/// Whitespace-only edits that apply the formatter's output to the document.
 #[must_use]
 pub fn format_edits(text: &str) -> Vec<TextEdit> {
+    let formatted = crate::fmt::format(text);
+    if formatted.outcome != crate::fmt::Outcome::Changed {
+        return Vec::new();
+    }
+
+    fn line_ranges(source: &str) -> Vec<(usize, usize, usize)> {
+        let mut ranges = Vec::new();
+        let mut start = 0;
+        for line in source.split_inclusive('\n') {
+            let end = start + line.len();
+            let mut body_end = end;
+            if source.as_bytes().get(end.saturating_sub(1)) == Some(&b'\n') {
+                body_end -= 1;
+                if source.as_bytes().get(body_end.saturating_sub(1)) == Some(&b'\r') {
+                    body_end -= 1;
+                }
+            }
+            ranges.push((start, body_end, end));
+            start = end;
+        }
+        ranges
+    }
+
+    let source_lines = line_ranges(text);
+    let output_lines = line_ranges(&formatted.text);
     let mut edits = Vec::new();
-    let mut strips: Vec<(usize, usize)> = Vec::new();
-    // End of the last line with content, and that line's terminator.
-    let mut last: Option<(usize, &str)> = None;
-    let mut start = 0;
-    for line in text.split_inclusive('\n') {
-        let (body, term) = match line.strip_suffix("\r\n") {
-            Some(b) => (b, "\r\n"),
-            None => match line.strip_suffix('\n') {
-                Some(b) => (b, "\n"),
-                None => (line, ""),
-            },
+    let mut tail: Option<(usize, usize, usize)> = None;
+
+    for (index, &(out_start, out_body_end, out_end)) in output_lines.iter().enumerate() {
+        let Some(&(src_start, src_body_end, _)) = source_lines.get(index) else {
+            return Vec::new();
         };
-        let keep = if body.contains("#@") {
-            body.len()
-        } else {
-            body.trim_end_matches(is_blank).len()
-        };
-        if keep < body.len() {
-            strips.push((start + keep, start + body.len()));
+        let source_body = &text[src_start..src_body_end];
+        let output_body = &formatted.text[out_start..out_body_end];
+        let source_indent = source_body
+            .bytes()
+            .take_while(|byte| matches!(byte, b' ' | b'\t'))
+            .count();
+        let output_indent = output_body
+            .bytes()
+            .take_while(|byte| matches!(byte, b' ' | b'\t'))
+            .count();
+        let source_rest = &source_body[source_indent..];
+        let output_rest = &output_body[output_indent..];
+
+        if source_body[..source_indent] != output_body[..output_indent] {
+            edits.push(TextEdit::new(
+                range(text, src_start, src_start + source_indent),
+                output_body[..output_indent].to_string(),
+            ));
         }
-        if keep > 0 {
-            last = Some((start + keep, if term.is_empty() { "\n" } else { term }));
+        if source_rest != output_rest {
+            if !source_rest.starts_with(output_rest)
+                || !source_rest[output_rest.len()..]
+                    .bytes()
+                    .all(|byte| matches!(byte, b' ' | b'\t'))
+            {
+                return Vec::new();
+            }
+            let strip_start = src_start + source_indent + output_rest.len();
+            let strip_end = src_body_end;
+            // The post-loop tail replacement prunes any strip it overlaps.
+            edits.push(TextEdit::new(
+                range(text, strip_start, strip_end),
+                String::new(),
+            ));
         }
-        start += line.len();
-    }
-    let (tail_start, want) = last.unwrap_or((0, ""));
-    for (a, b) in strips {
-        // The tail edit below covers everything from `tail_start` on.
-        if b <= tail_start {
-            edits.push(TextEdit::new(range(text, a, b), String::new()));
+
+        if !output_body.trim_matches([' ', '\t']).is_empty() {
+            tail = Some((
+                src_start + source_indent + output_rest.len(),
+                out_body_end,
+                out_end,
+            ));
         }
     }
-    if text[tail_start..] != *want {
-        edits.push(TextEdit::new(
-            range(text, tail_start, text.len()),
-            want.to_string(),
-        ));
+
+    if let Some((tail_start, out_body_end, _)) = tail {
+        let output_tail = &formatted.text[out_body_end..];
+        if text[tail_start..] != *output_tail {
+            edits.retain(|edit| {
+                let edit_start = crate::lsp::convert::offset(text, edit.range.start);
+                let edit_end = crate::lsp::convert::offset(text, edit.range.end);
+                edit_end <= tail_start && edit_start <= tail_start
+            });
+            edits.push(TextEdit::new(
+                range(text, tail_start, text.len()),
+                output_tail.to_string(),
+            ));
+        }
+    } else if !text.is_empty() && text.chars().all(char::is_whitespace) {
+        edits.clear();
+        for &(start, _, end) in &source_lines {
+            if start < end {
+                edits.push(TextEdit::new(range(text, start, end), String::new()));
+            }
+        }
     }
+    edits.sort_by_key(|edit| crate::lsp::convert::offset(text, edit.range.start));
     edits
 }

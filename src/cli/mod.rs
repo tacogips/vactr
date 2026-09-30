@@ -11,6 +11,7 @@
 //! `--cycles` runs end deterministically with no sleeping (14.5.10, S6).
 
 pub mod args;
+mod fmt;
 mod get;
 mod repl;
 mod run;
@@ -111,6 +112,7 @@ pub fn main(args: Vec<OsString>) -> i32 {
         }) => serve_dispatch(file, host, port, bind, &cwd),
         Ok(Command::Get { target, store }) => get::main(target, store, &cwd),
         Ok(Command::Lsp { session }) => lsp_verb(session),
+        Ok(Command::Fmt { check, input }) => fmt::main(check, &input, &cwd),
         Err(UsageError(message)) => {
             eprintln!("vactr: {message}");
             eprintln!("{}", args::USAGE);

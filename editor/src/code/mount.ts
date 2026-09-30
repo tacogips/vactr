@@ -9,7 +9,7 @@
 
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { lintGutter } from '@codemirror/lint';
-import { EditorState, Text } from '@codemirror/state';
+import { Compartment, EditorState, Text } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { createComponent } from 'solid-js';
 import { render } from 'solid-js/web';
@@ -21,6 +21,8 @@ import { DiagnosticsController } from './diagnostics';
 import { EvalController } from './eval';
 import { HighlightScheduler, TimeAnchor, highlightExtension, setPlaying } from './highlight';
 import { vactLanguage } from './language';
+import { formatKeymap } from './format';
+import { treeSitterHighlighting } from './syntax';
 import { SampleBrowser, SampleLibrary, type DecodedAudio } from './samples';
 import { DocumentSync } from './sync';
 import { TransportBar } from './transport';
@@ -56,6 +58,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
   addStylesheet(doc);
   const codePane = pane(root, 'code');
   const transportPane = pane(root, 'transport');
+  codePane.dataset.syntax = 'fallback';
 
   const holder = doc.createElement('div');
   const disposeCodeView = render(() => createComponent(CodeSurface, {}), holder);
@@ -67,6 +70,8 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
   const anchor = new TimeAnchor(clock, tier === 'browser' ? 'audio' : 'receipt');
 
   let view: EditorView | null = null;
+  const language = new Compartment();
+  let disposed = false;
   const highlight = new HighlightScheduler({
     clock,
     file: DOC_FILE,
@@ -99,17 +104,28 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
       extensions: [
         // First: every later listener sees the edit already recorded.
         sync.extension(),
-        vactLanguage(),
+        language.of(vactLanguage()),
         lineNumbers(),
         history(),
         lintGutter(),
         highlightExtension(),
         evalCtl.extension(),
+        formatKeymap(() => deps.formatter),
         keymap.of([...defaultKeymap, ...historyKeymap]),
       ],
     }),
   });
   const editorView = view;
+  if (deps.syntax) {
+    void deps.syntax().then(
+      (syntax) => {
+        if (disposed) return;
+        editorView.dispatch({ effects: language.reconfigure(treeSitterHighlighting(syntax)) });
+        codePane.dataset.syntax = 'tree-sitter';
+      },
+      () => undefined,
+    );
+  }
   evalCtl.attach(editorView);
   diagnostics.attach(editorView);
 
@@ -206,6 +222,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
 
   return {
     dispose() {
+      disposed = true;
       if (frame !== null) win?.cancelAnimationFrame?.(frame);
       for (const off of offs) off();
       evalCtl.dispose();

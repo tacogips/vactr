@@ -1,6 +1,6 @@
 # FST-21: LSP `textDocument/formatting` on the Formatter
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-21 (wave 2; parallel with FST-20, FST-22, FST-23)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 3.7.2; `design-docs/specs/design-implementation.md` 14.5.11 "Formatting" (Revised 2026-09-30)
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -116,17 +116,28 @@ means `server.rs` does not change.
 
 ## Completion Criteria
 
-- [ ] `format_edits` delegates to `crate::fmt::format`, keeps its signature, and returns no edits when the outcome is `Refused`.
-- [ ] Applying the edits reproduces the formatter's output exactly, for every committed file and fixture.
-- [ ] The existing formatting test passes unchanged.
-- [ ] Verification steps 1-6 pass, each with a log.
-- [ ] The Progress Log is updated.
+- [x] `format_edits` delegates to `crate::fmt::format`, keeps its signature, and returns no edits when the outcome is `Refused`.
+- [x] Applying the edits reproduces the formatter's output exactly, for every committed file and fixture.
+- [x] The existing formatting test passes unchanged.
+- [x] Verification steps 1-6 pass, each with a log.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 222 step 4).
 **Blockers**: Waits for FST-10.
+
+### Session: 2026-09-30 (FST-21 implementation)
+**Tasks Completed**: Reimplemented `format_edits` on `crate::fmt::format`; `Refused` and `Unchanged` return no edits. Changed documents receive nonoverlapping UTF-16-ranged indentation, trailing-blank, and final-tail edits. Whitespace-only input formatted to empty text uses one whitespace-only deletion per physical line, preserving the line-aligned edit contract. Kept the existing formatting test unchanged and added exact-output coverage over tracked `.vact` files and formatter fixtures, continuation indentation, reader-error refusal, UTF-16 positions after a non-ASCII comment, and whitespace-only input. Both Rust files remain under 1000 lines.
+**Edit evidence**: Per-edit source hashes and intent are recorded in `tmp/fst/FST-21/01-analysis-intent.md`, `02-tests-intent.md`, `03-tests-edit-intent.md`, `13-utf16-test-fix-intent.md`, `17-utf16-test-fix2-intent.md`, `27-empty-output-intent.md`, and `37-line-aligned-fix-intent.md`; rustfmt records include `04-*`, `14-*`, `18-*`, `28-*`, and `38-*`. Final Rust source hashes are in `tmp/fst/FST-21/39-after-rustfmt.sha256` and the branch evidence snapshot.
+**Review repair**: Scoped FST-21 review found the empty-output case violated the no-full-document-edit constraint. Replaced it with line-aligned whitespace deletions and asserted one edit per physical line; no open findings remain in the assigned hunks.
+**Verification**: `tmp/fst/FST-21/41-build-final.log` (exit 0); `40-nextest-final.log` (14/14 passed, exit 0); `42-clippy-lsp-final.log` and `43-clippy-default-final.log` (exit 0); `44-fmt-check-final.log` (exit 0); `45-lines-final.log` (analysis.rs 626, tests/analysis.rs 533, exit 0).
+**Resolved attempts**: `12-nextest-lsp.log` and `16-nextest-lsp-rerun.log` identified the UTF-16 test's broad selector; `20-nextest-lsp-final.log` confirmed the corrected assertion. `lsp_review` identified the whole-document empty-output replacement; the line-aligned repair passed `40-nextest-final.log`. A concurrent FST-20 formatting diff observed by the check agent was absent in final `cargo fmt --check`.
+**Downstream**: FST-40 owns combined-tree integration review and workflow closeout; neither is claimed complete here.
+
+### Session: 2026-09-30 (test-integrity repair)
+**Tasks Completed**: Test-integrity repair (2026-09-30): trailing-blank strips on non-last lines were dropped by format_edits; strips are now emitted per line and the tail replacement prunes overlaps; added middle-line and trailing-blank-variant regression tests. Logs tmp/fst/FST-21/59-65.
 
 ## Related Plans
 

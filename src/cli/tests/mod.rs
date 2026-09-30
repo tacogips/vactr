@@ -3,5 +3,6 @@
 //! behavior (`repl`, `run`, `serve`, `get`) is `tests/cli.rs`.
 
 mod args;
+mod fmt;
 #[cfg(feature = "host-native")]
 mod ws;

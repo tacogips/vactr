@@ -1,6 +1,6 @@
 # FST-20: `vactr fmt` CLI Verb
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-20 (wave 2; parallel with FST-21, FST-22, FST-23)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 3.7.1; `design-docs/specs/command.md` (the `fmt` verb, `--check` flag, exit codes 1/2/3)
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -185,17 +185,23 @@ minimal one under `std::env::temp_dir()` with a unique name. Pass
 
 ## Completion Criteria
 
-- [ ] `Command::Fmt` and `FmtInput` match the contract, and `USAGE` lists `fmt`.
-- [ ] Every test above exists and passes.
-- [ ] The exit-code precedence matches `command.md`.
-- [ ] Verification 1-7 pass, each with a log.
-- [ ] The Progress Log is updated.
+- [x] `Command::Fmt` and `FmtInput` match the contract, and `USAGE` lists `fmt`.
+- [x] Every test above exists and passes.
+- [x] The exit-code precedence matches `command.md`.
+- [x] Verification 1-7 pass, each with a log.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 222 step 4).
 **Blockers**: Waits for FST-10.
+
+### Session: 2026-09-30 (FST-20 implementation)
+**Tasks Completed**: Added `FmtInput`, `Command::Fmt`, `parse_fmt`, usage synopsis and CLI dispatch; implemented file/stdin formatting, check mode, UTF-8 and I/O errors, reader-refusal diagnostics, process-all behavior and exit-code precedence; added parser and CLI behavioral tests. FST-10 dependency was accepted by the runtime fanout contract.
+**Verification**: All required gates passed. `CARGO_TERM_QUIET=true cargo build` (exit 0); `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run cli::` (30 passed, 0 failed); `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` (exit 0); `CARGO_TERM_QUIET=true cargo fmt --check` (exit 0); `mise run fmt-vact-check` (exit 0); stdin continuation example (exit 0); all four Rust files under 1000 lines. Logs: `tmp/fst/FST-20/90-check-after-modify.log`, `91-clippy.log`, `92-cargo-fmt.log`, `93-vact-check.log`, `94-stdin-example.log`, `95-line-count.log`, and `13-rustfmt-check-final.log`.
+**Codex-agent references**: `rust-coding` implemented the non-overlapping verb and behavioral test files; `check-and-test-after-modify` ran the build and CLI test suite.
+**Blockers**: None for FST-20 implementation. FST-40 owns formal review, combined-tree integration and workflow closeout.
 
 ## Related Plans
 

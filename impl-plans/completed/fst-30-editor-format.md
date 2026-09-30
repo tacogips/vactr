@@ -1,6 +1,6 @@
 # FST-30: Editor Format Command (wasm formatter, Shift-Alt-f)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-30 (wave 3)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 3.7.4, 5.4; `design-docs/user-qa/pending-formatter-syntax-questions.md` F3
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -169,16 +169,26 @@ real `vactr.wasm` via `loadVactrWasm()`):
 
 ## Completion Criteria
 
-- [ ] `Formatter`, `WasmFormatter`, `formatDocument` and `formatKeymap` match the contract.
-- [ ] `Shift-Alt-f` formats the document in both tiers, verified by tests with a fake formatter and with the real wasm.
-- [ ] Verification steps 1-6 pass, each with a log.
-- [ ] The Progress Log is updated.
+- [x] `Formatter`, `WasmFormatter`, `formatDocument` and `formatKeymap` match the contract.
+- [x] `Shift-Alt-f` formats the document in both tiers, verified by a mounted jsdom fake-formatter test and real wasm ABI/API tests.
+- [x] Verification steps 1-6 pass, each with a log.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 222 step 4).
 **Blockers**: Waits for FST-22 and FST-23.
+
+### Session: 2026-09-30 (Step 6 implementation)
+**Tasks Completed**: Added `editor/src/code/format.ts` with lazy dedicated wasm loading, memory-safe formatter ABI access, stale-result protection, minimal single-change dispatch and the `Shift-Alt-f` keymap. Added `EditorDeps.formatter`, configured the formatter URL in both tiers, and mounted the keymap before default/history bindings while preserving FST-23 syntax integration. Added jsdom fake-formatter tests and real-wasm tests, including ABI statuses, idempotence, outbox isolation and loader caching. Confirmed `defaultKeymap` and `historyKeymap` do not bind `Shift-Alt-f`.
+**Final-Source Verification**: `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` exit 0 (`tmp/fst/FST-30/25-wasm-build-final.log`); `mise run ts-build-wasm` exit 0 (`26-ts-build-wasm-final.log`); `cd editor && npm run check` exit 0 (`27-editor-check-final-source.log`); `cd editor && npm test` exit 0, 61 files / 374 tests passed (`28-editor-test-final-source.log`); `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` exit 0 (`29-editor-build-final-source.log`); `wc -l editor/src/code/format.ts editor/src/code/mount.ts` exit 0, 108 and 239 lines (`30-line-count-final-source.log`).
+**Prior Attempts**: Initial typecheck caught and resolved the `Extension` import location (`12-editor-check.log`, exit 1; final-source rerun passed). Initial full suite caught a missing `buildLayout` in the new mount test (`15-editor-test.log`, 373/374 passed; final-source rerun passed).
+**Blockers**: None for implementation. FST-40 combined-tree review and full project gate remain downstream.
+
+### Session: 2026-09-30 (FST-40 combined-tree closeout)
+**Tasks Completed**: The serial combined-tree gate passed after rebuilding the current formatter WASM. The full editor suite passed 374/374 tests, typecheck and production build passed, and `dist/` contained the formatter, grammar, query, and web-tree-sitter WASM assets. The FST-40 archive move remains orchestrator-owned.
+**Verification**: `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` plus export assertion (exit 0, `tmp/fst/FST-40/07-wasm-build-and-exports.log`); `cd editor && npm run check` (exit 0, `12-editor-check.log`); `cd editor && npm test` (61 files, 374/374 tests, exit 0, `13-editor-test.log`); `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` (exit 0, `14-editor-build.log`); dist asset listing (exit 0, `15-editor-dist-assets.log`).
 
 ## Related Plans
 

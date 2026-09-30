@@ -170,6 +170,213 @@ fn formatting_changes_only_whitespace_and_keeps_directive_lines() {
     );
 }
 
+fn vact_paths() -> Vec<PathBuf> {
+    fn walk(path: &Path, paths: &mut Vec<PathBuf>) {
+        let entries = std::fs::read_dir(path).expect("read source directory");
+        for entry in entries {
+            let path = entry.expect("source entry").path();
+            if path.is_dir() {
+                walk(&path, paths);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "vact")
+            {
+                paths.push(path);
+            }
+        }
+    }
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let listed = std::process::Command::new("git")
+        .args(["ls-files", "-z", "--", "*.vact"])
+        .current_dir(root)
+        .output();
+    let mut paths = match listed {
+        Ok(output) if output.status.success() => output
+            .stdout
+            .split(|byte| *byte == 0)
+            .filter(|path| !path.is_empty())
+            .map(|path| root.join(String::from_utf8_lossy(path).as_ref()))
+            .collect(),
+        _ => {
+            let mut paths = Vec::new();
+            for dir in [root.join("examples"), root.join("src/prelude")] {
+                walk(&dir, &mut paths);
+            }
+            paths
+        }
+    };
+    paths.sort();
+    paths
+}
+
+fn assert_whitespace_edits(text: &str, edits: &[TextEdit]) {
+    for edit in edits {
+        let start = offset(text, edit.range.start);
+        let end = offset(text, edit.range.end);
+        assert!(
+            text[start..end].chars().all(char::is_whitespace),
+            "{edit:?}"
+        );
+        assert!(edit.new_text.chars().all(char::is_whitespace), "{edit:?}");
+    }
+}
+
+#[test]
+fn formatting_edits_match_formatter_for_sources_and_fixtures() {
+    for path in vact_paths() {
+        let text = std::fs::read_to_string(&path).expect("read committed Vact source");
+        let formatted = crate::fmt::format(&text);
+        let edits = format_edits(&text);
+        assert_eq!(apply(&text, &edits), formatted.text, "{}", path.display());
+        assert_whitespace_edits(&text, &edits);
+        assert!(
+            edits.is_empty(),
+            "committed source changed: {}",
+            path.display()
+        );
+    }
+
+    let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/fmt/tests/fixtures");
+    let mut fixtures: Vec<_> = std::fs::read_dir(fixture_dir)
+        .expect("read formatter fixtures")
+        .map(|entry| entry.expect("fixture entry").path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "in"))
+        .collect();
+    fixtures.sort();
+    for path in fixtures {
+        let text = std::fs::read_to_string(&path).expect("read formatter fixture");
+        let formatted = crate::fmt::format(&text);
+        let edits = format_edits(&text);
+        assert_eq!(apply(&text, &edits), formatted.text, "{}", path.display());
+        assert_whitespace_edits(&text, &edits);
+    }
+}
+
+#[test]
+fn formatting_edits_normalize_continuation_indentation() {
+    let text = "s :bd\n\t\t\t> d1\n";
+    let edits = format_edits(text);
+    assert_eq!(edits.len(), 1);
+    assert_whitespace_edits(text, &edits);
+    assert_eq!(apply(text, &edits), "s :bd\n\t> d1\n");
+}
+
+#[test]
+fn formatting_refused_reader_errors_without_edits() {
+    assert!(format_edits("s \"abc\n  ").is_empty());
+}
+
+#[test]
+fn formatting_whitespace_only_source_matches_empty_output() {
+    let text = "   \n\t";
+    let edits = format_edits(text);
+    assert_eq!(edits.len(), 2, "one deletion per physical line");
+    assert_eq!(apply(text, &edits), crate::fmt::format(text).text);
+    assert_eq!(apply(text, &edits), "");
+    assert_whitespace_edits(text, &edits);
+}
+
+#[test]
+fn formatting_non_ascii_comment_ranges_use_utf16_columns() {
+    let text = "let a 1\n\t\t\t# é日本  \n";
+    let edits = format_edits(text);
+    assert_eq!(apply(text, &edits), "let a 1\n# é日本\n");
+    assert_whitespace_edits(text, &edits);
+    let trailing_delete = edits
+        .iter()
+        .find(|edit| edit.range.start.line == 1 && edit.range.start.character > 0)
+        .expect("trailing blanks are removed");
+    assert_eq!(trailing_delete.range.start.character, 8);
+}
+
+#[test]
+fn formatting_edits_strip_trailing_blanks_on_middle_lines() {
+    let cases = [
+        (
+            "let a 1\nlet b 2  \nlet c 3\n",
+            "let a 1\nlet b 2\nlet c 3\n",
+        ),
+        (
+            "let a 1  \nlet b 2  \nlet c 3  \n",
+            "let a 1\nlet b 2\nlet c 3\n",
+        ),
+        ("let a 1\n# c  \nlet c 3\n", "let a 1\n# c\nlet c 3\n"),
+        (
+            "inst a:\n\ts :bd  \n\ts :sn\n",
+            "inst a:\n\ts :bd\n\ts :sn\n",
+        ),
+        (
+            "let a 1\r\nlet b 2  \r\nlet c 3\r\n",
+            "let a 1\r\nlet b 2\r\nlet c 3\r\n",
+        ),
+    ];
+    for (text, want) in cases {
+        let edits = format_edits(text);
+        let out = apply(text, &edits);
+        assert_eq!(out, crate::fmt::format(text).text, "{text:?}");
+        assert_eq!(out, want, "{text:?}");
+        assert_whitespace_edits(text, &edits);
+    }
+}
+
+/// Inserts `" \t"` before every line terminator and at the end of a
+/// non-empty unterminated last line.
+fn with_trailing_blanks(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() * 2);
+    for line in text.split_inclusive('\n') {
+        let body = line.strip_suffix('\n');
+        let terminated = body.is_some();
+        let body = body.unwrap_or(line);
+        let (body, cr) = match body.strip_suffix('\r') {
+            Some(rest) if terminated => (rest, "\r"),
+            _ => (body, ""),
+        };
+        out.push_str(body);
+        out.push_str(" \t");
+        out.push_str(cr);
+        if terminated {
+            out.push('\n');
+        }
+    }
+    out
+}
+
+#[test]
+fn formatting_edits_match_formatter_for_trailing_blank_variants() {
+    let mut inputs: Vec<(PathBuf, bool)> = vact_paths().into_iter().map(|p| (p, true)).collect();
+    let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/fmt/tests/fixtures");
+    let mut fixtures: Vec<_> = std::fs::read_dir(fixture_dir)
+        .expect("read formatter fixtures")
+        .map(|entry| entry.expect("fixture entry").path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "in"))
+        .collect();
+    fixtures.sort();
+    inputs.extend(fixtures.into_iter().map(|p| (p, false)));
+
+    let mut committed_changed = 0;
+    for (path, committed) in inputs {
+        let original = std::fs::read_to_string(&path).expect("read Vact input");
+        let variant = with_trailing_blanks(&original);
+        let formatted = crate::fmt::format(&variant);
+        let edits = format_edits(&variant);
+        assert_eq!(
+            apply(&variant, &edits),
+            formatted.text,
+            "{}",
+            path.display()
+        );
+        assert_whitespace_edits(&variant, &edits);
+        if committed && formatted.outcome == crate::fmt::Outcome::Changed {
+            committed_changed += 1;
+        }
+    }
+    assert!(
+        committed_changed > 0,
+        "no committed variant was reformatted"
+    );
+}
+
 #[test]
 fn an_unfetched_import_is_a_warning_and_nothing_is_fetched_or_written() {
     let tmp = TempDir::new("pkg");

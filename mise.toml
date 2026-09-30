@@ -26,6 +26,7 @@ taplo = "latest"
 "cargo:cargo-audit" = "latest"
 gitleaks = "latest"
 pre-commit = "latest"
+"aqua:tree-sitter/tree-sitter" = "0.27.0"
 
 [tasks.default]
 description = "Show available tasks"
@@ -182,3 +183,49 @@ else
   echo "Using existing custom Git hooks path: $hooks_path"
 fi
 '''
+
+[tasks.ts-generate]
+description = "Verify tree-sitter grammar generation is reproducible"
+dir = "{{config_root}}/tree-sitter-vact"
+run = '''
+set -eu
+before=$(shasum -a 256 src/parser.c src/grammar.json src/node-types.json src/tree_sitter/*.h)
+tree-sitter generate
+after=$(shasum -a 256 src/parser.c src/grammar.json src/node-types.json src/tree_sitter/*.h)
+if [ "$before" != "$after" ]; then
+  echo "tree-sitter generate changed committed generated files" >&2
+  exit 1
+fi
+echo "tree-sitter generation is reproducible"
+'''
+
+[tasks.ts-test]
+description = "Test tree-sitter corpus, query and committed Vact files"
+dir = "{{config_root}}/tree-sitter-vact"
+run = '''
+set -eu
+tree-sitter test
+query_output=$(tree-sitter query queries/highlights.scm test/highlight-sample.txt 2>&1) || { printf '%s\n' "$query_output"; exit 1; }
+printf '%s\n' "$query_output"
+if printf '%s\n' "$query_output" | grep -qi error; then
+  echo "highlight query reported an error" >&2
+  exit 1
+fi
+scripts/parse-all.sh
+'''
+
+[tasks.ts-build-wasm]
+description = "Build tree-sitter-vact for the web"
+dir = "{{config_root}}/tree-sitter-vact"
+run = '''
+set -eu
+tree-sitter build --wasm -o tree-sitter-vact.wasm
+magic=$(od -An -tx1 -N4 tree-sitter-vact.wasm | tr -d ' \n')
+test "$magic" = "0061736d"
+echo "WASM magic bytes verified: $magic"
+'''
+
+[tasks.fmt-vact-check]
+description = "Check all tracked Vact sources are formatted"
+run = "git ls-files -z '*.vact' | xargs -0 cargo run --quiet -- fmt --check"
+env = { CARGO_TERM_QUIET = "true" }

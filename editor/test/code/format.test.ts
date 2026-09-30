@@ -1,0 +1,117 @@
+import { defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { Transaction } from '@codemirror/state';
+import { EditorView, runScopeHandlers } from '@codemirror/view';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { EditorDeps } from '../../src/app/deps';
+import { buildLayout } from '../../src/app/layout';
+import { mount } from '../../src/code/mount';
+import { formatDocument, formatKeymap, FORMAT_KEY, type Formatter } from '../../src/code/format';
+import { MemoryFiles } from '../../src/platform/files';
+import { Client } from '../../src/protocol/client';
+import { Store } from '../../src/protocol/store';
+import { MockClock } from '../support/clock';
+import { RecordingTransport } from '../support/recording';
+
+const views: EditorView[] = [];
+
+afterEach(() => {
+  for (const view of views.splice(0)) view.destroy();
+  document.body.replaceChildren();
+});
+
+function viewWith(text: string): EditorView {
+  const transactions: Transaction[] = [];
+  const view = new EditorView({
+    parent: document.body,
+    doc: text,
+    extensions: [EditorView.updateListener.of((update) => transactions.push(...update.transactions))],
+  });
+  (view as EditorView & { seenTransactions: Transaction[] }).seenTransactions = transactions;
+  views.push(view);
+  return view;
+}
+
+function seen(view: EditorView): Transaction[] {
+  return (view as EditorView & { seenTransactions: Transaction[] }).seenTransactions;
+}
+
+function deps(): EditorDeps {
+  const store = new Store();
+  return {
+    client: new Client(new RecordingTransport(), { store }),
+    store,
+    clock: new MockClock(),
+    tier: 'native',
+    files: new MemoryFiles(),
+  };
+}
+
+describe('formatDocument', () => {
+  it('dispatches one minimal format transaction with the format user event', async () => {
+    const view = viewWith('a\n\t\t\tb\n');
+    const formatter: Formatter = { format: async () => ({ status: 0, text: 'a\n\tb\n' }) };
+    await expect(formatDocument(view, formatter)).resolves.toBe(true);
+    expect(view.state.doc.toString()).toBe('a\n\tb\n');
+    expect(seen(view)).toHaveLength(1);
+    expect(seen(view)[0]?.annotation(Transaction.userEvent)).toBe('format');
+    const changes: { from: number; to: number; insert: string }[] = [];
+    seen(view)[0]?.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      changes.push({ from: fromA, to: toA, insert: inserted.toString() });
+    });
+    expect(changes).toEqual([{ from: 3, to: 5, insert: '' }]);
+  });
+
+  it('does not dispatch a refused or unchanged result', async () => {
+    const view = viewWith('let x 1');
+    await expect(formatDocument(view, { format: async (text) => ({ status: 1, text }) })).resolves.toBe(false);
+    await expect(formatDocument(view, { format: async (text) => ({ status: 0, text }) })).resolves.toBe(false);
+    expect(seen(view)).toHaveLength(0);
+  });
+
+  it('does not apply a result after the document changes while formatting', async () => {
+    const view = viewWith('let x 1');
+    let finish!: (value: { status: number; text: string }) => void;
+    const pending = formatDocument(view, { format: () => new Promise((resolve) => (finish = resolve)) });
+    view.dispatch({ changes: { from: 0, insert: '# changed\n' } });
+    finish({ status: 0, text: 'let x 1\n' });
+    await expect(pending).resolves.toBe(false);
+    expect(view.state.doc.toString()).toBe('# changed\nlet x 1');
+    expect(seen(view)).toHaveLength(1);
+  });
+
+  it('catches formatter rejection', async () => {
+    const view = viewWith('let x 1');
+    await expect(formatDocument(view, { format: async () => Promise.reject(new Error('offline')) })).resolves.toBe(false);
+    expect(seen(view)).toHaveLength(0);
+  });
+});
+
+describe('formatKeymap', () => {
+  it('does not conflict with the default or history keymaps and reports unavailable without a formatter', () => {
+    expect(FORMAT_KEY).toBe('Shift-Alt-f');
+    expect([...defaultKeymap, ...historyKeymap].some((binding) => binding.key === FORMAT_KEY)).toBe(false);
+    const view = new EditorView({ parent: document.body, extensions: [formatKeymap(() => undefined)] });
+    views.push(view);
+    const event = new KeyboardEvent('keydown', { key: 'f', altKey: true, shiftKey: true, bubbles: true });
+    expect(runScopeHandlers(view, event, 'editor')).toBe(false);
+  });
+
+  it('formats through the mounted code pane keymap', async () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    buildLayout(root);
+    const editorDeps = deps();
+    const format = vi.fn(async (text: string) => ({ status: 0, text: 'let x 1\n' }));
+    editorDeps.formatter = { format };
+    const mounted = mount(root, editorDeps);
+    const view = editorDeps.code?.view;
+    expect(view).toBeDefined();
+    view?.dispatch({ changes: { from: 0, insert: 'let x 1' } });
+    const event = new KeyboardEvent('keydown', { key: 'f', altKey: true, shiftKey: true, bubbles: true });
+    expect(runScopeHandlers(view as EditorView, event, 'editor')).toBe(true);
+    await vi.waitFor(() => expect(view?.state.doc.toString()).toBe('let x 1\n'));
+    expect(format).toHaveBeenCalledWith('let x 1');
+    mounted.dispose();
+    if (view) views.splice(views.indexOf(view), 1);
+  });
+});

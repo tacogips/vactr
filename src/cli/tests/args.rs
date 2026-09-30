@@ -4,7 +4,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
-use crate::cli::args::{parse, Command, HostChoice, StoreSpec};
+use crate::cli::args::{parse, Command, FmtInput, HostChoice, StoreSpec};
 use crate::ns::pkg::PackageId;
 use crate::pkg::semver::Version;
 
@@ -237,4 +237,54 @@ fn lsp_parses_with_and_without_session() {
             session: Some("ws://127.0.0.1:1/session?token=x".to_string())
         })
     );
+}
+
+#[test]
+fn fmt_parses_paths_and_check_in_any_position() {
+    assert_eq!(
+        parse(&args(&["fmt", "a.vact"])),
+        Ok(Command::Fmt {
+            check: false,
+            input: FmtInput::Paths(vec![PathBuf::from("a.vact")]),
+        })
+    );
+    for invocation in [
+        args(&["fmt", "--check", "a", "b"]),
+        args(&["fmt", "a", "--check", "b"]),
+    ] {
+        assert_eq!(
+            parse(&invocation),
+            Ok(Command::Fmt {
+                check: true,
+                input: FmtInput::Paths(vec![PathBuf::from("a"), PathBuf::from("b")]),
+            })
+        );
+    }
+}
+
+#[test]
+fn fmt_parses_stdin_and_rejects_invalid_inputs() {
+    assert_eq!(
+        parse(&args(&["fmt", "-"])),
+        Ok(Command::Fmt {
+            check: false,
+            input: FmtInput::Stdin,
+        })
+    );
+    assert_eq!(
+        parse(&args(&["fmt", "--check", "-"])),
+        Ok(Command::Fmt {
+            check: true,
+            input: FmtInput::Stdin,
+        })
+    );
+    for invocation in [
+        args(&["fmt"]),
+        args(&["fmt", "-", "a"]),
+        args(&["fmt", "-", "-"]),
+        args(&["fmt", "--bogus", "a"]),
+        args(&["fmt", "--check", "--check", "a"]),
+    ] {
+        assert!(parse(&invocation).is_err(), "{invocation:?}");
+    }
 }

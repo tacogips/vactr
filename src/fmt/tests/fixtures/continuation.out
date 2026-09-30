@@ -1,0 +1,8 @@
+let x foo
+	> bar
+let y foo
+	> f:
+		s
+inst x:
+	foo
+		> bar

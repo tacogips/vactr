@@ -1,6 +1,6 @@
 # FST-10: Formatter Core (`src/fmt/`)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-10 (wave 1; parallel with FST-11)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` sections 3.1-3.6 and 3.8
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -240,12 +240,12 @@ ending each with an `exit=<status>` line.
 
 ## Completion Criteria
 
-- [ ] The `src/fmt` contract matches the pinned signatures exactly.
-- [ ] All the fixtures listed above exist with hand-written `.out` files.
-- [ ] G1-G7 are asserted over every committed `.vact` file and every clean fixture. The fixed-point check passes, or a finding is recorded.
-- [ ] The mutation test (2000 mutants) passes.
-- [ ] Verification commands 1-6 pass with their logs.
-- [ ] The Progress Log is updated.
+- [x] The `src/fmt` contract matches the pinned signatures exactly.
+- [x] All the fixtures listed above exist with hand-written `.out` files.
+- [x] G1-G7 are asserted over every committed `.vact` file and every clean fixture. The fixed-point check passes, or a finding is recorded.
+- [x] The mutation test (2000 mutants) passes.
+- [x] Verification commands 1-6 pass with their logs.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
@@ -254,6 +254,23 @@ ending each with an `exit=<status>` line.
 **Tasks In Progress**: None.
 **Blockers**: None.
 **Notes**: The contract is pinned for FST-20/21/22.
+
+### Session: 2026-09-30 (FST-10 implementation)
+**Tasks Completed**: Implemented the pinned formatter API, reader gate, byte API, line model, code/comment indentation, output assembly, required hand-written fixtures, G1-G7 checks, committed `.vact` corpus fixed-point checks, and 2,000 deterministic mutation cases. Added `pub mod fmt;` in `src/lib.rs`.
+**Verification**: `CARGO_TERM_QUIET=true cargo build` (exit 0, `tmp/fst/FST-10/45-final-build.log`); formatter nextest suite (15 passed, exit 0, `tmp/fst/FST-10/44-final-nextest.log`, independently rerun by check-and-test verifier); strict Clippy (exit 0, `tmp/fst/FST-10/46-final-clippy.log`); wasm32 host-wasm build (exit 0, `tmp/fst/FST-10/47-final-wasm.log`); `cargo fmt --check` (exit 0, `tmp/fst/FST-10/48-final-fmt.log`); line counts all below 1000 (exit 0, `tmp/fst/FST-10/49-final-lines.log`).
+**Resolved Attempts**: Intermediate source/test/clippy failures were corrected and retained in logs 10, 23, and 30; the complete final-source suite and gates pass.
+**Deferred**: Full `cargo nextest run` is owned by orchestrator reconciliation outside the Codex sandbox. CLI, LSP, wasm ABI, tree-sitter and editor work belong to downstream plans.
+**Blockers**: None for FST-10.
+
+### Session: 2026-09-30 (FST-10 test-integrity repair)
+**Tasks Completed**: Rewrote `crlf.in` with real CRLF bytes (two CRLF code lines, a deep `>` continuation, a blank CRLF line, unterminated final line) and hand-wrote `crlf.out` with printf (CRLF kept, continuation at one tab, final `\n` added). `fixture_test!` now asserts the outcome is not `Refused` so fixed-point fixtures cannot pass vacuously. Added `all_blank_input_formats_to_empty` (`"\n\n\t\n"` -> `""` Changed, `""` -> `""` Unchanged).
+**Verification**: `cargo nextest run fmt::` (16 passed, exit 0, `tmp/fst/FST-10/61-repair-nextest.log`); strict Clippy (exit 0, `tmp/fst/FST-10/62-repair-clippy.log`); `rustfmt --edition 2021 --check src/fmt/tests/rules.rs` (exit 0, `tmp/fst/FST-10/63-repair-fmt.log`). Edit intent and sha256 record: `tmp/fst/FST-10/60-repair-intent.log`. No fixture was reader-refused.
+**Blockers**: None.
+
+### Session: 2026-09-30 (FST-10 adversarial-review repair)
+**Tasks Completed**: Fixed a G6 violation where an `elif`/`else` line popped deeper frames and dropped still-nearest attach targets from the comment chain (repro `"if true:\n\tinst a:\n\t\ts :bd\nelse:\n\t\t#@ label: x\n\tlet b 2\n"` rebound the directive from `s :bd` to `inst a:`). `format()` now computes the sorted attach-target start offsets from `read.nodes` (mirroring `directives::attach::Doc::new`/`body_targets`) and `levels::assign_code_levels` builds the comment chain from a monotonic target stack (pop `original >= o`, push on target lines only); the code-level frame pass is unchanged and the unused frame `current` was removed. Added two regression cases (`else` after a deeper branch, `elif`) to `design_comment_level_examples_match_the_spec`; the first failed before the change (`tmp/fst/FST-10/90-adv-repair-before.log`).
+**Verification**: `cargo nextest run fmt::` (16 passed, exit 0, `tmp/fst/FST-10/91-adv-repair-nextest.log`); strict Clippy (exit 0, `92-adv-repair-clippy.log`); wasm32 host-wasm lib build (exit 0, `93-adv-repair-wasm.log`); rustfmt check (exit 0, `94-adv-repair-fmt.log`); line counts under 1000 (`95-adv-repair-lines.log`). Edit intent: `90-adv-repair-intent.log`.
+**Blockers**: None.
 
 ## Related Plans
 

@@ -8,11 +8,10 @@ level ... the formatter normalizes"). The second is a tree-sitter
 grammar for `.vact` that runs as WASM in the web editor. It also records
 the answer to the user's question of 2026-09-30 (section 2).
 
-Status: Decided 2026-09-30 (issue-resolution run
-`opus-luna-design-and-implement-review-loop-session-221`, checked against
-the repository and revised in session 222). The questions
-that stay open are in `design-docs/user-qa/pending-formatter-syntax-questions.md`.
-Their recommendations are followed by default.
+Status: Implemented and verified 2026-09-30 on `wf/syntax-fmt`; plans
+FST-10..40 are in `impl-plans/completed/`. The questions that stay open are in
+`design-docs/user-qa/pending-formatter-syntax-questions.md`. Their
+recommendations are followed by default.
 
 ## Overview
 

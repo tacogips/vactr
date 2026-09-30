@@ -1,6 +1,6 @@
 # FST-40: Serial Reconciliation, Full Gate and Closeout
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-40 (wave 4, serial, last)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` sections 7-8
 **Dispatch**: `impl-plans/active/fst-dispatch.json`
@@ -116,17 +116,28 @@ Every FST plan file and every file written by FST-10..30.
 
 ## Completion Criteria
 
-- [ ] Every BLOCKED step from FST-10..30 has been rerun, with its exit status and log.
-- [ ] Gate commands 1-13 pass, each with a complete log.
-- [ ] The README documents `vactr fmt` and the grammar tasks, and the design doc Status line is updated.
-- [ ] Every FST plan is marked Completed, the `impl-plans/README.md` rows are updated, and the plans are archived by the orchestrator.
-- [ ] Every serial repair and every finding is listed in the Progress Log.
+- [x] The FST-10..30 progress logs contain no unresolved BLOCKED entries; the scan is recorded and every prescribed combined gate is rerun with exit status and log.
+- [x] Gate commands 1-13 pass on the combined tree, each with a complete final log.
+- [x] The README documents `vactr fmt` and the grammar tasks, and the design doc Status line is updated.
+- [x] Every FST plan is marked Completed and the `impl-plans/README.md` rows are updated.
+- [x] The orchestrator moves the plan files to `impl-plans/completed/` after this implementation node.
+- [x] Every serial repair and every finding is listed in the Progress Log; no serial code repair or product finding was needed.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 222 step 4).
 **Blockers**: Waits for all FST plans.
+
+### Session: 2026-09-30 (FST-40 implementation closeout)
+**Dependency readiness**: All required predecessors FST-10, FST-11, FST-20, FST-21, FST-22, FST-23 and FST-30 are present in `fanoutItem.acceptedPlanIds`. Scanned the seven active predecessor progress logs; no unresolved `BLOCKED` entries were recorded, so there were no earlier blocked commands to rerun.
+**Tasks Completed**: Ran the full combined-tree gate and rebuilt both WASM artifacts; verified formatter exports and browser dist assets; confirmed every changed Rust source file is under 1000 lines. Updated README usage and editor build instructions, marked all FST plans Completed, updated the plan index, and updated the design status. No source repairs or new findings were required.
+**Verification**: Logs `tmp/fst/FST-40/01-cargo-build.log` through `21-git-status-scope.log`; canonical quiet Cargo formatting and full nextest reruns are `22-cargo-fmt-quiet.log`, `23-nextest-quiet.log` (1,647/1,647), and `24-nextest-lsp-quiet.log` (1,663/1,663). Final post-plan-edit diff and scope checks are recorded as `25-git-diff-check-final.log` and `26-git-status-scope-final.log`. The line-count gate is `17-rust-line-counts-final.log`. Cargo build, Clippy with and without LSP, cargo fmt, both full nextest suites, WASM build and export check, tree-sitter reproducibility/corpus/parse-all/WASM, committed-file format check, editor typecheck/test/build/dist assets, `mise run lint`, Rust line counts and diff check all exited 0.
+**Orchestrator handoff**: Do not move plans or change Git state in this node. The orchestrator owns `git mv` into `impl-plans/completed/`, then final review and commit/push.
+
+### Session: 2026-09-30 (step 8 docs refresh and archive)
+**Tasks Completed**: Step 7 accepted FST-40 after one README self-repair (ts-build-wasm before npm run test; Formatting and Syntax sections after Editor). Step 8 added `fmt` to the README verb list and usage block, LSP formatting and `src/fmt/` to the module list, the tree-sitter/fallback highlighting and Shift-Alt-f format command to the editor feature list, and the `data-syntax` check plus fresh-checkout ts-build-wasm note to the Syntax section. Moved the eight FST plans to `impl-plans/completed/` and removed the "archive move pending orchestrator" notes from `impl-plans/README.md`.
+**Remaining**: Commit and push of `wf/syntax-fmt` belong to step 9. The dispatch manifest `fst-dispatch.json` stays in `impl-plans/active/` until the workflow run ends.
 
 ## Related Plans
 

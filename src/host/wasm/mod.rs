@@ -12,9 +12,12 @@
 //! or `dsp::ring` byte record that JS moves as an `ArrayBuffer`. `session_half`
 //! and `session_hosts` are the editor's session half: a page calls
 //! `session_init` instead of `main_init` (design 15.1.2 G1).
+//! The formatter's independent raw exports are `fmt_source`, `fmt_out_ptr`,
+//! and `fmt_out_len` (`fmt_abi`).
 
 pub mod abi;
 pub mod cells;
+pub mod fmt_abi;
 pub mod main_half;
 pub mod messages;
 pub mod session_half;

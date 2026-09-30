@@ -1,0 +1,37 @@
+==================
+nested interpolation
+==================
+let text "hello {name} and {f {g x}} # }"
+let escapes "quote \" slash \\ newline \n tab \t braces \{\}"
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (string
+      (string_content)
+      (interpolation
+        (identifier))
+      (string_content)
+      (interpolation
+        (identifier)
+        (group
+          (identifier)
+          (identifier)))
+      (string_content)))
+  (statement
+    (identifier)
+    (identifier)
+    (string
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (escape_sequence)
+      (escape_sequence))))

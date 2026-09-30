@@ -59,6 +59,7 @@ pub mod compile;
 pub mod directives;
 pub mod dsp;
 pub mod expand;
+pub mod fmt;
 pub mod host;
 #[cfg(all(feature = "lsp", not(target_arch = "wasm32")))]
 pub mod lsp;

@@ -1,0 +1,69 @@
+==================
+comment indentation and blanks
+==================
+root:
+	# odd comment indentation
+	#@ odd directive
+
+	child
+next
+---
+
+(source_file
+  (statement
+    (identifier)
+    (block_colon)
+    (block
+      (comment)
+      (directive)
+      (statement
+        (identifier))))
+  (statement
+    (identifier)))
+
+==================
+CRLF lines
+==================
+root:
+	child
+next
+---
+
+(source_file
+  (statement
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier))))
+  (statement
+    (identifier)))
+
+==================
+EOF without final newline
+==================
+root:
+	child
+---
+
+(source_file
+  (statement
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)))))
+
+==================
+continuation greater equal
+==================
+root
+	>= x
+---
+
+(source_file
+  (statement
+    (identifier))
+  (statement
+    (operator)
+    (identifier)))

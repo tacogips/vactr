@@ -2,7 +2,7 @@
 
 **planId**: CE-TELEMETRY
 **planPath**: impl-plans/active/canvas-editor-224-telemetry.md
-**Status**: In Progress — restart seam allocated; implementation retry and formal reviews pending
+**Status**: In Progress — restart implemented; required Clippy gate blocked by unapproved paths
 **Created / Last Updated**: 2026-09-30
 **Design Reference**: design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30
 **Issue**: codex-design-and-implement-review-loop-session-224
@@ -40,9 +40,9 @@ None.
 | Task | Deliverables | Status |
 |---|---|---|
 | T1 | session/protocol.rs and codec.rs | Implemented; behavioral verification pending |
-| T2 | session/publish.rs and session.rs | Partial; restart-generation seam blocked |
+| T2 | session/publish.rs and session.rs | Implemented; final behavioral verification blocked |
 | T3 | wasm/session_half.rs and tests | Implemented; behavioral verification blocked |
-| T4 | midi_clock.rs generation, publisher consumption and restart regressions | Not started |
+| T4 | midi_clock.rs generation, publisher consumption and restart regressions | Implemented; final behavioral verification blocked |
 
 ### T1: session/protocol.rs and codec.rs
 **Status**: Implemented; verification pending
@@ -54,7 +54,7 @@ Mirror CE-CONTRACT optional fields with defaults and old-client compatibility. T
 - [ ] Targeted tests prove behavior and complete logs show final exits.
 
 ### T2: session/publish.rs and session.rs
-**Status**: Partial; restart seam allocated by session 227; retry pending
+**Status**: Implemented; final behavioral verification blocked by aggregate Clippy ownership
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 playing_wire end_time = scheduled event time plus original e.dur seconds (not recomputed from later BPM). Snapshot uses runtime cycle position and matching host_now; add publisher cadence and epoch state, pause/lost-clock handling and discontinuity invalidation. Avoid allocations/serialization in audio callback; publication on session control side. Maintain subscription routing and existing tempo behavior for old clients.
 
@@ -126,7 +126,7 @@ This amendment allocates `src/sched/midi_clock.rs` exclusively to CE-TELEMETRY.
 edit is necessary or authorized. No scheduler redesign or DSP timing change is intended.
 
 ### T4: Observe every successful MIDI restart, then consume its generation
-**Status**: Not started
+**Status**: Implemented; final behavioral verification blocked by aggregate Clippy ownership
 **Parallelizable**: No; implement before retrying T2/T3 verification.
 - `src/sched/midi_clock.rs`: add a runtime-owned restart-generation counter and
   read-only `MidiClockState::restart_generation` accessor. Advance exactly once after
@@ -154,8 +154,8 @@ edit is necessary or authorized. No scheduler redesign or DSP timing change is i
   loading a mock artifact or skipping tests cannot pass this gate.
 
 **Acceptance and evidence**:
-- [ ] Generation changes on every successful restart, independent of sampled position.
-- [ ] Publisher consumes generation before any post-restart playing publication.
+- [x] Generation changes on every successful restart, independent of sampled position (source inspection; behavioral gate pending).
+- [x] Publisher consumes generation before any post-restart playing publication (source inspection; behavioral gate pending).
 - [ ] Rust and real Wasm restart regressions fail against the former heuristic and pass
       against the generation implementation; record actual counts and complete exits.
 - [ ] Required Rust agents run; native progress gate and formal workflow reviews accept.
@@ -184,3 +184,58 @@ Generation seam now allocated in manifest and plan, within accepted design 15.3.
 No Rust modified here. Native implementation result remains blocked pending T4, renewed
 Rust/Wasm/type/format checks, progress admission and formal workflow reviews. Historical
 attempt-1 exit 101 and incomplete format intention history retained without reclassification.
+
+### Session: 2026-09-30 18:19 JST — CE-TELEMETRY Step6 attempt-2
+Admission: runtime acceptedPlanIds contains CE-CONTRACT. Allocated midi_clock.rs seam
+matches accepted design15.3.4; runtime.rs and shared manifest were not edited.
+Required agents: /root/rust_coding and /root/check_and_test_after_modify.
+Read-only independent inspection: /root/telemetry_review; improve author self-check applied.
+
+Implemented runtime restart generation and initial session observation. Successful Start
+increments once; rejected Start, pulses/ticks, Stop/Continue and slave transitions preserve
+the counter. Publisher observes it before assigning playing/snapshot epochs, preserving
+the existing discontinuity checks and 20Hz cadence. Added two Rust and two real-Wasm
+restart regressions plus one Rust counter-neutrality test. Source revisions and original
+scheduled end times remain asserted. Two owned Clippy cadence predicates were changed
+to equivalent is_none_or calls. No unrelated source or Git mutations.
+
+Fail-before evidence (old production heuristic, complete foreground commands):
+- Rust restart filter: exit100, testsRun2/testsPassed0/failureCount2.
+- Real host-Wasm build: exit0.
+- Real-Wasm canvas-clock suite: exit1, testsRun7/testsPassed5/failureCount2.
+Both suites failed only the expected unchanged-epoch assertions. Exact commands, full
+logs, terminal metadata and source hashes: attempt-2/fail-before/{rust-restarts,
+wasm-build,wasm-restarts}.{log,json} under tmp/canvas-editor-224/CE-TELEMETRY/.
+These prove regression sensitivity, not final-source passes.
+
+Final-source required gates: attempt-2/final-retry/summary.json records exact commands.
+- cargo check --locked with RUSTUP_TOOLCHAIN=1.98.1, isolated attempt-2/target and
+  CARGO_TERM_QUIET=true: exit0; final-retry/check.log and check.json.
+- cargo clippy --locked --all-targets -- -D warnings with the same environment:
+  exit101; final-retry/clippy.log and clippy.json. Two publish.rs warnings resolved;
+  remaining 16 library / 27 library-test diagnostics are outside approved writePaths.
+- Required session nextest, scheduler nextest, final Wasm build, final real-Wasm
+  test, editor type check and exact-file format check: blocked-not-run at the safe
+  ownership boundary. No post-fix behavioral pass is claimed.
+Earlier check0/clippy101 logs remain in attempt-2/final/. Attempt-1 nextest exit101,
+missing fixture repair and format-intention limitations are retained without erasure.
+
+Blocker: canonical Clippy requires changes outside this plan's ownership. Exact diagnostic
+locations and resume criterion: attempt-2/clippy-ownership-blocker.json. Examples include
+src/cli/ws.rs, src/directives/writeback.rs, src/dsp/graph/shape.rs, src/dsp/release.rs,
+src/host/native/audio.rs, src/reader/line.rs and src/sched/commit/timestamps.rs.
+No source-matched baseline disposition was proven or claimed. Resume when the serial
+coordinator allocates exact repair paths or authorized owners resolve the diagnostics,
+then rerun all eight required gates on the preserved final source.
+
+Immutable intentions: attempt-2/edit-rust-001..010, edit-ts-001 and edit-plan-001..002;
+mirrors /private/tmp/vactr-224-implementation/CE-TELEMETRY/attempt-2/.
+pre-node-comparison.json confirms prior protocol/codec/Wasm-host changes remain intact;
+source changes add the intended restart seam/tests. independent-inspection.json records
+no additional material code finding before the equivalent Clippy predicate fix.
+Author self-check retains the unresolved mid verification/ownership blocker and six
+blocked gates. All foreground sessions exited. Implementation remains incomplete/blocked.
+Native progress admission, formal integrity/adversarial/integration reviews, accepted
+completion record, shared indexes/archive and Git finalization remain downstream; their
+pending status is separate from this implementation blocker. CE-STATE and CE-PACKAGE
+findings belong to their owners. No physical iPad or hardware evidence is claimed.

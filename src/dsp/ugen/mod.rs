@@ -54,6 +54,7 @@ pub mod grain_pair;
 pub mod hat_pair;
 pub mod mixer;
 pub mod modal_pair;
+pub mod musicdsp_synth;
 pub mod number_station;
 pub mod osc;
 pub mod particle_pair;
@@ -219,6 +220,12 @@ pub enum Node {
     FeedbackDrum,
     NoiseDrum,
     SineDrum,
+    DsfOsc,
+    ChebyshevOsc,
+    GaussianNoise,
+    LorenzOsc,
+    RosslerOsc,
+    AmFormantOsc,
     PhaseDistortion,
     Additive {
         partials_max: u8,

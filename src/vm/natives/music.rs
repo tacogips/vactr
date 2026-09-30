@@ -23,7 +23,7 @@ type R = Result<Value, Failure>;
 
 /// Every control native except `shape` (in the overload group), with the
 /// structure-giving `n` and `note`.
-const CONTROLS: [&str; 24] = [
+const CONTROLS: [&str; 26] = [
     "n",
     "note",
     "gain",
@@ -48,6 +48,8 @@ const CONTROLS: [&str; 24] = [
     "cut",
     "orbit",
     "velocity",
+    "start-ms",
+    "stop-ms",
 ];
 
 pub(super) fn register(p: &mut Prelude) {

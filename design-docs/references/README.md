@@ -73,3 +73,27 @@ When adding new reference materials:
 1. Create a topic directory if it does not exist
 2. Add reference documents with clear naming
 3. Update this README.md with the reference entry
+
+## Rumble compressor research
+
+| Source | URL | Use |
+|--------|-----|-----|
+| Citizen Chunk, Simple Compressor class | https://www.musicdsp.org/en/latest/Effects/204-simple-compressor-class-c.html | Author's explanation of feed-forward peak detection before gain reduction and stereo linking; research only |
+| Bram, asymmetric envelope follower | https://www.musicdsp.org/en/latest/Analysis/136-envelope-follower-with-different-attack-and-release.html | Attack/release coefficient derivation and explicit 99 percent versus 63.2 percent settling-time distinction; research only |
+
+## MusicDSP effects expansion
+
+See [pinned source audit](musicdsp-audit.md) for all Effects/Filters/Synthesis entries,
+individual notices, overlap decisions and primary spring/reverb references.
+The [expansion design](../specs/design-musicdsp-effects.md) defines the selected
+independent algorithms and verification requirements.
+
+## Lo-fi DSP research
+
+- [MusicDSP Lo-Fi Crusher](https://www.musicdsp.org/en/latest/Effects/139-lo-fi-crusher.html): quantization and held samples; independent implementation.
+- [MusicDSP Decimator](https://www.musicdsp.org/en/latest/Effects/124-decimator.html): fractional sample-rate reduction; independent implementation.
+- [Jatin Chowdhury, DAFx 2019 tape model](https://www.dafx.de/paper-archive/2019/DAFx2019_paper_3.pdf): bandwidth losses, saturation, hiss and delay-based flutter; conceptual reference, CC BY 3.0.
+
+## Breakcore sample source
+
+[SampleLoom synthetic Amen recreation](https://sampleloom.com/sample/jungle-amen-break-slice-165bpm-4-bars-262cb3) lists CC0. The original download and checksum are retained in examples/samples/amen-recreation; the track edits the complete source in Vact.

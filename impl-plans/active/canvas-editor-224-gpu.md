@@ -145,3 +145,33 @@ CE-FINAL owns shared indexes/archive, combined-tree checks, real GPU/physical iP
 performance evidence, plus coordinator Git finalization. RecordingGL/font metrics are behavioral
 unit proof only; real browser Japanese/ligature caret validation and hardware measurements remain
 with those accepted downstream gates. No GPU/iPad/performance acceptance is inferred here.
+
+### Session: 2026-09-30 — CE-GPU runtime retry retry-20260930-180816
+
+Runtime dependency admission: CE-CONTRACT is in acceptedPlanIds. Assigned reviewFeedback
+has no findings; supplied CE-STATE/CE-TELEMETRY/CE-PACKAGE findings remain with their owners.
+Committed plan at 4fc37414e2f2704f6737f1545071bf506bd9c0f8 and accepted design15.3.3/15.3.5
+were read; current G1–G3 implementation remains aligned. No source correction was necessary.
+All seven owned files match the supplied pre-node snapshot; snapshot-comparison.json records
+the exact comparison. All163 captured source/configuration identities remained unchanged
+across fresh foreground verification (source-before.json/source-after.json).
+
+Fresh required gates on this source:
+- `cd editor && npm run check`: exit0; complete `tmp/canvas-editor-224/CE-GPU/retry-20260930-180816/check.log` and check.json.
+- `cd editor && npm run test -- test/canvas/gpu.test.ts`: exit0;28 run,28 passed,0 failed;
+  complete `tmp/canvas-editor-224/CE-GPU/retry-20260930-180816/test.log` and test.json.
+
+Supporting independent read-only agent `/root/gpu_scope_review` found no high/mid issue;
+review decision retained in supporting-review.json. Improve author self-check inspected
+GPU drawing paths, clipping, admission/rollback, idle upload reuse, context-loss recovery,
+CPU save retention, disposal and current tests; no actionable material finding or required
+verification gap. No Rust/Swift changes or Git mutations. This retry edits only this log;
+immutable fresh-read prebytes, intent, diff and posthash live in edit-progress/ here and
+/private/tmp/vactr-224-implementation/CE-GPU/retry-20260930-180816-edit-progress/.
+
+Implementation-phase G1–G3 and required behavioral gates are complete. Formal integrity,
+adversarial/integration review and review-dependent completion record remain downstream;
+the formal-review checkbox stays unchecked. CE-INPUT/CE-VISUAL/CE-JOIN/CE-FINAL retain
+interaction, consumer integration, real GPU/device and measured hardware ownership as
+already recorded above. Unit tests do not establish actual Japanese font shaping or iPad
+performance. No native progress-gate result or formal acceptance is manufactured here.

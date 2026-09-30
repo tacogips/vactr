@@ -50,6 +50,8 @@ struct Master {
 #[derive(Clone, Debug, Default)]
 pub struct MidiClockState {
     sync: Option<MidiClockSync>,
+    /// Successful MIDI Starts, independent of clock position and polling cadence.
+    restart_generation: u64,
     frozen: bool,
     /// Host time of the last pulse (or of the slave's (re)start).
     last_seen: f64,
@@ -59,6 +61,12 @@ pub struct MidiClockState {
 }
 
 impl MidiClockState {
+    /// Changes once per successful MIDI Start, including repeated Starts at zero.
+    #[must_use]
+    pub fn restart_generation(&self) -> u64 {
+        self.restart_generation
+    }
+
     /// True under `use-clock :midi`.
     #[must_use]
     pub fn is_slave(&self) -> bool {
@@ -273,6 +281,7 @@ impl Runtime {
         if sync.start(&mut self.clock, now).is_err() {
             return;
         }
+        self.midi_clock.restart_generation = self.midi_clock.restart_generation.wrapping_add(1);
         self.pos = Ratio64::ZERO;
         self.clock.set_pos(Ratio64::ZERO);
         for k in self.slots.keys() {

@@ -8,10 +8,11 @@ use super::{
     braids_struck, braids_subsync, braids_triple, braids_wave_bank, braids_wave_line, chip_pair,
     chord_pair, clock_noise_pair, digital_drum, dual_kick, elements_internal, env, feedback_metal,
     filter, fm, fm_drum, fm_pair, frame_lfo, fusion_drum, grain_pair, hat_pair, modal_pair,
-    number_station, osc, particle_pair, peak_function, peak_pulse, phase_pair, rings_part, sample,
-    shape_pair, six_op_original, snare_pair, spectrum_pair, speech_original, stage_chain,
-    stage_segment, string_choir, string_machine_pair, string_pair, swarm_pair, table_terrain_pair,
-    terrain_pair, tidal_function, tidal_poly, va_filter, vactrol_gate, wavetable,
+    musicdsp_synth, number_station, osc, particle_pair, peak_function, peak_pulse, phase_pair,
+    rings_part, sample, shape_pair, six_op_original, snare_pair, spectrum_pair, speech_original,
+    stage_chain, stage_segment, string_choir, string_machine_pair, string_pair, swarm_pair,
+    table_terrain_pair, terrain_pair, tidal_function, tidal_poly, va_filter, vactrol_gate,
+    wavetable,
 };
 use super::{Inp, Kx, Node, NodeSpec, NodeState, MAX_PORTS};
 
@@ -25,6 +26,12 @@ pub fn run(
     kx: &mut Kx<'_>,
 ) {
     match spec.node {
+        Node::DsfOsc => musicdsp_synth::dsf(ins, st, out, kx),
+        Node::ChebyshevOsc => musicdsp_synth::chebyshev(ins, st, out, kx),
+        Node::GaussianNoise => musicdsp_synth::gaussian(ins, st, out, kx),
+        Node::LorenzOsc => musicdsp_synth::lorenz(ins, st, out, kx),
+        Node::RosslerOsc => musicdsp_synth::rossler(ins, st, out, kx),
+        Node::AmFormantOsc => musicdsp_synth::am_formant(ins, st, mem, out, kx),
         Node::SinOsc => osc::sine(ins, st, out, kx),
         Node::Saw => osc::saw(ins, st, out, kx),
         Node::Pulse => osc::pulse(ins, st, out, kx),

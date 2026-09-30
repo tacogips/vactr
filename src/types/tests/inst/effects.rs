@@ -88,3 +88,22 @@ fn analyzers_are_bus_units() {
     assert_eq!(chain[0].kind.name(), "level");
     assert_eq!(chain[1].kind.name(), "spectrum");
 }
+
+#[test]
+fn lofi_composite_is_typed_and_lowers_in_bus_and_instrument() {
+    let source="bus :dust:\n\tlofi tone: 4200 drive: 1.4 wow: 0.1 flutter: 0.02 bits: 14 rate: 26000 hiss: 0.03 crackle: 0.02 mix: 0.8\ninst soft:\n\tsin-osc freq > lofi tone: 5000 mix: 0.5";
+    let checked = super::super::check_src(source);
+    assert!(checked.diags.is_empty(), "{:?}", checked.diags);
+    let mut session = Session::new();
+    session.ok(source);
+    let registry = session.reg.borrow();
+    assert_eq!(
+        registry.bus(intern_kw("dust")).unwrap().def.chain[0].kind,
+        EffectKind::Lofi
+    );
+    let definition = session.def("soft");
+    assert!(definition
+        .nodes
+        .iter()
+        .any(|n| matches!(n,UGenSpec::Effect(fx) if fx.kind==EffectKind::Lofi)));
+}

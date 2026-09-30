@@ -40,3 +40,26 @@
 .vact-entry[data-missing='true'] { color: #7a7f87; }
 .vact-preview { width: 96px; height: 24px; }
 .vact-samples-status { color: #7a7f87; }
+
+/* GPU surface; legacy CM styles stay until the serial CE-JOIN cutover. */
+.vact-code-surface { position: relative; overflow: hidden; height: 100%; }
+.vact-code-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.vact-code-input-bridge {
+  position: absolute;
+  width: 1px;
+  min-width: 1px;
+  height: 1em;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: transparent;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+}
+.vact-code-input-bridge::selection { background: transparent; color: transparent; }
+.vact-code-gpu-status { position: absolute; bottom: 0; left: 0; padding: 0.25rem; }

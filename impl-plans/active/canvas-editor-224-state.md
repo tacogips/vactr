@@ -2,7 +2,7 @@
 
 **planId**: CE-STATE
 **planPath**: impl-plans/active/canvas-editor-224-state.md
-**Status**: In Progress — native blocked result retained; reconciled-tree retry and formal reviews pending
+**Status**: In Progress — implementation verified; native progress and formal reviews pending
 **Created / Last Updated**: 2026-09-30
 **Design Reference**: design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30
 **Issue**: codex-design-and-implement-review-loop-session-224
@@ -35,13 +35,13 @@ None.
 ## File-level tasks and module status
 | Task | Deliverables | Status |
 |---|---|---|
-| S1 | code/surface.ts | Implemented; final type-check pending |
-| S2 | code/sync.ts and history.ts | Implemented; final type-check pending |
-| S3 | code/language.ts and state tests | Implemented; final type-check pending |
-| S4 | Reconciled-tree verification and native/formal gates | Not started |
+| S1 | code/surface.ts | Implemented; retry verified |
+| S2 | code/sync.ts and history.ts | Implemented; retry verified |
+| S3 | code/language.ts and state tests | Implemented; retry verified |
+| S4 | Reconciled-tree verification and native/formal gates | Implementation verified; downstream gates pending |
 
 ### S1: code/surface.ts
-**Status**: Implemented; final type-check pending
+**Status**: Implemented; retry verified
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 Implement CodeSurface with one EditorState authority, transaction dispatch, view-independent undo/redo, annotations and subscription cleanup. Dispatch synchronously calls DocumentSync.apply once before subscriptions; selection/feedback changes never increment revisions. Preserve history grouping semantics and immutable snapshots; no hidden EditorView.
 
@@ -50,7 +50,7 @@ Implement CodeSurface with one EditorState authority, transaction dispatch, view
 - [x] Targeted tests prove behavior and complete logs show final exits.
 
 ### S2: code/sync.ts and history.ts
-**Status**: Implemented; final type-check pending
+**Status**: Implemented; retry verified
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 Replace EditorView update listeners with surface subscription binding while keeping per-revision ChangeSet mapping, touched-span rejection and 200ms DocSync debounce/flush ordering. Limit256 revisions/four indexes, history+undo32MiB and indexes8MiB. Conservatively account retained text/changes; trim complete undo groups and old revisions with visible reduced-depth status, preserve current document and reject stale mappings.
 
@@ -59,7 +59,7 @@ Replace EditorView update listeners with surface subscription binding while keep
 - [x] Targeted tests prove behavior and complete logs show final exits.
 
 ### S3: code/language.ts and state tests
-**Status**: Implemented; final type-check pending
+**Status**: Implemented; retry verified
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 Expose tokenizer spans for GPU styles without using tokenizer to identify sites. Test multi-change transactions, Japanese/emoji UTF round-trips, deletion-boundary mapping, clipboard replacement/undo/redo, selection-only updates and byte-budget eviction. Keep existing semantics for protocol writes.
 
@@ -123,7 +123,7 @@ exit 1 remains unchanged; it is not reclassified as passing. Native CE-STATE res
 remains blocked until a new implementation attempt passes progress and formal review gates.
 
 ### S4: Reverify implemented state on the reconciled tree
-**Status**: Not started
+**Status**: Implementation verified; native progress and formal reviews pending
 **Parallelizable**: No; wait for CE-GPU accepted handoff, then fresh-read and hash state,
 renderer and resource files. CE-STATE must not edit GPU files.
 Run the two required commands below plus `cd editor && npm run test -- test/code`.
@@ -137,10 +137,21 @@ Report these implementation-exercising results through the runner-supplied nativ
 progress gate, then required test-integrity, adversarial and integration reviews.
 Author checks or generic smoke results cannot substitute for workflow acceptance.
 Do not uncheck historical behavioral evidence; add these new retry criteria instead:
-- [ ] Reconciled-tree typecheck, state/UTF/document and code compatibility checks exit 0.
+- [x] Reconciled-tree typecheck, state/UTF/document and code compatibility checks exit 0.
 - [ ] Native progress gate accepts actual behavioral counts/results and source identities.
 - [ ] Formal workflow review decisions accepted with no unresolved high/mid findings.
 
 ### Session: 2026-09-30 — Step4 session 227 amendment
 S4 and CE-GPU retry ordering added. Historical exit 1 preserved. No implementation
 checks or reviews run in this planning node; S4 and native acceptance remain pending.
+
+### Session: 2026-09-30 — CE-STATE fresh Step 6 retry (retry-20260930-184530)
+**Tasks completed**: S4 implementation verification; S1–S3 final typecheck verified. Runtime acceptedPlanIds admits CE-CONTRACT and CE-GPU; committed plan and accepted design 15.3.2 agree. Integration finding 1 addressed with fresh checks on repaired source; no source repair needed.
+**Complete foreground evidence**:
+- `cd editor && npm run check`: exit 0; `tmp/canvas-editor-224/CE-STATE/retry-20260930-184530/check.log`, terminal metadata `check.json`.
+- `cd editor && npm run test -- test/canvas/state.test.ts test/protocol/utf8.test.ts test/protocol/document.test.ts`: exit 0; 30/30 tests, zero failures; `tmp/canvas-editor-224/CE-STATE/retry-20260930-184530/state.log`, terminal metadata `state.json`.
+- `cd editor && npm run test -- test/code`: exit 0; 57/57 tests, zero failures; `tmp/canvas-editor-224/CE-STATE/retry-20260930-184530/compatibility.log`, terminal metadata `compatibility.json`.
+**Source identity**: `tmp/canvas-editor-224/CE-STATE/retry-20260930-184530/source-before.json`, `source-after.json` and `source-stability.json` match all 181 editor source/test/root configuration identities across execution, including renderer/resources. All six owned pre-node paths match native snapshot bytes/modes in `node-snapshot-comparison.json`. Historical attempt-1 check-final.log/check-final.json exit 1 remains untouched and is not passing evidence.
+**Independent inspection / improve self-review**: `/root/state_retry_review` reviewed state/history/sync/tokenizer, pinned history implementation and behavioral tests; no material findings. Author checked exactly-once ordering, ceilings, stale spans, preserved source and terminal exits; no extra source change warranted. Evidence: `tmp/canvas-editor-224/CE-STATE/retry-20260930-184530/independent-review.json`, `author-self-check.json`.
+**Immutable edit evidence**: `tmp/canvas-editor-224/CE-STATE/retry-20260930-184530/edit-plan-001/` and `/private/tmp/vactr-224-implementation/CE-STATE/retry-20260930-184530/edit-plan-001/` retain fresh preimage, exact intent, dirty diff and posthash. Only own progress plan edited; no Rust/Swift, shared files, locks or Git mutations.
+**Downstream pending**: structured Step 6 output submits actual counts and source identities to runner-owned native progress; no native decision tool was supplied in this node. Formal integrity/adversarial/integration decisions, review-dependent completion records and Git finalization belong later workflow steps. Unchecked criteria remain; no acceptance invented. Assigned implementation-phase work is complete.

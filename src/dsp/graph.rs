@@ -201,6 +201,13 @@ pub enum UGenSpec {
     },
     Wavetable(TableRef),
     Granular(GranSrc),
+    // Original mathematical synthesis kernels (MusicDSP synthesis design).
+    DsfOsc,
+    ChebyshevOsc,
+    GaussianNoise,
+    LorenzOsc,
+    RosslerOsc,
+    AmFormantOsc,
     /// Any builtin effect as a ugen (12.5).
     Effect(EffectSpec),
 }
@@ -291,11 +298,29 @@ macro_rules! effect_kinds {
             TextureLoop,
             /// Bounded stereo spectral texture adaptation.
             TextureSpectral,
+            SvfFilter,
+            ButterworthFilter,
+            ChebyshevFilter,
+            LadderFilter,
+            AllpassFilter,
+            ParametricResonator,
+            FeedbackResonator,
+            Foldback,
+            VariableClip,
+            AlienWah,
+            DynamicConvolution,
+            EarlyReflections,
+            SchroederReverb,
+            SpringReverb,
+            SpaceReverb,
+            ShimmerReverb,
+            TapeDelay,
+            DiffusionDelay,
+            Lofi,
         }
 
         impl EffectKind {
-            /// Every effect, in catalog order, `granulate` and the analyzers
-            /// last.
+            /// Every effect in stable codec order; additions follow existing capture kinds.
             pub const ALL: &'static [EffectKind] = &[
                 $(EffectKind::$variant,)*
                 EffectKind::Granulate,
@@ -310,6 +335,25 @@ macro_rules! effect_kinds {
                 EffectKind::TextureStretch,
                 EffectKind::TextureLoop,
                 EffectKind::TextureSpectral,
+                EffectKind::SvfFilter,
+                EffectKind::ButterworthFilter,
+                EffectKind::ChebyshevFilter,
+                EffectKind::LadderFilter,
+                EffectKind::AllpassFilter,
+                EffectKind::ParametricResonator,
+                EffectKind::FeedbackResonator,
+                EffectKind::Foldback,
+                EffectKind::VariableClip,
+                EffectKind::AlienWah,
+                EffectKind::DynamicConvolution,
+                EffectKind::EarlyReflections,
+                EffectKind::SchroederReverb,
+                EffectKind::SpringReverb,
+                EffectKind::SpaceReverb,
+                EffectKind::ShimmerReverb,
+                EffectKind::TapeDelay,
+                EffectKind::DiffusionDelay,
+                EffectKind::Lofi,
             ];
 
             /// The catalog name (kebab-case).
@@ -323,6 +367,26 @@ macro_rules! effect_kinds {
                     EffectKind::TextureStretch => "texture-stretch",
                     EffectKind::TextureLoop => "texture-loop",
                     EffectKind::TextureSpectral => "texture-spectral",
+                    EffectKind::SvfFilter => "svf-filter",
+                    EffectKind::ButterworthFilter => "butterworth-filter",
+                    EffectKind::ChebyshevFilter => "chebyshev-filter",
+                    EffectKind::LadderFilter => "ladder-filter",
+                    EffectKind::AllpassFilter => "allpass-filter",
+                    EffectKind::ParametricResonator => "parametric-resonator",
+                    EffectKind::FeedbackResonator => "feedback-resonator",
+                    EffectKind::Foldback => "foldback",
+                    EffectKind::VariableClip => "variable-clip",
+                    EffectKind::AlienWah => "alien-wah",
+                    EffectKind::DynamicConvolution => "dynamic-convolution",
+                    EffectKind::EarlyReflections => "early-reflections",
+                    EffectKind::SchroederReverb => "schroeder-reverb",
+                    EffectKind::SpringReverb => "spring-reverb",
+                    EffectKind::SpaceReverb => "space-reverb",
+                    EffectKind::ShimmerReverb => "shimmer-reverb",
+                    EffectKind::TapeDelay => "tape-delay",
+                    EffectKind::DiffusionDelay => "diffusion-delay",
+                    EffectKind::Lofi => "lofi",
+
                 }
             }
         }
@@ -487,6 +551,8 @@ pub enum UGenInput {
     /// A signal sampled once per tick into a control cell (12.8.6).
     Signal(Rc<Sig>),
     Keyword(KwId),
+    /// An evaluator-resolved compressor key; never an audio input.
+    Sidechain(BusId),
     /// A realization-time constant list (`partials`).
     List(Rc<[f32]>),
 }

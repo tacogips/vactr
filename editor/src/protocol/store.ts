@@ -21,6 +21,7 @@ import type {
   ManifestBody,
   ServerMsg,
   TempoBody,
+  TransportSample,
   WireDirectives,
   WireForm,
   WireSite,
@@ -47,6 +48,15 @@ export const nameKey = (n: string): string => `name:${n}`;
 export const siteKey = (id: number): string => `site:${id}`;
 export const slotKey = (s: string): string => `slot:${s}`;
 
+// Correlated replies stay outside the telemetry drop policy.
+function isTelemetry(msg: ServerMsg): boolean {
+  return (msg as ServerMsg & { re?: number }).re === undefined &&
+    (msg.kind === 'tempo' || msg.kind === 'levels' || msg.kind === 'playing');
+}
+function older(next: TransportSample | undefined, prev: TransportSample | null | undefined): boolean {
+  return !!next && !!prev && next.epoch === prev.epoch && next.sample_time < prev.sample_time;
+}
+
 export class Store {
   private readonly siteMap = new Map<number, WireSite>();
   private readonly siteFile = new Map<number, string>();
@@ -62,6 +72,24 @@ export class Store {
   private subs: Sub[] = [];
   private queue: ServerMsg[] = [];
   private notifying = false;
+  private disposed = false;
+  private timedSample: TransportSample | null = null;
+  private dropped = 0;
+  private coalesced = 0;
+  get transportSample(): TransportSample | null { return this.timedSample; }
+  get synchronized(): boolean { return this.timedSample !== null; }
+  get queueStats(): { telemetryQueued: number; dropped: number; coalesced: number } {
+    return { telemetryQueued: this.queue.filter(isTelemetry).length, dropped: this.dropped, coalesced: this.coalesced };
+  }
+  dispose(): void {
+    this.disposed = true;
+    this.queue.length = 0;
+    for (const sub of this.subs) sub.active = false;
+    this.subs.length = 0;
+    this.siteMap.clear(); this.siteFile.clear(); this.nameMap.clear();
+    this.fileDiags.clear(); this.slotDiags.clear(); this.directiveMap.clear(); this.formMap.clear();
+    this.tempoBody = null; this.timedSample = null; this.levelsBody = null; this.manifestBody = null;
+  }
   private readonly onError: (e: unknown) => void;
 
   constructor(opts: { onError?: (e: unknown) => void } = {}) {
@@ -134,6 +162,7 @@ export class Store {
   // ------------------------------------------------------ subscriptions
 
   subscribe(keys: Iterable<string>, cb: StoreCallback): () => void {
+    if (this.disposed) return () => {};
     const sub: Sub = { keys: new Set(keys), cb, active: true };
     this.subs.push(sub);
     return () => {
@@ -146,6 +175,20 @@ export class Store {
 
   /** Applies one server message atomically, then notifies. */
   apply(msg: ServerMsg): void {
+    if (this.disposed) return;
+    if (isTelemetry(msg)) {
+      if (msg.kind === 'tempo' || msg.kind === 'levels') {
+        const i = this.queue.findIndex((m) => isTelemetry(m) && m.kind === msg.kind);
+        // Do not replace a newer same-epoch transport snapshot with a stale arrival.
+        const prev = i >= 0 ? this.queue[i] : undefined;
+        if (msg.kind === 'tempo' && prev?.kind === 'tempo' && older(msg.body.transport, prev.body.transport)) return;
+        if (i >= 0) { this.queue.splice(i, 1); this.coalesced += 1; }
+      }
+      if (this.queue.filter(isTelemetry).length >= 64) {
+        this.queue.splice(this.queue.findIndex(isTelemetry), 1);
+        this.dropped += 1;
+      }
+    }
     this.queue.push(msg);
     if (this.notifying) return;
     while (this.queue.length > 0) {
@@ -191,6 +234,8 @@ export class Store {
         this.levelsBody = msg.body;
         return new Set(['levels']);
       case 'tempo':
+        if (older(msg.body.transport, this.timedSample)) return new Set();
+        this.timedSample = msg.body.transport ?? null;
         this.tempoBody = msg.body;
         return new Set(['tempo']);
       case 'manifest':

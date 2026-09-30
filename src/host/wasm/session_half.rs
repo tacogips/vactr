@@ -169,6 +169,9 @@ pub unsafe extern "C" fn session_apply(ptr: *const u8, len: u32) {
 /// first, then `Session::tick_routed` and its console lines are emitted.
 #[no_mangle]
 pub extern "C" fn session_tick(now: f64) {
+    if !now.is_finite() || now < 0.0 {
+        return;
+    }
     with(|half| {
         half.host.borrow_mut().now = now;
         let out = half.session.tick_routed(now);

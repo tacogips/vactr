@@ -1,0 +1,32 @@
+# MusicDSP synthesis sketch: DSF, independent Chebyshev harmonics, AM formants, normal noise.
+# Standalone Lorenz/Rossler and each other kernel: examples/synth-labs/*.vact
+# Run: target/debug/vactr run examples/musicdsp-synth-lab.vact --host native --cycles 16
+
+inst lab-dsf spacing: float = 1 rolloff: float = 0.72 count: float = 32:
+	dsf-osc freq spacing: spacing rolloff: rolloff count: count
+		> * {env-perc 0.005 0.25} > * amp
+
+inst lab-chebyshev second: float = 0.6 fourth: float = -0.3:
+	chebyshev-osc freq harmonic-1: 1 harmonic-2: second harmonic-3: 0.4 harmonic-4: fourth harmonic-5: 0.2 harmonic-6: 0 harmonic-7: -0.15 harmonic-8: 0
+		> * {env-perc 0.005 0.25} > * amp
+
+inst lab-am-formant formant-one: float = 700 second: float = 1400:
+	am-formant-osc freq formant-1: formant-one formant-2: second bandwidth-1: 120 bandwidth-2: 190 balance: 0.5
+		> * {env-perc 0.005 0.25} > * amp
+
+inst lab-gaussian :
+	gaussian-noise 0.22 mean: 0 > hpf 500 > lpf 6500
+		> * {env-perc 0.005 0.25} > * amp
+
+use-bpm 126
+
+bus :echo:
+	tape-delay time: 0.238 feedback: 0.35 tone: 3200 drive: 1.5 wow: 0.2 mix: 0.2
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+s :lab-dsf > note [:g1 :g1 :ab1 :f1] > spacing 1 > rolloff {range sine 0.35 0.7} > gain 0.25 > d1
+s :lab-chebyshev > note [nil :g3 nil :d3] > second 0.6 > fourth -0.2 > gain 0.12 > pan 0.35 > bus :echo > d2
+s :lab-am-formant > note [:g2 nil :ab2 nil] > slow 2 > formant-one {range sine 450 950} > second {range sine 1200 2200} > gain 0.12 > pan 0.65 > bus :echo > d3
+s :lab-gaussian > note [nil :a4 nil [:a4 :a4]] > gain 0.08 > d4

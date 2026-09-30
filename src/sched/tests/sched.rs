@@ -16,6 +16,7 @@ mod granular;
 mod merge;
 mod output;
 mod rebind;
+mod timestamps;
 
 use std::rc::Rc;
 use std::sync::Arc;

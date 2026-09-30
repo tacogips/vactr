@@ -1,0 +1,179 @@
+import { isolateHistory } from '@codemirror/commands';
+import type { CodeAnnotation } from '../app/apis';
+import { CodeSurface } from './surface';
+import { AccessibilityBridge, boundary } from './accessibility';
+import { KeyboardController, type KeyboardOptions } from './keyboard';
+
+export interface InputPresentation { text: string; cursor: number; annotations: readonly CodeAnnotation[] }
+export interface InputOptions extends KeyboardOptions {
+  label?: string;
+  onPresentation?: (presentation: InputPresentation) => void;
+  onError?: (message: string) => void;
+}
+
+/** Platform input reconciliation; the document is never changed by preedit. */
+export class InputController {
+  readonly accessibility: AccessibilityBridge;
+  readonly keyboard: KeyboardController;
+  private composing = false;
+  private preedit = '';
+  private original = '';
+  private trailingComposition = false;
+  private stop: () => void;
+  private listeners: (() => void)[] = [];
+  private disposed = false;
+  constructor(readonly surface: CodeSurface, container: HTMLElement, private options: InputOptions = {}) {
+    this.accessibility = new AccessibilityBridge(surface, container, options.label);
+    this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
+    const el = this.accessibility.textarea;
+    this.listen(el, 'compositionstart', () => this.beginComposition());
+    this.listen(el, 'compositionupdate', (event) => this.updateComposition((event as CompositionEvent).data));
+    this.listen(el, 'compositionend', (event) => this.endComposition((event as CompositionEvent).data));
+    this.listen(el, 'beforeinput', (event) => this.beforeInput(event as InputEvent));
+    this.listen(el, 'input', (event) => this.input(event as InputEvent));
+    this.listen(el, 'select', () => {
+      if (this.composing || el.value !== this.accessibility.window.value) return;
+      const selection = this.accessibility.readSelection();
+      if (selection) this.surface.dispatch({ selection });
+    });
+    this.listen(el, 'keydown', (event) => {
+      const key = event as KeyboardEvent;
+      if (this.composing && key.key === 'Escape') { key.preventDefault(); this.cancelComposition(); return; }
+      if (!this.composing) this.trailingComposition = false;
+      this.keyboard.handle(key);
+    });
+    this.listen(el, 'copy', (event) => this.clipboard(event as ClipboardEvent, 'copy'));
+    this.listen(el, 'cut', (event) => this.clipboard(event as ClipboardEvent, 'cut'));
+    this.listen(el, 'paste', (event) => this.clipboard(event as ClipboardEvent, 'paste'));
+    this.listen(el, 'blur', () => this.cancelComposition());
+    const position = () => this.accessibility.position();
+    this.listen(window, 'resize', position);
+    this.listen(window, 'orientationchange', position);
+    this.listen(window, 'scroll', position);
+    if (window.visualViewport) { this.listen(window.visualViewport, 'resize', position); this.listen(window.visualViewport, 'scroll', position); }
+    this.stop = surface.subscribe(() => {
+      if (!this.composing) this.accessibility.refresh();
+      this.publish();
+    });
+    this.publish();
+  }
+  get isComposing(): boolean { return this.composing; }
+  get presentation(): InputPresentation {
+    const text = this.surface.state.doc.toString(), range = this.surface.compositionRange;
+    if (!this.composing || !range) return { text, cursor: this.surface.state.selection.main.head, annotations: [] };
+    return { text: text.slice(0, range.from) + this.preedit + text.slice(range.to), cursor: range.from + this.preedit.length,
+      annotations: [{ from: range.from, to: range.from + this.preedit.length, kind: 'composition' }] };
+  }
+  private listen(target: EventTarget, name: string, fn: EventListener): void {
+    target.addEventListener(name, fn); this.listeners.push(() => target.removeEventListener(name, fn));
+  }
+  private publish(): void { if (!this.disposed) this.options.onPresentation?.(this.presentation); }
+  beginComposition(): void {
+    if (this.composing || this.disposed) return;
+    this.trailingComposition = false;
+    const selection = this.surface.state.selection.main;
+    this.original = this.surface.state.doc.sliceString(selection.from, selection.to);
+    this.surface.setCompositionRange({ from: selection.from, to: selection.to });
+    this.preedit = ''; this.composing = true; this.publish();
+  }
+  updateComposition(text: string): void {
+    if (!this.composing) this.beginComposition();
+    this.preedit = text; this.publish();
+  }
+  endComposition(text: string): void {
+    if (!this.composing) return;
+    const range = this.surface.compositionRange;
+    // Empty end data denotes cancellation. Revalidate because independent edits may have mapped the range.
+    if (text && range && this.surface.state.doc.sliceString(range.from, range.to) === this.original) {
+      const insert = this.surface.state.toText(text);
+      this.preedit = insert.toString();
+      this.surface.dispatch({ changes: { from: range.from, to: range.to, insert }, selection: { anchor: range.from + insert.length },
+        annotations: isolateHistory.of('full'), userEvent: 'input.type.compose.start' });
+    } else if (text) this.error('Composition cancelled: source changed');
+    this.finishComposition();
+  }
+  cancelComposition(): void { if (this.composing) this.finishComposition(); }
+  private finishComposition(): void {
+    this.composing = false; this.preedit = ''; this.trailingComposition = true;
+    this.surface.setCompositionRange(null); // commit is recorded before revalidating deferred writes
+    this.accessibility.refresh(); this.publish();
+  }
+  private beforeInput(event: InputEvent): void {
+    const kind = event.inputType;
+    if (this.trailingComposition && (kind === 'insertFromComposition' || kind === 'insertCompositionText')) {
+      if (event.cancelable) event.preventDefault();
+      this.accessibility.refresh(); return;
+    }
+    if (this.composing || event.isComposing) {
+      if (!this.composing) this.beginComposition();
+      if (event.data != null) this.updateComposition(event.data);
+      return; // platform owns the textarea during IME
+    }
+    this.trailingComposition = false;
+    if (!event.cancelable) return; // fallback input reconciles the native mutation
+    if (kind === 'historyUndo' || kind === 'historyRedo') {
+      event.preventDefault(); if (kind === 'historyUndo') this.surface.undo(); else this.surface.redo(); return;
+    }
+    if (kind === 'deleteContentBackward' || kind === 'deleteContentForward') {
+      event.preventDefault(); this.keyboard.delete(kind === 'deleteContentBackward' ? -1 : 1); return;
+    }
+    const insert = kind === 'insertLineBreak' || kind === 'insertParagraph' ? '\n' : event.data;
+    if ((kind === 'insertText' || kind === 'insertReplacementText' || kind === 'insertLineBreak' || kind === 'insertParagraph') && insert != null) {
+      event.preventDefault(); this.replaceSelection(insert, 'input.type');
+    }
+  }
+  private input(event: InputEvent): void {
+    if (this.composing || event.isComposing) return;
+    if (this.trailingComposition && (event.inputType === 'insertFromComposition' || event.inputType === 'insertCompositionText')) {
+      this.accessibility.refresh(); return;
+    }
+    const old = this.accessibility.window, value = this.accessibility.textarea.value;
+    if (old.outside && old.anchor !== old.head) {
+      // A clipped selection represents more source than the textarea contains.
+      // Strip only unselected context: a minimal diff would drop shared replacement characters.
+      const projectedFrom = Math.max(0, Math.min(old.value.length, Math.min(old.anchor, old.head) - old.start));
+      const projectedTo = Math.max(0, Math.min(old.value.length, Math.max(old.anchor, old.head) - old.start));
+      const suffixLength = old.value.length - projectedTo;
+      this.replaceSelection(value.slice(projectedFrom, value.length - suffixLength), 'input.type');
+      return;
+    }
+    if (value === old.value) return;
+    // Native fallback (noncancelable beforeinput, dictation, accessibility) reconciles one splice.
+    let from = 0;
+    while (from < old.value.length && from < value.length && old.value[from] === value[from]) from++;
+    let a = old.value.length, b = value.length;
+    while (a > from && b > from && old.value[a - 1] === value[b - 1]) { a--; b--; }
+    const localFrom = boundary(old.value, from, -1), localTo = boundary(old.value, a, 1);
+    const extraLeft = from - localFrom, extraRight = localTo - a;
+    const insert = this.surface.state.toText(value.slice(Math.max(0, from - extraLeft), Math.min(value.length, b + extraRight)));
+    this.surface.dispatch({ changes: { from: old.start + localFrom, to: old.start + localTo, insert },
+      selection: { anchor: old.start + localFrom + insert.length }, userEvent: 'input.type' });
+  }
+  replaceSelection(text: string, userEvent = 'input.paste'): void {
+    if (this.composing) return;
+    const s = this.surface.state.selection.main, insert = this.surface.state.toText(text);
+    this.surface.dispatch({ changes: { from: s.from, to: s.to, insert }, selection: { anchor: s.from + insert.length },
+      userEvent, annotations: userEvent === 'input.paste' ? isolateHistory.of('full') : [] });
+    this.options.scrollCaret?.();
+  }
+  private clipboard(event: ClipboardEvent, operation: 'copy' | 'cut' | 'paste'): void {
+    if (this.composing) { event.preventDefault(); return; }
+    event.preventDefault();
+    try {
+      if (!event.clipboardData) throw new Error('Clipboard permission unavailable');
+      if (operation === 'paste') this.replaceSelection(event.clipboardData.getData('text/plain'));
+      else {
+        const s = this.surface.state.selection.main;
+        event.clipboardData.setData('text/plain', this.surface.state.doc.sliceString(s.from, s.to));
+        if (operation === 'cut' && !s.empty) this.replaceSelection('', 'delete.cut');
+      }
+    } catch { this.error('Clipboard operation denied'); }
+  }
+  private error(message: string): void { this.accessibility.announce(message, true); this.options.onError?.(message); }
+  focus(): void { this.accessibility.focus(); }
+  dispose(): void {
+    if (this.disposed) return;
+    this.cancelComposition(); this.disposed = true;
+    this.stop(); for (const remove of this.listeners) remove(); this.listeners = []; this.accessibility.dispose();
+  }
+}

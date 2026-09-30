@@ -594,6 +594,12 @@ pub fn decode_graph(
             }
             for _ in 0..i.u16()? {
                 get_node(&mut i, raw)?;
+                if raw.node_params[..raw.n_node_params]
+                    .iter()
+                    .any(|(_, id, _)| *id == crate::dsp::effects::SIDECHAIN_BUS_CTL)
+                {
+                    return Err(FaultCode::BadRecord);
+                }
                 encoded[raw.n_nodes - 1] =
                     NodeAudioShape::from_byte(i.u8()?).ok_or(FaultCode::BadRecord)?;
             }
@@ -628,6 +634,9 @@ pub fn decode_graph(
             for _ in 0..i.u16()? {
                 let n = i.u16()?;
                 let (id, c) = i.ctl()?;
+                if id == crate::dsp::effects::SIDECHAIN_BUS_CTL {
+                    return Err(FaultCode::BadRecord);
+                }
                 raw.push_node_param(n, id, c)
                     .map_err(|_| FaultCode::GraphTooLarge)?;
             }
@@ -647,6 +656,18 @@ pub fn decode_graph(
                 let k = bus.push(kind).ok_or(FaultCode::GraphTooLarge)?;
                 for _ in 0..i.u16()? {
                     let (id, c) = i.ctl()?;
+                    if id == crate::dsp::effects::SIDECHAIN_BUS_CTL {
+                        let source =
+                            crate::dsp::effects::sidechain_bus(c).ok_or(FaultCode::BadRecord)?;
+                        if kind != EffectKind::Compressor
+                            || source == bus.bus
+                            || bus.params[k][..usize::from(bus.n_params[k])]
+                                .iter()
+                                .any(|(id, _)| *id == crate::dsp::effects::SIDECHAIN_BUS_CTL)
+                        {
+                            return Err(FaultCode::BadRecord);
+                        }
+                    }
                     if !bus.push_param(k, id, c) && MAX_FX_PARAMS > 0 {
                         return Err(FaultCode::GraphTooLarge);
                     }

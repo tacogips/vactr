@@ -240,23 +240,7 @@ pub(super) fn process(
     use EffectKind as K;
     let sr = ctx.sr;
     match kind {
-        K::Compressor => {
-            let thr = p[0];
-            let ratio = p[1].max(1.0);
-            let att = OnePole::time_coef(p[2], sr);
-            let rel = OnePole::time_coef(p[3], sr);
-            let makeup = prim::db_to_gain(p[4]);
-            let knee = p[5].max(0.0);
-            let n = l.len().min(r.len());
-            for (xl, xr) in l[..n].iter_mut().zip(r[..n].iter_mut()) {
-                let peak = xl.abs().max(xr.abs());
-                let env = st.env[0].run(peak, att, rel);
-                let gr = comp_gain_db(prim::gain_to_db(env), thr, ratio, knee);
-                let g = (prim::db_to_gain(gr) * makeup).clamp(0.0, 8.0);
-                *xl *= g;
-                *xr *= g;
-            }
-        }
+        K::Compressor => compress(p, st, l, r, sr, None),
         K::Expander => {
             let thr = p[0];
             let ratio = p[1].max(1.0);
@@ -497,5 +481,34 @@ pub(super) fn process(
             }
         }
         _ => {}
+    }
+}
+
+/// Existing feed-forward gain computer with an optional external linked peak detector.
+pub(super) fn compress(
+    p: &[f32],
+    st: &mut FxState,
+    l: &mut [f32],
+    r: &mut [f32],
+    sr: f32,
+    key: Option<&[f32]>,
+) {
+    let thr = p[0];
+    let ratio = p[1].max(1.0);
+    let att = OnePole::time_coef(p[2], sr);
+    let rel = OnePole::time_coef(p[3], sr);
+    let makeup = prim::db_to_gain(p[4]);
+    let knee = p[5].max(0.0);
+    let n = l.len().min(r.len());
+    for (i, (xl, xr)) in l[..n].iter_mut().zip(r[..n].iter_mut()).enumerate() {
+        let peak = key.map_or_else(
+            || xl.abs().max(xr.abs()),
+            |k| k.get(i).copied().unwrap_or(0.0),
+        );
+        let env = st.env[0].run(peak, att, rel);
+        let gr = comp_gain_db(prim::gain_to_db(env), thr, ratio, knee);
+        let g = (prim::db_to_gain(gr) * makeup).clamp(0.0, 8.0);
+        *xl *= g;
+        *xr *= g;
     }
 }

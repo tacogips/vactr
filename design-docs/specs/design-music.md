@@ -522,3 +522,82 @@ All are pattern controls.
 | patterns (Tidal/Strudel names) | `s`/`sound`, `n`, `note`, `gain`, `pan`, `speed`, `lpf`, `hpf`, `room`, `size`, `delay`, `fast`, `slow`, `rev`, `every`, `whenmod`, `sometimes`, `rarely`, `often`, `alt`, `maybe`, `euclid`, `hold`, `repeat`, `choose`, `stack`, `cat`, `fastcat`, `superimpose`, `off`, `jux`, `iter`, `chop`, `striate`, `slice`, `splice`, `begin`, `end`, `loop-at`, `fit`, `cut`, `ply`, `chunk`, `hurry`, `segment`, `range`, `scale`, `chord`, `voicing`, `arp`, `grid` (Tidal's `struct`, renamed because `struct` declares a struct; Decided 2026-09-25) |
 | signals | `sine`, `saw`, `tri`, `square`, `rand`, `irand`, `perlin`, `time`, `beat`, `phase`, `cycle`, `fft`, `amp`, `cc` (MIDI controller, 0..1), `midi-notes` (note input as a pattern), `lag`, `map-range` |
 | sound (SuperCollider names) | `inst`, `look` (a visual keyed to a sound), `sin-osc`, `saw`, `pulse`, `tri`, `white-noise`, `lpf`, `hpf`, `bpf`, `delay`, `comb`, `env-perc`, `env-adsr`, `line`, `midi`, `osc` ; synthesis: `sampler`, `analog`, `fm`, `pd`, `additive`, `wavetable`, `granular`, ugens `vco`, `sub-osc`, `ladder`, `svf`, `fm-op`, `fm-mod`, `phase-distortion`, `sample-play`, `env-perc`, `env-adsr`; buses `bus`, `master`; effects: see section 5 |
+
+## Kick-keyed rumble compression (RUM-001)
+
+Industrial techno combines a dry four-on-the-floor kick with a low, distorted
+reverberant tail. A compressor on the rumble/bass bus reads the actual kick
+bus and reduces bass gain at each kick onset; its release restores the tail
+between kicks. Ducking must include tails from earlier events, work on both
+stereo lanes, and follow missing or altered kick events rather than a fixed
+beat-shaped gain pattern.
+
+### Public interface and routing
+
+Declare the source bus before the receiving bus. A bus-chain compressor
+accepts `sidechain: :kick` to select an existing non-master bus; omitted
+`sidechain` retains the existing linked stereo self detector. The key is
+control audio only and is never added to the compressed output. An unknown
+source, master source, self source, duplicate selector, dynamic/numeric
+selector, or use inside an instrument must report a diagnostic and preserve
+the existing live chain.
+
+Every callback snapshots raw, pre-effect bus accumulators before any bus
+processing. A compressor uses the current block's linked stereo peak from
+that snapshot. Thus processing order, stereo pan, and effect chains do not
+introduce a block of latency or change the key; bus swaps retain their IDs
+and key audio includes active retiring voices. A disappeared key supplies
+silence (with normal envelope recovery), never a fallback to self detection.
+Snapshots are preallocated: no callback allocation or locks.
+
+The named selector is resolved to a bus ID on the evaluator side. An
+internal constant effect parameter may transport that ID using the existing
+graph codec if it is exactly representable and bypasses smoothing; do not
+expose an interpolated ID, silently clamp it, or accept it as public numeric
+syntax. Preserve all existing compressor parameter indices and behavior.
+No dependency is necessary: extend the existing compressor implementation.
+
+### Compressor algorithm
+
+Retain the feed-forward peak topology: rectify and take the maximum of the
+two key channels, follow the level with separate one-pole attack and release,
+convert to dB, apply the existing soft-knee threshold/ratio gain computer,
+and apply the same gain to the receiving left/right audio. Times are seconds;
+the one-pole convention is the 63.2 percent time constant, not the 99 percent
+settling convention in the MusicDSP envelope example. Mix and makeup retain
+the existing compressor semantics. This design has no lookahead.
+
+Research sources are indexed in `../references/README.md`: Citizen Chunk's
+feed-forward stereo compressor explanation and Bram's asymmetric envelope
+follower. They explain the topology and time-constant convention; implement
+original Rust using the repository's primitives, without importing source.
+
+### Example and verification
+
+Preserve the previously played light-hat loop in `examples/techno-pattern.vact`.
+Update `examples/industrial-techno.vact` to route the kick to a key bus and
+continuous/overlapping reverberant rumble and FM bass to compressed buses.
+Use a dark filtered, saturated reverb/delay tail and fewer heavier metallic
+hits. Include a minimal standalone `examples/rumble-kick.vact` exposing the
+threshold, ratio, attack, release, and mix in readable code.
+
+Tests must measure gain reduction and recovery with known key envelopes,
+no key leakage, silent-key transparency with zero makeup, self-compression
+compatibility, stereo linking, arbitrary callback partitions, source-bus
+ordering/swaps/missing sources, and graph codec round trips. End-to-end tests
+must evaluate the actual examples and render finite, nonzero audio. Compare
+keyed and bypassed renders to prove rumble energy falls around kick attacks
+and recovers between them. Verify callback allocation and native/browser
+behavior using existing infrastructure, then play the industrial example.
+
+## MusicDSP expansion
+
+See [effects and resonators](design-musicdsp-effects.md) and [synthesis kernels](design-musicdsp-synths.md) for the 2026-09-30 user goal extensions.
+
+## Original track collections and lo-fi production
+
+See [genre collection](design-genre-tracks.md) for fifteen original ambient,
+chill, house, hip-hop and pop scores, and [lo-fi effect and collection](design-lofi.md)
+for the researched `lofi` bus/voice effect and nine additional lo-fi scores.
+[Track catalog and export commands](../../examples/tracks/README.md) cover all
+24 arrangements and their production-engine WAV exports.

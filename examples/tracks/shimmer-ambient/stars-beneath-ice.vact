@@ -1,0 +1,59 @@
+# Stars Beneath Ice — original shimmer ambient, 72 BPM, F-sharp minor.
+# Dark slow-moving ninths, distant glass notes and a fifth-shifted frozen halo.
+# 64 bars: emergence / statement / bloom / bridge / answer / crest / return / dissolve.
+# Play live: target/debug/vactr run examples/tracks/shimmer-ambient/stars-beneath-ice.vact --host native --cycles 64
+
+inst score-bass score-brightness: float = 800 score-roundness: float = 0.6:
+	{sin-osc freq > * score-roundness} > + {saw freq > * {- 1 score-roundness}}
+		> lpf score-brightness > * {env-adsr 0.008 0.12 0.7 0.18} > * amp
+
+inst score-keys score-color: float = 1.5 score-softness: float = 0.65:
+	fm-op freq ratio: 1 index: {* score-color {env-perc 0.002 score-softness}}
+		> fm-mod {fm-op freq ratio: 2 index: 0.25}
+		> * {env-perc 0.005 score-softness} > * amp
+
+inst score-pad score-brightness: float = 1900 score-air: float = 0.35:
+	{tri freq > * 0.6} > + {sin-osc {* freq 1.003} > * 0.4}
+		> + {sin-osc {* freq 2.001} > * score-air}
+		> lpf score-brightness > * {env-adsr 1.1 0.8 0.75 2.8} > * amp
+
+inst score-lead score-warmth: float = 0.7 score-tail: float = 0.28:
+	{sin-osc freq > * score-warmth} > + {tri freq > * {- 1 score-warmth}}
+		> * {env-perc 0.008 score-tail} > * amp
+
+use-bpm 72
+
+bus :shimmer:
+	shimmer-reverb size: 0.82 decay: 12 damping: 0.44 shift: 7 feedback: 0.36 mix: 0.74
+		> hpf cutoff: 180 > lpf cutoff: 10500
+
+bus :room:
+	diffusion-delay time: 0.625 feedback: 0.4 diffusion: 0.72 tone: 5200 mix: 0.24
+		> space-reverb size: 0.62 decay: 4.8 damping: 0.5 modulation: 0.18 gravity: -0.15 mix: 0.38
+		> hpf cutoff: 160
+
+bus :music:
+	hpf cutoff: 28
+
+master:
+	compressor threshold: -14 ratio: 1.4 attack: 0.04 release: 0.25 knee: 6
+		> gain 12 > limiter ceiling: -2 release: 0.1
+
+let changes {alt [:fs3 :m9] [:fs3 :m9] [:d4 :maj7] [:d4 :maj7] [:a3 :maj7] [:a3 :maj7] [:e4 :sus4] [:e4 :sus4] [:fs3 :m9] [:fs3 :m9] [:d4 :maj7] [:d4 :maj7] [:a3 :maj7] [:a3 :maj7] [:e4 :sus4] [:e4 :sus4] [:fs3 :m9] [:fs3 :m9] [:d4 :maj7] [:d4 :maj7] [:a3 :maj7] [:a3 :maj7] [:e4 :sus4] [:e4 :sus4] [:a3 :maj7] [:a3 :maj7] [:d4 :maj7] [:d4 :maj7] [:fs3 :m9] [:fs3 :m9] [:e4 :sus4] [:e4 :sus4] [:fs3 :m9] [:fs3 :m9] [:a3 :maj7] [:a3 :maj7] [:d4 :maj7] [:d4 :maj7] [:e4 :sus4] [:e4 :sus4] [:fs3 :m9] [:fs3 :m9] [:a3 :maj7] [:a3 :maj7] [:d4 :maj7] [:d4 :maj7] [:e4 :sus4] [:e4 :sus4] [:fs3 :m9] [:fs3 :m9] [:d4 :maj7] [:d4 :maj7] [:a3 :maj7] [:a3 :maj7] [:e4 :sus4] [:e4 :sus4] [:a3 :maj7] [:a3 :maj7] [:e4 :sus4] [:e4 :sus4] [:d4 :maj7] [:d4 :maj7] [:fs3 :m9] [:fs3 :m9]}
+let bass-line {cat [[:fs2] [:fs2] [:d2] [:d2] [:a2] [:a2] [:e2] [:e2] [:fs2] [:fs2] [:d2] [:d2] [:a2] [:a2] [:e2] [:e2] [:fs2] [:fs2] [:d2] [:d2] [:a2] [:a2] [:e2] [:e2] [:a2] [:a2] [:d2] [:d2] [:fs2] [:fs2] [:e2] [:e2] [:fs2] [:fs2] [:a2] [:a2] [:d2] [:d2] [:e2] [:e2] [:fs2] [:fs2] [:a2] [:a2] [:d2] [:d2] [:e2] [:e2] [:fs2] [:fs2] [:d2] [:d2] [:a2] [:a2] [:e2] [:e2] [:a2] [:a2] [:e2] [:e2] [:d2] [:d2] [:fs2] [:fs2]]}
+let phrase-a [:cs6 nil nil nil :gs5 nil :a5 nil]
+let phrase-b [nil :fs5 nil :e5 nil nil :cs5 nil]
+let cadence [:fs5 nil nil nil]
+let motif {cat [phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a cadence]}
+
+# Slow pad excitation keeps the shifted halo continuously evolving.
+s :score-pad > chord changes > voicing > score-brightness 2100 > score-air 0.24 > legato 1.05 > gain {slow [0.0352 0.0352 0.0352 0.0352 0.0352 0.0352 0.0352 0.0352 0.0512 0.0512 0.0512 0.0512 0.0512 0.0512 0.0512 0.0512 0.064 0.064 0.064 0.064 0.064 0.064 0.064 0.064 0.0288 0.0288 0.0288 0.0288 0.0288 0.0288 0.0288 0.0288 0.0576 0.0576 0.0576 0.0576 0.0576 0.0576 0.0576 0.0576 0.0704 0.0704 0.0704 0.0704 0.0704 0.0704 0.0704 0.0704 0.0512 0.0512 0.0512 0.0512 0.0512 0.0512 0.0512 0.0512 0.016 0.0144 0.01248 0.0104 0.008 0.0056 0.00288 0.00112] 64} > pan 0.43 > bus :shimmer > d1
+
+# Sparse lead remains readable through a separate unshifted room.
+s :score-lead > note motif > score-tail 1.1 > score-warmth 0.9 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0605 0.0605 0.0605 0.0605 0.0605 0.0605 0.0605 0.0605 0.0935 0.0935 0.0935 0.0935 0.0935 0.0935 0.0935 0.0935 0.033 0.033 0.033 0.033 0.033 0.033 0.033 0.033 0.11 0.11 0.11 0.11 0.11 0.11 0.11 0.11 0.099 0.099 0.099 0.099 0.099 0.099 0.099 0.099 0.066 0.066 0.066 0.066 0.066 0.066 0.066 0.066 0.0165 0.01485 0.01287 0.01073 0.00825 0.00577 0.00297 0.00116] 64} > pan 0.59 > bus :room > d2
+
+# The bass follows the two-bar harmonic sequence and stays outside pitch feedback.
+s :score-bass > note bass-line > score-roundness 1 > score-brightness 400 > legato 1.02 > gain {slow [0.048 0.048 0.048 0.048 0.048 0.048 0.048 0.048 0.096 0.096 0.096 0.096 0.096 0.096 0.096 0.096 0.12 0.12 0.12 0.12 0.12 0.12 0.12 0.12 0.042 0.042 0.042 0.042 0.042 0.042 0.042 0.042 0.102 0.102 0.102 0.102 0.102 0.102 0.102 0.102 0.12 0.12 0.12 0.12 0.12 0.12 0.12 0.12 0.096 0.096 0.096 0.096 0.096 0.096 0.096 0.096 0.024 0.0216 0.01872 0.0156 0.012 0.0084 0.00432 0.00168] 64} > bus :music > d3
+
+# Glass attacks excite the shimmer network more strongly in the second half.
+s :score-keys > note motif > score-color 0.8 > score-softness 1.5 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.02625 0.02625 0.02625 0.02625 0.02625 0.02625 0.02625 0.02625 0.04875 0.04875 0.04875 0.04875 0.04875 0.04875 0.04875 0.04875 0.015 0.015 0.015 0.015 0.015 0.015 0.015 0.015 0.06 0.06 0.06 0.06 0.06 0.06 0.06 0.06 0.075 0.075 0.075 0.075 0.075 0.075 0.075 0.075 0.0375 0.0375 0.0375 0.0375 0.0375 0.0375 0.0375 0.0375 0.0075 0.00675 0.00585 0.00487 0.00375 0.00262 0.00135 0.00053] 64} > pan 0.36 > bus :shimmer > d4

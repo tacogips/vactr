@@ -165,3 +165,38 @@ fn a_bus_chain_over_the_cap_is_graph_too_large() {
         200
     );
 }
+
+#[test]
+fn sidechain_resolves_declared_bus_and_rejects_invalid_selectors_without_install() {
+    let mut s = Session::new();
+    s.ok("bus :kick:\n\tgain 0");
+    s.ok("bus :rumble:\n\tcompressor sidechain: :kick threshold: -22");
+    let original = s.reg.borrow().bus(intern_kw("rumble")).unwrap().def.clone();
+    let source = s.reg.borrow().bus(intern_kw("kick")).unwrap().id;
+    assert!(original.chain[0].params.contains(&(
+        crate::dsp::effects::SIDECHAIN_BUS_CTL,
+        Ctl::Const(source.get() as f32)
+    )));
+    for args in [
+        "sidechain: :missing",
+        "sidechain: :master",
+        "sidechain: :rumble",
+        "sidechain: 1",
+        "sidechain: sine",
+        "sidechain: {alt :kick :rumble}",
+        "sidechain: :kick [:sidechain :kick]",
+    ] {
+        let outcomes = s.eval(&format!("bus :rumble:\n\tcompressor {args}"));
+        assert!(outcomes.last().unwrap().value.is_err(), "{args}");
+        assert_eq!(
+            s.reg.borrow().bus(intern_kw("rumble")).unwrap().def,
+            original
+        );
+    }
+    assert!(s
+        .eval("inst forbidden:\n\tsin-osc 50 > compressor sidechain: :kick")
+        .last()
+        .unwrap()
+        .value
+        .is_err());
+}

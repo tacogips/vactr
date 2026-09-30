@@ -1,0 +1,31 @@
+# Rumble kick: the same Peaks-style FM kick pattern feeds a dry kick bus
+# and a persistent, fully wet reverb bus. The actual dry kick audio keys
+# the compressor; it ducks ALL rumble tails, including earlier hits.
+# Evaluate the whole file. To compare, set the rumble compressor's mix to 0.
+
+use-bpm 138
+
+inst rumble-source fm-amount: float = 7 pitch-sweep: float = 2.6 decay: float = 0.24 drum-noise: float = 0.025 drive: float = 0.42:
+	fm-drum freq fm-amount: fm-amount pitch-sweep: pitch-sweep decay: decay drum-noise: drum-noise drive: drive
+		> * amp
+
+# The key is tapped before bus effects, with no callback-block delay.
+bus :kick:
+	gain 0
+
+# Reverb memory persists across hits. Saturation adds low-mid weight;
+# filters clear the subsonics and keep the tail below the percussion.
+bus :rumble:
+	plate size: 0.68 decay: 1.8 damping: 0.72 predelay: 0.025 mix: 1
+		> saturate drive: 18 tone: 500 output: -10
+		> hpf cutoff: 35
+		> lpf cutoff: 240
+		> compressor sidechain: :kick threshold: -22 ratio: 8 attack: 0.002 release: 0.12 knee: 4 makeup: 0 mix: 1
+
+master:
+	limiter ceiling: -1 release: 0.06
+
+# Changing or resting a note here changes both feeds together.
+let kick s :rumble-source > note [:g1 :g1 :g1 :g1]
+kick > gain 0.82 > bus :kick > d1
+kick > gain 1 > bus :rumble > d2

@@ -450,3 +450,8 @@ position. The inference model (per-function monomorphic vs HM-lite) is
 open as QA-92.
 
 ---
+
+## Static song mode
+
+See [Song mode: reusable finite multi-track parts](design-song-mode.md) for the
+proposed finite arrangement, event editing, effect isolation and playback design.

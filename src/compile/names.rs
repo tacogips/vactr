@@ -114,7 +114,15 @@ impl Compiler<'_, '_> {
     pub(crate) fn atom(&mut self, n: &Node, a: &Atom) -> Result<(), Diagnostic> {
         match a {
             Atom::Int(_) | Atom::Float { .. } | Atom::Ratio(_) => {
-                let v = literal(a).unwrap_or(Value::Nil);
+                let v = if self.timestamp_exact {
+                    match a {
+                        Atom::Float { exact: Some(r), .. } => Value::Ratio(*r),
+                        Atom::Float { value, .. } => Value::Float64(*value),
+                        _ => literal(a).unwrap_or(Value::Nil),
+                    }
+                } else {
+                    literal(a).unwrap_or(Value::Nil)
+                };
                 self.number(n, v);
             }
             Atom::Sym(name) => {

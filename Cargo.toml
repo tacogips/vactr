@@ -55,3 +55,8 @@ crate-type = ["rlib", "cdylib"]
 name = "beep"
 path = "examples/beep.rs"
 required-features = ["host-native"]
+
+[[example]]
+name = "render_track"
+path = "examples/render_track.rs"
+required-features = ["host-native"]

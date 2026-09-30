@@ -15,7 +15,9 @@
 mod beep;
 mod buses;
 mod live_input;
+mod musicdsp;
 mod regions;
+mod rumble;
 mod sched_gaps;
 mod templates;
 

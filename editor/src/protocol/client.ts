@@ -20,6 +20,10 @@ import type {
 } from './types';
 
 export const TWEAK_INTERVAL_MS = 16;
+export const MAX_PENDING_REQUESTS = 64;
+export const MAX_TELEMETRY_QUEUE = 64;
+const telemetry = (env: ServerEnvelope): boolean => env.re === undefined &&
+  (env.kind === 'playing' || env.kind === 'tempo' || env.kind === 'levels');
 
 /** Where the client hands every decoded server message (the store). */
 export interface MessageSink {
@@ -33,6 +37,7 @@ export interface ClientOptions {
   now?: () => number;
   /** The `doc-changed` debounce. */
   debounceMs?: number;
+  onError?: (error: unknown) => void;
 }
 
 type Listener = (env: ServerEnvelope) => void;
@@ -54,11 +59,20 @@ export class Client {
   private readonly timers: Timers;
   private readonly now: () => number;
   private readonly debounceMs: number | undefined;
+  private readonly onError: (error: unknown) => void;
   private readonly docs = new Map<string, DocSync>();
   private readonly pending = new Map<number, Pending>();
   private readonly listeners = new Map<ServerKind | '*', Listener[]>();
   private readonly errorListeners: ((e: DecodeError) => void)[] = [];
   private readonly tweaks = new Map<string, TweakSlot>();
+  private readonly receiveQueue: ServerEnvelope[] = [];
+  private receiving = false;
+  private telemetryDropped = 0;
+  private telemetryCoalesced = 0;
+  get queueStats(): { telemetryQueued: number; dropped: number; coalesced: number; pendingRequests: number } {
+    return { telemetryQueued: this.receiveQueue.filter(telemetry).length,
+      dropped: this.telemetryDropped, coalesced: this.telemetryCoalesced, pendingRequests: this.pending.size };
+  }
   private seq = 0;
   private closed = false;
 
@@ -68,6 +82,7 @@ export class Client {
     this.timers = opts.timers ?? defaultTimers;
     this.now = opts.now ?? (() => Date.now());
     this.debounceMs = opts.debounceMs;
+    this.onError = opts.onError ?? ((e) => console.error('client subscriber failed', e));
     transport.onText((text) => this.receive(text));
   }
 
@@ -98,16 +113,18 @@ export class Client {
   /** Sends one message and resolves with the first reply whose `re` is its `seq`. */
   request(msg: ClientMsg): Promise<ServerEnvelope> {
     if (this.closed) return Promise.reject(new Error('client closed'));
+    if (this.pending.size >= MAX_PENDING_REQUESTS) return Promise.reject(new Error('client busy: 64 pending requests'));
     return new Promise((resolve, reject) => {
       // Registered before sending: the wasm transport replies synchronously.
       const seq = this.seq + 1;
       this.pending.set(seq, { resolve, reject });
-      this.send(msg);
+      try { this.send(msg); } catch (e) { this.pending.delete(seq); reject(e instanceof Error ? e : new Error(String(e))); }
     });
   }
 
   /** Listens to one server kind, or to every message with `'*'`. */
   on(kind: ServerKind | '*', cb: Listener): () => void {
+    if (this.closed) return () => {};
     const list = this.listeners.get(kind) ?? [];
     list.push(cb);
     this.listeners.set(kind, list);
@@ -118,8 +135,14 @@ export class Client {
   }
 
   /** Listens to undecodable frames (dropped after reporting). */
-  onDecodeError(cb: (e: DecodeError) => void): void {
+  onDecodeError(cb: (e: DecodeError) => void): () => void {
+    if (this.closed) return () => {};
     this.errorListeners.push(cb);
+    return () => { const i = this.errorListeners.indexOf(cb); if (i >= 0) this.errorListeners.splice(i, 1); };
+  }
+
+  clockProbe(pageSend: number): Promise<ServerEnvelope> {
+    return this.request({ kind: 'clock-probe', body: { page_send: pageSend } });
   }
 
   // ------------------------------------------------------------- helpers
@@ -210,6 +233,10 @@ export class Client {
     for (const d of this.docs.values()) d.dispose();
     for (const p of this.pending.values()) p.reject(new Error('client closed'));
     this.pending.clear();
+    this.docs.clear();
+    this.receiveQueue.length = 0;
+    this.listeners.clear();
+    this.errorListeners.length = 0;
     this.transport.close();
   }
 
@@ -229,15 +256,41 @@ export class Client {
       return;
     }
     const env = d.env;
-    this.store?.apply(env);
-    for (const cb of this.listeners.get(env.kind) ?? []) cb(env);
-    for (const cb of this.listeners.get('*') ?? []) cb(env);
+    if (telemetry(env)) {
+      if (env.kind === 'tempo' || env.kind === 'levels') {
+        const i = this.receiveQueue.findIndex((m) => telemetry(m) && m.kind === env.kind);
+        const prev = i >= 0 ? this.receiveQueue[i] : undefined;
+        if (env.kind === 'tempo' && prev?.kind === 'tempo') {
+          const next = env.body.transport;
+          const before = prev.body.transport;
+          if (next && before && next.epoch === before.epoch && next.sample_time < before.sample_time) return;
+        }
+        if (i >= 0) { this.receiveQueue.splice(i, 1); this.telemetryCoalesced += 1; }
+      }
+      if (this.receiveQueue.filter(telemetry).length >= MAX_TELEMETRY_QUEUE) {
+        const i = this.receiveQueue.findIndex(telemetry);
+        this.receiveQueue.splice(i, 1);
+        this.telemetryDropped += 1;
+      }
+    }
+    this.receiveQueue.push(env);
+    if (this.receiving) return;
+    this.receiving = true;
+    try {
+      while (!this.closed && this.receiveQueue.length) this.deliver(this.receiveQueue.shift()!);
+    } finally { this.receiving = false; }
+  }
+
+  private deliver(env: ServerEnvelope): void {
+    // Control correlation is independent of telemetry overflow and subscriber failures.
     if (env.re !== undefined) {
       const p = this.pending.get(env.re);
-      if (p) {
-        this.pending.delete(env.re);
-        p.resolve(env);
-      }
+      if (p) { this.pending.delete(env.re); p.resolve(env); }
+    }
+    try { this.store?.apply(env); } catch (e) { this.onError(e); }
+    for (const cb of [...(this.listeners.get(env.kind) ?? []), ...(this.listeners.get('*') ?? [])]) {
+      if (this.closed) break;
+      try { cb(env); } catch (e) { this.onError(e); }
     }
   }
 }

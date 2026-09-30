@@ -360,3 +360,222 @@ fn a_pass_that_schedules_no_form_publishes_nothing() {
     let bs = upd(&mut rig, &[("g", WireValue::Float(0.25))]);
     assert!(bs.is_empty(), "{bs:?}");
 }
+
+fn transport_samples(msgs: &[ServerMsg]) -> Vec<crate::session::protocol::TransportSample> {
+    msgs.iter()
+        .filter_map(|m| match m {
+            ServerMsg::Tempo(t) => t.transport.clone(),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceiling() {
+    let mut rig = Rig::new();
+    let mut samples = Vec::new();
+    for n in 0..=1000 {
+        let time = f64::from(n) / 1000.0;
+        rig.clock.set(time);
+        for sample in transport_samples(&rig.tick()) {
+            assert_eq!(sample.sample_time, time);
+            assert_eq!(
+                sample.cycle,
+                crate::session::publish::ratio_pair(rig.s.runtime().clock().pos())
+            );
+            assert!(sample.running);
+            assert_eq!(sample.latency_kind, "unavailable");
+            assert_eq!(sample.latency_seconds, None);
+            samples.push(sample);
+        }
+    }
+    assert!(
+        samples.len() >= 19 && samples.len() <= 21,
+        "{}",
+        samples.len()
+    );
+    for pair in samples.windows(2) {
+        assert!(pair[1].sample_time - pair[0].sample_time >= 0.05);
+        assert_eq!(pair[0].epoch, pair[1].epoch);
+    }
+    let before = samples.last().unwrap().epoch.clone();
+    rig.clock.set(0.0);
+    let restarted = transport_samples(&rig.tick());
+    assert_ne!(restarted[0].epoch, before);
+    assert_eq!(restarted[0].sample_time, 0.0);
+}
+
+#[test]
+fn transport_pause_and_lost_external_clock_hold_position_and_invalidate_epoch() {
+    let mut rig = Rig::new();
+    rig.ok("use-clock :midi", 1);
+    rig.clock.set(0.1);
+    let running = transport_samples(&rig.tick())[0].clone();
+    rig.s.rt.transport_stop(0.1);
+    rig.clock.set(0.2);
+    let paused = transport_samples(&rig.tick())[0].clone();
+    assert!(!paused.running);
+    assert_ne!(paused.epoch, running.epoch);
+    rig.clock.set(0.3);
+    let held = transport_samples(&rig.tick())[0].clone();
+    assert_eq!(held.cycle, paused.cycle);
+    rig.s.rt.transport_continue(0.3);
+    rig.clock.set(0.4);
+    let resumed = transport_samples(&rig.tick())[0].clone();
+    assert!(resumed.running);
+    assert_ne!(resumed.epoch, paused.epoch);
+    rig.clock.set(1.0);
+    let lost = transport_samples(&rig.tick())[0].clone();
+    assert!(!lost.running);
+    assert_ne!(lost.epoch, resumed.epoch);
+    rig.clock.set(1.2);
+    let still_lost = transport_samples(&rig.tick())[0].clone();
+    assert_eq!(still_lost.cycle, lost.cycle);
+    assert_eq!(still_lost.epoch, lost.epoch);
+}
+
+#[test]
+fn scheduled_end_time_uses_original_seconds_and_preserves_source_revision() {
+    use crate::ns::namespace::FormGen;
+    use crate::reader::span::{FileId, Span, SrcRef};
+    use crate::sched::slots::SlotKind;
+    use crate::sched::telemetry::PlayingEvent;
+    use crate::value::intern::intern_kw;
+    use crate::value::ratio::Ratio64;
+    let event = PlayingEvent {
+        slot: intern_kw("d1"),
+        beat: Ratio64::ZERO,
+        time: 2.0,
+        dur: 0.75,
+        src: Some(SrcRef {
+            span: Span::new(FileId::new(0), 3, 9),
+            doc_revision: 42,
+            form_gen: FormGen::new(7),
+        }),
+        kind: SlotKind::Pattern,
+        reduced_lead: false,
+    };
+    let files = vec![std::rc::Rc::from("main.vact")];
+    let first = crate::session::publish::playing_wire(&event, &files, 120.0, &|_| 42);
+    let changed = crate::session::publish::playing_wire(&event, &files, 240.0, &|_| 42);
+    assert_eq!(first.end_time, Some(2.75));
+    assert_eq!(changed.end_time, first.end_time);
+    assert_ne!(
+        first.dur, changed.dur,
+        "legacy beat duration still follows current BPM"
+    );
+    assert_eq!(changed.src.unwrap().doc_revision, 42);
+}
+
+fn published_playing(msgs: &[ServerMsg]) -> Vec<crate::session::protocol::WirePlaying> {
+    msgs.iter()
+        .filter_map(|m| match m {
+            ServerMsg::Playing(p) => Some(p.events.clone()),
+            _ => None,
+        })
+        .flatten()
+        .collect()
+}
+
+#[test]
+fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
+    let mut rig = Rig::new();
+    rig.ok("use-clock :midi\ns :analog > d1", 41);
+    let first = transport_samples(&rig.tick())[0].clone();
+    assert_eq!(first.cycle, [0, 1]);
+    rig.s.rt.transport_start(0.0);
+    rig.clock.set(0.01);
+    let immediate = rig.tick();
+    assert!(
+        transport_samples(&immediate).is_empty(),
+        "cadence is preserved"
+    );
+    let playing = published_playing(&immediate);
+    assert!(!playing.is_empty());
+    let epoch = playing[0].epoch.clone();
+    assert_ne!(epoch.as_deref(), Some(first.epoch.as_str()));
+    for event in &playing {
+        assert_eq!(event.epoch, epoch);
+        assert_eq!(event.src.as_ref().unwrap().doc_revision, 41);
+        assert_eq!(event.src.as_ref().unwrap().file, "main.vact");
+        assert!((event.end_time.unwrap() - event.time - 2.0).abs() < 1e-9);
+    }
+    rig.clock.set(0.05);
+    let next = transport_samples(&rig.tick());
+    assert_eq!(next.len(), 1);
+    assert_eq!(Some(next[0].epoch.as_str()), epoch.as_deref());
+}
+
+#[test]
+fn midi_restarts_between_samples_invalidate_epoch_with_nondecreasing_position() {
+    let mut rig = Rig::new();
+    rig.ok("use-clock :midi\ns :analog > d1", 42);
+    let first = transport_samples(&rig.tick())[0].clone();
+    // Multiple successful Starts occur without an intervening publisher observation.
+    rig.s.rt.transport_start(0.02);
+    rig.s.rt.transport_start(0.04);
+    rig.clock.set(0.1);
+    let out = rig.tick();
+    let next = transport_samples(&out)[0].clone();
+    assert!(next.cycle[0] >= first.cycle[0]);
+    assert_ne!(next.epoch, first.epoch);
+    let playing = published_playing(&out);
+    assert!(!playing.is_empty());
+    for event in playing {
+        assert_eq!(event.epoch.as_deref(), Some(next.epoch.as_str()));
+        assert_eq!(event.src.unwrap().doc_revision, 42);
+        assert!((event.end_time.unwrap() - event.time - 2.0).abs() < 1e-9);
+    }
+}
+
+#[test]
+fn restart_generation_counts_successful_starts_and_preserves_neutral_transitions() {
+    let mut rig = Rig::new();
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 0);
+    rig.s.rt.transport_start(0.0); // Internal clock rejects MIDI Start.
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 0);
+    let initial = transport_samples(&rig.tick())[0].clone();
+    rig.s.rt.transport_continue(0.0);
+    rig.clock.set(0.05);
+    assert_eq!(transport_samples(&rig.tick())[0].epoch, initial.epoch);
+    rig.ok("use-clock :midi", 1);
+    rig.tick();
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 0);
+    for expected in 1..=3 {
+        rig.s.rt.transport_start(0.05);
+        assert_eq!(rig.s.rt.midi_clock().restart_generation(), expected);
+    }
+    rig.s.rt.clock_pulse(0.06);
+    rig.clock.set(0.1);
+    rig.tick();
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 3);
+    rig.s.rt.transport_stop(0.1);
+    rig.s.rt.transport_continue(0.1);
+    rig.s.rt.transport_continue(0.1);
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 3);
+    rig.ok("use-clock :internal", 2);
+    rig.tick();
+    rig.s.rt.transport_start(0.1);
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 3);
+    rig.ok("use-clock :midi", 3);
+    rig.tick();
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 3);
+    rig.s.rt.transport_start(0.1);
+    assert_eq!(rig.s.rt.midi_clock().restart_generation(), 4);
+}
+
+#[test]
+fn invalid_host_samples_do_not_advance_or_publish_and_unsubscribed_samples_are_absent() {
+    let mut rig = Rig::new();
+    for time in [f64::NAN, f64::INFINITY, -1.0] {
+        assert!(rig.s.tick(time).is_empty());
+    }
+    rig.send(crate::session::protocol::ClientMsg::Subscribe(
+        crate::session::protocol::SubscribeBody {
+            telemetry: false,
+            levels: false,
+            diagnostics: false,
+        },
+    ));
+    assert!(transport_samples(&rig.tick()).is_empty());
+}

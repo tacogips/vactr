@@ -17,7 +17,7 @@ use NativeMask::{Fn as F, Late as L, Value as V};
 /// The pattern controls of design-music.md section 2 ("sound parameters
 /// available on any pattern", lines 150-153). `shape` is also the visual
 /// source, so its entry is the overload group below.
-pub(crate) const CONTROLS: [&str; 23] = [
+pub(crate) const CONTROLS: [&str; 25] = [
     "gain",
     "pan",
     "speed",
@@ -41,6 +41,8 @@ pub(crate) const CONTROLS: [&str; 23] = [
     "cut",
     "orbit",
     "velocity",
+    "start-ms",
+    "stop-ms",
 ];
 
 const fn f(
@@ -140,6 +142,8 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     control("sustain"),
     control("begin"),
     control("end"),
+    control("start-ms"),
+    control("stop-ms"),
     control("cut"),
     control("orbit"),
     control("velocity"),
@@ -349,6 +353,12 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     // design 12.8.6). `saw`, `tri`, `lpf`, `hpf`, `delay`, `gain`, `pan`,
     // `room`, `saturate` and `range` are the entries above: the VM picks
     // their DSP meaning from the subject (B2).
+    dsp("dsf-osc"),
+    dsp("chebyshev-osc"),
+    dsp("gaussian-noise"),
+    dsp("lorenz-osc"),
+    dsp("rossler-osc"),
+    dsp("am-formant-osc"),
     dsp("sin-osc"),
     dsp("pulse"),
     dsp("white-noise"),
@@ -435,6 +445,25 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("additive"),
     dsp("wavetable"),
     dsp("granular"),
+    dsp("svf-filter"),
+    dsp("butterworth-filter"),
+    dsp("chebyshev-filter"),
+    dsp("ladder-filter"),
+    dsp("allpass-filter"),
+    dsp("parametric-resonator"),
+    dsp("feedback-resonator"),
+    dsp("foldback"),
+    dsp("variable-clip"),
+    dsp("alien-wah"),
+    dsp("dynamic-convolution"),
+    dsp("early-reflections"),
+    dsp("schroeder-reverb"),
+    dsp("spring-reverb"),
+    dsp("space-reverb"),
+    dsp("shimmer-reverb"),
+    dsp("tape-delay"),
+    dsp("diffusion-delay"),
+    dsp("lofi"),
     dsp("compressor"),
     dsp("expander"),
     dsp("gate"),

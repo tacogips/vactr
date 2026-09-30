@@ -97,6 +97,7 @@ pub fn decode_as<M: Message>(text: &str) -> Result<Envelope<M>, ProtocolError> {
     let body = obj
         .remove("body")
         .unwrap_or_else(|| Json::Object(Map::new()));
+    validate_timing(&kind, &body)?;
     let mut tagged = Map::new();
     tagged.insert("kind".to_string(), Json::String(kind.clone()));
     tagged.insert("body".to_string(), body);
@@ -126,4 +127,79 @@ pub fn encode<M: Message>(env: &Envelope<M>) -> String {
         }
     }
     Json::Object(obj).to_string()
+}
+
+/// Additive telemetry fields are validated before typed decoding; legacy
+/// messages without those fields retain their v1 behavior.
+fn validate_timing(kind: &str, body: &Json) -> Result<(), ProtocolError> {
+    let nonnegative = |v: &Json| v.as_f64().is_some_and(|x| x.is_finite() && x >= 0.0);
+    let positive = |v: &Json| v.as_f64().is_some_and(|x| x.is_finite() && x > 0.0);
+    let epoch = |v: &Json| v.as_str().is_some_and(|x| !x.is_empty());
+    let ratio = |v: &Json| {
+        v.as_array().is_some_and(|r| {
+            r.len() == 2
+                && r[0]
+                    .as_i64()
+                    .is_some_and(|n| n.unsigned_abs() <= 9_007_199_254_740_991)
+                && r[1]
+                    .as_i64()
+                    .is_some_and(|d| d > 0 && d <= 9_007_199_254_740_991)
+        })
+    };
+    let bad = || err(ErrorCode::BadBody, "invalid telemetry timing");
+    if kind == "playing" {
+        if let Some(events) = body.get("events").and_then(Json::as_array) {
+            if events.len() > 4096 {
+                return Err(bad());
+            }
+            for e in events {
+                let integer = |v: &Json| v.as_u64().is_some_and(|n| n <= 9_007_199_254_740_991);
+                let source_valid = e.get("src").is_none_or(|src| {
+                    src["file"].is_string()
+                        && integer(&src["doc_revision"])
+                        && integer(&src["form_gen"])
+                        && integer(&src["span"]["start"])
+                        && integer(&src["span"]["end"])
+                        && src["span"]["start"].as_u64() <= src["span"]["end"].as_u64()
+                });
+                if !nonnegative(&e["time"])
+                    || !ratio(&e["beat"])
+                    || !ratio(&e["dur"])
+                    || e["dur"][0].as_i64().is_none_or(|n| n < 0)
+                    || !source_valid
+                    || e.get("epoch").is_some_and(|v| !epoch(v))
+                    || e.get("end_time").is_some_and(|v| {
+                        !nonnegative(v)
+                            || !nonnegative(&e["time"])
+                            || v.as_f64() < e["time"].as_f64()
+                    })
+                {
+                    return Err(bad());
+                }
+            }
+        }
+    }
+    if kind == "tempo" {
+        if let Some(t) = body.get("transport") {
+            let optional_number = |v: &Json| v.is_null() || nonnegative(v);
+            let latency_kind = t["latency_kind"].as_str();
+            if !epoch(&t["epoch"])
+                || !nonnegative(&t["sample_time"])
+                || !ratio(&t["cycle"])
+                || !positive(&t["bpm"])
+                || !positive(&t["beats_per_cycle"])
+                || !t["running"].is_boolean()
+                || !t.as_object().is_some_and(|o| {
+                    o.contains_key("latency_seconds") && o.contains_key("uncertainty_seconds")
+                })
+                || !optional_number(&t["latency_seconds"])
+                || !optional_number(&t["uncertainty_seconds"])
+                || !matches!(latency_kind, Some("measured" | "estimate" | "unavailable"))
+                || (latency_kind == Some("unavailable")) != t["latency_seconds"].is_null()
+            {
+                return Err(bad());
+            }
+        }
+    }
+    Ok(())
 }

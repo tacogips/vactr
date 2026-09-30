@@ -12,6 +12,7 @@
 
 import type { ChangeSet, Extension, Text } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import type { CodeSurface } from './surface';
 import type { DocSync } from '../protocol/document';
 import type { Span } from '../protocol/types';
 import { Utf8Index, type Utf16Change } from '../protocol/utf8';
@@ -30,9 +31,9 @@ export class DocumentSync {
   readonly history: RevisionHistory;
   private readonly listeners: ((rev: number) => void)[] = [];
 
-  constructor(doc: DocSync, initial: Text, historyLimit?: number) {
+  constructor(doc: DocSync, initial: Text, historyLimit?: number, byteLimit?: number, indexByteLimit?: number) {
     this.doc = doc;
-    this.history = new RevisionHistory(initial, doc.revision, historyLimit);
+    this.history = new RevisionHistory(initial, doc.revision, historyLimit, byteLimit, indexByteLimit);
   }
 
   get file(): string {
@@ -83,7 +84,13 @@ export class DocumentSync {
     return idx.spanToBytes(from, to);
   }
 
-  /** The CodeMirror extension: every transaction of the view goes through `apply`. */
+  /** Headless observer binding: the surface has already applied and recorded the transaction. */
+  bind(surface: CodeSurface, cb: (rev: number) => void): () => void {
+    if (surface.sync !== this) throw new Error('Surface belongs to a different DocumentSync');
+    return surface.subscribe((update) => { if (update.docChanged) cb(this.revision); });
+  }
+
+  /** Legacy compatibility until CE-JOIN; never install on a headless surface. */
   extension(): Extension {
     return EditorView.updateListener.of((update) => {
       for (const tr of update.transactions) this.apply(tr);

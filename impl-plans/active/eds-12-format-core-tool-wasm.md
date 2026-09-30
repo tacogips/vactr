@@ -1,6 +1,6 @@
 # EDS-12: CodeMirror-free Format Core and Shared `ToolWasm`
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EDS-12 (wave 1; parallel with CMP-10, CMP-15, FST-50, EDS-10, EDS-11)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 5.5 (format part); `design-docs/specs/design-completion.md` 6.4 (`ToolWasm`)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -142,20 +142,44 @@ Follow `cmp-dispatch.json` `editProtocol`. Write logs to
 
 ## Completion Criteria
 
-- [ ] `ToolWasm`, `WasmFormatter(string | ToolWasm)` and `minimalChange`
+- [x] `ToolWasm`, `WasmFormatter(string | ToolWasm)` and `minimalChange`
       match the pinned contract.
-- [ ] `format.ts` keeps its public API through re-exports, and
+- [x] `format.ts` keeps its public API through re-exports, and
       `main.ts` compiles unchanged.
-- [ ] The new and appended tests pass, and the existing format tests pass
+- [x] The new and appended tests pass, and the existing format tests pass
       unchanged.
-- [ ] The two new source files contain no `@codemirror` import.
-- [ ] Logs are recorded, and the Progress Log is updated.
+- [x] The two new source files contain no `@codemirror` import.
+- [x] Logs are recorded, and the Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
 **Blockers**: None.
+
+### Session: 2026-09-30 (EDS-12 implementation)
+**Tasks Completed**: Extracted `ToolWasm` and `WasmFormatter` into
+`tool-wasm.ts` and `format-core.ts`; preserved the lazy URL constructor,
+shared-instance constructor, rejection retry, memory-growth-safe output
+read and `finally` free. `format.ts` retains its command/key API and
+re-exports the moved contract. Added minimal splice, Japanese text,
+CodeMirror import-boundary and ToolWasm lazy/cache/retry tests.
+**Changed file hashes** (pre -> post):
+- `editor/src/code/format.ts`: `c789f38da72669f447b3d1a05010a1cf69708460b391be519158460177e253b5` -> `d6c3f61ba0eda4f64db39227836b9f4ec0f2e0e2b2f0660706baf35f8cb11f7b`
+- `editor/src/code/format-core.ts`: absent -> `37197ced64557c179a6a6734ca7d86ba41b4fe5e97c0187163ee6951f1997ad8`
+- `editor/src/code/tool-wasm.ts`: absent -> `bb940db5848d4626311817125b86d9a9576c1d9c779c887c296f3350b065206d`
+- `editor/test/code/format.test.ts`: `b6eeb4b1146ad41d8867f3eb0fcce11d5c8cfa5e46c707cf004a87425329d89f` -> `eb9d5a6caeafb0d9eb809cc9ceacd58ea9d6db5fd6a5c173af414e9fe828d1c1`
+- `editor/test/code/tool-wasm.test.ts`: absent -> `3ca8f64d8d26bfe6acec920f00795b5d9c63920d397b46ffb1906874f939bffe`
+**Verification** (complete logs under `tmp/cmp/EDS-12/`):
+- `cd editor && npx tsc --noEmit`: exit 0, `attempt-1/01-tsc.log` (initial run; repeated on final shared source below).
+- `cd editor && npx vitest run test/code/format.test.ts test/code/tool-wasm.test.ts`: exit 0, 11 tests passed, `attempt-1/02-vitest.log` (initial run; repeated on final shared source below).
+- `cd editor && npx tsc --noEmit`: exit 0, `attempt-2/01-tsc.log`.
+- `cd editor && npx vitest run test/code/format.test.ts test/code/tool-wasm.test.ts`: exit 0, 11 tests passed, `attempt-2/02-vitest.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && cd editor && npx vitest run test/wasm/format.test.ts`: exit 0, 3 tests passed, `attempt-2/03-wasm-build-format.log`.
+- `git diff --check -- editor/src/code/format.ts editor/test/code/format.test.ts impl-plans/active/eds-12-format-core-tool-wasm.md`: exit 0, `attempt-2/04-diff-check.log`.
+- The first wasm gate attempt exited 101 before compiling EDS-12 because concurrent CMP-10 edits had declared but not yet created `src/complete/rank.rs`, `scope.rs` and `sources.rs`. The complete captured failure is in `attempt-1/03-wasm-build-format-console.log`; the same gate passed after those files appeared. This was a resolved shared-tree transient, not an EDS-12 source failure.
+- Final EDS-12 source identities are recorded in `attempt-2/source-sha256.txt`.
+**Blockers**: None for this plan. Independent review, reconciliation and commit/push remain downstream workflow steps.
 
 ## Related Plans
 

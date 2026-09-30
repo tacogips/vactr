@@ -1,6 +1,6 @@
 # CMP-21: Wasm Completion Export
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CMP-21 (wave 2; parallel with CMP-20, CMP-30, CMP-31)
 **Design Reference**: `design-docs/specs/design-completion.md` 5.1, 5.2, 7.3
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -99,17 +99,29 @@ logs to `tmp/cmp/CMP-21/attempt-<n>/`.
 
 ## Completion Criteria
 
-- [ ] The three exports exist with the pinned signatures and appear in the
+- [x] The three exports exist with the pinned signatures and appear in the
       export listing.
-- [ ] The node test passes against the real artifact, the outbox stays
+- [x] The node test passes against the real artifact, the outbox stays
       empty, and statuses 2 and 3 are covered.
-- [ ] Steps 1-6 are logged, and the Progress Log is updated.
+- [x] Steps 1-6 are logged, and the Progress Log is updated.
 
 ## Progress Log
 
-### Session: 2026-09-30 (plan created)
-**Tasks Completed**: Plan authored (session 226, step 4).
-**Blockers**: Waits for CMP-10.
+### Session: 2026-09-30 (session 226, Step 6 implementation)
+**Pre-edit SHA-256**: `8776d181b410c56edb0afde8b87ed735730b026c6534cfa26d881cc593b4fa9c`
+**Final test SHA-256**: `ecd4578522c9a123befc69f5d4374c1b86038978b2b9cb273442f2962c44ab0b` (`editor/test/wasm/complete.test.ts`).
+**Tasks Completed**: Added the pinned raw completion exports in `src/host/wasm/complete_abi.rs`, declared `complete_abi` in `src/host/wasm/mod.rs`, and added a real-artifact node test covering scoped local and keyword suggestions, UTF-8 byte ranges after Japanese text, invalid UTF-8/cursor statuses, and an empty outbox.
+**Verification**:
+1. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit 0; `tmp/cmp/CMP-21/post-modify-checks/wasm-build.log`.
+2. `CARGO_TERM_QUIET=true cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm -- -D warnings` — exit 0; `tmp/cmp/CMP-21/post-modify-checks/wasm-clippy.log`.
+3. The plan's Node export-list command — exit 0; output exactly `complete_out_len complete_out_ptr complete_source fmt_out_len fmt_out_ptr fmt_source session_init`; `tmp/cmp/CMP-21/attempt-1/10-export-list-final.log`.
+4. `cd editor && npx vitest run test/wasm/complete.test.ts` — exit 0, 1 file and 4 tests passed on the final test source; `tmp/cmp/CMP-21/attempt-1/13-vitest-final.log`.
+5. `CARGO_TERM_QUIET=true cargo build` — exit 0; `tmp/cmp/CMP-21/post-modify-checks/native-build.log`.
+6. `rustfmt --edition 2021 --check src/host/wasm/complete_abi.rs src/host/wasm/mod.rs` — exit 0; `tmp/cmp/CMP-21/post-modify-checks/rustfmt.log`.
+Additional TypeScript check: `cd editor && npx tsc --noEmit` — exit 0 on the final test source; `tmp/cmp/CMP-21/attempt-1/14-tsc-final.log`.
+**Resolved attempt**: Initial rustfmt check exited 1 (`tmp/cmp/CMP-21/attempt-1/05-rustfmt.log`); the source was formatted and the final check exited 0 as recorded above.
+**Dependency**: CMP-10 is accepted by the runtime-owned `acceptedPlanIds` for this plan.
+**Downstream**: Formal integrity/adversarial review and CMP-40 combined-tree closeout remain pending.
 
 ## Related Plans
 

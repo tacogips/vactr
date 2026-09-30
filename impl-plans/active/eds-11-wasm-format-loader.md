@@ -1,6 +1,6 @@
 # EDS-11: Wasm Format Test Honors `VACTR_WASM`
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: EDS-11 (wave 1; parallel with CMP-10, CMP-15, FST-50, EDS-10, EDS-12)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 5.4 (session-226 amendment D)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -83,15 +83,36 @@ another plan's in-progress writePaths is transient: follow the
 
 ## Completion Criteria
 
-- [ ] No hardcoded artifact path remains in the file, and every artifact
+- [x] No hardcoded artifact path remains in the file, and every artifact
       read goes through `loadVactrWasm()`.
-- [ ] Steps 1-5 are logged, and all three tests pass in both runs.
-- [ ] The Progress Log is updated.
+- [x] Steps 1-5 are logged, and all three tests pass in both runs.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
+**Blockers**: None.
+
+### Session: 2026-09-30 (session 226, step 6 implementation)
+**Tasks Completed**: `readWasm()` now calls `loadVactrWasm()` and reads the
+resolved `wasm.path`; the three existing test cases and assertions are
+unchanged. The file no longer contains the hardcoded target path.
+**Pre-edit snapshot**: `editor/test/wasm/format.test.ts`
+`4665970704b65fb11a4945fcbe9a7266b5117a717e99232fa33f97bd3d3a4374`;
+intent in `tmp/cmp/EDS-11/attempt-1/edit-intent-01.json`.
+Post-edit SHA-256:
+`9b7f3b289852437d99120233665f464f5cc8044591bdd5c91dc6b9ea02d746f5`.
+**Verification** (complete logs under `tmp/cmp/EDS-11/attempt-1/`):
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit 0 (`01-wasm-build.log`).
+- `cd editor && npx vitest run test/wasm/format.test.ts` — exit 0, 3 passed (`02-vitest-default.log`).
+- `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npx vitest run test/wasm/format.test.ts` — exit 0, 3 passed (`03-vitest-vactr-wasm.log`).
+- `grep -c 'target/wasm32-unknown-unknown' editor/test/wasm/format.test.ts` — output `0`, expected grep exit 1 (`04-hardcoded-path-check.log`).
+- `cd editor && npx tsc --noEmit` — exit 0 (`05-tsc.log`).
+**Edit protocol**: The first build wrapper exited 1 after cargo completed
+because zsh reserves `status`; the build was rerun with a non-reserved
+variable and exited 0. Plan edit intent and pre-edit hash are in
+`tmp/cmp/EDS-11/attempt-1/edit-intent-02.json`.
 **Blockers**: None.
 
 ## Related Plans

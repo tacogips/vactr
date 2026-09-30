@@ -1,6 +1,6 @@
 # CMP-32: EditorView Completion Adapter and Wiring
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CMP-32 (wave 3)
 **Design Reference**: `design-docs/specs/design-completion.md` 6.4, 6.5, 6.6, 7.4 (the view bullets)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -169,19 +169,30 @@ line in `main.ts`. Write logs to `tmp/cmp/CMP-32/attempt-<n>/`.
 
 ## Completion Criteria
 
-- [ ] `attachCompletion` implements the surface in the only completion
+- [x] `attachCompletion` implements the surface in the only completion
       file that imports `@codemirror/view`.
-- [ ] Enter accepts while the popup is open and inserts a newline while
+- [x] Enter accepts while the popup is open and inserts a newline while
       it is closed.
-- [ ] Eval and format keys are untouched, and the wiring is minimal.
-- [ ] The real-wasm engine test passes.
-- [ ] Steps 1-5 are logged, and the Progress Log is updated.
+- [x] Eval and format keys are untouched, and the wiring is minimal.
+- [x] The real-wasm engine test passes.
+- [x] Steps 1-5 are logged, and the Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
-**Blockers**: Waits for CMP-21, CMP-30, CMP-31 and EDS-12.
+**Blockers**: None. The initial dependency wait was resolved by the runtime accepted dependency set for CMP-21, CMP-30, CMP-31 and EDS-12.
+
+### Session: 2026-09-30 (CMP-32 implementation)
+**Tasks Completed**: Added the EditorView CompletionSurface adapter with one appendConfig dispatch, completion-only key bindings, update/blur/composition forwarding, guarded replacement and idempotent disposal. Added optional mount wiring and shared ToolWasm boot wiring. Added EditorView behavior tests and real-wasm completion service tests. CMP-21, CMP-30, CMP-31 and EDS-12 are accepted dependencies per the dispatch runtime.
+**Verification**:
+- `cd editor && npx tsc --noEmit` — exit 0; `tmp/cmp/CMP-32/attempt-1/07-tsc-final.log`.
+- `cd editor && npx vitest run test/code/completion-view.test.ts test/wasm/completion-engine.test.ts` — exit 0, 9/9; `tmp/cmp/CMP-32/attempt-1/04-focused-vitest.log`.
+- `cd editor && npx vitest run test/code` — exit 0, 124/124; `tmp/cmp/CMP-32/attempt-1/05-code-vitest.log`.
+- `cd editor && npm run build` — exit 0; `tmp/cmp/CMP-32/attempt-1/06-build.log`.
+- `git diff --numstat -- editor/src/code/mount.ts editor/src/app/main.ts editor/src/app/deps.ts` — exit 0; added lines are 3, 5 and 3 respectively; `tmp/cmp/CMP-32/attempt-1/08-wiring-numstat.log`.
+- `rg -l '@codemirror/view' editor/src/code/completion*.ts` — exit 0; only `completion-view.ts`; `tmp/cmp/CMP-32/attempt-1/09-codemirror-import-boundary.log`.
+**Blockers**: None for CMP-32 implementation. CMP-40 owns combined-tree review and plan closeout.
 
 ## Related Plans
 

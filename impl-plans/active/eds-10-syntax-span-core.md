@@ -1,6 +1,6 @@
 # EDS-10: CodeMirror-free Tree-sitter Span Core
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EDS-10 (wave 1; parallel with CMP-10, CMP-15, FST-50, EDS-11, EDS-12)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 5.5 (syntax part), 5.3, 4.5
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -129,18 +129,37 @@ record it as BLOCKED with the command, exit code and stderr.
 
 ## Completion Criteria
 
-- [ ] `syntax-core.ts` exports the moved symbols plus `StyleSpan` and
+- [x] `syntax-core.ts` exports the moved symbols plus `StyleSpan` and
       `styleSpans`, and it has no `@codemirror` import.
-- [ ] `syntax.ts` is a thin adapter that re-exports the moved symbols,
+- [x] `syntax.ts` is a thin adapter that re-exports the moved symbols,
       and no other file changed.
-- [ ] The new test passes with the mocks that throw, and the existing
+- [x] The new test passes with the mocks that throw, and the existing
       syntax tests pass.
-- [ ] Logs are recorded, and the Progress Log is updated.
+- [x] Logs are recorded, and the Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
+**Blockers**: None.
+
+### Session: 2026-09-30 (implementation)
+**Tasks Completed**: Moved the tree-sitter capture types, classes, loader and parser to `editor/src/code/syntax-core.ts`; added sorted, first-capture-wins `styleSpans`; kept `syntax.ts` as the CodeMirror adapter with shared visible-range deduplication; added the throwing-mock core test. No EDS-10 files outside the plan's writePaths were changed.
+**Pre-edit hashes / intent**:
+- `editor/src/code/syntax.ts` `716c5b09bb38b37737837efb99c1457afe0e8f8c9244da2e59bc4b03f37a5bcb`: keep the current CodeMirror plugin and visible-range behavior; replace capture mapping with `styleSpans`, and re-export the moved API.
+- `editor/src/code/syntax-core.ts`: absent in the authoritative pre-node snapshot; move capture types, class map, loader and parser implementation here, adding sorted deduplicated style spans.
+- `editor/test/code/syntax-core.test.ts`: absent in the authoritative pre-node snapshot; add the node test with throwing CodeMirror mocks and assertions from the plan.
+- `impl-plans/active/eds-10-syntax-span-core.md` `1526d633a83f68d018d901ca6f4d7b21cf52b852bbaa23b0f0446d93dedba079`: append implementation intent and source hashes before editing the adapter.
+- Adapter result: `editor/src/code/syntax.ts` is now `d83962dcf1a1a8b6a44fc8a565d4e05f1ebf3835c6c70d813f87655f101e539d`; `editor/src/code/syntax-core.ts` is `8aab1b65c59afc8ee4f1b421c0842ee566b97432dac282222c6a27b4a565e52a`.
+- Next edit intent: add `editor/test/code/syntax-core.test.ts` with throwing CodeMirror mocks, real runtime/grammar WASM setup, requested style/range assertions and a source check; test file was absent in the fanout snapshot.
+**Post-edit hashes**:
+- `editor/src/code/syntax-core.ts`: `8aab1b65c59afc8ee4f1b421c0842ee566b97432dac282222c6a27b4a565e52a`
+- `editor/src/code/syntax.ts`: `d83962dcf1a1a8b6a44fc8a565d4e05f1ebf3835c6c70d813f87655f101e539d`
+- `editor/test/code/syntax-core.test.ts`: `3ab4d61db67de712c010394e3147b72452020e849d3c1f520ac1a0572d16c6fd`
+**Verification**:
+- `cd editor && npx tsc --noEmit` — exit 0; complete log: `tmp/cmp/EDS-10/attempt-1/tsc-rerun.log`.
+- `cd editor && npx vitest run test/code/syntax-core.test.ts test/code/syntax.test.ts test/code/syntax-fallback.test.ts` — exit 0; 3 files and 10 tests passed; complete log: `tmp/cmp/EDS-10/attempt-1/vitest.log`.
+- Initial typecheck wrapper attempt exited 1 because zsh rejected an assignment to its read-only `status` variable after the check ran; preserved in `tmp/cmp/EDS-10/attempt-1/tsc.log`. The rerun above is complete and passed.
 **Blockers**: None.
 
 ## Related Plans

@@ -1,6 +1,6 @@
 # CMP-30: Editor Completion Service (`completion.ts`)
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CMP-30 (wave 2; parallel with CMP-20, CMP-21, CMP-31)
 **Design Reference**: `design-docs/specs/design-completion.md` 6.1, 6.6, 7.4 (the service bullets)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -118,18 +118,28 @@ Follow `cmp-dispatch.json` `editProtocol`. Write logs to
 
 ## Completion Criteria
 
-- [ ] The pinned exports exist, and the service never throws.
-- [ ] The UTF-16 and UTF-8 helpers are correct for Japanese text and
+- [x] The pinned exports exist, and the service never throws.
+- [x] The UTF-16 and UTF-8 helpers are correct for Japanese text and
       surrogate pairs.
-- [ ] The fallback disables the engine after one failure.
-- [ ] `completion.ts` has no `@codemirror` import.
-- [ ] Logs are recorded, and the Progress Log is updated.
+- [x] The fallback disables the engine after one failure.
+- [x] `completion.ts` has no `@codemirror` import.
+- [x] Logs are recorded, and the Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
 **Blockers**: Waits for CMP-15 and EDS-12.
+
+### Session: 2026-09-30 (session 226, step 6 implementation)
+**Tasks Completed**: Added `editor/src/code/completion.ts` with the pinned UTF-16/UTF-8 helpers, shared-ToolWasm completion engine and permanent first-failure fallback. Added `editor/test/code/completion.test.ts` covering ASCII, Japanese text, surrogate pairs, result mapping, status/export handling, fallback, and the CodeMirror import boundary. Current source hashes: `completion.ts` 7038cf116edd9bcb063db3a3fb7033efa98cf502e7b113241b7f396a4950553c; `completion.test.ts` 7ab26635d5d0bf954ee63d7c6b085b78c0db423fe777c61eee7becd56bad667c.
+**Verification**: `cd editor && npx vitest run test/code/completion.test.ts` exit=0, 12/12 tests passed; complete log `tmp/cmp/CMP-30/attempt-1/vitest.log`. `cd editor && npx tsc --noEmit` exit=1; complete log `tmp/cmp/CMP-30/attempt-1/tsc.log`; blocked by sibling-owned `editor/src/code/completion-popup.ts:114` (TS2678: `Ctrl-Space` is excluded by the narrowed switch union). CMP-30 does not own that path; retry after sibling changes stabilize.
+**Blockers**: Required TypeScript gate has no passing result yet because of the sibling-owned popup type error. Resume criterion: after CMP-31 repairs or completes `editor/src/code/completion-popup.ts`, rerun `cd editor && npx tsc --noEmit` and record exit=0.
+
+### Session: 2026-09-30 (session 226, step 6 stable-tree verification)
+**Tasks Completed**: CMP-15 and EDS-12 dependencies were accepted by dispatch. All five CMP-30 completion criteria are met. The initial TypeScript failure was in sibling-owned `editor/src/code/completion-popup.ts:114`; after that shared source stabilized, the required typecheck passed. The plan remains In Progress pending downstream review and CMP-40 closeout.
+**Verification**: `cd editor && npx tsc --noEmit` exit=0; complete log `tmp/cmp/CMP-30/attempt-2/tsc.log`. `cd editor && npx vitest run test/code/completion.test.ts` exit=0, 12/12 passed; complete log `tmp/cmp/CMP-30/attempt-2/vitest.log`. The earlier sibling-caused tsc exit=1 remains recorded at `tmp/cmp/CMP-30/attempt-1/tsc.log`; the retry is on the stable shared tree. Current source hashes: `completion.ts` 7038cf116edd9bcb063db3a3fb7033efa98cf502e7b113241b7f396a4950553c; `completion.test.ts` 7ab26635d5d0bf954ee63d7c6b085b78c0db423fe777c61eee7becd56bad667c.
+**Blockers**: None for CMP-30 implementation or its required gates. Formal review, CMP-32 wiring, and CMP-40 integration/closeout remain downstream.
 
 ## Related Plans
 

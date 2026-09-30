@@ -108,15 +108,25 @@ logs to `tmp/cmp/CMP-15/attempt-<n>/`.
 
 ## Completion Criteria
 
-- [ ] Every pinned export exists with exactly the pinned names and shapes.
-- [ ] The tests pass, and `tsc --noEmit` passes.
-- [ ] No `@codemirror` string appears in `completion-types.ts`.
-- [ ] The Progress Log records the commands, exit codes and log paths.
+- [x] Every pinned export exists with exactly the pinned names and shapes.
+- [x] The tests pass, and `tsc --noEmit` passes.
+- [x] No `@codemirror` string appears in `completion-types.ts`.
+- [x] The Progress Log records the commands, exit codes and log paths.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
+**Blockers**: None.
+
+### Session: 2026-09-30 (CMP-15 implementation)
+**Tasks Completed**: Added the pinned completion contract types, `CompletionSurface` members, ordered key constants, completion user-event constant and trigger-character predicate. Added focused Vitest coverage for trigger and non-trigger inputs, key ordering, user-event value and absence of CodeMirror references.
+**Verification**:
+- `cd editor && npx tsc --noEmit` — exit 0; complete log: `tmp/cmp/CMP-15/attempt-3/tsc.log`.
+- `cd editor && npx vitest run test/code/completion-types.test.ts` — exit 0; 17 passed, 0 failed; complete log: `tmp/cmp/CMP-15/attempt-3/vitest.log`.
+**Prior attempts**:
+- Initial tsc log wrapper exited 1 before recording the child status because zsh reserves the variable name `status`; retained at `tmp/cmp/CMP-15/attempt-1/tsc.log`. The corrected wrapper rerun passed (exit 0), retained at `tmp/cmp/CMP-15/attempt-2/tsc.log`.
+- `cd editor && npx vitest run test/code/completion-types.test.ts` initially exited 1 (16 passed, 1 failed) because Vitest supplied a non-file `import.meta.url`; retained at `tmp/cmp/CMP-15/attempt-2/vitest.log`. Source lookup now uses the editor working directory; final rerun passed as recorded above.
 **Blockers**: None.
 
 ## Related Plans

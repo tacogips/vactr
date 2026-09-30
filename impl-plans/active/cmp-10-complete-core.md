@@ -336,3 +336,40 @@ Patterns to imitate:
 ## Related Plans
 
 - **Next**: CMP-20, CMP-21
+
+### Session: 2026-09-30 (CMP-10 implementation)
+**Tasks Completed**: Added the pinned public completion API and byte status seam; implemented cursor scanning, scope/source collection and ranking; added context, scope, rank and robustness tests; added the exact completion module doc bullet and `pub mod complete;` line in `src/lib.rs`.
+**Edit evidence**: Before/after hashes and per-file intended behavior are recorded in `tmp/cmp/CMP-10/attempt-1/edit-intents.md`. The preserved fanout snapshot was read-only (sha256 `728efca8bac734a00b2204c046e997ce9b358b8dbb3e10e3ce09ae3174e044b6`).
+**Verification**: An early `CARGO_TERM_QUIET=true cargo build` completed with exit=0 before implementation was complete; captured output is at `tmp/cmp/CMP-10/attempt-1/0-initial-build.log`. It is not final-source evidence. The plan gates 1-7 remain pending serial verification after this handoff.
+**Completion Criteria**: API, source files, tests and `src/lib.rs` change are implemented; behavioral completeness and all gates await serial verification. No blocker identified.
+
+### Session: 2026-09-30 (CMP-10 bounded repair)
+**Tasks Completed**: Repaired the reported pair-colon, pipe seed-control, empty-limit, UTF-8 cursor test, for-pattern and function-parameter cases. Added document fn/inst key eligibility/source coverage, match pair-pattern binder coverage, formatter fixture prefix enumeration and the exact JSON wire-field/name assertion.
+**Edit evidence**: Follow-up intents and literal pre-edit hashes are in `tmp/cmp/CMP-10/attempt-1/edit-intents.md`; final source hashes are recorded there after handoff. No shared paths were edited.
+**Verification**: Per serial owner instruction, no verification commands were run during this follow-up. Fresh build, nextest and the CMP-10 plan gates remain pending.
+**Completion Criteria**: All requested bounded repairs and added tests are implemented. Criteria requiring passing fresh behavioral and wasm/performance gates remain unchecked pending verification.
+
+### Session: 2026-09-30 (CMP-10 criteria audit)
+**Tasks Completed**: Added dynamic metadata and native PairKey assertions, including no-prior-pair arity fallback; added both for-pattern binders, sibling/outside block visibility, tab-only parameters and inner shadow detail assertions; made sound/synth/template keyword suborder precede controls; added explicit match-class, tier and label tie-break ordering assertions.
+**Behavioral changes**: Scope descent now follows cursor indentation and function/instance details identify the owning declaration. Sound keyword controls remain available after sound/synth/template candidates.
+**Edit evidence**: Exact audit intents and literal pre/post hashes are recorded in `tmp/cmp/CMP-10/attempt-1/edit-intents.md`.
+**Verification**: No checks were run in this bounded audit; fresh checker and plan gates remain pending.
+
+### Session: 2026-09-30 (CMP-10 explicit criteria assertions)
+**Tasks Completed**: Added dynamic metadata and native PairKey tests that assert the selected key, tier precedence and pre-arity fallback; added explicit both-k/v, sibling/outside block, tab-only parameter and inner shadow-detail checks; added sound/synth/template-before-control ordering and rank class/tier/label tie-break assertions. Block traversal now follows the last preceding statement and cursor indentation so closed blocks do not leak.
+**Edit evidence**: Per-edit intents and hashes are in `tmp/cmp/CMP-10/attempt-1/edit-intents.md`.
+**Verification**: No checks run in this turn; fresh post-modification checker and seven gates are pending.
+
+### Session: 2026-09-30 (CMP-10 final verification)
+**Tasks Completed**: Final core and test implementation passed all seven assigned verification gates. The tests explicitly cover seven cursor contexts, native and metadata PairKey paths, scope binders and visibility, candidate sources and order, ranking classes/tiers/ties/cap, JSON/status wire contract, corpus/fixture prefixes and 2,000 mutants.
+**Verification (final source)**:
+1. `CARGO_TERM_QUIET=true cargo build` — exit=0; `tmp/cmp/CMP-10/attempt-1/1-cargo-build-final4.log`.
+2. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit=0; `tmp/cmp/CMP-10/attempt-1/2-wasm-build-final4.log`.
+3. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run complete::` — exit=0, 16 passed, 1657 skipped; `tmp/cmp/CMP-10/attempt-1/3-nextest-final4.log`.
+4. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --release --run-ignored only -E 'test(budget)'` — exit=0; median 1.071 ms from the quiet-cargo no-capture run; `tmp/cmp/CMP-10/attempt-1/4-release-budget-final4.log`, latest median evidence `tmp/cmp/CMP-10/attempt-1/4-release-budget-median-final5.log`.
+5. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` — exit=0; `tmp/cmp/CMP-10/attempt-1/5-clippy-final4.log`.
+6. `rustfmt --edition 2021 --check src/complete/*.rs src/complete/tests/*.rs src/lib.rs` — exit=0; `tmp/cmp/CMP-10/attempt-1/6-rustfmt-final4.log`.
+7. `wc -l src/complete/*.rs src/complete/tests/*.rs` — exit=0; every Rust file is below 1000 lines; `tmp/cmp/CMP-10/attempt-1/7-line-count-final4.log`.
+**Additional check**: `CARGO_TERM_QUIET=true cargo check` — exit=0; final-source log `tmp/cmp/CMP-10/attempt-1/1-cargo-check-final4.log`.
+**Evidence**: Edit intents and pre/post hashes are in `tmp/cmp/CMP-10/attempt-1/edit-intents.md`. Persisted clippy, rustfmt and line-count wrapper failures are retained with final successful reruns. Two early agent-mediated nextest failures were reported before a complete plan-local log was requested; their reported compile/test failures were repaired, and final passing nextest runs have complete logs.
+**Completion Criteria**: Implementation and all plan-owned verification are complete. Formal review and downstream plans CMP-20/CMP-21 remain separate workflow steps.

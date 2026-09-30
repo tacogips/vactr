@@ -1,6 +1,6 @@
 # CMP-31: Completion DOM Popup (`completion-popup.ts`)
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CMP-31 (wave 2; parallel with CMP-20, CMP-21, CMP-30)
 **Design Reference**: `design-docs/specs/design-completion.md` 6.2, 6.3, 6.5, 7.4 (the popup bullets); user-QA C6
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -168,18 +168,26 @@ Follow `cmp-dispatch.json` `editProtocol`. Write logs to
 
 ## Completion Criteria
 
-- [ ] The pinned exports and the DOM contract are implemented, and the
+- [x] The pinned exports and the DOM contract are implemented, and the
       behavior table is covered by the tests above.
-- [ ] Keys are never consumed while the popup is closed (except
+- [x] Keys are never consumed while the popup is closed (except
       `Ctrl-Space`), and IME and staleness rules hold.
-- [ ] `completion-popup.ts` has no `@codemirror` import.
-- [ ] Logs are recorded, and the Progress Log is updated.
+- [x] `completion-popup.ts` has no `@codemirror` import.
+- [x] Logs are recorded, and the Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
 **Blockers**: Waits for CMP-15.
+
+### Session: 2026-09-30 (session 226, step 6 implementation)
+**Tasks Completed**: Implemented `CompletionPopup` against the pinned `CompletionSurface` and `CompletionSource` contracts. Added the listbox and option DOM, fixed caret positioning, 12-row scroll window, trigger filtering, closed-key propagation, navigation and acceptance, mouse handling, IME/blur/selection closure, exact-text/latest-sequence staleness checks, one-in-flight dirty coalescing, and subscription cleanup. Added fake-surface vitest coverage for the behavior table, including queued requests and invalidation on close events. `completion-popup.ts` has no `@codemirror` import.
+**Verification**:
+- `cd editor && npx tsc --noEmit` — exit 0; final-source log `tmp/cmp/CMP-31/attempt-1/11-tsc-final.log`.
+- `cd editor && npx vitest run test/code/completion-popup.test.ts` — exit 0, 1 file and 10/10 tests passed; final-source log `tmp/cmp/CMP-31/attempt-1/12-vitest-final.log`.
+- Earlier checks were repaired and rerun: `01-tsc.log` (exit 1, TypeScript diagnostics fixed in edit 03), `02-vitest.log` (exit 1, 7/9 passed; test fixture ownership/expected current selection corrected in edit 03), `03-tsc-rerun.log` and `04-vitest-rerun.log` (exit 0; 9/9), and `07-tsc-source-final.log` and `08-vitest-source-final.log` (exit 0; 10/10). The final-source pair above also covers the explicit 24px row bound.
+**Blockers**: None for CMP-31 implementation. Formal integrity/adversarial review and combined-tree acceptance remain downstream in the workflow; no review approval is claimed here.
 
 ## Related Plans
 

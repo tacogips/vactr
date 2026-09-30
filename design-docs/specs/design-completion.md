@@ -765,13 +765,37 @@ the files it owns. Workspace-wide gates run at reconcile.
 | 2 | CMP-30 completion-service | `editor/src/code/completion.ts`, `editor/test/code/completion.test.ts` | CMP-15, EDS-12 | vitest `code/completion` |
 | 2 | CMP-31 completion-popup | `editor/src/code/completion-popup.ts`, `editor/test/code/completion-popup.test.ts` | CMP-15 | vitest `completion-popup` |
 | 3 | CMP-32 completion-view-wiring | `editor/src/code/{completion-view.ts,mount.ts}`, `editor/src/app/{main.ts,deps.ts}`, `editor/test/code/completion-view.test.ts`, `editor/test/wasm/completion-engine.test.ts` | CMP-21, CMP-30, CMP-31, EDS-12 | vitest `completion-view`, `wasm/completion-engine` |
-| 4 | CMP-40 closeout | `README.md`, `impl-plans/README.md`, plan status and archive, the status lines of this document and `design-formatter-and-syntax.md` | all | the full gate of section 9 |
+| 4 | CMP-40 closeout | `README.md`, `impl-plans/README.md`, the status lines of this document and `design-formatter-and-syntax.md`, and each of the 12 cmp/eds/fst-50 plan files and `cmp-dispatch.json` in `impl-plans/active/` with its `impl-plans/completed/` destination (files only) | all | the full gate of section 9 |
 
 CMP-32 is the only plan that edits `mount.ts`, `main.ts` and `deps.ts`,
 so no two plans share them. CMP-30 and CMP-31 work against fakes of the
 CMP-15 interfaces, so they do not wait for CMP-21. The real wasm is
 exercised by CMP-21's raw-export test and by CMP-32's
 `WasmCompletionEngine` test.
+
+Closeout run (session 234, no design change). Session 226 accepted
+every plan except CMP-40, but its CMP-40 dispatch failed because that
+manifest entry listed directories, which exceeded the 512-entry fanout
+snapshot (tacogips/riela#128). The closeout is dispatched from a new
+manifest, `impl-plans/active/cmp-closeout-dispatch.json`:
+
+- `plans` holds CMP-40 only;
+- the 11 accepted plans (CMP-10, CMP-15, FST-50, EDS-10, EDS-11,
+  EDS-12, CMP-20, CMP-21, CMP-30, CMP-31, CMP-32) are listed in the
+  top-level `acceptedDependencies` as `{planId, planPath}`, so they are
+  treated as satisfied and are not re-implemented;
+- CMP-40's `writePaths` are the concrete files of the row above, and
+  its `sharedPaths` are the concrete source, test and fixture files
+  changed since `a61fc2e`. No entry is a directory.
+
+`cmp-dispatch.json` is not dispatched again; it is archived with the
+plans. `cmp-closeout-dispatch.json` stays in `impl-plans/active/`, like
+the earlier `fst-dispatch.json`. The uncommitted working tree is the
+accepted implementation. A material integration finding (a gate
+failure, a violated rule of this document or of
+`design-formatter-and-syntax.md`, or a cross-plan contract mismatch) is
+repaired in its owning file with a minimal edit and re-verified; a
+finding that needs a design change stops the closeout.
 
 ## 9. Verification gate
 

@@ -1,6 +1,6 @@
 # CMP-20: LSP Completion on the Engine
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CMP-20 (wave 2; parallel with CMP-21, CMP-30, CMP-31)
 **Design Reference**: `design-docs/specs/design-completion.md` 4.1, 4.2, 7.2; `design-docs/specs/design-implementation.md` 14.5 (Revised 2026-09-30)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -149,20 +149,32 @@ wave. Write logs to `tmp/cmp/CMP-20/attempt-<n>/`.
 
 ## Completion Criteria
 
-- [ ] The LSP completion path calls `complete::complete`, and the
+- [x] The LSP completion path calls `complete::complete`, and the
       response is `CompletionResponse::List` with `is_incomplete`.
-- [ ] The items carry UTF-16 `text_edit`s, a rank `sort_text` and the
+- [x] The items carry UTF-16 `text_edit`s, a rank `sort_text` and the
       mapped kinds.
-- [ ] The changed test matches design 4.2, and the new tests (local,
+- [x] The changed test matches design 4.2, and the new tests (local,
       keyword, control, UTF-16, incomplete, string and comment, superset)
       pass.
-- [ ] Steps 1-6 are logged, and the Progress Log is updated.
+- [x] Steps 1-6 are logged, and the Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
-**Blockers**: Waits for CMP-10.
+**Dependency**: CMP-10 accepted for the implementation wave.
+
+### Session: 2026-09-30 (session 226, step 6 implementation)
+**Tasks Completed**: CMP-10 was accepted in the runtime dependency set. Replaced the LSP's prefix-only completion with the shared engine and `CompletionList`; mapped candidates to LSP kinds, UTF-16 `text_edit`s, `filter_text` and rank `sort_text`; preserved the vector wrapper; updated the design 4.2 test and added seven focused LSP tests. The new test module owns an `open` helper because the existing helper is private to the sibling `analysis` module.
+**Verification**:
+- `CARGO_TERM_QUIET=true cargo build --features lsp` — exit=0 (`tmp/cmp/CMP-20/attempt-1/05-build-lsp.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --features lsp lsp::` — exit=0; 23 passed, 0 failed (`tmp/cmp/CMP-20/attempt-1/12-nextest-lsp-quiet.log`; independently rerun after helper repair, 23 passed, 0 failed, `tmp/cmp/CMP-20/attempt-1/11-check-agent-nextest.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings` — exit=0 (`tmp/cmp/CMP-20/attempt-1/07-clippy-lsp.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` — exit=0 (`tmp/cmp/CMP-20/attempt-1/08-clippy-default.log`).
+- `rustfmt --edition 2021 --check src/lsp/analysis.rs src/lsp/server.rs src/lsp/tests/mod.rs src/lsp/tests/analysis.rs src/lsp/tests/complete.rs` — exit=0 (`tmp/cmp/CMP-20/attempt-1/09-rustfmt.log`).
+- `wc -l src/lsp/analysis.rs src/lsp/tests/analysis.rs src/lsp/tests/complete.rs` — exit=0; 622, 644 and 176 lines (`tmp/cmp/CMP-20/attempt-1/10-line-count.log`).
+**Repair evidence**: Initial nextest compilation failed because the new module imported a private sibling test helper (`tmp/cmp/CMP-20/attempt-1/02-nextest-lsp.log`, exit=101). Added a local helper as the plan permits; the source-matched reruns above pass. The initial feature build and formatting/line checks are recorded in `01-build.log`, `03-rustfmt.log` and `04-line-count.log`.
+**Handoff**: Implementation criteria are complete. Combined-tree integration review and final plan closeout remain with CMP-40.
 
 ## Related Plans
 

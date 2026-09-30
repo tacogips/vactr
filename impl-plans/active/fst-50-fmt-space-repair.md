@@ -178,22 +178,38 @@ logs to `tmp/cmp/FST-50/attempt-<n>/`.
 
 ## Completion Criteria
 
-- [ ] The repair runs only under the design 3.9 preconditions. The re-read
+- [x] The repair runs only under the design 3.9 preconditions. The re-read
       gate is enforced, and refusal returns the original text and
       diagnostics.
-- [ ] 2- and 4-space fixtures convert, are idempotent and equal the tab
+- [x] 2- and 4-space fixtures convert, are idempotent and equal the tab
       version, and the ambiguous, mixed and other-error cases are refused
       unchanged.
-- [ ] The CLI tests pass, and the existing fmt and CLI tests pass
+- [x] The CLI tests pass, and the existing fmt and CLI tests pass
       unchanged.
-- [ ] Verification steps 1-7 are logged with `exit=0`.
-- [ ] The Progress Log is updated.
+- [x] Verification steps 1-7 are logged with `exit=0`.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: Plan authored (session 226, step 4).
 **Blockers**: None.
+
+### Session: 2026-09-30 (session 226, step 6 implementation)
+**Tasks Completed**: Added the conservative pure-space repair and zero-error reread gate; added 2/4-space, ambiguous/mixed/other-error fixtures, Rust guarantees and refusal tests, mutation coverage for repaired inputs, and three CLI tests. Acceptance criteria 1-3 pass.
+**Edit Evidence**: `tmp/cmp/FST-50/attempt-1/rust-edit-evidence.txt`, `fixture-edit-intent.txt`, `test-edit-intent.txt`, `mutation-shadowing-fix-intent.txt`, and `repair-test-edit-intent.txt`.
+**Attempt 1**: `CARGO_TERM_QUIET=true cargo build` exit=0 (`tmp/cmp/FST-50/attempt-1/step-1.log`); `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run fmt::` exit=101 before compiling tests because concurrent `src/complete/mod.rs` referenced a missing `src/complete/tests` module (`step-2.log`).
+**Attempt 2**: Step 1 `CARGO_TERM_QUIET=true cargo build` exit=0 (`tmp/cmp/FST-50/attempt-2/step-1.log`); step 2 `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run fmt::` exit=0, 29/29 passed (`step-2.log`); step 3 `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run cli::tests::fmt` exit=0, 9/9 passed (`step-3.log`); step 4 `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` exit=0 (`step-4.log`); step 5 `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` exit=101 due to `clippy::question_mark` at sibling-owned `src/complete/rank.rs:30` (`step-5.log`); step 6 `rustfmt --edition 2021 --check src/fmt/mod.rs src/fmt/repair.rs src/fmt/tests/mod.rs src/fmt/tests/repair.rs src/fmt/tests/mutation.rs src/cli/tests/fmt.rs` exit=0 (`step-6.log`); step 7 `mise run fmt-vact-check` exit=0 (`step-7.log`).
+**Blocker**: Step 5 requires a retry after the sibling-owned Clippy finding is repaired. Verification criterion remains unchecked. No out-of-plan files were edited.
+
+### Session: 2026-09-30 (implementation continuation 1)
+**Tasks Completed**: Rechecked the outstanding verification gap. FST-50 source hashes remain unchanged since attempt 2; `src/complete/rank.rs` still contains the `let...else` rejected by Clippy at line 30 (current sha256 `c6caa6f0c2f017862947ba802ce202631190418b4feed3d285e2b255b6b3637e`).
+**Review Decision**: Do not edit `src/complete/rank.rs`; it is outside FST-50 `writePaths` and owned by CMP-10. No repeat Clippy command was run while this concrete ownership mismatch remains. Resume step 5 after CMP-10 repairs that lint, then record the complete log and exit code here.
+**Evidence**: `tmp/cmp/FST-50/attempt-3/ownership-check-edit-intent.txt`; prior failing command and complete output remain in `tmp/cmp/FST-50/attempt-2/step-5.log`.
+
+### Session: 2026-09-30 (serial reconciliation after fanout join)
+**Tasks Completed**: Step 5 blocker resolved by the CMP-10 owner. `src/complete/rank.rs` sha256 is now `dc68a20d15ed1faa36ddea6f1552d57643a668018d67963aa4993c34c0130f91` (was `c6caa6f0...`), and line 30 reads `let (i, _) = found?;`. On the combined tree, `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` exit=0 (`tmp/cmp/FST-50/reconcile/step-5.log`, a copy of `tmp/cmp/reconcile/01-clippy-all-targets.log`). Steps 1-4 and 6-7 were rerun on the combined tree, all exit=0: build (`tmp/cmp/reconcile/02-cargo-build.log`), `fmt::` 29/29 (`06-nextest-fmt.log`), `cli::tests::fmt` 9/9 (`07-nextest-cli-fmt.log`), wasm32 (`03-wasm32-build.log`), rustfmt (`04-rustfmt-check.log`), fmt-vact-check (`10-mise-fmt-vact-check.log`). FST-50 source files were not edited in this session.
+**Blockers**: None. Integration review owns acceptance and the Status change.
 
 ## Related Plans
 

@@ -236,3 +236,9 @@ Run from the repository root and save every log under `tmp/logs/`.
 **Repair**: `cargo clippy --all-targets -- -D warnings` failed on `clippy::assertions_on_constants` at `src/dsp/tests/dsp/bass_voice.rs:11`. The `PORT_COUNT <= MAX_PORTS` check is now a compile-time `const _: () = assert!(...)`, which keeps the check.
 **Correction**: The adversarial review moved `pub mod bass_voice;` after `analog_percussion`. The current `src/dsp/ugen/mod.rs` SHA-256 is `76a980db3c5094b3c293193252ad69695d83f94efff9c7cd7cbea7280d1470e4`, which replaces the earlier "after" hash. Canonical logs are under `tmp/bass-voices-229/BASS-00/` and `tmp/bass-voices-229/reconcile/`.
 **Verification** (logs in `tmp/bass-voices-229/reconcile/attempt-2/`): cargo build, cargo fmt --check, clippy -D warnings, wasm32 host-wasm build, and mise run lint all exit 0. Full nextest: 1627 passed, 2 skipped, exit 0. The `test(/bass_voice::/)` filter: 4 passed, exit 0.
+
+### Session: 2026-09-30 (session 232 closeout)
+**Tasks Completed**: The scaffold was adopted by BASS-20 and BASS-30. The whole bass voice set was accepted by serial integration review (comm-003043).
+**Verification**: Combined-tree reconcile gates in `tmp/bass-voices-232/reconcile/wave-7/` all exit 0 (build, clippy, fmt check, mise lint, full nextest 1697 passed, wasm32 build).
+**Remaining (non-blocking)**: The Step 8 move to `impl-plans/completed/` was denied by the sandbox and is still pending.
+**Status**: Completed.

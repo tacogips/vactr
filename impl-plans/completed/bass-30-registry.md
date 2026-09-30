@@ -1,6 +1,6 @@
 # BASS-30: Register `bass-core` and the Six Bass Templates
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BASS-30 (wave 3; the only registry-owning plan)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "Registration and digest stability", "Controls", "Tempo sync" and "Verification" (e2e template tests)
 **Created**: 2026-09-30
@@ -274,12 +274,33 @@ Save logs under `tmp/logs/`.
 
 ## Done Criteria
 
-- [ ] All six templates are appended, registered, editor-visible and
+- [x] All six templates are appended, registered, editor-visible and
       audible.
-- [ ] 18 golden lines added and 0 removed.
-- [ ] Verification 1-5 pass and are recorded.
+- [x] 18 golden lines added and 0 removed.
+- [x] Verification 1-5 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+
+### Session: 2026-09-30 (BASS-30 implementation)
+**Tasks Completed**: All BASS-30 Done Criteria.
+**Notes**: Registered `BassCore` through graph/node, fixed-state allocation, mixer dispatch, catalog ports, codec tag 98, build names, native identifiers, and tempo/onset controls. Appended the six templates in the accepted order and raised template capacity to 80. Added bass editor parameter tables, header-default overrides for Float/Bool/Enum values, and the specified custom ranges. Added the bass-core seed-order test, registration/ports/render/wobble/slide/editor e2e coverage, shared offline WAV helper and its four self-tests, plus BASS-40/BASS-41 placeholder modules. Blessed exactly 18 new golden lines and removed none; `THIRD_PARTY_NOTICES.md` is unchanged.
+
+**Verification**:
+- `rustfmt --edition 2021 --check` over all BASS-30 owned Rust paths: passed, exit 0 (`tmp/logs/bass-30-registry-rustfmt.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass/) | test(/e2e::templates/) | test(/seed_order/) | test(/catalog/) | test(/live_input/) | test(/ported::tests/) | test(/inst/) | test(/codec/) | test(/contracts/)'`: passed, 439 run, 439 passed, 0 failed (`tmp/logs/bass-30-registry-nextest.log`).
+- `CARGO_TERM_QUIET=true VACTR_BLESS_GOLDEN=1 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --run-ignored ignored-only -E 'test(/bless_golden_digests/)'`: passed, 1 run, 1 passed, 0 failed (`tmp/logs/bass-30-registry-bless.log`). Final golden diff: 0 removed, 18 added (`tmp/bass-voices-232/BASS-30/final-audit.log`).
+- `git diff --check`: exit 0. `THIRD_PARTY_NOTICES.md` diff: empty. All recorded Rust files are under 1000 lines; registry files are under their stricter limits.
+
+**Repairs**: The first compile exposed a visibility issue for the bass default-override table and an editor-test reference mismatch; both were fixed. The first integrated e2e run then found `fm-bass.res` defaulted to the generic row value (0.3) instead of the pinned header value (0.1); added its override and reran all 439 selected tests successfully. Earlier complete logs are `tmp/bass-voices-232/BASS-30/bless.log` and `tmp/bass-voices-232/BASS-30/nextest.log`.
+
+**Downstream**: Full workspace build/clippy/fmt/nextest and wasm gates belong to serial reconcile. Formal integrity/adversarial/integration review, BASS-40/BASS-41 implementation, final documentation reconciliation, commit, and push remain downstream workflow steps.
+
+### Session: 2026-09-30 (session 232 closeout)
+**Tasks Completed**: Accepted by fanout review and serial integration review (comm-003043). BASS-40 and BASS-41 are complete.
+**Verification**: Combined-tree reconcile gates in `tmp/bass-voices-232/reconcile/wave-7/` all exit 0 (build, clippy, fmt check, mise lint, full nextest 1697 passed, wasm32 build). Digests 9/9 passed. `golden-readme-diff.log` shows 18 golden lines added, 0 removed.
+**Remaining (non-blocking)**: No browser check of the editor template palette. The Step 8 move to `impl-plans/completed/` was denied by the sandbox and is still pending.
+**Status**: Completed.

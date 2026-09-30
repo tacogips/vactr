@@ -5,7 +5,8 @@ original kernel UGen, a named-patch preset library, four techno example tracks,
 and the tests that render them offline. Linked from
 [`design-music.md` section 4.3](design-music.md#43-dedicated-bass-voices-author-2026-09-30).
 
-Status: accepted design for the wf/bass workflow (2026-09-30). Unresolved
+Status: accepted design for the wf/bass workflow (2026-09-30), implemented
+in session 232 by plans BASS-00..BASS-41 (see `impl-plans/README.md`). Unresolved
 decisions are recorded in
 [`../user-qa/pending-bass-questions.md`](../user-qa/pending-bass-questions.md);
 their recommendations are followed by default.

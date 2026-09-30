@@ -479,6 +479,7 @@ impl Template {
             | Node::DigitalSnareCore
             | Node::DigitalMetalCore
             | Node::DigitalHatCore
+            | Node::BassCore
             | Node::AnalogPercussion
             | Node::FeedbackDrum
             | Node::NoiseDrum

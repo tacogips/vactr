@@ -1,6 +1,6 @@
 # BASS-41: Techno Example Tracks, Example Render Tests and README
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BASS-41 (wave 4; parallel with BASS-40)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "Presets and examples", "Verification" (offline render tests) and "Risks" (README overlap)
 **Created**: 2026-09-30
@@ -164,11 +164,57 @@ in the Progress Log, citing the design's license boundary.
 
 ## Done Criteria
 
-- [ ] Four example files exist and render; 4 WAVs exist.
-- [ ] Tests pass with the exit code and count recorded.
-- [ ] README bullet group added; notices unchanged.
+- [x] Four example files exist and render; 4 WAVs exist.
+- [x] Tests pass with the exit code and count recorded.
+- [x] README bullet group added; notices unchanged.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+### Session: 2026-09-30 (BASS-41 implementation)
+**Tasks Completed**: Four techno examples, two focused offline-render tests, the README bass bullet group, and all plan-local verification.
+
+- Added `examples/acid-techno.vact` (132 BPM), `examples/rumble-techno.vact` (128 BPM), `examples/offbeat-bass-techno.vact` (126 BPM), and `examples/wobble-techno.vact` (136 BPM). Existing examples were not edited; no master limiter was added.
+- `bass_examples_render_and_meet_level_targets` renders each track for two cycles to `tmp/bass/examples/<stem>.wav` and checks faults, committed events, finite output, RMS > 1e-3, peak <= 1.0 and low-band share >= 0.3. `bass_examples_use_bass_templates` checks bass templates and the acid slide/accent and wobble LFO controls.
+- Successful render measurements (committed; finite; RMS; peak; low-band share):
+  - acid-techno (132 BPM): 48; true; 0.110741; 0.368705; 0.981867.
+  - rumble-techno (128 BPM): 42; true; 0.077585; 0.322180; 0.989055.
+  - offbeat-bass-techno (126 BPM): 21; true; 0.068792; 0.199399; 0.989580.
+  - wobble-techno (136 BPM): 20; true; 0.084721; 0.337725; 0.967983.
+- `rustfmt --edition 2021 --check src/host/tests/e2e/templates/bass_examples.rs`: exit 0 (`tmp/bass-voices-232/BASS-41/rustfmt-metrics.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_examples::/)' --no-capture`: exit 0, 2 run, 2 passed, 0 failed (`tmp/bass-voices-232/BASS-41/nextest-metrics.log`).
+- WAV count: 4. `git diff -U0 README.md` has one hunk. `THIRD_PARTY_NOTICES.md` is unchanged; the accepted design's license boundary says no MIT code was adapted.
+- README SHA-256: before `7dec92fa574a3da83ea1bec22c3ee36f046ab9a9d8c0c1f744e5b458e69c2c4a`; after `79301ce363f1ace424249fc97805fd6adec524b635b99882a5f0eba3192b5dce`.
+- Downstream workflow steps retain formal review, serial integration gates, and any review-dependent finalization.
+
+### Session: 2026-09-30 (test-integrity self-repair)
+**Tasks Completed**: Repaired one mid-severity test-integrity finding in the wobble-techno example and its guarding test.
+
+- Finding: `examples/wobble-techno.vact` used `lfo-rate [8 12]`. Per the design's structure rule the first list step (`note [:c1]`) defines structure and later list controls are sampled at existing onsets, so the single onset at cycle position 0 always sampled `8`; the 1/8-triplet value `12` was never played. The test only checked `wobble.contains("lfo-rate")`, so it could not detect this.
+- Edit 1: `examples/wobble-techno.vact` line 9 changed `lfo-rate [8 12]` to `lfo-rate {alt 8 12}` (per-cycle alternation). The line-8 comment already read "alternate 1/8 and 1/8-triplet wobble divisions" and was left unchanged.
+- Edit 2: `src/host/tests/e2e/templates/bass_examples.rs` (`bass_examples_use_bass_templates`) now asserts `wobble.contains("lfo-rate {alt 8 12}")` with message "wobble-techno alternates 1/8 and 1/8T lfo-rate per cycle"; no other assertion or the render test was changed.
+- New render measurements (committed; finite; RMS; peak; low-band share):
+  - acid-techno (132 BPM): 48; true; 0.110741; 0.368705; 0.981867 (unchanged).
+  - rumble-techno (128 BPM): 42; true; 0.077585; 0.322180; 0.989055 (unchanged).
+  - offbeat-bass-techno (126 BPM): 21; true; 0.068792; 0.199399; 0.989580 (unchanged).
+  - wobble-techno (136 BPM): 20; true; 0.084804; 0.337731; 0.969096 (was 0.084721; 0.337725; 0.967983, confirming the second cycle now differs).
+- `rustfmt --edition 2021 --check src/host/tests/e2e/templates/bass_examples.rs`: exit 0 (`tmp/bass-voices-232/BASS-41/test-integrity/rustfmt.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_examples::/)' --no-capture`: exit 0, 2 run, 2 passed, 0 failed (`tmp/bass-voices-232/BASS-41/test-integrity/nextest.log`).
+- Intent recorded in `tmp/bass-voices-232/BASS-41/intents/test-integrity-repair.md`.
+
+### Session: 2026-09-30 (adversarial review repair: acid-techno slide)
+**Tasks Completed**: Repaired one mid-severity adversarial finding in `examples/acid-techno.vact` line 10.
+
+- Adversarial review repair: acid-techno slide-from corrected to the design mapping note(N) - note(N+1) = +8 (eb2 -> g1) on steps 3 and 11, and gate-length 1 added on the preceding eb2 steps 2 and 10 so the slides are legato; render metrics from the rerun below.
+- acid-techno (132 BPM): committed=48; finite=true; rms=0.111997; peak=0.368705; low=0.982285 (was rms=0.110741; peak=0.368705; low=0.981867).
+- Other examples unchanged (rumble 0.077585 / 0.322180 / 0.989055; offbeat 0.068792 / 0.199399 / 0.989580; wobble 0.084804 / 0.337731 / 0.969096).
+- `cargo nextest run -E 'test(/bass_examples::/)' --no-capture`: exit 0, 2 passed (`tmp/bass-voices-232/BASS-41/adversarial/nextest-repair.log`).
+- Intent recorded in `tmp/bass-voices-232/BASS-41/adversarial/intent-acid-slide.md`.
+
+### Session: 2026-09-30 (session 232 closeout)
+**Tasks Completed**: Accepted by test-integrity review, adversarial review and serial integration review (comm-003043). The Step 8 documentation refresh reviewed the README hunk and kept it as the single bass hunk.
+**Verification**: Combined-tree reconcile gates in `tmp/bass-voices-232/reconcile/wave-7/` all exit 0 (full nextest 1697 passed, presets/examples 9/9). `golden-readme-diff.log` shows 1 README hunk.
+**Remaining (non-blocking)**: Manual listening pass on `tmp/bass/examples/*.wav` (4 files). The Step 8 move to `impl-plans/completed/` was denied by the sandbox and is still pending.
+**Status**: Completed.

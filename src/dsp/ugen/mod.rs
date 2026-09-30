@@ -20,6 +20,7 @@ use build_helpers::{mem_need, topo_order};
 pub mod additive;
 pub mod analog_pair;
 pub mod analog_percussion;
+pub mod bass_voice;
 pub mod braids_cloud;
 pub mod braids_digital;
 pub mod braids_filter;
@@ -230,6 +231,8 @@ pub enum Node {
         kind: EffectKind,
         fx: u8,
     },
+    /// Self-enveloped bass voice kernel (six prelude models).
+    BassCore,
 }
 
 pub use mixer::run;
@@ -254,6 +257,7 @@ impl Node {
                 | Node::DigitalSnareCore
                 | Node::DigitalMetalCore
                 | Node::DigitalHatCore
+                | Node::BassCore
                 | Node::AnalogPercussion
                 | Node::DualKick
                 | Node::SnarePair

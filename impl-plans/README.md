@@ -67,14 +67,16 @@ Large features are split into multiple related plans with cross-references.
 | [modular-clouds-texture.md](active/modular-clouds-texture.md) | In progress; four stereo texture adaptations, source parity pending | design-mutable-audio.md | 2026-09-28 |
 | [modular-streams-controls.md](active/modular-streams-controls.md) | Ready; six control functions and explicit analog audio boundary | design-mutable-audio.md | 2026-09-28 |
 | [modular-audio-effects.md](active/modular-audio-effects.md) | In progress; audio effects and XMOD SRC | design-mutable-audio.md | 2026-09-28 |
-| [bass-00-scaffold.md](active/bass-00-scaffold.md) | Ready; wave 0 bass kernel module tree and 32-port contract | design-bass-voices.md | 2026-09-30 |
-| [bass-10-filters.md](active/bass-10-filters.md) | Ready; wave 1 ZDF transistor and diode ladders | design-bass-voices.md | 2026-09-30 |
-| [bass-11-sources.md](active/bass-11-sources.md) | Ready; wave 1 polyBLEP/BLAMP oscillators, feedback FM, ADAA folder, bit depth | design-bass-voices.md | 2026-09-30 |
-| [bass-12-mods.md](active/bass-12-mods.md) | Ready; wave 1 envelopes, gate length, accent, glide, tempo-synced LFO | design-bass-voices.md | 2026-09-30 |
-| [bass-20-kernel.md](active/bass-20-kernel.md) | Ready; wave 2 `bass-core` render and six models | design-bass-voices.md | 2026-09-30 |
-| [bass-30-registry.md](active/bass-30-registry.md) | Ready; wave 3 registry, six templates, metadata, golden digests | design-bass-voices.md | 2026-09-30 |
-| [bass-40-presets.md](active/bass-40-presets.md) | Ready; wave 4 preset library and preset renders | design-bass-voices.md | 2026-09-30 |
-| [bass-41-examples.md](active/bass-41-examples.md) | Ready; wave 4 four techno examples, example renders, README | design-bass-voices.md | 2026-09-30 |
+| [bass-00-scaffold.md](completed/bass-00-scaffold.md) | Completed (session 232; integration review comm-003043); bass kernel module tree and 32-port contract | design-bass-voices.md | 2026-09-30 |
+| [bass-10-filters.md](completed/bass-10-filters.md) | Completed (session 232; integration review comm-003043); ZDF transistor and diode ladders | design-bass-voices.md | 2026-09-30 |
+| [bass-11-sources.md](completed/bass-11-sources.md) | Completed (session 232; integration review comm-003043); polyBLEP/BLAMP oscillators, feedback FM, ADAA folder, bit depth | design-bass-voices.md | 2026-09-30 |
+| [bass-12-mods.md](completed/bass-12-mods.md) | Completed (session 232; integration review comm-003043); envelopes, gate length, accent, glide, drift-free tempo-synced LFO | design-bass-voices.md | 2026-09-30 |
+| [bass-20-kernel.md](completed/bass-20-kernel.md) | Completed (session 232; integration review comm-003043); `bass-core` render and six models | design-bass-voices.md | 2026-09-30 |
+| [bass-30-registry.md](completed/bass-30-registry.md) | Completed (session 232; integration review comm-003043); registry, six templates, metadata, 18 golden digest lines | design-bass-voices.md | 2026-09-30 |
+| [bass-40-presets.md](completed/bass-40-presets.md) | Completed (session 232; integration review comm-003043); 19-patch preset library and preset renders; manual listening pending | design-bass-voices.md | 2026-09-30 |
+| [bass-41-examples.md](completed/bass-41-examples.md) | Completed (session 232; integration review comm-003043); four techno examples, example renders, README; manual listening pending | design-bass-voices.md | 2026-09-30 |
+| [bass-voices-232-dispatch.json](completed/bass-voices-232-dispatch.json) | Dispatch manifest for BASS-00..41 (session 232, checkpoint f986f19; all plans accepted) | - | 2026-09-30 |
+| [bass-voices-229-dispatch.json](completed/bass-voices-229-dispatch.json) | Superseded session 229 dispatch manifest (checkpoint 843bd8a) | - | 2026-09-30 |
 | [digital-drums.md](active/digital-drums.md) | Completed 2026-09-29; four digital drum families, kit and editor metadata (audible review pending) | design-music.md 4.1 | 2026-09-29 |
 | [vactr-core.md](active/vactr-core.md) | Completed (implementation, TASK-001..010, 2026-09-26; manual audible/browser/Tauri confirmations pending user sign-off) | design-docs/specs/design-implementation.md | 2026-09-26 |
 | [vactr-editor-scaffold.md](completed/vactr-editor-scaffold.md) | Completed (ED-SCAFFOLD, issue #5 TASK-010, wave 1; npm project, protocol client, store, transports, host.js options; holds the common ED contract; final-tree evidence `target/fe-logs/ed-final-*-s188-1.log`; accepted; archived 2026-09-26) | design-implementation.md 15.1.3, 15.1.4, 15.1.6 | 2026-09-26 |

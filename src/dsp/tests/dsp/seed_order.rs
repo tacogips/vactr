@@ -232,3 +232,10 @@ fn gated_template_build_allocates_nothing_in_place() {
     result.expect("in-place build succeeds");
     assert_eq!(allocations, 0);
 }
+
+#[test]
+fn bass_core_graph_uses_plain_ordinals() {
+    let graph = def(vec![UGenSpec::BassCore], vec![]);
+    let t = template(&graph);
+    assert_eq!(t.seed_ordinal(0), 0);
+}

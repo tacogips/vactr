@@ -1,6 +1,6 @@
 # BASS-12: Envelopes, Gate Length, Accent, Glide and Tempo-synced LFO
 
-**Status**: Ready (session 232: drift-free LFO revision)
+**Status**: Completed (session 232; accepted by fanout review and integration review comm-003043; ready to archive to `impl-plans/completed/`)
 **Plan ID**: BASS-12 (session 232 wave 1, runs alone; BASS-10 and BASS-11 re-verify after it)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "Envelopes and timing", "Tempo sync and wobble divisions", "Note length and slide" and "Verification"
 **Created**: 2026-09-30
@@ -319,10 +319,10 @@ commands in the manifest.
 
 ## Done Criteria
 
-- [ ] Interface contract exact, including the session 232 six-float `Lfo`;
+- [x] Interface contract exact, including the session 232 six-float `Lfo`;
       `mods.rs` under 450 lines. The cap was raised from 400 for the
       drift-free LFO.
-- [ ] Verification passes, with the exit code and test count recorded.
+- [x] Verification passes, with the exit code and test count recorded.
 - [x] Only writePaths changed.
 
 ## Progress Log
@@ -340,3 +340,15 @@ commands in the manifest.
 **Tasks Completed**: Revised the `Lfo` contract. The design and this plan now specify a six-float, drift-free layout: the phase is derived in f64 from an exact split sample count, and the LFO re-anchors on rate change. This replaces the three-float accumulating LFO. Added the long-playback, split-count and rate-change test specs. The `mods.rs` cap is now 450 lines.
 **Findings**: The ambiguous-integer `abs_diff` error that blocked the BASS-11 nextest (`tmp/bass-voices-229/BASS-11/nextest.log:57-60`, old line 183) is already fixed in the tree: `wrap` is annotated as `Option<usize>` at `bass_mods.rs:170`. The later BASS-12 run compiled and executed 17 tests (`tmp/bass-voices-229/BASS-12/nextest.log:42`).
 **Remaining**: Implement the revised `Lfo` in `mods.rs`, update the `Lfo` tests in `bass_mods.rs` (the `cycles(sr)` accessor, the six-field round-trip, three new tests), then run both verification commands.
+
+### Session: 2026-09-30 (session 232 implementation)
+**Tasks Completed**: Replaced incremental phase updates with the six-float LFO state and f64 sample-count-derived phase, including split-count carry and bitwise rate-change re-anchoring. Updated wrap/accessor and round-trip tests; added long-playback, split-count and rate-change tests. The `Option<usize>` wrap annotation remains in place. `mods.rs` is 432 lines.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/mods.rs src/dsp/tests/dsp/bass_mods.rs` exited 0 (`tmp/bass-voices-232/BASS-12/rustfmt-final.log`). `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_mods::/)'` exited 0 with 20 tests passed and 0 failed (`tmp/bass-voices-232/BASS-12/nextest.log`). The first format check exited 1 only for formatting and was resolved by rustfmt (`tmp/bass-voices-232/BASS-12/rustfmt.log`). The no-incremental-phase search returned no matches and `wc -l` reported 432 (`no-incremental-phase.log`, `line-count.log`). Final source SHA-256 values are recorded in `final-source-hashes.txt`.
+**Findings**: None in the assigned implementation scope.
+**Remaining**: Formal implementation review and workflow finalization are downstream steps.
+
+### Session: 2026-09-30 (session 232 closeout)
+**Tasks Completed**: Accepted by fanout review and serial integration review (comm-003043). The drift-free LFO is in place.
+**Verification**: Combined-tree reconcile gates in `tmp/bass-voices-232/reconcile/wave-7/` all exit 0 (build, clippy, fmt check, mise lint, full nextest 1697 passed, digests 9/9, presets/examples 9/9, wasm32 build).
+**Remaining (non-blocking)**: The Step 8 move to `impl-plans/completed/` was denied by the sandbox and is still pending.
+**Status**: Completed.

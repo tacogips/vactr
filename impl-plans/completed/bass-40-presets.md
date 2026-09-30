@@ -1,6 +1,6 @@
 # BASS-40: Bass Preset Library and Preset Render Tests
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BASS-40 (wave 4; parallel with BASS-41)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "Presets and examples" and "Verification" (offline render tests)
 **Created**: 2026-09-30
@@ -166,11 +166,25 @@ None.
 
 ## Done Criteria
 
-- [ ] At least 18 presets, with at least 3 per family.
-- [ ] All render assertions pass and at least 18 WAVs exist.
-- [ ] Only writePaths changed.
+- [x] At least 18 presets, with at least 3 per family.
+- [x] All render assertions pass and at least 18 WAVs exist.
+- [x] Only writePaths changed.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+### Session: 2026-09-30 (BASS-40 implementation)
+**Tasks Completed**: Added 19 named patches and three focused tests; rendered all 19 patches for 2 seconds to `tmp/bass/presets/`.
+**Checkpoint**: `bass_preset_fn_pipes_to_sink` passes using the plan's parameterized returned-pattern syntax. `E2e::committed` increments during `run_stereo_for`, so the checkpoint ticks 0.1 seconds before asserting committed events. No zero-argument fallback was needed.
+**Verification**: `rustfmt --edition 2021 --check src/host/tests/e2e/templates/bass_presets.rs` exit 0; `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --no-capture -E 'test(/bass_presets::/)'` exit 0, 3/3 tests passed; 19 WAV files present. The earlier rustfmt check failed on one line wrap before formatting; no behavior changed, and the final-source checks are rerun after formatting.
+**Metrics** (rms / peak / low-band share): analog-pluck 0.072539 / 0.269405 / 0.986032; analog-driven 0.079841 / 0.212686 / 0.994952; analog-square 0.113583 / 0.242978 / 0.985831; acid-squelch 0.138512 / 0.365538 / 0.983554; acid-rolling 0.128286 / 0.382868 / 0.984333; acid-deep 0.241844 / 0.396500 / 0.986457; fm-pluck 0.038508 / 0.167749 / 0.875685; fm-digital-grit 0.035208 / 0.128111 / 0.684065; fm-metal 0.027094 / 0.103190 / 0.753174; wobble-quarter 0.089669 / 0.194657 / 0.945180; wobble-eighth 0.081466 / 0.171958 / 0.950798; wobble-triplet 0.096051 / 0.190007 / 0.942395; wobble-free 0.077216 / 0.174397 / 0.952744; sub-deep 0.124793 / 0.260407 / 0.999914; sub-driven 0.088564 / 0.204060 / 0.999111; sub-long 0.164349 / 0.267683 / 0.999996; reese-hoover 0.105741 / 0.168135 / 0.976274; reese-dark 0.132607 / 0.204131 / 0.990323; reese-rumble 0.124046 / 0.220210 / 0.997363.
+**Drift evidence**: At start the test placeholder SHA256 was `b90cbef95f0861c577838ffc50553ef21b34a4c3866b6bf62531c5e017c15fe4`; `examples/bass-presets.vact` was absent. See `tmp/bass-voices-232/BASS-40/` for edit intents and complete verification logs.
+**Final owned-path SHA256**: `examples/bass-presets.vact` `5ac2c9a50bc84a679ad7757ea9c94dc92bc186c6bb080bf366dfa98bf7c4d114`; `src/host/tests/e2e/templates/bass_presets.rs` `5a5faac46453013383056b3dc56cbcfbbf5504c3d4c99db5deee57aa98207eb1`; `impl-plans/active/bass-40-presets.md` `1106bb3fb08e8865155a7bac82a19659278c51ee75df5112ed809ef002e35f6a` (before this final evidence-line append). Final gates: `tmp/bass-voices-232/BASS-40/rustfmt-final.log`, `tmp/bass-voices-232/BASS-40/nextest-final.log`.
+
+### Session: 2026-09-30 (session 232 closeout)
+**Tasks Completed**: Accepted by test-integrity review, adversarial review and serial integration review (comm-003043).
+**Verification**: Combined-tree reconcile gates in `tmp/bass-voices-232/reconcile/wave-7/` all exit 0 (full nextest 1697 passed, presets/examples 9/9).
+**Remaining (non-blocking)**: Manual listening pass on `tmp/bass/presets/*.wav` (19 files). The Step 8 move to `impl-plans/completed/` was denied by the sandbox and is still pending.
+**Status**: Completed.

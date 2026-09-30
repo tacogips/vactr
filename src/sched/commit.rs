@@ -534,6 +534,7 @@ fn audio_events(
                     | crate::dsp::graph::UGenSpec::DigitalSnareCore
                     | crate::dsp::graph::UGenSpec::DigitalMetalCore
                     | crate::dsp::graph::UGenSpec::DigitalHatCore
+                    | crate::dsp::graph::UGenSpec::BassCore
             )
         })
     });

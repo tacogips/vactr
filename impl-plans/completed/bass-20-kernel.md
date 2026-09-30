@@ -1,6 +1,6 @@
 # BASS-20: `bass-core` Kernel Render and Model Tests
 
-**Status**: Ready
+**Status**: Completed (session 232; accepted by fanout review and integration review comm-003043; ready to archive to `impl-plans/completed/`)
 **Plan ID**: BASS-20 (wave 2)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "Signal flow", "DSP components", "Note length and slide" and "Verification" (kernel unit tests)
 **Created**: 2026-09-30
@@ -233,13 +233,116 @@ Test cases:
 
 ## Done Criteria
 
-- [ ] Port contract unchanged: all four BASS-00 tests (including
+- [x] Port contract unchanged: all four BASS-00 tests (including
       `bass_voice_render_is_finite_and_bounded`) are kept unmodified and
       still pass.
-- [ ] Verification passes, with the exit code and count recorded.
-- [ ] Only writePaths changed.
+- [x] Verification passes, with the exit code and count recorded.
+- [x] Only writePaths changed.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+### Session: 2026-09-30 (session 232 implementation)
+**Tasks Completed**: BASS-20 kernel, direct behavioral tests, scoped verification.
+**Tasks In Progress**: Formal test-integrity and adversarial review are downstream workflow steps.
+**Blockers**: None for the assigned implementation.
+**Notes**:
+- Replaced the stub render with a six-model real-time-safe kernel, retaining
+  the BASS-00 port table, `Model`, and `sanitize` unchanged. Named offsets use
+  a shared filter slot sized to five floats and six-float `Lfo` state;
+  `STATE_FLOATS = 25`. The private render implementation remains in
+  `bass_voice.rs` (388 lines), so the optional `voice.rs` split was unnecessary
+  and removed to follow the plan's 600-line condition.
+- `MODEL_GAIN = [0.6, 0.12, 0.6, 0.6, 0.6, 0.6]` in model order Analog,
+  Acid, FM, Wobble, Sub, Reese. Measured 55 Hz default peaks were 0.558401,
+  0.325309, 0.552675, 0.484977, 0.558401, and 0.484977 respectively.
+- Added direct tests for all models at 55/110 Hz, accent, slide and no filter
+  retrigger, gate release at two cps values, synced/free wobble period,
+  two-second stability, finish zeroing, determinism, and no render allocation.
+  The allocation probe reported zero allocations. All four original BASS-00
+  tests were left unmodified and passed within the focused run.
+- The accepted accent signal-flow gain remains before the filter; a second
+  output gain preserves the required audible accent level after the diode
+  input saturation compressed the pre-filter boost to 0.22 dB. The legato
+  flag is passed to `AmpEnv::next` only while stage 0 is ramping, avoiding the
+  component's stage-1 catch-all completion behavior without changing the
+  component file.
+- Wobble uses 10 ms RMS windows at a 200 Hz sine carrier and 20 Hz cutoff.
+  Autocorrelation peak search ignores lags below 10 frames to exclude the
+  trivial adjacent-window peak; the expected periodic peaks remain at 50 +/-2
+  frames for synced and 25 +/-2 for free rate.
+- Final source verification:
+  - `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice.rs src/dsp/tests/dsp/bass_voice.rs`
+    exited 0 (`tmp/bass-voices-232/BASS-20/implementation/rustfmt-final-4.log`).
+  - `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_voice::/) | test(/bass_filters::/) | test(/bass_sources::/) | test(/bass_mods::/)'`
+    exited 0: 57 run, 57 passed, 0 failed
+    (`tmp/bass-voices-232/BASS-20/implementation/nextest-final-4.log`).
+  - The separate default-level measurement run exited 0, 1/1 passed, with
+    peaks recorded above (`tmp/bass-voices-232/BASS-20/implementation/model-levels-final-4.log`).
+  - Earlier failed tuning attempts remain in their original logs; the final
+    source-matched focused run is green.
+
+### Session: 2026-09-30 (final-source verification after conformance pass)
+**Tasks Completed**: Final control-rate port-read adjustment; reverified the integrated source.
+**Tasks In Progress**: Formal test-integrity and adversarial review remain downstream.
+**Blockers**: None.
+**Notes**:
+- `slide-from` is now clamped and read once per block before deriving `legato`.
+  Final source: `src/dsp/ugen/bass_voice.rs` SHA-256
+  `4dcb750479677a245af1ee766ac9da6c2968a0fa4f3fb258339e4806a44726f4`;
+  `src/dsp/tests/dsp/bass_voice.rs` SHA-256
+  `31bdfa16b0db0193a319855e87958a217c89f0986b572b30ede4d597898f6840`.
+- Final `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice.rs src/dsp/tests/dsp/bass_voice.rs`
+  exited 0 (`tmp/bass-voices-232/BASS-20/implementation/rustfmt-final-5.log`).
+- Final focused nextest command exited 0: 57 run, 57 passed, 0 failed
+  (`tmp/bass-voices-232/BASS-20/implementation/nextest-final-5.log`).
+- Final default-peak measurement test exited 0: 1 run, 1 passed, 0 failed;
+  the six measured peaks match the values in the prior entry
+  (`tmp/bass-voices-232/BASS-20/implementation/model-levels-final-5.log`).
+
+### Session: 2026-09-30 (final source hash correction)
+**Tasks Completed**: Recorded the source identity after the final one-read port adjustment.
+**Tasks In Progress**: Formal test-integrity and adversarial review remain downstream.
+**Blockers**: None.
+**Notes**: The final `src/dsp/ugen/bass_voice.rs` hash is
+`b03ae1c7a914b23a41d41b175e0ca90ef8591a1989581d346154fd2816a281ac`,
+superseding the earlier pre-adjustment hash. The final focused gates and
+peak measurements are the source-matched `*-final-5.log` evidence above.
+
+### Session: 2026-09-30 (review repairs and serial reconcile)
+**Tasks Completed**: Recorded the test-integrity and adversarial repairs, which the
+entries above predate, plus one serial-reconcile lint repair.
+- Test-integrity (Sonnet subagent, assertions added, none changed): gate note-off timing
+  is now checked through the first divergence between short-gate and long-gate renders
+  (exact at 6000 and 5333), and the slide no-retrigger test gained a pitch-controlled
+  comparison. Both new assertions fail under their mutations
+  (`tmp/bass-voices-232/BASS-20/test-integrity/mutation-gate.log`,
+  `mutation-fenv.log`); 57/57 passed (`test-integrity/nextest.log`).
+- Adversarial finish-path repair: the finish block used to zero the whole final output
+  block, which dropped audio rendered before the release ended. It now writes
+  `out[rendered..].fill(0.0)` before zeroing state and calling `st.finish()`
+  (`src/dsp/ugen/bass_voice.rs:312`). The new regression test
+  `bass_voice_finish_keeps_audio_rendered_before_release_end` fails before the fix
+  (`tmp/bass-voices-232/BASS-20/adversarial/pre-fix-test.log`, exit 100) and passes after
+  it (`adversarial/reviewer/nextest.log`, 58/58).
+- Serial reconcile repair: `cargo clippy --all-targets -- -D warnings` failed on
+  `clippy::needless_range_loop` in the wobble autocorrelation loop of
+  `src/dsp/tests/dsp/bass_voice.rs`. The loop now iterates
+  `correlations.iter_mut().enumerate().skip(1)`, which covers the same lags 1..70 with the
+  same sums, so behavior is unchanged
+  (`tmp/bass-voices-232/reconcile/wave-5/repair-01-diff.txt`).
+**Verification** (`tmp/bass-voices-232/reconcile/wave-5/`): rustfmt on the owned files
+exit 0, clippy -D warnings exit 0, `test(/bass_voice::/)` 14/14 exit 0, and the
+four-module bass filter 58/58.
+**Hashes**: `src/dsp/ugen/bass_voice.rs`
+`5b5f121e6b75707b9ec9aa93f448070a18b76a80e45ca4df0b4205989cf84ce2`;
+`src/dsp/tests/dsp/bass_voice.rs` `758d0369ece913c9a7a79419618d48435a53d822983fda4837ed91d9f85fc9cc`.
+These supersede the `4dcb7504`, `b03ae1c7` and `31bdfa16` hashes above.
+
+### Session: 2026-09-30 (session 232 closeout)
+**Tasks Completed**: Accepted by fanout review and serial integration review (comm-003043).
+**Verification**: Combined-tree reconcile gates in `tmp/bass-voices-232/reconcile/wave-7/` all exit 0 (build, clippy, fmt check, mise lint, full nextest 1697 passed, digests 9/9, presets/examples 9/9, wasm32 build).
+**Remaining (non-blocking)**: Manual listening pass on `tmp/bass/`. The Step 8 move to `impl-plans/completed/` was denied by the sandbox and is still pending.
+**Status**: Completed.

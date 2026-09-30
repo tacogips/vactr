@@ -48,7 +48,7 @@ pub const TEMPLATES: &str = include_str!("../prelude/templates.vact");
 /// The file id the template source reads under.
 pub const TEMPLATE_FILE: FileId = FileId::new(u32::MAX - 1);
 /// The prelude template names, in source order.
-pub const TEMPLATE_NAMES: [&str; 67] = [
+pub const TEMPLATE_NAMES: [&str; 73] = [
     "sampler",
     "analog",
     "fm",
@@ -116,6 +116,12 @@ pub const TEMPLATE_NAMES: [&str; 67] = [
     "frame-keyframe-voice",
     "peak-pulse-voice",
     "number-station-voice",
+    "analog-bass",
+    "acid-bass",
+    "fm-bass",
+    "wobble-bass",
+    "sub-bass",
+    "reese-bass",
 ];
 
 /// The control cells the registry hands out (inst defaults that are tweak

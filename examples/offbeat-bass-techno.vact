@@ -1,0 +1,9 @@
+# Minimal offbeat bass at 126 BPM.
+use-bpm 126
+
+# Sparse four-on-the-floor kick and quiet hats.
+s :phase-drum > note [:c1 :c1 :c1 :c1] > fm-amount 1.35 > pitch-sweep 0.68 > decay 0.3 > gain 0.32 > d1
+s :dual-hat-voice > note [nil :a5 nil nil nil :a5 nil nil] > hat-harmonics 0.6 > timbre 0.62 > morph 0.55 > gain 0.07 > d2
+
+# Offbeat analog bass answers each kick.
+s :analog-bass > note [nil :c2 nil :c2 nil :g1 nil :bb1] > gate-length 1.6 > cutoff 520 > env-mod 1.8 > gain 0.34 > d3

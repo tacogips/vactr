@@ -728,9 +728,9 @@ impl EngineConfig {
             max_block,
             output_channels: 2,
             store,
-            // The core prelude currently installs 63 definitions. Leave
-            // bounded room for opt-in input and quad instruments.
-            template_slots: 72,
+            // The core prelude installs 73 definitions; leave room for
+            // two live-input and four quad-stem definitions.
+            template_slots: 80,
             bus_slots: DEFAULT_BUS_SLOTS,
             bus_seconds: 4.0,
             voice_seconds: 0.5,

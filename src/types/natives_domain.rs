@@ -372,6 +372,7 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("digital-snare-core"),
     dsp("digital-metal-core"),
     dsp("digital-hat-core"),
+    dsp("bass-core"),
     dsp("analog-percussion"),
     dsp("va-source"),
     dsp("va-filter"),

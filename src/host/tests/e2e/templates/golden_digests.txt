@@ -1,5 +1,7 @@
+graph acid-bass baseline d5d35deb0d272315 0
 graph additive baseline ddf2f387d77d1f84 0
 graph analog baseline e2f35fcba29d86c3 0
+graph analog-bass baseline 8a0f5e7d79585ae3 0
 graph analog-pair-voice baseline 0ee1da1142d6ad09 0
 graph chip-voice baseline c61c2552aeedde2e 0
 graph chord-layer-voice baseline 20510a0b5562b742 0
@@ -15,6 +17,7 @@ graph exciter-voice baseline f3279699e6f4d100 0
 graph feedback-metal-drum baseline b7c12763f2f1866b 0
 graph filter-voice baseline 6a09c7023f417707 0
 graph fm baseline 29a87235be1d7b30 0
+graph fm-bass baseline f3b1ce50ae4d97e7 0
 graph fm-pair-voice baseline 7a900d231ccdbd4b 0
 graph frame-keyframe-voice baseline 79cfbc5d992d58c2 0
 graph frame-lfo-voice baseline 9ee69ba0b33934db 0
@@ -45,6 +48,7 @@ graph peak-motion-voice baseline d1fe0b24b4fc0ea6 0
 graph peak-pulse-voice baseline 9b4811ae3063fb0e 0
 graph phase-drum baseline b4da94fbf66a1761 0
 graph phase-pair-voice baseline 1782d074f8958fd3 0
+graph reese-bass baseline 4046db5f2a90ec52 0
 graph resonator-voice baseline d91608b758688c1d 0
 graph sampler baseline f44518dce1cd043a 0
 graph shape-voice baseline cb9c6230c184cf7b 0
@@ -58,6 +62,7 @@ graph stage-voice baseline 2dc18abc41f4c8e3 0
 graph string-choir-voice baseline 380eb5fbe919e04f 0
 graph string-machine-voice baseline e97aa86731f8137c 0
 graph string-voice baseline 229246c516bd13e5 0
+graph sub-bass baseline 0bc98dbc0e5a7db3 0
 graph swarm-voice baseline f87a314f7836f7f1 0
 graph terrain-voice baseline 2375eb8a21f5947d 0
 graph tidal-poly-voice baseline 7445b51b801c6c07 0
@@ -65,10 +70,15 @@ graph tidal-voice baseline 6934b01c5a3a622d 0
 graph wave-grid-voice baseline ce5018b6f96f27ef 0
 graph wavetable baseline e112fcf7c7585bed 0
 graph wire-drum baseline 48a154773b0b20e9 0
+graph wobble-bass baseline 731fb546065d5cc1 0
+render acid-bass center e5b9337e808954d1 24064
+render acid-bass pan02 92d18ff5b2cea2c1 24064
 render additive center c7a64ac158cc67e5 24064
 render additive pan02 c5491e2084e48cbf 24064
 render analog center cae5a708e7459349 24064
 render analog pan02 80c6bca1ee6be7fe 24064
+render analog-bass center 883621e020c8d8d5 24064
+render analog-bass pan02 709dc6071f35b666 24064
 render analog-pair-voice center 8004ec5855c329a3 24064
 render chip-voice center 6835d7e95113d951 24064
 render chord-layer-voice center b36a9129df632362 24064
@@ -90,6 +100,8 @@ render feedback-metal-drum pan02 d4f25a027f3dd402 24064
 render filter-voice center d28a6c234d71406f 24064
 render fm center f84c6215540e7cb1 24064
 render fm pan02 013b4c5a6d6773d5 24064
+render fm-bass center f1712a8763c8df7d 24064
+render fm-bass pan02 7c42ac2bb3e2c943 24064
 render fm-pair-voice center bb77a86aaad2b82a 24064
 render frame-keyframe-voice center e0d65f6401be9abd 24064
 render frame-lfo-voice center 33a8de7c0d0a2197 24064
@@ -140,6 +152,8 @@ render peak-pulse-voice center 4d854487a499ba52 24064
 render phase-drum center ddeea722bb1bc591 24064
 render phase-drum pan02 8843c808c1169344 24064
 render phase-pair-voice center 16ffb3f699466cb5 24064
+render reese-bass center 90f79e6caf5661e5 24064
+render reese-bass pan02 cbef29f3626e9eca 24064
 render resonator-voice center 17f58b445c5b3ef3 24064
 render sampler center 20c00ffeeec4e325 24064
 render sampler pan02 20c00ffeeec4e325 24064
@@ -156,6 +170,8 @@ render stage-voice center e6082d7b946576d0 24064
 render string-choir-voice center cd744a8a90e42117 24064
 render string-machine-voice center 04d8c6966270600c 24064
 render string-voice center 848c6e29e66b2e43 24064
+render sub-bass center 65f1bc505aa084cd 24064
+render sub-bass pan02 494bdd662e25fac9 24064
 render swarm-voice center 3cc7d459697a6eb5 24064
 render terrain-voice center 7311dd0dbd45ece4 24064
 render tidal-poly-voice center 747b4d72c3d423ed 24064
@@ -165,3 +181,5 @@ render wavetable center 20c00ffeeec4e325 24064
 render wavetable pan02 20c00ffeeec4e325 24064
 render wire-drum center b7c4bfa44ac4d0d1 24064
 render wire-drum pan02 eb94ae177c32c084 24064
+render wobble-bass center 7913f6f7ead72781 24064
+render wobble-bass pan02 f4eedcd10e24c7ff 24064

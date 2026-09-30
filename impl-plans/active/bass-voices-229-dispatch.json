@@ -1,0 +1,376 @@
+{
+  "taskId": "bass-voices-229",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/bass",
+  "baseBranch": "wf/bass",
+  "remote": "origin",
+  "originalHead": "4fc37414e2f2704f6737f1545071bf506bd9c0f8",
+  "worktree": "/Users/taco/gits/tacogips/vactr-worktrees/wf-bass",
+  "designDocPaths": [
+    "design-docs/specs/design-bass-voices.md",
+    "design-docs/specs/design-music.md",
+    "design-docs/references/README.md",
+    "design-docs/user-qa/pending-bass-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "planIndexPaths": [
+    "impl-plans/README.md"
+  ],
+  "evidenceRoot": "tmp/bass-voices-229",
+  "evidenceLayout": "tmp/bass-voices-229/<planId>/attempt-<n>/ holds each plan's full command logs, one file per command, each ending with an exit=<status> line. The manifest verification commands write under tmp/bass-voices-229/<planId>/; workers that run a later attempt copy that directory to attempt-<n>/ before re-running. These paths replace the tmp/logs/ paths in the plan text. Each plan's Progress Log records every command, its exit status and its log path. tmp/ is gitignored (.gitignore **/tmp) and must stay untracked, including the WAVs under tmp/bass/. A missing or truncated log is not a pass.",
+  "executionModel": {
+    "waves": [
+      ["BASS-00"],
+      ["BASS-10", "BASS-11", "BASS-12"],
+      ["BASS-20"],
+      ["BASS-30"],
+      ["BASS-40", "BASS-41"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The orchestrator commits on wf/bass after the run with the AGENTS.md 1-6 section message and pushes only wf/bass, never main. Workers never commit, stash, checkout, reset, branch, push or merge. Codex's sandbox keeps .git read-only and cannot bind localhost; full nextest runs happen outside it.",
+    "retryPolicy": "Wave 1 and wave 4 plans share one cargo target dir. If cargo reports a lock, or a sibling's file fails to compile mid-edit, wait about 60 s and retry, up to 10 times, then record a blocker in the plan's Progress Log. Never edit a sibling's file.",
+    "editProtocol": "Before each edit, re-read the file and record its sha256 in the Progress Log. If it drifted from the expected state, stop and reconcile only the plan's own intent. After editing, record the post-edit sha256. Never edit outside writePaths/sharedPaths.",
+    "serialReconciliation": "Shared registry files are owned by BASS-30 alone (wave 3). BASS-00 owns the one-line pub mod bass_voice; in src/dsp/ugen/mod.rs and the four test module lines in src/dsp/tests/dsp.rs, and runs alone in wave 0. BASS-30 creates bass_presets.rs and bass_examples.rs placeholders and their module lines so wave 4 needs no shared file. Workspace-wide gates (cargo build, cargo clippy --all-targets -- -D warnings, cargo fmt --check, full cargo nextest run, wasm32 build, mise run lint) run only in reconcile and integration review. Plan Status headers, impl-plans/README.md and moving plans to impl-plans/completed/ are done serially by the orchestrator, not by workers."
+  },
+  "reviewContext": {
+    "issueReference": "No GitHub issue. Inline workflowInput request 2026-09-30 (intake communication comm-002931, workflow execution opus-luna-design-and-implement-review-loop-session-229): Research and add dedicated bass synth voices (analog-modeling, acid, digital/FM, wobble, sub, reese) plus techno bass presets and examples",
+    "userProblem": "The prelude's 67 templates include no dedicated bass voice, and the techno examples and presets are badly lacking bass. There is no acid diode-ladder filter, feedback FM, note length for audio voices, glide/slide, accent, or per-sample tempo-synced filter wobble.",
+    "requiredOutcomes": [
+      "Design doc design-docs/specs/design-bass-voices.md with research notes, license-clean references, per-voice signal flow, controls and defaults, indexed from design-music.md section 4.3 and design-docs/references/README.md.",
+      "One new kernel UGen bass-core (src/dsp/ugen/bass_voice with ladder, diode, osc, fm, mods components) with six models.",
+      "Six prelude templates appended in order: analog-bass, acid-bass, fm-bass, wobble-bass, sub-bass, reese-bass; registered and editor-visible with tuned header defaults.",
+      "Kernel unit tests: filter response and resonance, accent, slide, gate length, tempo-synced wobble period, extreme-control stability over 2 s renders, determinism, no NaN/Inf.",
+      "All pre-existing render and graph digests byte-identical; exactly 18 golden lines added and 0 removed.",
+      "examples/bass-presets.vact with at least 3 patches per family (18 or more); four techno examples (acid, rumble, offbeat, wobble); committed render tests writing WAVs under tmp/bass/ and asserting finite, rms > 1e-3, peak <= 1.0 and low-band share thresholds.",
+      "README bass bullet group; THIRD_PARTY_NOTICES.md unchanged because no MIT source is adapted.",
+      "Reconcile gate: CARGO_TERM_QUIET=true cargo build, cargo clippy --all-targets -- -D warnings, cargo fmt --check, cargo nextest run all green, cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm."
+    ],
+    "nonGoals": [
+      "No scheduler rewrite, no engine-side slide handoff, no monophonic legato voice mode.",
+      "No change to existing templates, controls.rs rows, note-length handling of existing templates, src/dsp/ugen/osc.rs, src/dsp/ugen/filter.rs, digital_drum/, or src/dsp/graph/shape.rs.",
+      "No seventh rumble template (rumble is an example recipe, user-QA BQ3).",
+      "No oversampling, no stereo kernel output, no new crate dependencies.",
+      "No edits to wf/syntax-fmt areas: src/fmt, src/complete, src/lsp, src/host/wasm, editor/, tree-sitter-vact/.",
+      "No edits to examples/industrial-techno.vact or any existing example."
+    ],
+    "constraints": [
+      "Work only on wf/bass in /Users/taco/gits/tacogips/vactr-worktrees/wf-bass; push only wf/bass.",
+      "License: original Rust from published papers only; no GPL/LGPL/unknown-license or book/app-note code consulted or translated.",
+      "Real-time safe: no allocation in the audio path, bounded CPU per sample, denormal flush, finite clamped output, deterministic seeds.",
+      "Append-only registries: inst blocks, UGEN_NAMES, both TEMPLATE_NAMES, UGENS and enum variants at the end; codec tag 98; no new control rows.",
+      "Rust files under 1000 lines (component files under 400, bass_voice.rs under 600); English only, no emojis; CARGO_TERM_QUIET=true for cargo.",
+      "Per-plan gates are scoped to owned files (rustfmt --check on owned .rs, nextest filters with positive counts); workspace-wide gates only at reconcile.",
+      "Manifests list only tracked source paths; never target/, tmp/, editor/node_modules or editor/dist."
+    ],
+    "designDecisionsAndRationale": [
+      "One kernel bass-core with a per-template literal mode port (0..5) instead of six kernels: one codec tag, one port list, one natives entry, fewer shared-registry edits.",
+      "New UGen justified by the diode ladder, feedback FM, slide, tempo-relative gate length and per-sample filter wobble that existing UGens cannot express.",
+      "TPT/ZDF transistor and diode ladders with a single input tanh per sample, cutoff recomputed every sample.",
+      "Note-off owned by the kernel through gate-length in sixteenth-steps of 1/(16*cps) s; kx.gate ignored, like the self-enveloped drum cores, so existing env-adsr gates and digests stay unchanged.",
+      "Slide is an explicit per-event slide-from (semitones from the previous note) plus slide-time settle-to-1%, used with cut 1; legato notes do not retrigger the amp or filter envelope.",
+      "Wobble LFO reimplements the digital-drum formulas (rate_hz = lfo_rate * cps when synced; transport-locked phase frac(rate_hz * onset) in f64) without importing digital_drum; divisions 1/4=4, 1/8=8, 1/4T=6, 1/8T=12.",
+      "template_default_override generalized minimally to Float/Bool so editor defaults match bass headers, keeping existing Enum results identical.",
+      "template_slots raised 72 -> 80 so the 73rd template installs (73 prelude + 2 live-input + 4 quad-stem = 79).",
+      "BASS-30 creates the bass_render.rs helper and wave-4 placeholder test files so BASS-40 and BASS-41 run in parallel with disjoint files."
+    ],
+    "intentionalTradeoffs": [
+      "Slide interval is user-written, not inferred; during the 3 ms cut crossfade the old and new voice states are independent; no accent build-up across consecutive accents; slide notes start with a decayed filter envelope.",
+      "Live-input or MIDI held keys do not sustain past gate-length (user-QA BQ2, option A).",
+      "No oversampling: filter saturation at high drive may alias; accepted for bass.",
+      "Kernel is mono; reese and wobble width come from effects in examples.",
+      "Implicit row-named ports get the controls.rs row default (for example lfo-sync 0) when a template does not pass them; documented, not fixed with literals.",
+      "Automated checks (non-silence, peak, low-band share) only partly prove the sound; WAVs in tmp/bass/ support a manual listening pass."
+    ],
+    "supportedEdgeCases": [
+      "Non-finite port values and inputs: components reset state and return 0; sanitize flushes denormals and non-finite values.",
+      "Extreme controls: freq 20/2000, cutoff 20/20000, res 1, drive 1, index 32, fm-feedback 1, fold 1, bit-depth 2, lfo-depth +/-1, slide-from +/-24, rendered 2 s finite and |y| <= 1.",
+      "cps 0 or non-finite clamps to 0.03 or 0.5; onset-time up to 3600 s keeps phase accuracy via f64.",
+      "Voice finish zeroes all state floats and later blocks output zeros.",
+      "Bypass exactness: fold 0, bit-depth 16 and click-level 0 are bit-identical passes.",
+      "Tempo changes: wobble period follows use-bpm (120 vs 150 BPM e2e test).",
+      "Preset fn piping fallback: zero-argument fns if a fn-returned pattern cannot be piped."
+    ],
+    "outOfScopeEdgeCases": [
+      "Automatic previous-note slide detection (user-QA BQ1, deferred engine handoff).",
+      "Held-key sustain beyond gate-length for live input/MIDI (BQ2).",
+      "Hardware-accurate accent capacitor accumulation and per-stage diode nonlinearities with Newton iteration.",
+      "Stereo kernel output and oversampled filters."
+    ],
+    "residualRisksCarriedFromReview": [
+      "BASS-41 hunk check uses git diff -U0 README.md | grep -c '^@@' == 1 (the plan's --stat wording is superseded by the manifest command).",
+      "BASS-20 rustfmt check includes src/dsp/ugen/bass_voice/voice.rs when that optional file exists (manifest command handles it).",
+      "BASS-30 bass_editor_defaults_match_headers uses meta::decl_for, the entry point src/dsp/tests/dsp/catalog.rs exercises.",
+      "Citation URLs/DOIs in design-docs/references/README.md were not web-checked.",
+      "DSP constants and preset thresholds may need tuning; sub low-band share never below 0.8 in BASS-40."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-bass-voices.md",
+      "design-docs/specs/design-music.md",
+      "design-docs/references/README.md",
+      "design-docs/user-qa/pending-bass-questions.md",
+      "src/prelude/templates.vact",
+      "src/dsp/ugen/digital_drum/chain.rs",
+      "src/dsp/ugen/digital_drum/tonal.rs",
+      "src/dsp/ugen/analog_pair.rs",
+      "src/dsp/tests/dsp/analog_pair.rs",
+      "src/dsp/meta.rs",
+      "src/dsp/meta/templates/plaits.rs",
+      "src/sched/commit.rs",
+      "src/dsp/ring.rs",
+      "src/host/tests/e2e.rs",
+      "src/host/tests/e2e/templates/golden.rs",
+      "src/host/tests/e2e/templates/golden_digests.txt",
+      "src/dsp/offline.rs",
+      "examples/industrial-techno.vact",
+      "examples/digital-kit.vact"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "BASS-00",
+      "planPath": "impl-plans/active/bass-00-scaffold.md",
+      "dependsOn": [],
+      "writePaths": [
+        "src/dsp/ugen/bass_voice.rs",
+        "src/dsp/ugen/bass_voice/ladder.rs",
+        "src/dsp/ugen/bass_voice/diode.rs",
+        "src/dsp/ugen/bass_voice/osc.rs",
+        "src/dsp/ugen/bass_voice/fm.rs",
+        "src/dsp/ugen/bass_voice/mods.rs",
+        "src/dsp/tests/dsp/bass_voice.rs",
+        "src/dsp/tests/dsp/bass_filters.rs",
+        "src/dsp/tests/dsp/bass_sources.rs",
+        "src/dsp/tests/dsp/bass_mods.rs",
+        "impl-plans/active/bass-00-scaffold.md"
+      ],
+      "sharedPaths": [
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/tests/dsp.rs"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/dsp/ugen/mod.rs", "intendedEdit": "add exactly one line, pub mod bass_voice;, in alphabetical position after analog_pair"},
+        {"path": "src/dsp/tests/dsp.rs", "intendedEdit": "add exactly four lines in alphabetical position: mod bass_filters;, mod bass_mods;, mod bass_sources;, mod bass_voice;"}
+      ],
+      "acceptanceCriteria": [
+        "bass_voice.rs pins PORT_COUNT 32, the PORTS table order and defaults, the port index module, Model::from_port, sanitize, STATE_FLOATS placeholder and a stub render.",
+        "Five component placeholders and three test placeholders contain only a //! doc line naming the owning plan.",
+        "Four tests pass, including bass_voice_render_is_finite_and_bounded, which does not assert all zeros.",
+        "sharedPaths change by exactly 1 and 4 lines; no Node variant or registry edits."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-00 && { rustfmt --edition 2021 --check src/dsp/ugen/bass_voice.rs src/dsp/ugen/bass_voice/ladder.rs src/dsp/ugen/bass_voice/diode.rs src/dsp/ugen/bass_voice/osc.rs src/dsp/ugen/bass_voice/fm.rs src/dsp/ugen/bass_voice/mods.rs src/dsp/tests/dsp/bass_voice.rs src/dsp/tests/dsp/bass_filters.rs src/dsp/tests/dsp/bass_sources.rs src/dsp/tests/dsp/bass_mods.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-00/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-00 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_voice::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-00/nextest.log 2>&1",
+        "git diff --stat -- src/dsp/ugen/mod.rs src/dsp/tests/dsp.rs"
+      ]
+    },
+    {
+      "planId": "BASS-10",
+      "planPath": "impl-plans/active/bass-10-filters.md",
+      "dependsOn": ["BASS-00"],
+      "writePaths": [
+        "src/dsp/ugen/bass_voice/ladder.rs",
+        "src/dsp/ugen/bass_voice/diode.rs",
+        "src/dsp/tests/dsp/bass_filters.rs",
+        "impl-plans/active/bass-10-filters.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "Ladder (FLOATS 4) and Diode (FLOATS 5) with load/store/reset/flush/process and LadderCoeffs/DiodeCoeffs::new(cutoff_hz, res, drive, sr) exactly as pinned.",
+        "Response, monotonic resonance (+12 dB at res 1), 2 s extreme-noise stability, flush-to-zero, NaN recovery, round-trip and determinism tests pass (at least 8 tests).",
+        "K_LADDER_MAX, K_DIODE_MAX, DIODE_FC_SCALE, FB_HP_HZ and the measured diode -3 dB corner recorded in the Progress Log.",
+        "Original code from cited papers only; each file under 400 lines."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-10 && { rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/ladder.rs src/dsp/ugen/bass_voice/diode.rs src/dsp/tests/dsp/bass_filters.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-10/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-10 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_filters::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-10/nextest.log 2>&1"
+      ]
+    },
+    {
+      "planId": "BASS-11",
+      "planPath": "impl-plans/active/bass-11-sources.md",
+      "dependsOn": ["BASS-00"],
+      "writePaths": [
+        "src/dsp/ugen/bass_voice/osc.rs",
+        "src/dsp/ugen/bass_voice/fm.rs",
+        "src/dsp/tests/dsp/bass_sources.rs",
+        "impl-plans/active/bass-11-sources.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "Wave, PULSE_WIDTH, Osc, click_semis, detune_ratios, FmPair (FB_MAX 1.5, two-sample feedback average), Folder (first-order ADAA) and quantize exactly as pinned.",
+        "Period, DC, aliasing-vs-naive, FM centroid, FM stability, folder bypass bit-exactness, quantize and round-trip tests pass (at least 10 tests).",
+        "src/dsp/ugen/osc.rs unchanged; original code from cited papers only."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-11 && { rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/osc.rs src/dsp/ugen/bass_voice/fm.rs src/dsp/tests/dsp/bass_sources.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-11/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-11 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_sources::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-11/nextest.log 2>&1"
+      ]
+    },
+    {
+      "planId": "BASS-12",
+      "planPath": "impl-plans/active/bass-12-mods.md",
+      "dependsOn": ["BASS-00"],
+      "writePaths": [
+        "src/dsp/ugen/bass_voice/mods.rs",
+        "src/dsp/tests/dsp/bass_mods.rs",
+        "impl-plans/active/bass-12-mods.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "clamp_cps, gate_samples, settle_coeff, AmpEnv, FilterEnv, accent, Glide, LfoShape, rate_hz, initial_phase (f64), Lfo and cutoff_octaves exactly as pinned.",
+        "Gate-length, envelope, legato, accent, glide, synced and free LFO period, initial phase, random determinism, square smoothing and round-trip tests pass (at least 12 tests).",
+        "digital_drum/ not imported or edited; mods.rs under 400 lines."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-12 && { rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/mods.rs src/dsp/tests/dsp/bass_mods.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-12/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-12 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_mods::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-12/nextest.log 2>&1"
+      ]
+    },
+    {
+      "planId": "BASS-20",
+      "planPath": "impl-plans/active/bass-20-kernel.md",
+      "dependsOn": ["BASS-00", "BASS-10", "BASS-11", "BASS-12"],
+      "writePaths": [
+        "src/dsp/ugen/bass_voice.rs",
+        "src/dsp/ugen/bass_voice/voice.rs",
+        "src/dsp/tests/dsp/bass_voice.rs",
+        "impl-plans/active/bass-20-kernel.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/dsp/ugen/bass_voice/voice.rs", "intendedEdit": "optional new private module, created only if bass_voice.rs would exceed 600 lines"}
+      ],
+      "acceptanceCriteria": [
+        "Real per-voice render for the six models with named state offsets, kernel-owned note-off via gate-length, finish path zeroing all state, soft limit and clamp to [-1, 1].",
+        "Port contract, Model and sanitize unchanged; all four BASS-00 tests unmodified and passing.",
+        "Default-level, accent, slide (first period 1.3x..2.05x of 48000/110, mean period +/-1%, 2.5 ms sustain), no-filter-retrigger on slide, gate length, synced/free wobble autocorrelation, 2 s stability grid, finish-zeroing and determinism tests pass (at least 45 tests across the four bass modules).",
+        "No allocation in render; STATE_FLOATS, MODEL_GAIN and measured default peaks recorded in the Progress Log."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-20 && { rustfmt --edition 2021 --check src/dsp/ugen/bass_voice.rs src/dsp/tests/dsp/bass_voice.rs $(test -f src/dsp/ugen/bass_voice/voice.rs && echo src/dsp/ugen/bass_voice/voice.rs); echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-20/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-20 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_voice::/) | test(/bass_filters::/) | test(/bass_sources::/) | test(/bass_mods::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-20/nextest.log 2>&1",
+        "wc -l src/dsp/ugen/bass_voice.rs src/dsp/ugen/bass_voice/ladder.rs src/dsp/ugen/bass_voice/diode.rs src/dsp/ugen/bass_voice/osc.rs src/dsp/ugen/bass_voice/fm.rs src/dsp/ugen/bass_voice/mods.rs"
+      ]
+    },
+    {
+      "planId": "BASS-30",
+      "planPath": "impl-plans/active/bass-30-registry.md",
+      "dependsOn": ["BASS-20"],
+      "writePaths": [
+        "src/dsp/graph.rs",
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/ugen/template.rs",
+        "src/dsp/ugen/build_helpers.rs",
+        "src/dsp/ugen/mixer.rs",
+        "src/dsp/ugen/catalog.rs",
+        "src/dsp/ugen/catalog/voice_ports.rs",
+        "src/dsp/ugen/catalog/codec.rs",
+        "src/dsp/build/names.rs",
+        "src/dsp/build/names/table.rs",
+        "src/types/natives_domain.rs",
+        "src/sched/commit.rs",
+        "src/dsp/ring.rs",
+        "src/dsp/meta.rs",
+        "src/dsp/meta/templates.rs",
+        "src/dsp/meta/templates/bass.rs",
+        "src/ns/insts.rs",
+        "src/prelude/templates.vact",
+        "src/dsp/tests/dsp/seed_order.rs",
+        "src/host/tests/e2e/templates.rs",
+        "src/host/tests/e2e/templates/bass.rs",
+        "src/host/tests/e2e/templates/bass_render.rs",
+        "src/host/tests/e2e/templates/bass_presets.rs",
+        "src/host/tests/e2e/templates/bass_examples.rs",
+        "src/host/tests/e2e/templates/golden_digests.txt",
+        "impl-plans/active/bass-30-registry.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/dsp/ugen/catalog/codec.rs", "intendedEdit": "encode UGenSpec::BassCore => (98, 0) and decode 98 => Node::BassCore; verify 98 is free first"},
+        {"path": "src/dsp/ring.rs", "intendedEdit": "template_slots 72 -> 80 and fix the stale comment (73 prelude, 2 live-input, 4 quad-stem)"},
+        {"path": "src/ns/insts.rs", "intendedEdit": "TEMPLATE_NAMES [&str; 67] -> 73, append the six names"},
+        {"path": "src/sched/commit.rs", "intendedEdit": "add UGenSpec::BassCore to wants_tempo_anchor matches! only"},
+        {"path": "src/prelude/templates.vact", "intendedEdit": "append six inst blocks and the bass header comment at the end of the file"},
+        {"path": "src/host/tests/e2e/templates/golden_digests.txt", "intendedEdit": "bless; exactly 18 lines added, 0 removed"},
+        {"path": "src/host/tests/e2e/templates/bass_presets.rs", "intendedEdit": "//! placeholder owned by BASS-40"},
+        {"path": "src/host/tests/e2e/templates/bass_examples.rs", "intendedEdit": "//! placeholder owned by BASS-41"}
+      ],
+      "acceptanceCriteria": [
+        "bass-core registered append-only across graph, node, catalog, codec tag 98, names, natives, mixer, build_helpers, template, meta, insts and commit.rs wants_tempo_anchor.",
+        "Six templates appended to templates.vact with the pinned header defaults; editor metadata ranges and Float/Bool default overrides make editor defaults equal header defaults; existing Enum overrides unchanged.",
+        "bass_render.rs helper contract (SR, write_wav, low_band_share, RenderCheck, check) with its self-tests; bass.rs e2e tests (registration order, catalog ports, audible render, wobble follows tempo, slide pattern, editor defaults); seed_order case.",
+        "golden_digests.txt: 0 removed and 18 added lines; every touched Rust file under 1000 lines; THIRD_PARTY_NOTICES.md unchanged."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-30 && { rustfmt --edition 2021 --check src/dsp/graph.rs src/dsp/ugen/mod.rs src/dsp/ugen/template.rs src/dsp/ugen/build_helpers.rs src/dsp/ugen/mixer.rs src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/voice_ports.rs src/dsp/ugen/catalog/codec.rs src/dsp/build/names.rs src/dsp/build/names/table.rs src/types/natives_domain.rs src/sched/commit.rs src/dsp/ring.rs src/dsp/meta.rs src/dsp/meta/templates.rs src/dsp/meta/templates/bass.rs src/ns/insts.rs src/dsp/tests/dsp/seed_order.rs src/host/tests/e2e/templates.rs src/host/tests/e2e/templates/bass.rs src/host/tests/e2e/templates/bass_render.rs src/host/tests/e2e/templates/bass_presets.rs src/host/tests/e2e/templates/bass_examples.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-30/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-30 && { CARGO_TERM_QUIET=true VACTR_BLESS_GOLDEN=1 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --run-ignored ignored-only -E 'test(/bless_golden_digests/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-30/bless.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-30 && { echo \"removed=$(git diff -U0 src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')\"; echo \"added=$(git diff -U0 src/host/tests/e2e/templates/golden_digests.txt | grep -c '^+[^+]')\"; } > tmp/bass-voices-229/BASS-30/golden-diff.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-30 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass/) | test(/e2e::templates/) | test(/seed_order/) | test(/catalog/) | test(/live_input/) | test(/ported::tests/) | test(/inst/) | test(/codec/) | test(/contracts/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-30/nextest.log 2>&1",
+        "wc -l src/ns/insts.rs src/dsp/meta.rs src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/voice_ports.rs src/dsp/build/names/table.rs src/dsp/meta/templates.rs src/dsp/ring.rs src/sched/commit.rs src/dsp/ugen/template.rs",
+        "git diff --stat"
+      ]
+    },
+    {
+      "planId": "BASS-40",
+      "planPath": "impl-plans/active/bass-40-presets.md",
+      "dependsOn": ["BASS-30"],
+      "writePaths": [
+        "examples/bass-presets.vact",
+        "src/host/tests/e2e/templates/bass_presets.rs",
+        "impl-plans/active/bass-40-presets.md"
+      ],
+      "sharedPaths": [],
+      "acceptanceCriteria": [
+        "bass_preset_fn_pipes_to_sink checkpoint written first; fallback to zero-argument fns recorded if needed.",
+        "At least 18 presets, at least 3 per family (analog, acid, fm, wobble, sub, reese) including the named required patches.",
+        "Every preset renders 2 s to tmp/bass/presets/<name>.wav with no faults, committed > 0, finite, rms > 1e-3, peak <= 1.0; low-band share >= 0.8 for sub (never lower) and >= 0.5 for analog/reese/wobble/fm; failures collected before asserting.",
+        "No master limiter; per-preset rms/peak/low recorded in the Progress Log."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-40 && { rustfmt --edition 2021 --check src/host/tests/e2e/templates/bass_presets.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-40/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-40 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_presets::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-40/nextest.log 2>&1",
+        "ls tmp/bass/presets/*.wav | wc -l"
+      ]
+    },
+    {
+      "planId": "BASS-41",
+      "planPath": "impl-plans/active/bass-41-examples.md",
+      "dependsOn": ["BASS-30"],
+      "writePaths": [
+        "examples/acid-techno.vact",
+        "examples/rumble-techno.vact",
+        "examples/offbeat-bass-techno.vact",
+        "examples/wobble-techno.vact",
+        "src/host/tests/e2e/templates/bass_examples.rs",
+        "README.md",
+        "impl-plans/active/bass-41-examples.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "README.md", "intendedEdit": "one contiguous bass bullet group under ## Status next to the src/dsp/ bullet; wf/syntax-fmt may also edit README"}
+      ],
+      "acceptanceCriteria": [
+        "Four example tracks (acid 132, rumble 128, offbeat 126, wobble 136 BPM) using existing drum templates and the new bass templates; no existing example edited; no master limiter.",
+        "bass_examples_render_and_meet_level_targets renders each file for 2 cycles to tmp/bass/examples/<stem>.wav: no faults, committed > 0, finite, rms > 1e-3, peak <= 1.0, low >= 0.3; bass_examples_use_bass_templates passes.",
+        "README gains exactly one contiguous hunk listing the six templates, slide, gate-length, wobble divisions, presets and examples; THIRD_PARTY_NOTICES.md unchanged."
+      ],
+      "verification": [
+        "mkdir -p tmp/bass-voices-229/BASS-41 && { rustfmt --edition 2021 --check src/host/tests/e2e/templates/bass_examples.rs; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-41/rustfmt.log 2>&1",
+        "mkdir -p tmp/bass-voices-229/BASS-41 && { CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_examples::/)'; echo \"exit=$?\"; } > tmp/bass-voices-229/BASS-41/nextest.log 2>&1",
+        "ls tmp/bass/examples/*.wav | wc -l",
+        "git diff -U0 README.md | grep -c '^@@'",
+        "git diff --quiet -- THIRD_PARTY_NOTICES.md"
+      ]
+    }
+  ],
+  "reconcileVerification": [
+    "CARGO_TERM_QUIET=true cargo build",
+    "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+    "cargo fmt --check",
+    "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+    "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+    "mise run lint"
+  ]
+}

@@ -455,6 +455,27 @@ available in `.vact`; upstream brand and module names are provenance only,
 not product names. This effort supersedes using one external drum machine as
 the design basis for the digital percussion kit above.
 
+### 4.3 Dedicated bass voices (author, 2026-09-30)
+
+The prelude gains six bass templates for techno at 125-140 BPM:
+`analog-bass`, `acid-bass`, `fm-bass`, `wobble-bass`, `sub-bass` and
+`reese-bass`. All six are thin template bodies over one original kernel,
+`bass-core`, which has six models:
+
+- the kernel owns its tempo-relative note length (`gate-length`, in
+  sixteenth-steps derived from the hidden `cps`);
+- a per-event `slide-from`/`slide-time` glide is applied inside the new voice,
+  with `cut` choking the previous note;
+- an `accent` control;
+- a transistor-ladder or diode-ladder filter, depending on the model;
+- a tempo-synced wobble LFO that reuses the digital drums' `lfo-*` rows.
+
+A named-patch library (`examples/bass-presets.vact`) and four techno example
+tracks come with them. The research notes, license boundary, signal flow,
+controls, digest-stability rules and verification are in
+[`design-bass-voices.md`](design-bass-voices.md). Existing templates and
+their render digests are unchanged.
+
 ## 5. Effects (builtin catalog; author, 2026-09-24)
 
 Effects are builtins, usable in three positions: as per-event pattern

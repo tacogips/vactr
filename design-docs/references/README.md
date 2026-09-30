@@ -55,6 +55,26 @@ This directory contains reference materials for system design and implementation
 | stmlib license | https://github.com/pichenettes/stmlib/blob/master/LICENSE | Mostly MIT, with separately licensed ST and serial-programming subtrees that must not enter Vactr's audio code |
 | Upstream file inventory | `verification/upstream_inventory.toml` | Per-file license, kind and use for every Mutable Instruments and `stmlib` file Vactr names; checked by `mise run audit-upstream` against a pinned checkout. `elements/resources/samples.py` and `stmlib/ui/event_queue.h` are GPL-3.0 and excluded |
 
+### Bass Synthesis
+
+These are papers, books and manuals, used for their equations and published
+behaviour only. No emulation source code is consulted or adapted. See
+[`design-bass-voices.md`](../specs/design-bass-voices.md#license-boundary).
+
+| Name | URL | Description |
+|------|-----|-------------|
+| Stinchcombe, Moog ladder and derivative filters (2008) | http://www.timstinchcombe.co.uk/ | Circuit analysis of the transistor ladder and the TB-303 diode ladder; basis for the acid diode-ladder topology |
+| Zavalishin, The Art of VA Filter Design (rev. 2.1.2) | https://www.native-instruments.com/fileadmin/ni_media/downloads/pdf/VAFilterDesign_2.1.2.pdf | TPT integrators, zero-delay feedback solution, transistor and diode ladders |
+| Pirkle, Designing Software Synthesizer Plugins in C++ (2nd ed., 2021) | https://www.willpirkle.com/ | VA diode ladder equations; the book and app-note code is not used |
+| Huovilainen, Non-linear digital Moog ladder (DAFx-04) | https://www.dafx.de/paper-archive/2004/P_061.PDF | Nonlinear ladder model; the kernel uses a single input nonlinearity instead of per-stage nonlinearities |
+| Valimaki and Huovilainen, VA oscillator and filter algorithms (CMJ 30(2), 2006) | https://doi.org/10.1162/comj.2006.30.2.19 | Virtual-analog oscillators and ladder filter survey |
+| Valimaki and Huovilainen, Antialiasing oscillators in subtractive synthesis (IEEE SPM, 2007) | https://doi.org/10.1109/MSP.2007.323276 | polyBLEP saw, pulse and square |
+| Esqueda, Valimaki and Bilbao, Rounding corners with BLAMP (DAFx-16) | https://www.dafx.de/paper-archive/ (DAFx-16 proceedings) | polyBLAMP triangle corners |
+| Chowning, FM synthesis (JAES 21(7), 1973) | https://www.aes.org/e-lib/ (JAES 21(7), 1973) | Frequency-modulation spectra and index envelopes |
+| Tomisawa, US Patent 4,249,447 (1981) | https://patents.google.com/patent/US4249447A | Operator self-feedback FM |
+| Esqueda et al., Lockhart and Serge wavefolders (Applied Sciences 7(12), 2017) | https://doi.org/10.3390/app7121328 | Wavefolding models |
+| Bilbao et al., Antiderivative antialiasing (IEEE SPL 24(7), 2017) | https://doi.org/10.1109/LSP.2017.2675541 | First-order ADAA for the wavefolder |
+
 ## Reference Documents
 
 Reference documents should be organized by topic:

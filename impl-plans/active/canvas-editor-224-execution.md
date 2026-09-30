@@ -72,3 +72,27 @@ moves only completed plans and updates only task index rows. Do not erase logs w
 No Cursor adapter: supplied codex-agent references are repository contracts, not UI behavior.
 Intentional divergence: GPU source supersedes visible CodeMirror; output correlation supersedes
 receipt timing. All other language/binding/browser-first/native host decisions remain.
+
+## Session 227 rerun boundary and native gates
+Runner runtimeVariables/workflowInput and resolved provenance are authoritative. This
+Step4 amends remaining work only; Step3 accepted design 15.3 remains the baseline. No
+workflow/package registry discovery or repair is part of any plan. Historical issue224
+and plan IDs/paths stay stable; rerun execution is session227.
+State retry follows CE-GPU acceptance; CE-TELEMETRY alone owns midi_clock.rs generation
+observation and publisher consumption; CE-PACKAGE retries installed preparation without
+regenerating valid locks. Existing CE-CONTRACT/CE-GPU checks do not automatically admit
+pending workflow reviews. Native blocked results stay blocked until runner-owned retries
+and review gates actually succeed. Before dependent fanout use runtime-accepted plan IDs,
+not Markdown checkboxes or a manually changed manifest status.
+
+For every retry, supply testsRun/testsPassed/failureCount (actual assertions), exact
+commands/cwd, complete log paths, terminal exits and pre/post source hashes to the native
+progress gate using the implementation node's runner-supplied mechanism. Retain returned
+decision and review references in the own-plan log. Never invent a gate CLI or manufacture
+accepted results. A missing result remains pending. Formal test-integrity, adversarial and
+integration review follow implementation verification; improve author review is additional.
+Workers append own progress only. Serial coordinator reconciles source hashes and accepts
+contracts before successor waves; indexes, manifest updates, lock reconciliation, archive
+and Git remain serial. Step5 must accept these amended plans, then coordinator commits
+and non-force pushes owned plan amendments before further implementation fanout. Current
+Step4 does not commit unreviewed amendments or execute the planned implementation tests.

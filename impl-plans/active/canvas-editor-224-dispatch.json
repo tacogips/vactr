@@ -2,8 +2,8 @@
   "workflowMode": "issue-resolution",
   "issueReference": "codex-design-and-implement-review-loop-session-224",
   "designReference": "design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30",
-  "reviewCommunicationId": "comm-002816",
-  "status": "Accepted checkpoint prepared; commit and successful non-force push required",
+  "reviewCommunicationId": "comm-002895",
+  "status": "All 13 amended plans accepted by comm-002895; checkpoint commit and non-force push pending",
   "executionContractPath": "impl-plans/active/canvas-editor-224-execution.md",
   "plans": [
     {
@@ -45,7 +45,8 @@
       "planId": "CE-STATE",
       "planPath": "impl-plans/active/canvas-editor-224-state.md",
       "dependsOn": [
-        "CE-CONTRACT"
+        "CE-CONTRACT",
+        "CE-GPU"
       ],
       "writePaths": [
         "editor/src/code/surface.ts",
@@ -59,13 +60,15 @@
       "sharedPathNotes": [],
       "verification": [
         "cd editor && npm run check",
-        "cd editor && npm run test -- test/canvas/state.test.ts test/protocol/utf8.test.ts test/protocol/document.test.ts"
+        "cd editor && npm run test -- test/canvas/state.test.ts test/protocol/utf8.test.ts test/protocol/document.test.ts",
+        "cd editor && npm run test -- test/code"
       ],
       "acceptanceCriteria": [
         "Exactly-once synchronous revision recording",
         "History/undo/index ceilings and stale mapping tests pass",
         "Own progress log includes command evidence, fixes and remaining gates.",
-        "Independent review and improve self-review findings resolved."
+        "Independent review and improve self-review findings resolved.",
+        "Historical typecheck exit 1 retained; fresh source-matched retries pass native progress and formal review gates"
       ],
       "progressPath": "impl-plans/active/canvas-editor-224-state.md"
     },
@@ -134,6 +137,7 @@
         "CE-CONTRACT"
       ],
       "writePaths": [
+        "src/sched/midi_clock.rs",
         "src/session/protocol.rs",
         "src/session/codec.rs",
         "src/session/publish.rs",
@@ -147,16 +151,22 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "verification": [
-        "CARGO_TERM_QUIET=true cargo check",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run session::tests::",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm npm run test -- test/wasm/canvas-clock.test.ts"
+        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true cargo check --locked",
+        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --locked session::tests::",
+        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --locked sched::tests::",
+        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true cargo build --locked --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && VACTR_WASM=../tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target/wasm32-unknown-unknown/debug/deps/vactr.wasm npm run test -- test/wasm/canvas-clock.test.ts",
+        "cd editor && npm run check",
+        "RUSTUP_TOOLCHAIN=1.98.1 rustfmt --check --edition 2021 src/sched/midi_clock.rs src/session/protocol.rs src/session/codec.rs src/session/publish.rs src/session/session.rs src/host/wasm/session_half.rs src/session/tests/publish.rs src/session/tests/codec.rs"
       ],
       "acceptanceCriteria": [
         "Real native-session and Wasm telemetry share contracts",
         "Periodic timing/end-time/epoch/legacy tests pass",
         "Own progress log includes command evidence, fixes and remaining gates.",
-        "Independent review and improve self-review findings resolved."
+        "Independent review and improve self-review findings resolved.",
+        "Runtime restart generation consumed before publication; zero-position and between-sample restarts have Rust and real-Wasm regressions",
+        "Historical nextest exit 101 retained; required Rust/Wasm/type/format and native progress/formal review gates pass"
       ],
       "progressPath": "impl-plans/active/canvas-editor-224-telemetry.md"
     },
@@ -445,6 +455,8 @@
         "CE-CONTRACT"
       ],
       "writePaths": [
+        "editor/test/canvas/package-browser-smoke.mjs",
+        "editor/test/canvas/package-dependencies.py",
         "editor/package.json",
         "editor/package-lock.json",
         "editor/src-tauri/Cargo.toml",
@@ -462,20 +474,17 @@
         }
       ],
       "verification": [
-        "cd editor && npm install --save-dev --save-exact playwright@1.62.1 --ignore-scripts",
-        "cd editor && npm exec -- playwright install chromium",
-        "CARGO_TERM_QUIET=true cargo generate-lockfile --manifest-path editor/src-tauri/Cargo.toml",
-        "CARGO_TERM_QUIET=true cargo metadata --locked --no-deps --manifest-path editor/src-tauri/Cargo.toml --format-version 1",
-        "mise exec -- rustup target list --installed",
-        "xcodebuild -version",
-        "xcodebuild -showsdks",
-        "CARGO_TERM_QUIET=true cargo tauri --version"
+        "node editor/test/canvas/package-browser-smoke.mjs",
+        "python3 editor/test/canvas/package-dependencies.py --baseline tmp/canvas-editor-224/CE-PACKAGE/attempt-1 --output tmp/canvas-editor-224/CE-PACKAGE/attempt-2/dependency-comparison.json",
+        "CARGO_TERM_QUIET=true cargo metadata --locked --manifest-path editor/src-tauri/Cargo.toml --format-version 1",
+        "CARGO_TERM_QUIET=true cargo tree --locked --manifest-path editor/src-tauri/Cargo.toml -p vactr"
       ],
       "acceptanceCriteria": [
         "Task-only pinned dependency diffs and complete logs",
         "Browser binary available or verification gap explicitly recorded; no worker regenerates locks",
         "Own progress log includes command evidence, fixes and remaining gates.",
-        "Independent review and improve self-review findings resolved."
+        "Independent review and improve self-review findings resolved.",
+        "Native progress accepts actual installed-browser and dependency assertions; formal workflow reviews complete before dependent admission"
       ],
       "progressPath": "impl-plans/active/canvas-editor-224-package-preparation.md"
     }
@@ -486,7 +495,7 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
+  "originalHead": "8ee36f23e2311455126f6486db992d33227ff3e2",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/architecture.md",
@@ -592,13 +601,15 @@
     ],
     "reviewDecisions": {
       "design": "Accept design for code-free implementation planning; implementation and device acceptance remain pending.",
-      "plans": "Accept all 13 implementation plans. No material consistency or implementation-readiness findings."
+      "plans": "Accept all 13 amended plans (comm-002895); implementation acceptance remains incomplete pending native progress and formal reviews.",
+      "implementation": "CE-STATE, CE-TELEMETRY and CE-PACKAGE retries and native progress/formal reviews remain pending; historical failures preserved."
     },
     "communications": {
       "intake": "comm-002812",
       "designAcceptance": "comm-002814",
       "planAuthor": "comm-002815",
-      "planAcceptance": "comm-002816"
+      "planAcceptance": "comm-002816",
+      "amendedPlanAcceptance": "comm-002895"
     },
     "codexAgentReferences": [
       "AGENTS.md",
@@ -608,11 +619,42 @@
       "/Users/taco/.codex/skills/improve/SKILL.md"
     ],
     "remainingVerification": [
+      "CE-STATE native blocked result: retry source-matched checks and formal reviews",
+      "CE-TELEMETRY generation implementation and Rust/Wasm restart regressions",
+      "CE-PACKAGE native blocked result: implementation-exercising progress retry and formal reviews",
       "Implementation builds and behavioral tests",
       "Real browser GPU, input, resource and performance evidence",
       "Native/iOS build and signing checks",
       "Manual IME, accessibility and physical synchronization evidence",
       "Unavailable physical iPad checks remain incomplete"
-    ]
-  }
+    ],
+    "gitBaseline": {
+      "historicalIntakeHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
+      "resumedCheckpointHead": "8ee36f23e2311455126f6486db992d33227ff3e2",
+      "branch": "main",
+      "evidence": "HEAD is the prior accepted checkpoint referenced in CE-CONTRACT progress; historical intake is an ancestor."
+    }
+  },
+  "rerunExecutionReference": "codex-design-and-implement-review-loop-session-227",
+  "revisionFeedback": [
+    {
+      "finding": 1,
+      "severity": "mid",
+      "planId": "CE-STATE",
+      "decision": "Addressed in planning; implementation/gate resolution pending"
+    },
+    {
+      "finding": 2,
+      "severity": "mid",
+      "planId": "CE-TELEMETRY",
+      "decision": "Addressed in planning; implementation/gate resolution pending"
+    },
+    {
+      "finding": 3,
+      "severity": "mid",
+      "planId": "CE-PACKAGE",
+      "decision": "Addressed in planning; implementation/gate resolution pending"
+    }
+  ],
+  "intakeOriginalHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c"
 }

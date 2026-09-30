@@ -2,7 +2,7 @@
 
 **planId**: CE-TELEMETRY
 **planPath**: impl-plans/active/canvas-editor-224-telemetry.md
-**Status**: Ready for Step5 review; implementation not started
+**Status**: In Progress — restart seam allocated; implementation retry and formal reviews pending
 **Created / Last Updated**: 2026-09-30
 **Design Reference**: design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30
 **Issue**: codex-design-and-implement-review-loop-session-224
@@ -16,12 +16,13 @@ Baseline: existing browser Rust/Wasm ABI, CodeMirror state/history and native CP
 Read [execution contract](canvas-editor-224-execution.md) before editing; its ownership, snapshots, Git/review, Rust agents, logs and progress rules are mandatory.
 
 ## Non-goals
-No DSP scheduling changes, native shell or frontend clock algorithm.
+No DSP scheduling changes, native shell or frontend clock algorithm. The only scheduler change is observing successful transport restarts.
 
 ## Related plans
 Previous/dependencies: CE-CONTRACT. Next: CE-AUDIO, CE-CLOCK.
 
 ## Write paths
+- src/sched/midi_clock.rs
 - src/session/protocol.rs
 - src/session/codec.rs
 - src/session/publish.rs
@@ -38,12 +39,13 @@ None.
 ## File-level tasks and module status
 | Task | Deliverables | Status |
 |---|---|---|
-| T1 | session/protocol.rs and codec.rs | Not started |
-| T2 | session/publish.rs and session.rs | Not started |
-| T3 | wasm/session_half.rs and tests | Not started |
+| T1 | session/protocol.rs and codec.rs | Implemented; behavioral verification pending |
+| T2 | session/publish.rs and session.rs | Partial; restart-generation seam blocked |
+| T3 | wasm/session_half.rs and tests | Implemented; behavioral verification blocked |
+| T4 | midi_clock.rs generation, publisher consumption and restart regressions | Not started |
 
 ### T1: session/protocol.rs and codec.rs
-**Status**: Not started
+**Status**: Implemented; verification pending
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 Mirror CE-CONTRACT optional fields with defaults and old-client compatibility. Timing emission bounded20Hz independent of tempo changes, file/revision/span unchanged. Preserve dirty MusicDSP protocol hunks; one owner fresh-reads each edit. Validate epoch/sample/end/latency fields without rejecting old wire envelopes.
 
@@ -52,7 +54,7 @@ Mirror CE-CONTRACT optional fields with defaults and old-client compatibility. T
 - [ ] Targeted tests prove behavior and complete logs show final exits.
 
 ### T2: session/publish.rs and session.rs
-**Status**: Not started
+**Status**: Partial; restart seam allocated by session 227; retry pending
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 playing_wire end_time = scheduled event time plus original e.dur seconds (not recomputed from later BPM). Snapshot uses runtime cycle position and matching host_now; add publisher cadence and epoch state, pause/lost-clock handling and discontinuity invalidation. Avoid allocations/serialization in audio callback; publication on session control side. Maintain subscription routing and existing tempo behavior for old clients.
 
@@ -61,7 +63,7 @@ playing_wire end_time = scheduled event time plus original e.dur seconds (not re
 - [ ] Targeted tests prove behavior and complete logs show final exits.
 
 ### T3: wasm/session_half.rs and tests
-**Status**: Not started
+**Status**: Implemented; verification blocked
 **Parallelizable**: No within plan; execute tasks in listed order. Independent plans may run only after DAG predecessors finish.
 Thread browser host sample time into same session timing semantics while preserving raw ABI and TAG_SESSION. RealWasm test init/eval/tick and read actual telemetry: no tempo-change needed for refreshed snapshots, duration unchanged by subsequent BPM, revision source retained, epoch reset and rate ceiling verified. Rust tests cover malformed/legacy records and subscription/cadence.
 
@@ -88,7 +90,7 @@ Record complete logs/exit statuses per execution contract. No test/build is clai
 ## Completion criteria
 - [ ] Real native-session and Wasm telemetry share contracts
 - [ ] Periodic timing/end-time/epoch/legacy tests pass
-- [ ] Own progress log includes command evidence, fixes and remaining gates.
+- [x] Own progress log includes command evidence, fixes and remaining gates.
 - [ ] Independent review and improve self-review findings resolved.
 
 ## Progress Log
@@ -96,3 +98,89 @@ Record complete logs/exit statuses per execution contract. No test/build is clai
 Tasks completed: code-free plan authored from accepted design.
 Implementation: not started. Build/behavior/device criteria unchecked.
 Next: independent Step5 plan review, accepted-plan commit/push, then dependency-ready execution.
+
+### Session: 2026-09-30 — CE-TELEMETRY Step6 attempt-1
+Dependency admission: runtime acceptedPlanIds includes CE-CONTRACT; committed plan matches design15.3.4. Skills: impl-plan, design-doc reference, Rust coding standards, improve. Required agent references: /root/rust_coding, /root/check_and_test_after_modify; TS owner /root/wasm_tests; bounded author review and one-line Rust repair /root/telemetry_selfcheck.
+
+Implemented optional protocol-v1 playing epoch/end_time and transport fields, finite/latency/rational/source validation and legacy decoding. Publisher uses original scheduled duration, matching host sample/runtime position, independent <=20Hz cadence, legacy tempo change notices, explicit unavailable latency, observed epoch discontinuities and held paused/lost position. Invalid native/Wasm host samples are ignored. Six Rust behavioral tests and five real-Wasm tests added; actual ABI tempo/playing records pass through the accepted TypeScript decoder when executed. No behavioral pass is claimed.
+
+Immutable intentions: tmp/canvas-editor-224/CE-TELEMETRY/attempt-1/edit-rust-001 through edit-rust-017, ts-edit-001 through ts-edit-002, edit-plan-001 through edit-plan-004; mirrored under /private/tmp/vactr-224-implementation/CE-TELEMETRY/. Read/prehash guards and post-edit captures preserve prior MusicDSP protocol unit comment. No Git mutations or unrelated edits.
+
+Command evidence (complete foreground logs, final terminal exits):
+- RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-1/target CARGO_TERM_QUIET=true cargo check --locked: exit0, cargo-check.log/.json. Stable production source; later edit-rust-017 changes only test fixture.
+- RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-1/target CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --locked `session::tests::`: exit101, nextest.log/.json; compilation stopped before tests, counts unavailable. Missing SrcRef.doc_revision fixture fixed to42 in edit-rust-017; renewed gate remains unrun, not a pass.
+- rustup target add wasm32-unknown-unknown --toolchain 1.98.1: exit0, wasm-target.log/.json. Toolchain override accommodates existing modern Rust source; isolated Cargo output avoids shared build mutation.
+All command logs above reside under tmp/canvas-editor-224/CE-TELEMETRY/attempt-1/.
+
+Author improve finding (mid, unresolved): sampled position/source/frozen/lost/time cannot identify every MIDI Start. Start at prior sampled position0 or between sparse ticks can reset Runtime while leaving publisher observations nondecreasing; restarted events then retain old epoch. Runtime::transport_start in src/sched/midi_clock.rs exposes no generation. A robust monotonic restart generation and observable accessor require src/sched/midi_clock.rs (possibly src/sched/runtime.rs), outside this plan's approved writePaths. No anchor heuristic or downstream host wiring substituted for the missing seam.
+
+Resume criterion: serial ownership amendment authorizes this exact runtime seam, or its owning plan delivers an accepted generation accessor. Then consume generation in publisher and add zero-position/sparse-tick restart regressions, rerun nextest, isolated Wasm build, actual-Wasm tests, editor npm run check and exact-file format check. All these gates are incomplete; no narrower verification attempted after discovering ownership gap. All command sessions exited.
+
+Implementation is incomplete and blocked. Formal integrity/adversarial review, accepted completion, shared indexes/archive, commit/push remain later workflow steps; their pending state is not the blocker. Native output-correlation and frontend clock algorithms remain CE-AUDIO/CE-CLOCK allocation. No hardware/device evidence claimed.
+
+Snapshot author audit: attempt-1/snapshot-audit.json confirms all final Rust edit snapshots match current files and no semantic drift. Four within-node formatting transitions lack their own pre-edit intentions; adjacent immutable snapshots are rustfmt-equivalent. This is an evidence-protocol limitation, not proof of a complete per-edit history. Retain it for serial review; future edits must capture formatter intentions before writing. Handoff source identities and pre-node owned diff are recorded in final-handoff-source.json/final-handoff.diff.
+
+## Session 227 restart generation contract (integration finding 2)
+This amendment allocates `src/sched/midi_clock.rs` exclusively to CE-TELEMETRY.
+`MidiClockState` and its `impl Runtime` already live there; no `src/sched/runtime.rs`
+edit is necessary or authorized. No scheduler redesign or DSP timing change is intended.
+
+### T4: Observe every successful MIDI restart, then consume its generation
+**Status**: Not started
+**Parallelizable**: No; implement before retrying T2/T3 verification.
+- `src/sched/midi_clock.rs`: add a runtime-owned restart-generation counter and
+  read-only `MidiClockState::restart_generation` accessor. Advance exactly once after
+  each successful `transport_start`, including Start at zero and repeated Starts before
+  any publisher sample. Rejected Start, normal pulses, ticks and Continue do not advance
+  this counter. Enter/leave slave and stop/resume must not reset or fabricate it.
+- `src/session/session.rs`: retain the last observed restart generation in publisher
+  state, initialized without falsely reporting a first observation as a restart.
+- `src/session/publish.rs`: compare generation before assigning epoch to playing
+  events or snapshots; generation change invalidates the prior epoch even when sampled
+  position/time/source/paused/lost appear unchanged. Preserve existing discontinuity
+  detection and <=20 Hz snapshot cadence. A restart inside the cadence window must
+  still give immediately published playing events the new epoch. Later snapshot and
+  playing epochs must agree; no frontend generation field or v1 ABI change is needed.
+- `src/session/tests/publish.rs`: use the real Rig/runtime MIDI transport, not injected
+  epoch strings. Add regressions for Start at prior sampled position zero, restart
+  between samples with nondecreasing sampled position, multiple Starts before next
+  observation, restart inside 50 ms cadence with a playing event, and rejected Start/
+  Continue counter neutrality. Assert epoch change, epoch consistency and unchanged
+  source revision/end-time semantics. Retain existing pause/lost/rollback tests.
+- `editor/test/wasm/canvas-clock.test.ts`: exercise the existing real Wasm MIDI input
+  ABI for zero-position and between-sample Starts, decode original TAG_SESSION bytes
+  through the accepted decoder, and assert new epoch on playing plus next snapshot.
+  Preserve init/eval/tick, cadence, original-duration and source-revision assertions;
+  loading a mock artifact or skipping tests cannot pass this gate.
+
+**Acceptance and evidence**:
+- [ ] Generation changes on every successful restart, independent of sampled position.
+- [ ] Publisher consumes generation before any post-restart playing publication.
+- [ ] Rust and real Wasm restart regressions fail against the former heuristic and pass
+      against the generation implementation; record actual counts and complete exits.
+- [ ] Required Rust agents run; native progress gate and formal workflow reviews accept.
+
+## Retry verification commands (supersede the original commands for this attempt)
+Use existing installed toolchain 1.98.1 from attempt-1; do not modify mise.toml.
+Run serially from repository root except the explicit editor command. Isolated target
+output below is a build directory, not a worktree or private branch.
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true cargo check --locked`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --locked session::tests::`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --locked sched::tests::`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TARGET_DIR=tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target CARGO_TERM_QUIET=true cargo build --locked --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+- `cd editor && VACTR_WASM=../tmp/canvas-editor-224/CE-TELEMETRY/attempt-2/target/wasm32-unknown-unknown/debug/deps/vactr.wasm npm run test -- test/wasm/canvas-clock.test.ts`
+- `cd editor && npm run check`
+- `RUSTUP_TOOLCHAIN=1.98.1 rustfmt --check --edition 2021 src/sched/midi_clock.rs src/session/protocol.rs src/session/codec.rs src/session/publish.rs src/session/session.rs src/host/wasm/session_half.rs src/session/tests/publish.rs src/session/tests/codec.rs`
+Compile/clippy/format prove the actual modified bytes build cleanly; nextest proves real
+session and scheduler restart compatibility; Wasm build plus tests prove the production
+ABI/decoder pairing. Run post-modification verification agent after every Rust change.
+Preserve attempt-1 nextest exit 101 and snapshot-history limitations; new logs must not
+replace them. Missing toolchain/target or real-artifact failure remains an actual check
+failure, with complete output; it is never a workflow provenance blocker.
+
+### Session: 2026-09-30 — Step4 session 227 amendment
+Generation seam now allocated in manifest and plan, within accepted design 15.3.4.
+No Rust modified here. Native implementation result remains blocked pending T4, renewed
+Rust/Wasm/type/format checks, progress admission and formal workflow reviews. Historical
+attempt-1 exit 101 and incomplete format intention history retained without reclassification.

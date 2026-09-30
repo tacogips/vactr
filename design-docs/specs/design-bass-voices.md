@@ -122,7 +122,9 @@ sound" rule. The one new UGen is justified by the acid diode ladder, feedback
 FM, slide, gate length and per-sample wobble. The six templates are thin
 bodies over it.
 
-**Kernel module layout.** No new crates. Every file is under 400 lines.
+**Kernel module layout.** No new crates. Every file is under 400 lines,
+except `mods.rs`. Its cap is 450 lines, raised in session 232 for the
+drift-free LFO.
 
 | File | Responsibility |
 |------|----------------|
@@ -260,10 +262,35 @@ phases. Every other model starts its phases at zero.
     the sustain level through a fixed 2 ms anti-click ramp, and the filter
     envelope is not retriggered, so it starts decayed.
 - LFO (wobble):
-  - Phase increments by `rate_hz / sr` per sample, with
-    `rate_hz = lfo-sync ? lfo-rate * cps : lfo-rate`.
-  - Initial phase is `lfo-offset` when `lfo-retrigger` is true, and
+  - `rate_hz = lfo-sync ? lfo-rate * cps : lfo-rate`.
+  - Initial phase `phi0` is `lfo-offset` when `lfo-retrigger` is true, and
     `frac(rate_hz * onset-time)` otherwise.
+  - The phase is **derived, not accumulated** (revision 2026-09-30, session
+    232). Adding `rate_hz / sr` to an f32 phase every sample rounds on every
+    step. The measured error was 85265 samples per cycle instead of 85333 at
+    0.5625 Hz, so a synced wobble slid off the beat. Instead, the LFO keeps
+    an exact integer count `n` of the samples since its anchor. It then
+    computes the position in f64:
+    `pos = phi0 + n * rate_hz / sr`, `phase = frac(pos)`,
+    `cycle = anchor_cycles + floor(pos)`. Phase error does not grow with
+    playback time, and consecutive wraps are `sr / rate_hz` samples apart,
+    within 1 sample.
+  - Rate change: if the per-block `rate_hz` differs bit-for-bit from the
+    anchored rate, the LFO re-anchors. It sets
+    `phi0 = frac(pos)` and `anchor_cycles += floor(pos)` at the current `n`,
+    then `n = 0` and stores the new rate. The phase stays continuous under
+    `lfo-rate` modulation. `cps` is fixed per voice, so a synced LFO with a
+    constant `lfo-rate` never re-anchors.
+  - State (`Lfo::FLOATS = 6`, all slots exact in f32):
+    `anchor_phase` in `[0, 1)`, `anchor_cycles` (a whole number up to 2^24),
+    `count_lo` (a whole number below 2^20), `count_hi` (a whole number up to
+    2^24, so `n = count_hi * 2^20 + count_lo`), `rate` (the anchored
+    `rate_hz`), and `smooth`. An integer below 2^24 is exact in f32. Splitting
+    the count keeps it exact far beyond any voice lifetime: 2^24 samples is
+    only about 349 s at 48 kHz, while the `gate-length` maximum at the
+    minimum `cps` is about 133 s plus release.
+  - CPU: one f64 multiply, one divide and one floor per sample. There is no
+    loop and no allocation.
   - Shapes come from the existing `lfo-wave` enum: `sine tri saw ramp square
     random`. `random` is sample-and-hold, seeded from `kx.seed`, one value per
     LFO cycle.
@@ -582,8 +609,18 @@ component structs and the kernel `render` directly at 48 kHz.
   sample, for cps in {0.5, 0.5625}.
 - Wobble period: at `cps = 0.5625` (135 BPM), `lfo-sync true`, and `lfo-rate`
   in {1, 2, 4, 8, 3, 6, 12}, the LFO phase wraps every
-  `sr / (lfo-rate * cps)` samples, within 1 sample.
+  `sr / (lfo-rate * cps)` samples, within 1 sample. Tolerances are not
+  loosened.
 - Free-rate mode: `lfo-sync false`, `lfo-rate 3.2` gives a period of 3.2 Hz.
+  The first wrap from phase 0 is at sample 15000 +/-1.
+- Drift-free: run `next` 5,760,000 times (120 s at 48 kHz) with
+  `cps 0.5625` and `lfo-rate 4` (2.25 Hz). The cycle count is then exactly
+  270, and the phase is within 1e-6 of 0 by circular distance. The old
+  accumulating LFO ended about 0.2 cycles off here. A state loaded with `count_hi` greater than 0
+  (an elapsed count above 2^20) gives the same phase as the closed form.
+- Rate change: switching `rate_hz` mid-stream moves the phase by at most one
+  new-rate increment across the switch, and the cycle count never
+  decreases.
 - Phase: `lfo-retrigger false` starts at `frac(rate_hz * onset-time)`.
 - Stability: a grid of extreme controls, including
   - `freq` 20 and 2000;
@@ -672,6 +709,10 @@ Fanout manifests list only these tracked source paths. They never list
   fundamental keep aliasing low. ADAA handles the folder. The filters'
   saturation at high drive can alias; this is accepted for bass.
 - Slide and accent are per-voice approximations (see "Note length and slide").
+- The LFO phase comes from an exact per-voice sample count, so it cannot
+  drift within a voice. Only the `rate_hz` value itself is rounded to f32.
+  Bar alignment across voices still depends on `onset-time`, as the "Tempo
+  sync and wobble divisions" section describes.
 - The kernel is mono. Reese and wobble width come from effects in examples,
   not from the kernel.
 

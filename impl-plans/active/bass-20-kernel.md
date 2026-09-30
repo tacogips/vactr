@@ -64,7 +64,15 @@ None.
   - `FILTER` (sized `max(Ladder::FLOATS, Diode::FLOATS)`);
   - `OSC_A`, `OSC_B`, `OSC_SUB`, `FM`, `FOLD`, `AMP`, `FENV`, `GLIDE`,
     `LFO`;
-  - `ELAPSED`: samples since note start, as f32;
+  - The `LFO` slot is sized with `Lfo::FLOATS`, which is 6 after the
+  session 232 drift-free revision. The fields are `anchor_phase`,
+  `anchor_cycles`, `count_lo`, `count_hi`, `rate` and `smooth`. Call
+  `Lfo::start` only in the first block. In every later block, `load` it,
+  call `next` per sample, then `store` it. Re-calling `start` would reset
+  the elapsed count and bring back the beat drift. Always pass the same
+  per-block `rate_hz(lfo_rate, lfo_sync, cps)` value, so a constant rate
+  never re-anchors.
+- `ELAPSED`: samples since note start, as f32;
   - `GATE_LEFT`: remaining gate samples, as f32.
 - Imitate the named-offset style of
   `src/dsp/ugen/digital_drum/tonal.rs` (`STATE_FLOATS`, `HIT_ELAPSED`,

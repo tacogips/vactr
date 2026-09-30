@@ -1,7 +1,7 @@
 # BASS-10: Transistor Ladder and Diode Ladder Filters
 
-**Status**: Ready
-**Plan ID**: BASS-10 (wave 1; parallel with BASS-11 and BASS-12)
+**Status**: Ready (session 232 re-verification; implementation completed in session 229)
+**Plan ID**: BASS-10 (session 232 wave 2, parallel with BASS-11, after BASS-12)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "DSP components" (transistor ladder, diode ladder), "Intentional simplifications" and "Verification"
 **Created**: 2026-09-30
 **Last Updated**: 2026-09-30
@@ -203,13 +203,74 @@ helper that measures `gain_db(filter, coeffs, f_hz)`: a 0.75 s sine at
 
 ## Done Criteria
 
-- [ ] The interface contract matches exactly: `FLOATS`, method names and
+- [x] The interface contract matches exactly: `FLOATS`, method names and
       signatures.
-- [ ] Verification 1-2 pass, with the exit code and test count recorded.
-- [ ] Constants and measurements recorded. No file outside writePaths
+- [x] Verification 1-2 pass, with the exit code and test count recorded.
+- [x] Constants and measurements recorded. No file outside writePaths
       changed (`git diff --stat`).
+
+## Session 232 Re-verification (dispatch task)
+
+**Intent.** BASS-10 was implemented and passed 8/8 in session 229. Only
+its test-integrity review failed, and only on output-contract formatting.
+This task produces fresh evidence and the integrity table. It is not a
+rewrite.
+
+**Order.** This task runs after BASS-12. The lib test crate is shared, so
+a `bass_mods.rs` or `mods.rs` compile error blocks this run. If cargo fails
+in a file this plan does not own, follow the manifest retry policy (wait
+about 60 s, up to 10 times). Never edit that file.
+
+**Non-goals.**
+
+- No refactor, no retuning of constants, and no change to any threshold
+  in "Tests".
+- Do not edit `mods.rs`, `osc.rs`, `fm.rs` or their test files.
+
+**Steps.**
+
+1. Record `shasum -a 256` of the three owned files.
+2. Run the two manifest commands, writing logs to
+   `tmp/bass-voices-232/BASS-10/`.
+3. Write a test-integrity table in the Progress Log, one row per bullet
+   in "Tests", with these columns:
+   `spec bullet | test fn name | plan threshold | threshold in code | result`.
+   Every threshold in code must equal or be stricter than the plan's.
+   Every bullet must map to at least one test fn.
+4. If a focused test fails, fix `ladder.rs` or `diode.rs` only and follow
+   the pinned contract. Record the before and after hashes. Never relax a
+   threshold.
+5. Record the end-of-run hashes, the exit codes, the test count and the
+   log paths.
+
+**Done criteria (session 232).**
+
+- [ ] The rustfmt log ends with `exit=0`.
+- [ ] The nextest log ends with `exit=0` and reports at least 8 tests run
+      and 0 failed.
+- [ ] The integrity table covers every "Tests" bullet, with no loosened
+      threshold.
+- [ ] The owned-file hashes are unchanged, or every change is justified
+      by a failing test.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+### Session: 2026-09-30 (BASS-10 implementation)
+**Tasks Completed**: Ladder and diode component APIs, state handling, bounded
+TPT/ZDF processing, filter response and safety tests, and scoped gates.
+**Constants and measurements**: `K_LADDER_MAX=4.08`,
+`K_DIODE_MAX=2.5`, `DIODE_FC_SCALE=2.9`, `FB_HP_HZ=60 Hz`; measured diode
+`-3 dB` corner `1002.6 Hz` at `1000 Hz` nominal cutoff. Diode resonance uses
+drive-tapered output compensation (22 dB maximum at zero drive) and a 15.0
+extreme-signal output guard.
+**Verification**: exact owned-file rustfmt check exited 0
+(`tmp/bass-voices-229/BASS-10/check-agent-rustfmt-final13.log`); filtered
+nextest exited 0 with 8 run, 8 passed, 0 failed
+(`tmp/bass-voices-229/BASS-10/check-agent-nextest-final13.log`). The
+success-output rerun also passed 8/8 and recorded the diode corner
+(`tmp/bass-voices-229/BASS-10/check-agent-nextest-corner-final6.log`).
+**File sizes**: ladder.rs 140 lines, diode.rs 180 lines, bass_filters.rs 194
+lines; all are under 400 lines.

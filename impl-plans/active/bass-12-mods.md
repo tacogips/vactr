@@ -1,7 +1,7 @@
 # BASS-12: Envelopes, Gate Length, Accent, Glide and Tempo-synced LFO
 
-**Status**: Ready
-**Plan ID**: BASS-12 (wave 1; parallel with BASS-10 and BASS-11)
+**Status**: Ready (session 232: drift-free LFO revision)
+**Plan ID**: BASS-12 (session 232 wave 1, runs alone; BASS-10 and BASS-11 re-verify after it)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "Envelopes and timing", "Tempo sync and wobble divisions", "Note length and slide" and "Verification"
 **Created**: 2026-09-30
 **Last Updated**: 2026-09-30
@@ -32,8 +32,29 @@ imported or edited. The formulas are:
 
 ## Dependencies
 
-- **dependsOn**: BASS-00
-- **Blocks**: BASS-20
+- **dependsOn**: BASS-00 (completed in session 229, so no dispatch dependency in session 232)
+- **Blocks**: BASS-20. In session 232 it also blocks the BASS-10 and BASS-11
+  re-verification runs, because they share the lib test crate and cannot
+  run while `bass_mods.rs` or `mods.rs` fails to compile.
+
+## Session 232 scope (read first)
+
+- Keep every non-LFO item in `mods.rs` and every non-LFO test in
+  `bass_mods.rs` as is. Those 15 tests already pass
+  (`tmp/bass-voices-229/BASS-12/nextest.log:42`). Change only `Lfo` (the
+  struct, `FLOATS`, `load`, `store`, `start`, `next`, the accessors, and the
+  new `COUNT_SPLIT`) and the `Lfo` tests.
+- `raw_value`, `random_value`, `rate_hz`, `initial_phase`, `LfoShape` and
+  `cutoff_octaves` keep their current signatures and behaviour. `raw_value`
+  now receives the derived `phase` and `cycle`.
+- Update the existing `Lfo` tests: the wrap detection now uses
+  `cycles(48_000.0)`, and the round-trip test uses the six-field literal.
+  Add the three new tests listed under Tests.
+- The `bass_mods.rs` ambiguous-integer error is already fixed
+  (`wrap: Option<usize>` at line 170). Do not re-fix it.
+- The implementation goes through `mods.rs:Lfo`. Imitate the component
+  style already in the same file (`Glide::load`/`store`, and the
+  `finite_or`/`finite_clamp` helpers).
 
 ## writePaths
 
@@ -132,16 +153,50 @@ LFO:
   - `offset.rem_euclid(1.0)` when retriggering;
   - otherwise `(rate_hz as f64 * onset as f64).rem_euclid(1.0) as f32`,
     **computed in f64**.
-- `pub struct Lfo` holds `phase`, `cycles` (a whole-number count stored as
-  f32) and `smooth`; `FLOATS = 3`, plus `load`/`store`.
-  - `pub fn start(&mut self, phase: f32, shape: LfoShape, seed: u32)` sets
-    the phase, `cycles = 0`, and `smooth` to the raw value at that phase,
-    so there is no ramp from 0.
+- `pub struct Lfo` (revised in session 232 for a drift-free phase; the
+  three-float `phase`/`cycles`/`smooth` layout is retired) has these
+  fields, in this order: `pub anchor_phase: f32`, `pub anchor_cycles: f32`,
+  `pub count_lo: f32`, `pub count_hi: f32`, `pub rate: f32` and
+  `pub smooth: f32`. `pub const FLOATS: usize = 6;`, plus `load`/`store` in
+  that slot order.
+  - The elapsed count is `n = count_hi * 2^20 + count_lo`, evaluated in
+    f64. Define `pub const COUNT_SPLIT: f32 = 1_048_576.0;` (2^20).
+  - `load`/`store` clamp the slots. `anchor_phase` is `rem_euclid(1)`.
+    `anchor_cycles` and `count_hi` are floored and clamped to
+    `[0, 16_777_216]`. `count_lo` is floored and clamped to
+    `[0, COUNT_SPLIT)`. `rate` is finite and at least 0. `smooth` is clamped
+    to `[0, 1]`. Non-finite values become 0.
+  - `pub fn start(&mut self, phase: f32, shape: LfoShape, seed: u32)` does
+    the following:
+    - sets `anchor_phase = phase.rem_euclid(1)` (non-finite becomes 0);
+    - zeroes `anchor_cycles`, the count and `rate`;
+    - sets `smooth` to the raw value at that phase, so there is no ramp
+      from 0.
   - `pub fn next(&mut self, shape: LfoShape, rate_hz: f32, seed: u32, sr: f32) -> f32`
-    returns the smoothed unipolar value `u` in `[0, 1]`, with a one-pole
-    smoother of `LFO_SMOOTH_S = 0.002`. It then advances the phase and
-    increments `cycles` on wrap.
-  - `pub fn cycles(&self) -> f32`.
+    does the following:
+    1. Sanitize `rate_hz` to a finite value of at least 0, and `sr` to a
+       finite value of at least 1 (non-finite becomes 48000).
+    2. If `rate_hz.to_bits() != self.rate.to_bits()`, re-anchor at the
+       current `n` with the old rate. Set `anchor_cycles += floor(pos)`
+       and `anchor_phase = frac(pos)`, zero the count, then set
+       `rate = rate_hz`.
+    3. Compute `pos = anchor_phase + n * rate / sr` in f64. Then
+       `phase = frac(pos)` and `cycle = anchor_cycles + floor(pos)`,
+       clamped to 2^24.
+    4. Compute the raw shape value at `(phase, cycle)`. Advance the
+       one-pole smoother (`LFO_SMOOTH_S = 0.002`) and return the smoothed
+       unipolar `u` in `[0, 1]`.
+    5. Increment the count: `count_lo += 1`. On reaching `COUNT_SPLIT`, set
+       `count_lo = 0` and `count_hi += 1`, saturating at 2^24.
+  - The value returned is always the one at the pre-increment position, as
+    before. The first call after `start` re-anchors with `n = 0`, which is
+    a no-op for phase.
+  - Accessors take the sample rate, because the position is derived:
+    - `pub fn cycles(&self, sr: f32) -> f32` is
+      `anchor_cycles + floor(pos)` at the current count;
+    - `pub fn phase(&self, sr: f32) -> f32` is `frac(pos)`.
+  - No incremental `phase += inc` accumulation may remain anywhere in
+    `Lfo`.
   - Raw shapes:
     - sine: `0.5 - 0.5 * cos(2*pi*p)`;
     - tri: rises 0 to 1 at `p = 0.5`, back to 0;
@@ -160,8 +215,21 @@ LFO:
   f64, or the phase error exceeds 1%.
 - Do not store RNG state in f32 memory; arbitrary bit patterns can be NaN
   and the flush would clobber them. Random uses a hash of `(seed, cycles)`.
-- `cycles` stays exact in f32 up to 2^24. That is far beyond any single
-  voice lifetime.
+- Never accumulate the LFO phase in f32 or f64. Session 229 lost about
+  0.08% per cycle that way, because each `phase += rate / sr` rounds. Only
+  integers (the count and the cycle base) are stored. The phase is derived
+  in f64 every sample.
+- Integers are exact in f32 only below 2^24 (about 349 s at 48 kHz), so
+  the count is split into `count_lo`/`count_hi`. `anchor_cycles` stays far
+  below 2^24 for any voice.
+- Evaluate the position as `anchor_phase + (n * rate) / sr` in f64,
+  multiply first. `n * (rate / sr)` can round 270.0 down to 269.999...,
+  and then `floor` returns 269, which fails the long-playback test. Cast
+  each operand to f64 before the arithmetic.
+- Re-anchor on a bit-level rate change only. Comparing with a tolerance
+  would let tiny port changes silently scale `n` and jump the phase.
+- `sanitize` flushes values below 1e-20 to 0. That is harmless for whole
+  numbers and for `anchor_phase`.
 - Legato semantics: the amp starts at 0 but reaches `sustain` within 2 ms
   and never exceeds it.
 - Every `next` must stay finite for non-finite parameters. Clamp or
@@ -192,8 +260,27 @@ LFO:
 - LFO synced, cps 0.5625, `rate` in {1, 2, 4, 8, 3, 6, 12}: the sample
   distance between consecutive wraps equals
   `round(48000 / (rate * 0.5625))` +/-1, checked over at least 3 wraps.
+  Wraps are detected with `cycles(48000.0)`. Keep the tolerance at +/-1.
 - LFO free, `rate_hz(3.2, false, 0.5) == 3.2`, and the wrap period is
-  15000 +/-1 samples.
+  15000 +/-1 samples. Keep the `Option<usize>` annotation on `wrap`. Session
+  229 hit an ambiguous-integer `abs_diff` compile error here, and it is
+  already fixed in the tree.
+- Drift-free long playback (new test,
+  `bass_mods_synced_lfo_stays_drift_free_over_long_playback`): run `next`
+  5,760,000 times at `rate_hz(4, true, 0.5625)` (2.25 Hz) and 48 kHz. Then
+  `cycles(48000.0) == 270.0`, and the circular distance of
+  `phase(48000.0)` from 0 is at most 1e-6.
+- Split count (new test): a state loaded with
+  `count_hi = 3, count_lo = 12345, rate = 2.25, anchor_phase = 0.1`
+  gives a `phase(48000.0)` equal to
+  `frac(0.1 + (3 * 2^20 + 12345) * 2.25 / 48000)`, computed in f64 and
+  within 1e-6. After `2^20 - 12345` more `next` calls at `rate_hz = 2.25`, so no
+  re-anchor happens, `count_hi == 4`
+  and `count_lo == 0`.
+- Rate change (new test): run 1000 samples at 2 Hz, then switch to 8 Hz.
+  `phase(48000.0)` after the switching `next` call equals `phase(48000.0)`
+  before it plus one new increment, `8 / 48000`, within 1e-7. Later calls
+  keep advancing by `8 / 48000`. `cycles` never decreases.
 - `initial_phase`:
   - `(false, 0, 2.0, 10.25) == 0.5`;
   - `(true, 1.25, 2.0, 10.25) == 0.25`;
@@ -203,14 +290,25 @@ LFO:
 - Square shape at 8 Hz: the largest per-sample change of the smoothed
   output is below 0.02.
 - `cutoff_octaves`: `(0.8, 1.0) == 4.0`; `(-1, 1) == -5`.
-- `load(store(x))` round-trips for every struct.
+- `load(store(x))` round-trips for every struct. The `Lfo` case uses the
+  six-field layout with non-zero `count_hi`.
 
 ## Verification (evidence required)
 
+Session 232 logs go to `tmp/bass-voices-232/BASS-12/`, using the exact
+commands in the manifest.
+
 1. `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/mods.rs src/dsp/tests/dsp/bass_mods.rs`
    must exit 0.
-2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_mods::/)' > tmp/logs/bass-12-nextest.log 2>&1; echo "exit=$?"`
-   must give `exit=0`, with at least 12 tests and 0 failed.
+2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_mods::/)'`
+   must give `exit=0`, with at least 20 tests and 0 failed (the 17
+   existing plus 3 new). The two LFO period tests must pass with their
+   `<= 1` tolerances unchanged.
+3. `grep -n "phase +\|+= rate\|+ rate" src/dsp/ugen/bass_voice/mods.rs`
+   must show no incremental phase accumulation left in `Lfo`. Also record
+   `wc -l src/dsp/ugen/bass_voice/mods.rs` and confirm it is under 450.
+4. `git diff --stat` touches only this plan's writePaths, compared with
+   the start-of-run snapshot.
 
 ## Concurrency and Drift Protocol
 
@@ -221,11 +319,24 @@ LFO:
 
 ## Done Criteria
 
-- [ ] Interface contract exact; `mods.rs` under 400 lines.
+- [ ] Interface contract exact, including the session 232 six-float `Lfo`;
+      `mods.rs` under 450 lines. The cap was raised from 400 for the
+      drift-free LFO.
 - [ ] Verification passes, with the exit code and test count recorded.
-- [ ] Only writePaths changed.
+- [x] Only writePaths changed.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+### Session: 2026-09-30 (BASS-12 implementation)
+**Tasks Completed**: Implemented the modulation component API and 17 focused tests for gate timing, envelopes, accent, glide, LFO behavior, serialization, and non-finite controls. `mods.rs` is 381 lines.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/mods.rs src/dsp/tests/dsp/bass_mods.rs` exited 0 (`tmp/bass-voices-229/BASS-12/rustfmt-final.log`). The scoped nextest run exited 100: 17 tests ran, 15 passed, and 2 LFO period tests failed (`tmp/bass-voices-229/BASS-12/nextest.log`).
+**Findings**: The synced 0.5625 Hz case measured wraps of 85265, 85266, and 85265 samples against 85333 expected; the free 3.2 Hz case did not wrap by sample 15002. The pinned `Lfo` contract stores phase/cycles/smoothing in 3 floats; a precision repair must preserve or explicitly revise that state contract before BASS-12 can pass its behavioral gate.
+**Remaining**: Fix the LFO period error within the accepted state contract, rerun scoped nextest to green, then mark completion criteria.
+
+### Session: 2026-09-30 (session 232 design revision)
+**Tasks Completed**: Revised the `Lfo` contract. The design and this plan now specify a six-float, drift-free layout: the phase is derived in f64 from an exact split sample count, and the LFO re-anchors on rate change. This replaces the three-float accumulating LFO. Added the long-playback, split-count and rate-change test specs. The `mods.rs` cap is now 450 lines.
+**Findings**: The ambiguous-integer `abs_diff` error that blocked the BASS-11 nextest (`tmp/bass-voices-229/BASS-11/nextest.log:57-60`, old line 183) is already fixed in the tree: `wrap` is annotated as `Option<usize>` at `bass_mods.rs:170`. The later BASS-12 run compiled and executed 17 tests (`tmp/bass-voices-229/BASS-12/nextest.log:42`).
+**Remaining**: Implement the revised `Lfo` in `mods.rs`, update the `Lfo` tests in `bass_mods.rs` (the `cycles(sr)` accessor, the six-field round-trip, three new tests), then run both verification commands.

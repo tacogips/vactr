@@ -1,6 +1,6 @@
 # BASS-00: Bass Kernel Scaffold and Port Contract
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BASS-00 (wave 0; blocks every other BASS plan)
 **Design Reference**: `design-docs/specs/design-bass-voices.md` (sections "Architecture decision", "Controls")
 **Baseline**: wf/bass at `4fc3741` plus the accepted design commit
@@ -209,13 +209,30 @@ Run from the repository root and save every log under `tmp/logs/`.
 
 ## Done Criteria
 
-- [ ] All writePaths exist, and the sharedPaths changed by exactly 1 and 4
+- [x] All writePaths exist, and the sharedPaths changed by exactly 1 and 4
       lines.
-- [ ] Verification 1-3 pass, with the exit codes and test count recorded.
-- [ ] Progress Log updated.
+- [x] Verification 1-3 pass, with the exit codes and test count recorded.
+- [x] Progress Log updated.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
 **Notes**: Awaiting implementation.
+
+### Session: 2026-09-30 (BASS-00 implementation)
+**Tasks Completed**: Kernel port scaffold, component/test placeholders, shared module declarations, and four port-contract tests.
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice.rs src/dsp/ugen/bass_voice/*.rs src/dsp/tests/dsp/bass_voice.rs src/dsp/tests/dsp/bass_filters.rs src/dsp/tests/dsp/bass_sources.rs src/dsp/tests/dsp/bass_mods.rs` — exit 0; log: `tmp/logs/bass-00-rustfmt.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/bass_voice::/)'` — exit 0; 4 passed, 0 failed; log: `tmp/logs/bass-00-nextest.log`.
+- `git diff --stat` — exit 0; the plan progress file and both shared paths appear in the full diff; shared source hunks are exactly 1 line in `src/dsp/ugen/mod.rs` and 4 lines in `src/dsp/tests/dsp.rs`, with no Node variant or registry edits; log: `tmp/logs/bass-00-diff-stat.log`.
+**Shared-path SHA-256**:
+- `src/dsp/ugen/mod.rs`: before `4e53f4fb20efa3c50e5b487fc975d2ab9e37093e7412412259c7f1c602b535df`; after `e54421034f6b5dd8522ab16abb5a0908a662623b7708180e84d2ac08f954792b`.
+- `src/dsp/tests/dsp.rs`: before `301119efe5808c079c892722f3d463829a65504482c714883eced72965072b44`; after `25831d329056191cdaec23bf69e2d4512b2f29f10d7e026f94cea581fca2f818`.
+**Notes**: The scaffold remains unreachable from the UGen registry. DSP implementations and registry/template wiring are owned by downstream plans.
+
+### Session: 2026-09-30 (serial reconcile)
+**Tasks Completed**: Combined-tree reconcile gates for BASS-00.
+**Repair**: `cargo clippy --all-targets -- -D warnings` failed on `clippy::assertions_on_constants` at `src/dsp/tests/dsp/bass_voice.rs:11`. The `PORT_COUNT <= MAX_PORTS` check is now a compile-time `const _: () = assert!(...)`, which keeps the check.
+**Correction**: The adversarial review moved `pub mod bass_voice;` after `analog_percussion`. The current `src/dsp/ugen/mod.rs` SHA-256 is `76a980db3c5094b3c293193252ad69695d83f94efff9c7cd7cbea7280d1470e4`, which replaces the earlier "after" hash. Canonical logs are under `tmp/bass-voices-229/BASS-00/` and `tmp/bass-voices-229/reconcile/`.
+**Verification** (logs in `tmp/bass-voices-229/reconcile/attempt-2/`): cargo build, cargo fmt --check, clippy -D warnings, wasm32 host-wasm build, and mise run lint all exit 0. Full nextest: 1627 passed, 2 skipped, exit 0. The `test(/bass_voice::/)` filter: 4 passed, exit 0.

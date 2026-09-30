@@ -1,7 +1,7 @@
 # BASS-11: Band-limited Oscillators, Feedback FM, Folder and Bit Depth
 
-**Status**: Ready
-**Plan ID**: BASS-11 (wave 1; parallel with BASS-10 and BASS-12)
+**Status**: Ready (session 232 re-verification; implementation done in session 229)
+**Plan ID**: BASS-11 (session 232 wave 2, parallel with BASS-10, after BASS-12)
 **Design Reference**: `design-docs/specs/design-bass-voices.md`, sections "DSP components" (oscillators, feedback FM) and "Verification"
 **Created**: 2026-09-30
 **Last Updated**: 2026-09-30
@@ -177,11 +177,60 @@ In `fm.rs`:
 
 ## Done Criteria
 
-- [ ] Interface contract exact.
+- [x] Interface contract exact.
 - [ ] Verification passes, with the exit code and test count recorded.
 - [ ] `git diff --stat` touches only writePaths.
+
+## Session 232 Re-verification (dispatch task)
+
+**Intent.** BASS-11 was implemented in session 229, with 15 tests in
+`bass_sources.rs` and `cargo check --lib` exit 0. Its focused nextest never
+ran, because the sibling test file had compile errors. The ambiguous
+`abs_diff` in `bass_mods.rs` is now fixed, and BASS-12 runs first in
+session 232. This task runs the focused gate for the first time and
+records the integrity table.
+
+**Order.** This task runs after BASS-12. If cargo fails in a file this
+plan does not own, follow the manifest retry policy (wait about 60 s, up
+to 10 times) and record the failure. Never edit that file.
+
+**Non-goals.**
+
+- Do not rewrite the oscillators or FM.
+- Do not touch `src/dsp/ugen/osc.rs`, which is the existing crate
+  oscillator and not this plan's file.
+- Do not change any threshold in "Tests".
+
+**Steps.**
+
+1. Record `shasum -a 256` of the three owned files.
+2. Run the two manifest commands, writing logs to
+   `tmp/bass-voices-232/BASS-11/`.
+3. If a `bass_sources` test fails, find the concrete defect in
+   `bass_voice/osc.rs` or `bass_voice/fm.rs` and fix it against the pinned
+   contract. A defect in the test itself may be fixed only when the test
+   contradicts the plan text. Record the reasoning, then re-run.
+4. Write a test-integrity table in the Progress Log, one row per bullet
+   in "Tests", with these columns:
+   `spec bullet | test fn name | plan threshold | threshold in code | result`.
+5. Record the end-of-run hashes, the exit codes, the test count and the
+   log paths.
+
+**Done criteria (session 232).**
+
+- [ ] The rustfmt log ends with `exit=0`.
+- [ ] The nextest log ends with `exit=0` and reports at least 10 tests run
+      and 0 failed.
+- [ ] The integrity table covers every "Tests" bullet, with no loosened
+      threshold.
+- [ ] `git diff --stat -- src/dsp/ugen/osc.rs` is empty.
 
 ## Progress Log
 
 ### Session: 2026-09-30 (plan created)
 **Tasks Completed**: none
+
+### Session: 2026-09-30 (BASS-11 implementation)
+**Tasks Completed**: Oscillator, feedback FM, folder, quantizer, and 15 focused behavioral tests implemented in the owned files.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/bass_voice/osc.rs src/dsp/ugen/bass_voice/fm.rs src/dsp/tests/dsp/bass_sources.rs` passed (exit 0; `tmp/bass-voices-229/BASS-11/rustfmt.log`). `CARGO_TERM_QUIET=true cargo check --lib` passed (exit 0; `tmp/bass-voices-229/BASS-11/check-lib.log`). Two focused nextest attempts did not reach test execution: attempt 1 exposed compile errors in BASS-10/BASS-12 files; attempt 2 still fails before tests on the BASS-12-owned ambiguous integer type in `src/dsp/tests/dsp/bass_mods.rs:183` (exit 101; `tmp/bass-voices-229/BASS-11/nextest-attempt-02.log`). No sibling files were edited.
+**Status**: In Progress; rerun the positive-count BASS-11 nextest gate after sibling compilation blockers are resolved.

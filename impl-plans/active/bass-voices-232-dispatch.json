@@ -1,10 +1,10 @@
 {
-  "taskId": "bass-voices-229",
+  "taskId": "bass-voices-232",
   "workflowMode": "issue-resolution",
   "implementationBranch": "wf/bass",
   "baseBranch": "wf/bass",
   "remote": "origin",
-  "originalHead": "4fc37414e2f2704f6737f1545071bf506bd9c0f8",
+  "originalHead": "843bd8a",
   "worktree": "/Users/taco/gits/tacogips/vactr-worktrees/wf-bass",
   "designDocPaths": [
     "design-docs/specs/design-bass-voices.md",
@@ -16,18 +16,28 @@
   "planIndexPaths": [
     "impl-plans/README.md"
   ],
-  "status": "Superseded",
-  "supersededBy": "impl-plans/active/bass-voices-232-dispatch.json",
-  "resumeRun": "opus-luna-design-and-implement-review-loop-session-232",
-  "resumeNotes": "Superseded in session 232 by impl-plans/active/bass-voices-232-dispatch.json (taskId bass-voices-232, evidenceRoot tmp/bass-voices-232), which carries the session 232 plan set, waves and verification commands. This manifest is history only and must not be dispatched. The plans array below keeps the session 232 revision for reference; its tmp/bass-voices-232/ commands belong to the bass-voices-232 task. Session 229 evidence stays under tmp/bass-voices-229/.",
-  "evidenceRoot": "tmp/bass-voices-229",
-  "evidenceLayout": "Session 229 evidence is under tmp/bass-voices-229/. Session 232 evidence follows the bass-voices-232 manifest: tmp/bass-voices-232/<planId>/attempt-<n>/ holds each plan's full command logs, one file per command, each ending with an exit=<status> line. The manifest verification commands write under tmp/bass-voices-232/<planId>/; workers that run a later attempt copy that directory to attempt-<n>/ before re-running. These paths replace the tmp/logs/ and tmp/bass-voices-229/ paths in the plan text. Each plan's Progress Log records every command, its exit status and its log path. tmp/ is gitignored (.gitignore **/tmp) and must stay untracked, including the WAVs under tmp/bass/. A missing or truncated log is not a pass.",
+  "acceptedPlanPaths": [
+    "impl-plans/active/bass-00-scaffold.md",
+    "impl-plans/active/bass-10-filters.md",
+    "impl-plans/active/bass-11-sources.md",
+    "impl-plans/active/bass-12-mods.md",
+    "impl-plans/active/bass-20-kernel.md",
+    "impl-plans/active/bass-30-registry.md",
+    "impl-plans/active/bass-40-presets.md",
+    "impl-plans/active/bass-41-examples.md"
+  ],
+  "supersedes": "impl-plans/active/bass-voices-229-dispatch.json",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-232",
+  "resumeNotes": "Session 232 resumes task bass-voices-229 (checkpoint 843bd8a on wf/bass) under the new taskId bass-voices-232, so the taskId, the manifest file name and evidenceRoot tmp/bass-voices-232 agree with the evidence paths already written into the accepted plans. impl-plans/active/bass-voices-229-dispatch.json is marked superseded and is not dispatched. BASS-00 is accepted and listed in completedPlans; it is not dispatched again. Its source files and the BASS-10/11/12 source files are uncommitted in the working tree and are adopted, not discarded. BASS-12 runs alone first, with the drift-free Lfo revision, so the shared lib test crate compiles before the BASS-10 and BASS-11 re-verification runs. BASS-10 and BASS-11 are already implemented; they only re-run their focused gates and record the test-integrity table. Their code changes only if a focused test fails. Session 229 evidence under tmp/bass-voices-229/ stays as history; session 232 writes to tmp/bass-voices-232/.",
+  "evidenceRoot": "tmp/bass-voices-232",
+  "evidenceLayout": "tmp/bass-voices-232/<planId>/attempt-<n>/ holds each plan's full command logs, one file per command, each ending with an exit=<status> line. The manifest verification commands write under tmp/bass-voices-232/<planId>/; workers that run a later attempt copy that directory to attempt-<n>/ before re-running. These paths replace the tmp/logs/ and tmp/bass-voices-229/ paths in the plan text. Each plan's Progress Log records every command, its exit status and its log path. tmp/ is gitignored (.gitignore **/tmp) and must stay untracked, including the WAVs under tmp/bass/. A missing or truncated log is not a pass.",
   "completedPlans": [
     {
       "planId": "BASS-00",
       "planPath": "impl-plans/active/bass-00-scaffold.md",
       "status": "Completed (accepted in session 229; not re-dispatched)",
-      "writePaths": ["src/dsp/ugen/bass_voice.rs", "src/dsp/ugen/mod.rs", "src/dsp/tests/dsp.rs", "src/dsp/tests/dsp/bass_voice.rs"]
+      "writePaths": ["src/dsp/ugen/bass_voice.rs", "src/dsp/ugen/mod.rs", "src/dsp/tests/dsp.rs", "src/dsp/tests/dsp/bass_voice.rs"],
+      "notes": "The plan document is committed in 843bd8a. Its accepted source files are still uncommitted in the working tree; the orchestrator commits them after the run."
     }
   ],
   "executionModel": {
@@ -44,37 +54,41 @@
     "commitOwner": "The orchestrator commits on wf/bass after the run with the AGENTS.md 1-6 section message and pushes only wf/bass, never main. Workers never commit, stash, checkout, reset, branch, push or merge. Codex's sandbox keeps .git read-only and cannot bind localhost; full nextest runs happen outside it.",
     "retryPolicy": "Wave 1 and wave 4 plans share one cargo target dir. If cargo reports a lock, or a sibling's file fails to compile mid-edit, wait about 60 s and retry, up to 10 times, then record a blocker in the plan's Progress Log. Never edit a sibling's file.",
     "editProtocol": "Before each edit, re-read the file and record its sha256 in the Progress Log. If it drifted from the expected state, stop and reconcile only the plan's own intent. After editing, record the post-edit sha256. Never edit outside writePaths/sharedPaths.",
-    "serialReconciliation": "Shared registry files are owned by BASS-30 alone (wave 3). BASS-00 (completed in session 229) owns the one-line pub mod bass_voice; in src/dsp/ugen/mod.rs and the four test module lines in src/dsp/tests/dsp.rs; no session 232 plan edits them. In session 232 BASS-12 runs alone first so the shared lib test crate compiles before BASS-10 and BASS-11 re-verify. BASS-30 creates bass_presets.rs and bass_examples.rs placeholders and their module lines so wave 4 needs no shared file. Workspace-wide gates (cargo build, cargo clippy --all-targets -- -D warnings, cargo fmt --check, full cargo nextest run, wasm32 build, mise run lint) run only in reconcile and integration review. Plan Status headers, impl-plans/README.md and moving plans to impl-plans/completed/ are done serially by the orchestrator, not by workers."
+    "serialReconciliation": "Shared registry files are owned by BASS-30 alone (wave 3). BASS-00 (completed in session 229) owns the one-line pub mod bass_voice; in src/dsp/ugen/mod.rs and the four test module lines in src/dsp/tests/dsp.rs; no session 232 plan edits them. In session 232 BASS-12 runs alone first so the shared lib test crate compiles before BASS-10 and BASS-11 re-verify. BASS-30 creates bass_presets.rs and bass_examples.rs placeholders and their module lines so wave 4 needs no shared file. Workspace-wide gates (cargo build, cargo clippy --all-targets -- -D warnings, cargo fmt --check, full cargo nextest run, wasm32 build, mise run lint) run only in reconcile and integration review. Plan Status headers, impl-plans/README.md, this manifest and moving plans to impl-plans/completed/ are handled serially by the orchestrator, not by workers."
   },
   "reviewContext": {
-    "issueReference": "No GitHub issue. Inline workflowInput request 2026-09-30 (intake communication comm-002931, workflow execution opus-luna-design-and-implement-review-loop-session-229): Research and add dedicated bass synth voices (analog-modeling, acid, digital/FM, wobble, sub, reese) plus techno bass presets and examples",
-    "userProblem": "The prelude's 67 templates include no dedicated bass voice, and the techno examples and presets are badly lacking bass. There is no acid diode-ladder filter, feedback FM, note length for audio voices, glide/slide, accent, or per-sample tempo-synced filter wobble.",
+    "issueReference": "No GitHub issue. Inline workflowInput request 2026-09-30 (original intake comm-002931, session 229 checkpoint 843bd8a on wf/bass). Session 232 resume: workflow execution opus-luna-design-and-implement-review-loop-session-232, plans from comm-002972, plan review accepted in comm-002973. Title: Resume: bass voices implementation (fix drift-free tempo-synced LFO, re-verify filters/sources, then kernel, registry, presets and techno examples)",
+    "userProblem": "The prelude's 67 templates include no dedicated bass voice, and the techno examples and presets are badly lacking bass. There is no acid diode-ladder filter, feedback FM, note length for audio voices, glide/slide, accent, or per-sample tempo-synced filter wobble. In session 229 the wobble LFO drifted about 0.08 percent per cycle from f32 phase accumulation, so it would not stay locked to the beat over long playback.",
     "requiredOutcomes": [
       "Design doc design-docs/specs/design-bass-voices.md with research notes, license-clean references, per-voice signal flow, controls and defaults, indexed from design-music.md section 4.3 and design-docs/references/README.md.",
       "One new kernel UGen bass-core (src/dsp/ugen/bass_voice with ladder, diode, osc, fm, mods components) with six models.",
       "Six prelude templates appended in order: analog-bass, acid-bass, fm-bass, wobble-bass, sub-bass, reese-bass; registered and editor-visible with tuned header defaults.",
       "Kernel unit tests: filter response and resonance, accent, slide, gate length, tempo-synced wobble period, extreme-control stability over 2 s renders, determinism, no NaN/Inf.",
+      "Session 232: a drift-free tempo-synced LFO (six-float Lfo with the phase derived in f64 from an exact split elapsed-sample count, re-anchored on a bit-level rate change), so the synced cps 0.5625 and free 3.2 Hz period tests pass at +/-1 sample with unchanged tolerances; the ambiguous integer type at src/dsp/tests/dsp/bass_mods.rs:183 is fixed.",
       "All pre-existing render and graph digests byte-identical; exactly 18 golden lines added and 0 removed.",
       "examples/bass-presets.vact with at least 3 patches per family (18 or more); four techno examples (acid, rumble, offbeat, wobble); committed render tests writing WAVs under tmp/bass/ and asserting finite, rms > 1e-3, peak <= 1.0 and low-band share thresholds.",
       "README bass bullet group; THIRD_PARTY_NOTICES.md unchanged because no MIT source is adapted.",
       "Reconcile gate: CARGO_TERM_QUIET=true cargo build, cargo clippy --all-targets -- -D warnings, cargo fmt --check, cargo nextest run all green, cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm."
     ],
     "nonGoals": [
+      "No redesign: the session 229 design and plans are reused and revised only for the LFO fix.",
       "No scheduler rewrite, no engine-side slide handoff, no monophonic legato voice mode.",
       "No change to existing templates, controls.rs rows, note-length handling of existing templates, src/dsp/ugen/osc.rs, src/dsp/ugen/filter.rs, digital_drum/, or src/dsp/graph/shape.rs.",
       "No seventh rumble template (rumble is an example recipe, user-QA BQ3).",
       "No oversampling, no stereo kernel output, no new crate dependencies.",
       "No edits to wf/syntax-fmt areas: src/fmt, src/complete, src/lsp, src/host/wasm, editor/, tree-sitter-vact/.",
-      "No edits to examples/industrial-techno.vact or any existing example."
+      "No edits to examples/industrial-techno.vact or any existing example.",
+      "Loosening the LFO period tolerances is not an acceptable fix."
     ],
     "constraints": [
       "Work only on wf/bass in /Users/taco/gits/tacogips/vactr-worktrees/wf-bass; push only wf/bass.",
       "License: original Rust from published papers only; no GPL/LGPL/unknown-license or book/app-note code consulted or translated.",
       "Real-time safe: no allocation in the audio path, bounded CPU per sample, denormal flush, finite clamped output, deterministic seeds.",
       "Append-only registries: inst blocks, UGEN_NAMES, both TEMPLATE_NAMES, UGENS and enum variants at the end; codec tag 98; no new control rows.",
-      "Rust files under 1000 lines (component files under 400, bass_voice.rs under 600); English only, no emojis; CARGO_TERM_QUIET=true for cargo.",
+      "Rust files under 1000 lines (component files under 400, mods.rs under 450, bass_voice.rs under 600); English only, no emojis; CARGO_TERM_QUIET=true for cargo.",
       "Per-plan gates are scoped to owned files (rustfmt --check on owned .rs, nextest filters with positive counts); workspace-wide gates only at reconcile.",
-      "Manifests list only tracked source paths; never target/, tmp/, editor/node_modules or editor/dist."
+      "Manifests list only tracked source paths; never target/, tmp/, editor/node_modules or editor/dist.",
+      "Adopt the uncommitted BASS-00/10/11/12 work in the tree; do not discard or rewrite it without a concrete defect."
     ],
     "designDecisionsAndRationale": [
       "One kernel bass-core with a per-template literal mode port (0..5) instead of six kernels: one codec tag, one port list, one natives entry, fewer shared-registry edits.",
@@ -83,6 +97,8 @@
       "Note-off owned by the kernel through gate-length in sixteenth-steps of 1/(16*cps) s; kx.gate ignored, like the self-enveloped drum cores, so existing env-adsr gates and digests stay unchanged.",
       "Slide is an explicit per-event slide-from (semitones from the previous note) plus slide-time settle-to-1%, used with cut 1; legato notes do not retrigger the amp or filter envelope.",
       "Wobble LFO reimplements the digital-drum formulas (rate_hz = lfo_rate * cps when synced; transport-locked phase frac(rate_hz * onset) in f64) without importing digital_drum; divisions 1/4=4, 1/8=8, 1/4T=6, 1/8T=12.",
+      "Session 232: incremental f32 phase accumulation drifted about 0.08 percent (85265 vs 85333 samples per synced cycle). Lfo now stores anchor_phase, anchor_cycles, count_lo, count_hi (split at 2^20), rate and smooth (FLOATS 6) and evaluates anchor_phase + (n * rate) / sr in f64, multiply before divide, so wobble stays beat-locked over long playback (design-bass-voices.md:265-293, bass-12-mods.md:156-199).",
+      "Session 232: the kernel sizes its LFO slot with Lfo::FLOATS, calls Lfo::start only in the first block, and loads and stores the LFO every block with a constant rate_hz per block, so the elapsed count persists across blocks (bass-20-kernel.md:67-74). Only mods.rs and bass_mods.rs use Lfo, so no sibling breaks.",
       "template_default_override generalized minimally to Float/Bool so editor defaults match bass headers, keeping existing Enum results identical.",
       "template_slots raised 72 -> 80 so the 73rd template installs (73 prelude + 2 live-input + 4 quad-stem = 79).",
       "BASS-30 creates the bass_render.rs helper and wave-4 placeholder test files so BASS-40 and BASS-41 run in parallel with disjoint files."
@@ -93,12 +109,14 @@
       "No oversampling: filter saturation at high drive may alias; accepted for bass.",
       "Kernel is mono; reese and wobble width come from effects in examples.",
       "Implicit row-named ports get the controls.rs row default (for example lfo-sync 0) when a template does not pass them; documented, not fixed with literals.",
+      "The drift-free Lfo doubles its state from three to six floats; STATE_FLOATS of the new kernel grows accordingly, and no existing template is affected.",
       "Automated checks (non-silence, peak, low-band share) only partly prove the sound; WAVs in tmp/bass/ support a manual listening pass."
     ],
     "supportedEdgeCases": [
       "Non-finite port values and inputs: components reset state and return 0; sanitize flushes denormals and non-finite values.",
       "Extreme controls: freq 20/2000, cutoff 20/20000, res 1, drive 1, index 32, fm-feedback 1, fold 1, bit-depth 2, lfo-depth +/-1, slide-from +/-24, rendered 2 s finite and |y| <= 1.",
       "cps 0 or non-finite clamps to 0.03 or 0.5; onset-time up to 3600 s keeps phase accuracy via f64.",
+      "Long playback: 5,760,000 samples at 2.25 Hz gives exactly 270 cycles; count_lo carries into count_hi at 2^20; a rate change re-anchors with a continuity error under 1e-7.",
       "Voice finish zeroes all state floats and later blocks output zeros.",
       "Bypass exactness: fold 0, bit-depth 16 and click-level 0 are bit-identical passes.",
       "Tempo changes: wobble period follows use-bpm (120 vs 150 BPM e2e test).",
@@ -108,20 +126,30 @@
       "Automatic previous-note slide detection (user-QA BQ1, deferred engine handoff).",
       "Held-key sustain beyond gate-length for live input/MIDI (BQ2).",
       "Hardware-accurate accent capacitor accumulation and per-stage diode nonlinearities with Newton iteration.",
-      "Stereo kernel output and oversampled filters."
+      "Stereo kernel output and oversampled filters.",
+      "Per-sample tempo changes inside one block: rate_hz is constant per block and re-anchors between blocks."
     ],
     "residualRisksCarriedFromReview": [
       "BASS-41 hunk check uses git diff -U0 README.md | grep -c '^@@' == 1 (the plan's --stat wording is superseded by the manifest command).",
       "BASS-20 rustfmt check includes src/dsp/ugen/bass_voice/voice.rs when that optional file exists (manifest command handles it).",
       "BASS-30 bass_editor_defaults_match_headers uses meta::decl_for, the entry point src/dsp/tests/dsp/catalog.rs exercises.",
       "Citation URLs/DOIs in design-docs/references/README.md were not web-checked.",
-      "DSP constants and preset thresholds may need tuning; sub low-band share never below 0.8 in BASS-40."
+      "DSP constants and preset thresholds may need tuning; sub low-band share never below 0.8 in BASS-40.",
+      "Session 232 review (comm-002973, low): bass-20-kernel.md:75 markdown list nesting is broken by the LFO bullet; meaning unaffected.",
+      "Session 232 review (comm-002973, low): bass-12-mods.md:307 Verification 3 grep for incremental phase accumulation is a heuristic that needs human judgment.",
+      "Session 232 review (comm-002973, low): the stale BASS-12 'at least 12 tests' criterion is corrected in this manifest to at least 20 tests.",
+      "BASS-11's first real focused nextest run may expose defects; fixes are limited to bass_voice/osc.rs and fm.rs with no threshold changes, and the reasoning and hashes are recorded.",
+      "impl-plans/README.md index rows still show session 229 statuses; the orchestrator updates them serially.",
+      "The plan review ran no cargo command; compile status rests on tmp/bass-voices-229/BASS-12/nextest.log (17 tests compiled and ran, 15 passed, 2 failed)."
     ],
     "sourcePaths": [
       "design-docs/specs/design-bass-voices.md",
       "design-docs/specs/design-music.md",
       "design-docs/references/README.md",
       "design-docs/user-qa/pending-bass-questions.md",
+      "impl-plans/active/bass-12-mods.md",
+      "src/dsp/ugen/bass_voice/mods.rs",
+      "src/dsp/tests/dsp/bass_mods.rs",
       "src/prelude/templates.vact",
       "src/dsp/ugen/digital_drum/chain.rs",
       "src/dsp/ugen/digital_drum/tonal.rs",
@@ -197,10 +225,11 @@
       "sharedPaths": [],
       "acceptanceCriteria": [
         "clamp_cps, gate_samples, settle_coeff, AmpEnv, FilterEnv, accent, Glide, LfoShape, rate_hz, initial_phase (f64), Lfo and cutoff_octaves exactly as pinned.",
-        "Gate-length, envelope, legato, accent, glide, synced and free LFO period, initial phase, random determinism, square smoothing and round-trip tests pass (at least 12 tests).",
+        "Gate-length, envelope, legato, accent, glide, synced and free LFO period, initial phase, random determinism, square smoothing and round-trip tests pass (at least 20 tests, 0 failed).",
         "Session 232 LFO revision: Lfo is the six-float drift-free layout (anchor_phase, anchor_cycles, count_lo, count_hi, rate, smooth; FLOATS = 6) with the phase derived in f64 from an exact split sample count, re-anchoring on a bit-level rate change, and accessors cycles(sr)/phase(sr); no incremental phase accumulation remains.",
         "The synced period test (cps 0.5625, rates 1/2/4/8/3/6/12) and the free 3.2 Hz test pass at +/-1 sample with unchanged tolerances; the new long-playback drift-free, split-count and rate-change continuity tests pass.",
         "The position is evaluated as anchor_phase + (n * rate) / sr in f64, with the multiply before the divide, so the 5,760,000-sample test gives exactly 270 cycles.",
+        "The ambiguous integer type at src/dsp/tests/dsp/bass_mods.rs:183 is fixed so the shared lib test crate compiles for the BASS-10 and BASS-11 runs.",
         "digital_drum/ not imported or edited; mods.rs under 450 lines."
       ],
       "verification": [

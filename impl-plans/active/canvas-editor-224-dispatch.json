@@ -2,7 +2,7 @@
   "workflowMode": "issue-resolution",
   "issueReference": "codex-design-and-implement-review-loop-session-224",
   "designReference": "design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30",
-  "status": "All 13 plans and retained dependency admission accepted by comm-003011; checkpoint commit and successful non-force push pending",
+  "status": "Session237 planning amendments independently accepted; scoped checkpoint commit and successful non-force push pending",
   "executionContractPath": "impl-plans/active/canvas-editor-224-execution.md",
   "plans": [
     {
@@ -286,6 +286,9 @@
         "editor/src/app/apis.ts",
         "editor/test/code",
         "editor/test/app/main.test.ts",
+        "editor/src/code/format.ts",
+        "editor/src/code/syntax.ts",
+        "editor/src/code/completion-view.ts",
         "impl-plans/active/canvas-editor-224-editor-join.md"
       ],
       "sharedPaths": [
@@ -304,6 +307,7 @@
       ],
       "verification": [
         "cd editor && npm run check",
+        "cd editor && npm run test -- test/code/format.test.ts test/code/syntax.test.ts test/code/syntax-core.test.ts test/code/syntax-fallback.test.ts test/code/completion-view.test.ts test/code/completion-popup.test.ts test/code/completion.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/canvas/gpu.test.ts",
         "cd editor && npm run test -- test/code test/app test/bind test/params test/canvas",
         "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build"
       ],
@@ -311,7 +315,8 @@
         "EditorView visible/hidden authority removed",
         "Browser/native boot, eval/diagnostics and all consumer regressions pass",
         "Own progress log includes command evidence, fixes and remaining gates.",
-        "Independent review and improve self-review findings resolved."
+        "Independent review and improve self-review findings resolved.",
+        "Current formatter shortcut, tree-sitter UTF16 spans/fallback, context-aware completion and IME cancellation persist through headless/GPU adapters; asynchronous stale revisions rejected; one undo/sync pipeline; no new backend or hidden EditorView"
       ],
       "progressPath": "impl-plans/active/canvas-editor-224-editor-join.md"
     },
@@ -375,7 +380,7 @@
         "editor/src-tauri/Cargo.lock",
         "impl-plans/active/canvas-editor-224-dependency-evidence.md",
         "impl-plans/active/canvas-editor-224-package-preparation.md",
-        "tmp/canvas-editor-224/CE-PACKAGE/native-tools"
+        "tmp/canvas-editor-224/CE-PACKAGE/native-tools/toolchain.json"
       ],
       "sharedPaths": [
         "editor/src-tauri/Cargo.toml"
@@ -388,16 +393,15 @@
       ],
       "verification": [
         "node editor/test/canvas/package-browser-smoke.mjs",
-        "python3 editor/test/canvas/package-dependencies.py --baseline tmp/canvas-editor-224/CE-PACKAGE/attempt-1 --output tmp/canvas-editor-224/CE-PACKAGE/recovery-235/dependency-comparison.json",
+        "python3 editor/test/canvas/package-dependencies.py --baseline tmp/canvas-editor-224/CE-PACKAGE/attempt-1 --output tmp/canvas-editor-224/CE-PACKAGE/recovery-237/historical-comparison.json",
+        "python3 editor/test/canvas/package-dependencies.py --current-intake tmp/canvas-editor-224/plan-amendment-237/package-current-intake.json --output tmp/canvas-editor-224/CE-PACKAGE/recovery-237/current-comparison.json",
         "CARGO_TERM_QUIET=true cargo metadata --locked --manifest-path editor/src-tauri/Cargo.toml --format-version 1",
         "CARGO_TERM_QUIET=true cargo tree --locked --manifest-path editor/src-tauri/Cargo.toml -p vactr",
         "RUSTUP_TOOLCHAIN=1.98.1 rustup target list --installed",
         "xcodebuild -version",
         "xcodebuild -showsdks",
-        "RUSTUP_TOOLCHAIN=1.98.1 rustup target add aarch64-apple-ios aarch64-apple-ios-sim --toolchain 1.98.1",
-        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_HOME=tmp/canvas-editor-224/CE-PACKAGE/native-tools/cargo-home CARGO_TERM_QUIET=true cargo info tauri-cli --registry crates-io",
-        "RUSTUP_TOOLCHAIN=1.98.1 CARGO_HOME=tmp/canvas-editor-224/CE-PACKAGE/native-tools/cargo-home CARGO_TERM_QUIET=true cargo install tauri-cli --version \"${CE_TAURI_CLI_VERSION}\" --locked --root tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli",
-        "CARGO_TERM_QUIET=true tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli/bin/cargo-tauri --version"
+        "CARGO_TERM_QUIET=true tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli/bin/cargo-tauri --version",
+        "shasum -a 256 tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli/bin/cargo-tauri tmp/canvas-editor-224/CE-PACKAGE/native-tools/toolchain.json"
       ],
       "acceptanceCriteria": [
         "Task-only pinned dependency diffs and complete logs",
@@ -406,9 +410,16 @@
         "Independent review and improve self-review findings resolved.",
         "Native progress accepts actual installed-browser and dependency assertions; formal workflow reviews complete before dependent admission",
         "Runner reconsideration replaces blocked classification using source-matched4/4 and10/10 evidence; formal reviews accepted",
-        "Task-local exact compatible CLI and iOS/simulator target preparation attempted; compile/sign/device outcomes remain distinct; no app dependency drift"
+        "Task-local exact compatible CLI and iOS/simulator target preparation attempted; compile/sign/device outcomes remain distinct; no app dependency drift",
+        "Snapshot derived from writePaths+sharedPaths fits unchanged native limits; no recursive generated-tool tracking; exact source/plan/audit-record ownership preserved",
+        "Fresh current-intake preservation checks verify admitted 7f6de4e inputs and exact dependencies; historical comparison failures retained separately without waived new failures; verified prerequisites reused"
       ],
-      "progressPath": "impl-plans/active/canvas-editor-224-package-preparation.md"
+      "progressPath": "impl-plans/active/canvas-editor-224-package-preparation.md",
+      "generatedEvidenceRoots": [
+        "tmp/canvas-editor-224/CE-PACKAGE/native-tools",
+        "tmp/canvas-editor-224/CE-PACKAGE/recovery-237"
+      ],
+      "evidenceContract": "Generated caches, downloaded binaries and full terminal logs are referenced evidence, never recursively tracked source paths or changedFiles. Exact small toolchain.json is tracked; all authored source/plan edits retain tracking. No snapshot cap or runner policy change."
     }
   ],
   "taskId": "canvas-editor-224",
@@ -417,7 +428,7 @@
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
+  "originalHead": "7f6de4e1c1bd8690ca45c69ca700c809c154cce9",
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/specs/architecture.md",
@@ -523,12 +534,15 @@
       "impl-plans/completed/vactr-editor-wasm.md",
       "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
       "tmp/canvas-editor-224/root-observations/session-235-accepted-plan-review.json",
-      "tmp/canvas-editor-224/root-observations/retained-dependency-projection-finding.json"
+      "tmp/canvas-editor-224/root-observations/retained-dependency-projection-finding.json",
+      "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json",
+      "tmp/canvas-editor-224/plan-amendment-237/package-current-intake.json",
+      "tmp/canvas-editor-224/root-observations/package-236-snapshot-policy-finding.json"
     ],
     "reviewDecisions": {
       "design": "Accept design for code-free implementation planning; implementation and device acceptance remain pending.",
-      "plans": "Accept session236 metadata and retained dependency admission (comm-003011); preserve comm-003003 amendments. Overall implementation remains incomplete.",
-      "implementation": "CE-CONTRACT/CE-STATE/CE-INPUT admitted at 4e34e25 by comm-003011 using 17 matched current and committed hashes. GPU excluded; post-GPU state/input checks, telemetry/package renewed gates and overall implementation acceptance remain pending."
+      "plans": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required.",
+      "implementation": "Committed CE-CONTRACT/CE-STATE/CE-INPUT continuation and additive deps.ts fields admitted by comm-003052. GPU/telemetry/package root acceptance and all remaining gates remain pending."
     },
     "communications": {
       "intake": "comm-002812",
@@ -538,7 +552,8 @@
       "amendedPlanAcceptance": "comm-002895",
       "session235PlanAcceptance": "comm-003003",
       "session236PlanAuthor": "comm-003010",
-      "session236PlanAcceptance": "comm-003011"
+      "session236PlanAcceptance": "comm-003011",
+      "session237PlanAcceptance": "comm-003052"
     },
     "codexAgentReferences": [
       "AGENTS.md",
@@ -562,20 +577,12 @@
       "baseBranch": "main",
       "remote": "origin",
       "remoteUrl": "https://github.com/tacogips/vactr.git",
-      "originalHead": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
-      "originTrackingHead": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
-      "observedRemoteMain": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
-      "remoteObservationEvidence": "tmp/canvas-editor-224/root-observations/concurrent-checkpoint-4e34e25.json",
+      "originalHead": "7f6de4e1c1bd8690ca45c69ca700c809c154cce9",
+      "originTrackingHead": "7f6de4e1c1bd8690ca45c69ca700c809c154cce9",
+      "observedRemoteMain": null,
       "freshRemoteLookupExitCode": 128,
-      "freshRemoteLookupLimitation": "github.com DNS unavailable; fresh remote state not established. Authorized checkpoint push remains a required later gate.",
-      "evidence": "tmp/canvas-editor-224/plan-amendment-236/git-context.json",
-      "authorization": "Task-owned commits and non-force pushes authorized; no extra worktrees.",
-      "historicalContext": {
-        "intakeHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
-        "designCheckpoint": "8ee36f23e2311455126f6486db992d33227ff3e2",
-        "planCheckpoint": "4fc37414e2f2704f6737f1545071bf506bd9c0f8",
-        "separateCommittedBaseline": "4e34e25039bdbe8521e1a5aa014e687d4de2b912"
-      }
+      "evidence": "tmp/canvas-editor-224/plan-amendment-237/git-context.json",
+      "authorization": "Task-only commits/non-force pushes already authorized; planning checkpoint after Step5 acceptance only"
     },
     "externalAcceptedDependencies": [
       {
@@ -588,9 +595,10 @@
         "evidencePaths": [
           "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
           "tmp/canvas-editor-224/root-observations/input-integration-acceptance.json",
-          "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json"
+          "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json",
+          "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json"
         ],
-        "reviewDecision": "Admitted by independent review comm-003011 at 4e34e25: formal comm-002949 source proof matches current and committed bytes. Preserve historical evidence; no implementation replay. Post-GPU state/input reconciliation remains required."
+        "reviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required. Retain independently corroborated historical committed proof at 4e34e25 and current7f6de4e identities; no replay."
       },
       {
         "planId": "CE-STATE",
@@ -602,9 +610,10 @@
         "evidencePaths": [
           "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
           "tmp/canvas-editor-224/root-observations/input-integration-acceptance.json",
-          "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json"
+          "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json",
+          "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json"
         ],
-        "reviewDecision": "Admitted by independent review comm-003011 at 4e34e25: formal comm-002949 source proof matches current and committed bytes. Preserve historical evidence; no implementation replay. Post-GPU state/input reconciliation remains required."
+        "reviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required. Retain independently corroborated historical committed proof at 4e34e25 and current7f6de4e identities; no replay."
       },
       {
         "planId": "CE-INPUT",
@@ -616,13 +625,15 @@
         "evidencePaths": [
           "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
           "tmp/canvas-editor-224/root-observations/input-integration-acceptance.json",
-          "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json"
+          "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json",
+          "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json"
         ],
-        "reviewDecision": "Admitted by independent review comm-003011 at 4e34e25: formal comm-002949 source proof matches current and committed bytes. Preserve historical evidence; no implementation replay. Post-GPU state/input reconciliation remains required."
+        "reviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required. Retain independently corroborated historical committed proof at 4e34e25 and current7f6de4e identities; no replay."
       }
-    ]
+    ],
+    "currentReviewStatus": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required."
   },
-  "rerunExecutionReference": "codex-design-and-implement-review-loop-session-236",
+  "rerunExecutionReference": "codex-design-and-implement-review-loop-session-237",
   "revisionFeedback": [
     {
       "finding": 1,
@@ -644,8 +655,8 @@
     }
   ],
   "intakeOriginalHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
-  "historicalReviewCommunicationId": "comm-002895",
-  "planReviewDecision": "Accept session236 metadata and retained dependency admission (comm-003011); preserve comm-003003 amendments. Overall implementation remains incomplete.",
+  "historicalReviewCommunicationId": "comm-003011",
+  "planReviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required.",
   "nominalWaves": [
     [
       "CE-CONTRACT"
@@ -686,9 +697,10 @@
       "evidencePaths": [
         "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
         "tmp/canvas-editor-224/root-observations/input-integration-acceptance.json",
-        "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json"
+        "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json",
+        "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json"
       ],
-      "reviewDecision": "Admitted by independent review comm-003011 at 4e34e25: formal comm-002949 source proof matches current and committed bytes. Preserve historical evidence; no implementation replay. Post-GPU state/input reconciliation remains required."
+      "reviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required. Retain independently corroborated historical committed proof at 4e34e25 and current7f6de4e identities; no replay."
     },
     {
       "planId": "CE-STATE",
@@ -700,9 +712,10 @@
       "evidencePaths": [
         "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
         "tmp/canvas-editor-224/root-observations/input-integration-acceptance.json",
-        "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json"
+        "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json",
+        "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json"
       ],
-      "reviewDecision": "Admitted by independent review comm-003011 at 4e34e25: formal comm-002949 source proof matches current and committed bytes. Preserve historical evidence; no implementation replay. Post-GPU state/input reconciliation remains required."
+      "reviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required. Retain independently corroborated historical committed proof at 4e34e25 and current7f6de4e identities; no replay."
     },
     {
       "planId": "CE-INPUT",
@@ -714,16 +727,19 @@
       "evidencePaths": [
         "tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json",
         "tmp/canvas-editor-224/root-observations/input-integration-acceptance.json",
-        "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json"
+        "tmp/canvas-editor-224/reconcile-implementations/session-227-comm-002948/source-after.json",
+        "tmp/canvas-editor-224/plan-amendment-237/retained-source-proof.json"
       ],
-      "reviewDecision": "Admitted by independent review comm-003011 at 4e34e25: formal comm-002949 source proof matches current and committed bytes. Preserve historical evidence; no implementation replay. Post-GPU state/input reconciliation remains required."
+      "reviewDecision": "comm-003052 independently accepts session237 planning amendments and current-baseline continuation only; implementation acceptance remains pending. Mandatory post-GPU STATE/INPUT and joined verification, fresh native/Wasm/lint inputs, and successful non-force checkpoint push remain required. Retain independently corroborated historical committed proof at 4e34e25 and current7f6de4e identities; no replay."
     }
   ],
   "historicalGitContext": {
     "intakeHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
     "designCheckpoint": "8ee36f23e2311455126f6486db992d33227ff3e2",
     "planCheckpoint": "4fc37414e2f2704f6737f1545071bf506bd9c0f8",
-    "separateCommittedBaseline": "4e34e25039bdbe8521e1a5aa014e687d4de2b912"
+    "separateCommittedBaseline": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
+    "session236Checkpoint": "3ce293e66d9cd1b436cf3a6018e2d581501d1a51",
+    "session236CurrentBaseline": "7f6de4e1c1bd8690ca45c69ca700c809c154cce9"
   },
   "gitContext": {
     "repositoryRoot": "/Users/taco/gits/tacogips/vactr",
@@ -731,14 +747,12 @@
     "baseBranch": "main",
     "remote": "origin",
     "remoteUrl": "https://github.com/tacogips/vactr.git",
-    "originalHead": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
-    "originTrackingHead": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
-    "observedRemoteMain": "4e34e25039bdbe8521e1a5aa014e687d4de2b912",
-    "remoteObservationEvidence": "tmp/canvas-editor-224/root-observations/concurrent-checkpoint-4e34e25.json",
+    "originalHead": "7f6de4e1c1bd8690ca45c69ca700c809c154cce9",
+    "originTrackingHead": "7f6de4e1c1bd8690ca45c69ca700c809c154cce9",
+    "observedRemoteMain": null,
     "freshRemoteLookupExitCode": 128,
-    "freshRemoteLookupLimitation": "github.com DNS unavailable; fresh remote state not established. Authorized checkpoint push remains a required later gate.",
-    "evidence": "tmp/canvas-editor-224/plan-amendment-236/git-context.json",
-    "authorization": "Task-owned commits and non-force pushes authorized; no extra worktrees."
+    "evidence": "tmp/canvas-editor-224/plan-amendment-237/git-context.json",
+    "authorization": "Task-only commits/non-force pushes already authorized; planning checkpoint after Step5 acceptance only"
   },
   "remainingWaves": [
     [
@@ -761,6 +775,5 @@
     [
       "CE-FINAL"
     ]
-  ],
-  "reviewCommunicationId": "comm-003011"
+  ]
 }

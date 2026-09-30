@@ -162,3 +162,65 @@ Bounded baseline/manifest repair only. Seventeen retained source/test hashes mat
 reviewed evidence and committed objects. Independent metadata review, accepted-plan
 checkpoint/non-force push, G4/T5/P5 and remaining implementation/native/device gates
 remain pending. No implementation tests, production edits or Git mutations performed.
+
+## Session237 snapshot and current-baseline recovery (latest precedence)
+Accepted design15.3/comm-002814 and historical plan reviews comm-003003/comm-003011 remain
+baseline; source236 failed terminal policyBlocked. No design restart, source staging or manual
+implementation acceptance. Latest intake is main7f6de4e1c1bd8690ca45c69ca700c809c154cce9;
+origin/main locally matches. Fresh ls-remote exit128 (DNS) does not prove current remote state.
+Evidence `tmp/canvas-editor-224/plan-amendment-237/git-context.json` has complete per-command logs.
+Step5 independently admits current baseline and exact planning delta, then coordinator stages
+only reviewed canvas planning paths/hunks, commits and requires non-force push success before
+fanout. Dirty implementation repairs, all foreign song-mode files and impl-plans/README.md are
+excluded. Retain historical4e/3ce identities separately; never overwrite current intake with them.
+
+Manifest has13 acceptedPlanPaths, ten remaining plans and three committed external dependencies.
+Fresh proof matches16/17 historical hashes; deps.ts differs only by committed additive formatter,
+syntax and completion imports/optional fields. Exact diff and committed/current hashes are in
+`plan-amendment-237/retained-source-proof.json` and `retained-deps-delta.diff`. Step5 must inspect
+and independently admit that delta before retention; otherwise serial evidence-only amendment,
+review and checkpoint are required. No new acceptance asserted here. GPU/telemetry child success
+is not root integration admission: retain both as pending native plans, preserve their repairs/logs,
+and verify matching evidence before retry. Post-GPU STATE/INPUT and combined gates still required.
+
+CE-PACKAGE source tracking removes recursive native-tools from writePaths/sharedPaths; exact
+small toolchain.json remains tracked alongside every authored source/plan. Dispatcher trackedPaths
+is writePaths+sharedPaths, so changedFiles-only narrowing cannot repair failure. Generated binary,
+cache/download/install and terminal logs remain referenced evidence, not tracked source outputs.
+Preserve512-entry/8MB-file/64MB-total limits and all source ownership/symlink protection. No cache
+deletion, tool reinstall or runner policy edit. Exact evidence checksums/logs stay audited.
+Current package preservation baseline is proposed in plan-amendment-237/package-current-intake.json
+with immutable snapshot/current/commit hashes; independent Step5 admission required. Historical
+attempt1 checks retain real failures distinctly. Only CE-PACKAGE updates its verifier; application
+versions/locks are unchanged. CE-SHELL/FINAL verify available device+simulator components rather
+than inferring compiler unavailability from lack of physical iPad.
+
+CE-JOIN owns three additional concrete adapter files format.ts/syntax.ts/completion-view.ts and
+existing test/code fixtures; UI-agnostic cores are read-only. Preserve current shortcut, tree-sitter
+fallback and completion behavior without new backend or hidden view. Nominal seven-wave DAG and
+projected five remaining waves are unchanged. Shared indexes, lock reconciliation, broad formatting,
+archives and Git stay serial; each worker updates only its own progress.
+
+All full-input verification must be refreshed if inputs changed, including current song-mode/bass/
+formatter changes. GPU scope hashes allow only its scoped evidence retention. Canonical global
+Clippy exit101 remains failure; historical27 diagnostic baseline cannot be reused after diagnostic
+source drift. CE-TELEMETRY and CE-FINAL require fresh independent reconstruction/provenance of
+current pre-task unowned diagnostics, zero introduced/owned diagnostics, no unknown blocks, and
+reviewed scoped disposition; new failures remain failures and no unrelated cleanup ownership added.
+Rust verification agents and all eight separate gates remain required. Compile, signing, simulator,
+physical-device and hardware synchronization/budget evidence remain distinct and honest.
+
+### Progress Log: 2026-10-01 — Step4 session237
+Bounded plans/manifest recovery authored. Immutable preimages and intents, current git/package and
+retained hashes under plan-amendment-237. No source modifications, installs, Git mutations or
+application passes claimed; new independent Step5 review/checkpoint/fanout remain downstream.
+
+### Author improve check: concurrent foreign drift
+Initial full-source stability audit failed (verify.log: Python exit1; shell wrapper also
+failed on zsh read-only variable status). Complete original log is retained. Ten structural
+checks rerun with corrected scoped audit pass (verify2.log exit0), while foreign drift
+is explicitly recorded in verify-2/author-self-check.json. Seven src/pattern/combinators
+and src/types/song_rules.rs files changed concurrently; this node wrote planning files
+only and no canvas source hash changed. Preserve those foreign changes; they invalidate
+whole-input native/Wasm/lint reuse. Owners capture fresh current sources and independently
+review renewed baseline provenance before accepting results. This is no gate waiver.

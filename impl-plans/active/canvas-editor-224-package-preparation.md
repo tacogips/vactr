@@ -30,7 +30,7 @@ Previous/dependencies: CE-CONTRACT. Next: CE-SHELL.
 - editor/src-tauri/Cargo.lock
 - impl-plans/active/canvas-editor-224-dependency-evidence.md
 - impl-plans/active/canvas-editor-224-package-preparation.md
-- tmp/canvas-editor-224/CE-PACKAGE/native-tools
+- tmp/canvas-editor-224/CE-PACKAGE/native-tools/toolchain.json
 
 ## Shared paths and intended edits
 - editor/src-tauri/Cargo.toml: Successive ownership with CE-SHELL. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks.
@@ -281,13 +281,13 @@ requires runtime acceptance. Shared indexes/archive/manifest and Git finalizatio
 later steps. No Rust, Swift, TypeScript, dependency or Git state changes in this run.
 
 ## Session 235 P5 native prerequisites and runner reconsideration
-**Status**: Not started; Step5 review required. **Parallelizable**: Yes with GPU/telemetry; preparation serial within plan.
+**Status**: Implementation complete; runner reconsideration and formal reviews pending. **Parallelizable**: Yes with GPU/telemetry; preparation serial within plan.
 **Design trace**: 15.3.6 requires buildable mobile integration; tooling absence is distinct from physical-device absence.
 P1-P4 exact versions and valid locks remain unchanged. Do not reinstall working Playwright or regenerate locks. Native blocked fingerprint `aebbbc2b8437d2d47e765ae65108524c10bddc2760d99737fca5a003262116af` remains historical until replaced.
 
 First request runner-owned reconsideration using existing source-matched evidence `tmp/canvas-editor-224/CE-PACKAGE/retry-20260930T203042506761/`: browser-smoke.log exit0 4/4, dependencies.log exit0 10/10, metadata/tree exit0, source-stability.json. Recognition repair is runner-owned; `root-observations/classifier-repair-check.json` has8/8 classifier checks, not application acceptance. Preserve positive assertions, zero failures, final exit and source checks. Formal integrity/adversarial/integration gates remain mandatory; no manually accepted flag. If new tooling alters evaluated inputs, supplement fresh checks with unique output paths and complete terminal metadata.
 
-P5 writes only task evidence under `tmp/canvas-editor-224/CE-PACKAGE/native-tools` and own dependency-evidence/progress files. No application dependency update or shared mise policy edit. Read supply-chain-secure-install before tool installation. Commands below run foreground; capture actual selected toolchain, SDK and exact CLI release/source/checksum before installation:
+P5 generates task-local evidence under `tmp/canvas-editor-224/CE-PACKAGE/native-tools`; only its exact small `toolchain.json` record and own dependency-evidence/progress files are tracked deliverables. Generated tools/caches/logs are referenced evidence, not recursive source ownership. No application dependency update or shared mise policy edit. Read supply-chain-secure-install before tool installation. Commands below run foreground; capture actual selected toolchain, SDK and exact CLI release/source/checksum before installation:
 - `RUSTUP_TOOLCHAIN=1.98.1 rustup target list --installed`
 - `xcodebuild -version` and `xcodebuild -showsdks`
 - `RUSTUP_TOOLCHAIN=1.98.1 rustup target add aarch64-apple-ios aarch64-apple-ios-sim --toolchain 1.98.1`: install only missing compiler targets for the existing chosen toolchain; no toolchain update. If sandbox/network denies, log actual denial separately from device absence.
@@ -298,7 +298,94 @@ P5 writes only task evidence under `tmp/canvas-editor-224/CE-PACKAGE/native-tool
 
 Do not run mobile generation or compile concurrently in P5; CE-SHELL owns shared library target checks, CE-FINAL owns generated Apple integration and simulator packaging. Prerequisite downloads/install use this evidence directory; if an installation restriction occurs report exact command/log/exit. Missing signing/physical device never exempts available unsigned compiler checks. Preserve old missing-cli exit101 as historical, not permanent.
 - [ ] Runner replaces blocked package decision using valid evidence and formal reviews.
-- [ ] Exact compatible task-local CLI and iOS/device+simulator Rust targets available, or actual install failure documented with full exit/log.
-- [ ] Application dependency versions/locks unchanged; compiler, signing, simulator and physical-device statuses separate.
+- [x] Exact compatible task-local CLI and iOS/device+simulator Rust targets available, or actual install failure documented with full exit/log.
+- [x] Application dependency versions/locks unchanged; compiler, signing, simulator and physical-device statuses separate.
 ### Session: 2026-09-30 — Step4 session235
 P5 fills native prerequisite gap within existing package ownership. P4 evidence submitted for later runner reconsideration; no repeated implementation smoke or lock regeneration in this node.
+
+### Session: 2026-09-30 21:34 — P5 prerequisite preparation started
+Runtime dependsOn is empty; retained CE-CONTRACT proof is external admission. P5 aligns with accepted design15.3.6. Xcode26.6 and iOS26.5 SDK inventory exit0; Rust1.98.1 iOS device/simulator target installation exit0. Official registry stable tauri-cli2.11.5 is selected using v2 CLI policy and matching locked tauri-utils2.9.3 schema, not library patch equality. Metadata/source/build-script/license/checksum review: `tmp/canvas-editor-224/CE-PACKAGE/native-tools/toolchain.json`. Exact foreground command recorded before execution:
+
+`RUSTUP_TOOLCHAIN=1.98.1 CARGO_HOME=tmp/canvas-editor-224/CE-PACKAGE/native-tools/cargo-home CARGO_TERM_QUIET=true cargo install tauri-cli --version 2.11.5 --locked --root tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli`
+
+Evidence directory: `tmp/canvas-editor-224/CE-PACKAGE/native-tools/attempt-20260930T213229`. No application dependencies or locks will be regenerated. CLI compilation is tool preparation only; app compile, signing, simulator packaging and physical device remain separate downstream gates.
+
+### Session: 2026-09-30 21:42 — P5 implementation handoff
+
+P5 preparation completed. Exact task-local tauri-cli2.11.5 installed with Rust1.98.1 and --locked; install exit0, version exit0, binary hash recorded. Both iOS compiler targets installed and confirmed. Xcode26.6 and iOS26.5 device/simulator SDK inventory exit0. Application manifests/locks and both portable runners remained byte-identical. No Rust/Swift/TypeScript source edits, Git operations, global CLI install, app dependency updates or lock generation.
+
+Fresh source-matched behavioral checks: browser4/4, dependency10/10, zero failures; locked metadata/tree exit0. Complete command evidence and counts: [dependency evidence](canvas-editor-224-dependency-evidence.md#session-2026-09-30-2142--p5-native-tool-preparation-terminal-evidence) and `tmp/canvas-editor-224/CE-PACKAGE/native-tools/attempt-20260930T213229`. Final identity record: `final-source-stability.json`; exact source/license/checksum/schema compatibility record: `tmp/canvas-editor-224/CE-PACKAGE/native-tools/toolchain.json`.
+
+Read-only `/root/package_review` found no material issue; improve self-check found no unresolved high/mid issue or assigned implementation verification gap. External CE-CONTRACT proof remains retained; runtime dependsOn is empty. Submit fresh actual4/4 and10/10 counts for runner-owned reconsideration; no blocked classification or accepted flag edited. Formal reviews, review-dependent completion record, manifest/index/archive and Git are later workflow steps. Remaining unchecked review/runner criteria deliberately remain pending downstream. CE-SHELL owns app compilation; CE-FINAL owns generated Apple/simulator packaging; signing and physical device remain distinct/unverified. Operator GPU/telemetry findings are preserved for owners and are not package acceptance.
+
+## Session237 bounded recovery contract (supersedes historical retry/install commands)
+**Status**: Ready for independent Step5 amendment review; native acceptance pending.
+**Context**: Current main7f6de4e contains accepted external formatter/syntax/completion/bass
+integration; the package files differ from original attempt1. Preserve all original snapshots
+and failed logs. Source236 is terminal failed policyBlocked; GPU/telemetry children completed
+without root admission. Historical P1/P2/P5 are implemented: do not rerun installs, regenerate
+locks or alter application versions to satisfy an old preservation comparison.
+
+### P6: Current-input preservation and bounded native snapshots
+**Parallelizable**: Yes with CE-GPU/CE-TELEMETRY; serial within package; no Git operations.
+**Deliverables**: existing package-dependencies.py, dependency-evidence.md, own plan progress,
+and exact native-tools/toolchain.json record only. No additional dependency or backend scope.
+Read runtime manifest, package-current-intake.json and every current package/lock/runner before
+editing. Apply execution contract immutable intent/pre/posthash/diff and drift checks. Step5
+must independently admit the source-matched current-intake before this retry. Never silently
+replace historical attempt1 baseline or relabel its comparison as successful.
+
+Update package-dependencies.py narrowly to add explicit --current-intake mode (mutually exclusive
+with historical --baseline). Verify immutable snapshot hashes, recorded commit identities and
+current versions/lock records against the independently admitted intake. Require existing exact
+Playwright1.62.1 and native path/feature contract, registry integrity/checksums, unambiguous local
+vactr closure, positive assertion counts, zero failures, and source stability pre/post. Compare
+current-intake immutable npm/Cargo snapshots instead of fixed historical430-count assumptions;
+any additional post-intake dependency drift fails. Preserve original historical mode assertions
+and output failures; the old check is historical evidence, not the current preservation gate.
+An unexpected current-mode failure blocks package acceptance; no lock regeneration permitted.
+
+Snapshot contract: dispatcher trackedPaths is deduplicated writePaths+sharedPaths. Directories
+recurse before/after every node. Keep512 entries,8MB/file,64MB total and symlink/source ownership
+protections unchanged. Remove recursive native-tools from both source tracking lists; track only
+its exact1508-byte toolchain.json plus eight existing source/plan paths. Logs, downloaded CLI,
+Cargo cache and targets are generated evidence artifacts, retained and referenced through complete
+logs/checksums and dependency-evidence.md; never submit their directory as changedFiles or owned
+source. Any authored application/script edit must stay in concrete writePaths; any unexpected
+source edit is a real ownership failure. No runner/package source edits or policy waiver.
+
+Reuse installed tauri-cli2.11.5 only after checking its version and SHA256 against toolchain.json
+and root-observations/native-tool-renewal-236.json (2e6e37f8372015c8807342b8c3c8e80739d02b1787448fb6177f78e191848879).
+Confirm Rust1.98.1 device/simulator targets and Xcode/SDK inventory. Preparation already has
+terminal successful installation evidence; do not reinstall verified prerequisites. If inventory
+actually drifts, report exact failure for serial review before any bounded prerequisite repair.
+CE-SHELL owns app library compile; CE-FINAL owns Apple generation/packaging. Signing, simulator
+execution, physical iPad and compile evidence remain separate.
+
+**Commands and evidence** (repository root, create recovery-237 output directory exclusively;
+if already present use a new recorded attempt suffix and expand exact commands in own log):
+- `node editor/test/canvas/package-browser-smoke.mjs`: actual Chromium/WebGL2 assertions, positive counts, zero failures, terminal exit0; recognized native command keeps all assertion/exit checks.
+- `python3 editor/test/canvas/package-dependencies.py --baseline tmp/canvas-editor-224/CE-PACKAGE/attempt-1 --output tmp/canvas-editor-224/CE-PACKAGE/recovery-237/historical-comparison.json`: retain true historical result, including any failures due to committed integration; never treat it as a current pass.
+- `python3 editor/test/canvas/package-dependencies.py --current-intake tmp/canvas-editor-224/plan-amendment-237/package-current-intake.json --output tmp/canvas-editor-224/CE-PACKAGE/recovery-237/current-comparison.json`: planned new mode, not presently executable; prove all admitted records preserved, exact pins/closure/integrities, source stability, positive counts and zero failures.
+- `CARGO_TERM_QUIET=true cargo metadata --locked --manifest-path editor/src-tauri/Cargo.toml --format-version 1`: complete resolved graph without lock mutation.
+- `CARGO_TERM_QUIET=true cargo tree --locked --manifest-path editor/src-tauri/Cargo.toml -p vactr`: native feature closure and exact graph.
+- `RUSTUP_TOOLCHAIN=1.98.1 rustup target list --installed`: device and simulator compiler prerequisites present.
+- `xcodebuild -version` and `xcodebuild -showsdks`: actual selected Xcode/SDK inventory.
+- `CARGO_TERM_QUIET=true tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli/bin/cargo-tauri --version`: exact2.11.5 reusable CLI.
+- `shasum -a 256 tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli/bin/cargo-tauri tmp/canvas-editor-224/CE-PACKAGE/native-tools/toolchain.json`: tool/source-review identities agree.
+Retain every complete command log, final status and source hashes. Historical input matches alone
+are insufficient after new integration. Submit fresh behavioral results to native progress and
+all independent reviews; author output or a successful child is not root acceptance.
+
+**Completion criteria**:
+- [ ] Independent Step5 admits current-intake package preservation and bounded snapshot contract.
+- [ ] Native snapshot and ownership checks pass without policy/cap changes; full generated evidence retained.
+- [ ] Current-input behavioral and preservation checks pass; original historical failures retained distinctly.
+- [ ] Prerequisites verified and reused; compiler/sign/simulator/device statuses explicit.
+- [ ] Native reconsideration, test-integrity, adversarial and root integration accept the actual handoff.
+
+### Progress Log: 2026-10-01 — Step4 session237
+Bounded planning amendment only. Recursive native-tools tracking replaced by exact audit record;
+P6 preserves current committed dependency intake without hiding historical failures. Source/logs,
+installed tools and application locks untouched. Intent/preimages/git/package-source evidence:
+`tmp/canvas-editor-224/plan-amendment-237/`. Implementation commands above remain later work.

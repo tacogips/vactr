@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-27
-**Last Updated**: 2026-09-29
+**Last Updated**: 2026-09-30
 
 ## Design Document Reference
 
@@ -69,7 +69,7 @@ audit their source and all dependencies before implementation.
 | SYN-005B | Position 8 virtual-analog pair, distinct from position 0 | MOD-003–005 | Bounded adaptation complete; BLEP/interpolation parity pending |
 | SYN-005C | Position 9 waveshaping pair with cleared fold math | MOD-001, MOD-003–005 | Bounded adaptation complete; spectral/source parity pending |
 | SYN-005D | Position 11 grain-oscillator pair with audited sources | MOD-001, MOD-003–005 | Bounded adaptation complete; BLEP/filter parity pending |
-| SYN-005D2 | Translate position 11 grainlet/Z BLEP resets and output high-pass stages | SYN-005D | Completed and independently verified; block interpolation and voice/LPG parity remain separate |
+| SYN-005D2 | Translate position 11 grainlet/Z BLEP resets and output high-pass stages | SYN-005D | Completed and independently verified; voice layer PLV-001 is SourceStage (probe A–E pass, `tmp/plv/s209/PLV-40/7-compare.json`); block interpolation remains separate |
 | SYN-005E | Source comparison and fidelity classification | SYN-005A–D, MOD-006 | Completed: positions 7/8/9/11 numerically measured; 7 not comparable for clock semantics, 8/9/11 measured gaps |
 
 ### SYN-005D2 grain source-stage translation
@@ -144,7 +144,7 @@ correlation at least 0.99 on every scenario and channel. Position 7 still
 has numerical measurements but is excluded from like-for-like classification
 because its clock controls have no one-to-one mapping. The kernel files and
 manifest fidelity labels were unchanged; raw signal comparison does not
-validate Plaits voice/LPG or Vactr event behavior.
+validate Plaits voice/LPG or Vactr event behavior; that layer has its own PLV-001 comparison (`tmp/plv/s209/PLV-40/7-compare.json`).
 
 ### Session: 2026-09-28, SYN-005D2 grain BLEP and filter stages
 
@@ -160,7 +160,7 @@ late-start and zero-allocation tests, `.vact` controls, editor and codec
 pass. Quiet native/no-default/wasm checks, strict Clippy, rustfmt, Taplo,
 19 mise task validations and full Cargo tests pass (1,440 passed, one
 ignored). The manifest records `SourceStage`; source numeric comparison
-and voice/LPG parity remain open.
+and voice-layer SourceStage evidence is recorded under PLV-001 (`tmp/plv/s209/PLV-40/7-compare.json`); oscillator parity remains open.
 
 ### Session: 2026-09-28, SYN-005C position 9 waveshaping adaptation
 

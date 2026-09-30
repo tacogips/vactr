@@ -648,8 +648,9 @@ low-pass and high-pass, respectively. Vactr does not copy Plaits'
 oscillator, filter, interpolator, code, or resource data. The referenced
 `variable_shape_oscillator.h`, `variable_saw_oscillator.h`, and pinned
 `stmlib` DSP dependencies carry Emilie Gillet MIT notices; no `stmlib`
-implementation or table is imported. This is not a bit-exact source port,
-and Plaits voice-level trigger/LPG behavior is not included in this slice.
+implementation or table is imported. This is not a bit-exact source port.
+The shared voice-level trigger/LPG layer is wired into all 24 Plaits
+templates as an opt-in `SourceStage`; see “Plaits voice-level layer” below.
 
 Copyright 2021 Emilie Gillet (Plaits engine source); copyright 2012 Emilie
 Gillet (`stmlib` dependencies). The MIT permission and warranty notice is
@@ -672,7 +673,8 @@ replaces the authored harmonics quantizer with an original equal-step ratio
 map because `harmonics` is already an effect name. It averages two analytic
 substeps per host sample but omits Plaits oscillator antialiasing and exact
 ratio, phase-distortion, and downsampling behavior. This is an adaptation,
-not a bit-exact source port; voice-level trigger/LPG behavior remains open.
+not a bit-exact source port; voice-level trigger/LPG behavior is handled
+by the shared opt-in `SourceStage` described below.
 
 ## Plaits positions 2–4 six-operator architectural reference
 
@@ -734,6 +736,13 @@ build also compiles `plaits/user_data.h`,
 `stmlib/system/flash_programming.h` and `stmlib/utils/buffer_allocator.h`.
 Nothing from them enters Vactr.
 
+All 24 Plaits templates route main and auxiliary outputs through two
+`vactrol-gate` nodes. The behavior is opt-in through the neutral
+`lpg-mode`, `lpg-decay` and `lpg-color` controls; `lpg-mode` defaults to
+`off`, an exact pass-through, and `decay-mod` remains separately opt-in.
+The final comparison measures the shared layer as `SourceStage`; it is not a
+bit-exact source port.
+
 ## Plaits position 10 FM architectural reference
 
 `fm-pair-voice` and `src/dsp/ugen/fm_pair.rs` translate the
@@ -752,8 +761,9 @@ aggregate `resources.cc`, DX7 patch bank, LXR code or wave/audio data. The
 authored harmonics ratio control is named `fm-harmonics` because `harmonics`
 already names an effect. The kernel now translates the four-substep ratio,
 amount, signed-feedback and downsampler stages, with analytic sine and
-floating-point phase arithmetic. Upstream table interpolation, exact phase
-quantization and voice-level trigger/LPG behavior still differ. It is a
+floating-point phase arithmetic. Upstream table interpolation and exact
+phase quantization remain measured gaps. Shared voice-level trigger/LPG
+behavior is handled by the opt-in `SourceStage` described above. It is a
 source-stage translation, not a bit-exact or complete Plaits port.
 
 ## Plaits position 12 additive MIT source-stage translation
@@ -777,7 +787,8 @@ source 0.001 coefficient per 12-sample 48 kHz block, but it retains raw
 smoothed amplitudes rather than the source's normalized-state recurrence and
 does not linearly interpolate oscillator amplitude across source blocks.
 It is a source-stage adaptation, not bit-exact firmware; voice-level
-trigger/LPG behavior remains open.
+trigger/LPG behavior is handled by the shared opt-in `SourceStage`
+described above.
 
 `verification/compare_plaits_osc.py` provides an opt-in raw-kernel comparison
 for positions 0, 1, 7, 8, 9, 11 and 12. It compiles the pinned engine sources

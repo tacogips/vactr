@@ -1,6 +1,6 @@
 # PLV-12: Plaits Manifest Voice Registration and Voice-Layer Label
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-12 (wave 1; parallel with PLV-10)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Upstream behavior translated: Registration table; Modules and nodes; Fidelity labels)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`

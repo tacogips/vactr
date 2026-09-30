@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-27
-**Last Updated**: 2026-09-27
+**Last Updated**: 2026-09-30
 
 ## Design Document Reference
 
@@ -192,3 +192,13 @@ so the particle/string adaptation labels and modal `SourceStage` label stay
 unchanged. The full metric table and the positions 16–17 results are in
 `modular-plaits-engines.md`, Session 2026-09-29. This raw-kernel comparison
 does not verify the surrounding voice, LPG or complete Plaits source parity.
+
+
+### Session: 2026-09-30, PLV-001 voice-layer wiring and comparison
+
+Plaits positions 18–20 are wired through the shared opt-in voice layer as
+part of the 24-template PLV-31 change. The final probe reports
+`voice_layer_label_eligible: true`, with scenarios A–E meeting their
+thresholds; the manifest label is `SourceStage`, not `SourcePort`. This
+voice-level result does not change the particle, string or modal kernel
+measurements above. Evidence: `tmp/plv/s209/PLV-40/7-compare.json`.

@@ -1,6 +1,6 @@
 # PLV-40: Evidence, Labels, Provenance and Plan Closeout (serial)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-40 (session 209, wave 3 of 3; serial finalization)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Provenance; Comparison probe; Fidelity labels; Rollout item 3)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`; handoff `impl-plans/active/modular-audio-handoff.md` priority 4
@@ -181,11 +181,11 @@ Logs go in `tmp/plv/s209/PLV-40/`, each ending with `exit=<n>`.
 
 ## Completion Criteria
 
-- [ ] `7-compare.json` is recorded (or BLOCKED is recorded), and the manifest label matches `voice_layer_label_eligible`. Nothing is SourcePort.
-- [ ] The audit reports 0 errors, and `voice.{h,cc}`, `envelope.h` and `fx/low_pass_gate.h` stay `source`.
-- [ ] The notices describe the opt-in, default-off wiring and the measured label, and no stale "trigger/LPG not included" clause remains.
-- [ ] The engines plan and its four subplans, the handoff (priorities 4 and 7), the README and the design status carry the evidence.
-- [ ] Commands 1-12 pass with complete logs, or are recorded as BLOCKED with the reason.
+- [x] `7-compare.json` is recorded (or BLOCKED is recorded), and the manifest label matches `voice_layer_label_eligible`. Nothing is SourcePort.
+- [x] The audit reports 0 errors, and `voice.{h,cc}`, `envelope.h` and `fx/low_pass_gate.h` stay `source`.
+- [x] The notices describe the opt-in, default-off wiring and the measured label, and no stale "trigger/LPG not included" clause remains.
+- [x] The engines plan and its four subplans, the handoff (priorities 4 and 7), the README and the design status carry the evidence.
+- [x] Commands 1-12 pass with complete logs, or are recorded as BLOCKED with the reason.
 
 ## Execution Protocol
 
@@ -201,4 +201,25 @@ Logs go in `tmp/plv/s209/PLV-40/`, each ending with `exit=<n>`.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30, Step 6 implementation
+
+**Tasks completed**: Fresh voice comparison, measured manifest label, upstream
+provenance audit, notice and Plaits-plan evidence, handoff and design status,
+verification commands 1–12, and progress tracking.
+
+The final comparison at `tmp/plv/s209/PLV-40/7-compare.json` reports
+`voice_layer_label_eligible: true`; scenarios A–E meet the thresholds. The
+manifest and tests record `SourceStage` for the shared layer; engine coverage
+is unchanged and nothing is labeled `SourcePort`. The audit reports 0 errors
+in `tmp/plv/s209/PLV-40/8-audit.log`, and the required four upstream headers
+remain `use = "source"`.
+
+Commands 1–6 and 9–12 exited 0. Full nextest ran 1,623 tests: 1,623 passed,
+2 skipped (`tmp/plv/s209/PLV-40/6-nextest.log`). Three preliminary `mise run audit-upstream` attempts are preserved in
+`8-audit.log`; the task selected shell Python 3.9 (without `tomllib`) and
+its nested reference-variable handoff did not work. The final direct audit run
+used mise Python 3.12 and passed with 0 errors. Compare and log JSON
+validation exited 0.
+
+The implementation criteria are complete. Formal integration/adversarial
+review and Git finalization are owned by downstream workflow steps.

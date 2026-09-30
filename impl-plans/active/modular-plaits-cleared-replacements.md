@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-30
 
 ## Design Document Reference
 
@@ -146,3 +146,15 @@ table in the latter, and an LPC excitation-pulse table referenced via
 replacement should author its own phoneme definitions and synthesize
 excitation procedurally, rather than importing the aggregate resource
 or assuming every transitive numeric table has verified provenance.
+
+
+### Session: 2026-09-30, PLV-001 voice-layer wiring and comparison
+
+Plaits positions 2, 3, 4 and 15 are wired through the shared voice layer as part of the
+24-template PLV-31 change. `lpg-mode` defaults to `off` (exact pass-through);
+`lpg-decay`, `lpg-color` and the separately opt-in `decay-mod` provide the
+opt-in behavior. The final comparison reports
+`voice_layer_label_eligible: true`, with scenarios A–E meeting thresholds;
+the manifest label is `SourceStage`, never `SourcePort`. This voice-layer
+result leaves the engine and resource gaps recorded in this plan unchanged.
+Evidence: `tmp/plv/s209/PLV-40/7-compare.json`.

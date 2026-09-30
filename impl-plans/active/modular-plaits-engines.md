@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-27
-**Last Updated**: 2026-09-29
+**Last Updated**: 2026-09-30
 
 ## Design Document Reference
 
@@ -44,9 +44,9 @@ implementation a source port; otherwise label it an independent adaptation.
 and note frequency, independent main/aux outputs, editor metadata, native and
 browser graph-codec support, and tests for each control and both channels.
 Its oscillator and filter state must fit the preallocated MOD-005 budget.
-Do not import a lookup table, patch bank or sound asset. The Plaits voice-level
-trigger/LPG handling is a separate parity requirement and must stay visibly
-open if this slice omits it.
+Do not import a lookup table, patch bank or sound asset. Shared voice-level
+trigger/LPG behavior is recorded under PLV-001 as SourceStage from the final
+comparison; this engine slice retains its own source-parity gaps.
 
 ### SYN-002B: Plaits position 1 phase distortion
 
@@ -100,7 +100,7 @@ outputs, preallocated state and graph/wire shape. Update
 - [x] The finite 0..1 harmonics selector reaches the source's entire quantized ratio range; timbre and morph drive the source-shaped amount and signed feedback roles.
 - [x] Four substeps, a persistent 24-frame-at-48-kHz (roughly 0.5 ms) control-interpolation clock scaled to host rate, two bounded FIR states and both outputs are preallocated; callbacks allocate nothing at 44.1/48/96 kHz and 64/256-frame blocks.
 - [x] Native/browser `.vact` control and main/sub routing tests pass without changing the template or wire schema.
-- [x] Pinned raw-kernel comparisons at more than one harmonics/timbre/morph setting show the remaining error; the manifest stays below `SourcePort` while analytic sine and voice/LPG differences remain.
+- [x] Pinned raw-kernel comparisons at more than one harmonics/timbre/morph setting show the remaining error; the manifest stays below `SourcePort` while analytic-sine engine differences remain; voice layer PLV-001 is separately measured as SourceStage, not SourcePort.
 - [x] Quiet Cargo, strict Clippy, rustfmt, wasm, full tests and independent Rust review pass.
 
 ### SYN-002, position 12: additive oscillator
@@ -235,19 +235,20 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 
 | Task | Deliverable | Depends on | Status |
 |---|---|---|---|
-| SYN-002A | Implement position 0 oscillator/filter slice with main/aux and control-response tests | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; raw comparison measured gap; LPG/full voice parity pending |
-| SYN-002B | Implement position 1 phase-distortion slice with two outputs and cleared quantizer | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; raw comparison measured gap; source parity/LPG pending |
-| SYN-002C | Implement position 10 two-operator FM with carrier/sub and signed feedback | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity/LPG pending |
-| SYN-002C2 | Translate individually audited MIT FM quantizer/FIR and source control, feedback and downsampling stages; compare raw outputs | SYN-002C, MOD-006A | Completed and independently verified; full voice/LPG/source parity remains separate |
-| SYN-002D | Implement position 12 additive integer/organ main/aux voice | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity/LPG pending |
-| SYN-002D2 | Translate position 12 amplitude stages and verify main/aux response | SYN-002D | Source-stage adaptation complete; raw comparison measured gap; LPG/full voice parity pending |
-| SYN-003A | Implement position 17 clocked-noise main/aux with event reset | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; measured numerical gap recorded; voice/LPG parity pending |
-| SYN-003A2 | Translate position 17 BLEP clocks and three SVF signal paths | SYN-003A | Completed and independently verified; raw-kernel comparison recorded; voice/LPG parity remains separate |
+| SYN-002A | Implement position 0 oscillator/filter slice with main/aux and control-response tests | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; raw comparison measured gap; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
+| SYN-002B | Implement position 1 phase-distortion slice with two outputs and cleared quantizer | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; raw comparison measured gap; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
+| SYN-002C | Implement position 10 two-operator FM with carrier/sub and signed feedback | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
+| SYN-002C2 | Translate individually audited MIT FM quantizer/FIR and source control, feedback and downsampling stages; compare raw outputs | SYN-002C, MOD-006A | Completed and independently verified; voice layer PLV-001: SourceStage, probe A–E pass; engine/source parity remains |
+| SYN-002D | Implement position 12 additive integer/organ main/aux voice | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
+| SYN-002D2 | Translate position 12 amplitude stages and verify main/aux response | SYN-002D | Source-stage adaptation complete; raw comparison measured gap; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
+| SYN-003A | Implement position 17 clocked-noise main/aux with event reset | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; measured numerical gap recorded; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
+| SYN-003A2 | Translate position 17 BLEP clocks and three SVF signal paths | SYN-003A | Completed and independently verified; raw-kernel comparison recorded; voice layer PLV-001: SourceStage, probe A–E pass; engine parity remains |
 | SYN-003B | Implement position 21 dual bass-drum main/aux with accent and retrigger | MOD-003, MOD-004 bounded, MOD-005 bounded | Bounded adaptation complete; source parity pending |
 | SYN-003C | Replace position 21 approximations with source stages and scheduled retrigger test | SYN-003B | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`), one resonance-Q translation error fixed; bit-exact parity not claimed |
 | SYN-003D | Translate position 22 analog/synthetic snare stages and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`); bit-exact parity not claimed |
 | SYN-003E | Translate position 23 square/ring-mod hi-hat variants and verify main/aux | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation complete; raw-kernel numerical comparison recorded (`compare-plaits-drums`); bit-exact parity not claimed |
 | SYN-003F | Translate position 16 eight-voice swarm with saw/sine outputs | MOD-003, MOD-004 bounded, MOD-005 bounded | Source-stage translation and raw-kernel comparison complete; distribution-level close, waveform correlation varies with random streams |
+| PLV-001 | Shared voice layer, `vactrol-gate`/`decay-mod`, 24 wired templates and `compare-plaits-voice` | PLV-30, PLV-31, PLV-40 | SourceStage; probe scenarios A–E meet thresholds (`tmp/plv/s209/PLV-40/7-compare.json`) |
 
 ## Module Status
 
@@ -270,7 +271,7 @@ state-budget rejection, native/browser rates/blocks and callback allocation.
 
 - [ ] All 24 registered positions have a cleared renderer or explicit unavailable-resource status.
 - [ ] Every sound parameter and main/aux output is accessible through .vact and the editor.
-- [ ] Trigger/LPG and source algorithm behavior have comparison evidence.
+- [ ] Trigger/LPG and source algorithm behavior have comparison evidence (the shared voice-layer part is recorded under PLV-001; engine algorithm comparisons remain pending).
 - [ ] Asset and source notices are complete for each included engine.
 - [ ] Native/browser tests pass with bounded callback state and no allocation.
 
@@ -477,7 +478,7 @@ or LPG parity.
 ### Session: 2026-09-28, SYN-003A2 position 17 clocked-noise stages
 
 The pinned Plaits noise and clocked-noise sources and `stmlib` BLEP/SVF helpers carry Emilie Gillet MIT notices. The kernel now has two quadratic-BLEP held-noise clocks, source-shaped clock/filter frequencies, gain/Q, a signed triangular LP/BP/HP main SVF and two separate band-pass auxiliary SVFs. All five `.vact` ports and deterministic event restart remain; fixed inline state persists a rate-scaled 0.5 ms control clock without callback allocation. No lookup, aggregate resource or other sound asset was imported.
-Independent review verified source control equations, BLEP signs, three filter states and the node-local state layout. Exact partition tests with changing audio-rate controls, native/browser 44.1/48/96 kHz × 64/256 late starts, armed allocation probes, two-hit retrigger, editor and `.vact` controls pass. Quiet native/no-default/wasm checks, strict Clippy, rustfmt, Taplo, 19 mise task validations and full Cargo tests pass (1,429 passed, one ignored). The manifest is `SourceStage`: per-voice RNG, exact-tangent versus polynomial SVF, host timing, event-local sync, output bound and voice/LPG behavior still differ from firmware.
+Independent review verified source control equations, BLEP signs, three filter states and the node-local state layout. Exact partition tests with changing audio-rate controls, native/browser 44.1/48/96 kHz × 64/256 late starts, armed allocation probes, two-hit retrigger, editor and `.vact` controls pass. Quiet native/no-default/wasm checks, strict Clippy, rustfmt, Taplo, 19 mise task validations and full Cargo tests pass (1,429 passed, one ignored). The manifest is `SourceStage`: per-voice RNG, exact-tangent versus polynomial SVF, host timing, event-local sync and output bounds still differ from firmware. The shared voice layer is separately measured as PLV-001 `SourceStage`, with its event and timing differences documented.
 
 ### Session: 2026-09-28, SYN-002D2 additive amplitude stages
 
@@ -488,36 +489,46 @@ resource, and a host-rate one-pole coefficient replaces the source 0.001
 once-per-12-sample 48 kHz block update. Vactr keeps unnormalized smoothed
 amplitudes and does not reproduce the source's normalized-state recurrence,
 linear block interpolation or Chebyshev oscillator, so the manifest advances
-only to `SourceStage`; exact numerical comparison, trigger/LPG and full voice
-parity remain open. Main/aux and the 96-float paired install budget remain.
+only to `SourceStage`; its exact engine-kernel numerical comparison remains
+open. The separate trigger/LPG layer is measured under PLV-001 as
+`SourceStage` (`tmp/plv/s209/PLV-40/7-compare.json`). Main/aux and the
+96-float paired install budget remain.
 
 ### Session: 2026-09-27, SYN-002 position 12 analytic additive slice
 
 **Source and license**: Pinned Plaits `additive_engine.{h,cc}`, `harmonic_oscillator.h`, sine oscillator header and pinned `stmlib/dsp/cosine_oscillator.h` carry Emilie Gillet MIT notices. The eight-stop organ harmonic map is preserved in one-based form with notice in `THIRD_PARTY_NOTICES.md`. No source oscillator, sine table, aggregate resource, DX7 patch or LXR data is imported.
 **Implementation**: `spectrum-voice` exposes pitch/note, timbre/centroid, morph/slope and the original harmonics bump role as `spectrum-bumps` (avoiding the existing `harmonics` effect name). Two fixed-state `spectrum-pair` UGen nodes emit 24 integer partials to main and eight organ partials to `aux-out`. Each node reserves 48 floats for phase and smoothed amplitudes at template install; the paired voice requires 96 floats and fails explicitly below that budget. The original Gaussian/ripple weighting differs from source amplitude equations.
 **Verification**: Native/browser serialized graph tests cover finite, audible, distinct main/aux spectra at 44.1/48/96 kHz and 64/256-frame blocks with callback allocation probes. An install test rejects 95-float voice memory and accepts 96. End-to-end `.vact` tests exercise pitch and all three sound controls, editor metadata and prelude aux routing. `CARGO_TERM_QUIET=true cargo check`, strict all-target Clippy, full `cargo test` (1026 library tests plus integration suites), rustfmt and diff checks pass; touched Rust files stay below 1000 lines.
-**Remaining**: Source-exact amplitude normalization/smoothing, harmonic oscillator response, and Plaits voice-level trigger/LPG behavior remain open. Other Plaits positions are not claimed.
+**Remaining**: Source-exact amplitude normalization/smoothing and harmonic oscillator
+response remain open. The shared voice-level trigger/LPG layer is recorded as
+PLV-001 `SourceStage` (`tmp/plv/s209/PLV-40/7-compare.json`). Other Plaits
+positions are not claimed.
 
 ### Session: 2026-09-27, SYN-002 position 10 analytic FM slice
 
 **Source and license**: The pinned `plaits/dsp/engine/fm_engine.{h,cc}` and sine oscillator/downsampler dependencies carry Emilie Gillet MIT notices; relevant pinned `stmlib` DSP dependencies are MIT. The source sine and downsampler depend on generated `resources.h` tables, so Vactr imports no source code, FIR coefficients, sine/quantizer table, aggregate `resources.cc`, DX7 patch data or LXR asset. `THIRD_PARTY_NOTICES.md` records provenance.
 **Implementation**: `fm-pair-voice` exposes note/frequency, `fm-harmonics` (the authored harmonics ratio role, renamed to avoid the existing `harmonics` effect), timbre/FM amount and morph/signed feedback. Two fixed-inline-state UGen nodes run the same fourfold analytic carrier/modulator/sub process; one emits carrier main and the other sends sub to `aux-out`. The original equal-step ratio map from SYN-002B replaces the source quantizer. A simple box average replaces the source FIR; there is no callback allocation or resource dependency.
 **Verification**: Native/browser serialized graph tests cover finite, audible, distinct main/sub outputs at 44.1/48/96 kHz and 64/256-frame blocks with callback allocation probes. End-to-end `.vact` tests exercise pitch, ratio, timbre and both signs of feedback plus editor metadata and prelude aux routing. `CARGO_TERM_QUIET=true cargo check`, strict all-target Clippy, full `cargo test` (1022 library tests plus integration suites), rustfmt and diff checks pass; touched Rust files stay below 1000 lines.
-**Remaining**: Source-exact quantizer, sine/FIR assets, interpolation, anti-aliasing, output equivalence and Plaits voice-level trigger/LPG behavior remain open; the other Plaits positions are not claimed.
+**Remaining**: Source-exact quantizer, sine/FIR assets, interpolation, anti-aliasing, output equivalence remain open; the shared voice-level trigger/LPG layer is recorded as PLV-001
+`SourceStage` (`tmp/plv/s209/PLV-40/7-compare.json`). The other Plaits
+positions are not claimed.
 
 ### Session: 2026-09-27, SYN-002B analytic phase-distortion slice
 
 **Source and license**: The pinned Plaits `phase_distortion_engine.{h,cc}`, variable-shape/sine oscillator headers, `lookup_tables.py`, and used `stmlib` DSP dependencies carry Emilie Gillet MIT notices. No generated `resources.cc`, DX7 patch bank, lookup table, oscillator or `stmlib` implementation is imported. `THIRD_PARTY_NOTICES.md` records provenance.
 **Implementation**: `phase-pair-voice` exposes pitch/note, `phase-harmonics` (the original harmonics role, renamed to avoid the existing `harmonics` effect), timbre and morph. An original analytic 25-step ratio map replaces the Plaits quantizer; two inline-state nodes average two substeps/sample, with the free-running path sent to `aux-out` and the synced path to main. The graph codec needs only a new UGen kind, no external resource or callback allocation.
 **Verification**: Native/browser serialized graph tests show finite, audible, distinct main/aux outputs at 44.1/48/96 kHz and 64/256-frame blocks with allocation-free callbacks. End-to-end `.vact` and editor tests show pitch and all three sound controls respond, and the prelude graph contains a free-running aux branch. `CARGO_TERM_QUIET=true cargo check`, strict all-target Clippy, full `cargo test` (1019 library tests plus integration suites), rustfmt and diff checks pass; touched Rust files stay below 1000 lines.
-**Remaining**: This is not bit-exact Plaits DSP: curated frequency ratios, oscillator antialiasing, interpolation/downsampling details, and voice-level trigger/LPG behavior are not reproduced. Other Plaits positions remain pending.
+**Remaining**: This is not bit-exact Plaits DSP: curated frequency ratios, oscillator
+antialiasing and interpolation/downsampling remain kernel-specific gaps.
+The shared voice-level trigger/LPG layer is recorded as PLV-001 `SourceStage`
+(`tmp/plv/s209/PLV-40/7-compare.json`). Other Plaits positions remain pending.
 
 ### Session: 2026-09-27, SYN-002A analytic oscillator/filter slice
 
 **Source and license**: The pinned Plaits `virtual_analog_vcf_engine.{h,cc}` and its variable oscillator headers carry Emilie Gillet MIT notices. The pinned `stmlib` submodule DSP filter, interpolator and polyblep dependencies are MIT; the unrelated STM and serial-programming exceptions are not used. `THIRD_PARTY_NOTICES.md` records provenance and copyright. The Vactr implementation independently uses finite harmonic synthesis and simple analytic filters; it imports no code, waveform table or asset and is not bit-exact.
 **Implementation**: `filter-voice` exposes note/frequency, morph, timbre and the original harmonics role as `filter-harmonics` (avoiding the existing `harmonics` effect name). Two synchronized source/filter branches feed low-pass main and high-pass `aux-out`; fixed inline node state is preallocated with voices, and the existing graph codec carries both UGen kinds. Scalar rows and editor metadata include all sound controls.
 **Verification**: Native/browser graph install, codec, distinct finite audible outputs, allocation-free callbacks, end-to-end `.vact` parameter response and editor metadata tests pass. `CARGO_TERM_QUIET=true cargo check`, strict all-target Clippy, full `cargo test` (1016 library tests plus integration suites), rustfmt and diff checks pass; touched Rust files stay below 1000 lines.
-**Remaining**: Plaits' voice-level trigger/LPG behavior, anti-aliasing/filter response parity, and the other 23 Plaits positions are not covered by this adaptation. Generic arbitrary dual-output node edges remain a separate MOD-004 limitation.
+**Remaining**: anti-aliasing/filter response parity and the other 23 Plaits positions are not covered by this adaptation. The shared voice-level layer is wired separately and recorded as PLV-001 `SourceStage` (`tmp/plv/s209/PLV-40/7-compare.json`). Generic arbitrary dual-output node edges remain a separate MOD-004 limitation.
 
 ### Session: 2026-09-29, MOD-006 physical positions 16–20 comparison
 
@@ -562,5 +573,18 @@ and auxiliary spectrum differ. Position 20 is a **measured gap overall**:
 the deterministic auxiliary excitation is close, while the randomized main
 resonator level, centroid and decay differ. No kernel change was justified
 as an unambiguous translation error; existing manifest fidelity labels stay
-unchanged. These comparisons do not cover Plaits voice/LPG behavior or prove
-full source parity.
+unchanged. These raw-kernel comparisons do not cover voice/LPG behavior; the separate
+PLV-001 probe measures that layer as `SourceStage`
+(`tmp/plv/s209/PLV-40/7-compare.json`). Neither comparison proves full
+Plaits source parity.
+
+### Session: 2026-09-30, PLV-001 voice-layer closeout
+
+All 24 Plaits templates are wired through two `vactrol-gate` nodes with
+`lpg-mode` defaulting to the exact pass-through `off` mode. The final
+`compare-plaits-voice` probe reports `voice_layer_label_eligible: true`;
+trajectory, audio, bypass and host-rate scenarios A–E meet their thresholds.
+The shared voice layer is recorded as `SourceStage`, never `SourcePort`;
+engine-specific numerical and resource parity gaps remain. Evidence:
+`tmp/plv/s209/PLV-40/7-compare.json`. Golden evidence records 24 graph lines
+and zero render lines changed in `tmp/plv/s209/PLV-40/12-golden.log`.

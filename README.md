@@ -73,6 +73,15 @@ Back end (TASK-007..008):
   pan. The graph codec carries output shapes and edge output indexes, so
   native and browser peers of the same revision render the same graph
   (design `design-docs/specs/design-mutable-audio.md`, MOD-004).
+  The 24 templates that cover the Plaits engine positions share an
+  opt-in voice layer (trigger, decay envelope and low-pass gate) on
+  their main and aux outputs. It is controlled by `lpg-mode` (`:off`,
+  `:ping`, `:level`),
+  `lpg-decay` and `lpg-color`. The default `lpg-mode: :off` is an exact
+  pass-through, so existing templates keep their sound. The layer is
+  labelled source-stage against the pinned reference by
+  `mise run compare-plaits-voice`; it is not a full source port
+  (design PLV-001, `examples/voice-layer.vact`).
 - `src/host/`: capability traits and `NoopHost`; `native/` (cpal, timer
   tick, midir, WAV loader) behind the `host-native` feature; `wasm/` (raw
   ABI, control-cell mirror protocol, resource lifecycle) behind `host-wasm`

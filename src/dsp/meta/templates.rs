@@ -1,5 +1,7 @@
 //! Built-in instrument parameter names for editor metadata.
 
+mod plaits;
+
 pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
     (
         "sampler",
@@ -274,66 +276,13 @@ pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
             "amp",
         ],
     ),
-    (
-        "filter-voice",
-        &["freq", "morph", "timbre", "filter-harmonics", "amp"],
-    ),
-    (
-        "phase-pair-voice",
-        &["freq", "phase-harmonics", "timbre", "morph", "amp"],
-    ),
-    (
-        "fm-pair-voice",
-        &["freq", "fm-harmonics", "timbre", "morph", "amp"],
-    ),
-    (
-        "six-bank-a-voice",
-        &[
-            "freq",
-            "six-patch",
-            "timbre",
-            "morph",
-            "velocity",
-            "six-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "six-bank-b-voice",
-        &[
-            "freq",
-            "six-patch",
-            "timbre",
-            "morph",
-            "velocity",
-            "six-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "six-bank-c-voice",
-        &[
-            "freq",
-            "six-patch",
-            "timbre",
-            "morph",
-            "velocity",
-            "six-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "speech-voice",
-        &[
-            "freq",
-            "speech-harmonics",
-            "timbre",
-            "morph",
-            "velocity",
-            "speech-sustain",
-            "amp",
-        ],
-    ),
+    ("filter-voice", plaits::FILTER_VOICE),
+    ("phase-pair-voice", plaits::PHASE_PAIR_VOICE),
+    ("fm-pair-voice", plaits::FM_PAIR_VOICE),
+    ("six-bank-a-voice", plaits::SIX_BANK_A_VOICE),
+    ("six-bank-b-voice", plaits::SIX_BANK_B_VOICE),
+    ("six-bank-c-voice", plaits::SIX_BANK_C_VOICE),
+    ("speech-voice", plaits::SPEECH_VOICE),
     (
         "resonator-voice",
         &[
@@ -588,113 +537,19 @@ pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
             "amp",
         ],
     ),
-    (
-        "spectrum-voice",
-        &["freq", "timbre", "morph", "spectrum-bumps", "amp"],
-    ),
-    (
-        "clock-noise-voice",
-        &["freq", "noise-harmonics", "timbre", "morph", "amp"],
-    ),
-    (
-        "dual-kick-voice",
-        &[
-            "freq",
-            "kick-harmonics",
-            "timbre",
-            "morph",
-            "velocity",
-            "kick-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "dual-snare-voice",
-        &[
-            "freq",
-            "snare-harmonics",
-            "timbre",
-            "morph",
-            "velocity",
-            "snare-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "dual-hat-voice",
-        &[
-            "freq",
-            "hat-harmonics",
-            "timbre",
-            "morph",
-            "velocity",
-            "hat-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "swarm-voice",
-        &[
-            "freq",
-            "swarm-spread",
-            "timbre",
-            "morph",
-            "swarm-continuous",
-            "amp",
-        ],
-    ),
-    (
-        "particle-voice",
-        &["freq", "particle-spread", "timbre", "morph", "amp"],
-    ),
-    (
-        "modal-voice",
-        &[
-            "freq",
-            "modal-structure",
-            "timbre",
-            "morph",
-            "velocity",
-            "modal-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "string-voice",
-        &[
-            "freq",
-            "string-structure",
-            "timbre",
-            "morph",
-            "velocity",
-            "string-sustain",
-            "amp",
-        ],
-    ),
-    (
-        "chip-voice",
-        &[
-            "freq",
-            "chip-chord",
-            "timbre",
-            "morph",
-            "chip-clocked",
-            "chip-rate",
-            "amp",
-        ],
-    ),
-    (
-        "analog-pair-voice",
-        &["freq", "analog-detune", "timbre", "morph", "amp"],
-    ),
-    (
-        "grain-pair-voice",
-        &["freq", "grain-harmonics", "timbre", "morph", "amp"],
-    ),
-    (
-        "shape-voice",
-        &["freq", "shape-harmonics", "timbre", "morph", "amp"],
-    ),
+    ("spectrum-voice", plaits::SPECTRUM_VOICE),
+    ("clock-noise-voice", plaits::CLOCK_NOISE_VOICE),
+    ("dual-kick-voice", plaits::DUAL_KICK_VOICE),
+    ("dual-snare-voice", plaits::DUAL_SNARE_VOICE),
+    ("dual-hat-voice", plaits::DUAL_HAT_VOICE),
+    ("swarm-voice", plaits::SWARM_VOICE),
+    ("particle-voice", plaits::PARTICLE_VOICE),
+    ("modal-voice", plaits::MODAL_VOICE),
+    ("string-voice", plaits::STRING_VOICE),
+    ("chip-voice", plaits::CHIP_VOICE),
+    ("analog-pair-voice", plaits::ANALOG_PAIR_VOICE),
+    ("grain-pair-voice", plaits::GRAIN_PAIR_VOICE),
+    ("shape-voice", plaits::SHAPE_VOICE),
     (
         "macro-five-voice",
         &[
@@ -863,22 +718,10 @@ pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
             "amp",
         ],
     ),
-    (
-        "string-machine-voice",
-        &["freq", "machine-chord", "timbre", "morph", "amp"],
-    ),
-    (
-        "terrain-voice",
-        &["freq", "terrain-select", "timbre", "morph", "amp"],
-    ),
-    (
-        "wave-grid-voice",
-        &["freq", "wave-bank", "timbre", "morph", "amp"],
-    ),
-    (
-        "chord-layer-voice",
-        &["freq", "layer-chord", "timbre", "morph", "amp"],
-    ),
+    ("string-machine-voice", plaits::STRING_MACHINE_VOICE),
+    ("terrain-voice", plaits::TERRAIN_VOICE),
+    ("wave-grid-voice", plaits::WAVE_GRID_VOICE),
+    ("chord-layer-voice", plaits::CHORD_LAYER_VOICE),
     ("additive", &["amp", "attack", "release"]),
     (
         "wavetable",

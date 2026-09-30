@@ -3,7 +3,7 @@
 **Status**: In Progress
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#coverage-inventory`
 **Created**: 2026-09-28
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-30
 
 ## Design Document Reference
 
@@ -194,3 +194,15 @@ Source inspection distinguishes the position 6 broad resource include from
 positions 5, 13 and 14, which actually read `wav_integrated_waves`. Position
 6 needs final dependency verification; the others remain pending original
 wave replacement and source-behavior comparison.
+
+
+### Session: 2026-09-30, PLV-001 voice-layer wiring and comparison
+
+Plaits positions 5, 6, 13 and 14 are wired through the shared voice layer as part of the
+24-template PLV-31 change. `lpg-mode` defaults to `off` (exact pass-through);
+`lpg-decay`, `lpg-color` and the separately opt-in `decay-mod` provide the
+opt-in behavior. The final comparison reports
+`voice_layer_label_eligible: true`, with scenarios A–E meeting thresholds;
+the manifest label is `SourceStage`, never `SourcePort`. This voice-layer
+result leaves the engine and resource gaps recorded in this plan unchanged.
+Evidence: `tmp/plv/s209/PLV-40/7-compare.json`.

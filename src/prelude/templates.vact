@@ -98,89 +98,105 @@ inst metal-hat hat-frequency: float = 3900 hat-tone: float = 0.5 hat-decay: floa
 	analog-percussion hat-frequency tone: hat-tone decay: hat-decay metal: hat-metal mode: 2
 		> * amp
 
+# Plaits templates end in the voice gate; lpg-mode :off is an exact pass-through.
 # Analytic variable-spectrum oscillator and paired filters. One bound node
 # provides both outputs; aux-out sends the high-pass path to the right channel.
-inst filter-voice morph: float = 0.5 timbre: float = 0.5 filter-harmonics: float = 0.5:
+inst filter-voice morph: float = 0.5 timbre: float = 0.5 filter-harmonics: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {va-source freq morph: morph > va-filter freq: freq timbre: timbre filter-harmonics: filter-harmonics mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 0 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 0 lane: 0
 
 # Table-free phase distortion: synchronized main and free-running auxiliary.
 # The harmonics role uses a distinct name because harmonics is an effect.
-inst phase-pair-voice phase-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst phase-pair-voice phase-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	phase-pair freq phase-harmonics: phase-harmonics timbre: timbre morph: morph mode: 0 > * amp
-		> + {phase-pair freq phase-harmonics: phase-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+		> + {phase-pair freq phase-harmonics: phase-harmonics timbre: timbre morph: morph mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 1 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 1 lane: 0
 
 # Fourfold analytic two-operator FM. Main is carrier; aux is a sub oscillator.
 # Morph ranges from negative phase feedback to positive modulator feedback. One bound node provides both outputs.
-inst fm-pair-voice fm-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst fm-pair-voice fm-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 10 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 10 lane: 0
 
 # Original 32-configuration six-operator banks. Main and aux intentionally
 # duplicate the same signal, matching the source engine's output relationship.
-inst six-bank-a-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0:
+inst six-bank-a-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 0 > * amp
-		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 0 > * amp > aux-out}
+		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 0 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 2 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 2 lane: 0
 
-inst six-bank-b-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0:
+inst six-bank-b-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 1 > * amp
-		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 1 > * amp > aux-out}
+		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 3 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 3 lane: 0
 
-inst six-bank-c-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0:
+inst six-bank-c-voice six-patch: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 six-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp
-		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp > aux-out}
+		> + {six-op-original freq six-patch: six-patch timbre: timbre morph: morph velocity: velocity six-sustain: six-sustain six-bank: 2 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 4 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 4 lane: 0
 
 # Original naive/SAM/LPC-like speech models and four Vactr syllable tokens.
 # Harmonics 0..1/3 blends the three models; above 1/3 selects token ava,
 # omi, era or unu. Main is formant voice, auxiliary is excitation.
-inst speech-voice speech-harmonics: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 speech-sustain: float = 0:
+inst speech-voice speech-harmonics: float = 0 timbre: float = 0.5 morph: float = 0.5 velocity: float = 1 speech-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	speech-original freq speech-harmonics: speech-harmonics timbre: timbre morph: morph velocity: velocity speech-sustain: speech-sustain mode: 0 > * amp
-		> + {speech-original freq speech-harmonics: speech-harmonics timbre: timbre morph: morph velocity: velocity speech-sustain: speech-sustain mode: 1 > * amp > aux-out}
+		> + {speech-original freq speech-harmonics: speech-harmonics timbre: timbre morph: morph velocity: velocity speech-sustain: speech-sustain mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 15 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 15 lane: 0
 
 # Integer-series main and organ-series auxiliary additive spectra.
 # Timbre sets centroid, morph slope, spectrum-bumps the harmonic emphasis.
-inst spectrum-voice timbre: float = 0.5 morph: float = 0.5 spectrum-bumps: float = 0.5:
+inst spectrum-voice timbre: float = 0.5 morph: float = 0.5 spectrum-bumps: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	spectrum-pair freq timbre: timbre morph: morph spectrum-bumps: spectrum-bumps mode: 0 > * amp
-		> + {spectrum-pair freq timbre: timbre morph: morph spectrum-bumps: spectrum-bumps mode: 1 > * amp > aux-out}
+		> + {spectrum-pair freq timbre: timbre morph: morph spectrum-bumps: spectrum-bumps mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 12 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 12 lane: 0
 
 # Event-start-reset clocked noise. Main blends LP/HP; aux sums two bandpasses.
-inst clock-noise-voice noise-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst clock-noise-voice noise-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	clock-noise-pair freq noise-harmonics: noise-harmonics timbre: timbre morph: morph mode: 0 > * amp
-		> + {clock-noise-pair freq noise-harmonics: noise-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+		> + {clock-noise-pair freq noise-harmonics: noise-harmonics timbre: timbre morph: morph mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 17 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 17 lane: 0
 
 # Triggered dual bass drum: analog main, synthetic auxiliary.
 # Event velocity is the accent. A new note retriggers both paths.
-inst dual-kick-voice kick-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 kick-sustain: float = 0:
+inst dual-kick-voice kick-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 kick-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	dual-kick-core freq kick-harmonics: kick-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 kick-sustain: kick-sustain > * amp
-		> + {dual-kick-core freq kick-harmonics: kick-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 kick-sustain: kick-sustain > * amp > aux-out}
+		> + {dual-kick-core freq kick-harmonics: kick-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 kick-sustain: kick-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 21 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 21 lane: 0
 
 # Plaits position 22 snare stages, analog main and synthetic auxiliary.
 # Event velocity supplies accent; a new note retriggers both paths.
-inst dual-snare-voice snare-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 snare-sustain: float = 0:
+inst dual-snare-voice snare-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 snare-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	snare-pair-core freq snare-harmonics: snare-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 snare-sustain: snare-sustain > * amp
-		> + {snare-pair-core freq snare-harmonics: snare-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 snare-sustain: snare-sustain > * amp > aux-out}
+		> + {snare-pair-core freq snare-harmonics: snare-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 snare-sustain: snare-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 22 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 22 lane: 0
 
 # Plaits position 23 hi-hat stages: square-noise main, ring-mod auxiliary.
 # Event velocity supplies accent and each note retriggers both envelopes.
-inst dual-hat-voice hat-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 hat-sustain: float = 0:
+inst dual-hat-voice hat-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 hat-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 hat-sustain: hat-sustain > * amp
-		> + {hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 hat-sustain: hat-sustain > * amp > aux-out}
+		> + {hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 hat-sustain: hat-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 23 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 23 lane: 0
 
 # Eight ranked grain voices; burst on each event or continuous cloud.
 # Main is BLEP saw, auxiliary is analytic sine.
-inst swarm-voice swarm-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.5 swarm-continuous: float = 0:
+inst swarm-voice swarm-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.5 swarm-continuous: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 0 swarm-continuous: swarm-continuous > * amp
-		> + {swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 1 swarm-continuous: swarm-continuous > * amp > aux-out}
+		> + {swarm-pair-core freq swarm-spread: swarm-spread timbre: timbre morph: morph mode: 1 swarm-continuous: swarm-continuous > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 16 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 16 lane: 0
 
 # Plaits position 8 roles: variable square/saw main, sync difference aux. One bound node provides both outputs.
-inst analog-pair-voice analog-detune: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst analog-pair-voice analog-detune: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 8 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 8 lane: 0
 
 # Four-note chord with inversion and fifteen original procedural timbres. One bound node provides both outputs.
-inst chord-layer-voice layer-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst chord-layer-voice layer-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {chord-layer-core freq layer-chord: layer-chord timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 14 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 14 lane: 0
 
 # Five original analytic oscillator shapes selected by macro-shape (0..4).
 # Strike adds a short overtone transient; sync adds an event-local hard-sync clock.
@@ -241,53 +257,62 @@ inst macro-cloud-voice macro-shape: float = 44 macro-color: float = 0.5 macro-ti
 	macro-cloud-core freq macro-shape: macro-shape macro-color: macro-color macro-timbre: macro-timbre macro-strike: macro-strike macro-sync: macro-sync > * amp
 
 # Original analytic 8x8x3 wave grid; quantized auxiliary output. One bound node provides both outputs.
-inst wave-grid-voice wave-bank: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst wave-grid-voice wave-bank: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {wave-grid-core freq wave-bank: wave-bank timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 13 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 13 lane: 0
 
 # Eight default wave terrains; modes 5-7 use original procedural surfaces. One bound node provides both outputs.
-inst terrain-voice terrain-select: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst terrain-voice terrain-select: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {terrain-pair-core freq terrain-select: terrain-select timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 5 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 5 lane: 0
 
 # Four divide-down chord voices, filtered and sent through a stereo ensemble. One bound node provides both outputs.
-inst string-machine-voice machine-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst string-machine-voice machine-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {string-machine-core freq machine-chord: machine-chord timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 6 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 6 lane: 0
 
 # Analytic slope folding main and sine/overtone auxiliary. One bound node provides both outputs.
-inst shape-voice shape-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst shape-voice shape-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	let p {shape-pair-core freq shape-harmonics: shape-harmonics timbre: timbre morph: morph mode: 0}
-	{p :main} > * amp > + {{p :aux} > * amp > aux-out}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 9 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 9 lane: 0
 
 # Two grainlet oscillators on main; independent Z oscillator on aux.
-inst grain-pair-voice grain-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst grain-pair-voice grain-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	grain-pair-core freq grain-harmonics: grain-harmonics timbre: timbre morph: morph mode: 0 > * amp
-		> + {grain-pair-core freq grain-harmonics: grain-harmonics timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+		> + {grain-pair-core freq grain-harmonics: grain-harmonics timbre: timbre morph: morph mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 11 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 11 lane: 0
 
 # Three independently controlled components: delayed feedback noise,
 # Five-square chord or internally clocked arpeggio, with stepped bass aux.
-inst chip-voice chip-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5 chip-clocked: float = 0 chip-rate: float = 8:
+inst chip-voice chip-chord: float = 0.5 timbre: float = 0.5 morph: float = 0.5 chip-clocked: float = 0 chip-rate: float = 8 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	chip-pair-core freq chip-chord: chip-chord timbre: timbre morph: morph mode: 0 chip-clocked: chip-clocked chip-rate: chip-rate > * amp
-		> + {chip-pair-core freq chip-chord: chip-chord timbre: timbre morph: morph mode: 1 chip-clocked: chip-clocked chip-rate: chip-rate > * amp > aux-out}
+		> + {chip-pair-core freq chip-chord: chip-chord timbre: timbre morph: morph mode: 1 chip-clocked: chip-clocked chip-rate: chip-rate > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 7 clocked: chip-clocked lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 7 clocked: chip-clocked lane: 0
 
 # Three independently controlled components: delayed feedback noise,
 # Three bounded strings per event: resonator main, filtered noise/dust aux.
-inst string-voice string-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 string-sustain: float = 0:
+inst string-voice string-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 string-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 0 string-sustain: string-sustain > * amp
-		> + {string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 1 string-sustain: string-sustain > * amp > aux-out}
+		> + {string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 1 string-sustain: string-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 19 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 19 lane: 0
 
 # Three independently controlled components: delayed feedback noise,
 # Twenty-four resonant modes: main body, auxiliary filtered mallet or dust.
-inst modal-voice modal-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 modal-sustain: float = 0:
+inst modal-voice modal-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 modal-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	modal-pair-core freq modal-structure: modal-structure timbre: timbre morph: morph velocity: velocity mode: 0 modal-sustain: modal-sustain > * amp
-		> + {modal-pair-core freq modal-structure: modal-structure timbre: timbre morph: morph velocity: velocity mode: 1 modal-sustain: modal-sustain > * amp > aux-out}
+		> + {modal-pair-core freq modal-structure: modal-structure timbre: timbre morph: morph velocity: velocity mode: 1 modal-sustain: modal-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 20 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 20 lane: 0
 
 # Three independently controlled components: delayed feedback noise,
 # Six resonant impulse particles; main is short-diffused, aux is impulses.
-inst particle-voice particle-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.5:
+inst particle-voice particle-spread: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
 	particle-pair-core freq particle-spread: particle-spread timbre: timbre morph: morph mode: 0 > * amp
-		> + {particle-pair-core freq particle-spread: particle-spread timbre: timbre morph: morph mode: 1 > * amp > aux-out}
+		> + {particle-pair-core freq particle-spread: particle-spread timbre: timbre morph: morph mode: 1 > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 18 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 18 lane: 0
 
 # Three independently controlled components: delayed feedback noise,
 # a filtered noise transient, and a tracked sine-FM transient.

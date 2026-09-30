@@ -26,54 +26,60 @@ fn templates_realize_at_session_start() {
             "{name} is prelude source"
         );
         let d = s.def(name);
-        let final_node = if matches!(
+        if matches!(
             name,
             "filter-voice"
                 | "phase-pair-voice"
-                | "fm-pair-voice"
                 | "six-bank-a-voice"
                 | "six-bank-b-voice"
                 | "six-bank-c-voice"
-                | "speech-voice"
-                | "resonator-voice"
-                | "string-choir-voice"
-                | "exciter-voice"
-                | "tidal-voice"
-                | "tidal-poly-voice"
-                | "peak-motion-voice"
-                | "stage-voice"
-                | "stage-chain-voice"
-                | "frame-lfo-voice"
-                | "frame-keyframe-voice"
-                | "peak-pulse-voice"
-                | "number-station-voice"
+                | "terrain-voice"
+                | "string-machine-voice"
+                | "chip-voice"
+                | "analog-pair-voice"
+                | "shape-voice"
+                | "fm-pair-voice"
+                | "grain-pair-voice"
                 | "spectrum-voice"
+                | "wave-grid-voice"
+                | "chord-layer-voice"
+                | "speech-voice"
+                | "swarm-voice"
                 | "clock-noise-voice"
+                | "particle-voice"
+                | "string-voice"
+                | "modal-voice"
                 | "dual-kick-voice"
                 | "dual-snare-voice"
                 | "dual-hat-voice"
-                | "swarm-voice"
-                | "particle-voice"
-                | "modal-voice"
-                | "string-voice"
-                | "chip-voice"
-                | "analog-pair-voice"
-                | "grain-pair-voice"
-                | "shape-voice"
-                | "string-machine-voice"
-                | "terrain-voice"
-                | "wave-grid-voice"
-                | "chord-layer-voice"
         ) {
-            "add"
+            assert_eq!(d.nodes.last(), Some(&UGenSpec::VactrolGate), "{name}");
         } else {
-            "mul"
-        };
-        assert_eq!(
-            kinds(&d).last().map(String::as_str),
-            Some(final_node),
-            "{name}"
-        );
+            let final_node = if matches!(
+                name,
+                "resonator-voice"
+                    | "string-choir-voice"
+                    | "exciter-voice"
+                    | "tidal-voice"
+                    | "tidal-poly-voice"
+                    | "peak-motion-voice"
+                    | "stage-voice"
+                    | "stage-chain-voice"
+                    | "frame-lfo-voice"
+                    | "frame-keyframe-voice"
+                    | "peak-pulse-voice"
+                    | "number-station-voice"
+            ) {
+                "add"
+            } else {
+                "mul"
+            };
+            assert_eq!(
+                kinds(&d).last().map(String::as_str),
+                Some(final_node),
+                "{name}"
+            );
+        }
     }
     let installs = s
         .effects

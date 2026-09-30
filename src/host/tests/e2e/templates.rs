@@ -59,6 +59,7 @@ mod terrain_pair;
 mod tidal_function;
 mod tidal_poly;
 mod voice_engines;
+mod voice_layer;
 
 use std::sync::Arc;
 

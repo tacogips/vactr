@@ -61,6 +61,7 @@ mod release;
 mod render;
 mod resonant_bank;
 mod rings_part;
+mod seed_order;
 mod shape_contract;
 mod shape_pair;
 mod shift_pair;
@@ -93,6 +94,7 @@ mod va_filter;
 mod vactrol_gate;
 mod voice_input;
 mod voice_layout;
+mod voice_lifetime;
 mod voice_stereo;
 
 use std::sync::Arc;

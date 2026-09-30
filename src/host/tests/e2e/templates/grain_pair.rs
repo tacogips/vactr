@@ -61,9 +61,14 @@ fn grain_pair_controls_reach_audio_editor_and_aux_graph() {
     };
     let template = Template::from_inst(&entry.def, &env).expect("grain graph");
     assert!(template.has_aux);
-    assert_eq!(template.mem_total, 2 * grain_pair::STATE_FLOATS);
+    assert_eq!(
+        template.mem_total,
+        (2 * grain_pair::STATE_FLOATS) + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS
+    );
     let low_budget = BuildEnv {
-        voice_mem: 2 * grain_pair::STATE_FLOATS - 1,
+        voice_mem: (2 * grain_pair::STATE_FLOATS)
+            + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS
+            - 1,
         ..env
     };
     assert_eq!(

@@ -1854,6 +1854,22 @@ Session 205 saw only the first of its 14 `mem_total` failures. Write
 evidence logs under `tmp/`. The saved session-205 attempt
 (`tmp/plv-wave3-saved/`) is reference only.
 
+
+### Implementation status (2026-09-30)
+
+PLV-10/12/20/21 landed in commit `f5e623b`; PLV-30/31/40 completed in
+session 209. All 24 Plaits templates now include two `vactrol-gate` nodes;
+`lpg-mode` defaults to `off`, preserving the default render, while the gate
+is opt-in. `golden_digests.txt` records exactly 24 changed graph lines and
+zero changed render lines. Each wired template reserves 32 additional memory
+floats for the two fixed gate states.
+
+The final `compare-plaits-voice` probe reports
+`voice_layer_label_eligible: true`: trajectory, audio path, end-to-end,
+bypass and host-rate scenarios A–E meet their thresholds. The manifest label
+is `SourceStage` for all 24 wired positions; the layer is not a bit-exact
+`SourcePort`. Probe evidence is `tmp/plv/s209/PLV-40/7-compare.json`.
+
 ## References
 
 See `design-docs/references/README.md` for the official source and license.

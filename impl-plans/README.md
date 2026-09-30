@@ -39,7 +39,7 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
-| [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; prioritized TODOs after the WV-004 stopping point | design-mutable-audio.md; design-music.md 4.1 | 2026-09-28 |
+| [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; PLV-001 voice layer measured SourceStage and wired into 24 templates; MOD-004 stereo/multi-output edges complete; remaining audio TODOs prioritized | design-mutable-audio.md; design-music.md 4.1 | 2026-09-30 |
 | [modular-audio-foundation.md](active/modular-audio-foundation.md) | In progress; MOD-001 inventory/audit, MOD-002 neutral names and MOD-004 stereo and multi-output edges complete; MOD-005/006 pending | design-mutable-audio.md | 2026-09-30 |
 | [mod004-00-baseline.md](active/mod004-00-baseline.md) | Completed (85a300a); wave 0 golden digests and test scaffolding | design-mutable-audio.md MOD-004 | 2026-09-30 |
 | [mod004-10-shape-contract.md](active/mod004-10-shape-contract.md) | Completed (85a300a); wave 1 shape contract and edge output index | design-mutable-audio.md MOD-004 | 2026-09-30 |
@@ -50,21 +50,14 @@ Large features are split into multiple related plans with cross-references.
 | [mod004-22-voice-runtime.md](active/mod004-22-voice-runtime.md) | Completed (b6fa077); wave 2 dense buffers, stereo voices, balance pan | design-mutable-audio.md MOD-004 | 2026-09-30 |
 | [mod004-30-template-migration.md](active/mod004-30-template-migration.md) | Completed (0a15742); wave 3 nine-template migration | design-mutable-audio.md MOD-004 | 2026-09-30 |
 | [mod004-40-regression-closeout.md](active/mod004-40-regression-closeout.md) | Completed; wave 4 cross-path regression and MOD-004A..F closeout | design-mutable-audio.md MOD-004 | 2026-09-30 |
-| [plv-10-voice-layer-dsp.md](active/plv-10-voice-layer-dsp.md) | Ready; wave 1 pure shared voice-layer DSP | design-mutable-audio.md PLV-001 | 2026-09-30 |
-| [plv-12-manifest-registration.md](active/plv-12-manifest-registration.md) | Ready; wave 1 manifest voice registration and voice-layer label | design-mutable-audio.md PLV-001 | 2026-09-30 |
-| [plv-20-gate-nodes.md](active/plv-20-gate-nodes.md) | Ready; wave 2 vactrol-gate/decay-mod kinds, controls and registry | design-mutable-audio.md PLV-001 | 2026-09-30 |
-| [plv-21-voice-probe.md](active/plv-21-voice-probe.md) | Ready; wave 2 compare-plaits-voice probe | design-mutable-audio.md PLV-001 | 2026-09-30 |
-| [plv-30-voice-lifetime.md](active/plv-30-voice-lifetime.md) | Ready; session 209 serial wave 1: gate-elided seed order and layer-shaped voice lifetime | design-mutable-audio.md PLV-001 | 2026-09-30 |
-| [plv-31-template-wiring.md](active/plv-31-template-wiring.md) | Ready; session 209 serial wave 2: transparent wiring of the 24 Plaits templates, editor lists, golden graph lines and mem expectations | design-mutable-audio.md PLV-001 | 2026-09-30 |
-| [plv-40-evidence-closeout.md](active/plv-40-evidence-closeout.md) | Ready; session 209 serial wave 3: probe evidence, labels, provenance and plan closeout | design-mutable-audio.md PLV-001 | 2026-09-30 |
 | [modular-fm-drums.md](active/modular-fm-drums.md) | In progress; three percussion voices, Peaks FM source stages verified, numerical parity and broader EFM family pending | design-mutable-audio.md | 2026-09-28 |
 | [modular-synth-engines.md](active/modular-synth-engines.md) | Planning; all eligible voice and oscillator engines | design-mutable-audio.md | 2026-09-27 |
-| [modular-plaits-engines.md](active/modular-plaits-engines.md) | In progress; public 24-position inventory, fifteen adaptations, nine source-stage translations, zero full ports | design-mutable-audio.md | 2026-09-28 |
+| [modular-plaits-engines.md](active/modular-plaits-engines.md) | In progress; 24-position inventory and PLV-001 voice layer measured SourceStage; engine/source/resource parity remains | design-mutable-audio.md | 2026-09-30 |
 | [modular-live-input.md](active/modular-live-input.md) | In progress; host stereo input for bus effects, device and instrument ports pending | design-mutable-audio.md | 2026-09-28 |
-| [modular-plaits-resonant-noise.md](active/modular-plaits-resonant-noise.md) | In progress; positions 18–20 particle, string and modal engines | design-mutable-audio.md | 2026-09-27 |
-| [modular-plaits-oscillators.md](active/modular-plaits-oscillators.md) | In progress; positions 7–9 and 11 oscillator modes | design-mutable-audio.md | 2026-09-27 |
-| [modular-plaits-wave-replacements.md](active/modular-plaits-wave-replacements.md) | In progress; positions 5, 6, 13 and 14, with original wave replacements | design-mutable-audio.md | 2026-09-28 |
-| [modular-plaits-cleared-replacements.md](active/modular-plaits-cleared-replacements.md) | Ready; original FM banks and speech data for four blocked positions | design-mutable-audio.md | 2026-09-28 |
+| [modular-plaits-resonant-noise.md](active/modular-plaits-resonant-noise.md) | In progress; positions 18–20 engines; PLV-001 voice-layer SourceStage recorded | design-mutable-audio.md | 2026-09-30 |
+| [modular-plaits-oscillators.md](active/modular-plaits-oscillators.md) | In progress; positions 7–9 and 11; PLV-001 voice-layer SourceStage recorded | design-mutable-audio.md | 2026-09-30 |
+| [modular-plaits-wave-replacements.md](active/modular-plaits-wave-replacements.md) | In progress; positions 5, 6, 13 and 14; PLV-001 voice-layer SourceStage recorded | design-mutable-audio.md | 2026-09-30 |
+| [modular-plaits-cleared-replacements.md](active/modular-plaits-cleared-replacements.md) | Ready; original FM banks and speech data for positions 2–4 and 15; PLV-001 voice-layer SourceStage recorded | design-mutable-audio.md | 2026-09-30 |
 | [modular-braids-shapes.md](active/modular-braids-shapes.md) | Ready; 47 accessible macro-oscillator shapes and resource audit | design-mutable-audio.md | 2026-09-28 |
 | [modular-rings-resonator.md](active/modular-rings-resonator.md) | Ready; six resonator models, string synth and external excitation | design-mutable-audio.md | 2026-09-28 |
 | [modular-elements-model.md](active/modular-elements-model.md) | Ready; twenty patch controls, three resonators and sample-rights boundary | design-mutable-audio.md | 2026-09-28 |
@@ -111,6 +104,14 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
+| [plv-10-voice-layer-dsp.md](completed/plv-10-voice-layer-dsp.md) | 2026-09-30 (PLV-10, wave 1 pure shared voice-layer DSP; f5e623b; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-12-manifest-registration.md](completed/plv-12-manifest-registration.md) | 2026-09-30 (PLV-12, voice registration; measured SourceStage label recorded by PLV-40; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-20-gate-nodes.md](completed/plv-20-gate-nodes.md) | 2026-09-30 (PLV-20, wave 2 vactrol-gate/decay-mod kinds, controls and registry; f5e623b; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-21-voice-probe.md](completed/plv-21-voice-probe.md) | 2026-09-30 (PLV-21, voice probe; final rerun eligible for SourceStage, `tmp/plv/s209/PLV-40/7-compare.json`; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-30-voice-lifetime.md](completed/plv-30-voice-lifetime.md) | 2026-09-30 (PLV-30, session 209 serial wave 1: gate-elided seed order and layer-shaped voice lifetime; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-31-template-wiring.md](completed/plv-31-template-wiring.md) | 2026-09-30 (PLV-31, session 209 serial wave 2: transparent default-off wiring of 24 templates, editor lists, 48 golden graph lines, 0 render lines, mem expectations; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-40-evidence-closeout.md](completed/plv-40-evidence-closeout.md) | 2026-09-30 (PLV-40, session 209 serial wave 3: probe evidence, SourceStage label, provenance and plan closeout; adversarial review accepted; archived session 209) | design-mutable-audio.md PLV-001 |
+| [plv-dispatch.json](completed/plv-dispatch.json) | 2026-09-30 (dispatch manifest for PLV-30/31/40, checkpoint 870b12c; accepted dependencies PLV-10/12/20/21; archived session 209) | design-mutable-audio.md PLV-001 |
 | [product-rename.md](completed/product-rename.md) | 2026-09-28 (Vactr source, docs, editor, remote and local checkout) | architecture.md product identifier contract |
 | [modular-warps-vocoder.md](completed/modular-warps-vocoder.md) | 2026-09-28 (WV-001..004, 96-kHz source-rate stages and generated 8–192-kHz host boundary; full firmware parity remains outside this plan) | design-mutable-audio.md vocoder fidelity |
 | [vactr-session-contracts.md](completed/vactr-session-contracts.md) | 2026-09-26 (SS-CONTRACTS, issue #4 TASK-009, wave 1; archived in f345e62) | design-implementation.md 14.5.2, 14.5.3, 14.5.6, 14.5.9, 14.5.12 |

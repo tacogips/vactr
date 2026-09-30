@@ -87,10 +87,16 @@ fn editor_lists_controls_and_install_rejects_insufficient_memory() {
             voice_mem: 24_000,
         };
         let template = Template::from_inst(&entry.def, &env).expect("voice graph");
-        assert_eq!(template.mem_total, 2 * six_op_original::STATE_FLOATS);
+        assert_eq!(
+            template.mem_total,
+            (2 * six_op_original::STATE_FLOATS)
+                + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS
+        );
         assert!(template.has_aux);
         let low = BuildEnv {
-            voice_mem: 2 * six_op_original::STATE_FLOATS - 1,
+            voice_mem: (2 * six_op_original::STATE_FLOATS)
+                + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS
+                - 1,
             ..env
         };
         assert_eq!(

@@ -1,6 +1,6 @@
 # PLV-21: Voice-Layer Source Comparison Probe (`compare-plaits-voice`)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-21 (wave 2; parallel with PLV-20)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Comparison probe; Intentional divergences 1, 4 and 5)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`

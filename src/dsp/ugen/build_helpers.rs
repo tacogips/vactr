@@ -105,3 +105,131 @@ pub(super) fn topo_order(
     }
     Ok(order)
 }
+
+/// Seed positions after removing voice-layer gates and their private controls.
+/// The returned array is indexed by compiled position (`order`), not raw node.
+pub(super) fn seed_ordinals(
+    n: usize,
+    nodes: &[Node],
+    edges: &[crate::dsp::graph::Edge],
+    order: &[u16],
+) -> Result<[u16; NODE_CAP], BuildError> {
+    let mut out = [0u16; NODE_CAP];
+    for (compiled, seed) in out.iter_mut().enumerate().take(n) {
+        *seed = u16::try_from(compiled).map_err(|_| BuildError::TooManyNodes)?;
+    }
+    if !nodes[..n]
+        .iter()
+        .any(|node| matches!(node, Node::VactrolGate))
+    {
+        return Ok(out);
+    }
+
+    let mut keep = [true; NODE_CAP];
+    for (raw, node) in nodes.iter().enumerate().take(n) {
+        if matches!(node, Node::VactrolGate) {
+            keep[raw] = false;
+        }
+    }
+
+    // Gate-only controls are source nodes whose complete fan-out is to a
+    // non-subject gate port. Subjects remain even when they are sources.
+    for (raw, _) in nodes.iter().enumerate().take(n) {
+        if edges.iter().any(|edge| usize::from(edge.to) == raw) {
+            continue;
+        }
+        let mut has_output = false;
+        let mut gate_only = true;
+        for edge in edges.iter().filter(|edge| usize::from(edge.from) == raw) {
+            has_output = true;
+            if !matches!(nodes[usize::from(edge.to)], Node::VactrolGate) || edge.port == 0 {
+                gate_only = false;
+                break;
+            }
+        }
+        if has_output && gate_only {
+            keep[raw] = false;
+        }
+    }
+
+    // Map every gate to the source/output feeding its subject port. Following
+    // this map handles gate-to-gate chains without allocating.
+    let mut subjects = [u16::MAX; NODE_CAP];
+    let mut subject_outputs = [0u8; NODE_CAP];
+    for (gate, node) in nodes.iter().enumerate().take(n) {
+        if !matches!(node, Node::VactrolGate) {
+            continue;
+        }
+        if let Some(subject) = edges
+            .iter()
+            .find(|edge| usize::from(edge.to) == gate && edge.port == 0)
+        {
+            subjects[gate] = subject.from;
+            subject_outputs[gate] = subject.output;
+        }
+    }
+
+    let mut raw_to_compact = [u16::MAX; NODE_CAP];
+    let mut compact_to_raw = [0u16; NODE_CAP];
+    let mut kept = 0usize;
+    for raw in 0..n {
+        if keep[raw] {
+            raw_to_compact[raw] = u16::try_from(kept).map_err(|_| BuildError::TooManyNodes)?;
+            compact_to_raw[kept] = u16::try_from(raw).map_err(|_| BuildError::TooManyNodes)?;
+            kept += 1;
+        }
+    }
+
+    let mut elided_edges = [crate::dsp::graph::Edge {
+        from: 0,
+        to: 0,
+        port: 0,
+        output: 0,
+    }; MAX_EDGES];
+    let mut edge_count = 0usize;
+    for edge in edges {
+        let target = usize::from(edge.to);
+        if !keep[target] {
+            continue;
+        }
+        let mut source = usize::from(edge.from);
+        let mut output = edge.output;
+        let mut hops = 0usize;
+        while matches!(nodes[source], Node::VactrolGate) && hops < n {
+            if subjects[source] == u16::MAX {
+                source = n;
+                break;
+            }
+            output = subject_outputs[source];
+            source = usize::from(subjects[source]);
+            hops += 1;
+        }
+        if source >= n || !keep[source] {
+            continue;
+        }
+        let mapped = elided_edges
+            .get_mut(edge_count)
+            .ok_or(BuildError::TooManyEdges)?;
+        *mapped = crate::dsp::graph::Edge {
+            from: raw_to_compact[source],
+            to: raw_to_compact[target],
+            port: edge.port,
+            output,
+        };
+        edge_count += 1;
+    }
+
+    let elided_order = topo_order(kept, &elided_edges[..edge_count])?;
+    let mut ordinal_by_raw = [u16::MAX; NODE_CAP];
+    for (ordinal, compact) in elided_order.iter().copied().enumerate().take(kept) {
+        let raw = usize::from(compact_to_raw[usize::from(compact)]);
+        ordinal_by_raw[raw] = u16::try_from(ordinal).map_err(|_| BuildError::TooManyNodes)?;
+    }
+    for (compiled, raw) in order.iter().copied().enumerate().take(n) {
+        let raw = usize::from(raw);
+        if keep[raw] {
+            out[compiled] = ordinal_by_raw[raw];
+        }
+    }
+    Ok(out)
+}

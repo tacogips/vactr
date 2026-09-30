@@ -233,6 +233,9 @@ pub struct Template {
     pub reads_pan: bool,
     pub envs: u8,
     pub players: u8,
+    /// Number of voice-level gates in the compiled graph.
+    pub gates: u8,
+    seeds: [u16; NODE_CAP],
 }
 
 impl Template {
@@ -267,6 +270,8 @@ impl Template {
             reads_pan: false,
             envs: 0,
             players: 0,
+            gates: 0,
+            seeds: [0; NODE_CAP],
         })
     }
 
@@ -286,6 +291,16 @@ impl Template {
     #[must_use]
     pub fn nodes(&self) -> &[NodeSpec] {
         &self.nodes[..self.n_nodes]
+    }
+
+    /// The seed ordinal for compiled node `i`.
+    #[must_use]
+    pub fn seed_ordinal(&self, i: usize) -> u16 {
+        if i < self.n_nodes {
+            self.seeds[i]
+        } else {
+            u16::try_from(i).unwrap_or(u16::MAX)
+        }
     }
 
     /// The controls the template reads.
@@ -371,6 +386,7 @@ impl Template {
         }
         let edges = &raw.edges[..raw.n_edges.min(MAX_EDGES)];
         let order = topo_order(n, edges)?;
+        self.seeds = super::build_helpers::seed_ordinals(n, &raw.nodes[..n], edges, &order[..n])?;
         let mut shapes = [NodeAudioShape::MONO; NODE_CAP];
         derive_shapes(n, |i| decl_for_node(&raw.nodes[i]), edges, &mut shapes)
             .map_err(map_shape_error)?;
@@ -395,6 +411,7 @@ impl Template {
         self.has_quad = false;
         self.envs = 0;
         self.players = 0;
+        self.gates = 0;
         for &(id, ctl) in &raw.params[..raw.n_params.min(MAX_PARAMS)] {
             let k = usize::from(self.param_slot(id)?);
             self.params[k] = (id, ctl);
@@ -470,6 +487,7 @@ impl Template {
                 self.players += 1;
                 self.add_ref(b.get());
             }
+            Node::VactrolGate => self.gates = self.gates.saturating_add(1),
             Node::Wavetable(t) => self.add_ref(t.get()),
             Node::Granular(GranSrc::Sample(b)) => self.add_ref(b.get()),
             Node::Granular(GranSrc::Table(t)) => self.add_ref(t.get()),

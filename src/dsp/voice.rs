@@ -21,6 +21,8 @@
 //! `release`-second fade once the gate closes. A short gate is a 3 ms
 //! linear fade (12.8.9).
 
+mod lifetime;
+
 use crate::dsp::arena::SampleStore;
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellRead;
@@ -362,24 +364,7 @@ impl Voice {
     }
 
     fn finished(&self, t: &Template) -> bool {
-        let nodes = &self.nodes[..t.n_nodes];
-        if t.envs > 0 {
-            return t
-                .nodes()
-                .iter()
-                .zip(nodes)
-                .filter(|(s, _)| s.node.is_env())
-                .all(|(_, st)| st.done());
-        }
-        if t.players > 0 {
-            return t
-                .nodes()
-                .iter()
-                .zip(nodes)
-                .filter(|(s, _)| matches!(s.node, Node::SamplePlay(_)))
-                .all(|(_, st)| st.done());
-        }
-        self.ienv <= 0.0
+        lifetime::finished(t, &self.nodes[..t.n_nodes], self.ienv)
     }
 }
 
@@ -524,7 +509,7 @@ pub fn render<C: CellRead + ?Sized>(
                     store: rc.store,
                     caps: rc.fx.caps,
                     stats: rc.fx.stats,
-                    seed: v.seed.wrapping_add(u32::try_from(i).unwrap_or(0)),
+                    seed: v.seed.wrapping_add(u32::from(t.seed_ordinal(i))),
                 };
                 ugen::stage_linked::render(data, &ins, &mut v.nodes[i], mem, out, &kx);
             } else {
@@ -567,7 +552,7 @@ pub fn render<C: CellRead + ?Sized>(
             store: rc.store,
             caps: rc.fx.caps,
             stats: rc.fx.stats,
-            seed: v.seed.wrapping_add(u32::try_from(i).unwrap_or(0)),
+            seed: v.seed.wrapping_add(u32::from(t.seed_ordinal(i))),
         };
         let has_output1 = spec.outs[1] != DISCARD;
         let output1_channels = spec.shape.output(1).map_or(0, AudioOutputShape::channels);
@@ -656,7 +641,7 @@ pub fn render<C: CellRead + ?Sized>(
             }
         }
     }
-    let implicit = t.envs == 0 && t.players == 0;
+    let implicit = lifetime::implicit_fade(t, &v.nodes[..t.n_nodes]);
     let step = 1.0 / (v.release * rc.sr);
     for (k, (a, right)) in y.iter_mut().zip(rc.out_r[..m].iter_mut()).enumerate() {
         let mut g = v.amp;

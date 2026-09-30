@@ -267,7 +267,10 @@ fn spectrum_voice_controls_and_note_reach_audio_and_editor() {
     };
     let template = crate::dsp::ugen::Template::from_inst(&entry.def, &env).unwrap();
     assert!(template.has_aux);
-    assert_eq!(template.mem_total, 96);
+    assert_eq!(
+        template.mem_total,
+        96 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS
+    );
     assert!(entry.def.edges.iter().any(|edge| edge.port == 4
         && matches!(
             entry.def.nodes[usize::from(edge.from)],
@@ -334,8 +337,9 @@ fn clock_noise_voice_controls_and_note_reach_audio_and_editor() {
     let template = crate::dsp::ugen::Template::from_inst(&entry.def, &env).unwrap();
     assert!(template.has_aux);
     assert_eq!(
-        template.mem_total, 0,
-        "node state is inline and preallocated"
+        template.mem_total,
+        2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS,
+        "kernel state is inline; only the two voice gates use memory"
     );
     assert!(entry.def.edges.iter().any(|edge| edge.port == 4
         && matches!(
@@ -412,11 +416,12 @@ fn dual_kick_voice_controls_and_note_reach_audio_and_editor() {
     let template = crate::dsp::ugen::Template::from_inst(&entry.def, &env).unwrap();
     assert!(template.has_aux);
     assert_eq!(
-        template.mem_total, 48,
+        template.mem_total,
+        48 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS,
         "both output states are preallocated"
     );
     let too_small = crate::dsp::ugen::BuildEnv {
-        voice_mem: 47,
+        voice_mem: 48 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(
@@ -521,11 +526,12 @@ fn dual_snare_voice_controls_and_note_reach_audio_and_editor() {
     let template = crate::dsp::ugen::Template::from_inst(&entry.def, &env).unwrap();
     assert!(template.has_aux);
     assert_eq!(
-        template.mem_total, 48,
+        template.mem_total,
+        48 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS,
         "both output states are preallocated"
     );
     let too_small = crate::dsp::ugen::BuildEnv {
-        voice_mem: 47,
+        voice_mem: 48 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(
@@ -630,11 +636,12 @@ fn dual_hat_voice_controls_and_note_reach_audio_and_editor() {
     let template = crate::dsp::ugen::Template::from_inst(&entry.def, &env).unwrap();
     assert!(template.has_aux);
     assert_eq!(
-        template.mem_total, 32,
+        template.mem_total,
+        32 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS,
         "both output states are preallocated"
     );
     let too_small = crate::dsp::ugen::BuildEnv {
-        voice_mem: 31,
+        voice_mem: 32 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(
@@ -735,11 +742,12 @@ fn swarm_voice_controls_and_note_reach_audio_and_editor() {
     let template = crate::dsp::ugen::Template::from_inst(&entry.def, &env).unwrap();
     assert!(template.has_aux);
     assert_eq!(
-        template.mem_total, 224,
+        template.mem_total,
+        224 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS,
         "both output states are preallocated"
     );
     let too_small = crate::dsp::ugen::BuildEnv {
-        voice_mem: 223,
+        voice_mem: 224 + 2 * crate::dsp::ugen::vactrol_gate::GATE_STATE_FLOATS - 1,
         ..env
     };
     assert_eq!(

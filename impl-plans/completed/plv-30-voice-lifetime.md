@@ -1,6 +1,6 @@
 # PLV-30: Gate-Elided Seed Order and Layer-Shaped Voice Lifetime
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-30 (session 209, wave 1 of 3; serial)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Template wiring and seed preservation: "Lowering order is not the seed order" and "Gate-elided seed order (required)"; Voice lifetime; Real-time, capacity and invariance; Test strategy: seed order, lifetime, partition and rate)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`
@@ -243,12 +243,12 @@ Logs go in `tmp/plv/s209/PLV-30/`. Run each command as
 
 ## Completion Criteria
 
-- [ ] `seed_ordinals`, `Template::seed_ordinal`, `Template.gates` and the `seeds` field exist with the pinned signatures; both `Kx` sites use the ordinal.
-- [ ] `lifetime.rs` implements the three functions, and `voice.rs` delegates to them.
-- [ ] Every listed test exists and passes. The shift-compensation test asserts that the compiled index really differs.
-- [ ] The golden suites pass with `golden_digests.txt` byte-identical (command 9).
-- [ ] Commands 1-9 pass with complete logs ending in `exit=0`.
-- [ ] The header `**Status**` is set to `Completed` and the Progress Log records the session.
+- [x] `seed_ordinals`, `Template::seed_ordinal`, `Template.gates` and the `seeds` field exist with the pinned signatures; both `Kx` sites use the ordinal.
+- [x] `lifetime.rs` implements the three functions, and `voice.rs` delegates to them.
+- [x] Every listed test exists and passes. The shift-compensation test asserts that the compiled index really differs.
+- [x] The golden suites pass with `golden_digests.txt` byte-identical (command 9).
+- [x] Commands 1-9 pass with complete logs ending in `exit=0`.
+- [x] The header `**Status**` is set to `Completed` and the Progress Log records the session.
 
 ## Execution Protocol
 
@@ -267,4 +267,22 @@ Logs go in `tmp/plv/s209/PLV-30/`. Run each command as
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30 (PLV-30 implementation)
+
+**Tasks Completed**: Implemented fixed-array gate-elided seed ordinals, template gate tracking, both `Kx` seed updates, and layer-shaped lifetime handling. Added seed-order and voice-lifetime tests. Off and bypassed voices retain the prior implicit fade; gate-free templates use identity ordinals. No template or golden fixture changed.
+
+**Repairs During Verification**: Fixed `MAX_EDGES` and `seed_ordinals` name resolution within the assigned source paths. Corrected the fresh slot-reuse fixture to trigger `definition.id` rather than hardcoded instrument 1. Initial failed logs are preserved under `tmp/plv/s209/PLV-30/attempt-01/` and `attempt-02/`; all final-source commands below pass.
+
+**Verification Commands** (complete logs under `tmp/plv/s209/PLV-30/`):
+
+1. `CARGO_TERM_QUIET=true cargo fmt --check` -> exit 0; `1-fmt.log`.
+2. `CARGO_TERM_QUIET=true cargo check -q --all-targets` -> exit 0; `2-check.log`.
+3. `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings` -> exit 0; `3-clippy.log`.
+4. `CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib` -> exit 0; `4-wasm.log`.
+5. `CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp` -> exit 0; `5-lsp.log`.
+6. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run seed_order voice_lifetime vactrol_gate golden multi_output migrated_pairs select_output` -> exit 0; 45 passed, 0 failed; `6-focused.log`.
+7. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` -> exit 0; 1617 passed, 0 failed, 2 skipped; `7-nextest.log`.
+8. `wc -l src/dsp/voice.rs src/dsp/voice/lifetime.rs src/dsp/ugen/template.rs src/dsp/ugen/build_helpers.rs src/dsp/tests/dsp/seed_order.rs src/dsp/tests/dsp/voice_lifetime.rs src/dsp/tests/dsp.rs` -> exit 0; all files below 1000 lines, `voice.rs` 903; `8-lines.log`.
+9. `git diff --exit-code -- src/host/tests/e2e/templates/golden_digests.txt src/prelude/templates.vact` -> exit 0; `9-golden-unchanged.log`.
+
+Final source SHA256 values are recorded in `tmp/plv/s209/PLV-30/hashes.txt`. PLV-31 template wiring and PLV-40 closeout remain downstream plans.

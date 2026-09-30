@@ -1,6 +1,6 @@
 # PLV-31: Wire the Voice Layer into the 24 Plaits Templates (transparent by default)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: PLV-31 (session 209, wave 2 of 3; serial, after PLV-30)
 **Design Reference**: `design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001` (Controls and editor metadata; Event mapping; Template wiring and seed preservation; Real-time, capacity and invariance; `decay-mod`; Test strategy; Rollout item 2)
 **Parent Plan**: `impl-plans/active/modular-plaits-engines.md`
@@ -262,12 +262,12 @@ Logs go in `tmp/plv/s209/PLV-31/`. Run each command as
 
 ## Completion Criteria
 
-- [ ] All 24 templates follow the edit rule. Command 11 passes, and chip-voice's gates carry `clocked: chip-clocked`.
-- [ ] The editor lists carry the three controls. `templates.rs` and `plaits.rs` are below 1000 lines.
-- [ ] `golden_digests.txt` differs from `golden-pre.txt` in exactly the 24 Plaits graph lines, with 0 render lines.
-- [ ] The 14 mem files and `src/types/tests/inst/templates.rs` are updated as specified, and each changed line is logged with its reason.
-- [ ] Every listed test passes, and commands 1-11 pass with complete logs.
-- [ ] The header `**Status**` is set to `Completed` and the Progress Log records the session.
+- [x] All 24 templates follow the edit rule. Command 11 passes, and chip-voice's gates carry `clocked: chip-clocked`. Command 11 passes, and chip-voice's gates carry `clocked: chip-clocked`.
+- [x] The editor lists carry the three controls. `templates.rs` and `plaits.rs` are below 1000 lines.
+- [x] `golden_digests.txt` differs from `golden-pre.txt` in exactly the 24 Plaits graph lines, with 0 render lines.
+- [x] The 14 mem files and `src/types/tests/inst/templates.rs` are updated as specified, and each changed line is logged with its reason.
+- [x] Every listed test passes, and commands 1-11 pass with complete logs.
+- [x] The header `**Status**` is set to `Completed` and the Progress Log records the session.
 
 ## Execution Protocol
 
@@ -286,4 +286,34 @@ Logs go in `tmp/plv/s209/PLV-31/`. Run each command as
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-09-30 — PLV-31 implementation
+
+**Tasks completed**: Wire all 24 Plaits templates, editor parameter metadata, owned memory and final-node tests, voice-layer behavioral coverage, opt-in example, golden refresh, and commands 1–11. PLV-30 was admitted from runtime `acceptedPlanIds`; its shared source changes were preserved.
+
+**Per-line edit record and reasons**
+
+- `src/prelude/templates.vact`: each listed header line received the neutral defaults `lpg-mode :off`, `lpg-decay 0.5`, `lpg-color 0.5`; each aux line's terminal `> * amp > aux-out}` became `> * amp > vactrol-gate ... slot: N lane: 1 > aux-out}`; each root gate was appended on the next two-tab line as lane 0. This appends gates after existing nodes and preserves default renders. For `chip-voice`, both gates also read `clocked: chip-clocked`. Line map (header / aux lane 1 / root lane 0 / slot): `filter-voice` 104/106/107/0; `phase-pair-voice` 111/113/114/1; `six-bank-a-voice` 125/127/128/2; `six-bank-b-voice` 130/132/133/3; `six-bank-c-voice` 135/137/138/4; `terrain-voice` 266/268/269/5; `string-machine-voice` 272/274/275/6; `chip-voice` 291/293/294/7; `analog-pair-voice` 190/192/193/8; `shape-voice` 278/280/281/9; `fm-pair-voice` 118/120/121/10; `grain-pair-voice` 284/286/287/11; `spectrum-voice` 150/152/153/12; `wave-grid-voice` 260/262/263/13; `chord-layer-voice` 196/198/199/14; `speech-voice` 143/145/146/15; `swarm-voice` 184/186/187/16; `clock-noise-voice` 156/158/159/17; `particle-voice` 312/314/315/18; `string-voice` 298/300/301/19; `modal-voice` 305/307/308/20; `dual-kick-voice` 163/165/166/21; `dual-snare-voice` 170/172/173/22; `dual-hat-voice` 177/179/180/23. Added comment at line 101 documents the off-mode pass-through without adding another gate-token match.
+- `src/dsp/meta/templates.rs:3,279-285,540-552,721-724`: declared `mod plaits` and replaced the inline arrays for the same 24 templates with `plaits::<NAME>` references, retaining TEMPLATE_PARAMS order. `src/dsp/meta/templates/plaits.rs` (286 lines) contains the 24 extracted arrays with the three new controls before `amp`. Reason: keep editor metadata aligned with each template and keep both Rust files below 1000 lines.
+- Memory reason for all 14 owning files: each wired template allocates two fixed gate states, `2 * GATE_STATE_FLOATS` = 32 floats; retain the prior kernel-state expression and move the exact budget-minus-one boundary by 32. `analog_pair.rs:66,69` old `STATE_FLOATS` -> `STATE_FLOATS + 2G`, boundary `STATE_FLOATS - 1` -> `STATE_FLOATS + 2G - 1`; `chip.rs:76,79` old `2 * chip_pair::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `chord_pair.rs:66,69` old `STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `grain_pair.rs:66,69` old `2 * grain_pair::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `modal.rs:74,77` old `2 * modal_pair::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `particle.rs:67,70` old `2 * particle_pair::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `shape_pair.rs:64,67` old `STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `six_op_original.rs:92-93,97` old `2 * six_op_original::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `speech_original.rs:84-85,89` old `2 * speech_original::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `string_machine_pair.rs:66,69` old `STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `string_voice.rs:74,77` old `2 * string_pair::STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `table_terrain_pair.rs:66,69` old `STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`; `terrain_pair.rs:64,67` old `STATE_FLOATS` -> `+ 2G`, boundary -> total `- 1`.
+- `src/host/tests/e2e/templates/voice_engines.rs`: `spectrum` line 272 old 96 -> 96+2G; `clock-noise` 341 old 0 -> 2G and its message now states kernel state is inline while the two voice gates use memory; `dual-kick` 420 old 48 -> 48+2G and boundary line 424 old 47 -> 48+2G-1; `dual-snare` 530 old 48 -> 48+2G and boundary line 534 old 47 -> 48+2G-1; `dual-hat` 640 old 32 -> 32+2G and boundary line 644 old 31 -> 32+2G-1; `swarm` 746 old 224 -> 224+2G and boundary line 750 old 223 -> 224+2G-1. The pre-existing `edge.port == 4` / `Const(1.0)` assertions remain unchanged.
+- `src/types/tests/inst/templates.rs:31-67`: for the 24 Plaits names, compare the last `UGenSpec` to `UGenSpec::VactrolGate`; non-Plaits retain their existing `add`/`mul` expectation. Direct variant matching is necessary because shared `kinds()` spells its debug name `vactrolgate` without the DSL hyphen.
+- `src/host/tests/e2e/templates.rs:62` registers `voice_layer`; `src/host/tests/e2e/templates/voice_layer.rs` adds the assigned off-identity, pre-wiring seed/render identity, structure, ping/level, bypass, chip clocked, all-template sound, editor, and example checks. `examples/voice-layer.vact` demonstrates opt-in slot-10 ping with decay modulation and `lpg-mode :ping` defaults.
+- `src/host/tests/e2e/templates/golden_digests.txt`: updated using the ignored bless test after the identity tests passed; exactly the 24 Plaits graph records changed and every render record stayed identical. Golden comparison evidence: `tmp/plv/s209/PLV-31/10-golden-diff.log`.
+
+**Verification commands and final-source evidence**
+
+1. `CARGO_TERM_QUIET=true cargo fmt --check` — exit 0, `tmp/plv/s209/PLV-31/1-fmt-final.log`.
+2. `CARGO_TERM_QUIET=true cargo check -q --all-targets` — exit 0, `tmp/plv/s209/PLV-31/2-check-final.log`.
+3. `CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings` — exit 0, `tmp/plv/s209/PLV-31/3-clippy-final.log`.
+4. `CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib` — exit 0, `tmp/plv/s209/PLV-31/4-wasm-final.log`.
+5. `CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp` — exit 0, `tmp/plv/s209/PLV-31/5-lsp-final.log`.
+6. Focused nextest command from this plan — exit 0, 130 passed, `tmp/plv/s209/PLV-31/6-focused-final.log`.
+7. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` — exit 0, 1,623 passed, 2 skipped, `tmp/plv/s209/PLV-31/7-nextest.log`.
+8. Plan `wc -l` command — exit 0; maximum listed file is 789 lines, `tmp/plv/s209/PLV-31/8-lines.log`.
+9. `VACTR_BLESS_GOLDEN=1 CARGO_TERM_QUIET=true cargo test -q --lib bless_golden_digests -- --ignored` — exit 0, `tmp/plv/s209/PLV-31/9-bless.log`.
+10. `git diff -U0 -- src/host/tests/e2e/templates/golden_digests.txt` and exact-name/render comparison — exit 0; 24 graph records changed, 0 render changes, `tmp/plv/s209/PLV-31/10-golden-diff.log`.
+11. Gate-count check — exit 0, 48 matches, `tmp/plv/s209/PLV-31/11-gate-count.log`.
+
+Earlier superseded attempts are retained: `2-check.log` (compile errors in the new tuple comparator), `3-clippy.log` (identity-op on `0 + 2G`), `6-focused.log` and `6-focused-attempt-02.log` (test harness assumptions corrected in `edit-intent-09` through `edit-intent-12`). Final-source reruns above pass; no failure remains unresolved.
+
+**Downstream handoff**: formal integrity/adversarial/integration review and PLV-40 closeout evidence remain owned by later workflow steps; no review approval, commit, push, or PLV-40 work is claimed here.

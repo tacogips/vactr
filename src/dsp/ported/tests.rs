@@ -141,7 +141,7 @@ fn plaits_voice_registrations_match_all_24_pinned_rows() {
         };
         assert_eq!(plaits_voice(position), Some(registration));
         assert_eq!(rows[position].voice, registration);
-        assert_eq!(rows[position].voice_layer, CoverageState::Pending);
+        assert_eq!(rows[position].voice_layer, CoverageState::SourceStage);
         assert_ne!(rows[position].coverage, CoverageState::SourcePort);
     }
     assert_eq!(plaits_voice(24), None);
@@ -165,7 +165,7 @@ fn implemented_rows_have_registered_templates_and_editor_controls() {
     let mut adaptations = 0;
     let mut source_stages = 0;
     for row in rows {
-        assert_eq!(row.voice_layer, CoverageState::Pending);
+        assert_eq!(row.voice_layer, CoverageState::SourceStage);
         if let Some(name) = row.vactr_template {
             assert!(
                 TEMPLATE_NAMES.contains(&name),
@@ -264,7 +264,7 @@ fn resource_blocked_positions_are_not_reported_as_ports() {
     assert!(summary.contains("0 source ports"));
     assert!(summary.contains("0 unavailable"));
     assert!(summary.contains("upstream wave assets unaudited: 3"));
-    assert!(summary.ends_with(" Voice layer: 24 pending, 0 source-stage."));
+    assert!(summary.ends_with(" Voice layer: 0 pending, 24 source-stage."));
 }
 
 // --- MOD-002: cross-family neutral-naming and template/effect matrix ---

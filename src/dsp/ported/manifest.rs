@@ -299,7 +299,7 @@ const fn implemented(
         aux_outputs: 1,
         coverage,
         voice,
-        voice_layer: CoverageState::Pending,
+        voice_layer: CoverageState::SourceStage,
         resources: ResourceState::Replacement,
         resource_flags: ResourceFlags::NONE,
     }

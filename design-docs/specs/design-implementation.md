@@ -5289,8 +5289,10 @@ a REPL-bound pattern reaches the audio host as events. Rollback is a
 
 ## 15. Editor: Tauri, Web, Wasm — and What Performance Needs
 
-One TypeScript frontend (`editor/`, CodeMirror 6 + Vite), delivered two
-ways from the same code:
+One TypeScript frontend (`editor/`, Vite), delivered two ways from the same
+code. The historical CodeMirror visible surface below is superseded by
+15.3 for the canvas-editor workflow; its state and revision machinery is
+retained where compatible:
 
 | Delivery | Core | Audio |
 |----------|------|-------|
@@ -6045,7 +6047,8 @@ session or audio was never unlocked).
   the slider panel and directive control panel, parameter editors, step
   grid and piano roll, meters and scopes, sample browser, package pane,
   status/diagnostic surfaces) becomes a Solid component. CodeMirror 6
-  stays the code surface, mounted from a Solid component. State comes
+  was the code surface, mounted from a Solid component; 15.3 now replaces
+  visible code rendering with GPU canvas. State comes
   from signals derived from the protocol client: one signal (or store
   path) per site, slot and telemetry stream, updated once per `bindings`
   batch / `playing` / `tempo` / `levels` message, so a batch repaints
@@ -6078,6 +6081,268 @@ session or audio was never unlocked).
 - **Unchanged**: the protocol, the wasm and native tiers, Tauri wrapping
   the same `dist`, and every TASK-010 behavior; the TASK-010 vitest
   suites are ported, not dropped.
+
+### 15.3 GPU canvas code editor and synchronized composition (2026-09-30)
+
+**Issue reference:** `codex-design-and-implement-review-loop-session-224`.
+**Status:** author proposal for independent adversarial review; no implementation,
+performance, accessibility or physical-device acceptance is claimed here.
+Historical issue #5 describes the baseline, not a newly supplied issue number.
+
+#### 15.3.1 Baseline and boundary
+
+Retain architecture.md Host Tiers and Editor Requirements, sections 14.4,
+15.1 and 15.2, design-visual.md's Hydra chains, and the completed
+`impl-plans/completed/vactr-editor-wasm.md` raw session ABI. This amendment
+supersedes only visible CodeMirror rendering, DOM decoration dependencies,
+receipt-based synchronized timing, and the earlier exclusion of native
+frontend visual composition. Native engine visual-language execution remains
+a separate capability: unsupported programs must report a diagnostic.
+Solid panels, document protocol, binding authority, audio DSP and two-Wasm
+browser delivery remain. DOM panels and input/accessibility bridges are allowed;
+all visible source text, line numbers, cursor, selection, syntax, diagnostics,
+evaluation flashes, playing spans and inline binding badges use WebGL2 canvas.
+No second editor engine, new language coupling, raw GLSL interface, browser taps,
+per-slot audio mixing, AUv3 or new external-code-agent adapter is required.
+
+Repository evidence: `code/mount.ts` constructs EditorView and exports it in
+`app/apis.ts`; `bind/{mount,drag,write,routing}.ts` and `params/{mount,roll}.ts`
+consume it. `code/history.ts` retains 256 revisions/four UTF-8 indexes;
+`code/highlight.ts` retains 4096 events but anchors native times at receipt.
+`app/clock.ts` returns processing time; `src/session/publish.rs` emits tempo only
+on changes, without a sample timestamp. `visual/render-host.ts` owns four
+ping-pong outputs and release routines, but no editor glyph atlas or video
+source. `src-tauri/src/main.rs` is presently a desktop wrapper without IPC.
+The `code/`, `app/`, `bind/`, `params/` and `visual/` paths above are relative
+to `editor/src/`; `src-tauri/` is relative to `editor/`.
+
+#### 15.3.2 One editing authority and coherent migration
+
+Retain CodeMirror EditorState, Text, ChangeSet and compatible state commands as
+headless document machinery; do not instantiate a hidden EditorView as the
+editing authority. A concrete code-surface contract in `app/apis.ts` exposes
+state reads, transaction dispatch, change/selection subscriptions, focus,
+coordinate-to-position and position-to-rectangle mapping, and range annotations.
+It serves the existing consumers rather than providing a generalized editor
+framework. `code/mount.ts` owns this surface, input bridge and renderer.
+
+Each document-changing dispatch records `DocumentSync.apply` exactly once,
+synchronously before subscriber notifications or protocol writes. Retain
+revision/epoch increments, 200 ms debounce, flush-before-write/eval ordering,
+UTF-8 wire versus UTF-16 state conversion, 256-revision touched-span rejection,
+and four-index cache. Undo/redo are transactions through this same pipeline.
+Selection-only and annotation updates do not increment document revisions.
+
+Migrate sync listeners, eval key bindings/200 ms flash, diagnostic range data,
+playing ranges, numeric drag hit testing and capture, directive write-back,
+binding overlay badges, parameter-head selection and roll text reads together.
+No consumer depends on EditorView DOM, decorations, lint gutter or widgets after
+cutover. Preserve Mod-Enter form selection, Mod-Shift-Enter full eval, Mod-.
+hush, source-edit versus runtime-overlay modes, stale-generation checks,
+expected-text checks and per-target latest-wins rate limits. Syntax tokenization
+is presentation only; sites and semantic identity still come from the session.
+
+#### 15.3.3 Text, input and accessibility
+
+Start with unwrapped lines, tabs at four space stops, horizontal/vertical scroll
+and line numbers. Retain line-ending content in the document; rendering treats
+CRLF as one line break. Navigation and hit testing use grapheme boundaries,
+UTF-16 offsets and measured advances; never split surrogate pairs or combining
+clusters. Shape and rasterize complete visible runs with browser font rendering
+in an offscreen 2D canvas, upload bounded run tiles to an atlas, then draw only
+GPU quads. This is a reusable text atlas, not per-frame full-page rasterization.
+Cache keys include text, font/fallback identity, scale and syntax style; font
+load/DPR changes invalidate metrics. Run-level shaping preserves ligatures and
+Japanese glyphs; caret boundary advances must be validated against the same
+shaping. Mixed RTL text requires visual-order hit testing and selection evidence;
+if unsupported it is reported as an input limitation, not claimed supported.
+
+Use a focusable textarea with a bounded surrounding-text window as the DOM
+bridge. Keep it transparent at the caret rectangle (including visual viewport
+and scroll offsets), available to accessibility and virtual keyboards, without
+visible duplicate text. Reconcile beforeinput/input, composition and platform
+selection changes into the single transaction pipeline. During composition,
+show preedit and underline on GPU, retain replacement range, suppress eval,
+shortcut dispatch and bridge reset, and commit exactly once at composition end;
+cancellation restores the original state. Defer source-write operations touching
+the composing range until composition ends, then revalidate expected text/site.
+
+Clipboard cut/copy/paste uses selected document text and normal transactions;
+respect platform event permissions and report failed operations. Keyboard
+navigation supports word/line/document movement, shift extension, select-all,
+undo/redo and scrolling to caret. Pointer hit testing supports click, word/line
+selection, drag/autoscroll and numeric drag without stealing normal selection.
+Touch supports caret placement, long-press word selection, GPU selection handles
+and scroll gestures; pointer capture cancels on blur/cancel. VoiceOver/screen
+readers receive label, editable value window, selection and bounded status
+announcements; window shifts preserve document offsets. Review navigation across
+window boundaries and full-document selection, not just the ARIA attributes.
+Resizing, orientation, soft keyboard and DPR changes keep selection and scroll.
+
+#### 15.3.4 Audible time, transport and revisions
+
+Every frame samples one audible transport position shared by code highlights,
+beat display and visual effects. Audio scheduling never waits for a frame.
+Event timestamps mean scheduled processing-time onset in seconds in a declared
+clock epoch. Source identity remains file + doc_revision + UTF-8 span; slot and
+an optional sequence within epoch distinguish repeated events. Add optional
+end-time seconds to playing records, calculated using the scheduled event's
+original tempo; do not reinterpret queued durations with a later tempo.
+
+Add periodic transport snapshots at no more than 20 Hz, independent of tempo
+changes, containing epoch, sample processing time, cycle/beat, BPM,
+beats-per-cycle, running/paused state and output-latency seconds with provenance
+(measured, estimate, unavailable). Browser sample time comes from the audio
+host; native time and position come from the same engine clock. New fields are
+additive in protocol v1; legacy peers are explicitly marked unsynchronized.
+Validate finite nonnegative latency/duration, positive BPM, valid rational
+denominators, monotonic sample time within epoch, source bounds and message size.
+An epoch changes on restart/seek/clock discontinuity; clear old pending events.
+
+Browser audible time uses output-timestamp correlation between performance time
+and audio context time when available. That correlation already represents
+output presentation: do not subtract latency again. Without correlation, use
+processing time minus a host-reported total output delay, explicitly estimated;
+never add base/output delays blindly or claim compensation when unavailable.
+Native IPC uses a bounded clock probe/reply with echoed page send time, engine
+receive/send monotonic times, epoch and audio-output correlation/total delay.
+Use the lowest-RTT valid sample to estimate page/engine offset, retaining at most
+8 probes; refresh once per second. Reject RTT over 100 ms; expose uncertainty
+including half RTT and host delay uncertainty. Receipt anchoring may support
+legacy display only, labeled unsynchronized and excluded from synchronization
+acceptance. Native WebSocket may carry the same probe contract for development.
+
+Compute position from the latest valid timestamped snapshot and audible elapsed
+time; hold on pause or lost external clock, reanchor on tempo changes and epochs.
+Never advance beat or highlights by counting frames or message arrival deltas.
+Hide synchronized indicators when snapshot age exceeds 2 seconds or correlation
+is invalid; resume from fresh absolute time. On late frames discard expired
+events, show still-active ranges and latest beat; do not replay missed flashes.
+Hush/stop clears relevant queues. Unmappable/touched/too-old revisions drop spans.
+Cap highlight entries at 4096, future horizon at 2 seconds, incoming batches at
+4096 events, each telemetry envelope at 1 MiB, and native/frontend telemetry
+backlog at 64 messages (coalesce snapshots/levels, discard expired events first);
+record overflow/drop counters. Control requests/replies are separate: never drop
+eval results, errors or document acknowledgments under the telemetry policy;
+reject additional requests with a visible busy error at 64 in-flight requests.
+A gap/overflow makes affected transient evidence incomplete, without blocking audio.
+
+#### 15.3.5 Composition and resources
+
+Reuse GlRenderHost for Hydra synth effects and o0..o3 feedback. Keep its GL
+textures within their owning context. A code compositor may upload the latest
+visual canvas image to one reusable background texture at most once per frame;
+this explicit copy avoids claiming cross-context texture sharing or zero-copy.
+Layer background/video, subdued contrast scrim, selections/playing/eval,
+syntax text, diagnostic underlines, cursor and GPU badges/selection handles.
+DOM tooltips/panels are allowed outside the source surface. Oscilloscopes reuse
+published analyzer ring cells; beat display uses 15.3.4. No microphone capture.
+
+Video scope is one user-selected local file, decoded by a media element and
+composited as background; no camera, streaming service or new language syntax.
+Autoplay follows user gesture; failed decode is visible, audio track is muted,
+video wall/media time is not the musical clock. Musical uniforms/effects use
+audible time. Reuse one texture, upload only new video frames, pause when hidden,
+and revoke object URLs/release decoder on replacement or disposal. Cap uploaded
+video to 1280x720 at 30 Hz; higher-resolution decoded memory must be measured
+separately and rejected if the session resource budget cannot be met.
+
+Initial enforceable caps per editor instance: text atlas 16 MiB, geometry and
+staging buffers 8 MiB, text layout cache 8 MiB, canvas/backdrop targets 4 million
+pixels total, visual outputs at most 1024x1024 each with eight RGBA8 targets,
+and at most 8 MiB of visual text-asset textures. Total application-owned GPU
+allocations including video remain below 96 MiB; reserve replacement allocations
+against that cap before allocating. Use effective DPR reduction/downscale when
+needed and show quality status. Validate device texture limits before allocation.
+Caches evict offscreen LRU entries; visible working-set overflow renders in
+bounded batches, never silently omits text. Idle frames change uniforms and
+small feedback geometry only; dirty text/layout rebuilds occur only on edit,
+scroll, font, viewport or atlas eviction. Reuse buffers and upload dirty regions.
+
+Keep 256 history entries as a count ceiling and impose a 32 MiB history/undo
+retention ceiling (evict oldest complete undo groups and report reduced depth),
+with four UTF-8 indexes totaling at most 8 MiB. The current document is never
+evicted; documents above the measured 1 MiB profile report unverified performance.
+Account cached copies explicitly rather than assuming rope sharing bounds bytes.
+Context loss cancels GPU work without changing the document or audio; restore
+from CPU state with empty feedback targets and fresh resources. On allocation
+failure retain editing state and accessible save, display GPU-unavailable status;
+do not switch to visible DOM source. Resize releases superseded targets. Dispose
+cancels frame/probe/video callbacks, listeners, observers, timers and captures,
+then deletes textures, programs, buffers/framebuffers and bridge nodes.
+
+#### 15.3.6 Browser and iPad/native delivery
+
+Browser retains the existing real Rust/Wasm session and AudioWorklet ABI, with
+new telemetry tested end-to-end. Desktop wrapper may keep the interim Wasm mode.
+For native/iPad, convert the shell bootstrap to a shared Rust library entry
+plus thin desktop main, add a Session Protocol IPC transport and native session
+owner on a control thread using existing host capabilities. Connect native audio
+through the existing Rust host; no VM, IPC, allocation or frontend work runs in
+its callback. Advertise capabilities and fail clearly if audio init is unavailable.
+Expected ownership is `editor/src/protocol/tauri.ts` for the IPC adapter,
+`editor/src-tauri/src/{lib,session,clock}.rs` for shared bootstrap, session and
+clock probe handling, and the existing `src/host/` audio and capability modules
+for native host wiring. The plan resolves exact host paths after reading them,
+without creating a separate engine. A session owner closes IPC subscriptions
+and stops/joins its control task on app close. Foreground activate/suspend/close
+controls session lifetime; iOS glue is limited
+to audio-session activation, interruption/route changes and latency refresh.
+Audio route changes invalidate clock correlation. No new Swift UI is introduced.
+
+Deliver shared frontend transport, Rust session lifecycle/clock contract,
+mobile library entry/configuration and integration tests that build on available
+host tooling. The plan must specify exact files and native host wiring before
+approval; a desktop compile alone is not an iPad build. Add iOS target compile,
+packaging/signing and physical-device checklist; lack of SDK, signing or device
+is a reported incomplete platform gate, never replaced by a mock pass. Device
+checks include Japanese keyboard, touch handles, VoiceOver, audio unlock,
+interruption/resume, orientation, high DPI and output-route latency. PWA on iPad
+remains the browser delivery, not evidence of native audio integration.
+
+#### 15.3.7 Verification and review gates
+
+Budgets are proposed acceptance targets, not measured results. Before measurement
+record actual hardware model/CPU/GPU/RAM, OS, browser/WebView versions, display
+refresh/DPR, audio device/sample rate/buffer, build mode and workload seed. Measure
+desktop browser and physical iPad separately; unknown hardware remains pending
+in `user-qa/pending-editor-questions.md` E6. Use a 1 MiB/20,000-line document
+including Japanese, emoji and long lines, 64 simultaneous sounding voices,
+four 1024x1024 synth outputs, one 720p video and analyzer scope; also test text
+alone to identify regressions. Warm up 30 seconds, record 5 minutes of editing,
+selection and scrolling, then 10 minutes of repeated edit/font/DPR/resize cycles.
+
+| Metric | Acceptance target and evidence |
+|--------|--------------------------------|
+| Frame | At 60 Hz, JS update/submission p95 <=8 ms and presentation interval p95 <=16.7 ms, p99 <=33.4 ms; record GPU time when supported separately |
+| Input | Real input event to presented updated canvas p95 <=50 ms; report sampling method, composition separately |
+| Sync | Audible reference impulse versus visible onset p95 <=33.4 ms when host correlation uncertainty <=10 ms; record external audio/video measurement and estimated-host cases separately |
+| Late frame | Inject 250 ms stall; first recovered frame shows current beat/active ranges, no expired flash replay; no growing offset over 5 minutes |
+| Resources | Caps above never exceeded; application-owned live allocations return to baseline on dispose; retained heap growth <=8 MiB after warmup/GC across 10-minute cycles, decoded video memory reported separately |
+| Audio | UI stalls/hidden/context loss do not stop audio; record underruns under combined workload rather than infer independence from UI tests |
+
+Unit tests cover revision conversions, stale spans, composition transaction
+ordering, clipboard/undo semantics, grapheme coordinates, epoch/correlation and
+latency double-counting, overflow and late recovery. Existing jsdom tests verify
+contracts only. Real browser/WebGL evidence must prove visible glyphs and all
+feedback are canvas-rendered, texture reuse, high DPI, context loss and input.
+Japanese IME and accessibility require manual browser/device evidence with steps
+and captured results. Preserve existing bind/params behavior tests while migrating.
+Run `cd editor && npm run check`, `cd editor && npm run test`,
+`cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`, real-Wasm tests,
+`CARGO_TERM_QUIET=true cargo check`, clippy all-targets with warnings denied,
+fmt check and nextest with the required failure-focused environment, plus
+`CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml`.
+The plan must list actual browser/mobile commands from installed tooling; never
+invent a passing device or GPU command. Record complete logs and final statuses.
+
+Independent design and code-free file-level plan review precede implementation.
+The plan covers the consumer migration, telemetry producer/consumer pairing,
+resource accounting, native wiring, dependencies and behavioral gates. Accepted
+plan commit and non-force push precede implementation fanout; task-only final
+commit/push follow review and improve self-review. Preserve recorded MusicDSP,
+rumble and dirty shared-file hunks, assigning one owner for shared protocol edits.
+Missing device/measurement evidence stays unchecked even if build checks pass.
 
 ## 16. Wasm and AudioWorklet Layout
 

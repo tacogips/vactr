@@ -4,9 +4,9 @@ These questions came up while designing the editor: the `editor/` app,
 the browser delivery and the Tauri shell (design section 15.1 in
 `design-docs/specs/design-implementation.md`; wire additions in
 `design-docs/specs/command.md`). Each one has a recommendation, and the
-implementation follows it until the question is answered. Only E1 can
-block an acceptance check. E1 decides whether the Tauri `cargo check`
-can run at all.
+implementation follows it until the question is answered. E1 records the historical dependency-access question; E6 below records the
+canvas workflow measurement and device-evidence gates. None is a workflow
+package-readiness check.
 
 The following are already decided and are not asked here:
 - the Editor Requirements (slider panel with source-edit and overlay
@@ -15,7 +15,7 @@ The following are already decided and are not asked here:
 - the visual model (WebGL2 RenderHost, ping-pong feedback);
 - the self-analysis model (12.3);
 - the host tiers (browser first, then a Tauri shell over the same
-  frontend, no Swift).
+  frontend; architecture.md permits Swift platform glue only).
 
 ## E1. crates.io access for the Tauri shell crate
 
@@ -102,3 +102,31 @@ network access outside the npm registry.
   `mise.toml`.
 - Alternative: pin `node = "22"` in `mise.toml`. This is an
   operator-run install.
+
+## E6. Canvas editor measurement and physical iPad evidence (2026-09-30)
+
+Operator update (2026-09-30): no physical iPad is available for verification
+at present. Continue implementation and available host verification; physical
+iPad input, accessibility, audio-route and performance checks remain pending.
+Host inventory: Mac16,12, Apple M4, 32 GiB RAM; `xcodebuild -showsdks` lists
+iOS 26.5 and iOS Simulator 26.5 SDKs. `xcrun simctl list devices booted`
+reports no booted simulator. These are tooling facts, not build, signing,
+behavioral or device-performance results.
+
+Issue reference: `codex-design-and-implement-review-loop-session-224`; design
+section 15.3 supersedes the historical CodeMirror visible surface and native
+receipt-anchor timing. The host-tier decisions above still apply; Swift is
+limited to platform glue as architecture.md specifies.
+
+- Which physical iPad model, iPadOS version, audio route, Japanese keyboard and
+  VoiceOver setup are available? Record actual equipment before verification.
+- Which desktop browser/hardware and external audio/video timing measurement
+  setup are available for the 15.3.7 budgets? No performance target is a result.
+- Are iOS SDK, signing and device packaging available to the implementation
+  owner? Shared Rust/TypeScript components proceed on available host tools;
+  unavailable iOS build, signing or physical checks remain incomplete.
+
+Recommendation: use the explicit 15.3.7 workload and budgets, retain measured
+results by named hardware, and leave unavailable native/iPad, IME, accessibility
+and synchronization evidence unchecked. These evidence gaps do not require a
+new editor architecture or block code-free plan authoring.

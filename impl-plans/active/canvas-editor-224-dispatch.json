@@ -1,0 +1,618 @@
+{
+  "workflowMode": "issue-resolution",
+  "issueReference": "codex-design-and-implement-review-loop-session-224",
+  "designReference": "design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30",
+  "reviewCommunicationId": "comm-002816",
+  "status": "Accepted checkpoint prepared; commit and successful non-force push required",
+  "executionContractPath": "impl-plans/active/canvas-editor-224-execution.md",
+  "plans": [
+    {
+      "planId": "CE-CONTRACT",
+      "planPath": "impl-plans/active/canvas-editor-224-contracts.md",
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/app/apis.ts",
+        "editor/src/app/deps.ts",
+        "editor/src/protocol/types.ts",
+        "editor/src/protocol/envelope.ts",
+        "editor/src/protocol/client.ts",
+        "editor/src/protocol/store.ts",
+        "editor/test/canvas/contracts.test.ts",
+        "impl-plans/active/canvas-editor-224-contracts.md"
+      ],
+      "sharedPaths": [
+        "editor/src/app/apis.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/src/app/apis.ts",
+          "intendedEdit": "Successive ownership with CE-JOIN. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        }
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/canvas/contracts.test.ts test/protocol"
+      ],
+      "acceptanceCriteria": [
+        "Wire v1 compatibility and bounded queues proven",
+        "Contract descriptors consumed without runtime EditorView requirement",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-contracts.md"
+    },
+    {
+      "planId": "CE-STATE",
+      "planPath": "impl-plans/active/canvas-editor-224-state.md",
+      "dependsOn": [
+        "CE-CONTRACT"
+      ],
+      "writePaths": [
+        "editor/src/code/surface.ts",
+        "editor/src/code/sync.ts",
+        "editor/src/code/history.ts",
+        "editor/src/code/language.ts",
+        "editor/test/canvas/state.test.ts",
+        "impl-plans/active/canvas-editor-224-state.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/canvas/state.test.ts test/protocol/utf8.test.ts test/protocol/document.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Exactly-once synchronous revision recording",
+        "History/undo/index ceilings and stale mapping tests pass",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-state.md"
+    },
+    {
+      "planId": "CE-GPU",
+      "planPath": "impl-plans/active/canvas-editor-224-gpu.md",
+      "dependsOn": [
+        "CE-CONTRACT"
+      ],
+      "writePaths": [
+        "editor/src/code/layout.ts",
+        "editor/src/code/atlas.ts",
+        "editor/src/code/renderer.ts",
+        "editor/src/code/resources.ts",
+        "editor/src/code/code.css",
+        "editor/test/canvas/gpu.test.ts",
+        "impl-plans/active/canvas-editor-224-gpu.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/canvas/gpu.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "All required annotations have GPU drawing paths",
+        "Allocation ledger enforces caps and disposal returns live owned bytes to zero",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-gpu.md"
+    },
+    {
+      "planId": "CE-INPUT",
+      "planPath": "impl-plans/active/canvas-editor-224-input.md",
+      "dependsOn": [
+        "CE-STATE",
+        "CE-GPU"
+      ],
+      "writePaths": [
+        "editor/src/code/input.ts",
+        "editor/src/code/keyboard.ts",
+        "editor/src/code/pointer.ts",
+        "editor/src/code/accessibility.ts",
+        "editor/test/canvas/input.test.ts",
+        "impl-plans/active/canvas-editor-224-input.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/canvas/input.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Single composition commit and cancellation behavior tested",
+        "Keyboard/clipboard/pointer contracts pass; manual IME/VoiceOver gates remain separately pending",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-input.md"
+    },
+    {
+      "planId": "CE-TELEMETRY",
+      "planPath": "impl-plans/active/canvas-editor-224-telemetry.md",
+      "dependsOn": [
+        "CE-CONTRACT"
+      ],
+      "writePaths": [
+        "src/session/protocol.rs",
+        "src/session/codec.rs",
+        "src/session/publish.rs",
+        "src/session/session.rs",
+        "src/host/wasm/session_half.rs",
+        "src/session/tests/publish.rs",
+        "src/session/tests/codec.rs",
+        "editor/test/wasm/canvas-clock.test.ts",
+        "impl-plans/active/canvas-editor-224-telemetry.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run session::tests::",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm npm run test -- test/wasm/canvas-clock.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Real native-session and Wasm telemetry share contracts",
+        "Periodic timing/end-time/epoch/legacy tests pass",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-telemetry.md"
+    },
+    {
+      "planId": "CE-AUDIO",
+      "planPath": "impl-plans/active/canvas-editor-224-native-clock.md",
+      "dependsOn": [
+        "CE-TELEMETRY"
+      ],
+      "writePaths": [
+        "src/host/native/audio.rs",
+        "src/host/native/clock.rs",
+        "src/host/native/mod.rs",
+        "src/host/native/tests/audio.rs",
+        "src/host/native/tests/clock.rs",
+        "src/host/native/tests/mod.rs",
+        "impl-plans/active/canvas-editor-224-native-clock.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run host::native::tests::"
+      ],
+      "acceptanceCriteria": [
+        "Native output metadata has explicit provenance",
+        "Audio callback remains isolated from UI/control paths",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-native-clock.md"
+    },
+    {
+      "planId": "CE-CLOCK",
+      "planPath": "impl-plans/active/canvas-editor-224-clock.md",
+      "dependsOn": [
+        "CE-TELEMETRY"
+      ],
+      "writePaths": [
+        "editor/src/app/clock.ts",
+        "editor/src/code/highlight.ts",
+        "editor/src/code/transport.ts",
+        "editor/src/visual/frame.ts",
+        "editor/test/canvas/clock.test.ts",
+        "editor/test/code/highlight.test.ts",
+        "editor/test/code/transport.test.ts",
+        "editor/test/visual/frame.test.ts",
+        "impl-plans/active/canvas-editor-224-clock.md"
+      ],
+      "sharedPaths": [
+        "editor/test/code/highlight.test.ts",
+        "editor/test/code/transport.test.ts",
+        "editor/test/visual/frame.test.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/test/code/highlight.test.ts",
+          "intendedEdit": "Successive ownership with CE-JOIN. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        },
+        {
+          "path": "editor/test/code/transport.test.ts",
+          "intendedEdit": "Successive ownership with CE-JOIN. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        },
+        {
+          "path": "editor/test/visual/frame.test.ts",
+          "intendedEdit": "Successive ownership with CE-VISUAL. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        }
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/canvas/clock.test.ts test/code/highlight.test.ts test/code/transport.test.ts test/visual/frame.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Absolute-time late recovery and invalid correlation behavior pass",
+        "Processing versus audible display time is explicit",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-clock.md"
+    },
+    {
+      "planId": "CE-CONSUMERS",
+      "planPath": "impl-plans/active/canvas-editor-224-consumers.md",
+      "dependsOn": [
+        "CE-INPUT",
+        "CE-CLOCK"
+      ],
+      "writePaths": [
+        "editor/src/bind/mount.ts",
+        "editor/src/bind/drag.ts",
+        "editor/src/bind/write.ts",
+        "editor/src/bind/routing.ts",
+        "editor/src/params/mount.ts",
+        "editor/src/params/roll.ts",
+        "editor/test/bind",
+        "editor/test/params",
+        "impl-plans/active/canvas-editor-224-consumers.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/bind test/params"
+      ],
+      "acceptanceCriteria": [
+        "No migrated consumer imports EditorView or decorations",
+        "Binding, directives, numeric drag and params regression suites retain behavioral coverage",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-consumers.md"
+    },
+    {
+      "planId": "CE-VISUAL",
+      "planPath": "impl-plans/active/canvas-editor-224-visual.md",
+      "dependsOn": [
+        "CE-GPU",
+        "CE-CLOCK"
+      ],
+      "writePaths": [
+        "editor/src/visual/render-host.ts",
+        "editor/src/visual/text-asset.ts",
+        "editor/src/visual/mount.ts",
+        "editor/src/visual/video.ts",
+        "editor/src/visual/panes.ts",
+        "editor/src/visual/scopes.ts",
+        "editor/test/visual",
+        "editor/test/canvas/visual.test.ts",
+        "impl-plans/active/canvas-editor-224-visual.md"
+      ],
+      "sharedPaths": [
+        "editor/test/visual"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/test/visual",
+          "intendedEdit": "Successive ownership with CE-CLOCK. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        }
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/canvas/visual.test.ts test/visual"
+      ],
+      "acceptanceCriteria": [
+        "Reusable bounded background/video lifecycle verified",
+        "Existing synth feedback and analyzer behavior retained",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-visual.md"
+    },
+    {
+      "planId": "CE-SHELL",
+      "planPath": "impl-plans/active/canvas-editor-224-native-shell.md",
+      "dependsOn": [
+        "CE-AUDIO",
+        "CE-CLOCK",
+        "CE-PACKAGE"
+      ],
+      "writePaths": [
+        "editor/src-tauri/src",
+        "editor/src-tauri/ios",
+        "editor/src-tauri/Cargo.toml",
+        "editor/src-tauri/tauri.conf.json",
+        "editor/src-tauri/capabilities/default.json",
+        "editor/src/protocol/tauri.ts",
+        "editor/test/canvas/tauri.test.ts",
+        "impl-plans/active/canvas-editor-224-native-shell.md"
+      ],
+      "sharedPaths": [
+        "editor/src-tauri/Cargo.toml"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/src-tauri/Cargo.toml",
+          "intendedEdit": "Successive ownership with CE-PACKAGE. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        }
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo test --locked --manifest-path editor/src-tauri/Cargo.toml --lib",
+        "cd editor && npm run test -- test/canvas/tauri.test.ts",
+        "CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml --lib --target aarch64-apple-ios"
+      ],
+      "acceptanceCriteria": [
+        "Desktop/shared-library IPC builds and tests pass",
+        "iOS compile/sign/device checks tracked individually; unavailable checks unchecked",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-native-shell.md"
+    },
+    {
+      "planId": "CE-JOIN",
+      "planPath": "impl-plans/active/canvas-editor-224-editor-join.md",
+      "dependsOn": [
+        "CE-CONSUMERS",
+        "CE-VISUAL",
+        "CE-SHELL"
+      ],
+      "writePaths": [
+        "editor/src/code/mount.ts",
+        "editor/src/code/eval.ts",
+        "editor/src/code/diagnostics.ts",
+        "editor/src/code/code-view.tsx",
+        "editor/src/app/main.ts",
+        "editor/src/app/apis.ts",
+        "editor/test/code",
+        "editor/test/app/main.test.ts",
+        "impl-plans/active/canvas-editor-224-editor-join.md"
+      ],
+      "sharedPaths": [
+        "editor/src/app/apis.ts",
+        "editor/test/code"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/src/app/apis.ts",
+          "intendedEdit": "Successive ownership with CE-CONTRACT. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        },
+        {
+          "path": "editor/test/code",
+          "intendedEdit": "Successive ownership with CE-CLOCK. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        }
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npm run test -- test/code test/app test/bind test/params test/canvas",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build"
+      ],
+      "acceptanceCriteria": [
+        "EditorView visible/hidden authority removed",
+        "Browser/native boot, eval/diagnostics and all consumer regressions pass",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-editor-join.md"
+    },
+    {
+      "planId": "CE-FINAL",
+      "planPath": "impl-plans/active/canvas-editor-224-verification.md",
+      "dependsOn": [
+        "CE-JOIN"
+      ],
+      "writePaths": [
+        "editor/src-tauri/gen/apple",
+        "editor/test/browser",
+        "editor/test/canvas/measurement.ts",
+        "design-docs/references/canvas-editor-224-evidence.md",
+        "design-docs/user-qa/pending-editor-questions.md",
+        "impl-plans/README.md",
+        "impl-plans/completed",
+        "impl-plans/active/canvas-editor-224-verification.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm npm run test",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "node editor/test/browser/run.mjs --mode behavior",
+        "node editor/test/browser/run.mjs --mode measure",
+        "CARGO_TERM_QUIET=true cargo check",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo fmt -- --check",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo fmt --manifest-path editor/src-tauri/Cargo.toml -- --check",
+        "CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml --lib --target aarch64-apple-ios",
+        "CARGO_TERM_QUIET=true cargo tauri ios init",
+        "CARGO_TERM_QUIET=true cargo tauri ios build --debug"
+      ],
+      "acceptanceCriteria": [
+        "RealGPU behavior evidence, not mocks alone",
+        "Named hardware measurements and all unavailable gates explicitly recorded",
+        "Independent review/improve fixes and task-only non-force Git finalization",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-verification.md"
+    },
+    {
+      "planId": "CE-PACKAGE",
+      "planPath": "impl-plans/active/canvas-editor-224-package-preparation.md",
+      "dependsOn": [
+        "CE-CONTRACT"
+      ],
+      "writePaths": [
+        "editor/package.json",
+        "editor/package-lock.json",
+        "editor/src-tauri/Cargo.toml",
+        "editor/src-tauri/Cargo.lock",
+        "impl-plans/active/canvas-editor-224-dependency-evidence.md",
+        "impl-plans/active/canvas-editor-224-package-preparation.md"
+      ],
+      "sharedPaths": [
+        "editor/src-tauri/Cargo.toml"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/src-tauri/Cargo.toml",
+          "intendedEdit": "Successive ownership with CE-SHELL. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks."
+        }
+      ],
+      "verification": [
+        "cd editor && npm install --save-dev --save-exact playwright@1.62.1 --ignore-scripts",
+        "cd editor && npm exec -- playwright install chromium",
+        "CARGO_TERM_QUIET=true cargo generate-lockfile --manifest-path editor/src-tauri/Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo metadata --locked --no-deps --manifest-path editor/src-tauri/Cargo.toml --format-version 1",
+        "mise exec -- rustup target list --installed",
+        "xcodebuild -version",
+        "xcodebuild -showsdks",
+        "CARGO_TERM_QUIET=true cargo tauri --version"
+      ],
+      "acceptanceCriteria": [
+        "Task-only pinned dependency diffs and complete logs",
+        "Browser binary available or verification gap explicitly recorded; no worker regenerates locks",
+        "Own progress log includes command evidence, fixes and remaining gates.",
+        "Independent review and improve self-review findings resolved."
+      ],
+      "progressPath": "impl-plans/active/canvas-editor-224-package-preparation.md"
+    }
+  ],
+  "taskId": "canvas-editor-224",
+  "evidenceRoot": "tmp/canvas-editor-224",
+  "designReviewCommunicationId": "comm-002814",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
+  "designDocPaths": [
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/pending-editor-questions.md",
+    "design-docs/user-qa/README.md",
+    "design-docs/specs/design-visual.md"
+  ],
+  "acceptedPlanPaths": [
+    "impl-plans/active/canvas-editor-224-contracts.md",
+    "impl-plans/active/canvas-editor-224-state.md",
+    "impl-plans/active/canvas-editor-224-gpu.md",
+    "impl-plans/active/canvas-editor-224-input.md",
+    "impl-plans/active/canvas-editor-224-telemetry.md",
+    "impl-plans/active/canvas-editor-224-native-clock.md",
+    "impl-plans/active/canvas-editor-224-clock.md",
+    "impl-plans/active/canvas-editor-224-consumers.md",
+    "impl-plans/active/canvas-editor-224-visual.md",
+    "impl-plans/active/canvas-editor-224-native-shell.md",
+    "impl-plans/active/canvas-editor-224-editor-join.md",
+    "impl-plans/active/canvas-editor-224-package-preparation.md",
+    "impl-plans/active/canvas-editor-224-verification.md"
+  ],
+  "supportingPlanPaths": [
+    "impl-plans/active/canvas-editor-224-execution.md"
+  ],
+  "reviewContext": {
+    "issueReference": "codex-design-and-implement-review-loop-session-224",
+    "userProblem": "Replace visible CodeMirror DOM rendering with GPU canvas text, cursor, selection and feedback while preserving editor behavior. Design, plan, implement and verify browser WASM integration, a concrete iPad integration path, audio-clock synchronization and bounded visual resources.",
+    "requiredOutcomes": [
+      "Reviewed design documents GPU text architecture, browser/native iPad integration, accessibility, synchronization, resource lifetime, measurable budgets and risks.",
+      "Reviewed code-free file-level plans record invariants, dependencies, behavioral verification and completion progress.",
+      "GPU canvas renders text, cursor, selection, syntax, evaluation, diagnostics and playing highlights while existing interactions remain functional.",
+      "Evidence covers Japanese IME, clipboard, undo/redo, keyboard/touch selection, scrolling, resizing and high DPI.",
+      "Timestamped audio/transport time, revision-aware mapping and output-latency compensation support late-frame recovery without accumulated drift.",
+      "Reviewed visual scope includes video, synth effects, oscilloscopes and beat displays.",
+      "Bounded reusable glyph, geometry, buffer and queue resources have measured rendering, input and memory evidence under concurrent audio/visual load.",
+      "Browser WASM and buildable iPad integration components are verified; unavailable physical-device checks remain incomplete.",
+      "Independent review, improve self-review, material fixes, progress updates and authorized Git finalization are delivered."
+    ],
+    "nonGoals": [
+      "No second editor engine, new language coupling, raw GLSL interface, browser taps, per-slot audio mixing or AUv3.",
+      "No camera, microphone, streaming service or new Swift UI.",
+      "No extra worktrees, PR creation, third-party messaging or unrelated changes."
+    ],
+    "constraints": [
+      "Visible code must use GPU canvas rendering; DOM bridges may serve input and accessibility.",
+      "Preserve all recorded dirty files; never stage unrelated MusicDSP or rumble work.",
+      "Task-owned commits and non-force pushes are explicitly authorized; no extra worktrees, PR creation or third-party messaging.",
+      "Accepted-plan commit and non-force push precede implementation fanout.",
+      "Use design-doc and impl-plan skills; explicit code-free planning requirements override skill examples containing code.",
+      "Use rust-coding and check-and-test-after-modify agents for Rust modifications; split touched Rust files at 1000 or more lines unless explicitly excluded.",
+      "Keep audio independent of rendering; make no hard real-time display or universal zero-copy claims.",
+      "Measure budgets on named hardware; never infer iPad evidence from unit tests.",
+      "Run commands in the foreground, retain session handles until exit, and record complete logs and final statuses.",
+      "Use CARGO_TERM_QUIET=true and failure-focused nextest environment variables.",
+      "Apply improve self-review before handoff.",
+      "Each worker owns only its plan progress log; never edit this shared manifest. Shared indexes, archive and broad formatting are serial CE-FINAL work; initial locks belong CE-PACKAGE.",
+      "Evidence logs use tmp/canvas-editor-224/<planId>/<attempt>/; immutable edit snapshots also follow the execution contract."
+    ],
+    "designDecisionsAndRationale": [
+      "Retain headless CodeMirror state and revision authority; migrate all EditorView consumers coherently while WebGL2 renders visible source and feedback.",
+      "Shape visible runs offscreen and reuse bounded atlas tiles and GPU geometry; retain CPU editing state across context loss.",
+      "Use timestamped epoch/revision-aware transport and audible output correlation, without double-counting latency; late frames recover from absolute time.",
+      "Reuse GlRenderHost and analyzers; compose one muted local video and synth outputs through an explicit bounded canvas copy.",
+      "Retain browser Rust/WASM ABI; native IPC and shared Rust bootstrap use existing CPAL host with limited iOS audio-session glue."
+    ],
+    "intentionalTradeoffs": [
+      "No hard real-time display or universal zero-copy guarantee.",
+      "DOM bridge serves input and accessibility while source stays GPU-rendered.",
+      "Unavailable device, manual IME/accessibility and physical synchronization evidence remains incomplete; desktop builds cannot replace iPad evidence."
+    ],
+    "supportedEdgeCases": [
+      "Composition commit/cancel and deferred source writes; clipboard, undo/redo, graphemes, CRLF and tabs.",
+      "Revision/epoch changes, stale spans, telemetry overflow, late frames, pause and lost correlation.",
+      "Scroll, DPR/resize, touch selection, context loss and restore, allocation refusal, hidden video and disposal."
+    ],
+    "outOfScopeEdgeCases": [
+      "Mixed RTL support requires explicit visual-order evidence; report unsupported cases as a limitation.",
+      "Documents above the measured 1 MiB profile have unverified performance.",
+      "Native visual-language programs unsupported by host capabilities report diagnostics."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-implementation.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/user-qa/pending-editor-questions.md",
+      "design-docs/user-qa/README.md",
+      "design-docs/specs/design-visual.md",
+      "impl-plans/active/canvas-editor-224-contracts.md",
+      "impl-plans/active/canvas-editor-224-state.md",
+      "impl-plans/active/canvas-editor-224-gpu.md",
+      "impl-plans/active/canvas-editor-224-input.md",
+      "impl-plans/active/canvas-editor-224-telemetry.md",
+      "impl-plans/active/canvas-editor-224-native-clock.md",
+      "impl-plans/active/canvas-editor-224-clock.md",
+      "impl-plans/active/canvas-editor-224-consumers.md",
+      "impl-plans/active/canvas-editor-224-visual.md",
+      "impl-plans/active/canvas-editor-224-native-shell.md",
+      "impl-plans/active/canvas-editor-224-editor-join.md",
+      "impl-plans/active/canvas-editor-224-package-preparation.md",
+      "impl-plans/active/canvas-editor-224-verification.md",
+      "impl-plans/active/canvas-editor-224-execution.md",
+      "impl-plans/completed/vactr-editor-wasm.md"
+    ],
+    "reviewDecisions": {
+      "design": "Accept design for code-free implementation planning; implementation and device acceptance remain pending.",
+      "plans": "Accept all 13 implementation plans. No material consistency or implementation-readiness findings."
+    },
+    "communications": {
+      "intake": "comm-002812",
+      "designAcceptance": "comm-002814",
+      "planAuthor": "comm-002815",
+      "planAcceptance": "comm-002816"
+    },
+    "codexAgentReferences": [
+      "AGENTS.md",
+      ".agents/skills/impl-plan/SKILL.md",
+      ".agents/agents/rust-coding.md",
+      ".agents/agents/check-and-test-after-modify.md",
+      "/Users/taco/.codex/skills/improve/SKILL.md"
+    ],
+    "remainingVerification": [
+      "Implementation builds and behavioral tests",
+      "Real browser GPU, input, resource and performance evidence",
+      "Native/iOS build and signing checks",
+      "Manual IME, accessibility and physical synchronization evidence",
+      "Unavailable physical iPad checks remain incomplete"
+    ]
+  }
+}

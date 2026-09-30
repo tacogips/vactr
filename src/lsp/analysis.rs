@@ -11,7 +11,7 @@
 //! checker, packages) and `directives::build_table` (directive lint), and
 //! reads the package cache only when it already exists.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -19,10 +19,11 @@ use std::thread;
 
 use tokio::sync::oneshot;
 use tower_lsp::lsp_types::{
-    CompletionItem, CompletionItemKind, Diagnostic as LspDiag, Hover, HoverContents, MarkupContent,
-    MarkupKind, Position, TextEdit, Url,
+    CompletionItem, CompletionItemKind, CompletionList, CompletionTextEdit, Diagnostic as LspDiag,
+    Hover, HoverContents, MarkupContent, MarkupKind, Position, TextEdit, Url,
 };
 
+use crate::complete::{self, CandidateKind, DocName, PackageNames, Snapshot};
 use crate::directives::build_table;
 use crate::expand::{expand, ExpandCx};
 use crate::lsp::convert::{offset, range, to_lsp, wire_to_lsp};
@@ -37,8 +38,6 @@ use crate::reader::span::FileId;
 use crate::reader::{read, AliasEnv};
 use crate::session::eval::{analyze, Analysis, PackageView};
 use crate::session::protocol::{DiagBody, WireDiag};
-use crate::types::natives::NativeTable;
-use crate::types::ty::KeySet;
 
 /// The lock file name in the workspace root.
 pub const LOCK_FILE: &str = "vactr.lock";
@@ -83,7 +82,7 @@ pub enum AnalysisReq {
     Complete {
         uri: Url,
         pos: Position,
-        reply: oneshot::Sender<Vec<CompletionItem>>,
+        reply: oneshot::Sender<CompletionList>,
     },
     Format {
         uri: Url,
@@ -151,10 +150,6 @@ fn defined_name(form: &Node) -> Option<&str> {
         }
         _ => None,
     }
-}
-
-fn is_word(c: char) -> bool {
-    c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | ':' | '?' | '!' | '*' | '+' | '/')
 }
 
 /// True when the runtime diagnostic's `file` names the document `uri`: the
@@ -331,91 +326,100 @@ impl Analyzer {
         names
     }
 
-    /// Completion at `pos`: prelude natives, document top-level names,
-    /// manifest keywords (`:name`), package prefixes and qualified names,
-    /// filtered by the word before the cursor.
-    pub fn complete(&mut self, uri: &Url, pos: Position) -> Vec<CompletionItem> {
+    /// Context-aware completion at `pos`, using the shared completion engine.
+    pub fn complete_list(&mut self, uri: &Url, pos: Position) -> CompletionList {
         let Some(d) = self.docs.get(uri) else {
-            return Vec::new();
+            return CompletionList {
+                is_incomplete: false,
+                items: Vec::new(),
+            };
         };
         let at = offset(&d.text, pos);
-        let word_start = d.text[..at]
-            .char_indices()
-            .rev()
-            .take_while(|(_, c)| is_word(*c))
-            .last()
-            .map_or(at, |(k, _)| k);
-        let word = d.text[word_start..at].to_string();
-        let mut items: BTreeMap<String, (CompletionItemKind, String)> = BTreeMap::new();
-        let mut add = |label: String, kind, detail: String| {
-            items.entry(label).or_insert((kind, detail));
-        };
-        for f in &d.analysis.forms {
-            if let Some(name) = defined_name(f) {
-                let kind = match f.children.first().and_then(Node::sym_name) {
-                    Some("fn") => CompletionItemKind::FUNCTION,
-                    Some("struct" | "enum") => CompletionItemKind::STRUCT,
-                    _ => CompletionItemKind::VARIABLE,
-                };
-                let detail = f
-                    .children
-                    .get(2)
-                    .and_then(|v| d.analysis.types.get(&v.id))
-                    .map_or_else(|| "document".to_string(), ToString::to_string);
-                add(name.to_string(), kind, detail);
-            }
-        }
-        for (_, sig) in NativeTable::global().iter() {
-            let detail = sig.ty.first().map_or("prelude", |t| t).to_string();
-            add(sig.name.to_string(), CompletionItemKind::FUNCTION, detail);
-        }
-        let m = &d.analysis.manifest;
-        for (set, what) in [
-            (&m.sounds, "sound"),
-            (&m.synths, "synth"),
-            (&m.controls, "control"),
-        ] {
-            if let KeySet::Of(keys) = set {
-                for k in keys {
-                    add(
-                        format!(":{k}"),
-                        CompletionItemKind::KEYWORD,
-                        what.to_string(),
-                    );
-                }
-            }
-        }
+        let text = d.text.clone();
+        let manifest = d.analysis.manifest.clone();
         let prefixes: Vec<(Rc<str>, Rc<str>)> = d
             .analysis
             .alias_env
             .prefixes
             .iter()
-            .map(|(p, path)| (Rc::clone(p), Rc::clone(path)))
+            .map(|(prefix, path)| (Rc::clone(prefix), Rc::clone(path)))
             .collect();
-        for (prefix, path) in &prefixes {
-            add(
-                prefix.to_string(),
-                CompletionItemKind::MODULE,
-                path.to_string(),
-            );
-        }
-        for (prefix, path) in prefixes {
-            for name in self.package_names(&path) {
-                items
-                    .entry(format!("{prefix}.{name}"))
-                    .or_insert((CompletionItemKind::FIELD, path.to_string()));
-            }
-        }
-        items
-            .into_iter()
-            .filter(|(label, _)| label.starts_with(&word))
-            .map(|(label, (kind, detail))| CompletionItem {
-                label,
-                kind: Some(kind),
-                detail: Some(detail),
-                ..CompletionItem::default()
+        let document = d
+            .analysis
+            .forms
+            .iter()
+            .filter_map(|form| {
+                let label = defined_name(form)?;
+                let kind = match form.children.first().and_then(Node::sym_name) {
+                    Some("fn") => CandidateKind::Function,
+                    Some("struct" | "enum") => CandidateKind::Type,
+                    _ => CandidateKind::Variable,
+                };
+                let detail = form
+                    .children
+                    .get(2)
+                    .and_then(|value| d.analysis.types.get(&value.id))
+                    .map_or_else(|| "document".to_string(), ToString::to_string);
+                Some(DocName {
+                    label: label.to_string(),
+                    kind,
+                    detail,
+                })
             })
-            .collect()
+            .collect();
+        let packages = prefixes
+            .into_iter()
+            .map(|(prefix, path)| PackageNames {
+                prefix: prefix.to_string(),
+                path: path.to_string(),
+                names: self.package_names(&path),
+            })
+            .collect();
+        let snapshot = Snapshot {
+            manifest,
+            packages,
+            document,
+        };
+        let completion = complete::complete(&text, at, &snapshot, complete::DEFAULT_LIMIT);
+        let items = completion
+            .items
+            .into_iter()
+            .enumerate()
+            .map(|(rank, candidate)| {
+                let kind = match candidate.kind {
+                    CandidateKind::Local | CandidateKind::Variable => CompletionItemKind::VARIABLE,
+                    CandidateKind::Function => CompletionItemKind::FUNCTION,
+                    CandidateKind::Value => CompletionItemKind::CONSTANT,
+                    CandidateKind::Type => CompletionItemKind::STRUCT,
+                    CandidateKind::Keyword => CompletionItemKind::KEYWORD,
+                    CandidateKind::Control => CompletionItemKind::PROPERTY,
+                    CandidateKind::Key => CompletionItemKind::FIELD,
+                    CandidateKind::Module => CompletionItemKind::MODULE,
+                    CandidateKind::Qualified => CompletionItemKind::FIELD,
+                };
+                CompletionItem {
+                    label: candidate.label.clone(),
+                    kind: Some(kind),
+                    detail: Some(candidate.detail),
+                    filter_text: Some(candidate.label),
+                    sort_text: Some(format!("{rank:04}")),
+                    text_edit: Some(CompletionTextEdit::Edit(TextEdit::new(
+                        range(&text, completion.from, completion.to),
+                        candidate.insert,
+                    ))),
+                    ..CompletionItem::default()
+                }
+            })
+            .collect();
+        CompletionList {
+            is_incomplete: completion.incomplete,
+            items,
+        }
+    }
+
+    /// Completion items at `pos`, retained for callers that need the legacy vector shape.
+    pub fn complete(&mut self, uri: &Url, pos: Position) -> Vec<CompletionItem> {
+        self.complete_list(uri, pos).items
     }
 
     /// The whitespace-only formatting edits of the document.
@@ -483,7 +487,7 @@ impl Analyzer {
                 let _ = reply.send(self.hover(&uri, pos));
             }
             AnalysisReq::Complete { uri, pos, reply } => {
-                let _ = reply.send(self.complete(&uri, pos));
+                let _ = reply.send(self.complete_list(&uri, pos));
             }
             AnalysisReq::Format { uri, reply } => {
                 let _ = reply.send(self.format(&uri));

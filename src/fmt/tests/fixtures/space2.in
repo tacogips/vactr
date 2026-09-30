@@ -1,0 +1,30 @@
+inst x:
+  if true:
+    let y 1
+  else:
+    let y 2
+let x foo
+      > bar
+let y foo
+      > f:
+        s
+inst x:
+  foo
+    > bar
+let x foo
+      > f:
+        s
+#@ label: zero
+  #@ label: one
+    #@ label: two
+      #@ label: three
+        #@ label: four
+          #@ label: five
+            #@ label: six
+let y 2
+let a 1 #@ mute   
+if true:
+  let a 1
+elif false:
+  #@ label: mid
+  let b 2

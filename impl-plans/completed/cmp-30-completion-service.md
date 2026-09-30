@@ -1,6 +1,6 @@
 # CMP-30: Editor Completion Service (`completion.ts`)
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: CMP-30 (wave 2; parallel with CMP-20, CMP-21, CMP-31)
 **Design Reference**: `design-docs/specs/design-completion.md` 6.1, 6.6, 7.4 (the service bullets)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

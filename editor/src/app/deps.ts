@@ -7,6 +7,7 @@ import type { WasmCore } from '../protocol/wasm';
 import type { BindApi, CodeApi, MidiApi, VisualApi } from './apis';
 import type { Clock } from './clock';
 import type { Formatter } from '../code/format';
+import type { CompletionEngine } from '../code/completion-types';
 import type { SyntaxLoader } from '../code/syntax';
 
 export type Tier = 'browser' | 'native';
@@ -23,6 +24,8 @@ export interface EditorDeps {
   syntax?: SyntaxLoader;
   /** Dedicated formatter wasm instance, independent of the session core. */
   formatter?: Formatter;
+  /** Optional wasm completion engine for the code area. */
+  completion?: CompletionEngine;
   /** Set by the owning area's mount; read at use time. */
   code?: CodeApi;
   midi?: MidiApi;

@@ -2,6 +2,7 @@
 
 mod levels;
 mod lines;
+mod repair;
 
 use crate::directives::attach::extent;
 use crate::reader::import::AliasEnv;
@@ -42,15 +43,36 @@ pub fn format(src: &str) -> Formatted {
         .iter()
         .any(|diagnostic| diagnostic.severity == Severity::Error)
     {
-        return Formatted {
-            text: src.to_owned(),
-            outcome: Outcome::Refused,
-            diags: read.diags,
+        let Some(converted) = repair::space_indent(src, &read.diags) else {
+            return refused(src, read.diags);
         };
+        let converted_read = crate::reader::read(&converted, FileId::new(1), &AliasEnv::new());
+        if converted_read
+            .diags
+            .iter()
+            .any(|diagnostic| diagnostic.severity == Severity::Error)
+        {
+            return refused(src, read.diags);
+        }
+        let mut formatted = format_clean(&converted, converted_read.diags, &converted_read.nodes);
+        formatted.outcome = Outcome::Changed;
+        return formatted;
     }
 
+    format_clean(src, read.diags, &read.nodes)
+}
+
+fn refused(src: &str, diags: Vec<Diagnostic>) -> Formatted {
+    Formatted {
+        text: src.to_owned(),
+        outcome: Outcome::Refused,
+        diags,
+    }
+}
+
+fn format_clean(src: &str, diags: Vec<Diagnostic>, nodes: &[Node]) -> Formatted {
     let mut lines = lines::split(src, FileId::new(1));
-    levels::assign_code_levels(&mut lines, &attach_target_starts(src, &read.nodes));
+    levels::assign_code_levels(&mut lines, &attach_target_starts(src, nodes));
     let text = lines::assemble(src, &lines);
     let outcome = if text == src {
         Outcome::Unchanged
@@ -60,7 +82,7 @@ pub fn format(src: &str) -> Formatted {
     Formatted {
         text,
         outcome,
-        diags: read.diags,
+        diags,
     }
 }
 

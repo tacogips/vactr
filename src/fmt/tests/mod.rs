@@ -2,6 +2,7 @@
 
 mod corpus;
 mod mutation;
+mod repair;
 mod rules;
 
 use crate::directives::attach::{attach, Doc};

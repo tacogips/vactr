@@ -1,6 +1,6 @@
 # CMP-10: Completion Engine Core (`src/complete/`)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CMP-10 (wave 1; parallel with CMP-15, FST-50, EDS-10, EDS-11, EDS-12)
 **Design Reference**: `design-docs/specs/design-completion.md` sections 3.1-3.8, 7.1
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`
@@ -318,14 +318,14 @@ Patterns to imitate:
 
 ## Completion Criteria
 
-- [ ] The pinned public contract exists exactly as written.
-- [ ] All seven contexts, scope rules, sources and ranking are covered by
+- [x] The pinned public contract exists exactly as written.
+- [x] All seven contexts, scope rules, sources and ranking are covered by
       the tests listed above, and they pass.
-- [ ] No panic over the corpus prefixes and the mutants.
-- [ ] The wasm32 build passes, and the release budget median is recorded.
-- [ ] `src/lib.rs` has only the one-line module addition and its doc line.
-- [ ] Verification steps 1-7 are logged with `exit=0`.
-- [ ] The Progress Log is updated.
+- [x] No panic over the corpus prefixes and the mutants.
+- [x] The wasm32 build passes, and the release budget median is recorded.
+- [x] `src/lib.rs` has only the one-line module addition and its doc line.
+- [x] Verification steps 1-7 are logged with `exit=0`.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
@@ -373,3 +373,6 @@ Patterns to imitate:
 **Additional check**: `CARGO_TERM_QUIET=true cargo check` — exit=0; final-source log `tmp/cmp/CMP-10/attempt-1/1-cargo-check-final4.log`.
 **Evidence**: Edit intents and pre/post hashes are in `tmp/cmp/CMP-10/attempt-1/edit-intents.md`. Persisted clippy, rustfmt and line-count wrapper failures are retained with final successful reruns. Two early agent-mediated nextest failures were reported before a complete plan-local log was requested; their reported compile/test failures were repaired, and final passing nextest runs have complete logs.
 **Completion Criteria**: Implementation and all plan-owned verification are complete. Formal review and downstream plans CMP-20/CMP-21 remain separate workflow steps.
+
+### Session: 2026-09-30 (session 234 closeout, docs refresh)
+**Tasks Completed**: Ticked the seven Completion Criteria from the final verification entry above (median 1.071 ms; `git diff a61fc2e -- src/lib.rs` shows only the doc bullet and `pub mod complete;`). The plan was accepted in session 226 and passed the CMP-40 combined gate; it is archived in `impl-plans/completed/`.

@@ -1,99 +1,22 @@
 import { EditorState, type Extension } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin } from '@codemirror/view';
-import type { Language, Parser, Query } from 'web-tree-sitter';
+import { styleSpans, type ParsedVact, type VactSyntax } from './syntax-core';
 
-export interface SyntaxCapture {
-  name: string;
-  from: number;
-  to: number;
-}
-
-export interface ParsedVact {
-  captures(from: number, to: number): SyntaxCapture[];
-  delete(): void;
-}
-
-export interface VactSyntax {
-  parse(text: string): ParsedVact;
-}
-
-export type SyntaxLoader = () => Promise<VactSyntax>;
-
-export const CAPTURE_CLASSES: Readonly<Record<string, string>> = {
-  comment: 'vact-tok-comment',
-  'comment.directive': 'vact-tok-directive',
-  string: 'vact-tok-string',
-  number: 'vact-tok-number',
-  'string.special.symbol': 'vact-tok-keyword',
-  'string.special.path': 'vact-tok-path',
-  keyword: 'vact-tok-head',
-  'punctuation.bracket': 'vact-tok-bracket',
-};
-
-interface TreeSitterModule {
-  Parser: typeof Parser;
-  Language: typeof Language;
-  Query: typeof Query;
-}
-
-let parserInit: Promise<void> | null = null;
-
-export async function loadVactSyntax(base: string): Promise<VactSyntax> {
-  const treeSitter = (await import('web-tree-sitter')) as TreeSitterModule;
-  parserInit ??= treeSitter.Parser.init({ locateFile: (name: string) => new URL(name, base).href });
-  await parserInit;
-
-  const language = await treeSitter.Language.load(new URL('tree-sitter-vact.wasm', base));
-  const response = await fetch(new URL('highlights.scm', base));
-  if (!response.ok) throw new Error(`Unable to load highlights.scm: ${response.status}`);
-  const query = new treeSitter.Query(language, await response.text());
-  const parser = new treeSitter.Parser();
-  parser.setLanguage(language);
-
-  return createVactSyntax(parser, query);
-}
-
-export function createVactSyntax(parser: Parser, query: Query): VactSyntax {
-  return {
-    parse(text: string): ParsedVact {
-      const tree = parser.parse(text);
-      if (!tree) throw new Error('Tree-sitter could not parse the document');
-      return {
-        captures(from, to) {
-          // web-tree-sitter interprets QueryOptions startIndex/endIndex as byte offsets
-          // (2 per UTF-16 code unit), so range in code units by filtering instead.
-          return query
-            .captures(tree.rootNode)
-            .filter(
-              (capture) =>
-                capture.node.startIndex < to && (capture.node.endIndex > from || capture.node.startIndex >= from),
-            )
-            .map((capture) => ({
-              name: capture.name,
-              from: capture.node.startIndex,
-              to: capture.node.endIndex,
-            }));
-        },
-        delete: () => tree.delete(),
-      };
-    },
-  };
-}
+export { CAPTURE_CLASSES, createVactSyntax, loadVactSyntax } from './syntax-core';
+export type { ParsedVact, StyleSpan, SyntaxCapture, SyntaxLoader, VactSyntax } from './syntax-core';
 
 function decorations(view: EditorView, parsed: ParsedVact): DecorationSet {
   const ranges: { from: number; to: number; decoration: Decoration }[] = [];
   const seen = new Set<string>();
   for (const visible of view.visibleRanges) {
-    for (const capture of parsed.captures(visible.from, visible.to)) {
-      const cls = CAPTURE_CLASSES[capture.name];
-      if (!cls || capture.from >= capture.to) continue;
-      const key = `${capture.from}:${capture.to}`;
+    for (const span of styleSpans(parsed, visible.from, visible.to)) {
+      const key = `${span.from}:${span.to}`;
       if (seen.has(key)) continue;
       seen.add(key);
       ranges.push({
-        from: capture.from,
-        to: capture.to,
-        decoration: Decoration.mark({ class: cls }),
+        from: span.from,
+        to: span.to,
+        decoration: Decoration.mark({ class: span.cls }),
       });
     }
   }

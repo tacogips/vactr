@@ -18,9 +18,10 @@ async function readText(path: string): Promise<string> {
 }
 
 async function readWasm(): Promise<ArrayBuffer> {
+  const wasm = await loadVactrWasm();
   const spec: string = 'node:fs';
   const fs = (await import(/* @vite-ignore */ spec)) as { readFileSync(path: string): Uint8Array<ArrayBuffer> };
-  const bytes = fs.readFileSync(`${root}/../target/wasm32-unknown-unknown/debug/vactr.wasm`);
+  const bytes = fs.readFileSync(wasm.path);
   return bytes.slice().buffer;
 }
 

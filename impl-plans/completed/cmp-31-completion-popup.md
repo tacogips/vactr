@@ -1,6 +1,6 @@
 # CMP-31: Completion DOM Popup (`completion-popup.ts`)
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: CMP-31 (wave 2; parallel with CMP-20, CMP-21, CMP-30)
 **Design Reference**: `design-docs/specs/design-completion.md` 6.2, 6.3, 6.5, 7.4 (the popup bullets); user-QA C6
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

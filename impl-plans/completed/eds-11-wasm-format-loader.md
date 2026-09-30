@@ -1,6 +1,6 @@
 # EDS-11: Wasm Format Test Honors `VACTR_WASM`
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: EDS-11 (wave 1; parallel with CMP-10, CMP-15, FST-50, EDS-10, EDS-12)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 5.4 (session-226 amendment D)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

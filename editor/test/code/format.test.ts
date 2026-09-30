@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EditorDeps } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
 import { mount } from '../../src/code/mount';
-import { formatDocument, formatKeymap, FORMAT_KEY, type Formatter } from '../../src/code/format';
+import { formatDocument, formatKeymap, FORMAT_KEY, minimalChange, type Formatter } from '../../src/code/format';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
@@ -13,6 +13,12 @@ import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
 const views: EditorView[] = [];
+
+interface NodeFs {
+  readFileSync(path: string): Uint8Array<ArrayBuffer> | string;
+}
+
+const proc = (globalThis as unknown as { process: { cwd(): string } }).process;
 
 afterEach(() => {
   for (const view of views.splice(0)) view.destroy();
@@ -113,5 +119,34 @@ describe('formatKeymap', () => {
     expect(format).toHaveBeenCalledWith('let x 1');
     mounted.dispose();
     if (view) views.splice(views.indexOf(view), 1);
+  });
+});
+
+describe('minimalChange', () => {
+  it('returns null for identical text and the smallest range for changed text', () => {
+    expect(minimalChange('abc', 'abc')).toBeNull();
+    const change = minimalChange('a  b', 'a b');
+    expect(change).toEqual({ from: 2, to: 3, insert: '' });
+    expect(change && 'a  b'.slice(0, change.from) + change.insert + 'a  b'.slice(change.to)).toBe('a b');
+  });
+
+  it('keeps Japanese text around the minimal replacement intact', () => {
+    const before = '前の音量後';
+    const after = '前の音高後';
+    const change = minimalChange(before, after);
+    expect(change).not.toBeNull();
+    expect(before.slice(0, change!.from) + change!.insert + before.slice(change!.to)).toBe(after);
+  });
+
+  it('keeps the extracted core modules free of CodeMirror imports', async () => {
+    const spec: string = 'node:fs';
+    const fs = (await import(/* @vite-ignore */ spec)) as NodeFs;
+    const readText = (path: string) => {
+      const value = fs.readFileSync(path);
+      return typeof value === 'string' ? value : new TextDecoder().decode(value);
+    };
+    const root = proc.cwd();
+    expect(readText(`${root}/src/code/format-core.ts`)).not.toContain('@codemirror/');
+    expect(readText(`${root}/src/code/tool-wasm.ts`)).not.toContain('@codemirror/');
   });
 });

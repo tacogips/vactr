@@ -244,3 +244,78 @@ fn directory_and_invalid_utf8_are_io_errors() {
         .contains("vactr: binary.vact: not UTF-8"));
     assert_eq!(std::fs::read(file).expect("read binary input"), invalid);
 }
+
+#[test]
+fn four_space_file_is_rewritten_and_stable_on_the_second_run() {
+    let input = include_bytes!("../../fmt/tests/fixtures/space4.in");
+    let expected = include_bytes!("../../fmt/tests/fixtures/space4.out");
+    let dir = TempDir::new();
+    let file = dir.write("sample.vact", input);
+
+    let (status, stdout, stderr) = invoke(
+        false,
+        FmtInput::Paths(vec![PathBuf::from("sample.vact")]),
+        dir.path(),
+        b"",
+    );
+    assert_eq!(status, 0);
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+    assert_eq!(std::fs::read(&file).expect("read repaired file"), expected);
+
+    let (status, stdout, stderr) = invoke(
+        false,
+        FmtInput::Paths(vec![PathBuf::from("sample.vact")]),
+        dir.path(),
+        b"",
+    );
+    assert_eq!(status, 0);
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+    assert_eq!(std::fs::read(&file).expect("read stable file"), expected);
+}
+
+#[test]
+fn check_mode_reports_space_file_without_rewriting_it() {
+    let input = include_bytes!("../../fmt/tests/fixtures/space4.in");
+    let dir = TempDir::new();
+    let file = dir.write("sample.vact", input);
+
+    let (status, stdout, stderr) = invoke(
+        true,
+        FmtInput::Paths(vec![PathBuf::from("sample.vact")]),
+        dir.path(),
+        b"",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"sample.vact\n");
+    assert!(stderr.is_empty());
+    assert_eq!(std::fs::read(&file).expect("read unchanged file"), input);
+}
+
+#[test]
+fn ambiguous_space_file_is_refused_unchanged() {
+    let input = include_bytes!("../../fmt/tests/fixtures/space-ambiguous.in");
+    let dir = TempDir::new();
+    let file = dir.write("ambiguous.vact", input);
+
+    let (status, stdout, stderr) = invoke(
+        false,
+        FmtInput::Paths(vec![PathBuf::from("ambiguous.vact")]),
+        dir.path(),
+        b"",
+    );
+    assert_eq!(status, 3);
+    assert!(stdout.is_empty());
+    let diagnostic = String::from_utf8(stderr).expect("diagnostic UTF-8");
+    assert!(
+        diagnostic.contains("vactr: ambiguous.vact:"),
+        "{diagnostic}"
+    );
+    assert!(diagnostic.contains("error[indent-space]"), "{diagnostic}");
+    assert_eq!(
+        std::fs::read(&file).expect("read refused file"),
+        input,
+        "refused input must remain byte-identical"
+    );
+}

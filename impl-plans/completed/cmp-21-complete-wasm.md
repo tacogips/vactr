@@ -1,6 +1,6 @@
 # CMP-21: Wasm Completion Export
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: CMP-21 (wave 2; parallel with CMP-20, CMP-30, CMP-31)
 **Design Reference**: `design-docs/specs/design-completion.md` 5.1, 5.2, 7.3
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

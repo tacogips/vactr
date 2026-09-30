@@ -1,6 +1,6 @@
 # FST-50: Formatter Space-Indent Repair
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FST-50 (wave 1; parallel with CMP-10, CMP-15, EDS-10, EDS-11, EDS-12)
 **Design Reference**: `design-docs/specs/design-formatter-and-syntax.md` 3.1 (amended), 3.6 (repaired-input guarantees), 3.8 (mutation amendment), 3.9; `design-docs/user-qa/pending-completion-questions.md` C4, C5
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

@@ -1,6 +1,6 @@
 # CMP-20: LSP Completion on the Engine
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: CMP-20 (wave 2; parallel with CMP-21, CMP-30, CMP-31)
 **Design Reference**: `design-docs/specs/design-completion.md` 4.1, 4.2, 7.2; `design-docs/specs/design-implementation.md` 14.5 (Revised 2026-09-30)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

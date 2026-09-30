@@ -1,6 +1,6 @@
 # CMP-40: Integration Review, Full Gate and Closeout
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CMP-40 (wave 4; serial; the only dispatched plan of run session 234)
 **Design Reference**: `design-docs/specs/design-completion.md` 3-9 (section 8 "Closeout run (session 234, no design change)"); `design-docs/specs/design-formatter-and-syntax.md` 3.9, 5.4, 5.5, 8
 **Dispatch**: `impl-plans/active/cmp-closeout-dispatch.json` (`plans` = [CMP-40]; the 11 accepted plans are in `acceptedDependencies`)
@@ -339,21 +339,21 @@ script counts as evidence.
 
 ## Completion Criteria
 
-- [ ] Task 1 checks pass: 30 tracked-diff paths and 40 untracked paths
+- [x] Task 1 checks pass: 30 tracked-diff paths and 40 untracked paths
       exactly as listed, no apis.ts/language.ts diff, no autocomplete,
       and every `.rs` file under 1000 lines.
-- [ ] Task 2 items 1-6 are each recorded OK, or are repaired and
+- [x] Task 2 items 1-6 are each recorded OK, or are repaired and
       re-verified.
-- [ ] Gate steps 1-12 exit 0 with complete logs, and the counts and the
+- [x] Gate steps 1-12 exit 0 with complete logs, and the counts and the
       budget median are recorded. Any BLOCKED step is listed with its
       evidence for the orchestrator to rerun.
-- [ ] The README, the two design status sentences and
+- [x] The README, the two design status sentences and
       `impl-plans/README.md` are updated as in Task 4.
-- [ ] The 13 files are in `impl-plans/completed/` and each plan is
+- [x] The 13 files are in `impl-plans/completed/` and each plan is
       marked Completed. `impl-plans/active/` keeps only
       `cmp-closeout-dispatch.json` of the cmp/eds/fst-50 names, and the
       stale-link grep is clean.
-- [ ] The Progress Log is updated with commands, exit codes, log paths
+- [x] The Progress Log is updated with commands, exit codes, log paths
       and hashes.
 
 ## Progress Log
@@ -369,6 +369,13 @@ script counts as evidence.
 ### Session: 2026-09-30 (plan revised, session 234)
 **Tasks Completed**: Pointed the dispatch at the new `impl-plans/active/cmp-closeout-dispatch.json` (plans [CMP-40], 11 acceptedDependencies, 86 concrete paths). `cmp-dispatch.json` is now moved unchanged. The Task 1 path counts were fixed to 30 tracked plus 40 untracked. The Task 5 archive check now keeps `cmp-closeout-dispatch.json` in active/. The status text now says session 234.
 **Blockers**: none
+
+### Session: 2026-09-30 (CMP-40 implementation closeout, session 234)
+**Tasks Completed**: Task 1 matched exactly 30 tracked diff paths and 40 untracked paths before closeout edits (`tmp/cmp-closeout/CMP-40/attempt-1/01-diff-name-only-retry.log`, `02-untracked.log`). Protected `apis.ts`/`language.ts` diff was empty, autocomplete grep had no matches, and all listed Rust files were under 1000 lines (`03-protected-paths.log`, `04-autocomplete.log`, `05-rust-lines.log`). Task 2 items 1-6 were reviewed; item 1 exposed analyzed LSP document kinds losing ties to the generic parsed-name fallback. `src/complete/sources.rs` now defers to matching `Snapshot.document` metadata, with `src/lsp/tests/complete.rs::analyzed_document_function_keeps_function_kind` passing 1/1 (`lsp-focused-retry-1.log`, `check-agent-regression-lsp.log`). Items 2-6 are OK; evidence is `attempt-2/task2-review.log` and `11-task2-static.log`.
+**Full gate**: all steps passed on the final source. (1) `CARGO_TERM_QUIET=true cargo build`, exit 0, `attempt-2/01-cargo-build.log`; (2) `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings`, exit 0, `02-clippy.log`; (3) `CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings`, exit 0, `03-clippy-lsp.log`; (4) `CARGO_TERM_QUIET=true cargo fmt --check`, exit 0, `04-fmt-check.log`; (5) plain nextest, 1,672 passed, 0 failed, 3 skipped, exit 0, `05-nextest.log`; (6) nextest `--features lsp`, 1,696 passed, 0 failed, 3 skipped, exit 0, `06-nextest-lsp.log`; (7) release ignored `test(budget)`, 1 passed, exit 0, `07-budget-median.log`; rerun with output recorded median 0.653 ms, `07-budget-median-output.log`; (8) wasm32 host build and export listing, both exit 0 with exact exports `complete_out_len complete_out_ptr complete_source fmt_out_len fmt_out_ptr fmt_source session_init`, `08-wasm-build-exports.log`; (9) `mise run ts-build-wasm` and `mise run ts-test`, exit 0, 13/13 parses, `09-ts-build-wasm.log` and `09-ts-test.log`; (10) `CARGO_TERM_QUIET=true mise run fmt-vact-check`, exit 0, `10-fmt-vact-check-quiet-retry.log`; (11) `CARGO_TERM_QUIET=true mise run lint`, exit 0, `11-lint-quiet-retry.log`; (12) editor check/test/build, exit 0, Vitest 432/432 across 69 files, `12-editor-gate.log`. No steps were blocked.
+**Docs and archive**: README, plan index and both design status sentences updated. Eleven accepted plans now say Completed; EDS-10 and EDS-12 already said Completed. Their 11 plan files and unchanged session-226 `cmp-dispatch.json` moved to `impl-plans/completed/`; `cmp-40-closeout.md` is moved last after this entry. Pre-move hashes are in `attempt-2/archive-source-sha256.txt`; `cmp-dispatch.json` matches its `a61fc2e` hash. Pre-final active/completed count and stale-link output is `attempt-2/archive-pre-final-check.log`; final archive validation is recorded in `attempt-2/archive-final-check.log`.
+**Edit hashes**: documentation pre-edit hashes and intent are in `edit-intents/01-docs.intent`; active plan hashes/status intent in `edit-intents/02-plan-statuses.intent`; index row intent in `03-impl-readme-rows.intent`; archive intent in `04-archive-move.intent`; this plan's pre-edit hash/intent in `05-cmp40-final.intent`. Source repair pre/post hashes are in `attempt-1/01-source-intent.txt` and `02-test-intent.txt`.
+**Blockers**: none. Formal integrity/adversarial reviews, commit and push are owned by downstream workflow steps.
 
 ## Related Plans
 

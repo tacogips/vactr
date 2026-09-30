@@ -7,8 +7,10 @@ service with a small DOM popup. It answers the user request of
 suggestion engine that shows next-candidate suggestions while typing.
 
 Issue reference: workflow input of `opus-luna-design-and-implement-review-loop-session-226`
-(no GitHub issue number was supplied). Status: Design, 2026-09-30, branch
-`wf/syntax-fmt`. The open choices are in
+(no GitHub issue number was supplied). Status: Implemented and verified
+2026-09-30 (session 234; 1,672 plain nextest, 1,696 `--features lsp`
+nextest, and 432 vitest tests passed); plans are in `impl-plans/completed/`,
+branch `wf/syntax-fmt`. The open choices are in
 `design-docs/user-qa/pending-completion-questions.md`. Their
 recommendations are followed by default.
 

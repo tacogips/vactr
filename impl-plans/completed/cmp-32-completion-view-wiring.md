@@ -1,6 +1,6 @@
 # CMP-32: EditorView Completion Adapter and Wiring
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: CMP-32 (wave 3)
 **Design Reference**: `design-docs/specs/design-completion.md` 6.4, 6.5, 6.6, 7.4 (the view bullets)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

@@ -13,7 +13,9 @@ FST-10..40 are in `impl-plans/completed/`. The questions that stay open are in
 `design-docs/user-qa/pending-formatter-syntax-questions.md`. Their
 recommendations are followed by default.
 
-Follow-up amendment (2026-09-30, session 226, status: Design). This run
+Follow-up amendment (2026-09-30, session 226, status: Implemented and verified
+2026-09-30 (session 234); FST-50, EDS-10..12 are in
+`impl-plans/completed/`). This run
 adds three things:
 
 - the space-indent repair, section 3.9, with gate changes in 3.1, 3.6

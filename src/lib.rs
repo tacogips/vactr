@@ -12,6 +12,7 @@
 //! - `ns`, `compile`, `vm`: namespaces and tweak slots, the reactive
 //!   dependency graph and top-level `Evaluator`, the bytecode compiler, and
 //!   the VM with the core and domain natives.
+//! - `complete`: the shared context-aware completion engine.
 //! - `pattern`, `clock`, `tex`: the pattern engine and signals, the cycle
 //!   clock, and the visual chains with their shader and uniform plans.
 //! - `sched`, `dsp`, `host`: the scheduler and slot table, the DSP graph and
@@ -56,6 +57,7 @@ macro_rules! id_newtype {
 pub mod cli;
 pub mod clock;
 pub mod compile;
+pub mod complete;
 pub mod directives;
 pub mod dsp;
 pub mod expand;

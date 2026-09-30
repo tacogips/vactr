@@ -166,7 +166,7 @@ impl LanguageServer for Backend {
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let at = params.text_document_position;
-        let items = self
+        let list = self
             .ask(|reply| AnalysisReq::Complete {
                 uri: at.text_document.uri,
                 pos: at.position,
@@ -174,7 +174,7 @@ impl LanguageServer for Backend {
             })
             .await
             .ok_or_else(gone)?;
-        Ok(Some(CompletionResponse::Array(items)))
+        Ok(Some(CompletionResponse::List(list)))
     }
 
     async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {

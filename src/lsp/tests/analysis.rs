@@ -120,20 +120,44 @@ fn hover_over_a_let_bound_number_gives_its_type() {
 
 #[test]
 fn completion_offers_prelude_names_keywords_and_document_names() {
+    // Design 4.2 moves keyword completion to Keyword context and makes the
+    // empty-prefix head list explicitly incomplete when the cap is reached.
     let (mut an, u) = open("let tempo-x 12\n\n");
-    let labels: Vec<String> = an
-        .complete(&u, Position::new(1, 0))
-        .into_iter()
-        .map(|c| c.label)
-        .collect();
-    for want in ["sine", ":bd", ":analog", "tempo-x"] {
-        assert!(labels.iter().any(|l| l == want), "{want} missing");
+    let list = an.complete_list(&u, Position::new(1, 0));
+    assert!(list.is_incomplete);
+    assert!(list.items.iter().any(|item| item.label == "tempo-x"));
+
+    let (mut an, u) = open("si");
+    assert!(an
+        .complete(&u, Position::new(0, 2))
+        .iter()
+        .any(|item| item.label == "sine"));
+
+    let (mut an, u) = open("s :");
+    let items = an.complete(&u, Position::new(0, 3));
+    for want in [":bd", ":analog"] {
+        assert!(
+            items.iter().any(|item| item.label == want),
+            "{want} missing"
+        );
     }
-    // The word before the cursor filters: `:b` keeps keywords only.
+
     let (mut an, u) = open(":b");
     let items = an.complete(&u, Position::new(0, 2));
-    assert!(items.iter().any(|c| c.label == ":bd"));
-    assert!(items.iter().all(|c| c.label.starts_with(":b")));
+    assert!(items.iter().any(|item| item.label == ":bd"));
+    assert!(items.iter().all(|item| item.label.starts_with(':')));
+    let last_prefix = items.iter().rposition(|item| {
+        item.label
+            .strip_prefix(':')
+            .is_some_and(|name| name.starts_with('b'))
+    });
+    let first_other = items.iter().position(|item| {
+        !item
+            .label
+            .strip_prefix(':')
+            .is_some_and(|name| name.starts_with('b'))
+    });
+    assert!(matches!((last_prefix, first_other), (Some(last), Some(first)) if last < first));
 }
 
 #[test]

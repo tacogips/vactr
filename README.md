@@ -121,9 +121,13 @@ Session layer (TASK-009):
   most 8 connections, 1 MiB frames).
 - `src/lsp/`: `vactr lsp` over stdio (tower-lsp, `lsp` feature). It can
   attach to a running `serve` socket with `--session`. Its
-  `textDocument/formatting` uses the formatter in `src/fmt/`.
+  `textDocument/formatting` uses the formatter in `src/fmt/`, and
+  `textDocument/completion` uses the engine in `src/complete/`.
 - `src/fmt/`: the `.vact` source formatter (layout whitespace only;
   wasm32-clean), shared by `vactr fmt`, the LSP and the editor.
+- `src/complete/`: the context-aware, scope-aware, ranked completion
+  engine (wasm32-clean), shared by the LSP and editor through the
+  `complete_source` export.
 
 The CLI and the session protocol are specified in
 `design-docs/specs/command.md`. The audible REPL check (a REPL-bound
@@ -161,7 +165,9 @@ It provides:
 - the `.vact` mode (tree-sitter highlighting once `tree-sitter-vact.wasm`
   loads, the StreamLanguage mode otherwise), eval keybindings and flash,
   a format command on `Shift-Alt-f` (the wasm formatter), and inline
-  diagnostics;
+  diagnostics; a completion popup appears while typing, `Ctrl-Space` opens
+  it manually, Arrow/PageUp/PageDown move, `Enter`/`Tab` accept, and
+  `Escape` closes it;
 - playing-step highlighting on the audio clock, and the transport bar;
 - the right-pane slider panel (source-edit and overlay modes), the
   `#@` directive control panel, drag on literals and WebMIDI learn;
@@ -208,7 +214,10 @@ real-browser visual pane, and the Tauri app run.
 success, 1 means an I/O error or a changed file under `--check`, 2 means
 a usage error, and 3 means at least one input had reader errors and was
 left unchanged. Run `mise run fmt-vact-check` to check all tracked `.vact`
-files.
+files. A file whose only reader errors are `indent-space` is repaired when
+one inferred indent unit divides every leading-space width and the reread is
+clean; mixed, ambiguous or otherwise erroneous files remain unchanged with
+exit 3.
 
 ## Syntax (tree-sitter)
 
@@ -223,7 +232,9 @@ to the existing StreamLanguage mode if they are unavailable. The code
 pane's `data-syntax` attribute shows which one is active (`tree-sitter`
 or `fallback`). `tree-sitter-vact.wasm` is git-ignored, so run
 `mise run ts-build-wasm` before `npm run test` or `npm run build` on a
-fresh checkout.
+fresh checkout. Tree-sitter spans come from the CodeMirror-free
+`editor/src/code/syntax-core.ts` as `{from, to, class}` with the `vact-tok-*`
+classes, so other renderers can consume them.
 
 ## Name
 

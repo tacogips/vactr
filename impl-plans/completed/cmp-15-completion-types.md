@@ -1,6 +1,6 @@
 # CMP-15: Editor Completion Contract Types (`completion-types.ts`)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CMP-15 (wave 1; parallel with CMP-10, FST-50, EDS-10, EDS-11, EDS-12)
 **Design Reference**: `design-docs/specs/design-completion.md` 5.2, 6.1, 6.2, 6.3 (the auto-trigger rule)
 **Dispatch**: `impl-plans/active/cmp-dispatch.json`

@@ -3,3 +3,4 @@
 //! without execution and the runtime-diagnostic merge.
 
 mod analysis;
+mod complete;

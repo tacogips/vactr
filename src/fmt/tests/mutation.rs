@@ -30,14 +30,36 @@ fn two_thousand_deterministic_mutants_obey_the_guarantees() {
         let token = MUTATIONS[random.index(MUTATIONS.len())];
         let mutant = mutate(source, token, random.next());
         let formatted = format(&mutant);
-        let read = read(&mutant, FileId::new(1), &AliasEnv::new());
-        let refused = read
+        let parsed = read(&mutant, FileId::new(1), &AliasEnv::new());
+        let refused = parsed
             .diags
             .iter()
             .any(|diagnostic| diagnostic.severity == Severity::Error);
         if refused {
-            assert_eq!(formatted.outcome, Outcome::Refused, "iteration {iteration}");
-            assert_eq!(formatted.text, mutant, "iteration {iteration}");
+            match formatted.outcome {
+                Outcome::Refused => assert_eq!(formatted.text, mutant, "iteration {iteration}"),
+                Outcome::Changed => {
+                    let repaired = read(&formatted.text, FileId::new(1), &AliasEnv::new());
+                    assert!(
+                        repaired
+                            .diags
+                            .iter()
+                            .all(|diagnostic| diagnostic.severity != Severity::Error),
+                        "changed mutant has reader errors at iteration {iteration}"
+                    );
+                    for line in crate::fmt::lines::split(&formatted.text, FileId::new(1)) {
+                        if line.is_code() {
+                            assert!(
+                                !formatted.text[line.start..line.indent_end].contains(' '),
+                                "changed mutant has spaces in code indentation at iteration {iteration}"
+                            );
+                        }
+                    }
+                }
+                Outcome::Unchanged => {
+                    panic!("reader-error mutant became unchanged at iteration {iteration}")
+                }
+            }
         } else {
             check_guarantees(&mutant);
         }

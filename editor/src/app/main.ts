@@ -15,7 +15,9 @@ import { Store } from '../protocol/store';
 import { WasmCore, WasmTransport } from '../protocol/wasm';
 import { mount as mountBind } from '../bind/mount';
 import { mount as mountCode } from '../code/mount';
+import { WasmCompletionEngine } from '../code/completion';
 import { WasmFormatter } from '../code/format';
+import { ToolWasm } from '../code/tool-wasm';
 import { loadVactSyntax } from '../code/syntax';
 import { mount as mountMidi } from '../midi/mount';
 import { mount as mountParams } from '../params/mount';
@@ -98,7 +100,9 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
     deps = { client, store, clock: new AudioClock(ctx), tier: 'browser', files, core };
   }
   const formatterUrl = new URL('vactr.wasm', win.document.baseURI).href;
-  deps.formatter = new WasmFormatter(formatterUrl);
+  const tool = new ToolWasm(formatterUrl);
+  deps.formatter = new WasmFormatter(tool);
+  deps.completion = new WasmCompletionEngine(tool);
   deps.syntax = () => loadVactSyntax(win.document.baseURI);
   const editor = createEditor(root, deps);
   deps.client.subscribe({ telemetry: true, levels: true, diagnostics: true });

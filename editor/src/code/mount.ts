@@ -27,6 +27,7 @@ import { SampleBrowser, SampleLibrary, type DecodedAudio } from './samples';
 import { DocumentSync } from './sync';
 import { TransportBar } from './transport';
 import { CodeSurface } from './code-view';
+import { attachCompletion } from './completion-view';
 
 /** The document the code pane edits. */
 export const DOC_FILE = 'main.vact';
@@ -128,6 +129,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
   }
   evalCtl.attach(editorView);
   diagnostics.attach(editorView);
+  const completion = deps.completion ? attachCompletion(editorView, deps.completion) : null;
 
   const transport = new TransportBar(transportPane, {
     client,
@@ -227,6 +229,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
       for (const off of offs) off();
       evalCtl.dispose();
       diagnostics.dispose();
+      completion?.dispose();
       transport.dispose();
       browser.dispose();
       editorView.destroy();

@@ -76,6 +76,7 @@ than treating the product name as a component name.
 | 2026-09-24 | Model | TidalCycles/Strudel (patterns) + Overtone (instruments as ugen chains) + Hydra (visual chains). The Sonic Pi imperative layer (live-loop, sleep, sync, cue, density, tick, play/sample-now, with-fx blocks, p5 draw loop) is withdrawn. | Decided |
 | 2026-09-25 | Middle-end naming and scope (issue #2) | Shadowing stays STRICT against the prelude, and the parent-scope relaxation is not adopted (design 20 Q1). Tidal's `struct` is `grid` (Q3). `gain` (pattern control) and `amp` (instrument parameter) both stay (Q4). Chord qualities are letter-first keywords (`:maj7 :m7 :dom7 :sus4`), never `:7`. Implementation choices: design-implementation 7.1. | Decided |
 | 2026-09-25 | Scope, paths, sound kits, sound first (issue #2) | Supersedes the STRICT shadowing sentence of the row above and the "let / var / upd" row: no rebinding within one scope; scope chain prelude -> session -> fn/block; a child may shadow a parent (prelude = hint, user parent = warning); the prelude is read-only. Unquoted `path` and `url` literal types (file paths are no longer strings); `load path`; prelude `default-sound-kit` and late-bound `sound-kit`; `s` takes an optional `kit:` argument, and a non-keyword argument is a sound value used as is. A pattern chain starts with `s`; the first list-valued step gives structure; `midi-notes` is a step after `s`; d1..d9 are the only sinks. Implementation: design-implementation 5.6, 6.5.8, 7.1, 10.1, 11.7. | Decided |
+| 2026-09-30 | Formatter and editor syntax | The formatter is a wasm32-clean Rust core (`src/fmt/`) exposed as `vactr fmt`, LSP formatting, a raw wasm export and an editor command. It is gated on a reader pass with no errors. It changes only indentation, trailing blanks and the final newline, and never spacing within a line. Comment lines are re-indented so that `#@` bindings are preserved. Editor highlighting comes from a tree-sitter grammar (a C scanner, built to WASM by CLI 0.27.0 without emscripten, loaded by web-tree-sitter 0.27.0), with the StreamLanguage mode as the fallback. The Rust reader stays the source of truth. See `design-formatter-and-syntax.md`. | Decided |
 
 ### Execution Modes
 
@@ -103,6 +104,13 @@ source text (indent syntax)
 The S-expression AST is the single shared data model: the LSP, formatter,
 macros, and both execution modes all consume it. No stage below the reader
 sees indentation.
+
+The formatter (`src/fmt/`) and the editor-only tree-sitter grammar
+(`tree-sitter-vact/`, run as WASM through web-tree-sitter) are designed in
+`design-formatter-and-syntax.md`. The formatter formats only sources the
+reader accepts. It is checked against the reader output
+(`sexpr::print_all` equality). The grammar is a lenient superset, used for
+highlighting only.
 
 ### Redefinition Model
 

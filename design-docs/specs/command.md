@@ -34,6 +34,7 @@ Every verb runs one `Session` on the main thread (design 14.5.4).
 | `serve` | `vactr serve [<file.vact>] [--host H] [--audio-in] [--port P] [--bind 127.0.0.1]` | Starts the session socket, optionally evaluating a file first, and prints the connect URL with the token once to stderr. Serves until interrupted. |
 | `get` | `vactr get [<package-path>[@<version>]] [--store dir:<root>]` | With a path: adds or raises the requirement in `./vactr.toml` (created with only `[deps]` if absent). Then, and also with no path: runs minimal version selection, fetches and verifies every selected package into the cache, and writes `./vactr.lock`. The default store is git; `--store dir:<root>` uses a local-directory store (`<root>/<path>@<version>/`). |
 | `lsp` | `vactr lsp [--session <ws-url>]` | Language server over stdio (design 14.3, 14.5.11). With `--session` it attaches to a running `serve` socket for runtime diagnostics. A build without the `lsp` feature prints an error and exits 1. |
+| `fmt` | `vactr fmt [--check] <PATH>...` or `vactr fmt [--check] -` | Formats `.vact` sources, rewriting each changed file in place. With `-`, it reads stdin and writes stdout. `--check` writes nothing and prints each path that would change. An input with reader errors is left unchanged, and its diagnostics go to stderr. The rules are in `design-formatter-and-syntax.md` section 3. |
 | (none) | `vactr --version`, `vactr help` | Prints the version or the usage. |
 
 A package path is `github.com/<owner>/<name>` (lowercase), and a
@@ -51,6 +52,7 @@ version is a git tag `vMAJOR.MINOR.PATCH[-pre]`. With no version given,
 | `--bind` | serve | IP address | `127.0.0.1` | Only loopback addresses are accepted; anything else is a usage error. |
 | `--store` | get | `dir:<path>` | (git) | Resolve and fetch from a local-directory store instead of git. |
 | `--session` | lsp | ws URL with token | (none) | Attach to a live session socket. |
+| `--check` | fmt | switch | off | Report without writing: print each path that would change, and exit 1 if any would. |
 
 ### Environment Variables
 
@@ -69,9 +71,9 @@ printed URL.
 | Code | Meaning |
 |------|---------|
 | 0 | Success. For `run`, the document evaluated with no error-severity diagnostic and no failed form. |
-| 1 | General error: IO, audio host, package resolution or integrity (`get`), socket bind. |
-| 2 | Usage error: unknown verb or flag, missing argument, non-loopback `--bind`. |
-| 3 | `run` only: the document reported error-severity diagnostics or failed forms. The run still played for the requested cycles and printed everything. |
+| 1 | General error: IO, audio host, package resolution or integrity (`get`), socket bind. For `fmt --check`: no IO error and no refused input, but at least one input would change. |
+| 2 | Usage error: unknown verb or flag, missing argument, non-loopback `--bind`, `fmt` with no input or with `-` mixed with paths. |
+| 3 | `run`: the document reported error-severity diagnostics or failed forms. The run still played for the requested cycles and printed everything. `fmt`: no IO error, but at least one input had reader errors and was left unchanged. |
 
 ### Files
 

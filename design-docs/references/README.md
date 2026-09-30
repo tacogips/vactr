@@ -55,6 +55,18 @@ This directory contains reference materials for system design and implementation
 | stmlib license | https://github.com/pichenettes/stmlib/blob/master/LICENSE | Mostly MIT, with separately licensed ST and serial-programming subtrees that must not enter Vactr's audio code |
 | Upstream file inventory | `verification/upstream_inventory.toml` | Per-file license, kind and use for every Mutable Instruments and `stmlib` file Vactr names; checked by `mise run audit-upstream` against a pinned checkout. `elements/resources/samples.py` and `stmlib/ui/event_queue.h` are GPL-3.0 and excluded |
 
+### Tree-sitter
+
+Used by `design-docs/specs/design-formatter-and-syntax.md` sections 2 and 4-5.
+
+| Name | URL | Description |
+|------|-----|-------------|
+| Tree-sitter documentation | https://tree-sitter.github.io/tree-sitter/ | Grammar DSL, `tree-sitter.json`, CLI (`generate`, `test`, `parse`, `query`, `build --wasm`), query syntax |
+| External scanners | https://tree-sitter.github.io/tree-sitter/creating-parsers/4-external-scanners.html | The C scanner API (`scan`, `serialize`, `deserialize`, `valid_symbols`) used for NEWLINE/INDENT/DEDENT |
+| tree-sitter repository | https://github.com/tree-sitter/tree-sitter | MIT; the C runtime (`lib/`), the CLI, and `lib/binding_web` (web-tree-sitter) |
+| web-tree-sitter (npm) | https://www.npmjs.com/package/web-tree-sitter | The runtime compiled to WASM with a JS API (`Parser`, `Language`, `Query`), pinned at 0.27.0 |
+| tree-sitter-python scanner | https://github.com/tree-sitter/tree-sitter-python/blob/master/src/scanner.c | Reference design for indentation tokens and comment-line handling in a layout-sensitive scanner |
+
 ## Reference Documents
 
 Reference documents should be organized by topic:

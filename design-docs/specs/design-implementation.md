@@ -1134,6 +1134,10 @@ comment and trivia spans in a side table, and it recovers from errors
 (a bad line yields an `Error` node; following lines still parse) so the
 editor gets diagnostics while typing.
 
+The formatter rules (which lines are re-indented, whitespace policy,
+directive-preserving comment indentation, the reader gate) are in
+`design-formatter-and-syntax.md` section 3.
+
 ### 6.4 Expander
 
 Compile-time only, fixed sugar (no user macros in v1): `if`/`elif` to
@@ -5226,6 +5230,12 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
     names, manifest keywords, package prefixes and qualified names.
   - Formatting: only strips trailing whitespace and ensures one final
     newline. This keeps every comment and directive byte-identical.
+    **Revised 2026-09-30:** `format_edits` now delegates to the
+    `src/fmt` formatter (`design-formatter-and-syntax.md` 3.7.2). Those
+    whitespace rules are kept (R5, R7, R8). Continuation and
+    comment-only lines are also re-indented. The comment text is kept,
+    and `#@` bindings are preserved. A document with reader errors gets
+    no edits.
 - **Attach.** `vactr lsp --session <url>` connects to a running
   `serve` socket, subscribes to diagnostics, and merges runtime `diag`s
   into the matching document's diagnostics. Standalone, it serves

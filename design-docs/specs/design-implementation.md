@@ -5228,6 +5228,11 @@ wave. Tests go in `tests/` submodules, as in 6.5, 7.1 and 12.8.
     `CheckResult.types`, which is the `TypedInfo` of 14.3.
   - Completion: prelude names from `NativeTable`, document top-level
     names, manifest keywords, package prefixes and qualified names.
+    **Revised 2026-09-30:** completion delegates to the shared
+    `src/complete` engine (`design-completion.md` section 4). The
+    engine keeps these sources and adds cursor contexts, scope-aware
+    locals, ranking, a cap of 100 with `isIncomplete`, and UTF-16
+    `textEdit` ranges.
   - Formatting: only strips trailing whitespace and ensures one final
     newline. This keeps every comment and directive byte-identical.
     **Revised 2026-09-30:** `format_edits` now delegates to the

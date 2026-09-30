@@ -13,6 +13,18 @@ FST-10..40 are in `impl-plans/completed/`. The questions that stay open are in
 `design-docs/user-qa/pending-formatter-syntax-questions.md`. Their
 recommendations are followed by default.
 
+Follow-up amendment (2026-09-30, session 226, status: Design). This run
+adds three things:
+
+- the space-indent repair, section 3.9, with gate changes in 3.1, 3.6
+  and 3.8;
+- the CodeMirror-free span and format cores, section 5.5;
+- the `VACTR_WASM` loader fix of the wasm format test, section 5.4.
+
+The delivery waves are in `design-completion.md` section 8. The open
+choices are in `design-docs/user-qa/pending-completion-questions.md`
+(C4, C5).
+
 ## Overview
 
 | Part | Where | Role |
@@ -94,7 +106,11 @@ sources become the WASM artifact.
   are returned. The formatter never formats a source that the reader
   rejects. This covers mixed tab/space indentation on code lines
   (`indent-space`), unterminated strings, a qualifier that no import in
-  the same document binds, and sources over 4 GiB.
+  the same document binds, and sources over 4 GiB. **Amended
+  (session 226):** there is one exception, the space-indent repair of
+  3.9. A source whose only defect is space indentation is converted to
+  tabs, and it is formatted only when the converted text passes this
+  same gate with zero errors. Every other refusal is unchanged.
 - It has no host-native dependencies and no new crates. It uses only
   `reader` (the `pub(crate)` `lexer::lex_line` included) and `types::diag`.
   It builds with `--lib --target wasm32-unknown-unknown
@@ -213,6 +229,13 @@ For every input:
 - G7: output line `n` differs from input line `n` only in its indent run,
   its trailing blanks or its terminator.
 
+For a REPAIRED input (3.9), G3, G5 and G6 are stated against the
+converted text `c`, not against `src`, because `read(src)` has errors.
+So `read(out)` has no error,
+`print_all(read(out).nodes) == print_all(read(c).nodes)`, and the trivia
+and directive placement of `out` equal those of `c`. G1, G4 and G7 hold
+unchanged against `src`.
+
 ### 3.7 Surfaces
 
 #### 3.7.1 CLI `vactr fmt`
@@ -325,7 +348,85 @@ For every input:
   G1 always, and G3-G7 whenever the mutant reads clean.
 - Every Rust file stays under 1000 lines. The core is split into
   `src/fmt/mod.rs` (API, gate, assembly), `src/fmt/lines.rs` (the line
-  model) and `src/fmt/levels.rs` (3.4 and 3.5).
+  model) and `src/fmt/levels.rs` (3.4 and 3.5). The repair of 3.9 lives
+  in `src/fmt/repair.rs`.
+- **Amended (session 226).** The mutation test's reader-error branch
+  becomes "`Refused` with `text == mutant`, OR repaired: `Changed`,
+  `read(out)` has no error, and every code indent run of `out` is tabs
+  only". The 3.9 minimum unit of 2 means a single inserted space
+  (width 1) never qualifies. The fixtures `mixed-indent` and
+  `reader-error` stay `Refused`.
+
+### 3.9 Space-indent repair (amendment, session 226)
+
+A file whose code lines are indented with spaces is refused today. The
+reader reports `indent-space` for each such line. It also reports
+`empty-block` for every block opener whose body lines are
+space-indented, because those lines have zero tabs and so never reach
+the block's level (`reader/layout.rs` `body` and `block`). The repair
+converts such a file to tabs only when that conversion is unambiguous.
+
+**Preconditions.** All of these must hold, or the source is refused
+unchanged with its original diagnostics (G2):
+
+1. **Error gate.** Every `Severity::Error` diagnostic of `read(src)` has
+   the code `indent-space` or `empty-block`, and at least one is
+   `indent-space`. `empty-block` is allowed only because space
+   indentation causes it. Any other code (unterminated string, unclosed
+   group, unexpected indentation, an unbound qualifier, and so on)
+   refuses the file.
+2. **Pure spaces.** No code line and no comment-only line (3.2) has a
+   tab in its indent run. A tab inside a run, or tab indentation on some
+   lines and space indentation on others, is MIXED and refused. Blank
+   and whitespace-only lines are ignored, because R5 empties them.
+3. **Unit.** Let `W` be the set of positive indent widths of the code
+   lines and comment-only lines. The unit `u` is `min(W)`. It must be at
+   least 2 and at most 8, and every width in `W` must be an exact
+   multiple of `u`. Otherwise the widths are AMBIGUOUS, and the file is
+   refused. For example, widths `{4, 6}` are refused, and `{2, 4, 6}`
+   give `u = 2`.
+
+**Conversion.** Each code line and comment-only line of width `k * u`
+gets `k` tabs in place of its indent run. No other byte changes.
+
+**Acceptance.** Let `c` be the converted text. If `read(c)` has any
+`Severity::Error`, the source is refused with the ORIGINAL diagnostics.
+The unit then did not produce a valid structure. For example, a block
+body two units deep reads as unexpected indentation.
+
+Otherwise `format(src)` is the normal pipeline (3.2 to 3.5) applied to
+`c`. The outcome is `Changed`, `text` is the formatted `c`, and `diags`
+are the diagnostics of `read(c)`.
+
+**Why structure is kept.** Dividing widths by `u` keeps the order of
+every pair of widths:
+
+- a line deeper than another stays deeper;
+- equal widths stay equal;
+- a directive's comparison with its target (3.5) keeps its result.
+
+The zero-error re-read is the final guard.
+
+**Surfaces.** The API does not change, so `vactr fmt`, LSP formatting,
+the wasm export and the editor command all get the repair through
+`fmt::format`. The LSP edits still change only indent runs (G7).
+
+**Tests** (`src/fmt/tests/repair.rs`, fixtures in `src/fmt/tests/fixtures/`):
+
+- `space2` and `space4` are the `blocks`, `continuation` and
+  `directives` shapes indented with 2 and 4 spaces. For each, `format`
+  equals the tab version's `format` output, `print_all` equals the tab
+  version's, and a second run is `Unchanged` (idempotent).
+- These are refused byte for byte, with the original diagnostics:
+  - `space-ambiguous` (widths 4 and 6);
+  - `space-mixed-lines` (tab lines plus space lines);
+  - `mixed-indent` (a tab and a space in one run);
+  - `space-other-error` (spaces plus an unclosed `{`);
+  - a 1-space file.
+- A CLI test in `src/cli/tests/fmt.rs` covers the command end to end. A
+  4-space file is rewritten to tabs with exit 0. `--check` lists it and
+  exits 1. A `space-ambiguous` file is left untouched, prints its
+  diagnostics and exits 3.
 
 ---
 
@@ -528,6 +629,69 @@ parses JS strings as UTF-16).
     `formatDocument` makes one minimal change, does nothing on refusal,
     and `Shift-Alt-f` is bound.
 - `language.test.ts` and all other existing tests stay green unchanged.
+- **Amended (session 226, D).** `editor/test/wasm/format.test.ts` reads
+  its artifact bytes only through the shared loader. Its private
+  `readWasm()`, which hardcodes
+  `../target/wasm32-unknown-unknown/debug/vactr.wasm` (line 23), is
+  replaced by the path that `loadVactrWasm()` resolves (`wasm.path`, so
+  `$VACTR_WASM` wins), or it is removed. No other path to the artifact
+  remains in the file.
+
+### 5.5 CodeMirror-free cores (amendment, session 226, B)
+
+The GPU canvas editor (design-implementation 15.3 on `origin/main`)
+draws syntax itself and cannot use `Decoration`s. So the tree-sitter
+logic that produces style spans moves into a core with no CodeMirror
+dependency, and the CodeMirror side becomes a thin adapter.
+
+- `editor/src/code/syntax-core.ts` (new) must not import
+  `@codemirror/*`. It holds:
+  - `SyntaxCapture`, `ParsedVact`, `VactSyntax`, `SyntaxLoader`,
+    `CAPTURE_CLASSES`, `loadVactSyntax` and `createVactSyntax`, moved
+    unchanged;
+  - `styleSpans(parsed, from, to): StyleSpan[]` (new), with
+    `StyleSpan = { from, to, cls }`. It does what `decorations()` does
+    today without the `Decoration`: map through `CAPTURE_CLASSES`, drop
+    empty and unmapped captures, remove duplicate `(from, to)` pairs
+    with the first query pattern winning, and sort by
+    `(from, to)`. Offsets are UTF-16. Callers query by range, so a
+    renderer can ask for only its visible ranges.
+
+  Reparsing stays full-text, as in 5.3. An incremental `tree.edit`
+  path is not added.
+- `editor/src/code/syntax.ts` keeps `treeSitterHighlighting`. It
+  becomes a thin adapter: for each visible range it calls `styleSpans`
+  and wraps each span in `Decoration.mark({ class: cls })`. It
+  re-exports every moved symbol, so `main.ts`, `deps.ts` and the
+  existing tests keep their imports, and no wiring file changes.
+  Highlighting output is identical.
+- `editor/src/code/format-core.ts` (new) must not import
+  `@codemirror/*`. It holds:
+  - `Formatter`, `FormatResult` and `WasmFormatter`, moved;
+  - `minimalChange(before, after): { from, to, insert } | null`, the
+    common-prefix and common-suffix computation that `formatDocument`
+    inlines today.
+
+  `WasmFormatter` accepts either a URL, the constructor it has today, or
+  a shared `ToolWasm` (`editor/src/code/tool-wasm.ts`, owned by the same
+  plan and specified in `design-completion.md` 6.4).
+  `editor/src/code/format.ts` keeps `FORMAT_KEY`, `formatDocument`
+  (now calling `minimalChange`) and `formatKeymap`, and it re-exports
+  the moved symbols.
+- Tests:
+  - `editor/test/code/syntax-core.test.ts` (node) loads the real runtime
+    and grammar wasm, as `syntax.test.ts` does. It asserts that
+    `styleSpans` gives `vact-tok-head`, `vact-tok-keyword`,
+    `vact-tok-string`, `vact-tok-comment` and `vact-tok-bracket` spans
+    at the expected UTF-16 offsets for a sample that includes Japanese
+    text in a comment. Two checks show that the core does not load
+    `@codemirror/view`:
+    - a `vi.mock('@codemirror/view', ...)` factory that throws;
+    - a source-text check that `syntax-core.ts` and `format-core.ts`
+      contain no `@codemirror/` import.
+  - The existing `syntax.test.ts`, `syntax-fallback.test.ts` and both
+    `format.test.ts` files stay green. The jsdom `format.test.ts` adds
+    `minimalChange` cases.
 
 ---
 

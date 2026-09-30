@@ -39,6 +39,19 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
+| [cmp-dispatch.json](active/cmp-dispatch.json) | Dispatch manifest for the session-226 completion, span-core and formatter follow-ups (waves [CMP-10, CMP-15, FST-50, EDS-10, EDS-11, EDS-12] [CMP-20, CMP-21, CMP-30, CMP-31] [CMP-32] [CMP-40]) | design-completion.md; design-formatter-and-syntax.md 3.9, 5.4, 5.5 | 2026-09-30 |
+| [cmp-10-complete-core.md](active/cmp-10-complete-core.md) | Ready; wasm32-clean completion engine `src/complete/` | design-completion.md 3 | 2026-09-30 |
+| [cmp-15-completion-types.md](active/cmp-15-completion-types.md) | Ready; editor completion contract types | design-completion.md 6.2 | 2026-09-30 |
+| [fst-50-fmt-space-repair.md](active/fst-50-fmt-space-repair.md) | Ready; formatter space-indent repair | design-formatter-and-syntax.md 3.9 | 2026-09-30 |
+| [eds-10-syntax-span-core.md](active/eds-10-syntax-span-core.md) | Ready; CodeMirror-free tree-sitter span core | design-formatter-and-syntax.md 5.5 | 2026-09-30 |
+| [eds-11-wasm-format-loader.md](active/eds-11-wasm-format-loader.md) | Ready; wasm format test honors `VACTR_WASM` | design-formatter-and-syntax.md 5.4 | 2026-09-30 |
+| [eds-12-format-core-tool-wasm.md](active/eds-12-format-core-tool-wasm.md) | Ready; CodeMirror-free format core and shared `ToolWasm` | design-formatter-and-syntax.md 5.5; design-completion.md 6.4 | 2026-09-30 |
+| [cmp-20-complete-lsp.md](active/cmp-20-complete-lsp.md) | Ready; LSP completion on the engine | design-completion.md 4 | 2026-09-30 |
+| [cmp-21-complete-wasm.md](active/cmp-21-complete-wasm.md) | Ready; wasm completion exports | design-completion.md 5 | 2026-09-30 |
+| [cmp-30-completion-service.md](active/cmp-30-completion-service.md) | Ready; UI-agnostic completion service | design-completion.md 6.1 | 2026-09-30 |
+| [cmp-31-completion-popup.md](active/cmp-31-completion-popup.md) | Ready; DOM completion popup over `CompletionSurface` | design-completion.md 6.3 | 2026-09-30 |
+| [cmp-32-completion-view-wiring.md](active/cmp-32-completion-view-wiring.md) | Ready; EditorView adapter and minimal wiring | design-completion.md 6.4, 6.5 | 2026-09-30 |
+| [cmp-40-closeout.md](active/cmp-40-closeout.md) | Ready; full gate, docs and archive | design-completion.md 8, 9 | 2026-09-30 |
 | [fst-dispatch.json](active/fst-dispatch.json) | Dispatch manifest for FST-10..40 (waves [10,11] [20,21,22,23] [30] [40]; all eight plans completed and archived session 222) | - | 2026-09-30 |
 | [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; PLV-001 voice layer measured SourceStage and wired into 24 templates; MOD-004 stereo/multi-output edges complete; remaining audio TODOs prioritized | design-mutable-audio.md; design-music.md 4.1 | 2026-09-30 |
 | [modular-audio-foundation.md](active/modular-audio-foundation.md) | In progress; MOD-001 inventory/audit, MOD-002 neutral names and MOD-004 stereo and multi-output edges complete; MOD-005/006 pending | design-mutable-audio.md | 2026-09-30 |

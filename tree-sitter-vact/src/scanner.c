@@ -161,6 +161,10 @@ bool tree_sitter_vact_external_scanner_scan(void *payload, TSLexer *lexer, const
     return true;
   }
 
+  if (valid[BLOCK_COLON] || valid[NEWLINE]) {
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') lexer->advance(lexer, true);
+  }
+
   if (valid[BLOCK_COLON] && lexer->lookahead == ':') {
     lexer->advance(lexer, false);
     lexer->mark_end(lexer);

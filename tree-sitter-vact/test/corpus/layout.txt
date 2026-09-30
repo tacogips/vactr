@@ -67,3 +67,165 @@ root
   (statement
     (operator)
     (identifier)))
+
+==================
+standalone block colon
+==================
+inst foo :
+	play voice
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier)))))
+
+==================
+standalone block colon with trailing comment
+==================
+inst foo : # instrument body
+	play voice
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (comment)
+    (block
+      (statement
+        (identifier)
+        (identifier)))))
+
+==================
+nested block opened by standalone colon
+==================
+inst foo:
+	bus :
+		play voice
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (block_colon)
+        (block
+          (statement
+            (identifier)
+            (identifier)))))))
+
+==================
+keyword after whitespace where a block colon is valid
+==================
+play s :bd
+next
+
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (keyword))
+  (statement
+    (identifier)))
+
+==================
+pair with spaced colon and numeric-colon pair
+==================
+name : value
+a :1
+
+---
+
+(source_file
+  (statement
+    (pair
+      key: (identifier)
+      value: (identifier)))
+  (statement
+    (pair
+      key: (identifier)
+      value: (number))))
+
+==================
+lambda block opened by spaced colon
+==================
+f = x -> :
+	play x
+
+---
+
+(source_file
+  (statement
+    (identifier)
+    (operator)
+    (identifier)
+    (operator)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier)))))
+
+==================
+trailing whitespace before newline
+==================
+foo   
+bar
+
+---
+
+(source_file
+  (statement
+    (identifier))
+  (statement
+    (identifier)))
+
+==================
+trailing whitespace after block colon
+==================
+root:   
+	child
+
+---
+
+(source_file
+  (statement
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)))))
+
+==================
+CRLF standalone block colon
+==================
+inst foo :
+	play v
+next
+
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier))))
+  (statement
+    (identifier)))

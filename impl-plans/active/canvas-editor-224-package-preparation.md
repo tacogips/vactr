@@ -30,6 +30,7 @@ Previous/dependencies: CE-CONTRACT. Next: CE-SHELL.
 - editor/src-tauri/Cargo.lock
 - impl-plans/active/canvas-editor-224-dependency-evidence.md
 - impl-plans/active/canvas-editor-224-package-preparation.md
+- tmp/canvas-editor-224/CE-PACKAGE/native-tools
 
 ## Shared paths and intended edits
 - editor/src-tauri/Cargo.toml: Successive ownership with CE-SHELL. Fresh-read/hash before each edit; predecessor finishes before dependent edit. CE-PACKAGE alone generates initial locks; finalization updates index/archive after join. Workers use locked checks.
@@ -278,3 +279,26 @@ integration decisions remain downstream; their checkboxes stay unchecked. Submit
 fresh Step 6 JSON to the native gate without inventing acceptance. CE-SHELL admission
 requires runtime acceptance. Shared indexes/archive/manifest and Git finalization belong
 later steps. No Rust, Swift, TypeScript, dependency or Git state changes in this run.
+
+## Session 235 P5 native prerequisites and runner reconsideration
+**Status**: Not started; Step5 review required. **Parallelizable**: Yes with GPU/telemetry; preparation serial within plan.
+**Design trace**: 15.3.6 requires buildable mobile integration; tooling absence is distinct from physical-device absence.
+P1-P4 exact versions and valid locks remain unchanged. Do not reinstall working Playwright or regenerate locks. Native blocked fingerprint `aebbbc2b8437d2d47e765ae65108524c10bddc2760d99737fca5a003262116af` remains historical until replaced.
+
+First request runner-owned reconsideration using existing source-matched evidence `tmp/canvas-editor-224/CE-PACKAGE/retry-20260930T203042506761/`: browser-smoke.log exit0 4/4, dependencies.log exit0 10/10, metadata/tree exit0, source-stability.json. Recognition repair is runner-owned; `root-observations/classifier-repair-check.json` has8/8 classifier checks, not application acceptance. Preserve positive assertions, zero failures, final exit and source checks. Formal integrity/adversarial/integration gates remain mandatory; no manually accepted flag. If new tooling alters evaluated inputs, supplement fresh checks with unique output paths and complete terminal metadata.
+
+P5 writes only task evidence under `tmp/canvas-editor-224/CE-PACKAGE/native-tools` and own dependency-evidence/progress files. No application dependency update or shared mise policy edit. Read supply-chain-secure-install before tool installation. Commands below run foreground; capture actual selected toolchain, SDK and exact CLI release/source/checksum before installation:
+- `RUSTUP_TOOLCHAIN=1.98.1 rustup target list --installed`
+- `xcodebuild -version` and `xcodebuild -showsdks`
+- `RUSTUP_TOOLCHAIN=1.98.1 rustup target add aarch64-apple-ios aarch64-apple-ios-sim --toolchain 1.98.1`: install only missing compiler targets for the existing chosen toolchain; no toolchain update. If sandbox/network denies, log actual denial separately from device absence.
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_HOME=tmp/canvas-editor-224/CE-PACKAGE/native-tools/cargo-home CARGO_TERM_QUIET=true cargo info tauri-cli --registry crates-io`: inspect official CLI metadata and its release compatibility with locked tauri2.11.6/tauri-build2.6.3. Do not assume CLI equals library version. Resolve a single exact supported release, record it in native-tools/toolchain.json and append the literal install command to own progress before running. Review source/version/lock/license/build-script inputs per supply-chain skill; if compatibility cannot be established, block tool preparation honestly.
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_HOME=tmp/canvas-editor-224/CE-PACKAGE/native-tools/cargo-home CARGO_TERM_QUIET=true cargo install tauri-cli --version "${CE_TAURI_CLI_VERSION}" --locked --root tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli`: CE_TAURI_CLI_VERSION must be the one exact recorded release above, not latest/range; set it from reviewed metadata and preserve literal expanded command in logs. This installs into task-local root, not global Cargo bin.
+- `CARGO_TERM_QUIET=true tmp/canvas-editor-224/CE-PACKAGE/native-tools/cli/bin/cargo-tauri --version`
+- `RUSTUP_TOOLCHAIN=1.98.1 rustup target list --installed`: confirm both targets. Hash CLI binary and record toolchain/release identities for CE-SHELL/CE-FINAL; inspect app manifests/locks pre/post to prove no drift.
+
+Do not run mobile generation or compile concurrently in P5; CE-SHELL owns shared library target checks, CE-FINAL owns generated Apple integration and simulator packaging. Prerequisite downloads/install use this evidence directory; if an installation restriction occurs report exact command/log/exit. Missing signing/physical device never exempts available unsigned compiler checks. Preserve old missing-cli exit101 as historical, not permanent.
+- [ ] Runner replaces blocked package decision using valid evidence and formal reviews.
+- [ ] Exact compatible task-local CLI and iOS/device+simulator Rust targets available, or actual install failure documented with full exit/log.
+- [ ] Application dependency versions/locks unchanged; compiler, signing, simulator and physical-device statuses separate.
+### Session: 2026-09-30 — Step4 session235
+P5 fills native prerequisite gap within existing package ownership. P4 evidence submitted for later runner reconsideration; no repeated implementation smoke or lock regeneration in this node.

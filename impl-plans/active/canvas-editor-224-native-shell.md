@@ -76,10 +76,10 @@ Implement existing Transport over bounded native apply/event commands; subscribe
 - Device and measurement evidence remains incomplete unless actually captured.
 
 ## Verification commands and required evidence
-- `CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml`
-- `CARGO_TERM_QUIET=true cargo test --locked --manifest-path editor/src-tauri/Cargo.toml --lib`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TERM_QUIET=true cargo test --locked --manifest-path editor/src-tauri/Cargo.toml --lib`
 - `cd editor && npm run test -- test/canvas/tauri.test.ts`
-- `CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml --lib --target aarch64-apple-ios`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml --lib --target aarch64-apple-ios`
 
 These commands establish compile/type safety and the task behaviors listed above. Tests must assert concrete outputs, boundaries, revisions, lifetime or timing rather than mirror implementation. Real browser runner is planned code, not an existing passing command. iOS/sign/device commands are conditional on actual tooling; log missing prerequisites as unavailable.
 Record complete logs/exit statuses per execution contract. No test/build is claimed executed by this plan author.
@@ -95,3 +95,12 @@ Record complete logs/exit statuses per execution contract. No test/build is clai
 Tasks completed: code-free plan authored from accepted design.
 Implementation: not started. Build/behavior/device criteria unchecked.
 Next: independent Step5 plan review, accepted-plan commit/push, then dependency-ready execution.
+
+## Session 235 native compiler handoff
+Consume CE-PACKAGE P5 toolchain.json only after runner acceptance; fresh-read/hash it and app locks. Compile actual shared native library for BOTH device and simulator targets after N1-N3. Add to required commands:
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml --lib --target aarch64-apple-ios`
+- `RUSTUP_TOOLCHAIN=1.98.1 CARGO_TERM_QUIET=true cargo check --locked --manifest-path editor/src-tauri/Cargo.toml --lib --target aarch64-apple-ios-sim`
+Record complete terminal logs and native host feature linkage; these are compiler checks, not signing/Swift integration/device passes. Missing targets require P5 preparation, not a permanent unavailable classification. Actual compiler/platform incompatibilities stay failures with diagnostic ownership; fix only N1-N3 owned components, never substitute noop host. CE-FINAL serially wires and compiles generated Apple project plus ios/AudioSession.swift using task-local CLI. No generated Apple changes by this worker.
+- [ ] Device and simulator Rust shared-library checks pass, or actual compiler/prerequisite failures explicitly remain unresolved.
+### Session: 2026-09-30 — Step4 session235
+Required compiler checks distinguish available SDK from physical hardware; no native source modified.

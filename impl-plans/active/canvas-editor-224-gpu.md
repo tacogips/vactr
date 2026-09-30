@@ -2,7 +2,7 @@
 
 **planId**: CE-GPU
 **planPath**: impl-plans/active/canvas-editor-224-gpu.md
-**Status**: In Progress
+**Status**: In Progress — cache regression open; historical provisional acceptance insufficient
 **Created / Last Updated**: 2026-09-30
 **Design Reference**: design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30
 **Issue**: codex-design-and-implement-review-loop-session-224
@@ -175,3 +175,30 @@ the formal-review checkbox stays unchecked. CE-INPUT/CE-VISUAL/CE-JOIN/CE-FINAL 
 interaction, consumer integration, real GPU/device and measured hardware ownership as
 already recorded above. Unit tests do not establish actual Japanese font shaping or iPad
 performance. No native progress-gate result or formal acceptance is manufactured here.
+
+## Session 235 bounded recovery: G4 first-frame background cache repair
+**Status**: Ready for independent plan review; implementation repair not started.
+**Design trace**: accepted 15.3.3, 15.3.5 and 15.3.7 require persistent text reuse separated from animation.
+**Parallelizable**: Yes with CE-TELEMETRY and CE-PACKAGE after checkpoint; never with a dependent renderer consumer.
+Fresh-read renderer.ts, atlas.ts, resources.ts and gpu.test.ts, with execution-contract pre/post hashes and immutable intentions for every edit. Change only existing owned paths. Diagnose shared geometry/staging admission: uploadBackground currently reserves staging through the atlas, so near-cap copies can evict resident text. Preserve text residency by accounting temporary backdrop staging independently of persistent text metadata or downscaling backdrop admission to leave required text headroom. Choose the smallest repair after reading current admission code. No new cache framework, cap increase, skipped glyphs or softened assertions.
+
+Read complete preserved evidence:
+- `tmp/canvas-editor-224/root-observations/background-cache-repro/finding.json` and `test.log`: isolated production renderer regression exit 1, 0/1; uploads 80,146,212,278.
+- `tmp/canvas-editor-224/root-observations/background-cache-browser/finding.json`, `result.json`, `test.log`: production Chromium WebGL2 exit 1, 5/6; first-frame background uploads 80,144,208,272.
+- `result-preloaded-cache.json` in that browser directory: 6/6 control, uploads remain 80. Passing control does not excuse first-frame failure.
+
+Add official `editor/test/canvas/gpu.test.ts` regression using unchanged text with animated near-staging-cap background from the first frame. Require no extra text uploads after first render, reusable backdrop allocation, caps at every frame, no omitted text and zero live resources on disposal. Preserve original isolated reproduction and assertion sensitivity; do not rewrite operator tests to hide failure. Retain 16 MiB atlas, 8 MiB geometry/staging, 8 MiB layout, 4 million canvas/backdrop pixels and 96 MiB total caps.
+
+Run foreground to exit, recording unique new log paths and source identities:
+- `cd editor && npm run check`: whole-editor typing.
+- `cd editor && npm run test -- test/canvas/gpu.test.ts`: original suite plus official first-frame regression.
+- `cd editor && ./node_modules/.bin/vitest run --config ../tmp/canvas-editor-224/root-observations/background-cache-repro/vitest.config.mjs`: original isolated case must pass.
+- `node tmp/canvas-editor-224/CE-GPU/recovery-235/background-cache-browser.mjs`: repaired first-frame case must pass all six assertions and exit 0. Prepare this finite evidence runner by copying `root-observations/background-cache-browser/run.mjs` into that equally deep attempt directory and changing ONLY its output `dir` constant to `tmp/canvas-editor-224/CE-GPU/recovery-235`. Preserve imports, production workload, all six assertions, cleanup and exit checks byte-for-byte; record original/copy hashes and exact one-line diff for independent integrity review. Use a new attempt name if the directory already exists. This avoids overwriting historical result/source/log records; execution-contract evidence paths permit probe artifacts, not additional production ownership. Capture stdout/stderr to the new complete test.log.
+SwiftShader is software. These checks establish API/cache behavior, not Apple GPU performance, full editor integration or physical iPad evidence. CE-FINAL retains those gates.
+
+- [ ] G4 official regression, original isolated reproduction and six-assertion real-browser scenario pass on identical repaired source.
+- [ ] No cap increase; text/cache residency, admission refusal and disposal invariants retained.
+- [ ] Runner-owned native progress, test-integrity, adversarial and integration decisions accept fresh evidence. Provisional historical GPU acceptance is invalid for final acceptance while G4 is open.
+
+### Session: 2026-09-30 — Step4 session235
+G4 allocated within existing GPU paths; failed evidence retained. No production source modified or implementation tests executed. CE-STATE/CE-INPUT accepted behavior is preserved; fresh reconciled-tree verification follows GPU repair under their retention contract.

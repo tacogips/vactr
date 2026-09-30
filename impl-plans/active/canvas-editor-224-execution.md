@@ -2,7 +2,7 @@
 
 Issue: codex-design-and-implement-review-loop-session-224. Workflow mode: issue-resolution.
 Design accepted by Step3 communication comm-002814, version0.3.52; no design findings.
-This node writes plans only; all implementation criteria initially unchecked.
+This node writes plans only; historical implementation evidence remains intact. New recovery criteria are unchecked.
 Code-free instructions override impl-plan skill examples requiring Rust code.
 
 ## Ownership and drift protocol
@@ -96,3 +96,69 @@ contracts before successor waves; indexes, manifest updates, lock reconciliation
 and Git remain serial. Step5 must accept these amended plans, then coordinator commits
 and non-force pushes owned plan amendments before further implementation fanout. Current
 Step4 does not commit unreviewed amendments or execute the planned implementation tests.
+
+## Session235 recovery contract (supersedes stale pending instructions above)
+Step3 accepted existing design15.3; design checkpoint8ee36f23e2311455126f6486db992d33227ff3e2 and accepted-plan checkpoint4fc37414e2f2704f6737f1545071bf506bd9c0f8 are historical. Current amendments require independent Step5 acceptance, then coordinator-only owned-plan commit/non-force push before dispatch. Operator authorization persists; no permission rediscovery or registry tasks.
+
+Seven nominal waves remain a DAG:
+1. CE-CONTRACT
+2. CE-GPU, CE-TELEMETRY, CE-PACKAGE
+3. CE-STATE, CE-AUDIO, CE-CLOCK
+4. CE-INPUT, CE-VISUAL, CE-SHELL
+5. CE-CONSUMERS
+6. CE-JOIN
+7. CE-FINAL
+Runtime may retain accepted CE-CONTRACT/CE-STATE/CE-INPUT using source-matched evidence; nominal edges are not deleted. CE-GPU is excluded from retained acceptance until first-frame cache repair/review. After admission, remaining nominal waves are GPU/telemetry/package; audio/clock; consumers/visual/shell; join; final. Use runner native acceptedDependencies mechanism and provenance checks, not manual accepted flags; rejected retained provenance returns its owner to evidence-only verification. Post-GPU state/input reconciliation remains mandatory. Gate capacity/retry lifecycle is runner-owned; never repair workflow package here or bypass independent review.
+
+No current source allocation is added for unrelated27 lint diagnostics. Step5 explicitly decides the telemetry scoped-baseline proposal; canonical global Clippy exit101 remains failed. Both historical telemetry blocked fingerprints and package blocked fingerprint remain untouched. Rust verification agent continues all eight independent commands after lint failure. Device/compiler preparation stays CE-PACKAGE; generated Apple outputs stay serial CE-FINAL. Exact tool pins come from recorded official release compatibility, never guessed library/CLI equality; no application lock/version updates.
+
+
+## Session236 resumed baseline and external dependency admission
+**Status**: Bounded metadata amendment authored; new Step5 review/checkpoint pending.
+Session235 Step5 accepted the behavior/tooling amendments in comm-003003
+(`tmp/canvas-editor-224/root-observations/session-235-accepted-plan-review.json`).
+Those amendments and all13 plan files/nominal edges are retained. No design restart,
+source repair, tool installation, cap change or implementation acceptance occurs here.
+
+Current resumed intake is main at4e34e25039bdbe8521e1a5aa014e687d4de2b912,
+with origin/main tracking the same revision and origin URL https://github.com/tacogips/vactr.git.
+Evidence: `tmp/canvas-editor-224/plan-amendment-236/git-context.json` and complete
+per-command logs beside it. Original2793, design8ee36f23 and prior plan4fc37414
+are historical identities only; do not populate current checkpoint intake from them.
+The operator's `root-observations/concurrent-checkpoint-4e34e25.json` records a
+successful remote lookup. Fresh lookup in this node exits128 (github.com DNS unavailable);
+it does not establish current remote state. Checkpoint coordinator rechecks HEAD/branch,
+scopes only current task plan diffs, then requires the authorized non-force push to
+succeed before fanout. Preserve the separate committed baseline and any new foreign hunks.
+
+`tmp/canvas-editor-224/plan-amendment-236/retained-source-proof.json` matches17
+CONTRACT/STATE/INPUT source/test identities against formal comm-002949 review evidence,
+current bytes and the committed4e34e25 objects. STATE plan-only retention amendments
+were accepted in comm-003003; historical gate failures stay preserved. New Step5 must
+independently confirm this proof before checkpoint admission; this author creates no gate
+acceptance. Keep each accepted dependency's planPath, commit and provided contract in
+acceptedDependencies; plans[] contains only the ten remaining owners. All13 acceptedPlanPaths
+stay referenced. Do not retain GPU: G4 repair and all independent gates are still required.
+
+The inspected dispatcher validates external IDs and removes their edges from projected
+remaining items; its worker acceptedPlanIds contains only remaining dispatched IDs. Thus
+workers read external contracts/commit proof from reviewContext.externalAcceptedDependencies
+and this contract, instead of requiring external IDs in worker acceptedPlanIds. Seven
+nominal waves remain documented; five projected remaining waves are GPU/telemetry/package,
+audio/clock, consumers/visual/shell, join, final. No runner source changes or Git fanout.
+If source proof or formal continuation admission fails, serial coordinator amends dispatch
+for evidence-only verification by that named owner and obtains review/checkpoint before
+redispatch; never restore source snapshots or silently replay accepted implementation.
+
+After GPU repair acceptance, serial CE-FINAL reruns all three STATE S4 commands,
+INPUT typecheck/input suite and the combined code/app/bind/params/canvas/visual/protocol
+suite with new complete logs/source hashes. Nominal GPU dependencies are not erased by
+external admission; retained behavior must pass on repaired and final joined bytes.
+Each remaining worker updates only its own plan log; shared indexes, final archiving,
+lock reconciliation, lost-intent repair and Git remain serial.
+
+### Progress Log: 2026-09-30 — Step4 session236
+Bounded baseline/manifest repair only. Seventeen retained source/test hashes matched
+reviewed evidence and committed objects. Independent metadata review, accepted-plan
+checkpoint/non-force push, G4/T5/P5 and remaining implementation/native/device gates
+remain pending. No implementation tests, production edits or Git mutations performed.

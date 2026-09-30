@@ -27,6 +27,7 @@ type FieldType = 'array' | 'number' | 'string' | 'object' | 'boolean';
 // The required top-level body fields per server kind: enough that a
 // consumer (the store in particular) never walks a missing array.
 const SERVER_FIELDS: Record<ServerKind, Record<string, FieldType>> = {
+  'clock-probe': { page_send: 'number', engine_receive: 'number', engine_send: 'number', epoch: 'string' },
   'eval-result': {
     file: 'string',
     doc_revision: 'number',
@@ -53,6 +54,7 @@ const SERVER_FIELDS: Record<ServerKind, Record<string, FieldType>> = {
 };
 
 const CLIENT_FIELDS: Record<ClientKind, Record<string, FieldType>> = {
+  'clock-probe': { page_send: 'number' },
   eval: { file: 'string', code: 'string', doc_revision: 'number', edit_epoch: 'number' },
   hush: {},
   stop: { slot: 'string' },
@@ -108,7 +110,7 @@ function decodeWith<T>(
     return fail('bad-json', String(e));
   }
   if (!isObject(raw)) return fail('bad-shape', 'the envelope is not an object');
-  if (raw.v !== PROTOCOL_VERSION) return fail('unsupported-version', `v = ${String(raw.v)}`);
+  if (raw.v !== PROTOCOL_VERSION) return fail('unsupported-version', `v = ${JSON.stringify(raw.v)}`);
   if (typeof raw.seq !== 'number' || !Number.isInteger(raw.seq)) {
     return fail('bad-shape', 'seq is not an integer');
   }
@@ -145,12 +147,87 @@ export function encodeServer(env: ServerEnvelope): string {
   return JSON.stringify(out);
 }
 
+export const MAX_TELEMETRY_BYTES = 1024 * 1024;
+export const MAX_PLAYING_EVENTS = 4096;
+
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const nonnegative = (v: unknown): v is number => finite(v) && v >= 0;
+const positive = (v: unknown): v is number => finite(v) && v > 0;
+const integer = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+const epoch = (v: unknown): boolean => typeof v === 'string' && v.length > 0;
+function ratio(v: unknown, duration = false): boolean {
+  return Array.isArray(v) && v.length === 2 && Number.isSafeInteger(v[0]) &&
+    Number.isSafeInteger(v[1]) && v[1] > 0 && (!duration || v[0] >= 0);
+}
+function latency(v: Record<string, unknown>): boolean {
+  return (v.latency_seconds === null || nonnegative(v.latency_seconds)) &&
+    (v.uncertainty_seconds === null || nonnegative(v.uncertainty_seconds)) &&
+    typeof v.latency_kind === 'string' && ['measured', 'estimate', 'unavailable'].includes(v.latency_kind) &&
+    (v.latency_kind === 'unavailable' ? v.latency_seconds === null : v.latency_seconds !== null);
+}
+function transport(v: unknown): boolean {
+  return isObject(v) && epoch(v.epoch) && nonnegative(v.sample_time) && ratio(v.cycle) &&
+    positive(v.bpm) && positive(v.beats_per_cycle) && typeof v.running === 'boolean' && latency(v);
+}
+function validPlaying(v: unknown): boolean {
+  if (!isObject(v) || typeof v.slot !== 'string' || !nonnegative(v.time) ||
+    !ratio(v.beat) || !ratio(v.dur, true)) return false;
+  if (v.epoch !== undefined && !epoch(v.epoch)) return false;
+  if (v.end_time !== undefined && (!nonnegative(v.end_time) || v.end_time < v.time)) return false;
+  if (v.src !== undefined) {
+    const s = v.src;
+    if (!isObject(s) || typeof s.file !== 'string' || !integer(s.doc_revision) ||
+      !integer(s.form_gen) || !isObject(s.span) || !integer(s.span.start) ||
+      !integer(s.span.end) || s.span.end < s.span.start) return false;
+  }
+  return true;
+}
+
 /** Decodes one server frame; never throws. */
 export function decodeServer(text: string): Decoded<ServerEnvelope> {
-  return decodeWith<ServerEnvelope>(text, SERVER_KINDS, SERVER_FIELDS);
+  const decoded = decodeWith<ServerEnvelope>(text, SERVER_KINDS, SERVER_FIELDS);
+  if (!decoded.ok) return decoded;
+  const env = decoded.env;
+  if (['playing', 'levels', 'tempo'].includes(env.kind) &&
+    new TextEncoder().encode(text).byteLength > MAX_TELEMETRY_BYTES) {
+    return fail('bad-shape', 'telemetry exceeds 1 MiB');
+  }
+  switch (env.kind) {
+    case 'playing':
+      if (env.body.events.length > MAX_PLAYING_EVENTS || !env.body.events.every(validPlaying))
+        return fail('bad-shape', 'invalid or oversized playing batch');
+      break;
+    case 'levels':
+      if (!env.body.levels.every((v) => isObject(v) && typeof v.source === 'string' &&
+        nonnegative(v.rms) && (v.bands === undefined ||
+        (Array.isArray(v.bands) && v.bands.every(nonnegative)))) ||
+        (env.body.analyzers !== undefined && (!Array.isArray(env.body.analyzers) ||
+        !env.body.analyzers.every((v) => isObject(v) && typeof v.bus === 'string' &&
+          typeof v.kind === 'string' && integer(v.id) && Array.isArray(v.cells) && v.cells.every(finite)))))
+        return fail('bad-shape', 'invalid levels');
+      break;
+    case 'tempo':
+      if (!positive(env.body.bpm) || !positive(env.body.beats_per_cycle) || !ratio(env.body.cycle) ||
+        (env.body.transport !== undefined && !transport(env.body.transport)))
+        return fail('bad-shape', 'invalid tempo timing');
+      break;
+    case 'clock-probe': {
+      const b = env.body;
+      if (!nonnegative(b.page_send) || !nonnegative(b.engine_receive) || !nonnegative(b.engine_send) ||
+        b.engine_send < b.engine_receive || !epoch(b.epoch) || !latency(b as unknown as Record<string, unknown>) ||
+        (b.correlation !== undefined && (!isObject(b.correlation) ||
+          !nonnegative(b.correlation.engine_time) || !nonnegative(b.correlation.output_time))))
+        return fail('bad-shape', 'invalid clock probe');
+      break;
+    }
+  }
+  return decoded;
 }
 
 /** Decodes one client frame (tests and the recording transport). */
 export function decodeClient(text: string): Decoded<ClientEnvelope> {
-  return decodeWith<ClientEnvelope>(text, CLIENT_KINDS, CLIENT_FIELDS);
+  const decoded = decodeWith<ClientEnvelope>(text, CLIENT_KINDS, CLIENT_FIELDS);
+  if (decoded.ok && decoded.env.kind === 'clock-probe' && !nonnegative(decoded.env.body.page_send))
+    return fail('bad-shape', 'invalid clock probe page_send');
+  return decoded;
 }

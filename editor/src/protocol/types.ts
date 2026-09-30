@@ -85,7 +85,7 @@ export type EditorKind =
   | 'scalar';
 
 export type ParamCurve = 'linear' | 'log' | 'stepped';
-export type ParamUnit = 'none' | 'db' | 's' | 'ms' | 'hz' | 'st';
+export type ParamUnit = 'none' | 'db' | 's' | 'ms' | 'hz' | 'st' | 'm';
 
 export interface ParamMeta {
   name: string;
@@ -176,7 +176,21 @@ export interface SubscribeBody {
   diagnostics: boolean;
 }
 
+export interface ClockProbeBody { page_send: number }
+export interface ClockProbeReply {
+  page_send: number;
+  engine_receive: number;
+  engine_send: number;
+  epoch: string;
+  /** Host presentation correlation, absent when unavailable. All times in seconds. */
+  correlation?: { engine_time: number; output_time: number };
+  latency_seconds: number | null;
+  latency_kind: 'measured' | 'estimate' | 'unavailable';
+  uncertainty_seconds: number | null;
+}
+
 export type ClientMsg =
+  | { kind: 'clock-probe'; body: ClockProbeBody }
   | { kind: 'eval'; body: EvalBody }
   | { kind: 'hush'; body: EmptyBody }
   | { kind: 'stop'; body: StopBody }
@@ -190,6 +204,7 @@ export type ClientMsg =
 export type ClientKind = ClientMsg['kind'];
 
 export const CLIENT_KINDS: readonly ClientKind[] = [
+  'clock-probe',
   'eval',
   'hush',
   'stop',
@@ -321,6 +336,8 @@ export interface DiagBody {
 }
 
 export interface WirePlaying {
+  epoch?: string;
+  end_time?: number;
   slot: string;
   beat: Ratio;
   time: number;
@@ -357,7 +374,21 @@ export interface TempoClock {
   locked?: boolean;
 }
 
+/** Timestamp is processing onset time, never message receipt time. */
+export interface TransportSample {
+  epoch: string;
+  sample_time: number;
+  cycle: Ratio;
+  bpm: number;
+  beats_per_cycle: number;
+  running: boolean;
+  latency_seconds: number | null;
+  latency_kind: 'measured' | 'estimate' | 'unavailable';
+  uncertainty_seconds: number | null;
+}
+
 export interface TempoBody {
+  transport?: TransportSample;
   bpm: number;
   beats_per_cycle: number;
   cycle: Ratio;
@@ -366,6 +397,7 @@ export interface TempoBody {
 }
 
 export type ServerMsg =
+  | { kind: 'clock-probe'; body: ClockProbeReply }
   | { kind: 'eval-result'; body: EvalResultBody }
   | { kind: 'stale-binding'; body: StaleBindingBody }
   | { kind: 'directive-edit'; body: DirectiveEditBody }
@@ -380,6 +412,7 @@ export type ServerMsg =
 export type ServerKind = ServerMsg['kind'];
 
 export const SERVER_KINDS: readonly ServerKind[] = [
+  'clock-probe',
   'eval-result',
   'stale-binding',
   'directive-edit',

@@ -52,6 +52,12 @@ pub(crate) fn effect_index(k: EffectKind) -> u8 {
 /// Encodes one node spec.
 pub(crate) fn put_spec(o: &mut Out<'_>, spec: &UGenSpec) -> Result<(), BuildError> {
     let (tag, payload): (u8, u32) = match spec {
+        UGenSpec::DsfOsc => (98, 0),
+        UGenSpec::ChebyshevOsc => (99, 0),
+        UGenSpec::GaussianNoise => (100, 0),
+        UGenSpec::LorenzOsc => (101, 0),
+        UGenSpec::RosslerOsc => (102, 0),
+        UGenSpec::AmFormantOsc => (103, 0),
         UGenSpec::SinOsc => (0, 0),
         UGenSpec::Saw => (1, 0),
         UGenSpec::Pulse => (2, 0),
@@ -291,6 +297,12 @@ pub(crate) fn get_node(i: &mut In<'_>, raw: &mut RawGraph) -> Result<(), FaultCo
     let p = i.u32()?;
     let small = u8::try_from(p).unwrap_or(u8::MAX);
     let node = match tag {
+        98 => Node::DsfOsc,
+        99 => Node::ChebyshevOsc,
+        100 => Node::GaussianNoise,
+        101 => Node::LorenzOsc,
+        102 => Node::RosslerOsc,
+        103 => Node::AmFormantOsc,
         0 => Node::SinOsc,
         1 => Node::Saw,
         2 => Node::Pulse,

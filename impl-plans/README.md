@@ -37,6 +37,7 @@ Large features are split into multiple related plans with cross-references.
 
 ## Active Plans
 
+
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
 | [cmp-closeout-dispatch.json](active/cmp-closeout-dispatch.json) | Dispatch manifest for the session-234 closeout (plans [CMP-40]; 11 accepted dependencies; all 12 plans completed and archived session 234) | design-completion.md 8-9; design-formatter-and-syntax.md 8 | 2026-09-30 |
@@ -106,6 +107,14 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
+| [sample-timestamps.md](completed/sample-timestamps.md) | 2026-09-30 | design-sample-timestamps.md |
+| [sampled-breakcore.md](completed/sampled-breakcore.md) | 2026-09-30 | design-genre-tracks.md sampled breakcore |
+| [shimmer-ambient-tracks.md](completed/shimmer-ambient-tracks.md) | 2026-09-30 | design-genre-tracks.md shimmer ambient |
+| [genre-tracks.md](completed/genre-tracks.md) | 2026-09-30 | design-genre-tracks.md |
+| [lofi.md](completed/lofi.md) | 2026-09-30 | design-lofi.md |
+| [rumble-kick.md](completed/rumble-kick.md) | 2026-09-30 | design-music.md RUM-001 |
+| [musicdsp-effects.md](completed/musicdsp-effects.md) | 2026-09-30 | design-musicdsp-effects.md |
+| [musicdsp-synths.md](completed/musicdsp-synths.md) | 2026-09-30 | design-musicdsp-synths.md |
 | [cmp-10-complete-core.md](completed/cmp-10-complete-core.md) | 2026-09-30 (CMP-10, context-aware completion engine core; CMP-40 combined gate passed; archived session 234) | design-completion.md 3 |
 | [cmp-15-completion-types.md](completed/cmp-15-completion-types.md) | 2026-09-30 (CMP-15, editor completion contract types; CMP-40 combined gate passed; archived session 234) | design-completion.md 6.2 |
 | [fst-50-fmt-space-repair.md](completed/fst-50-fmt-space-repair.md) | 2026-09-30 (FST-50, conservative formatter space-indent repair; CMP-40 combined gate passed; archived session 234) | design-formatter-and-syntax.md 3.9 |
@@ -213,3 +222,28 @@ PHASE_TO_PLANS = {
 - Subtasks should be as independent as possible for parallel execution
 - Always update progress log after each session
 - **Keep each plan file under 400 lines** - split if necessary
+
+## Song-mode plans (2026-09-30)
+
+Accepted design: [Finite multi-track song mode](../design-docs/specs/design-song-mode.md).
+Riela accepted the design and all 16 plans with no material findings on 2026-09-30.
+All plans are Ready; implementation has not started. Shared files follow serial dependencies; indexes and archiving belong to SONG-16.
+
+| Plan ID | Plan | Depends On |
+|---|---|---|
+| SONG-01 | [Finite symbolic values](active/song-mode-values.md) | Accepted design |
+| SONG-02 | [Value and VM compatibility](active/song-mode-value-integration.md) | SONG-01 |
+| SONG-03 | [Checker types and native signatures](active/song-mode-checker.md) | SONG-02 |
+| SONG-04 | [Canonical realization and pure edits](active/song-mode-query-edits.md) | SONG-01 |
+| SONG-05 | [Song native execution](active/song-mode-natives.md) | SONG-03, SONG-04 |
+| SONG-06 | [Snapshot and session request contracts](active/song-mode-snapshot-contracts.md) | SONG-05 |
+| SONG-07 | [Isolated whole-code candidate evaluation](active/song-mode-candidate-evaluation.md) | SONG-06 |
+| SONG-08 | [Audio commands and acknowledgments](active/song-mode-audio-contracts.md) | SONG-06 |
+| SONG-09 | [Private branches, tails and audio gates](active/song-mode-dsp-routing.md) | SONG-08 |
+| SONG-10 | [Native and worklet song adapters](active/song-mode-host-adapters.md) | SONG-09 |
+| SONG-11 | [Finite song transport and atomic activation](active/song-mode-transport.md) | SONG-07, SONG-10 |
+| SONG-12 | [Streaming complete-song WAV export](active/song-mode-export-core.md) | SONG-11 |
+| SONG-13 | [Automatic run completion and render command](active/song-mode-cli.md) | SONG-12 |
+| SONG-14 | [Browser song protocol integration](active/song-mode-browser-session.md) | SONG-11 |
+| SONG-15 | [Whole-code Apply and instrument mute UI](active/song-mode-editor-controls.md) | SONG-14 |
+| SONG-16 | [Serial integration evidence and documentation](active/song-mode-reconciliation.md) | SONG-13, SONG-15 |

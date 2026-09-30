@@ -101,6 +101,26 @@ impl BusTemplate {
         true
     }
 
+    /// Rejects malformed reserved selector transport before installing a chain.
+    #[must_use]
+    pub fn valid_sidechains(&self) -> bool {
+        (0..self.n.min(MAX_CHAIN)).all(|k| {
+            let mut selected = false;
+            self.params[k][..usize::from(self.n_params[k]).min(MAX_FX_PARAMS)]
+                .iter()
+                .all(|&(id, ctl)| {
+                    if id != effects::SIDECHAIN_BUS_CTL {
+                        return true;
+                    }
+                    let valid = !selected
+                        && self.kinds[k] == EffectKind::Compressor
+                        && effects::sidechain_bus(ctl).is_some_and(|source| source != self.bus);
+                    selected = true;
+                    valid
+                })
+        })
+    }
+
     /// The template of a `BusDef` (evaluator side).
     ///
     /// # Errors
@@ -116,6 +136,9 @@ impl BusTemplate {
                 }
             }
         }
+        if !t.valid_sidechains() {
+            return Err(BuildError::BadEdge);
+        }
         Ok(t)
     }
 }
@@ -126,6 +149,15 @@ pub enum SlotState {
     Free,
     Live,
     Retiring,
+}
+
+/// Immutable pre-effect accumulators, captured before any bus runs.
+#[derive(Debug)]
+struct KeySnapshot {
+    bus: BusId,
+    active: bool,
+    l: Box<[f32]>,
+    r: Box<[f32]>,
 }
 
 /// One preallocated bus.
@@ -236,12 +268,15 @@ impl BusSlot {
     }
 
     /// Runs reverb and chain over the input accumulators (`frames`).
+    #[allow(clippy::too_many_arguments)]
     fn run<C: CellRead + ?Sized>(
         &mut self,
         frames: usize,
         cells: &C,
         dry: &mut [f32],
         ctx: &mut FxCtx<'_>,
+        snapshots: &[KeySnapshot],
+        key: &mut [f32],
     ) {
         let (l, r) = (&mut self.l[..frames], &mut self.r[..frames]);
         let (a, b) = self.room_region;
@@ -265,7 +300,19 @@ impl BusSlot {
                 continue;
             }
             let (off, len) = self.regions[k];
-            unit.run(&mut self.mem[off..off + len], l, r, dry, ctx);
+            let detector = unit.sidechain().map(|bus| {
+                // Sum channels across live and retiring generations before rectifying.
+                for (frame, peak) in key[..frames].iter_mut().enumerate() {
+                    let (mut left, mut right) = (0.0f32, 0.0f32);
+                    for source in snapshots.iter().filter(|s| s.active && s.bus == bus) {
+                        left += source.l[frame];
+                        right += source.r[frame];
+                    }
+                    *peak = left.abs().max(right.abs());
+                }
+                &key[..frames]
+            });
+            unit.run_with_key(&mut self.mem[off..off + len], l, r, dry, ctx, detector);
         }
         for x in l.iter_mut().chain(r.iter_mut()) {
             if !x.is_finite() {
@@ -279,6 +326,8 @@ impl BusSlot {
 #[derive(Debug)]
 pub struct BusGraph {
     pub slots: Box<[BusSlot]>,
+    snapshots: Box<[KeySnapshot]>,
+    key: Box<[f32]>,
 }
 
 impl BusGraph {
@@ -301,7 +350,19 @@ impl BusGraph {
         m.state = SlotState::Live;
         m.master = true;
         m.resource = DEFAULT_MASTER;
-        Self { slots }
+        let snapshots = (0..slots.len())
+            .map(|_| KeySnapshot {
+                bus: BusId::new(0),
+                active: false,
+                l: vec![0.0; max_block].into_boxed_slice(),
+                r: vec![0.0; max_block].into_boxed_slice(),
+            })
+            .collect();
+        Self {
+            slots,
+            snapshots,
+            key: vec![0.0; max_block].into_boxed_slice(),
+        }
     }
 
     /// The live master slot.
@@ -356,6 +417,9 @@ impl BusGraph {
         sr: f32,
         caps: &CapabilitySet,
     ) -> bool {
+        if !t.valid_sidechains() {
+            return false;
+        }
         let Some(free) = self.slots.iter().position(|s| s.state == SlotState::Free) else {
             return false;
         };
@@ -377,22 +441,7 @@ impl BusGraph {
             if capture_effect && caps.max_capture_seconds < effects::texture::CAPTURE_SECONDS {
                 return false;
             }
-            if (capture_effect
-                || matches!(
-                    *kind,
-                    EffectKind::CrossMod
-                        | EffectKind::ResonantBank
-                        | EffectKind::ElementsBank
-                        | EffectKind::StreamEnvelope
-                        | EffectKind::StreamVactr
-                        | EffectKind::StreamFollower
-                        | EffectKind::StreamCompressor
-                        | EffectKind::StreamFilter
-                        | EffectKind::StreamLorenz
-                        | EffectKind::ShiftPair
-                ))
-                && want > remaining
-            {
+            if effects::requires_full_memory(*kind) && want > remaining {
                 return false;
             }
             remaining = remaining.saturating_sub(want);
@@ -478,12 +527,20 @@ impl BusGraph {
         l: &mut [f32],
         r: &mut [f32],
     ) {
+        for (source, snapshot) in self.slots.iter().zip(self.snapshots.iter_mut()) {
+            snapshot.active = !source.master && source.state != SlotState::Free;
+            snapshot.bus = source.bus;
+            if snapshot.active {
+                snapshot.l[..frames].copy_from_slice(&source.l[..frames]);
+                snapshot.r[..frames].copy_from_slice(&source.r[..frames]);
+            }
+        }
         let m = self.master();
         for i in 0..self.slots.len() {
             if i == m || self.slots[i].state == SlotState::Free {
                 continue;
             }
-            self.slots[i].run(frames, cells, dry, ctx);
+            self.slots[i].run(frames, cells, dry, ctx, &self.snapshots, &mut self.key);
             let (src, dst) = if i < m {
                 let (a, b) = self.slots.split_at_mut(m);
                 (&a[i], &mut b[0])
@@ -497,7 +554,7 @@ impl BusGraph {
             }
         }
         let master = &mut self.slots[m];
-        master.run(frames, cells, dry, ctx);
+        master.run(frames, cells, dry, ctx, &self.snapshots, &mut self.key);
         for k in 0..frames {
             l[k] = master.l[k];
             r[k] = master.r[k];

@@ -23,9 +23,9 @@ use crate::reader::span::{FileId, Span, SrcRef};
 use crate::sched::runtime::Runtime;
 use crate::sched::telemetry::PlayingEvent;
 use crate::session::protocol::{
-    BindingsBody, DiagBody, LevelsBody, PlayingBody, ServerMsg, TempoBody, WireAnalyzer, WireCall,
-    WireChanged, WireClear, WireClock, WireDiag, WireFormState, WireLevel, WireOrigin, WirePlaying,
-    WireSite, WireSpan, WireSrcRef, WireState, WireTier,
+    BindingsBody, DiagBody, LevelsBody, PlayingBody, ServerMsg, TempoBody, TransportSample,
+    WireAnalyzer, WireCall, WireChanged, WireClear, WireClock, WireDiag, WireFormState, WireLevel,
+    WireOrigin, WirePlaying, WireSite, WireSpan, WireSrcRef, WireState, WireTier,
 };
 use crate::session::session::{DocState, Outgoing, Session};
 use crate::types::diag::Diagnostic;
@@ -36,6 +36,8 @@ use crate::vm::fail::Failure;
 
 /// The shortest interval between two `levels` messages, seconds.
 const LEVELS_PERIOD: f64 = 0.1;
+/// Maximum transport snapshot cadence: twenty per second.
+const TRANSPORT_PERIOD: f64 = 0.05;
 
 /// The display name of `id` in `files`.
 #[must_use]
@@ -312,6 +314,8 @@ pub fn playing_wire(
     rev_of: &dyn Fn(&SrcRef) -> u64,
 ) -> WirePlaying {
     WirePlaying {
+        epoch: None,
+        end_time: Some(e.time + e.dur),
         slot: name_of_kw(e.slot).to_string(),
         beat: ratio_pair(e.beat),
         time: e.time,
@@ -388,6 +392,9 @@ impl Session {
     /// telemetry), `levels` (at most 10 per second) and `tempo` (on
     /// change).
     pub fn tick_routed(&mut self, host_now: f64) -> Vec<Outgoing> {
+        if !host_now.is_finite() || host_now < 0.0 {
+            return Vec::new();
+        }
         let mut out = std::mem::take(&mut self.outbox);
         for (conn, msg) in self.apply_pending() {
             let routed = self.route(conn.unwrap_or(0), None, vec![msg]);
@@ -427,19 +434,52 @@ impl Session {
             msgs.push(ServerMsg::Diag(DiagBody { add, clear }));
         }
         let tempo = self.rt.clock().tempo();
+        let source = self.rt.clock().source();
+        let frozen = self.rt.midi_clock.is_frozen();
+        let lost = self.rt.midi_clock.is_lost();
+        let state = (host_now, self.rt.pos, source, frozen, lost);
+        let generation = self.rt.midi_clock().restart_generation();
+        let restarted = generation != self.transport_restart_generation;
+        self.transport_restart_generation = generation;
+        if restarted
+            || self
+                .transport_state
+                .is_some_and(|(time, pos, old_source, paused, old_lost)| {
+                    host_now < time
+                        || self.rt.pos < pos
+                        || source != old_source
+                        || frozen != paused
+                        || lost != old_lost
+                })
+        {
+            self.transport_epoch = self.transport_epoch.saturating_add(1);
+            // A changed epoch invalidates any previously projected event times.
+        }
+        if !lost {
+            self.transport_cycle = self.rt.pos;
+        } else if self.transport_state.is_some_and(|s| !s.4) {
+            self.transport_cycle = self.transport_state.map_or(self.rt.pos, |s| s.1);
+        }
+        self.transport_state = Some(state);
+        let epoch = format!("session-{}-{}", self.transport_id, self.transport_epoch);
         let events = self.rt.telemetry();
         if !events.is_empty() && self.subs.values().any(|s| s.telemetry) {
             let bpm = tempo.bpm.to_f64();
             let rev_of = |s: &SrcRef| self.revision_of(s);
             let events = events
                 .iter()
-                .map(|e| playing_wire(e, &self.files, bpm, &rev_of))
+                .take(4096)
+                .map(|e| {
+                    let mut wire = playing_wire(e, &self.files, bpm, &rev_of);
+                    wire.epoch = Some(epoch.clone());
+                    wire
+                })
                 .collect();
             msgs.push(ServerMsg::Playing(PlayingBody { events }));
         }
         let due = self
             .last_levels
-            .map_or(true, |t| host_now - t >= LEVELS_PERIOD || host_now < t);
+            .is_none_or(|t| host_now - t >= LEVELS_PERIOD || host_now < t);
         if due && self.subs.values().any(|s| s.levels) {
             self.last_levels = Some(host_now);
             let sigs = self.rt.hosts.audio.analysis();
@@ -463,7 +503,6 @@ impl Session {
                 analyzers: analyzers.filter(|v| !v.is_empty()),
             }));
         }
-        let source = self.rt.clock().source();
         let clock = if source == ClockSource::MidiClock {
             WireClock {
                 source: "midi".to_string(),
@@ -476,9 +515,29 @@ impl Session {
             }
         };
         let key = (tempo.bpm, tempo.beats_per_cycle, source, clock.locked);
-        if self.last_tempo != Some(key) {
+        let due = self
+            .last_transport
+            .is_none_or(|t| host_now - t >= TRANSPORT_PERIOD || host_now < t);
+        let transport = if due && self.subs.values().any(|s| s.telemetry) {
+            self.last_transport = Some(host_now);
+            Some(TransportSample {
+                epoch,
+                sample_time: host_now,
+                cycle: ratio_pair(self.transport_cycle),
+                bpm: tempo.bpm.to_f64(),
+                beats_per_cycle: tempo.beats_per_cycle.to_f64(),
+                running: !frozen && !lost,
+                latency_seconds: None,
+                latency_kind: "unavailable".to_string(),
+                uncertainty_seconds: None,
+            })
+        } else {
+            None
+        };
+        if self.last_tempo != Some(key) || transport.is_some() {
             self.last_tempo = Some(key);
             msgs.push(ServerMsg::Tempo(TempoBody {
+                transport,
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.floor(),
                 cycle: ratio_pair(self.rt.pos),

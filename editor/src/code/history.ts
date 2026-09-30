@@ -10,13 +10,52 @@
 // cached for the few most recent revisions asked for. Every UTF-8 <-> UTF-16
 // conversion goes through `Utf8Index`.
 
-import type { ChangeSet, Text } from '@codemirror/state';
+import { Text, type ChangeSet } from '@codemirror/state';
 import { Utf8Index } from '../protocol/utf8';
 import type { Span } from '../protocol/types';
 
 export const HISTORY_LIMIT = 256;
 
 const INDEX_CACHE = 4;
+export const HISTORY_UNDO_BYTES = 32 * 1024 * 1024;
+export const INDEX_BYTES = 8 * 1024 * 1024;
+
+/** Conservative retained-heap charge; count copies rather than assuming rope sharing. */
+export function retainedBytes(value: unknown, seen = new Set<object>()): number {
+  if (typeof value === 'string') return 32 + value.length * 2;
+  if (value === null || value === undefined) return 0;
+  if (typeof value !== 'object') return 16;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  if (value instanceof Text) return 128 + value.length * 2 + value.lines * 64;
+  if (ArrayBuffer.isView(value)) return 128 + value.byteLength;
+  if (value instanceof ArrayBuffer) return 128 + value.byteLength;
+  if (value instanceof Map) return 128 + [...value].reduce((n, [k, v]) => n + retainedBytes(k, seen) + retainedBytes(v, seen) + 64, 0);
+  if (value instanceof Set) return 128 + [...value].reduce((n, v) => n + retainedBytes(v, seen) + 32, 0);
+  return 128 + Object.values(value).reduce<number>((n, v) => n + 16 + retainedBytes(v, seen), 0);
+}
+
+/** Adapter for pinned @codemirror/commands 6.11.1; no serialized effects are lost. */
+export function trimUndoHistory(value: unknown, budget: number): { value: unknown; bytes: number; reduced: boolean } {
+  const h = value as { done: readonly unknown[]; undone: readonly unknown[] };
+  if (!h || !Array.isArray(h.done) || !Array.isArray(h.undone)) throw new Error('Unsupported CodeMirror history layout');
+  const done = [...h.done], undone = [...h.undone];
+  const cost = (events: readonly unknown[]): number => events.reduce<number>((n, event) => n + retainedBytes(event), 0);
+  let bytes = cost(done) + cost(undone);
+  let reduced = false;
+  while (bytes > budget && (done.length || undone.length)) {
+    // Oldest complete groups are at the front on both branches.
+    const branch = done.length ? done : undone;
+    bytes -= retainedBytes(branch.shift());
+    reduced = true;
+  }
+  if (!reduced) return { value, bytes, reduced };
+  const replacement = Object.create(Object.getPrototypeOf(value));
+  Object.defineProperties(replacement, Object.getOwnPropertyDescriptors(value));
+  replacement.done = done;
+  replacement.undone = undone;
+  return { value: replacement, bytes, reduced };
+}
 
 /** A UTF-16 range of one revision. */
 export interface Range16 {
@@ -52,9 +91,33 @@ export class RevisionHistory {
   readonly limit: number;
   private entries: Entry[];
   private readonly indexes = new Map<number, Utf8Index>();
+  readonly byteLimit: number;
+  readonly indexByteLimit: number;
+  private reduced = false;
 
-  constructor(initial: Text, rev = 1, limit = HISTORY_LIMIT) {
-    this.limit = Math.max(1, limit);
+  get retainedBytes(): number {
+    return this.entries.reduce((n, e, i) => n + (i < this.entries.length - 1 ? retainedBytes(e.text) : 0) + retainedBytes(e.changes), 0);
+  }
+  get indexBytes(): number {
+    return [...this.indexes.values()].reduce((n, idx) => n + 128 + idx.text.length * 2 + (idx.text.length + 1) * 4, 0);
+  }
+  get indexCount(): number { return this.indexes.size; }
+  get reducedDepth(): boolean { return this.reduced; }
+
+  trimToBytes(budget: number): void {
+    while (this.entries.length > 1 && (this.entries.length > this.limit || this.retainedBytes > budget)) {
+      const dropped = this.entries.shift() as Entry;
+      this.indexes.delete(dropped.rev);
+      (this.entries[0] as Entry).changes = null;
+      this.reduced = true;
+    }
+    if (this.entries.length === 1) (this.entries[0] as Entry).changes = null;
+  }
+
+  constructor(initial: Text, rev = 1, limit = HISTORY_LIMIT, byteLimit = HISTORY_UNDO_BYTES, indexByteLimit = INDEX_BYTES) {
+    this.limit = Math.max(1, Math.min(HISTORY_LIMIT, Math.floor(limit)));
+    this.byteLimit = Math.max(0, Math.min(HISTORY_UNDO_BYTES, byteLimit));
+    this.indexByteLimit = Math.max(0, Math.min(INDEX_BYTES, indexByteLimit));
     this.entries = [{ rev, text: initial, changes: null }];
   }
 
@@ -82,11 +145,7 @@ export class RevisionHistory {
       return;
     }
     this.entries.push({ rev, text, changes });
-    while (this.entries.length > this.limit) {
-      const dropped = this.entries.shift() as Entry;
-      this.indexes.delete(dropped.rev);
-    }
-    (this.entries[0] as Entry).changes = null;
+    this.trimToBytes(this.byteLimit);
   }
 
   /** The `Utf8Index` of `rev`, or null when it is not kept. */
@@ -101,8 +160,11 @@ export class RevisionHistory {
     const e = this.entry(rev);
     if (!e) return null;
     const idx = new Utf8Index(e.text.toString());
+    const bytes = 128 + idx.text.length * 2 + (idx.text.length + 1) * 4;
+    // Oversized conversions remain available, but are never retained in the cache.
+    if (bytes > this.indexByteLimit) return idx;
     this.indexes.set(rev, idx);
-    while (this.indexes.size > INDEX_CACHE) {
+    while (this.indexes.size > INDEX_CACHE || this.indexBytes > this.indexByteLimit) {
       const oldest = this.indexes.keys().next().value as number;
       this.indexes.delete(oldest);
     }
@@ -120,6 +182,8 @@ export class RevisionHistory {
     if (start < 0 || end < 0 || end < start) return null;
     let from = span.from;
     let to = span.to;
+    const text = (this.entries[start] as Entry).text;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to > text.length) return null;
     for (let i = start + 1; i <= end; i += 1) {
       const changes = (this.entries[i] as Entry).changes;
       if (!changes) return null;
@@ -139,7 +203,7 @@ export class RevisionHistory {
   mapWireSpan(span: Span, rev: number): Range16 | null {
     const idx = this.index(rev);
     if (!idx) return null;
-    if (span.start < 0 || span.end < span.start || span.end > idx.byteLength) return null;
+    if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end < span.start || span.end > idx.byteLength) return null;
     return this.mapSpan(idx.spanToUtf16(span), rev);
   }
 

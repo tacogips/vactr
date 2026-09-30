@@ -9,6 +9,8 @@
 //! MIDI and OSC bake values at transmission (the documented sink deviation).
 //! Any failure is event-local: that event (and its held output) is dropped.
 
+pub(crate) mod timestamps;
+
 use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
 
@@ -79,6 +81,7 @@ struct SampleEntry {
     reported: bool,
     /// The loaded sample's duration, seconds (0.0 when it failed to load).
     seconds: f64,
+    geometry: timestamps::Geometry,
 }
 
 /// Sample resources: `SampleSrc -> resource id` (16.1 "the scheduler
@@ -151,16 +154,24 @@ impl SampleTable {
             ),
             _ => hosts.samples.load(src),
         };
-        let (state, seconds) = match loaded {
+        let (state, seconds, geometry) = match loaded {
             Ok(data) => {
                 let channels = f64::from(data.channels.max(1));
                 let rate = f64::from(data.rate.max(1));
                 #[allow(clippy::cast_precision_loss)]
                 let seconds = data.frames.len() as f64 / channels / rate;
+                let geometry = timestamps::Geometry {
+                    frames: (data.frames.len() / usize::from(data.channels.max(1))) as u64,
+                    rate: data.rate,
+                };
                 hosts.audio.install_sample(id, data);
-                (SampleState::Loading, seconds)
+                (SampleState::Loading, seconds, geometry)
             }
-            Err(_) => (SampleState::Failed, 0.0),
+            Err(_) => (
+                SampleState::Failed,
+                0.0,
+                timestamps::Geometry { frames: 0, rate: 0 },
+            ),
         };
         self.entries.push(SampleEntry {
             src: src.clone(),
@@ -168,6 +179,7 @@ impl SampleTable {
             state,
             reported: false,
             seconds,
+            geometry,
         });
     }
 
@@ -349,6 +361,21 @@ fn commit_inner(
     cx.samples.note_value(&ev.value);
     let route = cx.resolver.route(&sound)?;
     let controls = controls_of(ev, ecx.overrides);
+    timestamps::validate_values(&controls)?;
+    if timestamps::present(&controls)
+        && !matches!(
+            &route,
+            Route::Audio {
+                sample: Some(_),
+                ..
+            }
+        )
+    {
+        return Err(Failure::new(
+            FailCode::Type,
+            "sample timestamps require a sample source",
+        ));
+    }
     match route {
         Route::Audio { inst, sample } => {
             let bank = match sample {
@@ -383,9 +410,22 @@ fn commit_inner(
             };
             // The installed sample's duration, for a `speed-fit` marker
             // (`splice`/`loop-at`/`fit`, design 10.1) to resolve against.
-            let secs = bank.and_then(|id| cx.samples.seconds(id));
+            let window = bank
+                .and_then(|id| {
+                    cx.samples
+                        .entries
+                        .iter()
+                        .find(|e| e.id == id)
+                        .map(|e| e.geometry)
+                })
+                .map(|g| timestamps::resolve(&controls, g))
+                .transpose()?
+                .flatten();
+            let secs = window
+                .map(|w| w.seconds)
+                .or_else(|| bank.and_then(|id| cx.samples.seconds(id)));
             admit_grains(ev, &controls, inst, cx, ecx);
-            audio_events(time, inst, bank, secs, &controls, cx, ecx).map(Committed::Audio)
+            audio_events(time, inst, bank, secs, window, &controls, cx, ecx).map(Committed::Audio)
         }
         Route::Midi { ch } => Ok(Committed::Midi(midi_events(time, dur, ch, &controls, ecx))),
         Route::Osc { addr } => Ok(Committed::Osc(OscEvent {
@@ -408,11 +448,13 @@ fn notes(controls: &Controls, bank: bool) -> Option<(Vec<f64>, Option<VarSlotRef
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn audio_events(
     time: f64,
     inst: crate::dsp::graph::InstId,
     bank: Option<u32>,
     secs: Option<f64>,
+    window: Option<timestamps::Window>,
     controls: &Controls,
     cx: &mut CommitCx<'_>,
     ecx: &EventCx<'_>,
@@ -427,6 +469,15 @@ fn audio_events(
     if let (Some(id), Some(row)) = (bank, controls::row("bank")) {
         #[allow(clippy::cast_precision_loss)]
         base.push_ctl(row.ctl, Ctl::Const(id as f32))?;
+    }
+    if let Some(window) = window {
+        for (prefix, frame) in [("region-start", window.start), ("region-stop", window.stop)] {
+            for (suffix, value) in [("low", frame & 65535), ("high", frame >> 16)] {
+                if let Some(row) = controls::row(&format!("{prefix}-{suffix}")) {
+                    base.push_ctl(row.ctl, Ctl::Const(value as f32))?;
+                }
+            }
+        }
     }
     // R3: `bus` is a `CtlRoute::Scheduler` row (skipped by the generic loop
     // below), resolved here instead, the same way `bank` is. An unknown
@@ -459,6 +510,9 @@ fn audio_events(
     }
     for (k, e) in controls {
         let name = name_of_kw(*k);
+        if window.is_some() && matches!(&*name, "begin" | "end") {
+            continue;
+        }
         let row = controls::row(&name);
         if row.is_none() {
             if &*name == "speed-fit" {

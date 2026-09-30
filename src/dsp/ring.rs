@@ -693,7 +693,10 @@ pub struct EngineConfig {
     pub bus_slots: usize,
     /// Bus delay memory beyond the capture buffer, seconds.
     pub bus_seconds: f32,
-    /// Per-voice delay memory, seconds.
+    /// Per-voice state budget: this value times sample rate gives float samples.
+    /// The default four seconds costs 768 KB per voice at 48 kHz; it reserves
+    /// 196.6 MB for 256 native voices or 49.2 MB for 64 browser voices.
+    /// Stereo rings share this budget; it is not a maximum delay duration.
     pub voice_seconds: f32,
     pub orbits: usize,
     pub orbit_delay_seconds: f32,
@@ -719,7 +722,11 @@ impl EngineConfig {
     /// Per-voice and per-bus delay-state ceiling, in float samples.
     pub const MAX_STATE_SAMPLES: f32 = 2_000_000.0;
 
-    /// The defaults of 12.8.9 for a tier.
+    /// The defaults of 12.8.9 for a tier, with full-state creative effects.
+    /// At 48 kHz, voice state costs `max_voices * 768_000` bytes and each
+    /// bus reserves 1.92 MB plus the granular capture region. Costs scale
+    /// linearly with sample rate; custom smaller budgets reject oversized
+    /// effect graphs at installation rather than reducing their algorithms.
     #[must_use]
     pub fn new(caps: &CapabilitySet, sample_rate: f32, max_block: usize, store: StoreKind) -> Self {
         Self {
@@ -728,12 +735,14 @@ impl EngineConfig {
             max_block,
             output_channels: 2,
             store,
-            // The core prelude currently installs 63 definitions. Leave
-            // bounded room for opt-in input and quad instruments.
-            template_slots: 72,
+            // The core prelude currently installs 67 definitions. Leave
+            // bounded room for local song voices and opt-in instruments.
+            template_slots: 96,
             bus_slots: DEFAULT_BUS_SLOTS,
-            bus_seconds: 4.0,
-            voice_seconds: 0.5,
+            // Full stereo FDN/shimmer state fits one voice; buses have room
+            // for useful combinations. These buffers are reserved at startup.
+            bus_seconds: 10.0,
+            voice_seconds: 4.0,
             orbits: 4,
             orbit_delay_seconds: 4.0,
             analysis_cells: 4096,

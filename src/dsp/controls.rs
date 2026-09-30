@@ -547,6 +547,27 @@ pub static ROWS: &[ControlRow] = &[
     ),
     param("lpg-decay", 154, 0.5, (0.0, 1.0)),
     param("lpg-color", 155, 0.5, (0.0, 1.0)),
+    mk(
+        "start-ms",
+        156,
+        0.0,
+        (0.0, 3_600_000.0),
+        CtlRoute::Scheduler,
+        CtlDomain::Float,
+    ),
+    mk(
+        "stop-ms",
+        157,
+        0.0,
+        (0.0, 3_600_000.0),
+        CtlRoute::Scheduler,
+        CtlDomain::Float,
+    ),
+    // Exact frame indices packed as two integer 16-bit f32 components.
+    param("region-start-low", 158, 0.0, (0.0, 65535.0)),
+    param("region-start-high", 159, -1.0, (-1.0, 65535.0)),
+    param("region-stop-low", 160, 0.0, (0.0, 65535.0)),
+    param("region-stop-high", 161, -1.0, (-1.0, 65535.0)),
 ];
 
 /// The row of a control name.

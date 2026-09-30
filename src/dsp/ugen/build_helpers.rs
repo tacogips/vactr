@@ -59,9 +59,17 @@ pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize) {
         Node::FrameLfo => (frame_lfo::STATE_FLOATS, 0),
         Node::PeakPulse => (peak_pulse::STATE_FLOATS, 0),
         Node::NumberStation => (number_station::STATE_FLOATS, 0),
+        Node::AmFormantOsc => (musicdsp_synth::AM_STATE_FLOATS, 0),
         Node::Comb => (0, secs(0.1)),
         Node::Granular(_) => (0, crate::dsp::granular::ugen_mem_len(env.sr, &env.caps)),
-        Node::Effect { kind, .. } => (0, effects::mem_len(*kind, env.sr, &env.caps)),
+        Node::Effect { kind, .. } => {
+            let need = effects::mem_len(*kind, env.sr, &env.caps);
+            if effects::requires_full_memory(*kind) {
+                (need, 0)
+            } else {
+                (0, need)
+            }
+        }
         _ => (0, 0),
     }
 }

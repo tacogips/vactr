@@ -140,7 +140,19 @@ fn regions_at_the_bounds_stay_inside_the_sample() {
 #[test]
 fn sample_play_reads_only_its_region_controls() {
     let names: Vec<&str> = SAMPLE.iter().map(|p| p.name).collect();
-    assert_eq!(names, ["speed", "begin", "end", "loop"]);
+    assert_eq!(
+        names,
+        [
+            "speed",
+            "begin",
+            "end",
+            "loop",
+            "region-start-low",
+            "region-start-high",
+            "region-stop-low",
+            "region-stop-high"
+        ]
+    );
     let env = NativeRig::native().engine.build_env();
     let t = Template::from_inst(
         &chain(1, vec![UGenSpec::SamplePlay(BankRef::new(BANK_ID))]),
@@ -154,9 +166,16 @@ fn sample_play_reads_only_its_region_controls() {
         ctl::BEGIN.get(),
         ctl::END.get(),
         ctl::LOOP.get(),
+        158,
+        159,
+        160,
+        161,
     ];
     want.sort_unstable();
-    assert_eq!(ids, want, "no controls beyond begin/end/speed/loop");
+    assert_eq!(
+        ids, want,
+        "only legacy playback controls and exact timestamp frame words"
+    );
 }
 
 #[test]

@@ -53,6 +53,8 @@ tarpaulin-report.html
 
 mise.local.toml
 
+# Local Riela execution history and runtime databases
+/.riela/sessions/
 ## tree-sitter build outputs
 tree-sitter-vact/*.wasm
 tree-sitter-vact/build/

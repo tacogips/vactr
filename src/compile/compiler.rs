@@ -93,6 +93,7 @@ pub fn compile(n: &Node, cx: &mut CompileCx<'_>) -> Result<Rc<FnProto>, Diagnost
         overflow: false,
         dsp: 0,
         head: false,
+        timestamp_exact: false,
     };
     c.top_form(n)?;
     if c.overflow {
@@ -134,6 +135,8 @@ pub(crate) struct Compiler<'c, 'a> {
     pub dsp: u32,
     /// The next atom is a call head (never an implicit control name).
     pub head: bool,
+    /// Exact numeric literals inside millisecond timestamp argument trees.
+    pub timestamp_exact: bool,
 }
 
 impl Compiler<'_, '_> {
@@ -582,7 +585,10 @@ impl Compiler<'_, '_> {
         r?;
         let mut kinds = Vec::with_capacity(args.len() + 1);
         let mut pos: usize = 0;
+        let timestamp_parent = self.timestamp_exact;
         for a in args {
+            self.timestamp_exact = timestamp_parent
+                || (matches!(head.sym_name(), Some("start-ms" | "stop-ms")) && pos == 1);
             match a.kind {
                 NodeKind::Pair => {
                     self.site = site.nested();
@@ -610,6 +616,7 @@ impl Compiler<'_, '_> {
                 }
             }
         }
+        self.timestamp_exact = timestamp_parent;
         if let Some((name, _, _)) = &inst_ctl {
             self.load_const(Value::Keyword(intern_kw(name)));
             kinds.push(ArgKind::Pos);

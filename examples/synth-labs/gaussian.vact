@@ -1,0 +1,14 @@
+# Original MusicDSP-inspired gaussian synthesis, sample-free.
+# Run: target/debug/vactr run examples/synth-labs/gaussian.vact --host native --cycles 16
+# Lorenz/Rossler are chaotic textures; note values do not imply tuned pitch.
+
+inst lab-gaussian :
+	gaussian-noise 0.22 mean: 0 > hpf 500 > lpf 6500
+		> * {env-perc 0.01 0.45} > * amp
+
+use-bpm 120
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+s :lab-gaussian > note [:g2 nil :d3 :ab2]  > gain 0.25 > d1

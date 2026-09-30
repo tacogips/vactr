@@ -310,7 +310,12 @@ fn tombstones_drop_a_note_on_after_its_release() {
 fn effect_catalog_names_round_trip() {
     let names: BTreeSet<&str> = EffectKind::ALL.iter().map(|k| k.name()).collect();
     assert_eq!(names.len(), EffectKind::ALL.len());
-    assert_eq!(EffectKind::ALL.len(), 103 + 7 + AnalyzerKind::ALL.len());
+    // Eighteen MusicDSP families and composite lo-fi append after the legacy catalog.
+    // The frozen byte-ID fixture separately verifies every legacy position.
+    assert_eq!(
+        EffectKind::ALL.len(),
+        103 + 7 + AnalyzerKind::ALL.len() + 19
+    );
     for k in EffectKind::ALL {
         assert_eq!(EffectKind::from_name(k.name()), Some(*k));
     }

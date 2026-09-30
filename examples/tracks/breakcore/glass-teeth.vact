@@ -1,0 +1,75 @@
+# Glass Teeth — original sampled breakcore, 190 BPM, C minor.
+# CC0 synthetic Amen-pattern recreation: provenance in examples/samples/amen-recreation.
+# All cuts and rearrangements happen here in Vact, using the intact upstream WAV.
+# 64 bars: fracture / statement / escalation / half-time / rebuild / shred / return / dissolve.
+# Play live: target/debug/vactr run examples/tracks/breakcore/glass-teeth.vact --host native --cycles 64
+
+inst score-kick score-punch: float = 1.8 score-body: float = 0.22:
+	fm-drum freq fm-amount: 0.4 pitch-sweep: score-punch decay: score-body drum-noise: 0.01 drive: 0.12 > * amp
+
+inst score-bass score-brightness: float = 800 score-roundness: float = 0.6:
+	{sin-osc freq > * score-roundness} > + {saw freq > * {- 1 score-roundness}}
+		> lpf score-brightness > * {env-adsr 0.008 0.12 0.7 0.18} > * amp
+
+inst score-pad score-brightness: float = 1900 score-air: float = 0.35:
+	{tri freq > * 0.6} > + {sin-osc {* freq 1.003} > * 0.4}
+		> + {sin-osc {* freq 2.001} > * score-air}
+		> lpf score-brightness > * {env-adsr 0.6 0.8 0.75 1.8} > * amp
+
+inst score-lead score-warmth: float = 0.7 score-tail: float = 0.28:
+	{sin-osc freq > * score-warmth} > + {tri freq > * {- 1 score-warmth}}
+		> * {env-perc 0.008 score-tail} > * amp
+
+use-bpm 190
+
+bus :break:
+	hpf cutoff: 55 > lofi tone: 11500 drive: 2.2 wow: 0 flutter: 0 bits: 12 rate: 32000 mix: 0.25
+		> compressor threshold: -15 ratio: 3 attack: 0.003 release: 0.08 knee: 4
+
+bus :bass:
+	hpf cutoff: 32 > bitcrush bits: 12 mix: 0.15
+
+bus :halo:
+	diffusion-delay time: 0.237 feedback: 0.35 diffusion: 0.65 tone: 3800 mix: 0.2
+		> shimmer-reverb size: 0.55 decay: 4 damping: 0.6 shift: 12 feedback: 0.2 mix: 0.3
+		> hpf cutoff: 250
+
+master:
+	compressor threshold: -12 ratio: 2 attack: 0.01 release: 0.12 knee: 5
+		> gain 4 > limiter ceiling: -2 release: 0.08
+
+# One sample; absolute timestamp window uses milliseconds with three decimal places.
+let amen sample ../../samples/amen-recreation/source.wav
+let source-break s amen > start-ms 0 > stop-ms 5818.163
+
+let break-a [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]
+let break-b [16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31]
+let break-c [32 33 36 35 36 37 34 39 40 41 44 43 44 45 42 47]
+let break-d [48 49 50 51 52 [53 53] 54 55 56 57 58 59 60 [61 61 61] 62 63]
+let shred-a [0 3 4 [4 4] 8 11 12 [12 12 12] 32 35 36 [36 36] 40 47 44 [44 44 44 44]]
+let shred-b [48 [49 49] 52 55 56 [60 60 60] 58 63 16 19 20 [20 20] 24 27 28 [28 28 28 28]]
+let half-time [0 nil 2 nil 4 nil 6 nil 8 nil nil nil 12 nil 14 nil]
+let reverse-a [7 nil 15 nil 23 nil 31 nil 39 nil 47 nil 55 nil 63 nil]
+let edits {cat [break-a break-b half-time break-c break-a break-b half-time break-c break-a break-b break-c break-d break-a break-b break-c break-d shred-a break-b shred-b break-d shred-a break-b shred-b break-d half-time half-time break-c half-time half-time half-time break-c half-time shred-a shred-b break-c break-d shred-a shred-b break-c break-d shred-b shred-a break-d shred-b shred-b shred-a break-d shred-b break-a break-b shred-a break-d break-a break-b shred-a break-d break-c half-time half-time half-time break-c half-time half-time half-time]}
+
+# Splice fits each selected sixteenth slice to its event; nested indices produce snare retriggers.
+source-break > splice 64 edits > attack 0.001 > release 0.003 > legato 1 > gain {slow [0.216 0.216 0.216 0.216 0.216 0.216 0.216 0.216 0.384 0.384 0.384 0.384 0.384 0.384 0.384 0.384 0.48 0.48 0.48 0.48 0.48 0.48 0.48 0.48 0.1344 0.1344 0.1344 0.1344 0.1344 0.1344 0.1344 0.1344 0.456 0.456 0.456 0.456 0.456 0.456 0.456 0.456 0.5184 0.5184 0.5184 0.5184 0.5184 0.5184 0.5184 0.5184 0.432 0.432 0.432 0.432 0.432 0.432 0.432 0.432 0.1056 0.09504 0.08448 0.06864 0.0528 0.03696 0.01584 0.00528] 64} > bus :break > d1
+
+# Sequential chop statements anchor the original groove between the rearranged phrases.
+source-break > chop 64 > slow 4 > speed 1.151515 > attack 0.001 > release 0.003 > gain {slow [0.065 0.065 0.065 0.065 0.065 0.065 0.065 0.065 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.052 0.052 0.052 0.052 0.052 0.052 0.052 0.052 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.013 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.0195 0.01755 0.0156 0.01268 0.00975 0.00682 0.00293 0.00098] 64} > bus :break > d2
+
+# Negative speed reverses sample audio; rev alone would only reverse event order.
+source-break > slice 64 reverse-a > speed -1.151515 > attack 0.001 > release 0.005 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0595 0.0595 0.0595 0.0595 0.0595 0.0595 0.0595 0.0595 0.17 0.17 0.17 0.17 0.17 0.17 0.17 0.17 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.136 0.136 0.136 0.136 0.136 0.136 0.136 0.136 0.0425 0.0425 0.0425 0.0425 0.0425 0.0425 0.0425 0.0425 0.051 0.0459 0.0408 0.03315 0.0255 0.01785 0.00765 0.00255] 64} > pan 0.65 > bus :break > d3
+
+let changes {alt [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:g3 :sus4] [:c4 :m9] [:ab3 :maj7] [:f3 :m7] [:c4 :m9]}
+let bass-bar-0 [:c3 nil :c3 :g2 :c3 nil :bb2 :g2]
+let bass-bar-1 [:ab2 :ab2 nil :eb3 :ab2 nil :g2 :eb3]
+let bass-bar-2 [:f2 nil :c3 :f2 :ab2 nil :g2 :c3]
+let bass-bar-3 [:g2 nil :d3 :g2 :c3 nil :g2 :d3]
+let bass-line {cat [bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-0]}
+
+s :score-bass > note bass-line > score-roundness 0.65 > score-brightness 1600 > legato 0.6 > gain {slow [0.098 0.098 0.098 0.098 0.098 0.098 0.098 0.098 0.196 0.196 0.196 0.196 0.196 0.196 0.196 0.196 0.266 0.266 0.266 0.266 0.266 0.266 0.266 0.266 0.084 0.084 0.084 0.084 0.084 0.084 0.084 0.084 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.238 0.238 0.238 0.238 0.238 0.238 0.238 0.238 0.056 0.0504 0.0448 0.0364 0.028 0.0196 0.0084 0.0028] 64} > bus :bass > d4
+
+s :score-pad > chord changes > voicing > score-brightness 1600 > score-air 0.15 > legato 1 > gain {slow [0.01925 0.01925 0.01925 0.01925 0.01925 0.01925 0.01925 0.01925 0.02275 0.02275 0.02275 0.02275 0.02275 0.02275 0.02275 0.02275 0.028 0.028 0.028 0.028 0.028 0.028 0.028 0.028 0.035 0.035 0.035 0.035 0.035 0.035 0.035 0.035 0.02625 0.02625 0.02625 0.02625 0.02625 0.02625 0.02625 0.02625 0.028 0.028 0.028 0.028 0.028 0.028 0.028 0.028 0.02275 0.02275 0.02275 0.02275 0.02275 0.02275 0.02275 0.02275 0.0105 0.00945 0.0084 0.00683 0.00525 0.00367 0.00158 0.00053] 64} > pan 0.4 > bus :halo > d5
+
+s :score-lead > note {alt [:g5 nil :eb5 nil :d5 nil :c5 nil] [:c6 nil nil :bb5 nil :g5 nil :eb5]} > score-tail 0.4 > score-warmth 0.7 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.03 0.03 0.03 0.03 0.03 0.03 0.03 0.03 0.06 0.06 0.06 0.06 0.06 0.06 0.06 0.06 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.065 0.065 0.065 0.065 0.065 0.065 0.065 0.065 0.015 0.0135 0.012 0.00975 0.0075 0.00525 0.00225 0.00075] 64} > pan 0.58 > bus :halo > d6

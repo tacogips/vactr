@@ -66,6 +66,23 @@ pub fn effect_ports(kind: EffectKind) -> &'static [&'static str] {
             &["cutoff", "res"]
         }
         EffectKind::Delay | EffectKind::PingPong | EffectKind::Comb => &["time", "feedback"],
+        EffectKind::SvfFilter
+        | EffectKind::ButterworthFilter
+        | EffectKind::ChebyshevFilter
+        | EffectKind::LadderFilter
+        | EffectKind::AllpassFilter => &["cutoff"],
+        EffectKind::ParametricResonator => &["freq-1"],
+        EffectKind::FeedbackResonator | EffectKind::DynamicConvolution => &["freq"],
+        EffectKind::Foldback => &["threshold"],
+        EffectKind::VariableClip => &["hardness"],
+        EffectKind::AlienWah => &["rate"],
+        EffectKind::TapeDelay | EffectKind::DiffusionDelay => &["time", "feedback"],
+        EffectKind::Lofi => &["tone", "drive"],
+        EffectKind::SchroederReverb | EffectKind::SpaceReverb | EffectKind::ShimmerReverb => {
+            &["size", "decay"]
+        }
+        EffectKind::SpringReverb => &["length"],
+        EffectKind::EarlyReflections => &["room-x"],
         EffectKind::Gain => &["gain"],
         EffectKind::Pan | EffectKind::Balance => &["pan"],
         EffectKind::Room => &["room", "size"],
@@ -215,6 +232,33 @@ pub fn lower_bus(
                 }
                 _ => {
                     let pname = port_name(*name, effect_ports(kind), &mut pos)?;
+                    if &*pname == "sidechain" {
+                        let UGenInput::Sidechain(source) = inp else {
+                            return Err(LowerError::ty(
+                                "sidechain requires a resolved bus keyword",
+                            ));
+                        };
+                        if kind != EffectKind::Compressor
+                            || source.get() == 0
+                            || *source == id
+                            || params
+                                .iter()
+                                .any(|(ctl, _)| *ctl == effects::SIDECHAIN_BUS_CTL)
+                        {
+                            return Err(LowerError::ty(
+                                "invalid or duplicate compressor sidechain source",
+                            ));
+                        }
+                        #[allow(clippy::cast_precision_loss)]
+                        let value = source.get() as f32;
+                        if source.get() > effects::MAX_SIDECHAIN_BUS {
+                            return Err(LowerError::ty(
+                                "sidechain bus ID exceeds exact transport range",
+                            ));
+                        }
+                        params.push((effects::SIDECHAIN_BUS_CTL, Ctl::Const(value)));
+                        continue;
+                    }
                     let ctl = bus_param(kind, &pname, inp, &mut lw, &mut extras)?;
                     // `room`'s first port is really its `mix` parameter.
                     let alias = (kind == EffectKind::Room && &*pname == "room").then_some("mix");
@@ -373,7 +417,7 @@ fn bus_param(
         // control's default (per-event routing is the scheduler's).
         UGenInput::Param(c) => Ctl::Const(controls::row_by_id(*c).map_or(0.0, |r| r.default)),
         UGenInput::Signal(s) => signal_cell(s, lw, extras),
-        UGenInput::List(_) | UGenInput::Node(_) => {
+        UGenInput::List(_) | UGenInput::Node(_) | UGenInput::Sidechain(_) => {
             return Err(LowerError::ty(format!(
                 "the bus parameter `{pname}:` takes a number, keyword, bool or signal"
             )))
@@ -412,7 +456,12 @@ fn keyword(effect: Option<EffectKind>, port: &str, k: KwId) -> Result<f32, Lower
     let list: Option<&[&str]> = match (effect, port) {
         (Some(EffectKind::Codec), "kind") => Some(CODEC_KINDS),
         (Some(EffectKind::Radio), "kind") => Some(RADIO_KINDS),
+        (Some(EffectKind::Comb), "mode") => Some(&["feedback", "feedforward", "allpass"][..]),
+        (Some(EffectKind::ButterworthFilter | EffectKind::ChebyshevFilter), "mode") => {
+            Some(&["low", "high"][..])
+        }
         (_, "mode") => Some(SVF_MODES),
+        (_, "output-axis") => Some(&["x", "y", "z"][..]),
         _ => match controls::row(port).map(|r| r.domain) {
             Some(CtlDomain::Enum(names)) => Some(names),
             Some(CtlDomain::Resource) => return Ok(0.0),
@@ -486,6 +535,9 @@ impl Graph<'_> {
             UGenInput::Const(v) => Src::Node(self.konst(*v)?, 0),
             UGenInput::Param(c) => Src::Node(self.param(*c)?, 0),
             UGenInput::Keyword(k) => Src::Node(self.konst(keyword(effect, port, *k)?)?, 0),
+            UGenInput::Sidechain(_) => {
+                return Err(LowerError::ty("sidechain is invalid in an instrument"))
+            }
             UGenInput::List(xs) => return Ok(Src::List(Rc::clone(xs))),
             UGenInput::Signal(s) => {
                 let k = u16::try_from(self.extras.signals.len()).unwrap_or(u16::MAX);
@@ -585,7 +637,12 @@ impl Graph<'_> {
                 u8::try_from(u16::from(NAMED_PORT) + id)
                     .map_err(|_| LowerError::ty(format!("parameter `{pname}:` has no port")))?
             };
-            let src = self.input(inp, effect, &pname, depth)?;
+            let keyword_effect = if matches!(spec, UGenSpec::Comb) {
+                Some(EffectKind::Comb)
+            } else {
+                effect
+            };
+            let src = self.input(inp, keyword_effect, &pname, depth)?;
             wires.push((src, port, pname));
         }
         self.refine(&mut spec, n)?;

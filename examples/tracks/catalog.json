@@ -1,0 +1,226 @@
+[
+  {
+    "g": "ambient",
+    "slug": "tidal-glass",
+    "title": "Tidal Glass",
+    "bpm": 62,
+    "key": "D major / B minor",
+    "desc": "Slow suspended harmony, isolated glass notes, octave shimmer."
+  },
+  {
+    "g": "ambient",
+    "slug": "lichen-orbit",
+    "title": "Lichen Orbit",
+    "bpm": 68,
+    "key": "F Lydian",
+    "desc": "Warm drone, sparse asymmetric plucks and a gently swelling room."
+  },
+  {
+    "g": "ambient",
+    "slug": "night-transit",
+    "title": "Night Transit",
+    "bpm": 74,
+    "key": "C minor",
+    "desc": "Dark minor pads, low heartbeat and drifting high reflections."
+  },
+  {
+    "g": "chill",
+    "slug": "window-seat",
+    "title": "Window Seat",
+    "bpm": 88,
+    "key": "A minor",
+    "desc": "Laid-back syncopated bass, warm electric keys and restrained drums."
+  },
+  {
+    "g": "chill",
+    "slug": "blue-hour",
+    "title": "Blue Hour",
+    "bpm": 96,
+    "key": "E minor",
+    "desc": "Dusty broken beat, suspended chords, answering bell phrases."
+  },
+  {
+    "g": "chill",
+    "slug": "citrus-rain",
+    "title": "Citrus Rain",
+    "bpm": 102,
+    "key": "G major",
+    "desc": "Light upbeat groove, bright plucks and spacious major-seventh harmony."
+  },
+  {
+    "g": "house",
+    "slug": "warm-current",
+    "title": "Warm Current",
+    "bpm": 122,
+    "key": "F minor",
+    "desc": "Deep four-on-the-floor, offbeat chords, rounded syncopated bass."
+  },
+  {
+    "g": "house",
+    "slug": "rooftop-signals",
+    "title": "Rooftop Signals",
+    "bpm": 126,
+    "key": "A Dorian",
+    "desc": "Bouncy organ-like stabs, percussion accents and a climbing hook."
+  },
+  {
+    "g": "house",
+    "slug": "velvet-floor",
+    "title": "Velvet Floor",
+    "bpm": 118,
+    "key": "C minor",
+    "desc": "Slow deep-house pocket, rich extended harmony and sparse high melody."
+  },
+  {
+    "g": "hiphop",
+    "slug": "paper-lanterns",
+    "title": "Paper Lanterns",
+    "bpm": 82,
+    "key": "D minor",
+    "desc": "Sparse boom-bap, low sine bass and a wistful electric-key hook."
+  },
+  {
+    "g": "hiphop",
+    "slug": "concrete-garden",
+    "title": "Concrete Garden",
+    "bpm": 92,
+    "key": "F-sharp minor",
+    "desc": "Tense minor motif, heavy backbeat and staggered bass answers."
+  },
+  {
+    "g": "hiphop",
+    "slug": "satellite-dust",
+    "title": "Satellite Dust",
+    "bpm": 76,
+    "key": "B minor",
+    "desc": "Half-time drums, triplet hat flashes and a soft nocturnal motif."
+  },
+  {
+    "g": "pop",
+    "slug": "neon-postcard",
+    "title": "Neon Postcard",
+    "bpm": 112,
+    "key": "C major",
+    "desc": "Bright chorus hook, octave bass and a clear verse/chorus contrast."
+  },
+  {
+    "g": "pop",
+    "slug": "small-sun",
+    "title": "Small Sun",
+    "bpm": 104,
+    "key": "G major",
+    "desc": "Sunny offbeat keys, singable repeating motif and a softer middle eight."
+  },
+  {
+    "g": "pop",
+    "slug": "after-the-rain",
+    "title": "After the Rain",
+    "bpm": 98,
+    "key": "B-flat major",
+    "desc": "Reflective verse, wide chorus pads and a rising instrumental refrain."
+  },
+  {
+    "g": "lofi-hiphop",
+    "slug": "amber-notebook",
+    "title": "Amber Notebook",
+    "bpm": 78,
+    "key": "E minor",
+    "desc": "Warm minor ninths, a sparse backbeat and a descending electric-key answer."
+  },
+  {
+    "g": "lofi-hiphop",
+    "slug": "sidewalk-polaroid",
+    "title": "Sidewalk Polaroid",
+    "bpm": 86,
+    "key": "A-flat major",
+    "desc": "Major-seventh warmth, clipped chord replies and a lopsided kick pocket."
+  },
+  {
+    "g": "lofi-hiphop",
+    "slug": "last-train-home",
+    "title": "Last Train Home",
+    "bpm": 72,
+    "key": "G minor",
+    "desc": "A slow half-time pocket, low rounded bass and a nocturnal bell refrain."
+  },
+  {
+    "g": "lofi-ambient",
+    "slug": "faded-atlas",
+    "title": "Faded Atlas",
+    "bpm": 58,
+    "key": "A minor",
+    "desc": "Slow ninth chords, tape-softened plucks and long diffuse reflections."
+  },
+  {
+    "g": "lofi-ambient",
+    "slug": "moss-cassette",
+    "title": "Moss Cassette",
+    "bpm": 64,
+    "key": "D major",
+    "desc": "Gentle major harmony, a soft wandering drone and restrained cassette flutter."
+  },
+  {
+    "g": "lofi-ambient",
+    "slug": "snow-on-the-dial",
+    "title": "Snow on the Dial",
+    "bpm": 66,
+    "key": "F minor",
+    "desc": "Dark suspended pads, isolated high notes and a narrow drifting tape image."
+  },
+  {
+    "g": "lofi-chill",
+    "slug": "sunday-receipts",
+    "title": "Sunday Receipts",
+    "bpm": 90,
+    "key": "C major",
+    "desc": "Relaxed major-seventh keys, a light broken beat and a rising plucked hook."
+  },
+  {
+    "g": "lofi-chill",
+    "slug": "tea-stained-map",
+    "title": "Tea-Stained Map",
+    "bpm": 94,
+    "key": "B minor",
+    "desc": "Dorian-colored chords, syncopated bass and short spring-room answers."
+  },
+  {
+    "g": "lofi-chill",
+    "slug": "peach-window",
+    "title": "Peach Window",
+    "bpm": 84,
+    "key": "F major",
+    "desc": "Soft sixth-like melodic colors, brushed noise percussion and tape echoes."
+  },
+  {
+    "g": "shimmer-ambient",
+    "slug": "aurora-veil",
+    "title": "Aurora Veil",
+    "bpm": 58,
+    "key": "D Lydian",
+    "desc": "Slow luminous Lydian pads, high glass droplets and an octave-up halo."
+  },
+  {
+    "g": "shimmer-ambient",
+    "slug": "prismatic-shore",
+    "title": "Prismatic Shore",
+    "bpm": 66,
+    "key": "E-flat major",
+    "desc": "Warm extended harmony, answering bell phrases and drifting crystalline reflections."
+  },
+  {
+    "g": "shimmer-ambient",
+    "slug": "stars-beneath-ice",
+    "title": "Stars Beneath Ice",
+    "bpm": 72,
+    "key": "F-sharp minor",
+    "desc": "Dark slow-moving ninths, distant glass notes and a fifth-shifted frozen halo."
+  },
+  {
+    "g": "breakcore",
+    "slug": "glass-teeth",
+    "title": "Glass Teeth",
+    "bpm": 190,
+    "key": "C minor",
+    "desc": "190 BPM chopped CC0 Amen recreation, snare retriggers, reverse edits, half-time contrast and a glassy halo."
+  }
+]

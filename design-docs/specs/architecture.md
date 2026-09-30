@@ -255,6 +255,12 @@ Swift is reduced to glue (AVAudioSession, background-audio mode, an
 AUv3 extension later) rather than a separate SwiftUI shell. iOS still
 forbids JIT, so the native tier runs the bytecode VM.
 
+Canvas-editor amendment (2026-09-30): visible source uses GPU canvas with a DOM
+input/accessibility bridge; host tiers above remain authoritative. See
+[design-implementation.md section 15.3](design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30)
+for editing migration, audible-time telemetry, native/iPad integration, resource
+caps and verification gates (workflow session 224; proposed for review).
+
 ### Editor Requirements (DECIDED, 2026-09-24)
 
 The dedicated editor (Tauri; also web and Wasm) is part of the product,
@@ -460,3 +466,8 @@ position. The inference model (per-function monomorphic vs HM-lite) is
 open as QA-92.
 
 ---
+
+## Static song mode
+
+See [Song mode: reusable finite multi-track parts](design-song-mode.md) for the
+proposed finite arrangement, event editing, effect isolation and playback design.

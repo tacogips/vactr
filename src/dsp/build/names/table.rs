@@ -8,11 +8,34 @@ use crate::dsp::graph::UGenSpec;
 pub fn ports(spec: &UGenSpec) -> &'static [&'static str] {
     match spec {
         UGenSpec::SinOsc | UGenSpec::Saw | UGenSpec::Tri | UGenSpec::SubOsc => &["freq"],
+        UGenSpec::DsfOsc => &["freq", "spacing", "rolloff", "count"],
+        UGenSpec::ChebyshevOsc => &[
+            "freq",
+            "harmonic-1",
+            "harmonic-2",
+            "harmonic-3",
+            "harmonic-4",
+            "harmonic-5",
+            "harmonic-6",
+            "harmonic-7",
+            "harmonic-8",
+        ],
+        UGenSpec::GaussianNoise => &["sigma", "mean"],
+        UGenSpec::LorenzOsc | UGenSpec::RosslerOsc => &["rate", "chaos", "output-axis"],
+        UGenSpec::AmFormantOsc => &[
+            "freq",
+            "formant-1",
+            "formant-2",
+            "bandwidth-1",
+            "bandwidth-2",
+            "balance",
+        ],
         UGenSpec::Pulse => &["freq", "width"],
         UGenSpec::Lpf | UGenSpec::Hpf | UGenSpec::Bpf | UGenSpec::Ladder => {
             &["in", "cutoff", "res"]
         }
-        UGenSpec::Delay | UGenSpec::Comb => &["in", "time", "feedback"],
+        UGenSpec::Delay => &["in", "time", "feedback"],
+        UGenSpec::Comb => &["in", "time", "feedback", "mode", "damping"],
         UGenSpec::EnvPerc => &["attack", "release"],
         UGenSpec::EnvAdsr => &["attack", "decay", "sustain", "release"],
         UGenSpec::Line => &["start", "end", "dur"],

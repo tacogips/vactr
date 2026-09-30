@@ -230,6 +230,8 @@ fn servers() -> Vec<ServerMsg> {
         }),
         ServerMsg::Playing(PlayingBody {
             events: vec![WirePlaying {
+                epoch: None,
+                end_time: None,
                 slot: "d1".to_string(),
                 beat: [4, 1],
                 time: 2.0,
@@ -251,6 +253,7 @@ fn servers() -> Vec<ServerMsg> {
             analyzers: None,
         }),
         ServerMsg::Tempo(TempoBody {
+            transport: None,
             bpm: 120.0,
             beats_per_cycle: 4,
             cycle: [7, 2],
@@ -410,4 +413,71 @@ fn the_session_answers_garbage_with_protocol_error_and_keeps_running() {
     // Still alive: an eval works.
     let r = rig.ok("let x 1", 1);
     assert_eq!(r.forms[0].value.as_deref(), Some("1"));
+}
+
+#[test]
+fn additive_timing_accepts_legacy_and_valid_samples_but_rejects_malformed_fields() {
+    let legacy =
+        r#"{"v":1,"seq":1,"kind":"tempo","body":{"bpm":120,"beats_per_cycle":4,"cycle":[0,1]}}"#;
+    let decoded = decode_as::<ServerMsg>(legacy).unwrap();
+    assert!(matches!(
+        decoded.body,
+        ServerMsg::Tempo(TempoBody {
+            transport: None,
+            ..
+        })
+    ));
+    let mut frame: serde_json::Value = serde_json::from_str(legacy).unwrap();
+    frame["body"]["transport"] = serde_json::json!({
+        "epoch":"e1", "sample_time":1.25, "cycle":[1,2], "bpm":120,
+        "beats_per_cycle":4, "running":true, "latency_seconds":null,
+        "latency_kind":"unavailable", "uncertainty_seconds":null
+    });
+    assert!(decode_as::<ServerMsg>(&frame.to_string()).is_ok());
+    for (key, value) in [
+        ("epoch", serde_json::json!("")),
+        ("sample_time", serde_json::json!(-1)),
+        ("cycle", serde_json::json!([0, 0])),
+        ("bpm", serde_json::json!(0)),
+        ("latency_seconds", serde_json::json!(-0.1)),
+        ("latency_kind", serde_json::json!("measured")),
+    ] {
+        let mut bad = frame.clone();
+        bad["body"]["transport"][key] = value;
+        assert_eq!(
+            decode_as::<ServerMsg>(&bad.to_string()).unwrap_err().code,
+            ErrorCode::BadBody
+        );
+    }
+    let playing = serde_json::json!({"v":1,"seq":2,"kind":"playing","body":{"events":[
+        {"slot":"d1","beat":[0,1],"time":2,"dur":[1,1],"epoch":"e1","end_time":1}
+    ]}});
+    assert_eq!(
+        decode_as::<ServerMsg>(&playing.to_string())
+            .unwrap_err()
+            .code,
+        ErrorCode::BadBody
+    );
+}
+
+#[test]
+fn playing_timing_rejects_invalid_duration_time_and_source_bounds() {
+    let event = serde_json::json!({"slot":"d1","beat":[0,1],"time":2,"dur":[1,1]});
+    for (key, value) in [
+        ("dur", serde_json::json!([-1, 1])),
+        ("beat", serde_json::json!([0, 0])),
+        ("time", serde_json::json!(-1)),
+        (
+            "src",
+            serde_json::json!({"file":"main.vact","doc_revision":1,"form_gen":2,"span":{"start":9,"end":3}}),
+        ),
+    ] {
+        let mut bad = event.clone();
+        bad[key] = value;
+        let frame = serde_json::json!({"v":1,"seq":1,"kind":"playing","body":{"events":[bad]}});
+        assert_eq!(
+            decode_as::<ServerMsg>(&frame.to_string()).unwrap_err().code,
+            ErrorCode::BadBody
+        );
+    }
 }

@@ -57,6 +57,7 @@ pub enum Unit {
     Millis,
     Hz,
     Semitones,
+    Metres,
 }
 
 /// One parameter's editor metadata.
@@ -101,7 +102,10 @@ fn unit_of(name: &str, unit: &str) -> Unit {
         "s" => Unit::Seconds,
         "ms" => Unit::Millis,
         "Hz" => Unit::Hz,
+        "m" => Unit::Metres,
+        "semitones" => Unit::Semitones,
         _ => match name {
+            "start-ms" | "stop-ms" => Unit::Millis,
             "freq" | "cutoff" | "lpf" | "hpf" | "density" | "fb-cutoff" | "noise-cutoff"
             | "fm-tuning" | "transient-freq" | "noise-freq" | "lfo-rate" => Unit::Hz,
             "attack" | "decay" | "release" | "size" | "time" | "dur" | "delaytime" | "fb-decay"
@@ -391,24 +395,47 @@ fn effect_meta(kind: EffectKind) -> Box<[ParamMeta]> {
         .iter()
         .filter_map(|d: &ParamDef| {
             let ctl = effects::param_ctl(kind, d.name)?;
-            let stepped = matches!(d.name, "kind" | "mode" | "count" | "stages" | "bits" | "id")
-                || (d.name == "quality"
-                    && matches!(
-                        kind,
-                        EffectKind::TextureGrain
-                            | EffectKind::TextureStretch
-                            | EffectKind::TextureLoop
-                            | EffectKind::TextureSpectral
-                    ));
-            Some(meta(
+            let stepped = matches!(
                 d.name,
-                ctl,
-                (d.min, d.max),
-                d.unit,
-                stepped,
-                d.default,
-                &[],
-            ))
+                "kind" | "mode" | "order" | "freeze" | "count" | "stages" | "bits" | "id"
+            ) || (d.name == "quality"
+                && matches!(
+                    kind,
+                    EffectKind::TextureGrain
+                        | EffectKind::TextureStretch
+                        | EffectKind::TextureLoop
+                        | EffectKind::TextureSpectral
+                ));
+            let mut parameter = meta(d.name, ctl, (d.min, d.max), d.unit, stepped, d.default, &[]);
+            // New families declare physical units explicitly; empty units are
+            // dimensionless even when legacy controls reuse names like size.
+            if d.unit.is_empty()
+                && matches!(
+                    kind,
+                    EffectKind::SvfFilter
+                        | EffectKind::ButterworthFilter
+                        | EffectKind::ChebyshevFilter
+                        | EffectKind::LadderFilter
+                        | EffectKind::AllpassFilter
+                        | EffectKind::ParametricResonator
+                        | EffectKind::FeedbackResonator
+                        | EffectKind::Foldback
+                        | EffectKind::VariableClip
+                        | EffectKind::AlienWah
+                        | EffectKind::DynamicConvolution
+                        | EffectKind::EarlyReflections
+                        | EffectKind::SchroederReverb
+                        | EffectKind::SpringReverb
+                        | EffectKind::SpaceReverb
+                        | EffectKind::ShimmerReverb
+                        | EffectKind::TapeDelay
+                        | EffectKind::DiffusionDelay
+                        | EffectKind::Lofi
+                )
+            {
+                parameter.unit = Unit::None;
+            }
+            Some(parameter)
         })
         .collect()
 }
@@ -437,11 +464,33 @@ fn effect_editor(kind: EffectKind) -> EditorKind {
         | K::Crossover
         | K::FirCrossover
         | K::PhaseSelectEq => EditorKind::EqCurve,
-        K::Lpf | K::Hpf | K::Bpf | K::Notch | K::Comb | K::Narrow | K::AutoFilter => {
-            EditorKind::FilterResponse
+        K::Lpf
+        | K::Hpf
+        | K::Bpf
+        | K::Notch
+        | K::Comb
+        | K::Narrow
+        | K::AutoFilter
+        | K::SvfFilter
+        | K::ButterworthFilter
+        | K::ChebyshevFilter
+        | K::LadderFilter
+        | K::AllpassFilter
+        | K::ParametricResonator
+        | K::FeedbackResonator => EditorKind::FilterResponse,
+        K::Delay | K::PingPong | K::Multitap | K::TimeAlign | K::TapeDelay | K::DiffusionDelay => {
+            EditorKind::DelayTaps
         }
-        K::Delay | K::PingPong | K::Multitap | K::TimeAlign => EditorKind::DelayTaps,
-        K::Plate | K::Fdn | K::Convolution | K::Scatter | K::Room => EditorKind::ReverbRoom,
+        K::Plate
+        | K::Fdn
+        | K::Convolution
+        | K::Scatter
+        | K::Room
+        | K::EarlyReflections
+        | K::SchroederReverb
+        | K::SpringReverb
+        | K::SpaceReverb
+        | K::ShimmerReverb => EditorKind::ReverbRoom,
         K::Chorus
         | K::Flanger
         | K::Phaser
@@ -450,7 +499,8 @@ fn effect_editor(kind: EffectKind) -> EditorKind {
         | K::Rotary
         | K::WowFlutter
         | K::Vibrato
-        | K::KeyframeMixer => EditorKind::LfoShape,
+        | K::KeyframeMixer
+        | K::AlienWah => EditorKind::LfoShape,
         K::Width
         | K::Balance
         | K::MultibandBalance
@@ -472,6 +522,12 @@ fn effect_editor(kind: EffectKind) -> EditorKind {
 
 fn ugen_node(name: &str) -> Option<Node> {
     Some(match name {
+        "dsf-osc" => Node::DsfOsc,
+        "chebyshev-osc" => Node::ChebyshevOsc,
+        "gaussian-noise" => Node::GaussianNoise,
+        "lorenz-osc" => Node::LorenzOsc,
+        "rossler-osc" => Node::RosslerOsc,
+        "am-formant-osc" => Node::AmFormantOsc,
         "sin-osc" => Node::SinOsc,
         "saw" => Node::Saw,
         "pulse" => Node::Pulse,
@@ -602,7 +658,33 @@ fn ugen_meta(node: &Node) -> Box<[ParamMeta]> {
         .iter()
         .enumerate()
         .filter_map(|(i, p): (usize, &Port)| {
+            // These transport words are scheduler implementation details.
+            if matches!(node, Node::SamplePlay(_)) && p.name.starts_with("region-") {
+                return None;
+            }
             let ctl = ucat::port_ctl(node, i)?;
+            if matches!(
+                node,
+                Node::DsfOsc
+                    | Node::ChebyshevOsc
+                    | Node::GaussianNoise
+                    | Node::LorenzOsc
+                    | Node::RosslerOsc
+                    | Node::AmFormantOsc
+            ) {
+                let (range, unit, stepped, choices) = match p.name {
+                    "freq" | "formant-1" | "formant-2" => ((20.0, 20000.0), "Hz", false, &[][..]),
+                    "bandwidth-1" | "bandwidth-2" => ((10.0, 8000.0), "Hz", false, &[][..]),
+                    "spacing" => ((0.1, 8.0), "", false, &[][..]),
+                    "count" => ((1.0, 128.0), "", true, &[][..]),
+                    "rate" => ((0.01, 100.0), "", false, &[][..]),
+                    "output-axis" => ((0.0, 2.0), "", true, &["x", "y", "z"][..]),
+                    "mean" => ((-1.0, 1.0), "", false, &[][..]),
+                    n if n.starts_with("harmonic-") => ((-1.0, 1.0), "", false, &[][..]),
+                    _ => ((0.0, 1.0), "", false, &[][..]),
+                };
+                return Some(meta(p.name, ctl, range, unit, stepped, p.default, choices));
+            }
             Some(row_meta(p.name).unwrap_or_else(|| {
                 let hi = if p.default.abs() > 1.0 {
                     p.default.abs() * 4.0

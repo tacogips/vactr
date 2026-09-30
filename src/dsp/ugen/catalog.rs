@@ -44,7 +44,40 @@ const PULSE: &[Port] = &[FREQ, p("width", 0.5)];
 const FILTER: &[Port] = &[IN, p("cutoff", 1200.0), p("res", 0.3)];
 const SVF: &[Port] = &[IN, p("cutoff", 1200.0), p("res", 0.3), p("mode", 0.0)];
 const DELAY: &[Port] = &[IN, p("time", 0.25), p("feedback", 0.0)];
-const COMB: &[Port] = &[IN, p("time", 0.01), p("feedback", 0.5)];
+const COMB: &[Port] = &[
+    IN,
+    p("time", 0.01),
+    p("feedback", 0.5),
+    p("mode", 0.0),
+    p("damping", 0.0),
+];
+const DSF: &[Port] = &[
+    p("freq", 110.0),
+    p("spacing", 1.0),
+    p("rolloff", 0.7),
+    p("count", 32.0),
+];
+const CHEBYSHEV: &[Port] = &[
+    p("freq", 110.0),
+    p("harmonic-1", 1.0),
+    p("harmonic-2", 0.0),
+    p("harmonic-3", 0.0),
+    p("harmonic-4", 0.0),
+    p("harmonic-5", 0.0),
+    p("harmonic-6", 0.0),
+    p("harmonic-7", 0.0),
+    p("harmonic-8", 0.0),
+];
+const GAUSSIAN: &[Port] = &[p("sigma", 0.25), p("mean", 0.0)];
+const CHAOS: &[Port] = &[p("rate", 1.0), p("chaos", 0.5), p("output-axis", 0.0)];
+const AM_FORMANT: &[Port] = &[
+    p("freq", 110.0),
+    p("formant-1", 700.0),
+    p("formant-2", 1200.0),
+    p("bandwidth-1", 100.0),
+    p("bandwidth-2", 150.0),
+    p("balance", 0.5),
+];
 const PERC: &[Port] = &[p("attack", 0.01), p("release", 0.3)];
 const ADSR: &[Port] = &[
     p("attack", 0.01),
@@ -60,6 +93,10 @@ pub const SAMPLE: &[Port] = &[
     p("begin", 0.0),
     p("end", 1.0),
     p("loop", 0.0),
+    p("region-start-low", 0.0),
+    p("region-start-high", -1.0),
+    p("region-stop-low", 0.0),
+    p("region-stop-high", -1.0),
 ];
 const MUL: &[Port] = &[p("a", 1.0), p("b", 1.0)];
 const AUX_OUT: &[Port] = &[IN];
@@ -160,6 +197,11 @@ const STAGE_LINKED: &[Port] = &[
 #[must_use]
 pub fn ports(node: &Node) -> &'static [Port] {
     match node {
+        Node::DsfOsc => DSF,
+        Node::ChebyshevOsc => CHEBYSHEV,
+        Node::GaussianNoise => GAUSSIAN,
+        Node::LorenzOsc | Node::RosslerOsc => CHAOS,
+        Node::AmFormantOsc => AM_FORMANT,
         Node::SinOsc | Node::Saw | Node::Tri | Node::SubOsc => OSC,
         Node::Pulse => PULSE,
         Node::WhiteNoise | Node::Const(_) | Node::Param(_) | Node::Effect { .. } => NONE,
@@ -301,6 +343,12 @@ pub fn implicit_ctl(node: &Node, i: usize) -> Option<CtlId> {
 #[must_use]
 pub fn ugen_name(spec: &UGenSpec) -> &'static str {
     match spec {
+        UGenSpec::DsfOsc => "dsf-osc",
+        UGenSpec::ChebyshevOsc => "chebyshev-osc",
+        UGenSpec::GaussianNoise => "gaussian-noise",
+        UGenSpec::LorenzOsc => "lorenz-osc",
+        UGenSpec::RosslerOsc => "rossler-osc",
+        UGenSpec::AmFormantOsc => "am-formant-osc",
         UGenSpec::SinOsc => "sin-osc",
         UGenSpec::Saw => "saw",
         UGenSpec::Pulse => "pulse",
@@ -402,6 +450,12 @@ pub fn ugen_name(spec: &UGenSpec) -> &'static str {
 
 /// The user-facing ugen names (design-music section 7 sound row), each once.
 pub const UGEN_NAMES: &[&str] = &[
+    "dsf-osc",
+    "chebyshev-osc",
+    "gaussian-noise",
+    "lorenz-osc",
+    "rossler-osc",
+    "am-formant-osc",
     "sin-osc",
     "saw",
     "pulse",
@@ -570,6 +624,12 @@ pub const TEMPLATE_NAMES: &[&str] = &[
 #[must_use]
 pub fn node_of(spec: &UGenSpec) -> Node {
     match spec {
+        UGenSpec::DsfOsc => Node::DsfOsc,
+        UGenSpec::ChebyshevOsc => Node::ChebyshevOsc,
+        UGenSpec::GaussianNoise => Node::GaussianNoise,
+        UGenSpec::LorenzOsc => Node::LorenzOsc,
+        UGenSpec::RosslerOsc => Node::RosslerOsc,
+        UGenSpec::AmFormantOsc => Node::AmFormantOsc,
         UGenSpec::SinOsc => Node::SinOsc,
         UGenSpec::Saw => Node::Saw,
         UGenSpec::Pulse => Node::Pulse,

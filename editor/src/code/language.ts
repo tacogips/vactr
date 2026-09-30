@@ -174,3 +174,22 @@ export function tokenize(lines: readonly string[]): LineToken[][] {
   }
   return out;
 }
+
+/** GPU presentation spans in document UTF-16 coordinates; never semantic site identities. */
+export interface TokenSpan { from: number; to: number; type: VactToken; className: string }
+export function tokenizerSpans(doc: import('@codemirror/state').Text): TokenSpan[] {
+  const state = vactParser.startState?.(2) ?? { inString: false };
+  const spans: TokenSpan[] = [];
+  for (let i = 1; i <= doc.lines; i += 1) {
+    const line = doc.line(i);
+    if (!line.length) vactParser.blankLine?.(state, 2);
+    const stream = new StringStream(line.text, 4, 2);
+    while (!stream.eol()) {
+      stream.start = stream.pos;
+      const type = vactParser.token(stream, state) as VactToken | null;
+      if (stream.pos === stream.start) stream.next();
+      if (type) spans.push({ from: line.from + stream.start, to: line.from + stream.pos, type, className: `vact-tok-${type}` });
+    }
+  }
+  return spans;
+}

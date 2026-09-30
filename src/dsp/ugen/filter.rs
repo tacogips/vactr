@@ -121,8 +121,23 @@ pub fn comb(
     let fb = ins[2].first().clamp(-0.98, 0.98);
     for (i, y) in out.iter_mut().enumerate() {
         let d = ins[1].at(i).max(0.0) * kx.sr;
-        let v = ins[0].at(i) + fb * st.dl.read(mem, d);
-        st.dl.write(mem, v);
-        *y = v;
+        let mode = ins[3].at(i).clamp(0.0, 2.0).round() as u32;
+        let damping = ins[4].at(i).clamp(0.0, 1.0);
+        let input = ins[0].at(i);
+        st.s[0] = (1.0 - damping) * st.dl.read(mem, d) + damping * st.s[0];
+        let tap = st.s[0];
+        let (wet, write) = match mode {
+            1 => (input + fb * tap, input),
+            2 => {
+                let wet = tap - fb * input;
+                (wet, input + fb * wet)
+            }
+            _ => {
+                let wet = input + fb * tap;
+                (wet, wet)
+            }
+        };
+        st.dl.write(mem, write);
+        *y = wet;
     }
 }

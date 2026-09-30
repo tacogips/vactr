@@ -4,7 +4,7 @@ import type { FileAccess } from '../platform/files';
 import type { Client } from '../protocol/client';
 import type { Store } from '../protocol/store';
 import type { WasmCore } from '../protocol/wasm';
-import type { BindApi, CodeApi, MidiApi, VisualApi } from './apis';
+import type { BindApi, CodeApi, MidiApi, VisualApi, ResourceBudget } from './apis';
 import type { Clock } from './clock';
 import type { Formatter } from '../code/format';
 import type { CompletionEngine } from '../code/completion-types';
@@ -20,6 +20,7 @@ export interface EditorDeps {
   files: FileAccess;
   /** The browser tier's wasm core. */
   core?: WasmCore;
+  resourceBudget?: ResourceBudget;
   /** Optional tree-sitter syntax loader; the code area keeps StreamLanguage as fallback. */
   syntax?: SyntaxLoader;
   /** Dedicated formatter wasm instance, independent of the session core. */

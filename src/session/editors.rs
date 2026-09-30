@@ -61,6 +61,7 @@ fn unit_name(u: Unit) -> &'static str {
         Unit::Millis => "ms",
         Unit::Hz => "hz",
         Unit::Semitones => "st",
+        Unit::Metres => "m",
     }
 }
 

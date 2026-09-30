@@ -396,7 +396,7 @@ pub struct WireParamMeta {
     pub range: [f32; 2],
     /// `linear`, `log`, `stepped`, or a read-only payload marker.
     pub curve: String,
-    /// `none`, `db`, `s`, `ms`, `hz`, `st`, or a payload stride label.
+    /// `none`, `db`, `s`, `ms`, `hz`, `st`, `m`, or a payload stride label.
     pub unit: String,
     /// Parameters drawn together (bands of a multiband unit share one).
     pub group: u32,
@@ -535,6 +535,10 @@ pub struct DiagBody {
 /// One realized event.
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct WirePlaying {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<f64>,
     pub slot: String,
     pub beat: [i64; 2],
     pub time: f64,
@@ -588,8 +592,24 @@ pub struct WireClock {
     pub locked: Option<bool>,
 }
 
+/// Processing-time transport snapshot; unavailable latency is explicit.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct TransportSample {
+    pub epoch: String,
+    pub sample_time: f64,
+    pub cycle: [i64; 2],
+    pub bpm: f64,
+    pub beats_per_cycle: f64,
+    pub running: bool,
+    pub latency_seconds: Option<f64>,
+    pub latency_kind: String,
+    pub uncertainty_seconds: Option<f64>,
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TempoBody {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport: Option<TransportSample>,
     pub bpm: f64,
     pub beats_per_cycle: i64,
     pub cycle: [i64; 2],

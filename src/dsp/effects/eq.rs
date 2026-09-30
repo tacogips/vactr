@@ -89,10 +89,12 @@ const NOTCH_PARAMS: [ParamDef; 2] = [
 /// The longest delay a `comb` unit's `time` parameter can request.
 const COMB_TIME_MAX: f32 = 0.05;
 
-const COMB_PARAMS: [ParamDef; 3] = [
+const COMB_PARAMS: [ParamDef; 5] = [
     ParamDef::unit("time", 0.01, 0.0002, COMB_TIME_MAX, "s"),
     ParamDef::new("feedback", 0.5, -0.9, 0.9),
     ParamDef::new("mix", 1.0, 0.0, 1.0),
+    ParamDef::new("mode", 0.0, 0.0, 2.0),
+    ParamDef::new("damping", 0.0, 0.0, 1.0),
 ];
 
 const NARROW_PARAMS: [ParamDef; 2] = [
@@ -360,18 +362,30 @@ pub(super) fn process(
             let time = pv(p, 0, 0.01);
             let feedback = pv(p, 1, 0.5).clamp(-0.9, 0.9);
             let delay_samples = (time * sr).max(1.0);
-            let n = l.len().min(r.len());
-            for i in 0..n {
-                let dxl = st.dl[0].read(mem, delay_samples);
-                let vl = l[i] + feedback * dxl;
-                st.dl[0].write(mem, vl);
-                l[i] = vl;
-                let dxr = st.dl[1].read(mem, delay_samples);
-                let vr = r[i] + feedback * dxr;
-                st.dl[1].write(mem, vr);
-                r[i] = vr;
+            let mode = pv(p, 3, 0.0).clamp(0.0, 2.0).round() as u32;
+            let damping = pv(p, 4, 0.0).clamp(0.0, 1.0);
+            for (xl, xr) in l.iter_mut().zip(r) {
+                for (ch, x) in [(0, xl), (1, xr)] {
+                    let delayed = st.dl[ch].read(mem, delay_samples);
+                    st.s[ch] = (1.0 - damping) * delayed + damping * st.s[ch];
+                    let tap = st.s[ch];
+                    let (wet, write) = match mode {
+                        1 => (*x + feedback * tap, *x),
+                        2 => {
+                            let wet = tap - feedback * *x;
+                            (wet, *x + feedback * wet)
+                        }
+                        _ => {
+                            let wet = *x + feedback * tap;
+                            (wet, wet)
+                        }
+                    };
+                    st.dl[ch].write(mem, write);
+                    *x = wet;
+                }
             }
         }
+
         K::Narrow => {
             let freq = pv(p, 0, 1000.0);
             let width = pv(p, 1, 0.1).max(0.01);

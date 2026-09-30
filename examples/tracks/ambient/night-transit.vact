@@ -1,0 +1,63 @@
+# Night Transit — original instrumental ambient, 74 BPM, C minor.
+# Dark minor pads, low heartbeat and drifting high reflections.
+# 64 bars, eight 8-bar sections: intro / A / A+ / contrast / B / B+ / reprise / ending.
+# Play: target/debug/vactr run examples/tracks/ambient/night-transit.vact --host native --cycles 64
+# Gains repeat after 64 bars; offline render stops at 64 bars and preserves the score-tail.
+
+# Local voices make each file self-contained. All sounds are synthesized.
+inst score-kick score-punch: float = 1.8 score-body: float = 0.22:
+	fm-drum freq fm-amount: 0.4 pitch-sweep: score-punch decay: score-body drum-noise: 0.01 drive: 0.12 > * amp
+
+inst score-snare grit: float = 0.5 score-body: float = 0.14:
+	{gaussian-noise 0.5 > * grit} > + {* {sin-osc {* freq 2.5}} 0.3}
+		> hpf 180 > lpf 7200 > * {env-perc 0.001 score-body} > * amp
+
+inst score-hat score-body: float = 0.055:
+	gaussian-noise 0.5 > hpf 6200 > lpf 11000 > * {env-perc 0.001 score-body} > * amp
+
+inst score-bass score-brightness: float = 800 score-roundness: float = 0.6:
+	{sin-osc freq > * score-roundness} > + {saw freq > * {- 1 score-roundness}}
+		> lpf score-brightness > * {env-adsr 0.008 0.12 0.7 0.18} > * amp
+
+inst score-keys score-color: float = 1.5 score-softness: float = 0.65:
+	fm-op freq ratio: 1 index: {* score-color {env-perc 0.002 score-softness}}
+		> fm-mod {fm-op freq ratio: 2 index: 0.25}
+		> * {env-perc 0.005 score-softness} > * amp
+
+inst score-pad score-brightness: float = 1900 score-air: float = 0.35:
+	{tri freq > * 0.6} > + {sin-osc {* freq 1.003} > * 0.4}
+		> + {sin-osc {* freq 2.001} > * score-air}
+		> lpf score-brightness > * {env-adsr 0.6 0.8 0.75 1.8} > * amp
+
+inst score-lead score-warmth: float = 0.7 score-tail: float = 0.28:
+	{sin-osc freq > * score-warmth} > + {tri freq > * {- 1 score-warmth}}
+		> * {env-perc 0.008 score-tail} > * amp
+
+use-bpm 74
+
+bus :air:
+	diffusion-delay time: 0.81 feedback: 0.62 diffusion: 0.78 tone: 2800 mix: 0.35 > space-reverb size: 0.7 decay: 8 damping: 0.6 modulation: 0.2 gravity: 0.6 mix: 0.45
+		> hpf cutoff: 100
+
+bus :music:
+	hpf cutoff: 30
+
+master:
+	compressor threshold: -14 ratio: 1.5 attack: 0.03 release: 0.18 knee: 6 makeup: 0
+		> gain 12 > limiter ceiling: -2 release: 0.08
+
+let changes {alt [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:bb3 :sus4] [:c4 :m9] [:ab3 :maj7] [:eb4 :maj7] [:c4 :m9]}
+let phrase-a [:g5 nil nil :eb5 nil nil :d5 nil]
+let phrase-b [nil :c5 nil :g4 nil :bb4 nil :d5]
+let cadence [:c5 nil nil nil]
+let motif {cat [phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b cadence]}
+
+# Sustained harmony; one chord per bar, but absolute section gains span 64 bars.
+s :score-pad > chord changes > voicing > score-brightness 2200 > score-air 0.35 > legato 1.1 > gain {slow [0.035 0.035 0.035 0.035 0.035 0.035 0.035 0.035 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.0455 0.0455 0.0455 0.0455 0.0455 0.0455 0.0455 0.0455 0.063 0.063 0.063 0.063 0.063 0.063 0.063 0.063 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.0595 0.0595 0.0595 0.0595 0.0595 0.0595 0.0595 0.0595 0.021 0.021 0.01785 0.0147 0.01155 0.0084 0.00525 0.00252] 64} > pan 0.42 > bus :air > d1
+
+# Contrast and response phrases alternate over two bars.
+s :score-lead > note motif > score-tail 0.65 > score-warmth 0.85 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.044 0.044 0.044 0.044 0.044 0.044 0.044 0.044 0.06 0.06 0.06 0.06 0.06 0.06 0.06 0.06 0.036 0.036 0.036 0.036 0.036 0.036 0.036 0.036 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.08 0.056 0.056 0.056 0.056 0.056 0.056 0.056 0.056 0.016 0.016 0.0136 0.0112 0.0088 0.0064 0.004 0.00192] 64} > pan 0.58 > bus :air > d2
+
+s :score-bass > note {cat [[:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:bb2] [:c3] [:ab2] [:eb3] [:c3]]} > score-roundness 1 > score-brightness 360 > legato 1.2 > gain {slow [0.049 0.049 0.049 0.049 0.049 0.049 0.049 0.049 0.112 0.112 0.112 0.112 0.112 0.112 0.112 0.112 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.119 0.119 0.119 0.119 0.119 0.119 0.119 0.119 0.035 0.035 0.02975 0.0245 0.01925 0.014 0.00875 0.0042] 64} > bus :music > d3
+
+s :score-keys > note [:eb5 nil nil :g5 nil nil nil nil] > slow 4 > score-color 0.6 > score-softness 1.4 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.051 0.051 0.051 0.051 0.051 0.051 0.051 0.051 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.034 0.034 0.034 0.034 0.034 0.034 0.034 0.034 0.0723 0.0723 0.0723 0.0723 0.0723 0.0723 0.0723 0.0723 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.051 0.051 0.051 0.051 0.051 0.051 0.051 0.051 0.017 0.017 0.01445 0.0119 0.00935 0.0068 0.00425 0.00204] 64} > pan {range sine 0.25 0.75} > bus :air > d4

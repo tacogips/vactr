@@ -10,9 +10,10 @@ description = "Tauri shell wrapping the Vactr editor frontend"
 [workspace]
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = "=2.6.3"
 
 [dependencies]
-tauri = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
+tauri = "=2.11.6"
+tauri-plugin-dialog = "=2.7.3"
+tauri-plugin-fs = "=2.5.2"
+vactr = { path = "../..", default-features = false, features = ["host-native"] }

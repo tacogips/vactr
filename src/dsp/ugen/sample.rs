@@ -2,15 +2,30 @@
 //!
 //! A sample event plays the region `[begin, end)` (fractions of the
 //! sample) at `speed` (negative plays backwards from `end`), looping inside
-//! the region when `loop` is on. These four controls plus the event's
-//! `bank` are everything the audio side reads: `chop`, `striate`, `slice`,
-//! `splice`, `loop-at` and `fit` are scheduler-side rewrites into them.
+//! the region when `loop` is on. Absolute timestamp windows arrive as four
+//! exact 16-bit frame words, taking precedence over normalized fractions.
+//! `chop`, `striate`, `slice`, `splice`, `loop-at` and `fit` are scheduler
+//! rewrites into these playback controls.
 //! Every read goes through `get`, so no region, speed or loop setting can
 //! index outside the sample.
 
 use crate::dsp::graph::BankRef;
 
 use super::{Inp, Kx, NodeState, MAX_PORTS};
+
+/// Decode exact frame words transported as exactly representable f32 integers.
+#[must_use]
+pub fn frame_region(frames: usize, words: [f32; 4]) -> Option<(usize, usize)> {
+    let [start_low, start_high, stop_low, stop_high] = words;
+    if start_high < 0.0 || stop_high < 0.0 || (stop_low <= 0.0 && stop_high <= 0.0) {
+        return None;
+    }
+    let frame = |low: f32, high: f32| -> usize {
+        (((high.clamp(0.0, 65535.0) as u32) << 16) | (low.clamp(0.0, 65535.0) as u32)) as usize
+    };
+    let start = frame(start_low, start_high).min(frames);
+    Some((start, frame(stop_low, stop_high).min(frames).max(start)))
+}
 
 /// The frame range `[start, stop)` of a `begin`/`end` region of a sample
 /// with `frames` frames; always within `0..=frames` and `start <= stop`.
@@ -80,7 +95,8 @@ fn play_worker(
     };
     let ch = usize::from(view.channels.max(1));
     let frames = view.frames();
-    let (start, stop) = region(frames, ins[1].first(), ins[2].first());
+    let (start, stop) = frame_region(frames, std::array::from_fn(|i| ins[i + 4].first()))
+        .unwrap_or_else(|| region(frames, ins[1].first(), ins[2].first()));
     let looping = ins[3].first() >= 0.5;
     #[allow(clippy::cast_precision_loss)]
     let rate = view.rate as f32 / kx.sr;

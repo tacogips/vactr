@@ -18,6 +18,9 @@
 
 pub mod analyzer;
 pub mod catalog;
+mod composite_lofi;
+pub mod creative_delay;
+pub mod creative_reverb;
 pub mod cross_mod;
 pub mod delay;
 pub mod dynamic_control;
@@ -26,10 +29,13 @@ pub mod elements_bank;
 pub mod eq;
 pub mod lofi;
 pub mod modulation;
+pub mod music_filters;
+pub mod musicdsp;
 pub mod prim;
 pub mod quad_mixer;
 pub mod resonant_bank;
 pub mod resonator;
+pub mod resonator_extra;
 pub mod restoration;
 pub mod reverb;
 pub mod saturation;
@@ -48,16 +54,42 @@ use crate::dsp::arena::SampleStore;
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellRead;
 use crate::dsp::fft::Fft;
-use crate::dsp::graph::EffectKind;
+use crate::dsp::graph::{BusId, EffectKind};
 use crate::host::wire::Ctl;
 use crate::sched::slots::CtlId;
 
 use self::prim::{Biquad, DelayLine, Follower, Lfo, OnePole, Rng};
 
+/// Reserved codec parameter carrying a constant bus ID, outside the public catalog.
+pub const SIDECHAIN_BUS_CTL: CtlId = CtlId::new(0x7ffe);
+/// Largest integer exactly representable by the existing f32 control transport.
+pub const MAX_SIDECHAIN_BUS: u32 = 1 << 24;
+
 /// The first effect-local parameter id.
 pub const EFFECT_PARAM_BASE: u16 = 0x4000;
 /// The most parameters one effect kind has.
 pub const MAX_FX_PARAMS: usize = 28;
+
+/// Decodes the reserved, exact constant key ID without truncation or clamping.
+#[must_use]
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+pub fn sidechain_bus(ctl: Ctl) -> Option<BusId> {
+    match ctl {
+        Ctl::Const(value)
+            if value.is_finite()
+                && value >= 1.0
+                && value <= MAX_SIDECHAIN_BUS as f32
+                && value.fract() == 0.0 =>
+        {
+            Some(BusId::new(value as u32))
+        }
+        _ => None,
+    }
+}
 
 /// One named effect parameter.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -164,6 +196,7 @@ enum Group {
     Saturation,
     Modulation,
     Lofi,
+    CompositeLofi,
     Resonator,
     Spatial,
     Restoration,
@@ -182,6 +215,11 @@ enum Group {
     StreamCv,
     ShiftPair,
     KeyframeMixer,
+    MusicDsp,
+    MusicFilters,
+    ResonatorExtra,
+    CreativeReverb,
+    CreativeDelay,
 }
 
 fn group(kind: EffectKind) -> Group {
@@ -284,6 +322,20 @@ fn group(kind: EffectKind) -> Group {
         K::ShiftPair => Group::ShiftPair,
         K::KeyframeMixer => Group::KeyframeMixer,
         K::Analyzer(_) => Group::Analyzer,
+        K::SvfFilter
+        | K::ButterworthFilter
+        | K::ChebyshevFilter
+        | K::LadderFilter
+        | K::AllpassFilter => Group::MusicFilters,
+        K::ParametricResonator | K::FeedbackResonator => Group::ResonatorExtra,
+        K::Foldback | K::VariableClip | K::AlienWah | K::DynamicConvolution => Group::MusicDsp,
+        K::EarlyReflections
+        | K::SchroederReverb
+        | K::SpringReverb
+        | K::SpaceReverb
+        | K::ShimmerReverb => Group::CreativeReverb,
+        K::TapeDelay | K::DiffusionDelay => Group::CreativeDelay,
+        K::Lofi => Group::CompositeLofi,
     }
 }
 
@@ -298,6 +350,7 @@ pub fn params(kind: EffectKind) -> &'static [ParamDef] {
         Group::Saturation => saturation::params(kind),
         Group::Modulation => modulation::params(kind),
         Group::Lofi => lofi::params(kind),
+        Group::CompositeLofi => composite_lofi::PARAMS,
         Group::Resonator => resonator::params(kind),
         Group::Spatial => spatial::params(kind),
         Group::Restoration => restoration::params(kind),
@@ -321,6 +374,11 @@ pub fn params(kind: EffectKind) -> &'static [ParamDef] {
             _ => stream_cv::LORENZ_PARAMS,
         },
         Group::ShiftPair => shift_pair::PARAMS,
+        Group::MusicDsp => musicdsp::params(kind),
+        Group::MusicFilters => music_filters::params(kind),
+        Group::ResonatorExtra => resonator_extra::params(kind),
+        Group::CreativeReverb => creative_reverb::params(kind),
+        Group::CreativeDelay => creative_delay::params(kind),
         Group::KeyframeMixer => quad_mixer::PARAMS,
     }
 }
@@ -337,6 +395,7 @@ pub fn mem_len(kind: EffectKind, sr: f32, caps: &CapabilitySet) -> usize {
         Group::Saturation => saturation::mem_len(kind, sr),
         Group::Modulation => modulation::mem_len(kind, sr),
         Group::Lofi => lofi::mem_len(kind, sr),
+        Group::CompositeLofi => composite_lofi::mem_len(sr),
         Group::Resonator => resonator::mem_len(kind, sr),
         Group::Spatial => spatial::mem_len(kind, sr),
         Group::Restoration => restoration::mem_len(kind, sr),
@@ -354,8 +413,55 @@ pub fn mem_len(kind: EffectKind, sr: f32, caps: &CapabilitySet) -> usize {
         Group::StreamDynamics => stream_dynamics::MEM_LEN,
         Group::StreamCv => stream_cv::MEM_LEN,
         Group::ShiftPair => shift_pair::MEM_LEN,
+        Group::MusicDsp => musicdsp::mem_len(kind, sr),
+        Group::MusicFilters => music_filters::mem_len(kind, sr),
+        Group::ResonatorExtra => resonator_extra::mem_len(kind, sr),
+        Group::CreativeReverb => creative_reverb::mem_len(kind, sr),
+        Group::CreativeDelay => creative_delay::mem_len(kind, sr),
         Group::KeyframeMixer => 0,
     }
+}
+
+/// Kinds whose declared memory is part of their algorithm, never a clampable hint.
+#[must_use]
+pub fn requires_full_memory(kind: EffectKind) -> bool {
+    use EffectKind as K;
+    matches!(
+        kind,
+        K::CrossMod
+            | K::ResonantBank
+            | K::ElementsBank
+            | K::TextureGrain
+            | K::TextureStretch
+            | K::TextureLoop
+            | K::TextureSpectral
+            | K::StreamEnvelope
+            | K::StreamVactr
+            | K::StreamFollower
+            | K::StreamCompressor
+            | K::StreamFilter
+            | K::StreamLorenz
+            | K::ShiftPair
+            | K::SvfFilter
+            | K::ButterworthFilter
+            | K::ChebyshevFilter
+            | K::LadderFilter
+            | K::AllpassFilter
+            | K::ParametricResonator
+            | K::FeedbackResonator
+            | K::Foldback
+            | K::VariableClip
+            | K::AlienWah
+            | K::DynamicConvolution
+            | K::EarlyReflections
+            | K::SchroederReverb
+            | K::SpringReverb
+            | K::SpaceReverb
+            | K::ShimmerReverb
+            | K::TapeDelay
+            | K::DiffusionDelay
+            | K::Lofi
+    )
 }
 
 /// Sets up a zeroed unit over `mem_len` floats of delay memory.
@@ -369,6 +475,7 @@ pub fn init(kind: EffectKind, st: &mut FxState, mem: &mut [f32], sr: f32, caps: 
         Group::Saturation => saturation::init(kind, st, n, sr),
         Group::Modulation => modulation::init(kind, st, n, sr),
         Group::Lofi => lofi::init(kind, st, n, sr),
+        Group::CompositeLofi => composite_lofi::init(st, n),
         Group::Resonator => resonator::init(kind, st, n, sr),
         Group::Spatial => spatial::init(kind, st, n, sr),
         Group::Restoration => restoration::init(kind, st, n, sr),
@@ -386,6 +493,11 @@ pub fn init(kind: EffectKind, st: &mut FxState, mem: &mut [f32], sr: f32, caps: 
         Group::StreamDynamics => stream_dynamics::init(st, mem),
         Group::StreamCv => stream_cv::init(kind, st, mem),
         Group::ShiftPair => shift_pair::init(st, mem),
+        Group::MusicDsp => musicdsp::init(kind, st, n, sr),
+        Group::MusicFilters => music_filters::init(kind, st, n, sr),
+        Group::ResonatorExtra => resonator_extra::init(kind, st, n, sr),
+        Group::CreativeReverb => creative_reverb::init(kind, st, n, sr),
+        Group::CreativeDelay => creative_delay::init(kind, st, n, sr),
         Group::KeyframeMixer => quad_mixer::init(st, mem),
     }
 }
@@ -409,6 +521,7 @@ pub fn process(
         Group::Saturation => saturation::process(kind, p, st, mem, l, r, ctx),
         Group::Modulation => modulation::process(kind, p, st, mem, l, r, ctx),
         Group::Lofi => lofi::process(kind, p, st, mem, l, r, ctx),
+        Group::CompositeLofi => composite_lofi::process(p, st, mem, l, r, ctx),
         Group::Resonator => resonator::process(kind, p, st, mem, l, r, ctx),
         Group::Spatial => spatial::process(kind, p, st, mem, l, r, ctx),
         Group::Restoration => restoration::process(kind, p, st, mem, l, r, ctx),
@@ -426,6 +539,11 @@ pub fn process(
         Group::StreamDynamics => stream_dynamics::process(kind, p, st, mem, l, r, ctx),
         Group::StreamCv => stream_cv::process(kind, p, st, mem, l, r, ctx),
         Group::ShiftPair => shift_pair::process(p, st, mem, l, r, ctx),
+        Group::MusicDsp => musicdsp::process(kind, p, st, mem, l, r, ctx),
+        Group::MusicFilters => music_filters::process(kind, p, st, mem, l, r, ctx),
+        Group::ResonatorExtra => resonator_extra::process(kind, p, st, mem, l, r, ctx),
+        Group::CreativeReverb => creative_reverb::process(kind, p, st, mem, l, r, ctx),
+        Group::CreativeDelay => creative_delay::process(kind, p, st, mem, l, r, ctx),
         Group::KeyframeMixer => quad_mixer::process(p, st, l, r, ctx.sr),
     }
 }
@@ -462,6 +580,7 @@ pub struct FxUnit {
     target: [f32; MAX_FX_PARAMS],
     vals: [f32; MAX_FX_PARAMS],
     pub st: FxState,
+    sidechain: Option<BusId>,
 }
 
 /// True when a convolution's `ir` parameter (a resource id) is `id`.
@@ -499,6 +618,7 @@ impl FxUnit {
             target: [0.0; MAX_FX_PARAMS],
             vals: [0.0; MAX_FX_PARAMS],
             st: FxState::default(),
+            sidechain: None,
         }
     }
 
@@ -516,11 +636,16 @@ impl FxUnit {
     ) {
         let defs = params(kind);
         self.kind = kind;
+        self.sidechain = None;
         self.n = u8::try_from(defs.len().min(MAX_FX_PARAMS)).unwrap_or(0);
         for (i, d) in defs.iter().take(MAX_FX_PARAMS).enumerate() {
             self.src[i] = Ctl::Const(d.default);
         }
         for &(id, ctl) in given {
+            if kind == EffectKind::Compressor && id == SIDECHAIN_BUS_CTL {
+                self.sidechain = sidechain_bus(ctl);
+                continue;
+            }
             if let Some(i) = param_index(kind, id) {
                 if i < MAX_FX_PARAMS {
                     self.src[i] = ctl;
@@ -575,6 +700,12 @@ impl FxUnit {
         self.vals.get(i).copied().unwrap_or(0.0)
     }
 
+    /// Evaluator-resolved key bus; independent of parameter smoothing.
+    #[must_use]
+    pub const fn sidechain(&self) -> Option<BusId> {
+        self.sidechain
+    }
+
     /// Processes one stereo block in place; `dry` is scratch of at least
     /// `2 * l.len()` floats for the mix blend.
     pub fn run(
@@ -584,6 +715,21 @@ impl FxUnit {
         r: &mut [f32],
         dry: &mut [f32],
         ctx: &mut FxCtx<'_>,
+    ) {
+        self.run_with_key(mem, l, r, dry, ctx, None);
+    }
+
+    /// Processes a bus compressor with an optional linked peak key.
+    /// A selected but missing bus supplies an all-zero key, never self detection.
+    #[allow(clippy::too_many_arguments)]
+    pub fn run_with_key(
+        &mut self,
+        mem: &mut [f32],
+        l: &mut [f32],
+        r: &mut [f32],
+        dry: &mut [f32],
+        ctx: &mut FxCtx<'_>,
+        key: Option<&[f32]>,
     ) {
         let n = usize::from(self.n);
         for i in 0..n {
@@ -611,15 +757,26 @@ impl FxUnit {
             dr[..frames].copy_from_slice(&r[..frames]);
         }
         let vals = self.vals;
-        process(
-            self.kind,
-            &vals[..n],
-            &mut self.st,
-            mem,
-            &mut l[..frames],
-            &mut r[..frames],
-            ctx,
-        );
+        if self.kind == EffectKind::Compressor {
+            dynamics::compress(
+                &vals[..n],
+                &mut self.st,
+                &mut l[..frames],
+                &mut r[..frames],
+                ctx.sr,
+                key.or_else(|| self.sidechain.map(|_| &[][..])),
+            );
+        } else {
+            process(
+                self.kind,
+                &vals[..n],
+                &mut self.st,
+                mem,
+                &mut l[..frames],
+                &mut r[..frames],
+                ctx,
+            );
+        }
         if let Some(m) = blend {
             for i in 0..frames {
                 l[i] = dl[i] + (l[i] - dl[i]) * m;

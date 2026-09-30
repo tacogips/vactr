@@ -185,6 +185,12 @@ pub struct Outgoing {
 
 /// The session.
 pub struct Session {
+    pub(super) transport_id: u64,
+    pub(super) transport_epoch: u64,
+    pub(super) transport_restart_generation: u64,
+    pub(super) last_transport: Option<f64>,
+    pub(super) transport_cycle: Ratio64,
+    pub(super) transport_state: Option<(f64, Ratio64, ClockSource, bool, bool)>,
     pub(super) ev: Evaluator,
     pub(super) rt: Runtime,
     /// A clone of the evaluator's sink (package effects, `hush`, `stop`).
@@ -262,7 +268,15 @@ impl Session {
         let _ = rt.drain(&mut ev);
         let mut docs = BTreeMap::new();
         docs.insert(FileId::CONSOLE, DocState::new(FileId::CONSOLE));
+        static NEXT_TRANSPORT_ID: std::sync::atomic::AtomicU64 =
+            std::sync::atomic::AtomicU64::new(1);
         Session {
+            transport_id: NEXT_TRANSPORT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            transport_epoch: 0,
+            transport_restart_generation: rt.midi_clock().restart_generation(),
+            last_transport: None,
+            transport_cycle: Ratio64::ZERO,
+            transport_state: None,
             ev,
             rt,
             sink,

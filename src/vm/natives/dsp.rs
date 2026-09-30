@@ -246,7 +246,42 @@ fn effect_node(cx: &mut NativeCx<'_>, kind: EffectKind, a: &[Value], kw: Kw<'_>)
         }
     };
     let mut args = vec![(None, subject)];
-    args.extend(inputs(cx, &pos, &named, &what)?);
+    args.extend(inputs(cx, &pos, &[], &what)?);
+    let selector = intern_kw("sidechain");
+    let mut selected = false;
+    for (name, value) in &named {
+        if *name != selector {
+            args.push((Some(*name), input(cx, value, &what)?));
+            continue;
+        }
+        if kind != EffectKind::Compressor || cx.vm.dsp.bus == 0 || cx.vm.dsp.inst > 0 {
+            return Err(type_err(
+                "sidechain is only valid on a bus-chain compressor",
+            ));
+        }
+        if selected {
+            return Err(type_err("duplicate sidechain selector"));
+        }
+        selected = true;
+        let Value::Keyword(source) = value else {
+            return Err(type_err("sidechain takes a constant bus keyword"));
+        };
+        if *source == intern_kw("master") {
+            return Err(type_err("master cannot be a sidechain source"));
+        }
+        let reg = cx
+            .vm
+            .dsp
+            .registry
+            .as_ref()
+            .ok_or_else(|| type_err("no bus registry"))?;
+        let id = reg
+            .borrow()
+            .bus(*source)
+            .map(|bus| bus.id)
+            .ok_or_else(|| type_err("sidechain source must be a declared bus"))?;
+        args.push((Some(*name), UGenInput::Sidechain(id)));
+    }
     Ok(Value::UGen(node(UGenKind::Effect(kind), args)))
 }
 

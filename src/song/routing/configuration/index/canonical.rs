@@ -413,19 +413,6 @@ pub(in crate::song::routing) fn canonical_index_configuration_issued(
     let Some(matched) = matched else {
         return Ok(None);
     };
-    let limits = budget.limits();
-    if let Some(selected) = selected {
-        budget.with_remaining(|left| {
-            bind_member(
-                address,
-                selected,
-                bound.timing.subject_handle(),
-                depth,
-                limits,
-                left,
-            )
-        })?;
-    }
     let geometry = canonical_prepared_index_geometry_issued(
         IssuedGeometryInput {
             prepared: &bound.prepared,

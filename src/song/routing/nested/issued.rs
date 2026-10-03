@@ -1,4 +1,6 @@
 //! Issued nested source resolution using fresh transcript-bound Index evidence.
+mod members;
+
 use super::*;
 use crate::song::routing::PreparedRoutes;
 use crate::{
@@ -368,7 +370,7 @@ fn resolve_origin_chain(
     let inherited_route = inherited_policy_route(plan, &stages, budget)?;
     verify_policy(plan, event, inherited_route, budget)?;
 
-    let index_configuration = issued_index_stage_configuration(
+    let index_configuration = members::issued_index_stage_configuration(
         context,
         &stages,
         &output_scopes,
@@ -460,188 +462,6 @@ fn inherited_policy_route<'a>(
     Ok(route)
 }
 
-fn issued_index_stage_configuration(
-    context: &IssuedResolution<'_>,
-    stages: &[Stage<'_>],
-    output_scopes: &[usize],
-    owner: TimeSpan,
-    budget: &mut ResolutionBudget,
-    bridge: &mut WorkBridge<'_>,
-) -> Result<Option<TimeSpan>, Failure> {
-    use crate::song::snapshot::occupancy::lookup::authority::{
-        bind_issued_index, IssuedOwnerSelector,
-    };
-    use crate::song::source_uses::FrozenUseTraceTerm;
-    let prepared = context.prepared;
-    let transcript = context.transcript;
-    let depth = context.depth;
-    let mut result = None;
-    for (stage_index, stage) in stages.iter().enumerate() {
-        let graph = stage.cover.graph();
-        let mut node_index = graph.root;
-        let mut prefix = Vec::<FrozenUseTraceTerm>::new();
-        let mut matched_timings = vec![false; stage.slice_timings.len()];
-        for cursor in 0..=stage.identity.edges.len() {
-            budget.enter(
-                stage
-                    .policy_depth
-                    .checked_add(u32::try_from(cursor).map_err(|_| capacity_overflow())?)
-                    .ok_or_else(capacity_overflow)?,
-            )?;
-            let node = graph
-                .nodes
-                .get(node_index as usize)
-                .ok_or_else(|| invalid("issued Index source path node"))?;
-            if let FrozenUseMapping::Slices {
-                structure: FrozenSliceStructure::Index { issuer },
-                ..
-            } = node.mapping
-            {
-                for (timing_index, timing) in stage
-                    .slice_timings
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, timing)| timing.issuer() == issuer)
-                {
-                    if super::super::index::trace_end(&prefix, timing.issuer_trace(), 0, budget)?
-                        != Some(timing.issuer_trace().len())
-                    {
-                        continue;
-                    }
-                    matched_timings[timing_index] = true;
-                    let output_scope = *output_scopes
-                        .get(stage_index)
-                        .ok_or_else(|| invalid("issued output scope missing"))?;
-                    let output = super::super::index::output_operand_owner(
-                        &prepared.plan().topology,
-                        output_scope,
-                        stage.handle.track(),
-                        budget,
-                    )?;
-                    let bound_prepared = super::super::index::prepare_slice_operands(
-                        output,
-                        issuer,
-                        &prefix,
-                        stage.policy_depth,
-                        budget,
-                    )?;
-                    let bound = super::super::index::bind_slice_operands(
-                        bound_prepared,
-                        timing,
-                        stage.handle,
-                        stage.policy_depth,
-                        budget,
-                    )?;
-                    let site_limits = budget.limits();
-                    let site = prepared.site(
-                        output_scope,
-                        stage.handle.track(),
-                        site_limits,
-                        budget.remaining_mut(),
-                        depth,
-                    )?;
-                    let selector = IssuedOwnerSelector {
-                        site,
-                        issuer,
-                        prefix: &prefix,
-                        owner_window: stage.scope.interval,
-                    };
-                    let mut timing_result = None;
-                    for seal in context.seals {
-                        sync_local_work(bridge, budget)?;
-                        let before = bridge.work.borrow().remaining();
-                        transcript.invocation(seal, bridge.work, depth)?;
-                        let after = bridge.work.borrow().remaining();
-                        let spent = before
-                            .checked_sub(after)
-                            .ok_or_else(|| invalid("issued invocation replenished shared work"))?;
-                        budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
-                        bridge.synced_remaining = budget.remaining();
-                        let policy_limits = budget.limits();
-                        let policy = prepared.policy(
-                            site,
-                            stage.identity.policy as usize,
-                            policy_limits,
-                            budget.remaining_mut(),
-                            depth,
-                        )?;
-                        sync_local_work(bridge, budget)?;
-                        let before = bridge.work.borrow().remaining();
-                        let operand = bind_issued_index(
-                            &selector,
-                            transcript,
-                            seal,
-                            Some(policy),
-                            bridge.work,
-                            depth,
-                        )?;
-                        let after = bridge.work.borrow().remaining();
-                        let spent = before.checked_sub(after).ok_or_else(|| {
-                            invalid("issued index binding replenished shared work")
-                        })?;
-                        budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
-                        bridge.synced_remaining = budget.remaining();
-                        let Some(operand) = operand else {
-                            continue;
-                        };
-                        let policy_limits = budget.limits();
-                        let selected = operand
-                            .policy()
-                            .ok_or_else(|| invalid("issued index policy binding missing"))?
-                            .bind_original(policy_limits, budget.remaining_mut(), depth)?;
-                        let Some(local) = super::configuration::issued_index_configuration(
-                            &bound,
-                            &operand,
-                            Some(selected),
-                            intersect(stage.scope.interval, owner)?,
-                            owner,
-                            depth,
-                            budget,
-                        )?
-                        else {
-                            continue;
-                        };
-                        timing_result = Some(if let Some(previous) = timing_result {
-                            if previous != local {
-                                return Err(invalid(
-                                    "issued invocations resolve conflicting Index routes",
-                                ));
-                            }
-                            previous
-                        } else {
-                            local
-                        });
-                    }
-                    let local = timing_result.ok_or_else(|| {
-                        invalid("issued Index timing has no matching fresh invocation")
-                    })?;
-                    result = Some(if let Some(previous) = result {
-                        intersect(previous, local)?
-                    } else {
-                        local
-                    });
-                }
-            }
-            let Some(ordinal) = stage.identity.edges.get(cursor) else {
-                break;
-            };
-            let edge = node
-                .edges
-                .get(*ordinal as usize)
-                .ok_or_else(|| invalid("issued Index source path edge"))?;
-            budget.charge(edge.trace.len())?;
-            prefix.extend_from_slice(&edge.trace);
-            node_index = edge.child;
-        }
-        if matched_timings.iter().any(|matched| !matched) {
-            return Err(invalid(
-                "issued Slice absent from authentic complete source path",
-            ));
-        }
-    }
-    Ok(result)
-}
-
 fn sync_local_work(bridge: &mut WorkBridge<'_>, budget: &ResolutionBudget) -> Result<(), Failure> {
     let spent = bridge
         .synced_remaining
@@ -650,6 +470,10 @@ fn sync_local_work(bridge: &mut WorkBridge<'_>, budget: &ResolutionBudget) -> Re
     bridge.work.borrow_mut().charge(u64::from(spent))?;
     bridge.synced_remaining = budget.remaining();
     Ok(())
+}
+
+pub(super) fn missing_issued_index_component() -> Failure {
+    invalid("issued Index event has no canonical component")
 }
 
 #[cfg(test)]
@@ -799,7 +623,7 @@ mod tests {
 
     #[test]
     fn discarded_augmented_source_origins_are_resolved() -> Result<(), Failure> {
-        let program = "fn cut beat:\n\tfirst [0]\nfn indexed p:\n\tslow {slice {beat -> p} 1 [cut]} 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet selected {transform-instrument base :drums :analog indexed}\nlet intro {part [drums: nil] duration: 1/2}\nsong {sequence [intro selected]} tail-seconds: 0 > play-song";
+        let program = "fn indexed p:\n\tslow {slice {beat -> p} 1 [0]} 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet selected {transform-instrument base :drums :analog indexed}\nlet intro {part [drums: nil] duration: 1/2}\nsong {sequence [intro selected]} tail-seconds: 0 > play-song";
         let (authority, batch) = capture(program)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;
@@ -836,48 +660,43 @@ mod tests {
 
     #[test]
     fn issued_joint_geometry_resolves_where_legacy_keeps_its_barrier() -> Result<(), Failure> {
-        let program = "fn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tslice {beat -> p} 2 [0 nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inside {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inside :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
-        let mut song = prepared_song(program)?;
+        let program = "fn indexed p:\n\teuclid {slice {beat -> p} 2 [0 nil]} 1 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 4}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
+        let (authority, batch) = capture(program)?;
+        let routes = prepare(authority.clone())?;
+        let work = attached_work(&authority)?;
+        let mut legacy_song = prepared_song(program)?;
         let policy = limits();
-        let window = TimeSpan::new(Ratio64::ZERO, song.snapshot().duration())?;
+        let window = TimeSpan::new(Ratio64::ZERO, legacy_song.snapshot().duration())?;
         let legacy_plan = crate::song::routing::prepare_routes(
-            song.snapshot(),
+            legacy_song.snapshot(),
             &crate::dsp::caps::CapabilitySet::native(),
             &capacities(),
         )?;
-        let mut remaining = policy.max_nodes;
-        let authority = song.issue_retained_route_authority(policy, &mut remaining, 0)?;
-        let batch = song.query_issued(window, &policy, &mut remaining, 0)?;
-        let routes = prepare(authority.clone())?;
-        let work = attached_work(&authority)?;
+        let legacy_event = legacy_song
+            .query(window, &policy)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| invalid("joint-geometry fixture emits no legacy event"))?;
+        let issued_event = batch
+            .events()
+            .first()
+            .ok_or_else(|| invalid("joint-geometry fixture emits no issued event"))?;
+        let legacy = super::super::source::resolve_route(&legacy_plan, &legacy_event, limits())
+            .expect_err("legacy route preserves the joint-geometry barrier");
         assert!(
-            !batch.events().is_empty(),
-            "joint-geometry fixture emits issued events"
+            legacy
+                .message
+                .contains("sampled context requires joint mapping geometry"),
+            "legacy error identifies the NeedsJointGeometry barrier"
         );
-        let mut found_legacy_barrier = false;
-        for (index, event) in batch.events().iter().enumerate() {
-            routes.resolve_issued_event(&batch, index, &work, 0)?;
-            if let Err(legacy) =
-                super::super::source::resolve_route(&legacy_plan, event.descriptor(), limits())
-            {
-                if legacy
-                    .message
-                    .contains("sampled context requires joint mapping geometry")
-                {
-                    found_legacy_barrier = true;
-                }
-            }
-        }
-        assert!(
-            found_legacy_barrier,
-            "public resolve_route keeps the NeedsJointGeometry barrier"
-        );
+        routes.resolve_issued_event(&batch, 0, &work, 0)?;
+        assert_eq!(legacy_event.handle, issued_event.descriptor().handle);
         Ok(())
     }
 
     #[test]
     fn distinct_equal_handle_invocations_are_all_resolved() -> Result<(), Failure> {
-        let program = "fn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tstack [{slice {beat -> p} 2 [0 nil]} {slice {beat -> p} 2 [0 nil]}]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inner-part {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inner-part :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
+        let program = "fn inner p:\n\tslice p 2 [0 nil]\nfn outer p:\n\tstack [{slice p 2 [0 nil]} {slice p 2 [0 nil]}]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inner-part {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inner-part :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
         let (authority, batch) = capture(program)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;

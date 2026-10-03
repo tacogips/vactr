@@ -3,9 +3,9 @@ pub(crate) mod authority;
 use super::*;
 use crate::pattern::eval::song_clock::{ProjectedInvocation, ProjectionBudget, SourceBoundaryRef};
 use crate::pattern::eval::song_observation::OwnerInvocation;
-use crate::song::snapshot::{FrozenEdit, FrozenPartNode, FrozenSelectedSource};
+use crate::song::snapshot::FrozenSelectedSource;
 use crate::value::Ratio64;
-use authority::{authenticate_request, policy_path};
+use authority::authenticate_request;
 
 #[derive(Clone, Copy)]
 pub(super) enum LookupAuthority<'a> {
@@ -523,61 +523,7 @@ impl<'s> RetainedIndexAddress<'s> {
         depth: u32,
         budget: &mut ProjectionBudget<'_>,
     ) -> Result<Option<Vec<u32>>, Failure> {
-        let parent = boundary.policy_parent()?;
-        let mut found = None;
-        for part in &self.owner.authority.inventory().parts {
-            budget.charge(1)?;
-            if part.revision != parent.revision {
-                continue;
-            }
-            let pattern = match &part.node {
-                FrozenPartNode::Capture(patterns) => {
-                    budget.charge(patterns.len() as u64 + 1)?;
-                    patterns.iter().find_map(|(track, p)| {
-                        (*track == parent.track && p.id == parent.root).then_some(p)
-                    })
-                }
-                FrozenPartNode::Edit {
-                    edit:
-                        FrozenEdit::Transform { track, payload, .. }
-                        | FrozenEdit::Replace { track, payload }
-                        | FrozenEdit::Overwrite { track, payload, .. },
-                    ..
-                } if *track == parent.track && payload.id == parent.root => Some(payload),
-                _ => None,
-            };
-            if let Some(pattern) = pattern {
-                budget.charge(pattern.sources.len() as u64 + 1)?;
-                let Some(policy) = pattern
-                    .sources
-                    .iter()
-                    .position(|source| std::ptr::eq(source, selected))
-                else {
-                    // Frozen copies can share logical parent identity. Only the
-                    // allocation owning this exact descriptor can certify its use.
-                    continue;
-                };
-                if let Some(edges) = policy_path(
-                    &pattern.source_uses,
-                    pattern.source_uses.root,
-                    policy,
-                    &boundary.producer().steps,
-                    0,
-                    depth,
-                    budget,
-                )? {
-                    if found.is_some() {
-                        return Err(invalid("ambiguous exact selected policy parent use"));
-                    }
-                    found = Some(edges);
-                } else {
-                    return Err(invalid(
-                        "source boundary producer does not authenticate original use",
-                    ));
-                }
-            }
-        }
-        Ok(found)
+        authority::selected_policy_in(self.owner.authority, selected, boundary, depth, budget)
     }
     #[cfg_attr(not(test), allow(dead_code))] // Borrowed opaque interface for next geometry consumer.
     pub(crate) fn empty_source(

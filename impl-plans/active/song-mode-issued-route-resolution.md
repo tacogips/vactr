@@ -962,7 +962,7 @@ because of the one new file.
 
 ### TASK-005: Issued member binder (`lookup/authority.rs`, `lookup.rs`)
 
-**Status**: Not Started
+**Status**: Incomplete; binder implemented, required resolver tests still fail
 **Parallelizable**: No (TASK-006 calls it)
 
 1. **Move `selected_policy` into `authority.rs`.** `selected_policy` is a private
@@ -1039,7 +1039,7 @@ Code to imitate:
 
 ### TASK-006: Stage call site, owner filter, parent-use policy, hard failure
 
-**Status**: Not Started
+**Status**: Incomplete; stage wiring implemented, required owner binding still fails
 **Parallelizable**: No (depends on TASK-005)
 **Deliverables**: `src/song/routing/nested/issued/members.rs` (new),
 `src/song/routing/nested/issued.rs`,
@@ -1131,7 +1131,7 @@ Code to imitate:
 
 ### TASK-007: Fixture integrity restorations (`nested/issued.rs` tests)
 
-**Status**: Not Started
+**Status**: Incomplete; fixtures restored as specified, required outcomes remain unproven
 **Parallelizable**: No (verify together with TASK-006)
 
 Diff the tests module against `1ac457f` and `6543273`, both before and after
@@ -1307,28 +1307,86 @@ No new test is added. The five resolver tests are the owning evidence.
 
 ### Session 253 done criteria (mechanically checkable)
 
-- [ ] `grep -n "fn bind_issued_member\|struct IssuedMemberQuery\|fn selected_policy_in" src/song/snapshot/occupancy/lookup/authority.rs`
+- [x] `grep -n "fn bind_issued_member\|struct IssuedMemberQuery\|fn selected_policy_in" src/song/snapshot/occupancy/lookup/authority.rs`
   shows all three.
-- [ ] `grep -c "bind_member" src/song/routing/configuration/index/canonical.rs`
+- [x] `grep -c "bind_member" src/song/routing/configuration/index/canonical.rs`
   is 2: the import and the legacy call (formerly line 323). No issued call
   remains.
-- [ ] `git diff 6543273 -- src/song/snapshot/occupancy/lookup.rs` touches only
+- [x] `git diff 6543273 -- src/song/snapshot/occupancy/lookup.rs` touches only
   `selected_policy`, whose body is replaced by the delegation.
 - [ ] `grep -n "issued Index event has no canonical component" src/song/routing/nested/issued.rs`
   matches an `ok_or_else` or `Err` path, and no `else { continue; }` follows
   `issued_index_configuration`.
-- [ ] `grep -n "lookup_owner" src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs`
+- [x] `grep -n "lookup_owner" src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs`
   shows the owner-frame filter in the seal loop.
-- [ ] `grep -n "mod members;" src/song/routing/nested/issued.rs` matches.
-- [ ] The test hunks of `git diff 1ac457f -- src/song/routing/nested/issued.rs`
+- [x] `grep -n "mod members;" src/song/routing/nested/issued.rs` matches.
+- [x] The test hunks of `git diff 1ac457f -- src/song/routing/nested/issued.rs`
   show only the classified TASK-007 changes, and
   `grep -n "sampled context requires joint mapping geometry" src/song/routing/nested/issued.rs`
   matches inside the joint-geometry test.
 - [ ] Verification commands 1-5, 7, 8, 11 and 12 exit 0 or print the required
   value. Command 6 is fully dispositioned, and commands 9 and 10 meet their
   rules.
-- [ ] No new `#[allow` or `#[expect` attribute:
+- [x] No new `#[allow` or `#[expect` attribute:
   `git diff 6543273 | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
-- [ ] The receipt holds `jointGeometryFixture`, `densityIndex`, `seams`,
+- [x] The receipt holds `jointGeometryFixture`, `densityIndex`, `seams`,
   cohort 953, and a fingerprint distinct from the five prior values.
-- [ ] One progress-log entry is added.
+- [x] One progress-log entry is added.
+
+### Session 253 progress log
+
+**Status**: Incomplete. The TASK-005 binder and TASK-006 owner-frame/member
+path are implemented, and TASK-007 fixture assertions were restored. The
+assigned resolver acceptance tests still fail. The owner-frame diagnostic
+shows the specified four-field predicate has no match among the fresh seals
+for the failing fixtures. The restored equal-handle fixture reaches the
+first-structure refusal, and the static discarded-origin fixture does not
+retain an augmented origin. These are explicit stop conditions in the
+session-253 amendment; no guard or assertion was weakened.
+
+**Changed paths**: `src/song/snapshot/occupancy/lookup/authority.rs`,
+`src/song/snapshot/occupancy/lookup.rs`,
+`src/song/routing/configuration/index/canonical.rs`,
+`src/song/routing/nested/issued.rs`, and new
+`src/song/routing/nested/issued/members.rs`. `configuration.rs` and
+`density/index.rs` were authorized but unedited. Receipt:
+`tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/receipt-final.json`
+(fingerprint `245cd7f6e538be8d03cd07ec9c348978fc1e6eb46309d28464b04cae8acd9965`).
+
+**Commands, exits and logs**:
+
+- Named resolver and occupancy tests: exit 100; 7 run, 2 passed, 5 failed;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/final-focused-post-helper.log`.
+- Resolver filter: exit 100; 11 of 17 selected tests ran, 6 passed, 5 failed;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/resolver-filter.log`.
+- Occupancy/PreparedRoutes filter: exit 100; one failure matches the recorded
+  session-252 baseline failure;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/occupancy-route8.log`.
+- Legacy binaries (`song_route_preparation`, `song_source_routes`,
+  `song_end_to_end`, `song_checker`): exit 0; 105 passed;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/legacy-binaries.log`.
+- `CARGO_TERM_QUIET=true cargo build`: exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/build-post-integrity-helper.log`.
+- `CARGO_TERM_QUIET=true cargo check`: exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/check-after-modify-retry.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings`: exit 101;
+  all 63 diagnostics are recorded by file, line, message and disposition in
+  the receipt, including the concurrent `SW-let_and_return`;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/clippy-final.log`.
+- Full nextest: exit 100; 1,229 ran, 1,224 passed, 5 failed, 3 skipped;
+  failures are concurrent structural-clock tests;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/full-nextest-post-helper.log`.
+- WASM build: exit 0; final-source rerun also exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/wasm.log` and
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/wasm-final-current.log`.
+- Scoped `rustfmt --edition 2021 --check` on declared resolution paths: exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/fmt-final-current.log`.
+- Declared path line limits: exit 0; all below 1,000, `nested/issued.rs` 762,
+  `source.rs` 991; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/line-counts.log`.
+- Unowned path comparison against `6543273`: exit 0; cohort count: 953;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/cohort-count.log`.
+
+The remaining required focused/full test and strict-Clippy gates do not pass.
+Do not mark this plan complete until the owner-frame/fixture mismatch and
+current-source verification failures are reconciled and all assigned resolver
+tests pass.

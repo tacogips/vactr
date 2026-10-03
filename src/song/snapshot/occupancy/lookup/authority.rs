@@ -1,5 +1,6 @@
 //! Original lookup authentication, extracted before issued backend adoption.
 use super::*;
+use crate::song::snapshot::{FrozenEdit, FrozenPartNode};
 pub(in crate::song::snapshot::occupancy) fn payload_for<'s>(
     authority: LookupAuthority<'s>,
     request: &CanonicalIndexRequest,
@@ -141,6 +142,146 @@ pub(in crate::song::snapshot::occupancy) fn policy_path(
         }
     }
     Ok(found)
+}
+
+pub(in crate::song::snapshot::occupancy) fn selected_policy_in(
+    authority: LookupAuthority<'_>,
+    selected: &FrozenSelectedSource,
+    boundary: &SourceBoundaryRef<'_>,
+    depth: u32,
+    budget: &mut ProjectionBudget<'_>,
+) -> Result<Option<Vec<u32>>, Failure> {
+    let parent = boundary.policy_parent()?;
+    let mut found = None;
+    for part in &authority.inventory().parts {
+        budget.charge(1)?;
+        if part.revision != parent.revision {
+            continue;
+        }
+        let pattern = match &part.node {
+            FrozenPartNode::Capture(patterns) => {
+                budget.charge(patterns.len() as u64 + 1)?;
+                patterns.iter().find_map(|(track, p)| {
+                    (*track == parent.track && p.id == parent.root).then_some(p)
+                })
+            }
+            FrozenPartNode::Edit {
+                edit:
+                    FrozenEdit::Transform { track, payload, .. }
+                    | FrozenEdit::Replace { track, payload }
+                    | FrozenEdit::Overwrite { track, payload, .. },
+                ..
+            } if *track == parent.track && payload.id == parent.root => Some(payload),
+            _ => None,
+        };
+        if let Some(pattern) = pattern {
+            budget.charge(pattern.sources.len() as u64 + 1)?;
+            let Some(policy) = pattern
+                .sources
+                .iter()
+                .position(|source| std::ptr::eq(source, selected))
+            else {
+                // Frozen copies can share logical parent identity. Only the
+                // allocation owning this exact descriptor can certify its use.
+                continue;
+            };
+            if let Some(edges) = policy_path(
+                &pattern.source_uses,
+                pattern.source_uses.root,
+                policy,
+                &boundary.producer().steps,
+                0,
+                depth,
+                budget,
+            )? {
+                if found.is_some() {
+                    return Err(invalid("ambiguous exact selected policy parent use"));
+                }
+                found = Some(edges);
+            } else {
+                return Err(invalid(
+                    "source boundary producer does not authenticate original use",
+                ));
+            }
+        }
+    }
+    Ok(found)
+}
+
+pub(crate) struct IssuedMemberQuery<'a, 'p> {
+    pub(crate) site: crate::song::routing::PreparedSiteRef<'a>,
+    pub(crate) owner: &'p crate::pattern::eval::song_observation::CanonicalOwnerFrame,
+    pub(crate) selected: &'p FrozenSelectedSource,
+    pub(crate) handle: &'p crate::song::EventHandle,
+}
+
+pub(crate) fn bind_issued_member<'a>(
+    query: &IssuedMemberQuery<'a, '_>,
+    transcript: &'a crate::pattern::eval::song_provenance::IssuedQueryTranscript,
+    seals: &'a [Rc<crate::pattern::eval::song_provenance::InvocationSeal>],
+    work: &crate::pattern::eval::song_observation::SharedIndexWork,
+    depth: u32,
+) -> Result<RetainedSourceMember<'a>, Failure> {
+    let authority = LookupAuthority::Issued(query.site.authority());
+    let part = authority
+        .inventory()
+        .parts
+        .get(query.selected.root_part)
+        .ok_or_else(|| invalid("member source root"))?;
+    let mut found: Option<(&'a crate::song::source::SongEventOrigin, Vec<u32>)> = None;
+    for seal in seals {
+        let actual = transcript.invocation(seal, work, depth)?;
+        let matched = with_work(work, |limits, remaining| {
+            let mut budget = ProjectionBudget::new(limits, remaining)?;
+            let boundaries = actual.lookup_clock().retained_sources(
+                actual.lookup_owner(),
+                depth,
+                &mut budget,
+            )?;
+            let mut matched: Option<(&'a crate::song::source::SongEventOrigin, Vec<u32>)> = None;
+            for boundary in boundaries {
+                if !super::same_intrinsic_owner(boundary.policy_parent()?, query.owner) {
+                    continue;
+                }
+                if !boundary.policy_matches(
+                    part.revision,
+                    part.duration,
+                    query.selected,
+                    &mut budget,
+                )? {
+                    continue;
+                }
+                let Some(edges) =
+                    selected_policy_in(authority, query.selected, &boundary, depth, &mut budget)?
+                else {
+                    continue;
+                };
+                let Some(origin) = boundary.member(query.handle, depth, &mut budget)? else {
+                    continue;
+                };
+                if let Some((previous, previous_edges)) = matched.as_ref() {
+                    if !std::ptr::eq(origin, *previous) || edges != *previous_edges {
+                        return Err(invalid("ambiguous original member binding"));
+                    }
+                } else {
+                    matched = Some((origin, edges));
+                }
+            }
+            Ok(matched)
+        })?;
+        if let Some((origin, edges)) = matched {
+            if let Some((previous, previous_edges)) = found.as_ref() {
+                if !std::ptr::eq(origin, *previous) || edges != *previous_edges {
+                    return Err(invalid("ambiguous original member binding"));
+                }
+            } else {
+                found = Some((origin, edges));
+            }
+        }
+    }
+    found
+        .map(|(origin, edges)| RetainedSourceMember { origin, edges })
+        .ok_or_else(|| invalid("original source membership missing"))
 }
 
 pub(in crate::song::snapshot::occupancy) fn site_count(
@@ -360,7 +501,8 @@ fn bind_issued_owner_if_matching<'a>(
             found.get_or_insert(request);
         }
     }
-    let request = found.ok_or_else(|| invalid("required issued execution is not retained at site"))?;
+    let request =
+        found.ok_or_else(|| invalid("required issued execution is not retained at site"))?;
     with_work(work, |limits, remaining| {
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         actual
@@ -384,7 +526,8 @@ pub(crate) fn bind_issued_index<'a>(
     work: &crate::pattern::eval::song_observation::SharedIndexWork,
     depth: u32,
 ) -> Result<Option<IssuedIndexOperand<'a>>, Failure> {
-    let Some(owner) = bind_issued_owner_if_matching(selector, transcript, seal, work, depth)? else {
+    let Some(owner) = bind_issued_owner_if_matching(selector, transcript, seal, work, depth)?
+    else {
         return Ok(None);
     };
     let request = owner.request;

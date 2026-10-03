@@ -409,7 +409,15 @@ pub(crate) fn query_euclid(
                     u32::try_from(j).unwrap_or(u32::MAX),
                 );
             }
-            match sample_child(inner, whole.begin, 0, st) {
+            match st.with_structural_sample(
+                inner,
+                whole.begin,
+                0,
+                Some(whole),
+                part,
+                Some(&timing),
+                |st| sample_child(inner, whole.begin, 0, st),
+            ) {
                 Ok(sampled) => out.extend(sampled.into_iter().map(|s| restruct(&timing, s))),
                 Err(f) => event_fault(st, &timing, p, f),
             }

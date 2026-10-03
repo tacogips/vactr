@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: Ready (wave 2, session 249; released after SONG-ROUTE8 joins)
+**Status**: In Progress (wave 2, session 250)
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -17,19 +17,20 @@ Do not invent an affine map for either category.
 - **Previous**: Accepted canonical clock, sampling and query authority work.
 - **Next**: Separate Chunk output-anchor selection proof and production adoption.
 
-No Rust changes are released by this draft. Frozen-event repair is active.
-Author must confirm the exact manifest and owning evidence before Ready.
+The session-250 implementation follows the accepted six-path manifest below.
+Post-semantic behavioral gates are pending because the shared tree currently
+fails compilation in files owned by other implementation plans.
 
 ## Proposed bounded manifest
 
 | Path | Deliverable | Status |
 |---|---|---|
-| `src/pattern/eval/song_clock.rs` | Extract dispatch and register children | Not Started |
-| `src/pattern/eval/song_clock/dispatch.rs` (new) | Exhaustive dispatch; remove only proven barriers | Not Started |
-| `src/pattern/combinators/structure.rs` | Genuine Euclid sampling hook and subdivision evidence | Not Started |
-| `src/pattern/combinators/region.rs` | Chop/Striate/LoopAt/Fit owning behavior | Not Started |
-| `src/pattern/combinators/music.rs` | Arp owning behavior | Not Started |
-| `src/pattern/eval/song_clock/structural_tests.rs` (new) | Actual Index clock regressions | Not Started |
+| `src/pattern/eval/song_clock.rs` | Extract dispatch and register children | Complete |
+| `src/pattern/eval/song_clock/dispatch.rs` (new) | Exhaustive dispatch; remove only proven barriers | In Progress |
+| `src/pattern/combinators/structure.rs` | Genuine Euclid sampling hook and subdivision evidence | In Progress |
+| `src/pattern/combinators/region.rs` | Chop/Striate/LoopAt/Fit owning behavior | Evidence pending; unchanged-time pass-through |
+| `src/pattern/combinators/music.rs` | Arp owning behavior | Evidence pending; unchanged-time pass-through |
+| `src/pattern/eval/song_clock/structural_tests.rs` (new) | Actual Index clock regressions | Written; blocked at compile gate |
 
 Six candidate paths. The current clock parent is994 lines and existing tests896;
 extract dispatch before additions and put bulk fixtures in the new child. Keep
@@ -74,26 +75,26 @@ LoopAt/Fit retain current sample-header speed encoding semantics.
 
 ### TASK-001: Extract exhaustive dispatch
 
-**Status**: Not Started
+**Status**: Complete
 **Parallelizable**: No
 
-- [ ] Confirm manifest, private ownership and test construction with author.
-- [ ] Extract dispatch with all existing branches and barriers unchanged first.
-- [ ] Preserve metering, failure restoration and public query behavior.
+- [x] Confirm the accepted manifest and dependency admission from the runtime plan contract.
+- [x] Extract dispatch with all existing branches and barriers unchanged first.
+- [x] Preserve metering, failure restoration and public query behavior.
 
 ### TASK-002: Actual sampling and unchanged child clocks
 
-**Status**: Not Started
+**Status**: In Progress
 **Parallelizable**: No; depends on TASK-001
 
-- [ ] Euclid passes its actual step timing event to structural sampling.
-- [ ] Remove seven barriers only after their actual clock behavior is proved.
+- [x] Euclid passes its actual step timing event to structural sampling.
+- [x] Remove exactly seven dispatch barriers; Chunk remains Unknown.
 - [ ] Preserve each operator's output wholes, controls and occurrence identities.
 - [ ] Keep Chunk Unknown until its separate selection proof is implemented.
 
 ### TASK-003: Genuine clock and replay evidence
 
-**Status**: Not Started
+**Status**: In Progress
 **Parallelizable**: No; depends on TASK-002
 
 - [ ] Real evaluated/frozen Index fixtures cover all seven operators.
@@ -124,6 +125,29 @@ observations require a separate applicability proof rather than an affine map.
 Existing pattern tests and grid source-route fixtures supply syntax/regressions,
 but do not establish canonical Index support for these operators. This bounded
 draft records required work without releasing concurrent source edits.
+
+### 2026-10-03 — Session 250 implementation and verification handoff
+
+Extracted `QState::with_clock_dispatch` into `song_clock/dispatch.rs`; the
+focused extraction checkpoint ran before semantic edits and passed 21/21 with
+exit 0. Removed the seven listed dispatch barriers while retaining Chunk's
+Unknown barrier. Euclid now passes its generated step event, original step
+whole, and inherited part through `with_structural_sample`. Added seven
+requirement-level tests in `structural_tests.rs`, including operator Index
+projection, empty Euclid, nested timing, split-window replay, Striate callback
+denial, Chunk Unknown and exact/one-less Euclid work.
+
+Post-semantic focused nextest exited 101 because the shared tree was being
+written by other plan owners: first a missing `src/song/snapshot/issued/`
+child/re-export, then unresolved `FrozenIssuedSongEvent` in
+`src/song/routing/source/issued.rs`. The current native build also exits 101
+with private-field/type errors in `src/song/routing/configuration/index/canonical.rs`
+and a missing `issued_leaves` field in `src/song/routing/source/issued.rs`.
+These files are outside this plan's six Rust write paths and were not edited.
+Resume post-semantic verification after those owners complete their source
+seams and the shared tree compiles. The final rustfmt `--check` exits 0. Earlier
+failed command attempts remain in the plan-local logs; no gate is marked passed
+based on those failures.
 
 ## Session 249 executable contract (wave 2)
 

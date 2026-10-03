@@ -7,7 +7,9 @@ use super::super::super::index::{BoundSliceOperands, PreparedSliceAddress};
 use super::super::super::source::{invalid, ResolutionBudget};
 use crate::pattern::query::{sect, TimeSpan};
 use crate::song::snapshot::occupancy::{
-    lookup::{bind_member, RetainedIndexAddress, RetainedProjectedIndexRow},
+    lookup::{
+        authority::IssuedIndexOperand, bind_member, RetainedIndexAddress, RetainedProjectedIndexRow,
+    },
     CanonicalIndexRequest,
 };
 use crate::song::snapshot::FrozenSelectedSource;
@@ -171,6 +173,138 @@ pub(in crate::song::routing) fn canonical_prepared_index_geometry<'s>(
         membership,
     })
 }
+
+pub(in crate::song::routing) struct IssuedGeometryInput<'a> {
+    pub(in crate::song::routing) prepared: &'a PreparedSliceAddress<'a>,
+    pub(in crate::song::routing) operand: &'a IssuedIndexOperand<'a>,
+    pub(in crate::song::routing) selected: Option<&'a FrozenSelectedSource>,
+    pub(in crate::song::routing) source: TimeSpan,
+    pub(in crate::song::routing) owner: TimeSpan,
+    pub(in crate::song::routing) depth: u32,
+}
+
+fn validate_issued_binding(
+    prepared: &PreparedSliceAddress<'_>,
+    operand: &IssuedIndexOperand<'_>,
+    selected: Option<&FrozenSelectedSource>,
+    depth: u32,
+    budget: &mut ResolutionBudget,
+) -> Result<(), Failure> {
+    let site = operand.site();
+    let issuer = prepared
+        .recipe
+        .nodes()
+        .get(prepared.slice as usize)
+        .ok_or_else(|| invalid("prepared issued issuer absent"))?
+        .issuer();
+    let limits = budget.limits();
+    let original =
+        budget.with_remaining(|remaining| site.bind_original(limits, remaining, depth))?;
+    if !operand.authenticates_prepared_site(issuer, prepared.prefix, original) {
+        return Err(invalid("issued prepared original recipe mismatch"));
+    }
+    match (operand.policy(), selected) {
+        (Some(policy), Some(selected)) => {
+            let limits = budget.limits();
+            let original = budget
+                .with_remaining(|remaining| policy.bind_original(limits, remaining, depth))?;
+            if !std::ptr::eq(original, selected) {
+                return Err(invalid("issued selected policy binding mismatch"));
+            }
+        }
+        (None, None) => {}
+        _ => return Err(invalid("issued source policy binding mismatch")),
+    }
+    Ok(())
+}
+
+/// Resolve geometry using a fresh issued address and canonical prepared bindings.
+pub(in crate::song::routing) fn canonical_prepared_index_geometry_issued<'a>(
+    input: IssuedGeometryInput<'a>,
+    budget: &mut ResolutionBudget,
+) -> Result<PreparedIndexGeometry<'a>, Failure> {
+    let IssuedGeometryInput {
+        prepared,
+        operand,
+        selected,
+        source,
+        owner,
+        depth,
+    } = input;
+    budget.enter(depth)?;
+    validate_issued_binding(prepared, operand, selected, depth, budget)?;
+    let address = operand.address();
+    let limits = budget.limits();
+    let membership = if let Some(selected) = selected {
+        Some(
+            if budget.with_remaining(|left| address.empty_source(selected, depth, limits, left))? {
+                RetainedSourceMembership::Empty
+            } else {
+                RetainedSourceMembership::NonEmpty
+            },
+        )
+    } else {
+        if !budget
+            .with_remaining(|left| address.source_boundaries(depth, limits, left))?
+            .is_empty()
+        {
+            return Err(invalid("issued selected source classification is required"));
+        }
+        None
+    };
+    let limits = budget.limits();
+    let rows = budget.with_remaining(|left| address.rows(depth, limits, left))?;
+    let mut groups: Vec<(usize, Vec<TimeSpan>)> = Vec::new();
+    for (ordinal, row) in rows.iter().enumerate() {
+        budget.charge(1)?;
+        let limits = budget.limits();
+        if !budget.with_remaining(|left| row.source_eligible(depth, limits, left))? {
+            continue;
+        }
+        let limits = budget.limits();
+        if !budget.with_remaining(|left| {
+            address.row_source_window(row, selected, source, depth, limits, left)
+        })? {
+            continue;
+        }
+        let mut group = None;
+        for (index, (representative, _)) in groups.iter().enumerate() {
+            let limits = budget.limits();
+            if budget.with_remaining(|left| {
+                row.same_configuration_group(&rows[*representative], depth, limits, left)
+            })? {
+                group = Some(index);
+                break;
+            }
+        }
+        let index = if let Some(index) = group {
+            index
+        } else {
+            budget.charge(1)?;
+            groups.push((ordinal, Vec::new()));
+            groups.len() - 1
+        };
+        insert_union(&mut groups[index].1, row.footprint().whole, budget)?;
+    }
+    for (_, components) in &mut groups {
+        let mut index = 0;
+        while index < components.len() {
+            budget.charge(1)?;
+            if let Some(clipped) = sect(components[index], owner) {
+                components[index] = clipped;
+                index += 1;
+            } else {
+                budget.charge(components.len() - index)?;
+                components.remove(index);
+            }
+        }
+    }
+    Ok(PreparedIndexGeometry {
+        rows,
+        groups,
+        membership,
+    })
+}
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(not(test), allow(dead_code))] // Genuine consumer; production route-authority wiring is the next bounded phase.
 pub(in crate::song::routing) fn canonical_index_configuration(
@@ -220,6 +354,84 @@ pub(in crate::song::routing) fn canonical_index_configuration(
             && matched.replace(row).is_some()
         {
             return Err(invalid("ambiguous addressed Index event"));
+        }
+    }
+    let matched = matched.ok_or_else(|| invalid("issued Index absent from retained invocation"))?;
+    let limits = budget.limits();
+    if !budget.with_remaining(|left| matched.source_eligible(depth, limits, left))? {
+        return Ok(None);
+    }
+    let limits = budget.limits();
+    if !budget.with_remaining(|left| {
+        address.row_source_window(matched, selected, source, depth, limits, left)
+    })? {
+        return Ok(None);
+    }
+    for (representative, components) in &geometry.groups {
+        let limits = budget.limits();
+        if budget.with_remaining(|left| {
+            matched.same_configuration_group(&geometry.rows[*representative], depth, limits, left)
+        })? {
+            for component in components {
+                budget.charge(1)?;
+                if sect(*component, matched.footprint().whole).is_some() {
+                    return Ok(Some(*component));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Resolve an addressed Index event through its authenticated issued operands.
+pub(in crate::song::routing) fn canonical_index_configuration_issued(
+    bound: &BoundSliceOperands<'_>,
+    operand: &IssuedIndexOperand<'_>,
+    selected: Option<&FrozenSelectedSource>,
+    source: TimeSpan,
+    owner: TimeSpan,
+    depth: u32,
+    budget: &mut ResolutionBudget,
+) -> Result<Option<TimeSpan>, Failure> {
+    let address = operand.address();
+    let limits = budget.limits();
+    if let Some(selected) = selected {
+        budget.with_remaining(|left| {
+            bind_member(
+                address,
+                selected,
+                bound.timing.subject_handle(),
+                depth,
+                limits,
+                left,
+            )
+        })?;
+    }
+    let geometry = canonical_prepared_index_geometry_issued(
+        IssuedGeometryInput {
+            prepared: &bound.prepared,
+            operand,
+            selected,
+            source,
+            owner,
+            depth,
+        },
+        budget,
+    )?;
+    let limits = budget.limits();
+    let own_rows = budget.with_remaining(|left| address.rows(depth, limits, left))?;
+    let mut matched = None;
+    for row in &own_rows {
+        let producer = row
+            .original_producer()
+            .ok_or_else(|| invalid("issued Index producer absent"))?;
+        budget.charge(producer.steps.len() + bound.timing.index_trace().len() + 1)?;
+        if producer.steps == bound.timing.index_trace()
+            && row.original_whole() == bound.timing.index_whole()
+            && row.issuer_start() == bound.timing.sample_start()
+            && matched.replace(row).is_some()
+        {
+            return Err(invalid("ambiguous issued Index event"));
         }
     }
     let matched = matched.ok_or_else(|| invalid("issued Index absent from retained invocation"))?;

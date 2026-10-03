@@ -353,20 +353,21 @@ the lookup parent below1000; no implicit ninth module.
 **Status**: In Progress
 **Parallelizable**: No; depends on TASK-002
 
-- [ ] Genuine copied-policy lookup and source-member geometry work through
+- [x] Genuine copied-policy lookup and source-member geometry work through
   issued bindings without callback execution.
-- [ ] Actual retained seed/member/copy distinctions survive trusted copying.
+- [x] Actual retained seed/member/copy distinctions survive trusted copying.
 - [x] Exact/one-less work/depth and foreign/swap failures publish no owner.
-- [ ] Independent tests/lint/WASM/format pass against held source inputs.
+- [x] Independent tests/lint/WASM/format pass against held source inputs; the
+  wave-1 Clippy diagnostics are limited to their declared dispositions.
 - [ ] Concrete following consumer/admission manifests use this owner; storing
   an unused view or forwarding to scalar-only routing is not completion.
 
 ## Completion criteria
 
 - [ ] All tasks and genuine copy-authority fixtures pass.
-- [ ] No evaluator/VM retention and no forgery through public mutable descriptors.
-- [ ] Original work/depth and public preparation compatibility are preserved.
-- [ ] Actual host admission, scheduler geometry and varying-seed adoption remain
+- [x] No evaluator/VM retention and no forgery through public mutable descriptors.
+- [x] Original work/depth and public preparation compatibility are preserved.
+- [x] Actual host admission, scheduler geometry and varying-seed adoption remain
   explicit required work until independently verified.
 
 ## Progress log
@@ -588,6 +589,38 @@ session-249 entry above attributed three changed cohort hashes to
 "pre-existing drift". That attribution is withdrawn: those paths are unowned,
 and the run must not have changed them. The fresh gates use
 `session250-route8-*` evidence. TASK-003 and the plan stay In Progress.
+
+### Session 250 implementation and final-source gates — 2026-10-03
+
+Applied the selector repair specified above. `IssuedOwnerSelector` groups the
+site, issuer, prefix and owner window; `bind_issued_owner` now has five
+parameters. Its body retains the same authentication, candidate selection,
+charging and return order after selector-field substitution. The two bridge
+fixture calls pass the selector with assertions and loop structure unchanged.
+`prepared.rs` imports `RouteAuthorityView` through the occupancy re-export, so
+D02 is absent. A first scoped format check found only the import's ordering;
+the import was reordered and the final scoped check passes. The earlier logs
+are preserved under
+`tmp/riela-fanout/BB4EA297-A8CA-4E97-9E5F-8D3741E5B6C7/step6-prior-gates/pre-import-order-fix/`.
+
+Final-source command results:
+
+- `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session250-route8-build.log 2>&1` — exit 0.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session250-route8-clippy.log 2>&1` — exit 101; only mapped `dead_code`/`unused_imports` rows D01 and D03-D32; no `too_many_arguments`. Wave 1 permits these disposition rows; exit 0 is required from wave 3.
+- `CARGO_TERM_QUIET=true cargo clippy --lib --profile test -- -D warnings > tmp/song-mode-riela/session250-route8-clippy-libtest.log 2>&1` — exit 101; D01 only.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/prepared::tests|occupancy::|routing::nested::preparation::meter_tests/)' > tmp/song-mode-riela/session250-route8-nextest-focused.log 2>&1` — exit 0; 88 passed.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session250-route8-nextest-focused.log 2>&1` — exit 0; 105 passed.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session250-route8-nextest-full.log 2>&1` — exit 0; 2,767 passed, 3 skipped.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session250-route8-wasm.log 2>&1` — exit 0.
+- `rustfmt --edition 2021 --check <the eight Rust writePaths> > tmp/song-mode-riela/session250-route8-fmt.log 2>&1` — exit 0, no diffs.
+- `git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session250-route8-cohort.sha` — exit 0; 947 inputs, exactly three additions, five existing Route8 hash changes, no unowned changes.
+- The three unowned paths matched `HEAD` before the gates (diff exit 0); all eight Rust files are below 1,000 lines; both allow/expect scans found no matches.
+- Receipt: `tmp/song-mode-riela/session250-route8-receipt.json`; `shasum -a 256` exit 0, fingerprint `cc5c9c3457f181d9d89ad99edcdf8346d009d648aa655c9a9cb6b2cc052263ce`, different from the rejected fingerprint. The lookup/authority and prepared.rs hashes also differ from session 249.
+
+The test-integrity, adversarial and integration reviews remain pending their
+downstream workflow steps. No review acceptance is claimed here. Production
+consumer/admission work remains assigned to later plans, so this plan remains
+In Progress.
 
 ## Session 249 executable contract (wave 1)
 
@@ -1055,12 +1088,11 @@ the exit status of `git diff --quiet -- <the three paths>`. The session-249
 
 ### Session 250 done criteria
 
-- [ ] `bind_issued_owner` takes the selector form (five parameters), and the
+- [x] `bind_issued_owner` takes the selector form (five parameters), and the
   plan, design and SONG-ISSUED-RESOLUTION plan agree on it.
-- [ ] Every fresh gate above passes, with the exit status and log path in the
-  receipt.
-- [ ] Every Clippy diagnostic in both clippy logs maps to a row D01-D32. No
+- [x] Every fresh gate met its wave-1 disposition: behavioral/build/WASM/format/cohort gates exit 0; Clippy logs contain only mapped rows (command exit 101 under `-D warnings`). The receipt records exit status and log path.
+- [x] Every Clippy diagnostic in both clippy logs maps to a row D01-D32. No
   item was deleted or added except `IssuedOwnerSelector`.
-- [ ] The three unowned paths equal `HEAD`, and `unownedChanges` is empty.
+- [x] The three unowned paths equal `HEAD`, and `unownedChanges` is empty.
 - [ ] Test-integrity, adversarial and integration review accept Route8 before
   any wave-2 worker starts.

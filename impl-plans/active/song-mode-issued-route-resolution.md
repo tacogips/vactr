@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: Ready (wave 2, session 249; released after SONG-ROUTE8 joins)
+**Status**: In Progress (wave 2, session 250)
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -415,3 +415,35 @@ impl PreparedRoutes {
 - [ ] No new `allow`/`expect` attributes.
 - [ ] The progress-log entry has commands, exits and log paths.
 
+### 2026-10-04 — Session 250 issued resolver implementation attempt
+
+Implemented the caller-work issued event resolver, source contribution/member
+authentication, fresh transcript invocation binding, issued canonical Index
+geometry dispatch, and owning tests in the declared Rust paths. The pinned
+`PreparedRoutes::resolve_issued_event` seam is present. Corrected fixture
+syntax for Euclid arity and the single `play-song` entrypoint. The source
+remains incomplete: the required `NeedsJointGeometry` fixture fails before
+`resolve_issued_event` during issued preflight. The diagnostic originates in
+`src/song/routing/density/index.rs` (`DensityIndex::index_opening`, reached from
+the issued preparation builder), which is outside this plan's writePaths.
+The distinct equal-handle fixture also reaches `Index address contradicts
+first-structure rule`; both issues need scoped follow-up, with the preflight
+repair requiring ownership/plan amendment before this plan can pass.
+
+Verification, all in the foreground:
+
+- `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-resolution-build.log 2>&1` — exit 0 on current tree.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-resolution-clippy.log 2>&1` — exit 101; includes an unclassified `clippy::let_and_return` in concurrent `src/song/snapshot/issued.rs:231`, outside this plan's writePaths, in addition to wave disposition warnings.
+- Focused issued/prepared nextest command — exit 100; 10 run, 5 passed, 5 failed; complete log `tmp/song-mode-riela/session249-resolution-nextest-focused.log`.
+- Corrected-fixture rerun `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/routing::nested::issued::tests::(issued_joint_geometry_resolves_where_legacy_keeps_its_barrier|distinct_equal_handle_invocations_are_all_resolved)/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1` — exit 100; 2 run, 0 passed, 2 failed. The first fails in out-of-plan issued preflight with `kind=Late, issuance=None`; the second fails on the source-address first-structure check.
+- Scoped `rustfmt --edition 2021 --check` over the eight Rust writePaths — exit 0; complete log `tmp/song-mode-riela/session249-resolution-fmt.log`.
+- `wc -l` over the eight Rust writePaths — exit 0; all paths are below 1000 lines (source.rs 991; nested/issued.rs 916; remaining files 834 or fewer).
+
+Legacy focused binaries, full nextest, WASM, and a Clippy receipt mapping were
+not completed because required issued behavior remains blocked and strict
+Clippy has a concurrent out-of-scope lint. Keep all completion criteria
+unchecked. Resume after the owner of density preflight either adds the exact
+admission seam to this plan's authorized paths or implements it in a declared
+dependency, and the concurrent `song/snapshot/issued.rs` Clippy diagnostic is
+repaired by its owning plan; then correct the equal-handle fixture/address
+contract and rerun the required gates on the stable combined tree.

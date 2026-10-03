@@ -251,8 +251,51 @@ impl ReplayView {
             return Err(invalid("foreign canonical replay view"));
         }
         let mut ledger = work.borrow_mut();
-        ledger.charge(self.executions.len() as u64)?;
-        ledger.executions = self.executions.clone();
+        let prior_len = ledger.executions.len();
+        match ledger.original.as_ref() {
+            Some(attached) if !Rc::ptr_eq(attached, &self.original) => {
+                return Err(invalid("foreign canonical replay collector"));
+            }
+            None if prior_len != 0 => {
+                return Err(invalid(
+                    "unattached canonical replay collector has prior executions",
+                ));
+            }
+            Some(_) | None => {}
+        }
+        let cost = self
+            .executions
+            .len()
+            .checked_mul(prior_len.checked_add(1).ok_or_else(|| {
+                Failure::new(
+                    FailCode::FuelExhausted,
+                    "canonical replay seed work exhausted",
+                )
+            })?)
+            .ok_or_else(|| {
+                Failure::new(
+                    FailCode::FuelExhausted,
+                    "canonical replay seed work exhausted",
+                )
+            })?;
+        ledger.charge(u64::try_from(cost).map_err(|_| {
+            Failure::new(
+                FailCode::FuelExhausted,
+                "canonical replay seed work exhausted",
+            )
+        })?)?;
+        for execution in &self.executions {
+            let mut found = false;
+            for prior in &ledger.executions[..prior_len] {
+                if !Rc::ptr_eq(&prior.key.original, &self.original) {
+                    return Err(invalid("foreign canonical replay execution"));
+                }
+                found |= Rc::ptr_eq(prior, execution);
+            }
+            if !found {
+                ledger.executions.push(execution.clone());
+            }
+        }
         Ok(())
     }
     fn required(

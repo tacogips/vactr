@@ -1,5 +1,7 @@
 //! Selected-source cover consumers and causal detector admission.
 
+pub(super) mod issued;
+
 use super::*;
 use crate::vm::fail::{FailCode, Failure};
 
@@ -109,6 +111,12 @@ impl ResolutionBudget {
             max_depth: self.max_depth,
             ..Default::default()
         }
+    }
+    pub(super) fn remaining(&self) -> u32 {
+        self.remaining
+    }
+    pub(super) fn remaining_mut(&mut self) -> &mut u32 {
+        &mut self.remaining
     }
     pub(super) fn with_remaining<T>(
         &mut self,

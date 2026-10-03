@@ -191,7 +191,7 @@ pub(in crate::song::snapshot::occupancy) fn site_count(
 }
 
 /// Bridge a caller collector without retaining its RefCell borrow across callbacks.
-fn with_work<T>(
+pub(crate) fn with_work<T>(
     work: &crate::pattern::eval::song_observation::SharedIndexWork,
     f: impl FnOnce(SongLimits, &mut u32) -> Result<T, Failure>,
 ) -> Result<T, Failure> {
@@ -207,21 +207,64 @@ fn with_work<T>(
     work.borrow_mut().charge(u64::from(spent))?;
     result
 }
+pub(crate) struct IssuedOwnerSelector<'a, 'p> {
+    pub(crate) site: crate::song::routing::PreparedSiteRef<'a>,
+    pub(crate) issuer: NodeId,
+    pub(crate) prefix: &'p [FrozenUseTraceTerm],
+    pub(crate) owner_window: TimeSpan,
+}
+
+/// Opaque operands authenticated from one actual issued invocation.
+pub(crate) struct IssuedIndexOperand<'a> {
+    request: &'a CanonicalIndexRequest,
+    address: RetainedIndexAddress<'a>,
+    site: crate::song::routing::PreparedSiteRef<'a>,
+    policy: Option<crate::song::routing::PreparedPolicyRef<'a>>,
+}
+impl<'a> IssuedIndexOperand<'a> {
+    pub(crate) fn address(&self) -> &RetainedIndexAddress<'a> {
+        &self.address
+    }
+
+    pub(crate) fn site(&self) -> crate::song::routing::PreparedSiteRef<'a> {
+        self.site
+    }
+
+    pub(crate) fn policy(&self) -> Option<&crate::song::routing::PreparedPolicyRef<'a>> {
+        self.policy.as_ref()
+    }
+
+    pub(crate) fn authenticates_prepared_site(
+        &self,
+        issuer: NodeId,
+        prefix: &[FrozenUseTraceTerm],
+        original: &crate::song::snapshot::FrozenPattern,
+    ) -> bool {
+        self.site.authenticates_request(self.request)
+            && self.request.scope == self.site.scope()
+            && self.request.track == self.site.track()
+            && self.request.issuer == issuer
+            && self.request.prefix == prefix
+            && self.request.root == original.id
+            && original
+                .index_timing
+                .as_ref()
+                .is_some_and(|recipe| Rc::ptr_eq(recipe, &self.request.recipe))
+    }
+}
+
 /// Bind the actual fresh issued invocation, retaining its rebound entry clock.
 pub(crate) fn bind_issued_owner<'a>(
-    site: crate::song::routing::PreparedSiteRef<'a>,
-    issuer: NodeId,
-    prefix: &[FrozenUseTraceTerm],
-    window: TimeSpan,
+    selector: &IssuedOwnerSelector<'a, '_>,
     transcript: &'a crate::pattern::eval::song_provenance::IssuedQueryTranscript,
     seal: &'a Rc<crate::pattern::eval::song_provenance::InvocationSeal>,
     work: &crate::pattern::eval::song_observation::SharedIndexWork,
     depth: u32,
 ) -> Result<RetainedOwnerAddress<'a>, Failure> {
-    let view = site.authority();
+    let view = selector.site.authority();
     let authority = LookupAuthority::Issued(view);
     let original_payload = with_work(work, |limits, remaining| {
-        site.bind_original(limits, remaining, depth)
+        selector.site.bind_original(limits, remaining, depth)
     })?;
     let before = work.borrow().remaining();
     if !transcript.authentic(view.original(), seal, work, depth)? {
@@ -236,20 +279,20 @@ pub(crate) fn bind_issued_owner<'a>(
     let candidates = with_work(work, |limits, remaining| {
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         budget.enter(depth)?;
-        budget.charge(view.records().len() as u64 + prefix.len() as u64 + 1)?;
+        budget.charge(view.records().len() as u64 + selector.prefix.len() as u64 + 1)?;
         let mut candidates = Vec::new();
         for record in view.records() {
             let request = &record.request;
             budget.charge(request.prefix.len() as u64 + 1)?;
-            if !site.authenticates_request(request) {
+            if !selector.site.authenticates_request(request) {
                 continue;
             }
-            if request.scope != site.scope()
-                || request.track != site.track()
-                || request.issuer != issuer
-                || request.prefix != prefix
-                || request.window.begin > window.begin
-                || request.window.end < window.end
+            if request.scope != selector.site.scope()
+                || request.track != selector.site.track()
+                || request.issuer != selector.issuer
+                || request.prefix != selector.prefix
+                || request.window.begin > selector.owner_window.begin
+                || request.window.end < selector.owner_window.end
             {
                 continue;
             }
@@ -314,5 +357,24 @@ pub(crate) fn bind_issued_owner<'a>(
         authority,
         request,
         invocation: actual,
+    })
+}
+
+/// Authenticate the fresh invocation and bind the selected original request.
+pub(crate) fn bind_issued_index<'a>(
+    selector: &IssuedOwnerSelector<'a, '_>,
+    transcript: &'a crate::pattern::eval::song_provenance::IssuedQueryTranscript,
+    seal: &'a Rc<crate::pattern::eval::song_provenance::InvocationSeal>,
+    policy: Option<crate::song::routing::PreparedPolicyRef<'a>>,
+    work: &crate::pattern::eval::song_observation::SharedIndexWork,
+    depth: u32,
+) -> Result<IssuedIndexOperand<'a>, Failure> {
+    let owner = bind_issued_owner(selector, transcript, seal, work, depth)?;
+    let request = owner.request;
+    Ok(IssuedIndexOperand {
+        request,
+        address: RetainedIndexAddress { owner },
+        site: selector.site,
+        policy,
     })
 }

@@ -1,5 +1,6 @@
 //! Prepared nested certificates and borrowed, budgeted origin-chain resolution.
 mod clock;
+pub(super) mod issued;
 mod preparation;
 use super::configuration::{
     map_intrinsic_configuration, map_source_locator, sampled_configuration, sampled_recipe,

@@ -4,8 +4,9 @@ use super::*;
 use crate::dsp::caps::CapabilitySet;
 use crate::pattern::eval::song_clock::ProjectionBudget;
 use crate::song::snapshot::occupancy::route_view::{
-    RouteAuthorityView, TrustedPolicyCopy, TrustedRouteCopy, TrustedSiteCopy,
+    TrustedPolicyCopy, TrustedRouteCopy, TrustedSiteCopy,
 };
+use crate::song::snapshot::occupancy::RouteAuthorityView;
 use crate::song::snapshot::{FrozenPattern, FrozenSelectedSource};
 use crate::song::{SongLimits, SongSettings};
 use crate::vm::fail::{FailCode, Failure};
@@ -65,6 +66,18 @@ pub(crate) fn prepare_routes_issued(
 impl PreparedRoutes {
     pub(crate) fn plan(&self) -> &SongRoutePlan {
         &self.plan
+    }
+    pub(crate) fn authority_original(&self) -> &Rc<crate::song::Song> {
+        self.authority.original()
+    }
+    pub(crate) fn resolve_issued_event(
+        &self,
+        batch: &crate::song::snapshot::issued::FrozenIssuedBatch,
+        event_index: usize,
+        work: &crate::pattern::eval::song_observation::SharedIndexWork,
+        depth: u32,
+    ) -> Result<SongResolvedRoute, Failure> {
+        super::source::issued::resolve_issued(self, batch, event_index, work, depth)
     }
     pub(crate) fn site(
         &self,
@@ -580,7 +593,9 @@ mod tests {
     #[test]
     fn retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits() {
         use crate::pattern::eval::song_observation::CanonicalIndexCollector;
-        use crate::song::snapshot::occupancy::lookup::authority::bind_issued_owner;
+        use crate::song::snapshot::occupancy::lookup::authority::{
+            bind_issued_owner, IssuedOwnerSelector,
+        };
         let (view, batch) = issued(SLICE);
         let (scope, track, issuer, prefix) = slice_site(&view);
         let routes = plan_with(view.clone());
@@ -601,10 +616,12 @@ mod tests {
                 work.borrow_mut().charge(7).unwrap();
                 let before = work.borrow().remaining();
                 if bind_issued_owner(
-                    site,
-                    issuer,
-                    &prefix,
-                    window,
+                    &IssuedOwnerSelector {
+                        site,
+                        issuer,
+                        prefix: &prefix,
+                        owner_window: window,
+                    },
                     batch.transcript(),
                     seal,
                     &work,
@@ -630,10 +647,12 @@ mod tests {
         foreign_work.borrow_mut().charge(7).unwrap();
         let before = foreign_work.borrow().remaining();
         assert!(bind_issued_owner(
-            site,
-            issuer,
-            &prefix,
-            window,
+            &IssuedOwnerSelector {
+                site,
+                issuer,
+                prefix: &prefix,
+                owner_window: window,
+            },
             &foreign_transcript,
             &seal,
             &foreign_work,

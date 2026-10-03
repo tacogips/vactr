@@ -188,6 +188,14 @@ impl SongSnapshot {
     ) -> Result<issued::FrozenIssuedBatch, Failure> {
         issued::query_issued(self, span, limits, remaining, depth)
     }
+    pub(crate) fn query_issued_with_work(
+        &mut self,
+        span: crate::pattern::query::TimeSpan,
+        work: &crate::pattern::eval::song_observation::SharedIndexWork,
+        depth: u32,
+    ) -> Result<issued::FrozenIssuedBatch, Failure> {
+        issued::query_issued_with_work(self, span, work, depth)
+    }
     /// Query access is kept crate-private; only a certified snapshot may enter.
     /// The caller receives an effect-restricted immediate borrow, not the VM.
     #[allow(dead_code)]
@@ -294,6 +302,14 @@ impl PreparedSong {
         depth: u32,
     ) -> Result<issued::FrozenIssuedBatch, Failure> {
         self.snapshot.query_issued(span, limits, remaining, depth)
+    }
+    pub(crate) fn query_issued_with_work(
+        &mut self,
+        span: crate::pattern::query::TimeSpan,
+        work: &crate::pattern::eval::song_observation::SharedIndexWork,
+        depth: u32,
+    ) -> Result<issued::FrozenIssuedBatch, Failure> {
+        self.snapshot.query_issued_with_work(span, work, depth)
     }
     #[must_use]
     pub const fn state(&self) -> SongPreparationState {

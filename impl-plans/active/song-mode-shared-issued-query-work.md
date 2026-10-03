@@ -1,6 +1,6 @@
 # Shared work through issued query and resolution
 
-**Status**: Ready (wave 2, session 249; released after SONG-ROUTE8 joins)
+**Status**: In Progress (wave 2, session 251; implementation present, combined-tree verification pending)
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -25,12 +25,12 @@ against accepted Route8 source before Ready.
 
 | Path | Deliverable | Status |
 |---|---|---|
-| src/song/snapshot.rs | Thin SongSnapshot/PreparedSong companions | Not Started |
-| src/song/snapshot/issued.rs | Shared-work query/freezing engine and legacy wrapper | Not Started |
-| src/song/snapshot/issued/shared_work_tests.rs (new) | Genuine owning shared-ledger fixtures | Not Started |
-| src/pattern/eval/song_replay.rs | Charged additive replay seeding | Not Started |
+| src/song/snapshot.rs | Thin SongSnapshot/PreparedSong companions | Implemented |
+| src/song/snapshot/issued.rs | Shared-work query/freezing engine and legacy wrapper | Implemented |
+| src/song/snapshot/issued/shared_work_tests.rs (new) | Genuine owning shared-ledger fixtures | Implemented; final verification pending |
+| src/pattern/eval/song_replay.rs | Charged additive replay seeding | Implemented |
 
-Four paths explicitly declared. snapshot.rs currently905 and issued.rs777;
+Four paths explicitly declared. snapshot.rs currently921 and issued.rs809;
 private fixture child avoids growth past1000. No current Route8 path is added implicitly; the replay path is explicitly declared
 for accumulated execution preservation. No dependencies required.
 
@@ -61,27 +61,27 @@ Original constructor debit remains charged exactly once for that transaction.
 
 ### TASK-001: Caller-owned engine and compatibility
 
-**Status**: Not Started
+**Status**: Implemented; final verification pending
 **Parallelizable**: No
 
-- [ ] Validate original collector attachment/limits/inherited depth.
-- [ ] Query and freeze using that actual collector without a new allowance.
-- [ ] Preserve legacy API behavior and all failure debits.
-- [ ] Replay seeding authenticates and retains prior genuine executions instead
+- [x] Validate original collector attachment/limits/inherited depth.
+- [x] Query and freeze using that actual collector without a new allowance.
+- [x] Preserve legacy API behavior and all failure debits.
+- [x] Replay seeding authenticates and retains prior genuine executions instead
   of replacing them; charge all validation, scans and appended Rc retention.
 
 ### TASK-002: Genuine shared-work evidence
 
-**Status**: Not Started
+**Status**: In Progress; owning tests implemented, combined-tree gates pending
 **Parallelizable**: No; depends on TASK-001
 
-- [ ] Real candidate query freezes proofs using supplied collector.
-- [ ] Subsequent transcript/binding validation charges that same collector.
-- [ ] Actual observations/executions and original attachment remain present.
-- [ ] Two genuine queries on the same collector retain all prior executions.
-- [ ] Foreign existing execution records refuse without synthetic proof repair.
-- [ ] Foreign attachment fails without callback access.
-- [ ] Whole transaction exact/one-less/depth failures preserve spent work.
+- [x] Real candidate query freezes proofs using supplied collector.
+- [x] Subsequent transcript/binding validation charges that same collector.
+- [x] Actual observations/executions and original attachment remain present.
+- [x] Two genuine queries on the same collector retain all prior executions.
+- [x] Foreign existing execution records refuse without synthetic proof repair.
+- [x] Foreign attachment fails without callback access.
+- [x] Whole transaction exact/one-less/depth failures preserve spent work.
 - [ ] Independent focused/regression/native/lint/WASM/format gates pass.
 
 ### TASK-003: Playback adoption
@@ -95,7 +95,7 @@ Original constructor debit remains charged exactly once for that transaction.
 ## Completion criteria
 
 - [ ] Shared engine and owning evidence accepted under exact source hold.
-- [ ] Legacy wrapper preserves public behavior and original failures.
+- [x] Legacy wrapper preserves public behavior and original failures.
 - [ ] Actual playback adopts companion; unused helpers are insufficient.
 - [ ] Varying domains/pre-Reserve admission remain full-goal requirements.
 
@@ -282,6 +282,61 @@ impl PreparedSong {
   it fails the join audit (design: Unowned working-tree paths).
 - `wc -l` on the four Rust paths: each must be below 1000.
 
+### 2026-10-03 — Session 251 shared-work implementation
+
+Implemented both pinned `query_issued_with_work` forwarders and a caller-owned
+query/freeze engine. The legacy wrapper constructs one collector and writes its
+actual remaining work back after either result. The engine binds an unattached
+collector to the original Song, refuses a foreign attachment before query
+callbacks, and drops its collector borrow before running the query.
+
+`ReplayView::seed_collection` now checks the view and collector attachments by
+pointer identity, refuses unattached collectors with prior executions before
+charging, rejects prior execution records for another Song without replacing
+them, and precharges checked `view.len * (prior.len + 1)` work before additive
+pointer-identity retention. The fresh collector charge remains `view.len`.
+Eight genuine fixture tests are present, including the seven required cases and
+an attached collector carrying a foreign execution record. The TASK-003 playback
+consumer remains assigned to SONG-ISSUED-PLAYBACK.
+
+An initial focused run exposed and failed one descriptor-comparison test
+because its fixtures had separate global revision identities; that test was
+corrected to compare both APIs on one snapshot. A subsequent focused run passed
+85/85 before the final foreign-record assertion was added
+(`tmp/song-s249/session251-sharedwork-nextest-focused-attempt2.log`, summary at
+line 347; the same archived log later includes a compile-failed rerun). Neither
+run is final-source evidence. Current complete logs report:
+
+- Build, focused nextest, full nextest, and wasm build exit 101 because
+  unowned issued-resolution files still have compile errors: private
+  `CanonicalIndexRequest` and `ResolutionBudget` access, an absent `topology`
+  method, a missing `issued_leaves` field, and an unresolved
+  `FrozenIssuedSongEvent` import. Current nextest attempts stop before tests
+  start. Logs: `tmp/song-mode-riela/session249-sharedwork-build.log`,
+  `tmp/song-mode-riela/session249-sharedwork-nextest-focused.log`,
+  `tmp/song-mode-riela/session249-sharedwork-nextest-full.log`, and
+  `tmp/song-mode-riela/session249-sharedwork-wasm.log`.
+- Clippy exits 101 on the same compile errors and reports the unowned
+  `nested/issued.rs:499` `collapsible_if` lint and the existing Route8
+  `prepare_routes_issued` import warning. The receipt maps these to
+  `RES-TASK-002` and `D07`. Log:
+  `tmp/song-mode-riela/session249-sharedwork-clippy.log`.
+- The exact rustfmt check exits 1 with hunks only in unowned child files
+  `src/song/snapshot/resources.rs` and
+  `src/song/snapshot/reservations_tests.rs`. Neither file was edited or
+  formatted. Log: `tmp/song-mode-riela/session249-sharedwork-fmt.log`.
+- `git diff --quiet -- src/song/snapshot/resources.rs
+  src/song/snapshot/reservations_tests.rs` exited 0. Current line counts are
+  921, 809, 382 and 871 for the four plan Rust paths.
+- The Rust source manifest before and after the final gate attempts is
+  byte-identical (SHA-256 of each manifest:
+  `d90f010b5906465ffbdabc4684ef13035dcaef555c700d01065ccbaacf9e7cf1`).
+
+No repair was made outside this plan's write paths. TASK-001 and the behavioral
+TASK-002 cases are implemented; final combined-tree verification remains open
+until the unowned compile blockers are resolved. Formal review and playback
+adoption remain downstream workflow work.
+
 ### Shared-branch protocol
 
 Same as SONG-ISSUED-RESOLUTION: an intent JSON before the first edit, a hash
@@ -290,12 +345,13 @@ format, no stash/checkout/reset, and updates to this plan's log only.
 
 ### Done criteria
 
-- [ ] Both pinned signatures exist.
-- [ ] `seed_collection` is additive, and the fresh-path charge is unchanged.
+- [x] Both pinned signatures exist.
+- [x] `seed_collection` is additive, and the fresh-path charge is unchanged.
 - [ ] All seven tests above are present and pass.
 - [ ] Build, full tests and WASM exit 0.
 - [ ] In this plan's paths, Clippy reports only the two forwarders. Every
   other diagnostic maps to a Route8 D-row or a `RES-` item in the receipt.
-- [ ] fmt is clean on touched paths and every file is below 1000 lines.
-- [ ] No new `allow`/`expect` attributes.
-- [ ] The progress-log entry is recorded.
+- [x] fmt is clean on touched paths and every file is below 1000 lines; the
+  only `--check` hunks are in the two untouched child modules documented above.
+- [x] No new `allow`/`expect` attributes.
+- [x] The progress-log entry is recorded.

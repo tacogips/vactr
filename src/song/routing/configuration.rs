@@ -1,6 +1,19 @@
 //! Intrinsic finite source placement and uncut mapped configuration geometry.
 mod index;
 pub(super) use index::index_configuration;
+pub(super) fn issued_index_configuration(
+    bound: &super::index::BoundSliceOperands<'_>,
+    operand: &crate::song::snapshot::occupancy::lookup::authority::IssuedIndexOperand<'_>,
+    selected: Option<&crate::song::snapshot::FrozenSelectedSource>,
+    source: crate::pattern::TimeSpan,
+    owner: crate::pattern::TimeSpan,
+    depth: u32,
+    budget: &mut ResolutionBudget,
+) -> Result<Option<crate::pattern::TimeSpan>, Failure> {
+    index::canonical::canonical_index_configuration_issued(
+        bound, operand, selected, source, owner, depth, budget,
+    )
+}
 mod sampling;
 use super::components::{
     iterator_component, joint_periodic_component, periodic_component, ClockedPredicate,

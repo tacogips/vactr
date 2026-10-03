@@ -197,6 +197,39 @@ fn freeze_batch(
         transcript: Rc::new(batch.transcript),
     })
 }
+pub(super) fn query_issued_with_work(
+    snapshot: &mut SongSnapshot,
+    span: TimeSpan,
+    work: &SharedIndexWork,
+    depth: u32,
+) -> Result<FrozenIssuedBatch, Failure> {
+    let original = snapshot.song.clone();
+    let limits = {
+        let mut ledger = work.borrow_mut();
+        if depth >= ledger.limits.max_depth {
+            return Err(Failure::new(
+                FailCode::DepthExceeded,
+                "issued query inherited depth",
+            ));
+        }
+        match ledger.original.as_ref() {
+            Some(attached) if !Rc::ptr_eq(attached, &original) => {
+                return Err(Failure::new(
+                    FailCode::Type,
+                    "issued query collector belongs to another Song",
+                ));
+            }
+            Some(_) => {}
+            None => ledger.original = Some(original),
+        }
+        ledger.limits
+    };
+    let result = (|| {
+        let batch = query_issued_rows(snapshot, span, &limits, work, depth)?;
+        freeze_batch(batch, work, depth)
+    })();
+    result
+}
 pub(super) fn query_issued(
     snapshot: &mut SongSnapshot,
     span: TimeSpan,
@@ -205,14 +238,13 @@ pub(super) fn query_issued(
     depth: u32,
 ) -> Result<FrozenIssuedBatch, Failure> {
     let work = CanonicalIndexCollector::new(*remaining, *limits)?;
-    work.borrow_mut().original = Some(snapshot.song.clone());
-    let result = (|| {
-        let batch = query_issued_rows(snapshot, span, limits, &work, depth)?;
-        freeze_batch(batch, &work, depth)
-    })();
+    let result = query_issued_with_work(snapshot, span, &work, depth);
     *remaining = work.borrow().remaining();
     result
 }
+
+#[cfg(test)]
+mod shared_work_tests;
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (session 255: runs FOURTH, after 2c, 2a and 2b are joined; see "Session 255 amendment")
+**Status**: Ready (session 256: runs FOURTH, after 2c, 2a and 2b are accepted; see "Session 256 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -711,3 +711,40 @@ These are the session 249 "Tests to add", unchanged:
 - [ ] The receipt has `fixes[]`, `seams`, the measured work and a new
   fingerprint. TASK-003 is ticked in the shared-work plan, and one
   progress-log entry is added.
+
+## Session 256 amendment (runs FOURTH, after 2c, 2a and 2b are accepted; serial)
+
+The source of truth is the design section "Session 256 resume amendments
+(2026-10-04)". The session 255 amendment stays in force: the owned paths
+including `src/sched/song/pools.rs`, the conditional seams, the tests,
+verification 1-9 and the done criteria. The base is still `<2b-join>`, the
+commit that records 2b acceptance. Only these items change.
+
+- **Allowed failures.** None. Before any edit, run
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-s249/SONG-ISSUED-PLAYBACK/session256/baseline-full.log 2>&1`
+  on `<2b-join>` and record `baselineFailures` in the receipt. The expected
+  list is empty. A non-empty list is stop condition 1: report each test with
+  its owner. Verification 4 (strict clippy) and verification 5 (full nextest)
+  must both exit 0.
+- **Evidence.** Step 1 copies `tmp/song-mode-riela/session249-playback-*` to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session255/` with `sha256.txt`.
+  Scratch logs go to `tmp/song-s249/SONG-ISSUED-PLAYBACK/session256/`. The
+  fingerprint must differ from every hash under
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/`.
+- **Unchanged requirements, restated for the implementer:**
+  - `SongTransport::realize` in `src/sched/song.rs` resolves every issued
+    event through `PreparedRoutes::resolve_issued_event`, with no `dedup_by`
+    and no scalar `resolve_route(`.
+  - `src/sched/song/pools.rs` stages projections and commands
+    (`PoolBook::staged`). Pools, the pending queue, the cursor and pending
+    receipts are committed only after the whole batch succeeds. The failure
+    test asserts they are byte-equal to their state before `realize`.
+
+### Session 256 done criteria
+
+- [ ] Every session 255 done criterion holds.
+- [ ] `baselineFailures` is recorded and empty.
+- [ ] Verification 4 and 5 exit 0. Verification 5 has zero failures and a
+  `Summary` line.
+- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session255/sha256.txt` exists,
+  and the receipt fingerprint is new.

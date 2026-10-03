@@ -1,6 +1,6 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (session 255: runs THIRD, after 2c and 2a are joined; see "Session 255 amendment")
+**Status**: In Progress (session 256: runs THIRD, after 2c and 2a are accepted; see "Session 256 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -671,3 +671,44 @@ All 2c and 2a tests stay green.
 - [ ] `git diff <2a-join> | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
 - [ ] The receipt has the review findings, `fixes[]`, `seams` and a new
   fingerprint, and one progress-log entry is added.
+
+## Session 256 amendment (runs THIRD, after 2c and 2a are accepted; serial)
+
+The source of truth is the design section "Session 256 resume amendments
+(2026-10-04)". The session 255 amendment stays in force: the owned paths,
+the conditional seams, the tests, verification 1-9 and the done criteria. The
+base is still `<2a-join>`, the commit that records 2a acceptance. Only these
+items change.
+
+- **Allowed failures.** None. 2a ends with full nextest green, so verification
+  5 must exit 0 with zero failures. Before any edit, run
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-s249/SONG-SHARED-WORK/session256/baseline-full.log 2>&1`
+  on `<2a-join>` and record its failure list in the receipt as
+  `baselineFailures`. The expected list is empty. If it is not empty, every
+  listed test is outside 2b's paths, so it is stop condition 1: report it with
+  its owner and do not start 2b edits.
+- **Evidence.** Step 1 copies `tmp/song-mode-riela/session249-sharedwork-*` to
+  `tmp/song-s249/SONG-SHARED-WORK/attempt-session255/` with `sha256.txt`.
+  Scratch logs go to `tmp/song-s249/SONG-SHARED-WORK/session256/`. The
+  fingerprint must differ from every hash under `tmp/song-s249/SONG-SHARED-WORK/`.
+- **Unchanged requirements, restated for the implementer:**
+  - `ReplayView::seed_collection` (`src/pattern/eval/song_replay.rs`, about
+    line 245) keeps accumulated executions additively. It appends only
+    executions absent by `Rc::ptr_eq` and precharges the checked
+    `view.len * (prior.len + 1)`. It refuses a foreign collector, and an
+    unattached collector with prior executions, before any charge or
+    mutation. No fresh-only collector, no `clear()`, no wholesale
+    `executions =` assignment.
+  - `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` is fixed by
+    returning the expression directly, with no behavior change and no
+    `allow`/`expect`.
+  - The 2c tests, the 2a resolver tests and all three
+    `routing::source::issued::tests` stay green.
+
+### Session 256 done criteria
+
+- [ ] Every session 255 done criterion holds.
+- [ ] `baselineFailures` is recorded and empty.
+- [ ] Verification 5 exits 0 with zero failures and a `Summary` line.
+- [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session255/sha256.txt` exists, and
+  the receipt fingerprint is new.

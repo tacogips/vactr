@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (session 255: first in the serial order; see "Session 255 amendment")
+**Status**: In Progress (session 256: acceptance gate rerun with six exact 2a-owned allowed failures; see "Session 256 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -1149,3 +1149,143 @@ Run the steps and the verification below.
 - [x] `git diff c7083fb | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
 - [x] The receipt has `fixes[]`, `depthBoundary` and a new fingerprint, and
   one progress-log entry is added.
+
+## Session 256 amendment (acceptance rerun only; serial, concurrency 1)
+
+The source of truth is the design section "Session 256 resume amendments
+(2026-10-04)" > "2c acceptance: exact allowed failures". This section wins over
+every earlier amendment of this plan where they conflict. Every session 255
+rule not changed here stays in force: the owned paths, the frozen files, the
+implementer authority and the done criteria. The implementation base stays
+`c7083fb`. The final tree is `88f5120`.
+
+### Intent and context
+
+- Session 255 completed TASK-008 to TASK-011. Their done criteria are ticked
+  above. The receipt records `depthBoundary: 247` and the fingerprint
+  `391d811a5189a3a4433c71e4f77eacfc1137c38aa25c5d70cf81cfae4ac98818`.
+- TASK-012 blocked on one thing only. The full run
+  (`tmp/song-mode-riela/session249-structural-nextest-full.log`: 2793 run,
+  2787 passed, 6 failed, 3 skipped) failed
+  `song::routing::source::issued::tests::genuine_source_contributions_reject_a_foreign_transcript`,
+  which the session 255 allowed list did not name.
+- That test fails identically at `1ac457f` and `c7083fb`. Its fixture has no
+  Euclid or child-sampling operator. Operator decision 1 adds it to the 2c
+  allowed list, and SONG-ISSUED-RESOLUTION fixes it.
+- This session reruns the 2c gates once on the final tree. No new
+  implementation is expected.
+
+### Non-goals
+
+- No Rust edit. Every 2c Rust writePath must equal `88f5120` at the end of
+  this session. The only exception is a fix forced by a gate failure in a 2c
+  path, made under the session 255 authority rule and recorded in `fixes[]`.
+  None is expected.
+- Do not touch `src/song/routing/source/issued.rs` or any other 2a path. The
+  sixth failure belongs to SONG-ISSUED-RESOLUTION.
+
+### Allowed full-suite failures (exact; replaces session 255 verification 4)
+
+Only these six test IDs may fail. All are owned by SONG-ISSUED-RESOLUTION.
+
+1. `song::routing::nested::issued::tests::cached_nested_slice_events_resolve_from_issued_transcript`
+2. `song::routing::nested::issued::tests::partitioned_nested_issued_queries_equal_the_full_route_set`
+3. `song::routing::nested::issued::tests::issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+4. `song::routing::nested::issued::tests::distinct_equal_handle_invocations_are_all_resolved`
+5. `song::routing::nested::issued::tests::discarded_augmented_source_origins_are_resolved`
+6. `song::routing::source::issued::tests::genuine_source_contributions_reject_a_foreign_transcript`
+
+- A failure outside this list fails 2c. If it is in a 2c path, fix it under
+  the authority rule. Otherwise it is stop condition 1: report it with its
+  owner.
+- If a listed test passes, that is not an error. Record it in the receipt
+  under `allowedFailuresAbsent`.
+- Clippy disposition rows stay as declared in session 255. `SW-let_and_return`
+  at `src/song/snapshot/issued.rs:231` is owned by SONG-SHARED-WORK, and
+  `RES-` rows are owned by SONG-ISSUED-RESOLUTION or wave 3.
+
+### TASK-013: Session 256 gate rerun, receipt and progress log
+
+**Status**: Not Started
+**Parallelizable**: No (only 2c task this session)
+**Deliverables**: the eight `tmp/song-mode-riela/session249-structural-*`
+files and a progress-log entry in this plan.
+
+Steps, in order:
+
+1. Copy every `tmp/song-mode-riela/session249-structural-*` file to
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session255/`. Write their
+   sha256 values to `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session255/sha256.txt`.
+   Do not delete, move or overwrite anything in
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session255/`. Scratch logs for this
+   session go to `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session256/`.
+2. Record `git rev-parse HEAD` (expected `88f5120...`) and
+   `git status --porcelain=v1` (expected clean apart from tmp/ and the
+   excluded `.agents/settings.local.json`) into
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session256/tree.log`.
+3. Run Session 255 verification commands 1, 2, 3, 5, 6, 7, 8, 9 and 10
+   unchanged, with the same log paths. Run command 4 unchanged, but judge it by
+   the six-ID rule above.
+4. Rewrite `tmp/song-mode-riela/session249-structural-receipt.json`. Keep the
+   session 255 fields (`fixes[]`, `depthBoundary`, the `tests.rs` numstat,
+   the frozen-file diff result). Update or add:
+   - `session: 256`;
+   - `treeHead`;
+   - every gate's exit status and full log path;
+   - `fullSuite`: the summary counts, `failures[]` (each with test ID and
+     owner `SONG-ISSUED-RESOLUTION`), `allowedFailures` (the six IDs) and
+     `allowedFailuresAbsent`;
+   - the clippy disposition;
+   - the cohort (953);
+   - the line counts;
+   - the unowned-path result;
+   - a new `evidenceFingerprint`. It is the sha256 of the receipt computed
+     with this field empty. It must differ from `391d811a...` and from every
+     hash in `tmp/song-s249/SONG-STRUCTURAL-CLOCK/`.
+5. Set TASK-012 and TASK-013 to Complete only if every check below passes.
+   Add one progress-log entry giving the commands, exit codes and log paths.
+
+Pitfalls:
+
+- Do not "fix" the six failures here. They are 2a-owned.
+- Do not run `cargo fmt` or `rustfmt` without `--check`.
+- Full nextest takes about 13 minutes. Run it in the foreground, poll until
+  it exits, and treat a truncated log (no `Summary` line) as a failure.
+
+### Session 256 verification (foreground; record the exit status and full log path)
+
+- V1 (focused): Session 255 command 1 exits 0 with a nonzero count.
+- V2 (build): command 2 exits 0.
+- V3 (clippy): command 3 shows no diagnostic in a 2c path, and every
+  diagnostic is mapped.
+- V4 (full): command 4 (`cargo nextest run --no-fail-fast` into
+  `tmp/song-mode-riela/session249-structural-nextest-full.log`) completes with
+  a `Summary` line. Check it with
+  `grep -E '^\s+FAIL' tmp/song-mode-riela/session249-structural-nextest-full.log | awk '{print $NF}' | sort -u`,
+  which must print a subset of the six IDs and nothing else. At least 425
+  distinct tests pass.
+- V5 (legacy binaries): command 5 exits 0.
+- V6 (WASM): command 6 exits 0.
+- V7 (fmt): command 7 shows no `Diff in` hunk on a line changed since
+  `c7083fb`.
+- V8 (lines): command 8 shows every file below 1000 and `tests.rs` at 896.
+- V9 (frozen and unowned): command 9 exits 0.
+- V10 (cohort): command 10 prints 953.
+- V11 (no Rust change this session):
+  `git diff --quiet 88f5120 -- src/pattern/eval/song_clock/structural_tests.rs src/pattern/eval/song_clock/tests.rs src/song/snapshot/occupancy/geometry_tests/domains.rs src/pattern/combinators/region.rs src/pattern/combinators/music.rs`
+  exits 0, unless `fixes[]` records a session 256 fix.
+
+### Session 256 done criteria (mechanically checkable)
+
+- [ ] V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
+- [ ] The V4 failure set is a subset of the six IDs, and the log has a
+  `Summary` line.
+- [ ] V3 has no 2c-path diagnostic, V7 has no hunk on changed lines, and V8
+  meets the line budget.
+- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session255/sha256.txt` exists,
+  and `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session255/` is unchanged.
+- [ ] The receipt has `session: 256`, `allowedFailures` with six IDs, and a
+  fingerprint different from `391d811a...`.
+- [ ] One progress-log entry is added. Test-integrity, adversarial and
+  integration review follow; they are owned by the workflow, not by this
+  task.

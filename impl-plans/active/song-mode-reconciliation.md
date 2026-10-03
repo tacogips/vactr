@@ -1072,3 +1072,38 @@ only after every final gate passes. Only these items change.
 - [ ] The receipt lists the requirement evidence names above, all passing.
 - [ ] `git diff --stat` for wave 4 shows only this plan's writePaths and
   sharedPaths.
+
+### Session 256 amendment (wave 4, SONG-16)
+
+The source of truth is the design section "Session 256 resume amendments
+(2026-10-04)". The session 255 amendment stays in force: no Rust or test
+edits, the cohort rule (954 plus created conditional files), the final gates
+and the status reconciliation. Only these items change.
+
+- **Allowed failures.** None. The final full run
+  (`--no-fail-fast`, `tmp/song-mode-riela/session249-final-nextest-full.log`)
+  must exit 0 with zero failures and a `Summary` line. Any Rust or test failure
+  is stop condition 1: report it with its owning plan ID.
+- **Requirement evidence names.** In addition to the session 255 list, the
+  final receipt lists all three `routing::source::issued::tests`, including
+  `genuine_source_contributions_reject_a_foreign_transcript`, as passed in
+  the final full run.
+- **Cohort allowance.** Changed hashes are also allowed on
+  `src/song/routing/source/issued.rs` (2a TASK-012).
+- **Evidence.** Prior final files are copied to
+  `tmp/song-s249/SONG-16/attempt-session255/` with `sha256.txt`. Scratch logs
+  go to `tmp/song-s249/SONG-16/session256/`. The final fingerprint differs
+  from every earlier one.
+- **Design checkpoint.** The dated evidence checkpoint is appended after the
+  "Session 256 resume amendments" section of
+  `design-docs/specs/design-song-mode.md`. It lists gate exits, log paths, the
+  cohort and the requirement evidence names. Nothing else in the design
+  changes.
+
+#### Session 256 done criteria
+
+- [ ] Every session 255 done criterion holds.
+- [ ] The final full run exits 0 with zero failures, and the receipt lists the
+  three `routing::source::issued::tests` as passed.
+- [ ] `tmp/song-s249/SONG-16/attempt-session255/sha256.txt` exists, and the
+  final fingerprint is new.

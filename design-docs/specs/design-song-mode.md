@@ -2101,3 +2101,101 @@ The diagnosis verified each one in a scratch worktree.
   unowned-path rule (`resources.rs`, `reservations_tests.rs` and
   `clock_tests.rs` equal `HEAD`; `.agents/settings.local.json` untouched) and
   `--check`-only formatting are unchanged.
+
+### Session 256 resume amendments (2026-10-04)
+
+Session 255 stopped at `88f5120`. SONG-STRUCTURAL-CLOCK (2c) finished its test
+corrections, but full nextest had six failures and the 2c disposition allowed
+only five. The design above and the session 251-255 amendments stay the
+baseline. Where these amendments conflict with an earlier one, they win.
+SONG-ROUTE8 stays accepted and is not redispatched. The serial order is
+unchanged: 2c, 2a (SONG-ISSUED-RESOLUTION), 2b (SONG-SHARED-WORK), wave 3
+(SONG-ISSUED-PLAYBACK), then SONG-16. The dispatch manifest
+`impl-plans/active/song-s249-dispatch.json` gets a `resumeSession256` entry in
+place and is never duplicated. The operator diagnosis is
+`tmp/song-mode-riela/session255-source-fixture-diagnosis.md`.
+
+#### 2c acceptance: exact allowed failures
+
+- **Six allowed failures.** This replaces the session 255 rule "a subset of the
+  five 2a resolver tests". The 2c full-suite gate (`--no-fail-fast`) may fail
+  only on these exact test IDs, all owned by 2a:
+  1. `song::routing::nested::issued::tests::cached_nested_slice_events_resolve_from_issued_transcript`
+  2. `song::routing::nested::issued::tests::partitioned_nested_issued_queries_equal_the_full_route_set`
+  3. `song::routing::nested::issued::tests::issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+  4. `song::routing::nested::issued::tests::distinct_equal_handle_invocations_are_all_resolved`
+  5. `song::routing::nested::issued::tests::discarded_augmented_source_origins_are_resolved`
+  6. `song::routing::source::issued::tests::genuine_source_contributions_reject_a_foreign_transcript`
+
+  The sixth test fails identically at `1ac457f` and `c7083fb`, before any 2c
+  change. Its fixture has no Euclid or child-sampling operator. Any failure
+  outside this list fails 2c. A missing listed failure is not an error, but the
+  receipt records it. The session 255 run
+  (`tmp/song-mode-riela/session249-structural-nextest-full.log`) shows exactly
+  these six with 2787 passed and 3 skipped.
+- **No new implementation.** 2c reruns its session 255 gates once on the final
+  tree. The gates are build, strict Clippy with disposition rows, the focused
+  filter, full nextest, WASM, `rustfmt --check` on 2c paths, line counts and
+  the cohort. 2c then goes to test-integrity, adversarial and integration
+  review. A gate failure in a 2c path falls under the session 255 implementer
+  authority rule. Clippy disposition rows owned by later plans stay as
+  declared; `let_and_return` at `src/song/snapshot/issued.rs:231` stays owned
+  by 2b.
+
+#### 2a: source fixture correction
+
+- **Own-test classification.** `src/song/routing/source/issued.rs` first
+  appears in `1ac457f`, after `37ea3e8`. Its tests are 2a's own tests, and
+  the file is a 2a writePath. Correcting the fixture is an `own-test-corrected`
+  fix, not a baseline-assertion change.
+- **Root cause.** The `SLICE` subject never uses the transform's selected
+  source `p`, so `base` is never queried. Only events that pass through the
+  selected source carry source contributions
+  (`src/song/snapshot/issued.rs:28`, `:175-191`; `:481-484` asserts that
+  other events have none). Every event therefore has empty
+  `source_contributions()`. The guard in the test (`source/issued.rs:312-313`)
+  is correct and stays.
+- **Fix.** Replace only the `SLICE` constant in the test module:
+  - the `indexed` body becomes `slice {beat -> p} 2 [cut nil]`;
+  - the chord moves into the source part:
+    `let base {part [drums: {s :analog > chord [:c :five]}] duration: 2}`.
+
+  `fn cut`, `selected` and the `song` line stay. This is the nested resolver
+  fixture shape and keeps the function-subject rule in `slice_index_root`.
+  `[cut nil]` is the chosen list. `[0 nil]` is not used, so the fixture keeps
+  its callable list element.
+- **Unchanged assertions.** The non-empty contribution guard stays. The genuine
+  transcript must authenticate. `authenticate_contributions` with the foreign
+  batch's transcript must still fail. `PLAIN` and the other two
+  `source::issued` tests do not change.
+- **2a acceptance.** The six tests above pass, and the session 254 and 255 2a
+  decisions stand. All three `source::issued` tests pass. Full nextest
+  (`--no-fail-fast`) has zero failures. `source.rs` stays at no more than 993
+  lines. Issued-path authentication of all contributors and of each source
+  contribution's augmented origin and member slots before coalescing is not
+  relaxed.
+
+#### Allowed failures for later plans
+
+Each plan enumerates its allowed failures from a full `--no-fail-fast` run at
+plan time. After 2a ends green, no known failure remains. 2b, wave 3 and
+SONG-16 therefore allow zero full-suite failures. Strict Clippy exits 0 from
+wave 3 on, as already declared.
+
+#### Out of scope
+
+`impl-plans/active/song-mode-issued-query-authority.md` is not in this run's
+plan set or dispatch manifest. It is neither dispatched nor edited.
+
+#### Evidence
+
+Before rerunning, each plan copies its prior
+`tmp/song-mode-riela/session249-<plan>-*` files to
+`tmp/song-s249/<planId>/attempt-session255/` with sha256 values. Scratch logs
+go to `tmp/song-s249/<planId>/session256/`. Every new receipt fingerprint
+differs from all earlier ones. Gates run in the foreground and record exit
+status and full log path. These rules are unchanged:
+
+- `resources.rs`, `reservations_tests.rs` and `clock_tests.rs` equal `HEAD`;
+- `.agents/settings.local.json` stays untouched;
+- formatting runs with `--check` only.

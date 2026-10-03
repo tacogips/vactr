@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (session 255: runs SECOND, after SONG-STRUCTURAL-CLOCK; see "Session 255 amendment")
+**Status**: In Progress (session 256: runs SECOND, after SONG-STRUCTURAL-CLOCK; adds TASK-012 SLICE fixture; see "Session 256 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -1946,3 +1946,130 @@ These are the session 254 tests, unchanged:
 - [ ] `git diff <2c-join> | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
 - [ ] The receipt has `fixes[]` and a new fingerprint, and one progress-log
   entry is added.
+
+## Session 256 amendment (runs SECOND, after SONG-STRUCTURAL-CLOCK is accepted; serial)
+
+The source of truth is the design section "Session 256 resume amendments
+(2026-10-04)" > "2a: source fixture correction". Everything in the session 254
+and 255 amendments stays in force: TASK-008 to TASK-011, the owned paths, the
+implementer authority, the frozen paths and the verification commands. This
+amendment adds TASK-012, adds one test to verification 1, and moves the
+evidence locations. The diff base is still `<2c-join>`, the commit that
+records 2c acceptance on `wf/route-authority`.
+
+### Intent and context
+
+- `song::routing::source::issued::tests::genuine_source_contributions_reject_a_foreign_transcript`
+  fails with `issued route source: Slice fixture produced no source
+  contribution`. It fails identically at `1ac457f` and `c7083fb`.
+- Root cause (`tmp/song-mode-riela/session255-source-fixture-diagnosis.md`):
+  the `SLICE` constant (`src/song/routing/source/issued.rs:241`) is a fixture
+  defect. Its `indexed` subject never uses the selected source `p`, so `base`
+  is never queried, and every event has empty `source_contributions()`
+  (`src/song/snapshot/issued.rs:28`, `:175-191`, `:481-484`). The guard at
+  `source/issued.rs:312-313` is correct.
+- `source/issued.rs` is absent at `37ea3e8` and first appears in `1ac457f`.
+  This test is therefore an own test, and the fix is class
+  `own-test-corrected`, not a baseline-assertion change.
+- Combined with TASK-008 to TASK-011, 2a must end with full nextest at zero
+  failures.
+
+### Non-goals
+
+- No production change for this test. The guard, `authenticate_contributions`
+  and the issued-path authentication of every contributor and of each source
+  contribution's augmented origin and member slots stay exactly as they are.
+- Do not touch `PLAIN`, `genuine_plain_event_matches_legacy_route`,
+  `exact_work_succeeds_and_one_less_returns_no_route` or any assertion in the
+  test module.
+- Do not use `[0 nil]`. The design pins `[cut nil]`.
+
+### TASK-012: SLICE fixture correction in `src/song/routing/source/issued.rs`
+
+**Status**: Not Started
+**Parallelizable**: No. It runs in the same serial 2a sub-wave and may go
+before or after TASK-008 to TASK-011. Running it first gives early evidence.
+**Deliverable**: one changed constant in the `#[cfg(test)]` module of
+`src/song/routing/source/issued.rs`.
+
+- In the `SLICE` constant, change exactly two lines of the embedded program:
+  - `\tslice {beat -> s :analog > chord [:c :five]} 2 [cut nil]` becomes
+    `\tslice {beat -> p} 2 [cut nil]`;
+  - `let base {part [drums: {s :analog}] duration: 2}` becomes
+    `let base {part [drums: {s :analog > chord [:c :five]}] duration: 2}`.
+- `fn cut beat:` / `\tfirst [0]`, `fn indexed p:`, the `selected`
+  `transform-instrument` line and the `song selected tail-seconds: 0 >
+  play-song` line stay byte-identical. The constant stays a single string
+  literal with `\n`/`\t` escapes, like `PLAIN` beside it.
+- This is the nested resolver fixture shape (subject lambda `{beat -> p}`),
+  which satisfies the first-structure rule in `slice_index_root`
+  (`src/song/routing/index.rs`). Do not edit `index.rs`.
+- Before the edit, re-read the file and hash-check it against the intent JSON.
+  Edit by hand. Never run rustfmt in write mode on `source/issued.rs` or
+  `source.rs`.
+- Pitfalls:
+  - Do not weaken the test to tolerate empty contributions, and do not remove
+    the `if event.source_contributions().is_empty()` guard.
+  - Do not pick a different event than `batch.events().first()`. If the first
+    event has no contributions after the fix, diagnose. A production defect
+    goes in a 2a path. A fixture defect stays within the accepted shape
+    (subject `{beat -> p}`, static list `[cut nil]`, chord in `base`). Record
+    either in `fixes[]`.
+  - The foreign batch comes from a second `capture(SLICE)`. Keep that call; it
+    makes a genuinely foreign transcript with the same program text.
+
+Tests (input -> expected outcome):
+
+- `genuine_source_contributions_reject_a_foreign_transcript` with the new
+  SLICE -> the first event has at least one source contribution, the genuine
+  transcript authenticates, and the foreign transcript returns `Err`.
+- `genuine_plain_event_matches_legacy_route` -> unchanged and passing.
+- `exact_work_succeeds_and_one_less_returns_no_route` -> unchanged and
+  passing.
+
+### Session 256 changes to the session 255 execution steps and verification
+
+- Step 1: copy `tmp/song-mode-riela/session249-resolution-*` to
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session255/` with
+  `sha256.txt`. Scratch logs go to
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session256/`. Never delete earlier
+  attempt directories.
+- Step 3 (reproduce): the expected result is exit 100 with the five resolver
+  tests failing. Also run
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib --no-fail-fast -E 'test(/routing::source::issued/)' > tmp/song-s249/SONG-ISSUED-RESOLUTION/session256/reproduce-source.log 2>&1`.
+  The expected result is exit 100 with exactly
+  `genuine_source_contributions_reject_a_foreign_transcript` failing.
+- Step 4: do TASK-012 as well as TASK-008 to TASK-011.
+- Verification 1: append `genuine_source_contributions_reject_a_foreign_transcript`
+  to the test-name list. It must exit 0 with 9 tests passed.
+- Verification 3 (`-E 'test(/routing::(source|nested)::issued|prepared::tests/)'`):
+  must exit 0, and all three `routing::source::issued::tests` must have run
+  and passed.
+- Verification 7 (full, `--no-fail-fast`): exit 0, with zero failures and a
+  `Summary` line. No allowed-failure list remains.
+- The receipt also records:
+  - a `fixes[]` entry for TASK-012 with class `own-test-corrected` and design
+    rule "Session 256 > 2a: source fixture correction";
+  - `sourceFixtureDiff`, the output of
+    `git diff <2c-join> -- src/song/routing/source/issued.rs`.
+
+  The fingerprint must also differ from every hash in
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session255/`.
+
+### Session 256 done criteria (mechanically checkable)
+
+- [ ] Every session 255 done criterion holds.
+- [ ] `grep -c 'slice {beat -> p} 2 \[cut nil\]' src/song/routing/source/issued.rs`
+  prints at least 1, and
+  `grep -c 'slice {beat -> s :analog > chord' src/song/routing/source/issued.rs`
+  prints 0.
+- [ ] `grep -n 'Slice fixture produced no source contribution' src/song/routing/source/issued.rs`
+  still matches (the guard is kept).
+- [ ] `grep -c 'foreign_batch.transcript(), &work, 0).is_err()' src/song/routing/source/issued.rs`
+  prints 1.
+- [ ] Verification 1 passes 9 tests. Verification 7 exits 0 with zero failures
+  and a `Summary` line.
+- [ ] `wc -l src/song/routing/source.rs` prints at most 993, and every 2a path
+  is below 1000.
+- [ ] The receipt has the TASK-012 `fixes[]` entry and a new fingerprint, and
+  one progress-log entry is added.

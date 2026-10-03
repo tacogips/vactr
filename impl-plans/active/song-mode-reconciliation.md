@@ -1002,3 +1002,73 @@ conflicts with. Everything else in the earlier sections still applies.
 - **Required final gates (unchanged).** Build, strict Clippy, focused nextest,
   full nextest, WASM, `rustfmt --check` on the touched files, the cohort
   check, and the editor npm test and build.
+
+### Session 255 amendment (wave 4, SONG-16)
+
+The source of truth is the design section "Session 255 resume amendments
+(2026-10-04)". The session 249-254 contract above still applies: the same
+writePaths and sharedPaths, no Rust or test edits, and statuses reconciled
+only after every final gate passes. Only these items change.
+
+- **Implementer authority.** SONG-16 owns no Rust or test path. Any final-gate
+  failure in Rust or test code is therefore stop condition 1 (unowned path):
+  report it with the log path and the owning plan ID. A failure in this
+  wave's own writePaths (receipt, design checkpoint, `impl-plans/README.md`)
+  is fixed here.
+- **Cohort.** 954 after wave 3, plus one for each conditional wave-3 file the
+  playback receipt records as created (`src/host/caps/song/preparation/issued.rs`,
+  `src/sched/song/realize_tests.rs`). Changed hashes are additionally allowed
+  on `src/pattern/eval/song_clock/tests.rs`, a 2c writePath in session 255
+  with exactly one changed line, and on any 2a writePath the 2a receipt
+  records under `fixes[]`.
+- **Format gate file list.** Add `src/pattern/eval/song_clock/tests.rs` and
+  every path named in a session 255 receipt `fixes[]` or `seams` entry as
+  edited.
+- **Requirement evidence names.** The final receipt lists, from the final
+  full run:
+  - the 2c corrected tests: `seven_structural_operators_preserve_slice_clocks`,
+    `split_queries_retain_the_single_query_index_rows`,
+    `nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation`,
+    `euclid_empty_subject_has_no_false_index_observation`,
+    `euclid_over_slice_obeys_inherited_depth_boundary_without_refunding_debit`
+    (with `depthBoundary` from the 2c receipt) and
+    `song_clock::tests::unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling`;
+  - the five 2a resolver tests, with names taken from the 2a receipt;
+  - the 2b `shared_work_tests`;
+  - the `tests/song_issued_transport.rs` tests, which are the requirement
+    evidence for the user goal.
+- **Final gates (foreground; record the exit status and full log path).**
+  These are the commands under "Final gates" above, with `--no-fail-fast` on
+  the full suite:
+  - `CARGO_TERM_QUIET=true cargo build`;
+  - `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` (exit 0);
+  - the focused nextest command with `--test song_issued_transport` and
+    `--test song_export`;
+  - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast`;
+  - `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`;
+  - `rustfmt --edition 2021 --check` on the touched files;
+  - the cohort sha;
+  - `npm --prefix editor run test` and `npm --prefix editor run build`.
+
+  Logs keep the `tmp/song-mode-riela/session249-final-*` names. Prior copies
+  go to `tmp/song-s249/SONG-16/attempt-session254/` with sha256 values. The
+  final receipt fingerprint differs from every earlier one.
+- **Status reconciliation.** If every gate passes:
+  - set SONG-ROUTE8, SONG-STRUCTURAL-CLOCK, SONG-ISSUED-RESOLUTION,
+    SONG-SHARED-WORK and SONG-ISSUED-PLAYBACK to Completed in their plan
+    headers and in `impl-plans/README.md`;
+  - append the dated evidence checkpoint to the design's "Production
+    integration contract" section;
+  - add one progress-log entry here.
+
+  Plans are not archived.
+
+#### Session 255 done criteria
+
+- [ ] Every final gate exits 0, with complete logs and exit statuses in
+  `tmp/song-mode-riela/session249-final-receipt.json`.
+- [ ] The cohort count equals 954 plus the created conditional files, with no
+  `unownedChanges`.
+- [ ] The receipt lists the requirement evidence names above, all passing.
+- [ ] `git diff --stat` for wave 4 shows only this plan's writePaths and
+  sharedPaths.

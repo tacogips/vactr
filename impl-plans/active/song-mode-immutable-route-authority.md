@@ -622,6 +622,24 @@ downstream workflow steps. No review acceptance is claimed here. Production
 consumer/admission work remains assigned to later plans, so this plan remains
 In Progress.
 
+### Session 255 status note (2026-10-04, plan author; no Rust edits)
+
+SONG-ROUTE8 was accepted at `1ac457f` by the session-250 reviews (dispatch
+manifest `acceptedDependencies`). It is not redispatched in session 255. Its
+eight paths are edited only as declared writePaths or sharedPaths of later
+plans:
+
+- `lookup/authority.rs` and `prepared.rs` (2a, wave 3);
+- `occupancy.rs`, `lookup.rs` and `route_view.rs` (2a, 2b seams);
+- `routing.rs` (wave 3 re-export seam).
+
+The remaining TASK-003 consumer wiring for `LookupAuthority::Issued`,
+`with_work`, `bind_issued_owner` and `PreparedRoutes` is completed by 2a and
+wave 3. The proof is strict Clippy exiting 0 from wave 3, with no D-row left.
+SONG-16 sets this plan's status to Completed only after its final gates pass.
+The held exact-947 Route8 cohort stays documented in
+`tmp/song-mode-riela/session250-route8-cohort.sha`. The current cohort is 953.
+
 ## Session 249 executable contract (wave 1)
 
 The source of truth is

@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (wave 3, session 249; released after the wave-2 join)
+**Status**: Ready (session 255: runs FOURTH, after 2c, 2a and 2b are joined; see "Session 255 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -507,3 +507,207 @@ criteria are unchanged. Only these facts change:
   `<2b-join>` as the diff base.
 - [ ] Full nextest with `--no-fail-fast` and strict Clippy both exit 0.
 - [ ] One progress-log entry is added.
+
+## Session 255 amendment (runs FOURTH, after 2c, 2a and 2b are joined; serial)
+
+The source of truth is the design section "Session 255 resume amendments
+(2026-10-04)": "Implementer authority" and "Remaining waves" > Wave 3, plus
+the existing "Wave 3: issued playback" and "Requirement-level end-to-end
+evidence" sections. The file-level changes, tests and done criteria from
+session 249-254 are unchanged. This amendment changes only the stop rules,
+declares one more seam, and sets the evidence locations. The diff base is
+`<2b-join>`.
+
+### Intent and context
+
+- The production scheduler (`SongTransport::realize` in `src/sched/song.rs`,
+  614 lines) must stop using `dedup_by`, the per-event allowance and the
+  scalar `resolve_route`. It consumes the issued batch and resolves every
+  envelope and contributor through `PreparedRoutes::resolve_issued_event`
+  before coalescing.
+- `src/sched/song/pools.rs` (151 lines, the plan's fifth path) gets a charged
+  staged copy (`PoolBook::staged`). All assignments and commands go to the
+  stage. Commit (`self.pools = staged`, extend `pending`, set `cursor`)
+  happens only after the whole batch succeeds. Any failure leaves the old
+  pools, queue, cursor and pending receipts byte-identical.
+- `preparation.rs` (903 lines) retains authority and prepares issued routes
+  before `resources::build`. That means before any Reserve or upload.
+- `tests/song_issued_transport.rs` is the requirement-level end-to-end proof
+  of the user goal.
+
+### Implementer authority (replaces earlier stop clauses)
+
+- Diagnose each failing gate and fix it inside the manifest below. Rerun the
+  focused command until it passes, then run every gate. Record each fix in the
+  receipt under `fixes[]` with: the test, the exact message, the root cause,
+  the edited paths, and the class.
+- Stop only for:
+  1. a fix outside the manifest. This covers the SM1 case (the end-to-end
+     song needs a larger host song allowance outside these paths) and a
+     strict-Clippy diagnostic in a path outside the manifest, which the root
+     reviewer repairs at the join;
+  2. a change to an assertion of a test that exists at `37ea3e8`. This
+     includes `tests/song_end_to_end.rs`, `tests/song_export.rs` and the
+     existing `preparation.rs` and `sched/song.rs` tests;
+  3. relaxing an identity check, adding a scalar or handle-only fallback, or
+     a non-atomic pool commit.
+- **Earlier clause that becomes "diagnose and fix":** "If an item in
+  `prepared.rs` is still reported as dead after wiring ... record a blocker".
+  Wire the item through its planned consumer in this plan's paths. Delete it
+  only if the Route8 D-row table names no consumer, and record that in
+  `fixes[]`.
+- Own tests (`tests/song_issued_transport.rs` and the new private fixtures)
+  may be corrected toward the design. Each required assertion in "Tests to
+  add" stays.
+
+### Owned paths for session 255
+
+```json
+{
+  "planId": "SONG-ISSUED-PLAYBACK",
+  "planPath": "impl-plans/active/song-mode-issued-playback.md",
+  "dependsOn": ["SONG-ROUTE8", "SONG-STRUCTURAL-CLOCK", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK"],
+  "writePaths": [
+    "src/host/caps/song/preparation.rs",
+    "src/host/caps/song/preparation/issued.rs",
+    "src/sched/song.rs",
+    "src/sched/song/pools.rs",
+    "src/sched/song/realize_tests.rs",
+    "src/song/routing/prepared.rs",
+    "tests/song_issued_transport.rs",
+    "impl-plans/active/song-mode-issued-playback.md",
+    "tmp/song-mode-riela/session249-playback-intent.json",
+    "tmp/song-mode-riela/session249-playback-receipt.json",
+    "tmp/song-mode-riela/session249-playback-build.log",
+    "tmp/song-mode-riela/session249-playback-clippy.log",
+    "tmp/song-mode-riela/session249-playback-nextest-focused.log",
+    "tmp/song-mode-riela/session249-playback-nextest-full.log",
+    "tmp/song-mode-riela/session249-playback-wasm.log",
+    "tmp/song-mode-riela/session249-playback-fmt.log"
+  ],
+  "sharedPaths": [
+    "src/song/routing.rs",
+    "impl-plans/active/song-mode-shared-issued-query-work.md"
+  ],
+  "sharedPathNotes": [
+    {"path": "src/song/routing.rs", "intendedEdit": "Only the PreparedRoutes/prepare_routes_issued re-export line (about line 623), and only if strict Clippy still reports unused_imports after wiring (session 252 rule)."},
+    {"path": "impl-plans/active/song-mode-shared-issued-query-work.md", "intendedEdit": "Tick TASK-003 and add one progress-log line pointing to this plan's evidence."}
+  ]
+}
+```
+
+- **Conditional new files.** Each is created only when needed, and each adds
+  one to the cohort, which the receipt records:
+  - `src/host/caps/song/preparation/issued.rs`, only if `preparation.rs`
+    would reach 1000 lines;
+  - `src/sched/song/realize_tests.rs` (new in session 255), only if the
+    private `realize` fixtures would push `sched/song.rs` to 1000 lines. It
+    is registered as `#[cfg(test)] mod realize_tests;` in `sched/song.rs`, and
+    the fixtures move there unchanged.
+- `src/host/caps/song/preparation/pools.rs` and `src/sched/song/encode.rs`
+  are not writePaths.
+- Frozen: every 2c, 2a and 2b path, the three unowned paths, editor and
+  canvas files, and `.agents/settings.local.json`.
+
+### Key pitfalls (restated for the adversarial review)
+
+- Stage before mutating. `PoolBook::staged` charges `slots.len()` plus the sum
+  of the `expected` lengths plus 1, before cloning. `assign` runs only on the
+  stage.
+- Resolve every envelope before coalescing. Coalesce equal handles only when
+  their descriptors and authenticated routes are equal; otherwise fail.
+- Keep the onset window filter. An envelope outside `[cursor, end)`, or at or
+  after the duration, is resolved but not encoded.
+- Never fall back to `resolve_route`, and never `dedup_by` handle.
+- Write the actual preparation debit back to `cleanup.remaining` on both
+  success and failure.
+- A static Song pre-retains every `:vary`/`:same` placement's first
+  execution. Runtime replay therefore never needs an unseen seed (SM2 stays
+  out of scope).
+
+### Session 255 execution steps (in order)
+
+1. Copy `tmp/song-mode-riela/session249-playback-*` to
+   `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session254/` with sha256
+   values. Scratch logs go under `tmp/song-s249/SONG-ISSUED-PLAYBACK/session255/`.
+2. Write the intent JSON with the design and plan sha256 values and the
+   sha256 and full text of each file to edit. Hash-check before every edit.
+3. Implement file-level changes 1-6 from the session 249 contract, in order:
+   preparation, ownership, pools, `realize`, `prepared.rs`, then the
+   end-to-end tests. Run `CARGO_TERM_QUIET=true cargo build` after each.
+4. Run verification 1-9, fixing failures under the authority rule.
+5. Write the receipt `tmp/song-mode-riela/session249-playback-receipt.json`
+   with:
+   - `fixes[]`;
+   - `seams` (`routing.rs`, `preparation/issued.rs`, `realize_tests.rs`, each
+     as edited/created or "declared, unedited/uncreated");
+   - the measured end-to-end work;
+   - the cohort;
+   - the line counts;
+   - the unowned-path result;
+   - `evidenceFingerprint`. It must differ from every hash in
+     `tmp/song-s249/SONG-ISSUED-PLAYBACK/`.
+6. Tick TASK-003 in the shared-work plan, and add one progress-log entry
+   here.
+
+### Session 255 tests (input -> expected outcome)
+
+These are the session 249 "Tests to add", unchanged:
+
+- The static program (reusable Part functions with nested reuse, `sequence`,
+  `part-repeat` with `:same` and `:vary`, `delete-event`, `overwrite-region`,
+  `transform-instrument` with `lpf`, `instrument-fx`, a Slice-sourced track
+  with a static Index list, `tail-seconds: 2`) driven through public `prepare`,
+  Ready and `SongTransport` with no cycle argument -> it ends on its own, and
+  the frames equal the arrangement frames plus the tail frames exactly.
+- Deleted tone -> absent, with its siblings present. Overwritten region ->
+  holds the replacement onsets.
+- `:same` repeats -> equal. `:vary` repeats -> differ in at least one random
+  decision, while authenticating distinct executions.
+- Effect -> only on the selected instrument branch.
+- `export_song` -> a finalized WAV whose frames and metadata match, and the
+  output is bit-exact on a repeat export.
+- Forged foreign batch, or a capacity failure on the last event -> pools,
+  pending queue and cursor are byte-equal to their state before `realize`.
+- Equal-handle events with conflicting routes -> fail.
+- Exact work for one window succeeds. One less fails with no publication.
+- A foreign or missing authority -> refused before any Reserve.
+- `tests/song_end_to_end.rs` and `tests/song_export.rs` -> unchanged and
+  passing.
+
+### Session 255 verification (foreground; record the exit status and full log path)
+
+1. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast --test song_issued_transport --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker --test song_export > tmp/song-mode-riela/session249-playback-nextest-focused.log 2>&1`
+   must exit 0, with a nonzero count for every binary.
+2. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib -E 'test(/sched::song|caps::song::preparation|routing::prepared/)' >> tmp/song-mode-riela/session249-playback-nextest-focused.log 2>&1`
+   must exit 0.
+3. `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-playback-build.log 2>&1`
+   must exit 0.
+4. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-playback-clippy.log 2>&1`
+   must exit 0.
+5. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-playback-nextest-full.log 2>&1`
+   must exit 0, with every test run and at least 425 distinct tests passed.
+6. `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-playback-wasm.log 2>&1`
+   must exit 0.
+7. `rustfmt --edition 2021 --check src/host/caps/song/preparation.rs src/sched/song.rs src/sched/song/pools.rs src/song/routing/prepared.rs tests/song_issued_transport.rs <each edited or created conditional path> > tmp/song-mode-riela/session249-playback-fmt.log 2>&1`.
+   It passes when no `Diff in` hunk covers a changed line of an owned path.
+8. `wc -l` on every touched Rust path: each is below 1000.
+9. Checks:
+   - `grep -n "dedup_by\|resolve_route(" src/sched/song.rs` prints nothing;
+   - `git diff --quiet <2b-join> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/sched/song/encode.rs src/host/caps/song/preparation/pools.rs`
+     exits 0;
+   - `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+     prints 954, plus one for each conditional file created.
+
+### Session 255 done criteria (mechanically checkable)
+
+- [ ] Every session 249-254 done criterion of this plan holds, with
+  `<2b-join>` as the base.
+- [ ] `grep -n "fn staged" src/sched/song/pools.rs` matches, and the
+  failure-path test asserts unchanged pools, pending and cursor.
+- [ ] Verification 1-6 exit 0. Verification 7 and 8 meet their rules.
+  Verification 9 prints nothing, exits 0 and gives the expected count.
+- [ ] `git diff <2b-join> | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [ ] The receipt has `fixes[]`, `seams`, the measured work and a new
+  fingerprint. TASK-003 is ticked in the shared-work plan, and one
+  progress-log entry is added.

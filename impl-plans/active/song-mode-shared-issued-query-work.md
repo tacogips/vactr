@@ -1,6 +1,6 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (wave 2, session 251; implementation present, combined-tree verification pending)
+**Status**: In Progress (session 255: runs THIRD, after 2c and 2a are joined; see "Session 255 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -522,3 +522,152 @@ this plan are unchanged. Only the following changes.
   no diagnostic in this plan's paths and no `SW-` row.
 - [ ] Full nextest with `--no-fail-fast` exits 0.
 - [ ] One progress-log entry is added.
+
+## Session 255 amendment (runs THIRD, after 2c and 2a are joined; serial)
+
+The source of truth is the design section "Session 255 resume amendments
+(2026-10-04)": "Implementer authority" and "Remaining waves" > 2b. The scope,
+the four writePaths, the two conditional seams, TASK-001 and TASK-002, the
+tests and the session 249-254 criteria are unchanged. Only the stop rules, the
+diff base (`<2a-join>`, the 2a join commit) and the evidence locations change.
+
+### Intent and context
+
+- `ReplayView::seed_collection` (`src/pattern/eval/song_replay.rs:245`) must
+  keep the collector's accumulated executions. It appends view executions
+  that are absent by `Rc::ptr_eq`, precharges a checked
+  `view.len * (prior.len + 1)` and refuses foreign or unattested prior
+  collectors before any mutation. It must never replace or clear executions.
+- One caller-owned `SharedIndexWork` must survive across query, freeze and
+  issued resolution through the pinned `query_issued_with_work` forwarders.
+- `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` is fixed by
+  returning the expression directly.
+- The partial code from sessions 251-254 is reviewed against "File-level
+  changes" above before the gates. It is not presumed accepted.
+
+### Implementer authority (replaces earlier stop clauses)
+
+- Diagnose each failing gate and fix it inside the four writePaths, or the
+  two declared seams under their session 252 limits. Rerun the focused
+  command until it passes, then run every gate. Record each fix in the
+  receipt under `fixes[]` with: the test, the exact message, the root cause,
+  the edited paths, and the class.
+- Stop only for:
+  1. a fix outside the manifest below;
+  2. a change to an assertion of a test that exists at `37ea3e8` (for
+     example the held-count tests in `snapshot::occupancy` and `song::query`);
+  3. a relaxed identity check. Membership is by `Rc::ptr_eq` only; foreign
+     and unattested prior collectors are refused before mutation.
+- Never replace additive retention with a fresh-only collector. That counts
+  as weakening, even when the tests pass.
+
+### Owned paths for session 255
+
+```json
+{
+  "planId": "SONG-SHARED-WORK",
+  "planPath": "impl-plans/active/song-mode-shared-issued-query-work.md",
+  "dependsOn": ["SONG-ROUTE8", "SONG-STRUCTURAL-CLOCK", "SONG-ISSUED-RESOLUTION"],
+  "writePaths": [
+    "src/song/snapshot.rs",
+    "src/song/snapshot/issued.rs",
+    "src/song/snapshot/issued/shared_work_tests.rs",
+    "src/pattern/eval/song_replay.rs",
+    "impl-plans/active/song-mode-shared-issued-query-work.md",
+    "tmp/song-mode-riela/session249-sharedwork-intent.json",
+    "tmp/song-mode-riela/session249-sharedwork-receipt.json",
+    "tmp/song-mode-riela/session249-sharedwork-build.log",
+    "tmp/song-mode-riela/session249-sharedwork-clippy.log",
+    "tmp/song-mode-riela/session249-sharedwork-nextest-focused.log",
+    "tmp/song-mode-riela/session249-sharedwork-nextest-full.log",
+    "tmp/song-mode-riela/session249-sharedwork-wasm.log",
+    "tmp/song-mode-riela/session249-sharedwork-fmt.log"
+  ],
+  "sharedPaths": [
+    "src/song/snapshot/occupancy.rs",
+    "src/song/query/issued.rs"
+  ]
+}
+```
+
+- The sharedPaths may change only in the `seed_collection` call statement and
+  the collector attachment line directly before it (session 252 rule). The
+  receipt records `seams`.
+- Never run rustfmt in write mode on `snapshot.rs` or `occupancy.rs`: they
+  have unowned children.
+- Frozen: every 2a and 2c path, every wave-3 path,
+  `src/song/snapshot/occupancy/lookup/authority.rs`, the three unowned paths,
+  and `.agents/settings.local.json`.
+
+### Session 255 execution steps (in order)
+
+1. Copy `tmp/song-mode-riela/session249-sharedwork-*` to
+   `tmp/song-s249/SONG-SHARED-WORK/attempt-session254/` with sha256 values.
+   Scratch logs go under `tmp/song-s249/SONG-SHARED-WORK/session255/`.
+2. Rewrite the intent JSON with the design and plan sha256 values and the
+   sha256 and full text of each file to edit. Hash-check before every edit.
+3. Review the partial code (session 254 bullet "Unreviewed partial code") and
+   record the findings.
+4. Fix `issued.rs:231` and every finding, under the authority rule.
+5. Run verification 1-9 and write the receipt
+   `tmp/song-mode-riela/session249-sharedwork-receipt.json` with: the
+   review findings, `fixes[]`, `seams`, the clippy disposition, the cohort
+   (953), the line counts, the unowned-path result and `evidenceFingerprint`.
+   The fingerprint must differ from every hash in
+   `tmp/song-s249/SONG-SHARED-WORK/`.
+6. Add one progress-log entry.
+
+### Session 255 tests (input -> expected outcome)
+
+The "Tests to add" bullets above, unchanged:
+
+- two queries on one collector -> the first query's executions are still
+  present by pointer, and the remaining work is monotonic;
+- reseeding the same executions -> no duplicates, and the charge is
+  `view.len * (prior.len + 1)`;
+- a fresh collector -> the same result and a charge of `view.len`;
+- a foreign collector -> refused, with zero callback reads and no mutation;
+- an unattached collector with prior executions -> refused, unchanged;
+- exact work passes and one less fails, with the debit written back;
+- the legacy `query_issued` output equals `query_issued_with_work` on a fresh
+  collector.
+
+All 2c and 2a tests stay green.
+
+### Session 255 verification (foreground; record the exit status and full log path)
+
+1. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast -E 'test(/shared_work_tests|song_replay|snapshot::issued|occupancy::/)' > tmp/song-mode-riela/session249-sharedwork-nextest-focused.log 2>&1`
+   must exit 0 with a nonzero count.
+2. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-sharedwork-nextest-focused.log 2>&1`
+   must exit 0.
+3. `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-sharedwork-build.log 2>&1`
+   must exit 0.
+4. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-sharedwork-clippy.log 2>&1`.
+   It shows no diagnostic in this plan's paths and no `SW-` row. Only `RES-`
+   `dead_code` rows whose sole consumer is wave 3 may remain, each mapped.
+5. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-sharedwork-nextest-full.log 2>&1`
+   must exit 0, with every test run and at least 425 distinct tests passed.
+6. `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-sharedwork-wasm.log 2>&1`
+   must exit 0.
+7. `rustfmt --edition 2021 --check src/song/snapshot.rs src/song/snapshot/issued.rs src/song/snapshot/issued/shared_work_tests.rs src/pattern/eval/song_replay.rs > tmp/song-mode-riela/session249-sharedwork-fmt.log 2>&1`.
+   It passes when no `Diff in` hunk covers a changed line of these four paths.
+   Untouched-child hunks are recorded and not fixed.
+8. `wc -l` on the four paths and any edited seam: each is below 1000.
+9. `git diff --quiet <2a-join> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/song/snapshot/occupancy/lookup/authority.rs`
+   must exit 0. `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+   prints 953.
+
+### Session 255 done criteria (mechanically checkable)
+
+- [ ] Every session 252 and 254 done criterion holds, with `<2a-join>` as the
+  base.
+- [ ] `grep -n "executions = \|executions.clear()" src/pattern/eval/song_replay.rs`
+  shows no wholesale replacement of `ledger.executions` inside
+  `seed_collection` (line 245 onward). At `c7083fb`, the only match is the
+  unrelated `let executions = if let Some(view)` near line 521, outside that
+  function.
+- [ ] Verification 1-6 and 9 exit 0 (9 prints 953). Verification 4 shows no
+  `SW-` row. Verification 7 and 8 meet their rules.
+- [ ] `git diff <2a-join> | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [ ] The receipt has the review findings, `fixes[]`, `seams` and a new
+  fingerprint, and one progress-log entry is added.

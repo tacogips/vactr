@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (session 254: first in the serial order; see "Session 254 amendment")
+**Status**: In Progress (session 255: first in the serial order; see "Session 255 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -785,3 +785,336 @@ against Wave 2c and record findings in the receipt. Check:
 - [ ] `git diff a8b8ed2 | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
 - [ ] The receipt is written with a new fingerprint, and the progress-log
   entry is added.
+
+## Session 255 amendment (runs FIRST; serial, concurrency 1)
+
+The source of truth is the design section "Session 255 resume amendments
+(2026-10-04)": "Implementer authority", "D4: Euclid sampling projection
+semantics" and "Structural clock (2c) test corrections". The operator
+diagnosis is `tmp/song-mode-riela/session254-structural-diagnosis.md`. This
+section wins over every earlier amendment of this plan where they conflict.
+The base is `c7083fb`.
+
+### Intent and context
+
+- Session 254 implemented TASK-004 to TASK-007. The focused run then failed
+  four tests:
+  - `split_queries_retain_the_single_query_index_rows`;
+  - `nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation`;
+  - `euclid_empty_subject_has_no_false_index_observation`;
+  - `euclid_over_slice_obeys_inherited_depth_boundary_without_refunding_debit`.
+- The pre-existing test
+  `song_clock::tests::unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling`
+  also still expects Euclid to be `Unknown`.
+- The production code is correct. These are wrong expectations for a
+  sampling Euclid, as D4 requires. At a sample boundary,
+  `song_clock_projection.rs:102-109` sets the projected whole to the step
+  whole, `sample_start` to the step begin and orientation to `At`.
+  `assert_unchanged_projection` (`structural_tests.rs:168-185`) assumes the
+  Index whole is unchanged. That is true only for the six time-preserving
+  operators.
+- This session corrects the plan's own tests and swaps one fixture string in
+  `tests.rs`, then runs every gate. The `domains.rs` work (TASK-006) passed in
+  session 254 and is kept as it is.
+
+### Implementer authority (replaces every earlier stop clause in this plan)
+
+- Diagnose each failing gate and fix it inside this plan's writePaths, then
+  rerun the focused gate until it passes. Record every fix in the receipt
+  under `fixes[]` with: the test, the exact message, the root cause, the
+  edited paths, and the class (`production-defect` or `own-test-corrected`,
+  naming the design rule).
+- Stop only for:
+  1. a fix that needs a path outside the writePaths below. This includes
+     `src/pattern/eval/song_clock.rs`, `src/pattern/eval/song_clock/dispatch.rs`
+     and `src/pattern/combinators/structure.rs`, which are frozen in this
+     session;
+  2. a change to an assertion in a test that exists at `37ea3e8`, other than
+     the single authorized fixture swap (TASK-011);
+  3. relaxing a production depth check or any identity check.
+- `structural_tests.rs` did not exist at `37ea3e8`, so every test in it is an
+  own test. Correcting it toward D4 is allowed. Every proof obligation stays,
+  either as the same assertion or as an equal-or-stronger replacement named in
+  the receipt. Deleting a test, or reducing it to `is_ok()`, is weakening and
+  is forbidden.
+
+### Owned paths for session 255
+
+```json
+{
+  "planId": "SONG-STRUCTURAL-CLOCK",
+  "planPath": "impl-plans/active/song-mode-structural-clock-hooks.md",
+  "dependsOn": ["SONG-ROUTE8"],
+  "writePaths": [
+    "src/pattern/eval/song_clock/structural_tests.rs",
+    "src/pattern/eval/song_clock/tests.rs",
+    "src/song/snapshot/occupancy/geometry_tests/domains.rs",
+    "src/pattern/combinators/region.rs",
+    "src/pattern/combinators/music.rs",
+    "impl-plans/active/song-mode-structural-clock-hooks.md",
+    "tmp/song-mode-riela/session249-structural-intent.json",
+    "tmp/song-mode-riela/session249-structural-receipt.json",
+    "tmp/song-mode-riela/session249-structural-build.log",
+    "tmp/song-mode-riela/session249-structural-clippy.log",
+    "tmp/song-mode-riela/session249-structural-nextest-focused.log",
+    "tmp/song-mode-riela/session249-structural-nextest-full.log",
+    "tmp/song-mode-riela/session249-structural-wasm.log",
+    "tmp/song-mode-riela/session249-structural-fmt.log"
+  ],
+  "sharedPaths": []
+}
+```
+
+- `tests.rs` is owned only for the one string in TASK-011.
+- `domains.rs` is owned only to keep its session 254 test passing. A change
+  there must stay within the session 254 classes (`chunk-substitution`,
+  `euclid-positive-branch`, `rename`).
+- `region.rs` and `music.rs` may change only to fix a failing time-preserving
+  operator test (Ply, Arp, Chop, Striate, LoopAt, Fit). None is expected.
+- Frozen (stop condition 1 if a fix needs them): `song_clock.rs`,
+  `song_clock/dispatch.rs`, `combinators/structure.rs`,
+  `combinators/input.rs`, every 2a, 2b and wave-3 path, the three unowned
+  paths, and `.agents/settings.local.json`.
+- Scratch logs go under `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session255/`.
+
+### TASK-008: Euclid-only projection helper
+
+**Status**: Not started
+**Parallelizable**: No
+**Deliverable**: `structural_tests.rs`
+
+- Add the private helper `fn assert_euclid_sampled_projection(work: &SharedIndexWork)`
+  next to `assert_unchanged_projection`. Imitate that function's loop. For
+  every row in `rows(work)` it asserts:
+  1. `row.clock` matches `CanonicalClockProjection::Known(_)`;
+  2. `row.clock.sampling_evidence()` (`song_clock.rs:902`, which returns
+     `(whole, part, point)` tuples) has `len() == 1`, and its `whole` is
+     `Some(step)`;
+  3. `row.clock.project_for(&row.owner, row.event.whole.expect(..), row.issuer_sample_start, work)`
+     returns `Ok(Some(footprint))`;
+  4. `footprint.whole == step`;
+  5. `footprint.sample_start == step.begin`;
+  6. `footprint.orientation == ClockOrientation::At`.
+
+  After the loop it asserts that the rows are non-empty and that at least one
+  footprint has `applicable == true`. Do not assert that every row is
+  applicable: a Rev under a point sample is legitimately non-applicable.
+- Use the helper in exactly these places:
+  - the `"euclid {slice {beat -> p} 2 [cut nil]} 1 2"` entry of
+    `seven_structural_operators_preserve_slice_clocks`. Split the Euclid entry
+    out of the loop, or branch on `body.starts_with("euclid")`. The other six
+    entries keep `assert_unchanged_projection`;
+  - `split_queries_retain_the_single_query_index_rows`;
+  - `nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation`, in
+    place of its `assert_unchanged_projection` call. Keep its existing extra
+    check that some `Known` row has non-empty `sampling_evidence()`;
+  - the accepted case of the depth test (TASK-010).
+- Do not change `assert_unchanged_projection`.
+  `striate_ranking_reuses_retained_work_without_callback_reads` and the
+  time-preserving entries still use it.
+- Pitfalls:
+  - Compare `footprint.sample_start` with the step begin. Never compare it
+    with `row.issuer_sample_start`, which is the original issuer START and is
+    kept separately.
+  - Do not filter out non-applicable rows before the per-row assertions.
+
+### TASK-009: Empty-subject exact rows
+
+**Status**: Not started
+**Parallelizable**: No (after TASK-008)
+
+- `euclid_empty_subject_has_no_false_index_observation` keeps its program
+  `euclid {slice {beat -> nil} 2 [cut nil]} 1 2` and its name.
+- Replace `assert!(rows(work).is_empty())` with:
+  - `assert_eq!(rows(work).len(), 1)`, with a comment: one pulse of 2 steps
+    sampled in cycle 0, and an empty-subject Slice still records its Index
+    row;
+  - `assert_euclid_sampled_projection(work)`.
+- The exact count replaces emptiness as the stronger evidence. The diagnosis
+  measured exactly one row (Index whole `0..1/2`, value 0). If the measured
+  count differs, recompute it by hand from the Euclid pulse layout. Record
+  the derivation in `fixes[]`. Never drop the count assertion.
+
+### TASK-010: Searched inherited-depth boundary
+
+**Status**: Not started
+**Parallelizable**: No (after TASK-008)
+
+Rewrite
+`euclid_over_slice_obeys_inherited_depth_boundary_without_refunding_debit`
+(currently `structural_tests.rs:265-291`). Keep the program
+`euclid {slice {beat -> p} 2 [cut nil]} 3 8 rotation: 1`, `DepthFixture` and
+`SongLimits::default()`.
+
+- **Search.** For `depth` from `limits.max_depth - 1` down to
+  `limits.max_depth - 32` (inclusive, at most 32 probes):
+  - build a fresh `DepthFixture::new(body)` and call
+    `collect(limits, depth)`;
+  - if the result is `Err`, assert `code == FailCode::DepthExceeded`. Any
+    other code fails the test. Keep the refused fixture and work of the most
+    recent probe, because that probe is B + 1 when the next one succeeds;
+  - on the first `Ok`, set `B = depth` and stop.
+
+  Assert that B was found, with the message
+  `inherited depth boundary found within 32 probes`. Never hard-code 247.
+- **At B.**
+  - `result` is `Ok`;
+  - `assert_euclid_sampled_projection(&work)` passes;
+  - the fixture's `evaluator.vm_and_ns().0.song_work().is_none()` holds.
+- **At B + 1** (the refused probe just above B):
+  - `FailCode::DepthExceeded`;
+  - `work.borrow().remaining() < limits.max_nodes`, with the message
+    `failed inherited-depth query keeps its collector debit`;
+  - the VM `song_work()` is `None`.
+  - Do not assert that `observations` is empty. Collector rows are scratch,
+    not publication (D4). The measurement at 248 holds one row.
+- **At `max_depth`** (extra refusal, fresh fixture):
+  - `FailCode::DepthExceeded`;
+  - `work.borrow().observations.is_empty()` (measured 0, because the topology
+    check at `song_replay.rs:782` fails before any collection);
+  - the VM `song_work()` is `None`.
+- Write B in the receipt as `depthBoundary`. The scratch measurement was 247,
+  but the test must not depend on it.
+- Pitfalls:
+  - Never change a production depth check (`vm.rs:367`, `eval.rs:370`,
+    `song_replay.rs:782`, `song/limits.rs`).
+  - Reuse one fixture per probe. A reused evaluator keeps VM state.
+  - Do not borrow `work` mutably while asserting.
+  - The test must stay fast. About 10 builds is the expected cost.
+
+### TASK-011: Authorized fixture swap in `song_clock/tests.rs`
+
+**Status**: Not started
+**Parallelizable**: No
+
+- In `unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling`
+  (`src/pattern/eval/song_clock/tests.rs:478`), replace exactly the string
+  `"euclid {slice {beat -> p} 2 [0]} 2 2"` with
+  `"chunk {slice {beat -> p} 2 [0]} 2 {q -> fast q 2}"`.
+- Change nothing else in the file. The variable name `unknown`, every
+  assertion (non-empty `outer_rows`, all `Unknown`), the faulted-frame half
+  and the test name all stay.
+- Edit the file by hand. Never run rustfmt in write mode on it or on
+  `song_clock.rs`.
+- Check: `git diff --numstat c7083fb -- src/pattern/eval/song_clock/tests.rs`
+  prints `1	1	src/pattern/eval/song_clock/tests.rs`, and `wc -l` stays 896.
+- If Chunk somehow yields an empty or non-`Unknown` row set, that is stop
+  condition 2. Report the rows. Do not change the assertions.
+
+### TASK-012: Gates, receipt and progress log
+
+**Status**: Not started
+**Parallelizable**: No (last)
+
+Run the steps and the verification below.
+
+### Session 255 execution steps (in order)
+
+1. Copy `tmp/song-mode-riela/session249-structural-*` to
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session254/`, and record the
+   sha256 values in `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session254/sha256.txt`.
+2. Rewrite `tmp/song-mode-riela/session249-structural-intent.json` with:
+   - the design and plan sha256 values;
+   - the sha256 and full text of `structural_tests.rs` and `tests.rs`.
+
+   Re-read and hash-check each file before every edit. On drift, stop the
+   edit and reconcile from the current file. Never restore a stale copy.
+3. Reproduce. Run the following and expect exit 100 with four failures in
+   `structural_tests` plus the `tests.rs` test:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib --no-fail-fast -E 'test(/song_clock::structural_tests|song_clock::tests::unsupported_sampling/)' > tmp/song-s249/SONG-STRUCTURAL-CLOCK/session255/reproduce.log 2>&1`
+4. Do TASK-008, TASK-009, TASK-010 and TASK-011. After each, rerun the
+   step-3 command into `.../session255/focused-<task>.log`, and fix any
+   failure under the authority rule.
+5. Run Session 255 verification commands 1-10.
+6. Write the receipt `tmp/song-mode-riela/session249-structural-receipt.json`
+   with:
+   - `fixes[]`;
+   - `depthBoundary`;
+   - the `tests.rs` numstat;
+   - the frozen-file diff result;
+   - the clippy disposition;
+   - the full-suite failure list with owners;
+   - the cohort (953);
+   - the line counts;
+   - the unowned-path result;
+   - `evidenceFingerprint`, the sha256 of the receipt. It must differ from
+     every hash in `tmp/song-s249/SONG-STRUCTURAL-CLOCK/`.
+7. Add one progress-log entry to this plan.
+
+### Session 255 tests (input -> expected outcome)
+
+- The Euclid `1 2` entry of `seven_structural_operators...` -> the Euclid
+  helper passes. The other six entries -> `assert_unchanged_projection`
+  passes.
+- `split_queries...` (`2 4`) -> footprints are 1/4-wide step wholes, with
+  `sample_start` equal to each step begin, and the helper passes.
+- `nested_fast_rev_weighted...` (`3 8`) -> the helper passes. At least one row
+  is applicable, and at least one row carries sampling evidence. A Rev row may
+  be non-applicable.
+- `euclid_empty_subject...` -> `Ok`, exactly one row, and the helper passes.
+- Depth test -> B is found. B is `Ok` with the helper passing and the VM
+  cleared. B + 1 is `DepthExceeded` with the debit kept and the VM cleared.
+  `max_depth` is `DepthExceeded` with no observations and the VM cleared.
+- `unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling`
+  (Chunk) -> non-empty rows, all `Unknown`. The faulted-frame half is
+  unchanged and passing.
+- `chunk_slice_clock_stays_unknown`, `striate_ranking...`,
+  `euclid_slice_query_charges_exact_and_one_less_work` and the `domains` test
+  -> unchanged and passing.
+
+### Session 255 verification (foreground; record the exit status and full log path)
+
+1. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast -E 'test(/song_clock|combinators|geometry_tests::domains/)' > tmp/song-mode-riela/session249-structural-nextest-focused.log 2>&1`
+   must exit 0 with a nonzero count.
+2. `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-structural-build.log 2>&1`
+   must exit 0.
+3. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-structural-clippy.log 2>&1`.
+   No diagnostic may name a path in this session's writePaths. Every other
+   diagnostic is mapped to `RES-`, `SW-` or a Route8 D-row in the receipt.
+   `SW-let_and_return` at `src/song/snapshot/issued.rs:231` is expected.
+4. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-structural-nextest-full.log 2>&1`
+   - The run completes, and the `Summary` line shows every test run.
+   - The failures are a subset of these five 2a tests:
+     `cached_nested_slice_events_resolve_from_issued_transcript`,
+     `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`,
+     `distinct_equal_handle_invocations_are_all_resolved`,
+     `partitioned_nested_issued_queries_equal_the_full_route_set` and
+     `discarded_augmented_source_origins_are_resolved`.
+   - At least 425 distinct tests pass.
+   - Any other failure in this plan's paths is fixed here. Any other failure
+     outside them is stop condition 1 and is reported with its owner.
+5. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-structural-nextest-focused.log 2>&1`
+   must exit 0.
+6. `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-structural-wasm.log 2>&1`
+   must exit 0.
+7. `rustfmt --edition 2021 --check src/pattern/eval/song_clock/structural_tests.rs src/song/snapshot/occupancy/geometry_tests/domains.rs src/pattern/combinators/region.rs src/pattern/combinators/music.rs src/pattern/eval/song_clock.rs > tmp/song-mode-riela/session249-structural-fmt.log 2>&1`.
+   It passes when no `Diff in` hunk covers a line changed since `c7083fb`.
+   A hunk on unchanged lines (for example in `tests.rs`, which rustfmt
+   reaches through `song_clock.rs`) is recorded and not fixed.
+8. `wc -l` on the five writePath Rust files and `song_clock.rs`: each is
+   below 1000, and `tests.rs` is 896.
+9. `git diff --quiet c7083fb -- src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs src/pattern/combinators/structure.rs src/pattern/combinators/input.rs src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+   must exit 0.
+10. `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+    prints 953.
+
+### Session 255 done criteria (mechanically checkable)
+
+- [ ] `grep -n "fn assert_euclid_sampled_projection" src/pattern/eval/song_clock/structural_tests.rs`
+  matches, and `grep -c "assert_euclid_sampled_projection" src/pattern/eval/song_clock/structural_tests.rs`
+  is at least 6 (the definition plus five uses).
+- [ ] `grep -n "max_depth - 1" src/pattern/eval/song_clock/structural_tests.rs`
+  shows only the search start, and `grep -n "within 32 probes"` matches.
+- [ ] `grep -n "rows(work).is_empty()" src/pattern/eval/song_clock/structural_tests.rs`
+  prints nothing.
+- [ ] `git diff --numstat c7083fb -- src/pattern/eval/song_clock/tests.rs`
+  is `1	1`, and `grep -n "chunk {slice {beat -> p} 2 \[0\]} 2 {q -> fast q 2}" src/pattern/eval/song_clock/tests.rs`
+  matches.
+- [ ] Verification 9 exits 0, which means the production files are
+  unchanged.
+- [ ] Verification 1, 2, 5, 6 and 10 exit 0 or meet their rule. Verification
+  3 is fully dispositioned, and verification 4 shows only allowed 2a failures.
+  Verification 7 and 8 meet their rules.
+- [ ] `git diff c7083fb | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [ ] The receipt has `fixes[]`, `depthBoundary` and a new fingerprint, and
+  one progress-log entry is added.

@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (wave 2a, session 253, serial; see "Session 253 amendment")
+**Status**: In Progress (session 255: runs SECOND, after SONG-STRUCTURAL-CLOCK; see "Session 255 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -1727,3 +1727,222 @@ Commands 1-12 of "Session 253 verification" apply, with these changes:
 - [ ] Verification commands pass under the rules above, with no new
   `allow`/`expect`.
 - [ ] The progress-log entry is added.
+
+## Session 255 amendment (runs SECOND, after SONG-STRUCTURAL-CLOCK is joined; serial)
+
+The source of truth is the design section "Session 255 resume amendments
+(2026-10-04)": "Implementer authority" and "Remaining waves" > 2a. The session
+254 decisions and TASK-008 to TASK-011 stand unchanged. TASK-008 to TASK-011
+were not started in session 254, because 2c blocked first. This amendment
+changes only three things: the stop rules, the base commit and the evidence
+locations. The diff base is the 2c join commit, written `<2c-join>`.
+
+### Intent and context
+
+- At `c7083fb`, the five resolver tests fail for the three causes listed in
+  the session 254 intent: the owner predicate is compared against the input
+  handle, the joint-geometry fixture evaluates the program twice, and site
+  request and retained execution are conflated.
+- TASK-008 to TASK-011 repair them. The issued path must then:
+  - authenticate every contributor, and each source contribution's augmented
+    origin and member slots, before coalescing;
+  - use fresh rebound clocks, the original source START, full configuration
+    groups and connected uncut wholes before clipping;
+  - resolve where legacy keeps its `NeedsJointGeometry` barrier
+    (`sampled context requires joint mapping geometry`).
+- Legacy `resolve_route`, `bind_member` and `prepare_routes` stay unchanged.
+
+### Implementer authority (replaces the stop clauses listed below)
+
+- Diagnose each failing gate and fix it inside this plan's writePaths and
+  sharedPaths. Rerun the named-tests command until all of it passes, then run
+  every gate. Record each fix in the receipt under `fixes[]` with: the test,
+  the exact message, the root cause, the edited paths, and the class
+  (`production-defect` or `own-test-corrected`, naming the design rule).
+- Stop only for:
+  1. a fix that needs a path outside the manifest below;
+  2. a change to an assertion of a test that exists at `37ea3e8` and is not
+     covered by a design decision (the `discarded_augmented` replacement is
+     covered, by session 254 D10);
+  3. relaxing an identity or security check: `Rc::ptr_eq` /
+     `authentic_retained_invocation`, `authenticate_authority`, the
+     owner/seed/entry/site comparisons, the hard error `issued Index event
+     has no canonical component`, any production depth check, or the
+     first-structure rule in `slice_index_root`.
+- **Earlier clauses that become "diagnose and fix":**
+  - TASK-010 `distinct_equal`, "If no event has two or more distinct seals,
+    stop and report". The test is an own test (added at `1ac457f`).
+    - If coalescing or binding in a 2a path loses a seal, that is a
+      production defect: fix it.
+    - If the fixture itself emits only one seal, adjust the fixture inside
+      the accepted shape until some event has at least two distinct seals.
+      The accepted shape is: Slice subject lambda `{beat -> p}`, a static
+      Index list, the first-structure rule, and an equal-handle `stack`.
+      Every assertion stays, including `len() >= 2` and the seal debit.
+  - TASK-010 `discarded_augmented`, "If no event qualifies, or the debit
+    assertion fails, stop and report".
+    - A debit below the contribution count means per-contribution
+      authentication or charging is missing in a 2a path. Fix the production
+      code; never lower the bound.
+    - If no event qualifies, adjust the own fixture, keeping a static Index
+      list, until an equal-handle union with at least two slice-timed
+      contributions exists.
+  - TASK-010 joint-geometry: use the call order that keeps all four
+    assertions (already allowed).
+- **Clauses kept as stops:**
+  - the session 252 legacy-invariance rule: any changed existing
+    `snapshot::occupancy` assertion stops (stop condition 2);
+  - the session 253 rule: an owner-matching bound seal with no canonical
+    component never gets `continue` restored (stop condition 3);
+  - a TASK-011 `scope-defect` fix only in `nested/issued.rs` or `members.rs`.
+
+### Owned paths for session 255
+
+```json
+{
+  "planId": "SONG-ISSUED-RESOLUTION",
+  "planPath": "impl-plans/active/song-mode-issued-route-resolution.md",
+  "dependsOn": ["SONG-ROUTE8", "SONG-STRUCTURAL-CLOCK"],
+  "writePaths": [
+    "src/song/routing/nested/issued/members.rs",
+    "src/song/routing/nested/issued.rs",
+    "src/song/snapshot/occupancy/lookup/authority.rs",
+    "src/song/routing/prepared.rs",
+    "src/song/routing/source.rs",
+    "src/song/routing/source/issued.rs",
+    "src/song/routing/nested.rs",
+    "src/song/routing/configuration.rs",
+    "src/song/routing/configuration/index/canonical.rs",
+    "src/song/routing/density/index.rs",
+    "src/song/snapshot/occupancy.rs",
+    "src/song/snapshot/occupancy/tests.rs",
+    "impl-plans/active/song-mode-issued-route-resolution.md",
+    "tmp/song-mode-riela/session249-resolution-intent.json",
+    "tmp/song-mode-riela/session249-resolution-receipt.json",
+    "tmp/song-mode-riela/session249-resolution-build.log",
+    "tmp/song-mode-riela/session249-resolution-clippy.log",
+    "tmp/song-mode-riela/session249-resolution-nextest-focused.log",
+    "tmp/song-mode-riela/session249-resolution-nextest-full.log",
+    "tmp/song-mode-riela/session249-resolution-wasm.log",
+    "tmp/song-mode-riela/session249-resolution-fmt.log"
+  ],
+  "sharedPaths": [
+    "src/song/snapshot/occupancy/lookup.rs",
+    "src/song/snapshot/occupancy/route_view.rs"
+  ]
+}
+```
+
+- The expected edits are in `members.rs`, `nested/issued.rs` (one call-site
+  argument and tests) and `lookup/authority.rs`, per TASK-008 to TASK-010.
+  The other writePaths are declared so that a proven defect does not end the
+  run. Each edit to them is recorded in `fixes[]`.
+- `src/song/routing/source.rs` is 991 lines and may reach at most 993. Any
+  larger issued-path growth goes into `src/song/routing/source/issued.rs`.
+- `src/song/routing/density/index.rs` is expected to stay unedited. The
+  receipt then records `densityIndex: "authorized, unedited"`.
+- `lookup.rs` and `route_view.rs` are sharedPaths, editable only under the
+  session 252/253 limits (alias skip, alias marker, `selected_policy`
+  delegation). Legacy outputs stay byte-identical.
+- Never run rustfmt in write mode on `occupancy.rs` or `lookup.rs`: they have
+  unowned children. Hand-format them.
+- Frozen: `src/pattern/eval/song_clock*`, `src/pattern/combinators/*`,
+  `geometry_tests/domains.rs`, `src/song/routing/index.rs`, every 2b and
+  wave-3 path, the three unowned paths, and `.agents/settings.local.json`.
+
+### Session 255 execution steps (in order)
+
+1. Copy `tmp/song-mode-riela/session249-resolution-*` to
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session254/` and record
+   their sha256 values. Scratch logs go under
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/session255/`.
+2. Rewrite the intent JSON with the design and plan sha256 values and the
+   sha256 and full text of every file you will edit. Hash-check before every
+   edit. On drift, reconcile from the current file.
+3. Reproduce with command 1 below into `.../session255/reproduce.log`. The
+   expected result is exit 100 with the five resolver tests failing.
+4. Do TASK-008, TASK-009, TASK-010 and TASK-011 from the session 254
+   amendment, in that order. Run `CARGO_TERM_QUIET=true cargo build` after
+   each into `.../session255/build-<task>.log`. Fix failures under the
+   authority rule.
+5. Run verification 1-12.
+6. Write the receipt `tmp/song-mode-riela/session249-resolution-receipt.json`
+   with:
+   - `fixes[]`;
+   - the TASK-010 line classification against `<2c-join>`;
+   - `insideDuplicateInvestigation`;
+   - `jointGeometryFixture: "euclid"`;
+   - `densityIndex`;
+   - the clippy disposition;
+   - the cohort (953);
+   - the line counts;
+   - the unowned-path result;
+   - `evidenceFingerprint`. It must differ from every hash in
+     `tmp/song-s249/SONG-ISSUED-RESOLUTION/` and from the values listed in
+     session 254 step 6.
+7. Add one progress-log entry.
+
+### Session 255 tests (input -> expected outcome)
+
+These are the session 254 tests, unchanged:
+
+- `cached_nested_slice_events_resolve_from_issued_transcript` -> passes.
+- `partitioned_nested_issued_queries_equal_the_full_route_set` -> passes.
+- `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` -> all four
+  assertions pass from one `PreparedSong`.
+- `distinct_equal_handle_invocations_are_all_resolved` -> at least 2 distinct
+  seals, and the seal debit is met.
+- `discarded_augmented_source_origins_are_resolved` (or its renamed form) ->
+  an event with at least 2 slice-timed contributions resolves with a debit of
+  at least the contribution count.
+- `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`,
+  `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`,
+  `distinct_sites_sharing_one_execution_are_retained_separately` and
+  `fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority`
+  -> unchanged and passing.
+- The 2c tests (`song_clock::structural_tests`, `song_clock::tests`,
+  `geometry_tests::domains`) -> still passing.
+
+### Session 255 verification (foreground; record the exit status and full log path)
+
+1. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib cached_nested_slice_events_resolve_from_issued_transcript issued_joint_geometry_resolves_where_legacy_keeps_its_barrier distinct_equal_handle_invocations_are_all_resolved partitioned_nested_issued_queries_equal_the_full_route_set <discarded_augmented test name> actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct distinct_sites_sharing_one_execution_are_retained_separately retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits > tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   must exit 0 with 8 tests passed.
+2. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/snapshot::occupancy|routing::prepared/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   must exit 0.
+3. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/routing::(source|nested)::issued|prepared::tests/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   must exit 0.
+4. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   must exit 0.
+5. `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-resolution-build.log 2>&1`
+   must exit 0.
+6. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-resolution-clippy.log 2>&1`.
+   In 2a paths, only `dead_code`/`unused_imports` on listed `RES-` items whose
+   consumer is wave 3 are allowed. `SW-let_and_return` is expected, and every
+   diagnostic is mapped.
+7. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-resolution-nextest-full.log 2>&1`
+   must exit 0, with every test run and at least 425 distinct tests passed.
+   No failure is allowed.
+8. `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-resolution-wasm.log 2>&1`
+   must exit 0.
+9. The session 253 command 9 `rustfmt --edition 2021 --check` list (13
+   paths), plus `src/song/routing/density/index.rs` if it was edited. It
+   passes when no `Diff in` hunk covers a line changed since `<2c-join>`.
+10. `wc -l` on the same paths:
+    - each is below 1000;
+    - `nested/issued.rs` is at most 990;
+    - `source.rs` is at most 993.
+11. `git diff --quiet <2c-join> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/song/routing/index.rs src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/tests.rs src/pattern/eval/song_clock/structural_tests.rs`
+    must exit 0.
+12. `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+    prints 953.
+
+### Session 255 done criteria (mechanically checkable)
+
+- [ ] Every session 254 done criterion holds, with `<2c-join>` as the base.
+- [ ] Verification 1-5, 7, 8, 11 and 12 exit 0 (or print 953). Verification 6
+  is fully dispositioned. Verification 9 and 10 meet their rules.
+- [ ] `grep -n "issued Index event has no canonical component" src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs`
+  matches a hard-error path.
+- [ ] `git diff <2c-join> | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [ ] The receipt has `fixes[]` and a new fingerprint, and one progress-log
+  entry is added.

@@ -1326,7 +1326,9 @@ the baseline. These amendments apply only to the remaining waves.
 - **Structural clock (2c).** Add one Euclid-over-Slice depth boundary test to
   `structural_tests.rs`. With inherited depth `max_depth - 1`, the query
   succeeds. With inherited depth `max_depth`, it fails with `DepthExceeded`,
-  publishes no events and keeps the collector debit.
+  publishes no events and keeps the collector debit. (Superseded by the
+  session 255 searched-boundary contract: `max_depth - 1` is unreachable for
+  this fixture.)
 - **Playback pools path (3).** The fifth playback path is
   `src/sched/song/pools.rs` (`PoolBook`/`Slot`), as declared in the manifest and
   in the wave table above. `src/host/caps/song/preparation/pools.rs` is
@@ -1680,7 +1682,8 @@ not redispatched.
 
   These edits are confined to `src/pattern/eval/song_clock/structural_tests.rs`.
   `src/pattern/eval/song_clock/tests.rs` stays unedited. Line 64 is only where
-  the shared harness reports the type error.
+  the shared harness reports the type error. (Session 255 adds one authorized
+  fixture swap in `tests.rs`; see "Session 255 resume amendments".)
 - **Euclid is a declared behavior change.** The Euclid barrier is not
   restored. Euclid stays in the instrumented arm of `with_clock_dispatch`
   (`src/pattern/eval/song_clock/dispatch.rs:13`), as Wave 2c intends. The
@@ -1712,14 +1715,16 @@ not redispatched.
   Further replacement evidence comes from `structural_tests.rs`. It covers the
   Euclid `Known` projection, the empty subject, nested orientation, split
   queries and exact/one-less work, plus the Euclid inherited-depth boundary
-  test (session 251 contract, unchanged).
+  test (session 251 contract; superseded by the session 255 D4 projection
+  semantics and searched depth boundary).
 - **2c gates.** The focused filter adds `test(/geometry_tests::domains/)`.
   Full nextest must exit 0 except for failures that the receipt names as owned
   by 2a, with exact test names. After this repair, the only failures allowed
   are the five 2a resolver tests listed below. Any other failure fails 2c. The
   cohort stays 953. The unchanged rules are the seven-barrier scope, Chunk
   staying `Unknown`, no edits to `combinators/input.rs` or
-  `song_clock/tests.rs`, and every file staying below 1000 lines.
+  `song_clock/tests.rs` (session 255 permits one fixture swap in `tests.rs`),
+  and every file staying below 1000 lines.
 
 #### Issued resolution (2a) decisions
 
@@ -1842,3 +1847,257 @@ not redispatched.
   must differ from every prior receipt. Gate logs keep the plan-declared
   `tmp/song-mode-riela/session249-*` names. Prior copies go to
   `tmp/song-s249/<planId>/attempt-session253/`.
+
+### Session 255 resume amendments (2026-10-04)
+
+Session 254 stopped in 2c at `c7083fb` with four failing structural tests. The
+operator diagnosis (`tmp/song-mode-riela/session254-structural-diagnosis.md`)
+found no production defect. All four failures, plus one older test, encode
+wrong expectations for a sampling Euclid. The design above and the session
+251-254 amendments stay the baseline. Where these amendments conflict with an
+earlier one, they win. SONG-ROUTE8 stays accepted and is not redispatched. The
+serial order is unchanged: 2c (SONG-STRUCTURAL-CLOCK), 2a
+(SONG-ISSUED-RESOLUTION), 2b (SONG-SHARED-WORK), wave 3
+(SONG-ISSUED-PLAYBACK), then SONG-16. The dispatch manifest
+`impl-plans/active/song-s249-dispatch.json` is updated in place with a
+`resumeSession255` entry. It is never duplicated.
+
+#### Implementer authority: fix within writePaths
+
+Six consecutive runs ended when the implementer stopped at the first
+behavioral failure. For every remaining plan (2c, 2a, 2b, wave 3, SONG-16),
+this rule replaces each earlier "stop and report" clause that does not fall
+under the three stop conditions below.
+
+- **Default.** The implementer diagnoses each failing gate and fixes it inside
+  the plan's writePaths and declared sharedPaths. This covers production code
+  and the plan's own tests. The implementer reruns the focused gate until the
+  plan's declared requirements pass, then runs every gate. Each fix is recorded
+  in the receipt under `fixes[]`, with:
+  - the failing test and its exact message;
+  - the root cause;
+  - the edited paths;
+  - the class: `production-defect` or `own-test-corrected`, and for the
+    latter, the design rule it now matches.
+- **Stop only for:**
+  1. a fix that needs a path that is neither a writePath nor a declared
+     sharedPath of the plan;
+  2. a change to a *pre-existing baseline assertion* that no accepted design
+     decision covers;
+  3. a security or identity check that would have to be relaxed. Examples:
+     `Rc`/allocation identity, the owner/seed/entry/site authentication, the
+     hard `issued Index event has no canonical component` failure, any depth
+     check in production code, and the first-structure rule in
+     `slice_index_root`.
+- **Definitions.**
+  - A *pre-existing baseline assertion* is an assertion in a test whose
+    function name already exists at `37ea3e8`, the checkpoint before wave 2.
+  - The plan's *own tests* are tests that a plan added after `37ea3e8`. They
+    include the session 249-254 additions in `structural_tests.rs`,
+    `nested/issued.rs`, `occupancy/tests.rs` and `shared_work_tests.rs`.
+  - Correcting an own test toward accepted design semantics is not weakening.
+    Every proof obligation the test carried must remain, either as the same
+    assertion or as a replacement that is equal or stronger and is named in
+    the receipt. Deleting an own test, or reducing it to `is_ok()`, is
+    weakening.
+  - Accepted design decisions that cover pre-existing assertions are these:
+    the session 254 `domains.rs` change, the session 254
+    `discarded_augmented` replacement evidence, and the session 255
+    `tests.rs:478` fixture swap below.
+- **Retained stop clauses.** These earlier clauses map to stop conditions 2
+  or 3, so they stay:
+  - the session 252 legacy-invariance rule: an existing occupancy assertion
+    that changes stops the sub-wave;
+  - the session 253 rule: an owner-matching bound seal with no canonical
+    component stops the sub-wave rather than restoring `continue`;
+  - every "never relax" rule.
+
+  Every other "stop and report" or "stop and record a blocker" clause in the
+  six plans now means "diagnose and fix within writePaths, recording the
+  diagnosis".
+- **Seams up front.** Each plan's session 255 amendment lists its concrete
+  sharedPaths before dispatch. These are file paths, never directories. The
+  plan author reads the code that the plan's tests exercise. The seams known
+  now are:
+  - 2c adds the writePath `src/pattern/eval/song_clock/tests.rs`, for one
+    fixture string only;
+  - 2a keeps its writePaths and its sharedPaths `lookup.rs`, `route_view.rs`,
+    `occupancy.rs` and `occupancy/tests.rs`. Growth in
+    `src/song/routing/source.rs` (991 lines) goes into the existing child
+    `src/song/routing/source/issued.rs`, and `source.rs` stays at no more than
+    993 lines;
+  - 2b keeps its conditional seams `src/song/snapshot/occupancy.rs` and
+    `src/song/query/issued.rs`;
+  - wave 3 keeps the conditional `src/song/routing.rs` re-export seam.
+
+  A seam found only during implementation is stop condition 1.
+
+#### D4: Euclid sampling projection semantics
+
+D4 (keep Euclid instrumented) stands. This subsection states what an
+instrumented sampling Euclid projects. It follows the existing rule in
+"Immutable consumers and authentic clock capture": first-structure sampling
+reassigns a sampled point to a new structural whole.
+
+- Euclid point-samples its child once per pulse step. It passes the step's
+  timing event to `with_structural_sample`, which records one
+  `ClockBoundary::Sample` relation per sampled step. That relation holds the
+  step whole, the part and the sample point.
+- When `project_for` crosses that boundary, it does three things:
+  - it replaces the projected whole with the step whole;
+  - it sets the projected `sample_start` to the step's begin;
+  - it resets orientation to `At`.
+
+  A row is applicable only if its inner projected whole contains the sample
+  point. Frames inside the sample (Fast, Rev, weighted steps, Chop) project
+  first and can make a row non-applicable. For example, a Rev under a point
+  sample reflects the Index whole `0..1/2` to `1/2..1`, which misses point 0.
+- The row's own `issuer_sample_start` is unchanged. It is the original issuer
+  START, which is kept separately from structural sample-time resets.
+- The six time-preserving operators (Ply, Arp, Chop, Striate, LoopAt, Fit) add
+  no sample boundary. Their rows project to the unchanged Index whole, issuer
+  START, orientation `At`, and every row is applicable.
+- An empty-subject Slice still records its Index row. Under Euclid, only the
+  pulse steps are sampled. An empty subject therefore yields exactly one row
+  per sampled pulse step, each projecting to its step whole. A *false
+  observation* means a row beyond those rows. It does not mean any row at all.
+- Collector rows are scratch, not publication. "Publishes no events" on a
+  refused query is checked through the owning snapshot, as
+  `song_clock/tests.rs:500-502` already does. It is never checked through
+  collector emptiness.
+- No change to `src/pattern/eval/song_clock.rs`,
+  `src/pattern/eval/song_clock/dispatch.rs` or
+  `src/pattern/combinators/structure.rs` follows from this subsection. The
+  code already behaves this way (`structure.rs:403-418`,
+  `song_clock_projection.rs:102-109`).
+
+#### Structural clock (2c) test corrections
+
+These five corrections are own-test corrections or authorized fixture swaps.
+The diagnosis verified each one in a scratch worktree.
+
+- **Euclid-only projection helper.** Add a private helper to
+  `structural_tests.rs`. For every target-owner row it asserts:
+  1. the clock is `Known`;
+  2. `row.clock.sampling_evidence()` has exactly one relation, and that
+     relation's whole is `Some(step)`;
+  3. the footprint from `project_for(&row.owner, whole,
+     row.issuer_sample_start, work)` is `Some`, with
+     `footprint.whole == step` and `footprint.sample_start == step.begin`;
+  4. `footprint.orientation == ClockOrientation::At`.
+
+  It also asserts that the row set is non-empty and that at least one row is
+  applicable. It replaces `assert_unchanged_projection` for every Euclid
+  program:
+  - the Euclid entry of `seven_structural_operators_preserve_slice_clocks`;
+  - `split_queries_retain_the_single_query_index_rows` (`2 4`, steps 1/4
+    wide);
+  - `nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation`
+    (`3 8`), which keeps its extra check that some row carries sampling
+    evidence;
+  - the accepted case of the depth test.
+
+  The six time-preserving entries and
+  `striate_ranking_reuses_retained_work_without_callback_reads` keep
+  `assert_unchanged_projection` unchanged.
+- **Empty subject.** `euclid_empty_subject_has_no_false_index_observation`
+  asserts:
+  - the query succeeds;
+  - the rows are exactly the sampled pulse-step rows. For `1 2` over cycle 0
+    that is one row, a hand-computed constant with a comment;
+  - every row passes the Euclid helper.
+
+  `rows(work).is_empty()` is removed. The exact count is the stronger
+  replacement.
+- **Searched inherited-depth boundary.** This replaces the session 251
+  `max_depth - 1` contract, which this fixture cannot reach: the run peaks at
+  depth 8, and the cut VM callback needs one more. Measured: 247 is `Ok`; 248
+  fails with `canonical VM inherited depth exhausted`; 255 fails with `pattern
+  nesting too deep`; 256 fails with `canonical prerequisite topology depth
+  exceeded`. All of them are `FailCode::DepthExceeded`. The program stays
+  `euclid {slice {beat -> p} 2 [cut nil]} 3 8 rotation: 1`, and each probe
+  uses a fresh `DepthFixture`.
+  - **Search.** Probe from `max_depth - 1` downward, at most 32 probes. Every
+    refused probe must fail with `FailCode::DepthExceeded`; any other error
+    fails the test. B is the first depth that succeeds. The test asserts that
+    B was found. B is not hard-coded, and the receipt records it.
+  - **At B.** The result is `Ok`, the Euclid helper passes, and the VM
+    `song_work()` is cleared.
+  - **At B + 1.** The result is `FailCode::DepthExceeded`, `remaining() <
+    max_nodes` (the debit is kept), and the VM `song_work()` is cleared. There
+    is no collector-emptiness assertion; see "Collector rows" under D4.
+  - **At `max_depth`.** An extra refusal: `FailCode::DepthExceeded`, collector
+    observations empty (measured 0, because the topology check fails before
+    any collection), and the VM `song_work()` is cleared.
+  - No production depth check moves or relaxes.
+- **Pre-existing `song_clock::tests` fixture swap.** In
+  `unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling`
+  (`src/pattern/eval/song_clock/tests.rs:478`), replace exactly one string,
+  `euclid {slice {beat -> p} 2 [0]} 2 2`, with
+  `chunk {slice {beat -> p} 2 [0]} 2 {q -> fast q 2}`. This keeps the
+  unsupported-sampling coverage on Chunk, which is still `Unknown`. Every
+  assertion, the test name and the line count (896) stay unchanged.
+  `git diff c7083fb -- src/pattern/eval/song_clock/tests.rs` shows exactly one
+  changed line. `tests.rs` becomes a 2c writePath for this edit only. It is
+  hand-edited and never run through rustfmt in write mode.
+- **Production unchanged.**
+  `git diff c7083fb -- src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs src/pattern/combinators/structure.rs`
+  is empty. If a corrected test still fails, the implementer fixes the test
+  toward this contract. If it could pass only by editing one of those three
+  files, that is outside this run's accepted scope: stop and report.
+- **2c gates.**
+  - The focused filter `test(/song_clock|combinators|geometry_tests::domains/)`
+    must exit 0. It includes the swapped `song_clock::tests` test.
+  - Full nextest with `--no-fail-fast` must complete. Its only allowed
+    failures are a subset of the five 2a resolver tests named in session 254.
+    Any 2c-path failure is fixed in 2c. Any other failure is stop condition 1
+    and is reported with its owner.
+  - Strict Clippy shows no diagnostic in a 2c path.
+  - WASM must pass.
+  - `rustfmt --check` must show no `Diff in` hunk on a changed line of a 2c
+    path. A pre-existing hunk on unchanged lines of `tests.rs` is recorded and
+    not fixed.
+  - Every file is below 1000 lines. The cohort stays 953.
+
+#### Remaining waves under the new authority
+
+- **2a.** The session 254 decisions stand unchanged: the owner-frame
+  predicate against the stage output handle, the single-`PreparedSong`
+  joint-geometry fixture, the separate site-request and retained-execution
+  facts with exact `Rc` identity, `slice {beat -> p} 2 [0 nil]`, the
+  equal-handle union with a per-contribution work-debit assertion, and no
+  `density/index.rs` edit. The five resolver tests and full nextest
+  (`--no-fail-fast`, zero failures) must pass. The implementer fixes failures
+  within the 2a paths under the authority rule above. The issued path
+  authenticates all contributors, and each source contribution's augmented
+  origin and member slots, before coalescing. It uses fresh rebound clocks,
+  the original source START, full configuration groups and connected uncut
+  wholes before clipping. Legacy `resolve_route` and its
+  `NeedsJointGeometry` barrier stay.
+- **2b.** Unchanged. Seeding in `src/pattern/eval/song_replay.rs` keeps the
+  accumulated executions additively, with charged, authentic retention, and
+  no fresh-only collector. `clippy::let_and_return` at
+  `src/song/snapshot/issued.rs:231` is fixed without `allow`/`expect`.
+- **Wave 3.** Unchanged:
+  - the production scheduler `src/sched/song.rs` consumes issued routes
+    through `PreparedRoutes::resolve_issued_event`, with no `dedup_by` and no
+    scalar `resolve_route`;
+  - `src/sched/song/pools.rs` (the playback plan's fifth path) stages
+    projections and commands and commits only after the whole batch succeeds;
+  - a failure test asserts that the pools, queue, cursor and pending receipts
+    are unchanged.
+
+  Strict Clippy exits 0 from this wave on.
+- **SONG-16.** Unchanged. `tests/song_issued_transport.rs` and the existing
+  `tests/song_end_to_end.rs` are the requirement-level evidence. They cover
+  reusable Part functions, `sequence` and `part-repeat` (`:same`/`:vary`),
+  `delete-event`, `overwrite-region`, instrument-selective `lpf` and
+  `instrument-fx`, automatic termination, and the WAV export.
+- **Evidence.** Before rerunning, each plan copies its prior
+  `tmp/song-mode-riela/session249-<plan>-*` files to
+  `tmp/song-s249/<planId>/attempt-session254/` with sha256 values. Every new
+  receipt fingerprint differs from every earlier one. Gates run in the
+  foreground, and each records its exit status and full log path. The
+  unowned-path rule (`resources.rs`, `reservations_tests.rs` and
+  `clock_tests.rs` equal `HEAD`; `.agents/settings.local.json` untouched) and
+  `--check`-only formatting are unchanged.

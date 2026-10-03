@@ -2454,3 +2454,176 @@ status and full log path. These rules are unchanged:
 - `resources.rs`, `reservations_tests.rs` and `clock_tests.rs` equal `HEAD`;
 - `.agents/settings.local.json` stays untouched;
 - formatting runs with `--check` only.
+
+### Session 259 resume amendments (2026-10-04)
+
+Session 258 stopped at `81c68e7`. 2a fixed five of its six failures. Only
+`song::routing::nested::issued::tests::discarded_augmented_source_origins_are_resolved`
+still fails. It reports `event does not match admitted route topology`
+(`src/song/routing/source/issued.rs:160`), because the nested resolver under it
+fails with `issued Index timing has no matching fresh invocation`. The operator
+diagnosis found that the fixture is correct and that three stacked code defects
+cause the failure. Each defect masked the next one. The reference delta is
+`tmp/song-mode-riela/session258-operator-fix-delta.diff`. It touches only
+`src/song/routing/nested/issued/members.rs` and
+`src/song/snapshot/occupancy/lookup/authority.rs`, and both are 2a writePaths.
+The delta is a guide. The implementer owns the final code and its evidence.
+
+The design above and the session 251-258 amendments stay the baseline. Where
+these amendments conflict with an earlier one, they win. SONG-ROUTE8 stays
+accepted and is not redispatched. The serial order from session 258 is
+unchanged: 2a, then 2c formatting and review, then 2b, then wave 3, then
+SONG-16. The dispatch manifest `impl-plans/active/song-s249-dispatch.json` gets
+a `resumeSession259` entry in place and is never duplicated.
+
+#### 2a decision 1: owner revision from the output scope part
+
+This supersedes the `revision` field of the session 254 "Owner-frame
+predicate", the session 253 "Hard failure restored" revision source, and the
+dispatch manifest TASK-008 wording "compares ... revision ... with the stage
+OUTPUT handle".
+
+- **Defect.** `owner_matches` (`members.rs:5-14`) compares `frame.revision`
+  with `output_handle.revision()`. For stage 0 the output handle is
+  `event.handle`, and its revision belongs to the song root. In the failing
+  fixture that root is the sequence (rev 4), while the transform owner is rev 2,
+  and its placement `[1,1,5,2]` does match. Earlier nested fixtures passed only
+  because their transform was the song root.
+- **Rule.** The revision is the revision of the stage's output scope part:
+  `prepared.plan().topology.parts[output_scope].revision`. It is read once, next
+  to where `output_scope` is computed, with a missing part failing as an
+  invalid issued output scope. It is passed to both `stage_owner_frame` and
+  `owner_matches`. The two must always use the same value.
+- **Unchanged fields.** `root` stays `stage.output_owner.payload().id`.
+  `track` and `placement` still come from the stage output handle
+  (`event.handle` for stage 0, `stages[k-1].handle` for stage k). The predicate
+  keeps all four fields and adds no scalar shortcut.
+
+#### 2a decision 2: cross-seal member agreement (operator-authorized)
+
+This supersedes the session 253 "Issued member binder" result rule for matches
+from *different* seals, and the manifest TASK-005 wording "duplicates must have
+the same origin (std::ptr::eq)". It is a stop-condition-3 class change, and the
+operator authorized it explicitly. No other identity check is relaxed.
+
+- **Defect.** The equal-handle union in the fixture has two base invocations.
+  Each one seals its own member allocation for the same handle, with identical
+  policy edges `[0,0,0]`. The cross-seal `std::ptr::eq` test rejected them as
+  ambiguous. They are exactly the discarded and the surviving contributors that
+  this design requires to *both* authenticate.
+- **Rule in `bind_issued_member`.**
+  - *Within one seal.* Unchanged. All matches must name the same origin
+    allocation (`std::ptr::eq`) with equal edges. Otherwise the call fails with
+    `ambiguous original member binding`.
+  - *Across seals.* Each seal's own binding must have edges equal to those of
+    the first bound seal. Origin allocations may differ. Disagreement fails with
+    `conflicting original member bindings`.
+  - *Zero matches.* Unchanged: `original source membership missing`.
+- **Retained authentication (must not change).** For every seal:
+  1. The clock is the fresh `transcript.invocation(seal)` of the authenticated
+     issued transcript, charged through the shared-work bridge. It is never the
+     retained clock.
+  2. The four boundary filters stay: `same_intrinsic_owner`, `policy_matches`,
+     `selected_policy_in` and `member(handle)`.
+  3. `SourceBoundaryRef::member`
+     (`src/pattern/eval/song_clock_projection.rs:227`) looks the handle up only
+     in that boundary's sealed `returned` set. It validates the genuine origin
+     with `copy_origin` and keeps its `ambiguous sealed source member` check.
+
+  A copied or value-equal DTO member therefore still cannot bind, because it is
+  not in any sealed `returned` set. The relaxation only lets two genuine sealed
+  allocations of one union both authenticate.
+- **Use of the returned origin.** `bind_timing_member` uses the binder only as
+  an authentication gate and drops the result (`members.rs:141`). The returned
+  origin is the first bound seal's allocation. It must not stand in for any
+  other contribution's origin. Per-contribution origin identity stays with
+  `authenticate_contributions` (`src/song/routing/source/issued.rs:166`), which
+  this decision does not change.
+- **Review.** The 2a adversarial review covers this rule explicitly. It tries a
+  foreign transcript, a copied member DTO, edge disagreement across seals, and a
+  within-seal duplicate allocation.
+
+#### 2a decision 3: owner-local Index windows
+
+- **Defect.** `issued_index_stage_configuration` passes song-time windows to
+  `issued_index_configuration` (`members.rs:317-318`). In the failing fixture
+  those are `[1/2..2]` and `[1/2..5/2]`. Retained rows are owner-local: issuer
+  START 0, footprint `[0..2]`. So `row_source_window`
+  (`src/song/snapshot/occupancy/lookup.rs:278`) rejects the row, and the event
+  fails with `issued Index event has no canonical component`. Earlier fixtures
+  hid this because their offset was 0.
+- **Rule.** This mirrors legacy `issuer_clock`
+  (`src/song/routing/nested/clock.rs:17`) and the legacy add-back
+  (`src/song/routing/nested.rs:557-567`).
+  1. Compute `local_owner = owner - context.offset` once per call, using checked
+     arithmetic.
+  2. Pass `intersect(stage.scope.interval, local_owner)` and `local_owner`.
+  3. Add `context.offset` back to each returned component before the
+     conflicting-routes comparison and the cross-timing `intersect`.
+
+  `context.offset` is the branch offset for every stage, as in legacy.
+- **Coverage gap.** The fixture covers a nonzero offset only at stage 0. No
+  fixture has an inner source at a nonzero scope offset at a stage with index
+  greater than 0. Adding such a 2a own test in `nested/issued.rs` is optional.
+  If added, it must keep `nested/issued.rs` at 990 lines or fewer. Otherwise the
+  receipt records the gap as residual risk. The gap does not gate acceptance.
+
+#### Plan and manifest text
+
+The plan step amends this text in step with the code:
+
+- `impl-plans/active/song-mode-issued-route-resolution.md`: TASK-008 title and
+  body (revision source), the TASK-005 result rule near lines 1020-1025, and
+  the identity bullets near lines 1181 and 1199. Each bullet is narrowed to
+  "within one seal".
+- `impl-plans/active/song-s249-dispatch.json`: a new `resumeSession259` entry
+  that restates TASK-005 and TASK-008. Earlier entries stay as history and are
+  not rewritten.
+
+#### Base and review range
+
+- 2a starts from `81c68e7`. Its unowned-path check compares against
+  `81c68e7`.
+- The review and receipt range stays
+  `git diff 1ac457f <plan-accepted> -- <plan writePaths and edited sharedPaths>`.
+- The receipt records sessions 258 and 259, `baseCommit` `81c68e7`, `fixes[]`
+  for decisions 1-3 (class `production-defect`), and a fingerprint that differs
+  from every earlier receipt.
+- Each later plan's base is the accepted commit of the plan before it, as in
+  session 258.
+
+#### 2a acceptance (adds to session 258)
+
+- `discarded_augmented_source_origins_are_resolved` passes with its session 254
+  assertions, together with the other focused issued tests (the operator
+  scratch run showed 10/10, including two occupancy guards).
+- Full nextest (`--no-fail-fast`, no `--retries`) exits 0 with zero failures.
+- `nested/issued.rs` is at most 990 lines, `source.rs` at most 993, and every
+  touched file is below 1000. The cohort is 953.
+- `rustfmt --check` passes on the touched 2a files. The long
+  `stage_owner_frame(...)` call in the reference delta is hand-wrapped to
+  rustfmt's form.
+- There are no new `allow` or `expect` attributes.
+- `git diff 81c68e7 -- src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs src/pattern/combinators/structure.rs`
+  is empty. This keeps the 2c frozen-path check valid.
+
+#### Later waves
+
+The later waves are unchanged from session 258:
+
+- **2c.** Fixes the two `rustfmt` hunks in `structural_tests.rs`, reruns its
+  gates on the green tree, then goes to review.
+- **2b.** Additive charged authentic retention in `song_replay.rs`, plus the
+  `let_and_return` fix at `src/song/snapshot/issued.rs:231`.
+- **Wave 3.** `src/sched/song.rs` consumes issued routes, and `pools.rs` uses a
+  staged atomic commit.
+- **SONG-16.** Requirement-level end-to-end evidence.
+
+Strict Clippy exits 0 from wave 3 on. Evidence follows the session 258 rules,
+with prior files copied to `tmp/song-s249/<planId>/attempt-session258/` and
+scratch logs in `tmp/song-s249/<planId>/session259/`.
+
+2a has one exception. The session 258 implementer already wrote its logs to
+`tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/`. That directory is session
+258 evidence and stays as it is. 2a writes its session 259 scratch logs to
+`tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/` instead.

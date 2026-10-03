@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (session 258: runs FOURTH, after 2a, 2c and 2b are accepted; see "Session 258 amendment")
+**Status**: Ready (session 259: runs FOURTH, on <2b-accepted>; see "Session 258 amendment" and "Session 259 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -839,4 +839,45 @@ Tests (input -> expected outcome), restated:
 - [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session257/sha256.txt`
   exists. The receipt has `session: 258`, `reviewDiffRange` and a new
   fingerprint.
+- [ ] One progress-log entry is added.
+
+## Session 259 amendment (runs FOURTH, on <2b-accepted>; serial)
+
+The source of truth is the design section "Session 259 resume amendments
+(2026-10-04)", subsection "Later waves". The session 258 amendment applies
+unchanged:
+
+- `src/sched/song.rs` consumes issued routes through
+  `PreparedRoutes::resolve_issued_event`. It contains no `dedup_by` and no
+  `resolve_route(`.
+- `src/sched/song/pools.rs` stages projections and commands. It commits only
+  after the whole batch succeeds. The failure test asserts that the old pools,
+  queue, cursor and pending receipts are unchanged.
+- Strict Clippy exits 0 through production use of the Route8 dead-code items,
+  never through `allow`/`expect`.
+- Full nextest exits 0 with 0 failures.
+
+This amendment changes only the following:
+
+- **Base.** `<2b-accepted>` is the session 259 commit that records
+  SONG-SHARED-WORK acceptance.
+- **Evidence.** Copy the prior `tmp/song-mode-riela/session249-playback-*`
+  files to `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session258/` with
+  `sha256.txt`. Baseline and scratch logs go to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/session259/`.
+- **Receipt.** It records `session: 259`, `baseCommit: <2b-accepted>`,
+  `reviewDiffRange` (`git diff 1ac457f <wave3-accepted> -- <playback paths>`)
+  and a new fingerprint.
+- **Issued resolution contract.** The scheduler calls `resolve_issued_event`
+  as-is. It must not re-implement or bypass the 2a owner-revision,
+  cross-seal or owner-local-window rules. A failure that needs a 2a path is
+  stop condition 1.
+
+### Session 259 done criteria
+
+- [ ] Every session 258 done criterion holds on `<2b-accepted>`.
+- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/session259/baseline-full.log` shows
+  0 failures.
+- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session258/sha256.txt`
+  exists. The receipt has `session: 259` and a new fingerprint.
 - [ ] One progress-log entry is added.

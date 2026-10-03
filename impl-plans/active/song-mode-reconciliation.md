@@ -1184,3 +1184,36 @@ change:
   passed.
 - [ ] `tmp/song-s249/SONG-16/attempt-session257/sha256.txt` exists, and the
   design checkpoint follows the Session 258 section.
+
+#### Session 259 amendment (runs last, on <wave3-accepted>)
+
+The source of truth is the design section "Session 259 resume amendments
+(2026-10-04)". The session 258 amendment applies unchanged, with these changes:
+
+- **Base.** `<wave3-accepted>` is the session 259 commit that records
+  SONG-ISSUED-PLAYBACK acceptance.
+- **Design checkpoint.** The dated evidence checkpoint goes after the "Session
+  259 resume amendments" section, at the end of
+  `design-docs/specs/design-song-mode.md`. It is about 15 lines and covers gate
+  exits, log paths and the cohort.
+- **Final receipt.** In addition to the session 258 requirements, it:
+  - names `discarded_augmented_source_origins_are_resolved` and the other 2a
+    resolver tests as passed in the final full run;
+  - copies the 2a `crossSealBindingAudit` and `nonzeroInnerOffsetCoverage`
+    values from the 2a receipt.
+- **Evidence.** Prior final files are copied to
+  `tmp/song-s249/SONG-16/attempt-session258/` with `sha256.txt`. Scratch logs
+  go to `tmp/song-s249/SONG-16/session259/`.
+- **Unchanged.** The final rustfmt `--check` list and the cohort allowance
+  stay as they are. They already include `members.rs`,
+  `lookup/authority.rs`, `structural_tests.rs`, `tests/song_export.rs` and
+  `tests/song_cli.rs`.
+
+#### Session 259 done criteria
+
+- [ ] Every session 258 done criterion holds on `<wave3-accepted>`.
+- [ ] The final receipt lists the 2a resolver tests, including
+  `discarded_augmented_source_origins_are_resolved`, as passed. It also carries
+  `crossSealBindingAudit` and `nonzeroInnerOffsetCoverage`.
+- [ ] The design checkpoint follows the Session 259 section.
+  `tmp/song-s249/SONG-16/attempt-session258/sha256.txt` exists.

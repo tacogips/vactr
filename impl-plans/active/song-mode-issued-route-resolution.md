@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (session 258: runs FIRST on base e71d726 and depends only on SONG-ROUTE8; TASK-008 to TASK-012 unchanged; see "Session 258 amendment")
+**Status**: In Progress (session 259: runs FIRST on base 81c68e7; TASK-013 to TASK-016 apply the operator three-defect fix for the last failing test; see "Session 259 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -1022,6 +1022,9 @@ because of the one new file.
      - Accept a later match only if `std::ptr::eq(origin, kept_origin)` and
        `edges == kept_edges`. Otherwise fail with
        `ambiguous original member binding`.
+       (Superseded in session 259 by TASK-014. This rule now applies only
+       *within one seal*. Across seals only equal edges are required, and a
+       disagreement fails with `conflicting original member bindings`.)
      - If no seal yields a match, fail with
        `original source membership missing`.
    - Return `RetainedSourceMember { origin, edges }`. Its private fields are
@@ -1179,7 +1182,9 @@ the edits.
 - Legacy APIs and their outputs are unchanged. Legacy fixture tests pass with
   zero edits.
 - Only allocation identity grants membership: `std::ptr::eq` on the origin,
-  and `Rc` seal authentication. Scalar equality never grants it.
+  and `Rc` seal authentication. Scalar equality never grants it. (Session 259
+  TASK-014: the origin `std::ptr::eq` requirement applies within one seal.
+  Membership itself still comes only from a sealed `returned` set.)
 - Every contributor authenticates before `timing_result` coalescing and before
   the `result` intersection.
 - Work comes only from the caller's `SharedIndexWork`, through the bridge.
@@ -1196,7 +1201,8 @@ the edits.
 - Do not walk only the owner seal's clock. The boundaries live on source-side
   seals; per the diagnosis, seal 0 has none and seals 1 and 2 hold them.
 - Do not count one boundary seen in two seals as ambiguous. Compare origins by
-  `std::ptr::eq` and edges by value.
+  `std::ptr::eq` and edges by value. (Session 259 TASK-014: across seals,
+  compare edges only.)
 - Do not pass the stage consuming policy to `bind_issued_index` any more. That
   argument is now the address parent-use policy.
 - Do not keep any `continue` for a `None` canonical component on an
@@ -1453,6 +1459,11 @@ shows the static `[0]` fixture passes preparation. Record it as "authorized,
 unedited".
 
 ### TASK-008: Owner-frame predicate on the stage OUTPUT handle
+
+> Session 259 correction (TASK-013): the `revision` field below is
+> superseded. It compares with
+> `prepared.plan().topology.parts[output_scope].revision`, not
+> `output_handle.revision()`. `root`, `track` and `placement` are unchanged.
 
 **Status**: Not started
 **Parallelizable**: No
@@ -2397,3 +2408,411 @@ temporary diagnostics were removed:
 This final-source suite result supersedes the earlier pre-anchor full-suite
 record. The TASK-010/TASK-008 fixture-owner conflict remains unresolved, so all
 resolver completion criteria stay unchecked.
+
+## Session 259 amendment (runs FIRST, on base 81c68e7; serial, concurrency 1)
+
+The source of truth is the design section "Session 259 resume amendments
+(2026-10-04)": decisions 1-3, "Base and review range" and "2a acceptance".
+This section wins over every earlier amendment of this plan where they
+conflict. Everything else in the session 253-258 amendments stays in force:
+
+- TASK-008 to TASK-012, as already applied at `81c68e7`;
+- the owned paths;
+- the implementer authority;
+- the frozen paths;
+- the tests and the done criteria.
+
+History note: the two sections above titled "Session 259 — Resolver repair and
+final-source verification" and "Session 259 final-source verification
+addendum" were written by the session 258 implementer. Their logs are in
+`tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/`. Both sections are session
+258 history. Do not edit them, and do not delete or overwrite that directory.
+
+### Intent and context
+
+- At `81c68e7`, exactly one test fails in full nextest:
+  `song::routing::nested::issued::tests::discarded_augmented_source_origins_are_resolved`.
+  The run had 2793 tests: 2792 passed, 1 failed and 3 skipped (log:
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/full-post-diagnostics.log`).
+  - Its outer error is `event does not match admitted route topology`
+    (`src/song/routing/source/issued.rs:160`).
+  - The source branch loop (`source/issued.rs:118-125`) skips every branch.
+    It skips them because the nested resolver fails with `song route: issued
+    Index timing has no matching fresh invocation`.
+- In a scratch worktree, the operator found three stacked code defects. The
+  fixture is correct and must not change. With all three fixed:
+  - the focused issued tests passed 10/10;
+  - the wider `song::` suite plus the four legacy binaries passed 379/379.
+- The reference delta is
+  `tmp/song-mode-riela/session258-operator-fix-delta.diff` (102 lines). It
+  touches only `members.rs` and `lookup/authority.rs`. It is a guide; you own
+  the final code and the evidence.
+- Each defect hides the next, so apply all three before judging the test. The
+  expected sequence of failure messages is:
+  1. before TASK-013: `no matching fresh invocation`;
+  2. after TASK-013: `ambiguous original member binding`;
+  3. after TASK-014: `issued Index event has no canonical component`;
+  4. after TASK-015: the test passes.
+
+  These intermediate messages are expected and are not stop conditions.
+
+### Non-goals
+
+- Do not change the fixture or any assertion of
+  `discarded_augmented_source_origins_are_resolved`
+  (`nested/issued.rs:755-797`). No other existing test changes.
+- Do not edit any 2c, 2b or wave-3 path. Also leave these files untouched:
+  - `src/pattern/eval/song_clock_projection.rs`;
+  - `src/song/routing/index.rs`;
+  - `src/song/routing/nested/clock.rs`;
+  - `src/song/routing/nested.rs`.
+
+  A fix that needs one of these is stop condition 1.
+- The only relaxation allowed is TASK-014's cross-seal rule. All of these stay
+  unchanged:
+  - within-seal `std::ptr::eq` uniqueness;
+  - `SourceBoundaryRef::member`, including its `copy_origin` validation and
+    `ambiguous sealed source member`;
+  - the fresh `transcript.invocation(seal)` clocks;
+  - `authenticate_contributions` and `authenticate_authority`;
+  - the owner, seed, entry and site comparisons;
+  - the hard `issued Index event has no canonical component` error;
+  - every depth check.
+- The legacy `bind_member` and its `ambiguous original member binding` in
+  `src/song/snapshot/occupancy/lookup.rs:738` stay unchanged. `lookup.rs` is
+  not edited in this session.
+- Add no `#[allow]` or `#[expect]`. Never run rustfmt or `cargo fmt` in write
+  mode.
+
+### Owned paths for session 259
+
+The owned paths are unchanged from the session 258 manifest entry, and
+`dependsOn` stays `["SONG-ROUTE8"]`.
+
+- **Expected edits:**
+  - `src/song/routing/nested/issued/members.rs` (TASK-013, TASK-015);
+  - `src/song/snapshot/occupancy/lookup/authority.rs` (TASK-014);
+  - this plan file (progress log);
+  - the `tmp/song-mode-riela/session249-resolution-*` evidence files.
+- **Optional edit:** `src/song/routing/nested/issued.rs`, only for the
+  TASK-016 test. The file stays at 990 lines or fewer.
+- **Any other edit** to a 2a path is recorded in `fixes[]` under the session
+  255 implementer authority.
+
+### TASK-013: Owner revision from the output scope part (design decision 1)
+
+**Status**: Not Started
+**Parallelizable**: No (serial 2a)
+**Deliverable**: `owner_matches` and `stage_owner_frame` in `members.rs`
+
+- **Signatures.** Each function gains one parameter, and arity stays at 7 or
+  fewer:
+  - `owner_matches(frame: &CanonicalOwnerFrame, stage: &Stage<'_>, output_handle: &crate::song::EventHandle, output_revision: crate::song::PartRevision) -> bool`
+  - `stage_owner_frame(context, stage, output_handle, output_revision, bridge, budget)`
+- **Rule.** The revision check becomes `frame.revision == output_revision`.
+  The other three fields stay as they are:
+  - `root`: `stage.output_owner.payload().id`;
+  - `track`: `output_handle.track()`;
+  - `placement`: `*output_handle.placement()`.
+- **Where to read the revision.** In `issued_index_stage_configuration`:
+  1. Directly after `let output_scope = *output_scopes.get(stage_index)...`
+     (about `members.rs:202-204`), read
+     `prepared.plan().topology.parts.get(output_scope)`.
+  2. If it is `None`, fail with `invalid("issued output scope part missing")`.
+  3. Take `.revision` and pass the same value to `stage_owner_frame` and to the
+     seal-loop `owner_matches` call (about `members.rs:262`).
+
+  Imitate the neighboring `output_scopes.get(..).ok_or_else(..)` idiom.
+- **Pitfalls:**
+  - Never index with `[]`.
+  - Do not read the revision from `output_handle`, `stage.handle` or
+    `event.handle`.
+  - Do not drop or weaken any of the four fields.
+  - Both call sites must use the same value.
+  - `bind_slice_operands(..., stage.handle, ...)` stays unchanged.
+
+### TASK-014: Cross-seal member agreement (design decision 2, operator-authorized)
+
+**Status**: Not Started
+**Parallelizable**: No (serial 2a)
+**Deliverable**: `bind_issued_member` in `lookup/authority.rs` (about lines
+217-285)
+
+- **What changes.** Only the cross-seal block changes: the
+  `if let Some((origin, edges)) = matched` block after `with_work` (about lines
+  272-279).
+  - If a previous seal was bound, require `edges == previous_edges`. On
+    disagreement, return `invalid("conflicting original member bindings")`.
+  - Do not compare origins.
+  - Keep `found` as the first bound seal's `(origin, edges)`.
+  - Add one short comment: distinct sealed invocations of one equal-handle
+    union each contribute their own genuine member allocation and must agree
+    on the original use path.
+- **What stays byte-identical:**
+  - the within-seal block inside the closure (about lines 262-267), which uses
+    `std::ptr::eq(origin, *previous) || edges != *previous_edges` and
+    `ambiguous original member binding`;
+  - the four boundary filters;
+  - `transcript.invocation(seal, work, depth)`;
+  - the per-seal `with_work` charging;
+  - the zero-match error `original source membership missing`.
+- **Pitfalls:**
+  - Do not remove the within-seal `ptr::eq`.
+  - Do not return the "last" origin.
+  - Do not add a fallback that accepts value-equal origins.
+  - Do not change `bind_timing_member` (`members.rs:102-143`). It drops the
+    result, and the returned origin must never stand in for another
+    contribution's origin.
+- **Mechanical checks** on `src/song/snapshot/occupancy/lookup/authority.rs`.
+  Each of these prints 1:
+  - `grep -c 'ambiguous original member binding'`
+  - `grep -c 'conflicting original member bindings'`
+  - `grep -c 'std::ptr::eq(origin, \*previous)'`
+
+### TASK-015: Owner-local Index windows (design decision 3)
+
+**Status**: Not Started
+**Parallelizable**: No (serial 2a)
+**Deliverable**: `issued_index_stage_configuration` in `members.rs`
+
+- **Steps.** `context.offset` is the branch offset for every stage.
+  1. Before the stage loop, compute
+     `let local_owner = owner.map(|time| time.checked_sub(context.offset))?;`
+     once.
+  2. In the `issued_index_configuration(...)` call (about
+     `members.rs:313-322`), pass `intersect(stage.scope.interval, local_owner)?`
+     and `local_owner`. These replace `intersect(stage.scope.interval, owner)?`
+     and `owner`.
+  3. Directly after the `let Some(local) = ... else { return Err(...) };`
+     binding, convert back to song time with
+     `local.map(|time| time.checked_add(context.offset))?`. Do this before the
+     `previous != local` conflict comparison and before the cross-timing
+     `intersect(previous, local)`.
+- **Code to imitate.** Legacy `issuer_clock`
+  (`src/song/routing/nested/clock.rs:17`) subtracts the branch offset, and
+  `src/song/routing/nested.rs:557-567` adds it back.
+- **Pitfalls:**
+  - Do not subtract per-stage scope offsets.
+  - Do not convert twice.
+  - Do not leave the conflict comparison in owner-local time while `result` is
+    in song time.
+  - Use checked arithmetic only.
+  - Do not touch `row_source_window` in `lookup.rs`.
+
+### TASK-016: Optional coverage for a nonzero offset at stage > 0 (design S259-D5)
+
+**Status**: Optional
+**Parallelizable**: No
+
+- **When.** Only if it is cheap.
+- **What.** Add one own test to the `nested/issued.rs` test module. In it, an
+  inner source sits at a nonzero scope offset at a stage whose index is greater
+  than 0. The event resolves with `resolve_issued_event`, and the result equals
+  the legacy route for the same event. Imitate
+  `cached_nested_slice_events_resolve_from_issued_transcript`
+  (`nested/issued.rs:729`).
+- **Limit.** `nested/issued.rs` stays at 990 lines or fewer.
+- **If skipped.** The receipt records `nonzeroInnerOffsetCoverage:
+  "residual-risk"`.
+- **If it exposes a defect** that needs a path outside 2a, that is stop
+  condition 1. Do not weaken the test.
+
+### Session 259 execution steps (in order)
+
+1. **Preserve evidence.** Copy every `tmp/song-mode-riela/session249-resolution-*`
+   file to `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session258/` and
+   write `sha256.txt` there.
+   - Never delete or overwrite `session251/` to `session253/` or
+     `session259/`.
+   - Scratch logs go to
+     `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/`.
+2. **Record the tree.** Write `git rev-parse HEAD` and
+   `git status --porcelain=v1` to `.../session259-resume/tree.log`.
+   - HEAD must be `81c68e7`, or a descendant whose only changes are the
+     committed session 259 design and plan text.
+   - The tree must be clean apart from `tmp/` and the excluded
+     `.agents/settings.local.json`.
+3. **Write the intent snapshot.** Rewrite
+   `tmp/song-mode-riela/session249-resolution-intent.json` with:
+   - the sha256 of the design doc, this plan and the operator delta;
+   - the sha256 and full text of `members.rs` and `lookup/authority.rs`.
+
+   Hash-check each file again right before each edit. On drift, re-read,
+   reconcile and record it.
+4. **Reproduce.** Run verification 1 into `.../session259-resume/reproduce.log`.
+   - Expected: exit 100, 9 run and 8 passed. The only failure is
+     `discarded_augmented_source_origins_are_resolved`, with
+     `event does not match admitted route topology`.
+   - Record any difference in `reproduceDelta`.
+5. **Fix.** Apply TASK-013, TASK-014 and TASK-015 by hand-editing. After each
+   one:
+   - run `CARGO_TERM_QUIET=true cargo build > .../session259-resume/build-<task>.log 2>&1`;
+   - run verification 1 into `.../session259-resume/named-<task>.log`;
+   - record the observed message (see the sequence under "Intent and
+     context").
+
+   Hand-wrap any line longer than 100 columns to rustfmt's form. Examples are
+   the `stage_owner_frame(...)` and `owner_matches(...)` calls.
+6. **Optional.** TASK-016.
+7. **Verify.** Run verification 1-14 below, each in the foreground. Record
+   every exit status and full log path.
+8. **Write the receipt.** `tmp/song-mode-riela/session249-resolution-receipt.json`
+   keeps every field required by sessions 254 to 258, and adds:
+   - `session: 259`, `resumesSession: 258` and
+     `baseCommit: "81c68e7d51c8bb825e3a9a54003bfa1a63773bc7"`;
+   - `reviewDiffRange`:
+     `git diff 1ac457f <final tree> -- <2a writePaths and edited sharedPaths>`;
+   - `fixes[]` entries for:
+     - TASK-013, TASK-014 and TASK-015, each with class `production-defect`,
+       the design rule "Session 259 > 2a decision N", the exact pre-fix
+       message, the root cause and the edited path;
+     - the session 258 edits already in `81c68e7`, taken from the session 258
+       progress log above, each classified: the descriptor-stage anchors and
+       per-stage output owners in `nested/issued.rs`, and the
+       `source/issued.rs:118-125` branch skip limited to the two exact
+       mismatch messages;
+   - `crossSealBindingAudit`: the three TASK-014 grep counts, and confirmation
+     that `git diff 81c68e7 -- src/pattern/eval/song_clock_projection.rs` is
+     empty;
+   - `nonzeroInnerOffsetCoverage`: the test name, or `"residual-risk"`;
+   - `fullSuite`: the `Summary` counts and `failures: []`;
+   - `evidenceFingerprint`: the sha256 of the receipt with this field empty.
+     It must differ from every hash under
+     `tmp/song-s249/SONG-ISSUED-RESOLUTION/`.
+9. **Close out.**
+   - Set TASK-008 to TASK-015 to Complete only if every done criterion passes.
+   - Set TASK-016 to Complete or Skipped.
+   - Add one progress-log entry under the heading
+     `### Session 259 resume progress log`, with the commands, exit codes and
+     log paths.
+
+### Session 259 tests (input -> expected outcome)
+
+- `discarded_augmented_source_origins_are_resolved` -> passes. Its event has
+  at least 2 slice-timed contributions, and the debit is at least the
+  contribution count. This proves that both the discarded and the surviving
+  seal authenticate.
+- `distinct_equal_handle_invocations_are_all_resolved` -> still passes, with
+  at least 2 distinct seals and the seal debit met. This guards against
+  TASK-014 admitting a disagreement.
+- `cached_nested_slice_events_resolve_from_issued_transcript`,
+  `partitioned_nested_issued_queries_equal_the_full_route_set` and
+  `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` -> still
+  pass.
+  - These fixtures have offset 0 and a root transform, so TASK-013 and TASK-015
+    must not change their results.
+  - The partitioned and full route sets stay equal.
+  - Legacy `resolve_route` still fails with `sampled context requires joint
+    mapping geometry`.
+- `genuine_source_contributions_reject_a_foreign_transcript` -> the genuine
+  transcript authenticates, and the foreign transcript returns `Err`.
+- The following stay unchanged and passing:
+  - `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`;
+  - `distinct_sites_sharing_one_execution_are_retained_separately`;
+  - `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`;
+  - `fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority`;
+  - the `snapshot::occupancy` groups;
+  - the four legacy binaries.
+- Optional TASK-016 test -> passes, and the issued route equals the legacy
+  route.
+
+### Session 259 verification (foreground; record the exit status and full log path)
+
+Logs use the manifest names `tmp/song-mode-riela/session249-resolution-*`.
+`ENV` stands for
+`NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true`.
+
+1. Focused named tests. Must exit 0 with 9 passed:
+   `ENV cargo nextest run --lib --no-fail-fast cached_nested_slice_events_resolve_from_issued_transcript issued_joint_geometry_resolves_where_legacy_keeps_its_barrier distinct_equal_handle_invocations_are_all_resolved partitioned_nested_issued_queries_equal_the_full_route_set discarded_augmented_source_origins_are_resolved actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct distinct_sites_sharing_one_execution_are_retained_separately retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits genuine_source_contributions_reject_a_foreign_transcript > tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+2. Occupancy and prepared-routes filter. Must exit 0:
+   `ENV cargo nextest run -E 'test(/snapshot::occupancy|routing::prepared/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+3. Issued routing filter:
+   `ENV cargo nextest run -E 'test(/routing::(source|nested)::issued|prepared::tests/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   - It must exit 0.
+   - All three `routing::source::issued::tests` must have run and passed.
+   - Every `routing::nested::issued::tests` test must have run and passed.
+4. Legacy binaries. Must exit 0:
+   `ENV cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+5. Native build. Must exit 0:
+   `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-resolution-build.log 2>&1`
+6. Strict Clippy:
+   `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-resolution-clippy.log 2>&1`
+   - A non-zero exit is allowed only for the declared disposition rows: the
+     Route8 dead-code rows that wave 3 consumes, and `SW-let_and_return` at
+     `src/song/snapshot/issued.rs:231`, which 2b owns.
+   - The receipt maps every diagnostic.
+   - No diagnostic may fall on a line changed since `81c68e7`.
+7. Full suite:
+   `ENV cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-resolution-nextest-full.log 2>&1`
+   - It must exit 0, with a `Summary` line showing at least 2793 run and 0
+     failed.
+   - Do not use `--retries`, and do not rerun until it happens to pass.
+   - The run takes about 13 minutes. Run it in the foreground and poll it until
+     it exits.
+   - `grep -cE '^\s+FAIL' tmp/song-mode-riela/session249-resolution-nextest-full.log`
+     must print 0.
+8. WASM build. Must exit 0:
+   `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-resolution-wasm.log 2>&1`
+9. Formatting:
+   `rustfmt --edition 2021 --check src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs src/song/snapshot/occupancy/lookup/authority.rs > tmp/song-mode-riela/session249-resolution-fmt.log 2>&1`
+   - This command must exit 0.
+   - Also run the session 253 13-path `--check` list. It passes when no
+     `Diff in` hunk covers a line changed since `81c68e7`.
+10. Line counts:
+    `wc -l src/song/routing/source.rs src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs src/song/snapshot/occupancy/lookup/authority.rs`
+    - `source.rs` is at most 993 lines.
+    - `nested/issued.rs` is at most 990 lines.
+    - Every file is below 1000 lines.
+11. Unowned and frozen paths. Must exit 0:
+    `git diff --quiet 81c68e7 -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/song/routing/index.rs src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs src/pattern/combinators/structure.rs src/pattern/eval/song_clock/tests.rs src/pattern/eval/song_clock/structural_tests.rs src/song/snapshot/occupancy/geometry_tests/domains.rs src/pattern/combinators/region.rs src/pattern/combinators/music.rs tests/song_export.rs tests/song_cli.rs src/song/snapshot/issued.rs src/pattern/eval/song_replay.rs src/pattern/eval/song_clock_projection.rs src/song/snapshot/occupancy/lookup.rs`
+12. Cohort. Must print 953:
+    `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+13. No new suppression. Must print nothing:
+    `git diff 81c68e7 | grep -E '^\+.*#\[(allow|expect)'`
+14. Code greps:
+    - The three TASK-014 counts on
+      `src/song/snapshot/occupancy/lookup/authority.rs` each print 1.
+    - `grep -n 'issued Index event has no canonical component' src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs`
+      still matches a hard-error path.
+    - `grep -n 'output scope part missing' src/song/routing/nested/issued/members.rs`
+      matches exactly once.
+    - `grep -c 'context.offset' src/song/routing/nested/issued/members.rs`
+      prints at least 2.
+
+### Session 259 done criteria (mechanically checkable)
+
+- [ ] `.../session259-resume/reproduce.log` exists and shows the single
+  failure, or `reproduceDelta` is recorded.
+- [ ] Verification 1 passes 9 tests (10 if the TASK-016 test is added to it).
+- [ ] Verifications 2-5, 8 and 11 exit 0, and verification 12 prints 953.
+- [ ] Verification 7 exits 0 with a `Summary` line and 0 failures.
+- [ ] Verification 6 is fully dispositioned, with no diagnostic on a changed
+  line.
+- [ ] Verifications 9, 10, 13 and 14 meet their rules.
+- [ ] `git diff --stat 81c68e7 -- src` lists only `members.rs` and
+  `lookup/authority.rs`, plus `nested/issued.rs` only if TASK-016 was done.
+- [ ] `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session258/sha256.txt`
+  exists, and `session259/` is unchanged.
+- [ ] The receipt has `session: 259`, `baseCommit`, `reviewDiffRange`, the
+  `fixes[]` entries above, `crossSealBindingAudit`,
+  `nonzeroInnerOffsetCoverage` and a new fingerprint.
+- [ ] One progress-log entry is added.
+
+### Review focus (workflow-owned test-integrity, adversarial and integration review)
+
+- **TASK-014 adversarial review.** Explicitly confirm each of these:
+  - A foreign transcript still fails, through both
+    `genuine_source_contributions_reject_a_foreign_transcript` and the
+    `transcript.invocation` authentication.
+  - A copied or value-equal member DTO cannot bind. `member()` searches only
+    the boundary's sealed `returned` set and validates the hit with
+    `copy_origin`.
+  - Edge disagreement across seals fails with `conflicting original member
+    bindings`.
+  - A duplicate allocation within one seal still fails with `ambiguous
+    original member binding`.
+- **Branch skip.** The `source/issued.rs:118-125` branch skip stays limited to
+  the two exact mismatch messages. Authentication and conflict failures stay
+  fatal, so a skipped branch cannot let a foreign branch win.
+- **Scope.** The review covers `reviewDiffRange`, the full 2a diff since
+  `1ac457f`.

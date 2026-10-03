@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (session 258: runs SECOND, after SONG-ISSUED-RESOLUTION is accepted; TASK-016 fixes the format hunks and reruns the gates with zero allowed failures; see "Session 258 amendment")
+**Status**: In Progress (session 259: runs SECOND, on <2a-accepted>; TASK-016 fixes the format hunks and reruns the gates with zero allowed failures; see "Session 258 amendment" and "Session 259 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -1744,3 +1744,41 @@ Pitfalls:
   `reviewDiffRange`, `failures: []` and a new fingerprint.
 - [ ] One progress-log entry is added. Test-integrity, adversarial and
   integration review over `reviewDiffRange` follow; the workflow owns them.
+
+## Session 259 amendment (runs SECOND, on <2a-accepted>; serial, concurrency 1)
+
+The source of truth is the design section "Session 259 resume amendments
+(2026-10-04)", subsection "Later waves". The session 258 amendment applies
+unchanged: TASK-016 hand-edits only the two `rustfmt --check` hunks in
+`src/pattern/eval/song_clock/structural_tests.rs`, and S258-V1 to S258-V5 and
+the session 255 commands rerun once. This amendment changes only the items
+below.
+
+- **Base.** `<2a-accepted>` is the commit that records SONG-ISSUED-RESOLUTION
+  acceptance in session 259. It descends from `81c68e7`.
+- **Frozen-path check.** `git diff --quiet c7083fb -- src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs src/pattern/combinators/structure.rs src/pattern/combinators/input.rs src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+  must still exit 0. The 2a session 259 verification 11 already guarantees
+  that 2a left these paths unchanged. If the check fails, record it as stop
+  condition 1 and name the plan that owns the path.
+- **Evidence.**
+  - Copy the `tmp/song-mode-riela/session249-structural-*` files to
+    `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session258/`, with
+    `sha256.txt`.
+  - Scratch logs go to `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session259/`.
+  - Never delete earlier directories.
+- **Receipt.** The receipt has `session: 259`, `baseCommit: <2a-accepted>`,
+  `reviewDiffRange` (`git diff 1ac457f <2c-accepted> -- <2c paths>`),
+  `failures: []` and a fingerprint that differs from every earlier one.
+- **No other change.** There is no 2c production or test change beyond the
+  TASK-016 format-only hunks.
+
+### Session 259 done criteria
+
+- [ ] Every session 258 done criterion holds, with `<2a-accepted>` from
+  session 259.
+- [ ] The frozen-path check above exits 0.
+- [ ] Full nextest `--no-fail-fast` exits 0 with a `Summary` line and 0
+  failures.
+- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session258/sha256.txt`
+  exists, and the receipt has `session: 259` and a new fingerprint.
+- [ ] One progress-log entry is added.

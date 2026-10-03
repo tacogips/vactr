@@ -1,6 +1,6 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (session 258: runs THIRD, after 2a and then 2c are accepted; see "Session 258 amendment")
+**Status**: In Progress (session 259: runs THIRD, on <2c-accepted>; see "Session 258 amendment" and "Session 259 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -807,4 +807,44 @@ Tests (input -> expected outcome), restated:
   scope.
 - [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session257/sha256.txt` exists.
   The receipt has `session: 258`, `reviewDiffRange` and a new fingerprint.
+- [ ] One progress-log entry is added.
+
+## Session 259 amendment (runs THIRD, on <2c-accepted>; serial)
+
+The source of truth is the design section "Session 259 resume amendments
+(2026-10-04)", subsection "Later waves". The session 258 amendment applies
+unchanged:
+
+- seeding stays additive, charged and authentic: Rc::ptr_eq retention in
+  `src/pattern/eval/song_replay.rs`, with no fresh-only collector, no `clear()`
+  and no wholesale `executions` assignment in `seed_collection`;
+- `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` is fixed
+  without `allow`/`expect`;
+- `baselineFailures` is empty;
+- full nextest exits 0 with 0 failures.
+
+This amendment changes only these items:
+
+- **Base.** `<2c-accepted>` is the session 259 commit that records
+  SONG-STRUCTURAL-CLOCK acceptance.
+- **Evidence.** Copy the prior `tmp/song-mode-riela/session249-sharedwork-*`
+  files to `tmp/song-s249/SONG-SHARED-WORK/attempt-session258/`, with
+  `sha256.txt`. Baseline and scratch logs go to
+  `tmp/song-s249/SONG-SHARED-WORK/session259/`, for example
+  `session259/baseline-full.log`.
+- **Receipt.** It has `session: 259`, `baseCommit: <2c-accepted>`,
+  `reviewDiffRange` (`git diff 1ac457f <2b-accepted> -- <2b paths>`) and a new
+  fingerprint.
+- **Interaction with 2a.** The 2a session 259 change to `bind_issued_member`
+  (cross-seal equal-edge agreement) is not a 2b path. If a 2b test fails
+  because of it, that is stop condition 1. Do not edit
+  `lookup/authority.rs`.
+
+### Session 259 done criteria
+
+- [ ] Every session 258 done criterion holds on `<2c-accepted>`.
+- [ ] `tmp/song-s249/SONG-SHARED-WORK/session259/baseline-full.log` shows 0
+  failures.
+- [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session258/sha256.txt` exists.
+  The receipt has `session: 259` and a new fingerprint.
 - [ ] One progress-log entry is added.

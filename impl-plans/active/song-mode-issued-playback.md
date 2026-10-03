@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (session 256: runs FOURTH, after 2c, 2a and 2b are accepted; see "Session 256 amendment")
+**Status**: Ready (session 257: runs FOURTH, after 2c, 2a and 2b are accepted; see "Session 256 amendment" and "Session 257 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -748,3 +748,28 @@ commit that records 2b acceptance. Only these items change.
   `Summary` line.
 - [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session255/sha256.txt` exists,
   and the receipt fingerprint is new.
+
+## Session 257 amendment (runs FOURTH, after 2c, 2a and 2b are accepted; serial)
+
+The source of truth is the design section "Session 257 resume amendments
+(2026-10-04)" > "Later waves". The session 255 and 256 amendments stay in
+force: the owned paths including the fifth path `src/sched/song/pools.rs`, the
+conditional seams, the zero-allowed-failure rule, `baselineFailures`, strict
+Clippy exit 0, the issued-route scheduler and the staged atomic pool commit.
+Only the evidence locations change:
+
+- Step 1 copies `tmp/song-mode-riela/session249-playback-*` to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session256/` with `sha256.txt`.
+  Do not create, delete or overwrite earlier attempt directories.
+- The baseline run and scratch logs go to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/session257/`.
+- The fingerprint must differ from every hash under
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/`.
+- `tests/song_export.rs` stays in the focused gate. Its 2c harness edit is not
+  a wave 3 path, and wave 3 must not edit it.
+
+### Session 257 done criteria
+
+- [ ] Every session 256 done criterion holds, with `session257/` in place of
+  `session256/`.
+- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session256/sha256.txt` exists.

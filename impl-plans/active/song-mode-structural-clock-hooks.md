@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (session 256: acceptance gate rerun with six exact 2a-owned allowed failures; see "Session 256 amendment")
+**Status**: In Progress (session 257: temp-dir harness fix in tests/song_export.rs and tests/song_cli.rs, then one acceptance gate rerun with six exact 2a-owned allowed failures; see "Session 257 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -1324,3 +1324,195 @@ Pitfalls:
 - [x] One progress-log entry is added. Test-integrity, adversarial and
   integration review follow; they are owned by the workflow, not by this
   task.
+
+## Session 257 amendment (harness fix plus acceptance rerun; serial, concurrency 1)
+
+The source of truth is the design section "Session 257 resume amendments
+(2026-10-04)" > "2c: temp-directory collision fix (operator authorization)" and
+"2c acceptance rerun". This section wins over every earlier amendment of this
+plan where they conflict. Every session 255 and 256 rule not changed here stays
+in force: the frozen files, the implementer authority, the six-ID allowed list
+and the done criteria. The Rust tree base is `259f0b9`, whose Rust sources
+equal `88f5120`. The run starts on the commit that records this amendment
+(`<s257-plan-commit>`); that commit changes documentation only.
+
+### Intent and context
+
+- Session 256 reran the 2c gates with no Rust edits. Full nextest
+  (`tmp/song-mode-riela/session249-structural-nextest-full.log`) reported 2793
+  run, 2786 passed, 7 failed and 3 skipped. Six failures are the allowed 2a
+  IDs. The seventh was
+  `song_export fractional_song_and_tail_write_exact_partial_block`, which
+  panicked at `tests/song_export.rs:20` with
+  `Os { code: 17, kind: AlreadyExists }`.
+- Root cause: `Directory::new` in `tests/song_export.rs` (lines 10-22) names
+  its directory `vactr-song-export-{stamp}-{NEXT}`. `stamp` is
+  `SystemTime` nanoseconds, and `NEXT` is a static `AtomicU64`. nextest runs
+  each test in its own process, so `NEXT` is 0 in every process. macOS clocks
+  are microsecond-granular, so two tests starting in the same microsecond
+  build the same name. `std::fs::create_dir` then fails for the second test.
+- `tests/song_cli.rs` `Directory::new` (lines 11-21) has the identical pattern
+  (`vactr-song-cli-{stamp}-{NEXT}`). It has not failed yet, but it would block
+  the zero-failure gates of 2a, 2b, wave 3 and SONG-16.
+- `tests/cli.rs` (line 23), `tests/song_assets.rs` (line 436) and
+  `tests/song_candidate.rs` (line 372) already include `std::process::id()`.
+  They are not touched.
+- Operator authorization adds `tests/song_export.rs` and `tests/song_cli.rs`
+  to this plan's writePaths for this fix only.
+
+### Non-goals
+
+- No change to any 2c Rust writePath from earlier sessions. The paths are
+  `structural_tests.rs`, `song_clock/tests.rs`, `geometry_tests/domains.rs`,
+  `combinators/region.rs` and `combinators/music.rs`. They stay equal to
+  `88f5120`. The only exception is a fix forced by a gate failure in one of
+  those paths, made under the session 255 authority rule and recorded in
+  `fixes[]`. None is expected.
+- No change to any test body, assertion, test name, `Drop` impl, import or
+  other helper in `tests/song_export.rs` or `tests/song_cli.rs`.
+- Do not replace `std::fs::create_dir` with `create_dir_all`. A real collision
+  must still fail loudly.
+- Do not touch `tests/cli.rs`, `tests/song_assets.rs`,
+  `tests/song_candidate.rs` or any 2a path, including
+  `src/song/routing/source/issued.rs`.
+- Do not "fix" the six allowed 2a failures here.
+- Do not run `cargo fmt` or `rustfmt` in write mode on any file.
+
+### TASK-014: Temp-directory name gains the process id
+
+**Status**: Not Started
+**Parallelizable**: No (it runs before TASK-015 in the same serial sub-wave)
+**Deliverables**: one edited `format!` call in `Directory::new` of
+`tests/song_export.rs` and of `tests/song_cli.rs`.
+
+- Before each edit, re-read the file, record its sha256 in
+  `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/pre-edit.sha256`, and check
+  it against `git show 259f0b9:<path> | shasum -a 256`. On a mismatch
+  (drift), stop and report it. Do not merge the drift.
+- In each file, change only the `format!` call inside `Directory::new`
+  (`tests/song_export.rs` lines 16-19, `tests/song_cli.rs` lines 16-19):
+  - The literal gains a leading `{}` for the process id:
+    `"vactr-song-export-{}-{stamp}-{}"` and
+    `"vactr-song-cli-{}-{stamp}-{}"`.
+  - Insert one argument line, `std::process::id(),`, before the existing
+    `NEXT.fetch_add(...)` argument, with the same 12-space indentation.
+  - The resulting name shape is `vactr-song-export-{pid}-{stamp}-{n}`.
+- Edit by hand. The expected per-file numstat is `2	1` (2 added lines,
+  1 deleted line).
+- Record the post-edit sha256 values in
+  `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/post-edit.sha256`.
+- In the receipt, add one `fixes[]` entry per file with:
+  - `test`: for song_export,
+    `song_export fractional_song_and_tail_write_exact_partial_block`; for
+    song_cli, `latent: same pattern`;
+  - `message`: `AlreadyExists` at `tests/song_export.rs:20`;
+  - `rootCause`: per-process `NEXT` restart plus microsecond clock;
+  - `paths`: the edited file;
+  - `class`: `harness-collision`;
+  - `designRule`: `Session 257 > 2c: temp-directory collision fix`.
+- Pitfalls:
+  - Do not use `{pid}` as an inline capture unless a `let pid` binding is
+    added. The pinned form is a positional argument, which keeps the diff at
+    `2	1`.
+  - Any further edit to either file is stop condition 1.
+
+Tests (input -> expected outcome):
+
+- `cargo nextest run --test song_export --test song_cli`, with each test in
+  its own process -> every test passes, and no `AlreadyExists` appears.
+- The same command run 5 times in a row -> every run exits 0.
+- Full nextest -> no `song_export` or `song_cli` failure.
+
+### TASK-015: Session 257 gate rerun, receipt and progress log
+
+**Status**: Not Started
+**Parallelizable**: No (depends on TASK-014)
+**Deliverables**: the eight `tmp/song-mode-riela/session249-structural-*`
+files, the session 257 scratch logs and one progress-log entry in this plan.
+
+Steps, in order:
+
+1. Copy every `tmp/song-mode-riela/session249-structural-*` file to
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session256/`. Write their
+   sha256 values to `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session256/sha256.txt`.
+   Do this before TASK-014. Never delete, move or overwrite anything in
+   `attempt-session255/`, `session255/` or `session256/`. Scratch logs for
+   this session go to `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/`.
+2. Record `git rev-parse HEAD` and `git status --porcelain=v1` in
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/tree.log`. The expected
+   status is the two test files only, apart from `tmp/` and the excluded
+   `.agents/settings.local.json`.
+3. Run session 255 verification commands 1-10 unchanged, with the same log
+   paths. Judge command 4 by the six-ID rule of the session 256 amendment.
+   Then run S257-V1 to S257-V6 below.
+4. Rewrite `tmp/song-mode-riela/session249-structural-receipt.json`. Keep the
+   session 255 and 256 fields. Update or add:
+   - `session: 257`;
+   - `treeHead`;
+   - every gate's exit status and full log path;
+   - `fixes[]` with the two TASK-014 entries;
+   - `harnessDiff`: the `git diff --numstat 259f0b9` output for the two files;
+   - `fullSuite`: the counts, `failures[]` with owners, `allowedFailures`
+     (six IDs) and `allowedFailuresAbsent`;
+   - the clippy disposition, the cohort (953), the line counts and the
+     unowned-path result;
+   - a new `evidenceFingerprint`. It is the sha256 of the receipt computed
+     with this field empty. It must differ from `391d811a...` and from every
+     hash under `tmp/song-s249/SONG-STRUCTURAL-CLOCK/`.
+5. Set TASK-012, TASK-013, TASK-014 and TASK-015 to Complete only if every
+   check below passes. Add one progress-log entry with the commands, exit
+   codes and log paths. Test-integrity, adversarial and integration review
+   follow. The workflow owns those reviews, not this task.
+
+Pitfalls:
+
+- Full nextest takes about 13 minutes. Run it in the foreground and poll it
+  until it exits. A log with no `Summary` line counts as a failure.
+- A failure outside the six IDs in a 2c path is fixed under the authority
+  rule. Any other such failure is stop condition 1: report it with its owner.
+  Do not edit tests to make it pass.
+
+### Session 257 verification (foreground; record the exit status and full log path)
+
+Session 255 commands 1-10 and session 256 V1-V11 apply unchanged. V4 must
+print a subset of the six IDs, and specifically no `song_export` or
+`song_cli` test. These checks are added:
+
+- S257-V1 (harness binaries):
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast --test song_export --test song_cli >> tmp/song-mode-riela/session249-structural-nextest-focused.log 2>&1`
+  exits 0 with a nonzero count.
+- S257-V2 (repeat): run the S257-V1 command 5 times in the foreground, sending
+  output to `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/harness-repeat.log`.
+  All 5 runs exit 0.
+- S257-V3 (fmt):
+  `rustfmt --edition 2021 --check tests/song_export.rs tests/song_cli.rs >> tmp/song-mode-riela/session249-structural-fmt.log 2>&1`.
+  No `Diff in` hunk may cover a line changed since `259f0b9`.
+- S257-V4 (diff shape):
+  - `git diff --numstat 259f0b9 -- tests/song_export.rs tests/song_cli.rs`
+    prints `2	1` for each file.
+  - `git diff -U0 259f0b9 -- tests/song_export.rs tests/song_cli.rs` shows
+    hunks only within lines 16-20 of each file.
+  - `grep -c 'std::process::id()' tests/song_export.rs tests/song_cli.rs`
+    prints 1 for each file.
+  - `grep -c 'create_dir_all' tests/song_export.rs tests/song_cli.rs` prints
+    0 for each file.
+- S257-V5 (assertions unchanged): for each of the two files,
+  `git show 259f0b9:<path> | grep -c assert` equals `grep -c assert <path>`.
+- S257-V6 (lines): `wc -l tests/song_export.rs tests/song_cli.rs` prints 197
+  and 160.
+
+### Session 257 done criteria (mechanically checkable)
+
+- [ ] S257-V1, S257-V2 and S257-V5 pass, and S257-V4 and S257-V6 print the
+  expected values.
+- [ ] Session 256 V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
+- [ ] The V4 failure set is a subset of the six IDs, with no `song_export` or
+  `song_cli` test, and the log has a `Summary` line.
+- [ ] V3 has no 2c-path diagnostic. V7 and S257-V3 have no hunk on changed
+  lines.
+- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session256/sha256.txt`
+  exists, and `attempt-session255/`, `session255/` and `session256/` are
+  unchanged.
+- [ ] The receipt has `session: 257`, the two `harness-collision` fixes, and a
+  fingerprint different from every earlier one.
+- [ ] One progress-log entry is added.

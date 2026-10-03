@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (session 256: runs SECOND, after SONG-STRUCTURAL-CLOCK; adds TASK-012 SLICE fixture; see "Session 256 amendment")
+**Status**: In Progress (session 257: runs SECOND, after SONG-STRUCTURAL-CLOCK; TASK-008 to TASK-012 unchanged; see "Session 256 amendment" and "Session 257 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -2073,3 +2073,41 @@ Tests (input -> expected outcome):
   is below 1000.
 - [ ] The receipt has the TASK-012 `fixes[]` entry and a new fingerprint, and
   one progress-log entry is added.
+
+## Session 257 amendment (runs SECOND, after SONG-STRUCTURAL-CLOCK is accepted; serial)
+
+The source of truth is the design section "Session 257 resume amendments
+(2026-10-04)" > "Later waves". The session 253-256 amendments stay in force
+unchanged: TASK-008 to TASK-012, the owned paths and sharedPaths, the
+implementer authority, the frozen paths, the verification commands and the
+done criteria. This includes the TASK-012 SLICE correction
+(`slice {beat -> p} 2 [cut nil]`, with the chord moved into
+`let base {part [drums: {s :analog > chord [:c :five]}] duration: 2}`) and the
+unchanged authentication assertions. The diff base is still `<2c-join>`, the
+commit that records 2c acceptance. In session 257 that commit includes the 2c
+harness fix in `tests/song_export.rs` and `tests/song_cli.rs`.
+
+Only these items change:
+
+- **Evidence locations.** Step 1 copies every existing
+  `tmp/song-mode-riela/session249-resolution-*` file to
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session256/` and writes
+  `sha256.txt` there. Do not create, delete or overwrite earlier attempt
+  directories. Scratch logs, including `reproduce-source.log`, go to
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session257/`. The fingerprint must
+  differ from every hash under `tmp/song-s249/SONG-ISSUED-RESOLUTION/`.
+- **Reproduce expectation.** On `<2c-join>`, the full-suite failures are a
+  subset of the six session 256 IDs, and no `song_export` or `song_cli` test
+  fails. A `song_export` or `song_cli` failure here is stop condition 1. Its
+  owner is SONG-STRUCTURAL-CLOCK, and 2a must not edit those files.
+- **Not 2a paths.** `tests/song_export.rs`, `tests/song_cli.rs` and every 2c
+  path are outside this plan.
+
+### Session 257 done criteria
+
+- [ ] Every session 256 done criterion holds. Verification 1 passes 9 tests,
+  and verification 7 (full, `--no-fail-fast`) exits 0 with zero failures and
+  a `Summary` line.
+- [ ] `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session256/sha256.txt`
+  exists, and the receipt fingerprint is new.
+- [ ] One progress-log entry is added.

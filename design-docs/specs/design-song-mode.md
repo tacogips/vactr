@@ -2199,3 +2199,95 @@ status and full log path. These rules are unchanged:
 - `resources.rs`, `reservations_tests.rs` and `clock_tests.rs` equal `HEAD`;
 - `.agents/settings.local.json` stays untouched;
 - formatting runs with `--check` only.
+
+### Session 257 resume amendments (2026-10-04)
+
+Session 256 stopped at `259f0b9`. The 2c acceptance rerun made no Rust edits.
+Its focused gate, native and WASM builds and route regressions passed. Full
+nextest (`tmp/song-mode-riela/session249-structural-nextest-full.log`) ran 2793
+tests: 2786 passed, 3 skipped and 7 failed. Six failures are the allowed 2a
+tests listed in session 256. The seventh is
+`song_export::fractional_song_and_tail_write_exact_partial_block`, which
+panicked at `tests/song_export.rs:20` with `AlreadyExists`. That failure is a
+pre-existing test-harness flake, not a regression. The design above and the
+session 251-256 amendments stay the baseline. Where these amendments conflict
+with an earlier one, they win. SONG-ROUTE8 stays accepted and is not
+redispatched. The serial order is unchanged: 2c, 2a, 2b, wave 3, then SONG-16.
+The dispatch manifest `impl-plans/active/song-s249-dispatch.json` gets a
+`resumeSession257` entry in place and is never duplicated.
+
+#### 2c: temp-directory collision fix (operator authorization)
+
+- **Root cause.** `Directory::new` in `tests/song_export.rs` (lines 10-22)
+  names its directory `vactr-song-export-{SystemTime nanos}-{NEXT}` and creates
+  it with `std::fs::create_dir`. nextest runs each test in its own process, so
+  the static `NEXT` counter restarts at 0 in every process. macOS wall-clock
+  time has microsecond granularity. Two tests that start in the same
+  microsecond therefore build the same name, and the second `create_dir` fails.
+- **Scope of the scan.** Five test files call `SystemTime::now`:
+  - `tests/song_cli.rs` (lines 8-21) has the same pattern
+    (`vactr-song-cli-{stamp}-{NEXT}`, no process id, `create_dir`). It is a
+    latent instance of the same flake;
+  - `tests/cli.rs`, `tests/song_assets.rs` (lines 433-442) and
+    `tests/song_candidate.rs` (lines 370-378) already include
+    `std::process::id()`. They are not changed.
+- **Decision.** 2c adds two writePaths, `tests/song_export.rs` and
+  `tests/song_cli.rs`, for this fix only. Both are declared so that a known
+  flake cannot block a later full-suite gate.
+- **Fix.** In each file, only the directory name in `Directory::new` changes.
+  It gains `std::process::id()`, for example
+  `vactr-song-export-{pid}-{stamp}-{n}` and `vactr-song-cli-{pid}-{stamp}-{n}`.
+  Concurrent processes have distinct ids, and the counter still separates
+  directories within one process.
+  - `create_dir` stays; it is not replaced with `create_dir_all`. A real
+    collision therefore still fails loudly instead of sharing a directory.
+  - The `Drop` cleanup, every test body and every assertion stay unchanged.
+  - `git diff 259f0b9 -- tests/song_export.rs tests/song_cli.rs` touches only
+    the `format!` call inside `Directory::new`.
+  - Both files are hand-edited and checked with `rustfmt --check`. They are
+    never formatted in write mode.
+- **Classification.** The receipt records this under `fixes[]` as class
+  `harness-collision`. The fix changes no assertion, so it is not a
+  baseline-assertion change. These two files carry no song-mode production
+  behavior. They are not 2c's own tests for the purpose of the session 255
+  authority rule, and any further edit to them is stop condition 1.
+
+#### 2c acceptance rerun
+
+- 2c reruns its session 255 gates once on the final tree. The gates are build,
+  strict Clippy with the declared disposition rows, the focused filter, full
+  nextest, WASM, `rustfmt --check` on 2c paths (including the two test files),
+  line counts and the cohort.
+- The full-suite gate (`--no-fail-fast`) may fail only on the six exact
+  2a-owned test IDs listed in session 256. A missing listed failure is
+  recorded, not an error. Any other failure fails 2c. This includes any
+  `song_export` or `song_cli` failure, because the flake is now fixed.
+- There is no further 2c production or own-test implementation. After the
+  rerun, 2c goes to test-integrity, adversarial and integration review.
+
+#### Later waves
+
+- **2a.** The session 256 source fixture correction stands unchanged: the
+  `SLICE` subject becomes `slice {beat -> p} 2 [cut nil]`, the chord moves into
+  `let base {part [drums: {s :analog > chord [:c :five]}] duration: 2}`, and
+  both authentication assertions stay. The session 253 diagnosis and the
+  session 254 and 255 2a decisions stand. 2a ends with all three
+  `source::issued` tests and the five nested resolver tests passing, and with
+  full nextest at zero failures.
+- **2b, wave 3 and SONG-16.** Unchanged from session 256. They allow zero
+  full-suite failures. 2b fixes `clippy::let_and_return` at
+  `src/song/snapshot/issued.rs:231`. Strict Clippy exits 0 from wave 3 on.
+
+#### Evidence
+
+Before rerunning, 2c copies its prior
+`tmp/song-mode-riela/session249-structural-*` files to
+`tmp/song-s249/<planId>/attempt-session256/` with sha256 values. Later plans do
+the same when they rerun. Scratch logs go to
+`tmp/song-s249/<planId>/session257/`. Every new receipt fingerprint differs
+from all earlier ones. Gates run in the foreground and record exit status and
+full log path. These rules are unchanged:
+
+- `resources.rs`, `reservations_tests.rs` and `clock_tests.rs` equal `HEAD`;
+- `.agents/settings.local.json` stays untouched;
+- formatting runs with `--check` only.

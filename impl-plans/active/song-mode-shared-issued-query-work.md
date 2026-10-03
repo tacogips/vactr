@@ -1,6 +1,6 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (session 256: runs THIRD, after 2c and 2a are accepted; see "Session 256 amendment")
+**Status**: In Progress (session 257: runs THIRD, after 2c and 2a are accepted; see "Session 256 amendment" and "Session 257 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -712,3 +712,27 @@ items change.
 - [ ] Verification 5 exits 0 with zero failures and a `Summary` line.
 - [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session255/sha256.txt` exists, and
   the receipt fingerprint is new.
+
+## Session 257 amendment (runs THIRD, after 2c and 2a are accepted; serial)
+
+The source of truth is the design section "Session 257 resume amendments
+(2026-10-04)" > "Later waves". The session 255 and 256 amendments stay in
+force: the four owned paths including `src/pattern/eval/song_replay.rs`, the
+conditional seams, the zero-allowed-failure rule, `baselineFailures`, the
+additive charged `Rc::ptr_eq` retention, and the `let_and_return` fix at
+`src/song/snapshot/issued.rs:231`. Only the evidence locations change:
+
+- Step 1 copies `tmp/song-mode-riela/session249-sharedwork-*` to
+  `tmp/song-s249/SONG-SHARED-WORK/attempt-session256/` with `sha256.txt`. Do
+  not create, delete or overwrite earlier attempt directories.
+- The baseline run and scratch logs go to
+  `tmp/song-s249/SONG-SHARED-WORK/session257/`, for example
+  `session257/baseline-full.log`.
+- The fingerprint must differ from every hash under
+  `tmp/song-s249/SONG-SHARED-WORK/`.
+
+### Session 257 done criteria
+
+- [ ] Every session 256 done criterion holds, with `session257/` in place of
+  `session256/`.
+- [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session256/sha256.txt` exists.

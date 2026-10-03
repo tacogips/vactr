@@ -1107,3 +1107,29 @@ and the status reconciliation. Only these items change.
   three `routing::source::issued::tests` as passed.
 - [ ] `tmp/song-s249/SONG-16/attempt-session255/sha256.txt` exists, and the
   final fingerprint is new.
+
+### Session 257 amendment (wave 4, SONG-16)
+
+The source of truth is the design section "Session 257 resume amendments
+(2026-10-04)". The session 255 and 256 amendments stay in force: no Rust or
+test edits, zero allowed failures, the requirement evidence names, the final
+gates and the status reconciliation. Only these items change:
+
+- **Cohort allowance.** Changed hashes are also allowed on
+  `tests/song_export.rs` and `tests/song_cli.rs`, from the 2c TASK-014
+  harness fix. The cohort count is unchanged by that fix.
+- **Final fmt list.** Append `tests/song_export.rs tests/song_cli.rs` to the
+  final `rustfmt --edition 2021 --check` command. No hunk may cover a line
+  changed since `259f0b9`.
+- **Evidence.** Prior final files are copied to
+  `tmp/song-s249/SONG-16/attempt-session256/` with `sha256.txt`. Scratch logs
+  go to `tmp/song-s249/SONG-16/session257/`.
+- **Design checkpoint.** The dated evidence checkpoint is appended after the
+  "Session 257 resume amendments" section of
+  `design-docs/specs/design-song-mode.md`.
+
+#### Session 257 done criteria
+
+- [ ] Every session 256 done criterion holds.
+- [ ] The final fmt log covers the two test files, and
+  `tmp/song-s249/SONG-16/attempt-session256/sha256.txt` exists.

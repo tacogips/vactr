@@ -1435,3 +1435,190 @@ add only the repair contract and the ownership rules the operator authorized.
   2b and 2c code at `980083a` is reviewed as part of its owning sub-wave. It is
   not presumed accepted. The 2b `SW-let_and_return` repair and the 2c Euclid
   depth boundary test stay required.
+
+### Session 253 resume amendments (2026-10-04)
+
+Session 252 landed the site-alias repair (TASK-004) at `6543273`, but 2a still
+fails five resolver tests. The design above and the session 251 and 252
+amendments stay the baseline. These amendments add only three things: the
+issued member-binding contract from the operator diagnosis
+(`tmp/song-mode-riela/session252-root-cause-diagnosis.md`), the test-integrity
+restorations, and the ownership these need. Nothing else changes.
+
+- **Defect.** The issued path calls the legacy `bind_member` (`lookup.rs:765`)
+  from `canonical_index_configuration_issued` (`canonical.rs:417-428`).
+  `bind_member` walks the source boundaries of the Index address invocation,
+  which is the consuming stage owner's own invocation.
+  `with_source_boundary` (`song_clock.rs:838`) creates each source boundary
+  with the consumer clock as its parent. `insert_source` (`song_clock.rs:426`)
+  attaches it only to the clocks of source-side owner invocations. The
+  outermost owner's chain is therefore always empty, and the call fails with
+  `original source membership missing` (`lookup.rs:799`). Legacy callers pass
+  a source-side address (`geometry_tests.rs:313-379`, `domains.rs:597-616`,
+  `lookup_tests.rs:205-251`). Legacy is therefore correct and stays unchanged.
+- **Two policy roles per stage.** The issued path keeps two policies apart:
+  - The *stage consuming policy* is
+    `prepared.policy(site, stage.identity.policy)`. It selects the matching
+    boundary on the source side.
+  - The *address parent-use policy* is the policy under which the Index
+    address owner is used by its own parent. It is `None` for the outermost
+    stage and the enclosing stage's consuming policy for an inner stage. It is
+    the value passed to `bind_issued_index`, and through the operand to
+    `validate_issued_binding`, `empty_source` and `row_source_window`. When it
+    is `None`, the existing check at `canonical.rs:251` still requires the
+    address's own boundary chain to be empty. That check is not relaxed.
+- **Issued member binder.** Add a new `pub(crate)` function in
+  `src/song/snapshot/occupancy/lookup/authority.rs`, an existing 2a writePath.
+  It is a child module of `lookup.rs`, so it can reuse `selected_policy`,
+  `same_intrinsic_owner` and the `SourceBoundaryRef` methods without growing
+  `lookup.rs`. Its inputs are the stage owner frame, the event's seals, the
+  transcript, the stage consuming policy's frozen selected source, the subject
+  handle, the shared work and the depth. For every seal of the event, it:
+  1. takes the fresh `transcript.invocation(seal)` clock, never the retained
+     clock, and charges it through the shared-work bridge as the seal loop
+     does today;
+  2. walks that clock's `retained_sources`;
+  3. keeps a boundary only if all four checks hold: `policy_parent()` is the
+     same intrinsic owner as the stage owner frame (defined under "Call site
+     and order"); `policy_matches` the stage consuming policy;
+     `selected_policy` yields use edges; and `member(subject_handle)` yields
+     an origin.
+
+  Result rule:
+  - Zero matches fail with `original source membership missing`.
+  - Matches from more than one seal are accepted only if they name the same
+    origin allocation (`std::ptr::eq`) with equal use edges. This covers one
+    retained boundary that appears in several seals' chains. The diagnosis
+    shows exactly this: the rev2-to-rev3 boundary appears in both seal 1 and
+    seal 2.
+  - Any disagreement fails with `ambiguous original member binding`.
+  - Scalar equality never stands in for allocation identity.
+
+  The binder returns the boundary's original origin and never rebases or clips
+  the source START. Legacy `bind_member`, `canonical_index_configuration` and
+  `resolve_route` stay unchanged.
+- **Call site and order.** In `issued_index_stage_configuration`, the binder
+  runs once per timing. It runs after the timing's prefix match and before the
+  seal loop that builds configurations, so it always precedes coalescing. If
+  the binder fails, the event fails.
+  - The *stage owner frame* is the owner identity the binder compares
+    `policy_parent()` against. It is the stage owner's intrinsic frame, taken
+    from the `lookup_owner()` of the fresh owner-matching invocation, which is
+    the same frame the restored owner-frame filter selects. It is obtained
+    before the configuration seal loop and needs no bound Index address.
+  - The binder still walks the fresh clocks of every seal of the event,
+    including non-owner seals, because the source-side boundaries live there.
+  - If no seal matches the stage owner frame, the timing fails with the
+    existing `no matching fresh invocation` error.
+
+  The call and its seal walk live in a new declared child module,
+  `src/song/routing/nested/issued/members.rs`, declared as `mod members;` in
+  `nested/issued.rs`. This is needed because
+  `nested/issued.rs` is at 943 lines and must stay below 1000.
+- **`canonical.rs`.** `canonical_index_configuration_issued` no longer calls
+  `bind_member`. Its other checks stay keyed to the address parent-use policy.
+  Member evidence is threaded through `configuration.rs` only if the geometry
+  consumer needs it. That threading stays within seven parameters, with no new
+  `allow` or `expect`.
+- **Hard failure restored.** `bind_issued_index` returns `None` only when no
+  retained request at the selector's site matches. That test does not depend on
+  the seal, so it cannot tell this stage's owner seals from other owners'
+  seals. The per-seal owner-frame filter that `1ac457f` had is therefore
+  restored ahead of `bind_issued_index`. Session 251 removed it. The fresh
+  `transcript.invocation(seal)` owner frame (`lookup_owner()`) must match the
+  stage owner on root (`stage.output_owner.payload().id`), track
+  (`stage.handle.track()`), revision (`stage.handle.revision()`) and placement
+  (`stage.handle.placement()`). A seal that does not match is skipped. It is
+  another owner's invocation, and the member binder reads its source
+  boundaries. If `bind_issued_index` returns `None` for an owner-matching seal
+  (no retained request at the site), that seal is also skipped. An
+  owner-matching seal that `bind_issued_index` binds must yield a canonical
+  component. If `issued_index_configuration` returns `None` for it, the event
+  fails with `issued Index event has no canonical component`, as it did at
+  `1ac457f`. The session-251 `continue` on that branch is removed. The
+  existing conflict error and the `no matching fresh invocation` error stay.
+  If an owner-matching bound seal legitimately has no component, the sub-wave
+  stops and reports that seal's owner frame. It does not restore the
+  `continue`.
+- **Fixture integrity.** Each change below is verified by diffing the test
+  module against `6543273` and against `1ac457f`.
+  - `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` returns to
+    its `1ac457f` shape: one Slice under one sampling combinator, and one
+    selected event. All four assertions come back:
+    1. legacy `prepare_routes` is `Ok`;
+    2. the legacy `resolve_route` error contains
+       `sampled context requires joint mapping geometry`;
+    3. `resolve_issued_event` is `Ok`;
+    4. both paths check the same event handle.
+
+    Only two substitutions are allowed:
+    - the sampling combinator, Euclid to `segment` or `grid`, under the
+      session 252 conditional rule (Euclid stays deferred to 2c);
+    - a static Index list, under SM4 default (a).
+
+    The nested-slice replacement and the "some event hits the barrier" loop are
+    removed.
+  - `discarded_augmented_source_origins_are_resolved` still uses `[cut]`. That
+    is a dynamic `Late` operand, which SM4 default (a) refuses on both ledgers.
+    This refusal is the observed `Index requires shared canonical realization`
+    failure. The fixture's Index list becomes static, and every assertion
+    stays, including `found_discarded_augmented`.
+    `src/song/routing/density/index.rs` is edited only if the static fixture is
+    still refused by the preflight (the session 251 seam rule). If the static
+    fixture no longer retains a discarded augmented origin, the sub-wave stops
+    and reports it. The test is not weakened.
+  - In `cached_nested_slice_events_resolve_from_issued_transcript`, session 251
+    changed `[cut nil]` to `[0 nil]`. That is the authorized SM4 substitution,
+    and it stays.
+  - In `partitioned_nested_issued_queries_equal_the_full_route_set`, session
+    251 changed `[cut nil]` to `[0 nil]` and dropped the `fn cut` line. That is
+    the same SM4 default (a) static-list substitution, and it stays.
+  - In `distinct_equal_handle_invocations_are_all_resolved`:
+    - `[cut nil]` to `[0 nil]` is an authorized SM4 substitution, and it
+      stays.
+    - The added seal-debit assertion strengthens the test, and it stays.
+    - `slice p 2` to `slice {beat -> p} 2` (in `inner` and in both `outer`
+      stack arms) changes the fixture shape and is not an authorized
+      substitution. 2a restores `slice p 2` and keeps the static list. If the
+      restored fixture no longer emits a coalesced event with at least two
+      distinct invocations, the sub-wave stops and reports. It does not weaken
+      the test.
+  - No other existing test line in `nested/issued.rs` changes beyond the
+    classified changes above.
+- **Ownership and cohort.** 2a adds one writePath:
+  `src/song/routing/nested/issued/members.rs` (new).
+  `src/song/snapshot/occupancy/lookup.rs` stays a sharedPath, and the binder
+  does not go there. Besides the session 252 alias skip, its only other edit
+  concerns `selected_policy`. That method needs a `RetainedIndexAddress`, which
+  the binder does not have, so its body moves verbatim into
+  `lookup/authority.rs` as a free function that takes `LookupAuthority`. The
+  method keeps its signature and delegates to that function. Legacy behavior
+  is byte-identical, and `lookup.rs` gets shorter. The new file raises the
+  cohort from 952 to 953 at the 2a join. It stays 953 through 2c, becomes 954
+  after wave 3 (955 only if `src/host/caps/song/preparation/issued.rs` is
+  needed), and is unchanged after wave 4. These numbers supersede the earlier
+  projections. `rustfmt --check` on `nested/issued.rs` now also covers
+  `members.rs`, which is owned.
+- **Resume criteria.** 2a reruns all of its gates.
+  - The five tests pass, together with the session 252 named tests:
+    - `cached_nested_slice_events_resolve_from_issued_transcript`
+    - `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+    - `distinct_equal_handle_invocations_are_all_resolved`
+    - `partitioned_nested_issued_queries_equal_the_full_route_set`
+    - `discarded_augmented_source_origins_are_resolved`
+  - The three legacy fixture groups above pass with unchanged assertions.
+  - `grep -n "issued Index event has no canonical component"
+    src/song/routing/nested/issued.rs` matches a hard-error path.
+  - `grep -n "lookup_owner" src/song/routing/nested/issued.rs
+    src/song/routing/nested/issued/members.rs` shows the owner-frame filter in
+    the seal loop.
+  - The evidence fingerprint differs from the four prior values and from every
+    session 252 receipt.
+
+  After 2a is accepted, the serial order holds:
+  1. 2b, including the `SW-let_and_return` repair at
+     `src/song/snapshot/issued.rs:231` and additive charged retention in
+     `src/pattern/eval/song_replay.rs`;
+  2. 2c, including the Euclid inherited-depth boundary test;
+  3. wave 3, with the staged atomic commit in `src/sched/song/pools.rs`;
+  4. SONG-16 requirement-level evidence.

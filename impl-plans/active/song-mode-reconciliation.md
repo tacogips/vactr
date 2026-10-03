@@ -940,3 +940,33 @@ Source: the design section "Session 252 resume amendments".
     `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct` and
     `distinct_sites_sharing_one_execution_are_retained_separately`), plus the 2c
     Euclid witness if it was deferred.
+
+### Session 253 amendment (wave 4)
+
+Source: the design section "Session 253 resume amendments". It supersedes the
+session 252 cohort numbers above. Everything else in the session 252 section
+still applies.
+
+- **Cohort.** 2a adds `src/song/routing/nested/issued/members.rs`. The cohort
+  is:
+  - 953 from the 2a join through 2c;
+  - 954 after wave 3, or 955 with `src/host/caps/song/preparation/issued.rs`;
+  - unchanged in wave 4.
+
+  The 2a join may also show changed hashes on these paths:
+  - `src/song/snapshot/occupancy/lookup/authority.rs` and
+    `src/song/snapshot/occupancy/lookup.rs` (the `selected_policy` delegation);
+  - `src/song/routing/configuration/index/canonical.rs`;
+  - `src/song/routing/nested/issued.rs`;
+  - `src/song/routing/nested/issued/members.rs`.
+- **Format gate file list.** Add `src/song/routing/nested/issued/members.rs`.
+  Also add `src/song/routing/density/index.rs` if the 2a receipt records it as
+  edited.
+- **Requirement evidence.** The final receipt lists these five 2a resolver
+  tests from the full run, in addition to the session 252 list:
+  - `cached_nested_slice_events_resolve_from_issued_transcript`
+  - `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+  - `distinct_equal_handle_invocations_are_all_resolved`
+  - `partitioned_nested_issued_queries_equal_the_full_route_set`
+  - `discarded_augmented_source_origins_are_resolved`
+- **No Rust edits.** Wave 4 still edits no Rust or test file.

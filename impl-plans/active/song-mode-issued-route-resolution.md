@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (wave 2a, session 252, serial; see "Session 252 amendment")
+**Status**: In Progress (wave 2a, session 253, serial; see "Session 253 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -869,3 +869,466 @@ After TASK-004, rerun the test by name.
 - Clippy warning dispositions are recorded per diagnostic in `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/clippy-dispositions.json`; final append-only receipt and evidence fingerprint are in `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/session252-final-receipt.json` (`3c6c504cf4e66accaf04cfedecab68895eb0e40dc149be59dbd60b203f277db6`).
 
 Legacy focused binaries, full nextest, WASM, the occupancy/Route8 aggregate, and the complete Session 252 lint-disposition receipt remain unverified because required issued routing behavior is failing. Do not mark TASK-001/TASK-002/TASK-003 or overall completion criteria done. Continue with the ownership-safe diagnosis of how the exact invocation is paired with its genuine source member/boundary, then rerun the named tests before the remaining gates. Formal test-integrity/adversarial review and later workflow finalization remain downstream.
+
+## Session 253 amendment (wave 2a, serial)
+
+Source of truth: the design section "Session 253 resume amendments
+(2026-10-04)" in `design-docs/specs/design-song-mode.md`, plus the operator
+diagnosis in `tmp/song-mode-riela/session252-root-cause-diagnosis.md`. This
+amendment adds TASK-005 to TASK-007 and one new file. Every rule from the
+session 249 to 252 sections still applies unless this section overrides it.
+This plan still runs alone (concurrency 1). TASK-004 stays as implemented at
+`6543273`; do not redo it.
+
+### Intent and context
+
+Five resolver tests fail at `6543273`:
+
+- Four fail with `original source membership missing` (`lookup.rs:799`):
+  - `cached_nested_slice_events_resolve_from_issued_transcript`
+  - `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+  - `distinct_equal_handle_invocations_are_all_resolved`
+  - `partitioned_nested_issued_queries_equal_the_full_route_set`
+- `discarded_augmented_source_origins_are_resolved` fails at preparation with
+  `Index requires shared canonical realization` (`src/song/routing/index.rs:80`).
+  Its fixture still uses the dynamic Index list `[cut]`.
+
+Root cause of the first four failures:
+
+- `canonical_index_configuration_issued`
+  (`src/song/routing/configuration/index/canonical.rs:417-428`) calls the
+  legacy `bind_member` with the consuming stage owner's own address.
+- `bind_member` walks the source boundaries of that address's invocation.
+- Source boundaries are attached only to the invocation clocks of source-side
+  owners (`src/pattern/eval/song_clock.rs:426` `insert_source`, `:838`
+  `with_source_boundary`).
+- So the outermost owner's chain is always empty, and the call can never
+  succeed.
+
+Membership must instead be read from the fresh invocation clocks of all of
+the event's seals.
+
+Session 251 also left two test-integrity defects, which are repaired here:
+
+- the weakened joint-geometry test;
+- the `continue` that replaced the hard failure
+  `issued Index event has no canonical component`.
+
+### Non-goals
+
+- No change to the behavior of the legacy `bind_member`,
+  `canonical_index_configuration`, `resolve_route`, `prepare_routes` or
+  `RetainedIndexAddress::source_boundaries`. These legacy fixtures keep
+  passing unchanged:
+  - `geometry_tests.rs:313-379`;
+  - `geometry_tests/domains.rs:597-616`;
+  - `lookup_tests.rs:205-251`.
+- None of these are relaxed:
+  - the check at `canonical.rs:251` (`issued selected source classification
+    is required`);
+  - `slice_index_root` in `src/song/routing/index.rs`;
+  - any NeedsJointGeometry barrier on the legacy path.
+- No dynamic Index preparation admission (user-QA SM4 default (a)).
+- None of these files are edited:
+  - `src/pattern/eval/song_clock.rs`, `song_clock_projection.rs`,
+    `song_provenance.rs`, `song_replay.rs`;
+  - any 2b, 2c or wave-3 path;
+  - the three unowned paths.
+- No new `allow`/`expect` attribute, no new public API, and no new test helper
+  file.
+
+### Owned paths for session 253
+
+| Path | Kind | Allowed edit |
+|---|---|---|
+| `src/song/routing/nested/issued/members.rs` | writePath (new) | Stage owner frame, parent-use policy and member-binding call (TASK-006) |
+| `src/song/routing/nested/issued.rs` | writePath | `mod members;`, owner-frame filter, parent-use policy, hard failure, fixture restorations (TASK-006, TASK-007) |
+| `src/song/snapshot/occupancy/lookup/authority.rs` | writePath | `IssuedMemberQuery`, `bind_issued_member`, `selected_policy_in` (TASK-005) |
+| `src/song/routing/configuration/index/canonical.rs` | writePath | Remove the `bind_member` call from `canonical_index_configuration_issued` only (TASK-006) |
+| `src/song/routing/configuration.rs` | writePath | Only if `issued_index_configuration` cannot already accept `Option<&FrozenSelectedSource>`; at most 7 parameters |
+| `src/song/routing/density/index.rs` | writePath | Session 251 rule unchanged: edit only if the static discarded-origin fixture is still refused |
+| `src/song/snapshot/occupancy/lookup.rs` | sharedPath | Session 252 alias skip (done). In addition, the body of `RetainedIndexAddress::selected_policy` moves to `authority.rs`, and the method becomes a one-call delegation. Nothing else changes. |
+
+These paths remain writePaths or sharedPaths from earlier sessions, but no
+edit is planned for them in session 253:
+
+- `occupancy.rs`, `occupancy/tests.rs` and `route_view.rs`;
+- `prepared.rs`;
+- `source.rs`, `source/issued.rs` and `nested.rs`.
+
+Edit one of them only to fix a compile error that this session's change
+causes, and record that edit in the receipt. The cohort goes from 952 to 953
+because of the one new file.
+
+### TASK-005: Issued member binder (`lookup/authority.rs`, `lookup.rs`)
+
+**Status**: Not Started
+**Parallelizable**: No (TASK-006 calls it)
+
+1. **Move `selected_policy` into `authority.rs`.** `selected_policy` is a private
+   method on `RetainedIndexAddress` (`lookup.rs:519-581`). It reads only
+   `self.owner.authority`.
+   - Move its body unchanged into `authority.rs` as:
+     `pub(in crate::song::snapshot::occupancy) fn selected_policy_in(authority: LookupAuthority<'_>, selected: &FrozenSelectedSource, boundary: &SourceBoundaryRef<'_>, depth: u32, budget: &mut ProjectionBudget<'_>) -> Result<Option<Vec<u32>>, Failure>`.
+   - The `lookup.rs` method keeps its signature, and its body becomes a single
+     call:
+     `authority::selected_policy_in(self.owner.authority, selected, boundary, depth, budget)`.
+   - `LookupAuthority` is `Copy` (`lookup.rs:10`), and `policy_path` already
+     lives in `authority.rs`.
+   - Behavior, charges and error strings stay byte-identical. The error
+     strings are `ambiguous exact selected policy parent use` and
+     `source boundary producer does not authenticate original use`.
+   - `lookup.rs` gets shorter.
+2. **Add the query type and the binder in `authority.rs`.** The contract is
+   pinned and has 5 parameters:
+
+   ```rust
+   pub(crate) struct IssuedMemberQuery<'a, 'p> {
+       pub(crate) site: crate::song::routing::PreparedSiteRef<'a>,
+       pub(crate) owner: &'p CanonicalOwnerFrame,
+       pub(crate) selected: &'p crate::song::snapshot::FrozenSelectedSource,
+       pub(crate) handle: &'p crate::song::EventHandle,
+   }
+   pub(crate) fn bind_issued_member<'a>(
+       query: &IssuedMemberQuery<'a, '_>,
+       transcript: &'a IssuedQueryTranscript,
+       seals: &'a [Rc<InvocationSeal>],
+       work: &SharedIndexWork,
+       depth: u32,
+   ) -> Result<RetainedSourceMember<'a>, Failure>
+   ```
+
+   Behavior, in order:
+   - Set `authority = LookupAuthority::Issued(query.site.authority())`.
+   - Look up `part = authority.inventory().parts.get(query.selected.root_part)`.
+     If it is absent, fail with `member source root`, exactly as
+     `bind_member` does (`lookup.rs:775-781`).
+   - For each seal in `seals`, in order:
+     - Call `actual = transcript.invocation(seal, work, depth)?`. This uses the
+       fresh clock and already authenticates the seal.
+     - Inside `with_work(work, |limits, remaining| ...)`, with one
+       `ProjectionBudget`, call
+       `actual.lookup_clock().retained_sources(actual.lookup_owner(), depth, &mut budget)?`.
+       This is the same call `bind_issued_owner_if_matching` makes at
+       `authority.rs:366-368`.
+   - For each boundary, apply these four checks in order. Skip the boundary
+     at the first check that fails:
+     1. `same_intrinsic_owner(boundary.policy_parent()?, query.owner)`;
+     2. `boundary.policy_matches(part.revision, part.duration, query.selected, &mut budget)?`;
+     3. `selected_policy_in(authority, query.selected, &boundary, depth, &mut budget)?` is `Some(edges)`;
+     4. `boundary.member(query.handle, depth, &mut budget)?` is `Some(origin)`.
+   - Result rule:
+     - Keep the first match as `(origin, edges)`.
+     - Accept a later match only if `std::ptr::eq(origin, kept_origin)` and
+       `edges == kept_edges`. Otherwise fail with
+       `ambiguous original member binding`.
+     - If no seal yields a match, fail with
+       `original source membership missing`.
+   - Return `RetainedSourceMember { origin, edges }`. Its private fields are
+     visible here because `authority.rs` is a child of `lookup.rs`.
+   - Never rebase, clip or copy the origin. The original source START is
+     whatever the retained origin holds.
+3. Do not touch `bind_member`, `bind_issued_owner`,
+   `bind_issued_owner_if_matching` or `bind_issued_index`.
+
+Code to imitate:
+
+- `lookup.rs:bind_member` (lines 765-800) for the loop and the error strings.
+- `authority.rs:bind_issued_owner_if_matching` (lines 268-376) for the
+  `with_work` work bridging and the fresh `transcript.invocation` call.
+
+### TASK-006: Stage call site, owner filter, parent-use policy, hard failure
+
+**Status**: Not Started
+**Parallelizable**: No (depends on TASK-005)
+**Deliverables**: `src/song/routing/nested/issued/members.rs` (new),
+`src/song/routing/nested/issued.rs`,
+`src/song/routing/configuration/index/canonical.rs`
+
+1. **`nested/issued.rs`.** Add `mod members;` at item level, not inside
+   `mod tests`. `members.rs` is a child module, so it can reach `Stage`,
+   `IssuedResolution`, `WorkBridge` and `sync_local_work` through `super::`.
+2. **`members.rs`** holds the four `pub(super)` helpers below. The signatures
+   are indicative; keep each one below 8 parameters.
+   - `fn owner_matches(frame: &CanonicalOwnerFrame, stage: &Stage<'_>) -> bool`
+     is true if and only if all four hold:
+     - `frame.root == stage.output_owner.payload().id`;
+     - `frame.track == stage.handle.track()`;
+     - `frame.revision == stage.handle.revision()`;
+     - `frame.placement == *stage.handle.placement()`.
+
+     This is exactly the predicate that session 251 removed. See the first
+     hunk of `git diff 1ac457f 6543273 -- src/song/routing/nested/issued.rs`.
+   - `fn stage_owner_frame(...)` walks `context.seals` in order.
+     - For each seal it calls `transcript.invocation(seal, bridge.work, depth)`
+       and charges it through the bridge. Use the same
+       before/after/`sync_local_work` pattern as `nested/issued.rs`
+       lines 551-559.
+     - It returns the `lookup_owner()` of the first seal for which
+       `owner_matches` is true.
+     - If no seal matches, it fails with the existing string
+       `issued Index timing has no matching fresh invocation`.
+   - `fn parent_use_policy(...) -> Result<Option<PreparedPolicyRef<'_>>, Failure>`:
+     - It returns `None` when `stage_index == 0`.
+     - Otherwise it uses the enclosing stage, `stages[stage_index - 1]`.
+       Index 0 is the outermost stage: in `inherited_policy_route`,
+       `stages.get(index + 1)` is the inner one.
+     - It builds the enclosing stage's site with
+       `prepared.site(output_scopes[stage_index - 1], enclosing.handle.track(), ...)`.
+     - It returns
+       `Some(prepared.policy(enclosing_site, enclosing.identity.policy as usize, ...))`.
+   - `fn bind_timing_member(...)` builds
+     `IssuedMemberQuery { site, owner: stage_owner_frame, selected, handle: bound.timing.subject_handle() }`.
+     - `selected` is the stage consuming policy,
+       `prepared.policy(site, stage.identity.policy as usize, ...)`, bound
+       with `bind_original`.
+     - It calls
+       `bind_issued_member(&query, transcript, context.seals, bridge.work, depth)`
+       inside the same work-bridge pattern as lines 568-583.
+     - The returned member is dropped after success, because it serves only
+       as an authentication gate. Do not thread it into `configuration.rs`
+       unless a failing test proves that the geometry consumer needs it.
+3. **Changes in `issued_index_stage_configuration`.** Inside the
+   `for (timing_index, timing)` body, after `bound`, `site` and `selector` are
+   built and before `let mut timing_result = None;`:
+   - Call `stage_owner_frame`, then `bind_timing_member`. An error from either
+     one fails the event.
+   - Compute `parent_use = parent_use_policy(...)` once per timing.
+4. **Changes in the seal loop:**
+   - Restore the owner-frame filter. Keep the fresh invocation result
+     (`let actual = transcript.invocation(...)`), and `continue` when
+     `!members::owner_matches(actual.lookup_owner(), stage)`.
+   - Pass `parent_use` to `bind_issued_index` instead of `Some(policy)` of the
+     consuming policy.
+   - The consuming-policy lookup at lines 560-567 moves into
+     `bind_timing_member`. Remove it from the loop if the loop no longer uses
+     it.
+   - Keep `let Some(operand) = operand else { continue; };`. It covers an owner
+     seal that has no retained request at this site.
+   - `selected` becomes
+     `operand.policy().map(|p| p.bind_original(...)).transpose()?`, which is
+     an `Option<&FrozenSelectedSource>`, and is passed straight to
+     `issued_index_configuration`.
+   - Drop the `issued index policy binding missing` error, because `None` is
+     now legal for the outermost stage.
+   - Restore the hard failure. If `issued_index_configuration(...)?` returns
+     `None`, the event fails with
+     `issued Index event has no canonical component`, as at `1ac457f`. Remove
+     the `else { continue; }`.
+   - The conflict error and the `no matching fresh invocation` error stay
+     unchanged.
+5. **`canonical.rs`.** In `canonical_index_configuration_issued`:
+   - Delete the
+     `if let Some(selected) = selected { ... bind_member(...) ... }` block
+     (lines 416-428).
+   - Remove the now-unused `limits` binding if clippy flags it.
+   - Leave `validate_issued_binding`, `empty_source` and
+     `row_source_window` unchanged.
+   - Keep the `bind_member` import, which is still used at line 323.
+6. **Line limits.** `nested/issued.rs` must end at no more than 949 lines, so
+   that the 2c Euclid witness (at most 50 lines) still fits below 1000. Move
+   helper bodies into `members.rs` rather than growing `nested/issued.rs`.
+
+### TASK-007: Fixture integrity restorations (`nested/issued.rs` tests)
+
+**Status**: Not Started
+**Parallelizable**: No (verify together with TASK-006)
+
+Diff the tests module against `1ac457f` and `6543273`, both before and after
+the edits.
+
+- **`issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`.** Restore
+  the `1ac457f` shape: use `capture(program)`, `prepare` and `attached_work`,
+  and take the first event (`batch.events().first()`). Assert all four:
+  1. the legacy
+     `prepare_routes(song.snapshot(), &CapabilitySet::native(), &capacities())`
+     is `Ok` (keep the legacy plan it returns);
+  2. `resolve_route(&legacy_plan, event.descriptor(), limits())` is `Err`, and
+     its message contains `sampled context requires joint mapping geometry`;
+  3. `routes.resolve_issued_event(&batch, 0, &work, 0)` is `Ok`;
+  4. same handle: the handle checked on the legacy path equals the handle of
+     the issued event at index 0.
+
+  The program is the `1ac457f` program with at most two substitutions:
+  - a static Index list (`[0 nil]`), with the `fn cut` line dropped;
+  - only under the session 252 conditional Euclid rule: `euclid` replaced by
+    `segment` or `grid` over the same Slice.
+
+  Record `jointGeometryFixture`: `"euclid"`, or `"euclid-deferred-to-2c"` plus
+  the combinator used. Remove the nested-slice program and the "some event
+  hits the barrier" loop. If no allowed program reaches the legacy barrier
+  while the issued path resolves, stop and report the exact messages.
+- **`discarded_augmented_source_origins_are_resolved`.** Change `[cut]` to
+  `[0]` and drop the `fn cut` line. Change nothing else.
+  - If preparation still refuses, apply the session 251 density seam rule.
+  - If `found_discarded_augmented` then fails, stop and report. Do not weaken
+    the test.
+- **`distinct_equal_handle_invocations_are_all_resolved`.** Restore
+  `slice p 2` in `inner` and in both `outer` stack arms; session 251 had
+  changed them to `slice {beat -> p} 2`. Keep `[0 nil]` and the added
+  seal-debit assertion. If the restored fixture has no event with two or more
+  distinct seals (the `ok_or_else` after the `find`), stop and report.
+- **`cached_nested_slice_events_resolve_from_issued_transcript`** and
+  **`partitioned_nested_issued_queries_equal_the_full_route_set`.** Keep their
+  `[cut nil]` to `[0 nil]` changes, which are authorized SM4 substitutions.
+  Make no other change.
+- No other test line changes. No assertion is deleted or loosened.
+
+### Invariants
+
+- Legacy APIs and their outputs are unchanged. Legacy fixture tests pass with
+  zero edits.
+- Only allocation identity grants membership: `std::ptr::eq` on the origin,
+  and `Rc` seal authentication. Scalar equality never grants it.
+- Every contributor authenticates before `timing_result` coalescing and before
+  the `result` intersection.
+- Work comes only from the caller's `SharedIndexWork`, through the bridge.
+  There is no fresh budget, and no `RefCell` borrow is held across transcript
+  calls.
+- Every touched Rust file stays below 1000 lines. `nested/issued.rs` ends at
+  no more than 949 lines, and `source.rs` at no more than 993.
+- The three unowned paths equal `6543273`. `.agents/settings.local.json` is
+  not touched.
+
+### Key pitfalls (do not)
+
+- Do not call or modify the legacy `bind_member` from the issued path.
+- Do not walk only the owner seal's clock. The boundaries live on source-side
+  seals; per the diagnosis, seal 0 has none and seals 1 and 2 hold them.
+- Do not count one boundary seen in two seals as ambiguous. Compare origins by
+  `std::ptr::eq` and edges by value.
+- Do not pass the stage consuming policy to `bind_issued_index` any more. That
+  argument is now the address parent-use policy.
+- Do not keep any `continue` for a `None` canonical component on an
+  owner-matching bound seal.
+- Do not skip the owner-frame filter on the grounds that `bind_issued_index`
+  already filters. It does not: its `None` is scoped to the site, not to the
+  seal.
+- Do not run rustfmt in write mode on `lookup.rs` or `occupancy.rs`, whose
+  children are unowned. Running it on `nested/issued.rs` also formats the
+  owned `members.rs` and is allowed. Prefer `--check` plus hand formatting.
+- Do not fix `clippy::let_and_return` at `src/song/snapshot/issued.rs:231`.
+  It is `SW-let_and_return` and belongs to 2b.
+
+### Tests (input -> expected outcome)
+
+- `cached_nested_slice_events_resolve_from_issued_transcript` -> passes, with
+  no `original source membership missing`.
+- `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` (restored)
+  -> the legacy plan is `Ok`, the legacy error contains the barrier text, the
+  issued path is `Ok`, and the handle is the same.
+- `distinct_equal_handle_invocations_are_all_resolved` (with `slice p 2`) ->
+  passes, with at least two distinct seals on the chosen event.
+- `partitioned_nested_issued_queries_equal_the_full_route_set` -> passes.
+- `discarded_augmented_source_origins_are_resolved` (static list) -> passes,
+  and `found_discarded_augmented` is true.
+- `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct` and
+  `distinct_sites_sharing_one_execution_are_retained_separately` -> still
+  pass.
+- Legacy fixtures in `snapshot::occupancy` (geometry_tests, domains,
+  lookup_tests) -> pass unchanged.
+- Legacy binaries `song_route_preparation`, `song_source_routes`,
+  `song_end_to_end` and `song_checker` -> pass unchanged.
+
+No new test is added. The five resolver tests are the owning evidence.
+
+### Session 253 execution steps (in order)
+
+1. Copy the current `tmp/song-mode-riela/session249-resolution-*` files to
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session252/`, and record
+   their sha256 values.
+2. Rewrite `tmp/song-mode-riela/session249-resolution-intent.json`.
+   - It holds the design sha256, the plan sha256, and the sha256 and full
+     text of every session-253 path in the table above. `members.rs` is
+     recorded as absent.
+   - Re-read and hash-check each file before every edit. On drift, stop and
+     reconcile from the current file.
+3. Reproduce. Run named-tests command 1 below with its output redirected to
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/reproduce.log`. Record
+   the exit status. Exit 100 with five failures is expected.
+4. Implement TASK-005, then TASK-006, then TASK-007. After each task, run
+   `CARGO_TERM_QUIET=true cargo build` and keep its log under
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/`.
+5. Run every verification command below in order, in the foreground.
+6. Write the receipt `tmp/song-mode-riela/session249-resolution-receipt.json`.
+   It records:
+   - the Clippy disposition table (D-, `RES-`, `SW-` and `ST-` rows);
+   - `densityIndex`;
+   - `jointGeometryFixture`;
+   - `seams` (whether `configuration.rs` and `density/index.rs` were
+     edited);
+   - the cohort count (953);
+   - the line counts;
+   - the `git diff --quiet` result for the unowned paths;
+   - `evidenceFingerprint`, the sha256 of the receipt.
+
+   The fingerprint must differ from `04db7146...`, `4945fec7...`,
+   `15c388bd...`, `0493996e...` and
+   `3c6c504cf4e66accaf04cfedecab68895eb0e40dc149be59dbd60b203f277db6`.
+7. Add one progress-log entry to this plan listing every command, exit status
+   and log path. Edit no other plan.
+
+### Session 253 verification (foreground; record the exit status and full log path)
+
+1. Named tests. This command starts the focused log:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib cached_nested_slice_events_resolve_from_issued_transcript issued_joint_geometry_resolves_where_legacy_keeps_its_barrier distinct_equal_handle_invocations_are_all_resolved partitioned_nested_issued_queries_equal_the_full_route_set discarded_augmented_source_origins_are_resolved actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct distinct_sites_sharing_one_execution_are_retained_separately > tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   It must exit 0 with 7 tests passed.
+2. Occupancy, legacy fixtures and Route8:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/snapshot::occupancy|routing::prepared/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   It must exit 0.
+3. Resolver filter:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/routing::(source|nested)::issued|prepared::tests/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   It must exit 0 with 0 failed.
+4. Legacy binaries:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
+   It must exit 0.
+5. `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-resolution-build.log 2>&1`
+   must exit 0.
+6. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-resolution-clippy.log 2>&1`
+   may exit nonzero only for diagnostics that each map to a disposition row.
+   In this plan's paths, only `dead_code`/`unused_imports` on listed items are
+   allowed.
+7. Full suite:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run > tmp/song-mode-riela/session249-resolution-nextest-full.log 2>&1`
+   It must exit 0 and run at least 425 distinct tests.
+8. `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-resolution-wasm.log 2>&1`
+   must exit 0.
+9. `rustfmt --edition 2021 --check src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/snapshot/occupancy/lookup.rs src/song/routing/configuration/index/canonical.rs src/song/routing/configuration.rs src/song/routing/source.rs src/song/routing/source/issued.rs src/song/routing/nested.rs src/song/routing/prepared.rs src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/tests.rs src/song/snapshot/occupancy/route_view.rs > tmp/song-mode-riela/session249-resolution-fmt.log 2>&1`
+   passes when no `Diff in` line names one of these paths. Add
+   `src/song/routing/density/index.rs` to the list if it was edited.
+10. `wc -l` on the same paths plus `src/song/routing/density/index.rs`:
+    - each file is below 1000 lines;
+    - `nested/issued.rs` is at most 949;
+    - `source.rs` is at most 993.
+11. `git diff --quiet 6543273 -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+    must exit 0.
+12. `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+    prints 953.
+
+### Session 253 done criteria (mechanically checkable)
+
+- [ ] `grep -n "fn bind_issued_member\|struct IssuedMemberQuery\|fn selected_policy_in" src/song/snapshot/occupancy/lookup/authority.rs`
+  shows all three.
+- [ ] `grep -c "bind_member" src/song/routing/configuration/index/canonical.rs`
+  is 2: the import and the legacy call (formerly line 323). No issued call
+  remains.
+- [ ] `git diff 6543273 -- src/song/snapshot/occupancy/lookup.rs` touches only
+  `selected_policy`, whose body is replaced by the delegation.
+- [ ] `grep -n "issued Index event has no canonical component" src/song/routing/nested/issued.rs`
+  matches an `ok_or_else` or `Err` path, and no `else { continue; }` follows
+  `issued_index_configuration`.
+- [ ] `grep -n "lookup_owner" src/song/routing/nested/issued.rs src/song/routing/nested/issued/members.rs`
+  shows the owner-frame filter in the seal loop.
+- [ ] `grep -n "mod members;" src/song/routing/nested/issued.rs` matches.
+- [ ] The test hunks of `git diff 1ac457f -- src/song/routing/nested/issued.rs`
+  show only the classified TASK-007 changes, and
+  `grep -n "sampled context requires joint mapping geometry" src/song/routing/nested/issued.rs`
+  matches inside the joint-geometry test.
+- [ ] Verification commands 1-5, 7, 8, 11 and 12 exit 0 or print the required
+  value. Command 6 is fully dispositioned, and commands 9 and 10 meet their
+  rules.
+- [ ] No new `#[allow` or `#[expect` attribute:
+  `git diff 6543273 | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [ ] The receipt holds `jointGeometryFixture`, `densityIndex`, `seams`,
+  cohort 953, and a fingerprint distinct from the five prior values.
+- [ ] One progress-log entry is added.

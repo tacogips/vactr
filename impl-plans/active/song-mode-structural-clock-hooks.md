@@ -442,3 +442,23 @@ If it is edited, add it to the focused filter
   committed changes, which means this sub-wave made none.
 - [ ] No `ST-` row remains. Strict Clippy has no non-dead-code lint in this
   plan's paths.
+
+## Session 253 note (wave 2c, serial)
+
+Source: the design section "Session 253 resume amendments". The scope, paths,
+tests and done criteria of this plan are unchanged. Only these facts change:
+
+- 2a adds the child module `src/song/routing/nested/issued/members.rs`. It is a
+  2a file. This plan never edits it.
+- 2a leaves `src/song/routing/nested/issued.rs` at no more than 949 lines. The
+  conditional Euclid witness (at most 50 lines) must keep the file below 1000.
+- Use the conditional seam only if the 2a receipt records
+  `"euclid-deferred-to-2c"`. When it is used:
+  - The witness copies the restored 2a joint-geometry test: one Slice under
+    one sampling combinator, the first event, and the same four assertions.
+  - It does not copy the session-251 nested-slice form.
+- `rustfmt --check` on `nested/issued.rs` also checks `members.rs`. A `Diff in`
+  hunk reported for `members.rs` is recorded, not fixed. It belongs to 2a.
+- The cohort is 953 at the start of this sub-wave and stays 953.
+- `git diff --quiet` checks for the unowned paths use `6543273` or the 2a join
+  commit as the base, not `980083a`.

@@ -970,3 +970,35 @@ still applies.
   - `partitioned_nested_issued_queries_equal_the_full_route_set`
   - `discarded_augmented_source_origins_are_resolved`
 - **No Rust edits.** Wave 4 still edits no Rust or test file.
+
+### Session 254 amendment (wave 4, SONG-16)
+
+The source of truth is the design section "Session 254 resume amendments
+(2026-10-04)". This amendment supersedes the session 252-253 items it
+conflicts with. Everything else in the earlier sections still applies.
+
+- **Order.** SONG-16 runs last, after 2c, then 2a, then 2b, then wave 3. Each
+  of those is joined and committed first.
+- **Cohort.** The cohort equals the wave-3 join value: 954, or 955 with
+  `src/host/caps/song/preparation/issued.rs`. Changed hashes are additionally
+  allowed on `src/song/snapshot/occupancy/geometry_tests/domains.rs`, which is
+  a 2c writePath in session 254.
+- **Format gate file list.** Add
+  `src/song/snapshot/occupancy/geometry_tests/domains.rs`. Never run rustfmt
+  in write mode on it.
+- **No Euclid witness.** `issued_euclid_joint_geometry_resolves_after_structural_clock`
+  no longer exists. Do not list it. The 2a receipt's `jointGeometryFixture`
+  is `"euclid"`.
+- **Requirement evidence names.** Read the actual test names from the 2a and
+  2c receipts, because `discarded_augmented` and the `domains` test may be
+  renamed. The final receipt lists:
+  - the five 2a resolver tests;
+  - the 2c `domains` test with its Euclid positive branch and Chunk refusal;
+  - the six repaired structural tests and the Euclid depth-boundary test.
+
+  All of these are taken from the full run.
+- **Full suite.** The final full nextest adds `--no-fail-fast` and must exit 0
+  with every test run.
+- **Required final gates (unchanged).** Build, strict Clippy, focused nextest,
+  full nextest, WASM, `rustfmt --check` on the touched files, the cohort
+  check, and the editor npm test and build.

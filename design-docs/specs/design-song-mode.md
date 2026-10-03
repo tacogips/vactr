@@ -1622,3 +1622,223 @@ restorations, and the ownership these need. Nothing else changes.
   2. 2c, including the Euclid inherited-depth boundary test;
   3. wave 3, with the staged atomic commit in `src/sched/song/pools.rs`;
   4. SONG-16 requirement-level evidence.
+
+### Session 254 resume amendments (2026-10-04)
+
+Session 253 left `a8b8ed2` with unreviewed partial code for 2a, 2b and 2c and
+six failing tests in full nextest. The design above and the session 251-253
+amendments stay the baseline. These amendments apply the operator diagnosis
+(`tmp/song-mode-riela/session253-root-cause-diagnosis.md`). Where they conflict
+with an earlier amendment, they supersede it. SONG-ROUTE8 stays accepted and is
+not redispatched.
+
+- **Serial order.** The order is now SONG-STRUCTURAL-CLOCK (2c), then
+  SONG-ISSUED-RESOLUTION (2a), then SONG-SHARED-WORK (2b), then
+  SONG-ISSUED-PLAYBACK (wave 3), then SONG-16. 2c has no real dependency on 2a
+  or 2b: session 249 ran them in parallel, and its writePaths do not overlap
+  theirs. 2c goes first because its committed partial code breaks full nextest,
+  and a red full suite blocks every other plan's gate. Each step is reviewed,
+  accepted and committed before the next starts.
+- **Euclid joint-geometry seam dropped.** 2a now runs after 2c. The 2c
+  conditional sharedPath on `src/song/routing/nested/issued.rs` and its
+  `issued_euclid_joint_geometry_resolves_after_structural_clock` witness
+  (session 252/253 notes) are therefore removed. 2a keeps the Euclid program
+  already in `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`.
+  The legacy barrier this test asserts is the routing `NeedsJointGeometry`
+  refusal (`sampled context requires joint mapping geometry`). It is
+  independent of the clock dispatch, so it still holds after Euclid's clock is
+  instrumented.
+
+#### Structural clock (2c) repair
+
+- **Real builtin arities.** The fixtures are reconciled to the existing
+  builtins. No arity is added. `euclid` takes three positional arguments
+  (pattern, pulses, steps) plus the `rotation:` keyword, which defaults to 0
+  (`src/types/natives_domain.rs:214`, `src/vm/natives/pattern.rs:271-278`).
+  `chunk` takes three: pattern, divisions and a function
+  (`natives_domain.rs:198`). Changing these signatures would change the public
+  language surface, which the plan's non-goals exclude ("No new public
+  operators"), and would touch files outside its writePaths. The fixture
+  rewrites keep each program's meaning, so no assertion changes:
+  - `euclid X 1 2 0` becomes `euclid X 1 2`, and `euclid X 2 4 0` becomes
+    `euclid X 2 4`. Rotation is 0 either way.
+  - `euclid X 3 8 1` becomes `euclid X 3 8 rotation: 1`. This also applies to
+    the session 251 depth-boundary program.
+  - `chunk X 2` becomes `chunk X 2 {q -> fast q 2}`, the form
+    `tests/song_source_conditionals.rs:100` already uses.
+  - `euclid {chop ...} 3 0` has three positional arguments, but it means
+    3 pulses over 0 steps. Session 253 evidence shows it fails with
+    `euclid steps must be between 1 and 4096`. It becomes
+    `euclid {chop ...} 3 8`, which keeps 3 pulses and rotation 0. Its
+    assertions are not tied to the step count. (This bullet was corrected at
+    plan creation, citing
+    `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/full-nextest-post-helper.log`
+    line 570.)
+  - That full run stopped at fail-fast after 1229 of 2791 tests. Every 2c
+    full-suite gate therefore uses `--no-fail-fast`, so that all failures are
+    listed.
+
+  These edits are confined to `src/pattern/eval/song_clock/structural_tests.rs`.
+  `src/pattern/eval/song_clock/tests.rs` stays unedited. Line 64 is only where
+  the shared harness reports the type error.
+- **Euclid is a declared behavior change.** The Euclid barrier is not
+  restored. Euclid stays in the instrumented arm of `with_clock_dispatch`
+  (`src/pattern/eval/song_clock/dispatch.rs:13`), as Wave 2c intends. The
+  observable change is this: a canonical Index consumer over Euclid-sampled
+  Slice music now gets a `Known` clock and consumes successfully. Before, it
+  refused with `FailCode::Type` because the clock was `Unknown`. Legacy
+  `resolve_route` still refuses sampled contexts at its `NeedsJointGeometry`
+  barrier, and Chunk stays `Unknown`.
+- **`domains.rs` ownership and replacement evidence.** 2c adds
+  `src/song/snapshot/occupancy/geometry_tests/domains.rs` as its seventh Rust
+  writePath. It is a test file, and this is the only snapshot-side change the
+  plan's "no routing, snapshot or replay files" non-goal permits. In
+  `unsupported_and_continuous_index_evidence_refuse_without_callback_fallback`:
+  - The continuous `range saw` case is unchanged.
+  - The Euclid body leaves the refusing branch. A positive branch replaces it.
+    Under `deny(snapshot)`, `consume` must return `Ok` for every owner address
+    of `request.revision`, with at least one address. The callback read count
+    stays 0, and the prior replay `Rc` is unchanged (`Rc::ptr_eq`).
+  - The refusing branch keeps every existing assertion: `FailCode::Type`,
+    `refused > 0`, the unchanged replay `Rc` and zero reads. It now runs on a
+    still-unsupported operator:
+    `chunk {slice {beat -> nil} 1 [cut]} 2 {q -> fast q 2}`. If Chunk yields
+    no refused address, the sub-wave stops and reports. It does not drop
+    `refused > 0`.
+  - The test may be renamed only if its new name still says that unsupported
+    evidence refuses. The receipt classifies the diff line by line against
+    `a8b8ed2`.
+
+  Further replacement evidence comes from `structural_tests.rs`. It covers the
+  Euclid `Known` projection, the empty subject, nested orientation, split
+  queries and exact/one-less work, plus the Euclid inherited-depth boundary
+  test (session 251 contract, unchanged).
+- **2c gates.** The focused filter adds `test(/geometry_tests::domains/)`.
+  Full nextest must exit 0 except for failures that the receipt names as owned
+  by 2a, with exact test names. After this repair, the only failures allowed
+  are the five 2a resolver tests listed below. Any other failure fails 2c. The
+  cohort stays 953. The unchanged rules are the seven-barrier scope, Chunk
+  staying `Unknown`, no edits to `combinators/input.rs` or
+  `song_clock/tests.rs`, and every file staying below 1000 lines.
+
+#### Issued resolution (2a) decisions
+
+- **Owner-frame predicate (supersedes session 253 "Hard failure restored").**
+  `owner_matches` (`src/song/routing/nested/issued/members.rs:5-10`) took
+  `root` from the stage output owner but `track`, `revision` and `placement`
+  from `stage.handle`. That handle is the stage *input* event
+  (`issued.rs:247-262`), so the four fields named two different owners and
+  never matched. All four fields now come from the stage *output*:
+  - `root` stays `stage.output_owner.payload().id`;
+  - `track`, `revision` and `placement` come from the stage output handle. For
+    stage 0 that is `event.handle`. For stage `k > 0` it is
+    `stages[k-1].handle`.
+
+  `event.handle` is passed into `members::issued_index_stage_configuration`.
+  The predicate keeps all four fields and adds no scalar shortcut.
+- **Retained execution versus site request (the "not retained at site"
+  decision).** In `bind_issued_owner_if_matching`
+  (`src/song/snapshot/occupancy/lookup/authority.rs:409-518`), two facts are
+  checked separately, and both must hold:
+  1. *Site request exists.* The current selector scan is unchanged. It
+     requires an authenticated record with this site's scope, track, exact
+     issuer and exact prefix, a window covering the owner window, and the same
+     original payload allocation. If there is none, the result is `Ok(None)`,
+     as today.
+  2. *Execution authentically retained.* The fresh seal's execution must be
+     retained, with exact `Rc` identity through
+     `transcript.authentic_retained_invocation`, by a retained invocation in
+     *any* record of the route authority view. Every such record belongs to
+     the same original Song, because the view has exactly one. That record
+     must pass `authenticate_authority`. Its retained invocation must equal
+     the fresh one on owner frame, seed and entry, which are the existing
+     comparisons. Identity is never relaxed. Value-equal, handle-equal or
+     scalar-equal executions grant nothing, and the depth check stays.
+
+  The bound request is chosen as follows. If a site-matching record itself
+  retains the execution, that record's request is bound, exactly as today. So
+  every currently passing path keeps its binding. Otherwise the first
+  site-matching request in record order is bound, provided fact 2 holds. If
+  fact 1 holds and fact 2 fails, the call still fails with
+  `required issued execution is not retained at site`. The added scan over
+  non-site records is charged at the existing per-record and per-invocation
+  rates through the same `ProjectionBudget` and counted by
+  `limits.check_events`. The legacy lookup binding in
+  `src/song/snapshot/occupancy/lookup.rs` and `resolve_route` do not change.
+
+  Why: issued replay can serve an inner Slice site with the execution retained
+  under the enclosing record. The diagnosis observed the stage-1 seal
+  `rev2/[5,2]` recognized only by the outer record (scope 4, invocation 5),
+  while the inner-site records at scopes 2 and 3 hold separate executions.
+  Requiring both facts in one record would refuse a genuine execution.
+  Dropping either fact would accept foreign or unretained work.
+- **Duplicate frozen `inside` (investigation, not a fix).** 2a records in its
+  receipt why the selector used scope 2 while the selected sources came from
+  part 3. If parts 2 and 3 are separate placements of the same reusable
+  function, each owns its own frozen copy. That is expected, and the binding
+  must not merge them by value. If instead the stage output scope is computed
+  wrongly, that is a 2a defect in `nested/issued.rs` or `members.rs`, fixed
+  there. Either outcome is recorded with its owner frames. No change outside
+  2a's paths follows from it.
+- **Fixtures (supersedes the session 253 fixture-integrity bullets where they
+  differ).**
+  - `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`: one
+    `PreparedSong` supplies the legacy plan and event, the retained route
+    authority (`PreparedSong::issue_retained_route_authority`,
+    `route_view.rs:488`) and the issued batch
+    (`PreparedSong::query_issued_with_work`, `snapshot.rs:306`). The
+    test no longer evaluates the program twice through `capture` and
+    `prepared_song`, so revisions match. All four assertions stay. The Euclid
+    program stays.
+  - `distinct_equal_handle_invocations_are_all_resolved`: use
+    `slice {beat -> p} 2 [0 nil]` in `inner` and in both `outer` stack arms.
+    This restores the session 251 amendment. `slice p 2` has a structured
+    subject, which `slice_index_root` (`src/song/routing/index.rs:172-173`)
+    correctly refuses, and that rule is not relaxed. The distinct-seal
+    selection, the `len() >= 2` assertion and the seal-debit assertion stay.
+  - `discarded_augmented_source_origins_are_resolved`: this is a declared
+    assertion change with replacement evidence. The handle-based
+    `found_discarded_augmented` predicate cannot be satisfied. Every frozen
+    contribution is value-equal to the descriptor origin, and a discarded
+    origin is visible only by allocation identity in live rows. The fixture
+    (static `[0]`) stays. The test selects an event with at least two source
+    contributions that carry slice timing, asserting that one exists, and
+    resolves it with `resolve_issued_event`. It then asserts that the work
+    debit is at least the contribution count. This mirrors the seal-debit
+    check. Two pieces of evidence replace the old assertion:
+    1. this stricter per-contribution debit;
+    2. the unchanged snapshot test
+       `fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority`
+       (`src/song/snapshot/issued.rs:551-595`). It proves by `Rc::ptr_eq` that
+       the same equal-handle union shape holds a discarded allocation with
+       post-seal timing.
+
+    The test may be renamed to describe the union. `density/index.rs` stays
+    unedited, and the receipt says so.
+  - `cached_nested_slice_events_resolve_from_issued_transcript` and
+    `partitioned_nested_issued_queries_equal_the_full_route_set` keep their
+    static lists and every assertion.
+- **2a acceptance.** The five tests pass: `cached_nested`,
+  `partitioned_nested`, `issued_joint_geometry`, `distinct_equal` and
+  `discarded_augmented` (or its renamed form). The session 252 named tests and
+  the legacy fixture groups pass with unchanged assertions. Full nextest is
+  green. The authority change is a 2a edit of `lookup/authority.rs`, which is
+  already a 2a writePath. The cohort stays 953.
+
+#### Carried forward unchanged
+
+- 2b: additive charged authentic retention in
+  `src/pattern/eval/song_replay.rs`. No fresh-only collector is allowed. 2b
+  also fixes `clippy::let_and_return` at `src/song/snapshot/issued.rs:231`
+  without `allow`/`expect`.
+- Wave 3: the production scheduler consumes issued routes, and
+  `src/sched/song/pools.rs` stages projections and commands, then commits
+  atomically.
+- SONG-16: requirement-level end-to-end evidence and the editor npm test and
+  build.
+- Gates, the unowned-path rules (`resources.rs`, `reservations_tests.rs` and
+  `clock_tests.rs` equal `HEAD`; `.agents/settings.local.json` untouched), and
+  `--check`-only formatting are unchanged. Session 254 evidence fingerprints
+  must differ from every prior receipt. Gate logs keep the plan-declared
+  `tmp/song-mode-riela/session249-*` names. Prior copies go to
+  `tmp/song-s249/<planId>/attempt-session253/`.

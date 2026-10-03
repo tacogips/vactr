@@ -463,3 +463,47 @@ Done criteria added:
   `git diff <2c-join-commit> -- src/song/routing.rs` is empty or limited to
   the one re-export line.
 - [ ] Strict all-target Clippy exits 0 (unchanged criterion).
+
+## Session 254 amendment (runs FOURTH, after 2c, 2a and 2b are accepted)
+
+The source of truth is the design section "Session 254 resume amendments
+(2026-10-04)", subsection "Carried forward unchanged", together with the
+existing Wave 3 sections. Scope, writePaths, sharedPaths, tests and done
+criteria are unchanged. Only these facts change:
+
+- **Order and base.** The serial order is now 2c, 2a, 2b, then this plan.
+  `dependsOn` is unchanged. Every `<2c-join-commit>` base in the session 252
+  section becomes the 2b join commit (`<2b-join>`), which is the last commit
+  before this plan starts.
+- **Cohort.** The cohort is 953 at entry. It becomes 954 with
+  `tests/song_issued_transport.rs`, or 955 if
+  `src/host/caps/song/preparation/issued.rs` is created.
+- **Full suite.** Every full nextest run adds `--no-fail-fast`. It must exit 0
+  with every test run and at least 425 distinct tests passed. Strict
+  all-target Clippy must exit 0. No `SW-`, `ST-` or `RES-` row may remain.
+- **Pool atomicity (unchanged, restated because it is adversarially
+  reviewed).**
+  - `src/sched/song/pools.rs` stages projections and encoded commands in a
+    charged staging copy.
+  - Commit swaps the stage in and pushes the commands only after the whole
+    batch succeeds.
+  - On any route, encoding, work or capacity failure, the old pools, queue,
+    cursor and pending receipts stay byte-identical.
+  - The failure-path test must assert that unchanged state explicitly.
+- **Issued routes in production.** `grep -n "dedup_by\|resolve_route(" src/sched/song.rs`
+  prints nothing. The scheduler resolves every envelope and contributor
+  through `PreparedRoutes::resolve_issued_event` before coalescing.
+- **Evidence.** Copy `tmp/song-mode-riela/session249-playback-*` to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session253/` with sha256 values
+  before rerunning. The new receipt fingerprint must differ from every earlier
+  playback receipt hash.
+- **Unowned paths.**
+  `git diff --quiet <2b-join> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+  must exit 0.
+
+### Session 254 done criteria
+
+- [ ] Every session 249-252 done criterion of this plan holds, with
+  `<2b-join>` as the diff base.
+- [ ] Full nextest with `--no-fail-fast` and strict Clippy both exit 0.
+- [ ] One progress-log entry is added.

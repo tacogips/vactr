@@ -1390,3 +1390,340 @@ The remaining required focused/full test and strict-Clippy gates do not pass.
 Do not mark this plan complete until the owner-frame/fixture mismatch and
 current-source verification failures are reconciled and all assigned resolver
 tests pass.
+
+## Session 254 amendment (runs SECOND, after SONG-STRUCTURAL-CLOCK is accepted; serial)
+
+The source of truth is the design section "Session 254 resume amendments
+(2026-10-04)", subsection "Issued resolution (2a) decisions", together with
+`tmp/song-mode-riela/session253-root-cause-diagnosis.md`. This section
+supersedes these session 253 items:
+
+- the `owner_matches` predicate (TASK-006 item 2);
+- the TASK-007 bullets for `issued_joint_geometry`, `distinct_equal` and
+  `discarded_augmented`;
+- the matching test expectations.
+
+Everything else from session 249-253 still applies. TASK-005 and the
+TASK-006 wiring stay as they are at `a8b8ed2`; do not redo them.
+
+### Intent and context
+
+At `a8b8ed2` five resolver tests fail. The diagnosis gives three causes.
+
+- **(a) Owner predicate.** `members.rs:5-10` compares `root` from the stage
+  OUTPUT owner with `track`, `revision` and `placement` from `stage.handle`.
+  `stage.handle` is the stage INPUT event (`issued.rs:247-262`), so no seal
+  ever matches.
+  - Once fixed, `issued_joint_geometry` fails only because it evaluates the
+    program twice, so its revisions differ.
+  - The nested tests then hit `required issued execution is not retained at
+    site` (`authority.rs:505`). The fresh seal's execution is `Rc`-retained
+    only by the enclosing record (scope 4), while the inner-site records
+    (scopes 2 and 3) hold separate executions.
+- **(b)** `distinct_equal` uses `slice p 2` with a structured subject.
+  `slice_index_root` (`src/song/routing/index.rs:172-173`) correctly refuses
+  it.
+- **(c)** The `discarded_augmented` handle predicate cannot be satisfied.
+  Every frozen contribution is value-equal to the descriptor origin.
+
+### Non-goals
+
+- Same as session 253: no legacy behavior change, no relaxed first-structure
+  rule or legacy barrier, no SM4 dynamic admission, and no edits to 2b, wave-3
+  or unowned paths.
+- No relaxation of `Rc` identity anywhere. A value, handle or scalar match
+  never stands in for `transcript.authentic_retained_invocation`.
+- No new public API, no new file and no new test helper file.
+- No edits to `src/pattern/eval/song_clock*`, `src/pattern/combinators/*` or
+  `geometry_tests/domains.rs`. Those belong to SONG-STRUCTURAL-CLOCK, which is
+  already accepted by then.
+
+### Owned paths for session 254
+
+| Path | Kind | Allowed edit |
+|---|---|---|
+| `src/song/routing/nested/issued/members.rs` | writePath | TASK-008: output-handle owner predicate and its threading |
+| `src/song/routing/nested/issued.rs` | writePath | TASK-008: pass `&event.handle` at the call site (line 373). TASK-010: test fixtures. TASK-011: only if the investigation proves a scope defect. |
+| `src/song/snapshot/occupancy/lookup/authority.rs` | writePath | TASK-009: the two-fact split in `bind_issued_owner_if_matching` |
+| `src/song/routing/prepared.rs` | writePath | Unchanged unless a compile error caused by TASK-009 forces an edit. Record any such edit. |
+
+Every other 2a path from earlier sessions stays declared but should not need
+an edit. `src/song/routing/density/index.rs` stays unedited; the diagnosis
+shows the static `[0]` fixture passes preparation. Record it as "authorized,
+unedited".
+
+### TASK-008: Owner-frame predicate on the stage OUTPUT handle
+
+**Status**: Not started
+**Parallelizable**: No
+**Deliverables**: `members.rs`, plus one call-site line in `nested/issued.rs`
+
+- Change `owner_matches` to take the stage output handle explicitly. Use the
+  handle type of `Stage::handle`:
+  `pub(super) fn owner_matches(frame: &CanonicalOwnerFrame, stage: &Stage<'_>, output_handle: &<Stage::handle type>) -> bool`.
+  It returns true if and only if all four hold:
+  - `frame.root == stage.output_owner.payload().id`;
+  - `frame.track == output_handle.track()`;
+  - `frame.revision == output_handle.revision()`;
+  - `frame.placement == *output_handle.placement()`.
+- `stage_owner_frame` gains the same `output_handle` parameter and passes it
+  through.
+- `issued_index_stage_configuration` gains one parameter,
+  `event_handle: &<same type>`, which makes 7 parameters (the limit is 7).
+  Inside the `for (stage_index, stage)` loop, compute
+  `output_handle = if stage_index == 0 { event_handle } else { stages[stage_index - 1].handle }`.
+  Use `.get(stage_index - 1).ok_or_else(|| invalid("issued enclosing stage missing"))`,
+  never raw indexing. Use `output_handle` in both `stage_owner_frame` and the
+  seal-loop `owner_matches` call.
+- At the call site, `nested/issued.rs:373` passes `&event.handle`.
+- Pitfalls:
+  - Do not drop any of the four fields.
+  - Do not compare against `stage.handle`, which is the input.
+  - Leave `bind_slice_operands(..., stage.handle, ...)` unchanged. That call
+    correctly uses the input handle.
+  - Do not touch `parent_use_policy` or `bind_timing_member`.
+
+### TASK-009: Retained execution versus site request (`bind_issued_owner_if_matching`)
+
+**Status**: Not started
+**Parallelizable**: No (after TASK-008)
+**Deliverable**: `src/song/snapshot/occupancy/lookup/authority.rs`
+
+The rule (design D6): two facts are checked separately, and both must hold.
+
+1. **Site request exists.** Keep the existing first scan unchanged:
+   - same per-record charges;
+   - the same site, scope, track, issuer, prefix and window filter;
+   - `authenticate_authority`;
+   - the `original_payload` pointer check.
+
+   Collect the site-matching requests in record order into
+   `site_requests: Vec<&CanonicalIndexRequest>`, next to the existing
+   `candidates`. If none matched, return `Ok(None)` as today.
+2. **Execution authentically retained.** Run the existing identity loop over
+   `candidates`. If it sets `found`, behavior is exactly as today, and the
+   site record's own request is bound.
+
+   Only if `found` is `None`, run one fallback scan:
+   - Inside `with_work` with a fresh `ProjectionBudget` (same pattern as the
+     first scan), call `budget.enter(depth)`.
+   - Charge `view.records().len() + 1`.
+   - For every record in `view.records()`:
+     - charge `request.prefix.len() + 1`;
+     - call `authenticate_authority(authority, &record.request, depth, &mut budget)?`;
+     - for each retained invocation, charge the same placement, step and entry
+       sum as the first scan. Keep it only if
+       `old == fresh && seed == seed && entry == entry` (the same comparisons
+       as the first scan), and count it with `limits.check_events`.
+   - Outside `with_work`, for each kept invocation in order, call
+     `transcript.authentic_retained_invocation(view.original(), seal, retained, work, depth)?`.
+     On the first `true`:
+     - apply the same `lookup_depth() > max_depth` `DepthExceeded` check;
+     - set `found = Some(site_requests[0])`, the first site-matching request
+       in record order;
+     - stop.
+   - If there is still no `true`, return the existing error
+     `required issued execution is not retained at site`.
+3. Leave unchanged:
+   - the `retained_sources` precharge after binding;
+   - the returned `RetainedOwnerAddress { authority, request, invocation: actual }`;
+   - `bind_issued_owner`, `bind_issued_index` and every legacy function in
+     `lookup.rs`.
+
+Pitfalls:
+
+- Non-site records supply identity evidence only. Never take `request`,
+  `prefix`, `window` or `scope` from them.
+- Never grant retention by `==` on executions, handles or owner frames alone.
+  The only gate is `authentic_retained_invocation`, which uses `Rc::ptr_eq`.
+- Do not hold a `RefCell` borrow of `work` across `authentic_retained_invocation`.
+- Do not run the fallback when `found` is already set. The current charges
+  on passing paths must stay byte-identical.
+- The fallback must be charged: the test
+  `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`
+  in `prepared.rs` must keep passing unchanged.
+- `authority.rs` is 540 lines. Keep it below 1000. A private helper
+  `fn retained_in_any_record(...)` is allowed, with at most 7 parameters.
+
+### TASK-010: Fixture repairs (`nested/issued.rs` tests)
+
+**Status**: Not started
+**Parallelizable**: No (verify with TASK-008 and TASK-009)
+
+Diff the tests module against `a8b8ed2` before and after the edits, and
+classify every changed line in the receipt.
+
+- **`issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`.**
+  - Keep the Euclid program exactly as it is.
+  - Build everything from one `PreparedSong`, imitating
+    `partitioned_nested_issued_queries_equal_the_full_route_set` (`:732-760`):
+    - `let mut song = prepared_song(program)?`;
+    - the legacy plan from `prepare_routes(song.snapshot(), ...)`;
+    - `legacy_event` from `song.query(window, &policy)?`, first event;
+    - `authority = song.issue_retained_route_authority(policy, &mut remaining, 0)?`;
+    - `routes = prepare(authority.clone())?`;
+    - `work = attached_work(&authority)?`;
+    - `batch = song.query_issued_with_work(window, &work, 0)?`;
+    - `issued_event = batch.events().first()`.
+  - Remove the `capture(program)` call. Keep all four assertions verbatim:
+    1. legacy `prepare_routes` is `Ok`;
+    2. the legacy `resolve_route` error contains
+       `sampled context requires joint mapping geometry`;
+    3. `resolve_issued_event(&batch, 0, &work, 0)` is `Ok`;
+    4. `legacy_event.handle == issued_event.descriptor().handle`.
+  - If ordering matters (for example, the legacy query must run before
+    retention), use the order that keeps all four assertions and record it.
+- **`distinct_equal_handle_invocations_are_all_resolved`.** Replace
+  `slice p 2 [0 nil]` with `slice {beat -> p} 2 [0 nil]` in `inner` and in
+  both `outer` stack arms. Make no other change: the distinct-seal `find`, the
+  `len() >= 2` assertion and the seal-debit assertion stay. If no event has
+  two or more distinct seals, stop and report.
+- **`discarded_augmented_source_origins_are_resolved`.** This is a declared
+  assertion change (design D10). You may rename the test, for example to
+  `slice_timed_contribution_union_is_resolved_per_contribution`. Record both
+  names.
+  - Keep the program (static `[0]`) byte-identical.
+  - Select the first event index where at least 2 of its
+    `source_contributions()` carry slice timing. Use the existing
+    `carries_slice_timing` expression.
+  - Assert that such an event exists, with the message
+    `fixture has an equal-handle union with two or more slice-timed contributions`.
+  - Read `work.borrow().remaining()` before and after
+    `routes.resolve_issued_event(&batch, index, &work, 0)?`.
+  - Assert that the debit is at least
+    `u32::try_from(event.source_contributions().len())`. Imitate the
+    seal-debit lines in `distinct_equal` (`:719-727`).
+  - Remove only the `survives_descriptor` / `found_discarded_augmented`
+    predicate and its assertion.
+  - Add one comment line naming the replacement identity evidence,
+    `snapshot::issued::...::fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority`.
+    That snapshot test stays unchanged.
+  - If no event qualifies, or the debit assertion fails, stop and report. Do
+    not lower the bound.
+- **`cached_nested` and `partitioned_nested`:** no change.
+- No other test line changes.
+
+### TASK-011: Duplicate frozen `inside` investigation
+
+**Status**: Not started
+**Parallelizable**: No (after TASK-008 and TASK-009)
+
+In `cached_nested` and `partitioned_nested`, record in the receipt under
+`insideDuplicateInvestigation` the following facts for the failing or
+resolved stage:
+
+- the selector `site.scope()`;
+- the `output_scopes` per stage;
+- the `selected.root_part` of each stage;
+- the owner frames (root, revision, placement) of the fresh seals and of the
+  record that retains the execution.
+
+Gather them with a temporary local `eprintln!` or a debugger run, and remove
+any instrumentation before the gates.
+
+Classify the result as one of:
+
+- `separate-placements`: parts 2 and 3 are distinct placements of the reusable
+  function. Each owns its own frozen copy. No code change.
+- `scope-defect`: `output_scopes` names the wrong part. Fix it in
+  `nested/issued.rs` or `members.rs` only, and add the fix to the receipt.
+
+Never merge copies by value.
+
+### Invariants
+
+- Legacy APIs and their outputs are unchanged. Legacy fixtures and the four
+  binaries pass with zero edits.
+- The only membership and retention grants are allocation identity
+  (`Rc::ptr_eq` / `std::ptr::eq`).
+- Every contributor authenticates before coalescing. The hard error
+  `issued Index event has no canonical component` stays.
+- Work comes only from the caller's `SharedIndexWork`.
+- Files stay below 1000 lines. `nested/issued.rs` must be at most 990 (the 2c
+  witness budget is gone). `source.rs` must be at most 993.
+- `git diff --quiet <2c join commit> -- <three unowned paths>` exits 0.
+- `.agents/settings.local.json` is untouched.
+
+### Session 254 tests (input -> expected outcome)
+
+- `cached_nested_slice_events_resolve_from_issued_transcript` -> passes.
+- `partitioned_nested_issued_queries_equal_the_full_route_set` -> passes. The
+  full and partitioned route sets are equal.
+- `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` (one
+  `PreparedSong`) -> all four assertions pass.
+- `distinct_equal_handle_invocations_are_all_resolved` (`slice {beat -> p}`)
+  -> passes, with at least 2 distinct seals and the seal debit met.
+- `discarded_augmented` (renamed or not) -> an event with at least 2
+  slice-timed contributions resolves, and its debit is at least the
+  contribution count.
+- `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`
+  -> unchanged and passing. The foreign transcript still fails with a debit.
+- `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`,
+  `distinct_sites_sharing_one_execution_are_retained_separately`, the
+  `snapshot::occupancy` legacy groups and
+  `fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority`
+  -> unchanged and passing.
+
+### Session 254 execution steps (in order)
+
+1. Copy `tmp/song-mode-riela/session249-resolution-*` to
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session253/` with sha256
+   values.
+2. Rewrite the intent JSON with the design and plan sha256 values and the
+   sha256 and full text of `members.rs`, `nested/issued.rs` and
+   `lookup/authority.rs`. Hash-check before every edit.
+3. Reproduce with named-tests command 1 into
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/session254/reproduce.log`. The
+   expected result is exit 100 with five failures.
+4. Do TASK-008, then TASK-009, then TASK-010, then TASK-011. Run
+   `CARGO_TERM_QUIET=true cargo build` after each task, with logs in
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/session254/`.
+5. Run the verification below.
+6. Write the receipt with:
+   - the clippy disposition;
+   - `densityIndex: "authorized, unedited"`;
+   - `jointGeometryFixture: "euclid"`;
+   - `insideDuplicateInvestigation`;
+   - the TASK-010 line classification and the test names;
+   - cohort 953;
+   - the line counts;
+   - the unowned-path result;
+   - `evidenceFingerprint`. It must differ from `04db7146...`,
+     `4945fec7...`, `15c388bd...`, `0493996e...`, `3c6c504c...` and
+     `245cd7f6e538be8d03cd07ec9c348978fc1e6eb46309d28464b04cae8acd9965`.
+7. Add one progress-log entry.
+
+### Session 254 verification (foreground; record the exit status and full log path)
+
+Commands 1-12 of "Session 253 verification" apply, with these changes:
+
+- Command 1 replaces `discarded_augmented_source_origins_are_resolved` with
+  the renamed test if it was renamed, and adds
+  `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`.
+  It must exit 0 with 8 tests passed.
+- Command 6 (clippy): no diagnostic may name a 2a path except
+  `dead_code`/`unused_imports` on listed `RES-` items. `SW-let_and_return`
+  is still expected.
+- Command 7 (full suite) adds `--no-fail-fast`. It must exit 0 with at least
+  425 distinct tests passed and every test run.
+- Command 10: `nested/issued.rs` is at most 990 lines.
+- Command 11 uses the 2c join commit as the base instead of `6543273`.
+
+### Session 254 done criteria (mechanically checkable)
+
+- [ ] `grep -n "stage.handle" src/song/routing/nested/issued/members.rs`
+  shows no `owner_matches` comparison. `grep -n "output_handle" src/song/routing/nested/issued/members.rs`
+  shows the predicate and the per-stage selection.
+- [ ] `grep -n "event.handle\|&event.handle" src/song/routing/nested/issued.rs`
+  shows the argument at the `issued_index_stage_configuration` call.
+- [ ] `grep -c "authentic_retained_invocation" src/song/snapshot/occupancy/lookup/authority.rs`
+  is at least 2. `git diff <2c join> -- src/song/snapshot/occupancy/lookup/authority.rs`
+  touches only `bind_issued_owner_if_matching` and an optional private helper.
+- [ ] `grep -n "slice p 2" src/song/routing/nested/issued.rs` prints nothing.
+- [ ] `grep -n "capture(program)" src/song/routing/nested/issued.rs` does not
+  match inside the joint-geometry test.
+- [ ] The receipt contains the TASK-010 classification and
+  `insideDuplicateInvestigation`.
+- [ ] Verification commands pass under the rules above, with no new
+  `allow`/`expect`.
+- [ ] The progress-log entry is added.

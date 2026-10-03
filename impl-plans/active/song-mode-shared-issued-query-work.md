@@ -471,3 +471,54 @@ alias-specific code. Do not add any.
 - [ ] 2a's `distinct_sites_sharing_one_execution_are_retained_separately` and
   `distinct_equal_handle_invocations_are_all_resolved` still pass in the full
   run.
+
+## Session 254 amendment (runs THIRD, after 2c and 2a are accepted; serial)
+
+The source of truth is the design section "Session 254 resume amendments
+(2026-10-04)", subsection "Carried forward unchanged". The scope, the four
+writePaths, the two conditional seams, the tests and the done criteria of
+this plan are unchanged. Only the following changes.
+
+- **Order and base.** `dependsOn` is now SONG-ROUTE8, SONG-STRUCTURAL-CLOCK and
+  SONG-ISSUED-RESOLUTION. Every `git diff` base in this plan's checks becomes
+  the 2a join commit (written `<2a-join>`), replacing `980083a` and
+  `6543273`. The cohort is 953 and stays 953.
+- **Unreviewed partial code.** Before the gates, review
+  `git diff 37ea3e8 a8b8ed2 -- src/song/snapshot.rs src/song/snapshot/issued.rs src/song/snapshot/issued/shared_work_tests.rs src/pattern/eval/song_replay.rs`
+  against Wave 2b. Record the findings in the receipt. The review checks:
+  - `seed_collection` is additive by `Rc::ptr_eq`, never clears prior
+    entries, precharges a checked `view.len * (prior.len + 1)`, and refuses
+    foreign or unattached-with-prior collectors before any mutation or
+    precharge;
+  - there is no fresh-only collector anywhere on the query path;
+  - the fresh-collector result and charge (`view.len`) are unchanged.
+- **Carried repair.** Fix `clippy::let_and_return` at
+  `src/song/snapshot/issued.rs:231` by returning the expression directly, with
+  no `allow`/`expect` and no behavior change.
+- **Interaction with the 2a session 254 change.** The 2a fallback scan in
+  `bind_issued_owner_if_matching` reads retained records only. It does not
+  touch `ReplayView` or the collector's executions. This plan does not depend
+  on it and must not edit `lookup/authority.rs`.
+- **Full suite.** Every full nextest run adds `--no-fail-fast` and must exit
+  0, with no allowed failures, every test run and at least 425 distinct tests
+  passed. The 2a tests for session 254 (including the possibly renamed
+  `discarded_augmented` test) and the 2c `domains` test must pass in that run.
+- **Evidence.** Copy `tmp/song-mode-riela/session249-sharedwork-*` to
+  `tmp/song-s249/SONG-SHARED-WORK/attempt-session253/` with sha256 values
+  before rerunning. The receipt fingerprint must differ from every earlier
+  sharedwork receipt hash under `tmp/song-s249/SONG-SHARED-WORK/`. Strict
+  Clippy must show no `SW-` row afterward. Only `RES-` `dead_code` rows whose
+  sole consumer is wave 3 may remain.
+- **Unowned paths.**
+  `git diff --quiet <2a-join> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+  must exit 0. `snapshot.rs` has those children, so it is never run through
+  rustfmt in write mode.
+
+### Session 254 done criteria
+
+- [ ] The receipt records the partial-code review findings and the `seams`
+  entries.
+- [ ] `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` shows
+  no diagnostic in this plan's paths and no `SW-` row.
+- [ ] Full nextest with `--no-fail-fast` exits 0.
+- [ ] One progress-log entry is added.

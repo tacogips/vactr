@@ -1,8 +1,8 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (wave 2, session 250)
+**Status**: In Progress (session 254: first in the serial order; see "Session 254 amendment")
 **Created**: 2026-10-03
-**Last Updated**: 2026-10-03
+**Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
 
 ## Purpose and dependencies
@@ -462,3 +462,288 @@ tests and done criteria of this plan are unchanged. Only these facts change:
 - The cohort is 953 at the start of this sub-wave and stays 953.
 - `git diff --quiet` checks for the unowned paths use `6543273` or the 2a join
   commit as the base, not `980083a`.
+
+## Session 254 amendment (runs FIRST; serial, concurrency 1)
+
+The source of truth is the design section "Session 254 resume amendments
+(2026-10-04)", subsection "Structural clock (2c) repair". Where this section
+conflicts with an earlier amendment of this plan, this section wins.
+
+### Intent and context
+
+- The serial order is now: this plan, then SONG-ISSUED-RESOLUTION, then
+  SONG-SHARED-WORK, then SONG-ISSUED-PLAYBACK, then SONG-16.
+- This plan depends only on SONG-ROUTE8.
+- The base is `a8b8ed2`. The cohort is 953 and stays 953.
+- The partial code committed at `1ac457f` already extracted dispatch, removed
+  the seven barriers and wired Euclid. That code breaks full nextest in two
+  ways. Each failure is quoted from
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session253/full-nextest-post-helper.log`.
+  - The fixtures in `structural_tests.rs` use invalid arities or values:
+    - `euclid` takes 3 arguments, found 4;
+    - `chunk` takes 3 arguments, found 2;
+    - `euclid steps must be between 1 and 4096` (the nested test).
+  - `geometry_tests::domains::unsupported_and_continuous_index_evidence_refuse_without_callback_fallback`
+    still expects Euclid to refuse. Euclid is now intentionally supported.
+- That run stopped at fail-fast after 1229 of 2791 tests. More failures may
+  exist, so every full run here uses `--no-fail-fast`.
+
+### Scope decisions (pinned; do not reopen)
+
+- **D3: no new arities.** Rewrite the fixtures to the real builtins:
+  - `euclid` takes pattern, pulses and steps, plus the `rotation:` keyword
+    (default 0). See `src/types/natives_domain.rs:214` and
+    `src/vm/natives/pattern.rs:271-278`.
+  - `chunk` takes pattern, divisions and a function. See
+    `src/types/natives_domain.rs:198`.
+  - Do not edit `natives_domain.rs`, `vm/natives/pattern.rs` or `infer_call.rs`.
+- **D4: keep Euclid instrumented.** Do not restore its barrier in
+  `dispatch.rs`. Instead, own the `domains.rs` expectation change as a declared
+  behavior change, and back it with replacement evidence.
+- **The 2c sharedPath `src/song/routing/nested/issued.rs` is removed.** So is
+  the conditional `issued_euclid_joint_geometry_resolves_after_structural_clock`
+  witness. 2a runs after this plan and keeps its own Euclid fixture. Do not
+  touch `nested/issued.rs` or `nested/issued/members.rs`.
+
+### Owned paths for session 254
+
+| Path | Kind | Allowed edit |
+|---|---|---|
+| `src/pattern/eval/song_clock/structural_tests.rs` | writePath | Fixture strings only (TASK-004), plus the Euclid depth-boundary test (TASK-005), if it is absent |
+| `src/song/snapshot/occupancy/geometry_tests/domains.rs` | writePath (new for this plan) | Only the one test named below (TASK-006) |
+| `src/pattern/eval/song_clock/dispatch.rs` | writePath | Review only. Edit only if review finds a barrier removed without evidence; then restore that one barrier. |
+| `src/pattern/eval/song_clock.rs`, `src/pattern/combinators/structure.rs`, `src/pattern/combinators/region.rs`, `src/pattern/combinators/music.rs` | writePaths | Review only. Edit only to fix a defect that a 2c test proves. |
+
+There are no sharedPaths. These are never edited:
+
+- `src/pattern/eval/song_clock/tests.rs`, which holds the shared harness, the
+  `Fixture` type and `sampling_with_replay`;
+- `src/pattern/combinators/input.rs`;
+- every 2a, 2b or wave-3 path;
+- the three unowned paths;
+- `.agents/settings.local.json`.
+
+### TASK-004: Reconcile structural fixtures with the real arities
+
+**Status**: Not started
+**Parallelizable**: No
+**Deliverable**: `src/pattern/eval/song_clock/structural_tests.rs`
+
+Make exactly these string rewrites. Each keeps the program's meaning, so no
+assertion changes:
+
+| Test | Old body fragment | New body fragment |
+|---|---|---|
+| `seven_structural_operators_preserve_slice_clocks` | `euclid {slice {beat -> p} 2 [cut nil]} 1 2 0` | `euclid {slice {beat -> p} 2 [cut nil]} 1 2` |
+| `euclid_empty_subject_has_no_false_index_observation` | `... 1 2 0` | `... 1 2` |
+| `nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation` | `... 3} 3 0` (3 pulses over 0 steps) | `... 3} 3 8` |
+| `split_queries_retain_the_single_query_index_rows` | `... 2} 2 4 0` | `... 2} 2 4` |
+| `chunk_slice_clock_stays_unknown` | `chunk {slice {beat -> p} 2 [cut nil]} 2` | `chunk {slice {beat -> p} 2 [cut nil]} 2 {q -> fast q 2}` |
+| `euclid_slice_query_charges_exact_and_one_less_work` | `... 3 8 1` | `... 3 8 rotation: 1` |
+
+- Apply the `rotation: 1` form to the depth-boundary program as well
+  (TASK-005).
+- Imitate these existing forms:
+  - `tests/song_source_conditionals.rs:100` for `chunk p 2 {q -> fast q 2}`;
+  - `tests/song_source_sampling.rs:80` for `rotation:`.
+- Pitfalls:
+  - Do not change any `assert!`, helper or test name.
+  - Do not add a fourth positional argument anywhere.
+  - Do not change the Index lists (`[cut nil]`). This harness evaluates
+    through `song_clock`, not through routing preparation, so SM4 does not
+    apply here.
+- If a rewritten test then fails for any reason other than arity, stop and
+  record the exact message in the progress log. Never edit an assertion to
+  make it pass.
+
+### TASK-005: Euclid inherited-depth boundary test
+
+**Status**: Not started unless already present. Check with
+`grep -n DepthExceeded src/pattern/eval/song_clock/structural_tests.rs`.
+**Parallelizable**: No (after TASK-004)
+
+The session 251 contract is unchanged:
+
+- Use the program `euclid {slice {beat -> p} 2 [cut nil]} 3 8 rotation: 1`.
+- At depth `max_depth - 1`, the result is `Ok`. Rows are non-empty and have
+  no `Unknown` clock.
+- At depth `max_depth`, the result fails with `FailCode::DepthExceeded`,
+  publishes no rows, and leaves `remaining()` no greater than the start value.
+- The session 251 harness rules apply: copy a minimal private fixture into
+  `structural_tests.rs`, and do not edit `tests.rs`.
+- Never relax a depth check. If `max_depth - 1` refuses on unmodified code,
+  stop and report.
+
+### TASK-006: Declared Euclid behavior change in `domains.rs`
+
+**Status**: Not started
+**Parallelizable**: No (after TASK-004)
+**Deliverable**: `src/song/snapshot/occupancy/geometry_tests/domains.rs`,
+only the test
+`unsupported_and_continuous_index_evidence_refuse_without_callback_fallback`
+(currently lines 248-320)
+
+1. Keep the `range saw` continuous case byte-identical.
+2. Replace the Euclid body in the refusing loop with a still-unsupported
+   operator: `chunk {slice {beat -> nil} 1 [cut]} 2 {q -> fast q 2}`. The
+   refusing branch keeps all four assertions unchanged:
+   - `failure.code == FailCode::Type`, with its message text;
+   - `refused > 0`;
+   - `Rc::ptr_eq(&prior, snapshot.replay...)`;
+   - `reads.get() == 0`.
+3. Add the Euclid replacement evidence as a positive branch in the same
+   test.
+   - Use the body `euclid {slice {beat -> nil} 1 [cut]} 1 2` and the same
+     `retain`, `deny`, `request` and `owner_addresses` sequence.
+   - For every address whose `owner().revision == request.revision`,
+     `bind_index` then `consume` (same arguments as the refusing branch) must
+     return `Ok`. Count these as `accepted`, and assert `accepted > 0`.
+   - Assert `reads.get() == 0` and that the replay `Rc` is unchanged.
+   - Use a separate loop iteration or an explicit `if body.starts_with("euclid")`
+     branch. Imitate the existing `if body.contains("range saw")` split.
+4. You may rename the test, but only to a name that still says unsupported
+   evidence refuses, for example
+   `unsupported_index_evidence_refuses_and_euclid_consumes_without_callback_fallback`.
+   Record the old and new names in the receipt.
+5. Stop conditions. Do not weaken the test to get past either one.
+   - Chunk yields `refused == 0`: stop and report the owner addresses seen.
+   - Euclid `consume` errors: stop and report the error. This is a genuine 2c
+     hook defect. Fix it in this plan's `song_clock`/`combinators` paths, never
+     in snapshot or routing code.
+6. In the receipt, classify every diff line against `a8b8ed2` with
+   `git diff a8b8ed2 -- src/song/snapshot/occupancy/geometry_tests/domains.rs`.
+   Allowed classes: `chunk-substitution`, `euclid-positive-branch`,
+   `rename`. Any other changed line fails review.
+
+### TASK-007: Review the committed partial 2c code
+
+**Status**: Not started
+**Parallelizable**: No (before the gates)
+
+Review `git diff 37ea3e8 a8b8ed2 -- <the six original 2c Rust paths>`
+against Wave 2c and record findings in the receipt. Check:
+
+- Exactly seven barriers were removed, and Chunk stays `Unknown`
+  (`dispatch.rs:11-14`).
+- Euclid calls `with_structural_sample` with the actual step timing event,
+  the step whole and the part.
+- Ply, Arp, Chop, Striate, LoopAt and Fit query their children in unchanged
+  time, with no per-subdivision requery.
+- Every removed barrier has a passing evaluated Index test with callback
+  denial in `structural_tests.rs`. If one has none, restore that barrier and
+  record it.
+
+### Invariants
+
+- Chunk stays `Unknown`. Legacy routing `resolve_route` still refuses sampled
+  contexts with `sampled context requires joint mapping geometry`.
+- `tests.rs` and `input.rs` are unchanged:
+  `git diff a8b8ed2 -- src/pattern/eval/song_clock/tests.rs src/pattern/combinators/input.rs`
+  is empty.
+- No assertion is removed or loosened anywhere. There is no new `#[allow` or
+  `#[expect`.
+- Every touched file stays below 1000 lines. `domains.rs` is 634 lines at
+  `a8b8ed2`.
+- Never run rustfmt in write mode on `domains.rs` or any snapshot file. Use
+  `--check` only and hand-format.
+
+### Session 254 tests (input -> expected outcome)
+
+- The six rewritten structural tests and the unchanged
+  `striate_ranking_reuses_retained_work_without_callback_reads` -> pass.
+- The Euclid depth boundary -> `Ok` at `max_depth - 1`; `DepthExceeded` at
+  `max_depth`, with no rows and the debit kept.
+- `domains` test, Chunk body -> refused with `FailCode::Type`, zero reads and
+  the replay `Rc` unchanged.
+- `domains` test, Euclid body -> every address consumes `Ok`, with
+  `accepted > 0`, zero reads and the replay `Rc` unchanged.
+- `domains` test, `range saw` body -> unchanged refusal mentioning
+  `first-structure`.
+- Full suite with `--no-fail-fast` -> the only failures allowed are the five
+  2a-owned resolver tests:
+  - `cached_nested_slice_events_resolve_from_issued_transcript`
+  - `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+  - `distinct_equal_handle_invocations_are_all_resolved`
+  - `partitioned_nested_issued_queries_equal_the_full_route_set`
+  - `discarded_augmented_source_origins_are_resolved`
+
+  Any other failure stops 2c. The receipt lists it with its owner (`ST-`,
+  `RES-`, `SW-` or Route8). A failure in a 2c path is fixed here. Any other
+  failure is reported to the orchestrator.
+
+### Session 254 execution steps (in order)
+
+1. Copy `tmp/song-mode-riela/session249-structural-*` to
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session253/` and record their
+   sha256 values.
+2. Rewrite `tmp/song-mode-riela/session249-structural-intent.json` with:
+   - the design sha256 and plan sha256;
+   - the sha256 and full text of `structural_tests.rs` and `domains.rs`.
+
+   Re-read and hash-check each file before every edit. On drift, stop and
+   reconcile from the current file.
+3. Reproduce. Run the following, then record its exit status. Exit 100 is
+   expected:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib --no-fail-fast -E 'test(/song_clock::structural_tests|geometry_tests::domains/)' > tmp/song-s249/SONG-STRUCTURAL-CLOCK/session254/reproduce.log 2>&1`
+4. Do TASK-007, then TASK-004, TASK-005 and TASK-006, then the verification
+   below.
+5. Write the receipt `tmp/song-mode-riela/session249-structural-receipt.json`
+   with:
+   - the arity rewrite table;
+   - the `domains.rs` diff classification and the test names;
+   - the TASK-007 review findings;
+   - the clippy disposition;
+   - the full-suite failure list with owners;
+   - the cohort count (953) and the line counts;
+   - the result of the unowned-path `git diff --quiet`;
+   - `evidenceFingerprint`, the sha256 of the receipt. It must differ from
+     every earlier structural receipt hash recorded in
+     `tmp/song-s249/SONG-STRUCTURAL-CLOCK/`.
+6. Add one progress-log entry to this plan.
+
+### Session 254 verification (foreground; record the exit status and full log path)
+
+1. Focused:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast -E 'test(/song_clock|combinators|geometry_tests::domains/)' > tmp/song-mode-riela/session249-structural-nextest-focused.log 2>&1`
+   It must exit 0 with a nonzero count.
+2. `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-structural-build.log 2>&1`
+   must exit 0.
+3. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-structural-clippy.log 2>&1`
+   - No diagnostic may name a 2c path, `domains.rs` included.
+   - Every other diagnostic maps to an `SW-`, `RES-` or Route8 D-row. For
+     example, `SW-let_and_return` at `src/song/snapshot/issued.rs:231` is
+     expected.
+4. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-structural-nextest-full.log 2>&1`
+   - The run must complete (the `Summary` line shows every test run).
+   - The failures must be exactly a subset of the five 2a tests above.
+   - At least 425 distinct tests must pass.
+5. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-structural-nextest-focused.log 2>&1`
+   must exit 0.
+6. `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-structural-wasm.log 2>&1`
+   must exit 0.
+7. `rustfmt --edition 2021 --check src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs src/pattern/combinators/structure.rs src/pattern/combinators/region.rs src/pattern/combinators/music.rs src/pattern/eval/song_clock/structural_tests.rs src/song/snapshot/occupancy/geometry_tests/domains.rs > tmp/song-mode-riela/session249-structural-fmt.log 2>&1`
+   passes when no `Diff in` line names a touched path. A hunk in an untouched
+   child, such as `song_clock/tests.rs`, is recorded and not fixed.
+8. `wc -l` on the seven Rust paths: each must be below 1000.
+9. `git diff --quiet a8b8ed2 -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/pattern/eval/song_clock/tests.rs src/pattern/combinators/input.rs`
+   must exit 0.
+10. `git ls-files -co --exclude-standard -- '*.rs' Cargo.toml Cargo.lock | wc -l`
+    prints 953.
+
+### Session 254 done criteria (mechanically checkable)
+
+- [ ] `grep -nE "euclid [^\"]* [0-9]+ [0-9]+ [0-9]+\"|chunk \{[^}]*\}[^{]*\} 2\"" src/pattern/eval/song_clock/structural_tests.rs`
+  prints nothing.
+- [ ] `grep -n "rotation: 1" src/pattern/eval/song_clock/structural_tests.rs`
+  matches at least 2 lines: the exact-work test and the depth test.
+- [ ] `grep -n "DepthExceeded" src/pattern/eval/song_clock/structural_tests.rs`
+  matches.
+- [ ] `grep -n "chunk {slice {beat -> nil} 1 \[cut\]} 2 {q -> fast q 2}" src/song/snapshot/occupancy/geometry_tests/domains.rs`
+  matches, and the Euclid body is asserted `Ok` with `accepted > 0`.
+- [ ] `dispatch.rs` still returns `true` only for `PatNode::Chunk`.
+- [ ] Verification 1, 2, 5, 6, 9 and 10 meet their rules. Verification 3 is
+  fully dispositioned. Verification 4 completes with only allowed 2a failures.
+  Verification 7 and 8 meet their rules.
+- [ ] `git diff a8b8ed2 | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [ ] The receipt is written with a new fingerprint, and the progress-log
+  entry is added.

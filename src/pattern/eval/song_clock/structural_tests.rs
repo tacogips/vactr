@@ -184,10 +184,39 @@ fn assert_unchanged_projection(work: &SharedIndexWork) {
     }
 }
 
+fn assert_euclid_sampled_projection(work: &SharedIndexWork) {
+    let observations = rows(work);
+    assert!(
+        !observations.is_empty(),
+        "actual Euclid-sampled Slice observations"
+    );
+    let mut any_applicable = false;
+    for row in observations {
+        assert!(matches!(row.clock, CanonicalClockProjection::Known(_)));
+        let evidence = row.clock.sampling_evidence();
+        assert_eq!(evidence.len(), 1, "one Euclid sample relation per row");
+        let step = evidence[0].0.expect("Euclid sample has a step whole");
+        let whole = row.event.whole.expect("actual Index whole");
+        let footprint = row
+            .clock
+            .project_for(&row.owner, whole, row.issuer_sample_start, work)
+            .unwrap()
+            .expect("canonical Euclid sample clock");
+        assert_eq!(footprint.whole, step);
+        assert_eq!(footprint.sample_start, step.begin);
+        assert_eq!(footprint.orientation, ClockOrientation::At);
+        any_applicable |= footprint.applicable;
+    }
+    assert!(any_applicable, "at least one Euclid sample row applies");
+}
+
 #[test]
 fn seven_structural_operators_preserve_slice_clocks() {
+    sampling_with_replay(
+        &indexed_song("euclid {slice {beat -> p} 2 [cut nil]} 1 2"),
+        assert_euclid_sampled_projection,
+    );
     for body in [
-        "euclid {slice {beat -> p} 2 [cut nil]} 1 2",
         "ply {slice {beat -> p} 2 [cut nil]} 2",
         "arp {slice {beat -> p} 2 [cut nil]} :up",
         "chop {slice {beat -> p} 2 [cut nil]} 2",
@@ -202,14 +231,18 @@ fn seven_structural_operators_preserve_slice_clocks() {
 #[test]
 fn euclid_empty_subject_has_no_false_index_observation() {
     let code = indexed_song("euclid {slice {beat -> nil} 2 [cut nil]} 1 2");
-    sampling_with_replay(&code, |work| assert!(rows(work).is_empty()));
+    sampling_with_replay(&code, |work| {
+        // One pulse of two steps is sampled in cycle 0; an empty Slice still records its Index row.
+        assert_eq!(rows(work).len(), 1);
+        assert_euclid_sampled_projection(work);
+    });
 }
 
 #[test]
 fn nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation() {
     let body = "euclid {chop {fast [{hold {rev {slice {beat -> p} 2 [cut nil]}} 3} nil] 2} 3} 3 8";
     sampling_with_replay(&indexed_song(body), |work| {
-        assert_unchanged_projection(work);
+        assert_euclid_sampled_projection(work);
         let observations = rows(work);
         assert!(observations.iter().any(|row| {
             matches!(&row.clock, CanonicalClockProjection::Known(_))
@@ -222,7 +255,7 @@ fn nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation() {
 fn split_queries_retain_the_single_query_index_rows() {
     sampling_with_replay(
         &indexed_song("euclid {chop {slice {beat -> p} 2 [cut nil]} 2} 2 4"),
-        assert_unchanged_projection,
+        assert_euclid_sampled_projection,
     );
 }
 
@@ -269,23 +302,52 @@ fn euclid_slice_query_charges_exact_and_one_less_work() {
 fn euclid_over_slice_obeys_inherited_depth_boundary_without_refunding_debit() {
     let body = "euclid {slice {beat -> p} 2 [cut nil]} 3 8 rotation: 1";
     let limits = SongLimits::default();
-    let mut accepted = DepthFixture::new(body);
-    let (accepted_work, accepted_result) = accepted.collect(limits, limits.max_depth - 1);
-    accepted_result.unwrap();
-    assert!(accepted.evaluator.vm_and_ns().0.song_work().is_none());
-    assert_unchanged_projection(&accepted_work);
-
-    let mut refused = DepthFixture::new(body);
-    let before = limits.max_nodes;
-    let (refused_work, refused_result) = refused.collect(limits, limits.max_depth);
+    let mut boundary = None;
+    let mut immediately_above = None;
+    for depth in (limits.max_depth - 32..=limits.max_depth - 1).rev() {
+        let mut fixture = DepthFixture::new(body);
+        let (work, result) = fixture.collect(limits, depth);
+        match result {
+            Ok(()) => {
+                boundary = Some((depth, fixture, work));
+                break;
+            }
+            Err(failure) => {
+                assert_eq!(
+                    failure.code,
+                    crate::vm::fail::FailCode::DepthExceeded,
+                    "every refused inherited-depth probe must be DepthExceeded"
+                );
+                immediately_above = Some((depth, fixture, work, failure));
+            }
+        }
+    }
+    let (boundary_depth, mut accepted, accepted_work) =
+        boundary.expect("inherited depth boundary found within 32 probes");
+    let (refused_depth, mut refused, refused_work, refused_failure) =
+        immediately_above.expect("the probe immediately above the boundary is refused");
+    assert_eq!(refused_depth, boundary_depth + 1);
     assert_eq!(
-        refused_result.unwrap_err().code,
+        refused_failure.code,
         crate::vm::fail::FailCode::DepthExceeded
     );
-    assert!(refused_work.borrow().observations.is_empty());
     assert!(
-        refused_work.borrow().remaining() < before,
+        refused_work.borrow().remaining() < limits.max_nodes,
         "failed inherited-depth query keeps its collector debit"
     );
     assert!(refused.evaluator.vm_and_ns().0.song_work().is_none());
+
+    assert!(accepted.evaluator.vm_and_ns().0.song_work().is_none());
+    assert_euclid_sampled_projection(&accepted_work);
+
+    let mut max_depth = DepthFixture::new(body);
+    let before = limits.max_nodes;
+    let (max_depth_work, max_depth_result) = max_depth.collect(limits, limits.max_depth);
+    assert_eq!(
+        max_depth_result.unwrap_err().code,
+        crate::vm::fail::FailCode::DepthExceeded
+    );
+    assert!(max_depth_work.borrow().observations.is_empty());
+    assert!(max_depth_work.borrow().remaining() < before);
+    assert!(max_depth.evaluator.vm_and_ns().0.song_work().is_none());
 }

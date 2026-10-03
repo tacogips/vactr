@@ -475,7 +475,7 @@ fn iter_rev_point_predicates_and_two_reflections_keep_original_sample_start() {
 }
 #[test]
 fn unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling() {
-    let mut unknown = Fixture::new("euclid {slice {beat -> p} 2 [0]} 2 2");
+    let mut unknown = Fixture::new("chunk {slice {beat -> p} 2 [0]} 2 {q -> fast q 2}");
     let (work, result) = unknown.collect(
         TimeSpan::cycle(0).unwrap(),
         SongLimits::default(),

@@ -18,8 +18,11 @@ Do not invent an affine map for either category.
 - **Next**: Separate Chunk output-anchor selection proof and production adoption.
 
 The session-250 implementation follows the accepted six-path manifest below.
-Post-semantic behavioral gates are pending because the shared tree currently
-fails compilation in files owned by other implementation plans.
+Session 255 corrected the Euclid projection fixtures and the unsupported
+sampling fixture; focused structural tests, native build and WASM pass. The
+full suite completes with six issued-resolution failures, including one test
+outside the session's five explicitly allowed resolver failures. That source
+path is owned by the downstream issued-resolution plan.
 
 ## Proposed bounded manifest
 
@@ -30,7 +33,7 @@ fails compilation in files owned by other implementation plans.
 | `src/pattern/combinators/structure.rs` | Genuine Euclid sampling hook and subdivision evidence | In Progress |
 | `src/pattern/combinators/region.rs` | Chop/Striate/LoopAt/Fit owning behavior | Evidence pending; unchanged-time pass-through |
 | `src/pattern/combinators/music.rs` | Arp owning behavior | Evidence pending; unchanged-time pass-through |
-| `src/pattern/eval/song_clock/structural_tests.rs` (new) | Actual Index clock regressions | Written; blocked at compile gate |
+| `src/pattern/eval/song_clock/structural_tests.rs` (new) | Actual Index clock regressions | Session 255 D4 corrections pass focused tests |
 
 Six candidate paths. The current clock parent is994 lines and existing tests896;
 extract dispatch before additions and put bulk fixtures in the new child. Keep
@@ -113,6 +116,32 @@ LoopAt/Fit retain current sample-header speed encoding semantics.
   varying seeds remain required for the full goal.
 
 ## Progress log
+
+### 2026-10-04 — Session 255 implementation handoff
+
+Applied the accepted D4 test corrections in `structural_tests.rs`: added the
+Euclid-only projection helper; kept unchanged-clock assertions for the six
+time-preserving operators; asserted the empty-subject Euclid's exact one row;
+and searched the inherited-depth boundary over 32 fresh fixtures, checking B,
+B+1 and the `max_depth` refusal. Swapped only the unsupported-sampling test's
+Euclid input to the accepted Chunk fixture in `song_clock/tests.rs`; its
+assertions and faulted-frame half are unchanged.
+
+The focused structural/combinator/domain filter passes 37/37. The separate
+route regression selection passes 105/105. Native and WASM builds exit 0.
+Strict Clippy exits 101 with no diagnostic in a 2c path; other diagnostics
+are in the Route8/RES/SW disposition paths listed in the receipt. Full
+nextest completes with 2,787 passed and six failed. Five are the named
+downstream 2a resolver tests. The sixth,
+`song::routing::source::issued::tests::genuine_source_contributions_reject_a_foreign_transcript`,
+is outside this plan's writePaths and not in the allowed five-test list; the
+serial join is blocked until its owner repairs or formally dispositions it.
+Formatting reports only pre-existing hunks in `structural_tests.rs` lines 30
+and 95, with no hunk on a changed line. Line counts, the 953-file cohort, the
+one-line fixture diff, frozen paths and no-new-allow/expect checks pass. Full
+logs and source snapshots are under
+`tmp/song-s249/SONG-STRUCTURAL-CLOCK/session255/` and
+`tmp/song-mode-riela/session249-structural-*`.
 
 ### 2026-10-04 — Session 254 implementation handoff
 
@@ -879,7 +908,7 @@ The base is `c7083fb`.
 
 ### TASK-008: Euclid-only projection helper
 
-**Status**: Not started
+**Status**: Complete (session 255)
 **Parallelizable**: No
 **Deliverable**: `structural_tests.rs`
 
@@ -920,7 +949,7 @@ The base is `c7083fb`.
 
 ### TASK-009: Empty-subject exact rows
 
-**Status**: Not started
+**Status**: Complete (session 255)
 **Parallelizable**: No (after TASK-008)
 
 - `euclid_empty_subject_has_no_false_index_observation` keeps its program
@@ -937,7 +966,7 @@ The base is `c7083fb`.
 
 ### TASK-010: Searched inherited-depth boundary
 
-**Status**: Not started
+**Status**: Complete (session 255)
 **Parallelizable**: No (after TASK-008)
 
 Rewrite
@@ -984,7 +1013,7 @@ Rewrite
 
 ### TASK-011: Authorized fixture swap in `song_clock/tests.rs`
 
-**Status**: Not started
+**Status**: Complete (session 255)
 **Parallelizable**: No
 
 - In `unsupported_sampling_is_unknown_and_faulted_frame_restores_sibling`
@@ -1003,7 +1032,7 @@ Rewrite
 
 ### TASK-012: Gates, receipt and progress log
 
-**Status**: Not started
+**Status**: In Progress (unclassified downstream full-suite failure)
 **Parallelizable**: No (last)
 
 Run the steps and the verification below.
@@ -1100,21 +1129,23 @@ Run the steps and the verification below.
 
 ### Session 255 done criteria (mechanically checkable)
 
-- [ ] `grep -n "fn assert_euclid_sampled_projection" src/pattern/eval/song_clock/structural_tests.rs`
+- [x] `grep -n "fn assert_euclid_sampled_projection" src/pattern/eval/song_clock/structural_tests.rs`
   matches, and `grep -c "assert_euclid_sampled_projection" src/pattern/eval/song_clock/structural_tests.rs`
   is at least 6 (the definition plus five uses).
-- [ ] `grep -n "max_depth - 1" src/pattern/eval/song_clock/structural_tests.rs`
+- [x] `grep -n "max_depth - 1" src/pattern/eval/song_clock/structural_tests.rs`
   shows only the search start, and `grep -n "within 32 probes"` matches.
-- [ ] `grep -n "rows(work).is_empty()" src/pattern/eval/song_clock/structural_tests.rs`
+- [x] `grep -n "rows(work).is_empty()" src/pattern/eval/song_clock/structural_tests.rs`
   prints nothing.
-- [ ] `git diff --numstat c7083fb -- src/pattern/eval/song_clock/tests.rs`
+- [x] `git diff --numstat c7083fb -- src/pattern/eval/song_clock/tests.rs`
   is `1	1`, and `grep -n "chunk {slice {beat -> p} 2 \[0\]} 2 {q -> fast q 2}" src/pattern/eval/song_clock/tests.rs`
   matches.
-- [ ] Verification 9 exits 0, which means the production files are
+- [x] Verification 9 exits 0, which means the production files are
   unchanged.
 - [ ] Verification 1, 2, 5, 6 and 10 exit 0 or meet their rule. Verification
-  3 is fully dispositioned, and verification 4 shows only allowed 2a failures.
-  Verification 7 and 8 meet their rules.
-- [ ] `git diff c7083fb | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
-- [ ] The receipt has `fixes[]`, `depthBoundary` and a new fingerprint, and
+  3 has no diagnostic in a 2c path. Verification 4 has the five allowed 2a
+  failures plus the unclassified `genuine_source_contributions_reject_a_foreign_transcript`
+  failure owned outside this plan; serial acceptance waits for its owner.
+  Verification 7 has no hunk on changed lines, and 8 meets the line budget.
+- [x] `git diff c7083fb | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- [x] The receipt has `fixes[]`, `depthBoundary` and a new fingerprint, and
   one progress-log entry is added.

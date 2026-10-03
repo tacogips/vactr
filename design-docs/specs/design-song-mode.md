@@ -1338,3 +1338,100 @@ the baseline. These amendments apply only to the remaining waves.
   new gate runs. Every gate runs in the foreground with its exit status and
   full log path recorded. The no-progress fingerprints `4945fec7...`,
   `15c388bd...` and `0493996e...` must change.
+
+### Session 252 resume amendments (2026-10-04)
+
+Session 251 blocked in 2a on a retention defect in an accepted Route8 path. The
+design above and the session 251 amendments stay the baseline. These amendments
+add only the repair contract and the ownership rules the operator authorized.
+
+- **Defect.** `CanonicalIndexRequest::same_execution`
+  (`src/song/snapshot/occupancy.rs:143`) compares original, recipe, scope,
+  track, revision, root, window and depth. It does not compare issuer or prefix.
+  `retain_index_occupancy` uses it to coalesce requests, so a second Slice site
+  under the same root and window gets no retained record. The issued selector
+  in `bind_issued_owner` (`lookup/authority.rs`) filters records by exact issuer
+  and prefix, so it finds no record for that site.
+  `distinct_equal_handle_invocations_are_all_resolved` fails for this reason.
+  The fixture is not at fault.
+- **Execution key and site identity.** There are two identities, and they are
+  kept separate:
+  - The *execution key* is the current eight-field comparison. One
+    `observe_part` execution serves every request with the same key, because
+    that execution depends on none of issuer or prefix: its rows are filtered by
+    owner only.
+  - The *retained site identity* is the execution key plus `issuer` plus exact
+    `prefix` equality. This is `Vec` equality, not `trace_matches`.
+    `same_execution` is repaired to compare this full identity. Its other caller,
+    `replay_site`, therefore refuses a request from a different site with the
+    existing `foreign canonical replay address` error.
+- **Retention rule.** For each request in the batch, scan retained and pending
+  records in the current order, with the current per-record charge
+  (`prefix.len + 1`).
+  - A record with the same site identity coalesces the request and stops the
+    scan. Behavior and charges are unchanged.
+  - If no record has the same site identity but a primary record has the same
+    execution key, append one *site alias record* for the new site. It does not
+    run a second `observe_part` or any VM work. It holds the primary execution's
+    observations, calls and invocations, with the invocations as the same `Rc`
+    allocations. It copies the primary's `peak_depth`, `vm_instructions` and
+    `admitted_depth`. The cached-depth refusal applies first. The alias is
+    charged its copy size plus 1 and counted by `limits.check_events`. It is
+    published only with the complete batch, as today.
+  - Otherwise, execute as today.
+
+  The plan pins whether the alias shares the payload by strong reference or by
+  a charged copy. Either form keeps the exact invocation allocations.
+- **Each execution is enumerated once.** A site alias is marked as one, and
+  the marker is visible through the records iterator of both lookup
+  authorities. Enumerations that are not scoped to a site skip an alias's
+  invocations and coverage, charging only the existing per-record charge. These
+  enumerations are `owner_addresses` (`lookup.rs:95`) and the configuration-row
+  loop (`lookup.rs:408`). Their outputs therefore stay identical to the
+  coalesced behavior before the repair. Publication (`route_view.rs:352`)
+  publishes aliases with the marker so that the site-scoped issued selector
+  finds them. The selector is unchanged: it still requires exact issuer, prefix
+  and retained-execution membership. Scalar equality still grants no
+  membership.
+- **Legacy invariance.** Fixtures with one Slice site per execution key create no
+  alias. Their records, charges, exact-work assertions and `occupancy.len()`
+  assertions are therefore unchanged. Fixtures with several sites per key
+  (for example `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`)
+  gain alias records, but every non-site enumeration returns the same output
+  as before. No existing assertion is edited. If an existing assertion changes,
+  the sub-wave stops and reports it. The assertion is not adapted.
+- **Regression test.** Append one test to the existing
+  `src/song/snapshot/occupancy/tests.rs`, so the cohort stays at 952. It retains
+  two distinct Slice sites with the same execution key in one batch, and
+  asserts:
+  - two records with distinct (issuer, prefix);
+  - one execution: the alias shares the primary's invocation allocations, and
+    the callback journal count matches the single-site count;
+  - `owner_addresses` returns the same count as with one site;
+  - re-retaining either site adds no record;
+  - `replay_site` with the other site's request refuses.
+- **2a ownership additions.**
+  - Authorization 1 adds two writePaths: `src/song/snapshot/occupancy.rs` and
+    `src/song/snapshot/occupancy/tests.rs`.
+  - Authorization 2 adds two sharedPaths: `src/song/snapshot/occupancy/lookup.rs`
+    (alias skip) and `src/song/snapshot/occupancy/route_view.rs` (alias marker
+    publication). `lookup/authority.rs` and `prepared.rs` are already 2a
+    writePaths.
+  - `occupancy.rs` has unowned child modules, so no rustfmt write mode is run
+    on it. Formatting uses `--check` only, under the existing child-hunk rule.
+- **Downstream seams (authorization 2).** 2b, 2c, wave 3 and SONG-16 may declare
+  any of the eight Route8 paths as concrete sharedPaths when a named defect
+  there blocks their requirement. SONG-ROUTE8 tests must stay green with
+  unchanged assertions. Each plan author reads the code paths that the plan's
+  tests exercise and declares likely seams before dispatch. An undeclared seam
+  still terminates the run.
+- **Resume criteria.** After the repair, 2a reruns all of its gates.
+  `distinct_equal_handle_invocations_are_all_resolved` must pass.
+  `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` must also
+  pass: legacy refuses with the exact message
+  `sampled context requires joint mapping geometry`, and the issued path
+  resolves. The 2a evidence fingerprint must differ from `04db7146...`,
+  `4945fec7...`, `15c388bd...` and `0493996e...`. The session-251 partial 2a,
+  2b and 2c code at `980083a` is reviewed as part of its owning sub-wave. It is
+  not presumed accepted. The 2b `SW-let_and_return` repair and the 2c Euclid
+  depth boundary test stay required.

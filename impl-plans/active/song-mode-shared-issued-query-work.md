@@ -413,3 +413,61 @@ sub-wave runs.
   most 935 lines.
 - [ ] The receipt and a progress-log entry are written with the exit codes and
   log paths.
+
+## Session 252 amendment (wave 2b, serial)
+
+Source: the design section "Session 252 resume amendments", Downstream seams
+(operator authorization 2). This plan starts only after 2a is joined and
+committed. TASK-001 to TASK-002 and the session 251 criteria are unchanged.
+The session-251 partial code already in `song_replay.rs` and `issued.rs` at
+`980083a` is unreviewed. Review it against the "Wave 2b" design contract before
+the gates run; it is not presumed accepted.
+
+### Declared seams (conditional sharedPaths)
+
+`seed_collection` has three production call sites. A 2b test exercises each
+one:
+
+- `src/song/snapshot/occupancy.rs:194` (retention; the collector is attached
+  at `:191` before seeding);
+- `src/song/snapshot/occupancy.rs:390` (fresh collector, never attached);
+- `src/song/query/issued.rs:191` (`query_part_issued`; seeds before
+  `IssuedQueryTransaction::begin`).
+
+The signature does not change, so none of them is expected to need an edit.
+Both files are declared up front only so that a concrete defect does not end
+the run:
+
+- **`src/song/snapshot/occupancy.rs`** (a Route8 path; owned by 2a in session
+  252). Edit only the `seed_collection` call statement and the collector
+  attachment directly before it. Edit them only if a `shared_work_tests` or
+  `snapshot::occupancy` test proves that the call order is refused by the
+  attachment or prior-execution checks. Do not touch the 2a `site_alias`
+  logic, `same_execution` or `shares_execution`.
+- **`src/song/query/issued.rs`**. Same rule: only the call at `:191` and its
+  attachment.
+
+If neither file needs a change, record `"seams": {"occupancy.rs": "declared,
+unedited", "query/issued.rs": "declared, unedited"}` in the receipt. If either
+is edited, add it to the `rustfmt --check` and `wc -l` commands. Never run
+rustfmt in write mode on `occupancy.rs`, because its child modules are not
+owned by this plan.
+
+### Interaction with the 2a site aliases
+
+A 2a site alias holds the same `OwnerInvocation` allocations as its primary,
+but `ReplayView` executions are collector executions, not records. Additive
+`Rc::ptr_eq` seeding therefore never sees alias records and needs no
+alias-specific code. Do not add any.
+
+### Session 252 done criteria
+
+- [ ] `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` is gone
+  without `allow`/`expect`, and no `SW-` row remains.
+- [ ] The receipt has the `seams` entry. Any edit to a declared seam is
+  limited to the call statement and the attachment line
+  (`git diff 980083a -- src/song/query/issued.rs` is empty or touches only
+  those lines).
+- [ ] 2a's `distinct_sites_sharing_one_execution_are_retained_separately` and
+  `distinct_equal_handle_invocations_are_all_resolved` still pass in the full
+  run.

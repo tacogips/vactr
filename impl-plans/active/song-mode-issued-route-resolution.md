@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (wave 2a, session 251, serial)
+**Status**: In Progress (wave 2a, session 252, serial; see "Session 252 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -599,3 +599,251 @@ fmt and `wc -l` commands only if it was edited.
 **Ownership blocker**: The observed missing request points to request de-duplication in `src/song/snapshot/occupancy.rs` (`CanonicalIndexRequest::same_execution` does not distinguish issuer/prefix for otherwise shared recipe/scope/window). That file is not in this plan's nine concrete writePaths, the fanout `writePaths`, or the current accepted amendment. Repairing it and adding a regression test requires an explicit plan/manifest ownership amendment. No edit was made to that file, and no selector or route-index security checks were relaxed. Resume after the accepted plan and dispatch manifest add that exact path and test location to owned writePaths, then preserve every distinct issuer/prefix request and rerun the focused requirements before the remaining gates.
 
 **Progress**: Assigned implementation remains incomplete. Do not mark TASK-002, TASK-003, or the session-251 done criteria complete. Evidence and per-edit snapshots are under `tmp/song-s249/SONG-ISSUED-RESOLUTION/session251/`.
+
+## Session 252 amendment (wave 2a, serial)
+
+Source of truth: design section "Session 252 resume amendments (2026-10-04)"
+in `design-docs/specs/design-song-mode.md`. This amendment adds TASK-004 and
+four owned paths. Everything from the session 249, 250 and 251 sections still
+applies unless this section says otherwise. This plan still runs alone.
+
+### Intent and context
+
+Session 251 stopped on a real retention defect, not on a fixture problem.
+`CanonicalIndexRequest::same_execution` (`src/song/snapshot/occupancy.rs:143`)
+compares eight fields (original, recipe, scope, track, revision, root, window,
+depth). It does not compare `issuer` or `prefix`. `retain_index_occupancy`
+(`occupancy.rs:213-229`) uses it to coalesce requests. When two Slice sites sit
+under the same root and window, the second site therefore gets no record. The
+issued selector in `bind_issued_owner` (`lookup/authority.rs:296-310`) filters
+records by exact `issuer` and `prefix`, so it cannot find the second site.
+`distinct_equal_handle_invocations_are_all_resolved` fails for that reason: in
+scope 4 only one of two issuers was retained.
+
+### New owned paths (operator authorizations 1 and 2)
+
+| Path | Kind | Allowed edit |
+|---|---|---|
+| `src/song/snapshot/occupancy.rs` | writePath (auth. 1) | Split identity in `same_execution`; site-alias retention; `site_alias` field |
+| `src/song/snapshot/occupancy/tests.rs` | writePath (auth. 1) | Append exactly one new `#[test]`; no existing line changed |
+| `src/song/snapshot/occupancy/lookup.rs` | sharedPath (auth. 2) | `AuthorityRecord` gains `site_alias`; alias skip in `owner_addresses` and the configuration-row loop; nothing else |
+| `src/song/snapshot/occupancy/route_view.rs` | sharedPath (auth. 2) | `PublishedRetainedIndex` gains `site_alias`, copied at publication; nothing else |
+
+`lookup/authority.rs` and `prepared.rs` are already writePaths of this plan.
+No other Route8 path may be edited. The cohort stays at 952 because no file is
+created.
+
+### TASK-004: Retained site identity and site aliases
+
+**Status**: Not Started
+**Parallelizable**: No (it must land before the TASK-002/TASK-003 reruns)
+**Deliverables**: the four paths above
+
+Changes, file by file:
+
+1. **`occupancy.rs`**
+   - Keep the current eight-field comparison as a new private method,
+     `fn shares_execution(&self, other: &Self) -> bool`. Its body is exactly
+     today's `same_execution` body.
+   - Change `same_execution` to `shares_execution(other) && self.issuer ==
+     other.issuer && self.prefix == other.prefix`. That is exact `Vec`
+     equality. Do not use `trace_matches`, because it is a prefix match meant
+     for rows.
+   - `RetainedCanonicalIndex` gains the private field `site_alias: bool`. Every
+     existing construction sets it to `false`.
+   - Rewrite the scan inside the `for request in requests` loop of
+     `retain_index_occupancy`:
+     - For each record in `snapshot.occupancy.iter().chain(&pending)`, charge
+       `request.prefix.len() as u64 + 1`, exactly as today.
+     - If `record.request.same_execution(&request)`: this is a full site match.
+       Coalesce as today: run the cached-depth refusal, then `continue`, and
+       stop scanning.
+     - Otherwise, if `record.request.shares_execution(&request) &&
+       !record.site_alias`, remember the first such record as `primary`. Keep
+       scanning, because a later alias may be a full site match.
+     - After the scan, if there was no full site match but there is a
+       `primary`:
+       - run the same cached-depth refusal against `primary`;
+       - charge `primary.observations.len() + primary.calls.len() +
+         primary.invocations.len() + 1` as `u64`, with checked addition;
+       - run the same `limits.check_events(occupancy.len() + pending.len() + 1)`
+         check;
+       - push a new `RetainedCanonicalIndex` with `request` = the incoming
+         request (moved), cloned `observations` and `calls`, `invocations`
+         cloned as `Rc` clones (the same allocations), the primary's
+         `peak_depth`, `vm_instructions` and `admitted_depth`, and
+         `site_alias: true`;
+       - `continue`. Do not call `observe_part`, `prepare_owner_dependencies` or
+         any VM or evaluator method.
+     - Otherwise, execute as today.
+   - Borrowing: `primary` borrows from `pending`, and the push mutates
+     `pending`. Copy the needed values first, or record the primary's index in
+     the chained iteration, and then push. Do not hold a borrow across the push.
+   - `replay_site` keeps calling `same_execution`. It now refuses a request from
+     another site with the existing `foreign canonical replay address` error.
+     This is intended.
+2. **`route_view.rs`**
+   - `PublishedRetainedIndex` gains `pub(super) site_alias: bool`.
+   - At publication (around line 386), copy `record.site_alias`. Make no other
+     change. The alias still goes through `authenticate_request`, the site
+     match and the invocation checks, exactly like any other record.
+3. **`lookup.rs`**
+   - `AuthorityRecord` gains `site_alias: bool`, filled from both iterator
+     arms.
+   - In `owner_addresses` (`lookup.rs:95`), after the existing per-record
+     charge, `continue` when `record.site_alias`. This loop iterates
+     `snapshot.occupancy` directly, so read the field there.
+   - In the configuration-row loop (`lookup.rs:408`), after the existing
+     per-record authentication block, `continue` when `record.site_alias`.
+     Skip both its rows and its `insert_coverage`.
+   - Do not touch the site-scoped checks at `lookup.rs:206`, `:293` or `:387`.
+4. **`lookup/authority.rs`**: no change for TASK-004. The selector at `:296` is
+   site-scoped and must find aliases. Do not add an alias skip there.
+
+Code to imitate:
+
+- Site traversal for a fixture with several sites:
+  `src/song/snapshot/occupancy/geometry_tests/domains.rs:actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`
+  (lines 143-191).
+- Callback journal assertion: `src/song/snapshot/occupancy/tests.rs:cuts`.
+- Batch atomicity: `occupancy.rs:296-303`. Publish only after every request
+  succeeds.
+
+Key pitfalls (do not):
+
+- Do not add `issuer`/`prefix` to `same_execution` and stop there. A second
+  execution creates new `OwnerInvocation` allocations that no issued seal
+  refers to, and it duplicates rows in the configuration loop.
+- Do not skip aliases in `bind_issued_owner` or in publication. The alias
+  exists for the site-scoped selector.
+- Do not change the per-record charge or the break-on-full-match behavior.
+  `assert_clock_retention_transaction` asserts `remaining == 0` for exact work.
+- Do not edit `src/song/snapshot/occupancy/geometry_tests*`,
+  `lookup_tests.rs`, `replay_tests.rs`, `invocation_tests.rs`, or any
+  existing test in `tests.rs`.
+- Do not run rustfmt in write mode on `occupancy.rs` or `lookup.rs`. Both
+  have child modules that are not owned here. Hand-format the new lines in the
+  surrounding style, then use `--check` only.
+
+Test to append to `src/song/snapshot/occupancy/tests.rs` (one `#[test]`, named
+`distinct_sites_sharing_one_execution_are_retained_separately`):
+
+- `from_code` with
+  `fn cut beat:\n\tfirst [0]\nfn indexed p:\n\tstack [{slice {beat -> p} 2 [cut nil]} {slice {beat -> p} 2 [cut nil]}]\n`
+  plus the `base`/`selected`/`song` lines of `prepared_with_deletion(_, false)`.
+  Collect the Slice sites with the `domains.rs` traversal. Mint one request per
+  site over `TimeSpan::cycle(0)`. Then retain both in one batch:
+  - there are exactly 2 records, with distinct `(issuer, prefix)`;
+  - exactly one record has `site_alias`;
+  - the alias's `invocations` equal the primary's element by element under
+    `Rc::ptr_eq`;
+  - `cuts(alias).len() == cuts(primary).len()`;
+  - `primary.vm_instructions > 0`.
+- Count with `owner_addresses` for each site's request. The address count
+  equals the primary record's `invocations.len()`, with no doubling.
+- Re-mint both site requests and retain them again in one batch. The
+  `occupancy.len()` stays 2.
+- `primary.replay_site(&alias_request, ...)` fails with a message containing
+  `foreign canonical replay address`.
+
+The Index list may have to be static (`[0 nil]`) if the preparation preflight
+refuses `[cut nil]` for two sites. In that case, drop the `cuts` check and keep
+every other assertion.
+
+### Joint-geometry fixture: conditional Euclid substitution
+
+`issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` uses
+`euclid {slice ...} 1 2`. At `980083a`, Euclid still has a structural clock
+barrier (`src/pattern/eval/song_clock/dispatch.rs:13`), and SONG-STRUCTURAL-CLOCK
+(2c) removes it later. Session 251 saw this test fail with
+`original source membership missing` (`lookup.rs:792`, `bind_member`).
+
+After TASK-004, rerun the test by name.
+
+- If it passes, keep the Euclid fixture.
+- If it still fails with `original source membership missing`, confirm the
+  cause. Record in the receipt whether the Euclid node goes through
+  `with_clock_unknown`, using a fixture-local check or existing test helpers;
+  do not leave diagnostics in the source. If that is confirmed, replace only
+  the fixture's sampling combinator. Use an instrumented combinator from the
+  `false` arm of `with_clock_dispatch` that still yields
+  `SourceLocatorMapping::NeedsJointGeometry` on the legacy path, for example
+  `segment` or `grid` over the Slice. Keep every assertion: legacy
+  `prepare_routes` is `Ok`, the legacy error contains
+  `sampled context requires joint mapping geometry`, `resolve_issued_event` is
+  `Ok`, and the handle is the same. Record `jointGeometryFixture:
+  "euclid-deferred-to-2c"` and the chosen combinator in the receipt.
+  SONG-STRUCTURAL-CLOCK then adds the Euclid issued witness.
+- If no instrumented combinator yields NeedsJointGeometry, stop and record a
+  blocker with the exact messages. Do not change resolver logic or relax any
+  barrier.
+
+### Session 252 execution steps (in order)
+
+1. Write `tmp/song-mode-riela/session249-resolution-intent.json` again. It
+   holds the design sha256, the plan sha256, and the sha256 and full text of
+   all thirteen Rust paths: the nine from session 251 plus the four above.
+   Re-read and hash-check each file before every edit.
+2. Reproduce before editing. Run the named-tests command below with its output
+   redirected to `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/reproduce.log`
+   instead of the focused log. Record the exit status, whatever it is. A
+   nonzero exit is expected, because the new test does not exist yet.
+3. Implement TASK-004 and append the regression test.
+4. Run the regression test, then the two named resolver tests. Apply the
+   joint-geometry rule above if needed.
+5. Finish whatever TASK-002/TASK-003 items the reruns still show failing,
+   inside the thirteen paths only.
+6. Run every verification command in order, in the foreground. Write the
+   receipt, including:
+   - the Clippy disposition table (rows D-, `RES-`, `SW-`, `ST-`);
+   - `densityIndex`;
+   - `jointGeometryFixture`;
+   - `evidenceFingerprint`: the receipt sha256, which must differ from
+     `04db7146...`, `4945fec7...`, `15c388bd...` and `0493996e...`;
+   - the `git diff --quiet` result for the three unowned paths.
+7. Add one progress-log entry to this plan. Edit no other plan.
+
+### Session 252 verification (foreground; record the exit status and full log path)
+
+- Named tests. This is the first gate, and it starts the focused log:
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib distinct_equal_handle_invocations_are_all_resolved issued_joint_geometry_resolves_where_legacy_keeps_its_barrier actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct distinct_sites_sharing_one_execution_are_retained_separately > tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`.
+  It must exit 0 with 4 tests passed. Every later focused command appends
+  with `>>`, in the order the manifest gives.
+- Occupancy and Route8 regression:
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/snapshot::occupancy|routing::prepared/)' >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`.
+  It must exit 0, with the same test names as before plus the one new test.
+- Every session 249 verification command above (build, Clippy, the
+  resolver-focused filter, the legacy binaries, the full suite and WASM), to
+  the same log paths.
+- Format:
+  `rustfmt --edition 2021 --check src/song/routing/source.rs src/song/routing/source/issued.rs src/song/routing/nested.rs src/song/routing/nested/issued.rs src/song/routing/configuration.rs src/song/routing/configuration/index/canonical.rs src/song/routing/prepared.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/tests.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/route_view.rs > tmp/song-mode-riela/session249-resolution-fmt.log 2>&1`.
+  It passes when no `Diff in` line names one of these paths. Add
+  `src/song/routing/density/index.rs` if it was edited. `Diff in` hunks for
+  unowned child modules are recorded and not fixed.
+- `wc -l` on the thirteen paths. Each must be below 1000, and `source.rs` must
+  be at most 993.
+- `git diff --quiet 980083a -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+  must exit 0.
+
+### Session 252 done criteria (mechanically checkable)
+
+- [ ] `grep -n "fn shares_execution" src/song/snapshot/occupancy.rs` matches.
+  `same_execution` compares `issuer` and `prefix`.
+- [ ] `grep -c "site_alias" src/song/snapshot/occupancy/lookup.rs` is at least
+  3, and `grep -c "site_alias" src/song/snapshot/occupancy/route_view.rs` is at
+  least 2.
+- [ ] `git diff 980083a -- src/song/snapshot/occupancy/tests.rs` contains only
+  added lines (`grep -c '^-[^-]'` prints 0).
+- [ ] `git diff 980083a --name-only -- src/song/snapshot/occupancy/` lists no
+  path other than `tests.rs`, `lookup.rs`, `route_view.rs` and
+  `lookup/authority.rs`.
+- [ ] The four named tests pass. The occupancy and Route8 filter, the
+  resolver-focused filter, the legacy binaries, the full suite, build and WASM
+  all exit 0.
+- [ ] Every Clippy diagnostic has a row. There is no non-dead-code lint in the
+  thirteen paths, and no new `allow`/`expect`
+  (`git diff 980083a -- <thirteen paths> | grep -E '^\+.*#\[(allow|expect)'`
+  prints nothing).
+- [ ] The receipt has `jointGeometryFixture`, `densityIndex` and a fingerprint
+  that differs from the four prior values.
+- [ ] The progress-log entry lists every command, exit status and log path.

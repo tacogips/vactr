@@ -382,3 +382,63 @@ starts only after 2a and 2b are joined and committed. It runs alone
   `allow`/`expect`.
 - [ ] `git diff 1ac457f -- src/pattern/eval/song_clock/tests.rs` is empty.
 - [ ] The receipt and a progress-log entry are written.
+
+## Session 252 amendment (wave 2c, serial)
+
+Source: the design section "Session 252 resume amendments" (Downstream seams)
+and the 2a joint-geometry rule in `song-mode-issued-route-resolution.md`. This
+plan starts only after 2b is joined and committed. The six writePaths, the
+seven-barrier scope, Chunk staying Unknown and the Euclid depth boundary test
+are unchanged. The session-251 partial code at `980083a` in
+`song_clock/dispatch.rs` and `structural_tests.rs` is unreviewed. It is
+reviewed against the design before the gates run.
+
+### Declared seam (conditional sharedPath)
+
+**`src/song/routing/nested/issued.rs`** (a 2a writePath, 941 lines at
+`980083a`). Use it only if the 2a receipt records
+`jointGeometryFixture: "euclid-deferred-to-2c"`. Then:
+
+- After Euclid's barrier is removed, append one test,
+  `issued_euclid_joint_geometry_resolves_after_structural_clock`, to the
+  existing `#[cfg(test)] mod tests`. It reuses the original session-251
+  Euclid program:
+  `fn indexed p:\n\teuclid {slice {beat -> p} 2 [0 nil]} 1 2` with a
+  `base` of duration 4.
+- It asserts the same four facts as
+  `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`:
+  - legacy `prepare_routes` is `Ok`;
+  - the legacy `resolve_route` error contains
+    `sampled context requires joint mapping geometry`;
+  - `resolve_issued_event` is `Ok`;
+  - the handle is the same.
+- Imitate that test's body. Copy it; do not call into it.
+- Change no existing line. The file must stay below 1000 lines, so the new
+  test may be at most 50 lines.
+- If 2a kept the Euclid fixture, this path stays unedited and the receipt
+  records `"nested/issued.rs": "declared, unedited"`.
+
+If it is edited, add it to the focused filter
+(`-E 'test(/song_clock|combinators|routing::nested::issued/)'`), the
+`rustfmt --check` command and `wc -l`. Never run rustfmt in write mode on it.
+
+### Test case
+
+- 2a deferred Euclid, and this sub-wave removed the Euclid barrier: the Euclid
+  joint-geometry program resolves on the issued path, and legacy still refuses
+  with the barrier message.
+- If it still refuses with `original source membership missing`, the Euclid
+  hook is not genuine. Fix the hook in this plan's paths. Do not change the
+  resolver or the test.
+
+### Session 252 done criteria
+
+- [ ] The Euclid depth boundary test is present and passes (session 251
+  criterion).
+- [ ] If the 2a receipt deferred Euclid, `grep -n
+  "issued_euclid_joint_geometry_resolves_after_structural_clock"
+  src/song/routing/nested/issued.rs` matches and the test passes. Otherwise
+  `git diff 980083a -- src/song/routing/nested/issued.rs` shows only 2a's
+  committed changes, which means this sub-wave made none.
+- [ ] No `ST-` row remains. Strict Clippy has no non-dead-code lint in this
+  plan's paths.

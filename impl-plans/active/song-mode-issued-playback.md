@@ -432,3 +432,34 @@ to this plan's log plus the one shared TASK-003 note.
   sub-wave. This plan does not fix it.
 - The Index/Slice-sourced track in `tests/song_issued_transport.rs` uses a
   statically admissible Index list (user-QA SM4 default (a)).
+
+## Session 252 amendment (wave 3)
+
+Source: the design section "Session 252 resume amendments" (Downstream seams,
+operator authorization 2). The writePaths, tasks and acceptance criteria are
+unchanged. One seam is declared up front, and it may be edited only under its
+stated condition. `PreparedSong::issue_retained_route_authority`
+(`route_view.rs:486`) is already `pub(crate)`, so no seam is declared on
+`route_view.rs`.
+
+- **`src/song/routing.rs`** (a Route8 path). The Route8 disposition table
+  leaves an `unused_imports` diagnostic on the `PreparedRoutes` and
+  `prepare_routes_issued` re-exports (`routing.rs:623`). This plan wires their
+  consumers, which is expected to clear the diagnostic. Edit `routing.rs` only
+  if strict Clippy still reports `unused_imports` there after `preparation.rs`
+  and `sched/song.rs` name these items as `crate::song::routing::X`. The only
+  allowed edit is to the `routing.rs:623` re-export line. The receipt then
+  records the before and after diagnostics. Otherwise record
+  `"routing.rs": "declared, unedited"`.
+
+The seam allows no semantic change. SONG-ROUTE8 tests (`snapshot::occupancy`
+and `routing::prepared`) must pass unchanged. The 2a site aliases need no
+playback change, because only the site-scoped selector inside
+`resolve_issued_event` enumerates them.
+
+Done criteria added:
+
+- [ ] The receipt has a `seams` entry for `routing.rs`.
+  `git diff <2c-join-commit> -- src/song/routing.rs` is empty or limited to
+  the one re-export line.
+- [ ] Strict all-target Clippy exits 0 (unchanged criterion).

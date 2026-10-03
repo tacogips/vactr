@@ -914,3 +914,29 @@ this batch holds on the joined tree. Then record it and reconcile the statuses.
 - [ ] Statuses are reconciled.
 - [ ] No Rust or test file was edited in this wave. Check that
   `git diff --stat` for wave 4 shows only the writePaths and sharedPaths.
+
+### Session 252 amendment (wave 4)
+
+Source: the design section "Session 252 resume amendments".
+
+- **No new seams.** This wave edits no Rust or test file. It declares no Route8
+  sharedPath.
+- **Format gate file list.** The final `rustfmt --check` list must add
+  `src/song/snapshot/occupancy/tests.rs` (2a). It must also add any declared
+  seam that a receipt records as edited: `src/song/query/issued.rs` (2b),
+  `src/song/routing/nested/issued.rs` (2c, already listed) and
+  `src/song/routing.rs` (3, already listed).
+- **Cohort.** The cohort stays at 952 through 2c and 953 after wave 3 (954
+  with `preparation/issued.rs`). The 2a regression test is appended to an
+  existing file and adds nothing. Changed hashes may additionally appear on:
+  - the four session-252 2a paths;
+  - any conditional seam that a receipt records as edited.
+- **Requirement evidence.** The final receipt records:
+  - each sub-wave's `seams` entries;
+  - the 2a `jointGeometryFixture` value;
+  - the four named 2a tests from the full run
+    (`distinct_equal_handle_invocations_are_all_resolved`,
+    `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`,
+    `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct` and
+    `distinct_sites_sharing_one_execution_are_retained_separately`), plus the 2c
+    Euclid witness if it was deferred.

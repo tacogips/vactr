@@ -207,9 +207,17 @@ pub(crate) fn owner_addresses_issued<'a>(
     prefix: &[FrozenUseTraceTerm], owner_window: TimeSpan,
     limits: SongLimits, remaining: &mut u32, depth: u32,
 ) -> Result<Vec<RetainedOwnerAddress<'a>>, Failure>;
+// Session 250 amendment: the eight-parameter form failed
+// clippy::too_many_arguments. Caller selection inputs are grouped into a
+// borrowed selector; authentication semantics are unchanged.
+pub(crate) struct IssuedOwnerSelector<'a, 'p> {
+    pub(crate) site: PreparedSiteRef<'a>,
+    pub(crate) issuer: NodeId,
+    pub(crate) prefix: &'p [FrozenUseTraceTerm],
+    pub(crate) owner_window: TimeSpan,
+}
 pub(crate) fn bind_issued_owner<'a>(
-    site: PreparedSiteRef<'a>, issuer: NodeId,
-    prefix: &[FrozenUseTraceTerm], owner_window: TimeSpan,
+    selector: &IssuedOwnerSelector<'a, '_>,
     transcript: &'a IssuedQueryTranscript, seal: &'a Rc<InvocationSeal>,
     work: &SharedIndexWork, depth: u32,
 ) -> Result<RetainedOwnerAddress<'a>, Failure>;
@@ -571,6 +579,16 @@ Foreground gates (full logs under `tmp/song-mode-riela/`):
 - Agent verification `CARGO_TERM_QUIET=true cargo check` — exit 0;
   `/tmp/song-route8-compile-check/final2-cargo-check.log`.
 
+### Session 250 design amendment (no Rust edits)
+
+The operator chose to amend the signature instead of suppressing the lint.
+`bind_issued_owner` now takes a borrowed `IssuedOwnerSelector` and has five
+parameters, with unchanged semantics. See "Session 250 amendment" below. The
+session-249 entry above attributed three changed cohort hashes to
+"pre-existing drift". That attribution is withdrawn: those paths are unowned,
+and the run must not have changed them. The fresh gates use
+`session250-route8-*` evidence. TASK-003 and the plan stay In Progress.
+
 ## Session 249 executable contract (wave 1)
 
 The source of truth is
@@ -595,19 +613,25 @@ deliverables.
     "src/song/routing/prepare/builder.rs",
     "src/song/routing/prepared.rs",
     "impl-plans/active/song-mode-immutable-route-authority.md",
-    "tmp/song-mode-riela/session249-route8-intent.json",
-    "tmp/song-mode-riela/session249-route8-receipt.json",
-    "tmp/song-mode-riela/session249-route8-cohort.sha",
-    "tmp/song-mode-riela/session249-route8-build.log",
-    "tmp/song-mode-riela/session249-route8-clippy.log",
-    "tmp/song-mode-riela/session249-route8-nextest-focused.log",
-    "tmp/song-mode-riela/session249-route8-nextest-full.log",
-    "tmp/song-mode-riela/session249-route8-wasm.log",
-    "tmp/song-mode-riela/session249-route8-fmt.log"
+    "tmp/song-mode-riela/session250-route8-intent.json",
+    "tmp/song-mode-riela/session250-route8-receipt.json",
+    "tmp/song-mode-riela/session250-route8-cohort.sha",
+    "tmp/song-mode-riela/session250-route8-build.log",
+    "tmp/song-mode-riela/session250-route8-clippy.log",
+    "tmp/song-mode-riela/session250-route8-clippy-libtest.log",
+    "tmp/song-mode-riela/session250-route8-nextest-focused.log",
+    "tmp/song-mode-riela/session250-route8-nextest-full.log",
+    "tmp/song-mode-riela/session250-route8-wasm.log",
+    "tmp/song-mode-riela/session250-route8-fmt.log"
   ],
   "sharedPaths": []
 }
 ```
+
+Session 250 replaced the `session249-route8-*` evidence paths with
+`session250-route8-*`. The session-249 files are read-only historical evidence
+of the failed Clippy gate. Workers must not overwrite them. The Rust writePaths
+are unchanged.
 
 ### Intent and context
 
@@ -637,10 +661,12 @@ This wave finishes the slice:
 
 ### Non-goals
 
-- Do not edit any file outside writePaths, including nested.rs,
+- Do not edit any file outside writePaths. This includes nested.rs,
   nested/preparation.rs, snapshot.rs, routing/index.rs, the
-  host/scheduler/replay/clock files, editor/ and the three files with
-  pre-existing uncommitted edits.
+  host/scheduler/replay/clock files, editor/, and the unowned paths
+  `src/song/snapshot/resources.rs`, `src/song/snapshot/reservations_tests.rs`
+  and `src/sched/runtime/song/clock_tests.rs`. Never format, stage or restore
+  these paths. Run rustfmt in write mode only on the eight Rust writePaths.
 - Do not wire production callers. That happens in wave 3.
 - Do not write an issued resolver. That happens in wave 2.
 - Do not add varying-seed admission guards.
@@ -752,11 +778,64 @@ This wave finishes the slice:
 The non-test library may still warn only for the items in this table. Each
 item's planned consumer is listed. Any other warning fails this wave.
 
-| Item | Consumer |
-|---|---|
-| `LookupAuthority::Issued`, `with_work`, `bind_issued_owner` | wave 2 issued resolution |
-| `RouteAuthorityView` accessors, `TrustedRouteCopy`/`TrustedSiteCopy`/`TrustedPolicyCopy` methods, `slot_payload`, `PayloadSlot`, the `ViewSite`/`ViewPolicy` fields, `publish_route_authority`, `issue_route_authority` | `prepare_routes_issued` and `issue_retained_route_authority`, then wave 3 preparation |
-| `PreparedRoutes`, `PreparedSiteRef`, `PreparedPolicyRef`, `prepare_routes_issued`, `issue_retained_route_authority`, `canonical_song_requests` | wave 2 resolver and wave 3 Ready/preparation |
+Session 250 replaced the earlier three-row summary with this table. The table
+lists every `dead_code`/`unused_imports` diagnostic in
+`tmp/song-mode-riela/session249-route8-clippy.log` (31 lib diagnostics at
+`a91d94b`), plus the row for the session-250 selector (D32).
+
+Match each diagnostic by file and item name, not by line number, because the
+repair may shift lines. Every item stays in wave 1, and no wave-1 deletion is
+needed. The "Caller written in" column names the wave that adds the caller
+code. Wave-2 callers (`resolve_issued_event` and its children) are themselves
+unreachable from non-test code until wave-3 playback calls them. So every row
+stays allowed through the wave-2 join, and all rows become live in wave 3.
+
+| ID | Diagnostic (file:line at a91d94b) | Item | Consumer chain | Caller written in |
+|---|---|---|---|---|
+| D01 | `src/song/routing.rs:623` unused imports | re-exports `PreparedPolicyRef`, `PreparedRoutes`, `prepare_routes_issued` | wave-2 resolver children (`routing/source/issued.rs`, `routing/nested/issued.rs`) and wave-3 `host/caps/song/preparation.rs` import them through `routing` | wave 2 / 3 |
+| D02 | `src/song/snapshot/occupancy.rs:6` unused import | re-export `RouteAuthorityView` | the session-250 repair (item 3) changes the `prepared.rs` import to go through this re-export, so D02 should disappear in wave 1 | wave 1 (session 250) |
+| D03 | `src/song/routing/prepared.rs:14` struct never constructed | `PreparedRoutes` | `prepare_routes_issued` <- wave-3 `SongHostPreparation::prepare` | wave 3 |
+| D04 | `prepared.rs:20` struct never constructed | `PreparedSiteRef` | `PreparedRoutes::site` <- wave-2 `resolve_issued_event` | wave 2 |
+| D05 | `prepared.rs:26` struct never constructed | `PreparedPolicyRef` | `PreparedRoutes::policy` <- wave-2 resolver | wave 2 |
+| D06 | `prepared.rs:31` function never used | private `invalid` | `prepare_routes_issued` settings guard (`:44`) and `PreparedRoutes::site`/`policy` refusals (`:86`, `:89`, `:112`, `:122`) | wave 2 / 3 |
+| D07 | `prepared.rs:34` function never used | `prepare_routes_issued` | wave-3 `SongHostPreparation::prepare` | wave 3 |
+| D08 | `prepared.rs:66` methods never used | `PreparedRoutes::plan`, `site`, `policy` | wave-2 resolver (`site`, `policy`); wave-3 Ready `routes()` (`plan`) | wave 2 / 3 |
+| D09 | `prepared.rs:137` methods never used | `PreparedSiteRef::authenticates_request`, `authority`, `scope`, `track`, `bind_original` | `bind_issued_owner` (`authority.rs:244` calls `authenticates_request`; it uses `authority`, `scope`, `track`, `bind_original`) <- wave-2 resolver | wave 2 |
+| D10 | `prepared.rs:173` method never used | `PreparedPolicyRef::bind_original` | wave-2 issued companion in `configuration/index/canonical.rs` | wave 2 |
+| D11 | `src/song/snapshot/occupancy.rs:27` function never used | `canonical_song_requests` | `issue_retained_route_authority` <- wave-3 preparation | wave 3 |
+| D12 | `src/song/snapshot/occupancy/route_view.rs:12` variants never constructed | `PayloadSlot::Capture`, `PayloadSlot::Edit` | constructed during `publish_route_authority` and the trusted copy <- `issue_route_authority` <- wave 3 | wave 3 |
+| D13 | `route_view.rs:18` fields never read | `ViewPolicy.source`, `ViewPolicy.seal` | trusted policy copy and `TrustedPolicyCopy::resolve`/`matches` <- `prepare_routes_issued` / wave-2 policy binding | wave 2 / 3 |
+| D14 | `route_view.rs:22` fields never read | `ViewSite.slot`, `track`, `seal`, `policies` | `TrustedSiteCopy::matches`/`authenticates_record`/`resolve` and the trusted copy | wave 2 / 3 |
+| D15 | `route_view.rs:29` field never read | `PublishedRetainedIndex.site` | `TrustedSiteCopy::authenticates_record` (`route_view.rs:258`, `Rc::ptr_eq(&record.site, &site.seal)`) <- `PreparedSiteRef::authenticates_request` <- `bind_issued_owner` | wave 2 |
+| D16 | `route_view.rs:35` fields never read | `RouteAuthorityView.resource_count`, `pcm_bytes`, `sites` | accessors (D22) and the trusted copy <- `prepare_routes_issued` | wave 3 |
+| D17 | `route_view.rs:40` struct never constructed | `TrustedRouteCopy` | `RouteAuthorityView::trusted_copy` <- `prepare_routes_issued` | wave 3 |
+| D18 | `route_view.rs:46` methods never used | `TrustedRouteCopy::inventory`, `sites`, `policies` | `prepare_routes_issued` and `PreparedRoutes::site`/`policy` | wave 2 / 3 |
+| D19 | `route_view.rs:56` struct never constructed | `TrustedSiteCopy` | trusted copy <- `prepare_routes_issued` | wave 3 |
+| D20 | `route_view.rs:61` struct never constructed | `TrustedPolicyCopy` | trusted copy <- `prepare_routes_issued` | wave 3 |
+| D21 | `route_view.rs:66` function never used | `slot_payload` | site/policy `bind_original` and `resolve` paths <- wave-2 resolver | wave 2 |
+| D22 | `route_view.rs:189` methods never used | `RouteAuthorityView::resource_count`, `pcm_bytes`, `trusted_copy` | `prepare_routes_issued` host demand and plan copy | wave 3 |
+| D23 | `route_view.rs:240` methods never used | `TrustedSiteCopy::authenticates_record`, `resolve` | `PreparedSiteRef::authenticates_request`/`bind_original` (D09) | wave 2 |
+| D24 | `route_view.rs:293` function never used | `publish_route_authority` | `SongSnapshot::issue_route_authority` (D25) | wave 3 |
+| D25 | `route_view.rs:415` method never used | `SongSnapshot::issue_route_authority` | `PreparedSong::issue_retained_route_authority` (D28) | wave 3 |
+| D26 | `route_view.rs:426` method never used | `TrustedSiteCopy::matches` | `PreparedRoutes::site` <- wave-2 resolver | wave 2 |
+| D27 | `route_view.rs:438` methods never used | `TrustedPolicyCopy::resolve`, `matches` | `PreparedRoutes::policy` and `PreparedPolicyRef::bind_original` <- wave-2 resolver | wave 2 |
+| D28 | `route_view.rs:486` method never used | `PreparedSong::issue_retained_route_authority` | wave-3 `SongHostPreparation::prepare` | wave 3 |
+| D29 | `src/song/snapshot/occupancy/lookup.rs:13` variant never constructed | `LookupAuthority::Issued` | `bind_issued_owner` <- wave-2 resolver | wave 2 |
+| D30 | `src/song/snapshot/occupancy/lookup/authority.rs:194` function never used | `with_work` | `bind_issued_owner` and `resolve_issued_event` | wave 2 |
+| D31 | `authority.rs:211` function never used | `bind_issued_owner` | wave-2 `resolve_issued_event` step 3 | wave 2 |
+| D32 | `authority.rs` struct never constructed or fields never read (new in session 250) | `IssuedOwnerSelector` | wave-2 `resolve_issued_event` step 3 | wave 2 |
+
+Gate rules:
+
+- The receipt lists every lib and lib-test Clippy diagnostic as
+  `{file, line, message, rowId}`.
+- A diagnostic that maps to no row fails the gate. This includes
+  `too_many_arguments` and any non-dead-code lint.
+- To clear an unmapped diagnostic, do not delete, add or rewire any item.
+  Stop and record a plan amendment instead.
+- Rows may remain through the wave-2 join, where they are recorded in the
+  resolution and shared-work receipts. Every row must be clear by wave 3, when
+  strict Clippy must exit 0.
 
 ### Key pitfalls
 
@@ -836,10 +915,10 @@ item's planned consumer is listed. Any other warning fails this wave.
   - It must contain exactly 947 lines.
   - Compared with `route-preparation-meter-full-cohort-held-0003.json`, it adds
     exactly route_view.rs, lookup/authority.rs and prepared.rs.
-  - Hash changes may appear only on the five existing Route8 paths, plus any of
-    the three pre-existing edited files (resources.rs, reservations_tests.rs,
-    clock_tests.rs). The receipt lists those three explicitly as pre-existing
-    drift.
+  - Hash changes may appear only on the five existing Route8 paths. A changed
+    hash on any other path fails the gate and is listed under
+    `unownedChanges`. Superseded for the rerun by the session-250 amendment
+    below.
 - `wc -l` on all eight paths: each must be below 1000.
 
 ### Done criteria (mechanically checkable)
@@ -855,3 +934,133 @@ item's planned consumer is listed. Any other warning fails this wave.
 - [x] Status stays In Progress, with a progress-log entry giving commands, exit
   codes and log paths. It becomes Completed only after wave 3 removes the last
   disposition-table warning (TASK-003 consumer criterion).
+
+## Session 250 amendment: wave-1 Clippy repair and fresh evidence
+
+This amendment resumes the blocked session-249 run on top of WIP commit
+`a91d94b`. The session-249 gates passed except one: strict Clippy reported
+`clippy::too_many_arguments` at `lookup/authority.rs:211`, because this plan
+pinned an eight-parameter `bind_issued_owner` and forbade `allow`/`expect`.
+That pin is now replaced by the selector signature in "Proposed issuing and
+lookup signatures". The design rule is in
+[Wave 1 item 4](../../design-docs/specs/design-song-mode.md#wave-1-completing-immutable-route-authority).
+The Rust writePaths, tasks and the 947-input cohort target are unchanged.
+
+### Repair scope
+
+Before the first edit, write `session250-route8-intent.json` under the edit
+protocol above. It records the design sha256, the plan sha256, and the sha256
+and full original text of each of the eight writePaths as they are at
+`a91d94b`.
+
+1. **`src/song/snapshot/occupancy/lookup/authority.rs`**
+   - Add `IssuedOwnerSelector<'a, 'p>` next to `bind_issued_owner`, with the
+     four `pub(crate)` fields shown in the signature block. Derives are
+     optional. The selector carries no seal and grants no authority:
+     `PreparedSiteRef` can only be obtained from `PreparedRoutes::site`.
+   - Change `bind_issued_owner` to the five-parameter selector form. The body
+     reads `selector.site`, `selector.issuer`, `selector.prefix` and
+     `selector.owner_window` where it previously read the four parameters.
+     Nothing else in the body changes: no statement is reordered, and no
+     check, charge or error is added, removed or changed.
+2. **`src/song/routing/prepared.rs`**
+   - Update only the two `bind_issued_owner` call sites in
+     `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`
+     to build a selector. Keep every assertion and the loop structure as they
+     are.
+3. **`src/song/routing/prepared.rs` import (D02).** `unused_imports` depends
+   on whether any path names the re-export, not on reachability. So the
+   `occupancy.rs:6` re-export stays unused forever unless something names it.
+   Import `RouteAuthorityView` in the non-test part of `prepared.rs` as
+   `crate::song::snapshot::occupancy::RouteAuthorityView`, instead of through
+   `occupancy::route_view`. Keep the other `route_view` imports
+   (`TrustedRouteCopy`, `TrustedSiteCopy`, `TrustedPolicyCopy`) unchanged.
+   This is an import-path change only.
+4. No other path changes unless the compiler requires a visibility or import
+   adjustment inside the eight writePaths. Record any such adjustment in the
+   receipt.
+5. **D01 import-path rule for later waves.** The `src/song/routing.rs:623`
+   re-exports (`prepare_routes_issued`, `PreparedPolicyRef`, `PreparedRoutes`)
+   are consumed only when later code names them as `crate::song::routing::X`.
+   Waves 2 and 3 must import them through that path, never through
+   `routing::prepared`. SONG-ISSUED-RESOLUTION and SONG-ISSUED-PLAYBACK pin
+   this rule.
+
+### Equivalence obligations for adversarial review
+
+The reviewer compares `a91d94b` with the repaired source and confirms each item
+below:
+
+- Retained-request selection still uses the attested site seal, plus the exact
+  scope, track, issuer, prefix and window-coverage predicates, in the same
+  order.
+- `transcript.authentic` runs before `transcript.invocation`. The measured
+  authentication delta is still precharged once before the invocation find.
+- Exact retained-execution membership is checked, along with owner, placement,
+  seed, entry, admitted depth, original recipe and complete coverage.
+- The returned address uses the fresh issued invocation clock, never a
+  retained clock.
+- The `with_work` bridge holds no `RefCell` borrow across transcript calls. The
+  debit on success and on failure is identical to `a91d94b`. The existing
+  bridge fixture shows this: its assertions are unchanged and it still passes.
+- No `allow` or `expect` attribute is added anywhere in the eight paths.
+
+### Unowned paths precondition
+
+`src/song/snapshot/resources.rs`, `src/song/snapshot/reservations_tests.rs`
+and `src/sched/runtime/song/clock_tests.rs` must equal `HEAD` before the gates
+run. Under the SM3 default
+(`design-docs/user-qa/pending-song-mode-questions.md`), the orchestrator saves
+the diff to `tmp/song-mode-riela/session250-unowned-rewrite.patch` and
+restores exactly those three paths. Workers never do this. The receipt records
+the exit status of `git diff --quiet -- <the three paths>`. The session-249
+"pre-existing drift" exception is withdrawn.
+
+### Fresh gates (foreground; record the exit status and full log path)
+
+- `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session250-route8-build.log 2>&1` must exit 0.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session250-route8-clippy.log 2>&1`.
+  The log must contain no `too_many_arguments` diagnostic and no lint other
+  than `dead_code`/`unused_imports` mapped to a row D01-D32. Under the accepted
+  design, exit 0 is required from wave 3 onward, not in wave 1.
+- `CARGO_TERM_QUIET=true cargo clippy --lib --profile test -- -D warnings > tmp/song-mode-riela/session250-route8-clippy-libtest.log 2>&1`.
+  This prints the cfg(test) lib diagnostics on their own, because cargo
+  deduplicates them in the all-targets log (session 249 printed only "3
+  previous errors"). Every diagnostic must map to a row D01-D32. Record both
+  logs in the receipt as `{file, line, message, rowId}` entries.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/prepared::tests|occupancy::|routing::nested::preparation::meter_tests/)' > tmp/song-mode-riela/session250-route8-nextest-focused.log 2>&1`
+  must exit 0 with a nonzero count. Then append
+  `cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker`
+  (same env, `>>` to the same log), which must also exit 0.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session250-route8-nextest-full.log 2>&1`
+  must exit 0, with at least the session-249 count of 2767 passing.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session250-route8-wasm.log 2>&1`
+  must exit 0.
+- `rustfmt --edition 2021 --check <the eight Rust writePaths> > tmp/song-mode-riela/session250-route8-fmt.log 2>&1`
+  must report no `Diff in` naming any of the eight paths.
+- `git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session250-route8-cohort.sha`.
+  It must have exactly 947 lines. Compared with held0003, it adds exactly
+  route_view.rs, lookup/authority.rs and prepared.rs. Changed hashes appear
+  only on the five existing Route8 paths, and `unownedChanges` is empty.
+- `wc -l` on the eight paths: each must be below 1000.
+- `git diff a91d94b -- <eight paths> | grep -E '^\+.*#\[(allow|expect)'` and
+  `git diff -- <eight paths> | grep -E '^\+.*#\[(allow|expect)'` must both
+  print nothing.
+- **Freshness.** `session250-route8-receipt.json` records the sha256 of every
+  gate log, of the cohort file and of each of the eight paths. The sha256 of
+  the receipt file is the evidence fingerprint. It must not equal
+  `92d679ea9b4ca29f3f96a7594724ae8ca1a7f0ff2b2b73834930287638c5f61e`. The
+  `lookup/authority.rs` and `prepared.rs` hashes must differ from the
+  session-249 receipt values (`9e3b4601...` and `d530fe89...`).
+
+### Session 250 done criteria
+
+- [ ] `bind_issued_owner` takes the selector form (five parameters), and the
+  plan, design and SONG-ISSUED-RESOLUTION plan agree on it.
+- [ ] Every fresh gate above passes, with the exit status and log path in the
+  receipt.
+- [ ] Every Clippy diagnostic in both clippy logs maps to a row D01-D32. No
+  item was deleted or added except `IssuedOwnerSelector`.
+- [ ] The three unowned paths equal `HEAD`, and `unownedChanges` is empty.
+- [ ] Test-integrity, adversarial and integration review accept Route8 before
+  any wave-2 worker starts.

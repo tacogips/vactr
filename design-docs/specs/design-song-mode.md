@@ -1056,12 +1056,35 @@ release. Nothing else is added implicitly.
      site/policy copies: consumed by `prepare_routes_issued`.
    - `PreparedRoutes` and its references: consumed by the wave-2 resolver and
      wave-3 Ready/preparation.
+   - `IssuedOwnerSelector` (session 250): consumed by the wave-2 resolver.
+   - Private helpers and fields that are reachable only through the items
+     above: for example `prepared::invalid` and `PublishedRetainedIndex.site`.
+     They share their caller's consumer.
+
+   The Route8 plan's disposition table (rows D01-D32) is the authoritative
+   per-diagnostic list. It is checked against
+   `tmp/song-mode-riela/session249-route8-clippy.log`.
 
    Waves 1 and 2 record the strict Clippy run with its exact remaining warning
-   list. Any warning not listed above fails the wave. Strict all-target Clippy
-   with `-D warnings` must pass from wave 3 onward. The Route8 plan becomes
-   Completed only after wave 3 consumes it, which matches its own TASK-003
-   consumer criterion.
+   list. Only `dead_code` and `unused_imports` on the items listed above may
+   remain; any other lint, including `clippy::too_many_arguments`, fails the
+   wave. Strict all-target Clippy with `-D warnings` must exit 0 from wave 3
+   onward. The Route8 plan becomes Completed only after wave 3 consumes it,
+   which matches its own TASK-003 consumer criterion.
+
+   Every new Route8 function has at most seven parameters. `bind_issued_owner`
+   meets this by taking its caller selection inputs (prepared site, issuer,
+   use-trace prefix and owner window) as one borrowed selector struct. The
+   selector only selects a retained request. It grants no authority. This
+   grouping does not change authentication semantics:
+   - the private retained-request selection;
+   - exact retained-execution membership;
+   - the owner, placement, seed, entry, depth, recipe and coverage checks;
+   - the fresh issued invocation clock;
+   - the serialized `with_work` bridge, including the order, amount and
+     failure retention of every charge.
+
+   The exact signature is pinned in the Route8 plan (session 250 amendment).
 5. **Exact 947 input cohort.** The held0003 cohort has 944 inputs (a path to
    sha256 map in `route-preparation-meter-full-cohort-held-0003.json`).
    `immutable-route-authority-source-intent-0001.json` records
@@ -1223,16 +1246,34 @@ The cohort count rises only by declared new files. The projection is 947 after
 wave 1, 952 after wave 2, 953 after wave 3 and 953 after wave 4. Each wave
 receipt confirms the actual count.
 
-### Pre-existing working-tree edits
+### Unowned working-tree paths (session 250 correction)
 
-`git diff` shows three uncommitted, unattributed modifications:
+Session 249 called the edits to `src/song/snapshot/resources.rs`,
+`src/song/snapshot/reservations_tests.rs` and
+`src/sched/runtime/song/clock_tests.rs` "pre-existing drift". That was wrong.
+The run itself rewrote them, most likely by running rustfmt in write mode on a
+parent module outside its writePaths. There is no accepted pre-existing drift, and no cohort
+audit may excuse a changed hash with that label.
 
-- `src/song/snapshot/resources.rs`
-- `src/song/snapshot/reservations_tests.rs`
-- `src/sched/runtime/song/clock_tests.rs`
-
-All three are pure reformatting of test assertions and struct literals, with no
-semantic change. No plan owns them. Keep them unstaged and unmodified. Every
-wave commit stages explicit declared paths only, and no wave may format them.
-The wave-1 cohort audit compares their hashes with held0003 and attributes any
-difference to this pre-existing drift.
+- No plan owns these three paths. No wave edits, formats, stages or commits
+  them, and every wave commit stages its declared paths explicitly.
+- rustfmt and cargo fmt run in write mode only on a plan's own Rust writePaths.
+  They never run on a parent whose child modules are outside those writePaths.
+  Gates use `--check`.
+- Every cohort audit, from wave 1 to wave 4, allows changed hashes only on the
+  declared writePaths of the plans joined so far. A changed hash on any other
+  path fails the audit. The receipt names the path under `unownedChanges`.
+  It is not relabelled.
+- A `--check` hunk that rustfmt reports for an untouched child module is still
+  recorded and not fixed (see the format-gate rule above). That rule covers
+  formatting output only. It does not excuse cohort hash changes.
+- Before the Route8 gates are rerun, all three paths must equal `HEAD`, which
+  is the state the operator described. Under the
+  [SM3](../user-qa/pending-song-mode-questions.md#sm3-unowned-rustfmt-rewrites-in-the-working-tree)
+  default, the orchestrator does this, never a worker or reviewer. It first
+  saves `git diff -- <the three paths>` to
+  `tmp/song-mode-riela/session250-unowned-rewrite.patch`, then restores exactly
+  those three paths to `HEAD`. It confirms with `git diff --quiet -- <the three
+  paths>` (exit 0) and records the result in the Route8 receipt. Workers and
+  reviewers never run `git checkout`, `git restore` or `git stash`. If the
+  paths still differ, the Route8 cohort gate fails.

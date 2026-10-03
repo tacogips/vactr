@@ -4,7 +4,20 @@
   "implementationBranch": "wf/route-authority",
   "baseBranch": "wf/route-authority",
   "remote": "origin",
-  "originalHead": "37ea3e821bd8b690e55357d2dea013f36e55154a",
+  "originalHead": "a91d94b2a47d306de2bb78a17f26b87e50eaf655",
+  "resume": {
+    "session": "opus-luna-design-and-implement-review-loop-session-250",
+    "resumesFrom": "opus-luna-design-and-implement-review-loop-session-249",
+    "resumeHead": "a91d94b2a47d306de2bb78a17f26b87e50eaf655",
+    "wave1State": "SONG-ROUTE8 implemented at a91d94b (WIP, unreviewed). Its only blocker was clippy::too_many_arguments at src/song/snapshot/occupancy/lookup/authority.rs:211, caused by the plan-pinned eight-parameter bind_issued_owner.",
+    "amendments": [
+      "bind_issued_owner takes &IssuedOwnerSelector { site, issuer, prefix, owner_window } plus transcript, seal, work and depth (five parameters). Authentication semantics are unchanged. Pinned in song-mode-immutable-route-authority.md and mirrored in song-mode-issued-route-resolution.md; the design (Wave 1 item 4) states the arity rule.",
+      "SONG-ROUTE8 reruns every gate into session250-route8-* evidence. The receipt sha256 (the evidence fingerprint) must differ from 92d679ea9b4ca29f3f96a7594724ae8ca1a7f0ff2b2b73834930287638c5f61e. Session-249 logs stay as read-only history.",
+      "The session-249 'pre-existing drift' exception is withdrawn in every plan and in the design. Cohort audits allow hash changes only on declared writePaths. The three unowned paths must equal HEAD before the Route8 gates run, restored by the orchestrator under the user-QA SM3 default after saving tmp/song-mode-riela/session250-unowned-rewrite.patch.",
+      "SONG-ROUTE8 needs test-integrity, adversarial and integration review acceptance before any wave-2 worker starts."
+    ],
+    "unchanged": "Wave order, Rust writePaths, tasks and downstream plan contracts are unchanged, apart from the bind_issued_owner call form in SONG-ISSUED-RESOLUTION."
+  },
   "designDocPaths": [
     "design-docs/specs/design-song-mode.md"
   ],
@@ -31,7 +44,7 @@
     "serialReconciliation": "src/song/routing/prepared.rs (waves 1, 2, 3) and src/song/snapshot/occupancy/lookup/authority.rs (waves 1, 2) are edited only after the previous wave joins. impl-plans/README.md, plan status reconciliation and the design evidence checkpoint belong only to SONG-16 in wave 4."
   },
   "reviewContext": {
-    "issueReference": "workflowInput (no GitHub issue) - opus-luna-design-and-implement-review-loop-session-249; issueTitle: Song mode: finish immutable route authority and integrate issued routing, shared query work, playback and structural clock hooks into production; accepted by step5-impl-plan-review communication comm-003440",
+    "issueReference": "workflowInput (no GitHub issue) - opus-luna-design-and-implement-review-loop-session-250, resuming blocked session-249; issueTitle: RESUME session 249: repair SONG-ROUTE8 clippy blocker, then review and continue song-mode issued routing, shared query work, playback and structural clock waves; design accepted in comm-003453, plans and manifest accepted by step5-impl-plan-review in comm-003455; baseline ed52903; Route8 WIP a91d94b",
     "userProblem": "Static song code (reusable finite Part functions, repeat/sequence, remove-one-event, regional overwrite, instrument-selective filter/effect) must produce a complete automatically terminating song and export through production paths. Checkpoint 37ea3e8 has an unfinished, unwired immutable route authority slice (dead-code warnings only), and production still resolves routes from copied public descriptors with a handle-only dedup, a scalar resolve_route, replacing replay seeding, non-atomic pool mutation and eight Unknown structural clock barriers.",
     "requiredOutcomes": [
       "SONG-ROUTE8: legacy-compatible PreparationLedger (held0003-identical Legacy, metered Issued), issued-only input-size precharges including Template::from_inst, bus default cell scan and BusTemplate::from_def, canonical_song_requests, PreparedSong::issue_retained_route_authority, genuine owning fixtures in prepared.rs, exact 947-input cohort with exactly three additions, clippy diagnostics limited to the disposition table.",
@@ -57,7 +70,8 @@
       "writePaths and sharedPaths are exactly the plan-declared concrete file paths; never whole directories.",
       "Preserve legacy snapshot/static APIs and behavior; never weaken, delete or edit existing test assertions.",
       "Do not substitute fresh-only collectors for additive replay retention; playback pool commits are staged and atomic with old state preserved on failure.",
-      "The pre-existing uncommitted edits to src/song/snapshot/resources.rs, src/song/snapshot/reservations_tests.rs and src/sched/runtime/song/clock_tests.rs stay unstaged and unmodified and are reported as pre-existing drift in cohort audits.",
+      "src/song/snapshot/resources.rs, src/song/snapshot/reservations_tests.rs and src/sched/runtime/song/clock_tests.rs are unowned. No worker edits, formats, stages or restores them. Cohort audits allow changed hashes only on declared writePaths; any other change fails as unownedChanges, with no pre-existing drift exception.",
+      "Never run rustfmt or cargo fmt in write mode on files outside the plan's Rust writePaths, or on a writePath whose child modules are not plan-owned. Gates use --check.",
       "Commit message bodies contain no AI tool attribution or Co-Authored-By lines."
     ],
     "designDecisionsAndRationale": [
@@ -138,34 +152,42 @@
         "src/song/routing/prepare/builder.rs",
         "src/song/routing/prepared.rs",
         "impl-plans/active/song-mode-immutable-route-authority.md",
-        "tmp/song-mode-riela/session249-route8-intent.json",
-        "tmp/song-mode-riela/session249-route8-receipt.json",
-        "tmp/song-mode-riela/session249-route8-cohort.sha",
-        "tmp/song-mode-riela/session249-route8-build.log",
-        "tmp/song-mode-riela/session249-route8-clippy.log",
-        "tmp/song-mode-riela/session249-route8-nextest-focused.log",
-        "tmp/song-mode-riela/session249-route8-nextest-full.log",
-        "tmp/song-mode-riela/session249-route8-wasm.log",
-        "tmp/song-mode-riela/session249-route8-fmt.log"
+        "tmp/song-mode-riela/session250-route8-intent.json",
+        "tmp/song-mode-riela/session250-route8-receipt.json",
+        "tmp/song-mode-riela/session250-route8-cohort.sha",
+        "tmp/song-mode-riela/session250-route8-build.log",
+        "tmp/song-mode-riela/session250-route8-clippy.log",
+        "tmp/song-mode-riela/session250-route8-clippy-libtest.log",
+        "tmp/song-mode-riela/session250-route8-nextest-focused.log",
+        "tmp/song-mode-riela/session250-route8-nextest-full.log",
+        "tmp/song-mode-riela/session250-route8-wasm.log",
+        "tmp/song-mode-riela/session250-route8-fmt.log"
       ],
       "sharedPaths": [],
       "acceptanceCriteria": [
-        "Build, focused tests, full tests (at least the held0003 425 plus new tests) and the wasm32 host-wasm build exit 0.",
-        "Clippy diagnostics are only dead_code/unused_imports on items in the plan's dead-code disposition table, listed in the receipt.",
+        "Session 250 repair: bind_issued_owner takes &IssuedOwnerSelector plus transcript, seal, work and depth (five parameters). The body is semantically identical to a91d94b; only the two call sites in the prepared.rs bridge fixture change, and their assertions are unchanged. prepared.rs imports RouteAuthorityView through crate::song::snapshot::occupancy::RouteAuthorityView (import-path only), so D02 disappears.",
+        "Build, focused tests (the filter set plus song_route_preparation, song_source_routes, song_end_to_end and song_checker), full tests (at least the session-249 count of 2767) and the wasm32 host-wasm build exit 0.",
+        "Clippy, both the all-targets log and the separate lib --profile test log, reports no too_many_arguments and only dead_code/unused_imports diagnostics. The receipt maps each one, as {file, line, message, rowId}, to a row D01-D32 of the plan's dead-code disposition table. D01-D31 cover all 31 session-249 lib diagnostics, including prepared.rs invalid (D06) and PublishedRetainedIndex.site (D15); D32 is IssuedOwnerSelector. A diagnostic with no row fails the gate and triggers a plan amendment, not an ad-hoc deletion. Exit 0 is required from wave 3 onward.",
+        "The receipt sha256 (evidence fingerprint) differs from 92d679ea9b4ca29f3f96a7594724ae8ca1a7f0ff2b2b73834930287638c5f61e. The lookup/authority.rs and prepared.rs hashes differ from the session-249 receipt.",
         "Legacy prepare_routes is held0003-identical (Legacy ledger, prepare_nested_covers wrapper, inventory.clone(), no new precharges); Issued applies every listed precharge before its operation, and existing charges are confirmed, not duplicated.",
         "canonical_song_requests and PreparedSong::issue_retained_route_authority exist; capture_test_route_authority exists; all nine listed owning-fixture tests in prepared.rs exist and pass.",
         "rustfmt log has no Diff in line for the eight Rust paths; each is below 1000 lines; no allow/expect attributes added.",
-        "Cohort has exactly 947 lines with exactly route_view.rs, lookup/authority.rs and prepared.rs added; hash changes only on the five existing Route8 paths plus reported pre-existing drift.",
+        "The three unowned paths equal HEAD before the gates run (git diff --quiet exit 0, recorded in the receipt). Cohort has exactly 947 lines with exactly route_view.rs, lookup/authority.rs and prepared.rs added; hash changes only on the five existing Route8 paths; unownedChanges is empty.",
+        "Test-integrity, adversarial (selector equivalence obligations in the plan) and integration review accept SONG-ROUTE8 before any wave-2 worker starts.",
         "Status stays In Progress with a progress-log entry giving commands, exit codes and log paths."
       ],
       "verification": [
-        "CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-route8-build.log 2>&1",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-route8-clippy.log 2>&1",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/prepared::tests|occupancy::|routing::nested::preparation::meter_tests/)' > tmp/song-mode-riela/session249-route8-nextest-focused.log 2>&1",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session249-route8-nextest-full.log 2>&1",
-        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-route8-wasm.log 2>&1",
-        "rustfmt --edition 2021 --check src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/route_view.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/prepared.rs > tmp/song-mode-riela/session249-route8-fmt.log 2>&1",
-        "git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session249-route8-cohort.sha",
+        "git diff --quiet -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs",
+        "CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session250-route8-build.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session250-route8-clippy.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --lib --profile test -- -D warnings > tmp/song-mode-riela/session250-route8-clippy-libtest.log 2>&1",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/prepared::tests|occupancy::|routing::nested::preparation::meter_tests/)' > tmp/song-mode-riela/session250-route8-nextest-focused.log 2>&1",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session250-route8-nextest-focused.log 2>&1",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session250-route8-nextest-full.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session250-route8-wasm.log 2>&1",
+        "rustfmt --edition 2021 --check src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/route_view.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/prepared.rs > tmp/song-mode-riela/session250-route8-fmt.log 2>&1",
+        "git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session250-route8-cohort.sha",
+        "shasum -a 256 tmp/song-mode-riela/session250-route8-receipt.json",
         "wc -l src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/route_view.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/prepared.rs",
         "git diff -- src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/route_view.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/prepared.rs | grep -E '^\\+.*#\\[(allow|expect)'"
       ]
@@ -199,7 +221,7 @@
         "Work comes only from the caller's SharedIndexWork through with_work; no fresh budget; no RefCell borrow across transcript calls.",
         "All seven listed tests in source/issued.rs and nested/issued.rs exist and pass, including NeedsJointGeometry resolving on the issued path while public resolve_route still refuses.",
         "Legacy focused binaries (song_route_preparation, song_source_routes, song_end_to_end, song_checker) pass unchanged; build, full tests and wasm build exit 0.",
-        "Clippy diagnostics are only dead_code entries whose consumer is wave 3; fmt clean on touched paths; every file below 1000 lines (source.rs grows by at most 10); no new allow/expect attributes.",
+        "Clippy diagnostics are only dead_code/unused_imports, each mapped in the receipt to a Route8 D-row (D01-D32), a RES-<item> whose only caller is wave-3 playback, or a concurrent SW-<item>. New code names PreparedPolicyRef, PreparedRoutes and PreparedSiteRef as crate::song::routing::X, so the PreparedPolicyRef part of D01 is consumed. fmt clean on touched paths; every file below 1000 lines (source.rs grows by at most 10); no new allow/expect attributes.",
         "Progress-log entry records commands, exits and log paths."
       ],
       "verification": [
@@ -237,7 +259,7 @@
         "SongSnapshot::query_issued_with_work and PreparedSong::query_issued_with_work exist with the pinned signatures; the legacy remaining-taking query_issued wraps the shared engine and writes back the actual debit on success and error.",
         "seed_collection checks original-Song attachment, refuses a foreign collector and an unattached collector with prior executions before precharge or mutation, precharges checked view.len * (prior.len + 1), appends only executions absent by Rc::ptr_eq, never clears prior entries, and keeps the fresh-collector result and charge (view.len).",
         "All seven listed tests in shared_work_tests.rs exist and pass.",
-        "Build, full tests and wasm build exit 0; clippy diagnostics limited to the two forwarders; fmt clean on the four paths (resources.rs/reservations_tests.rs hunks recorded as pre-existing drift); every file below 1000 lines (snapshot.rs grows by at most 30); no new allow/expect attributes.",
+        "Build, full tests and wasm build exit 0; in this plan's paths clippy reports only the two query_issued_with_work forwarders; any other diagnostic maps to a Route8 D-row or a RES-<item> in the receipt; fmt clean on the four paths (--check hunks reported for the unowned children resources.rs/reservations_tests.rs are recorded as untouched-child hunks, never fixed; snapshot.rs is never rustfmt-ed in write mode; their cohort hashes must stay unchanged); every file below 1000 lines (snapshot.rs grows by at most 30); no new allow/expect attributes.",
         "Progress-log entry recorded; TASK-003 is left to SONG-ISSUED-PLAYBACK."
       ],
       "verification": [
@@ -331,7 +353,7 @@
         "SongTransport::realize uses one CanonicalIndexCollector, resolves every envelope before coalescing, coalesces equal handles only with equal descriptors and routes, applies the onset window filter and preserves the per-event body and push order, stages pools via PoolBook::staged, and commits pools/pending/cursor only after full success.",
         "grep -n \"dedup_by\\|resolve_route(\" src/sched/song.rs prints nothing.",
         "tests/song_issued_transport.rs and the private sched/song.rs and preparation.rs fixtures exist and pass; the program covers nested reusable Part functions, sequence with part-repeat :same and :vary, delete-event, overwrite-region, transform-instrument lpf, instrument-fx, a Slice-sourced track and tail-seconds 2; Ended state with exact frames; export WAV bit-exact on repeat; tests/song_end_to_end.rs and tests/song_export.rs pass unchanged.",
-        "Strict all-target clippy exits 0; build, full tests and wasm build exit 0; fmt clean; every file below 1000 lines; no allow/expect attributes; progress log updated. If the end-to-end song is refused for work under defaults, record measured work and stop/report per SM1."
+        "Strict all-target clippy exits 0 (PreparedRoutes/prepare_routes_issued imported as crate::song::routing::X; a residual diagnostic outside playback writePaths is a blocker, repaired serially by the root reviewer at the wave-3 join, never by the worker); build, full tests and wasm build exit 0; fmt clean; every file below 1000 lines; no allow/expect attributes; progress log updated. If the end-to-end song is refused for work under defaults, record measured work and stop/report per SM1."
       ],
       "verification": [
         "CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-playback-build.log 2>&1",
@@ -404,7 +426,7 @@
       ],
       "acceptanceCriteria": [
         "Every final gate exits 0 with full logs: build, strict all-target clippy, focused nextest (nonzero count per binary), full nextest (at least 425 distinct tests), wasm32 host-wasm build, rustfmt --check on every Rust file touched in waves 1-3, editor npm test and build.",
-        "Cohort count equals the wave-3 join projection (953, or 954 with preparation/issued.rs) with only the declared new files added; the three pre-existing edited files are reported as pre-existing drift.",
+        "Cohort count equals the wave-3 join projection (953, or 954 with preparation/issued.rs) with only the declared new files added; changed hashes only on declared waves 1-3 writePaths; unownedChanges is empty (no pre-existing drift exception).",
         "Design evidence checkpoint appended; the five plan statuses and six README lines reconciled only if gates pass; one progress-log entry added.",
         "No Rust or test file edited in wave 4; plans are not archived."
       ],

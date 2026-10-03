@@ -261,16 +261,25 @@ impl PreparedSong {
 
 - `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-sharedwork-build.log 2>&1` must exit 0.
 - `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-sharedwork-clippy.log 2>&1`
-  may report only `dead_code` on the two new forwarders, whose consumer is
-  wave 3. Record them.
+  may report, in this plan's four paths, only `dead_code` on the two new
+  `query_issued_with_work` forwarders, whose consumer is wave 3. Diagnostics
+  in other paths are allowed only if they map to a Route8 disposition row
+  D01-D32 (`song-mode-immutable-route-authority.md`) or to a concurrent
+  SONG-ISSUED-RESOLUTION item. Record every diagnostic as
+  `{file, line, message, rowId}`, with `rowId` set to `SW-<item>`, a D-row or
+  `RES-<item>`. Do not edit any file outside this plan's writePaths to clear a
+  diagnostic.
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/shared_work_tests|song_replay|snapshot::issued|occupancy::/)' > tmp/song-mode-riela/session249-sharedwork-nextest-focused.log 2>&1`
   must exit 0 with a nonzero count.
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session249-sharedwork-nextest-full.log 2>&1` must exit 0.
 - `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-sharedwork-wasm.log 2>&1` must exit 0.
 - `rustfmt --edition 2021 --check src/song/snapshot.rs src/song/snapshot/issued.rs src/song/snapshot/issued/shared_work_tests.rs src/pattern/eval/song_replay.rs > tmp/song-mode-riela/session249-sharedwork-fmt.log 2>&1`
   passes when no `Diff in` line names these four paths. `snapshot.rs` pulls in
-  `resources.rs` and `reservations_tests.rs`. Hunks in those two files are
-  pre-existing drift: record them and do not fix them.
+  the unowned child modules `resources.rs` and `reservations_tests.rs`. Record
+  any `--check` hunk reported for them as an untouched-child hunk and do not fix
+  it. Never run rustfmt in write mode on `snapshot.rs`, because that would
+  rewrite those children. A changed cohort hash on either file is not excused;
+  it fails the join audit (design: Unowned working-tree paths).
 - `wc -l` on the four Rust paths: each must be below 1000.
 
 ### Shared-branch protocol
@@ -285,7 +294,8 @@ format, no stash/checkout/reset, and updates to this plan's log only.
 - [ ] `seed_collection` is additive, and the fresh-path charge is unchanged.
 - [ ] All seven tests above are present and pass.
 - [ ] Build, full tests and WASM exit 0.
-- [ ] Clippy diagnostics are limited to the two forwarders.
+- [ ] In this plan's paths, Clippy reports only the two forwarders. Every
+  other diagnostic maps to a Route8 D-row or a `RES-` item in the receipt.
 - [ ] fmt is clean on touched paths and every file is below 1000 lines.
 - [ ] No new `allow`/`expect` attributes.
 - [ ] The progress-log entry is recorded.

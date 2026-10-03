@@ -40,3 +40,28 @@ the recommendation for each one applies by default.
   are outside this release (design: Timing and randomness). Evidence for (a) is
   that `:vary` repeats differ musically and `:same` repeats are identical on
   the production path.
+
+## SM3: Unowned rustfmt rewrites in the working tree
+
+Added 2026-10-03, session 250.
+
+- **Question**: The session-250 issue says that
+  `src/song/snapshot/resources.rs`, `src/song/snapshot/reservations_tests.rs`
+  and `src/sched/runtime/song/clock_tests.rs` were restored to `HEAD`. At
+  session-250 intake, however, all three are modified and unstaged again. The
+  changes look like a rustfmt rewrite of assert chains and struct literals
+  (about 76 insertions and 80 deletions). No plan owns these paths. What should
+  happen to them before the Route8 gates are rerun?
+- **Options**:
+  - (a) The orchestrator saves the diff to
+    `tmp/song-mode-riela/session250-unowned-rewrite.patch` and restores exactly
+    these three paths to `HEAD`. Every cohort audit then allows hash changes
+    only on declared writePaths.
+  - (b) Leave the files modified, and have the audits keep excusing them as
+    "pre-existing drift".
+  - (c) Commit the rewrite as a separate formatting-only commit outside this
+    batch, then rebaseline the cohort.
+- **Recommendation**: (a). It produces the state the operator described, and the
+  saved patch makes it reversible. Option (b) restores the drift clause that the
+  operator asked to remove. Option (c) changes the 944-input baseline, which no
+  plan declares. Workers and reviewers never perform the restore.

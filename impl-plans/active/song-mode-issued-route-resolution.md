@@ -35,13 +35,25 @@ impl IssuedQueryTranscript {
         work: &SharedIndexWork, depth: u32,
     ) -> Result<&'s OwnerInvocation, Failure>;
 }
+// Session 250: selector form pinned by the Route8 plan amendment.
+pub(crate) struct IssuedOwnerSelector<'a, 'p> {
+    pub(crate) site: PreparedSiteRef<'a>,
+    pub(crate) issuer: NodeId,
+    pub(crate) prefix: &'p [FrozenUseTraceTerm],
+    pub(crate) owner_window: TimeSpan,
+}
 pub(crate) fn bind_issued_owner<'a>(
-    site: PreparedSiteRef<'a>, issuer: NodeId,
-    prefix: &[FrozenUseTraceTerm], owner_window: TimeSpan,
+    selector: &IssuedOwnerSelector<'a, '_>,
     transcript: &'a IssuedQueryTranscript, seal: &'a Rc<InvocationSeal>,
     work: &SharedIndexWork, depth: u32,
 ) -> Result<RetainedOwnerAddress<'a>, Failure>;
 ```
+
+This resolver builds one `IssuedOwnerSelector` per seal from the attested
+prepared site and the stage's complete issuer, prefix and owner window. It
+must not add parameters back to `bind_issued_owner` or bypass the selector.
+New functions in this plan's paths also stay at seven parameters or fewer,
+because no `allow`/`expect` is permitted.
 
 The transcript signature is present; the route adapter is currently being
 implemented in the declared preceding phase. Final Ready signatures must be
@@ -294,8 +306,9 @@ impl PreparedRoutes {
    1. Check `Rc::ptr_eq` between the batch transcript's original Song and the
       view's `original()`.
    2. Bound-check `event_index`.
-   3. For every seal in `invocations()`, call `bind_issued_owner` and then the
-      issued stage walk.
+   3. For every seal in `invocations()`, build an `IssuedOwnerSelector`, call
+      `bind_issued_owner(&selector, transcript, seal, work, depth)`, and then
+      run the issued stage walk.
    4. For every `source_contributions()` entry, authenticate its own augmented
       origin and each member slot against genuine transcript members and the
       attested policy binding. Discarded augmented origins are included.
@@ -347,8 +360,26 @@ impl PreparedRoutes {
 
 - `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-resolution-build.log 2>&1` must exit 0.
 - `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-resolution-clippy.log 2>&1`
-  may report only `dead_code` on items whose consumer is wave 3. List them in
-  the receipt. No other lint is allowed.
+  may report only `dead_code`/`unused_imports` diagnostics of two kinds:
+  - a diagnostic that maps to a Route8 disposition row D01-D32 (see
+    `song-mode-immutable-route-authority.md`, "Dead-code disposition after
+    wave 1"), matched by file and item;
+  - a new item added by this plan whose only caller is wave-3 playback
+    (`resolve_issued_event` and the items reachable only from it).
+
+  List each diagnostic in the receipt as `{file, line, message, rowId}`, with
+  `rowId` either a D-row or `RES-<item>`. Diagnostics from the concurrent
+  SONG-SHARED-WORK forwarders may also appear; label them `SW-<item>`. No other
+  lint is allowed.
+
+  Import rule (D01): name `PreparedPolicyRef`, `PreparedRoutes` and
+  `PreparedSiteRef` as `crate::song::routing::X` in every new or changed
+  file. Never use `routing::prepared::X` or `super::prepared::X` outside
+  `prepared.rs`. In particular, the `IssuedIndexOperand` field types in
+  `lookup/authority.rs` and the issued companion in `canonical.rs` must name
+  `crate::song::routing::PreparedPolicyRef`. That consumes the
+  `PreparedPolicyRef` part of D01, which wave 3 cannot reach (`routing.rs` is
+  not a playback writePath).
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/routing::(source|nested)::issued|prepared::tests/)' > tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
   must exit 0 with a nonzero count.
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker >> tmp/song-mode-riela/session249-resolution-nextest-focused.log 2>&1`
@@ -377,7 +408,9 @@ impl PreparedRoutes {
 - [ ] All seven test bullets above are present and pass.
 - [ ] The legacy focused binaries pass unchanged.
 - [ ] Build, full tests and WASM exit 0.
-- [ ] Clippy diagnostics are only dead_code entries whose consumer is wave 3.
+- [ ] Every Clippy diagnostic maps to a Route8 D-row, `RES-<item>` or
+  `SW-<item>` in the receipt. The `PreparedPolicyRef` part of D01 no longer
+  appears.
 - [ ] fmt is clean on touched paths and every file is below 1000 lines.
 - [ ] No new `allow`/`expect` attributes.
 - [ ] The progress-log entry has commands, exits and log paths.

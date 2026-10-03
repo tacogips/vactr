@@ -861,8 +861,9 @@ this batch holds on the joined tree. Then record it and reconcile the statuses.
   would break relative links in other active song-mode plans. Global archiving
   stays deferred to song-mode completion, which also needs SM1, SM2 and the
   other active plans.
-- Do not change the three pre-existing edited files. Do not run a crate-wide
-  format.
+- Do not edit, format or stage the unowned paths
+  `src/song/snapshot/resources.rs`, `src/song/snapshot/reservations_tests.rs`
+  and `src/sched/runtime/song/clock_tests.rs`. Do not run a crate-wide format.
 
 ### Final gates (run serially in the foreground; record the exit status and full log path in the final receipt)
 
@@ -881,8 +882,10 @@ this batch holds on the joined tree. Then record it and reconcile the statuses.
   baseline of 590 tests.
 - Cohort: `git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session249-final-cohort.sha`.
   The count must equal the wave-3 join projection, and the only additions are
-  the declared new files. The three pre-existing edited files are reported
-  explicitly as pre-existing drift.
+  the declared new files. Changed hashes appear only on declared writePaths of
+  waves 1-3. Any other changed hash fails the gate and is listed under
+  `unownedChanges` (design: Unowned working-tree paths). No pre-existing drift
+  exception applies.
 - `wc -l` on every touched Rust file: each must be below 1000.
 
 ### Documentation and status

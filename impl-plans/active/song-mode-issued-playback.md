@@ -213,8 +213,10 @@ Wave 1 provides `PreparedSong::issue_retained_route_authority` and
   is not a writePath).
 - No runtime first-time seed execution (design user-QA SM2).
 - No changes to `SongLimits::default()`.
-- No edits to the routing resolver, snapshot, replay, clock, the editor or the
-  three pre-existing edited files.
+- No edits to the routing resolver, snapshot, replay, clock or the editor.
+  Never edit, format or stage the unowned paths `src/song/snapshot/resources.rs`,
+  `src/song/snapshot/reservations_tests.rs` or
+  `src/sched/runtime/song/clock_tests.rs` (design: Unowned working-tree paths).
 - No `allow`/`expect` attributes.
 
 ### File-level changes
@@ -282,7 +284,10 @@ Wave 1 provides `PreparedSong::issue_retained_route_authority` and
    - Remove `dedup_by`, the allowance and the scalar `resolve_route` from
      production.
 5. **`prepared.rs`**: only the borrow and lifetime adjustments that Ready needs.
-   Do not change the resolver semantics.
+   Do not change the resolver semantics. If an item in `prepared.rs` is still
+   reported as dead after wiring, it is in this plan's writePaths. Wire it
+   through its planned consumer (Route8 D-row table) or record a blocker. Never
+   delete it silently.
 6. **`tests/song_issued_transport.rs` (new)**: public end-to-end tests, listed
    below.
 
@@ -379,7 +384,15 @@ Private fixture in `preparation.rs`'s existing test module:
 - `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-playback-build.log 2>&1` must exit 0.
 - `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-playback-clippy.log 2>&1`
   must exit 0. This is the first strict gate, so every Route8 and wave-2
-  dead-code item must be consumed by now.
+  dead-code item must be consumed by now. Import `PreparedRoutes` and
+  `prepare_routes_issued` as `crate::song::routing::X`, which consumes the
+  rest of Route8 row D01. If the log still shows a diagnostic in a path outside
+  this plan's writePaths (for example `src/song/routing.rs` or a wave-2 path),
+  do not edit that path. Record it in the receipt as
+  `{file, line, message, rowId}` and stop with a blocker. The root reviewer
+  then repairs it serially at the wave-3 join (dispatch `joinProtocol`),
+  limited to removing or re-pathing the named unused import or item, and reruns
+  the gate.
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_issued_transport --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker --test song_export > tmp/song-mode-riela/session249-playback-nextest-focused.log 2>&1`
   must exit 0 with a nonzero count for every binary.
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session249-playback-nextest-full.log 2>&1` must exit 0.

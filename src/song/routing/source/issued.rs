@@ -98,7 +98,7 @@ pub(in crate::song::routing) fn resolve_issued(
         let Some((configuration, offset)) = interval else {
             continue;
         };
-        let matched = super::super::nested::issued::resolve_issued_sources(
+        let matched = match super::super::nested::issued::resolve_issued_sources(
             super::super::nested::issued::IssuedSourceRequest {
                 prepared,
                 issued,
@@ -109,7 +109,22 @@ pub(in crate::song::routing) fn resolve_issued(
                 work,
                 depth,
             },
-        )?;
+        ) {
+            Ok(matched) => matched,
+            // A descriptor can overlap multiple admitted route branches. Keep
+            // searching when this branch cannot prove the source or Index
+            // owner; authentication errors and route conflicts remain fatal.
+            Err(failure)
+                if matches!(
+                    failure.message.as_str(),
+                    "source origin does not match admitted use"
+                        | "song route: issued Index timing has no matching fresh invocation"
+                ) =>
+            {
+                continue;
+            }
+            Err(failure) => return Err(failure),
+        };
         let placement_words = event.handle.placement().0.len();
         let route_words = placement_words
             .checked_add(matched.sources.len())
@@ -238,7 +253,7 @@ mod tests {
 
     const PLAIN: &str =
         "let base {part [drums: {s :analog}] duration: 2}\nsong base tail-seconds: 0 > play-song";
-    const SLICE: &str = "fn cut beat:\n\tfirst [0]\nfn indexed p:\n\tslice {beat -> s :analog > chord [:c :five]} 2 [cut nil]\nlet base {part [drums: {s :analog}] duration: 2}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
+    const SLICE: &str = "fn cut beat:\n\tfirst [0]\nfn indexed p:\n\tslice {beat -> p} 2 [cut nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
 
     fn limits() -> SongLimits {
         SongLimits {

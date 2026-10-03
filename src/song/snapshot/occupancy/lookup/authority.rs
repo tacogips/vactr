@@ -428,12 +428,12 @@ fn bind_issued_owner_if_matching<'a>(
     // invocation() authenticates again and then searches the same immutable vector.
     work.borrow_mut().charge(u64::from(charged_scan))?;
     let actual = transcript.invocation(seal, work, depth)?;
-    let (matched_request, candidates) = with_work(work, |limits, remaining| {
+    let (site_requests, candidates) = with_work(work, |limits, remaining| {
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         budget.enter(depth)?;
         budget.charge(view.records().len() as u64 + selector.prefix.len() as u64 + 1)?;
+        let mut site_requests = Vec::new();
         let mut candidates = Vec::new();
-        let mut matched_request = false;
         for record in view.records() {
             let request = &record.request;
             budget.charge(request.prefix.len() as u64 + 1)?;
@@ -456,7 +456,7 @@ fn bind_issued_owner_if_matching<'a>(
             ) {
                 return Err(invalid("foreign original prepared site"));
             }
-            matched_request = true;
+            site_requests.push(request);
             for retained in &record.invocations {
                 let old = retained.lookup_owner();
                 let fresh = actual.lookup_owner();
@@ -483,9 +483,9 @@ fn bind_issued_owner_if_matching<'a>(
                 candidates.push((request, retained.as_ref()));
             }
         }
-        Ok((matched_request, candidates))
+        Ok((site_requests, candidates))
     })?;
-    if !matched_request {
+    if site_requests.is_empty() {
         return Ok(None);
     }
     let mut found = None;
@@ -499,6 +499,62 @@ fn bind_issued_owner_if_matching<'a>(
             }
             // Repeated retained coverage is harmless for this exact fresh invocation.
             found.get_or_insert(request);
+        }
+    }
+    if found.is_none() {
+        let fallback = with_work(work, |limits, remaining| {
+            let mut budget = ProjectionBudget::new(limits, remaining)?;
+            budget.enter(depth)?;
+            budget.charge(view.records().len() as u64 + 1)?;
+            let mut candidates = Vec::new();
+            for record in view.records() {
+                budget.charge(record.request.prefix.len() as u64 + 1)?;
+                authenticate_authority(authority, &record.request, depth, &mut budget)?;
+                for retained in &record.invocations {
+                    let old = retained.lookup_owner();
+                    let fresh = actual.lookup_owner();
+                    budget.charge(
+                        old.placement.0.len() as u64
+                            + fresh.placement.0.len() as u64
+                            + retained.lookup_entry().steps.len() as u64
+                            + actual.lookup_entry().steps.len() as u64
+                            + 2,
+                    )?;
+                    if old != fresh
+                        || retained.lookup_seed() != actual.lookup_seed()
+                        || retained.lookup_entry() != actual.lookup_entry()
+                    {
+                        continue;
+                    }
+                    budget.charge(1)?;
+                    limits.check_events(
+                        candidates
+                            .len()
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("route candidates overflow"))?,
+                    )?;
+                    candidates.push(retained.as_ref());
+                }
+            }
+            Ok(candidates)
+        })?;
+        for retained in fallback {
+            if transcript.authentic_retained_invocation(
+                view.original(),
+                seal,
+                retained,
+                work,
+                depth,
+            )? {
+                if actual.lookup_depth() > work.borrow().limits.max_depth {
+                    return Err(Failure::new(
+                        FailCode::DepthExceeded,
+                        "issued route execution depth",
+                    ));
+                }
+                found = site_requests.first().copied();
+                break;
+            }
         }
     }
     let request =

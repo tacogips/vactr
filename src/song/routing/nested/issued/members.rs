@@ -2,16 +2,21 @@ use super::*;
 use crate::pattern::eval::song_observation::CanonicalOwnerFrame;
 use crate::song::snapshot::occupancy::lookup::authority::{bind_issued_member, IssuedMemberQuery};
 
-pub(super) fn owner_matches(frame: &CanonicalOwnerFrame, stage: &Stage<'_>) -> bool {
+pub(super) fn owner_matches(
+    frame: &CanonicalOwnerFrame,
+    stage: &Stage<'_>,
+    output_handle: &crate::song::EventHandle,
+) -> bool {
     frame.root == stage.output_owner.payload().id
-        && frame.track == stage.handle.track()
-        && frame.revision == stage.handle.revision()
-        && frame.placement == *stage.handle.placement()
+        && frame.track == output_handle.track()
+        && frame.revision == output_handle.revision()
+        && frame.placement == *output_handle.placement()
 }
 
 pub(super) fn stage_owner_frame<'a>(
     context: &IssuedResolution<'a>,
     stage: &Stage<'_>,
+    output_handle: &crate::song::EventHandle,
     bridge: &mut WorkBridge<'_>,
     budget: &mut ResolutionBudget,
 ) -> Result<&'a CanonicalOwnerFrame, Failure> {
@@ -28,7 +33,7 @@ pub(super) fn stage_owner_frame<'a>(
         budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
         bridge.synced_remaining = budget.remaining();
         let frame = actual.lookup_owner();
-        if owner_matches(frame, stage) {
+        if owner_matches(frame, stage, output_handle) {
             return Ok(frame);
         }
     }
@@ -38,6 +43,7 @@ pub(super) fn stage_owner_frame<'a>(
 }
 
 pub(super) fn parent_use_policy<'a>(
+    context: &IssuedResolution<'_>,
     prepared: &'a crate::song::routing::PreparedRoutes,
     stages: &[Stage<'_>],
     output_scopes: &[usize],
@@ -46,7 +52,26 @@ pub(super) fn parent_use_policy<'a>(
     depth: u32,
 ) -> Result<Option<crate::song::routing::PreparedPolicyRef<'a>>, Failure> {
     if stage_index == 0 {
-        return Ok(None);
+        let Some(parent) = context.anchor_parent else {
+            return Ok(None);
+        };
+        let limits = budget.limits();
+        let site = prepared.site(
+            parent.scope,
+            parent.track,
+            limits,
+            budget.remaining_mut(),
+            depth,
+        )?;
+        return prepared
+            .policy(
+                site,
+                parent.source,
+                budget.limits(),
+                budget.remaining_mut(),
+                depth,
+            )
+            .map(Some);
     }
     let enclosing_index = stage_index - 1;
     let enclosing = stages
@@ -121,6 +146,7 @@ pub(super) fn issued_index_stage_configuration(
     context: &IssuedResolution<'_>,
     stages: &[Stage<'_>],
     output_scopes: &[usize],
+    output_handles: &[&crate::song::EventHandle],
     owner: TimeSpan,
     budget: &mut ResolutionBudget,
     bridge: &mut WorkBridge<'_>,
@@ -134,6 +160,9 @@ pub(super) fn issued_index_stage_configuration(
     let depth = context.depth;
     let mut result = None;
     for (stage_index, stage) in stages.iter().enumerate() {
+        let output_handle = output_handles
+            .get(stage_index)
+            .ok_or_else(|| invalid("issued output handle missing"))?;
         let graph = stage.cover.graph();
         let mut node_index = graph.root;
         let mut prefix = Vec::<FrozenUseTraceTerm>::new();
@@ -207,9 +236,11 @@ pub(super) fn issued_index_stage_configuration(
                         prefix: &prefix,
                         owner_window: stage.scope.interval,
                     };
-                    let stage_owner = stage_owner_frame(context, stage, bridge, budget)?;
+                    let stage_owner =
+                        stage_owner_frame(context, stage, output_handle, bridge, budget)?;
                     bind_timing_member(context, stage, stage_owner, site, &bound, bridge, budget)?;
                     let mut parent_use = parent_use_policy(
+                        context,
                         prepared,
                         stages,
                         output_scopes,
@@ -228,12 +259,13 @@ pub(super) fn issued_index_stage_configuration(
                             .ok_or_else(|| invalid("issued invocation replenished shared work"))?;
                         budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
                         bridge.synced_remaining = budget.remaining();
-                        if !owner_matches(actual.lookup_owner(), stage) {
+                        if !owner_matches(actual.lookup_owner(), stage, output_handle) {
                             continue;
                         }
                         let address_policy = match parent_use.take() {
                             Some(policy) => Some(policy),
                             None if stage_index > 0 => parent_use_policy(
+                                context,
                                 prepared,
                                 stages,
                                 output_scopes,

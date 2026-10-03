@@ -2309,3 +2309,91 @@ The session 254 and 256 tests stand unchanged:
   `fixes[]` and a new fingerprint.
 - [ ] One progress-log entry is added. Test-integrity, adversarial and
   integration review follow; the workflow owns them.
+
+### Session 259 — Resolver repair and final-source verification
+
+Continued the assigned resolver work on base `e71d726` with the accepted
+`SONG-ROUTE8` dependency. Updated nested issued resolution to use authenticated
+descriptor-stage anchors and per-stage output owners, retained matching parent
+policy context, and unioned authentic invocation seals before resolution.
+Updated source branch selection to continue only on the two exact topology or
+fresh-invocation mismatch errors; authentication and conflict failures remain
+fatal. The discarded-origin fixture now checks an event with multiple
+slice-timed contributions and confirms charged resolution. Eight of the nine
+named tests pass, but `discarded_augmented_source_origins_are_resolved` still
+fails with `event does not match admitted route topology`; do not mark the
+resolver tasks complete.
+
+Foreground verification on the final source:
+
+- `CARGO_TERM_QUIET=true cargo build` — exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/build-final-candidate.log`.
+- `CARGO_TERM_QUIET=true cargo check` — exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/check-final.log`.
+- Focused issued resolver nextest — exit 100; 9 tests, 8 passed, 1 failed;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/focused-current-source.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast`
+  — exit 100; 2793 run, 2792 passed, 1 failed, 3 skipped; the sole failure is
+  `discarded_augmented_source_origins_are_resolved`;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/full-final-source.log`.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+  — exit 0; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/wasm-final.log`.
+- Scoped `rustfmt --edition 2021 --check` on the plan's touched Rust paths —
+  exit 0; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/fmt-final.log`.
+- Strict all-target Clippy — exit 101; the diagnostics are disposition-limited
+  dead-code/unused-import warnings plus `clippy::let_and_return` in the
+  downstream shared-work path;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/agent-clippy.log`.
+- Unowned-path equality and no-new-suppression checks pass. The Rust cohort is
+  953, and all touched Rust files are below 1000 lines (`source.rs`: 991).
+
+The complete suite remains red, so implementation acceptance is incomplete.
+The remaining fixture diagnosis is an exact owner mismatch: the sequence-root
+descriptor is Rev4 at placement `[1,1,5,2]`, while every matching fresh owner
+frame is Rev2 at the same root and placement. Session 254 requires the owner
+predicate to compare the stage output handle's revision and placement, and
+TASK-010 requires this static-`[0]` program to remain byte-identical. A local
+candidate that removes the intro sequence would reconcile those identities,
+but it violates that accepted fixture constraint, so it was not applied. No
+identity check was relaxed. Resume after an accepted TASK-010 fixture amendment
+or an explicitly compatible output-owner interpretation, then rerun the
+discarded-origin focused test and full nextest. Formal review and workflow
+finalization remain downstream.
+
+Diagnostic attempts are in `session259/discarded-owner-diagnostic.log`,
+`session259/discarded-anchor-debug.log` and
+`session259/discarded-branch-debug.log`. Temporary diagnostic output was
+removed from source before handoff. The latest full-suite evidence above is
+from before partial descriptor-anchor retention; it remains a failure and is
+not claimed as final-source passing evidence.
+
+### Session 259 final-source verification addendum
+
+The following gates ran after descriptor-anchor retention and after all
+temporary diagnostics were removed:
+
+- `CARGO_TERM_QUIET=true cargo check` — exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/check-post-diagnostics.log`.
+- `CARGO_TERM_QUIET=true cargo build` — exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/build-post-diagnostics.log`.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+  — exit 0; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/wasm-post-diagnostics.log`.
+- Focused resolver command — exit 100; 9 run, 8 passed, 1 failed;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/focused-final-source.log`.
+- Full nextest `--no-fail-fast` — exit 100; 2793 run, 2792 passed, 1 failed,
+  3 skipped; `discarded_augmented_source_origins_are_resolved` is the only
+  failure. Log: `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/full-post-diagnostics.log`.
+- Strict all-target Clippy — exit 101; 67 dead-code/unused-import errors and
+  one `let_and_return` in the downstream shared-work path;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/clippy-post-diagnostics.log`.
+- Scoped `rustfmt --edition 2021 --check` — exit 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259/fmt-post-diagnostics.log`.
+- Line caps pass (`source.rs` 991, `nested/issued.rs` 901); cohort is 953;
+  unowned-path equality and no-new-suppression checks pass. Logs:
+  `line-counts-final.log`, `cohort-files-final.log`,
+  `unowned-paths-final.log`, `suppressions-final2.log` in the same session259
+  directory.
+
+This final-source suite result supersedes the earlier pre-anchor full-suite
+record. The TASK-010/TASK-008 fixture-owner conflict remains unresolved, so all
+resolver completion criteria stay unchecked.

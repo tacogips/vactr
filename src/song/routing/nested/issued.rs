@@ -68,8 +68,20 @@ pub(in crate::song::routing) fn resolve_issued_sources(
                 .checked_add(1)
                 .ok_or_else(capacity_overflow)?,
         )?;
-        let event_seals = issued.invocations().to_vec();
+        let mut event_seals = issued.invocations().to_vec();
+        for contribution in issued.source_contributions() {
+            for seal in contribution.leaves().contributors() {
+                if !event_seals
+                    .iter()
+                    .any(|prior| std::rc::Rc::ptr_eq(prior, seal))
+                {
+                    budget.charge(1)?;
+                    event_seals.push(seal.clone());
+                }
+            }
+        }
         let mut resolved = Vec::new();
+        let mut descriptor_anchors = OriginAnchors::default();
         if let Some(origin) = event.source_origin.as_ref() {
             let context = IssuedResolution {
                 prepared,
@@ -78,15 +90,20 @@ pub(in crate::song::routing) fn resolve_issued_sources(
                 branch,
                 offset,
                 depth,
+                anchor_parent: None,
             };
-            resolved.push(resolve_origin_chain(
+            // Descriptor provenance can identify a prepared nested stage, but
+            // never contributes a route. Every returned route below is still
+            // resolved from a separately authenticated source contribution.
+            let _descriptor_result = resolve_origin_chain(
                 &context,
                 event,
                 origin,
                 configuration,
                 &mut budget,
                 &mut bridge,
-            )?);
+                &mut descriptor_anchors,
+            );
         }
         for contribution in issued.source_contributions() {
             budget.charge(
@@ -97,13 +114,19 @@ pub(in crate::song::routing) fn resolve_issued_sources(
                     .checked_add(1)
                     .ok_or_else(capacity_overflow)?,
             )?;
-            let mut seals = event_seals.clone();
-            for seal in contribution.leaves().contributors() {
-                if !seals.iter().any(|prior| std::rc::Rc::ptr_eq(prior, seal)) {
-                    budget.charge(1)?;
-                    seals.push(seal.clone());
-                }
-            }
+            let seals = event_seals.clone();
+            let anchor_index = descriptor_anchors
+                .stages
+                .iter()
+                .position(|anchor| anchor.matches(contribution.augmented_origin()));
+            let anchor_parent = anchor_index
+                .and_then(|index| index.checked_sub(1))
+                .and_then(|index| descriptor_anchors.stages.get(index))
+                .map(|parent| AnchorParent {
+                    scope: parent.output_scope,
+                    track: parent.output_track,
+                    source: parent.identity.policy as usize,
+                });
             let context = IssuedResolution {
                 prepared,
                 transcript,
@@ -111,15 +134,22 @@ pub(in crate::song::routing) fn resolve_issued_sources(
                 branch,
                 offset,
                 depth,
+                anchor_parent,
             };
-            resolved.push(resolve_origin_chain(
+            let mut contribution_anchors = OriginAnchors {
+                stages: descriptor_anchors.stages.clone(),
+                start_index: anchor_index,
+            };
+            let contribution_result = resolve_origin_chain(
                 &context,
                 event,
                 contribution.augmented_origin(),
                 configuration,
                 &mut budget,
                 &mut bridge,
-            )?);
+                &mut contribution_anchors,
+            );
+            resolved.push(contribution_result?);
         }
         if resolved.is_empty() {
             verify_policy(prepared.plan(), event, None, &mut budget)?;
@@ -163,19 +193,63 @@ struct IssuedResolution<'a> {
     branch: &'a SongBranchRoute,
     offset: Ratio64,
     depth: u32,
+    anchor_parent: Option<AnchorParent>,
+}
+#[derive(Clone, Copy)]
+struct AnchorParent {
+    scope: usize,
+    track: KwId,
+    source: usize,
 }
 struct WorkBridge<'a> {
     work: &'a SharedIndexWork,
     synced_remaining: u32,
 }
 
-fn resolve_origin_chain(
-    context: &IssuedResolution<'_>,
-    event: &FrozenSongEvent,
-    origin: &crate::song::source_uses::FrozenSourceOrigin,
+#[derive(Default)]
+struct OriginAnchors<'a> {
+    stages: Vec<OriginAnchor<'a>>,
+    start_index: Option<usize>,
+}
+
+#[derive(Clone)]
+struct OriginAnchor<'a> {
+    handle: &'a crate::song::EventHandle,
+    source_part: TimeSpan,
+    original_instrument: &'a FrozenSound,
+    entry_trace: &'a [crate::pattern::occ::ProducerStep],
+    source_whole: Option<TimeSpan>,
+    payload: &'a crate::song::snapshot::FrozenPattern,
+    output_scope: usize,
+    output_track: KwId,
+    cover: &'a crate::song::source_uses::FrozenSourceUseCover,
+    identity: crate::song::source_uses::FrozenSourceUseIdentity,
+    output_handle: &'a crate::song::EventHandle,
+    base_depth: u32,
+    output_onset: Ratio64,
+    output_whole: Option<TimeSpan>,
+    output_offset: Ratio64,
+    incoming_sampled: Option<SourceMembership>,
+}
+
+impl OriginAnchor<'_> {
+    fn matches(&self, origin: &crate::song::source_uses::FrozenSourceOrigin) -> bool {
+        self.handle == &origin.handle
+            && self.source_part == origin.source_part
+            && self.original_instrument == &origin.original_instrument
+            && self.entry_trace == origin.entry_trace
+            && self.source_whole == origin.source_whole()
+    }
+}
+
+fn resolve_origin_chain<'a>(
+    context: &IssuedResolution<'a>,
+    event: &'a FrozenSongEvent,
+    origin: &'a crate::song::source_uses::FrozenSourceOrigin,
     mut configuration: TimeSpan,
     budget: &mut ResolutionBudget,
     bridge: &mut WorkBridge<'_>,
+    anchors: &mut OriginAnchors<'a>,
 ) -> Result<MatchedSources, Failure> {
     let IssuedResolution {
         prepared,
@@ -193,20 +267,37 @@ fn resolve_origin_chain(
                 as usize,
         )
         .ok_or_else(|| invalid("issued source cover index"))?;
-    let mut payload = scope_payload(&plan.topology, certificate.scope_part, certificate.track)?;
-    let mut output_scope = certificate.scope_part;
-    let mut output_track = certificate.track;
-    let mut cover = &certificate.cover;
-    let mut base_depth = u32::try_from(
-        branch
-            .placement
-            .iter()
-            .filter(|place| !matches!(place, SongRoutePlacement::Region { .. }))
-            .count(),
-    )
-    .map_err(|_| capacity_overflow())?
-    .checked_add(1)
-    .ok_or_else(capacity_overflow)?;
+    let start_anchor = anchors
+        .start_index
+        .and_then(|index| anchors.stages.get(index));
+    let start_identity = start_anchor.map(|anchor| anchor.identity.clone());
+    let (mut payload, mut output_scope, mut output_track, mut cover, mut base_depth) =
+        if let Some(anchor) = start_anchor {
+            (
+                anchor.payload,
+                anchor.output_scope,
+                anchor.output_track,
+                anchor.cover,
+                anchor.base_depth,
+            )
+        } else {
+            (
+                scope_payload(&plan.topology, certificate.scope_part, certificate.track)?,
+                certificate.scope_part,
+                certificate.track,
+                &certificate.cover,
+                u32::try_from(
+                    branch
+                        .placement
+                        .iter()
+                        .filter(|place| !matches!(place, SongRoutePlacement::Region { .. }))
+                        .count(),
+                )
+                .map_err(|_| capacity_overflow())?
+                .checked_add(1)
+                .ok_or_else(capacity_overflow)?,
+            )
+        };
     let count = origin
         .inherited
         .len()
@@ -215,13 +306,22 @@ fn resolve_origin_chain(
     budget.charge(count)?;
     let mut stages = Vec::with_capacity(count);
     let mut output_scopes = Vec::with_capacity(count);
-    let mut output_onset = event.handle.occurrence().onset.checked_sub(offset)?;
-    let mut output_offset = Ratio64::ZERO;
-    let mut incoming_sampled = None;
-    let mut output_whole = event
-        .whole
-        .map(|whole| whole.map(|time| time.checked_sub(offset)))
-        .transpose()?;
+    let mut output_handles = Vec::with_capacity(count);
+    let mut output_onset = start_anchor.map_or(
+        event.handle.occurrence().onset.checked_sub(offset)?,
+        |anchor| anchor.output_onset,
+    );
+    let mut output_offset = start_anchor.map_or(Ratio64::ZERO, |anchor| anchor.output_offset);
+    let mut incoming_sampled = start_anchor.and_then(|anchor| anchor.incoming_sampled);
+    let mut output_whole = if let Some(anchor) = start_anchor {
+        anchor.output_whole
+    } else {
+        event
+            .whole
+            .map(|whole| whole.map(|time| time.checked_sub(offset)))
+            .transpose()?
+    };
+    let mut stage_output_handle = start_anchor.map_or(&event.handle, |anchor| anchor.output_handle);
 
     for ordinal in 0..count {
         let stage_output_scope = output_scope;
@@ -244,12 +344,14 @@ fn resolve_origin_chain(
                 .ok_or_else(|| invalid("issued inherited source frame"))?
                 .slice_timings()
         };
-        let (handle, instrument, trace, source_whole, borrowed_view) = if ordinal == 0 {
+        let (handle, instrument, trace, source_whole, source_part, borrowed_view) = if ordinal == 0
+        {
             (
                 &origin.handle,
                 &origin.original_instrument,
                 origin.entry_trace.as_slice(),
                 origin.source_whole(),
+                origin.source_part,
                 origin.borrowed_view(),
             )
         } else {
@@ -259,10 +361,12 @@ fn resolve_origin_chain(
                 &frame.original_instrument,
                 frame.entry_trace.as_slice(),
                 frame.source_whole(),
+                frame.source_part,
                 frame.borrowed_view(),
             )
         };
         let current_cover = cover;
+        output_handles.push(stage_output_handle);
         let source_limits = super::super::source::reserve_source_search(
             cover,
             payload,
@@ -270,7 +374,12 @@ fn resolve_origin_chain(
             base_depth,
             budget,
         )?;
-        let identity = if ordinal == 0 {
+        let identity = if ordinal == 0 && start_identity.is_some() {
+            start_identity
+                .as_ref()
+                .ok_or_else(|| invalid("issued source anchor disappeared"))?
+                .clone()
+        } else if ordinal == 0 {
             resolve_source_use(cover, origin, source_limits)?
         } else {
             resolve_source_use_frame(
@@ -279,6 +388,26 @@ fn resolve_origin_chain(
                 source_limits,
             )?
         };
+        if anchors.start_index.is_none() {
+            anchors.stages.push(OriginAnchor {
+                handle,
+                source_part,
+                original_instrument: instrument,
+                entry_trace: trace,
+                source_whole,
+                payload,
+                output_scope,
+                output_track,
+                cover: current_cover,
+                identity: identity.clone(),
+                output_handle: stage_output_handle,
+                base_depth,
+                output_onset,
+                output_whole,
+                output_offset,
+                incoming_sampled,
+            });
+        }
         let selected = payload
             .sources
             .get(identity.policy as usize)
@@ -360,6 +489,7 @@ fn resolve_origin_chain(
             source_whole,
         });
         output_scopes.push(stage_output_scope);
+        stage_output_handle = handle;
         output_whole = source_whole
             .map(|whole| whole.map(|time| time.checked_sub(scope_offset)))
             .transpose()?;
@@ -374,6 +504,7 @@ fn resolve_origin_chain(
         context,
         &stages,
         &output_scopes,
+        &output_handles,
         configuration,
         budget,
         bridge,
@@ -627,33 +758,39 @@ mod tests {
         let (authority, batch) = capture(program)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;
-        let mut found_discarded_augmented = false;
-        for (index, issued) in batch.events().iter().enumerate() {
-            let descriptor = issued.descriptor();
-            for contribution in issued.source_contributions() {
-                let augmented = contribution.augmented_origin();
-                let survives_descriptor = descriptor.source_origin.as_ref().is_some_and(|origin| {
-                    origin.handle == augmented.handle
-                        || origin
-                            .inherited
-                            .iter()
-                            .any(|frame| frame.handle == augmented.handle)
-                });
-                let carries_slice_timing = !augmented.slice_timings().is_empty()
-                    || augmented
-                        .inherited
-                        .iter()
-                        .any(|frame| !frame.slice_timings().is_empty());
-                if !survives_descriptor && carries_slice_timing {
-                    found_discarded_augmented = true;
-                    routes.resolve_issued_event(&batch, index, &work, 0)?;
-                    break;
-                }
-            }
-        }
+        // Identity evidence is retained by fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority.
+        let (index, event) = batch
+            .events()
+            .iter()
+            .enumerate()
+            .find(|(_, event)| {
+                event
+                    .source_contributions()
+                    .iter()
+                    .filter(|contribution| {
+                        let augmented = contribution.augmented_origin();
+                        !augmented.slice_timings().is_empty()
+                            || augmented
+                                .inherited
+                                .iter()
+                                .any(|frame| !frame.slice_timings().is_empty())
+                    })
+                    .count()
+                    >= 2
+            })
+            .ok_or_else(|| {
+                invalid(
+                    "fixture has an equal-handle union with two or more slice-timed contributions",
+                )
+            })?;
+        let remaining_before = work.borrow().remaining();
+        routes.resolve_issued_event(&batch, index, &work, 0)?;
+        let remaining_after = work.borrow().remaining();
+        let minimum_contribution_debit = u32::try_from(event.source_contributions().len())
+            .map_err(|_| invalid("source contribution count overflow"))?;
         assert!(
-            found_discarded_augmented,
-            "fixture retains an augmented source origin not present in descriptor chain"
+            remaining_before.saturating_sub(remaining_after) >= minimum_contribution_debit,
+            "each source contribution is authenticated through caller work"
         );
         Ok(())
     }
@@ -661,22 +798,24 @@ mod tests {
     #[test]
     fn issued_joint_geometry_resolves_where_legacy_keeps_its_barrier() -> Result<(), Failure> {
         let program = "fn indexed p:\n\teuclid {slice {beat -> p} 2 [0 nil]} 1 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 4}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
-        let (authority, batch) = capture(program)?;
-        let routes = prepare(authority.clone())?;
-        let work = attached_work(&authority)?;
-        let mut legacy_song = prepared_song(program)?;
+        let mut song = prepared_song(program)?;
         let policy = limits();
-        let window = TimeSpan::new(Ratio64::ZERO, legacy_song.snapshot().duration())?;
+        let window = TimeSpan::new(Ratio64::ZERO, song.snapshot().duration())?;
         let legacy_plan = crate::song::routing::prepare_routes(
-            legacy_song.snapshot(),
+            song.snapshot(),
             &crate::dsp::caps::CapabilitySet::native(),
             &capacities(),
         )?;
-        let legacy_event = legacy_song
+        let legacy_event = song
             .query(window, &policy)?
             .into_iter()
             .next()
             .ok_or_else(|| invalid("joint-geometry fixture emits no legacy event"))?;
+        let mut remaining = policy.max_nodes;
+        let authority = song.issue_retained_route_authority(policy, &mut remaining, 0)?;
+        let routes = prepare(authority.clone())?;
+        let work = attached_work(&authority)?;
+        let batch = song.query_issued_with_work(window, &work, 0)?;
         let issued_event = batch
             .events()
             .first()
@@ -696,7 +835,7 @@ mod tests {
 
     #[test]
     fn distinct_equal_handle_invocations_are_all_resolved() -> Result<(), Failure> {
-        let program = "fn inner p:\n\tslice p 2 [0 nil]\nfn outer p:\n\tstack [{slice p 2 [0 nil]} {slice p 2 [0 nil]}]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inner-part {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inner-part :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
+        let program = "fn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tstack [{slice {beat -> p} 2 [0 nil]} {slice {beat -> p} 2 [0 nil]}]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inner-part {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inner-part :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
         let (authority, batch) = capture(program)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;

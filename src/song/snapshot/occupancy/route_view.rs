@@ -1,8 +1,11 @@
 //! Immutable original-to-view ownership. Seals have no backedges to their owners.
 use super::*;
 use crate::pattern::eval::{song_clock::ProjectionBudget, song_observation::OwnerInvocation};
+#[cfg(test)]
+use crate::pattern::query::TimeSpan;
 use crate::song::snapshot::{FrozenEdit, FrozenPartNode, FrozenPattern, FrozenRoutingInventory};
 use crate::song::source_uses::FrozenUseMapping;
+use crate::song::SongLimits;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PayloadSlot {
@@ -198,6 +201,12 @@ impl RouteAuthorityView {
         remaining: &mut u32,
         depth: u32,
     ) -> Result<TrustedRouteCopy, Failure> {
+        if depth >= limits.max_depth {
+            return Err(Failure::new(
+                FailCode::DepthExceeded,
+                "trusted route copy depth exhausted",
+            ));
+        }
         let copied = copy_inventory(&self.inventory, limits, remaining, depth)?;
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         budget.enter(depth)?;
@@ -228,16 +237,35 @@ impl RouteAuthorityView {
     }
 }
 impl TrustedSiteCopy {
-    pub(crate) fn resolve<'a>(
+    pub(crate) fn authenticates_record(
         &self,
-        view: &'a RouteAuthorityView,
-        copy: &TrustedRouteCopy,
+        view: &RouteAuthorityView,
+        request: &CanonicalIndexRequest,
         scope: usize,
         track: KwId,
+    ) -> bool {
+        let Some(site) = view.sites.get(self.site) else {
+            return false;
+        };
+        let ownscope = match self.slot {
+            PayloadSlot::Capture { part, .. } | PayloadSlot::Edit { part } => part,
+        };
+        ownscope == scope
+            && site.track == track
+            && site.slot == self.slot
+            && Rc::ptr_eq(&site.seal, &self.seal)
+            && view.records.iter().any(|record| {
+                std::ptr::eq(&record.request, request) && Rc::ptr_eq(&record.site, &site.seal)
+            })
+    }
+    pub(crate) fn resolve<'a>(
+        &self,
+        binding: (&'a RouteAuthorityView, &TrustedRouteCopy, usize, KwId),
         limits: SongLimits,
         remaining: &mut u32,
         depth: u32,
     ) -> Result<&'a FrozenPattern, Failure> {
+        let (view, copy, scope, track) = binding;
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         budget.enter(depth)?;
         budget.charge(copy.sites.len() as u64 + 3)?;
@@ -340,9 +368,10 @@ pub(crate) fn publish_route_authority(
                     slot_payload(&snapshot.routing, site.slot)?,
                     original_payload,
                 ) {
-                    if matched.replace(site).is_some() {
-                        return Err(invalid("ambiguous original site"));
-                    }
+                    let Some(_) = matched.replace(site) else {
+                        continue;
+                    };
+                    return Err(invalid("ambiguous original site"));
                 }
             }
             let site = matched.ok_or_else(|| invalid("missing retained original site"))?;
@@ -408,14 +437,17 @@ impl TrustedSiteCopy {
 impl TrustedPolicyCopy {
     pub(crate) fn resolve<'a>(
         &self,
-        view: &'a RouteAuthorityView,
-        copy: &TrustedRouteCopy,
-        site: &TrustedSiteCopy,
-        source: usize,
+        binding: (
+            &'a RouteAuthorityView,
+            &TrustedRouteCopy,
+            &TrustedSiteCopy,
+            usize,
+        ),
         limits: SongLimits,
         remaining: &mut u32,
         depth: u32,
     ) -> Result<&'a crate::song::snapshot::FrozenSelectedSource, Failure> {
+        let (view, copy, site, source) = binding;
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         budget.enter(depth)?;
         budget.charge(copy.policies.len() as u64 + copy.sites.len() as u64 + 3)?;
@@ -446,5 +478,109 @@ impl TrustedPolicyCopy {
     }
     pub(crate) fn matches(&self, site: &TrustedSiteCopy, source: usize) -> bool {
         self.site == site.site && self.source == source
+    }
+}
+
+impl crate::song::PreparedSong {
+    /// Retain the original Index executions before issuing an owned routing view.
+    pub(crate) fn issue_retained_route_authority(
+        &mut self,
+        limits: SongLimits,
+        remaining: &mut u32,
+        depth: u32,
+    ) -> Result<Rc<RouteAuthorityView>, Failure> {
+        let requests = super::canonical_song_requests(&self.snapshot, limits, remaining, depth)?;
+        crate::song::snapshot::occupancy::retain_index_occupancy(
+            &mut self.snapshot,
+            requests,
+            limits,
+            remaining,
+        )?;
+        self.snapshot
+            .issue_route_authority(limits, remaining, depth)
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn capture_test_route_authority(
+    code: &str,
+    limits: SongLimits,
+    remaining: &mut u32,
+    depth: u32,
+) -> Result<
+    (
+        Rc<RouteAuthorityView>,
+        crate::song::snapshot::issued::FrozenIssuedBatch,
+    ),
+    Failure,
+> {
+    use crate::session::song::{evaluate_song_candidate, CandidateBuildCtx};
+    use crate::song::assets::{DecodedSongAssetFactory, SongAssetLimits};
+    use crate::song::{prepare_song, SnapshotEpoch};
+    use std::collections::BTreeMap;
+
+    let factory = DecodedSongAssetFactory::new(BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
+    let context = CandidateBuildCtx {
+        assets: &factory,
+        asset_limits: SongAssetLimits {
+            max_resources: 64,
+            max_pcm_bytes: 1_000_000,
+            max_source_files: 32,
+            max_source_bytes: 100_000,
+            max_banks: 32,
+            max_walk_nodes: limits.max_nodes,
+            max_walk_depth: limits.max_depth,
+        },
+        lock: None,
+        cache: None,
+    };
+    let candidate =
+        evaluate_song_candidate(code, "route-authority.vact", 7, SnapshotEpoch(91), &context)?;
+    let mut prepared = prepare_song(candidate)?;
+    let authority = prepared.issue_retained_route_authority(limits, remaining, depth)?;
+    let window = TimeSpan::new(crate::value::Ratio64::ZERO, prepared.snapshot.duration())?;
+    use crate::ns::namespace::VarSlotRef;
+    use crate::value::intern::intern_sym;
+    use crate::vm::vm::ReadObserver;
+    use std::cell::Cell;
+    struct Denied {
+        reads: Rc<Cell<u32>>,
+    }
+    impl ReadObserver for Denied {
+        fn on_read(&mut self, slot: &VarSlotRef) -> Result<(), Failure> {
+            if slot.name() == intern_sym("cut") {
+                self.reads.set(self.reads.get() + 1);
+                return Err(Failure::new(
+                    FailCode::HostUnavailable,
+                    "route authority callback denied",
+                ));
+            }
+            Ok(())
+        }
+    }
+    let reads = Rc::new(Cell::new(0));
+    prepared
+        .snapshot
+        .evaluator
+        .vm_and_ns()
+        .0
+        .set_read_observer(Some(Box::new(Denied {
+            reads: reads.clone(),
+        })));
+    let batch = prepared.query_issued(window, &limits, remaining, depth)?;
+    if reads.get() != 0 {
+        return Err(invalid("retained route authority query executed callback"));
+    }
+    drop(prepared);
+    Ok((authority, batch))
+}
+
+#[cfg(test)]
+impl RouteAuthorityView {
+    pub(crate) fn test_record_summaries(&self) -> Vec<(usize, TimeSpan)> {
+        self.records
+            .iter()
+            .map(|record| (record.request.scope, record.request.window))
+            .collect()
     }
 }

@@ -241,6 +241,9 @@ pub(crate) fn bind_issued_owner<'a>(
         for record in view.records() {
             let request = &record.request;
             budget.charge(request.prefix.len() as u64 + 1)?;
+            if !site.authenticates_request(request) {
+                continue;
+            }
             if request.scope != site.scope()
                 || request.track != site.track()
                 || request.issuer != issuer

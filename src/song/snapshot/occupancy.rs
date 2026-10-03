@@ -17,11 +17,85 @@ use crate::pattern::eval::{
 use crate::pattern::occ::ProducerTrace;
 use crate::pattern::query::{sect, TimeSpan};
 use crate::reader::span::NodeId;
-use crate::song::source_uses::{timing::FrozenIndexTiming, FrozenUseTraceTerm};
+use crate::song::source_uses::{timing::FrozenIndexTiming, FrozenUseOperation, FrozenUseTraceTerm};
 use crate::song::{PartRevision, Song, SongLimits};
 use crate::value::intern::KwId;
 use crate::vm::fail::{FailCode, Failure};
 use std::rc::Rc;
+
+/// Collect every actual Slice site from original Capture and Edit payloads.
+pub(crate) fn canonical_song_requests(
+    snapshot: &SongSnapshot,
+    limits: SongLimits,
+    remaining: &mut u32,
+    depth: u32,
+) -> Result<Vec<CanonicalIndexRequest>, Failure> {
+    limits.validate()?;
+    if depth >= limits.max_depth {
+        return Err(Failure::new(
+            FailCode::DepthExceeded,
+            "canonical request depth exhausted",
+        ));
+    }
+    if *remaining > limits.max_nodes {
+        return Err(Failure::new(
+            FailCode::Type,
+            "canonical request counter exceeds original limit",
+        ));
+    }
+    let mut requests = Vec::new();
+    for (scope, part) in snapshot.routing.parts.iter().enumerate() {
+        let mut payloads = Vec::new();
+        match &part.node {
+            super::FrozenPartNode::Capture(entries) => {
+                for (track, payload) in entries {
+                    payloads.push((*track, payload));
+                }
+            }
+            super::FrozenPartNode::Edit { edit, .. } => match edit {
+                super::FrozenEdit::Replace { track, payload }
+                | super::FrozenEdit::Transform { track, payload, .. }
+                | super::FrozenEdit::Overwrite { track, payload, .. } => {
+                    payloads.push((*track, payload))
+                }
+                super::FrozenEdit::InstrumentFx { .. } | super::FrozenEdit::Delete(_) => {}
+            },
+            super::FrozenPartNode::Sequence(_) | super::FrozenPartNode::Repeat { .. } => {}
+        }
+        for (track, payload) in payloads {
+            let Some(recipe) = payload.index_timing() else {
+                continue;
+            };
+            let mut pending = vec![(recipe.root(), Vec::<FrozenUseTraceTerm>::new())];
+            while let Some((node_index, prefix)) = pending.pop() {
+                debit(remaining, 1)?;
+                let node = recipe
+                    .nodes()
+                    .get(node_index as usize)
+                    .ok_or_else(|| invalid("Slice recipe child out of range"))?;
+                if node.operation() == FrozenUseOperation::Slice {
+                    requests.push(snapshot.canonical_index_request(
+                        scope,
+                        track,
+                        node.issuer(),
+                        &prefix,
+                        TimeSpan::new(crate::value::Ratio64::ZERO, part.duration)?,
+                        depth,
+                        limits,
+                        remaining,
+                    )?);
+                }
+                for edge in node.children() {
+                    debit(remaining, edge.trace().len() as u64)?;
+                    let mut child = prefix.clone();
+                    child.extend_from_slice(edge.trace());
+                    pending.push((edge.child(), child));
+                }
+            }
+        }
+    }
+    Ok(requests)
+}
 
 pub(crate) struct CanonicalIndexRequest {
     original: Rc<Song>,

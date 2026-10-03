@@ -321,34 +321,34 @@ the lookup parent below1000; no implicit ninth module.
 
 ### TASK-001: Immutable view and lookup ownership
 
-**Status**: Not Started
+**Status**: Completed
 **Parallelizable**: No
 
-- [ ] Finalize owning-view issuance, original record/recipe validation and
+- [x] Finalize owning-view issuance, original record/recipe validation and
   compatibility for current snapshot-based genuine fixtures.
-- [ ] Extract authentication helpers before lookup grows to1000 lines.
-- [ ] Preserve original source/use, seed, placement and member distinctions.
-- [ ] Prove the issued view remains usable after evaluator ownership is dropped.
+- [x] Extract authentication helpers before lookup grows to1000 lines.
+- [x] Preserve original source/use, seed, placement and member distinctions.
+- [x] Prove the issued view remains usable after evaluator ownership is dropped.
 
 ### TASK-002: Attested topology copy and prepared owner
 
-**Status**: Not Started
+**Status**: Completed
 **Parallelizable**: No; depends on TASK-001
 
-- [ ] Mint opaque site/policy bindings during the actual trusted inventory copy.
-- [ ] Preserve public prepare_routes compatibility and keep the new owner private.
-- [ ] Charge copying, bindings and record retention under inherited original work.
-- [ ] Reject independently cloned, mutated, foreign or swapped policy plans.
+- [x] Mint opaque site/policy bindings during the actual trusted inventory copy.
+- [x] Preserve public prepare_routes compatibility and keep the new owner private.
+- [x] Charge copying, bindings and record retention under inherited original work.
+- [x] Reject independently cloned, mutated, foreign or swapped policy plans.
 
 ### TASK-003: Genuine consumer fixtures and acceptance
 
-**Status**: Not Started
+**Status**: In Progress
 **Parallelizable**: No; depends on TASK-002
 
 - [ ] Genuine copied-policy lookup and source-member geometry work through
   issued bindings without callback execution.
 - [ ] Actual retained seed/member/copy distinctions survive trusted copying.
-- [ ] Exact/one-less work/depth and foreign/swap failures publish no owner.
+- [x] Exact/one-less work/depth and foreign/swap failures publish no owner.
 - [ ] Independent tests/lint/WASM/format pass against held source inputs.
 - [ ] Concrete following consumer/admission manifests use this owner; storing
   an unused view or forwarding to scalar-only routing is not completion.
@@ -537,6 +537,39 @@ semantics. Only parent-subtree method visibility and module import changed;
 full extracted texts saved in immutable-route-authority-lookup-extraction-only-0001.json.
 Fresh issued clock, original counter and trusted copy bindings remain required.
 No production routing acceptance is inferred from this extraction.
+
+### Session 249 implementation and verification
+
+TASK-001 and TASK-002 are complete. The nine owning-fixture tests are present
+and passed within the focused suite. The all-target Clippy gate remains
+unaccepted: `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings`
+exited 101, and reports one `clippy::too_many_arguments` diagnostic for the
+plan-pinned eight-argument `bind_issued_owner` signature. Every other diagnostic
+is `dead_code` or `unused_imports` on the wave-1 disposition table. That
+signature remains as designed, with no lint suppression attribute added; this
+specific acceptance mismatch is recorded for integration review. TASK-003 and
+the overall plan remain In Progress pending that disposition and downstream
+consumer work.
+
+Foreground gates (full logs under `tmp/song-mode-riela/`):
+
+- `CARGO_TERM_QUIET=true cargo build` — exit 0;
+  `session249-route8-build.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` — exit 101;
+  `session249-route8-clippy.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/prepared::tests|occupancy::|routing::nested::preparation::meter_tests/)'` — exit 0, 88 passed, 0 failed;
+  `session249-route8-nextest-focused.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` — exit 0, 2767 passed, 3 skipped;
+  `session249-route8-nextest-full.log`.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit 0;
+  `session249-route8-wasm.log`.
+- `rustfmt --edition 2021 --check src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/route_view.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/prepared.rs` — exit 0, no diffs;
+  `session249-route8-fmt.log`.
+- `git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256` — exit 0, 947 cohort inputs: baseline 944 plus exactly `route_view.rs`, `lookup/authority.rs`, and `prepared.rs`; the only changed existing hashes are the five Route8 paths and pre-existing drift in `src/sched/runtime/song/clock_tests.rs`, `src/song/snapshot/reservations_tests.rs`, and `src/song/snapshot/resources.rs`; `session249-route8-cohort.sha`.
+- `wc -l` on the eight authorized Rust paths — exit 0; counts are 586, 586, 841, 318, 648, 573, 605, and 645 (all below 1000).
+- Added-attribute scan (`git diff -- <eight paths> | grep -E '^\+.*#\[(allow|expect)'`) — no matches; `/tmp/session249-route8-attrs.log`.
+- Agent verification `CARGO_TERM_QUIET=true cargo check` — exit 0;
+  `/tmp/song-route8-compile-check/final2-cargo-check.log`.
 
 ## Session 249 executable contract (wave 1)
 
@@ -811,14 +844,14 @@ item's planned consumer is listed. Any other warning fails this wave.
 
 ### Done criteria (mechanically checkable)
 
-- [ ] Build, focused tests, full tests and WASM all exit 0.
+- [x] Build, focused tests, full tests and WASM all exit 0.
 - [ ] Clippy diagnostics are a subset of the disposition table.
-- [ ] The fmt log has no `Diff in` for any of the eight paths.
-- [ ] The cohort has 947 lines with exactly the three additions.
-- [ ] Every new test listed above exists and passes.
-- [ ] No `allow`/`expect` lint attributes were added. Check with
+- [x] The fmt log has no `Diff in` for any of the eight paths.
+- [x] The cohort has 947 lines with exactly the three additions.
+- [x] Every new test listed above exists and passes.
+- [x] No `allow`/`expect` lint attributes were added. Check with
   `git diff -- <eight paths> | grep -E '^\+.*#\[(allow|expect)'`, which must
   print nothing.
-- [ ] Status stays In Progress, with a progress-log entry giving commands, exit
+- [x] Status stays In Progress, with a progress-log entry giving commands, exit
   codes and log paths. It becomes Completed only after wave 3 removes the last
   disposition-table warning (TASK-003 consumer criterion).

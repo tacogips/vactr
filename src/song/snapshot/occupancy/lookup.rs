@@ -1,5 +1,5 @@
 //! Opaque borrowed original invocation addresses. No query or caller key dictionary.
-pub(super) mod authority;
+pub(crate) mod authority;
 use super::*;
 use crate::pattern::eval::song_clock::{ProjectedInvocation, ProjectionBudget, SourceBoundaryRef};
 use crate::pattern::eval::song_observation::OwnerInvocation;
@@ -415,7 +415,7 @@ impl<'s> RetainedIndexAddress<'s> {
                 }
                 authority::authenticate_authority(
                     self.owner.authority,
-                    &record.request,
+                    record.request,
                     depth,
                     &mut budget,
                 )?;

@@ -7,6 +7,24 @@ use crate::vm::fail::{FailCode, Failure};
 
 mod builder;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum PreparationLedger {
+    Legacy,
+    Issued,
+}
+pub(super) struct MeteredPreparation<'a> {
+    pub inventory: &'a FrozenRoutingInventory,
+    pub settings: crate::song::SongSettings,
+    pub resource_count: usize,
+    pub pcm_bytes: u64,
+    pub caps: &'a CapabilitySet,
+    pub available: &'a SongHostCapacities,
+    pub limits: crate::song::SongLimits,
+    pub remaining: &'a mut u32,
+    pub depth: u32,
+    pub ledger: PreparationLedger,
+}
+
 /// Compile and admit the complete symbolic configuration set before activation.
 /// Does not evaluate music, expand repeats, allocate host IDs, or install graphs.
 pub fn prepare_routes(
@@ -20,30 +38,35 @@ pub fn prepare_routes(
         ..Default::default()
     };
     let mut remaining = limits.max_nodes;
-    prepare_routes_metered(
-        snapshot.routing(),
-        snapshot.settings(),
-        snapshot.resource_count(),
-        snapshot.pcm_bytes(),
+    prepare_routes_metered(MeteredPreparation {
+        inventory: snapshot.routing(),
+        settings: snapshot.settings(),
+        resource_count: snapshot.resource_count(),
+        pcm_bytes: snapshot.pcm_bytes(),
         caps,
         available,
         limits,
-        &mut remaining,
-        0,
-    )
+        remaining: &mut remaining,
+        depth: 0,
+        ledger: PreparationLedger::Legacy,
+    })
 }
 /// Compile from the authenticated immutable inventory using the caller's original ledger.
 pub(super) fn prepare_routes_metered(
-    inventory: &FrozenRoutingInventory,
-    settings: crate::song::SongSettings,
-    resource_count: usize,
-    pcm_bytes: u64,
-    caps: &CapabilitySet,
-    available: &SongHostCapacities,
-    limits: crate::song::SongLimits,
-    remaining: &mut u32,
-    depth: u32,
+    request: MeteredPreparation<'_>,
 ) -> Result<SongRoutePlan, Failure> {
+    let MeteredPreparation {
+        inventory,
+        settings,
+        resource_count,
+        pcm_bytes,
+        caps,
+        available,
+        limits,
+        remaining,
+        depth,
+        ledger,
+    } = request;
     limits.validate()?;
     if *remaining > limits.max_nodes {
         return Err(Failure::new(
@@ -62,6 +85,20 @@ pub(super) fn prepare_routes_metered(
         .parts
         .get(inventory.root_part)
         .ok_or_else(|| route_failure("missing root Part"))?;
+    if ledger == PreparationLedger::Issued {
+        // Bound track/template selection by track count times each bus candidate plus no match.
+        precharge(
+            remaining,
+            product(
+                root.tracks.len(),
+                inventory
+                    .buses
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(capacity_overflow)?,
+            )?,
+        )?;
+    }
     let mut tracks = Vec::new();
     let mut next_bus = inventory
         .buses
@@ -103,13 +140,18 @@ pub(super) fn prepare_routes_metered(
         .checked_sub(builder.work)
         .ok_or_else(capacity_overflow)?;
     walked?;
-    let nested_source_covers = nested::prepare_nested_covers_metered(
-        inventory,
-        &builder.source_covers,
-        limits,
-        remaining,
-        depth,
-    )?;
+    let nested_source_covers = match ledger {
+        PreparationLedger::Legacy => {
+            nested::prepare_nested_covers(inventory, &builder.source_covers, remaining)?
+        }
+        PreparationLedger::Issued => nested::prepare_nested_covers_metered(
+            inventory,
+            &builder.source_covers,
+            limits,
+            remaining,
+            depth,
+        )?,
+    };
     let source_covers = builder.source_covers;
     let mut branches = builder.branches;
     let min_duration = builder.min_duration;
@@ -134,6 +176,16 @@ pub(super) fn prepare_routes_metered(
     // Every potential configuration can own generations across this many
     // successive minimum-duration placement boundaries, including old tails.
     let mut max_live_generations = 0u32;
+    if ledger == PreparationLedger::Issued {
+        // Bound reservation accounting by one visit per branch and final aggregation.
+        precharge(
+            remaining,
+            branches
+                .len()
+                .checked_add(1)
+                .ok_or_else(capacity_overflow)?,
+        )?;
+    }
     for route in &mut branches {
         route.reserved_generations = u32::try_from(
             route.occurrences.min(match route.source_cover {
@@ -157,18 +209,67 @@ pub(super) fn prepare_routes_metered(
             .checked_add(route.reserved_generations)
             .ok_or_else(capacity_overflow)?;
     }
+    if ledger == PreparationLedger::Issued {
+        // Bound the master selector scan by every bus plus the no-match case.
+        precharge(
+            remaining,
+            inventory
+                .buses
+                .len()
+                .checked_add(1)
+                .ok_or_else(capacity_overflow)?,
+        )?;
+    }
     let master = inventory
         .buses
         .iter()
         .find_map(|(name, def)| name.is_none().then(|| def.clone()));
+    if ledger == PreparationLedger::Issued {
+        // Bound detector graph/control scans and detector validation by tracks, branches, buses and controls.
+        let controls = inventory.buses.iter().try_fold(0usize, |sum, (_, bus)| {
+            bus.chain.iter().try_fold(sum, |sum, unit| {
+                sum.checked_add(unit.params.len())
+                    .ok_or_else(capacity_overflow)
+            })
+        })?;
+        let bound = tracks
+            .len()
+            .checked_add(branches.len())
+            .and_then(|n| n.checked_add(inventory.buses.len()))
+            .and_then(|n| n.checked_add(controls))
+            .and_then(|n| n.checked_add(1))
+            .ok_or_else(capacity_overflow)?;
+        precharge(remaining, bound)?;
+    }
     let sidechains = sidechain_routes(inventory, &tracks, master.as_deref(), &branches)?;
     let sr = available.sample_rate as f32;
+    if ledger == PreparationLedger::Issued {
+        // Bound frame aggregation by all tracks, branches and the master graph.
+        precharge(
+            remaining,
+            tracks
+                .len()
+                .checked_add(branches.len())
+                .and_then(|n| n.checked_add(1))
+                .ok_or_else(capacity_overflow)?,
+        )?;
+    }
     let mut bus_frames = 0u64;
     for track in &tracks {
+        if ledger == PreparationLedger::Issued {
+            if let Some(graph) = track.template.as_deref() {
+                precharge(remaining, bus_compile_bound(graph)?)?;
+            }
+        }
         bus_frames = add64(
             bus_frames,
             chain_frames(track.template.as_deref(), sr, caps)?,
         )?;
+    }
+    if ledger == PreparationLedger::Issued {
+        if let Some(graph) = master.as_deref() {
+            precharge(remaining, bus_compile_bound(graph)?)?;
+        }
     }
     bus_frames = add64(bus_frames, chain_frames(master.as_deref(), sr, caps)?)?;
     let private_count = max_live_generations;
@@ -188,6 +289,11 @@ pub(super) fn prepare_routes_metered(
             .effect_template
             .map(|name| named_bus(inventory, name))
             .transpose()?;
+        if ledger == PreparationLedger::Issued {
+            if let Some(graph) = graph {
+                precharge(remaining, bus_compile_bound(graph)?)?;
+            }
+        }
         bus_frames = add64(
             bus_frames,
             mul64(
@@ -211,6 +317,19 @@ pub(super) fn prepare_routes_metered(
     let mut max_voice_frames = 0usize;
     let mut cells = std::collections::BTreeSet::new();
     for instrument in &inventory.instruments {
+        if ledger == PreparationLedger::Issued {
+            // Bound graph compilation traversal and diagnostics by all graph tables.
+            let graph = &instrument.graph;
+            let bound = graph
+                .nodes
+                .len()
+                .checked_add(graph.edges.len())
+                .and_then(|n| n.checked_add(graph.node_params.len()))
+                .and_then(|n| n.checked_add(graph.params.len()))
+                .and_then(|n| n.checked_add(1))
+                .ok_or_else(capacity_overflow)?;
+            precharge(remaining, bound)?;
+        }
         let template = crate::dsp::ugen::Template::from_inst(&instrument.graph, &env)
             .map_err(|e| route_failure(&format!("instrument compilation: {e:?}")))?;
         max_voice_frames = max_voice_frames.max(template.mem_total);
@@ -221,6 +340,10 @@ pub(super) fn prepare_routes_metered(
     // Bus default cell references are candidate-local too; remapping must cover
     // every copied graph, not just instrument defaults.
     for (_, bus) in &inventory.buses {
+        if ledger == PreparationLedger::Issued {
+            // Bound each bus default-cell scan by its chain units and parameter cells.
+            precharge(remaining, bus_compile_bound(bus)?)?;
+        }
         for unit in bus.chain.iter() {
             for (_, ctl) in unit.params.iter() {
                 if let crate::host::wire::Ctl::Cell(id) = ctl {
@@ -249,7 +372,7 @@ pub(super) fn prepare_routes_metered(
         template_slots,
         bus_slots,
         sample_resources,
-        pcm_bytes: pcm_bytes,
+        pcm_bytes,
         voice_frames: mul64(max_voice_frames as u64, u64::from(voice_slots))?,
         bus_frames,
         ack_slots,
@@ -284,9 +407,31 @@ pub(super) fn prepare_routes_metered(
         required_bytes,
         branch_delay_frames,
         required,
-        topology: crate::song::snapshot::occupancy::route_view::copy_inventory(
-            inventory, limits, remaining, depth,
-        )?,
+        topology: match ledger {
+            PreparationLedger::Legacy => inventory.clone(),
+            PreparationLedger::Issued => {
+                crate::song::snapshot::occupancy::route_view::copy_inventory(
+                    inventory, limits, remaining, depth,
+                )?
+            }
+        },
+    })
+}
+fn precharge(remaining: &mut u32, cost: usize) -> Result<(), Failure> {
+    let cost = u32::try_from(cost).map_err(|_| capacity_overflow())?;
+    *remaining = remaining
+        .checked_sub(cost)
+        .ok_or_else(|| Failure::new(FailCode::FuelExhausted, "song route input work exhausted"))?;
+    Ok(())
+}
+fn product(left: usize, right: usize) -> Result<usize, Failure> {
+    left.checked_mul(right).ok_or_else(capacity_overflow)
+}
+fn bus_compile_bound(bus: &BusDef) -> Result<usize, Failure> {
+    bus.chain.iter().try_fold(1usize, |sum, unit| {
+        sum.checked_add(1)
+            .and_then(|n| n.checked_add(unit.params.len()))
+            .ok_or_else(capacity_overflow)
     })
 }
 fn route_failure(message: &str) -> Failure {

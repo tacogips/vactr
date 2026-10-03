@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (session 257: runs FOURTH, after 2c, 2a and 2b are accepted; see "Session 256 amendment" and "Session 257 amendment")
+**Status**: Ready (session 258: runs FOURTH, after 2a, 2c and 2b are accepted; see "Session 258 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -773,3 +773,70 @@ Only the evidence locations change:
 - [ ] Every session 256 done criterion holds, with `session257/` in place of
   `session256/`.
 - [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session256/sha256.txt` exists.
+
+## Session 258 amendment (runs FOURTH, after 2a, 2c and 2b are accepted; serial)
+
+The source of truth is the design section "Session 258 resume amendments
+(2026-10-04)" > "Serial order and dependency edge" and "Later waves". The
+session 255 to 257 amendments stay in force:
+
+- the owned paths, including the fifth path `src/sched/song/pools.rs`;
+- the conditional seams (`src/song/routing.rs` re-export,
+  `src/host/caps/song/preparation/issued.rs`, `src/sched/song/realize_tests.rs`);
+- the tests and verification 1-9;
+- `baselineFailures` and the zero-allowed-failure rule;
+- strict Clippy exit 0;
+- the issued-route scheduler and the staged atomic pool commit.
+
+Only these items change:
+
+- **Base.** `<2b-join>` means `<2b-accepted>`, the commit that records 2b
+  acceptance. That commit contains the accepted 2a, 2c and 2b work. The
+  `dependsOn` list is unchanged.
+- **Baseline.** Before any edit, run
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-s249/SONG-ISSUED-PLAYBACK/session258/baseline-full.log 2>&1`
+  on `<2b-accepted>`. It must exit 0, and the receipt records
+  `baselineFailures: []`. A non-empty list is stop condition 1.
+- **No retries.** No nextest `--retries`, and no rerunning the full suite
+  until it happens to pass.
+- **Strict Clippy.** `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings`
+  exits 0. The remaining Route8 dead-code rows (`LookupAuthority::Issued`,
+  `with_work`, `bind_issued_owner`, `PreparedRoutes`) and the `RES-` rows are
+  cleared by production use from `src/host/caps/song/preparation.rs` and
+  `src/sched/song.rs`, never by `allow`/`expect` or by deleting the items. A
+  residual diagnostic outside the playback paths is a blocker that the root
+  reviewer repairs serially at the join; the worker never repairs it.
+- **Reviews.** The reviews and the receipt field `reviewDiffRange` cover
+  `git diff 1ac457f <wave3-accepted> -- <playback writePaths and edited seams>`.
+- **Evidence.** Step 1 copies `tmp/song-mode-riela/session249-playback-*` to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session257/` with `sha256.txt`.
+  Never delete or overwrite earlier directories. Scratch logs go to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/session258/`. The receipt has
+  `session: 258` and `baseCommit`. Its fingerprint differs from every hash
+  under `tmp/song-s249/SONG-ISSUED-PLAYBACK/`.
+
+Tests (input -> expected outcome), restated:
+
+- The `tests/song_issued_transport.rs` program (nested reusable Part
+  functions, `sequence` with `part-repeat :same` and `:vary`, `delete-event`,
+  `overwrite-region`, `transform-instrument` `lpf`, `instrument-fx`, a
+  Slice-sourced track, `tail-seconds 2`) -> the transport reaches `Ended`
+  with exact frames, and the WAV export is bit-exact on a repeat.
+- An injected failure in the middle of a `realize` batch -> pools, the pending
+  queue, the cursor and pending receipts are equal to their state before
+  `realize`.
+- `grep -n "dedup_by\|resolve_route(" src/sched/song.rs` -> prints nothing.
+
+### Session 258 done criteria
+
+- [ ] Every session 256 done criterion holds, with `session258/` in place of
+  `session256/` and `<2b-accepted>` in place of `<2b-join>`.
+- [ ] `baseline-full.log` exits 0, and `baselineFailures` is empty.
+- [ ] Strict Clippy (verification 4) exits 0. Full nextest (verification 5)
+  exits 0 with a `Summary` line and 0 failures.
+- [ ] `git diff <2b-accepted> | grep -E '^\+.*#\[(allow|expect)'` prints
+  nothing.
+- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session257/sha256.txt`
+  exists. The receipt has `session: 258`, `reviewDiffRange` and a new
+  fingerprint.
+- [ ] One progress-log entry is added.

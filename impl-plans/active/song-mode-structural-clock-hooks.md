@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (assigned implementation complete in session 257; workflow-owned reviews and downstream Chunk selection remain)
+**Status**: In Progress (session 258: runs SECOND, after SONG-ISSUED-RESOLUTION is accepted; TASK-016 fixes the format hunks and reruns the gates with zero allowed failures; see "Session 258 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -1561,3 +1561,186 @@ print a subset of the six IDs, and specifically no `song_export` or
 - [x] The receipt has `session: 257`, the two `harness-collision` fixes, and a
   fingerprint different from every earlier one.
 - [x] One progress-log entry is added.
+
+## Session 258 amendment (format fix plus acceptance rerun; runs SECOND; serial, concurrency 1)
+
+The source of truth is the design section "Session 258 resume amendments
+(2026-10-04)": "Serial order and dependency edge" and "2c: formatting fix and
+review on the green tree". This section wins over every earlier amendment of
+this plan where they conflict. The session 255 to 257 rules not changed here
+stay in force: the frozen files, the implementer authority, the owned paths
+and TASK-014.
+
+### Intent and context
+
+- The 2c implementation is complete at `e71d726`. Session 257 V4 had exactly
+  the six 2a-owned failures. 2c was not accepted, because the workflow
+  progress gate rejects every non-zero full-suite exit.
+- The new order runs SONG-ISSUED-RESOLUTION first. This plan's `dependsOn`
+  becomes `["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION"]`, so 2c cannot start
+  while 2a is running. 2c starts from the commit that records 2a acceptance,
+  written `<2a-accepted>`. On that tree the full suite must have zero
+  failures.
+- `tmp/song-mode-riela/session249-structural-fmt.log` shows two `rustfmt
+  --check` hunks in this plan's own writePath
+  `src/pattern/eval/song_clock/structural_tests.rs`:
+  - **Hunk A (about line 33).** The four-line
+    `DecodedSongAssetFactory::new(` call with three `BTreeMap::new(),`
+    argument lines becomes rustfmt's two-line form: `let factory =` on one
+    line, then the call with its three arguments on the next, indented one
+    more level.
+  - **Hunk B (about line 98).** The
+    `use crate::pattern::eval::song_observation::{CanonicalIndexCollector, CanonicalIndexTarget};`
+    line is wrapped over three lines (open brace, the two names on one
+    indented line with a trailing comma, closing `};`). The
+    `use crate::vm::query_vm::MeteredSongQuery;` line moves after
+    `use crate::value::intern::intern_kw;`.
+- `structural_tests.rs` is declared at `src/pattern/eval/song_clock.rs:892`
+  and has no child modules.
+- **Reviews.** The test-integrity, adversarial and integration reviews cover
+  `git diff 1ac457f <2c-accepted> -- <2c writePaths>`, which is all of the 2c
+  work since SONG-ROUTE8 acceptance, not only the format hunks.
+
+### Non-goals
+
+- No token change in `structural_tests.rs` other than whitespace, line breaks
+  and the position of one `use` line. No test, assertion, fixture string or
+  name changes.
+- No edit to any other 2c path (`song_clock/tests.rs`, `domains.rs`,
+  `region.rs`, `music.rs`, `tests/song_export.rs`, `tests/song_cli.rs`).
+  These must equal `<2a-accepted>`, unless a gate failure in one of them
+  forces a fix under the session 255 authority, recorded in `fixes[]`. None is
+  expected.
+- No edit to any 2a, 2b, wave-3 or unowned path.
+- Do not run `rustfmt` or `cargo fmt` in write mode on any file, including
+  `structural_tests.rs`. Edit by hand.
+- No `--retries`. Do not rerun the full suite until it happens to pass.
+- The six-ID allowed list from sessions 256 and 257 is withdrawn. No failure
+  is allowed.
+
+### TASK-016: Format-only fix, gate rerun, receipt and progress log
+
+**Status**: Not Started
+**Parallelizable**: No (only 2c task this session; it starts after
+SONG-ISSUED-RESOLUTION is accepted)
+**Deliverables**: two hand-edited hunks in
+`src/pattern/eval/song_clock/structural_tests.rs`, the eight
+`tmp/song-mode-riela/session249-structural-*` files, the session 258 scratch
+logs and one progress-log entry in this plan.
+
+Steps, in order:
+
+1. Copy every `tmp/song-mode-riela/session249-structural-*` file to
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session257/` and write their
+   sha256 values to `sha256.txt` there. Never delete, move or overwrite
+   `attempt-session253/` to `attempt-session256/` or `session254/` to
+   `session257/`. Scratch logs go to
+   `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session258/`.
+2. Record `git rev-parse HEAD` (`<2a-accepted>`) and
+   `git status --porcelain=v1` in `.../session258/tree.log`. The status must
+   be clean apart from `tmp/` and the excluded `.agents/settings.local.json`.
+3. Pre-edit check:
+   - record the sha256 of `structural_tests.rs` in
+     `.../session258/pre-edit.sha256`;
+   - confirm `git diff --quiet e71d726 -- src/pattern/eval/song_clock/structural_tests.rs`
+     exits 0 (2a did not touch it). On drift, stop and report it.
+   - Run `rustfmt --edition 2021 --check src/pattern/eval/song_clock/structural_tests.rs > tmp/song-s249/SONG-STRUCTURAL-CLOCK/session258/fmt-before.log 2>&1`.
+     It must exit 1 and show exactly hunks A and B.
+4. Hand-edit hunks A and B to match the `+` lines in `fmt-before.log`
+   exactly, including indentation. Record the post-edit sha256 in
+   `.../session258/post-edit.sha256`.
+5. Run `rustfmt --edition 2021 --check src/pattern/eval/song_clock/structural_tests.rs > tmp/song-s249/SONG-STRUCTURAL-CLOCK/session258/fmt-after.log 2>&1`.
+   It must exit 0 with an empty log. If a hunk remains, adjust only
+   whitespace until it is clean.
+6. Run session 255 verification commands 1 to 10, with the same log paths and
+   the changes below, then S257-V1, S257-V3 and S257-V5, then S258-V1 to
+   S258-V5.
+7. Rewrite `tmp/song-mode-riela/session249-structural-receipt.json`. Keep the
+   session 255 to 257 fields. Update or add:
+   - `session: 258`, `treeHead` and `baseCommit` (`<2a-accepted>`);
+   - every gate's exit status and full log path;
+   - a `fixes[]` entry for TASK-016 with class `format-only`, the two hunks,
+     path `src/pattern/eval/song_clock/structural_tests.rs` and design rule
+     `Session 258 > 2c: formatting fix and review on the green tree`;
+   - `formatDiff`: the `git diff --numstat <2a-accepted>` output for
+     `structural_tests.rs`;
+   - `fullSuite` with the counts and `failures: []`. Remove
+     `allowedFailures` and `allowedFailuresAbsent`, or set them to empty with
+     the note `withdrawn in session 258`;
+   - `reviewDiffRange`: `git diff 1ac457f <final tree> -- <2c writePaths>`;
+   - the clippy disposition, the cohort (953), the line counts and the
+     unowned-path result;
+   - a new `evidenceFingerprint`: the sha256 of the receipt with this field
+     empty. It must differ from every hash under
+     `tmp/song-s249/SONG-STRUCTURAL-CLOCK/` and from `391d811a...`.
+8. Set TASK-016 to Complete only if every check below passes. Add one
+   progress-log entry with the commands, exit codes and log paths.
+
+Pitfalls:
+
+- Never use `rustfmt` without `--check`. `structural_tests.rs` is a child of
+  `song_clock.rs`, and a write-mode run on `song_clock.rs` would also rewrite
+  `tests.rs`.
+- Do not reorder `use crate::pattern::eval::InputCells;`. Only
+  `MeteredSongQuery` moves.
+- A full-suite failure in a 2c path is fixed under the authority rule. Any
+  other failure is stop condition 1, reported with its owner. Do not edit
+  tests to make it pass.
+
+### Session 258 changes to session 255 verification
+
+- Command 3 (clippy): no diagnostic names a 2c path. Every other diagnostic is
+  mapped to a declared disposition row. `SW-let_and_return` at
+  `src/song/snapshot/issued.rs:231` is still expected, and 2b owns it.
+- Command 4 (full, `--no-fail-fast`): exit 0 with a `Summary` line, at least
+  2793 tests run and 0 failed.
+  `grep -cE '^\s+FAIL' tmp/song-mode-riela/session249-structural-nextest-full.log`
+  prints 0. Run it in the foreground and poll it until it exits.
+- Command 7 (fmt): still judged by "no hunk on a changed line" for the other
+  paths. `structural_tests.rs` must have no hunk at all. A pre-existing
+  `tests.rs` hunk on unchanged lines is recorded, not fixed.
+- Command 9: the base stays `c7083fb` (those frozen files are unchanged
+  since then).
+- Session 256 V11 (`git diff --quiet 88f5120 -- ...` on the five earlier 2c
+  Rust writePaths) is withdrawn for session 258, because TASK-016 edits
+  `structural_tests.rs`. S258-V2 (format-only diff of `structural_tests.rs`)
+  and S258-V3 (the other 2c paths equal `<2a-accepted>`) replace it.
+
+### Session 258 verification additions (foreground; record the exit status and full log path)
+
+- S258-V1 (structural_tests format):
+  `rustfmt --edition 2021 --check src/pattern/eval/song_clock/structural_tests.rs >> tmp/song-mode-riela/session249-structural-fmt.log 2>&1`
+  exits 0 and adds nothing to the log.
+- S258-V2 (format-only diff):
+  - `git diff --numstat <2a-accepted> -- src/pattern/eval/song_clock/structural_tests.rs`
+    prints at most 7 added and 7 deleted lines (expected 6 added and 7
+    deleted: hunk A is 2 for 5, hunk B is 3 for 1, and the moved `use` is 1
+    for 1);
+  - `git diff -w --word-diff=porcelain <2a-accepted> -- src/pattern/eval/song_clock/structural_tests.rs`
+    shows only the `MeteredSongQuery` line moving and the brace or line-break
+    changes;
+  - `git show <2a-accepted>:src/pattern/eval/song_clock/structural_tests.rs | grep -c assert`
+    equals `grep -c assert src/pattern/eval/song_clock/structural_tests.rs`.
+- S258-V3 (other 2c paths unchanged):
+  `git diff --quiet <2a-accepted> -- src/pattern/eval/song_clock/tests.rs src/song/snapshot/occupancy/geometry_tests/domains.rs src/pattern/combinators/region.rs src/pattern/combinators/music.rs tests/song_export.rs tests/song_cli.rs`
+  exits 0, unless `fixes[]` records a forced fix.
+- S258-V4 (unowned and other plans unchanged):
+  `git diff --quiet <2a-accepted> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/song/routing src/song/snapshot/occupancy/lookup src/song/snapshot/issued.rs src/pattern/eval/song_replay.rs`
+  exits 0.
+- S258-V5 (lines): `wc -l src/pattern/eval/song_clock/structural_tests.rs`
+  prints a value below 1000 (353 before the edit, about 352 after).
+
+### Session 258 done criteria (mechanically checkable)
+
+- [ ] `fmt-before.log` shows hunks A and B, and `fmt-after.log` is empty with
+  exit 0. S258-V1 exits 0.
+- [ ] S258-V2 to S258-V5 pass.
+- [ ] Session 255 commands 1, 2, 5, 6, 9 and 10 exit 0 (10 prints 953).
+  Command 4 exits 0 with a `Summary` line and 0 failures. Command 3 has no
+  2c-path diagnostic, and command 7 meets its rule.
+- [ ] S257-V1 exits 0, and S257-V5 assert counts are unchanged.
+- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session257/sha256.txt`
+  exists. The receipt has `session: 258`, the TASK-016 `format-only` fix,
+  `reviewDiffRange`, `failures: []` and a new fingerprint.
+- [ ] One progress-log entry is added. Test-integrity, adversarial and
+  integration review over `reviewDiffRange` follow; the workflow owns them.

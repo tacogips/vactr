@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (session 257: runs SECOND, after SONG-STRUCTURAL-CLOCK; TASK-008 to TASK-012 unchanged; see "Session 256 amendment" and "Session 257 amendment")
+**Status**: In Progress (session 258: runs FIRST on base e71d726 and depends only on SONG-ROUTE8; TASK-008 to TASK-012 unchanged; see "Session 258 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -2111,3 +2111,201 @@ Only these items change:
 - [ ] `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session256/sha256.txt`
   exists, and the receipt fingerprint is new.
 - [ ] One progress-log entry is added.
+
+## Session 258 amendment (runs FIRST, on base e71d726; serial, concurrency 1)
+
+The source of truth is the design section "Session 258 resume amendments
+(2026-10-04)": "Serial order and dependency edge" and "2a: verified current
+state and fix map". This section wins over every earlier amendment of this
+plan where they conflict. The session 253 to 257 amendments otherwise stay in
+force unchanged: TASK-008 to TASK-012, the owned paths and sharedPaths of the
+session 255 manifest, the implementer authority, the frozen paths, the tests
+and the done criteria.
+
+### Intent and context
+
+- The operator removed the `SONG-ISSUED-RESOLUTION` dependency on
+  `SONG-STRUCTURAL-CLOCK`. `dependsOn` is now `["SONG-ROUTE8"]`. 2a runs
+  first, because the workflow progress gate rejects any non-zero full-suite
+  exit, and all six remaining failures are owned by 2a.
+- The 2c code is already committed at `e71d726`, including the Euclid
+  instrumentation used by `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`.
+  2a builds on it and never edits it.
+- **Base.** Every `<2c-join>` in the session 255 to 257 amendments of this
+  plan now means `e71d726`. That covers verification 9 and 11, the TASK-010
+  line classification and `sourceFixtureDiff`.
+- **State verified at `e71d726`.** The session 253 code is present:
+  `members.rs`, `mod members;` at `nested/issued.rs:2`, the hard error at
+  `nested/issued.rs:476`, and two `bind_member` matches in `canonical.rs`.
+  TASK-008 to TASK-012 are NOT applied yet:
+  - `members.rs:5-10` `owner_matches` still reads `track`, `revision` and
+    `placement` from `stage.handle` (the stage input);
+  - `authority.rs` (540 lines) calls `authentic_retained_invocation` once (line
+    493), so there is no fallback scan yet;
+  - `nested/issued.rs:699` still uses `slice p 2 [0 nil]`;
+  - `nested/issued.rs:630-655` still uses the handle-based
+    `found_discarded_augmented` predicate;
+  - `source/issued.rs:241` `SLICE` still has the old subject.
+- **Failure-to-task map.** The latest full run is
+  `tmp/song-mode-riela/session249-structural-nextest-full.log` (2793 run,
+  2787 passed, 6 failed, 3 skipped):
+
+  | Exact message | Tests | Tasks |
+  |---|---|---|
+  | `song route: issued Index timing has no matching fresh invocation` | `cached_nested_slice_events_resolve_from_issued_transcript`, `partitioned_nested_issued_queries_equal_the_full_route_set`, `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` | TASK-008, then TASK-009; TASK-010 for the joint-geometry fixture; TASK-011 investigation |
+  | `song route: Index address contradicts first-structure rule` | `distinct_equal_handle_invocations_are_all_resolved` | TASK-010 (`slice {beat -> p} 2 [0 nil]`) |
+  | panic at `src/song/routing/nested/issued.rs:654` | `discarded_augmented_source_origins_are_resolved` | TASK-010 (declared replacement evidence) |
+  | `issued route source: Slice fixture produced no source contribution` | `genuine_source_contributions_reject_a_foreign_transcript` | TASK-012 |
+
+  Once TASK-008 lands, the three nested tests are expected to move on to
+  `required issued execution is not retained at site`
+  (`authority.rs:505`). TASK-009 fixes that. This intermediate message is
+  expected and is not a stop condition.
+
+### Non-goals
+
+- No edit to any 2c path: `src/pattern/eval/song_clock/structural_tests.rs`,
+  `src/pattern/eval/song_clock/tests.rs`,
+  `src/song/snapshot/occupancy/geometry_tests/domains.rs`,
+  `src/pattern/combinators/region.rs`, `src/pattern/combinators/music.rs`,
+  `tests/song_export.rs` and `tests/song_cli.rs`. Do not fix the two
+  `structural_tests.rs` rustfmt hunks; 2c fixes them after 2a. A fix that needs
+  a 2c path is stop condition 1.
+- No edit to `src/song/snapshot/issued.rs` (its `let_and_return` belongs to
+  2b), `src/pattern/eval/song_replay.rs`, `src/sched/**`, `src/host/**` or
+  `src/song/routing/index.rs`.
+- No `--retries` and no rerunning the full suite until it happens to pass.
+- No relaxation of `Rc` identity, `authenticate_authority`, the
+  owner/seed/entry/site comparisons, the hard `issued Index event has no
+  canonical component` error, any production depth check or the
+  first-structure rule.
+
+### Owned paths for session 258
+
+These are the session 255 manifest paths, unchanged, with the new
+`dependsOn`:
+
+- `dependsOn`: `["SONG-ROUTE8"]`.
+- writePaths: `src/song/routing/nested/issued/members.rs`,
+  `src/song/routing/nested/issued.rs`,
+  `src/song/snapshot/occupancy/lookup/authority.rs`,
+  `src/song/routing/prepared.rs`, `src/song/routing/source.rs`,
+  `src/song/routing/source/issued.rs`, `src/song/routing/nested.rs`,
+  `src/song/routing/configuration.rs`,
+  `src/song/routing/configuration/index/canonical.rs`,
+  `src/song/routing/density/index.rs`, `src/song/snapshot/occupancy.rs`,
+  `src/song/snapshot/occupancy/tests.rs`, this plan file, and the nine
+  `tmp/song-mode-riela/session249-resolution-*` evidence files.
+- sharedPaths: `src/song/snapshot/occupancy/lookup.rs` and
+  `src/song/snapshot/occupancy/route_view.rs`, under the session 252/253
+  limits.
+
+Expected edits are in `members.rs`, `nested/issued.rs` (one call-site argument
+plus test fixtures), `lookup/authority.rs` and the `source/issued.rs` test
+module. Any other edit must be recorded in `fixes[]`.
+
+### Session 258 execution steps (in order)
+
+1. Copy every `tmp/song-mode-riela/session249-resolution-*` file to
+   `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session257/` and write their
+   sha256 values to `sha256.txt` in that directory. Never delete or overwrite
+   `session251/`, `session252/`, `session253/` or any other existing
+   directory. Scratch logs go to `tmp/song-s249/SONG-ISSUED-RESOLUTION/session258/`.
+2. Record `git rev-parse HEAD` and `git status --porcelain=v1` in
+   `.../session258/tree.log`. The status must be clean apart from `tmp/` and
+   the excluded `.agents/settings.local.json`.
+3. Rewrite `tmp/song-mode-riela/session249-resolution-intent.json` with:
+   - the sha256 of the design doc and of this plan;
+   - the sha256 and full text of every file to be edited.
+
+   Hash-check each file again right before each edit. On drift, re-read the
+   file, reconcile against the current content and record it.
+4. Reproduce. Run session 255 command 1, with
+   `genuine_source_contributions_reject_a_foreign_transcript` appended, into
+   `.../session258/reproduce.log`. It must exit 100 with exactly the six tests
+   above failing, with the exact messages in the table. If the failure set or
+   the messages differ, record the difference in the receipt under
+   `reproduceDelta` and diagnose before editing.
+5. Do TASK-012 first (early evidence), then TASK-008, TASK-009, TASK-010 and
+   TASK-011, exactly as specified in the session 254 and 256 amendments. After
+   each task, run `CARGO_TERM_QUIET=true cargo build > tmp/song-s249/SONG-ISSUED-RESOLUTION/session258/build-<task>.log 2>&1`
+   and session 255 command 1 into `.../session258/named-<task>.log`. Fix any
+   remaining failure under the session 255 implementer authority.
+6. Run session 255 verification 1 to 12, with the session 256 changes and the
+   changes below. Every command runs in the foreground, and its exit status and
+   full log path are recorded.
+7. Write `tmp/song-mode-riela/session249-resolution-receipt.json` with every
+   field required by sessions 254 to 256, plus:
+   - `session: 258` and `baseCommit: "e71d726a027bfdee20675f2b3cc3b4f22a018008"`;
+   - `reviewDiffRange`: `git diff 1ac457f <final tree> -- <2a writePaths and edited sharedPaths>`.
+     The reviews cover the session 251 to 253 2a work as well as this
+     session's edits;
+   - `fullSuite` with the `Summary` counts and `failures: []`;
+   - `evidenceFingerprint`: the sha256 of the receipt with this field empty.
+     It must differ from every hash under `tmp/song-s249/SONG-ISSUED-RESOLUTION/`
+     and from the values listed in session 254 step 6.
+8. Set TASK-008 to TASK-012 to Complete only if every done criterion passes.
+   Add one progress-log entry with the commands, exit codes and log paths.
+
+### Session 258 changes to verification
+
+- Verification 1 (named tests, including the session 256 addition) must exit
+  0 with 9 tests passed.
+- Verification 7: `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-mode-riela/session249-resolution-nextest-full.log 2>&1`
+  must exit 0. The log must have a `Summary` line showing at least 2793 run,
+  0 failed, and every test run. Run
+  `grep -cE '^\s+FAIL' tmp/song-mode-riela/session249-resolution-nextest-full.log`;
+  it must print 0. The suite takes about 13 minutes. Run it in the foreground
+  and poll it until it exits. A log without a `Summary` line is a failure.
+- Verification 9: rustfmt `--check` passes when no `Diff in` hunk covers a
+  line changed since `e71d726`.
+- Verification 11 becomes
+  `git diff --quiet e71d726 -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs src/song/routing/index.rs src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/tests.rs src/pattern/eval/song_clock/structural_tests.rs src/song/snapshot/occupancy/geometry_tests/domains.rs src/pattern/combinators/region.rs src/pattern/combinators/music.rs tests/song_export.rs tests/song_cli.rs src/song/snapshot/issued.rs src/pattern/eval/song_replay.rs`
+  and must exit 0.
+- Verification 12 prints 953.
+- S258-V1 (no new suppression):
+  `git diff e71d726 | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+- S258-V2 (line caps): `wc -l src/song/routing/source.rs src/song/routing/nested/issued.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing/nested/issued/members.rs`
+  shows `source.rs` at most 993, `nested/issued.rs` at most 990 and every file
+  below 1000.
+
+### Session 258 tests (input -> expected outcome)
+
+The session 254 and 256 tests stand unchanged:
+
+- `cached_nested_slice_events_resolve_from_issued_transcript` -> passes.
+- `partitioned_nested_issued_queries_equal_the_full_route_set` -> passes, and
+  the full and partitioned route sets are equal.
+- `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` -> one
+  `PreparedSong` and all four assertions pass. Legacy `resolve_route` still
+  fails with `sampled context requires joint mapping geometry`.
+- `distinct_equal_handle_invocations_are_all_resolved` -> at least 2 distinct
+  seals, and the seal debit is met.
+- `discarded_augmented_source_origins_are_resolved` (or its renamed form) ->
+  an event with at least 2 slice-timed contributions resolves, with a debit of
+  at least the contribution count.
+- `genuine_source_contributions_reject_a_foreign_transcript` -> the first
+  event has a contribution, the genuine transcript authenticates, and the
+  foreign transcript errors.
+- `retained_issued_owner_bridge_preserves_success_and_foreign_failure_debits`,
+  `actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`,
+  `distinct_sites_sharing_one_execution_are_retained_separately`,
+  `fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority`,
+  the `snapshot::occupancy` legacy groups, the 2c tests and the four legacy
+  binaries -> unchanged and passing.
+
+### Session 258 done criteria (mechanically checkable)
+
+- [ ] Every session 254, 255 and 256 done criterion holds, with `e71d726`
+  replacing `<2c-join>`.
+- [ ] `.../session258/reproduce.log` exists and shows the six failures (or
+  `reproduceDelta` is recorded).
+- [ ] Verification 1 passes 9 tests. Verification 7 exits 0 with a `Summary`
+  line and 0 failures.
+- [ ] Verification 11 exits 0, S258-V1 prints nothing, and S258-V2 meets the
+  caps. Verification 12 prints 953.
+- [ ] `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session257/sha256.txt`
+  exists. The receipt has `session: 258`, `baseCommit`, `reviewDiffRange`,
+  `fixes[]` and a new fingerprint.
+- [ ] One progress-log entry is added. Test-integrity, adversarial and
+  integration review follow; the workflow owns them.

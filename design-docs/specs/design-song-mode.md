@@ -2291,3 +2291,166 @@ full log path. These rules are unchanged:
 - `resources.rs`, `reservations_tests.rs` and `clock_tests.rs` equal `HEAD`;
 - `.agents/settings.local.json` stays untouched;
 - formatting runs with `--check` only.
+
+### Session 258 resume amendments (2026-10-04)
+
+Session 257 stopped at `e71d726`. 2c finished its implementation, including the
+harness fix. Full nextest
+(`tmp/song-mode-riela/session249-structural-nextest-full.log`) ran 2793 tests:
+2787 passed, 3 skipped and 6 failed. The six failures are exactly the 2a IDs
+listed in session 256, and there is no `song_export` or `song_cli` failure. 2c
+was not accepted, because the workflow progress gate rejects every non-zero
+behavioral test exit, whatever allowed-failure list a plan declares. The design
+above and the session 251-257 amendments stay the baseline. Where these
+amendments conflict with an earlier one, they win. SONG-ROUTE8 stays accepted
+and is not redispatched. The dispatch manifest
+`impl-plans/active/song-s249-dispatch.json` gets a `resumeSession258` entry in
+place and is never duplicated.
+
+#### Serial order and dependency edge
+
+- **Order.** SONG-ISSUED-RESOLUTION (2a), then SONG-STRUCTURAL-CLOCK (2c)
+  formatting and review, then SONG-SHARED-WORK (2b), then SONG-ISSUED-PLAYBACK
+  (wave 3), then SONG-16. This supersedes the session 254 order. Each plan is
+  reviewed, accepted and committed before the next starts. `maxConcurrency`
+  stays 1.
+- **Edge removed.** The `SONG-ISSUED-RESOLUTION` `dependsOn` list becomes
+  `["SONG-ROUTE8"]`. This is safe for three reasons:
+  - The 2c code is already committed at `e71d726`, so 2a builds on it. The
+    Euclid program in `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`
+    uses the Euclid instrumentation that is already in the tree.
+  - The 2a and 2c writePaths do not overlap.
+  - All six remaining failures are in 2a writePaths.
+
+  2b, wave 3 and SONG-16 keep their `dependsOn` lists. 2c still precedes them.
+  The `SONG-STRUCTURAL-CLOCK` `dependsOn` list becomes
+  `["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION"]`. That edge encodes the 2a -> 2c
+  order, so 2c's zero-failure gate never runs on a tree where 2a is still
+  red.
+- **Base commits.** 2a starts from `e71d726`. Each later plan starts from the
+  accepted commit of the plan before it. These commits replace the
+  `<2c-join>` placeholder. The unowned-path check compares against the plan's
+  own base commit. The base commit only sets the starting tree and the
+  unowned-path check. It does not narrow what is reviewed. Each plan's review
+  (test-integrity, adversarial and integration) and its receipt cover the
+  plan's full implementation diff, `git diff 1ac457f <plan-accepted> --
+  <plan writePaths and edited sharedPaths>`, where `1ac457f` is the
+  `SONG-ROUTE8` accepted commit. For 2c this includes all of its committed
+  work since `1ac457f`, not only the format-only hunks. For 2a it includes
+  its session 251-253 work that is already in `e71d726`.
+- **No allowed failures anywhere.** Every plan's full-suite gate
+  (`--no-fail-fast`) must exit 0 with zero failures. This replaces every
+  allowed-failure list, including the session 256 and 257 six-ID list for 2c.
+  The suite runs without `--retries` and is not re-run until it happens to
+  pass. A failure outside the running plan's writePaths and sharedPaths is stop
+  condition 1, reported with its owner.
+
+#### 2a: verified current state and fix map
+
+No new 2a design decision is needed. At `e71d726` the session 253 code
+(`members.rs`, `mod members;`, the hard `issued Index event has no canonical
+component` error) is present. The session 254 decisions (TASK-008 to TASK-011)
+and the session 256 source fixture (TASK-012) are not yet applied:
+
+- `owner_matches` (`src/song/routing/nested/issued/members.rs:5-10`) still
+  reads `track`, `revision` and `placement` from `stage.handle`.
+- `distinct_equal_handle_invocations_are_all_resolved`
+  (`src/song/routing/nested/issued.rs:699`) still uses `slice p 2 [0 nil]`.
+- `discarded_augmented_source_origins_are_resolved` (`:630-655`) still uses the
+  handle-based `found_discarded_augmented` predicate.
+- The `SLICE` constant (`src/song/routing/source/issued.rs:241`) is still the
+  old subject.
+
+Each failure maps to an accepted decision:
+
+| Failure (exact message) | Tests | Accepted decision |
+| --- | --- | --- |
+| `issued Index timing has no matching fresh invocation` | `cached_nested_slice_events_resolve_from_issued_transcript`, `partitioned_nested_issued_queries_equal_the_full_route_set`, `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier` | Session 254: the owner-frame predicate uses the stage output handle; the site-request and retained-execution facts are separate, with exact `Rc` identity; joint geometry uses a single `PreparedSong` |
+| `Index address contradicts first-structure rule` | `distinct_equal_handle_invocations_are_all_resolved` | Session 254 fixture `slice {beat -> p} 2 [0 nil]`; `slice_index_root` is not relaxed |
+| panic at `nested/issued.rs:654` | `discarded_augmented_source_origins_are_resolved` | Session 254 declared replacement: per-contribution debit plus the unchanged `fractional_union_keeps_discarded_actual_augmented_metadata_and_reordered_authority` |
+| `issued route source: Slice fixture produced no source contribution` | `genuine_source_contributions_reject_a_foreign_transcript` | Session 256 `SLICE` fixture correction; both authentication assertions stay |
+
+If a test still fails after these decisions are applied, the session 255
+implementer authority applies inside the 2a writePaths and sharedPaths. The
+session 255 seams stand: `lookup.rs`, `route_view.rs`, `occupancy.rs`,
+`occupancy/tests.rs`, and `source/issued.rs` as the only outlet for
+`source.rs` growth. A fix that needs a 2c path is stop condition 1.
+
+**2a acceptance:**
+
+- the six tests and the session 252 and 254 named tests pass;
+- the focused binaries (`song_route_preparation`, `song_source_routes`,
+  `song_end_to_end`, `song_checker`) pass unchanged;
+- full nextest exits 0 with zero failures;
+- `source.rs` is at most 993 lines, `nested/issued.rs` at most 990, and every
+  file is below 1000;
+- the cohort is 953;
+- strict Clippy diagnostics are limited to the declared later-plan disposition
+  rows, with `let_and_return` at `src/song/snapshot/issued.rs:231` still owned
+  by 2b;
+- issued-path authentication of all contributors, and of each source
+  contribution's augmented origin and member slots before coalescing, is not
+  relaxed. The issued path uses fresh rebound clocks, the original source
+  START, full configuration groups and connected uncut wholes before clipping.
+  Legacy `resolve_route` keeps its `NeedsJointGeometry` barrier.
+
+#### 2c: formatting fix and review on the green tree
+
+- **Authorized edit.** 2c may change only the two `rustfmt --check` hunks in
+  its own writePath `src/pattern/eval/song_clock/structural_tests.rs`. Both are
+  recorded in `tmp/song-mode-riela/session249-structural-fmt.log`:
+  - near line 30, the `DecodedSongAssetFactory::new(...)` call is joined into
+    rustfmt's two-line form;
+  - near line 95, the `song_observation` import is wrapped, and the
+    `crate::vm::query_vm::MeteredSongQuery` import moves after
+    `crate::value::intern::intern_kw`.
+
+  The file is hand-edited to rustfmt's output for those hunks. No other token,
+  assertion or test changes. `git diff <2a-accepted> --
+  src/pattern/eval/song_clock/structural_tests.rs` touches only those lines.
+  The receipt records the edit in `fixes[]` with class `format-only`.
+- **Gates.** `rustfmt --edition 2021 --check
+  src/pattern/eval/song_clock/structural_tests.rs` prints no `Diff in`. The
+  other 2c paths keep the session 255 rule: no hunk on a changed line, and a
+  pre-existing hunk on unchanged lines of `tests.rs` is recorded but not fixed.
+  The other session 255 to 257 gates rerun once on the tree after 2a. Full
+  nextest exits 0 with zero failures. Strict Clippy shows no diagnostic in a 2c
+  path. The other disposition rows stay as declared until wave 3.
+- **Review.** 2c then goes to test-integrity, adversarial and integration
+  review. There is no other 2c implementation.
+
+#### Later waves
+
+- **2b.** Unchanged: charged, authentic, additive retention in
+  `src/pattern/eval/song_replay.rs`, with no fresh-only collector, and
+  `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` fixed without
+  `allow` or `expect`.
+- **Wave 3.** Unchanged:
+  - `src/sched/song.rs` consumes issued routes;
+  - `src/sched/song/pools.rs` stages projections and commands and commits only
+    after the whole batch succeeds, with the old state preserved on failure.
+
+  Strict Clippy exits 0 from wave 3 on. That removes the remaining Route8
+  dead-code rows (`LookupAuthority::Issued`, `with_work`, `bind_issued_owner`,
+  `PreparedRoutes`) through production use, not through `allow`.
+- **SONG-16.** Unchanged requirement-level end-to-end evidence:
+  `tests/song_issued_transport.rs` and `tests/song_end_to_end.rs`, plus the WAV
+  export. The final rustfmt `--check` list and the cohort allowance keep
+  `tests/song_export.rs` and `tests/song_cli.rs`.
+- **Route8 cohort.** The held exact-947 Route8 cohort stays documented in
+  `impl-plans/active/song-mode-immutable-route-authority.md`. SONG-ROUTE8 is not
+  reopened.
+
+#### Evidence
+
+Before rerunning, each plan copies its prior
+`tmp/song-mode-riela/session249-<plan>-*` files to
+`tmp/song-s249/<planId>/attempt-session257/` with a `sha256.txt`. Scratch logs
+go to `tmp/song-s249/<planId>/session258/`. Earlier attempt and session
+directories are never deleted or overwritten. Every new receipt fingerprint
+differs from all earlier ones. Gates run in the foreground and record exit
+status and full log path. These rules are unchanged:
+
+- `resources.rs`, `reservations_tests.rs` and `clock_tests.rs` equal `HEAD`;
+- `.agents/settings.local.json` stays untouched;
+- formatting runs with `--check` only.

@@ -1,6 +1,6 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (session 257: runs THIRD, after 2c and 2a are accepted; see "Session 256 amendment" and "Session 257 amendment")
+**Status**: In Progress (session 258: runs THIRD, after 2a and then 2c are accepted; see "Session 258 amendment")
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -736,3 +736,75 @@ additive charged `Rc::ptr_eq` retention, and the `let_and_return` fix at
 - [ ] Every session 256 done criterion holds, with `session257/` in place of
   `session256/`.
 - [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session256/sha256.txt` exists.
+
+## Session 258 amendment (runs THIRD, after 2a and then 2c are accepted; serial)
+
+The source of truth is the design section "Session 258 resume amendments
+(2026-10-04)" > "Serial order and dependency edge" and "Later waves". The
+session 255 to 257 amendments stay in force: the four owned paths
+(`src/song/snapshot.rs`, `src/song/snapshot/issued.rs`,
+`src/song/snapshot/issued/shared_work_tests.rs`,
+`src/pattern/eval/song_replay.rs`), the conditional seams
+(`src/song/snapshot/occupancy.rs`, `src/song/query/issued.rs`), the tests,
+verification 1-9, `baselineFailures`, the zero-allowed-failure rule, the
+additive charged `Rc::ptr_eq` retention in `ReplayView::seed_collection` and
+the `let_and_return` fix at `src/song/snapshot/issued.rs:231`. Only these
+items change:
+
+- **Order and base.** 2b now runs after 2a and then 2c. Every `<2a-join>` in
+  this plan means `<2c-accepted>`, the commit that records 2c acceptance on
+  `wf/route-authority`. That commit contains 2a's accepted work. The
+  `dependsOn` list stays `["SONG-ROUTE8", "SONG-STRUCTURAL-CLOCK", "SONG-ISSUED-RESOLUTION"]`.
+- **Baseline.** Before any edit, run
+  `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast > tmp/song-s249/SONG-SHARED-WORK/session258/baseline-full.log 2>&1`
+  on `<2c-accepted>`. It must exit 0 with a `Summary` line, and the receipt
+  records `baselineFailures: []`. A non-empty list is stop condition 1: report
+  each test with its owner and do not start 2b edits.
+- **No retries.** No nextest `--retries`, and no rerunning the full suite
+  until it happens to pass.
+- **Reviews.** The reviews and the receipt field `reviewDiffRange` cover
+  `git diff 1ac457f <2b-accepted> -- <the four 2b paths and any edited seam>`.
+  This range includes the unreviewed partial 2b code already in the tree
+  (sessions 251 to 253).
+- **Unowned paths.** `git diff --quiet <2c-accepted> -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs`
+  exits 0. Never run rustfmt in write mode on `src/song/snapshot.rs` or
+  `src/song/snapshot/occupancy.rs`; they have unowned children.
+- **Evidence.** Step 1 copies `tmp/song-mode-riela/session249-sharedwork-*`
+  to `tmp/song-s249/SONG-SHARED-WORK/attempt-session257/` with `sha256.txt`.
+  Never delete or overwrite earlier attempt or session directories. The
+  baseline and scratch logs go to `tmp/song-s249/SONG-SHARED-WORK/session258/`.
+  The receipt has `session: 258` and `baseCommit`. Its fingerprint differs
+  from every hash under `tmp/song-s249/SONG-SHARED-WORK/`.
+
+Tests (input -> expected outcome), restated:
+
+- A collector already holding executions A and B is seeded by a replay view
+  holding B (the same `Rc`) and C -> the collector holds A, B and C; B is not
+  duplicated; the debit equals the checked `view.len * (prior.len + 1)`
+  precharge.
+- A foreign collector, or an unattached collector with prior executions ->
+  refused before any charge or mutation; `remaining()` and the executions are
+  unchanged.
+- A fresh collector -> the same result and charge (`view.len`) as before.
+- `cargo clippy --all-targets -- -D warnings` -> no `let_and_return`
+  diagnostic and no diagnostic in a 2b path.
+
+### Session 258 done criteria
+
+- [ ] Every session 256 done criterion holds, with `session258/` in place of
+  `session256/` and `<2c-accepted>` in place of `<2a-join>`.
+- [ ] `baseline-full.log` exits 0, and `baselineFailures` is empty.
+- [ ] Verification 5 (full, `--no-fail-fast`) exits 0 with a `Summary` line
+  and 0 failures.
+- [ ] `grep -n "let_and_return" tmp/song-mode-riela/session249-sharedwork-clippy.log`
+  prints nothing, and `git diff <2c-accepted> | grep -E '^\+.*#\[(allow|expect)'`
+  prints nothing.
+- [ ] The receipt records the line range of the `ReplayView::seed_collection`
+  body (it starts at about `src/pattern/eval/song_replay.rs:245`).
+  `grep -nE 'executions\s*=|\.clear\(\)' src/pattern/eval/song_replay.rs`
+  prints no line inside that range. Matches outside it (today line 521
+  `let executions = ...` and line 772 `dependencies.clear()`) are not in
+  scope.
+- [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session257/sha256.txt` exists.
+  The receipt has `session: 258`, `reviewDiffRange` and a new fingerprint.
+- [ ] One progress-log entry is added.

@@ -1133,3 +1133,54 @@ gates and the status reconciliation. Only these items change:
 - [ ] Every session 256 done criterion holds.
 - [ ] The final fmt log covers the two test files, and
   `tmp/song-s249/SONG-16/attempt-session256/sha256.txt` exists.
+
+### Session 258 amendment (wave 4, SONG-16)
+
+The source of truth is the design section "Session 258 resume amendments
+(2026-10-04)". The session 255 to 257 amendments stay in force: no Rust or
+test edits, zero allowed failures, the requirement evidence names, the cohort
+allowances, the final gates and the status reconciliation. Only these items
+change:
+
+- **Order.** SONG-16 runs last, after SONG-ISSUED-RESOLUTION,
+  SONG-STRUCTURAL-CLOCK, SONG-SHARED-WORK and SONG-ISSUED-PLAYBACK are
+  accepted in that order. The base is `<wave3-accepted>`. The `dependsOn`
+  list is unchanged.
+- **No retries.** The final full run (`--no-fail-fast`) runs without
+  `--retries` and must exit 0 with a `Summary` line and 0 failures on the
+  first complete run. A failure is stop condition 1: report it with its
+  owning plan ID.
+- **Strict Clippy.** The final
+  `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` exits 0.
+  The immutable route authority plan
+  (`impl-plans/active/song-mode-immutable-route-authority.md`) is set to
+  Completed only if this holds. Its held exact-947 Route8 cohort is already
+  documented there and is not re-measured.
+- **Requirement evidence.** The final receipt names the end-to-end tests in
+  `tests/song_issued_transport.rs` and `tests/song_end_to_end.rs` that cover
+  reusable Part functions, `sequence` and `part-repeat` (`:same` and
+  `:vary`), `delete-event`, `overwrite-region`, instrument-selective `lpf`
+  and `instrument-fx`, automatic termination (`Ended`) and the WAV export.
+  Each must pass in the final full run. Helper-only tests do not count.
+- **Final fmt list.** It also includes `src/pattern/eval/song_clock/structural_tests.rs`
+  with no hunk at all (2c TASK-016).
+- **Evidence.** Prior final files are copied to
+  `tmp/song-s249/SONG-16/attempt-session257/` with `sha256.txt`. Scratch logs
+  go to `tmp/song-s249/SONG-16/session258/`. The final fingerprint differs
+  from every earlier one.
+- **Design checkpoint.** The dated evidence checkpoint is appended after the
+  "Session 258 resume amendments" section of
+  `design-docs/specs/design-song-mode.md`.
+- **Dispatch manifest.** SONG-16 does not edit
+  `impl-plans/active/song-s249-dispatch.json`. The root reviewer updates its
+  `resumeSession258` entry serially.
+
+#### Session 258 done criteria
+
+- [ ] Every session 257 done criterion holds.
+- [ ] Final strict Clippy and the final full run both exit 0. The full run
+  has a `Summary` line and 0 failures.
+- [ ] The final receipt lists the requirement-level end-to-end test names as
+  passed.
+- [ ] `tmp/song-s249/SONG-16/attempt-session257/sha256.txt` exists, and the
+  design checkpoint follows the Session 258 section.

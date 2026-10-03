@@ -248,7 +248,7 @@ fn actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct() {
 #[test]
 fn unsupported_and_continuous_index_evidence_refuse_without_callback_fallback() {
     for body in [
-        "euclid {slice {beat -> nil} 1 [cut]} 1 2",
+        "chunk {slice {beat -> nil} 1 [cut]} 2 {q -> fast q 2}",
         "slice {beat -> nil} 1 {range saw 0 0}",
     ] {
         let mut prepared = from_code(&code(body));
@@ -317,6 +317,47 @@ fn unsupported_and_continuous_index_evidence_refuse_without_callback_fallback() 
         assert!(Rc::ptr_eq(&prior, snapshot.replay.as_ref().unwrap()));
         assert_eq!(reads.get(), 0);
     }
+}
+
+#[test]
+fn euclid_index_evidence_is_retained_and_consumed_without_callback_fallback() {
+    let mut prepared = from_code(&code("euclid {slice {beat -> nil} 1 [cut]} 1 2"));
+    let snapshot = &mut prepared.snapshot;
+    let scope = snapshot.routing.root_part;
+    let limits = SongLimits {
+        max_nodes: 100_000,
+        ..SongLimits::default()
+    };
+    let mut left = limits.max_nodes;
+    retain(snapshot, scope, span(0, 4, 1), limits, &mut left);
+    let prior = snapshot.replay.clone().unwrap();
+    let reads = deny(snapshot);
+    let request = request(snapshot, scope, span(0, 4, 1), limits, &mut left);
+    let mut accepted = 0;
+    for address in owner_addresses(snapshot, &request, 0, limits, &mut left).unwrap() {
+        if address.owner().revision != request.revision {
+            continue;
+        }
+        let index = bind_index(snapshot, &request, address, 0, limits, &mut left).unwrap();
+        consume(
+            snapshot,
+            scope,
+            span(0, 4, 1),
+            &index,
+            None,
+            None,
+            span(0, 4, 1),
+            span(0, 4, 1),
+            0,
+            limits,
+            &mut left,
+        )
+        .unwrap();
+        accepted += 1;
+    }
+    assert!(accepted > 0);
+    assert!(Rc::ptr_eq(&prior, snapshot.replay.as_ref().unwrap()));
+    assert_eq!(reads.get(), 0);
 }
 
 #[test]

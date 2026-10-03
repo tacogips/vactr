@@ -114,6 +114,44 @@ LoopAt/Fit retain current sample-header speed encoding semantics.
 
 ## Progress log
 
+### 2026-10-04 — Session 254 implementation handoff
+
+Reviewed the committed partial structural-clock implementation. `dispatch.rs`
+returns `true` only for Chunk; Euclid passes its generated timing event, step
+whole and part to `with_structural_sample`; the six unchanged-time operators
+do not requery per subdivision. The existing Striate fixture uses
+`sampling_with_replay`, whose replay phase denies callback reads. No finding
+required a production edit.
+
+Rewrote the six parser fixtures to the real Euclid and Chunk arities without
+changing existing assertions or test names. Added the inherited-depth test
+with a private fixture and VM work cleanup checks. Changed the unsupported
+domains fixture from Euclid to Chunk, kept its four refusal checks and the
+`range saw` case unchanged, and added positive Euclid consume evidence.
+
+The baseline reproduction exited 100 with 14 selected tests: 7 passed and 7
+failed (six fixture arity errors and the stale Euclid refusal expectation).
+After the import correction, the focused session-254 confirmation exited 100:
+16 tests ran, 12 passed and 4 failed. The failures are:
+
+- `euclid_over_slice_obeys_inherited_depth_boundary_without_refunding_debit`:
+  `max_depth - 1` returned `DepthExceeded` (`pattern nesting too deep`) at
+  `structural_tests.rs:274`.
+- `euclid_empty_subject_has_no_false_index_observation`: the expected empty
+  observation set was non-empty at `structural_tests.rs:205`.
+- `split_queries_retain_the_single_query_index_rows`: projection ended at
+  `1/4`, expected `1/2`, at `structural_tests.rs:180`.
+- `nested_fast_rev_weighted_euclid_and_chop_keep_clock_orientation`:
+  projection ended at `1/8`, expected `1/2`, at `structural_tests.rs:180`.
+
+The plan directs stopping on any post-arity behavioral failure and forbids
+weakening assertions. Therefore build, Clippy, full nextest, focused regression
+suite, WASM and rustfmt gates were not run. The 953-file cohort, line budgets,
+unowned-path diff, unchanged `tests.rs`/`input.rs`, and no-new-allow/expect
+checks passed. Session-254 implementation remains incomplete pending diagnosis
+and an authorized correction to the Euclid/depth projection behavior, followed
+by the unrun gates.
+
 ### 2026-10-03 — Actual operator gap audited
 
 Read-only review locates all eight barriers at song_clock.rs892–899. Euclid
@@ -525,7 +563,7 @@ There are no sharedPaths. These are never edited:
 
 ### TASK-004: Reconcile structural fixtures with the real arities
 
-**Status**: Not started
+**Status**: Implemented; focused behavioral checks found non-arity failures
 **Parallelizable**: No
 **Deliverable**: `src/pattern/eval/song_clock/structural_tests.rs`
 
@@ -558,7 +596,7 @@ assertion changes:
 
 ### TASK-005: Euclid inherited-depth boundary test
 
-**Status**: Not started unless already present. Check with
+**Status**: Implemented; required `max_depth - 1` case fails with `DepthExceeded`. Check with
 `grep -n DepthExceeded src/pattern/eval/song_clock/structural_tests.rs`.
 **Parallelizable**: No (after TASK-004)
 
@@ -576,7 +614,7 @@ The session 251 contract is unchanged:
 
 ### TASK-006: Declared Euclid behavior change in `domains.rs`
 
-**Status**: Not started
+**Status**: Implemented; Chunk refusal and positive Euclid evidence passed the focused run
 **Parallelizable**: No (after TASK-004)
 **Deliverable**: `src/song/snapshot/occupancy/geometry_tests/domains.rs`,
 only the test
@@ -617,7 +655,7 @@ only the test
 
 ### TASK-007: Review the committed partial 2c code
 
-**Status**: Not started
+**Status**: Reviewed; no structural dispatch or sampling defect found in the reviewed partial code
 **Parallelizable**: No (before the gates)
 
 Review `git diff 37ea3e8 a8b8ed2 -- <the six original 2c Rust paths>`

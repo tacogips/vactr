@@ -354,6 +354,49 @@ impl Voice {
         }
     }
 
+    /// Reset private DSP history while retaining note controls and primitive envelope phase.
+    pub(crate) fn reset_song_voice_state<C: CellRead + ?Sized>(
+        &mut self,
+        t: &Template,
+        cells: &C,
+        sr: f32,
+        caps: &CapabilitySet,
+    ) {
+        let mem_len = self.mem.len();
+        for (state, spec) in self.nodes.iter_mut().zip(t.nodes()) {
+            if matches!(spec.node, Node::EnvPerc | Node::EnvAdsr) {
+                continue;
+            }
+            *state = NodeState::default();
+            let (off, len) = region(spec, mem_len);
+            self.mem[off..off + len].fill(0.0);
+            if let Node::Effect { kind, fx } = spec.node {
+                let fx = usize::from(fx);
+                self.fx[fx].configure(
+                    kind,
+                    &t.fx_params[fx][..usize::from(t.fx_n[fx])],
+                    cells,
+                    &mut self.mem[off..off + len],
+                    sr,
+                    caps,
+                );
+            }
+        }
+        self.post.bq.fill(Biquad::identity());
+        self.post_r.bq.fill(Biquad::identity());
+    }
+    /// Stop without dropping or replacing any retained voice allocation.
+    pub(crate) fn stop_song_voice(&mut self) {
+        self.active = false;
+        self.gate_left = 0;
+        self.fade = None;
+        self.nodes.fill(NodeState::default());
+        self.fx.fill(FxUnit::empty());
+        self.mem.fill(0.0);
+        self.post.bq.fill(Biquad::identity());
+        self.post_r.bq.fill(Biquad::identity());
+    }
+
     /// True when a resource is in use by this voice.
     #[must_use]
     pub fn uses(&self, t: &Template, resource: u32) -> bool {

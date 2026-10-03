@@ -490,9 +490,46 @@ impl Unifier {
             return Ok(());
         }
         let d = depth + 1;
+        if finite_result(&self.zonk(actual, false), d) {
+            return Err(Clash::Mismatch);
+        }
         match self.shallow(actual) {
             Ty::List(x) | Ty::Pattern(x) | Ty::Opt(x) => self.unify_step(elem, &x, d),
             Ty::Fn(ps, r) if ps.is_empty() => self.unify_step(elem, &r, d),
+            Ty::Fn(ps, r) if ps.len() == 1 => {
+                if !matches!(
+                    self.shallow(&ps[0]),
+                    Ty::Var(_)
+                        | Ty::Ratio
+                        | Ty::Int
+                        | Ty::Int64
+                        | Ty::Float
+                        | Ty::Float64
+                        | Ty::NumLit(_)
+                ) {
+                    return Err(Clash::Mismatch);
+                }
+                // A declared Any return cannot acquire sound authority from coercion.
+                let mut result = self.shallow(&r);
+                let mut result_depth = d;
+                loop {
+                    if result_depth > MAX_TY_DEPTH {
+                        return Err(Clash::Mismatch);
+                    }
+                    match result {
+                        Ty::Any => return Err(Clash::Mismatch),
+                        Ty::Pattern(inner) | Ty::List(inner) | Ty::Opt(inner) => {
+                            result = self.shallow(&inner);
+                            result_depth += 1;
+                        }
+                        _ => break,
+                    }
+                }
+                // Check both sides together: a shared time/result variable stays shared.
+                let expected = Ty::func(vec![Ty::Ratio], Ty::Pattern(Box::new(elem.clone())));
+                self.unify_at(&expected, &Ty::Fn(ps, r), d)
+            }
+            Ty::Part | Ty::Song | Ty::EventHandle => Err(Clash::Mismatch),
             Ty::Nil | Ty::Signal => Ok(()),
             other => self.unify_at(elem, &other, d),
         }
@@ -519,5 +556,21 @@ fn subst(t: &Ty, map: &[(TyVar, Ty)], depth: u32) -> Ty {
             Box::new(subst(r, map, d)),
         ),
         other => other.clone(),
+    }
+}
+
+/// A known finite return cannot serve as a lazy pattern source. Inspect only
+/// source-shaped wrappers; ordinary function/collection value passing is unchanged.
+fn finite_result(ty: &Ty, depth: u32) -> bool {
+    if depth > MAX_TY_DEPTH {
+        return false;
+    }
+    match ty {
+        Ty::Part | Ty::Song | Ty::EventHandle => true,
+        Ty::List(inner) | Ty::Opt(inner) | Ty::Pattern(inner) | Ty::Fn(_, inner) => {
+            finite_result(inner, depth + 1)
+        }
+        Ty::Dict(_, inner) => finite_result(inner, depth + 1),
+        _ => false,
     }
 }

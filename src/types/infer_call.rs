@@ -4,6 +4,9 @@
 //! user functions, index and key calls, struct constructors; and the
 //! hygiene and forcing warnings that are decided at a call site.
 
+#[path = "song_rules.rs"]
+mod song_rules;
+
 use crate::reader::node::{Atom, Node, NodeKind, Op};
 use crate::types::check::Checker;
 use crate::types::diag::DiagCode;
@@ -120,7 +123,8 @@ impl Checker<'_> {
             if sig.kind == crate::types::natives::NativeKind::Function {
                 self.types.insert(head.id, Ty::Any);
                 return match sig.name {
-                    "s" | "sound" => self.sound_call(n, sig, args, d),
+                    "s" | "sound" => song_rules::lazy_sound_call(self, n, sig, args, d)
+                        .unwrap_or_else(|| self.sound_call(n, sig, args, d)),
                     _ => self.native_call(n, sig, args, d),
                 };
             }
@@ -254,6 +258,10 @@ impl Checker<'_> {
         // take operands of any type (they return one of them).
         let per_arg = (arity_ok || a.splat) && !matches!(sig.name, "or" | "and");
         for (k, p) in a.positional.iter().enumerate().filter(|_| per_arg) {
+            if sig.name == "transform-instrument" && k == 3 {
+                // Song source callbacks admit two concrete pattern views locally.
+                continue;
+            }
             let expected = match params.get(k) {
                 Some(t) => Some(t.clone()),
                 None if variadic => params.last().cloned(),
@@ -263,7 +271,8 @@ impl Checker<'_> {
             self.check_one(p, expected.as_ref(), numeric, &what);
         }
         let arg_tys: Vec<Ty> = a.positional.iter().map(|p| self.ty_of(p)).collect();
-        self.native_rules(n, sig, &a);
+        self.native_rules(n, sig, &a, &params);
+        song_rules::check(self, n, sig, &a);
         match sig.name {
             "or" | "and" => self.truthy_result(&arg_tys),
             "/" if arg_tys.iter().all(|t| self.int_like(t)) => Ty::Ratio,
@@ -373,7 +382,7 @@ impl Checker<'_> {
     }
 
     /// The per-native rules of design 7 and 7.1.4.
-    fn native_rules(&mut self, n: &Node, sig: &'static NativeSig, a: &Args<'_>) {
+    fn native_rules(&mut self, n: &Node, sig: &'static NativeSig, a: &Args<'_>, params: &[Ty]) {
         let pos = &a.positional;
         match sig.name {
             "/" => {
@@ -451,7 +460,25 @@ impl Checker<'_> {
             .any(|s| matches!(&s.ty, Ty::Fn(_, r) if matches!(**r, Ty::Pattern(_))));
         if returns_pattern {
             for (k, p) in pos.iter().enumerate() {
-                if matches!(sig.entry_at(k), Some(NativeMask::Late | NativeMask::Fn))
+                let time_source = sig.entry_at(k) == Some(NativeMask::Value)
+                    && params
+                        .get(k)
+                        .is_some_and(|ty| matches!(self.u.shallow(ty), Ty::Pattern(_)))
+                    && matches!(self.u.shallow(&self.ty_of(p)),Ty::Fn(ref ps,_) if ps.len()==1);
+                if time_source && self.contains_query_effect(p, 0) {
+                    // A known effect invalidates this newly coerced query function;
+                    // the ordinary deferred-argument diagnostic remains a warning.
+                    if self.mute == 0 {
+                        self.diags.push(crate::types::diag::Diagnostic::error(
+                            DiagCode::EffectInPattern,
+                            p.span,
+                            format!(
+                                "an effectful time function inside a `{}` argument runs at every query",
+                                sig.name
+                            ),
+                        ));
+                    }
+                } else if matches!(sig.entry_at(k), Some(NativeMask::Late | NativeMask::Fn))
                     && self.contains_effect(p, 0)
                 {
                     self.emit(
@@ -534,11 +561,47 @@ impl Checker<'_> {
     }
 
     /// True when the subtree calls an effectful prelude native.
-    fn contains_effect(&self, n: &Node, depth: u32) -> bool {
+    pub(super) fn contains_effect(&self, n: &Node, depth: u32) -> bool {
         if depth > 256 {
             return false;
         }
         if let NodeKind::Call = n.kind {
+            if let Some(sig) = n.children.first().and_then(|head| self.prelude_head(head)) {
+                if sig.effectful {
+                    return true;
+                }
+            }
+        }
+        n.children
+            .iter()
+            .any(|child| self.contains_effect(child, depth + 1))
+    }
+    /// Known local query effects, retaining lambda facts from their lexical scope.
+    pub(super) fn contains_query_effect(&self, n: &Node, depth: u32) -> bool {
+        if depth > 256 {
+            return false;
+        }
+        if let Some(effect) = self.scopes.node_query_effect(n.id) {
+            return effect;
+        }
+        if self.prelude_head(n).is_some_and(|sig| sig.effectful) {
+            return true;
+        }
+        if n.sym_name()
+            .and_then(|name| self.scopes.lookup(name))
+            .is_some_and(|b| b.query_effect)
+        {
+            return true;
+        }
+        if let NodeKind::Call = n.kind {
+            if n.children
+                .first()
+                .and_then(Node::sym_name)
+                .and_then(|name| self.scopes.lookup(name))
+                .is_some_and(|b| b.query_effect)
+            {
+                return true;
+            }
             if let Some(sig) = n.children.first().and_then(|h| self.prelude_head(h)) {
                 if sig.effectful {
                     return true;
@@ -547,7 +610,7 @@ impl Checker<'_> {
         }
         n.children
             .iter()
-            .any(|c| self.contains_effect(c, depth + 1))
+            .any(|c| self.contains_query_effect(c, depth + 1))
     }
 
     /// A call whose head is a value: a user or local function, a list or
@@ -568,9 +631,53 @@ impl Checker<'_> {
         }
         match self.u.shallow(callee) {
             Ty::Fn(params, ret) => {
+                let persisted = if binding.is_none() {
+                    match &head.kind {
+                        NodeKind::Atom(Atom::Qualified { prefix, name }) => self
+                            .env
+                            .qualified_callables
+                            .get(prefix)
+                            .and_then(|m| m.get(name))
+                            .cloned(),
+                        _ => head.sym_name().and_then(|name| {
+                            if self.env.global(name).is_some() {
+                                self.env.global_callables.get(name).cloned()
+                            } else {
+                                self.live
+                                    .open_prefix(name)
+                                    .and_then(|prefix| {
+                                        self.env
+                                            .qualified_callables
+                                            .get(prefix)
+                                            .and_then(|m| m.get(name))
+                                    })
+                                    .cloned()
+                            }
+                        }),
+                    }
+                } else {
+                    None
+                };
+                let mut persisted_keywords = None;
+                if let Some(schema) = persisted {
+                    if let Ty::Fn(all, result) = self.u.instantiate(&schema.signature) {
+                        if all.len() == schema.positional + schema.keywords.len() {
+                            let view =
+                                Ty::func(all[..schema.positional].to_vec(), (*result).clone());
+                            let _ = self.u.try_unify(&view, callee);
+                            persisted_keywords = Some(std::rc::Rc::from(
+                                schema
+                                    .keywords
+                                    .into_iter()
+                                    .zip(all[schema.positional..].iter().cloned())
+                                    .collect::<Vec<_>>(),
+                            ));
+                        }
+                    }
+                }
                 let keywords = match binding.as_ref().map(|b| &b.extra) {
                     Some(BindExtra::Fn { keywords, .. }) => Some(keywords.clone()),
-                    _ => None,
+                    _ => persisted_keywords,
                 };
                 let a = split_args(args, keywords.is_some());
                 for p in &a.named {

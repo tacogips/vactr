@@ -293,6 +293,8 @@ impl Checker<'_> {
             })
             .collect();
         let ret = self.body(body, d);
+        let effect = self.contains_query_effect(body, 0);
+        self.scopes.record_query_effect(n.id, effect);
         self.scopes.truncate(mark);
         Ty::func(params, ret)
     }
@@ -334,6 +336,16 @@ impl Checker<'_> {
         let t = if self.u.too_large(&t) { Ty::Any } else { t };
         let is_var = kind == BindKind::Var;
         let (target, value) = (&n.children[1], &n.children[2]);
+        let is_callable = matches!(self.u.shallow(&t), Ty::Fn(..));
+        let query_effect = is_callable && self.contains_query_effect(value, 0);
+        let extra = if is_callable && !is_var {
+            value
+                .sym_name()
+                .and_then(|name| self.scopes.lookup(name))
+                .map_or(BindExtra::Plain, |b| b.extra.clone())
+        } else {
+            BindExtra::Plain
+        };
         match &target.kind {
             NodeKind::Atom(Atom::Sym(name)) => {
                 let generic = !is_var && is_syntactic_value(value);
@@ -350,7 +362,8 @@ impl Checker<'_> {
                     scheme,
                     span: target.span,
                     annot_any: false,
-                    extra: BindExtra::Plain,
+                    extra: extra.clone(),
+                    query_effect,
                 };
                 self.declare(name, target, b);
             }
@@ -371,6 +384,8 @@ impl Checker<'_> {
                     // Only a written `any` must be narrowed; an unknown type
                     // name reads as `any` without that obligation.
                     b.annot_any = target.children.get(1).and_then(Node::sym_name) == Some("any");
+                    b.extra = extra;
+                    b.query_effect = query_effect;
                     self.declare(&name, target, b);
                 }
             }
@@ -585,6 +600,7 @@ impl Checker<'_> {
         }
         let body = &ch[ch.len() - 1];
         let body_ty = self.body(body, d);
+        let query_effect = self.contains_query_effect(body, 0);
         if let Some(r) = &ret_annot {
             if self.u.unify(r, &body_ty).is_err() {
                 self.emit(
@@ -625,7 +641,9 @@ impl Checker<'_> {
                 format!("parameter {} of `{name}` is forwarded both as a value and as a closure; one call site forces it", pos + 1),
             );
         }
-        let fn_ty = Ty::func(positional, body_ty);
+        // Validation checks the body; callers retain the written result contract,
+        // including an explicitly unknown result that cannot grant pattern authority.
+        let fn_ty = Ty::func(positional, ret_annot.unwrap_or(body_ty));
         let _ = self.u.unify(&self_ty, &fn_ty);
         self.u.exit();
         self.u.default_nums(&fn_ty);
@@ -635,7 +653,8 @@ impl Checker<'_> {
             keywords: keywords.into(),
             mask: pos_mask,
         };
-        self.scopes.update(&name, scheme.clone(), extra);
+        self.scopes
+            .update(&name, scheme.clone(), extra, query_effect);
         if at_session {
             self.live.globals.insert(
                 name.clone(),

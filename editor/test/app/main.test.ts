@@ -10,7 +10,7 @@ const { order, area } = vi.hoisted(() => {
   });
   return { order, area };
 });
-vi.mock('../../src/code/mount', () => area('code'));
+vi.mock('../../src/code/mount', () => ({ ...area('code'), DOC_FILE: 'main.vact' }));
 vi.mock('../../src/midi/mount', () => area('midi'));
 vi.mock('../../src/visual/mount', () => area('visual'));
 vi.mock('../../src/bind/mount', () => area('bind'));

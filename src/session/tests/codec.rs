@@ -38,6 +38,20 @@ fn site() -> WireSite {
 
 fn clients() -> Vec<ClientMsg> {
     vec![
+        ClientMsg::ApplySong(ApplySongBody {
+            file: "song.vact".into(),
+            code: "song arrangement > play-song".into(),
+            doc_revision: 3,
+            edit_epoch: 9,
+        }),
+        ClientMsg::MuteInstrument(SongInstrumentMuteBody {
+            epoch: crate::song::SnapshotEpoch(5),
+            selector: WireInstrumentSelector::new(vec![WireSongSound::Builtin {
+                name: "bd".into(),
+            }])
+            .unwrap(),
+            muted: true,
+        }),
         ClientMsg::Eval(EvalBody {
             file: "main.vact".to_string(),
             code: "s [:bd :sd] > d1\n# ünïcode \"quoted\"".to_string(),
@@ -114,6 +128,57 @@ fn clients() -> Vec<ClientMsg> {
 
 fn servers() -> Vec<ServerMsg> {
     vec![
+        ServerMsg::SongInstrumentMuted(SongInstrumentMutedBody {
+            epoch: crate::song::SnapshotEpoch((1 << 53) + 1),
+            selector: WireInstrumentSelector::new(vec![
+                WireSongSound::Builtin {
+                    name: "analog".into(),
+                },
+                WireSongSound::Instrument { id: u32::MAX },
+            ])
+            .unwrap(),
+            muted: true,
+            application_frame: (1 << 53) + 3,
+        }),
+        ServerMsg::SongTransportState(SongTransportStateBody {
+            epoch: crate::song::SnapshotEpoch((1 << 53) + 5),
+            state: WireSongTransportState::Playing,
+            instruments: vec![WireInstrumentSelector::new(vec![WireSongSound::Instrument {
+                id: u32::MAX,
+            }])
+            .unwrap()],
+        }),
+        ServerMsg::SongTransportState(SongTransportStateBody {
+            epoch: crate::song::SnapshotEpoch((1 << 53) + 5),
+            state: WireSongTransportState::Draining,
+            instruments: vec![WireInstrumentSelector::new(vec![WireSongSound::Instrument {
+                id: u32::MAX,
+            }])
+            .unwrap()],
+        }),
+        ServerMsg::SongTransportState(SongTransportStateBody {
+            epoch: crate::song::SnapshotEpoch((1 << 53) + 5),
+            state: WireSongTransportState::Ended,
+            instruments: vec![WireInstrumentSelector::new(vec![WireSongSound::Instrument {
+                id: u32::MAX,
+            }])
+            .unwrap()],
+        }),
+        ServerMsg::SongCandidateReady(SongCandidateReadyBody {
+            epoch: crate::song::SnapshotEpoch(5),
+            doc_revision: 3,
+        }),
+        ServerMsg::SongCandidateApplied(crate::song::SongApplyAck {
+            epoch: crate::song::SnapshotEpoch(5),
+            application_frame: 48000,
+            doc_revision: 3,
+        }),
+        ServerMsg::SongCandidateFailed(SongCandidateFailedBody {
+            epoch: Some(crate::song::SnapshotEpoch(5)),
+            doc_revision: Some(3),
+            code: "failed".into(),
+            message: "candidate rejected".into(),
+        }),
         ServerMsg::EvalResult(EvalResultBody {
             file: "main.vact".to_string(),
             doc_revision: 3,

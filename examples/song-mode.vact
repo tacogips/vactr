@@ -1,0 +1,22 @@
+# Complete finite composition: nested generators, immutable instrument editing,
+# whole-Part repetition and sequencing. No external sample bank is required.
+# 24 cycles at 120 BPM plus the eight-second tail produce 56 seconds.
+
+inst kick:
+	digital-drum-core freq velocity :sine > * amp
+inst snare:
+	digital-snare-core freq velocity :sine > * amp
+inst hat:
+	digital-hat-core freq velocity :sine > * amp
+
+fn drums:
+	part [drums: {s [:kick :snare :kick :snare]} hats: {s :hat > euclid 7 8}] duration: 4
+
+fn developed:
+	let base {drums & []}
+	base > transform-instrument :drums :kick {p -> lpf p 900}
+
+let intro {drums & []}
+let verse {developed & []}
+let arrangement sequence [{part-repeat intro 2} {part-repeat verse 4}]
+song arrangement bpm: 120 cycle-beats: 4 meter: [4 4] seed: 42 tail-seconds: 8 > play-song

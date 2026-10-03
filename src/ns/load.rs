@@ -30,6 +30,11 @@ use crate::vm::vm::{EffectMode, Vm};
 
 /// Reads source files for `load`.
 pub trait SourceLoader {
+    /// Configuration-only isolated song preparation capability.
+    fn song_asset_factory(&self) -> Option<Rc<dyn crate::song::assets::SongAssetFactory>> {
+        None
+    }
+
     /// Resolves `path` (relative to `path.file`, 6.5.8) and returns the
     /// file's id and text.
     ///
@@ -166,12 +171,29 @@ fn run_source(
     let ns = Namespace::with_prelude(Rc::clone(prelude));
     let forms = read_forms(text, file).map_err(|d| load_failed(path, &d.to_string()))?;
     diags.extend(check(&forms, &ns.check_env(), &HostManifest::spec_default()).diags);
+    run_forms(vm, &ns, path, &forms)
+}
+
+fn run_forms(
+    vm: &mut Vm,
+    ns: &Namespace,
+    path: &PathVal,
+    forms: &[Node],
+) -> Result<Value, Failure> {
     let mut last = Value::Nil;
-    for form in &forms {
-        let mut cx = CompileCx::new(&ns, FormGen::new(0));
+    for form in forms {
+        let inputs = ns.checked_inputs();
+        let checked = check(
+            std::slice::from_ref(form),
+            &ns.check_env(),
+            &HostManifest::spec_default(),
+        );
+        let checked_ok = !checked.diags.iter().any(|d| d.severity == Severity::Error);
+        let mut cx = CompileCx::new(ns, FormGen::new(0));
         cx.tweak_sites = false;
         let proto = compile(form, &mut cx).map_err(|d| load_failed(path, &d.to_string()))?;
-        last = vm.run(proto, &ns).map_err(|e| match e.code {
+        let compile_ok = !cx.diags.iter().any(|d| d.severity == Severity::Error);
+        last = vm.run(proto, ns).map_err(|e| match e.code {
             FailCode::DepthExceeded => e,
             _ => {
                 let mut f = load_failed(path, &e.to_string());
@@ -179,6 +201,71 @@ fn run_source(
                 f
             }
         })?;
+        if checked_ok && compile_ok {
+            if let Some(inputs) = inputs.as_ref() {
+                ns.install_checked_callables(&checked.callables, inputs, FormGen::new(0));
+            }
+        }
     }
     Ok(last)
+}
+
+#[cfg(test)]
+mod certificate_tests {
+    use super::*;
+    use crate::value::intern::intern_sym;
+    fn execute(vm: &mut Vm, ns: &Namespace, text: &str) -> Result<Value, Failure> {
+        let forms = read_forms(text, FileId::new(10)).unwrap();
+        run_forms(
+            vm,
+            ns,
+            &PathVal {
+                text: "loaded.vact".into(),
+                file: None,
+            },
+            &forms,
+        )
+    }
+    #[test]
+    fn same_owner_source_replacement_and_default_dependencies_invalidate_proofs() {
+        let mut vm = Vm::new();
+        let mut prelude = Prelude::core();
+        crate::vm::natives::register_domain(&mut prelude);
+        let ns = Namespace::with_prelude(Rc::new(prelude));
+        execute(&mut vm, &ns, "var base-pitch 66.75\nfn helper p:\n\tgain p 1\nfn wrap p pitch: float = base-pitch:\n\thelper {s p} > note pitch").unwrap();
+        assert!(ns.check_env().global_callables.contains_key("wrap"));
+        assert_eq!(
+            ns.session_slot(intern_sym("wrap")).unwrap().owner(),
+            Some(FormGen::new(0))
+        );
+        let pitch = ns.session_slot(intern_sym("base-pitch")).unwrap();
+        pitch.set(Value::Float(67.25));
+        assert!(!ns.check_env().global_callables.contains_key("wrap"));
+        assert!(ns.check_env().global_callables.contains_key("helper"));
+        execute(&mut vm, &ns, "fn dependent p:\n\thelper p").unwrap();
+        assert!(ns.check_env().global_callables.contains_key("dependent"));
+        execute(&mut vm, &ns, "fn helper p:\n\tgain p 0.5").unwrap();
+        assert!(!ns.check_env().global_callables.contains_key("dependent"));
+        assert!(ns.check_env().global_callables.contains_key("helper"));
+    }
+    #[test]
+    fn failed_source_definition_does_not_certify_or_destroy_prior_proof() {
+        let mut vm = Vm::new();
+        let mut prelude = Prelude::core();
+        crate::vm::natives::register_domain(&mut prelude);
+        let ns = Namespace::with_prelude(Rc::new(prelude));
+        execute(&mut vm, &ns, "fn helper p:\n\tgain p 1").unwrap();
+        let slot = ns.session_slot(intern_sym("helper")).unwrap();
+        let version = slot.version();
+        assert_eq!(
+            execute(&mut vm, &ns, "let helper {/ 1 0}")
+                .unwrap_err()
+                .code,
+            FailCode::LoadFailed
+        );
+        assert_eq!(slot.version(), version);
+        assert!(ns.check_env().global_callables.contains_key("helper"));
+        execute(&mut vm, &ns, "fn bad p: float:\n\ts p").unwrap();
+        assert!(!ns.check_env().global_callables.contains_key("bad"));
+    }
 }

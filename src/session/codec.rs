@@ -203,3 +203,89 @@ fn validate_timing(kind: &str, body: &Json) -> Result<(), ProtocolError> {
     }
     Ok(())
 }
+
+/// New song u64 identities use canonical decimal strings, never JS numbers.
+pub(crate) mod decimal_u64 {
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub fn parse(value: &str) -> Result<u64, &'static str> {
+        if value.is_empty()
+            || !value.bytes().all(|c| c.is_ascii_digit())
+            || (value.len() > 1 && value.starts_with('0'))
+        {
+            return Err("expected a canonical decimal u64 string");
+        }
+        value.parse().map_err(|_| "decimal u64 overflow")
+    }
+    pub fn serialize<S: Serializer>(value: &u64, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&value.to_string())
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+        let value = String::deserialize(deserializer)?;
+        parse(&value).map_err(serde::de::Error::custom)
+    }
+}
+pub(crate) mod song_epoch {
+    use crate::song::SnapshotEpoch;
+    use serde::{Deserializer, Serializer};
+    pub fn serialize<S: Serializer>(
+        value: &SnapshotEpoch,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        super::decimal_u64::serialize(&value.0, serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<SnapshotEpoch, D::Error> {
+        super::decimal_u64::deserialize(deserializer).map(SnapshotEpoch)
+    }
+}
+pub(crate) mod optional_song_epoch {
+    use crate::song::SnapshotEpoch;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    pub fn serialize<S: Serializer>(
+        value: &Option<SnapshotEpoch>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        value.map(|v| v.0.to_string()).serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<SnapshotEpoch>, D::Error> {
+        Option::<String>::deserialize(deserializer)?
+            .map(|v| {
+                super::decimal_u64::parse(&v)
+                    .map(SnapshotEpoch)
+                    .map_err(serde::de::Error::custom)
+            })
+            .transpose()
+    }
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WireSongAck {
+    #[serde(with = "song_epoch")]
+    epoch: crate::song::SnapshotEpoch,
+    #[serde(with = "decimal_u64")]
+    application_frame: u64,
+    doc_revision: u64,
+}
+impl serde::Serialize for crate::song::SongApplyAck {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        WireSongAck {
+            epoch: self.epoch,
+            application_frame: self.application_frame,
+            doc_revision: self.doc_revision,
+        }
+        .serialize(serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for crate::song::SongApplyAck {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <WireSongAck as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(Self {
+            epoch: value.epoch,
+            application_frame: value.application_frame,
+            doc_revision: value.doc_revision,
+        })
+    }
+}

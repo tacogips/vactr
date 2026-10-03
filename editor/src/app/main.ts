@@ -14,7 +14,7 @@ import { SocketTransport } from '../protocol/socket';
 import { Store } from '../protocol/store';
 import { WasmCore, WasmTransport } from '../protocol/wasm';
 import { mount as mountBind } from '../bind/mount';
-import { mount as mountCode } from '../code/mount';
+import { DOC_FILE, mount as mountCode } from '../code/mount';
 import { WasmCompletionEngine } from '../code/completion';
 import { WasmFormatter } from '../code/format';
 import { ToolWasm } from '../code/tool-wasm';
@@ -26,6 +26,7 @@ import { mount as mountVisual } from '../visual/mount';
 import { AudioClock, PageClock } from './clock';
 import type { EditorDeps, Mounted, MountFn } from './deps';
 import { buildLayout, pane, type Layout } from './layout';
+import { mount as mountSong } from './song';
 import { mountShell, pageStorage } from '../ui/shell';
 import { BootFailure } from '../ui/status-view';
 import { createComponent } from 'solid-js';
@@ -56,6 +57,7 @@ export function createEditor(root: HTMLElement, deps: EditorDeps): Editor {
   const layout = buildLayout(root);
   const handles: Mounted[] = [mountShell(root, pageStorage(root.ownerDocument.defaultView))];
   for (const area of MOUNT_ORDER) handles.push(MOUNTS[area](root, deps));
+  handles.push(mountSong(root, deps, DOC_FILE));
   return {
     root,
     deps,

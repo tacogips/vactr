@@ -122,6 +122,11 @@ impl PkgNs {
             }
             for form in &forms {
                 gen += 1;
+                // Keep document diagnostics above unchanged. This fresh check
+                // only certifies this declaration against committed earlier forms.
+                let inputs = pkg.ns.checked_inputs();
+                let checked = check(std::slice::from_ref(form), &pkg.ns.check_env(), manifest);
+                let checked_ok = !checked.diags.iter().any(|d| d.severity == Severity::Error);
                 let mut cx = CompileCx::new(&pkg.ns, FormGen::new(gen));
                 cx.tweak_sites = false;
                 let proto = match compile(form, &mut cx) {
@@ -132,9 +137,20 @@ impl PkgNs {
                         continue;
                     }
                 };
+                let compile_ok = !cx.diags.iter().any(|d| d.severity == Severity::Error);
                 diags.append(&mut cx.diags);
-                if let Err(e) = vm.run(proto, &pkg.ns) {
-                    failures.push((form.span, format!("`{path}`: {e}")));
+                match vm.run(proto, &pkg.ns) {
+                    Err(e) => failures.push((form.span, format!("`{path}`: {e}"))),
+                    Ok(_) if checked_ok && compile_ok => {
+                        if let Some(inputs) = inputs.as_ref() {
+                            pkg.ns.install_checked_callables(
+                                &checked.callables,
+                                inputs,
+                                FormGen::new(gen),
+                            );
+                        }
+                    }
+                    Ok(_) => {}
                 }
             }
         }

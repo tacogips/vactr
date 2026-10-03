@@ -25,7 +25,41 @@ import type {
   WireDirectives,
   WireForm,
   WireSite,
+  SongApplied,
+  SongCandidateFailed,
+  SongSound,
+  SongTransportStatus,
 } from './types';
+
+export interface SongDocumentState {
+  draftRevision: number;
+  pending?: { request: number; revision: number; epoch?: string; ready: boolean };
+  applied?: SongApplied;
+  failure?: SongCandidateFailed;
+  transport?: SongTransportStatus;
+  instrumentMutes?: { sound: SongSound; muted: boolean; application_frame: string }[];
+}
+
+/** Decimal strings have already passed canonical u64 validation. */
+function frameOlder(next: string, previous: string): boolean {
+  return next.length < previous.length || (next.length === previous.length && next < previous);
+}
+function soundKey(sound: SongSound): string {
+  switch (sound.kind) {
+    case 'builtin': return JSON.stringify(['builtin', sound.name]);
+    case 'instrument': return JSON.stringify(['instrument', sound.id]);
+    case 'sample': return JSON.stringify(['sample', sound.path, sound.file ?? null]);
+    case 'buffer': return JSON.stringify(['buffer', sound.id]);
+  }
+}
+export function songSelectorKey(selector: { family: SongSound[] }): string {
+  return JSON.stringify(selector.family.map(soundKey).sort());
+}
+const transportOrder = { prepared: 0, playing: 1, draining: 2, ended: 3, failed: 4 };
+
+type CorrelatedMessage = ServerMsg & { re?: number };
+type QueuedChange = CorrelatedMessage | (() => Set<string>);
+export const songKey = (file: string): string => `song:${file}`;
 
 export interface NameState {
   /** The last completed value (display text). */
@@ -49,8 +83,8 @@ export const siteKey = (id: number): string => `site:${id}`;
 export const slotKey = (s: string): string => `slot:${s}`;
 
 // Correlated replies stay outside the telemetry drop policy.
-function isTelemetry(msg: ServerMsg): boolean {
-  return (msg as ServerMsg & { re?: number }).re === undefined &&
+function isTelemetry(msg: QueuedChange): boolean {
+  return typeof msg !== 'function' && msg.re === undefined &&
     (msg.kind === 'tempo' || msg.kind === 'levels' || msg.kind === 'playing');
 }
 function older(next: TransportSample | undefined, prev: TransportSample | null | undefined): boolean {
@@ -65,12 +99,14 @@ export class Store {
   private readonly slotDiags = new Map<string, Diagnostic[]>();
   private readonly directiveMap = new Map<string, WireDirectives>();
   private readonly formMap = new Map<string, WireForm[]>();
+  private readonly songMap = new Map<string, SongDocumentState>();
+  private readonly songRequests = new Map<number, string>();
   private tempoBody: TempoBody | null = null;
   private levelsBody: LevelsBody | null = null;
   private manifestBody: ManifestBody | null = null;
   private lastPass = 0;
   private subs: Sub[] = [];
-  private queue: ServerMsg[] = [];
+  private queue: QueuedChange[] = [];
   private notifying = false;
   private disposed = false;
   private timedSample: TransportSample | null = null;
@@ -88,6 +124,7 @@ export class Store {
     this.subs.length = 0;
     this.siteMap.clear(); this.siteFile.clear(); this.nameMap.clear();
     this.fileDiags.clear(); this.slotDiags.clear(); this.directiveMap.clear(); this.formMap.clear();
+    this.songMap.clear(); this.songRequests.clear();
     this.tempoBody = null; this.timedSample = null; this.levelsBody = null; this.manifestBody = null;
   }
   private readonly onError: (e: unknown) => void;
@@ -97,6 +134,58 @@ export class Store {
   }
 
   // -------------------------------------------------------------- reads
+
+  song(file: string): Readonly<SongDocumentState> | undefined { return this.songMap.get(file); }
+
+  beginSongApply(file: string, revision: number, request: number, notify = true): void {
+    this.changeSong(() => {
+      const previous = this.songMap.get(file);
+      if (previous?.pending) this.songRequests.delete(previous.pending.request);
+      this.songRequests.set(request, file);
+      this.songMap.set(file, { ...previous, draftRevision: revision, failure: undefined,
+        pending: { request, revision, ready: false } });
+      return notify ? new Set([songKey(file)]) : new Set();
+    });
+  }
+
+  publishSongApply(request: number): void {
+    this.changeSong(() => {
+      const file = this.songRequests.get(request);
+      const pending = file === undefined ? undefined : this.songMap.get(file)?.pending;
+      return file !== undefined && pending?.request === request && !pending.ready
+        ? new Set([songKey(file)]) : new Set();
+    });
+  }
+
+  cancelSongApply(request: number): void {
+    this.changeSong(() => {
+      const file = this.songRequests.get(request);
+      if (file === undefined) return new Set();
+      this.songRequests.delete(request);
+      const previous = this.songMap.get(file);
+      if (previous?.pending?.request !== request) return new Set();
+      const { pending: _, ...next } = previous;
+      this.songMap.set(file, next);
+      return new Set([songKey(file)]);
+    });
+  }
+
+  songDocumentChanged(file: string, revision: number): void {
+    this.changeSong(() => {
+      const previous = this.songMap.get(file);
+      if (!previous || revision <= previous.draftRevision) return new Set();
+      if (previous.pending) this.songRequests.delete(previous.pending.request);
+      const { pending: _, failure: __, ...active } = previous;
+      this.songMap.set(file, { ...active, draftRevision: revision });
+      return new Set([songKey(file)]);
+    });
+  }
+
+  private changeSong(change: () => Set<string>): void {
+    if (this.disposed) return;
+    this.queue.push(change);
+    this.drainChanges();
+  }
 
   site(id: number): WireSite | undefined {
     return this.siteMap.get(id);
@@ -174,14 +263,14 @@ export class Store {
   // ------------------------------------------------------------ applying
 
   /** Applies one server message atomically, then notifies. */
-  apply(msg: ServerMsg): void {
+  apply(msg: CorrelatedMessage): void {
     if (this.disposed) return;
     if (isTelemetry(msg)) {
       if (msg.kind === 'tempo' || msg.kind === 'levels') {
-        const i = this.queue.findIndex((m) => isTelemetry(m) && m.kind === msg.kind);
+        const i = this.queue.findIndex((m) => typeof m !== 'function' && isTelemetry(m) && m.kind === msg.kind);
         // Do not replace a newer same-epoch transport snapshot with a stale arrival.
         const prev = i >= 0 ? this.queue[i] : undefined;
-        if (msg.kind === 'tempo' && prev?.kind === 'tempo' && older(msg.body.transport, prev.body.transport)) return;
+        if (msg.kind === 'tempo' && typeof prev !== 'function' && prev?.kind === 'tempo' && older(msg.body.transport, prev.body.transport)) return;
         if (i >= 0) { this.queue.splice(i, 1); this.coalesced += 1; }
       }
       if (this.queue.filter(isTelemetry).length >= 64) {
@@ -190,10 +279,14 @@ export class Store {
       }
     }
     this.queue.push(msg);
+    this.drainChanges();
+  }
+
+  private drainChanges(): void {
     if (this.notifying) return;
-    while (this.queue.length > 0) {
-      const next = this.queue.shift() as ServerMsg;
-      const changed = this.applyOne(next);
+    while (!this.disposed && this.queue.length > 0) {
+      const next = this.queue.shift()!;
+      const changed = typeof next === 'function' ? next() : this.applyOne(next);
       if (changed.size > 0) this.notify(changed);
     }
   }
@@ -222,8 +315,53 @@ export class Store {
     }
   }
 
-  private applyOne(msg: ServerMsg): Set<string> {
+  private applyOne(msg: CorrelatedMessage): Set<string> {
     switch (msg.kind) {
+      case 'song-instrument-muted':
+      case 'song-transport-state': {
+        const entry = [...this.songMap.entries()].find(([, state]) => state.applied?.epoch === msg.body.epoch);
+        if (!entry) return new Set();
+        const [file, previous] = entry;
+        if (msg.kind === 'song-transport-state') {
+          if (previous.transport && transportOrder[msg.body.state] <= transportOrder[previous.transport.state]) return new Set();
+          this.songMap.set(file, { ...previous, transport: msg.body });
+        } else {
+          const mutes = new Map((previous.instrumentMutes ?? []).map((mute) => [soundKey(mute.sound), mute]));
+          let changed = false;
+          for (const sound of msg.body.selector.family) {
+            const key = soundKey(sound);
+            const old = mutes.get(key);
+            if (old && (frameOlder(msg.body.application_frame, old.application_frame) ||
+              (old.application_frame === msg.body.application_frame && old.muted === msg.body.muted))) continue;
+            mutes.set(key, { sound, muted: msg.body.muted, application_frame: msg.body.application_frame });
+            changed = true;
+          }
+          if (!changed) return new Set();
+          this.songMap.set(file, { ...previous, instrumentMutes: [...mutes.values()] });
+        }
+        return new Set([songKey(file)]);
+      }
+      case 'song-candidate-ready':
+      case 'song-candidate-applied':
+      case 'song-candidate-failed': {
+        const file = msg.re === undefined ? undefined : this.songRequests.get(msg.re);
+        const previous = file === undefined ? undefined : this.songMap.get(file);
+        const pending = previous?.pending;
+        if (file === undefined || !previous || !pending || pending.request !== msg.re) return new Set();
+        if (msg.body.doc_revision !== null && msg.body.doc_revision !== pending.revision) return new Set();
+        if (pending.epoch !== undefined && msg.body.epoch !== null && msg.body.epoch !== pending.epoch) return new Set();
+        if (msg.kind === 'song-candidate-ready') {
+          if (pending.ready) return new Set();
+          this.songMap.set(file, { ...previous, pending: { ...pending, ready: true, epoch: msg.body.epoch } });
+        } else {
+          this.songRequests.delete(pending.request);
+          const { pending: _, ...next } = previous;
+          this.songMap.set(file, msg.kind === 'song-candidate-applied'
+            ? { draftRevision: previous.draftRevision, applied: msg.body }
+            : { ...next, failure: msg.body });
+        }
+        return new Set([songKey(file)]);
+      }
       case 'bindings':
         return this.applyBindings(msg.body);
       case 'eval-result':

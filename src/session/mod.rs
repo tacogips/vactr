@@ -25,6 +25,7 @@ pub mod publish;
 pub mod repl;
 #[allow(clippy::module_inception)]
 pub mod session;
+pub mod song;
 
 pub use eval::{alias_env_for, analyze, Analysis, EvalOutcome, FormResult, PackageView};
 pub use protocol::{ClientMsg, Envelope, ServerMsg};

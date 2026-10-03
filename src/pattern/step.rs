@@ -4,9 +4,9 @@
 use std::rc::Rc;
 
 use crate::pattern::eval::{eval_param_int, resolve_dynamic, QState};
-use crate::pattern::occ::OccKey;
+use crate::pattern::occ::{OccKey, ProducerKind};
 use crate::pattern::pat::{Pat, PatNode};
-use crate::pattern::query::{q, sect, Event, TimeSpan};
+use crate::pattern::query::{q_child, sect, Event, TimeSpan};
 use crate::reader::span::{Span, SrcRef};
 use crate::value::ratio::Ratio64;
 use crate::value::value::{ListVal, Value};
@@ -58,6 +58,8 @@ struct Laid<'a> {
     value: &'a Value,
     src: Option<SrcRef>,
     weight: Ratio64,
+    ordinal: u32,
+    copy: Option<u32>,
 }
 
 /// Expands `hold` weights and `repeat` counts for one cycle.
@@ -69,7 +71,11 @@ fn lay_out<'a>(
 ) -> Result<Vec<Laid<'a>>, Failure> {
     let mut out = Vec::with_capacity(items.len());
     let at = Ratio64::from_int(cycle);
-    for s in items {
+    for (ordinal, s) in items.iter().enumerate() {
+        let ordinal = u32::try_from(ordinal)
+            .map_err(|_| Failure::new(FailCode::Overflow, "step ordinal overflow"))?;
+        let repeated =
+            matches!(&s.value, Value::Pattern(p) if matches!(p.node, PatNode::Repeat(..)));
         let (weight, copies) = match &s.value {
             Value::Pattern(p) => match &p.node {
                 PatNode::Hold(_, w) => {
@@ -87,12 +93,20 @@ fn lay_out<'a>(
             },
             _ => (Ratio64::ONE, 1),
         };
-        for _ in 0..copies {
+        for copy in 0..copies {
             st.spend(1, span)?;
             out.push(Laid {
                 value: &s.value,
                 src: s.src,
                 weight,
+                ordinal,
+                copy: if repeated {
+                    Some(u32::try_from(copy).map_err(|_| {
+                        Failure::new(FailCode::Overflow, "step copy ordinal overflow")
+                    })?)
+                } else {
+                    None
+                },
             });
         }
     }
@@ -134,6 +148,23 @@ fn subdivide(
     st: &mut QState<'_, '_>,
     out: &mut Vec<Event>,
 ) -> Result<(), Failure> {
+    // Nested lists recurse here without going through q(). Apply the same
+    // evaluator bound so programmatically built lists cannot bypass it.
+    st.enter()?;
+    let result = subdivide_inner(items, p, outer, piece, c, st, out);
+    st.leave();
+    result
+}
+
+fn subdivide_inner(
+    items: &[Step],
+    p: &Pat,
+    outer: TimeSpan,
+    piece: TimeSpan,
+    c: i64,
+    st: &mut QState<'_, '_>,
+    out: &mut Vec<Event>,
+) -> Result<(), Failure> {
     let laid = lay_out(items, c, st, p.span)?;
     let total = laid
         .iter()
@@ -155,7 +186,15 @@ fn subdivide(
         if sect(whole, piece).is_none() {
             continue;
         }
-        step_events(l.value, l.src, whole, piece, c, false, p, st, out)?;
+        st.with_producer(ProducerKind::NestedStep, l.ordinal, |st| {
+            let mut emit = |st: &mut QState<'_, '_>| {
+                step_events(l.value, l.src, whole, piece, c, false, p, st, out)
+            };
+            match l.copy {
+                Some(copy) => st.with_producer(ProducerKind::GeneratedBranch, copy, emit),
+                None => emit(st),
+            }
+        })?;
     }
     Ok(())
 }
@@ -184,55 +223,69 @@ fn step_events(
             subdivide(&nested, p, whole, part, c, st, out)
         }
         Value::Pattern(inner) => {
-            let inner = unwrap_step(inner);
-            squeeze(&inner, whole, piece, c, st, out)
+            let wrapped = matches!(inner.node, PatNode::Hold(..) | PatNode::Repeat(..));
+            let child = unwrap_step(inner);
+            if wrapped {
+                st.with_producer(ProducerKind::Child, 0, |st| {
+                    squeeze(&child, whole, piece, c, st, out)
+                })
+            } else {
+                squeeze(&child, whole, piece, c, st, out)
+            }
         }
         Value::VarRef(_) | Value::Fn(_) | Value::Native(_) | Value::Thunk(_) | Value::Signal(_) => {
-            let at = sect(whole, piece).map_or(whole.begin, |s| s.begin);
-            let resolved = resolve_dynamic(value, at, st)?;
-            match resolved {
-                Value::Pattern(inner) => squeeze(&inner, whole, piece, c, st, out),
-                // A signal is continuous: no whole, sampled at the part start.
-                Value::Signal(sig) => {
-                    if let Some(part) = sect(whole, piece) {
-                        let v = sig.value_at(part.begin, st.cx)?;
-                        st.spend(1, p.span)?;
-                        out.push(Event::new(None, part, v, src));
+            st.with_producer(ProducerKind::DynamicExpansion, 0, |st| {
+                let at = st.step_onset(whole, piece);
+                let resolved = resolve_dynamic(value, at, st)?;
+                match resolved {
+                    Value::Pattern(inner) => squeeze(&inner, whole, piece, c, st, out),
+                    // A signal is continuous: no whole, sampled at the part start.
+                    Value::Signal(sig) => {
+                        if let Some(part) = sect(whole, piece) {
+                            let v = sig.value_at(part.begin, st.cx)?;
+                            st.spend(1, p.span)?;
+                            let mut event = Event::new(None, part, v, src);
+                            event.producer = st.producer();
+                            out.push(event);
+                        }
+                        Ok(())
                     }
-                    Ok(())
-                }
-                Value::Nil => Ok(()),
-                // A late name whose value is a list (`let bar [..]`, then
-                // `[bar bar]` or `cat [bar ..]`) is a nested step list, like
-                // the list literal itself; atomic positions keep it whole.
-                Value::List(l) if !atomic_lists => {
-                    let nested = steps_of_list(&l);
-                    let Some(part) = sect(whole, piece) else {
-                        return Ok(());
-                    };
-                    subdivide(&nested, p, whole, part, c, st, out)
-                }
-                other => {
-                    let mark = out.len();
-                    atomic(other, src, whole, piece, p, st, out)?;
-                    // A direct var or tweak read (the slot holds the value
-                    // itself, not a function of time): commit keeps the
-                    // source so the value can travel as a control cell
-                    // (11.3).
-                    if let Value::VarRef(r) = value {
-                        let direct = !matches!(
-                            r.get(),
-                            Value::Fn(_) | Value::Native(_) | Value::Thunk(_) | Value::VarRef(_)
-                        );
-                        if direct {
-                            for e in &mut out[mark..] {
-                                e.late = Some(r.clone());
+                    Value::Nil => Ok(()),
+                    // A late name whose value is a list (`let bar [..]`, then
+                    // `[bar bar]` or `cat [bar ..]`) is a nested step list, like
+                    // the list literal itself; atomic positions keep it whole.
+                    Value::List(l) if !atomic_lists => {
+                        let nested = steps_of_list(&l);
+                        let Some(part) = sect(whole, piece) else {
+                            return Ok(());
+                        };
+                        subdivide(&nested, p, whole, part, c, st, out)
+                    }
+                    other => {
+                        let mark = out.len();
+                        atomic(other, src, whole, piece, p, st, out)?;
+                        // A direct var or tweak read (the slot holds the value
+                        // itself, not a function of time): commit keeps the
+                        // source so the value can travel as a control cell
+                        // (11.3).
+                        if let Value::VarRef(r) = value {
+                            let direct = !matches!(
+                                r.get(),
+                                Value::Fn(_)
+                                    | Value::Native(_)
+                                    | Value::Thunk(_)
+                                    | Value::VarRef(_)
+                            );
+                            if direct {
+                                for e in &mut out[mark..] {
+                                    e.late = Some(r.clone());
+                                }
                             }
                         }
+                        Ok(())
                     }
-                    Ok(())
                 }
-            }
+            })
         }
         other => atomic(other.clone(), src, whole, piece, p, st, out),
     }
@@ -247,9 +300,12 @@ fn atomic(
     st: &mut QState<'_, '_>,
     out: &mut Vec<Event>,
 ) -> Result<(), Failure> {
+    crate::pattern::build::reject_finite(&value)?;
     if let Some(part) = sect(whole, piece) {
         st.spend(1, p.span)?;
-        out.push(Event::new(Some(whole), part, value, src));
+        let mut event = Event::new(Some(whole), part, value, src);
+        event.producer = st.producer();
+        out.push(event);
     }
     Ok(())
 }
@@ -291,7 +347,19 @@ pub(crate) fn squeeze(
         begin: to_inner(part.begin)?,
         end: to_inner(part.end)?,
     };
-    for mut e in q(inner, inner_span, st) {
+    let events = if st.has_clock_observation() {
+        st.with_clock_frame(
+            || {
+                crate::pattern::eval::song_clock::CanonicalClockFrame::squeeze(
+                    width, base, step, inner_span, part,
+                )
+            },
+            |st| Ok(q_child(inner, inner_span, 0, st)),
+        )?
+    } else {
+        q_child(inner, inner_span, 0, st)
+    };
+    for mut e in events {
         e.whole = match e.whole {
             Some(w) => Some(w.map(to_outer)?),
             None => None,
@@ -341,7 +409,7 @@ pub(crate) fn query_single(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     if copies == 1 {
-        return q(inner, span, st);
+        return q_child(inner, span, 0, st);
     }
     let step = Step::bare(Value::Pattern(Rc::new(inner.clone())));
     let items: Vec<Step> = (0..copies.clamp(0, 4096)).map(|_| step.clone()).collect();
@@ -359,8 +427,45 @@ impl Event {
             controls: std::collections::BTreeMap::new(),
             src,
             occ: OccKey::empty(),
+            producer: None,
+            song_source: None,
             late: None,
             cells: std::collections::BTreeMap::new(),
         }
+    }
+}
+
+impl Event {
+    /// Rebuilds sampled content at new timing while retaining typed provenance,
+    /// controls and full producer identity. The new occurrence key is assigned
+    /// by the normal query finalizer, independently of certified source identity.
+    pub(crate) fn from_sample(whole: Option<TimeSpan>, part: TimeSpan, sampled: Self) -> Self {
+        let mut event = Self::new(whole, part, sampled.value, sampled.src);
+        event.controls = sampled.controls;
+        event.producer = sampled.producer;
+        event.song_source = sampled.song_source;
+        event.late = sampled.late;
+        event.cells = sampled.cells;
+        event
+    }
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+    #[test]
+    fn sampled_reconstruction_retains_metadata_and_assigns_new_timing() {
+        let source = crate::song::source::provenance_fixture();
+        let origin = source.song_source.clone().unwrap();
+        let span = TimeSpan::cycle(7).unwrap();
+        let reconstructed = Event::from_sample(Some(span), span, source);
+        assert!(Rc::ptr_eq(
+            &origin,
+            reconstructed.song_source.as_ref().unwrap()
+        ));
+        assert_eq!(reconstructed.whole, Some(span));
+        assert_eq!(reconstructed.part, span);
+        assert_eq!(origin.handle.occurrence().onset, Ratio64::ONE);
+        assert_eq!(origin.handle.tone(), 2);
     }
 }

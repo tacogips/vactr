@@ -9,6 +9,7 @@ use crate::ns::namespace::{FormGen, VarSlotRef};
 use crate::pattern::pat::Pat;
 use crate::pattern::signal::Sig;
 use crate::reader::span::{FileId, Span};
+use crate::song::{EventHandle, Part, Song};
 use crate::tex::texnode::TexNode;
 use crate::value::intern::{intern_kw, KwId, SymId};
 use crate::value::key::Key;
@@ -44,6 +45,12 @@ pub enum Value {
     /// A late-bound global var, fn or tweak (5.6).
     VarRef(VarSlotRef),
     Pattern(Rc<Pat>),
+    /// An immutable finite arrangement descriptor.
+    Part(Rc<Part>),
+    /// A finite arrangement with frozen playback settings.
+    Song(Rc<Song>),
+    /// An opaque, revision-scoped realized occurrence identity.
+    EventHandle(Rc<EventHandle>),
     Signal(Rc<Sig>),
     /// An instrument reference.
     Inst(InstId),

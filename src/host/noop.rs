@@ -40,6 +40,9 @@ impl AudioHost for NoopHost {
     fn send(&mut self, _: AudioEvent) {}
     fn control(&mut self, _: SlotControl) {}
     fn post(&mut self, _: CtlMsg) {}
+    fn poll_msg(&mut self) -> Result<Option<HostMsg>, Failure> {
+        Ok(None)
+    }
     fn drain(&mut self, _: &mut Vec<HostMsg>) {}
     fn now(&self) -> f64 {
         0.0

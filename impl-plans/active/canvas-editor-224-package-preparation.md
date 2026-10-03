@@ -2,7 +2,7 @@
 
 **planId**: CE-PACKAGE
 **planPath**: impl-plans/active/canvas-editor-224-package-preparation.md
-**Status**: In Progress — implementation retry verified; runner progress and formal reviews pending
+**Status**: In Progress — P6 implementation verified; native progress and formal reviews pending
 **Created / Last Updated**: 2026-09-30
 **Design Reference**: design-docs/specs/design-implementation.md#153-gpu-canvas-code-editor-and-synchronized-composition-2026-09-30
 **Issue**: codex-design-and-implement-review-loop-session-224
@@ -319,7 +319,7 @@ Fresh source-matched behavioral checks: browser4/4, dependency10/10, zero failur
 Read-only `/root/package_review` found no material issue; improve self-check found no unresolved high/mid issue or assigned implementation verification gap. External CE-CONTRACT proof remains retained; runtime dependsOn is empty. Submit fresh actual4/4 and10/10 counts for runner-owned reconsideration; no blocked classification or accepted flag edited. Formal reviews, review-dependent completion record, manifest/index/archive and Git are later workflow steps. Remaining unchecked review/runner criteria deliberately remain pending downstream. CE-SHELL owns app compilation; CE-FINAL owns generated Apple/simulator packaging; signing and physical device remain distinct/unverified. Operator GPU/telemetry findings are preserved for owners and are not package acceptance.
 
 ## Session237 bounded recovery contract (supersedes historical retry/install commands)
-**Status**: Ready for independent Step5 amendment review; native acceptance pending.
+**Status**: Step5 amendment accepted (comm-003052); P6 implementation verified, native/formal acceptance pending.
 **Context**: Current main7f6de4e contains accepted external formatter/syntax/completion/bass
 integration; the package files differ from original attempt1. Preserve all original snapshots
 and failed logs. Source236 is terminal failed policyBlocked; GPU/telemetry children completed
@@ -378,10 +378,10 @@ are insufficient after new integration. Submit fresh behavioral results to nativ
 all independent reviews; author output or a successful child is not root acceptance.
 
 **Completion criteria**:
-- [ ] Independent Step5 admits current-intake package preservation and bounded snapshot contract.
+- [x] Independent Step5 admits current-intake package preservation and bounded snapshot contract.
 - [ ] Native snapshot and ownership checks pass without policy/cap changes; full generated evidence retained.
-- [ ] Current-input behavioral and preservation checks pass; original historical failures retained distinctly.
-- [ ] Prerequisites verified and reused; compiler/sign/simulator/device statuses explicit.
+- [x] Current-input behavioral and preservation checks pass; original historical failures retained distinctly.
+- [x] Prerequisites verified and reused; compiler/sign/simulator/device statuses explicit.
 - [ ] Native reconsideration, test-integrity, adversarial and root integration accept the actual handoff.
 
 ### Progress Log: 2026-10-01 — Step4 session237
@@ -389,3 +389,25 @@ Bounded planning amendment only. Recursive native-tools tracking replaced by exa
 P6 preserves current committed dependency intake without hiding historical failures. Source/logs,
 installed tools and application locks untouched. Intent/preimages/git/package-source evidence:
 `tmp/canvas-editor-224/plan-amendment-237/`. Implementation commands above remain later work.
+
+
+### Progress Log: 2026-10-01 — P6 implementation handoff
+Current-intake mode implemented and verified on final source (verifier SHA256
+7c8fe1afadc33412c4a8b080ec3c5e8ab045144a4370079345c910bb022b7fca).
+Mutually exclusive historical mode retains authentic exit1,9/10, one failure due to admitted
+web-tree-sitter addition; old/new assertions identical. Current preservation14/14 and real
+Chromium/WebGL2 smoke4/4 pass. Tools reused: CLI2.11.5/version/hash, Rust1.98.1 iOS targets,
+Xcode26.6/iOS26.5 SDKs all verified, locked metadata/tree exit0. Source pre/post equality and
+native nine-file snapshot/cap audit12/12 pass; generated caches remain untracked evidence.
+Bounded independent author assistance `/root/package_review` found one low symlink-check issue,
+corrected before final reruns. Negative/equivalence checks6/6 pass. Improve self-check has no
+unresolved high/mid finding or assigned verification gap. Exact commands/counts/status/logs:
+[dependency evidence](canvas-editor-224-dependency-evidence.md#session-2026-10-01--p6-admitted-current-intake-preservation)
+and `tmp/canvas-editor-224/CE-PACKAGE/recovery-237/`.
+Fresh per-edit bytes/intents/pre/posthash/diff: recovery-237/edit-001..004 and mirrored
+`/private/tmp/vactr-224-implementation/CE-PACKAGE/recovery-237/`. Existing dependency-evidence dirty
+content retained. No application dependency, lock, toolchain audit, Rust/Swift/TypeScript, shared
+manifest/index or Git mutation. Native post-node progress/reconsideration and all formal reviews
+remain downstream; no author acceptance flag. CE-SHELL app compile and CE-FINAL Apple packaging,
+signing/simulator execution/physical-device evidence remain distinct downstream obligations.
+Known GPU/telemetry operator findings preserved for owners; package success cannot waive them.

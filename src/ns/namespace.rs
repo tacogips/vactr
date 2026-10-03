@@ -10,13 +10,18 @@
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::fmt;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
+
+#[path = "checked_callable.rs"]
+mod checked_callable;
+pub(crate) use checked_callable::CheckedInputs;
+use checked_callable::{callable_dependencies, CheckedCallable, CheckedDependency};
 
 use crate::ns::pkg::{ImportBinding, PkgNs};
 use crate::ns::tweak::TweakTable;
 use crate::types::masks::{CalleeRef, ForcingMask};
 use crate::types::natives::{NativeKind, NativeSig, NativeTable};
-use crate::types::ty::{BindKind, CheckEnv, GlobalInfo};
+use crate::types::ty::{BindKind, CallableSchema, CheckEnv, GlobalInfo};
 use crate::value::intern::{intern_sym, name_of_sym, SymId};
 use crate::value::value::{NativeId, Sound, Value};
 use crate::vm::fail::{FailCode, Failure};
@@ -72,6 +77,7 @@ pub struct VarSlot {
     local: bool,
     owner: Cell<Option<FormGen>>,
     id: u64,
+    checked: RefCell<Option<CheckedCallable>>,
 }
 
 /// A shared reference to a slot. `Value::VarRef` holds one (5.6).
@@ -89,6 +95,7 @@ impl VarSlotRef {
             local,
             owner: Cell::new(None),
             id: next_slot_id(),
+            checked: RefCell::new(None),
         }))
     }
 
@@ -152,6 +159,15 @@ impl VarSlotRef {
     #[must_use]
     pub fn same(&self, other: &VarSlotRef) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    fn checked_callable(&self) -> Option<CheckedCallable> {
+        self.0
+            .checked
+            .borrow()
+            .as_ref()
+            .filter(|c| c.valid())
+            .cloned()
     }
 
     /// Writes the value and bumps the version. No kind check: callers
@@ -603,9 +619,97 @@ impl Namespace {
         };
         GlobalInfo {
             kind,
-            scheme: None,
+            scheme: slot
+                .checked_callable()
+                .and_then(|c| c.schema.positional_scheme()),
             mask: self.mask_of_value(&slot.get()),
             span: None,
+        }
+    }
+
+    /// Scalar/weak snapshots for subsequent successful declaration certification.
+    /// Actual proto references select dependencies; unrelated names are not retained.
+    pub(crate) fn checked_inputs(&self) -> Option<CheckedInputs> {
+        let mut result = BTreeMap::new();
+        let mut remaining = 1_000_000usize;
+        let mut add = |slot: VarSlotRef| {
+            let dependencies = slot
+                .checked_callable()
+                .map_or(Vec::new(), |c| c.dependencies);
+            remaining = remaining.checked_sub(dependencies.len().checked_add(1)?)?;
+            result.insert(slot.id(), (CheckedDependency::capture(&slot), dependencies));
+            Some(())
+        };
+        for slot in self.session.borrow().values().filter(|s| s.is_bound()) {
+            add(slot.clone())?;
+        }
+        for (_, pkg) in self.imports.borrow().iter() {
+            for name in pkg.ns.session_names() {
+                if let Some(slot) = pkg.ns.session_slot(name).filter(VarSlotRef::is_bound) {
+                    add(slot)?;
+                }
+            }
+        }
+        Some(result)
+    }
+
+    pub(crate) fn install_checked_callables(
+        &self,
+        schemas: &BTreeMap<Rc<str>, CallableSchema>,
+        inputs: &CheckedInputs,
+        gen: FormGen,
+    ) {
+        for (name, declared) in schemas {
+            let Some(slot) = self.session_slot(intern_sym(name)) else {
+                continue;
+            };
+            if slot.owner() != Some(gen) {
+                continue;
+            }
+            let Value::Fn(closure) = slot.get() else {
+                continue;
+            };
+            let mut schema = declared.clone();
+            if schema.keywords.len() != usize::from(closure.proto.arity.keys) {
+                // A let alias retains the exact original certified Closure schema.
+                let original = self
+                    .session
+                    .borrow()
+                    .values()
+                    .filter_map(VarSlotRef::checked_callable)
+                    .find(|c| {
+                        c.own
+                            .closure
+                            .as_ref()
+                            .and_then(Weak::upgrade)
+                            .is_some_and(|f| Rc::ptr_eq(&f, &closure))
+                    });
+                let Some(original) = original else {
+                    continue;
+                };
+                schema = original.schema;
+            }
+            if schema.positional != usize::from(closure.proto.arity.fixed) || !schema.portable() {
+                continue;
+            }
+            let names = &closure.proto.arity.names;
+            if !schema.keywords.is_empty()
+                && (names.len() != schema.positional + schema.keywords.len()
+                    || schema
+                        .keywords
+                        .iter()
+                        .zip(&names[schema.positional..])
+                        .any(|(name, key)| **name != *crate::value::intern::name_of_kw(*key)))
+            {
+                continue;
+            }
+            if let Some(dependencies) = callable_dependencies(&closure, inputs, slot.id()) {
+                *slot.0.checked.borrow_mut() = Some(CheckedCallable {
+                    own: CheckedDependency::capture(&slot),
+                    schema,
+                    dependencies,
+                });
+            }
         }
     }
 
@@ -619,20 +723,28 @@ impl Namespace {
             if slot.is_bound() {
                 env.globals
                     .insert(name_of_sym(*name), self.global_info(slot));
+                if let Some(c) = slot.checked_callable() {
+                    env.global_callables.insert(name_of_sym(*name), c.schema);
+                }
             }
         }
         for (binding, pkg) in self.imports.borrow().iter() {
             let prefix = name_of_sym(binding.prefix);
             let mut names = BTreeMap::new();
+            let mut callables = BTreeMap::new();
             for name in pkg.ns.session_names() {
                 if let Some(slot) = pkg.ns.session_slot(name) {
                     names.insert(name_of_sym(name), pkg.ns.global_info(&slot));
+                    if let Some(c) = slot.checked_callable() {
+                        callables.insert(name_of_sym(name), c.schema);
+                    }
                 }
             }
             if binding.open {
                 env.opens
                     .push((prefix.clone(), names.keys().cloned().collect()));
             }
+            env.qualified_callables.insert(prefix.clone(), callables);
             env.qualified.insert(prefix, names);
         }
         env

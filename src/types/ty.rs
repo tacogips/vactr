@@ -88,6 +88,12 @@ pub enum Ty {
     Dict(Box<Ty>, Box<Ty>),
     Fn(Box<[Ty]>, Box<Ty>),
     Pattern(Box<Ty>),
+    /// A checked finite multi-track arrangement.
+    Part,
+    /// A finite arrangement with frozen playback settings.
+    Song,
+    /// An opaque realized event identity.
+    EventHandle,
     Signal,
     Path,
     Url,
@@ -152,6 +158,9 @@ impl fmt::Display for Ty {
                 write!(f, " -> {ret}")
             }
             Ty::Pattern(t) => write!(f, "pattern {}", Paren(t)),
+            Ty::Part => f.write_str("part"),
+            Ty::Song => f.write_str("song"),
+            Ty::EventHandle => f.write_str("event-handle"),
             Ty::Signal => f.write_str("signal"),
             Ty::Path => f.write_str("path"),
             Ty::Url => f.write_str("url"),
@@ -338,6 +347,9 @@ impl<'a> Parser<'a> {
             "string" => Ty::Str,
             "keyword" => Ty::keyword(),
             "nil" => Ty::Nil,
+            "part" => Ty::Part,
+            "song" => Ty::Song,
+            "event-handle" => Ty::EventHandle,
             "signal" => Ty::Signal,
             "path" => Ty::Path,
             "url" => Ty::Url,
@@ -382,6 +394,62 @@ pub struct GlobalInfo {
     pub span: Option<Span>,
 }
 
+/// One generalized callable signature, including optional keyword defaults.
+/// Inputs are positional first, then keyword types, sharing result quantifiers.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct CallableSchema {
+    pub positional: usize,
+    pub keywords: Vec<Rc<str>>,
+    pub signature: Scheme,
+}
+impl CallableSchema {
+    /// The positional view used by ordinary name inference.
+    pub fn positional_scheme(&self) -> Option<Scheme> {
+        let Ty::Fn(params, result) = &self.signature.ty else {
+            return None;
+        };
+        if params.len() != self.positional.checked_add(self.keywords.len())? {
+            return None;
+        }
+        Some(Scheme {
+            vars: self.signature.vars.clone(),
+            ty: Ty::func(params[..self.positional].to_vec(), (**result).clone()),
+        })
+    }
+    /// A persisted signature cannot refer to another check's nominal/free IDs.
+    pub fn portable(&self) -> bool {
+        if self.positional_scheme().is_none() {
+            return false;
+        }
+        let mut pending = vec![&self.signature.ty];
+        let mut remaining = 2048usize;
+        while let Some(ty) = pending.pop() {
+            let Some(next) = remaining.checked_sub(1) else {
+                return false;
+            };
+            remaining = next;
+            match ty {
+                Ty::Named(_) | Ty::NumLit(_) => return false,
+                Ty::Var(v) if !self.signature.vars.contains(v) => return false,
+                Ty::Opt(t) | Ty::List(t) | Ty::Pattern(t) => pending.push(t),
+                Ty::Dict(k, v) => {
+                    pending.push(k);
+                    pending.push(v);
+                }
+                Ty::Fn(ps, result) => {
+                    pending.push(result);
+                    pending.extend(ps.iter());
+                }
+                _ => {}
+            }
+            if pending.len() > remaining {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 /// The session state a program is checked against. `globals` holds the
 /// bindings made before the checked program: a top-level binding of one of
 /// them is Live redefinition, not `rebinding` (7.1.4). `qualified` maps an
@@ -392,6 +460,8 @@ pub struct CheckEnv {
     pub globals: BTreeMap<Rc<str>, GlobalInfo>,
     pub qualified: BTreeMap<Rc<str>, BTreeMap<Rc<str>, GlobalInfo>>,
     pub opens: Vec<(Rc<str>, BTreeSet<Rc<str>>)>,
+    pub global_callables: BTreeMap<Rc<str>, CallableSchema>,
+    pub qualified_callables: BTreeMap<Rc<str>, BTreeMap<Rc<str>, CallableSchema>>,
 }
 
 impl CheckEnv {

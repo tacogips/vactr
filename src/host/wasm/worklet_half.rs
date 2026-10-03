@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use crate::dsp::arena::{FaultCode, StoreKind, DEFAULT_ARENA_BYTES};
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
-use crate::dsp::engine::{Engine, EngineConfig, EngineIo};
+use crate::dsp::engine::{Engine, EngineIo};
 use crate::dsp::ring::{
     AckConsumer, AckProducer, ByteInbox, ControlSource, EventConsumer, EventProducer, EventRing,
     SpscRing, EVENT_CAPACITY, INBOX_SLOTS, INBOX_SLOT_BYTES,
@@ -135,7 +135,7 @@ fn memory_bytes() -> f64 {
 }
 
 /// Builds the worklet: `arena_bytes` 0 = the 64 MB default, `voices` 0 =
-/// the browser tier's 64. Returns 1.
+/// the browser tier's 64. Returns 1, or 0 for invalid configuration without replacing the worklet.
 #[no_mangle]
 pub extern "C" fn worklet_init(sample_rate: f32, arena_bytes: u32, voices: u32) -> u32 {
     init_with_outputs(sample_rate, arena_bytes, voices, 2)
@@ -157,13 +157,34 @@ fn init_with_outputs(sample_rate: f32, arena_bytes: u32, voices: u32, channels: 
     } else {
         arena_bytes as usize
     };
-    let mut cfg = EngineConfig::new(&caps, sample_rate, QUANTUM, StoreKind::Arena { bytes });
-    cfg.output_channels = channels;
+    let Ok(cfg) = crate::host::song_profile::song_engine_config(
+        sample_rate,
+        QUANTUM,
+        caps,
+        StoreKind::Arena { bytes },
+        channels,
+    ) else {
+        return 0;
+    };
     let (ev_tx, ev_rx) = EventRing::split(EVENT_CAPACITY);
     let (ack_tx, ack_rx) = SpscRing::<HostMsg>::split(1024);
     fix_outbox(OUTBOX_BYTES);
+    let mut engine = Engine::with_config(cfg);
+    let staging = crate::dsp::engine::SongStagingConfig {
+        preparations: 64,
+        leases: 256,
+        branches: 256,
+        control_slots: INST_CELL_BASE + INST_CELL_COUNT,
+        analysis_slots: u32::try_from(cfg.analysis_cells).unwrap_or(u32::MAX),
+        native_pcm_bytes: 0,
+        critical_receipts: 2,
+    };
+    let _ = engine.configure_song_staging_with_transport(
+        staging,
+        u32::try_from(ack_tx.capacity()).unwrap_or(0),
+    );
     let w = Worklet {
-        engine: Engine::with_config(cfg),
+        engine,
         cells: ProbeMirror::new((INST_CELL_BASE + INST_CELL_COUNT) as usize),
         inbox: ByteInbox::new(),
         ev_tx,
@@ -455,6 +476,8 @@ impl Worklet {
             use crate::dsp::arena::ResState;
             match self.engine.store().state(id) {
                 None => 0.0,
+                Some(ResState::Reserved) => 4.0,
+                Some(ResState::Staged) => 5.0,
                 Some(ResState::Installing) => 1.0,
                 Some(ResState::Live) => 2.0,
                 Some(ResState::Retiring) => 3.0,

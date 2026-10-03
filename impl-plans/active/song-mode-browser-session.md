@@ -1,6 +1,6 @@
 # Browser song protocol integration implementation plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: SONG-14
 **Plan Path**: impl-plans/active/song-mode-browser-session.md
 **Created**: 2026-09-30
@@ -29,7 +29,9 @@ Source baseline: design-song-mode.md capability audit distinguishes existing clo
     "editor/src/protocol/client.ts",
     "editor/src/protocol/store.ts",
     "editor/test/protocol/song.test.ts",
-    "impl-plans/active/song-mode-browser-session.md"
+    "impl-plans/active/song-mode-browser-session.md",
+    "editor/src/protocol/wasm.ts",
+    "editor/src/code/samples.ts"
   ],
   "sharedPaths": [
     "impl-plans/active/song-mode-browser-session.md"
@@ -148,3 +150,98 @@ export interface SongApplied { epoch: string; application_frame: string; doc_rev
 **Blockers**: None for planning; implementation awaits reviewed/committed documents and prerequisite waves.
 **Verification**: Read-only source/document consistency review only. Future commands above were not executed.
 **Next session**: Implement TASK-001 after dependency outputs and authorization are available.
+
+### Session: 2026-10-01 — browser asset-catalog integration
+This phase additionally owns protocol/wasm.ts and code/samples.ts (eight total
+modules). Wire the SONG-06A explicit complete bank catalog and decoded sample
+upload capability, and refresh a detached candidate factory before ApplySong.
+Ensure declared bank members are supplied before preparation can report Ready;
+missing uploads/catalogs remain Preparing or fail with an explicit diagnostic.
+Never infer a complete bank from a partial decoded map. Prepared snapshots remain
+unchanged by later page sample updates. Verify actual browser factory refresh and
+whole-code apply, rather than relying only on protocol compilation.
+
+### 2026-10-02 — browser protocol consumer implementation
+
+Root implements the declared TypeScript types, envelope validation, client and
+store, with focused song protocol tests. The Rust session adapter remains for
+the Rust author after Runtime integration. Preserve decimal u64 epochs/frames,
+request-sequence correlation through Ready to Applied, and draft/pending/applied
+separation. Editing invalidates pending UI state while active playback remains.
+Known source protocol messages are implemented first; mute/state publication
+will join the acknowledged-publication phase. Existing editor canvas changes
+are unrelated and remain untouched.
+
+### 2026-10-02 — correlated browser consumer checkpoint
+
+Implemented canonical decimal-u64 song envelope validation, exact selector
+validation, `Client.applySong`/`muteInstrument`, and per-document draft/pending/
+applied state. Ready retains request correlation until Applied/Failed; stale
+request/revision/epoch replies are ignored and failed preparation preserves the
+last acknowledged applied state. Local and incoming state changes share the
+existing notification queue so reentrant subscribers observe complete states.
+Requests reserve their sequence before subscribers or synchronous wasm replies.
+
+Verification executed through existing mise/npm scripts: `test/protocol/song.test.ts`
+8/8 passed, existing client/store fixtures 18/18 passed, and `npm --prefix editor
+run check` exited 0. This verifies the protocol consumer, not browser audio
+playback. Rust session integration, browser factory refresh, asset upload,
+acknowledged mute/state publication and Vite build remain incomplete.
+
+Final browser consumer refinement defers pending notifications until after the
+request is sent, so reentrant subscriber writes cannot overtake its reserved
+sequence. All 26 song/client/store fixtures and TypeScript checking passed after
+that change. Vite build exited 0 (session 16682); full output is retained at
+`/tmp/vactr-song-browser-build.log`. Existing optional missing tree-sitter grammar,
+dependency direct-eval and chunk-size warnings remain; this build packages an
+existing wasm artifact and does not verify newly modified Rust/wasm behavior.
+
+Added a real throwing-transport regression proving outgoing candidate failure
+clears pending UI state without erasing acknowledged playback. The focused song
+file now passes 9/9 (exit 0); full output is retained at
+`/tmp/vactr-song-browser-protocol.log`.
+
+### 2026-10-03 — acknowledged mute and finite state consumers
+
+Added planned `song-instrument-muted` and `song-transport-state` wire types and
+strict validation. The store changes individual family members only from actual
+current-epoch mute acknowledgements, using canonical decimal frame comparisons
+beyond JavaScript's safe integer range. Draft edits and failed candidates retain
+active mute/state; new Applied clears old epoch state. Old epochs, duplicate mute
+receipts and backward finite-state transitions cannot overwrite newer state.
+No optimistic mute update is emitted on submission.
+The focused song/client/store suite passed 32/32 and TypeScript checking exited 0.
+Backend acknowledgement aggregation/publication remains the Runtime author's
+next phase; these tests prove consumers, not real audio mute timing.
+
+### 2026-10-03 — raw browser asset ABI declarations
+
+The browser Rust author exclusively owns session_half.rs. Add exported
+`session_song_bank_catalog(ptr: *const u8, len: u32) -> u32` accepting strict JSON
+`{"banks":[{"name":"bd","members":["bd:0","bd:1"]}]}` and
+`session_song_refresh_assets() -> u32`. Return 1 on success, 0 plus diagnostic on
+invalid input; rejected catalogs leave the prior catalog unchanged. Bounds:
+1 MiB JSON, at most 64 banks and 16384 total members, bounded valid names/keys.
+Install only complete ordered banks with all referenced decoded PCM present.
+Configure explicit browser asset/preparation ceilings and actual runtime sample
+rate at session_init; invalid/nonintegral sample rate rejects before replacing
+the current session. Existing prepared candidates retain immutable inventories.
+Root wires the declared TypeScript wasm/sample modules. Future candidate factory
+refresh occurs before Apply; page maps never certify partially loaded banks.
+
+Same Rust adapter module may include these focused private fixture declarations:
+`take_records() -> Vec<Vec<u8>>`,
+`catalog_requires_complete_pcm_and_keeps_prior_catalog_on_refusal()`,
+`refresh_keeps_original_prepared_pcm_immutable()`, and
+`browser_session_original_song_reaches_real_worklet_applied_and_ended()`.
+The last fixture must pump actual session commands/worklet callbacks and actual
+acknowledgements; no fabricated Ready or activation events.
+
+Root wired the raw ABI in WasmCore. Apply refreshes future candidate assets first;
+missing/rejected ABI capabilities return explicit errors before submitting Apply.
+SampleLibrary publishes only fully decoded/uploaded ordered banks, invalidates
+catalogs on map replacement/reload, and rejects obsolete asynchronous decodes.
+New consumer fixtures cover exact raw string ABI order, partial-bank refusal and
+map/decode races. Song/assets plus existing sample/wasm transport fixtures passed
+29/29; TypeScript checking exited 0. Actual Rust ABI/worklet acceptance remains
+the browser author's pending checkpoint, not inferred from fake export bindings.

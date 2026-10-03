@@ -59,6 +59,8 @@ pub enum PatNode {
         kit: Option<PParam>,
     },
     Signal(Rc<Sig>),
+    /// Immutable selected finite source exposed to existing transforms.
+    SongSource(Rc<crate::song::SongSource>),
     Fast(Rc<Pat>, PParam),
     Slow(Rc<Pat>, PParam),
     /// `fast` that also multiplies `speed`.
@@ -225,6 +227,7 @@ fn structural_id(node: &PatNode, span: Option<Span>) -> NodeId {
                 None => h.word(0),
             }
         }
+        PatNode::SongSource(source) => h.word(42).word(source.seed_hash()),
         PatNode::Signal(s) => h.word(3).text(&format!("{s:?}")),
         PatNode::Fast(p, k) => hash_param(hash_pat(h.word(4), p), k),
         PatNode::Slow(p, k) => hash_param(hash_pat(h.word(5), p), k),

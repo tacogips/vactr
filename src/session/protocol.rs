@@ -231,10 +231,150 @@ pub struct SubscribeBody {
     pub diagnostics: bool,
 }
 
+/// Explicit whole-code song application, separate from incremental eval.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ApplySongBody {
+    pub file: String,
+    pub code: String,
+    pub doc_revision: u64,
+    pub edit_epoch: u64,
+}
+/// Wire identity only. Buffer IDs are resolved against a certified active family,
+/// never deserialized into a fabricated SampleBuf.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum WireSongSound {
+    Builtin {
+        name: String,
+    },
+    Instrument {
+        id: u32,
+    },
+    Sample {
+        path: String,
+        file: Option<u32>,
+    },
+    Buffer {
+        #[serde(with = "crate::session::codec::decimal_u64")]
+        id: u64,
+    },
+}
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(try_from = "UncheckedWireSelector")]
+pub struct WireInstrumentSelector {
+    family: Vec<WireSongSound>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UncheckedWireSelector {
+    family: Vec<WireSongSound>,
+}
+impl TryFrom<UncheckedWireSelector> for WireInstrumentSelector {
+    type Error = String;
+    fn try_from(value: UncheckedWireSelector) -> Result<Self, Self::Error> {
+        Self::new(value.family)
+    }
+}
+impl WireInstrumentSelector {
+    /// Validate representation, not membership in an active snapshot.
+    pub fn new(family: Vec<WireSongSound>) -> Result<Self, String> {
+        if family.is_empty() || family.len() > 256 {
+            return Err("song selector family must contain 1..=256 sounds".into());
+        }
+        let mut unique = std::collections::BTreeSet::new();
+        for sound in &family {
+            if !unique.insert(sound) {
+                return Err("duplicate song selector member".into());
+            }
+            let valid_text = |text: &str| {
+                !text.is_empty() && text.len() <= 4096 && !text.chars().any(char::is_control)
+            };
+            match sound {
+                WireSongSound::Builtin { name }
+                    if !valid_text(name)
+                        || name.starts_with(':')
+                        || name.chars().any(char::is_whitespace) =>
+                {
+                    return Err("invalid builtin song sound name".into())
+                }
+                WireSongSound::Sample { path, .. } if !valid_text(path) => {
+                    return Err("invalid song sample path".into())
+                }
+                _ => {}
+            }
+        }
+        Ok(Self { family })
+    }
+    #[must_use]
+    pub fn family(&self) -> &[WireSongSound] {
+        &self.family
+    }
+}
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SongInstrumentMuteBody {
+    #[serde(with = "crate::session::codec::song_epoch")]
+    pub epoch: crate::song::SnapshotEpoch,
+    pub selector: WireInstrumentSelector,
+    pub muted: bool,
+}
+/// Ready certifies preparation only; no application frame exists yet.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SongCandidateReadyBody {
+    #[serde(with = "crate::session::codec::song_epoch")]
+    pub epoch: crate::song::SnapshotEpoch,
+    pub doc_revision: u64,
+}
+/// Failure before an epoch was issued has epoch:null; a mute may have no
+/// document revision. Neither case invents a snapshot identity.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SongCandidateFailedBody {
+    #[serde(with = "crate::session::codec::optional_song_epoch")]
+    pub epoch: Option<crate::song::SnapshotEpoch>,
+    pub doc_revision: Option<u64>,
+    pub code: String,
+    pub message: String,
+}
+
+/// Success for the complete selector, after actual DSP mute acknowledgements.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SongInstrumentMutedBody {
+    #[serde(with = "crate::session::codec::song_epoch")]
+    pub epoch: crate::song::SnapshotEpoch,
+    pub selector: WireInstrumentSelector,
+    pub muted: bool,
+    #[serde(with = "crate::session::codec::decimal_u64")]
+    pub application_frame: u64,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireSongTransportState {
+    Prepared,
+    Playing,
+    Draining,
+    Ended,
+    Failed,
+}
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SongTransportStateBody {
+    #[serde(with = "crate::session::codec::song_epoch")]
+    pub epoch: crate::song::SnapshotEpoch,
+    pub state: WireSongTransportState,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub instruments: Vec<WireInstrumentSelector>,
+}
+
 /// A message from a client.
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "body", rename_all = "kebab-case")]
 pub enum ClientMsg {
+    ApplySong(ApplySongBody),
+    MuteInstrument(SongInstrumentMuteBody),
     Eval(EvalBody),
     Hush(Empty),
     Stop(StopBody),
@@ -249,7 +389,7 @@ pub enum ClientMsg {
 
 impl ClientMsg {
     /// Every client kind.
-    pub const KINDS: [&'static str; 9] = [
+    pub const KINDS: [&'static str; 11] = [
         "eval",
         "hush",
         "stop",
@@ -259,12 +399,16 @@ impl ClientMsg {
         "learn",
         "subscribe",
         "manifest?",
+        "apply-song",
+        "mute-instrument",
     ];
 
     /// The message kind.
     #[must_use]
     pub fn kind(&self) -> &'static str {
         match self {
+            ClientMsg::ApplySong(_) => "apply-song",
+            ClientMsg::MuteInstrument(_) => "mute-instrument",
             ClientMsg::Eval(_) => "eval",
             ClientMsg::Hush(_) => "hush",
             ClientMsg::Stop(_) => "stop",
@@ -621,6 +765,11 @@ pub struct TempoBody {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "body", rename_all = "kebab-case")]
 pub enum ServerMsg {
+    SongInstrumentMuted(SongInstrumentMutedBody),
+    SongTransportState(SongTransportStateBody),
+    SongCandidateReady(SongCandidateReadyBody),
+    SongCandidateApplied(crate::song::SongApplyAck),
+    SongCandidateFailed(SongCandidateFailedBody),
     EvalResult(EvalResultBody),
     StaleBinding(StaleBindingBody),
     DirectiveEdit(DirectiveEditBody),
@@ -657,7 +806,12 @@ pub enum Route {
 
 impl ServerMsg {
     /// Every server kind.
-    pub const KINDS: [&'static str; 10] = [
+    pub const KINDS: [&'static str; 15] = [
+        "song-instrument-muted",
+        "song-transport-state",
+        "song-candidate-ready",
+        "song-candidate-applied",
+        "song-candidate-failed",
         "eval-result",
         "stale-binding",
         "directive-edit",
@@ -674,6 +828,11 @@ impl ServerMsg {
     #[must_use]
     pub fn kind(&self) -> &'static str {
         match self {
+            ServerMsg::SongInstrumentMuted(_) => "song-instrument-muted",
+            ServerMsg::SongTransportState(_) => "song-transport-state",
+            ServerMsg::SongCandidateReady(_) => "song-candidate-ready",
+            ServerMsg::SongCandidateApplied(_) => "song-candidate-applied",
+            ServerMsg::SongCandidateFailed(_) => "song-candidate-failed",
             ServerMsg::EvalResult(_) => "eval-result",
             ServerMsg::StaleBinding(_) => "stale-binding",
             ServerMsg::DirectiveEdit(_) => "directive-edit",
@@ -691,14 +850,20 @@ impl ServerMsg {
     #[must_use]
     pub fn routing(&self) -> Route {
         match self {
-            ServerMsg::EvalResult(_)
+            ServerMsg::SongInstrumentMuted(_)
+            | ServerMsg::SongCandidateReady(_)
+            | ServerMsg::SongCandidateApplied(_)
+            | ServerMsg::SongCandidateFailed(_)
+            | ServerMsg::EvalResult(_)
             | ServerMsg::StaleBinding(_)
             | ServerMsg::DirectiveEdit(_)
             | ServerMsg::Manifest(_)
             | ServerMsg::ProtocolError(_) => Route::Requester,
             ServerMsg::Bindings(_) => Route::Broadcast(Topic::Bindings),
             ServerMsg::Diag(_) => Route::Broadcast(Topic::Diagnostics),
-            ServerMsg::Playing(_) => Route::Broadcast(Topic::Telemetry),
+            ServerMsg::Playing(_) | ServerMsg::SongTransportState(_) => {
+                Route::Broadcast(Topic::Telemetry)
+            }
             ServerMsg::Levels(_) => Route::Broadcast(Topic::Levels),
             ServerMsg::Tempo(_) => Route::Broadcast(Topic::Tempo),
         }

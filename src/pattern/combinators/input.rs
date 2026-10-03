@@ -93,7 +93,7 @@ fn contains_lane(p: &Pat) -> bool {
         PatNode::Sound { src, kit } => {
             param_has_lane(src) || kit.as_ref().is_some_and(param_has_lane)
         }
-        PatNode::Signal(_) => false,
+        PatNode::Signal(_) | PatNode::SongSource(_) => false,
         PatNode::Pure(s) => matches!(&s.value, Value::Pattern(inner) if contains_lane(inner)),
         PatNode::Choose(ps) | PatNode::Stack(ps) | PatNode::Cat(ps) | PatNode::FastCat(ps) => {
             ps.iter().any(contains_lane)
@@ -239,8 +239,7 @@ pub fn realize_note(
     let Some(base) = st.sample(&lane.subject, at)?.into_iter().next() else {
         return Ok(None);
     };
-    let mut e = Event::new(None, TimeSpan::point(at), base.value, base.src);
-    e.controls = base.controls;
+    let mut e = sampled_note_event(base, at);
     e.controls
         .insert(kw("note"), Value::Int(i32::from(note.note)));
     e.controls.insert(
@@ -318,4 +317,28 @@ fn note_list(notes: &[i64]) -> Value {
             .map(|n| crate::pattern::eval::exact_value(Ratio64::from_int(*n)))
             .collect(),
     )
+}
+
+fn sampled_note_event(base: Event, at: Ratio64) -> Event {
+    Event::from_sample(None, TimeSpan::point(at), base)
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+    #[test]
+    fn live_note_reconstruction_retains_sampled_origin() {
+        let source = crate::song::source::provenance_fixture();
+        let origin = source.song_source.clone().unwrap();
+        let mut event = sampled_note_event(source, Ratio64::from_int(12));
+        event.controls.insert(kw("note"), Value::Int(72));
+        assert!(Rc::ptr_eq(&origin, event.song_source.as_ref().unwrap()));
+        assert_eq!(origin.handle.tone(), 2);
+        assert!(event.whole.is_none());
+        assert_eq!(event.part, TimeSpan::point(Ratio64::from_int(12)));
+        assert!(matches!(
+            event.controls.get(&kw("note")),
+            Some(Value::Int(72))
+        ));
+    }
 }

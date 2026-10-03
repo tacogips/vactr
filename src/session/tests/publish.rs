@@ -480,7 +480,8 @@ fn published_playing(msgs: &[ServerMsg]) -> Vec<crate::session::protocol::WirePl
 #[test]
 fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
     let mut rig = Rig::new();
-    rig.ok("use-clock :midi\ns :analog > d1", 41);
+    // Literal pattern steps retain source provenance; a scalar sound does not.
+    rig.ok("use-clock :midi\ns [:analog] > d1", 41);
     let first = transport_samples(&rig.tick())[0].clone();
     assert_eq!(first.cycle, [0, 1]);
     rig.s.rt.transport_start(0.0);
@@ -496,8 +497,10 @@ fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
     assert_ne!(epoch.as_deref(), Some(first.epoch.as_str()));
     for event in &playing {
         assert_eq!(event.epoch, epoch);
-        assert_eq!(event.src.as_ref().unwrap().doc_revision, 41);
-        assert_eq!(event.src.as_ref().unwrap().file, "main.vact");
+        let src = event.src.as_ref().expect("literal pattern step provenance");
+        assert_eq!(src.doc_revision, 41);
+        assert_eq!(src.file, "main.vact");
+        assert_eq!(src.span, crate::session::protocol::WireSpan::new(19, 26));
         assert!((event.end_time.unwrap() - event.time - 2.0).abs() < 1e-9);
     }
     rig.clock.set(0.05);
@@ -509,7 +512,8 @@ fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
 #[test]
 fn midi_restarts_between_samples_invalidate_epoch_with_nondecreasing_position() {
     let mut rig = Rig::new();
-    rig.ok("use-clock :midi\ns :analog > d1", 42);
+    // Use the native synth in a source-bearing pattern without sample loading.
+    rig.ok("use-clock :midi\ns [:analog] > d1", 42);
     let first = transport_samples(&rig.tick())[0].clone();
     // Multiple successful Starts occur without an intervening publisher observation.
     rig.s.rt.transport_start(0.02);
@@ -523,7 +527,10 @@ fn midi_restarts_between_samples_invalidate_epoch_with_nondecreasing_position() 
     assert!(!playing.is_empty());
     for event in playing {
         assert_eq!(event.epoch.as_deref(), Some(next.epoch.as_str()));
-        assert_eq!(event.src.unwrap().doc_revision, 42);
+        let src = event.src.as_ref().expect("literal pattern step provenance");
+        assert_eq!(src.doc_revision, 42);
+        assert_eq!(src.file, "main.vact");
+        assert_eq!(src.span, crate::session::protocol::WireSpan::new(19, 26));
         assert!((event.end_time.unwrap() - event.time - 2.0).abs() < 1e-9);
     }
 }

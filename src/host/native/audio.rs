@@ -18,6 +18,10 @@
 //! template or bus by instrument (or bus) identity and hands the box back
 //! through the garbage ring, which `drain` empties on this thread.
 
+mod song;
+mod song_capacity;
+use song_capacity::SongCapacityCache;
+
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -350,6 +354,7 @@ pub(crate) fn render_captured(
 
 /// The evaluator half of the native audio host.
 pub struct NativeAudioHost {
+    song_capacity: SongCapacityCache,
     events: EventProducer,
     controls: Producer<NativeRecord>,
     acks: AckConsumer,
@@ -405,13 +410,14 @@ impl NativeAudioHost {
         let rate = supported.sample_rate().0;
         let config = supported.config();
         #[allow(clippy::cast_precision_loss)]
-        let mut engine = EngineConfig::new(
-            &CapabilitySet::native(),
+        let engine = crate::host::song_profile::song_engine_config(
             rate as f32,
             MAX_BLOCK,
+            CapabilitySet::native(),
             StoreKind::NativeArc,
-        );
-        engine.output_channels = output_channels;
+            output_channels,
+        )
+        .map_err(|_| unavailable("unsupported song audio device configuration"))?;
         let (mut this, mut side) = Self::pair(engine, AtomicCells::new(cfg.cells));
         let capture = if cfg.audio_in {
             let input_device = host.default_input_device().ok_or_else(|| {
@@ -482,12 +488,39 @@ impl NativeAudioHost {
     }
 
     /// A host with no device: the caller drives `AudioSide::render` (tests,
-    /// offline use). Same rings and capacities as `open`.
+    /// offline use). Same rings as `open`; generic six-bus capacity is retained.
     #[must_use]
     pub fn headless(sample_rate: u32, caps: CapabilitySet, cells: usize) -> (Self, AudioSide) {
         #[allow(clippy::cast_precision_loss)]
         let engine = EngineConfig::new(&caps, sample_rate as f32, MAX_BLOCK, StoreKind::NativeArc);
         Self::pair(engine, AtomicCells::new(cells))
+    }
+
+    /// A headless native host with explicitly allocated Engine capacity.
+    /// # Errors
+    /// Invalid native storage, rate, or capacity/render configuration.
+    pub fn headless_with_config(
+        config: EngineConfig,
+        cells: usize,
+    ) -> Result<(Self, AudioSide), Failure> {
+        let invalid = |message: &str| Failure::new(crate::vm::fail::FailCode::Type, message);
+        config
+            .validate()
+            .map_err(|_| invalid("invalid native Engine configuration"))?;
+        if !matches!(config.store, StoreKind::NativeArc) {
+            return Err(invalid("native headless host requires NativeArc storage"));
+        }
+        if config.sample_rate.fract() != 0.0 {
+            return Err(invalid(
+                "native frame clock requires an integral sample rate",
+            ));
+        }
+        if config.max_block < MAX_BLOCK {
+            return Err(invalid(
+                "native Engine quantum is smaller than render chunks",
+            ));
+        }
+        Ok(Self::pair(config, AtomicCells::new(cells)))
     }
 
     /// A headless four-channel host for offline stems and tests.
@@ -501,7 +534,7 @@ impl NativeAudioHost {
     }
 
     fn pair(cfg: EngineConfig, cells: AtomicCells) -> (Self, AudioSide) {
-        let engine = Engine::with_config(cfg);
+        let mut engine = Engine::with_config(cfg);
         let env = engine.build_env();
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let clock = FrameClock::new(cfg.sample_rate as u32);
@@ -510,7 +543,23 @@ impl NativeAudioHost {
         let (events, events_rx) = EventRing::split(EVENT_CAPACITY);
         let (controls, controls_rx) = SpscRing::split(CONTROL_CAPACITY);
         let (acks_tx, acks) = SpscRing::split(ACK_CAPACITY);
+        let ack_capacity = acks_tx.capacity();
         let (garbage_tx, garbage) = SpscRing::split(GARBAGE_CAPACITY);
+        let staging = crate::dsp::engine::SongStagingConfig {
+            preparations: 64,
+            leases: 256,
+            branches: 256,
+            control_slots: u32::try_from(cells.capacity()).unwrap_or(u32::MAX),
+            analysis_slots: u32::try_from(cfg.analysis_cells).unwrap_or(u32::MAX),
+            native_pcm_bytes: crate::dsp::arena::DEFAULT_ARENA_BYTES as u64,
+            critical_receipts: 2,
+        };
+        let configured = engine
+            .configure_song_staging_with_transport(
+                staging,
+                u32::try_from(ack_capacity).unwrap_or(0),
+            )
+            .is_ok();
         let side = AudioSide {
             engine,
             events: events_rx,
@@ -524,7 +573,8 @@ impl NativeAudioHost {
             scratch: vec![0.0; 2 * MAX_BLOCK].into_boxed_slice(),
             input_scratch: vec![0.0; 2 * MAX_BLOCK].into_boxed_slice(),
         };
-        let host = NativeAudioHost {
+        let mut host = NativeAudioHost {
+            song_capacity: SongCapacityCache::new(controls.capacity(), ack_capacity, 2, configured),
             events,
             controls,
             acks,
@@ -545,6 +595,7 @@ impl NativeAudioHost {
             taps,
             bus_names: None,
         };
+        host.request_song_capacity();
         (host, side)
     }
 
@@ -629,7 +680,7 @@ impl NativeAudioHost {
     }
 
     fn post_record(&mut self, rec: NativeRecord) {
-        if self.controls.push(rec).is_err() {
+        if self.song_capacity.post(&mut self.controls, rec).is_err() {
             self.overflow("control");
         }
     }
@@ -654,6 +705,91 @@ impl NativeAudioHost {
 }
 
 impl AudioHost for NativeAudioHost {
+    fn song_clock(&self) -> Result<crate::song::routing::SongHostClock, crate::vm::fail::Failure> {
+        if !self.env.sr.is_finite()
+            || self.env.sr.fract() != 0.0
+            || !(8000.0..=192000.0).contains(&self.env.sr)
+            || f64::from(self.env.sr) != f64::from(self.clock.sample_rate())
+        {
+            return Err(crate::vm::fail::Failure::new(
+                crate::vm::fail::FailCode::HostUnavailable,
+                "song clock requires an exact supported integral sample rate",
+            ));
+        }
+        Ok(crate::song::routing::SongHostClock {
+            frame: self.clock.frames(),
+            sample_rate: self.clock.sample_rate(),
+        })
+    }
+
+    #[allow(clippy::result_large_err)] // Exact inline command refusal preserves caller ownership.
+    fn try_song_command(
+        &mut self,
+        command: crate::song::routing::SongCommand,
+    ) -> Result<(), crate::host::caps::SongCommandRefusal> {
+        if matches!(command, crate::song::routing::SongCommand::RequestClock(_)) {
+            use crate::host::caps::{SongCommandRefusal, SongSubmitError};
+            let mut bytes = [0; CtlMsg::MAX_LEN];
+            if CtlMsg::Song(command).encode(&mut bytes) == 0 {
+                return Err(SongCommandRefusal {
+                    command,
+                    error: SongSubmitError::Invalid(crate::vm::fail::Failure::new(
+                        crate::vm::fail::FailCode::Type,
+                        "invalid song clock command",
+                    )),
+                });
+            }
+            return self
+                .controls
+                .push(NativeRecord::Msg(CtlMsg::Song(command)))
+                .map_err(|_| SongCommandRefusal {
+                    command,
+                    error: SongSubmitError::Backpressure,
+                });
+        }
+        self.try_song_command_checked(command)
+    }
+
+    fn submit_song_native(
+        &mut self,
+        install: crate::dsp::ring::NativeSongInstall,
+    ) -> Result<(), crate::dsp::ring::NativeSongInstall> {
+        self.song_native(install)
+    }
+    fn materialize_song_native(
+        &self,
+        lease: crate::song::routing::SongLeaseKey,
+        graph: &GraphHandle,
+    ) -> Result<Option<crate::dsp::ring::NativeSongInstall>, crate::vm::fail::Failure> {
+        self.materialize_song_graph(lease, graph).map(Some)
+    }
+    fn submit_song_graph(
+        &mut self,
+        lease: crate::song::routing::SongLeaseKey,
+        graph: &GraphHandle,
+    ) -> Result<(), crate::vm::fail::Failure> {
+        self.song_graph(lease, graph)
+    }
+    fn try_song_sample(
+        &mut self,
+        lease: crate::song::routing::SongLeaseKey,
+        data: Arc<SampleData>,
+    ) -> Result<(), crate::host::caps::SongSampleRefusal> {
+        self.song_sample_checked(lease, data)
+    }
+    fn song_sample_sender_capacity(
+        &self,
+    ) -> Result<crate::host::caps::SongSampleSenderCapacity, crate::vm::fail::Failure> {
+        Ok(crate::host::caps::SongSampleSenderCapacity::Unbounded)
+    }
+    fn submit_song_sample(
+        &mut self,
+        lease: crate::song::routing::SongLeaseKey,
+        data: Arc<SampleData>,
+    ) -> Result<(), Arc<SampleData>> {
+        self.song_sample(lease, data)
+    }
+
     fn send(&mut self, ev: AudioEvent) {
         if self.events.push(ev).is_err() {
             self.overflow("event");
@@ -668,10 +804,35 @@ impl AudioHost for NativeAudioHost {
         self.post_record(NativeRecord::Msg(msg));
     }
 
-    fn drain(&mut self, out: &mut Vec<HostMsg>) {
-        while let Some(m) = self.acks.pop() {
-            out.push(m);
+    fn poll_msg(&mut self) -> Result<Option<HostMsg>, Failure> {
+        self.collect_garbage();
+        self.song_capacity.retry(&mut self.controls);
+        if let Some(message) = self.acks.pop() {
+            let message = self.song_capacity.observe(message);
+            self.song_capacity.retry(&mut self.controls);
+            return Ok(message);
         }
+        if self.dropped != self.reported {
+            let message = HostMsg::Counters {
+                late: 0,
+                dropped: self.dropped - self.reported,
+                stolen: 0,
+                skipped: 0,
+            };
+            self.reported = self.dropped;
+            return Ok(Some(message));
+        }
+        Ok(None)
+    }
+
+    fn drain(&mut self, out: &mut Vec<HostMsg>) {
+        self.song_capacity.retry(&mut self.controls);
+        while let Some(m) = self.acks.pop() {
+            if let Some(message) = self.song_capacity.observe(m) {
+                out.push(message);
+            }
+        }
+        self.song_capacity.retry(&mut self.controls);
         self.collect_garbage();
         if self.dropped != self.reported {
             out.push(HostMsg::Counters {

@@ -21,3 +21,6 @@ pub mod telemetry;
 
 #[cfg(test)]
 mod tests;
+
+/// Owned finite song playback and streaming progression.
+pub mod song;

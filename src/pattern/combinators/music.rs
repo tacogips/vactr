@@ -3,13 +3,15 @@
 //! Note numbers are MIDI-style: `12 * octave + pitch class`, and a note name
 //! without an octave is in octave 5, so `:c` is 60 and `:e2` is 28.
 
+use crate::pattern::combinators::control::query_child;
 use std::rc::Rc;
 
 use crate::pattern::combinators::control::query_mapped;
 use crate::pattern::combinators::{count, event_fault, kw, op, split_event};
 use crate::pattern::eval::{eval_param, exact_value, int_of, num_f64, num_ratio, QState};
+use crate::pattern::occ::ProducerKind;
 use crate::pattern::pat::{PParam, Pat, PatNode};
-use crate::pattern::query::{q, Event, TimeSpan};
+use crate::pattern::query::{Event, TimeSpan};
 use crate::reader::span::Span;
 use crate::value::intern::{name_of_kw, KwId};
 use crate::value::ratio::Ratio64;
@@ -205,7 +207,7 @@ pub(crate) fn query_scale(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for mut e in q(inner, span, st) {
+    for mut e in query_child(inner, span, 0, st) {
         match scale_event(&mut e, root, name) {
             Ok(()) => out.push(e),
             Err(f) => event_fault(st, &e, p, f),
@@ -262,7 +264,7 @@ pub(crate) fn query_voicing(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for mut e in q(inner, span, st) {
+    for mut e in query_child(inner, span, 0, st) {
         match notes_of(&e) {
             Some(notes) => {
                 e.controls.insert(kw("note"), int_list(&voice(&notes)));
@@ -305,7 +307,7 @@ pub(crate) fn query_arp(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for e in q(inner, span, st) {
+    for e in query_child(inner, span, 0, st) {
         let Some(notes) = notes_of(&e) else {
             out.push(e);
             continue;
@@ -322,6 +324,12 @@ pub(crate) fn query_arp(
                 let note = seq[usize::try_from(i).unwrap_or(0)];
                 child.controls.insert(kw("note"), note_value(note));
                 child.occ.push(p.id, u32::try_from(i).unwrap_or(u32::MAX));
+                if let Some(trace) = &mut child.producer {
+                    trace.push(
+                        ProducerKind::GeneratedBranch,
+                        u32::try_from(i).unwrap_or(u32::MAX),
+                    );
+                }
                 kids.push(child);
             }
             Ok(kids)
@@ -360,7 +368,7 @@ pub(crate) fn query_range(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for mut e in q(inner, span, st) {
+    for mut e in query_child(inner, span, 0, st) {
         let at = e.anchor();
         let r = eval_param(lo, at, st)
             .and_then(|l| Ok((l, eval_param(hi, at, st)?)))

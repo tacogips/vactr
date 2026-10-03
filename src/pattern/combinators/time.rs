@@ -1,12 +1,16 @@
 //! Time operators: fast, slow, hurry, rev, every, whenmod, iter, chunk,
 //! segment.
 
+use crate::pattern::combinators::control::query_child;
 use std::rc::Rc;
 
+use crate::pattern::combinators::control::{sample_child, transformed_child};
 use crate::pattern::combinators::{kw, map_times, op, subtree, MAX_COUNT};
+use crate::pattern::eval::song_clock::CanonicalClockFrame;
 use crate::pattern::eval::{apply_transform, eval_param_int, eval_param_ratio, num_ratio, QState};
+use crate::pattern::occ::ProducerKind;
 use crate::pattern::pat::{PParam, Pat, PatNode};
-use crate::pattern::query::{q, sect, Event, TimeSpan};
+use crate::pattern::query::{sect, Event, TimeSpan};
 use crate::reader::span::Span;
 use crate::value::ratio::Ratio64;
 use crate::value::value::Value;
@@ -78,7 +82,14 @@ fn fast_by(
         return Ok(Vec::new());
     }
     let inner_span = span.map(|t| t.checked_mul(factor))?;
-    let events = q(inner, inner_span, st);
+    let events = if st.has_clock_observation() {
+        st.with_clock_frame(
+            || CanonicalClockFrame::fast(factor, inner_span, span),
+            |st| Ok(query_child(inner, inner_span, 0, st)),
+        )?
+    } else {
+        query_child(inner, inner_span, 0, st)
+    };
     map_times(events, |t| t.checked_div(factor))
 }
 
@@ -168,26 +179,56 @@ fn rev_piece(inner: &Pat, piece: TimeSpan, st: &mut QState<'_, '_>) -> Result<Ve
     let mirror = Ratio64::from_int(c)
         .checked_mul(Ratio64::from_int(2))?
         .checked_add(Ratio64::ONE)?;
-    let reflect = |s: TimeSpan| -> Result<TimeSpan, Failure> {
-        Ok(TimeSpan {
-            begin: mirror.checked_sub(s.end)?,
-            end: mirror.checked_sub(s.begin)?,
-        })
-    };
-    // A point is reflected against whole spans, which are end-exclusive:
-    // query the whole cycle and keep the events whose reflection holds it.
+    // Point queries need the full cycle: reflection uses end-exclusive wholes.
     let inner_span = if piece.is_point() {
         TimeSpan::cycle(c)?
     } else {
-        reflect(piece)?
+        reflect_span(piece, mirror)?
     };
+    let events = if st.has_clock_observation() {
+        observed_rev_child(inner, inner_span, piece, mirror, st)?
+    } else {
+        query_child(inner, inner_span, 0, st)
+    };
+    reverse_events(events, piece, mirror)
+}
+
+// Observed frame construction cannot enlarge the pending legacy Rev stack.
+#[inline(never)]
+fn observed_rev_child(
+    inner: &Pat,
+    child: TimeSpan,
+    piece: TimeSpan,
+    mirror: Ratio64,
+    st: &mut QState<'_, '_>,
+) -> Result<Vec<Event>, Failure> {
+    st.with_clock_frame(
+        || Ok(CanonicalClockFrame::rev(mirror, child, piece)),
+        |st| Ok(query_child(inner, child, 0, st)),
+    )
+}
+
+fn reflect_span(span: TimeSpan, mirror: Ratio64) -> Result<TimeSpan, Failure> {
+    Ok(TimeSpan {
+        begin: mirror.checked_sub(span.end)?,
+        end: mirror.checked_sub(span.begin)?,
+    })
+}
+
+/// Runs after the recursive source query returns, keeping event-loop
+/// temporaries outside every pending reversal frame.
+fn reverse_events(
+    events: Vec<Event>,
+    piece: TimeSpan,
+    mirror: Ratio64,
+) -> Result<Vec<Event>, Failure> {
     let mut out = Vec::new();
-    for mut e in q(inner, inner_span, st) {
+    for mut e in events {
         e.whole = match e.whole {
-            Some(w) => Some(reflect(w)?),
+            Some(w) => Some(reflect_span(w, mirror)?),
             None => None,
         };
-        e.part = reflect(e.part)?;
+        e.part = reflect_span(e.part, mirror)?;
         if piece.is_point() {
             let Some(part) = sect(e.whole.unwrap_or(e.part), piece) else {
                 continue;
@@ -214,9 +255,9 @@ fn choose_transform(
         out.extend(subtree(p, piece.begin, st, |st| {
             if apply(c, st)? {
                 let t = apply_transform(f, inner, st)?;
-                Ok(q(&t, piece, st))
+                Ok(transformed_child(&t, piece, 1, st))
             } else {
-                Ok(q(inner, piece, st))
+                Ok(query_child(inner, piece, 0, st))
             }
         }));
     }
@@ -267,10 +308,18 @@ pub(crate) fn query_iter(
         out.extend(subtree(p, piece.begin, st, |st| {
             let n = eval_param_int(n, Ratio64::from_int(c), st)?;
             if n <= 0 {
-                return Ok(q(inner, piece, st));
+                return Ok(query_child(inner, piece, 0, st));
             }
             let shift = Ratio64::new(c.rem_euclid(n), n)?;
-            let events = q(inner, piece.map(|t| t.checked_add(shift))?, st);
+            let child = piece.map(|t| t.checked_add(shift))?;
+            let events = if st.has_clock_observation() {
+                st.with_clock_frame(
+                    || CanonicalClockFrame::iter(shift, child, piece),
+                    |st| Ok(query_child(inner, child, 0, st)),
+                )?
+            } else {
+                query_child(inner, child, 0, st)
+            };
             map_times(events, |t| t.checked_sub(shift))
         }));
     }
@@ -291,7 +340,7 @@ pub(crate) fn query_chunk(
         out.extend(subtree(p, piece.begin, st, |st| {
             let n = eval_param_int(n, Ratio64::from_int(c), st)?;
             if n <= 0 {
-                return Ok(q(inner, piece, st));
+                return Ok(query_child(inner, piece, 0, st));
             }
             let i = c.rem_euclid(n);
             let lo = Ratio64::new(i, n)?;
@@ -301,8 +350,15 @@ pub(crate) fn query_chunk(
                 lo <= pos && pos < hi
             };
             let t = apply_transform(f, inner, st)?;
-            let mut events: Vec<Event> = q(&t, piece, st).into_iter().filter(&inside).collect();
-            events.extend(q(inner, piece, st).into_iter().filter(|e| !inside(e)));
+            let mut events: Vec<Event> = transformed_child(&t, piece, 1, st)
+                .into_iter()
+                .filter(&inside)
+                .collect();
+            events.extend(
+                query_child(inner, piece, 0, st)
+                    .into_iter()
+                    .filter(|e| !inside(e)),
+            );
             Ok(events)
         }));
     }
@@ -341,12 +397,12 @@ pub(crate) fn query_segment(
                 st.fault(f, p.span, Some(whole.begin));
                 return out;
             }
-            match st.sample(inner, whole.begin) {
+            match st.with_structural_sample(inner, whole.begin, 0, Some(whole), part, None, |st| {
+                sample_child(inner, whole.begin, 0, st)
+            }) {
                 Ok(sampled) => {
                     if let Some(s) = sampled.into_iter().next() {
-                        let mut e = Event::new(Some(whole), part, s.value, s.src);
-                        e.controls = s.controls;
-                        out.push(e);
+                        out.push(segment_event(s, whole, part, i));
                     }
                 }
                 Err(f) => st.fault(f, p.span, Some(whole.begin)),
@@ -363,4 +419,35 @@ pub(crate) fn step_span(c: i64, n: i64, i: i64) -> Result<TimeSpan, Failure> {
         begin: base.checked_add(Ratio64::new(i, n)?)?,
         end: base.checked_add(Ratio64::new(i + 1, n)?)?,
     })
+}
+
+fn segment_event(sampled: Event, whole: TimeSpan, part: TimeSpan, ordinal: i64) -> Event {
+    let mut event = Event::from_sample(Some(whole), part, sampled);
+    if let Some(trace) = &mut event.producer {
+        trace.push(
+            ProducerKind::GeneratedBranch,
+            u32::try_from(ordinal).unwrap_or(u32::MAX),
+        );
+    }
+    event
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+    #[test]
+    fn segment_reconstruction_retains_original_route_and_tone() {
+        let source = crate::song::source::provenance_fixture();
+        let origin = source.song_source.clone().unwrap();
+        let whole = TimeSpan::cycle(9).unwrap();
+        let event = segment_event(source, whole, whole, 3);
+        assert!(Rc::ptr_eq(&origin, event.song_source.as_ref().unwrap()));
+        assert_eq!(event.whole, Some(whole));
+        assert_eq!(event.producer.unwrap().steps.last().unwrap().ordinal, 3);
+        assert_eq!(origin.handle.tone(), 2);
+        assert!(matches!(
+            event.controls.get(&crate::value::intern::intern_kw("note")),
+            Some(Value::Float64(60.25))
+        ));
+    }
 }

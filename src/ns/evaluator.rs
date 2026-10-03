@@ -187,7 +187,10 @@ impl std::fmt::Debug for Evaluator {
 pub(super) fn one_shot(e: &StagedEffect) -> bool {
     matches!(
         e,
-        StagedEffect::OneShot { .. } | StagedEffect::Console(_) | StagedEffect::Revoke(_)
+        StagedEffect::OneShot { .. }
+            | StagedEffect::Console(_)
+            | StagedEffect::Revoke(_)
+            | StagedEffect::PlaySong(_)
     )
 }
 
@@ -275,6 +278,23 @@ impl Evaluator {
         (&mut self.vm, &self.ns)
     }
 
+    /// Candidate-only slot roots. The caller constructs this evaluator fresh;
+    /// this does not clone an active namespace or grant public mutation access.
+    pub(crate) fn candidate_slots(&self) -> Vec<VarSlotRef> {
+        let mut slots: Vec<_> = self
+            .ns
+            .session_names()
+            .into_iter()
+            .filter_map(|name| self.ns.session_slot(name))
+            .collect();
+        slots.extend(
+            self.ns
+                .prelude()
+                .names()
+                .filter_map(|name| self.ns.prelude().slot(name)),
+        );
+        slots
+    }
     /// The report of the most recent reactive pass.
     #[must_use]
     pub fn last_pass(&self) -> Option<&PassReport> {
@@ -301,6 +321,7 @@ impl Evaluator {
     /// gate compile or run (7.1.1).
     pub fn eval_form(&mut self, form: &Node) -> FormOutcome {
         self.last_pass = None;
+        let checked_inputs = self.ns.checked_inputs();
         let checked = check(
             std::slice::from_ref(form),
             &self.ns.check_env(),
@@ -309,6 +330,7 @@ impl Evaluator {
         let gen = self.next_gen();
         let bad = self.durable_bad();
         let a = self.attempt(form, gen, None, &[], BTreeSet::new(), bad);
+        let checked_callables = checked.callables;
         let mut diags = checked.diags;
         diags.extend(a.diags);
         let value = match a.value {
@@ -397,6 +419,15 @@ impl Evaluator {
             let report = self.propagate(&triggers, &status, &[], lead, names);
             diags.extend(report.diags.iter().cloned());
             self.last_pass = Some(report);
+        }
+        if !diags
+            .iter()
+            .any(|d| d.severity == crate::types::diag::Severity::Error)
+        {
+            if let Some(inputs) = checked_inputs.as_ref() {
+                self.ns
+                    .install_checked_callables(&checked_callables, inputs, gen);
+            }
         }
         FormOutcome {
             value: Ok(value),

@@ -13,6 +13,7 @@
 pub mod args;
 mod fmt;
 mod get;
+mod render;
 mod repl;
 mod run;
 #[cfg(feature = "host-native")]
@@ -104,6 +105,11 @@ pub fn main(args: Vec<OsString>) -> i32 {
         }
         Ok(Command::Repl { host }) => repl::main(host, &cwd),
         Ok(Command::Run { file, host, cycles }) => run::main(&file, host, cycles, &cwd),
+        Ok(Command::Render {
+            source,
+            output,
+            sample_rate,
+        }) => render::main(&source, &output, sample_rate, &cwd),
         Ok(Command::Serve {
             file,
             host,

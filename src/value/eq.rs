@@ -17,6 +17,8 @@ const fn is_opaque(v: &Value) -> bool {
             | Value::Thunk(_)
             | Value::VarRef(_)
             | Value::Pattern(_)
+            | Value::Part(_)
+            | Value::Song(_)
             | Value::Signal(_)
             | Value::Tex(_)
     )
@@ -40,7 +42,7 @@ const fn is_nan(v: &Value) -> bool {
 ///
 /// # Errors
 /// `Type` when either side is a function, native, thunk, var ref, pattern,
-/// signal or visual chain.
+/// signal, finite part, song or visual chain.
 pub fn deep_eq(a: &Value, b: &Value) -> Result<bool, Failure> {
     if is_opaque(a) || is_opaque(b) {
         return Err(Failure::new(
@@ -91,6 +93,7 @@ pub fn deep_eq(a: &Value, b: &Value) -> Result<bool, Failure> {
             (Sound::Buffer(a), Sound::Buffer(b)) => Rc::ptr_eq(a, b),
             _ => x == y,
         },
+        (Value::EventHandle(x), Value::EventHandle(y)) => x == y,
         (Value::UGen(x), Value::UGen(y)) => Rc::ptr_eq(x, y),
         _ => false,
     })

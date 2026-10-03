@@ -45,6 +45,7 @@ struct SessionHalf {
     session: Session,
     host: Rc<RefCell<HostState>>,
     samples: WasmSamples,
+    complete_song_banks: std::collections::BTreeMap<crate::value::intern::KwId, Vec<String>>,
     midi: MidiQueue,
     supplied: Prefetched,
 }
@@ -83,6 +84,14 @@ fn flush_console(session: &mut Session) {
 /// the 64 MB default) and returns 1.
 #[no_mangle]
 pub extern "C" fn session_init(sample_rate: f32, arena_bytes: u32) -> u32 {
+    if !sample_rate.is_finite()
+        || !(8000.0..=192000.0).contains(&sample_rate)
+        || sample_rate.fract() != 0.0
+    {
+        console("fault song: unsupported or nonintegral browser sample rate");
+        return 0;
+    }
+
     let arena = if arena_bytes == 0 {
         DEFAULT_ARENA_BYTES
     } else {
@@ -105,13 +114,41 @@ pub extern "C" fn session_init(sample_rate: f32, arena_bytes: u32) -> u32 {
     let mut cfg = SessionConfig::new(caps);
     cfg.runtime = RuntimeConfig {
         tier: Tier::Browser(Box::new(WasmCellPort(Rc::clone(&host)))),
+        sample_rate: sample_rate as u32,
         ..RuntimeConfig::default()
     };
     cfg.cache = Some(Box::new(MemCache::new()));
     cfg.loader = Box::new(NoopHost);
     cfg.persistence = PersistenceMode::Directive;
     cfg.insts = Some(Rc::clone(&reg));
+    cfg.song_assets = Some(samples.song_factory(
+        std::collections::BTreeMap::new(),
+        std::collections::BTreeMap::new(),
+    ));
     let mut session = Session::new(cfg, hosts);
+    let asset_limits = crate::song::assets::SongAssetLimits {
+        max_resources: 256,
+        max_pcm_bytes: arena as u64,
+        max_source_files: 64,
+        max_source_bytes: 1_000_000,
+        max_banks: 64,
+        max_walk_nodes: 100_000,
+        max_walk_depth: 256,
+    };
+    if let Err(error) = session.set_song_asset_limits(asset_limits).and_then(|()| {
+        session.set_song_preparation_limits(crate::host::caps::SongPreparationLimits {
+            capabilities: caps,
+            song: crate::song::SongLimits::default(),
+            max_resources: 256,
+            max_pending_records: 4096,
+            max_graph_bytes: 1_000_000,
+            max_work: 8_000_000,
+        })
+    }) {
+        console(&format!("fault song configuration: {}", error.message));
+        return 0;
+    }
+
     for e in reg.borrow().template_errors() {
         console(&format!("fault template: {e}"));
     }
@@ -121,6 +158,7 @@ pub extern "C" fn session_init(sample_rate: f32, arena_bytes: u32) -> u32 {
         session,
         host,
         samples,
+        complete_song_banks: std::collections::BTreeMap::new(),
         midi,
         supplied: Prefetched::new(),
     };
@@ -288,6 +326,11 @@ pub unsafe extern "C" fn session_sample_put(
     });
     with(|half| {
         half.samples.0.borrow_mut().insert(key.to_string(), sample);
+        half.session
+            .set_song_asset_factory(Some(half.samples.song_factory(
+                half.complete_song_banks.clone(),
+                std::collections::BTreeMap::new(),
+            )));
         1
     })
 }
@@ -402,4 +445,356 @@ pub unsafe extern "C" fn pkg_supply(
                 .supply_status(url, u16::try_from(status).unwrap_or(0));
         }
     });
+}
+
+/// Installs a complete ordered bank catalog and refreshes future candidate assets.
+/// Page upload integration calls this only after all listed PCM has arrived.
+pub fn set_song_bank_catalog(
+    catalog: std::collections::BTreeMap<crate::value::intern::KwId, Vec<String>>,
+) -> u32 {
+    with(|half| {
+        half.complete_song_banks = catalog;
+        half.session
+            .set_song_asset_factory(Some(half.samples.song_factory(
+                half.complete_song_banks.clone(),
+                std::collections::BTreeMap::new(),
+            )));
+        1
+    })
+}
+
+/// Refresh future candidate assets immediately before candidate application.
+/// Already prepared candidates retain their closed inventories.
+pub fn refresh_song_asset_factory() -> u32 {
+    with(|half| {
+        half.session
+            .set_song_asset_factory(Some(half.samples.song_factory(
+                half.complete_song_banks.clone(),
+                std::collections::BTreeMap::new(),
+            )));
+        1
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SongBankCatalog {
+    banks: Vec<SongBankEntry>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SongBankEntry {
+    name: String,
+    members: Vec<String>,
+}
+
+/// Publish a complete ordered catalog of decoded sample keys for future Songs.
+/// Invalid catalogs return zero and preserve the current catalog and factory.
+/// # Safety
+/// ptr..ptr+len is readable memory from the page; len must not exceed 1MiB.
+#[no_mangle]
+pub unsafe extern "C" fn session_song_bank_catalog(ptr: *const u8, len: u32) -> u32 {
+    if len > 1024 * 1024 {
+        console("fault song catalog: JSON exceeds 1MiB");
+        return 0;
+    }
+    // SAFETY: the ABI caller guarantees the supplied readable range.
+    let bytes = unsafe { input(ptr, len) };
+    let catalog = match serde_json::from_slice::<SongBankCatalog>(bytes) {
+        Ok(catalog) if catalog.banks.len() <= 64 => catalog,
+        _ => {
+            console("fault song catalog: invalid JSON or more than 64 banks");
+            return 0;
+        }
+    };
+    with(|half| {
+        let mut complete = std::collections::BTreeMap::new();
+        let mut members = 0usize;
+        let decoded = half.samples.0.borrow();
+        for bank in catalog.banks {
+            members = match members.checked_add(bank.members.len()) {
+                Some(count) if count <= 16384 => count,
+                _ => {
+                    console("fault song catalog: more than 16384 members");
+                    return 0;
+                }
+            };
+            if bank.name.is_empty()
+                || bank.name.len() > 4096
+                || bank.name.starts_with(':')
+                || bank.name.chars().any(char::is_whitespace)
+                || bank.name.chars().any(char::is_control)
+            {
+                console("fault song catalog: invalid bank name");
+                return 0;
+            }
+            let keyword = crate::value::intern::intern_kw(&bank.name);
+            if complete.contains_key(&keyword) {
+                console("fault song catalog: duplicate bank name");
+                return 0;
+            }
+            for key in &bank.members {
+                if key.is_empty()
+                    || key.len() > 4096
+                    || key.chars().any(char::is_control)
+                    || !decoded.contains_key(key)
+                {
+                    console("fault song catalog: invalid or missing decoded PCM key");
+                    return 0;
+                }
+            }
+            complete.insert(keyword, bank.members);
+        }
+        drop(decoded);
+        half.complete_song_banks = complete;
+        half.session
+            .set_song_asset_factory(Some(half.samples.song_factory(
+                half.complete_song_banks.clone(),
+                std::collections::BTreeMap::new(),
+            )));
+        1
+    })
+}
+
+/// Detach future candidate assets from the mutable page sample store.
+#[no_mangle]
+pub extern "C" fn session_song_refresh_assets() -> u32 {
+    refresh_song_asset_factory()
+}
+
+#[cfg(test)]
+mod song_asset_tests {
+    use super::*;
+    use crate::host::wasm::abi;
+    fn take_records() -> Vec<Vec<u8>> {
+        let n = abi::outbox_len();
+        // SAFETY: copied while the actual outbox allocation remains unchanged.
+        let bytes = unsafe { input(abi::outbox_ptr(), n) }.to_vec();
+        let mut records = Vec::new();
+        for_each_record(&bytes, |record| records.push(record.to_vec()));
+        abi::outbox_clear();
+        records
+    }
+    #[test]
+    fn catalog_requires_complete_pcm_and_keeps_prior_catalog_on_refusal() {
+        abi::fix_outbox(0);
+        assert_eq!(session_init(8000.0, 1024 * 1024), 1);
+        let key = b"kit:0";
+        let data = [0.25f32, -0.25];
+        // SAFETY: both arrays are live and exactly sized for the ABI call.
+        assert_eq!(
+            unsafe {
+                session_sample_put(
+                    key.as_ptr(),
+                    key.len() as u32,
+                    data.as_ptr().cast(),
+                    data.len() as u32,
+                    8000,
+                    2,
+                )
+            },
+            1
+        );
+        let good = br#"{"banks":[{"name":"kit","members":["kit:0"]}]}"#;
+        // SAFETY: the JSON byte array stays live throughout the call.
+        assert_eq!(
+            unsafe { session_song_bank_catalog(good.as_ptr(), good.len() as u32) },
+            1
+        );
+        let prior = with(|half| half.complete_song_banks.clone());
+        for bad in [
+            r#"{"banks":[{"name":"kit","members":["missing"]}]}"#,
+            r#"{"banks":[{"name":"kit","members":[]},{"name":"kit","members":[]}]}"#,
+            r#"{"banks":[],"unexpected":true}"#,
+        ] {
+            // SAFETY: borrowed JSON bytes are readable for their full length.
+            assert_eq!(
+                unsafe { session_song_bank_catalog(bad.as_ptr(), bad.len() as u32) },
+                0
+            );
+            assert_eq!(with(|half| half.complete_song_banks.clone()), prior);
+        }
+        assert_eq!(session_init(8000.5, 1024 * 1024), 0);
+        assert_eq!(with(|half| half.complete_song_banks.clone()), prior);
+        // SAFETY: oversized len is rejected before any read of the null pointer.
+        assert_eq!(
+            unsafe { session_song_bank_catalog(std::ptr::null(), 1024 * 1024 + 1) },
+            0
+        );
+        assert_eq!(with(|half| half.complete_song_banks.clone()), prior);
+    }
+    #[test]
+    fn refresh_keeps_original_prepared_pcm_immutable() {
+        abi::fix_outbox(0);
+        assert_eq!(session_init(8000.0, 1024 * 1024), 1);
+        let key = b"bd:0";
+        let data = [0.25f32, -0.25];
+        // SAFETY: the sample arrays are live for the ABI read.
+        assert_eq!(
+            unsafe {
+                session_sample_put(
+                    key.as_ptr(),
+                    key.len() as u32,
+                    data.as_ptr().cast(),
+                    data.len() as u32,
+                    8000,
+                    2,
+                )
+            },
+            1
+        );
+        let catalog = br#"{"banks":[{"name":"bd","members":["bd:0"]}]}"#;
+        // SAFETY: catalog points to exactly the supplied readable bytes.
+        assert_eq!(
+            unsafe { session_song_bank_catalog(catalog.as_ptr(), catalog.len() as u32) },
+            1
+        );
+        let original = with(|half| half.session.song_asset_factory()).unwrap();
+        let cx = crate::session::song::CandidateBuildCtx {
+            assets: original.as_ref(),
+            asset_limits: crate::song::assets::SongAssetLimits {
+                max_resources: 256,
+                max_pcm_bytes: 1024 * 1024,
+                max_source_files: 64,
+                max_source_bytes: 1_000_000,
+                max_banks: 64,
+                max_walk_nodes: 100_000,
+                max_walk_depth: 256,
+            },
+            lock: None,
+            cache: None,
+        };
+        let code = "song {part [drums: {s :bd}] duration: 1} > play-song";
+        let mut prepared = crate::song::prepare_song(
+            crate::session::song::evaluate_song_candidate(
+                code,
+                "main.vact",
+                1,
+                crate::song::SnapshotEpoch(7),
+                &cx,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let source = crate::host::caps::SampleSrc::Bank {
+            kw: crate::value::intern::intern_kw("bd"),
+            index: 0,
+        };
+        assert_eq!(prepared.sample(&source).unwrap().frames[0], 0.25);
+        let new = [0.75f32, -0.75];
+        // SAFETY: replacement arrays remain live while the ABI snapshots them.
+        assert_eq!(
+            unsafe {
+                session_sample_put(
+                    key.as_ptr(),
+                    key.len() as u32,
+                    new.as_ptr().cast(),
+                    new.len() as u32,
+                    8000,
+                    2,
+                )
+            },
+            1
+        );
+        assert_eq!(session_song_refresh_assets(), 1);
+        let future = with(|half| half.session.song_asset_factory()).unwrap();
+        let future_cx = crate::session::song::CandidateBuildCtx {
+            assets: future.as_ref(),
+            ..cx
+        };
+        let mut next = crate::song::prepare_song(
+            crate::session::song::evaluate_song_candidate(
+                code,
+                "main.vact",
+                2,
+                crate::song::SnapshotEpoch(8),
+                &future_cx,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(prepared.sample(&source).unwrap().frames[0], 0.25);
+        assert_eq!(next.sample(&source).unwrap().frames[0], 0.75);
+    }
+    #[test]
+    fn browser_session_original_song_reaches_real_worklet_applied_and_ended() {
+        use crate::host::wasm::worklet_half as worklet;
+        assert_eq!(worklet::worklet_init(8000.0, 1024 * 1024, 16), 1);
+        assert_eq!(session_init(8000.0, 1024 * 1024), 1);
+        let code = "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone > gain 0.1}] duration: 1/8} tail-seconds: 0 > play-song";
+        let request = serde_json::json!({"v":1,"seq":11,"kind":"apply-song","body":{
+            "file":"main.vact","code":code,"doc_revision":1,"edit_epoch":0}})
+        .to_string();
+        // SAFETY: request bytes are live and fully readable for this ABI call.
+        unsafe {
+            session_apply(request.as_ptr(), request.len() as u32);
+        }
+        let mut pending = std::collections::VecDeque::new();
+        let mut applied = false;
+        let mut audible = false;
+        let mut ended = false;
+        for _ in 0..512 {
+            for record in take_records() {
+                if record.first() == Some(&TAG_SESSION) {
+                    let message: serde_json::Value = serde_json::from_slice(&record[1..]).unwrap();
+                    assert_ne!(message["kind"], "song-candidate-failed", "{message}");
+                    if message["kind"] == "song-candidate-applied" {
+                        assert_eq!(message["re"], 11);
+                        assert!(message["body"]["application_frame"].is_string());
+                        applied = true;
+                    }
+                } else if record.first().is_some_and(|tag| *tag < TAG_FAULT) {
+                    pending.push_back(record);
+                }
+            }
+            for _ in 0..4 {
+                let Some(record) = pending.front() else { break };
+                assert!(record.len() <= crate::dsp::ring::INBOX_SLOT_BYTES);
+                // SAFETY: genuine staging allocation has at least INBOX_SLOT_BYTES.
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        record.as_ptr(),
+                        worklet::staging_ptr(),
+                        record.len(),
+                    );
+                }
+                if worklet::worklet_inbox(record.len() as u32) == 0 {
+                    break;
+                }
+                pending.pop_front();
+            }
+            let output = worklet::process(128);
+            // SAFETY: worklet emits 128 left then128 right samples until next process.
+            let pcm = unsafe { std::slice::from_raw_parts(output, 256) };
+            audible |= pcm.iter().any(|value| value.abs() > 1e-6);
+            let mut feedback = Vec::new();
+            for record in take_records() {
+                assert_ne!(
+                    record.first(),
+                    Some(&TAG_FAULT),
+                    "real worklet fault: {record:?}"
+                );
+                feedback.extend_from_slice(&(record.len() as u32).to_le_bytes());
+                feedback.extend_from_slice(&record);
+            }
+            // SAFETY: all feedback bytes remain live for the complete ABI read.
+            unsafe {
+                session_inbox(feedback.as_ptr(), feedback.len() as u32);
+            }
+            session_tick(worklet::worklet_now());
+            if with(|half| half.session.runtime().song_state())
+                == Some(crate::sched::song::SongTransportState::Ended)
+            {
+                ended = true;
+                // Applied is consumed from actual TAG_SESSION on the following loop.
+                if applied {
+                    break;
+                }
+            }
+        }
+        assert!(
+            applied && audible && ended,
+            "applied={applied} audible={audible} ended={ended}"
+        );
+    }
 }

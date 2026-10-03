@@ -1,15 +1,19 @@
 //! Structure: stack, cat, fastcat, superimpose, off, jux, ply, repeat,
 //! euclid, grid.
 
+use crate::pattern::combinators::control::query_child;
+use crate::pattern::eval::song_clock::CanonicalClockFrame;
 use std::rc::Rc;
 
+use crate::pattern::combinators::control::{merge_producers, sample_child, transformed_child};
 use crate::pattern::combinators::time::step_span;
 use crate::pattern::combinators::{
     count, event_fault, kw, map_times, op, split_event, subtree, MAX_COUNT,
 };
 use crate::pattern::eval::{apply_transform, eval_param_int, eval_param_ratio, QState};
+use crate::pattern::occ::ProducerKind;
 use crate::pattern::pat::{PParam, Pat, PatNode};
-use crate::pattern::query::{q, sect, Event, TimeSpan};
+use crate::pattern::query::{sect, Event, TimeSpan};
 use crate::pattern::step::query_single;
 use crate::reader::span::Span;
 use crate::value::ratio::Ratio64;
@@ -98,7 +102,11 @@ pub(crate) fn query_stack(
 ) -> Vec<Event> {
     let mut out = Vec::new();
     for (i, item) in items.iter().enumerate() {
-        out.extend(tag(q(item, span, st), p, i));
+        out.extend(tag(
+            query_child(item, span, u32::try_from(i).unwrap_or(u32::MAX), st),
+            p,
+            i,
+        ));
     }
     out
 }
@@ -120,7 +128,16 @@ fn cat_piece(
     let Some(item) = usize::try_from(i).ok().and_then(|i| items.get(i)) else {
         return Ok(Vec::new());
     };
-    let events = q(item, piece.map(|t| t.checked_sub(shift))?, st);
+    let child = piece.map(|t| t.checked_sub(shift))?;
+    let ordinal = u32::try_from(i).unwrap_or(u32::MAX);
+    let events = if st.has_clock_observation() {
+        st.with_clock_frame(
+            || CanonicalClockFrame::iter(Ratio64::ZERO.checked_sub(shift)?, child, piece),
+            |st| Ok(query_child(item, child, ordinal, st)),
+        )?
+    } else {
+        query_child(item, child, ordinal, st)
+    };
     let events = map_times(events, |t| t.checked_add(shift))?;
     Ok(tag(events, p, usize::try_from(i).unwrap_or(0)))
 }
@@ -153,9 +170,25 @@ pub(crate) fn query_fastcat(
     subtree(p, span.begin, st, |st| {
         let inner = span.map(|t| t.checked_mul(n))?;
         let mut out = Vec::new();
-        for piece in st.cycles(inner, p.span) {
-            out.extend(cat_piece(items, p, piece, st)?);
-        }
+        let events = if st.has_clock_observation() {
+            st.with_clock_frame(
+                || CanonicalClockFrame::fast(n, inner, span),
+                |st| {
+                    let mut events = Vec::new();
+                    for piece in st.cycles(inner, p.span) {
+                        events.extend(cat_piece(items, p, piece, st)?);
+                    }
+                    Ok(events)
+                },
+            )?
+        } else {
+            let mut events = Vec::new();
+            for piece in st.cycles(inner, p.span) {
+                events.extend(cat_piece(items, p, piece, st)?);
+            }
+            events
+        };
+        out.extend(events);
         map_times(out, |t| t.checked_div(n))
     })
 }
@@ -167,10 +200,10 @@ pub(crate) fn query_superimpose(
     span: TimeSpan,
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
-    let mut out = tag(q(inner, span, st), p, 0);
+    let mut out = tag(query_child(inner, span, 0, st), p, 0);
     out.extend(subtree(p, span.begin, st, |st| {
         let t = apply_transform(f, inner, st)?;
-        Ok(tag(q(&t, span, st), p, 1))
+        Ok(tag(transformed_child(&t, span, 1, st), p, 1))
     }));
     out
 }
@@ -183,11 +216,19 @@ pub(crate) fn query_off(
     span: TimeSpan,
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
-    let mut out = tag(q(inner, span, st), p, 0);
+    let mut out = tag(query_child(inner, span, 0, st), p, 0);
     out.extend(subtree(p, span.begin, st, |st| {
         let shift = eval_param_ratio(t, Ratio64::from_int(span.begin.floor()), st)?;
         let transformed = apply_transform(f, inner, st)?;
-        let events = q(&transformed, span.map(|x| x.checked_sub(shift))?, st);
+        let child = span.map(|x| x.checked_sub(shift))?;
+        let events = if st.has_clock_observation() {
+            st.with_clock_frame(
+                || CanonicalClockFrame::iter(Ratio64::ZERO.checked_sub(shift)?, child, span),
+                |st| Ok(transformed_child(&transformed, child, 1, st)),
+            )?
+        } else {
+            transformed_child(&transformed, child, 1, st)
+        };
         Ok(tag(map_times(events, |x| x.checked_add(shift))?, p, 1))
     }));
     out
@@ -201,13 +242,13 @@ pub(crate) fn query_jux(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let pan = kw("pan");
-    let mut out = tag(q(inner, span, st), p, 0);
+    let mut out = tag(query_child(inner, span, 0, st), p, 0);
     for e in &mut out {
         e.controls.insert(pan, Value::Float64(0.0));
     }
     out.extend(subtree(p, span.begin, st, |st| {
         let t = apply_transform(f, inner, st)?;
-        let mut right = tag(q(&t, span, st), p, 1);
+        let mut right = tag(transformed_child(&t, span, 1, st), p, 1);
         for e in &mut right {
             e.controls.insert(pan, Value::Float64(1.0));
         }
@@ -224,7 +265,7 @@ pub(crate) fn query_ply(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for e in q(inner, span, st) {
+    for e in query_child(inner, span, 0, st) {
         let r = eval_param_int(n, e.anchor(), st)
             .and_then(|k| count(k, "ply count"))
             .and_then(|k| split_event(&e, k));
@@ -232,6 +273,12 @@ pub(crate) fn query_ply(
             Ok(children) => {
                 for (i, mut child) in children {
                     child.occ.push(p.id, u32::try_from(i).unwrap_or(u32::MAX));
+                    if let Some(trace) = &mut child.producer {
+                        trace.push(
+                            ProducerKind::GeneratedBranch,
+                            u32::try_from(i).unwrap_or(u32::MAX),
+                        );
+                    }
                     out.push(child);
                 }
             }
@@ -307,6 +354,7 @@ fn restruct(timing: &Event, subject: Event) -> Event {
     let mut path = timing.occ.path.clone();
     path.extend(e.occ.path.iter().copied());
     e.occ.path = path;
+    merge_producers(timing, &mut e);
     e.whole = timing.whole;
     e.part = timing.part;
     e
@@ -354,7 +402,14 @@ pub(crate) fn query_euclid(
             };
             let mut timing = Event::new(Some(whole), part, Value::Nil, None);
             timing.occ.push(p.id, u32::try_from(j).unwrap_or(u32::MAX));
-            match st.sample(inner, whole.begin) {
+            timing.producer = st.producer();
+            if let Some(trace) = &mut timing.producer {
+                trace.push(
+                    ProducerKind::GeneratedBranch,
+                    u32::try_from(j).unwrap_or(u32::MAX),
+                );
+            }
+            match sample_child(inner, whole.begin, 0, st) {
                 Ok(sampled) => out.extend(sampled.into_iter().map(|s| restruct(&timing, s))),
                 Err(f) => event_fault(st, &timing, p, f),
             }
@@ -384,12 +439,14 @@ pub(crate) fn query_grid(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for mut b in q(bools, span, st) {
+    for mut b in query_child(bools, span, 1, st) {
         if !is_on(&b.value) {
             continue;
         }
         b.occ.push(p.id, 0);
-        match st.sample(inner, b.anchor()) {
+        match st.with_structural_sample(inner, b.anchor(), 0, b.whole, b.part, Some(&b), |st| {
+            sample_child(inner, b.anchor(), 0, st)
+        }) {
             Ok(sampled) => {
                 for s in sampled {
                     let src = s.src.or(b.src);

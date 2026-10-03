@@ -7,6 +7,10 @@
 //! callback never allocates, locks or blocks. A push onto a full ring hands
 //! the value back and counts a drop; the host reports `ring-overflow`.
 
+mod song;
+pub use song::{
+    encode_song_graph_record, encode_song_sample_begin, encode_song_slice, NativeSongInstall,
+};
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -205,6 +209,26 @@ impl EventRing {
 pub type CtlProducer = Producer<CtlMsg>;
 /// The audio side of a control channel.
 pub type CtlConsumer = Consumer<CtlMsg>;
+impl Producer<HostMsg> {
+    /// Retries a critical acknowledgment without counting temporary backpressure
+    /// as a drop. With one producer, the consumer can only free slots here.
+    pub fn push_critical(&mut self, message: HostMsg) -> Result<(), HostMsg> {
+        if self.len() >= self.capacity() {
+            return Err(message);
+        }
+        self.push(message)
+    }
+}
+
+impl Producer<CtlMsg> {
+    /// Queues the exact typed song envelope without allocations or reinterpretation.
+    // Return the intact inline POD for bounded retry; boxing allocates.
+    #[allow(clippy::result_large_err)]
+    pub fn push_song(&mut self, command: crate::song::routing::SongCommand) -> Result<(), CtlMsg> {
+        self.push(CtlMsg::Song(command))
+    }
+}
+
 /// The ack channel back to the evaluator.
 pub type AckProducer = Producer<HostMsg>;
 /// The evaluator side of the ack channel.
@@ -255,6 +279,7 @@ pub enum NativeInstall {
 /// A structure retired on the audio side, to be dropped on the evaluator
 /// thread (12.2 "garbage queue").
 pub enum Garbage {
+    SongInstall(NativeSongInstall),
     Template(Box<Template>),
     Bus(Box<BusTemplate>),
     Sample(Arc<SampleData>),
@@ -264,6 +289,22 @@ pub enum Garbage {
 /// box would allocate on the audio path.
 #[allow(clippy::large_enum_variant)]
 pub enum Record<'a> {
+    SongNative(NativeSongInstall),
+    SongGraph {
+        lease: crate::song::routing::SongLeaseKey,
+        bytes: &'a [u8],
+    },
+    SongSampleBegin {
+        lease: crate::song::routing::SongLeaseKey,
+        frames: u32,
+        channels: u8,
+        rate: u32,
+    },
+    SongSlice {
+        lease: crate::song::routing::SongLeaseKey,
+        offset: u32,
+        data: &'a [u8],
+    },
     Msg(CtlMsg),
     /// A `CellBatch` with its entries (browser).
     Batch(BatchView<'a>),
@@ -295,8 +336,8 @@ impl Record<'_> {
     #[must_use]
     pub fn install_bytes(&self) -> usize {
         match self {
-            Record::Slice { data, .. } => data.len(),
-            Record::Graph { bytes, .. } => bytes.len(),
+            Record::Slice { data, .. } | Record::SongSlice { data, .. } => data.len(),
+            Record::Graph { bytes, .. } | Record::SongGraph { bytes, .. } => bytes.len(),
             _ => 0,
         }
     }
@@ -337,6 +378,7 @@ impl ControlSource for Consumer<CtlMsg> {
 /// like `CtlMsg`, so the ring slot never allocates).
 #[allow(clippy::large_enum_variant)]
 pub enum NativeRecord {
+    SongInstall(NativeSongInstall),
     Msg(CtlMsg),
     Install(NativeInstall),
 }
@@ -346,6 +388,7 @@ impl ControlSource for Consumer<NativeRecord> {
         self.pop().map(|r| match r {
             NativeRecord::Msg(m) => Record::Msg(m),
             NativeRecord::Install(i) => Record::Native(i),
+            NativeRecord::SongInstall(i) => Record::SongNative(i),
         })
     }
 }
@@ -444,6 +487,8 @@ impl ByteInbox {
         match b.first().copied() {
             Some(TAG_SAMPLE_SLICE) => (b.len().saturating_sub(13), false, word(1)),
             Some(TAG_GRAPH_INSTALL) => (b.len().saturating_sub(13), false, word(1)),
+            Some(song::GRAPH) => (b.len().saturating_sub(22), false, word(9)),
+            Some(song::SLICE) => (b.len().saturating_sub(26), false, word(9)),
             Some(TAG_CELL_BATCH) => (0, true, 0),
             _ => (0, false, 0),
         }
@@ -478,6 +523,11 @@ impl ControlSource for ByteInbox {
         self.current = Some(i);
         let b = self.slot(i);
         let parsed = match b[0] {
+            song::GRAPH | song::BEGIN | song::SLICE => song::decode(b),
+            crate::song::routing::SONG_COMMAND_TAG => CtlMsg::decode(b)
+                .ok()
+                .filter(|(_, n)| *n == b.len())
+                .map(|(m, _)| Record::Msg(m)),
             TAG_CELL_BATCH => decode_batch(b).ok().map(|(v, _)| Record::Batch(v)),
             TAG_SAMPLE_SLICE => match CtlMsg::decode(b) {
                 Ok((
@@ -533,7 +583,15 @@ impl ControlSource for ByteInbox {
 
     fn drop_held(&mut self) -> Option<u32> {
         let i = (0..INBOX_SLOTS)
-            .filter(|&i| self.used[i] && Some(i) != self.current && self.class(i).0 > 0)
+            .filter(|&i| {
+                self.used[i]
+                    && Some(i) != self.current
+                    && self.class(i).0 > 0
+                    && !matches!(
+                        self.slot(i).first(),
+                        Some(&song::GRAPH) | Some(&song::SLICE)
+                    )
+            })
             .max_by_key(|&i| self.seqs[i])?;
         let (_, _, resource) = self.class(i);
         self.used[i] = false;
@@ -680,6 +738,15 @@ pub struct Counters {
     pub memory_capacity: usize,
 }
 
+/// Constructor-owned heterogeneous song storage; generic hosts use uniform regions.
+#[derive(Clone, Copy, Debug)]
+pub struct SongBusMemoryProfile {
+    /// Original full-budget regions, including the legacy master.
+    pub full_slots: usize,
+    /// Additional chain state beyond room and mandatory private delay, in seconds.
+    pub small_chain_seconds: f32,
+}
+
 /// Construction parameters; `Engine::new` uses the defaults.
 #[derive(Clone, Copy, Debug)]
 pub struct EngineConfig {
@@ -691,6 +758,8 @@ pub struct EngineConfig {
     pub store: StoreKind,
     pub template_slots: usize,
     pub bus_slots: usize,
+    /// Optional constructor-owned small song regions after the original full slots.
+    pub song_bus_memory: Option<SongBusMemoryProfile>,
     /// Bus delay memory beyond the capture buffer, seconds.
     pub bus_seconds: f32,
     /// Per-voice state budget: this value times sample rate gives float samples.
@@ -740,6 +809,7 @@ impl EngineConfig {
             // instruments.
             template_slots: 96,
             bus_slots: DEFAULT_BUS_SLOTS,
+            song_bus_memory: None,
             // Full stereo FDN/shimmer state fits one voice; buses have room
             // for useful combinations. These buffers are reserved at startup.
             bus_seconds: 10.0,
@@ -778,6 +848,33 @@ impl EngineConfig {
             || !valid_seconds(self.orbit_delay_seconds)
         {
             return Err(ConfigError::StateBudget);
+        }
+        if let Some(profile) = self.song_bus_memory {
+            if profile.full_slots < 2 || profile.full_slots > self.bus_slots {
+                return Err(ConfigError::StateBudget);
+            }
+            let small = crate::dsp::bus::small_song_region_frames(
+                self.sample_rate,
+                &self.caps,
+                profile.small_chain_seconds,
+            )?;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let full = (self.bus_seconds * self.sample_rate) as usize;
+            let full = full
+                .checked_add(crate::dsp::granular::effect_mem_len(
+                    self.sample_rate,
+                    &self.caps,
+                ))
+                .ok_or(ConfigError::StateBudget)?;
+            full.checked_mul(profile.full_slots)
+                .and_then(|n| {
+                    small
+                        .checked_mul(self.bus_slots - profile.full_slots)
+                        .and_then(|m| n.checked_add(m))
+                })
+                .and_then(|n| n.checked_mul(std::mem::size_of::<f32>()))
+                .filter(|n| *n <= isize::MAX as usize)
+                .ok_or(ConfigError::StateBudget)?;
         }
         Ok(())
     }

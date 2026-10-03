@@ -4,14 +4,17 @@
 //! equivalence). Seconds exist only at commit: rate fitting is a marker
 //! control resolved there with [`SpeedFit::resolve`].
 
+use crate::pattern::combinators::control::query_child;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use crate::pattern::combinators::control::{merge_producers, sample_child};
 use crate::pattern::combinators::{count, event_fault, kw, no_whole, op, split_event};
 use crate::pattern::eval::{eval_param_int, eval_param_ratio, int_of, num_ratio, QState};
-use crate::pattern::occ::OccKey;
+use crate::pattern::occ::ProducerKind;
+use crate::pattern::occ::{OccKey, ProducerTrace};
 use crate::pattern::pat::{PParam, Pat, PatNode, SliceCuts};
-use crate::pattern::query::{q, Event, TimeSpan};
+use crate::pattern::query::{Event, TimeSpan};
 use crate::reader::span::{NodeId, Span};
 use crate::value::ratio::Ratio64;
 use crate::value::value::Value;
@@ -172,7 +175,7 @@ pub(crate) fn query_chop(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for e in q(inner, span, st) {
+    for e in query_child(inner, span, 0, st) {
         let r = (|| {
             if e.whole.is_none() {
                 return Err(no_whole());
@@ -183,6 +186,12 @@ pub(crate) fn query_chop(
             for (i, mut child) in split_event(&e, k)? {
                 set_region(&mut child, lerp(b0, e0, i, k)?, lerp(b0, e0, i + 1, k)?);
                 child.occ.push(p.id, u32::try_from(i).unwrap_or(u32::MAX));
+                if let Some(trace) = &mut child.producer {
+                    trace.push(
+                        ProducerKind::GeneratedBranch,
+                        u32::try_from(i).unwrap_or(u32::MAX),
+                    );
+                }
                 kids.push(child);
             }
             Ok(kids)
@@ -196,23 +205,26 @@ pub(crate) fn query_chop(
 }
 
 /// The identities of a cycle's onsets, in rank order.
-type Ranked = Vec<(Vec<(NodeId, u32)>, Ratio64)>;
+type Ranked = Vec<(Vec<(NodeId, u32)>, Ratio64, Option<ProducerTrace>)>;
 
 /// The onsets of cycle `c` of `inner`, ranked by `whole.begin` (ties keep
 /// the deterministic branch order), as (path, begin) identities.
 fn rank_cycle(inner: &Pat, c: i64, st: &mut QState<'_, '_>) -> Result<Ranked, Failure> {
     let cycle = TimeSpan::cycle(c)?;
     // Faults of the widening query belong to events the main query reports
-    // itself (or to events outside the requested span): drop them here.
+    // itself (or outside its span). Preserve legacy dropping only when
+    // untraced; song realization must retain failures from the full cycle.
     let mark = st.faults.len();
-    let events = q(inner, cycle, st);
-    st.faults.truncate(mark);
+    let events = query_child(inner, cycle, 0, st);
+    if !st.is_traced() {
+        st.faults.truncate(mark);
+    }
     let mut onsets: Ranked = events
         .into_iter()
         .filter(|e| e.is_onset() && e.anchor().floor() == c)
         .map(|e| {
             let a = e.anchor();
-            (e.occ.path, a)
+            (e.occ.path, a, e.producer)
         })
         .collect();
     onsets.sort_by(|a, b| a.1.cmp(&b.1));
@@ -228,7 +240,7 @@ pub(crate) fn query_striate(
 ) -> Vec<Event> {
     let mut ranks: BTreeMap<i64, Ranked> = BTreeMap::new();
     let mut out = Vec::new();
-    for mut e in q(inner, span, st) {
+    for mut e in query_child(inner, span, 0, st) {
         let r = (|| {
             let Some(w) = e.whole else {
                 return Err(no_whole());
@@ -240,10 +252,7 @@ pub(crate) fn query_striate(
             }
             let rank = ranks
                 .get(&c)
-                .and_then(|r| {
-                    r.iter()
-                        .position(|(path, b)| *path == e.occ.path && *b == w.begin)
-                })
+                .and_then(|r| rank_of(r, &e, w.begin))
                 .ok_or_else(|| Failure::new(FailCode::Type, "striate could not rank an event"))?;
             let ord = i64::try_from(rank).unwrap_or(0).rem_euclid(k);
             Ok((ord, k))
@@ -352,17 +361,36 @@ pub(crate) fn query_slice(
     let mut pending: Vec<(Event, Value)> = Vec::new();
     if !pat.structured && index.structured {
         // The index list gives the structure (first-structure rule).
-        for ie in q(index, span, st) {
-            match st.sample(pat, ie.anchor()) {
+        for ie in query_child(index, span, 1, st) {
+            if let Err(f) = st.observe_song_index(p, &ie) {
+                event_fault(st, &ie, p, f);
+                continue;
+            }
+            match st.with_structural_sample(
+                pat,
+                ie.anchor(),
+                0,
+                ie.whole,
+                ie.part,
+                Some(&ie),
+                |st| sample_child(pat, ie.anchor(), 0, st),
+            ) {
                 Ok(sampled) => {
                     for s in sampled {
                         let mut e = s;
+                        if let Err(f) =
+                            crate::song::source::slices::issue_slice_timing(&mut e, &ie, p, st)
+                        {
+                            event_fault(st, &ie, p, f);
+                            continue;
+                        }
                         let mut path = ie.occ.path.clone();
                         path.extend(e.occ.path.iter().copied());
                         e.occ = OccKey {
                             path,
                             ..OccKey::empty()
                         };
+                        merge_producers(&ie, &mut e);
                         e.whole = ie.whole;
                         e.part = ie.part;
                         e.src = ie.src.or(e.src);
@@ -373,10 +401,22 @@ pub(crate) fn query_slice(
             }
         }
     } else {
-        for e in q(pat, span, st) {
+        for e in query_child(pat, span, 0, st) {
             match e.whole {
                 None => event_fault(st, &e, p, no_whole()),
-                Some(w) => match st.sample_value(index, w.begin) {
+                Some(w) => match st.with_structural_sample(
+                    index,
+                    w.begin,
+                    1,
+                    e.whole,
+                    e.part,
+                    Some(&e),
+                    |st| {
+                        st.with_producer(ProducerKind::Child, 1, |st| {
+                            st.sample_value(index, w.begin)
+                        })
+                    },
+                ) {
                     Ok(Value::Nil) => {}
                     Ok(v) => pending.push((e, v)),
                     Err(f) => event_fault(st, &e, p, f),
@@ -402,7 +442,7 @@ pub(crate) fn query_loop_at(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for mut e in q(inner, span, st) {
+    for mut e in query_child(inner, span, 0, st) {
         let r = (|| {
             let Some(w) = e.whole else {
                 return Err(no_whole());
@@ -437,7 +477,7 @@ pub(crate) fn query_fit(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for mut e in q(inner, span, st) {
+    for mut e in query_child(inner, span, 0, st) {
         match e.whole.map(TimeSpan::duration) {
             Some(Ok(cycles)) => {
                 e.controls
@@ -449,4 +489,38 @@ pub(crate) fn query_fit(
         }
     }
     out
+}
+
+/// Full traces are equality keys; legacy compact paths remain the fallback.
+fn rank_of(ranks: &Ranked, event: &Event, onset: Ratio64) -> Option<usize> {
+    ranks.iter().position(|(path, begin, trace)| {
+        *begin == onset
+            && match &event.producer {
+                Some(producer) => trace.as_ref() == Some(producer),
+                None => *path == event.occ.path,
+            }
+    })
+}
+
+#[cfg(test)]
+mod trace_rank_tests {
+    use super::*;
+    #[test]
+    fn striate_full_trace_equality_ignores_forced_compact_path_collisions() {
+        let span = TimeSpan::cycle(0).unwrap();
+        let mut event = Event::new(Some(span), span, Value::Int(7), None);
+        event.occ.push(NodeId::new(0), 0);
+        let mut a = ProducerTrace::default();
+        a.push(ProducerKind::Child, 0);
+        let mut b = ProducerTrace::default();
+        b.push(ProducerKind::Child, 1);
+        let ranks = vec![
+            (event.occ.path.clone(), Ratio64::ZERO, Some(a)),
+            (event.occ.path.clone(), Ratio64::ZERO, Some(b.clone())),
+        ];
+        event.producer = Some(b);
+        assert_eq!(rank_of(&ranks, &event, Ratio64::ZERO), Some(1));
+        event.producer = None;
+        assert_eq!(rank_of(&ranks, &event, Ratio64::ZERO), Some(0));
+    }
 }

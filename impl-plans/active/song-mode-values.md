@@ -1,10 +1,10 @@
 # Finite symbolic values implementation plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: SONG-01
 **Plan Path**: impl-plans/active/song-mode-values.md
 **Created**: 2026-09-30
-**Last Updated**: 2026-09-30
+**Last Updated**: 2026-10-01
 **Session target**: 1–3 sessions
 **Design Reference**: [Accepted song-mode design](../../design-docs/specs/design-song-mode.md#finite-values)
 
@@ -83,13 +83,13 @@ Use existing Ratio64, Pat, Value, Failure, Tempo, KwId and capability types. Dec
 
 | File | Intended change | Status |
 |---|---|---|
-| `src/song/mod.rs` | Export only the finite value, edit, identity and host contracts as they become available; keep implementation modules separate. | NOT_STARTED |
-| `src/song/part.rs` | Define immutable capture, sequence, repeat and edit nodes with checked duration and track keys. No PCM or eager repeat expansion. | NOT_STARTED |
-| `src/song/song.rs` | Define Song and frozen timing/seed settings; separate arrangement endpoint from tail deadline. | NOT_STARTED |
-| `src/song/limits.rs` | Define construction/work limits and checked duration/frame-capacity validation; use actual advertised host limits. | NOT_STARTED |
-| `src/song/identity.rs` | Define PartRevision, full OccurrencePath, EventHandle, SnapshotEpoch, PlacementPath, InstrumentSelector and SongEvent contracts before other consumers. | NOT_STARTED |
-| `src/lib.rs` | Expose song module without changing existing exports. | NOT_STARTED |
-| `tests/song_values.rs` | Exercise zero-repeat/empty sequence, timed silence, invalid durations/counts and rational overflow using public constructors. | NOT_STARTED |
+| `src/song/mod.rs` | Export only the finite value, edit, identity and host contracts as they become available; keep implementation modules separate. | IMPLEMENTED |
+| `src/song/part.rs` | Define immutable capture, sequence, repeat and edit nodes with checked duration and track keys. No PCM or eager repeat expansion. | IMPLEMENTED |
+| `src/song/song.rs` | Define Song and frozen timing/seed settings; separate arrangement endpoint from tail deadline. | IMPLEMENTED |
+| `src/song/limits.rs` | Define construction/work limits and checked duration/frame-capacity validation; use actual advertised host limits. | IMPLEMENTED |
+| `src/song/identity.rs` | Define PartRevision, full OccurrencePath, EventHandle, SnapshotEpoch, PlacementPath, InstrumentSelector and SongEvent contracts before other consumers. | IMPLEMENTED |
+| `src/lib.rs` | Expose song module without changing existing exports. | IMPLEMENTED |
+| `tests/song_values.rs` | Exercise zero-repeat/empty sequence, timed silence, invalid durations/counts and rational overflow using public constructors. | IMPLEMENTED |
 
 ### Public declaration contract
 
@@ -99,15 +99,24 @@ pub struct PartRevision(pub u64);
 pub struct SnapshotEpoch(pub u64);
 pub struct OccurrencePath { pub producer_ordinals: Vec<u32>, pub cycle: i64, pub onset: Ratio64 }
 pub struct PlacementPath(pub Vec<u32>);
-pub struct InstrumentSelector { pub family: Vec<Sound> }
-pub struct SongEvent { pub handle: EventHandle, pub track: KwId, pub instrument: Sound, pub event: Event, pub placement: PlacementPath, pub tone: Option<i64> }
+pub struct InstrumentSelector { family: Vec<Sound> } // checked new + family/contains getters
+pub struct SongEvent { pub handle: EventHandle, pub track: KwId, pub instrument: Sound, pub event: Event, pub placement: PlacementPath, pub tone: Option<ResolvedNote>, pub commit_mode: NoteCommitMode }
 pub struct SongLimits { pub max_nodes: u32, pub max_depth: u32, pub max_tracks: u32, pub max_cached_events: u32, pub max_frames: u64 }
-pub enum PartEdit { ReplaceTrack { track: KwId, pattern: Rc<Pat> }, TransformInstrument { track: KwId, selector: InstrumentSelector, transform: Value }, DeleteEvent(EventHandle), OverwriteRegion { track: KwId, region: TimeSpan, pattern: Rc<Pat> }, InstrumentFx { track: KwId, selector: InstrumentSelector, template: KwId } }
-pub struct EventHandle { pub revision: PartRevision, pub occurrence: OccurrencePath, pub tone: u32 }
+pub enum PartEdit { ReplaceTrack { track: KwId, pattern: Rc<Pat> }, TransformInstrument { track: KwId, selector: InstrumentSelector, pattern: Rc<Pat> }, DeleteEvent(EventHandle), OverwriteRegion { track: KwId, region: TimeSpan, pattern: Rc<Pat> }, InstrumentFx { track: KwId, selector: InstrumentSelector, template: KwId } }
+pub struct EventHandle {
+    revision: PartRevision, track: KwId, placement: PlacementPath,
+    occurrence: OccurrencePath, tone: u32
+}
+// Read-only getters expose each component. No public issuance constructor.
+// Crate-internal issuance certifies successful canonical realization (SONG-04).
+pub struct SeedIdentity(pub u64);
+pub enum ResolvedNote { Int(i64), Ratio(Ratio64), Float32(f32), Float64(f64) }
+pub enum NoteCommitMode { Mono }
+pub struct SongEventId { pub epoch: SnapshotEpoch, pub handle: EventHandle }
 pub struct SongSettings { pub bpm: Ratio64, pub cycle_beats: Ratio64, pub meter: [u32; 2], pub seed: u64, pub tail_seconds: Ratio64 }
 pub enum PartNode { Capture(BTreeMap<KwId, Rc<Pat>>), Sequence(Vec<Rc<Part>>), Repeat { child: Rc<Part>, count: u32, seed_mode: RepeatSeedMode }, Edit { source: Rc<Part>, edit: PartEdit } }
-pub struct Part { pub revision: PartRevision, pub duration: Ratio64, pub node: PartNode }
-pub struct Song { pub part: Rc<Part>, pub settings: SongSettings }
+pub struct Part { revision: PartRevision, duration: Ratio64, node: PartNode, /* private seed/track/cost metadata */ }
+pub struct Song { part: Rc<Part>, settings: SongSettings, /* private exact endpoints */ }
 pub fn capture_part(tracks: BTreeMap<KwId, Rc<Pat>>, duration: Ratio64) -> Result<Part, Failure>;
 pub fn sequence(parts: Vec<Rc<Part>>) -> Result<Part, Failure>;
 pub fn part_repeat(part: Rc<Part>, count: u32, mode: RepeatSeedMode) -> Result<Part, Failure>;
@@ -116,35 +125,35 @@ pub fn part_repeat(part: Rc<Part>, count: u32, mode: RepeatSeedMode) -> Result<P
 ## Tasks
 
 ### TASK-001: Baseline and contract integration
-**Status**: NOT_STARTED
+**Status**: Completed
 **Parallelizable**: No; acquire dependencies and fresh hashes first.
 **Deliverables**: Manifest, immutable intent snapshot and the declaration/type integration listed above.
-- [ ] Read accepted section and prerequisites; record exact ownership and imports.
-- [ ] Add declarations without changing legacy semantics; review manifest-required exhaustive consumers.
+- [x] Read accepted section and prerequisites; record exact ownership and imports.
+- [x] Add declarations without changing legacy semantics; review manifest-required exhaustive consumers.
 
 ### TASK-002: Implement the owned behavior
-**Status**: NOT_STARTED
+**Status**: Completed
 **Depends On**: TASK-001
 **Parallelizable**: No within this plan; cross-plan parallelism follows the DAG and ownership manifest.
 **Deliverables**: Every non-test file in the module table, with exactly its stated intended change.
-- [ ] Implement the declared behavior and all phase-specific criteria below.
-- [ ] Record post-edit hashes and run required modify-agent checks.
+- [x] Implement the declared behavior and all phase-specific criteria below.
+- [x] Record post-edit hashes and run required modify-agent checks.
 
 ### TASK-003: Behavioral evidence and progress
-**Status**: NOT_STARTED
+**Status**: Completed
 **Depends On**: TASK-002
 **Parallelizable**: No; verifies the complete phase.
 **Deliverables**: Every listed test/fixture file, full command logs and this plan progress record.
-- [ ] Add the specified success, boundary, compatibility and failure fixtures.
-- [ ] Run future commands below; record actual exit status and complete output, with no empty selected-test run accepted.
-- [ ] Reconcile final hashes with intent; update completion criteria and progress without editing other worker logs.
+- [x] Add the specified success, boundary, compatibility and failure fixtures.
+- [x] Run future commands below; record actual exit status and complete output, with no empty selected-test run accepted.
+- [x] Reconcile final hashes with intent; update completion criteria and progress without editing other worker logs.
 
 ## Phase acceptance criteria
 
-- [ ] Positive capture duration; zero only for empty derived arrangements; unique track keys and checked arithmetic.
-- [ ] Root revision is separate from seed identity. Define full producer-path entries, placement ordinals and tone ordinals; no hash-only equality.
-- [ ] PartEdit declaration is owned here as data: ReplaceTrack, TransformInstrument, DeleteEvent, OverwriteRegion and InstrumentFx. Execution belongs to SONG-04.
-- [ ] Reject nonpositive BPM/cycle beats and invalid meter; default 120 BPM, 4 beats/cycle, 4/4, eight-second tail.
+- [x] Positive capture duration; zero only for empty derived arrangements; unique track keys and checked arithmetic.
+- [x] Root revision is separate from seed identity. Define full producer-path entries, placement ordinals and tone ordinals; no hash-only equality.
+- [x] PartEdit declaration is owned here as data: ReplaceTrack, TransformInstrument, DeleteEvent, OverwriteRegion and InstrumentFx. Execution belongs to SONG-04.
+- [x] Reject nonpositive BPM/cycle beats and invalid meter; default 120 BPM, 4 beats/cycle, 4/4, eight-second tail.
 
 ## Future verification — not executed during planning
 
@@ -157,11 +166,11 @@ pub fn part_repeat(part: Rc<Part>, count: u32, mode: RepeatSeedMode) -> Result<P
 
 ## Completion criteria
 
-- [ ] All module-table changes and phase-specific criteria complete.
-- [ ] Tests listed above execute with nonzero fixture count and pass; check/typecheck/build gates pass.
-- [ ] All required command exit statuses and complete log paths recorded; no running foreground sessions remain.
-- [ ] Legacy behavior preserved; pre-existing changes retained and cross-worker hashes reconciled.
-- [ ] Progress status updated; archive/index changes deferred to SONG-16.
+- [x] All module-table changes and phase-specific criteria complete.
+- [x] Tests listed above execute with nonzero fixture count and pass; check/typecheck/build gates pass.
+- [x] All required command exit statuses and complete log paths recorded; no running foreground sessions remain.
+- [x] Legacy behavior preserved; pre-existing changes retained and cross-worker hashes reconciled.
+- [x] Progress status updated; archive/index changes deferred to SONG-16.
 
 ## Progress Log
 
@@ -171,3 +180,76 @@ pub fn part_repeat(part: Rc<Part>, count: u32, mode: RepeatSeedMode) -> Result<P
 **Blockers**: None for planning; implementation awaits reviewed/committed documents and prerequisite waves.
 **Verification**: Read-only source/document consistency review only. Future commands above were not executed.
 **Next session**: Implement TASK-001 after dependency outputs and authorization are available.
+
+### Session: 2026-10-01 — SONG-01 implementation
+
+**Implemented**: Checked finite captures, duplicate-safe capture iterator,
+exact sequence sums, symbolic repeats/count validation, immutable prepared edit
+data, settings freeze and exact absolute frame endpoints. Construction node,
+depth, track/cache and explicit frame capacities reject rather than truncate.
+Actual host allocations supply `SongLimits::for_capacities`; a voice limit is
+not misrepresented as routing capacity. Frame admission occurs with frozen Song
+tempo and the selected host rate, not an invented rate during Part construction.
+
+**Contract refinements approved by root**:
+- Part/Song and FrameEndpoints use private validated fields and read-only
+  accessors. This prevents forged duration/endpoints and unchecked tail subtraction.
+- EventHandle is opaque, issued internally only after successful realization;
+  identity includes explicit track, full finite placement, complete producer
+  tree/step ordinals, cycle/onset and tone. Delete data validates revision and
+  declared root track; it does not incorrectly require edit-generated occurrences
+  to belong to a pre-edit capture topology.
+- SeedIdentity is structural and separate from checked monotonic control-thread
+  revision allocation. Edits retain source seed identity; no hash substitutes
+  for full event equality. Native/browser use existing deterministic Hasher.
+- ResolvedNote retains Int/Ratio/Float32/Float64, including fractional notes;
+  nonfinite notes and chord-list coercion reject. Mono commit mode marks already
+  separated tones for downstream commit.
+- TransformInstrument stores a prepared Rc<Pat>, not a deferred callable.
+  Callback invocation and canonical tracing remain entirely in SONG-04.
+- Required song.rs is a private descriptor module behind public facade exports,
+  avoiding Clippy module-inception without changing listed file ownership.
+
+**Preservation/intent**: Numbered immutable before/after SHA-256 records are at
+`tmp/song-mode-riela/SONG-01/0001-checked-values*.json` through
+`0006-plan-contract-evidence*.json`. Each records fresh design/plan/target hashes;
+formatting used only owned files with rustfmt skip_children=true. Existing dirty
+editor and src/session/tests/publish.rs were not written. Root's approved design
+and trace-plan amendments are independent and intentionally preserved.
+
+**Initial evidence**: Public song_values 15/15 and internal identity tests 2/2
+passed. Initial cargo check exit 0; one focused Clippy module-inception finding
+was corrected by the descriptor alias. Final command/exit/full-log records will
+be retained in `tmp/song-mode-riela/SONG-01/foreground-results.json`.
+
+**Remaining verification**: Required independent checker notified that Rust
+writes are complete. Finish command evidence and checker reconciliation before
+marking this phase complete; plan archive/index updates belong to SONG-16.
+
+### Session: 2026-10-01 — phase verified and complete
+
+All SONG-01 deliverables and phase criteria are complete. Archive/index work
+remains assigned to SONG-16; no later song transport/query feature is claimed.
+
+Own foreground commands all exited 0 (full commands/status/logs:
+`tmp/song-mode-riela/SONG-01/foreground-results.json`):
+
+| Actual command (CARGO_TERM_QUIET=true) | Exit | Complete log |
+|---|---|---|
+| mise exec -- cargo check | 0 | tmp/song-mode-riela/SONG-01/check-final.log |
+| mise exec -- cargo clippy --lib --test song_values -- -D warnings | 0 | tmp/song-mode-riela/SONG-01/clippy-final.log |
+| mise exec -- cargo check --target wasm32-unknown-unknown --no-default-features --features host-wasm | 0 | tmp/song-mode-riela/SONG-01/wasm-final.log |
+| mise exec -- cargo nextest run -E 'binary(song_values)' (quiet nextest variables enabled) | 0 | tmp/song-mode-riela/SONG-01/song-values-nextest.log |
+| mise exec -- cargo test --lib song::identity::tests | 0 | tmp/song-mode-riela/SONG-01/identity-final.log |
+| mise exec -- cargo test --doc song::identity | 0 | tmp/song-mode-riela/SONG-01/opaque-handles-doc.log |
+
+Fixtures: 15 public tests, two full-identity/stale-revision tests, and one
+opaque-handle compile-fail doctest; each selected run was nonzero.
+
+Independent check-and-test agent cleared constructor/settings/identity audit,
+15+2+1 fixtures, nextest15, native and wasm checks, owned formatting,
+all-target Clippy and diff check, all exit0. Complete independent command/log
+manifest: `/tmp/vactr-song01-checker-results.json`. No outstanding finding.
+All owned Rust files remain under1000lines. No foreground session remains.
+Fresh numbered post-edit hashes reconcile all owned Rust files; pre-existing
+editor/session edits and root's separate plan refinements remain intact.

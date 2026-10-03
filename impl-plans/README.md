@@ -2,6 +2,20 @@
 
 This directory contains implementation plans that translate design documents into actionable implementation specifications.
 
+[Query-issued song authority](active/song-mode-issued-query-authority.md) is In Progress. Its reviewed eight-path scope is released for the live query/replay provenance bridge after accepted retained geometry.
+
+[Immutable route authority](active/song-mode-immutable-route-authority.md) is Ready and its exact eight paths are released for snapshot-issued views, attested topology copies and caller-metered preparation. Production admission and route consumption remain required following phases.
+
+[Frozen issued events](active/song-mode-frozen-issued-events.md) is released for its five-path implementation. [Issued playback](active/song-mode-issued-playback.md) remains Planning. The authenticated geometry resolver and pre-Reserve admission remain explicit prerequisites for actual scheduler consumption.
+
+[Retained execution membership](active/song-mode-retained-execution-membership.md) has its two-path source accepted after membership0003 verification; actual immutable-route consumer adoption remains open. It authenticates genuine retained executions without exporting raw records; varying seeds and permitted first executions still require admission work.
+
+[Authenticated issued route resolution](active/song-mode-issued-route-resolution.md) records the eight-path production consumer candidate and its genuine invocation/member evidence adapter prerequisite. It remains Planning.
+
+[Structural clock hooks](active/song-mode-structural-clock-hooks.md) records a bounded Planning phase for Euclid sampling and seven operators' clock evidence. Chunk output-anchor selection requires a separate proof.
+
+[Route preparation metering](active/song-mode-route-preparation-meter.md) has held0003 source accepted after eight focused tests, 425 broader Rust tests, and fresh frontend/build verification. Actual route-builder adoption is now released in the following phase. It preserves original nested depth and certification failure work before the immutable routing bridge.
+
 ## Purpose
 
 Implementation plans bridge design documents (what to build) and actual code (how to build). They provide:
@@ -40,6 +54,37 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Status | Design Reference | Last Updated |
 |------|--------|------------------|--------------|
+| [song-mode-live-isolation.md](active/song-mode-live-isolation.md) | Ready; reject live clock and reverse legacy mixing during finite ownership | design-song-mode.md timing and playback | 2026-10-03 |
+| [song-mode-controller-ack-pressure.md](active/song-mode-controller-ack-pressure.md) | Ready; actual controller critical acknowledgment saturation | design-song-mode.md live Apply review | 2026-10-03 |
+| [song-mode-sample-forwarding.md](active/song-mode-sample-forwarding.md) | Ready; checked sample forwarding in genuine provider fixtures | design-song-mode.md sample admission reassessment | 2026-10-03 |
+| [song-mode-atomic-apply-pressure.md](active/song-mode-atomic-apply-pressure.md) | In Progress; bounded receipts, reservations and lifecycle proof | design-song-mode.md implementation review | 2026-10-03 |
+| [song-mode-atomic-apply-controller.md](active/song-mode-atomic-apply-controller.md) | In Progress; exact live replacement and semantic mute continuity | design-song-mode.md implementation review | 2026-10-03 |
+| [song-mode-handoff-recovery.md](active/song-mode-handoff-recovery.md) | In Progress; authenticated cancellation restores original Apply authority | design-song-mode.md implementation review | 2026-10-03 |
+| [song-mode-index-occupancy.md](active/song-mode-index-occupancy.md) | In Progress; authenticated Slice support and bounds consumer | design-song-mode.md routing, identity and bounds | 2026-10-02 |
+| [song-mode-index-static-joint.md](active/song-mode-index-static-joint.md) | Planning; shared static compiler implemented and focused tests pass; full geometry remains open | design-song-mode.md routing and bounds | 2026-10-03 |
+| [song-mode-canonical-index-occupancy.md](active/song-mode-canonical-index-occupancy.md) | In Progress; collector source under review; immutable consumers and varying-seed bounds pending | design-song-mode.md remaining occupancy implementation direction | 2026-10-03 |
+| [song-mode-canonical-query-replay.md](completed/song-mode-canonical-query-replay.md) | Completed; genuine replay and348-test checkpoint verified | design-song-mode.md canonical collector review | 2026-10-03 |
+| [song-mode-canonical-clock-frames.md](completed/song-mode-canonical-clock-frames.md) | Completed; genuine runtime clocks,355 Rust tests and fresh590 editor tests verified | design-song-mode.md immutable consumers and authentic clock capture | 2026-10-03 |
+| [song-mode-clock-transaction-fixtures.md](completed/song-mode-clock-transaction-fixtures.md) | Completed; actual snapshot publication and normal-stack regressions verified | design-song-mode.md current completion path | 2026-10-03 |
+| [song-mode-canonical-sampling-relations.md](completed/song-mode-canonical-sampling-relations.md) | Completed; nine genuine sampling tests and joined gates accepted | design-song-mode.md immutable consumers and authentic clock capture | 2026-10-03 |
+| [song-mode-source-query-extraction.md](completed/song-mode-source-query-extraction.md) | Completed; extraction-only equivalence and joined gates accepted | design-song-mode.md immutable consumers and authentic clock capture | 2026-10-03 |
+| [song-mode-sampled-replay-binding.md](completed/song-mode-sampled-replay-binding.md) | Completed; genuine independent-owner to sampled-source rebinding accepted | design-song-mode.md immutable consumers and authentic clock capture | 2026-10-03 |
+| [song-mode-sampling-fixture-inventory.md](completed/song-mode-sampling-fixture-inventory.md) | Completed; same-original inventory and dependency preparation accepted | design-song-mode.md current completion path | 2026-10-03 |
+| [song-mode-owner-invocation-retention.md](active/song-mode-owner-invocation-retention.md) | In Progress; actual invocation records implemented, alias repair undergoing independent final gates | design-song-mode.md current completion path | 2026-10-03 |
+| [song-mode-retained-invocation-lookup.md](active/song-mode-retained-invocation-lookup.md) | In Progress; execution gates accepted380Rust/590editor; geometry companion pending | design-song-mode.md immutable consumers | 2026-10-03 |
+| [song-mode-retained-index-geometry.md](completed/song-mode-retained-index-geometry.md) | Completed;397 Rust and590 frontend tests plus scoped gates accepted; production integration remains | design-song-mode.md current completion path | 2026-10-03 |
+| [song-mode-canonical-native-meter.md](completed/song-mode-canonical-native-meter.md) | Completed; transitive meter verified in joined307-test checkpoint | design-song-mode.md canonical collector review | 2026-10-03 |
+| [song-mode-routing-consumer-splits.md](completed/song-mode-routing-consumer-splits.md) | Completed; original13 fixtures and joined gates pass | design-song-mode.md canonical collector review | 2026-10-03 |
+| [song-mode-index-runtime-fixtures.md](active/song-mode-index-runtime-fixtures.md) | In Progress; genuine Index runtime witnesses and public Subject regression | design-song-mode.md routing and identity | 2026-10-02 |
+| [song-mode-index-families.md](active/song-mode-index-families.md) | In Progress; connected multiple leaves/copies and positive affine issuer clocks | design-song-mode.md routing, identity and bounds | 2026-10-02 |
+| [song-mode-fixed-callable-sources.md](active/song-mode-fixed-callable-sources.md) | In Progress; genuine fixture repairs under independent verification | design-song-mode.md identity, editing and bounds | 2026-10-02 |
+| [song-mode-bounded-reservations.md](active/song-mode-bounded-reservations.md) | In Progress; explicit complete-lease resource/work bounds awaiting joined verification | design-song-mode.md bounds and routing | 2026-10-02 |
+| [song-mode-checked-graph-admission.md](active/song-mode-checked-graph-admission.md) | In Progress; typed browser graph admission verified in 21 scoped tests; wider integration pending | design-song-mode.md playback and bounds | 2026-10-02 |
+| [song-mode-host-preparation.md](active/song-mode-host-preparation.md) | In Progress; consuming owner implementation underway; joined verification pending | design-song-mode.md playback, application and bounds | 2026-10-02 |
+| [song-mode-time-source-inference.md](active/song-mode-time-source-inference.md) | In Progress; coherent time/result pattern inference implemented, public verification pending | design-song-mode.md editing and bounds | 2026-10-02 |
+| [song-mode-time-source-effects.md](active/song-mode-time-source-effects.md) | In Progress; local query-effect guard held; joined verification pending | design-song-mode.md editing and bounds | 2026-10-02 |
+| [song-mode-placement-overlap.md](active/song-mode-placement-overlap.md) | In Progress; checked half-open ordinary overlap held; joined verification pending | design-song-mode.md routing and bounds | 2026-10-02 |
+| [song-mode-native-configured-preparation.md](active/song-mode-native-configured-preparation.md) | In Progress; genuine configured Native capacity and full owner fixtures held | design-song-mode.md playback and application | 2026-10-02 |
 | [cmp-closeout-dispatch.json](active/cmp-closeout-dispatch.json) | Dispatch manifest for the session-234 closeout (plans [CMP-40]; 11 accepted dependencies; all 12 plans completed and archived session 234) | design-completion.md 8-9; design-formatter-and-syntax.md 8 | 2026-09-30 |
 | [fst-dispatch.json](active/fst-dispatch.json) | Dispatch manifest for FST-10..40 (waves [10,11] [20,21,22,23] [30] [40]; all eight plans completed and archived session 222) | - | 2026-09-30 |
 | [modular-audio-handoff.md](active/modular-audio-handoff.md) | Ready; PLV-001 voice layer measured SourceStage and wired into 24 templates; MOD-004 stereo/multi-output edges complete; remaining audio TODOs prioritized | design-mutable-audio.md; design-music.md 4.1 | 2026-09-30 |
@@ -117,6 +162,7 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
+| [song-mode-slice-matcher-budget.md](completed/song-mode-slice-matcher-budget.md) | 2026-10-02; focused accounting acceptance ROOT0494, actual20 tests | design-song-mode.md bounds and identity |
 | [sample-timestamps.md](completed/sample-timestamps.md) | 2026-09-30 | design-sample-timestamps.md |
 | [sampled-breakcore.md](completed/sampled-breakcore.md) | 2026-09-30 | design-genre-tracks.md sampled breakcore |
 | [shimmer-ambient-tracks.md](completed/shimmer-ambient-tracks.md) | 2026-09-30 | design-genre-tracks.md shimmer ambient |
@@ -237,23 +283,45 @@ PHASE_TO_PLANS = {
 
 Accepted design: [Finite multi-track song mode](../design-docs/specs/design-song-mode.md).
 Riela accepted the design and all 16 plans with no material findings on 2026-09-30.
-All plans are Ready; implementation has not started. Shared files follow serial dependencies; indexes and archiving belong to SONG-16.
+Implementation is in progress; statuses and evidence are recorded per plan. Shared files follow serial dependencies; indexes and archiving belong to SONG-16.
 
 | Plan ID | Plan | Depends On |
 |---|---|---|
 | SONG-01 | [Finite symbolic values](active/song-mode-values.md) | Accepted design |
 | SONG-02 | [Value and VM compatibility](active/song-mode-value-integration.md) | SONG-01 |
 | SONG-03 | [Checker types and native signatures](active/song-mode-checker.md) | SONG-02 |
-| SONG-04 | [Canonical realization and pure edits](active/song-mode-query-edits.md) | SONG-01 |
+| SONG-04A | [Producer trace core](active/song-mode-producer-trace.md) | SONG-01, SONG-02 |
+| SONG-04B | [Combinator trace propagation](active/song-mode-trace-combinators.md) | SONG-04A |
+| SONG-04P | [Selected source and route contracts](active/song-mode-source-contracts.md) | SONG-03, SONG-04B |
+| SONG-04Q | [Source provenance and canonical context](active/song-mode-source-provenance.md) | SONG-04P |
+| SONG-04R | [Sample classification](active/song-mode-sample-classification.md) | SONG-04Q |
+| SONG-04 | [Canonical realization and pure edits](active/song-mode-query-edits.md) | SONG-01, SONG-04B, SONG-04P, SONG-04Q, SONG-04R |
 | SONG-05 | [Song native execution](active/song-mode-natives.md) | SONG-03, SONG-04 |
-| SONG-06 | [Snapshot and session request contracts](active/song-mode-snapshot-contracts.md) | SONG-05 |
+| SONG-06A | [Isolated song assets](active/song-mode-assets.md) | SONG-05 |
+| SONG-06 | [Snapshot and session request contracts](active/song-mode-snapshot-contracts.md) | SONG-05, SONG-06A |
 | SONG-07 | [Isolated whole-code candidate evaluation](active/song-mode-candidate-evaluation.md) | SONG-06 |
 | SONG-08 | [Audio commands and acknowledgments](active/song-mode-audio-contracts.md) | SONG-06 |
 | SONG-09 | [Private branches, tails and audio gates](active/song-mode-dsp-routing.md) | SONG-08 |
 | SONG-10 | [Native and worklet song adapters](active/song-mode-host-adapters.md) | SONG-09 |
 | SONG-11 | [Finite song transport and atomic activation](active/song-mode-transport.md) | SONG-07, SONG-10 |
+| SONG-ACTIVATION-CORRELATION | [Correlated activation and exact initial onset](active/song-mode-activation-correlation.md) | SONG-HOST-PREPARATION |
+| SONG-ACTIVATION-WIRE | [Activation DTO and wire](active/song-mode-activation-wire.md) | verified host cohort |
+| SONG-SAMPLE-ADMISSION | [Checked sample sender admission](active/song-mode-sample-admission.md) | verified host/wire cohort |
+| SONG-ACTIVATION-PIPELINE | [Activation pipeline and exact empty-song lifecycle](active/song-mode-activation-pipeline.md) | SONG-ACTIVATION-WIRE, SONG-HOST-PREPARATION |
+| SONG-11A | [Owned finite transport core](active/song-mode-transport-core.md) | SONG-07, SONG-HOST-PREPARATION, SONG-ACTIVATION-CORRELATION, verified routes |
+| SONG-11B | [Runtime/session transport integration](active/song-mode-transport-integration.md) | SONG-11A, SONG-HOST-PREPARATION |
 | SONG-12 | [Streaming complete-song WAV export](active/song-mode-export-core.md) | SONG-11 |
 | SONG-13 | [Automatic run completion and render command](active/song-mode-cli.md) | SONG-12 |
 | SONG-14 | [Browser song protocol integration](active/song-mode-browser-session.md) | SONG-11 |
 | SONG-15 | [Whole-code Apply and instrument mute UI](active/song-mode-editor-controls.md) | SONG-14 |
 | SONG-16 | [Serial integration evidence and documentation](active/song-mode-reconciliation.md) | SONG-13, SONG-15 |
+
+## Completed song runtime checkpoints
+
+| Plan | Verified scope |
+|---|---|
+| [Browser runtime evidence](completed/song-mode-browser-runtime-evidence.md) | Four actual WASM ABI fixtures: catalog refusal, frozen PCM, finite playback and acknowledged mute/unmute without replay. Atomic replacement and browser UI/device acceptance remain separate. |
+
+- [Issued invocation compatibility witnesses](completed/song-mode-issued-invocation-compatibility.md): Completed; original full invocation witness preserved with fresh issued member proofs; joined405 Rust and590 frontend plus build gates accepted.
+
+[Shared issued query work](active/song-mode-shared-issued-query-work.md) is a separate Planning prerequisite for preserving the actual query collector through resolution. Its four paths (including charged additive replay seeding) are not part of the active routing release.

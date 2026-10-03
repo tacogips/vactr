@@ -24,12 +24,118 @@ use crate::vm::fail::{FailCode, Failure};
 
 /// The audio sink (design 11.5, 12.8.5).
 pub trait AudioHost {
+    /// Observes the exact rendered timebase without submitting a request.
+    ///
+    /// # Errors
+    /// Returns an explicit failure when unsupported or awaiting a matching report.
+    fn song_clock(&self) -> Result<crate::song::routing::SongHostClock, Failure> {
+        Err(Failure::new(
+            FailCode::HostUnavailable,
+            "exact song clock unavailable",
+        ))
+    }
+
+    /// Admits one complete command, or returns the exact command without posting it.
+    #[allow(clippy::result_large_err)] // Inline POD ownership is the refusal contract.
+    fn try_song_command(
+        &mut self,
+        command: crate::song::routing::SongCommand,
+    ) -> Result<(), SongCommandRefusal> {
+        Err(SongCommandRefusal {
+            command,
+            error: SongSubmitError::Unavailable,
+        })
+    }
+
+    /// Transfers an existing upload allocation, returning exact ownership on refusal.
+    fn submit_song_native(
+        &mut self,
+        install: crate::dsp::ring::NativeSongInstall,
+    ) -> Result<(), crate::dsp::ring::NativeSongInstall> {
+        Err(install)
+    }
+    /// Compiles a retained Native upload using the actual host environment.
+    /// None selects the existing borrowed graph upload strategy; no submission
+    /// or readiness is implied. This operation does not enqueue or consume ACKs.
+    ///
+    /// # Errors
+    /// Invalid graph kind or compilation against the actual allocation fails.
+    fn materialize_song_native(
+        &self,
+        _lease: crate::song::routing::SongLeaseKey,
+        _graph: &GraphHandle,
+    ) -> Result<Option<crate::dsp::ring::NativeSongInstall>, Failure> {
+        Ok(None)
+    }
+
+    /// Checks complete borrowed graph admission without consuming its owner.
+    /// Permanent invalidity is distinct from temporary queue backpressure.
+    fn try_song_graph(
+        &mut self,
+        _lease: crate::song::routing::SongLeaseKey,
+        _graph: &GraphHandle,
+    ) -> Result<(), SongSubmitError> {
+        Err(SongSubmitError::Unavailable)
+    }
+
+    /// Unsupported hosts retain caller graph ownership.
+    fn submit_song_graph(
+        &mut self,
+        _lease: crate::song::routing::SongLeaseKey,
+        _graph: &GraphHandle,
+    ) -> Result<(), Failure> {
+        Err(Failure::new(
+            FailCode::HostUnavailable,
+            "song graph upload unavailable",
+        ))
+    }
+    /// Checks actual sample admission; only Backpressure permits unchanged retry.
+    fn try_song_sample(
+        &mut self,
+        lease: crate::song::routing::SongLeaseKey,
+        data: Arc<SampleData>,
+    ) -> Result<(), SongSampleRefusal> {
+        Err(SongSampleRefusal {
+            lease,
+            data,
+            error: SongSubmitError::Unavailable,
+        })
+    }
+    /// Observes actual remaining sender-local metadata and PCM ownership bounds.
+    fn song_sample_sender_capacity(&self) -> Result<SongSampleSenderCapacity, Failure> {
+        Err(Failure::new(
+            FailCode::HostUnavailable,
+            "song sample sender capacity unavailable",
+        ))
+    }
+    /// A rejected sample submission returns the original shared allocation.
+    fn submit_song_sample(
+        &mut self,
+        lease: crate::song::routing::SongLeaseKey,
+        data: Arc<SampleData>,
+    ) -> Result<(), Arc<SampleData>> {
+        self.try_song_sample(lease, data)
+            .map_err(|refusal| refusal.data)
+    }
+
+    /// Posts an exact song POD command. Admission acknowledgment is asynchronous.
+    fn post_song(&mut self, command: crate::song::routing::SongCommand) {
+        self.post(CtlMsg::Song(command));
+    }
     /// Queues an event on the time-ordered ring.
     fn send(&mut self, ev: AudioEvent);
     /// Sends a slot control on the priority channel (11.3).
     fn control(&mut self, c: SlotControl);
     /// Sends any other priority-channel record.
     fn post(&mut self, msg: CtlMsg);
+    /// Returns at most one acknowledgment, leaving all following records queued.
+    /// Runs on the control thread; unsupported hosts consume nothing.
+    fn poll_msg(&mut self) -> Result<Option<HostMsg>, Failure> {
+        Err(Failure::new(
+            FailCode::HostUnavailable,
+            "bounded audio acknowledgment polling is unavailable",
+        ))
+    }
     /// Moves every record the audio side sent back into `out`.
     fn drain(&mut self, out: &mut Vec<HostMsg>);
     /// Host seconds on the audio timebase (12.8.4).
@@ -355,3 +461,17 @@ impl Hosts {
         }
     }
 }
+
+#[path = "caps/song/preparation.rs"]
+mod preparation;
+/// Concrete song POD byte codec, shared by native/browser wire facades.
+mod song;
+pub use preparation::{
+    SongHostPreparation, SongPhysicalBranch, SongPhysicalStage, SongPreparationCleanup,
+    SongPreparationDemand, SongPreparationLimits, SongPreparationProgress, SongPreparationRefusal,
+    SongReadyBundle, SongReplacementCommit, SongReplacementCommitRefusal,
+    SongReplacementPreparationRefusal, SongReplacementProgress, SongReplacementSource,
+    SongReplacementSourceRefusal,
+};
+pub(crate) use song::song_codec;
+pub use song::{SongCommandRefusal, SongSampleRefusal, SongSampleSenderCapacity, SongSubmitError};

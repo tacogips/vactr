@@ -71,6 +71,7 @@ pub mod pkg;
 pub mod reader;
 pub mod sched;
 pub mod session;
+pub mod song;
 pub mod tex;
 pub mod types;
 pub mod value;

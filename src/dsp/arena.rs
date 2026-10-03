@@ -18,6 +18,9 @@
 
 use std::sync::Arc;
 
+pub(crate) mod song;
+pub use song::SongResourceStager;
+
 use crate::dsp::bus::{BusTemplate, SlotState, MAX_CHAIN};
 use crate::dsp::caps::{Cap, CapabilitySet};
 use crate::dsp::cells::CellId;
@@ -75,6 +78,10 @@ impl SampleView<'_> {
 /// A resource's lifecycle state.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ResState {
+    /// A silent song extent reserved before upload.
+    Reserved,
+    /// Adopted song data, unavailable to legacy reads.
+    Staged,
     Installing,
     Live,
     Retiring,
@@ -146,6 +153,7 @@ pub struct InstallRequest {
 
 #[derive(Clone, Copy, Debug)]
 struct Entry {
+    song: Option<crate::song::routing::SongLeaseKey>,
     id: u32,
     gen: u32,
     state: ResState,
@@ -165,6 +173,9 @@ pub struct SampleStore {
     arena: Box<[f32]>,
     free: Box<[(usize, usize)]>,
     n_free: usize,
+    song_epoch: Option<crate::song::SnapshotEpoch>,
+    song_extents: Box<[crate::dsp::engine::SongFrameRegion]>,
+    native_pcm_limit: Option<u64>,
 }
 
 impl Default for SampleStore {
@@ -184,14 +195,27 @@ impl SampleStore {
         let mut free = vec![(0, 0); MAX_EXTENTS].into_boxed_slice();
         let n_free = usize::from(floats > 0);
         free[0] = (0, floats);
-        Self {
+        let mut store = Self {
             kind,
             entries: vec![None; MAX_RESOURCES].into_boxed_slice(),
             native: (0..MAX_RESOURCES).map(|_| None).collect(),
             arena: vec![0.0; floats].into_boxed_slice(),
             free,
             n_free,
-        }
+            song_epoch: None,
+            song_extents: vec![
+                crate::dsp::engine::SongFrameRegion {
+                    slot: 0,
+                    offset: 0,
+                    frames: 0
+                };
+                MAX_EXTENTS
+            ]
+            .into_boxed_slice(),
+            native_pcm_limit: None,
+        };
+        store.refresh_song_extents();
+        store
     }
 
     /// The store kind.
@@ -241,20 +265,7 @@ impl SampleStore {
     /// A live (or retiring, still referenced) resource.
     #[must_use]
     pub fn get(&self, id: u32) -> Option<SampleView<'_>> {
-        let i = self.slot(id)?;
-        let e = self.entries[i]?;
-        if e.state == ResState::Installing {
-            return None;
-        }
-        let data: &[f32] = match self.kind {
-            StoreKind::NativeArc => &self.native[i].as_ref()?.frames,
-            StoreKind::Arena { .. } => self.arena.get(e.off..e.off + e.len)?,
-        };
-        Some(SampleView {
-            data,
-            channels: e.channels,
-            rate: e.rate,
-        })
+        self.get_selected(id)
     }
 
     /// Checks a request against the tier and the free space (16.1
@@ -301,41 +312,6 @@ impl SampleStore {
         Ok(())
     }
 
-    /// Starts an arena install: reserves the extent (browser tier).
-    ///
-    /// # Errors
-    /// `ArenaExhausted` or `BadResource` (id in use, table full).
-    pub fn begin(
-        &mut self,
-        id: u32,
-        gen: u32,
-        frames: usize,
-        channels: u8,
-        rate: u32,
-    ) -> Result<(), FaultCode> {
-        if self.slot(id).is_some() {
-            return Err(FaultCode::BadResource);
-        }
-        let i = self
-            .entries
-            .iter()
-            .position(Option::is_none)
-            .ok_or(FaultCode::BadResource)?;
-        let len = frames * usize::from(channels.max(1));
-        let off = self.alloc(len).ok_or(FaultCode::ArenaExhausted)?;
-        self.entries[i] = Some(Entry {
-            id,
-            gen,
-            state: ResState::Installing,
-            channels: channels.max(1),
-            rate,
-            off,
-            len,
-            received: 0,
-        });
-        Ok(())
-    }
-
     /// Copies one slice of little-endian `f32` samples at float `offset`.
     /// Returns `Some(gen)` when the resource just completed.
     ///
@@ -369,37 +345,6 @@ impl SampleStore {
         Ok(done.then_some(e.gen))
     }
 
-    /// Installs a loader `Arc` (native tier); the `Arc` comes back on
-    /// failure.
-    ///
-    /// # Errors
-    /// The `Arc` when the id is in use or the table is full.
-    pub fn install_arc(
-        &mut self,
-        id: u32,
-        gen: u32,
-        data: Arc<SampleData>,
-    ) -> Result<(), Arc<SampleData>> {
-        if self.slot(id).is_some() {
-            return Err(data);
-        }
-        let Some(i) = self.entries.iter().position(Option::is_none) else {
-            return Err(data);
-        };
-        self.entries[i] = Some(Entry {
-            id,
-            gen,
-            state: ResState::Live,
-            channels: data.channels.max(1),
-            rate: data.rate,
-            off: 0,
-            len: data.frames.len(),
-            received: data.frames.len(),
-        });
-        self.native[i] = Some(data);
-        Ok(())
-    }
-
     /// Marks a live resource retiring; returns whether it was live or
     /// installing.
     pub fn retire(&mut self, id: u32) -> bool {
@@ -407,7 +352,7 @@ impl SampleStore {
             return false;
         };
         match &mut self.entries[i] {
-            Some(e) if e.state != ResState::Retiring => {
+            Some(e) if e.song.is_none() && e.state != ResState::Retiring => {
                 e.state = ResState::Retiring;
                 true
             }
@@ -430,7 +375,7 @@ impl SampleStore {
     pub fn release(&mut self, id: u32) -> Option<Option<Arc<SampleData>>> {
         let i = self.slot(id)?;
         let e = self.entries[i]?;
-        if e.state != ResState::Retiring {
+        if e.state != ResState::Retiring || e.song.is_some() {
             return None;
         }
         self.entries[i] = None;
@@ -453,6 +398,7 @@ impl SampleStore {
         } else {
             self.free[k] = (off + len, have - len);
         }
+        self.refresh_song_extents();
         Some(off)
     }
 
@@ -485,6 +431,7 @@ impl SampleStore {
                 }
             }
         }
+        self.refresh_song_extents();
     }
 }
 
@@ -687,6 +634,7 @@ pub fn decode_graph(
 
 /// One instrument template slot.
 pub struct TemplateSlot {
+    pub(crate) song: Option<crate::song::routing::SongLeaseKey>,
     pub state: SlotState,
     pub t: Option<Box<Template>>,
 }
@@ -706,6 +654,7 @@ impl Templates {
         Self {
             slots: (0..n.max(1))
                 .map(|_| TemplateSlot {
+                    song: None,
                     state: SlotState::Free,
                     t: preallocate.then(Template::boxed),
                 })
@@ -718,7 +667,9 @@ impl Templates {
     #[must_use]
     pub fn live(&self, inst: InstId) -> Option<usize> {
         self.slots.iter().position(|s| {
-            s.state == SlotState::Live && s.t.as_ref().is_some_and(|t| t.inst == inst)
+            s.song.is_none()
+                && s.state == SlotState::Live
+                && s.t.as_ref().is_some_and(|t| t.inst == inst)
         })
     }
 
@@ -733,6 +684,7 @@ impl Templates {
     fn activate(&mut self, slot: usize, inst: InstId) {
         for (i, s) in self.slots.iter_mut().enumerate() {
             if i != slot
+                && s.song.is_none()
                 && s.state == SlotState::Live
                 && s.t.as_ref().is_some_and(|t| t.inst == inst)
             {
@@ -742,61 +694,13 @@ impl Templates {
         self.slots[slot].state = SlotState::Live;
     }
 
-    /// Compiles `raw` into a free preallocated slot (arena tier).
-    ///
-    /// # Errors
-    /// `BadResource` with no free slot, `GraphTooLarge` when it does not
-    /// compile.
-    pub fn build(
-        &mut self,
-        raw: &RawGraph,
-        env: &BuildEnv,
-        resource: u32,
-        gen: u32,
-    ) -> Result<(), FaultCode> {
-        let slot = self
-            .slots
-            .iter()
-            .position(|s| s.state == SlotState::Free && s.t.is_some())
-            .ok_or(FaultCode::BadResource)?;
-        let t = self.slots[slot].t.as_mut().ok_or(FaultCode::BadResource)?;
-        t.build(raw, env).map_err(|_| FaultCode::GraphTooLarge)?;
-        t.resource = resource;
-        t.gen = gen;
-        let inst = t.inst;
-        self.activate(slot, inst);
-        Ok(())
-    }
-
-    /// Adopts a template built on the evaluator thread (native tier).
-    ///
-    /// # Errors
-    /// The box back when no slot is free.
-    pub fn adopt(
-        &mut self,
-        mut t: Box<Template>,
-        resource: u32,
-        gen: u32,
-    ) -> Result<(), Box<Template>> {
-        let Some(slot) = self
-            .slots
-            .iter()
-            .position(|s| s.state == SlotState::Free && s.t.is_none())
-        else {
-            return Err(t);
-        };
-        t.resource = resource;
-        t.gen = gen;
-        let inst = t.inst;
-        self.slots[slot].t = Some(t);
-        self.activate(slot, inst);
-        Ok(())
-    }
-
     /// `GraphRetire`: the live template of `resource` starts retiring.
     pub fn retire(&mut self, resource: u32) {
         for s in self.slots.iter_mut() {
-            if s.state == SlotState::Live && s.t.as_ref().is_some_and(|t| t.resource == resource) {
+            if s.song.is_none()
+                && s.state == SlotState::Live
+                && s.t.as_ref().is_some_and(|t| t.resource == resource)
+            {
                 s.state = SlotState::Retiring;
             }
         }
@@ -823,7 +727,8 @@ impl Templates {
     /// and, natively, the box to drop off the audio thread.
     pub fn collect(&mut self, voices: &[Voice]) -> Option<(u32, Option<Box<Template>>)> {
         let i = (0..self.slots.len()).find(|&i| {
-            self.slots[i].state == SlotState::Retiring
+            self.slots[i].song.is_none()
+                && self.slots[i].state == SlotState::Retiring
                 && !voices.iter().any(|v| v.active && v.tmpl == i)
         })?;
         let s = &mut self.slots[i];
@@ -831,5 +736,243 @@ impl Templates {
         let resource = s.t.as_ref().map_or(0, |t| t.resource);
         let boxed = if self.preallocated { None } else { s.t.take() };
         Some((resource, boxed))
+    }
+}
+
+impl Templates {
+    /// Compiles `raw` into a free preallocated slot (arena tier).
+    ///
+    /// # Errors
+    /// `BadResource` with no free slot, `GraphTooLarge` when it does not
+    /// compile.
+    pub fn build(
+        &mut self,
+        raw: &RawGraph,
+        env: &BuildEnv,
+        resource: u32,
+        gen: u32,
+    ) -> Result<(), FaultCode> {
+        self.build_with_song_claims(raw, env, resource, gen, 0)
+    }
+    pub(crate) fn build_with_song_claims(
+        &mut self,
+        raw: &RawGraph,
+        env: &BuildEnv,
+        resource: u32,
+        gen: u32,
+        unadopted: u32,
+    ) -> Result<(), FaultCode> {
+        if self
+            .slots
+            .iter()
+            .filter(|s| s.state == SlotState::Free && s.t.is_some())
+            .count()
+            <= unadopted as usize
+        {
+            return Err(FaultCode::BadResource);
+        }
+        let slot = self
+            .slots
+            .iter()
+            .position(|s| s.state == SlotState::Free && s.t.is_some())
+            .ok_or(FaultCode::BadResource)?;
+        let t = self.slots[slot].t.as_mut().ok_or(FaultCode::BadResource)?;
+        t.build(raw, env).map_err(|_| FaultCode::GraphTooLarge)?;
+        t.resource = resource;
+        t.gen = gen;
+        let inst = t.inst;
+        self.activate(slot, inst);
+        Ok(())
+    }
+}
+
+impl Templates {
+    /// Adopts a template built on the evaluator thread (native tier).
+    ///
+    /// # Errors
+    /// The box back when no slot is free.
+    pub fn adopt(
+        &mut self,
+        t: Box<Template>,
+        resource: u32,
+        gen: u32,
+    ) -> Result<(), Box<Template>> {
+        self.adopt_with_song_claims(t, resource, gen, 0)
+    }
+    pub(crate) fn adopt_with_song_claims(
+        &mut self,
+        mut t: Box<Template>,
+        resource: u32,
+        gen: u32,
+        unadopted: u32,
+    ) -> Result<(), Box<Template>> {
+        if self
+            .slots
+            .iter()
+            .filter(|s| s.state == SlotState::Free && s.t.is_none())
+            .count()
+            <= unadopted as usize
+        {
+            return Err(t);
+        }
+        let Some(slot) = self
+            .slots
+            .iter()
+            .position(|s| s.state == SlotState::Free && s.t.is_none())
+        else {
+            return Err(t);
+        };
+        t.resource = resource;
+        t.gen = gen;
+        let inst = t.inst;
+        self.slots[slot].t = Some(t);
+        self.activate(slot, inst);
+        Ok(())
+    }
+}
+
+impl SampleStore {
+    /// Starts an arena install: reserves the extent (browser tier).
+    ///
+    /// # Errors
+    /// `ArenaExhausted` or `BadResource` (id in use, table full).
+    pub fn begin(
+        &mut self,
+        id: u32,
+        gen: u32,
+        frames: usize,
+        channels: u8,
+        rate: u32,
+    ) -> Result<(), FaultCode> {
+        self.begin_with_song_claims(id, gen, frames, channels, rate, 0)
+    }
+    // Fixed legacy sample geometry plus a bounded external slot count.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn begin_with_song_claims(
+        &mut self,
+        id: u32,
+        gen: u32,
+        frames: usize,
+        channels: u8,
+        rate: u32,
+        unadopted: u32,
+    ) -> Result<(), FaultCode> {
+        if self.entries.iter().filter(|e| e.is_none()).count() <= unadopted as usize {
+            return Err(FaultCode::BadResource);
+        }
+        if self.slot(id).is_some() {
+            return Err(FaultCode::BadResource);
+        }
+        let i = self
+            .entries
+            .iter()
+            .position(Option::is_none)
+            .ok_or(FaultCode::BadResource)?;
+        let len = frames * usize::from(channels.max(1));
+        let off = self.alloc(len).ok_or(FaultCode::ArenaExhausted)?;
+        self.entries[i] = Some(Entry {
+            song: None,
+            id,
+            gen,
+            state: ResState::Installing,
+            channels: channels.max(1),
+            rate,
+            off,
+            len,
+            received: 0,
+        });
+        Ok(())
+    }
+}
+
+impl SampleStore {
+    /// Installs a loader `Arc` (native tier); the `Arc` comes back on
+    /// failure.
+    ///
+    /// # Errors
+    /// The `Arc` when the id is in use or the table is full.
+    pub fn install_arc(
+        &mut self,
+        id: u32,
+        gen: u32,
+        data: Arc<SampleData>,
+    ) -> Result<(), Arc<SampleData>> {
+        self.install_arc_with_song_claims(id, gen, data, 0)
+    }
+    pub(crate) fn install_arc_with_song_claims(
+        &mut self,
+        id: u32,
+        gen: u32,
+        data: Arc<SampleData>,
+        unadopted: u32,
+    ) -> Result<(), Arc<SampleData>> {
+        if self.entries.iter().filter(|e| e.is_none()).count() <= unadopted as usize {
+            return Err(data);
+        }
+        if self.slot(id).is_some()
+            || self.native_pcm_limit.is_some_and(|_| {
+                self.song_remaining_pcm_bytes().is_none_or(|free| {
+                    u64::try_from(data.frames.len())
+                        .ok()
+                        .and_then(|n| n.checked_mul(4))
+                        .is_none_or(|need| need > free)
+                })
+            })
+        {
+            return Err(data);
+        }
+        let Some(i) = self.entries.iter().position(Option::is_none) else {
+            return Err(data);
+        };
+        self.entries[i] = Some(Entry {
+            song: None,
+            id,
+            gen,
+            state: ResState::Live,
+            channels: data.channels.max(1),
+            rate: data.rate,
+            off: 0,
+            len: data.frames.len(),
+            received: data.frames.len(),
+        });
+        self.native[i] = Some(data);
+        Ok(())
+    }
+}
+
+impl Templates {
+    pub(crate) fn song_contains(&self, key: crate::song::routing::SongLeaseKey) -> bool {
+        self.slots
+            .iter()
+            .any(|s| s.song == Some(key) && s.state != SlotState::Free)
+    }
+}
+
+impl Templates {
+    pub(crate) fn activate_song_template(
+        &mut self,
+        key: crate::song::routing::SongLeaseKey,
+    ) -> Result<usize, crate::song::routing::SongRejectCode> {
+        let index = self
+            .slots
+            .iter()
+            .position(|slot| {
+                slot.song == Some(key) && slot.state == SlotState::Staged && slot.t.is_some()
+            })
+            .ok_or(crate::song::routing::SongRejectCode::NotReady)?;
+        self.slots[index].state = SlotState::Live;
+        Ok(index)
+    }
+    pub(crate) fn close_song_template_for_return(
+        &mut self,
+        key: crate::song::routing::SongLeaseKey,
+    ) -> Result<(), crate::song::routing::SongRejectCode> {
+        let slot = self
+            .slots
+            .iter_mut()
+            .find(|slot| slot.song == Some(key))
+            .ok_or(crate::song::routing::SongRejectCode::StaleEpoch)?;
+        slot.state = SlotState::Staged;
+        Ok(())
     }
 }

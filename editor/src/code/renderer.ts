@@ -253,13 +253,17 @@ export class CanvasRenderer {
     const source = this.background; if (!source || (this.backdrop?.revision === source.revision && this.backdrop.source === source.canvas)) return;
     const gl = this.gl!;
     const available = RESOURCE_LIMITS.canvasPixels - this.ledger.counters.pixels;
+    // Leave text headroom even when the backdrop precedes the first glyph upload.
+    // Animation copies must never reclaim resident glyph metadata to fit staging.
+    const stagingBytes = Math.min(RESOURCE_LIMITS.geometry / 2, RESOURCE_LIMITS.geometry - this.ledger.counters.byKind.geometry);
     const size = this.backdrop && this.backdrop.width <= source.canvas.width && this.backdrop.height <= source.canvas.height
+      && this.backdrop.width * this.backdrop.height * 4 <= stagingBytes
       ? { width: this.backdrop.width, height: this.backdrop.height }
-      : effectiveSize(source.canvas.width, source.canvas.height, 1, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number, Math.min(available, Math.floor((this.ledger.limitBytes - this.ledger.usedBytes) / 4), Math.floor((RESOURCE_LIMITS.geometry - this.ledger.counters.byKind.geometry) / 4)));
+      : effectiveSize(source.canvas.width, source.canvas.height, 1, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number, Math.min(available, Math.floor((this.ledger.limitBytes - this.ledger.usedBytes) / 8), Math.floor(stagingBytes / 4)));
     const reuse = this.backdrop?.width === size.width && this.backdrop.height === size.height;
     const allocation = reuse ? null : this.ledger.allocate('backdrop', size.width * size.height * 4, size);
     if (!reuse && !allocation) throw new Error('Backdrop replacement budget exhausted');
-    const staging = this.atlas!.reserveStaging(size.width * size.height * 4);
+    const staging = this.ledger.allocate('geometry', size.width * size.height * 4);
     if (!staging) { allocation?.release(); throw new Error('Backdrop staging budget exhausted'); }
     let texture: WebGLTexture | null = reuse ? this.backdrop!.texture : null; let canvas: HTMLCanvasElement | null = null;
     try {

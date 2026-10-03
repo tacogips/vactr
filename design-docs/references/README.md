@@ -128,3 +128,17 @@ independent algorithms and verification requirements.
 ## Breakcore sample source
 
 [SampleLoom synthetic Amen recreation](https://sampleloom.com/sample/jungle-amen-break-slice-165bpm-4-bars-262cb3) lists CC0. The original download and checksum are retained in examples/samples/amen-recreation; the track edits the complete source in Vact.
+
+## Song mode implementation evidence
+
+[Reconciliation checkpoint history](song-mode/reconciliation-checkpoints-20261003.md) preserves earlier design reviews, failed checks and bounded acceptance receipts. Current work remains tracked in [the active reconciliation plan](../../impl-plans/active/song-mode-reconciliation.md).
+
+[Sampling and invocation checkpoint archive](song-mode/reconciliation-invocation-checkpoints-20261003.md) preserves the next set of checkpoint bodies verbatim, including failed checks and the historical extraction-equivalence limitation.
+
+[Retained lookup checkpoint archive](song-mode/reconciliation-lookup-checkpoints-20261003.md) preserves the lookup reviews and failed checks verbatim, including the measured default-budget limitation and accepted scoped results.
+
+[Production provenance review](song-mode/production-provenance-review-20261003.md) records the current query-to-routing authority gaps and the required private issued-event contract.
+
+[Retained geometry checkpoint archive](song-mode/reconciliation-geometry-checkpoints-20261003.md) preserves all geometry checkpoint bodies verbatim, including failed fixtures, lint repair and scoped frontend acceptance.
+
+[Query authority checkpoint archive](song-mode/reconciliation-query-checkpoints-20261003.md) preserves query/replay issuance, all focused failures and compatibility repairs, accepted joined gates, and historical log-retention limitations verbatim.

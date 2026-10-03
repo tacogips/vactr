@@ -1,10 +1,10 @@
 # Song native execution implementation plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: SONG-05
 **Plan Path**: impl-plans/active/song-mode-natives.md
 **Created**: 2026-09-30
-**Last Updated**: 2026-09-30
+**Last Updated**: 2026-10-01
 **Session target**: 1–3 sessions
 **Design Reference**: [Accepted song-mode design](../../design-docs/specs/design-song-mode.md#proposed-language-surface)
 
@@ -29,7 +29,8 @@ Source baseline: design-song-mode.md capability audit distinguishes existing clo
     "src/ns/stage.rs",
     "src/sched/runtime.rs",
     "tests/song_natives.rs",
-    "impl-plans/active/song-mode-natives.md"
+    "impl-plans/active/song-mode-natives.md",
+    "src/ns/evaluator.rs"
   ],
   "sharedPaths": [
     "src/sched/runtime.rs",
@@ -55,8 +56,8 @@ Source baseline: design-song-mode.md capability audit distinguishes existing clo
 
 | Dependency | Required output | Status |
 |---|---|---|
-| SONG-03 | Reviewed declarations, passing phase checks and recorded post-edit hashes | NOT_STARTED |
-| SONG-04 | Reviewed declarations, passing phase checks and recorded post-edit hashes | NOT_STARTED |
+| SONG-03 | Reviewed declarations, passing phase checks and recorded post-edit hashes | VERIFIED |
+| SONG-04 | Reviewed declarations, passing phase checks and recorded post-edit hashes | VERIFIED |
 
 ## Execution and preservation contract
 
@@ -80,11 +81,12 @@ Use existing Ratio64, Pat, Value, Failure, Tempo, KwId and capability types. Dec
 
 | File | Intended change | Status |
 |---|---|---|
-| `src/vm/natives/song.rs` | Register thin song natives; force structural arguments and resolve thunks once; use pure callback construction for edits. | NOT_STARTED |
-| `src/vm/natives/mod.rs` | Register song native module after existing natives; do not replace repeat or cat. | NOT_STARTED |
-| `src/ns/stage.rs` | Add PlaySong staged effect carrying immutable Song; ensure form failure discards it. | NOT_STARTED |
-| `src/sched/runtime.rs` | Handle PlaySong exhaustively with a pending immutable descriptor; report playback unsupported until SONG-11 consumes it. Do not activate early or return false success. | NOT_STARTED |
-| `tests/song_natives.rs` | Evaluate nested part generators and all proposed APIs; check returned values and staging rollback. | NOT_STARTED |
+| `src/vm/natives/song.rs` | Register thin song natives; force structural arguments and resolve thunks once; use pure callback construction for edits. | Completed |
+| `src/vm/natives/mod.rs` | Register song native module after existing natives; do not replace repeat or cat. | Completed |
+| `src/ns/stage.rs` | Add PlaySong staged effect carrying immutable Song; ensure form failure discards it. | Completed |
+| `src/sched/runtime.rs` | Handle PlaySong exhaustively with a pending immutable descriptor; report playback unsupported until SONG-11 consumes it. Do not activate early or return false success. | Completed |
+| `src/ns/evaluator.rs` | Classify PlaySong as non-replayable during reactive rebuilds; explicit staging only. | Completed |
+| `tests/song_natives.rs` | Evaluate nested part generators and all proposed APIs; check returned values and staging rollback. | Completed |
 
 ### Public declaration contract
 
@@ -97,35 +99,35 @@ pub fn instrument_fx(part: &Part, track: KwId, selector: InstrumentSelector, tem
 ## Tasks
 
 ### TASK-001: Baseline and contract integration
-**Status**: NOT_STARTED
+**Status**: Completed
 **Parallelizable**: No; acquire dependencies and fresh hashes first.
 **Deliverables**: Manifest, immutable intent snapshot and the declaration/type integration listed above.
-- [ ] Read accepted section and prerequisites; record exact ownership and imports.
-- [ ] Add declarations without changing legacy semantics; review manifest-required exhaustive consumers.
+- [x] Read accepted section and prerequisites; record exact ownership and imports.
+- [x] Add declarations without changing legacy semantics; review manifest-required exhaustive consumers.
 
 ### TASK-002: Implement the owned behavior
-**Status**: NOT_STARTED
+**Status**: Completed
 **Depends On**: TASK-001
 **Parallelizable**: No within this plan; cross-plan parallelism follows the DAG and ownership manifest.
 **Deliverables**: Every non-test file in the module table, with exactly its stated intended change.
-- [ ] Implement the declared behavior and all phase-specific criteria below.
-- [ ] Record post-edit hashes and run required modify-agent checks.
+- [x] Implement the declared behavior and all phase-specific criteria below.
+- [x] Record post-edit hashes and run required modify-agent checks.
 
 ### TASK-003: Behavioral evidence and progress
-**Status**: NOT_STARTED
+**Status**: Completed
 **Depends On**: TASK-002
 **Parallelizable**: No; verifies the complete phase.
 **Deliverables**: Every listed test/fixture file, full command logs and this plan progress record.
-- [ ] Add the specified success, boundary, compatibility and failure fixtures.
-- [ ] Run future commands below; record actual exit status and complete output, with no empty selected-test run accepted.
-- [ ] Reconcile final hashes with intent; update completion criteria and progress without editing other worker logs.
+- [x] Add the specified success, boundary, compatibility and failure fixtures.
+- [x] Run future commands below; record actual exit status and complete output, with no empty selected-test run accepted.
+- [x] Reconcile final hashes with intent; update completion criteria and progress without editing other worker logs.
 
 ## Phase acceptance criteria
 
-- [ ] The enum block lists only the new StagedEffect variant; preserve every existing variant.
-- [ ] Exercise the accepted 24-cycle example and function-within-function partial overwrite/delete.
-- [ ] PlaySong only stages playback; constructing/editing Part has no audio or namespace mutation.
-- [ ] Returned event descriptors contain opaque handles; no mutable event vector is exposed.
+- [x] The enum block lists only the new StagedEffect variant; preserve every existing variant.
+- [x] Exercise the accepted 24-cycle example and function-within-function partial overwrite/delete.
+- [x] PlaySong only stages playback; constructing/editing Part has no audio or namespace mutation.
+- [x] Returned event descriptors contain opaque handles; no mutable event vector is exposed.
 
 ## Future verification — not executed during planning
 
@@ -138,11 +140,11 @@ pub fn instrument_fx(part: &Part, track: KwId, selector: InstrumentSelector, tem
 
 ## Completion criteria
 
-- [ ] All module-table changes and phase-specific criteria complete.
-- [ ] Tests listed above execute with nonzero fixture count and pass; check/typecheck/build gates pass.
-- [ ] All required command exit statuses and complete log paths recorded; no running foreground sessions remain.
-- [ ] Legacy behavior preserved; pre-existing changes retained and cross-worker hashes reconciled.
-- [ ] Progress status updated; archive/index changes deferred to SONG-16.
+- [x] All module-table changes and phase-specific criteria complete.
+- [x] Tests listed above execute with nonzero fixture count and pass; check/typecheck/build gates pass.
+- [x] All required command exit statuses and complete log paths recorded; no running foreground sessions remain.
+- [x] Legacy behavior preserved; pre-existing changes retained and cross-worker hashes reconciled.
+- [x] Progress status updated; archive/index changes deferred to SONG-16.
 
 ## Progress Log
 
@@ -152,3 +154,24 @@ pub fn instrument_fx(part: &Part, track: KwId, selector: InstrumentSelector, tem
 **Blockers**: None for planning; implementation awaits reviewed/committed documents and prerequisite waves.
 **Verification**: Read-only source/document consistency review only. Future commands above were not executed.
 **Next session**: Implement TASK-001 after dependency outputs and authorization are available.
+
+### Session: 2026-10-01 — reactive replay ownership
+Source-grounded preflight found evaluator::one_shot controls non-replayable
+staged effects. Add PlaySong there and prove reactive dependent rebuilds do not
+replay playback. This file is explicitly owned before implementation begins.
+
+### Session: 2026-10-01 — authorized native implementation
+Prerequisites independently verified: SONG-03 `/tmp/vactr-song03-04b-checker-results.json`; SONG-04 `/tmp/vactr-song04-independent-001/final-results.json` (153 distinct fixtures and 32 nextest repeats; all twelve gates exit 0). Implementing only the six owned Rust paths. Structural forcing uses a bounded iterative work stack; callable pattern transforms use an immediate effect-restricted VmQuery borrow, without a snapshot claim. Runtime retains explicit pending requests and reports unsupported playback until SONG-11. Archive/index deferred.
+
+### Session: 2026-10-01 — SONG-05 author seal, independent verification pending
+**Implemented**: All eleven native registrations, checked immutable constructors/edits, full selected-family kit resolution plus registry fallback, dictionary event descriptors with certified handles and original numeric note types, declared FX-template validation. Structural traversal uses a bounded explicit work stack, charges scheduled children before allocating queues, and evaluates actual nested Thunks once in Query mode with prior captured output restored. Pattern/function internals remain lazy. Existing eager evaluation of literal brace expressions before a native call is preserved; fixtures for deferred structural forcing use actual Value::Thunk closures rather than claiming those literal blocks were lazy.
+**Staging**: PlaySong carries Rc<Song>; failed forms discard it; reactive owners are marked non-replayable. Runtime retains a pending immutable descriptor and returns explicit BeyondCapability until SONG-11 adds playback. No early activation or completed-playback claim.
+**Behavioral evidence**: 19 native fixtures, 12 checker fixtures, 7 value-integration fixtures and 97 existing VM unit fixtures = 135 distinct tests, plus 19 nextest repeats. Includes accepted 24-cycle nested generators, function-within-function deletion/overwrite, fractional descriptors, stale handles, zero/billion symbolic repeats, timed silence, dynamic invalid settings/counts/regions/equal bounds, all native arities and unknown named arguments, complete bank freezing, selected-only kit evaluation, explicit effect/output rejection and restoration, actual once-only structural/callback execution, pre-admission bounds for wide nested containers, FX template validation, staging rollback, unsupported-runtime request retention, and reactive dependency/read-edge/non-replay proof.
+**Commands and terminal evidence**: `author-sealed-check-results.json` under `tmp/song-mode-riela/SONG-05/` lists exact commands, exits, timestamps and complete logs. All eight final gates exit 0: quiet `mise run check`; quiet host-wasm cargo check; focused cargo test (38 fixtures); cargo test --lib vm:: (97); quiet mise run clippy; nextest binary(song_natives) (19); scoped rustfmt check; scoped diff check. Author runner session 36997 polled to terminal exit 0; corrected Clippy session 92174 polled to terminal exit 0. The initial Clippy 101 from parallel SONG-06A type aliases is retained in `author-check-results.json`/`author-clippy.log`; its owner corrected their files and the rerun passed. Earlier compile/fixture failures and malformed/eager-literal assumptions are retained in tests-first through tests-eighth logs; tests-ninth has nineteen passing fixtures before final strengthening of reactive assertions, which final gates also pass.
+**Integrity**: Exact six Rust paths are sealed in `author-source-seal.json`, all below 1000 lines; immutable intent records 0001–0003 retain baseline/design/plan and post-edit hashes. No dependency, Git, unrelated editor, session/publish or other phase Rust modifications. Independent checker handoff is required before phase completion. Archive/index deferred to root reconciliation.
+
+### Session: 2026-10-01 — independent SONG-05 verification completed
+**Status**: Completed (native construction/staging phase only).
+**Independent evidence**: `/tmp/vactr-song05-independent-001/final-results.json`; all eight independent gates exit 0, 135 distinct fixtures plus 19 nextest repeats. Checker session 13281 was polled to terminal exit 0, with no foreground processes remaining. All six Rust SHA-256 values match the author seal both before and after verification; maximum touched Rust length is 822 lines. Full independent command/log paths, log hashes, source hashes and fixture counts are in the immutable result manifest. No outstanding review findings.
+**Completion**: TASK-001, TASK-002 and TASK-003 and all phase criteria are complete. The accepted eleven native APIs execute through the ordinary VM; the synchronous construction context deliberately is not a transitive frozen snapshot. Runtime playback remains an explicit pending descriptor plus unsupported diagnostic until SONG-11, as required by this phase contract.
+**Preservation and next phase**: This completion batch changes only this owned plan after a fresh immutable intent/hash verification; no Rust, archive, index or Git edits. SONG-06 implementation remains held until SONG-06A is independently cleared and root authorizes the next phase. Full-song playback/export completion is outside this completed phase.

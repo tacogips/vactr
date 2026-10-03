@@ -23,7 +23,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::compile::{compile, CompileCx};
-use crate::dsp::build::{lower_inst, LowerError, Lowering};
+use crate::dsp::build::{
+    header_resource, lower_inst_with_resources, DeclaredGraphResource, GraphResourceCaptureMode,
+    GraphResourceInput, LowerError, Lowering,
+};
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
 use crate::dsp::controls::{self, CtlDomain, DeclaredParam, ScalarType};
@@ -187,9 +190,49 @@ pub struct BusEntry {
     pub signals: Vec<SignalInput>,
 }
 
+/// Genuine resources paired with the exact committed instrument allocation.
+/// ```compile_fail
+/// use vactr::ns::insts::InstResourceDeclaration;
+/// fn alter(mut record: InstResourceDeclaration) { record.resources.clear(); }
+/// ```
+#[derive(Clone, Debug)]
+pub struct InstResourceDeclaration {
+    graph: Arc<InstDef>,
+    resources: Vec<DeclaredGraphResource>,
+}
+impl InstResourceDeclaration {
+    #[must_use]
+    pub fn graph(&self) -> &Arc<InstDef> {
+        &self.graph
+    }
+    #[must_use]
+    pub fn resources(&self) -> &[DeclaredGraphResource] {
+        &self.resources
+    }
+}
+/// Genuine resources paired with the exact committed bus allocation.
+#[derive(Clone, Debug)]
+pub struct BusResourceDeclaration {
+    graph: Arc<BusDef>,
+    resources: Vec<DeclaredGraphResource>,
+}
+impl BusResourceDeclaration {
+    #[must_use]
+    pub fn graph(&self) -> &Arc<BusDef> {
+        &self.graph
+    }
+    #[must_use]
+    pub fn resources(&self) -> &[DeclaredGraphResource] {
+        &self.resources
+    }
+}
+
 /// Instruments and buses by name.
 #[derive(Debug)]
 pub struct InstRegistry {
+    capture_mode: GraphResourceCaptureMode,
+    inst_resources: BTreeMap<InstId, InstResourceDeclaration>,
+    bus_resources: BTreeMap<BusId, BusResourceDeclaration>,
     insts: BTreeMap<InstId, InstEntry>,
     names: BTreeMap<KwId, InstId>,
     buses: BTreeMap<KwId, BusEntry>,
@@ -215,6 +258,9 @@ impl InstRegistry {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            capture_mode: GraphResourceCaptureMode::Legacy,
+            inst_resources: BTreeMap::new(),
+            bus_resources: BTreeMap::new(),
             insts: BTreeMap::new(),
             names: BTreeMap::new(),
             buses: BTreeMap::new(),
@@ -351,6 +397,7 @@ impl InstRegistry {
     }
 
     fn install(&mut self, entry: InstEntry, id: InstId) {
+        self.inst_resources.remove(&id);
         if self.names.insert(entry.name, id).is_none() {
             self.next_inst += 1;
         }
@@ -366,6 +413,7 @@ impl InstRegistry {
         signals: Vec<SignalInput>,
     ) -> GraphHandle {
         let id = def.id;
+        self.bus_resources.remove(&id);
         let def = Arc::new(def);
         let entry = BusEntry {
             id,
@@ -385,6 +433,61 @@ impl InstRegistry {
                 GraphHandle::Master(def)
             }
         }
+    }
+
+    /// Explicit opt-in used by a fresh isolated candidate before its declarations.
+    pub fn enable_closed_song_resources(&mut self) {
+        self.capture_mode = GraphResourceCaptureMode::ClosedSong;
+    }
+    #[must_use]
+    pub fn resource_capture_mode(&self) -> GraphResourceCaptureMode {
+        self.capture_mode
+    }
+    #[must_use]
+    pub fn inst_resources(&self, id: InstId) -> Option<&InstResourceDeclaration> {
+        self.inst_resources.get(&id).filter(|record| {
+            self.entry(id)
+                .is_some_and(|entry| Arc::ptr_eq(&entry.def, &record.graph))
+        })
+    }
+    #[must_use]
+    pub fn bus_resources(&self, id: BusId) -> Option<&BusResourceDeclaration> {
+        self.bus_resources.get(&id).filter(|record| {
+            self.buses()
+                .any(|(_, entry)| entry.id == id && Arc::ptr_eq(&entry.def, &record.graph))
+        })
+    }
+    pub(crate) fn install_with_resources(
+        &mut self,
+        entry: InstEntry,
+        id: InstId,
+        resources: Vec<DeclaredGraphResource>,
+    ) {
+        let graph = Arc::clone(&entry.def);
+        self.install(entry, id);
+        self.inst_resources
+            .insert(id, InstResourceDeclaration { graph, resources });
+    }
+    pub(crate) fn install_bus_with_resources(
+        &mut self,
+        name: Option<KwId>,
+        def: BusDef,
+        signals: Vec<SignalInput>,
+        resources: Vec<DeclaredGraphResource>,
+    ) -> GraphHandle {
+        let graph = self.install_bus(name, def, signals);
+        let def = match &graph {
+            GraphHandle::Bus { def, .. } | GraphHandle::Master(def) => Arc::clone(def),
+            GraphHandle::Inst { .. } => unreachable!("bus commit"),
+        };
+        self.bus_resources.insert(
+            def.id,
+            BusResourceDeclaration {
+                graph: def,
+                resources,
+            },
+        );
+        graph
     }
 
     /// Every installed instrument, bus and `master` graph, for a second
@@ -649,6 +752,7 @@ pub fn realize_inst(
     // R2b: the default keyword of a `CtlDomain::Resource` header parameter
     // (`bank`, `table` or `source`), if this instrument declares one.
     let mut resource: Option<KwId> = None;
+    let mut resource_headers = Vec::new();
     let (mut args, mut kw) = (Vec::new(), Vec::new());
     for (k, pname) in c.proto.arity.names.iter().enumerate() {
         let mut r = reg.borrow_mut();
@@ -700,6 +804,7 @@ pub fn realize_inst(
                 {
                     if row.domain == CtlDomain::Resource {
                         resource = Some(*rkw);
+                        resource_headers.push(header_resource(ctl, GraphResourceInput::Bank(*rkw)));
                     }
                 }
                 header.push((
@@ -747,17 +852,28 @@ pub fn realize_inst(
     let mut r = reg.borrow_mut();
     let id = r.peek_id(name);
     let caps = r.caps;
+    let mode = r.resource_capture_mode();
     let mut alloc = || r.alloc_cell();
     let lw = Lowering {
         caps: &caps,
         span,
         alloc: &mut alloc,
     };
-    let (def, extras) = lower_inst(id, &root, &header, lw)
+    let (def, mut extras) = lower_inst_with_resources(id, &root, &header, lw, mode)
         .map_err(|e| inst_failed(name, &e.failure.message, e.diag))?;
+    if resource_headers.len() + extras.resources.len()
+        > crate::dsp::graph::NODE_CAP + crate::dsp::ugen::MAX_PARAMS
+    {
+        return Err(inst_failed(
+            name,
+            "graph resource declarations exceed the graph bound",
+            None,
+        ));
+    }
+    resource_headers.append(&mut extras.resources);
     vm.dsp.diags.extend(extras.diags);
     let def = Arc::new(def);
-    r.install(
+    r.install_with_resources(
         InstEntry {
             name,
             def: Arc::clone(&def),
@@ -767,6 +883,7 @@ pub fn realize_inst(
             resource,
         },
         id,
+        resource_headers,
     );
     vm.effects_mut()
         .push(StagedEffect::Install(GraphHandle::Inst { id, def }));

@@ -11,11 +11,13 @@ use std::rc::Rc;
 use crate::ns::namespace::VarSlotRef;
 use crate::pattern::combinators::event_fault;
 use crate::pattern::eval::QState;
+use crate::pattern::occ::{ProducerKind, ProducerTrace};
 use crate::pattern::pat::{Pat, PatNode};
-use crate::pattern::query::{q, Event, TimeSpan};
+use crate::pattern::query::{q, q_child, Event, TimeSpan};
 use crate::reader::span::Span;
 use crate::value::eq::deep_eq;
 use crate::value::intern::KwId;
+use crate::value::ratio::Ratio64;
 use crate::value::value::Value;
 use crate::vm::fail::Failure;
 
@@ -45,14 +47,23 @@ pub(crate) fn pair_up(
 ) -> Vec<(Event, Value, Option<VarSlotRef>)> {
     let mut out = Vec::new();
     if gives_structure(subject, value) {
-        for v in q(value, span, st) {
-            match st.sample(subject, v.anchor()) {
+        for v in query_child(value, span, 0, st) {
+            match st.with_structural_sample(
+                subject,
+                v.anchor(),
+                1,
+                v.whole,
+                v.part,
+                Some(&v),
+                |st| sample_child(subject, v.anchor(), 1, st),
+            ) {
                 Ok(sampled) => {
                     for s in sampled {
                         let mut e = s;
                         let mut path = v.occ.path.clone();
                         path.extend(e.occ.path.iter().copied());
                         e.occ.path = path;
+                        merge_producers(&v, &mut e);
                         e.whole = v.whole;
                         e.part = v.part;
                         e.src = v.src.or(e.src);
@@ -63,8 +74,10 @@ pub(crate) fn pair_up(
             }
         }
     } else {
-        for e in q(subject, span, st) {
-            match st.sample(value, e.anchor()) {
+        for e in query_child(subject, span, 1, st) {
+            match st.with_structural_sample(value, e.anchor(), 0, e.whole, e.part, Some(&e), |st| {
+                sample_child(value, e.anchor(), 0, st)
+            }) {
                 // No value at the onset (a rest): the event is dropped, as
                 // with Tidal's `#`.
                 Ok(sampled) => {
@@ -122,4 +135,66 @@ pub(crate) fn query_control(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     query_mapped(name, value, subject, p, span, st, |v| Ok(v.clone()))
+}
+
+/// Samples a statically numbered child while retaining the shared query bounds.
+pub(crate) fn sample_child(
+    child: &Pat,
+    at: Ratio64,
+    ordinal: u32,
+    st: &mut QState<'_, '_>,
+) -> Result<Vec<Event>, Failure> {
+    st.with_producer(ProducerKind::Child, ordinal, |st| st.sample(child, at))
+}
+
+/// Frames both complete paths by role and length. Nested merges cannot alias
+/// a concatenation of leaves or a different timing/content split.
+pub(crate) fn merge_producers(timing: &Event, content: &mut Event) {
+    let (Some(timing), Some(subject)) = (&timing.producer, &content.producer) else {
+        return;
+    };
+    let mut merged = ProducerTrace::default();
+    for (kind, trace) in [
+        (ProducerKind::TimingSource, timing),
+        (ProducerKind::ContentSource, subject),
+    ] {
+        let length = trace.steps.len() as u64;
+        merged.push(kind, length as u32);
+        merged.push(kind, (length >> 32) as u32);
+        merged.steps.extend_from_slice(&trace.steps);
+    }
+    content.producer = Some(merged);
+}
+
+/// A transformed child is a separate producer even when its content is equal.
+pub(crate) fn transformed_child(
+    child: &Pat,
+    span: TimeSpan,
+    ordinal: u32,
+    st: &mut QState<'_, '_>,
+) -> Vec<Event> {
+    st.with_producer(ProducerKind::DynamicExpansion, ordinal, |st| {
+        query_child(child, span, ordinal, st)
+    })
+}
+
+/// Avoid additional recursion frames on the unchanged legacy query path.
+#[inline(always)]
+pub(crate) fn query_child(
+    child: &Pat,
+    span: TimeSpan,
+    ordinal: u32,
+    st: &mut QState<'_, '_>,
+) -> Vec<Event> {
+    if !st.is_traced() {
+        q(child, span, st)
+    } else {
+        traced_child(child, span, ordinal, st)
+    }
+}
+
+/// Keep trace-only scope temporaries outside legacy recursive caller frames.
+#[inline(never)]
+fn traced_child(child: &Pat, span: TimeSpan, ordinal: u32, st: &mut QState<'_, '_>) -> Vec<Event> {
+    q_child(child, span, ordinal, st)
 }

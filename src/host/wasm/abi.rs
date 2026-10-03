@@ -50,6 +50,19 @@ pub fn fix_outbox(bytes: usize) {
     OUTBOX_CAP.with(|c| c.set(bytes));
 }
 
+/// Whether a whole record fits an empty outbox; zero capacity permits growth.
+/// This does not modify the queue or its refusal counter.
+pub(crate) fn record_fits_empty_outbox(record_bytes: usize) -> bool {
+    if u32::try_from(record_bytes).is_err() {
+        return false;
+    }
+    let Some(framed) = FRAME_LEN.checked_add(record_bytes) else {
+        return false;
+    };
+    let cap = OUTBOX_CAP.with(Cell::get);
+    cap == 0 || framed <= cap
+}
+
 /// Appends one framed record; false (and counted) when a fixed outbox has
 /// no room for it.
 pub fn push_record(rec: &[u8]) -> bool {
@@ -102,7 +115,7 @@ pub unsafe fn input<'a>(ptr: *const u8, len: u32) -> &'a [u8] {
 }
 
 /// Allocates `len` bytes for JS to write into; free with `free`.
-#[no_mangle]
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn alloc(len: u32) -> *mut u8 {
     let mut v = vec![0u8; (len as usize).max(1)].into_boxed_slice();
     let p = v.as_mut_ptr();
@@ -114,7 +127,7 @@ pub extern "C" fn alloc(len: u32) -> *mut u8 {
 ///
 /// # Safety
 /// `ptr` and `len` must be exactly an earlier `alloc` result and its length.
-#[no_mangle]
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub unsafe extern "C" fn free(ptr: *mut u8, len: u32) {
     if ptr.is_null() {
         return;
@@ -125,19 +138,19 @@ pub unsafe extern "C" fn free(ptr: *mut u8, len: u32) {
 }
 
 /// The start of the outbox.
-#[no_mangle]
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn outbox_ptr() -> *const u8 {
     OUTBOX.with(|o| o.borrow().as_ptr())
 }
 
 /// The outbox length in bytes.
-#[no_mangle]
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn outbox_len() -> u32 {
     OUTBOX.with(|o| u32::try_from(o.borrow().len()).unwrap_or(u32::MAX))
 }
 
 /// Empties the outbox (its capacity is kept).
-#[no_mangle]
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn outbox_clear() {
     OUTBOX.with(|o| o.borrow_mut().clear());
 }

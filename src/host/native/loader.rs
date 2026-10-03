@@ -24,6 +24,7 @@
 //! read.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -56,6 +57,7 @@ struct State {
     next: u32,
     /// Registered package banks: keyword name and canonical files.
     banks: Vec<(Rc<str>, Vec<PathBuf>)>,
+    song_sources: BTreeMap<PathBuf, (FileId, Rc<str>)>,
 }
 
 /// Reads WAV samples and source files below configured roots.
@@ -77,6 +79,7 @@ impl NativeSampleLoader {
             files: Vec::new(),
             next: FIRST_LOADED_FILE,
             banks: Vec::new(),
+            song_sources: BTreeMap::new(),
         })))
     }
 
@@ -244,6 +247,10 @@ impl SampleLoader for NativeSampleLoader {
 }
 
 impl SourceLoader for NativeSampleLoader {
+    fn song_asset_factory(&self) -> Option<Rc<dyn crate::song::assets::SongAssetFactory>> {
+        Some(self.isolated_song_factory())
+    }
+
     fn read(&mut self, path: &PathVal) -> Result<(FileId, Rc<str>), Failure> {
         let file = self.resolve(path)?;
         let bytes = read_limited(&file, MAX_SOURCE_BYTES, &path.text)?;
@@ -254,6 +261,161 @@ impl SourceLoader for NativeSampleLoader {
         st.next = st.next.saturating_add(1);
         st.files.push((id, file));
         Ok((id, Rc::from(text)))
+    }
+}
+
+/// Immutable root/base configuration; no active file IDs or registered banks.
+pub struct NativeSongAssetFactory {
+    roots: Vec<PathBuf>,
+    base: PathBuf,
+}
+impl crate::song::assets::SongAssetFactory for NativeSongAssetFactory {
+    fn begin(
+        &self,
+        source: crate::song::assets::SongSourceFile,
+        limits: crate::song::assets::SongAssetLimits,
+    ) -> Result<crate::song::assets::SongAssetPreparation, Failure> {
+        let loader = NativeSampleLoader::new(&self.roots, &self.base);
+        let text = &*source.path.text;
+        let raw = if text == "<console>" {
+            self.base.join("__console_origin__.vact")
+        } else if let Some(rest) = text.strip_prefix("~/") {
+            PathBuf::from(std::env::var_os("HOME").ok_or_else(|| fail("HOME is not set"))?)
+                .join(rest)
+        } else {
+            self.base.join(text)
+        };
+        let parent = raw
+            .parent()
+            .ok_or_else(|| fail("source origin has no parent"))?;
+        let parent =
+            fs::canonicalize(parent).map_err(|e| fail(format!("source origin parent: {e}")))?;
+        contained(&loader.roots(), &parent, text)?;
+        let name = raw
+            .file_name()
+            .ok_or_else(|| fail("source origin has no filename"))?;
+        // Resolve only the parent: an entry symlink never grants an escaped read.
+        let path = parent.join(name);
+        loader.register_file(source.file, &path);
+        crate::song::assets::SongAssetPreparation::new(Box::new(loader), limits)
+    }
+}
+impl NativeSampleLoader {
+    /// Copies configuration, never the mutable active file/bank state.
+    #[must_use]
+    pub fn isolated_song_factory(&self) -> Rc<dyn crate::song::assets::SongAssetFactory> {
+        let state = self.0.borrow();
+        Rc::new(NativeSongAssetFactory {
+            roots: state.roots.clone(),
+            base: state.base.clone(),
+        })
+    }
+}
+impl crate::song::assets::SongAssetBackend for NativeSampleLoader {
+    fn bank_wraps(&self) -> bool {
+        true
+    }
+    fn read_bounded(
+        &mut self,
+        path: &PathVal,
+        remaining: u64,
+    ) -> Result<(FileId, Rc<str>), Failure> {
+        let file = self.resolve(path)?;
+        if let Some(source) = self.0.borrow().song_sources.get(&file) {
+            return Ok(source.clone());
+        }
+        let size = fs::metadata(&file).map_err(|e| fail(e.to_string()))?.len();
+        if size > remaining {
+            return Err(Failure::new(
+                FailCode::FuelExhausted,
+                "remaining source bytes exhausted",
+            ));
+        }
+        let bytes = read_limited(&file, remaining.min(MAX_SOURCE_BYTES), &path.text)?;
+        let text = String::from_utf8(bytes).map_err(|_| fail("song source is not UTF-8"))?;
+        let mut state = self.0.borrow_mut();
+        let id = FileId::new(state.next);
+        state.next = state
+            .next
+            .checked_add(1)
+            .ok_or_else(|| Failure::new(FailCode::Overflow, "song file identity overflow"))?;
+        let source = (id, Rc::from(text));
+        state.files.push((id, file.clone()));
+        state.song_sources.insert(file, source.clone());
+        Ok(source)
+    }
+    fn load_bounded(
+        &mut self,
+        src: &SampleSrc,
+        remaining: u64,
+    ) -> Result<Arc<SampleData>, Failure> {
+        let file = match src {
+            SampleSrc::Path(p) => self.resolve(p)?,
+            SampleSrc::Bank { kw, index } => self.bank_file(&name_of_kw(*kw), *index)?,
+            SampleSrc::Buffer { .. } => return Err(fail("buffer is not a file sample")),
+        };
+        let bytes = read_limited(&file, MAX_WAV_BYTES, "song WAV")?;
+        parse_wav_limited(&bytes, remaining)
+            .map(Arc::new)
+            .map_err(fail)
+    }
+
+    fn bank_len(&mut self, kw: KwId, remaining: u32) -> Result<u32, Failure> {
+        let name = name_of_kw(kw);
+        if let Some((_, files)) = self.0.borrow().banks.iter().find(|(n, _)| *n == name) {
+            let count = u32::try_from(files.len()).map_err(|_| fail("bank count overflow"))?;
+            if count > remaining {
+                return Err(Failure::new(
+                    FailCode::FuelExhausted,
+                    "complete bank exceeds remaining resources",
+                ));
+            }
+            return Ok(count);
+        }
+        if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
+            return Err(fail("invalid song bank name"));
+        }
+        let roots = self.roots();
+        let directory = roots
+            .iter()
+            .map(|r| r.join(&*name))
+            .find(|p| p.is_dir())
+            .ok_or_else(|| fail(format!("no song sample bank `:{name}`")))?;
+        let directory = fs::canonicalize(directory).map_err(|e| fail(e.to_string()))?;
+        contained(&roots, &directory, &name)?;
+        let mut files = Vec::new();
+        for entry in fs::read_dir(directory).map_err(|e| fail(e.to_string()))? {
+            let path = entry.map_err(|e| fail(e.to_string()))?.path();
+            if !path
+                .extension()
+                .is_some_and(|x| x.eq_ignore_ascii_case("wav"))
+            {
+                continue;
+            }
+            if files.len() >= remaining as usize {
+                return Err(Failure::new(
+                    FailCode::FuelExhausted,
+                    "complete bank exceeds remaining resources",
+                ));
+            }
+            let path = fs::canonicalize(path).map_err(|e| fail(e.to_string()))?;
+            contained(&roots, &path, &name)?;
+            if !path.is_file() {
+                return Err(fail("bank entry is not a regular file"));
+            }
+            files.push(path);
+        }
+        if files.is_empty() {
+            return Err(fail("song bank has no WAV files"));
+        }
+        files.sort_by(|a, b| {
+            a.as_os_str()
+                .as_encoded_bytes()
+                .cmp(b.as_os_str().as_encoded_bytes())
+        });
+        let count = u32::try_from(files.len()).map_err(|_| fail("bank count overflow"))?;
+        self.0.borrow_mut().banks.push((name, files));
+        Ok(count)
     }
 }
 
@@ -278,6 +440,10 @@ fn u32_at(b: &[u8], at: usize) -> Option<u32> {
 /// The reason, for anything that is not a well-formed mono or stereo
 /// PCM 16/24/32 or float 32 WAV.
 pub fn parse_wav(b: &[u8]) -> Result<SampleData, String> {
+    parse_wav_limited(b, u64::MAX)
+}
+
+fn parse_wav_limited(b: &[u8], remaining: u64) -> Result<SampleData, String> {
     if b.len() < 12 || &b[0..4] != b"RIFF" || &b[8..12] != b"WAVE" {
         return Err("not a RIFF WAVE file".into());
     }
@@ -296,6 +462,13 @@ pub fn parse_wav(b: &[u8]) -> Result<SampleData, String> {
             let data = b.get(body..end).ok_or("truncated data chunk")?;
             let frame = align * usize::from(channels);
             let data = &data[..data.len() - data.len() % frame];
+            let pcm_bytes = u64::try_from(data.len() / align)
+                .ok()
+                .and_then(|n| n.checked_mul(4))
+                .ok_or("decoded song PCM size overflow")?;
+            if pcm_bytes > remaining {
+                return Err("decoded song PCM exceeds remaining capacity".into());
+            }
             return Ok(SampleData {
                 rate,
                 channels,

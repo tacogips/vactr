@@ -21,6 +21,7 @@ pub mod offline;
 pub mod ported;
 pub mod release;
 pub mod ring;
+pub(crate) mod song;
 pub mod ugen;
 pub mod voice;
 

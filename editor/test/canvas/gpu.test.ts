@@ -242,6 +242,59 @@ describe('GPU code compositor', () => {
     renderer.setBackground(source, 2); expect(renderer.render()).toBe(true); expect(renderer.stats.backgroundUploads).toBe(2);
     expect(b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
+  it('retains every unchanged text tile with animated near-cap backgrounds from the first frame', () => {
+    const r = recordingGL(4096); const raster = rasterizer(); const b = new ResourceLedger();
+    const text = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n');
+    const renderer = new CanvasRenderer(document.createElement('canvas'), layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas });
+    renderer.setViewport({ width: 640, height: 800, scrollLeft: 0, scrollTop: 0 });
+    const source = document.createElement('canvas'); source.width = 3840; source.height = 2160;
+    const allocate = b.allocate.bind(b);
+    let peakGeometry = 0;
+    b.allocate = (...args) => {
+      const allocation = allocate(...args);
+      peakGeometry = Math.max(peakGeometry, b.counters.byKind.geometry);
+      expect(b.usedBytes).toBeLessThanOrEqual(RESOURCE_LIMITS.total);
+      expect(b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry);
+      expect(b.counters.byKind.atlas).toBeLessThanOrEqual(RESOURCE_LIMITS.atlas);
+      expect(b.counters.pixels).toBeLessThanOrEqual(RESOURCE_LIMITS.canvasPixels);
+      return allocation;
+    };
+    let firstUploads = 0; let firstTextures: unknown[] = []; let firstBytes = 0;
+    try {
+      for (let revision = 1; revision <= 4; revision++) {
+        const start = r.draws.length;
+        renderer.setBackground(source, revision); expect(renderer.render()).toBe(true);
+        const textures = r.draws.slice(start).map(draw => draw.texture);
+        if (revision === 1) {
+          firstUploads = renderer.atlasStats.uploads; firstTextures = textures; firstBytes = b.usedBytes;
+          expect(firstUploads).toBe(80); // 40 visible source runs and 40 line numbers.
+          expect(raster.text.filter(entry => entry.text.startsWith('line '))).toHaveLength(40);
+        } else {
+          expect(renderer.atlasStats.uploads).toBe(firstUploads);
+          expect(textures).toEqual(firstTextures); // No skipped or replaced visible tiles.
+          expect(b.usedBytes).toBe(firstBytes);
+        }
+        expect(renderer.atlasStats.evictions).toBe(0);
+        expect(renderer.stats.backgroundUploads).toBe(revision);
+      }
+      expect(peakGeometry).toBeGreaterThan(4 * MiB - 20_000);
+      expect(r.calls.filter(call => call.name === 'texSubImage2D')).toHaveLength(3);
+      expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(82); // White, backdrop, 80 glyph tiles.
+    } finally { renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); }
+  });
+  it('shrinks animated backdrop staging under new geometry pressure without evicting text', () => {
+    const f = fixture(); const source = document.createElement('canvas'); source.width = 3840; source.height = 2160;
+    f.renderer.setBackground(source, 1); expect(f.renderer.render()).toBe(true);
+    const uploads = f.renderer.atlasStats.uploads; const backdropBytes = f.b.counters.byKind.backdrop;
+    const pressure = f.b.allocate('geometry', RESOURCE_LIMITS.geometry - f.b.counters.byKind.geometry - 100_000)!;
+    expect(pressure).not.toBeNull();
+    try {
+      f.renderer.setBackground(source, 2); expect(f.renderer.render()).toBe(true);
+      expect(f.b.counters.byKind.backdrop).toBeLessThan(backdropBytes);
+      expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.renderer.atlasStats.evictions).toBe(0);
+      expect(f.renderer.stats.backgroundUploads).toBe(2);
+    } finally { pressure.release(); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0); expect(f.r.live.size).toBe(0); }
+  });
   it('dense offscreen syntax on a 1MiB line cannot overflow visible-tile metadata', () => {
     const f = fixture('x'.repeat(1024 * 1024));
     const annotations: CodeAnnotation[] = Array.from({ length: 150_000 }, (_, i) => ({ kind: 'syntax', from: i * 6, to: i * 6 + 3, className: 'vact-tok-head' }));

@@ -5,7 +5,13 @@
 
 import type { EditorState, Transaction, TransactionSpec, ChangeSet } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
-import type { Span, WireSite } from '../protocol/types';
+import type { InstrumentSelector, Span, WireSite } from '../protocol/types';
+
+export interface SongControls {
+  applyWholeCode(): Promise<void>;
+  muteInstrument(selector: InstrumentSelector, muted: boolean): Promise<void>;
+  dispose(): void;
+}
 
 export interface SampleFrames {
   /** Interleaved frames. */

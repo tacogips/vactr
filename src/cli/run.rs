@@ -28,11 +28,67 @@ pub fn main(file: &Path, host: HostChoice, cycles: Option<u64>, cwd: &Path) -> i
             return 1;
         }
     };
+    #[cfg(feature = "host-native")]
+    {
+        use crate::session::song::{probe_song_candidate, CandidateBuildCtx};
+        use crate::song::{prepare_song, SnapshotEpoch};
+        let Some(factory) = session.song_asset_factory() else {
+            eprintln!("vactr: isolated candidate asset factory unavailable");
+            return 1;
+        };
+        let lock = super::read_lock(cwd);
+        let cache = super::open_cache();
+        let cx = CandidateBuildCtx {
+            assets: factory.as_ref(),
+            asset_limits: super::render::asset_limits(),
+            lock: lock.as_ref(),
+            cache: cache.as_deref(),
+        };
+        match probe_song_candidate(&text, &file.to_string_lossy(), 1, SnapshotEpoch(1), &cx) {
+            Err(error) => {
+                eprintln!("{}", crate::session::console::format_failure(&error));
+                return 3;
+            }
+            Ok(None) => {} // Only typed no-entry classification permits active legacy eval.
+            Ok(Some(candidate)) => {
+                if cycles.is_some() {
+                    eprintln!("vactr: finite Song run does not accept --cycles");
+                    return 2;
+                }
+                if host != HostChoice::Native || matches!(clock, HostClock::Virtual(_)) {
+                    eprintln!("vactr: finite Song run requires an available native output clock; noop and live input are unsupported");
+                    return 1;
+                }
+                let prepared = match prepare_song(candidate) {
+                    Ok(prepared) => prepared,
+                    Err(error) => {
+                        eprintln!("vactr: {}: {}", error.code.as_str(), error.message);
+                        return 3;
+                    }
+                };
+                if let Err(error) =
+                    session.set_song_preparation_limits(super::render::preparation_limits())
+                {
+                    eprintln!("vactr: {}", error.message);
+                    return 3;
+                }
+                if let Err(refusal) = session.submit_prepared_song(prepared) {
+                    eprintln!("vactr: {}", refusal.failure.message);
+                    return 3;
+                }
+                return run_song(&mut session, &clock, &mut std::io::stdout());
+            }
+        }
+    }
     let file_name = file.to_string_lossy().into_owned();
     let (outcome, _batches) = session.eval(&text, &file_name, 1, 1, None);
     let mut out = std::io::stdout();
     print_eval_outcome(&session, &outcome, &mut out);
     let has_errors = outcome.has_errors();
+    if session.runtime().pending_song().is_some() {
+        eprintln!("vactr: finite Song run is unsupported on this build");
+        return 1;
+    }
     match cycles {
         Some(n) => run_cycles(&mut session, &clock, n, &mut out),
         None => run_forever(&mut session, &clock, &mut out),
@@ -71,5 +127,25 @@ fn run_forever(session: &mut Session, clock: &HostClock, out: &mut dyn Write) ->
         std::thread::sleep(TICK_PERIOD);
         clock.advance(TICK_PERIOD.as_secs_f64());
         let _ = tick(session, clock.now(), out);
+    }
+}
+
+#[cfg(feature = "host-native")]
+fn run_song(session: &mut Session, clock: &HostClock, out: &mut dyn Write) -> i32 {
+    use crate::sched::song::SongTransportState;
+    loop {
+        std::thread::sleep(TICK_PERIOD);
+        if let Err(error) = tick(session, clock.now(), out) {
+            eprintln!("vactr: output failed: {error}");
+            return 1;
+        }
+        match session.runtime().song_state() {
+            Some(SongTransportState::Ended) => return 0,
+            Some(SongTransportState::Failed) => {
+                eprintln!("vactr: finite song preparation or transport failed");
+                return 3;
+            }
+            _ => {}
+        }
     }
 }

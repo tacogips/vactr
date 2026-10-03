@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crate::ns::namespace::VarSlotRef;
 use crate::pattern::combinators::{control, input, music, random, region, sound, structure, time};
 use crate::pattern::eval::{QState, QueryCtx};
-use crate::pattern::occ::OccKey;
+use crate::pattern::occ::{OccKey, ProducerKind, ProducerTrace};
 use crate::pattern::pat::{Pat, PatNode};
 use crate::pattern::signal::Sig;
 use crate::pattern::step::{query_pure, query_single, query_steps};
@@ -37,6 +37,11 @@ pub struct Event {
     pub controls: Controls,
     pub src: Option<SrcRef>,
     pub occ: OccKey,
+    /// Full explicit source identity for song realization. Legacy queries
+    /// leave this absent and retain their existing scheduler occurrence keys.
+    pub producer: Option<ProducerTrace>,
+    /// Certified mono source provenance, absent on fresh legacy events.
+    pub song_source: Option<Rc<crate::song::source::SongEventOrigin>>,
     /// The var or tweak this event's value was read from directly, if any.
     /// Late-bound refs resolve at query time; commit keeps the source so it
     /// can emit `Ctl::Cell` (11.3). BE-SCHED fills it.
@@ -194,7 +199,17 @@ impl Event {
 /// origin, and sibling events survive. Pure relative to the values read
 /// through `cx` (10.4).
 pub fn query(p: &Pat, span: TimeSpan, cx: &mut QueryCtx<'_>) -> QueryResult {
-    let mut st = QState::new(cx);
+    query_state(p, span, QState::new(cx))
+}
+
+/// Queries with full producer tracing, retaining the same bounds, events and
+/// faults as `query`. Song realization supplies canonical whole-cycle spans;
+/// this entry does not change legacy dynamic sampling or clipping semantics.
+pub fn query_traced(p: &Pat, span: TimeSpan, cx: &mut QueryCtx<'_>) -> QueryResult {
+    query_state(p, span, QState::new_traced(cx))
+}
+
+fn query_state(p: &Pat, span: TimeSpan, mut st: QState<'_, '_>) -> QueryResult {
     let raw = q(p, span, &mut st);
     let mut events = Vec::with_capacity(raw.len());
     for mut e in raw {
@@ -211,7 +226,7 @@ pub fn query(p: &Pat, span: TimeSpan, cx: &mut QueryCtx<'_>) -> QueryResult {
         }
     }
     let faults = st.faults;
-    let output = cx.vm.take_output();
+    let output = st.cx.vm.take_output();
     QueryResult {
         events,
         faults,
@@ -228,9 +243,48 @@ pub(crate) fn q(p: &Pat, span: TimeSpan, st: &mut QState<'_, '_>) -> Vec<Event> 
         st.fault(f, p.span, Some(span.begin));
         return Vec::new();
     }
-    let out = dispatch(p, span, st);
+    // Legacy recursion never enters the observer's scope or closure frames.
+    let mut out = if st.has_clock_observation() {
+        dispatch_observed(p, span, st)
+    } else {
+        dispatch(p, span, st)
+    };
+    // A primitive emitting directly (e.g. sound or signal) has this node's
+    // current path. Child/source traces already assigned remain intact.
+    for event in &mut out {
+        if event.producer.is_none() {
+            event.producer = st.producer();
+        }
+    }
     st.leave();
     out
+}
+
+/// Traverses one static source edge. Ordinals name child slots, never output
+/// positions; the combinator propagation phase supplies each slot explicitly.
+#[inline(always)]
+pub(crate) fn q_child(
+    p: &Pat,
+    span: TimeSpan,
+    ordinal: u32,
+    st: &mut QState<'_, '_>,
+) -> Vec<Event> {
+    st.push_producer(ProducerKind::Child, ordinal);
+    let events = q(p, span, st);
+    st.pop_producer();
+    events
+}
+
+// Keep observed scope storage outside every pending legacy query frame.
+#[inline(never)]
+fn dispatch_observed(p: &Pat, span: TimeSpan, st: &mut QState<'_, '_>) -> Vec<Event> {
+    match st.with_clock_dispatch(&p.node, |st| Ok(dispatch(p, span, st))) {
+        Ok(events) => events,
+        Err(failure) => {
+            st.fault(failure, p.span, Some(span.begin));
+            Vec::new()
+        }
+    }
 }
 
 fn dispatch(p: &Pat, span: TimeSpan, st: &mut QState<'_, '_>) -> Vec<Event> {
@@ -238,6 +292,13 @@ fn dispatch(p: &Pat, span: TimeSpan, st: &mut QState<'_, '_>) -> Vec<Event> {
         PatNode::Steps(items) => query_steps(items, p, span, st),
         PatNode::Pure(step) => query_pure(step, p, span, st),
         PatNode::Sound { src, kit } => sound::query_sound(src, kit.as_ref(), p, span, st),
+        PatNode::SongSource(source) => match crate::song::source::query_source(source, span, st) {
+            Ok(events) => events,
+            Err(failure) => {
+                st.fault(failure, p.span, Some(span.begin));
+                Vec::new()
+            }
+        },
         PatNode::Signal(sig) => query_signal(sig, p, span, st),
         PatNode::Fast(inner, k) => time::query_fast(inner, k, false, p, span, st),
         PatNode::Slow(inner, k) => time::query_fast(inner, k, true, p, span, st),

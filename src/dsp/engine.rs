@@ -35,7 +35,12 @@ use crate::sched::slots::{CtlId, SlotId};
 
 pub use crate::dsp::ring::{CellStore, Counters, EngineConfig, EngineIo};
 
+mod occupancy;
 mod render;
+mod song;
+mod song_queue;
+mod song_runtime;
+pub use song::{SongFrameRegion, SongLeaseState, SongResourceStager, SongStagingConfig};
 
 const DELAYTIME: CtlId = CtlId::new(39);
 const DELAYFEEDBACK: CtlId = CtlId::new(40);
@@ -88,6 +93,14 @@ pub struct Engine {
     published: Counters,
     faults: [Option<Fault>; FAULTS],
     retiring_cells: [Option<(CellId, u32)>; MAX_RETIRING_CELLS],
+    song_validation: Option<(crate::dsp::ring::NativeSongInstall, usize)>,
+    song_return_key: Option<(crate::song::routing::SongLeaseKey, bool)>,
+    song_stager: Option<SongResourceStager>,
+    song_runtime: Option<crate::dsp::song::SongRuntime>,
+    song_followup: Option<HostMsg>,
+    song_ack: Option<HostMsg>,
+    pending_legacy_install: Option<Garbage>,
+    pending_song_install: Option<crate::dsp::ring::NativeSongInstall>,
     blocks: u64,
 }
 
@@ -131,6 +144,14 @@ impl Engine {
         Self {
             sr,
             frame: 0,
+            song_validation: None,
+            song_return_key: None,
+            song_stager: None,
+            song_runtime: None,
+            song_followup: None,
+            song_ack: None,
+            pending_legacy_install: None,
+            pending_song_install: None,
             fft: Fft::new(FFT_SIZE),
             templates: Templates::new(cfg.template_slots, arena_tier),
             raw: RawGraph::boxed(),
@@ -139,7 +160,16 @@ impl Engine {
             tags: TagMap::new(voices),
             tombs: Tombstones::new(),
             gens: SlotGens::new(MAX_SLOTS),
-            buses: BusGraph::new(cfg.bus_slots, mb, bus_mem, &NoCells, sr, &cfg.caps),
+            buses: BusGraph::new_with_memory_profile(
+                cfg.bus_slots,
+                mb,
+                bus_mem,
+                cfg.song_bus_memory,
+                &NoCells,
+                sr,
+                &cfg.caps,
+            )
+            .expect("validated constructor bus geometry"),
             orbits: (0..cfg.orbits.max(1))
                 .map(|_| OrbitDelay::new(secs(cfg.orbit_delay_seconds), mb))
                 .collect(),
@@ -343,7 +373,13 @@ impl Engine {
         self.controls(io);
         let mut done = 0;
         while done < frames {
-            let n = (frames - done).min(self.cfg.max_block);
+            let _ = self.apply_song_runtime_frame(self.frame, io.acks);
+            let mut n = (frames - done).min(self.cfg.max_block);
+            if let Some(frame) = self.next_song_runtime_frame(self.frame.saturating_add(n as u64)) {
+                if frame > self.frame {
+                    n = usize::try_from(frame - self.frame).unwrap_or(n).min(n);
+                }
+            }
             let input_block = input.map(|samples| &samples[2 * done..2 * (done + n)]);
             self.block(
                 io,
@@ -354,12 +390,44 @@ impl Engine {
             );
             done += n;
         }
+        self.finish_song_deadlines(self.frame);
+        self.retire_song_runtime(self.frame);
+        self.reap_returned_song_epochs();
         self.retire(io);
         self.publish(io);
         self.blocks += 1;
     }
 
     fn controls<C: CellStore, S: ControlSource>(&mut self, io: &mut EngineIo<'_, C, S>) {
+        if !self.return_legacy_install(io.garbage.as_deref_mut()) {
+            return;
+        }
+        if !self.return_song_install(io.garbage.as_deref_mut()) {
+            return;
+        }
+        if let Some(ack) = self.song_ack.take() {
+            if let Err(ack) = io.acks.push_critical(ack) {
+                self.song_ack = Some(ack);
+                return;
+            }
+        }
+        if let Some(message) = self.song_followup.take() {
+            if let Err(message) = io.acks.push_critical(message) {
+                self.song_followup = Some(message);
+                return;
+            }
+        }
+        self.flush_runtime_receipts(io.acks);
+        if self
+            .song_runtime
+            .as_ref()
+            .is_some_and(|r| r.has_pending_receipts())
+        {
+            return;
+        }
+        if !self.pump_song_staging(io.acks, io.garbage.as_deref_mut()) {
+            return;
+        }
         let mut credit = INSTALL_BYTES_PER_QUANTUM;
         let mut batch = true;
         let mut copied = 0;
@@ -374,6 +442,17 @@ impl Engine {
                 batch = false;
             }
             self.record(rec, io.cells, io.acks, io.garbage.as_deref_mut());
+            if self.pending_legacy_install.is_some()
+                || self.song_ack.is_some()
+                || self.pending_song_install.is_some()
+                || self.song_validation.is_some()
+                || self
+                    .song_runtime
+                    .as_ref()
+                    .is_some_and(|r| r.has_pending_receipts())
+            {
+                break;
+            }
         }
         while io.controls.held() > DEFERRED_MAX {
             match io.controls.drop_held() {
@@ -386,6 +465,24 @@ impl Engine {
         self.counters.bytes_copied_total += copied as u64;
     }
 
+    fn return_song_install(&mut self, garbage: Option<&mut Producer<Garbage>>) -> bool {
+        let Some(install) = self.pending_song_install.take() else {
+            return true;
+        };
+        let Some(queue) = garbage else {
+            self.pending_song_install = Some(install);
+            return false;
+        };
+        match queue.push(Garbage::SongInstall(install)) {
+            Ok(()) => true,
+            Err(Garbage::SongInstall(install)) => {
+                self.pending_song_install = Some(install);
+                false
+            }
+            Err(_) => unreachable!("song install garbage identity"),
+        }
+    }
+
     fn record<C: CellStore>(
         &mut self,
         rec: Record<'_>,
@@ -393,12 +490,31 @@ impl Engine {
         acks: &mut AckProducer,
         garbage: Option<&mut Producer<Garbage>>,
     ) {
+        if let Record::Msg(CtlMsg::Song(command)) = rec {
+            if self.song_runtime_record(command, acks) {
+                return;
+            }
+        }
         let mut ack = |m: HostMsg| {
             let _ = acks.push(m);
         };
         match rec {
+            rec @ (Record::SongNative(_)
+            | Record::SongGraph { .. }
+            | Record::SongSampleBegin { .. }
+            | Record::SongSlice { .. }
+            | Record::Msg(CtlMsg::Song(_))) => self.song_record(rec, acks, garbage),
             Record::Msg(CtlMsg::SlotControl(c)) => {
-                self.gens.control(c, &mut self.pool.voices, self.sr);
+                self.gens.control(c, &mut [], self.sr);
+                for (index, voice) in self.pool.voices.iter_mut().enumerate() {
+                    if self
+                        .song_runtime
+                        .as_ref()
+                        .is_none_or(|r| r.voices[index].is_none())
+                    {
+                        self.gens.control(c, std::slice::from_mut(voice), self.sr);
+                    }
+                }
                 ack(HostMsg::SlotControlAck(SlotControlAck {
                     slot: c.slot,
                     gen: c.new_gen,
@@ -454,9 +570,8 @@ impl Engine {
                 channels,
                 rate,
             } => {
-                if let Err(code) = self
-                    .store
-                    .begin(resource, gen, frames as usize, channels, rate)
+                if let Err(code) =
+                    self.begin_legacy_sample(resource, gen, frames as usize, channels, rate)
                 {
                     self.fault(code, resource);
                 }
@@ -484,243 +599,6 @@ impl Engine {
                 }
             }
         }
-    }
-
-    fn install_bytes<C: CellStore>(
-        &mut self,
-        id: u32,
-        gen: u32,
-        bytes: &[u8],
-        cells: &C,
-    ) -> Result<(), FaultCode> {
-        match decode_graph(bytes, &mut self.raw, &mut self.bus_tmp)? {
-            GraphKind::Inst => {
-                if self.cfg.output_channels == 2
-                    && self.raw.nodes[..self.raw.n_nodes].iter().any(|n| {
-                        matches!(
-                            n,
-                            crate::dsp::ugen::Node::Out3 | crate::dsp::ugen::Node::Out4
-                        )
-                    })
-                {
-                    return Err(FaultCode::OutputChannels);
-                }
-                let env = self.build_env();
-                self.templates.build(&self.raw, &env, id, gen)
-            }
-            kind => {
-                let t = *self.bus_tmp;
-                let master = kind == GraphKind::Master;
-                self.buses
-                    .install(&t, master, id, gen, cells, self.sr, &self.cfg.caps)
-                    .then_some(())
-                    .ok_or(FaultCode::BadResource)
-            }
-        }
-    }
-
-    fn install_native<C: CellStore>(
-        &mut self,
-        n: NativeInstall,
-        cells: &C,
-        garbage: Option<&mut Producer<Garbage>>,
-    ) -> Option<HostMsg> {
-        let (resource, gen, ok) = match n {
-            NativeInstall::Inst {
-                resource,
-                gen,
-                template,
-            } => match self.cfg.output_channels == 4 || !template.has_quad {
-                true => match self.templates.adopt(template, resource, gen) {
-                    Ok(()) => (resource, gen, true),
-                    Err(t) => {
-                        push_garbage(garbage, Garbage::Template(t));
-                        (resource, gen, false)
-                    }
-                },
-                false => {
-                    push_garbage(garbage, Garbage::Template(template));
-                    self.fault(FaultCode::OutputChannels, resource);
-                    (resource, gen, false)
-                }
-            },
-            NativeInstall::Bus {
-                resource,
-                gen,
-                master,
-                template,
-            } => {
-                let caps = self.cfg.caps;
-                let ok = self
-                    .buses
-                    .install(&template, master, resource, gen, cells, self.sr, &caps);
-                push_garbage(garbage, Garbage::Bus(template));
-                (resource, gen, ok)
-            }
-            NativeInstall::Sample {
-                resource,
-                gen,
-                data,
-            } => match self.store.install_arc(resource, gen, data) {
-                Ok(()) => (resource, gen, true),
-                Err(data) => {
-                    push_garbage(garbage, Garbage::Sample(data));
-                    (resource, gen, false)
-                }
-            },
-        };
-        if ok {
-            Some(HostMsg::Installed { resource, gen })
-        } else {
-            self.fault(FaultCode::BadResource, resource);
-            None
-        }
-    }
-
-    /// Starts a voice for `ev` at frame `delay` of the next block; on a full
-    /// pool the oldest open input voice is stolen (short gate, counted) and
-    /// the start waits for its slot.
-    fn start<C: CellRead + ?Sized>(
-        &mut self,
-        ev: &AudioEvent,
-        tag: Option<VoiceTag>,
-        delay: usize,
-        cells: &C,
-    ) {
-        let Some(ts) = self.templates.live(ev.inst) else {
-            self.counters.dropped += 1;
-            return;
-        };
-        let Some(vi) = self.pool.free() else {
-            let free_wait = self.deferred.iter().position(|d| d.0.is_none());
-            match (self.tags.oldest(), free_wait) {
-                (Some((_, victim)), Some(w)) => {
-                    self.pool.voices[victim as usize].short_gate(self.sr);
-                    self.tags.remove_voice(victim);
-                    self.counters.stolen += 1;
-                    self.deferred[w] = (Some(*ev), tag);
-                }
-                _ => self.counters.dropped += 1,
-            }
-            return;
-        };
-        let get = |id| event_ctl(ev, id).map(|c| resolve(c, cells));
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let bus = self
-            .buses
-            .route(get(BUS).map(|b| BusId::new(b.max(0.0) as u32)));
-        let seed = self.pool.seed();
-        let Some(t) = self.templates.get(ts) else {
-            return;
-        };
-        #[allow(clippy::cast_precision_loss)]
-        let start = self.now() + delay as f64 / f64::from(self.sr);
-        let v = &mut self.pool.voices[vi];
-        v.start(
-            t,
-            ts,
-            ev,
-            tag,
-            delay,
-            start,
-            bus,
-            cells,
-            self.sr,
-            &self.cfg.caps,
-            seed,
-        );
-        v.orbit = v.orbit.min(self.orbits.len() - 1);
-        self.orbits[v.orbit].set(get(DELAYTIME), get(DELAYFEEDBACK));
-        let slot = &mut self.buses.slots[bus];
-        slot.users += 1;
-        slot.set_room(get(ROOM), get(SIZE));
-        if let Some(tag) = tag {
-            let _ = self.tags.insert(tag, u32::try_from(vi).unwrap_or(u32::MAX));
-        }
-        self.choke_cut_group(vi);
-    }
-
-    /// Cut-group choke (design-music.md "cut group": `s :break > cut 1 >
-    /// d1`; open/closed hat choke, `digital-hat`'s `hat-open`). A voice
-    /// that just started with a nonzero cut group quickly releases every
-    /// other still-sounding voice that shares both that group and its
-    /// orbit, both read from `AudioEvent::voice_hint` (`cut_group`/
-    /// `hint_orbit`) rather than `Voice::orbit`, which the `orbit` control
-    /// does not currently reach (see the field's doc comment). The design
-    /// documents the group but not its scope; same orbit and same cut
-    /// group is chosen here. The release reuses `Voice::short_gate`, the
-    /// same bounded, allocation-free, click-free ~3 ms fade
-    /// (`voice::SHORT_GATE`) the pool-exhaustion steal path already uses,
-    /// so it is deterministic and identical on native and browser, both
-    /// running this same engine core. `cut == 0` means no group: such a
-    /// voice never chokes another voice and is never chokeable.
-    fn choke_cut_group(&mut self, vi: usize) {
-        let v = &self.pool.voices[vi];
-        if v.cut == 0 {
-            return;
-        }
-        let (cut, orbit) = (v.cut, v.cut_orbit);
-        let sr = self.sr;
-        for (i, other) in self.pool.voices.iter_mut().enumerate() {
-            if i != vi && other.active && other.cut == cut && other.cut_orbit == orbit {
-                other.short_gate(sr);
-            }
-        }
-    }
-
-    /// Dequeues due events and renders one block of `n <= max_block`.
-    fn block<C: CellStore, S: ControlSource>(
-        &mut self,
-        io: &mut EngineIo<'_, C, S>,
-        input: Option<&[f32]>,
-        out: &mut [f32],
-        n: usize,
-        channels: usize,
-    ) {
-        for i in 0..MAX_DEFERRED_STARTS {
-            if self.pool.free().is_none() {
-                break;
-            }
-            if let (Some(ev), tag) = self.deferred[i] {
-                self.deferred[i] = (None, None);
-                self.start(&ev, tag, 0, io.cells);
-            }
-        }
-        while self.n_pending < self.pending.len() {
-            let Some(ev) = io.events.pop() else {
-                break;
-            };
-            self.pending[self.n_pending] = ev;
-            self.n_pending += 1;
-        }
-        let start = self.now();
-        #[allow(clippy::cast_precision_loss)]
-        let end = start + n as f64 / f64::from(self.sr);
-        let mut k = 0;
-        while k < self.n_pending {
-            let ev = self.pending[k];
-            if ev.time >= end {
-                k += 1;
-                continue;
-            }
-            self.pending.copy_within(k + 1..self.n_pending, k);
-            self.n_pending -= 1;
-            if !self.gens.admit(&ev) {
-                self.counters.dropped += 1;
-                continue;
-            }
-            let delay = if ev.time < start {
-                self.counters.late += 1;
-                0
-            } else {
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                let f = ((ev.time - start) * f64::from(self.sr)).round() as usize;
-                f.min(n - 1)
-            };
-            self.start(&ev, None, delay, io.cells);
-        }
-        self.render(io.cells, input, out, n, channels);
-        self.frame += n as u64;
     }
 
     /// Frees resources nobody references and acks `Retired` (16.1).
@@ -828,5 +706,178 @@ struct NoCells;
 impl CellRead for NoCells {
     fn get(&self, _cell: CellId) -> f32 {
         0.0
+    }
+}
+
+use crate::song::routing::{SongHostCapacities, SongRejectCode};
+impl Engine {
+    pub(crate) fn configure_song_staging_with_transport(
+        &mut self,
+        config: SongStagingConfig,
+        measured_ack_slots: u32,
+    ) -> Result<(), SongRejectCode> {
+        if self.blocks != 0
+            || self
+                .song_stager
+                .as_ref()
+                .is_some_and(|s| !s.preparations.is_empty())
+        {
+            return Err(SongRejectCode::NotReady);
+        }
+        if measured_ack_slots == 0 || self.cfg.output_channels != 2 {
+            return Err(SongRejectCode::Capacity);
+        }
+        let bus_regions = self.buses.song_regions();
+        let voice_regions: Vec<_> = self
+            .pool
+            .voices
+            .iter()
+            .enumerate()
+            .map(|(slot, _)| {
+                let frames = u64::try_from(self.pool.voices[slot].mem_len()).unwrap_or(0);
+                SongFrameRegion {
+                    slot: u32::try_from(slot).unwrap_or(u32::MAX),
+                    offset: 0,
+                    frames,
+                }
+            })
+            .collect();
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let sample_rate = self.sr as u32;
+        let actual = SongHostCapacities {
+            sample_rate,
+            cell_slots: config.control_slots,
+            voice_slots: u32::try_from(self.pool.voices.len())
+                .map_err(|_| SongRejectCode::Capacity)?,
+            template_slots: u32::try_from(
+                self.templates
+                    .slots
+                    .iter()
+                    .filter(|s| s.state == crate::dsp::bus::SlotState::Free)
+                    .count(),
+            )
+            .map_err(|_| SongRejectCode::Capacity)?,
+            bus_slots: u32::try_from(
+                self.buses
+                    .slots
+                    .iter()
+                    .filter(|s| s.state == crate::dsp::bus::SlotState::Free)
+                    .count(),
+            )
+            .map_err(|_| SongRejectCode::Capacity)?,
+            sample_resources: self.store.song_free_sample_slots(),
+            pcm_bytes: self
+                .store
+                .song_remaining_pcm_with_limit(config.native_pcm_bytes)
+                .ok_or(SongRejectCode::Capacity)?,
+            voice_frames: voice_regions
+                .iter()
+                .try_fold(0_u64, |n, r| n.checked_add(r.frames))
+                .ok_or(SongRejectCode::Capacity)?,
+            bus_frames: bus_regions
+                .iter()
+                .try_fold(0_u64, |n, r| n.checked_add(r.frames))
+                .ok_or(SongRejectCode::Capacity)?,
+            ack_slots: measured_ack_slots,
+        };
+        let stager = SongResourceStager::new(
+            config,
+            actual,
+            bus_regions,
+            &voice_regions,
+            self.store.song_free_extents(),
+        )?;
+        let runtime = crate::dsp::song::SongRuntime::new(
+            config.preparations as usize,
+            config.branches as usize,
+            config.leases as usize,
+            self.pool.voices.len(),
+            self.cfg.event_capacity.max(1),
+            config.critical_receipts as usize,
+        )?;
+        self.store
+            .song_configure_native_limit(config.native_pcm_bytes);
+        self.song_stager = Some(stager);
+        self.song_runtime = Some(runtime);
+        Ok(())
+    }
+}
+
+impl Engine {
+    /// Configure before processing using the actual bounded acknowledgment producer.
+    /// # Errors
+    /// Late construction, missing physical capacity or insufficient transport.
+    pub fn configure_song_staging_for_transport(
+        &mut self,
+        config: SongStagingConfig,
+        acknowledgments: &AckProducer,
+    ) -> Result<(), SongRejectCode> {
+        self.configure_song_staging_with_transport(
+            config,
+            u32::try_from(acknowledgments.capacity()).map_err(|_| SongRejectCode::Capacity)?,
+        )
+    }
+}
+
+use crate::song::routing::{SongCommand, SongHostAck};
+impl Engine {
+    pub(super) fn next_song_runtime_frame(&self, end: u64) -> Option<u64> {
+        let r = self.song_runtime.as_ref()?;
+        r.commands
+            .iter()
+            .map(|c| c.frame)
+            .chain(r.branches.iter().filter(|b| b.muted).map(|b| b.gate.end))
+            .chain(
+                r.branches
+                    .iter()
+                    .filter(|b| b.ended)
+                    .map(|b| b.config.tail_deadline),
+            )
+            .chain(r.endpoints.iter().map(|e| e.deadline))
+            .chain(r.replacements.iter().flat_map(|x| {
+                let a = x.command.activation.frame;
+                [a - 64, a, a + 64]
+            }))
+            .filter(|f| *f > self.frame && *f < end)
+            .min()
+    }
+
+    /// Schedules a checked activation; Applied is emitted only at its actual frame.
+    /// # Errors
+    /// Unready preparation, stale epoch, past frame or exhausted bounded queue.
+    pub fn activate_song(
+        &mut self,
+        command: crate::song::routing::SongActivation,
+    ) -> Result<(), SongRejectCode> {
+        self.queue_song_runtime(SongCommand::Activate(command))
+    }
+    /// Schedules an instrument gate; actual application is acknowledged separately.
+    /// # Errors
+    /// Unready preparation, stale epoch, past frame or exhausted bounded queue.
+    pub fn apply_song_mute(
+        &mut self,
+        command: crate::song::routing::SongMute,
+    ) -> Result<(), SongRejectCode> {
+        self.queue_song_runtime(SongCommand::Mute(command))
+    }
+}
+
+#[cfg(test)]
+impl Engine {
+    pub(crate) fn song_analysis_test_value(
+        &self,
+        bank: crate::song::routing::SongLeaseKey,
+        logical: usize,
+    ) -> Result<f32, SongRejectCode> {
+        let stager = self.song_stager.as_ref().ok_or(SongRejectCode::NotReady)?;
+        let region = stager.analysis_bank(bank)?;
+        if logical >= region.frames as usize {
+            return Err(SongRejectCode::Malformed);
+        }
+        stager
+            .analysis
+            .get(region.offset as usize + logical)
+            .copied()
+            .ok_or(SongRejectCode::Malformed)
     }
 }

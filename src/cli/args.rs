@@ -49,6 +49,11 @@ pub enum Command {
         host: HostChoice,
         cycles: Option<u64>,
     },
+    Render {
+        source: PathBuf,
+        output: PathBuf,
+        sample_rate: u32,
+    },
     Serve {
         file: Option<PathBuf>,
         host: HostChoice,
@@ -95,6 +100,7 @@ usage: vactr <verb> [options]
 verbs:
   repl [--host native|noop] [--audio-in]
   run <file.vact> [--host native|noop] [--audio-in] [--cycles N]
+  render <score.vact> <output.wav> [--sample-rate N]
   serve [<file.vact>] [--host native|noop] [--audio-in] [--port P] [--bind ADDR]
   get [<path>[@version]] [--store dir:<root>]
   lsp [--session <ws-url>]
@@ -342,6 +348,41 @@ fn parse_fmt(args: &[String]) -> Result<Command, UsageError> {
     Ok(Command::Fmt { check, input })
 }
 
+fn parse_render(args: &[String]) -> Result<Command, UsageError> {
+    let mut paths = Vec::new();
+    let mut sample_rate = 48_000;
+    let mut rate_seen = false;
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if flag_matches(arg, "--sample-rate") {
+            if rate_seen {
+                return Err(usage("duplicate --sample-rate"));
+            }
+            rate_seen = true;
+            sample_rate = take_value(args, &mut i, "--sample-rate")?
+                .parse::<u32>()
+                .map_err(|_| usage("sample rate must be an integer in 8000..=192000"))?;
+            if !(8000..=192000).contains(&sample_rate) {
+                return Err(usage("sample rate must be in 8000..=192000"));
+            }
+        } else if arg.starts_with('-') {
+            return Err(usage(format!("unknown render option `{arg}`")));
+        } else {
+            paths.push(PathBuf::from(arg));
+        }
+        i += 1;
+    }
+    if paths.len() != 2 {
+        return Err(usage("render needs SCORE and OUTPUT"));
+    }
+    Ok(Command::Render {
+        source: paths.remove(0),
+        output: paths.remove(0),
+        sample_rate,
+    })
+}
+
 /// Parses the arguments after the program name (`argv[1..]`, already
 /// lossily converted to UTF-8).
 ///
@@ -357,6 +398,7 @@ pub fn parse(args: &[String]) -> Result<Command, UsageError> {
         "--help" | "help" => Ok(Command::Help),
         "repl" => parse_repl(&args[1..]),
         "run" => parse_run(&args[1..]),
+        "render" => parse_render(&args[1..]),
         "serve" => parse_serve(&args[1..]),
         "get" => parse_get(&args[1..]),
         "lsp" => parse_lsp(&args[1..]),

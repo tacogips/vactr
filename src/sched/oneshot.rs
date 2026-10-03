@@ -105,6 +105,13 @@ impl Runtime {
         diags: &mut Vec<Diagnostic>,
         faults: &mut Vec<Failure>,
     ) {
+        if self.owns_song_resources() && !matches!(t, TempoChange::MidiClockOut(_)) {
+            faults.push(Failure::new(
+                FailCode::BeyondCapability,
+                "live tempo or clock changes are unavailable while a finite song owns resources",
+            ));
+            return;
+        }
         let (value, bpm) = match t {
             TempoChange::Bpm(v) => (v, true),
             TempoChange::Cycle(v) => (v, false),
@@ -183,6 +190,13 @@ impl Runtime {
         overrides: Vec<(KwId, Value)>,
         faults: &mut Vec<Failure>,
     ) {
+        if self.owns_song_resources() {
+            faults.push(Failure::new(
+                FailCode::BeyondCapability,
+                "legacy one-shot scheduling is unavailable while a finite song owns resources",
+            ));
+            return;
+        }
         let (now, pos) = self.now_pos();
         let bpc = self.clock.tempo().beats_per_cycle;
         let offset = at.and_then(|b| b.checked_div(bpc).ok());

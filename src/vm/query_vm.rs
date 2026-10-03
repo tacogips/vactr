@@ -9,10 +9,11 @@
 
 use std::rc::Rc;
 
+use crate::host::caps::{InstResolver, Route};
 use crate::ns::namespace::{Namespace, VarSlotRef};
 use crate::pattern::eval::QueryVm;
 use crate::value::intern::{intern_sym, KwId};
-use crate::value::value::Value;
+use crate::value::value::{Sound, Value};
 use crate::vm::fail::{FailCode, Failure, Origin};
 use crate::vm::vm::{EffectMode, Vm};
 
@@ -33,6 +34,10 @@ impl<'a> VmQuery<'a> {
         &mut self,
         f: impl FnOnce(&mut Vm, &Namespace) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
+        if self.vm.song_work().is_some() {
+            let ns = self.ns;
+            return self.vm.with_effect_mode(EffectMode::Query, |vm| f(vm, ns));
+        }
         let saved = self.vm.fuel();
         let budget = self.vm.fuel_limit;
         self.vm.set_fuel(budget);
@@ -50,6 +55,9 @@ impl<'a> VmQuery<'a> {
 
 impl QueryVm for VmQuery<'_> {
     fn call(&mut self, f: &Value, args: &[Value]) -> Result<Value, Failure> {
+        if let Some(work) = self.vm.song_work() {
+            work.borrow_mut().charge(args.len() as u64 + 1)?;
+        }
         let args = args.to_vec();
         self.guarded(|vm, ns| vm.call_value(ns, f, args, Vec::new()))
     }
@@ -81,5 +89,100 @@ impl QueryVm for VmQuery<'_> {
 
     fn inst_sound(&mut self, k: KwId) -> Option<Value> {
         self.vm.dsp.registry.as_ref()?.borrow().sound(k)
+    }
+
+    fn song_sample_backed(&mut self, sound: &Sound) -> Result<bool, Failure> {
+        if let Some(work) = self.vm.song_work() {
+            work.borrow_mut().charge(1)?;
+        }
+        self.classify_song_resource(sound)
+    }
+}
+
+impl VmQuery<'_> {
+    fn classify_song_resource(&self, sound: &Sound) -> Result<bool, Failure> {
+        let registry = self.vm.dsp.registry.as_ref().ok_or_else(|| {
+            Failure::new(
+                FailCode::HostUnavailable,
+                "song instrument resolver is unavailable",
+            )
+        })?;
+        match registry.borrow().route(sound)? {
+            Route::Audio { sample, .. } => Ok(sample.is_some()),
+            Route::Midi { .. } | Route::Osc { .. } => Err(Failure::new(
+                FailCode::BeyondCapability,
+                "song sources require an audio route",
+            )),
+        }
+    }
+}
+
+/// Private original-snapshot adapter; VmQuery's public layout stays unchanged.
+pub(crate) struct MeteredSongQuery<'a> {
+    inner: VmQuery<'a>,
+    work: crate::pattern::eval::song_observation::SharedIndexWork,
+}
+impl<'a> MeteredSongQuery<'a> {
+    pub(crate) fn new(
+        vm: &'a mut Vm,
+        ns: &'a Namespace,
+        work: crate::pattern::eval::song_observation::SharedIndexWork,
+    ) -> Self {
+        Self {
+            inner: VmQuery::new(vm, ns),
+            work,
+        }
+    }
+    fn metered<T>(
+        &mut self,
+        f: impl FnOnce(&mut Vm, &Namespace) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        self.work.borrow_mut().charge(1)?;
+        let ns = self.inner.ns;
+        self.inner.vm.with_song_work(self.work.clone(), |vm| {
+            vm.with_effect_mode(EffectMode::Query, |vm| f(vm, ns))
+        })
+    }
+}
+impl QueryVm for MeteredSongQuery<'_> {
+    fn call(&mut self, callable: &Value, args: &[Value]) -> Result<Value, Failure> {
+        self.work.borrow_mut().charge(args.len() as u64 + 1)?;
+        let arguments = args.to_vec();
+        let result = self.metered(|vm, ns| vm.call_value(ns, callable, arguments, Vec::new()))?;
+        self.work
+            .borrow_mut()
+            .retain_call(callable, args, &result)?;
+        Ok(result)
+    }
+    fn deref(&mut self, slot: &VarSlotRef) -> Result<Value, Failure> {
+        let result = self.metered(|vm, _| vm.read_slot(slot))?;
+        self.work
+            .borrow_mut()
+            .retain_call(&Value::VarRef(slot.clone()), &[], &result)?;
+        Ok(result)
+    }
+    fn take_output(&mut self) -> Vec<(Origin, Rc<str>)> {
+        self.inner.take_output()
+    }
+    fn put_output(&mut self, output: Vec<(Origin, Rc<str>)>) {
+        self.inner.put_output(output);
+    }
+    fn sound_kit(&mut self) -> Result<Value, Failure> {
+        let name = intern_sym("sound-kit");
+        let slot = self
+            .inner
+            .ns
+            .session_slot(name)
+            .filter(VarSlotRef::is_bound)
+            .or_else(|| self.inner.ns.prelude().slot(name))
+            .ok_or_else(|| Failure::new(FailCode::UndefinedName, "`sound-kit` is not bound"))?;
+        self.deref(&slot)
+    }
+    fn inst_sound(&mut self, name: KwId) -> Option<Value> {
+        self.inner.inst_sound(name)
+    }
+    fn song_sample_backed(&mut self, sound: &Sound) -> Result<bool, Failure> {
+        self.work.borrow_mut().charge(1)?;
+        self.inner.song_sample_backed(sound)
     }
 }

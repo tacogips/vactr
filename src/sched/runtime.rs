@@ -10,6 +10,8 @@
 //! then run due `at` thunks. Logical time is `Ratio64`; host seconds appear
 //! only at the host boundary and in commit.
 
+mod song;
+pub use song::SongNotice;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
@@ -39,7 +41,7 @@ use crate::types::diag::{DiagCode, Diagnostic};
 use crate::value::intern::{intern_kw, KwId};
 use crate::value::ratio::Ratio64;
 use crate::value::value::Value;
-use crate::vm::fail::{Failure, Origin};
+use crate::vm::fail::{FailCode, Failure, Origin};
 use crate::vm::query_vm::VmQuery;
 
 /// Logical positions derived from host time are quantized to this grid.
@@ -141,6 +143,11 @@ pub struct Runtime {
     pub(crate) resolver: Rc<dyn InstResolver>,
     pub(crate) caps: CapabilitySet,
     queue: Rc<RefCell<CommandQueue>>,
+    /// Retained immutable request; playback admission is added by SONG-11.
+    pub(crate) pending_song: Option<Rc<crate::song::Song>>,
+    song_receipts: crate::song::routing::SongReceipts,
+    pending_song_ack: Option<crate::song::routing::SongHostAck>,
+    song: song::SongRuntime,
     pub(crate) slots: SlotTable,
     pub(crate) clock: Clock,
     pub(crate) cells: ControlCells,
@@ -237,6 +244,10 @@ impl Runtime {
             resolver,
             caps,
             queue: Rc::clone(&queue),
+            pending_song: None,
+            song_receipts: crate::song::routing::SongReceipts::default(),
+            pending_song_ack: None,
+            song: song::SongRuntime::default(),
             slots: SlotTable::new(),
             clock,
             cells,
@@ -258,6 +269,12 @@ impl Runtime {
             uniform_plans: [None, None, None, None],
         };
         (rt, RuntimeSink(queue))
+    }
+
+    /// Latest explicit immutable request; it has not activated playback.
+    #[must_use]
+    pub fn pending_song(&self) -> Option<&Rc<crate::song::Song>> {
+        self.pending_song.as_ref()
     }
 
     /// The input cells signals read (cc, analysis, telemetry).
@@ -341,6 +358,13 @@ impl Runtime {
 
     pub(crate) fn apply(&mut self, ev: &mut Evaluator, cmd: StagedEffect, rep: &mut DrainReport) {
         match cmd {
+            StagedEffect::PlaySong(song) => {
+                self.pending_song = Some(song);
+                rep.faults.push(Failure::new(
+                    crate::vm::fail::FailCode::BeyondCapability,
+                    "finite song playback is unavailable until song transport is installed",
+                ));
+            }
             StagedEffect::SlotBind { slot, value } => self.bind(ev, slot, &value, rep),
             StagedEffect::Revoke(key) => {
                 self.revoke(key);
@@ -438,6 +462,13 @@ impl Runtime {
 
     /// A slot bind: dry run, then pending at the next boundary (11.2, 11.5).
     fn bind(&mut self, ev: &mut Evaluator, key: SlotKey, value: &Value, rep: &mut DrainReport) {
+        if self.owns_song_resources() {
+            rep.faults.push(Failure::new(
+                crate::vm::fail::FailCode::BeyondCapability,
+                "legacy slot binding is unavailable while a finite song owns resources",
+            ));
+            return;
+        }
         let name = intern_kw(&key.name());
         let binding = match Binding::from_value(value) {
             Ok(b) => b,
@@ -502,6 +533,7 @@ impl Runtime {
     pub fn tick(&mut self, ev: &mut Evaluator, host_now: f64) -> TickReport {
         let mut rep = TickReport::default();
         self.take_host_msgs(&mut rep);
+        self.tick_song(&mut rep);
         self.poll_captures(&mut rep.faults);
         // MIDI input: cc cells, clock slave pulses and transport (11.7).
         self.take_midi_in(host_now, &mut rep);
@@ -554,11 +586,23 @@ impl Runtime {
 
     pub(crate) fn take_host_msgs(&mut self, rep: &mut TickReport) {
         let mut msgs = Vec::new();
-        self.hosts.audio.drain(&mut msgs);
+        if self.song_enabled() {
+            self.drain_owned_song_messages(rep, &mut msgs);
+        } else if self.song_receipts.expected_epoch().is_some() {
+            self.poll_song_messages(rep, &mut msgs);
+        } else {
+            self.hosts.audio.drain(&mut msgs);
+        }
         self.cells.drain_port(&mut msgs);
         let mut late = 0;
         for m in &msgs {
             match *m {
+                HostMsg::Song(_) => {
+                    rep.faults.push(Failure::new(
+                        FailCode::Type,
+                        "unsolicited song acknowledgment in legacy-only runtime",
+                    ));
+                }
                 HostMsg::SlotControlAck(a) => self.control.ack(a),
                 HostMsg::CellInitAck { .. }
                 | HostMsg::CellBatchAck { .. }

@@ -156,6 +156,10 @@ impl AudioHost for RecordingAudioHost {
     fn post(&mut self, msg: CtlMsg) {
         self.log(AudioCall::Post(msg));
     }
+    fn poll_msg(&mut self) -> Result<Option<HostMsg>, Failure> {
+        let mut replies = self.replies.borrow_mut();
+        Ok((!replies.is_empty()).then(|| replies.remove(0)))
+    }
     fn drain(&mut self, out: &mut Vec<HostMsg>) {
         out.append(&mut self.replies.borrow_mut());
     }
@@ -542,5 +546,48 @@ impl BrowserTransport {
     /// The records the audio side received, in order.
     pub fn delivered(&self) -> &[CtlMsg] {
         &self.delivered
+    }
+}
+
+#[cfg(test)]
+mod song_poll_tests {
+    use super::*;
+    use crate::song::{
+        routing::{SongHostAck, SongRejectCode},
+        SnapshotEpoch,
+    };
+    fn ack(epoch: u64) -> HostMsg {
+        HostMsg::Song(SongHostAck::Rejected {
+            epoch: SnapshotEpoch(epoch),
+            reason: SongRejectCode::NotReady,
+        })
+    }
+    #[test]
+    fn recording_poll_preserves_more_than64_identities_and_following_drain() {
+        let mut host = RecordingAudioHost::default();
+        let alias = host.clone();
+        for epoch in 1..=130 {
+            alias.reply(ack(epoch));
+        }
+        for epoch in 1..=70 {
+            assert_eq!(host.poll_msg().unwrap(), Some(ack(epoch)));
+        }
+        let mut rest = Vec::new();
+        host.drain(&mut rest);
+        assert_eq!(rest, (71..=130).map(ack).collect::<Vec<_>>());
+        assert_eq!(alias.replies.borrow().len(), 0);
+        assert_eq!(host.poll_msg().unwrap(), None);
+    }
+    #[test]
+    fn recording_legacy_drain_and_poll_share_one_fifo() {
+        let mut host = RecordingAudioHost::default();
+        host.reply(ack(1));
+        host.reply(ack(2));
+        assert_eq!(host.poll_msg().unwrap(), Some(ack(1)));
+        host.reply(ack(3));
+        let mut out = vec![ack(0)];
+        host.drain(&mut out);
+        assert_eq!(out, vec![ack(0), ack(2), ack(3)]);
+        assert_eq!(host.poll_msg().unwrap(), None);
     }
 }

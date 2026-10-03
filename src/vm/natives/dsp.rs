@@ -16,7 +16,7 @@
 
 use std::rc::Rc;
 
-use crate::dsp::build::{lower_bus, ugen_named, Lowering, SVF_MODES, UGENS};
+use crate::dsp::build::{lower_bus_with_resources, ugen_named, Lowering, SVF_MODES, UGENS};
 use crate::dsp::graph::{EffectKind, UGenInput, UGenKind, UGenNode, UGenSpec};
 use crate::ns::namespace::Prelude;
 use crate::ns::stage::StagedEffect;
@@ -498,13 +498,14 @@ fn define_bus(cx: &mut NativeCx<'_>, name: Option<KwId>, body: &Value) -> R {
     let mut r = reg.borrow_mut();
     let id = r.bus_id(name);
     let caps = r.caps;
+    let mode = r.resource_capture_mode();
     let mut alloc = || r.alloc_cell();
     let lw = Lowering {
         caps: &caps,
         span,
         alloc: &mut alloc,
     };
-    let lowered = lower_bus(id, &root, lw);
+    let lowered = lower_bus_with_resources(id, &root, lw, mode);
     let (def, extras) = match lowered {
         Ok(x) => x,
         Err(e) => {
@@ -516,7 +517,7 @@ fn define_bus(cx: &mut NativeCx<'_>, name: Option<KwId>, body: &Value) -> R {
         }
     };
     cx.vm.dsp.diags.extend(extras.diags);
-    let g = r.install_bus(name, def, extras.signals);
+    let g = r.install_bus_with_resources(name, def, extras.signals, extras.resources);
     drop(r);
     cx.stage(StagedEffect::Install(g))?;
     Ok(Value::Nil)

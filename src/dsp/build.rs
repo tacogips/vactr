@@ -128,9 +128,92 @@ impl LowerError {
     }
 }
 
+/// Resource capture is explicit for an isolated song candidate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GraphResourceCaptureMode {
+    Legacy,
+    ClosedSong,
+}
+/// Original declaration address, before compiled resource IDs exist.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GraphResourceSite {
+    Header { parameter: CtlId },
+    EmbeddedEffect { node: u16, parameter: CtlId },
+    BusEffect { effect: u16, parameter: CtlId },
+}
+/// A bank keyword is authority; numerical and dynamic fixed inputs are unresolved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GraphResourceInput {
+    Bank(KwId),
+    UnresolvedNumeric,
+    UnresolvedDynamic,
+}
+/// Issued by genuine lowering or header realization, publicly inspectable only.
+/// ```compile_fail
+/// use vactr::dsp::build::{DeclaredGraphResource, GraphResourceInput, GraphResourceSite};
+/// use vactr::sched::slots::CtlId;
+/// let forged = DeclaredGraphResource { site: GraphResourceSite::Header { parameter: CtlId::new(0) }, input: GraphResourceInput::UnresolvedNumeric };
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeclaredGraphResource {
+    site: GraphResourceSite,
+    input: GraphResourceInput,
+}
+impl DeclaredGraphResource {
+    #[must_use]
+    pub fn site(&self) -> &GraphResourceSite {
+        &self.site
+    }
+    #[must_use]
+    pub fn input(&self) -> &GraphResourceInput {
+        &self.input
+    }
+}
+pub(crate) fn header_resource(
+    parameter: CtlId,
+    input: GraphResourceInput,
+) -> DeclaredGraphResource {
+    DeclaredGraphResource {
+        site: GraphResourceSite::Header { parameter },
+        input,
+    }
+}
+fn fixed_resource_input(
+    kind: EffectKind,
+    parameter: &str,
+    input: &UGenInput,
+    mode: GraphResourceCaptureMode,
+) -> Option<(GraphResourceInput, Option<f32>)> {
+    if kind != EffectKind::Convolution || parameter != "ir" {
+        return None;
+    }
+    match input {
+        UGenInput::Const(v) if v.is_finite() && *v < 0.0 => None,
+        UGenInput::Const(_) => Some((GraphResourceInput::UnresolvedNumeric, None)),
+        UGenInput::Keyword(bank) if mode == GraphResourceCaptureMode::ClosedSong => {
+            Some((GraphResourceInput::Bank(*bank), Some(0.0)))
+        }
+        UGenInput::Keyword(_) => None, // Legacy keyword conversion retains its existing error.
+        _ => Some((GraphResourceInput::UnresolvedDynamic, None)),
+    }
+}
+fn push_resource(
+    extras: &mut Extras,
+    site: GraphResourceSite,
+    input: GraphResourceInput,
+    span: Span,
+) -> Result<(), LowerError> {
+    if extras.resources.len() >= NODE_CAP + crate::dsp::ugen::MAX_PARAMS {
+        return Err(too_large(span, "graph resource declarations"));
+    }
+    extras.resources.push(DeclaredGraphResource { site, input });
+    Ok(())
+}
+
 /// What lowering produced besides the template.
 #[derive(Clone, Debug, Default)]
 pub struct Extras {
+    pub resources: Vec<DeclaredGraphResource>,
     pub signals: Vec<SignalInput>,
     /// `beyond-capability` findings (the definition still installs; the
     /// audio side clamps, 12.6).
@@ -156,9 +239,25 @@ pub fn lower_inst(
     header: &[(CtlId, Ctl)],
     lw: Lowering<'_>,
 ) -> Result<(InstDef, Extras), LowerError> {
+    lower_inst_with_resources(id, root, header, lw, GraphResourceCaptureMode::Legacy)
+}
+/// Lowers with explicit declaration capture mode; ordinary callers use Legacy.
+/// # Errors
+/// The same graph/type bounds as lower_inst, including bounded resource metadata.
+pub fn lower_inst_with_resources(
+    id: InstId,
+    root: &Rc<UGenNode>,
+    header: &[(CtlId, Ctl)],
+    lw: Lowering<'_>,
+    mode: GraphResourceCaptureMode,
+) -> Result<(InstDef, Extras), LowerError> {
+    if header.len() > crate::dsp::ugen::MAX_PARAMS {
+        return Err(too_large(lw.span, "instrument header parameters"));
+    }
     let (root, output) = selected_source(root)?;
     let mut g = Graph {
         lw,
+        mode,
         nodes: Vec::new(),
         edges: Vec::new(),
         node_params: Vec::new(),
@@ -196,7 +295,18 @@ pub fn lower_inst(
 pub fn lower_bus(
     id: BusId,
     root: &Rc<UGenNode>,
+    lw: Lowering<'_>,
+) -> Result<(BusDef, Extras), LowerError> {
+    lower_bus_with_resources(id, root, lw, GraphResourceCaptureMode::Legacy)
+}
+/// Lower a bus with original fixed-resource provenance.
+/// # Errors
+/// The same chain/type bounds as lower_bus, including bounded resource metadata.
+pub fn lower_bus_with_resources(
+    id: BusId,
+    root: &Rc<UGenNode>,
     mut lw: Lowering<'_>,
+    mode: GraphResourceCaptureMode,
 ) -> Result<(BusDef, Extras), LowerError> {
     let mut chain = Vec::new();
     let mut extras = Extras::default();
@@ -259,11 +369,28 @@ pub fn lower_bus(
                         params.push((effects::SIDECHAIN_BUS_CTL, Ctl::Const(value)));
                         continue;
                     }
-                    let ctl = bus_param(kind, &pname, inp, &mut lw, &mut extras)?;
+                    let fixed = fixed_resource_input(kind, &pname, inp, mode);
+                    let ctl = if let Some((_, Some(value))) = &fixed {
+                        Ctl::Const(*value)
+                    } else {
+                        bus_param(kind, &pname, inp, &mut lw, &mut extras)?
+                    };
                     // `room`'s first port is really its `mix` parameter.
                     let alias = (kind == EffectKind::Room && &*pname == "room").then_some("mix");
                     let id = effects::param_ctl(kind, alias.unwrap_or(&pname))
                         .ok_or_else(|| LowerError::ty(format!("unknown parameter `{pname}:`")))?;
+                    if let Some((input, _)) = fixed {
+                        push_resource(
+                            &mut extras,
+                            GraphResourceSite::BusEffect {
+                                effect: u16::try_from(chain.len())
+                                    .map_err(|_| too_large(lw.span, "a bus chain"))?,
+                                parameter: id,
+                            },
+                            input,
+                            lw.span,
+                        )?;
+                    }
                     params.push((id, ctl));
                 }
             }
@@ -278,6 +405,12 @@ pub fn lower_bus(
         }
     }
     chain.reverse();
+    for resource in &mut extras.resources {
+        if let GraphResourceSite::BusEffect { effect, .. } = &mut resource.site {
+            *effect = u16::try_from(chain.len() - 1 - usize::from(*effect))
+                .map_err(|_| too_large(lw.span, "a bus chain"))?;
+        }
+    }
     Ok((
         BusDef {
             id,
@@ -476,6 +609,7 @@ fn keyword(effect: Option<EffectKind>, port: &str, k: KwId) -> Result<f32, Lower
 
 /// One lowering in progress.
 struct Graph<'a> {
+    mode: GraphResourceCaptureMode,
     lw: Lowering<'a>,
     nodes: Vec<UGenSpec>,
     edges: Vec<Edge>,
@@ -582,6 +716,7 @@ impl Graph<'_> {
         };
         let mut wires: Vec<(Src, u8, Rc<str>)> = Vec::new();
         let mut fx_params: Vec<(CtlId, Ctl)> = Vec::new();
+        let mut fixed_inputs = Vec::new();
         let mut pos = 0usize;
         for (k, (name, inp)) in n.args.iter().enumerate() {
             let subject = effect.is_some() && k == 0 && name.is_none();
@@ -599,10 +734,22 @@ impl Graph<'_> {
             if let Some(kind) = effect {
                 let ctl = effects::param_ctl(kind, &pname)
                     .ok_or_else(|| LowerError::ty(format!("unknown parameter `{pname}:`")))?;
-                let v = match inp {
-                    UGenInput::Const(v) => Some(*v),
-                    UGenInput::Keyword(kw) => Some(keyword(Some(kind), &pname, *kw)?),
-                    _ => None,
+                let fixed = fixed_resource_input(kind, &pname, inp, self.mode);
+                let placeholder = fixed.as_ref().and_then(|(_, value)| *value);
+                if let Some((input, _)) = fixed {
+                    if fixed_inputs.len() >= NODE_CAP + crate::dsp::ugen::MAX_PARAMS {
+                        return Err(too_large(self.lw.span, "graph resource declarations"));
+                    }
+                    fixed_inputs.push((ctl, input));
+                }
+                let v = if let Some(value) = placeholder {
+                    Some(value)
+                } else {
+                    match inp {
+                        UGenInput::Const(v) => Some(*v),
+                        UGenInput::Keyword(kw) => Some(keyword(Some(kind), &pname, *kw)?),
+                        _ => None,
+                    }
                 };
                 if let Some(v) = v {
                     fx_params.push((ctl, Ctl::Const(v)));
@@ -650,6 +797,17 @@ impl Graph<'_> {
             e.params = fx_params.into_boxed_slice();
         }
         let me = self.push(spec)?;
+        for (parameter, input) in fixed_inputs {
+            push_resource(
+                &mut self.extras,
+                GraphResourceSite::EmbeddedEffect {
+                    node: me,
+                    parameter,
+                },
+                input,
+                self.lw.span,
+            )?;
+        }
         for (src, port, pname) in wires {
             match src {
                 Src::Node(from, output) => self.edges.push(Edge {

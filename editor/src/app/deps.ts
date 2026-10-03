@@ -4,7 +4,7 @@ import type { FileAccess } from '../platform/files';
 import type { Client } from '../protocol/client';
 import type { Store } from '../protocol/store';
 import type { WasmCore } from '../protocol/wasm';
-import type { BindApi, CodeApi, MidiApi, VisualApi, ResourceBudget } from './apis';
+import type { BindApi, CodeApi, MidiApi, VisualApi, ResourceBudget, SongControls } from './apis';
 import type { Clock } from './clock';
 import type { Formatter } from '../code/format';
 import type { CompletionEngine } from '../code/completion-types';
@@ -32,6 +32,7 @@ export interface EditorDeps {
   midi?: MidiApi;
   visual?: VisualApi;
   bind?: BindApi;
+  song?: SongControls;
 }
 
 /** The handle every `mount` returns. */

@@ -88,15 +88,6 @@ export class GlyphAtlas {
       if (texture) this.gl.deleteTexture(texture); reservation.release(); metadata.release(); throw error;
     } finally { staging.release(); if (canvas) { canvas.width = 0; canvas.height = 0; } }
   }
-  /** Background copies can reclaim offscreen cache metadata before reserving staging. */
-  reserveStaging(bytes: number): Reservation | null {
-    let allocation = this.ledger.allocate('geometry', bytes);
-    while (!allocation && this.entries.size) {
-      const first = this.entries.entries().next().value!; this.remove(first[0], first[1]);
-      allocation = this.ledger.allocate('geometry', bytes);
-    }
-    return allocation;
-  }
   private remove(key: string, entry: Entry): void {
     this.gl.deleteTexture(entry.tile.texture); entry.reservation.release(); entry.metadata.release(); this.entries.delete(key); this.stats.evictions++;
   }

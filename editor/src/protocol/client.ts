@@ -17,6 +17,7 @@ import type {
   ServerKind,
   Span,
   SubscribeBody,
+  InstrumentSelector,
 } from './types';
 
 export const TWEAK_INTERVAL_MS = 16;
@@ -28,6 +29,10 @@ const telemetry = (env: ServerEnvelope): boolean => env.re === undefined &&
 /** Where the client hands every decoded server message (the store). */
 export interface MessageSink {
   apply(env: ServerEnvelope): void;
+  beginSongApply?(file: string, revision: number, request: number, notify?: boolean): void;
+  publishSongApply?(request: number): void;
+  songDocumentChanged?(file: string, revision: number): void;
+  cancelSongApply?(request: number): void;
 }
 
 export interface ClientOptions {
@@ -105,20 +110,24 @@ export class Client {
 
   /** Sends one message; returns its `seq`. */
   send(msg: ClientMsg): number {
+    if (msg.kind === 'doc-changed') this.store?.songDocumentChanged?.(msg.body.file, msg.body.doc_revision);
     this.seq += 1;
     if (!this.closed) this.transport.send(encodeClient(this.seq, msg));
     return this.seq;
   }
 
   /** Sends one message and resolves with the first reply whose `re` is its `seq`. */
-  request(msg: ClientMsg): Promise<ServerEnvelope> {
+  request(msg: ClientMsg, beforeSend?: (seq: number) => void): Promise<ServerEnvelope> {
     if (this.closed) return Promise.reject(new Error('client closed'));
     if (this.pending.size >= MAX_PENDING_REQUESTS) return Promise.reject(new Error('client busy: 64 pending requests'));
     return new Promise((resolve, reject) => {
       // Registered before sending: the wasm transport replies synchronously.
-      const seq = this.seq + 1;
+      const seq = ++this.seq;
       this.pending.set(seq, { resolve, reject });
-      try { this.send(msg); } catch (e) { this.pending.delete(seq); reject(e instanceof Error ? e : new Error(String(e))); }
+      try {
+        beforeSend?.(seq);
+        if (!this.closed) this.transport.send(encodeClient(seq, msg));
+      } catch (e) { this.pending.delete(seq); reject(e instanceof Error ? e : new Error(String(e))); }
     });
   }
 
@@ -153,6 +162,28 @@ export class Client {
     doc.flush();
     const body = { file, code, ...doc.stamp(), ...(span ? { span } : {}) };
     return this.request({ kind: 'eval', body });
+  }
+
+  /** Prepares a whole song. Only an Applied receipt confirms playback. */
+  applySong(file: string, code: string): Promise<ServerEnvelope> {
+    const doc = this.document(file);
+    doc.flush();
+    let request = 0;
+    // The wasm host can acknowledge synchronously inside request().
+    const response = this.request({ kind: 'apply-song', body: { file, code, ...doc.stamp() } }, (seq) => {
+      request = seq;
+      this.store?.beginSongApply?.(file, doc.revision, seq, false);
+    });
+    // Notify after sending so subscriber writes cannot overtake this request.
+    this.store?.publishSongApply?.(request);
+    return response.catch((error: unknown) => {
+        this.store?.cancelSongApply?.(request);
+        throw error;
+    });
+  }
+
+  muteInstrument(epoch: string, selector: InstrumentSelector, muted: boolean): Promise<ServerEnvelope> {
+    return this.request({ kind: 'mute-instrument', body: { epoch, selector, muted } });
   }
 
   hush(): void {

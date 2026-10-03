@@ -1,12 +1,14 @@
 //! Randomness through the pure hash RNG: degrade-by, maybe, sometimes-by
 //! (and sometimes/rarely/often), choose.
 
+use crate::pattern::combinators::control::query_child;
 use std::rc::Rc;
 
 use crate::pattern::combinators::{event_fault, op, subtree};
 use crate::pattern::eval::{apply_transform, eval_param_f64, QState};
+use crate::pattern::occ::ProducerKind;
 use crate::pattern::pat::{PParam, Pat, PatNode};
-use crate::pattern::query::{q, Event, TimeSpan};
+use crate::pattern::query::{Event, TimeSpan};
 use crate::pattern::rng::{below, unit_at};
 use crate::reader::span::Span;
 use crate::value::value::Value;
@@ -94,7 +96,7 @@ fn query_filtered(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let before = st.cx.vm.take_output();
-    let events = q(inner, span, st);
+    let events = query_child(inner, span, 0, st);
     let produced = !events.is_empty();
     let kept = filter(events, x, keep_below, p, st);
     let inner_out = st.cx.vm.take_output();
@@ -128,7 +130,9 @@ pub(crate) fn query_sometimes(
     let mut out = query_filtered(inner, x, false, p, span, st);
     out.extend(subtree(p, span.begin, st, |st| {
         let t = apply_transform(f, inner, st)?;
-        Ok(query_filtered(&t, x, true, p, span, st))
+        Ok(st.with_producer(ProducerKind::DynamicExpansion, 1, |st| {
+            query_filtered(&t, x, true, p, span, st)
+        }))
     }));
     out
 }
@@ -150,7 +154,7 @@ pub(crate) fn query_choose(
         let Some(item) = usize::try_from(i).ok().and_then(|i| items.get(i)) else {
             continue;
         };
-        for mut e in q(item, piece, st) {
+        for mut e in query_child(item, piece, u32::try_from(i).unwrap_or(u32::MAX), st) {
             e.occ.push(p.id, u32::try_from(i).unwrap_or(u32::MAX));
             out.push(e);
         }

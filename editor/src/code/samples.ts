@@ -32,6 +32,7 @@ export interface DecodedAudio {
 
 export interface SampleSink {
   samplePut(key: string, frames: Float32Array, rate: number, channels: number): void;
+  songBankCatalog?(banks: Record<string, string[]>): void;
 }
 
 export type FetchLike = (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; arrayBuffer(): Promise<ArrayBuffer> }>;
@@ -71,6 +72,8 @@ export class SampleLibrary {
   private readonly opts: SampleLibraryOptions;
   private mapDoc: SampleMap = {};
   private readonly decoded = new Map<string, SampleFrames>();
+  private readonly completeBanks = new Map<string, string[]>();
+  private mapRevision = 0;
 
   constructor(opts: SampleLibraryOptions) {
     this.opts = opts;
@@ -88,7 +91,12 @@ export class SampleLibrary {
     const res = await this.fetch(url);
     if (!res.ok) throw new Error(`sample map: HTTP ${res.status}`);
     const base = typeof location === 'undefined' ? undefined : new URL(url, location.href).href;
-    this.mapDoc = parseSampleMap(await res.json(), base);
+    const map = parseSampleMap(await res.json(), base);
+    this.opts.core?.songBankCatalog?.({});
+    this.mapDoc = map;
+    this.mapRevision += 1;
+    this.completeBanks.clear();
+    this.decoded.clear();
     return this.mapDoc;
   }
 
@@ -98,6 +106,9 @@ export class SampleLibrary {
     if (!urls) throw new Error(`sample map: no bank ${bank}`);
     const decode = this.opts.decode;
     if (!decode) throw new Error('sample library: no decoder');
+    const revision = this.mapRevision;
+    this.completeBanks.delete(bank);
+    this.publishCatalog();
     let loaded = 0;
     for (const [index, url] of urls.entries()) {
       const res = await this.fetch(url);
@@ -109,11 +120,24 @@ export class SampleLibrary {
         continue;
       }
       const frames: SampleFrames = { data: interleave(buf), rate: buf.sampleRate, channels: Math.max(1, buf.numberOfChannels) };
+      if (revision !== this.mapRevision) throw new Error('Sample map changed while loading the bank');
       this.decoded.set(`${bank}:${index}`, frames);
       this.opts.core?.samplePut(`${bank}:${index}`, frames.data, frames.rate, frames.channels);
       loaded += 1;
     }
+    if (revision !== this.mapRevision) throw new Error('Sample map changed while loading the bank');
+    if (loaded === urls.length) {
+      this.completeBanks.set(bank, urls.map((_, index) => `${bank}:${index}`));
+      try { this.publishCatalog(); } catch (error) {
+        this.completeBanks.delete(bank);
+        throw error;
+      }
+    }
     return loaded;
+  }
+
+  private publishCatalog(): void {
+    this.opts.core?.songBankCatalog?.(Object.fromEntries(this.completeBanks));
   }
 
   frames(bank: string, index: number): SampleFrames | null {

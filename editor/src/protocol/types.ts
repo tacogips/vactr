@@ -129,6 +129,31 @@ export interface EvalBody {
   edit_epoch: number;
 }
 
+export interface SongApplyRequest {
+  file: string;
+  code: string;
+  doc_revision: number;
+  edit_epoch: number;
+}
+export type SongSound =
+  | { kind: 'builtin'; name: string }
+  | { kind: 'instrument'; id: number }
+  | { kind: 'sample'; path: string; file: number | null }
+  | { kind: 'buffer'; id: string };
+export interface InstrumentSelector { family: SongSound[] }
+export interface SongMuteRequest { epoch: string; selector: InstrumentSelector; muted: boolean }
+export interface SongInstrumentMuted extends SongMuteRequest { application_frame: string }
+export type SongTransportState = 'prepared' | 'playing' | 'draining' | 'ended' | 'failed';
+export interface SongTransportStatus { epoch: string; state: SongTransportState; instruments?: InstrumentSelector[] }
+export interface SongCandidateReady { epoch: string; doc_revision: number }
+export interface SongApplied extends SongCandidateReady { application_frame: string }
+export interface SongCandidateFailed {
+  epoch: string | null;
+  doc_revision: number | null;
+  code: string;
+  message: string;
+}
+
 export type EmptyBody = Record<string, never>;
 
 export interface StopBody {
@@ -190,6 +215,8 @@ export interface ClockProbeReply {
 }
 
 export type ClientMsg =
+  | { kind: 'apply-song'; body: SongApplyRequest }
+  | { kind: 'mute-instrument'; body: SongMuteRequest }
   | { kind: 'clock-probe'; body: ClockProbeBody }
   | { kind: 'eval'; body: EvalBody }
   | { kind: 'hush'; body: EmptyBody }
@@ -204,6 +231,8 @@ export type ClientMsg =
 export type ClientKind = ClientMsg['kind'];
 
 export const CLIENT_KINDS: readonly ClientKind[] = [
+  'apply-song',
+  'mute-instrument',
   'clock-probe',
   'eval',
   'hush',
@@ -397,6 +426,11 @@ export interface TempoBody {
 }
 
 export type ServerMsg =
+  | { kind: 'song-instrument-muted'; body: SongInstrumentMuted }
+  | { kind: 'song-transport-state'; body: SongTransportStatus }
+  | { kind: 'song-candidate-ready'; body: SongCandidateReady }
+  | { kind: 'song-candidate-applied'; body: SongApplied }
+  | { kind: 'song-candidate-failed'; body: SongCandidateFailed }
   | { kind: 'clock-probe'; body: ClockProbeReply }
   | { kind: 'eval-result'; body: EvalResultBody }
   | { kind: 'stale-binding'; body: StaleBindingBody }
@@ -412,6 +446,11 @@ export type ServerMsg =
 export type ServerKind = ServerMsg['kind'];
 
 export const SERVER_KINDS: readonly ServerKind[] = [
+  'song-instrument-muted',
+  'song-transport-state',
+  'song-candidate-ready',
+  'song-candidate-applied',
+  'song-candidate-failed',
   'clock-probe',
   'eval-result',
   'stale-binding',

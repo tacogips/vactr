@@ -34,11 +34,42 @@ pub fn value_steps(values: &[Value]) -> Pat {
     steps(values.iter().cloned().map(Step::bare).collect(), None)
 }
 
+/// Reject finite descriptors even when nested in static containers. The bounded
+/// walk preserves lazy functions/patterns and cannot recurse on the Rust stack.
+pub(crate) fn reject_finite(v: &Value) -> Result<(), Failure> {
+    let mut pending = vec![(v, 0_u16)];
+    let mut visited = 0_u32;
+    while let Some((value, depth)) = pending.pop() {
+        visited += 1;
+        if depth > 256 || visited > 1_000_000 {
+            return Err(Failure::new(
+                FailCode::Type,
+                "pattern value nesting exceeds limits",
+            ));
+        }
+        match value {
+            Value::Part(_) | Value::Song(_) | Value::EventHandle(_) => {
+                return Err(Failure::new(
+                    FailCode::Type,
+                    "finite song values require explicit song APIs",
+                ));
+            }
+            Value::List(list) => pending.extend(list.items.iter().map(|v| (v, depth + 1))),
+            Value::Dict(dict) => pending.extend(dict.values().map(|v| (v, depth + 1))),
+            Value::Struct(s) => pending.extend(s.fields.iter().map(|(_, v)| (v, depth + 1))),
+            Value::Variant(s) => pending.extend(s.fields.iter().map(|(_, v)| (v, depth + 1))),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// The pattern for a value in a pattern position.
 ///
 /// # Errors
-/// `Type` for an open or over-long range.
+/// `Type` for finite song values, excessive container nesting or an open/over-long range.
 pub fn pattern_of(v: &Value, span: Option<Span>) -> Result<Rc<Pat>, Failure> {
+    reject_finite(v)?;
     Ok(match v {
         Value::Pattern(p) => Rc::clone(p),
         Value::List(l) => Rc::new(steps(steps_of_list(l), span)),
@@ -68,6 +99,7 @@ pub fn pattern_of(v: &Value, span: Option<Span>) -> Result<Rc<Pat>, Failure> {
 /// # Errors
 /// As [`pattern_of`].
 pub fn param_of(v: &Value) -> Result<PParam, Failure> {
+    reject_finite(v)?;
     Ok(match v {
         Value::VarRef(r) => PParam::Late(r.clone()),
         Value::Fn(_) | Value::Native(_) | Value::Thunk(_) => PParam::Fn(v.clone()),

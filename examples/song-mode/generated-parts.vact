@@ -1,0 +1,22 @@
+# Functions return finite Parts. Every repeated Part restarts at local zero.
+# Two intro repeats and four developed repeats produce exactly 24 cycles.
+
+# Explicit sound declarations wrap the existing digital percussion DSP kernels.
+inst kick:
+	digital-drum-core freq velocity :sine > * amp
+inst snare:
+	digital-snare-core freq velocity :sine > * amp
+inst hat:
+	digital-hat-core freq velocity :sine > * amp
+
+fn drums:
+	part [drums: {s [:kick :snare :kick :snare]} hats: {s :hat > euclid 7 8}] duration: 4
+
+fn developed:
+	let base {drums & []}
+	base > transform-instrument :drums :kick {p -> lpf p 900}
+
+let intro {drums & []}
+let verse {developed & []}
+let arrangement sequence [{part-repeat intro 2} {part-repeat verse 4}]
+song arrangement bpm: 120 cycle-beats: 4 meter: [4 4] seed: 42 tail-seconds: 2 > play-song

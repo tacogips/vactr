@@ -20,6 +20,7 @@ pub mod music;
 pub mod num;
 pub mod pattern;
 pub mod signal;
+pub mod song;
 pub mod sound;
 pub mod tex;
 pub mod value;
@@ -61,6 +62,7 @@ pub fn register_domain(p: &mut Prelude) {
     tex::register(p);
     register_dsp(p);
     analysis::register(p);
+    song::register(p);
 }
 
 /// The DSP natives, except `spectrum`: `analysis` registers the one

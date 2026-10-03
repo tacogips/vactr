@@ -190,6 +190,7 @@ pub struct VoiceTag {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum CtlMsg {
+    Song(crate::song::routing::SongCommand),
     SlotControl(SlotControl),
     CellInit {
         cell: CellId,
@@ -236,6 +237,7 @@ pub enum CtlMsg {
 /// Audio -> evaluator records (design 12.8.5).
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum HostMsg {
+    Song(crate::song::routing::SongHostAck),
     SlotControlAck(SlotControlAck),
     CellInitAck {
         cell: CellId,
@@ -333,15 +335,24 @@ const BATCH_ENTRY_LEN: usize = 4 + 4 + 4;
 
 impl CtlMsg {
     /// The largest encoded record (`LiveNoteOn`), including the tag byte.
-    pub const MAX_LEN: usize = 1 + TAG_LEN + EVENT_BODY_LEN;
+    pub const MAX_LEN: usize =
+        if crate::song::routing::SONG_COMMAND_MAX_LEN > 1 + TAG_LEN + EVENT_BODY_LEN {
+            crate::song::routing::SONG_COMMAND_MAX_LEN
+        } else {
+            1 + TAG_LEN + EVENT_BODY_LEN
+        };
 
     /// Writes the record to `out`; returns the bytes written, or 0 when `out`
     /// is too short. Batch entries (`encode_batch`) and slice samples are
     /// written separately.
     #[must_use]
     pub fn encode(&self, out: &mut [u8]) -> usize {
+        if let Self::Song(command) = *self {
+            return crate::host::caps::song_codec::encode_command(command, out);
+        }
         let mut w = Writer::new(out);
         match *self {
+            CtlMsg::Song(_) => unreachable!("song command encoded above"),
             CtlMsg::SlotControl(c) => {
                 w.u8(TAG_SLOT_CONTROL);
                 put_slot_control(&mut w, &c);
@@ -404,6 +415,10 @@ impl CtlMsg {
     /// # Errors
     /// `WireError` for a short buffer, an unknown tag or an invalid field.
     pub fn decode(bytes: &[u8]) -> Result<(Self, usize), WireError> {
+        if bytes.first() == Some(&crate::song::routing::SONG_COMMAND_TAG) {
+            return crate::host::caps::song_codec::decode_command(bytes)
+                .map(|(c, n)| (Self::Song(c), n));
+        }
         let mut r = Reader::new(bytes);
         let msg = match r.u8()? {
             TAG_SLOT_CONTROL => CtlMsg::SlotControl(get_slot_control(&mut r)?),
@@ -446,12 +461,15 @@ impl CtlMsg {
 
 impl HostMsg {
     /// The largest encoded record (`Counters`), including the tag byte.
-    pub const MAX_LEN: usize = 1 + 16;
+    pub const MAX_LEN: usize = crate::song::routing::SONG_ACK_MAX_LEN;
 
     /// Writes the record to `out`; returns the bytes written, or 0 when `out`
     /// is too short. Every field is one little-endian 32-bit word.
     #[must_use]
     pub fn encode(&self, out: &mut [u8]) -> usize {
+        if let Self::Song(ack) = *self {
+            return crate::host::caps::song_codec::encode_ack(ack, out);
+        }
         let (tag, words, n) = self.words();
         let mut w = Writer::new(out);
         w.u8(tag);
@@ -466,6 +484,10 @@ impl HostMsg {
     /// # Errors
     /// `WireError` for a short buffer or an unknown tag.
     pub fn decode(bytes: &[u8]) -> Result<(Self, usize), WireError> {
+        if bytes.first() == Some(&crate::song::routing::SONG_ACK_TAG) {
+            return crate::host::caps::song_codec::decode_ack(bytes)
+                .map(|(a, n)| (Self::Song(a), n));
+        }
         let mut r = Reader::new(bytes);
         let tag = r.u8()?;
         let n = host_arity(tag).ok_or(WireError::BadTag(tag))?;
@@ -481,6 +503,7 @@ impl HostMsg {
     #[rustfmt::skip]
     fn words(&self) -> (u8, [u32; 4], usize) {
         match *self {
+            HostMsg::Song(_) => unreachable!("song ack encoded above"),
             HostMsg::SlotControlAck(a) =>
                 (TAG_SLOT_CONTROL_ACK, [a.slot.get(), a.gen, 0, 0], 2),
             HostMsg::CellInitAck { cell, epoch } =>

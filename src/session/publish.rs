@@ -402,6 +402,7 @@ impl Session {
         }
         let drained = self.rt.drain(&mut self.ev);
         let rep = self.rt.tick(&mut self.ev, host_now);
+        out.extend(self.publish_song_notices());
         self.console.extend(
             drained
                 .console

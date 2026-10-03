@@ -50,6 +50,8 @@ pub enum TempoChange {
 /// One host-visible effect.
 #[derive(Clone, Debug)]
 pub enum StagedEffect {
+    /// Explicit finite-song request; released only after the form succeeds.
+    PlaySong(Rc<crate::song::Song>),
     /// Bind a pattern or texture (any value in this wave) to a slot.
     SlotBind {
         slot: SlotKey,

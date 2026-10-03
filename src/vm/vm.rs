@@ -80,6 +80,8 @@ pub struct Vm {
     pub(crate) observer: Option<Box<dyn ReadObserver>>,
     pub(crate) stack_base: Option<usize>,
     host: Option<Box<dyn Any>>,
+    song_work: Option<crate::pattern::eval::song_observation::SharedIndexWork>,
+    song_frame_floor: usize,
     /// In Query mode, local cells with ids below this outlive the query.
     query_cells_from: u64,
     /// The instrument registry and the `inst`/`bus` body depth (12.8.6).
@@ -122,6 +124,8 @@ impl Vm {
             observer: None,
             stack_base: None,
             host: None,
+            song_work: None,
+            song_frame_floor: 0,
             query_cells_from: 0,
             dsp: DspCx::default(),
         }
@@ -217,7 +221,9 @@ impl Vm {
         if nested {
             self.enter()?;
         } else {
-            self.fuel = self.fuel_limit;
+            if self.song_work.is_none() {
+                self.fuel = self.fuel_limit;
+            }
             self.stack_base = Some(stack_addr());
         }
         let mark = self.effects.len();
@@ -306,6 +312,77 @@ impl Vm {
         self.frames.last().ok_or_else(internal)
     }
 
+    pub(crate) fn song_work(
+        &self,
+    ) -> Option<crate::pattern::eval::song_observation::SharedIndexWork> {
+        self.song_work.clone()
+    }
+
+    pub(crate) fn song_query_depth(&self) -> Result<u32, Failure> {
+        if self.song_work.is_none() {
+            return Ok(0);
+        }
+        let base = self
+            .song_work
+            .as_ref()
+            .map_or(0, |work| work.borrow().depth);
+        u32::try_from(self.frames.len().saturating_sub(self.song_frame_floor))
+            .ok()
+            .and_then(|frames| base.checked_add(frames))
+            .ok_or_else(|| Failure::new(FailCode::DepthExceeded, "canonical VM depth overflow"))
+    }
+
+    pub(crate) fn with_song_query_frames<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        let saved = self.song_frame_floor;
+        self.song_frame_floor = self.frames.len();
+        let result = f(self);
+        self.song_frame_floor = saved;
+        result
+    }
+
+    pub(crate) fn with_song_work<T>(
+        &mut self,
+        work: crate::pattern::eval::song_observation::SharedIndexWork,
+        f: impl FnOnce(&mut Self) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        if let Some(current) = &self.song_work {
+            if !Rc::ptr_eq(current, &work) {
+                return Err(Failure::new(FailCode::Type, "foreign canonical VM ledger"));
+            }
+            return f(self);
+        }
+        let (budget, depth) = {
+            let ledger = work.borrow();
+            let depth = ledger
+                .limits
+                .max_depth
+                .checked_sub(ledger.depth)
+                .filter(|d| *d > 0)
+                .ok_or_else(|| {
+                    Failure::new(
+                        FailCode::DepthExceeded,
+                        "canonical VM inherited depth exhausted",
+                    )
+                })?;
+            (
+                u64::from(ledger.remaining()).min(self.fuel_limit),
+                depth as usize,
+            )
+        };
+        let saved = (self.fuel, self.depth_limit);
+        self.fuel = budget;
+        self.depth_limit = self.depth_limit.min(depth);
+        self.song_work = Some(work);
+        let result = f(self);
+        self.song_work = None;
+        self.fuel = saved.0;
+        self.depth_limit = saved.1;
+        result
+    }
+
     /// Consumes one unit of fuel.
     pub(crate) fn tick(&mut self) -> Result<(), Failure> {
         if self.fuel == 0 {
@@ -313,6 +390,19 @@ impl Vm {
                 FailCode::FuelExhausted,
                 "the evaluation ran out of fuel (an unbounded source?)",
             ));
+        }
+        if let Some(work) = &self.song_work {
+            if self.song_query_depth()? > work.borrow().limits.max_depth {
+                return Err(Failure::new(
+                    FailCode::DepthExceeded,
+                    "canonical VM frame depth exhausted",
+                ));
+            }
+            let mut ledger = work.borrow_mut();
+            ledger.charge(1)?;
+            ledger.vm_instructions = ledger.vm_instructions.checked_add(1).ok_or_else(|| {
+                Failure::new(FailCode::Overflow, "canonical instruction total overflow")
+            })?;
         }
         self.fuel -= 1;
         Ok(())

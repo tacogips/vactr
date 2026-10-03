@@ -27,6 +27,11 @@ type FieldType = 'array' | 'number' | 'string' | 'object' | 'boolean';
 // The required top-level body fields per server kind: enough that a
 // consumer (the store in particular) never walks a missing array.
 const SERVER_FIELDS: Record<ServerKind, Record<string, FieldType>> = {
+  'song-instrument-muted': { epoch: 'string', selector: 'object', muted: 'boolean', application_frame: 'string' },
+  'song-transport-state': { epoch: 'string', state: 'string' },
+  'song-candidate-ready': { epoch: 'string', doc_revision: 'number' },
+  'song-candidate-applied': { epoch: 'string', doc_revision: 'number', application_frame: 'string' },
+  'song-candidate-failed': { code: 'string', message: 'string' },
   'clock-probe': { page_send: 'number', engine_receive: 'number', engine_send: 'number', epoch: 'string' },
   'eval-result': {
     file: 'string',
@@ -54,6 +59,8 @@ const SERVER_FIELDS: Record<ServerKind, Record<string, FieldType>> = {
 };
 
 const CLIENT_FIELDS: Record<ClientKind, Record<string, FieldType>> = {
+  'apply-song': { file: 'string', code: 'string', doc_revision: 'number', edit_epoch: 'number' },
+  'mute-instrument': { epoch: 'string', selector: 'object', muted: 'boolean' },
   'clock-probe': { page_send: 'number' },
   eval: { file: 'string', code: 'string', doc_revision: 'number', edit_epoch: 'number' },
   hush: {},
@@ -155,6 +162,45 @@ const nonnegative = (v: unknown): v is number => finite(v) && v >= 0;
 const positive = (v: unknown): v is number => finite(v) && v > 0;
 const integer = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 const epoch = (v: unknown): boolean => typeof v === 'string' && v.length > 0;
+export function songInteger(v: unknown): v is string {
+  return typeof v === 'string' && /^(0|[1-9][0-9]*)$/.test(v) &&
+    (v.length < 20 || (v.length === 20 && v <= '18446744073709551615'));
+}
+function exactKeys(v: Record<string, unknown>, keys: string[]): boolean {
+  return Object.keys(v).every((key) => keys.includes(key));
+}
+function songSelector(v: unknown): boolean {
+  if (!isObject(v) || !exactKeys(v, ['family']) || !Array.isArray(v.family) ||
+    v.family.length === 0 || v.family.length > 256) return false;
+  const seen = new Set<string>();
+  const text = (s: unknown): s is string => typeof s === 'string' && s.length > 0 &&
+    new TextEncoder().encode(s).length <= 4096 && !/[\u0000-\u001f\u007f-\u009f]/u.test(s);
+  const u32 = (n: unknown): n is number => integer(n) && n <= 0xffffffff;
+  for (const sound of v.family) {
+    if (!isObject(sound)) return false;
+    let identity: string;
+    switch (sound.kind) {
+      case 'builtin':
+        if (!exactKeys(sound, ['kind', 'name']) || !text(sound.name) ||
+          sound.name.startsWith(':') || /\s/u.test(sound.name)) return false;
+        identity = JSON.stringify(['builtin', sound.name]); break;
+      case 'instrument':
+        if (!exactKeys(sound, ['kind', 'id']) || !u32(sound.id)) return false;
+        identity = JSON.stringify(['instrument', sound.id]); break;
+      case 'sample':
+        if (!exactKeys(sound, ['kind', 'path', 'file']) || !text(sound.path) ||
+          !(sound.file === undefined || sound.file === null || u32(sound.file))) return false;
+        identity = JSON.stringify(['sample', sound.file ?? null, sound.path]); break;
+      case 'buffer':
+        if (!exactKeys(sound, ['kind', 'id']) || !songInteger(sound.id)) return false;
+        identity = JSON.stringify(['buffer', sound.id]); break;
+      default: return false;
+    }
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+  }
+  return true;
+}
 function ratio(v: unknown, duration = false): boolean {
   return Array.isArray(v) && v.length === 2 && Number.isSafeInteger(v[0]) &&
     Number.isSafeInteger(v[1]) && v[1] > 0 && (!duration || v[0] >= 0);
@@ -193,6 +239,27 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
     return fail('bad-shape', 'telemetry exceeds 1 MiB');
   }
   switch (env.kind) {
+    case 'song-instrument-muted':
+      if (!songInteger(env.body.epoch) || !songInteger(env.body.application_frame) || !songSelector(env.body.selector))
+        return fail('bad-shape', 'invalid instrument mute acknowledgement');
+      break;
+    case 'song-transport-state':
+      if (!songInteger(env.body.epoch) || !['prepared', 'playing', 'draining', 'ended', 'failed'].includes(env.body.state) ||
+        (env.body.instruments !== undefined && (!Array.isArray(env.body.instruments) ||
+          env.body.instruments.length > 256 || !env.body.instruments.every(songSelector))))
+        return fail('bad-shape', 'invalid song transport state');
+      break;
+    case 'song-candidate-ready':
+    case 'song-candidate-applied':
+      if (!songInteger(env.body.epoch) || !integer(env.body.doc_revision) ||
+        (env.kind === 'song-candidate-applied' && !songInteger(env.body.application_frame)))
+        return fail('bad-shape', 'invalid song acknowledgement');
+      break;
+    case 'song-candidate-failed':
+      if (!(env.body.epoch === null || songInteger(env.body.epoch)) ||
+        !(env.body.doc_revision === null || integer(env.body.doc_revision)))
+        return fail('bad-shape', 'invalid song failure identity');
+      break;
     case 'playing':
       if (env.body.events.length > MAX_PLAYING_EVENTS || !env.body.events.every(validPlaying))
         return fail('bad-shape', 'invalid or oversized playing batch');
@@ -227,6 +294,16 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
 /** Decodes one client frame (tests and the recording transport). */
 export function decodeClient(text: string): Decoded<ClientEnvelope> {
   const decoded = decodeWith<ClientEnvelope>(text, CLIENT_KINDS, CLIENT_FIELDS);
+  if (decoded.ok && decoded.env.kind === 'apply-song') {
+    const b = decoded.env.body;
+    if (!integer(b.doc_revision) || !integer(b.edit_epoch) || !b.file || b.file.includes('\0'))
+      return fail('bad-shape', 'invalid song application');
+  }
+  if (decoded.ok && decoded.env.kind === 'mute-instrument') {
+    const b = decoded.env.body;
+    if (!songInteger(b.epoch) || !songSelector(b.selector))
+      return fail('bad-shape', 'invalid instrument mute');
+  }
   if (decoded.ok && decoded.env.kind === 'clock-probe' && !nonnegative(decoded.env.body.page_send))
     return fail('bad-shape', 'invalid clock probe page_send');
   return decoded;

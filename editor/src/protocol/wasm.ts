@@ -10,6 +10,7 @@
 
 import { startHost, type HostOptions, type VactrHost } from '../../worklet/host.js';
 import type { Transport } from './transport';
+import { decodeClient } from './envelope';
 import {
   TAG_PKG,
   TAG_RENDER,
@@ -88,7 +89,25 @@ export class WasmCore {
 
   /** `session_apply`: one client envelope (JSON text). */
   apply(text: string): void {
+    const decoded = decodeClient(text);
+    if (decoded.ok && decoded.env.kind === 'apply-song') this.refreshSongAssets();
     this.host.callStr('session_apply', text);
+  }
+
+  /** Certifies complete ordered banks; partial decoded maps are never catalogs. */
+  songBankCatalog(banks: Record<string, string[]>): void {
+    if (typeof this.host.x.session_song_bank_catalog !== 'function')
+      throw new Error('Song sample banks are unavailable in this browser runtime');
+    const catalog = { banks: Object.entries(banks).map(([name, members]) => ({ name, members })) };
+    if (this.host.callStr('session_song_bank_catalog', JSON.stringify(catalog)) !== 1)
+      throw new Error('Song sample bank catalog was rejected');
+  }
+
+  refreshSongAssets(): void {
+    if (typeof this.host.x.session_song_refresh_assets !== 'function')
+      throw new Error('Song playback is unavailable in this browser runtime');
+    if (this.host.call('session_song_refresh_assets') !== 1)
+      throw new Error('Song sample preparation is unavailable');
   }
 
   /** `session_check`: static diagnostics of `text`; never executes. */

@@ -9,6 +9,7 @@
 
 pub mod caps;
 pub mod noop;
+pub mod song_profile;
 pub mod wire;
 
 #[cfg(test)]

@@ -69,6 +69,8 @@ pub struct SessionConfig {
     pub cache: Option<Box<dyn CacheBackend>>,
     /// The source loader of `load`; the session wraps it (14.5.9).
     pub loader: Box<dyn SourceLoader>,
+    /// Optional immutable configuration for isolated finite-song assets.
+    pub song_assets: Option<Rc<dyn crate::song::assets::SongAssetFactory>>,
     pub persistence: PersistenceMode,
     /// The instrument registry to share with a host that resolves bus
     /// names (`NativeAudioHost::set_bus_names`); a fresh one when `None`.
@@ -86,6 +88,7 @@ impl SessionConfig {
             lock: None,
             cache: None,
             loader: Box::new(NoopHost),
+            song_assets: None,
             persistence: PersistenceMode::Directive,
             insts: None,
         }
@@ -202,6 +205,11 @@ pub struct Session {
     pub(super) banks: BTreeMap<Rc<str>, Rc<str>>,
     pub(super) lock: Option<LockFile>,
     pub(super) cache: Option<Box<dyn CacheBackend>>,
+    pub(super) song_assets: Option<Rc<dyn crate::song::assets::SongAssetFactory>>,
+    pub(super) song_asset_limits: Option<crate::song::assets::SongAssetLimits>,
+    pub(super) pending_song: Option<crate::song::PreparedSong>,
+    pub(super) song_epoch: u64,
+    pub(super) song_requests: super::song::SongRequests,
     pub(super) persistence: PersistenceMode,
     /// File names by `FileId` (index 0 is the console).
     pub(super) files: Vec<Rc<str>>,
@@ -243,6 +251,35 @@ impl std::fmt::Debug for Session {
 pub const CONSOLE_FILE: &str = "<console>";
 
 impl Session {
+    /// Begin isolated preparation or fail explicitly; never use the active loader.
+    pub fn begin_song_assets(
+        &self,
+        source: crate::song::assets::SongSourceFile,
+        limits: crate::song::assets::SongAssetLimits,
+    ) -> Result<crate::song::assets::SongAssetPreparation, Failure> {
+        self.song_assets
+            .as_ref()
+            .ok_or_else(|| {
+                Failure::new(
+                    FailCode::HostUnavailable,
+                    "isolated song assets are unavailable on this host",
+                )
+            })?
+            .begin(source, limits)
+    }
+
+    /// Replace future candidate configuration; existing candidates keep their own inventory.
+    pub fn set_song_asset_factory(
+        &mut self,
+        factory: Option<Rc<dyn crate::song::assets::SongAssetFactory>>,
+    ) {
+        self.song_assets = factory;
+    }
+    #[must_use]
+    pub fn song_asset_factory(&self) -> Option<Rc<dyn crate::song::assets::SongAssetFactory>> {
+        self.song_assets.clone()
+    }
+
     /// Builds the Evaluator + Runtime pair (12.8.3): the runtime first, so
     /// its sink exists; then the evaluator over the same instrument
     /// registry with the session loader carrying the `AnalysisCx`; then one
@@ -252,6 +289,7 @@ impl Session {
         let reg = cfg.insts.unwrap_or_else(InstRegistry::shared);
         let resolver: Rc<dyn InstResolver> = Rc::new(Rc::clone(&reg));
         let (mut rt, sink) = Runtime::new(hosts, resolver, cfg.caps, cfg.runtime);
+        let song_assets = cfg.song_assets.or_else(|| cfg.loader.song_asset_factory());
         let loader = SessionLoader {
             inner: cfg.loader,
             cx: AnalysisCx {
@@ -285,6 +323,11 @@ impl Session {
             banks: BTreeMap::new(),
             lock: cfg.lock,
             cache: cfg.cache,
+            song_assets,
+            song_asset_limits: None,
+            pending_song: None,
+            song_requests: super::song::SongRequests::default(),
+            song_epoch: 0,
             persistence: cfg.persistence,
             files: vec![Rc::from(CONSOLE_FILE)],
             docs,
@@ -443,6 +486,53 @@ impl Session {
     pub fn apply_from(&mut self, conn: u32, env: Envelope<ClientMsg>) -> Vec<Outgoing> {
         let re = Some(env.seq);
         let msgs = match env.body {
+            ClientMsg::ApplySong(b) => {
+                // Validation here is read-only: no file registration, active
+                // eval, runtime drain or false Ready response before SONG-07.
+                let stale = self
+                    .lookup_file(&b.file)
+                    .and_then(|file| self.docs.get(&file))
+                    .is_some_and(|doc| {
+                        doc.rev != b.doc_revision || doc.epoch_reconciled != b.edit_epoch
+                    });
+                let result = if stale {
+                    Err(Failure::new(
+                        FailCode::Type,
+                        "song request does not address the current document revision/edit epoch",
+                    ))
+                } else {
+                    self.submit_song_request(&b, conn, env.seq)
+                };
+                match result {
+                    Ok(_) => Vec::new(),
+                    Err(error) => vec![ServerMsg::SongCandidateFailed(
+                        crate::session::protocol::SongCandidateFailedBody {
+                            epoch: None,
+                            doc_revision: Some(b.doc_revision),
+                            code: if stale {
+                                "stale-song-revision".into()
+                            } else {
+                                error.code.as_str().into()
+                            },
+                            message: error.message.to_string(),
+                        },
+                    )],
+                }
+            }
+            ClientMsg::MuteInstrument(b) => {
+                let epoch = b.epoch;
+                match self.submit_song_mute(b, conn, env.seq) {
+                    Ok(()) => Vec::new(),
+                    Err(error) => vec![ServerMsg::SongCandidateFailed(
+                        crate::session::protocol::SongCandidateFailedBody {
+                            epoch: Some(epoch),
+                            doc_revision: None,
+                            code: error.code.as_str().into(),
+                            message: error.message.to_string(),
+                        },
+                    )],
+                }
+            }
             ClientMsg::Eval(b) => {
                 let span = b.span.map(|s| (s.start, s.end));
                 let (out, batches) =
@@ -464,7 +554,15 @@ impl Session {
             },
             ClientMsg::SetVar(b) => self.on_set_var(conn, env.seq, b),
             ClientMsg::SetTweak(b) => self.on_set_tweak(conn, env.seq, b),
-            ClientMsg::DocChanged(b) => self.on_doc_changed(&b),
+            ClientMsg::DocChanged(b) => {
+                if let Err(error) = self.invalidate_song_requests(&b) {
+                    return self.route(conn, re, vec![bad_body(error.message.to_string())]);
+                }
+                if let Some(pending) = &mut self.pending_song {
+                    pending.cancel_if_changed(&b.file, b.doc_revision, b.edit_epoch);
+                }
+                self.on_doc_changed(&b)
+            }
             ClientMsg::Learn(b) => self.on_learn(&b),
             ClientMsg::Subscribe(b) => {
                 self.subs.insert(conn, b.into());

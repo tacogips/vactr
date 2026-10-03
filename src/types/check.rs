@@ -13,7 +13,7 @@ use crate::types::diag::{DiagCode, Diagnostic};
 use crate::types::manifest::HostManifest;
 use crate::types::natives::NativeTable;
 use crate::types::scope::{pattern_names, BindExtra, Binding, ScopeKind, Scopes};
-use crate::types::ty::{BindKind, CheckEnv, KeySet, Scheme, Ty, TypeId};
+use crate::types::ty::{BindKind, CallableSchema, CheckEnv, KeySet, Scheme, Ty, TypeId};
 use crate::types::unify::Unifier;
 
 /// The checker's output: a type per expression node (the `TypedInfo` side
@@ -22,6 +22,8 @@ use crate::types::unify::Unifier;
 pub struct CheckResult {
     pub types: HashMap<NodeId, Ty>,
     pub diags: Vec<Diagnostic>,
+    /// Successfully checked portable session function declarations.
+    pub callables: BTreeMap<Rc<str>, CallableSchema>,
 }
 
 /// Checks the expanded forms of one document (a buffer, a spec block, or
@@ -45,7 +47,55 @@ pub fn check(program: &[Node], env: &CheckEnv, manifest: &HostManifest) -> Check
         };
         cx.types.insert(form.id, t);
     }
-    cx.finish()
+    let mut callables = BTreeMap::new();
+    if !cx
+        .diags
+        .iter()
+        .any(|d| d.severity == crate::types::diag::Severity::Error)
+    {
+        for form in program {
+            if !matches!(form.kind, NodeKind::Call)
+                || !matches!(
+                    form.children.first().and_then(Node::sym_name),
+                    Some("fn" | "let")
+                )
+            {
+                continue;
+            }
+            let Some(name) = form.children.get(1).and_then(Node::sym_name) else {
+                continue;
+            };
+            let Some(binding) = cx.scopes.session_lookup(name) else {
+                continue;
+            };
+            let Ty::Fn(params, result) = &binding.scheme.ty else {
+                continue;
+            };
+            let positional = params.len();
+            let mut all = params.to_vec();
+            let mut names = Vec::new();
+            if let BindExtra::Fn { keywords, .. } = &binding.extra {
+                for (key, ty) in keywords.iter() {
+                    names.push(key.clone());
+                    all.push(ty.clone());
+                }
+            }
+            let full = Ty::func(all, (**result).clone());
+            cx.u.default_nums(&full);
+            let signature = cx.u.generalize(&full);
+            let schema = CallableSchema {
+                positional,
+                keywords: names,
+                signature,
+            };
+            if schema.portable() {
+                callables.insert(Rc::from(name), schema);
+            }
+        }
+    }
+    let mut result = cx.finish();
+    result.callables = callables;
+    result
 }
 
 /// A struct field or an enum variant field.
@@ -408,6 +458,7 @@ impl<'a> Checker<'a> {
         CheckResult {
             types,
             diags: self.diags,
+            callables: BTreeMap::new(),
         }
     }
 }

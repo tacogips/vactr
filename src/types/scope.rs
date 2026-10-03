@@ -9,10 +9,11 @@
 //! session state from before the checked document. This module classifies
 //! each new binding into the 5.6 diagnostics; the checker reports them.
 
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::reader::node::{Atom, Node, NodeKind, Op};
-use crate::reader::span::Span;
+use crate::reader::span::{NodeId, Span};
 use crate::types::check::{Checker, TypeDef};
 use crate::types::diag::DiagCode;
 use crate::types::masks::ForcingMask;
@@ -45,6 +46,8 @@ pub(crate) struct Binding {
     /// Annotated `any`: it must be narrowed before use (`any-not-narrowed`).
     pub(crate) annot_any: bool,
     pub(crate) extra: BindExtra,
+    /// Known local callable effects; false does not certify unknown/imported code.
+    pub(crate) query_effect: bool,
 }
 
 impl Binding {
@@ -56,6 +59,7 @@ impl Binding {
             span,
             annot_any: false,
             extra: BindExtra::Plain,
+            query_effect: false,
         }
     }
 }
@@ -78,6 +82,7 @@ struct Scope {
 #[derive(Debug)]
 pub(crate) struct Scopes {
     stack: Vec<Scope>,
+    query_effects: HashMap<NodeId, bool>,
 }
 
 /// The scope diagnostic a new binding gets (7.1.4).
@@ -123,7 +128,15 @@ impl Scopes {
     pub(crate) fn new() -> Scopes {
         Scopes {
             stack: vec![Scope { names: Vec::new() }],
+            query_effects: HashMap::new(),
         }
+    }
+
+    pub(crate) fn record_query_effect(&mut self, node: NodeId, effect: bool) {
+        self.query_effects.insert(node, effect);
+    }
+    pub(crate) fn node_query_effect(&self, node: NodeId) -> Option<bool> {
+        self.query_effects.get(&node).copied()
     }
 
     /// Opens a child scope. Every kind classifies bindings the same way;
@@ -211,11 +224,18 @@ impl Scopes {
 
     /// Replaces the scheme and extra of the innermost binding of `name`
     /// (a `fn` is bound before its body is checked, for recursion).
-    pub(crate) fn update(&mut self, name: &str, scheme: Scheme, extra: BindExtra) {
+    pub(crate) fn update(
+        &mut self,
+        name: &str,
+        scheme: Scheme,
+        extra: BindExtra,
+        query_effect: bool,
+    ) {
         for s in self.stack.iter_mut().rev() {
             if let Some((_, b)) = s.names.iter_mut().rev().find(|(n, _)| &**n == name) {
                 b.scheme = scheme;
                 b.extra = extra;
+                b.query_effect = query_effect;
                 return;
             }
         }

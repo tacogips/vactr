@@ -109,3 +109,86 @@ fn check_env_lookups() {
     assert_eq!(env.open_prefix("warm").map(|p| &**p), Some("pads"));
     assert_eq!(env.open_prefix("x"), None);
 }
+
+#[test]
+fn time_pattern_source_preserves_time_and_element_relationship() {
+    use crate::types::unify::Unifier;
+    let mut u = Unifier::new();
+    let time = u.fresh();
+    let source = u.fresh();
+    let element = u.fresh();
+    u.try_unify(
+        &Ty::Pattern(Box::new(element.clone())),
+        &Ty::func(vec![time.clone()], source.clone()),
+    )
+    .unwrap();
+    assert_eq!(u.shallow(&time), Ty::Ratio);
+    assert_eq!(u.shallow(&source), Ty::Pattern(Box::new(element.clone())));
+    u.try_unify(&Ty::Sound, &element).unwrap();
+    assert_eq!(u.zonk(&source, false), Ty::Pattern(Box::new(Ty::Sound)));
+}
+#[test]
+fn time_pattern_sources_keep_wrapped_results_thunks_and_numeric_time() {
+    use crate::types::unify::Unifier;
+    let expected = Ty::Pattern(Box::new(Ty::Sound));
+    for result in [
+        Ty::Sound,
+        Ty::Pattern(Box::new(Ty::Sound)),
+        Ty::List(Box::new(Ty::Opt(Box::new(Ty::Pattern(Box::new(
+            Ty::Sound,
+        )))))),
+        Ty::Nil,
+    ] {
+        for input in [Ty::Ratio, Ty::Int, Ty::Float64] {
+            assert!(Unifier::new()
+                .try_unify(&expected, &Ty::func(vec![input], result.clone()))
+                .is_ok());
+        }
+        assert!(Unifier::new()
+            .try_unify(&expected, &Ty::func(vec![], result))
+            .is_ok());
+    }
+}
+#[test]
+fn invalid_time_pattern_sources_and_shared_numeric_result_roll_back() {
+    use crate::types::unify::{Clash, Unifier};
+    let expected = Ty::Pattern(Box::new(Ty::Sound));
+    for input in [Ty::Any, Ty::Str, Ty::Bool, Ty::Pattern(Box::new(Ty::Sound))] {
+        assert_eq!(
+            Unifier::new().try_unify(&expected, &Ty::func(vec![input], Ty::Sound)),
+            Err(Clash::Mismatch)
+        );
+    }
+    for result in [
+        Ty::Any,
+        Ty::Pattern(Box::new(Ty::Any)),
+        Ty::List(Box::new(Ty::Any)),
+        Ty::Part,
+        Ty::Song,
+        Ty::EventHandle,
+        Ty::Ratio,
+    ] {
+        let mut u = Unifier::new();
+        let time = u.fresh();
+        assert_eq!(
+            u.try_unify(&expected, &Ty::func(vec![time.clone()], result)),
+            Err(Clash::Mismatch)
+        );
+        assert_eq!(
+            u.shallow(&time),
+            time,
+            "failed return restores time inference"
+        );
+    }
+    let mut u = Unifier::new();
+    let shared = u.fresh();
+    assert_eq!(
+        u.try_unify(&expected, &Ty::func(vec![shared.clone()], shared.clone())),
+        Err(Clash::Mismatch)
+    );
+    assert_eq!(u.shallow(&shared), shared);
+    assert_eq!(
+        u.try_unify(&expected, &Ty::func(vec![Ty::Ratio, Ty::Ratio], Ty::Sound)),
+        Err(Clash::Mismatch)
+    );
+}

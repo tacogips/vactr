@@ -1,6 +1,6 @@
 # Whole-code Apply and instrument mute UI implementation plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: SONG-15
 **Plan Path**: impl-plans/active/song-mode-editor-controls.md
 **Created**: 2026-09-30
@@ -25,9 +25,11 @@ Source baseline: design-song-mode.md capability audit distinguishes existing clo
   "writePaths": [
     "editor/src/app/song.ts",
     "editor/src/app/apis.ts",
+    "editor/src/app/deps.ts",
     "editor/src/app/main.ts",
     "editor/src/code/sync.ts",
     "editor/test/app/song.test.ts",
+    "editor/test/app/main.test.ts",
     "impl-plans/active/song-mode-editor-controls.md"
   ],
   "sharedPaths": [
@@ -75,9 +77,11 @@ Use existing Ratio64, Pat, Value, Failure, Tempo, KwId and capability types. Dec
 |---|---|---|
 | `editor/src/app/song.ts` | Add finite transport status, explicit whole-code Apply and instrument mute controls bound to protocol state. | NOT_STARTED |
 | `editor/src/app/apis.ts` | Expose song actions/state through current dependency interface. | NOT_STARTED |
+| `editor/src/app/deps.ts` | Expose the mounted song controls through EditorDeps | NOT_STARTED |
 | `editor/src/app/main.ts` | Mount controls and route actions without replacing existing editor surface architecture. | NOT_STARTED |
 | `editor/src/code/sync.ts` | Keep editing separate from song application; invalidate pending candidate if submitted revision changes. | NOT_STARTED |
 | `editor/test/app/song.test.ts` | Test edit-without-apply, failed candidate retention, pending race, actual ack, instrument mute and compatibility with existing live evaluation. | NOT_STARTED |
+| `editor/test/app/main.test.ts` | Preserve the existing mount-order fixture with the document-name export | NOT_STARTED |
 
 ### Public declaration contract
 
@@ -95,7 +99,7 @@ export interface SongControls { applyWholeCode(): Promise<void>; muteInstrument(
 - [ ] Add declarations without changing legacy semantics; review manifest-required exhaustive consumers.
 
 ### TASK-002: Implement the owned behavior
-**Status**: NOT_STARTED
+**Status**: In Progress
 **Depends On**: TASK-001
 **Parallelizable**: No within this plan; cross-plan parallelism follows the DAG and ownership manifest.
 **Deliverables**: Every non-test file in the module table, with exactly its stated intended change.
@@ -103,7 +107,7 @@ export interface SongControls { applyWholeCode(): Promise<void>; muteInstrument(
 - [ ] Record post-edit hashes and run required modify-agent checks.
 
 ### TASK-003: Behavioral evidence and progress
-**Status**: NOT_STARTED
+**Status**: In Progress
 **Depends On**: TASK-002
 **Parallelizable**: No; verifies the complete phase.
 **Deliverables**: Every listed test/fixture file, full command logs and this plan progress record.
@@ -144,3 +148,71 @@ export interface SongControls { applyWholeCode(): Promise<void>; muteInstrument(
 **Blockers**: None for planning; implementation awaits reviewed/committed documents and prerequisite waves.
 **Verification**: Read-only source/document consistency review only. Future commands above were not executed.
 **Next session**: Implement TASK-001 after dependency outputs and authorization are available.
+
+### 2026-10-03 — explicit Apply and acknowledged instrument controls
+
+Mounted song controls alongside existing areas without changing their mount order.
+The public SongControls API is exposed on EditorDeps. Apply reads the entire
+current document and sends one explicit song request; Ready does not display
+Playing. Controls enumerate only the backend's certified family inventory and
+change mute state only on actual epoch/frame acknowledgements. Failed candidates
+retain active playback and controls. Finite Ended/Failed disables mute controls.
+Editing keeps active playback intact and immediately flushes document invalidation
+when a candidate is pending. The existing CodeSurface/DocumentSync observer is
+sufficient, so code/sync.ts needs no change. Both headless and legacy view paths
+are supported, with subscriptions removed on disposal.
+
+The original mount-order mock now exports its real document name. Actual focused
+tests: UI 5, existing mount 2, song protocol 14, existing client/store 18, all 39
+passed. Log `/tmp/vactr-song-editor-controls.log`. TypeScript checking and Vite
+build exited 0; full build log `/tmp/vactr-song-editor-controls-build.log`.
+Bundled wasm is the existing artifact; real browser audio integration, backend
+mute acceptance and atomic Apply are not inferred from these consumer tests.
+
+### 2026-10-03 — current consumer check and actual backend witness
+
+Current focused protocol/song, app/song and app/main tests pass 24/24 (actual
+session6081 exit0); TypeScript checking exits0. Add an acceptance witness to the
+already declared editor/test/app/song.test.ts connecting mounted DOM controls,
+CodeSurface, DocumentSync, Client and Store to actual separate WASM Session and
+worklet instances. Only real framed commands and receipts drive state. Verify
+initial Apply, mute with silence, edit without automatic Apply, replacement
+carried mute, unmute audio and finite Ended controls. Run against a newly built
+artifact after controller fixes are held; the previous artifact is insufficient.
+This is a test deliverable within TASK-003, not a new production interface.
+
+The new mounted-controls witness passes with all six app/song tests (actual
+session42962 exit0), and TypeScript checking exits0. This smoke run uses the
+previous artifact SHA256
+1d0cfc4ced4b9c23ae473dc526f74e614352b0a9be307c7cb01123418000ace2;
+it validates fixture wiring, not the controller changes currently being authored.
+The witness uses actual client envelopes and worklet receipts, checks PCM and
+DOM state, and never manufactures a server reply. Its replacement has two cycles
+so unmute can admit a future onset; a suppressed first onset is not resurrected.
+Fresh-artifact rerun remains required. Test source SHA256:
+2d23201511fdb9cd36b74de20bbdee835eec286afbbc43a7bf3aa1ccfe6726b9.
+
+The expanded focused consumer scope (song/client/store protocol and song/main UI)
+passes 43 tests across five files, actual session8013 exit0. Complete raw log:
+`/tmp/vactr-song-controls-real-backend-smoke-001.log`. TypeScript log:
+`/tmp/vactr-song-controls-typecheck-001.log`, exit0. The same previous artifact
+was used for the actual-backend UI witness; fresh-artifact acceptance is pending.
+
+### 2026-10-03 — fresh backend and full editor acceptance
+
+Fresh WASM artifact SHA256
+4cd5f7a0334f843ac438cf3d881992c00b658707697b1710044f867d4d7f512a
+passes all33 selected backend/protocol/UI tests (actual44872 exit0,
+/tmp/vactr-song-fresh-backend-ui-001.log), including mounted actual-backend
+Apply, mute carry, future-onset unmute and finite completion. Native checking
+and pure-WASM build exit0; full joined Rust lint/regression gates remain pending.
+
+The full editor suite initially reports584 passing tests and two failed suites
+because tree-sitter-vact.wasm is absent. The existing mise run ts-build-wasm
+task exits0 and verifies WASM magic without tracked grammar changes. The full
+rerun executes590/590 tests across78/78 passing files (actual44662 exit0;
+/tmp/vactr-song-editor-full-20261003.log). TypeScript check and Vite production
+build also exit0. The initial build reports its syntax fallback and existing
+dependency/chunk warnings; these are not concealed as warning-free evidence.
+Do not archive this plan until its remaining shared Rust gates and ownership
+reconciliation are complete.

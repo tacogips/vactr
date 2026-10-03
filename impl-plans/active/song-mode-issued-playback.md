@@ -158,7 +158,7 @@ Ready/preparation helpers into it.
   "planId": "SONG-ISSUED-PLAYBACK",
   "planPath": "impl-plans/active/song-mode-issued-playback.md",
   "wave": 3,
-  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK"],
+  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK", "SONG-STRUCTURAL-CLOCK"],
   "writePaths": [
     "src/host/caps/song/preparation.rs",
     "src/host/caps/song/preparation/issued.rs",
@@ -419,3 +419,16 @@ to this plan's log plus the one shared TASK-003 note.
 - [ ] Build, full tests and WASM exit 0, and fmt is clean.
 - [ ] Every file is below 1000 lines.
 - [ ] The progress log is updated.
+
+## Session 251 amendment (wave 3)
+
+- The fifth Rust path is `src/sched/song/pools.rs` (`PoolBook`/`Slot`), as
+  declared in the manifest. `src/host/caps/song/preparation/pools.rs` is not a
+  playback writePath and must not be edited.
+- This wave starts only after 2a, 2b and 2c are joined and committed. It runs
+  alone (concurrency 1).
+- Strict `cargo clippy --all-targets -- -D warnings` must exit 0. Any `SW-`,
+  `ST-` or `RES-` row still present at entry is a blocker for its owning
+  sub-wave. This plan does not fix it.
+- The Index/Slice-sourced track in `tests/song_issued_transport.rs` uses a
+  statically admissible Index list (user-QA SM4 default (a)).

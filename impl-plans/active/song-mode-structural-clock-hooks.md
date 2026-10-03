@@ -161,7 +161,7 @@ wave-1 cohort exact. Its paths do not overlap with any other plan.
   "planId": "SONG-STRUCTURAL-CLOCK",
   "planPath": "impl-plans/active/song-mode-structural-clock-hooks.md",
   "wave": 2,
-  "dependsOn": ["SONG-ROUTE8"],
+  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK"],
   "writePaths": [
     "src/pattern/eval/song_clock.rs",
     "src/pattern/eval/song_clock/dispatch.rs",
@@ -296,3 +296,89 @@ this plan's log only.
 - [ ] fmt is clean on touched paths and every file is below 1000 lines.
 - [ ] No new `allow`/`expect` attributes.
 - [ ] The progress log is updated.
+
+## Session 251 amendment (wave 2c, serial)
+
+Source of truth: design section "Session 251 resume amendments". This plan
+starts only after 2a and 2b are joined and committed. It runs alone
+(concurrency 1).
+
+- Add one test to `structural_tests.rs`: a Euclid-over-Slice query with
+  inherited depth `max_depth - 1` succeeds, and the same query with inherited
+  depth `max_depth` fails with `FailCode::DepthExceeded`. It publishes no
+  events, and the collector keeps the work spent before the refusal. The
+  existing exact/one-less work test stays unchanged.
+- Depth test harness and pitfalls:
+  - Harness: copy the minimal `Fixture` setup (`code`, `payload`, `collect`)
+    from `src/pattern/eval/song_clock/tests.rs` into `structural_tests.rs` as a
+    private test-only helper. It compiles without visibility changes because
+    `tests.rs` and `structural_tests.rs` are both direct child modules of
+    `song_clock` (`pub(crate) mod tests;` and `mod structural_tests;` in
+    `song_clock.rs`), so anything `tests.rs` can name is also nameable from
+    `structural_tests.rs`. Copy only the fields and methods the depth test
+    needs. Call `collect(TimeSpan::cycle(0).unwrap(), limits,
+    limits.max_nodes, depth)` with `limits = SongLimits::default()` and the
+    program `indexed_song("euclid {slice {beat -> p} 2 [cut nil]} 3 8 1")`,
+    following `sampling_exact_work` (`tests.rs`, depth 0). Use a fresh fixture
+    for each depth. Do not use `PreparedSong::query_issued_with_work` for this
+    test: its existing callers need private snapshot retention (the private
+    `retain` helper in `shared_work_tests.rs`) that is unreachable from this
+    module.
+  - Do not edit `src/pattern/eval/song_clock/tests.rs`. It is not a writePath,
+    and editing it breaks the join hash audit. Do not make its private
+    `Fixture` or `Fixture::collect` visible. Keep `structural_tests.rs` below
+    1000 lines.
+  - Never relax, move or remove any depth check (`depth >= max_depth` or
+    `depth > max_depth`, for example in `song_clock.rs` `copy_issued_clock`,
+    `src/song/limits.rs` and the `prepare_owner_dependencies` and
+    `observe_part` depth paths) to make the boundary pass. Nested evaluation passes `depth + 1` internally, so
+    `max_depth - 1` may refuse on the unmodified code. If it does, stop and
+    record a blocker in this plan's progress log with the exact failure message
+    and depth. Do not change the boundary numbers.
+  - Assertions. At depth `max_depth - 1`, the result is `Ok`, and `rows(&work)`
+    (the existing helper in `structural_tests.rs`, which filters to the
+    genuine target owner) is non-empty with no
+    `CanonicalClockProjection::Unknown` clock. At depth `max_depth`, the
+    result's error code is `FailCode::DepthExceeded`, `rows(&work)` is empty
+    (nothing published), and `work.borrow().remaining()` is at most the
+    starting budget (the debit is kept, never refunded). In both cases
+    `fixture.evaluator.vm_and_ns().0.song_work().is_none()` holds afterward,
+    as in `sampling_exact_work`. If the failing case publishes rows, record a
+    blocker in the progress log instead of weakening the assertion.
+- The seven barrier removals and the Chunk `Unknown` barrier from session 250
+  are kept. Review checks that each removed barrier has its evaluated or frozen
+  Index evidence and callback-denied replay. If a removed barrier has none,
+  restore it.
+- Clippy: no diagnostic in this plan's six paths. After this sub-wave, no
+  `ST-` row may remain.
+- Before rerunning the gates, the orchestrator copies the existing
+  `tmp/song-mode-riela/session249-structural-*` files to
+  `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session250/` and records their
+  sha256 values. Then rerun the focused, build, Clippy, full nextest, WASM,
+  fmt and `wc -l` commands above in the foreground. Record each exit status
+  and full log path.
+
+### Session 251 test cases (input -> expected outcome)
+
+- A Euclid-over-Slice query at inherited depth `max_depth - 1` -> `Ok`, with a
+  non-`Unknown` clock and observation rows.
+- The same query at inherited depth `max_depth` -> `Err` with
+  `FailCode::DepthExceeded`, no observation rows, and `remaining()` at most
+  the starting budget.
+- The seven existing session-250 tests in `structural_tests.rs` -> unchanged
+  and passing.
+
+### Session 251 done criteria (mechanically checkable)
+
+- [ ] `grep -n "DepthExceeded" src/pattern/eval/song_clock/structural_tests.rs`
+  matches the new test.
+- [ ] `grep -n "Chunk" src/pattern/eval/song_clock/dispatch.rs` still shows the
+  `Unknown` barrier, and exactly seven operators lost theirs. Check this with
+  `git diff 37ea3e8 -- src/pattern/eval/song_clock.rs src/pattern/eval/song_clock/dispatch.rs`.
+- [ ] Focused, build, strict clippy (no diagnostic in the six paths, no `ST-`
+  row), full nextest and WASM all exit 0. `rustfmt --check` is clean, and each
+  of the six paths is < 1000 lines.
+- [ ] `git diff 1ac457f -- src/pattern/combinators/input.rs` is empty. No new
+  `allow`/`expect`.
+- [ ] `git diff 1ac457f -- src/pattern/eval/song_clock/tests.rs` is empty.
+- [ ] The receipt and a progress-log entry are written.

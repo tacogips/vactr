@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (wave 2, session 250)
+**Status**: In Progress (wave 2a, session 251, serial)
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -213,6 +213,7 @@ SONG-STRUCTURAL-CLOCK. Their write paths do not overlap with this plan's.
     "src/song/routing/configuration/index/canonical.rs",
     "src/song/routing/prepared.rs",
     "src/song/snapshot/occupancy/lookup/authority.rs",
+    "src/song/routing/density/index.rs",
     "impl-plans/active/song-mode-issued-route-resolution.md",
     "tmp/song-mode-riela/session249-resolution-intent.json",
     "tmp/song-mode-riela/session249-resolution-receipt.json",
@@ -386,7 +387,7 @@ impl PreparedRoutes {
   must exit 0. This proves legacy compatibility.
 - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session249-resolution-nextest-full.log 2>&1` must exit 0.
 - `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-resolution-wasm.log 2>&1` must exit 0.
-- `rustfmt --edition 2021 --check <the eight Rust writePaths> > tmp/song-mode-riela/session249-resolution-fmt.log 2>&1`
+- `rustfmt --edition 2021 --check <the eight Rust writePaths, plus src/song/routing/density/index.rs if edited> > tmp/song-mode-riela/session249-resolution-fmt.log 2>&1`
   passes when no `Diff in` line names a touched path.
 - `wc -l` on every writePath: each must be below 1000.
 
@@ -447,3 +448,141 @@ admission seam to this plan's authorized paths or implements it in a declared
 dependency, and the concurrent `song/snapshot/issued.rs` Clippy diagnostic is
 repaired by its owning plan; then correct the equal-handle fixture/address
 contract and rerun the required gates on the stable combined tree.
+
+## Session 251 amendment (wave 2a, serial)
+
+Source of truth: design section "Session 251 resume amendments" and user-QA
+SM4. This plan runs alone (concurrency 1). SONG-SHARED-WORK and
+SONG-STRUCTURAL-CLOCK do not start until this sub-wave is joined and
+committed.
+
+### Ninth writePath (operator-authorized)
+
+`src/song/routing/density/index.rs` is added to writePaths for the issued
+preparation preflight seam. `DensityWalk` is shared by the legacy and issued
+ledgers, and it has no access to retained authority. Therefore:
+
+- Edit it only if a fixture with a statically admissible Index operand is
+  refused by the density preflight. Record the failing test and message in the
+  receipt before editing.
+- Never turn `IndexSupportAdmission::RequiresRealization` into a bound.
+  Dynamic Index operands (for example `[cut nil]` with a late-bound function
+  variable, `kind=Late`) keep refusing on both ledgers (SM4 default (a)).
+- Legacy `prepare_routes` plans stay byte-identical for every existing
+  fixture. The `density_tests` module, the legacy focused binaries and full
+  nextest are the witnesses.
+- If no edit is needed, leave the file unedited and record
+  `densityIndex: "authorized, unedited"` in the receipt.
+- The file is 516 lines. Keep it below 1000.
+- `density.rs`, `prepare.rs` and `prepare/builder.rs` are not writePaths.
+  If the seam would need them, stop and record a blocker that cites SM4
+  option (b).
+
+### Fixture repairs in `nested/issued.rs`
+
+- The session-250 nested fixtures used `[cut nil]` Index lists, so they failed
+  in the preparation preflight. Replace each Index list with a statically
+  admissible literal list (for example `[0 nil]` or `[0 1]`). Keep the subject
+  lambda `{beat -> p}` and the reusable Part functions, so callback-denied
+  replay still has callbacks to deny. Each test still asserts its named
+  contract from "Tests to add".
+- Distinct equal handles: `slice p 2 [...]` breaks the first-structure rule
+  (the subject `p` is structured), which produces `Index address contradicts
+  first-structure rule`. Repair the fixture so both `stack` branches and
+  `inner` use `slice {beat -> p} 2 [<static Index>]`. Do not edit
+  `src/song/routing/index.rs` or relax `slice_index_root`. The test must find
+  an event with at least two distinct seals (not `Rc::ptr_eq`). Both seals must
+  authenticate before the route is returned. A conflicting-route variant must
+  fail with no result.
+- NeedsJointGeometry: the legacy check must match the barrier refusal itself.
+  The `resolve_route` error message must contain `sampled context requires
+  joint mapping geometry`. A bare `is_err()` is not enough. Legacy
+  `prepare_routes` on the same program must succeed, so that the refusal comes
+  from the barrier and not from preparation. `resolve_issued_event` returns a
+  route for the same event.
+- `nested/issued.rs` is 916 lines and must stay below 1000. `source.rs` is 991
+  lines and may reach 993 at most (983 + 10). Any further growth goes into
+  `source/issued.rs`.
+
+### Clippy disposition in a serial sub-wave
+
+Map every diagnostic in `session249-resolution-clippy.log` to
+`{file, line, message, rowId}`. Use a Route8 D-row, `RES-<item>` for this
+plan's items whose only caller is wave 3, `SW-<item>` for committed 2b paths
+(for example `SW-let_and_return` at `src/song/snapshot/issued.rs:231`), or
+`ST-<item>` for committed 2c paths. Only `SW-` and `ST-` rows may be lints
+other than `dead_code`/`unused_imports`. Do not fix them in this sub-wave.
+Any other lint in this plan's nine paths fails the gate. If the
+`nested/issued.rs:499` `collapsible_if` reported in session 250 is still
+present, fix it without `allow`/`expect`, because the file is in this plan's
+paths.
+
+### Evidence
+
+Before rerunning the gates, the orchestrator copies the existing
+`tmp/song-mode-riela/session249-resolution-*` files to
+`tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session250/` and records their
+sha256 values. The gate logs then rewrite the plan-declared paths. Run every
+verification command above in the foreground, in order. Record the exit
+status and the full log path. Add `src/song/routing/density/index.rs` to the
+fmt and `wc -l` commands only if it was edited.
+
+### Session 251 execution steps (in order)
+
+1. Write `tmp/song-mode-riela/session249-resolution-intent.json`: design and
+   plan sha256, plus the sha256 and full text of each of the nine Rust
+   writePaths. Re-read and hash-check each file before every edit. If a hash
+   differs from the intent, stop and reconcile from the current file.
+2. Reproduce first. Run the two session-250 failing tests by name and save the
+   output in the focused log, before editing anything.
+3. Repair the fixtures in `nested/issued.rs` (static Index lists, the
+   first-structure rule, the barrier-message assertion). Do not change the
+   resolver logic just to make a fixture pass.
+4. Rerun the focused filter. If a static-Index fixture is still refused by
+   `DensityWalk::index_support` or `index_opening`, apply the
+   density/index.rs rules above. If it is refused anywhere outside the nine
+   paths (for example `nested.rs:547/555`, which is a writePath and may be
+   edited; or `configuration/index.rs:178` or `index.rs`, which may not), and
+   the refusal is in an unowned file, stop and record a blocker that cites
+   SM4 (b) and the exact message.
+5. Fix the remaining lints in this plan's paths without `allow`/`expect`.
+6. Run every verification command in the foreground, in order. Write the
+   receipt, including the Clippy disposition table and `densityIndex`.
+7. Add a progress-log entry to this plan only.
+
+### Session 251 test cases (input -> expected outcome)
+
+- `euclid {slice {beat -> p} 2 [<static Index>]} 1 2` inside a
+  `transform-instrument` Part -> legacy `prepare_routes` is `Ok`. Legacy
+  `resolve_route` on the event is `Err`, and the message contains
+  `sampled context requires joint mapping geometry`. `resolve_issued_event`
+  on the same event is `Ok`.
+- `stack` of two `slice {beat -> p} 2 [<static Index>]` branches under nested
+  `transform-instrument` -> some event has at least 2 non-`Rc::ptr_eq` seals.
+  `resolve_issued_event` is `Ok`. Every seal goes through `bind_issued_owner`,
+  which the test checks through the collector debit: it grows by at least one
+  authentication charge per seal.
+- The same program with one contributor's route made to conflict (or with a
+  swapped genuine member) -> `Err` and no route.
+- The cached nested, discarded-origin and partition fixtures with static
+  Index lists -> pass, with the callback-read counter at 0 during resolution.
+- The exact-work run is `Ok`. One unit less is `Err`, with no route, and the
+  debit is kept.
+
+### Session 251 done criteria (mechanically checkable)
+
+- [ ] `jq` shows `src/song/routing/density/index.rs` in this plan's manifest
+  writePaths (already done at plan time).
+- [ ] `grep -c "\[cut nil\]" src/song/routing/nested/issued.rs` prints 0.
+- [ ] `grep -n "sampled context requires joint mapping geometry" src/song/routing/nested/issued.rs`
+  matches inside the NeedsJointGeometry test.
+- [ ] `git diff 1ac457f -- src/song/routing/index.rs src/song/routing/density.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/configuration/index.rs`
+  is empty.
+- [ ] The focused filter exits 0 with every listed resolver test passing. The
+  legacy focused binaries, full nextest and WASM exit 0.
+- [ ] Every Clippy diagnostic has a row (D-row, `RES-`, `SW-` or `ST-`). No
+  non-dead-code lint is left in the nine paths.
+- [ ] `rustfmt --check` shows no `Diff in` for touched paths. `wc -l`:
+  `source.rs` <= 993 and every path < 1000.
+- [ ] `git diff 1ac457f -- <nine paths> | grep -E '^\+.*#\[(allow|expect)'`
+  prints nothing.

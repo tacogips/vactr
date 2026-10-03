@@ -135,7 +135,7 @@ scope.
   "planId": "SONG-SHARED-WORK",
   "planPath": "impl-plans/active/song-mode-shared-issued-query-work.md",
   "wave": 2,
-  "dependsOn": ["SONG-ROUTE8"],
+  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION"],
   "writePaths": [
     "src/song/snapshot.rs",
     "src/song/snapshot/issued.rs",
@@ -355,3 +355,61 @@ format, no stash/checkout/reset, and updates to this plan's log only.
   only `--check` hunks are in the two untouched child modules documented above.
 - [x] No new `allow`/`expect` attributes.
 - [x] The progress-log entry is recorded.
+
+## Session 251 amendment (wave 2b, serial)
+
+Source of truth: design section "Session 251 resume amendments". This plan
+starts only after SONG-ISSUED-RESOLUTION (2a) is joined and committed. It runs
+alone (concurrency 1). The compile blockers that session 250 recorded came
+from concurrent issued-resolution files. They are resolved by 2a before this
+sub-wave runs.
+
+- Fix `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` by
+  returning the expression directly. Do not use `allow`/`expect`. Do not
+  change behavior.
+- `seed_collection` keeps its charged, additive `Rc::ptr_eq` retention. A
+  fresh-only collector, or a seeding path that clears or replaces prior
+  executions, fails review.
+- The eight tests in `shared_work_tests.rs` (the seven required ones plus the
+  attached-collector foreign-execution test) must all pass on the final
+  source. The foreign-execution test must be part of the final focused run.
+- Clippy: after this sub-wave, no `SW-` row may remain. Map other diagnostics
+  to a Route8 D-row, `RES-<item>`, or `ST-<item>` for committed 2c paths.
+- Before rerunning the gates, the orchestrator copies the existing
+  `tmp/song-mode-riela/session249-sharedwork-*` files to
+  `tmp/song-s249/SONG-SHARED-WORK/attempt-session250/` and records their
+  sha256 values. Rerun every verification command above in the foreground.
+  Record each exit status and full log path.
+
+### Session 251 test cases (input -> expected outcome)
+
+- Two `query_issued_with_work` calls on one collector -> every first-query
+  execution is still present by `Rc::ptr_eq`, and remaining work never
+  increases.
+- `seed_collection` on a collector that already holds the view's executions
+  -> no duplicates, and the charge equals `view.len * (prior.len + 1)`.
+- `seed_collection` on a fresh collector -> the result equals the view, and
+  the charge equals `view.len`.
+- A foreign-attached collector, or an unattached collector with prior
+  executions -> `Err` before the precharge. `executions` (by pointer) and
+  `original` are unchanged, and there are 0 callback reads.
+- An attached collector that carries a foreign execution record -> `Err`, and
+  the prior entries are not replaced.
+- The legacy `query_issued` equals `query_issued_with_work` on a fresh
+  collector (same descriptors and seal count). Exact work is `Ok`, one less is
+  `Err`, and the spent work is written back.
+
+### Session 251 done criteria (mechanically checkable)
+
+- [ ] Strict clippy shows no `let_and_return` (or any other non-dead-code
+  lint) in the four paths. `git diff 1ac457f -- <four paths> | grep -E '^\+.*#\[(allow|expect)'`
+  prints nothing.
+- [ ] `grep -n "executions.clear\|executions = " src/pattern/eval/song_replay.rs`
+  shows no replacement of prior executions in `seed_collection`.
+- [ ] The focused filter exits 0 and runs all eight `shared_work_tests`. Full
+  nextest and WASM exit 0.
+- [ ] `git diff --quiet -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs`
+  exits 0. Each of the four paths is < 1000 lines, and `snapshot.rs` is at
+  most 935 lines.
+- [ ] The receipt and a progress-log entry are written with the exit codes and
+  log paths.

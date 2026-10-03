@@ -994,7 +994,7 @@ concrete file that the owning plan's manifest declares.
 | Wave | Plans | Declared paths |
 |---|---|---|
 | 1 | Immutable route authority | the exact eight Route8 paths |
-| 2 | Issued route resolution; shared issued query work; structural clock hooks | resolver eight, shared-work four (including `src/pattern/eval/song_replay.rs`), structural six |
+| 2 | Issued route resolution; shared issued query work; structural clock hooks (run serially as 2a, 2b, 2c from session 251) | resolver nine (the eight plus `src/song/routing/density/index.rs`, session 251), shared-work four (including `src/pattern/eval/song_replay.rs`), structural six |
 | 3 | Issued playback | five paths, including `src/sched/song/pools.rs` |
 | 4 | Reconciliation | its manifest (docs, plans, `tests/song_end_to_end.rs`) |
 
@@ -1277,3 +1277,64 @@ audit may excuse a changed hash with that label.
   paths>` (exit 0) and records the result in the Route8 receipt. Workers and
   reviewers never run `git checkout`, `git restore` or `git stash`. If the
   paths still differ, the Route8 cohort gate fails.
+
+### Session 251 resume amendments (2026-10-04)
+
+SONG-ROUTE8 is accepted at `1ac457f` and is not redispatched. Commit
+`1ac457f` also holds unreviewed partial wave-2 code. The design above stays
+the baseline. These amendments apply only to the remaining waves.
+
+- **Serial wave 2.** Session 250 blocked because three wave-2 workers verified
+  one shared, changing tree. Wave 2 now runs as 2a (SONG-ISSUED-RESOLUTION),
+  2b (SONG-SHARED-WORK) and 2c (SONG-STRUCTURAL-CLOCK), with concurrency 1.
+  Wave 3 and wave 4 follow. Each sub-wave runs all of its gates on a tree that
+  no other worker is editing. The orchestrator commits that sub-wave's declared
+  paths before the next sub-wave starts. The cohort is already 952 inputs,
+  because every new wave-2 file exists at `1ac457f`. It must stay 952 through
+  2a-2c.
+- **Clippy disposition across sub-waves.** A sub-wave's strict Clippy log can
+  show diagnostics from committed partial code that a later sub-wave owns. The
+  receipt maps each one to its owner: `SW-<item>` for 2b paths, `ST-<item>` for
+  2c paths, `RES-<item>` for 2a paths, or a Route8 D-row. These diagnostics do
+  not fail the earlier sub-wave. They are blockers for their owner. For
+  example, `clippy::let_and_return` at `src/song/snapshot/issued.rs:231` is
+  `SW-let_and_return` in 2a and must be gone after 2b. Any diagnostic in the
+  sub-wave's own paths that is not `dead_code`/`unused_imports` on a listed
+  item fails that sub-wave. Strict Clippy must still exit 0 from wave 3.
+- **Density preflight seam (2a).** The operator authorized
+  `src/song/routing/density/index.rs` as a ninth resolver writePath. The
+  density walk is shared by the legacy and issued ledgers, and it cannot see
+  retained authority. A change there is therefore allowed only if a resolver
+  fixture with a statically admissible Index operand is refused by the density
+  preflight. The change must keep legacy `prepare_routes` plans byte-identical
+  for every existing fixture. It must never turn
+  `IndexSupportAdmission::RequiresRealization` into a bound. Dynamic Index
+  operands, such as a late-bound function variable in the Index list, still
+  refuse at preparation on both ledgers (user-QA SM4 default (a)). If no
+  change is needed, the file stays unedited and the receipt says so.
+- **Resolver fixtures (2a).** The seven resolver tests use statically
+  admissible Index lists. Their callback-denied evidence comes from the Slice
+  subject lambda (`{beat -> p}`) and the reusable Part functions. Every Slice
+  operand follows the first-structure rule: an unstructured subject and a
+  structured Index. The address check in `src/song/routing/index.rs`
+  (`slice_index_root`) is a shared legacy validator. It is not a writePath and
+  is not relaxed. The distinct-equal-handle fixture is repaired, not the
+  contract. The NeedsJointGeometry test must prove that legacy refuses at the
+  barrier itself, with the message `sampled context requires joint mapping
+  geometry`, and not at preparation. The issued path must resolve the same
+  event.
+- **Structural clock (2c).** Add one Euclid-over-Slice depth boundary test to
+  `structural_tests.rs`. With inherited depth `max_depth - 1`, the query
+  succeeds. With inherited depth `max_depth`, it fails with `DepthExceeded`,
+  publishes no events and keeps the collector debit.
+- **Playback pools path (3).** The fifth playback path is
+  `src/sched/song/pools.rs` (`PoolBook`/`Slot`), as declared in the manifest and
+  in the wave table above. `src/host/caps/song/preparation/pools.rs` is
+  host preparation code. It is not a playback writePath.
+- **Evidence.** Before a session-251 sub-wave reruns its gates, the
+  orchestrator copies that plan's existing `tmp/song-mode-riela/session249-*`
+  logs and receipts to `tmp/song-s249/<planId>/attempt-session250/` and records
+  their sha256 values. The plan-declared log paths are then rewritten by the
+  new gate runs. Every gate runs in the foreground with its exit status and
+  full log path recorded. The no-progress fingerprints `4945fec7...`,
+  `15c388bd...` and `0493996e...` must change.

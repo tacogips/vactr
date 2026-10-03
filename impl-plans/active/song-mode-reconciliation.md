@@ -795,6 +795,14 @@ is written in waves 1, 2 and 3. `src/song/snapshot/occupancy/lookup/authority.rs
 is written in waves 1 and 2. Each is edited only after the previous wave has
 joined.
 
+Session 251 amendment: wave 2 runs serially as 2a (SONG-ISSUED-RESOLUTION),
+2b (SONG-SHARED-WORK) and 2c (SONG-STRUCTURAL-CLOCK), with concurrency 1.
+Each sub-wave is joined and committed before the next one starts.
+SONG-ISSUED-RESOLUTION also owns `src/song/routing/density/index.rs`
+(operator-authorized). If that file was edited, the final rustfmt `--check`
+and the cohort audit include it as a declared writePath. The cohort stays 952
+after wave 2.
+
 ### Join protocol (after each wave, run serially by the root reviewer)
 
 1. Compare every writePath's current sha256 with the worker receipts. An

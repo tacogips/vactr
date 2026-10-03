@@ -65,3 +65,38 @@ Added 2026-10-03, session 250.
   saved patch makes it reversible. Option (b) restores the drift clause that the
   operator asked to remove. Option (c) changes the 944-input baseline, which no
   plan declares. Workers and reviewers never perform the restore.
+
+## SM4: Preparation admission of dynamic Index operands
+
+Added 2026-10-04, session 251.
+
+- **Question**: Route preparation's density preflight
+  (`src/song/routing/density/index.rs`, `DensityWalk::index_support`) refuses
+  an Index operand whose support needs canonical realization, for example a
+  late-bound function variable in the Index list (`[cut nil]`, which is
+  `PParam::Late` and gives `kind=Late, issuance=None`). Session 250's resolver
+  fixtures used this form and failed during preparation, before
+  `resolve_issued_event` ran. An honest bound needs the retained canonical
+  Index evidence held by `RouteAuthorityView`. The density walk cannot reach
+  that evidence unless `src/song/routing/density.rs`,
+  `src/song/routing/prepare/builder.rs` and `src/song/routing/prepare.rs` are
+  edited. The last two are accepted SONG-ROUTE8 paths. Should this batch
+  support dynamic Index operands at preparation?
+- **Options**:
+  - (a) No. Both ledgers keep refusing dynamic Index operands at preparation,
+    and the refusal stays truthful. Resolver fixtures use statically admissible
+    Index lists. Their callback evidence comes from the Slice subject lambda
+    and reusable Part functions. Dynamic Index preparation admission stays
+    future work, together with the `RequiresUniformBound` ceiling in the
+    canonical occupancy plan.
+  - (b) Yes. Authorize `density.rs`, `prepare/builder.rs` and `prepare.rs` as
+    additional SONG-ISSUED-RESOLUTION writePaths. The issued ledger then passes
+    the retained canonical Index support for each site into the density walk.
+    The legacy ledger keeps refusing.
+- **Recommendation**: (a). The operator authorized only `density/index.rs`.
+  A density bound computed without retained evidence would be invented, which
+  the existing `Uncertifiable(DynamicTiming)` refusal already forbids.
+  The full objective (static Part code, an Index/Slice-sourced track, and
+  NeedsJointGeometry resolved on the issued path) does not need dynamic Index
+  values. Under (a), `density/index.rs` stays authorized but may stay
+  unedited.

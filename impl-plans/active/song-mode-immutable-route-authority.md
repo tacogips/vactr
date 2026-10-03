@@ -537,3 +537,288 @@ semantics. Only parent-subtree method visibility and module import changed;
 full extracted texts saved in immutable-route-authority-lookup-extraction-only-0001.json.
 Fresh issued clock, original counter and trusted copy bindings remain required.
 No production routing acceptance is inferred from this extraction.
+
+## Session 249 executable contract (wave 1)
+
+The source of truth is
+[the production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03),
+Wave 1 items 1-5. This section supersedes the earlier "Not Started" markers in
+the manifest table. The 37ea3e8 checkpoint already implements most of the
+deliverables.
+
+```json
+{
+  "planId": "SONG-ROUTE8",
+  "planPath": "impl-plans/active/song-mode-immutable-route-authority.md",
+  "wave": 1,
+  "dependsOn": [],
+  "writePaths": [
+    "src/song/snapshot/occupancy.rs",
+    "src/song/snapshot/occupancy/route_view.rs",
+    "src/song/snapshot/occupancy/lookup.rs",
+    "src/song/snapshot/occupancy/lookup/authority.rs",
+    "src/song/routing.rs",
+    "src/song/routing/prepare.rs",
+    "src/song/routing/prepare/builder.rs",
+    "src/song/routing/prepared.rs",
+    "impl-plans/active/song-mode-immutable-route-authority.md",
+    "tmp/song-mode-riela/session249-route8-intent.json",
+    "tmp/song-mode-riela/session249-route8-receipt.json",
+    "tmp/song-mode-riela/session249-route8-cohort.sha",
+    "tmp/song-mode-riela/session249-route8-build.log",
+    "tmp/song-mode-riela/session249-route8-clippy.log",
+    "tmp/song-mode-riela/session249-route8-nextest-focused.log",
+    "tmp/song-mode-riela/session249-route8-nextest-full.log",
+    "tmp/song-mode-riela/session249-route8-wasm.log",
+    "tmp/song-mode-riela/session249-route8-fmt.log"
+  ],
+  "sharedPaths": []
+}
+```
+
+### Intent and context
+
+The user wants static song code to produce a complete song that ends on its own.
+Production routing must use authenticated immutable authority, not copied public
+descriptors. Checkpoint 37ea3e8 already contains the following:
+
+- `RouteAuthorityView` (`route_view.rs:29`);
+- `TrustedRouteCopy` (`route_view.rs:37`);
+- `publish_route_authority` (`route_view.rs:265`);
+- `SongSnapshot::issue_route_authority` (`route_view.rs:386`);
+- `PreparedRoutes` and `prepare_routes_issued` (`prepared.rs:13`, `prepared.rs:33`);
+- `with_work` and `bind_issued_owner` (`lookup/authority.rs:194`,
+  `lookup/authority.rs:211`).
+
+Production does not call any of them yet. The author compile log
+`tmp/song-mode-riela/vactr-route-authority-author-compile-008.log` has 32
+dead-code warning lines.
+
+This wave finishes the slice:
+
+- legacy-compatible preparation;
+- input-size precharges on the issued path;
+- a pre-Reserve retention entry for later waves;
+- genuine owning fixtures;
+- the exact 947-input cohort.
+
+### Non-goals
+
+- Do not edit any file outside writePaths, including nested.rs,
+  nested/preparation.rs, snapshot.rs, routing/index.rs, the
+  host/scheduler/replay/clock files, editor/ and the three files with
+  pre-existing uncommitted edits.
+- Do not wire production callers. That happens in wave 3.
+- Do not write an issued resolver. That happens in wave 2.
+- Do not add varying-seed admission guards.
+- Do not add `allow` or `expect` lint attributes.
+- Do not change the public signature of `prepare_routes`.
+- Do not change any existing test's assertions.
+
+### File-level changes
+
+1. **`src/song/routing/prepare.rs`**
+   - Add a private enum `PreparationLedger { Legacy, Issued }`. It is visible
+     only in `prepare.rs` and `prepared.rs` (`pub(super)`).
+   - Thread it into `prepare_routes_metered` as an extra parameter.
+   - `Legacy`, used by `prepare_routes`, restores held0003 semantics exactly:
+     - It calls `nested::prepare_nested_covers(inventory,
+       &builder.source_covers, remaining)`, the legacy wrapper (see
+       `nested/preparation.rs:3`).
+     - It builds the plan topology with `inventory.clone()` instead of
+       `copy_inventory`. The original text is in the intent receipt,
+       `prepare.rs` original line 239.
+     - It applies no new precharges.
+   - `Issued` keeps `nested::prepare_nested_covers_metered` and
+     `route_view::copy_inventory`, and adds the precharges listed in item 2.
+   - This removes the dead-code warnings at `nested.rs:99` and
+     `nested/preparation.rs:3`.
+2. **Issued-only precharges**, in `prepare.rs` and `prepare/builder.rs`. Debit
+   the counter before each operation, using checked arithmetic. A failure keeps
+   the debit. Add a one-line comment documenting each bound:
+   - track/template setup: `root.tracks.len() * (inventory.buses.len() + 1)`;
+   - branch reservation loop: `branches.len() + 1`;
+   - master lookup: `buses.len() + 1`;
+   - `sidechain_routes` plus `source::validate_detectors`: tracks plus
+     branches plus sidechain controls, as an upper bound on its scans;
+   - chain-frame aggregation: tracks plus branches plus 1;
+   - instrument graph compilation: before each `Template::from_inst` call in
+     the instrument loop, charge that instrument's `nodes.len() + edges.len() +
+     node_params.len() + params.len() + 1` (checked), as the bound on
+     compilation traversal and diagnostics;
+   - bus default cell scan: per bus, `chain.len()` plus the sum of each unit's
+     `params.len()`, plus 1;
+   - bus chain compilation: per branch, the selected bus `chain.len()` plus the
+     sum of its units' `params.len()`, plus 1, charged before
+     `BusTemplate::from_def`. `chain_frames` is a free function, so charge at
+     the call site in the branch loop.
+
+   These charges apply only to `PreparationLedger::Issued`. `Legacy` stays
+   held0003-identical.
+
+   The design's remaining precharge operations are
+   already implemented at 37ea3e8 and must be kept, not duplicated: the
+   topology copy (`copy_inventory`, `route_view.rs`), the publication Capture
+   search (`publish_route_authority`), the site/policy binding scans
+   (`route_view.rs` trusted copy and binding methods), and the transcript
+   invocation find (`bind_issued_owner`, `lookup/authority.rs`). The worker
+   must confirm each still charges before the operation and record that
+   confirmation in the receipt.
+
+   Imitate the existing charge-before-call style in `builder.rs:15`
+   (`RouteBuilder::charge`) and `occupancy.rs:340` (`debit`).
+3. **`src/song/snapshot/occupancy.rs`**
+   - Add `pub(crate) fn canonical_song_requests(snapshot: &SongSnapshot,
+     limits: SongLimits, remaining: &mut u32, depth: u32) ->
+     Result<Vec<CanonicalIndexRequest>, Failure>`.
+   - For every Part scope and track whose Capture/Edit payload has
+     `index_timing()`, walk the recipe nodes from `root()`. Extend the prefix
+     with each `edge.trace()`. Collect every node whose `operation()` is
+     `FrozenUseOperation::Slice`, as `(issuer, prefix)`.
+   - Mint each request with `SongSnapshot::canonical_index_request` (existing,
+     `routing/index.rs:886`), using the window `[0, part duration)`.
+   - Imitate the walk in
+     `occupancy/geometry_tests/domains.rs:actual_list_repeated_slice_sites_keep_full_prefix_groups_distinct`.
+   - Charge one unit per visited node and per prefix term before visiting it.
+4. **`src/song/snapshot/occupancy/route_view.rs`**
+   - Add the pre-Reserve entry. It must be a descendant of the snapshot module
+     to reach the private `PreparedSong.snapshot`.
+
+     ```rust
+     impl PreparedSong {
+         pub(crate) fn issue_retained_route_authority(
+             &mut self, limits: SongLimits, remaining: &mut u32, depth: u32,
+         ) -> Result<Rc<RouteAuthorityView>, Failure>;
+     }
+     ```
+
+   - The order is: `canonical_song_requests`, then `retain_index_occupancy`,
+     then `issue_route_authority`, all on the same `remaining`.
+   - A `CanonicalIndexReadiness::RequiresUniformBound` result is not a refusal.
+     It is also not evidence of varying-seed support.
+   - A song with no Slice sites gets an empty request list and still issues a
+     view.
+   - Add the `#[cfg(test)] capture_test_route_authority` helper with the
+     signature already specified in this plan's progress log. It evaluates a
+     real candidate, issues the view through this entry, queries an issued
+     batch, and drops the `PreparedSong` before returning.
+5. **`src/song/routing/prepared.rs`**
+   - Keep the existing `prepare_routes_issued` and `PreparedRoutes` API.
+   - Pass `PreparationLedger::Issued`.
+   - Add a `#[cfg(test)] mod tests` block holding the bulk owning fixtures
+     listed below.
+   - The file must stay below 1000 lines. If the fixtures would push it over,
+     stop and record a plan amendment. Do not create an undeclared file.
+6. **`src/song/routing.rs`, `lookup.rs`, `lookup/authority.rs`,
+   `prepare/builder.rs`**: edit only what items 1-5 require (re-exports,
+   visibility). Delete any Route8 item that has no consumer in item 4 or in
+   the waves 2-3 table below.
+
+### Dead-code disposition after wave 1
+
+The non-test library may still warn only for the items in this table. Each
+item's planned consumer is listed. Any other warning fails this wave.
+
+| Item | Consumer |
+|---|---|
+| `LookupAuthority::Issued`, `with_work`, `bind_issued_owner` | wave 2 issued resolution |
+| `RouteAuthorityView` accessors, `TrustedRouteCopy`/`TrustedSiteCopy`/`TrustedPolicyCopy` methods, `slot_payload`, `PayloadSlot`, the `ViewSite`/`ViewPolicy` fields, `publish_route_authority`, `issue_route_authority` | `prepare_routes_issued` and `issue_retained_route_authority`, then wave 3 preparation |
+| `PreparedRoutes`, `PreparedSiteRef`, `PreparedPolicyRef`, `prepare_routes_issued`, `issue_retained_route_authority`, `canonical_song_requests` | wave 2 resolver and wave 3 Ready/preparation |
+
+### Key pitfalls
+
+- Do not route the legacy wrapper through the issued precharges or through
+  `copy_inventory`. Legacy output and refusal must be identical for every
+  existing test.
+- Never compare allocation addresses or scalar fields to grant authority.
+  Authority comes only from seal/token membership, which already exists.
+- On failure, nothing is published: no partial view, no partial
+  `PreparedRoutes`, and no retained records beyond those
+  `retain_index_occupancy` itself commits transactionally. Debited work stays
+  debited.
+- `prepare_routes_issued` must reject settings that differ from the original
+  Song. This check already exists (`prepared.rs:42`). Keep it ahead of any copy.
+- Do not hold a `RefCell` borrow of `SharedIndexWork` across
+  `transcript.authentic` or `transcript.invocation` (see `with_work`).
+
+### Tests to add (in `prepared.rs` `mod tests`, using genuine candidates)
+
+- A real Slice song goes through retention and is issued. The `PreparedSong` is
+  then dropped, and copied site/policy lookup succeeds through
+  `PreparedRoutes::site`/`policy`/`bind_original` with zero callback reads.
+- The same song goes through `issue_retained_route_authority`. The resulting
+  retained-record count equals the number of Slice sites found, and every
+  record's window is `[0, duration)`.
+- A song with no Slice sites gets a view with no records.
+  `prepare_routes_issued` succeeds, and `plan().branches` equals the branches
+  of legacy `prepare_routes`.
+- Legacy `prepare_routes` against the issued plan, for the same snapshot, gives
+  equal branches, tracks, `source_covers`, `nested_source_covers` and topology
+  descriptors.
+- Settings with a mutated tempo, tail or seed are refused before the copy is
+  made.
+- A foreign view's site or policy ref, a cloned-and-mutated `SongRoutePlan`, or
+  two swapped equal-looking policies are all refused.
+- Run view issuance, the trusted copy and `prepare_routes_issued` with exact
+  work and with one less. Exact work succeeds with `remaining == 0`. One less
+  fails, publishes no owner, and leaves the debit consumed. The fixture song
+  must declare at least one instrument graph and one bus chain used through
+  `instrument-fx`, so the new graph-compilation precharges are inside the
+  measured exact amount.
+- Depth at `max_depth - 1` is accepted where it should be. Depth at
+  `max_depth` is refused.
+- `bind_issued_owner` through the `with_work` bridge: a successful bind and a
+  foreign-transcript failure both leave the collector debited by the actual
+  spent amount. A prior debit is preserved.
+
+### Edit protocol (all waves use the same protocol)
+
+- Before the first edit, write `session249-route8-intent.json`. It contains:
+  the accepted design sha256, this plan's sha256, each writePath's sha256, and
+  the full original text of each writePath.
+- Before every edit, re-read the target fresh and compare its sha256 with the
+  last recorded value. If they differ, stop and reconcile from the current
+  file. Never restore a stale whole-file copy.
+- After the work is done, record post-edit hashes in the receipt.
+- Never run `cargo fmt` on the whole crate, `git stash`, `git checkout` or
+  `git reset`.
+- Update only this plan's status, checkboxes and progress log.
+
+### Verification (run in the foreground; record the exit status and full log path)
+
+- `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-route8-build.log 2>&1` must exit 0.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-route8-clippy.log 2>&1`
+  is expected to exit non-zero in this wave. Every diagnostic must be
+  `dead_code` or `unused_imports` on an item in the disposition table. Copy the
+  exact list into the receipt.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/prepared::tests|occupancy::|routing::nested::preparation::meter_tests/)' > tmp/song-mode-riela/session249-route8-nextest-focused.log 2>&1`
+  must exit 0 with a nonzero test count.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session249-route8-nextest-full.log 2>&1`
+  must exit 0. At least the held0003 425 tests must pass, plus the new ones.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-route8-wasm.log 2>&1`
+  must exit 0.
+- `rustfmt --edition 2021 --check src/song/snapshot/occupancy.rs src/song/snapshot/occupancy/route_view.rs src/song/snapshot/occupancy/lookup.rs src/song/snapshot/occupancy/lookup/authority.rs src/song/routing.rs src/song/routing/prepare.rs src/song/routing/prepare/builder.rs src/song/routing/prepared.rs > tmp/song-mode-riela/session249-route8-fmt.log 2>&1`
+  passes when the log has no `Diff in` line naming any of these eight paths.
+- Cohort: `git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session249-route8-cohort.sha`.
+  - It must contain exactly 947 lines.
+  - Compared with `route-preparation-meter-full-cohort-held-0003.json`, it adds
+    exactly route_view.rs, lookup/authority.rs and prepared.rs.
+  - Hash changes may appear only on the five existing Route8 paths, plus any of
+    the three pre-existing edited files (resources.rs, reservations_tests.rs,
+    clock_tests.rs). The receipt lists those three explicitly as pre-existing
+    drift.
+- `wc -l` on all eight paths: each must be below 1000.
+
+### Done criteria (mechanically checkable)
+
+- [ ] Build, focused tests, full tests and WASM all exit 0.
+- [ ] Clippy diagnostics are a subset of the disposition table.
+- [ ] The fmt log has no `Diff in` for any of the eight paths.
+- [ ] The cohort has 947 lines with exactly the three additions.
+- [ ] Every new test listed above exists and passes.
+- [ ] No `allow`/`expect` lint attributes were added. Check with
+  `git diff -- <eight paths> | grep -E '^\+.*#\[(allow|expect)'`, which must
+  print nothing.
+- [ ] Status stays In Progress, with a progress-log entry giving commands, exit
+  codes and log paths. It becomes Completed only after wave 3 removes the last
+  disposition-table warning (TASK-003 consumer criterion).

@@ -771,3 +771,135 @@ replacing collector executions. Root explicitly expands that Planning companion
 to four paths with song_replay.rs and charged authentic additive retention,
 preserving accumulated-state scope instead of a fresh-only collector shortcut.
 No additional Rust path is released into current Route8.
+
+## Session 249 batch contract (wave 4, serial finalization)
+
+The source of truth is the design section
+[Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03).
+This section governs only the session-249 batch. The SONG-16 manifest above
+stays the long-run song-mode reconciliation scope and is unchanged.
+
+### Batch wave DAG
+
+| Wave | planId | Plan | dependsOn |
+|---|---|---|---|
+| 1 | SONG-ROUTE8 | song-mode-immutable-route-authority.md | none |
+| 2 | SONG-ISSUED-RESOLUTION | song-mode-issued-route-resolution.md | SONG-ROUTE8 |
+| 2 | SONG-SHARED-WORK | song-mode-shared-issued-query-work.md | SONG-ROUTE8 |
+| 2 | SONG-STRUCTURAL-CLOCK | song-mode-structural-clock-hooks.md | SONG-ROUTE8 |
+| 3 | SONG-ISSUED-PLAYBACK | song-mode-issued-playback.md | SONG-ROUTE8, SONG-ISSUED-RESOLUTION, SONG-SHARED-WORK |
+| 4 | SONG-16 (this batch) | song-mode-reconciliation.md | all five above |
+
+Plans in the same wave have disjoint writePaths. `src/song/routing/prepared.rs`
+is written in waves 1, 2 and 3. `src/song/snapshot/occupancy/lookup/authority.rs`
+is written in waves 1 and 2. Each is edited only after the previous wave has
+joined.
+
+### Join protocol (after each wave, run serially by the root reviewer)
+
+1. Compare every writePath's current sha256 with the worker receipts. An
+   unexpected change is repaired serially here, never by another worker.
+2. Re-run that wave's gates once, serially, on the joined tree. Write the logs
+   to `tmp/song-mode-riela/session249-join<wave>-<gate>.log`.
+3. Cohort count projection, which the join receipt must confirm:
+   - 947 after wave 1;
+   - 952 after wave 2, adding `source/issued.rs`, `nested/issued.rs`,
+     `snapshot/issued/shared_work_tests.rs`, `song_clock/dispatch.rs` and
+     `song_clock/structural_tests.rs`;
+   - 953 after wave 3, adding `tests/song_issued_transport.rs`, or 954 if
+     `preparation/issued.rs` was needed.
+
+```json
+{
+  "planId": "SONG-16",
+  "batch": "session-249",
+  "planPath": "impl-plans/active/song-mode-reconciliation.md",
+  "wave": 4,
+  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK", "SONG-STRUCTURAL-CLOCK", "SONG-ISSUED-PLAYBACK"],
+  "writePaths": [
+    "impl-plans/active/song-mode-reconciliation.md",
+    "design-docs/specs/design-song-mode.md",
+    "impl-plans/README.md",
+    "tmp/song-mode-riela/session249-final-receipt.json",
+    "tmp/song-mode-riela/session249-final-cohort.sha",
+    "tmp/song-mode-riela/session249-final-build.log",
+    "tmp/song-mode-riela/session249-final-clippy.log",
+    "tmp/song-mode-riela/session249-final-nextest-focused.log",
+    "tmp/song-mode-riela/session249-final-nextest-full.log",
+    "tmp/song-mode-riela/session249-final-wasm.log",
+    "tmp/song-mode-riela/session249-final-fmt.log",
+    "tmp/song-mode-riela/session249-final-editor-test.log",
+    "tmp/song-mode-riela/session249-final-editor-build.log"
+  ],
+  "sharedPaths": [
+    "impl-plans/active/song-mode-immutable-route-authority.md",
+    "impl-plans/active/song-mode-issued-route-resolution.md",
+    "impl-plans/active/song-mode-shared-issued-query-work.md",
+    "impl-plans/active/song-mode-issued-playback.md",
+    "impl-plans/active/song-mode-structural-clock-hooks.md"
+  ],
+  "sharedPathNotes": [
+    {"path": "impl-plans/active/song-mode-immutable-route-authority.md", "intendedEdit": "Set Status Completed and tick the completion criteria only if the final gates pass. Keep the worker's progress log."},
+    {"path": "impl-plans/active/song-mode-issued-route-resolution.md", "intendedEdit": "Status and criteria reconciliation only, after the final gates."},
+    {"path": "impl-plans/active/song-mode-shared-issued-query-work.md", "intendedEdit": "Status and criteria reconciliation only, after the final gates."},
+    {"path": "impl-plans/active/song-mode-issued-playback.md", "intendedEdit": "Status and criteria reconciliation only, after the final gates."},
+    {"path": "impl-plans/active/song-mode-structural-clock-hooks.md", "intendedEdit": "Status and criteria reconciliation only, after the final gates."}
+  ]
+}
+```
+
+### Intent
+
+Produce the single authoritative final evidence that every acceptance signal of
+this batch holds on the joined tree. Then record it and reconcile the statuses.
+
+### Non-goals
+
+- This wave edits no Rust or test files. A gate failure is reported back to the
+  review loop with the log path; it is not fixed here.
+- Do not archive plans into `impl-plans/completed/` in this batch. Moving them
+  would break relative links in other active song-mode plans. Global archiving
+  stays deferred to song-mode completion, which also needs SM1, SM2 and the
+  other active plans.
+- Do not change the three pre-existing edited files. Do not run a crate-wide
+  format.
+
+### Final gates (run serially in the foreground; record the exit status and full log path in the final receipt)
+
+- `CARGO_TERM_QUIET=true cargo build > tmp/song-mode-riela/session249-final-build.log 2>&1` must exit 0.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/song-mode-riela/session249-final-clippy.log 2>&1` must exit 0.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_route_preparation --test song_source_routes --test song_end_to_end --test song_checker --test song_issued_transport --test song_export > tmp/song-mode-riela/session249-final-nextest-focused.log 2>&1`
+  must exit 0 with a nonzero count per binary.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/song-mode-riela/session249-final-nextest-full.log 2>&1`
+  must exit 0. The distinct-test count must be at least 425, the held0003 count.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/song-mode-riela/session249-final-wasm.log 2>&1` must exit 0.
+- `rustfmt --edition 2021 --check <every Rust file touched in waves 1-3> > tmp/song-mode-riela/session249-final-fmt.log 2>&1`
+  passes when no `Diff in` line names a touched file.
+- `npm --prefix editor run test > tmp/song-mode-riela/session249-final-editor-test.log 2>&1`
+  and `npm --prefix editor run build > tmp/song-mode-riela/session249-final-editor-build.log 2>&1`
+  must both exit 0. This is regression evidence against the held0003 frontend
+  baseline of 590 tests.
+- Cohort: `git ls-files -co --exclude-standard -z -- '*.rs' Cargo.toml Cargo.lock | xargs -0 shasum -a 256 > tmp/song-mode-riela/session249-final-cohort.sha`.
+  The count must equal the wave-3 join projection, and the only additions are
+  the declared new files. The three pre-existing edited files are reported
+  explicitly as pre-existing drift.
+- `wc -l` on every touched Rust file: each must be below 1000.
+
+### Documentation and status
+
+- Append a dated evidence checkpoint (about 15 lines) to the design section
+  "Production integration contract". It lists the gate exits, the log paths,
+  the cohort count and the SM1/SM2 outcomes.
+- Update the five plan statuses only if the final gates pass. Route8 becomes
+  Completed only when the clippy exit is 0.
+- Update the six corresponding lines in `impl-plans/README.md`.
+- Add one progress-log entry to this plan.
+
+### Done criteria
+
+- [ ] Every final gate exits 0, with full logs recorded.
+- [ ] The cohort count and its additions match the projection.
+- [ ] The design checkpoint is appended.
+- [ ] Statuses are reconciled.
+- [ ] No Rust or test file was edited in this wave. Check that
+  `git diff --stat` for wave 4 shows only the writePaths and sharedPaths.

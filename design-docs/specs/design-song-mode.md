@@ -963,3 +963,276 @@ through that handoff. It must preserve actual seed/entry/source-use context,
 cannot be reconstructed from handle or public note fields, and must not point
 back to an execution/clock that retains the same returned origins. A copied
 descriptor or an unused cloned view does not close this integration requirement.
+
+## Production integration contract: route authority to playback (2026-10-03)
+
+This section is the design baseline for the six-plan batch: immutable route
+authority, issued route resolution, shared issued query work, issued playback,
+structural clock hooks and reconciliation. It narrows the earlier review notes
+into executable boundaries. It does not replace function/Part composition, and
+it does not add a new abstraction layer. Earlier sections stay authoritative
+where this section is silent.
+
+### Starting state (checkpoint 37ea3e8)
+
+The Route8 slice compiles. Its author compile log
+`tmp/song-mode-riela/vactr-route-authority-author-compile-008.log` has 32
+warning lines, all dead code. Two of them are outside Route8. The legacy
+`prepare_routes` now goes through `prepare_routes_metered`, which calls
+`nested::prepare_nested_covers_metered`. That leaves the held0003 compatibility
+wrapper `prepare_nested_covers` (`src/song/routing/nested.rs:99`,
+`src/song/routing/nested/preparation.rs:3`) used only by tests. It also changes
+the legacy nested ledger: held0003 called the wrapper with
+`max_nodes = remaining after walk` and depth 0. Every other warning is a new
+Route8 item that no production code calls yet.
+
+### Wave order and path ownership
+
+Waves follow dependencies. Paths inside a wave do not overlap. Every path is a
+concrete file that the owning plan's manifest declares.
+
+| Wave | Plans | Declared paths |
+|---|---|---|
+| 1 | Immutable route authority | the exact eight Route8 paths |
+| 2 | Issued route resolution; shared issued query work; structural clock hooks | resolver eight, shared-work four (including `src/pattern/eval/song_replay.rs`), structural six |
+| 3 | Issued playback | five paths, including `src/sched/song/pools.rs` |
+| 4 | Reconciliation | its manifest (docs, plans, `tests/song_end_to_end.rs`) |
+
+Structural clock hooks are ready for wave 2 because their prerequisites (the
+canonical clock, sampling and query authority) are already accepted. Running
+them in wave 2 keeps wave 1's cohort an exact 947-input hold. `prepared.rs` and
+`lookup/authority.rs` belong to more than one plan. Only one wave edits them at a
+time.
+
+A file can only grow past 1000 lines if the plan first declares a cohesive
+child path. Today's near-limit files are `song_clock.rs` 994,
+`routing/source.rs` 983, `tests/song_end_to_end.rs` 916, `snapshot.rs` 905,
+`host/caps/song/preparation.rs` 903, `lookup.rs` 841 and `song_replay.rs` 828.
+If wave 3 would push `preparation.rs` past 1000 lines, the playback plan
+declares exactly one child (`src/host/caps/song/preparation/issued.rs`) before
+release. Nothing else is added implicitly.
+
+### Wave 1: completing immutable route authority
+
+1. **Restore the legacy nested ledger.** The private preparation core takes a
+   nested-ledger selection that only `prepare.rs` can see. Legacy
+   `prepare_routes` calls `nested::prepare_nested_covers` with held0003
+   semantics. `prepare_routes_issued` calls the metered variant with inherited
+   limits and depth. This fixes both out-of-manifest warnings without editing
+   nested paths. Legacy plans for every existing fixture must stay
+   byte-identical.
+2. **Input-size precharges.** Before each operation, charge its checked
+   upper-bound size against the caller's `remaining`. Failure keeps the debit and
+   publishes nothing. The operations are:
+   - track/template setup (root tracks times the bus scan);
+   - branch-demand aggregation;
+   - sidechain scans;
+   - `source::validate_detectors` and graph-compilation inputs (nodes, edges,
+     traversal and diagnostics);
+   - the final topology copy;
+   - the publication Capture track search;
+   - copy-site and copy-policy binding scans;
+   - the transcript invocation find (the measured authentication delta, which
+     is transcript length plus 1).
+
+   Document each bound at its call site. The legacy wrapper keeps its fixed
+   1,000,000/256 policy. Existing tests are the compatibility witness, and none
+   is edited or weakened.
+3. **Genuine owning fixtures.** The `#[cfg(test)]`
+   `capture_test_route_authority` lives in `route_view.rs`. Bulk assertions live
+   in `prepared.rs`. They must cover:
+   - real candidate evaluation, retained Index invocations and issued events;
+   - dropping PreparedSong and the evaluator, then resolving copied
+     site/policy/member geometry with callbacks disabled;
+   - refusal of foreign, cloned-and-mutated and swapped site/policy
+     references, and of mismatched settings (tempo, tail and seed);
+   - exact and one-less work/depth at view issuance, trusted copy and preparation;
+   - success and failure through the `with_work` bridge, keeping prior debits.
+4. **Dead-code disposition.** No `allow` or `expect` suppression may be added.
+   Every Route8 item either has a named consumer below or is deleted in wave 1:
+   - `LookupAuthority::Issued`, `with_work` and `bind_issued_owner`: consumed by
+     wave-2 resolution through the issued-index operand.
+   - `RouteAuthorityView`, the issuers, `TrustedRouteCopy` and the
+     site/policy copies: consumed by `prepare_routes_issued`.
+   - `PreparedRoutes` and its references: consumed by the wave-2 resolver and
+     wave-3 Ready/preparation.
+
+   Waves 1 and 2 record the strict Clippy run with its exact remaining warning
+   list. Any warning not listed above fails the wave. Strict all-target Clippy
+   with `-D warnings` must pass from wave 3 onward. The Route8 plan becomes
+   Completed only after wave 3 consumes it, which matches its own TASK-003
+   consumer criterion.
+5. **Exact 947 input cohort.** The held0003 cohort has 944 inputs (a path to
+   sha256 map in `route-preparation-meter-full-cohort-held-0003.json`).
+   `immutable-route-authority-source-intent-0001.json` records
+   `expected_full_cohort_after_three_new_children = 947`. The three added inputs
+   are `src/song/snapshot/occupancy/route_view.rs`,
+   `src/song/snapshot/occupancy/lookup/authority.rs` and
+   `src/song/routing/prepared.rs`. The wave-1 receipt lists exactly these three
+   additions. It lists changed hashes only for the five existing Route8 paths.
+   The other 939 hashes are unchanged.
+
+### Wave 2a: issued route resolution
+
+- **Entry point.** `PreparedRoutes::resolve_issued_event(batch, event_index,
+  work, depth)`. It first authenticates that the batch's original Song is the
+  same allocation as the view's original Song.
+- **Authenticate every contributor before reconciliation.** This covers every
+  invocation seal (through `transcript.invocation` plus `bind_issued_owner`) and
+  every source contribution. Each contribution's own augmented origin and each
+  of its member slots must authenticate against genuine transcript members and
+  the attested copied-policy binding. Discarded augmented origins are included.
+  Resolving only the surviving descriptor or the first branch is not allowed.
+- **Geometry.** Use the fresh rebound issued invocation clock, never the
+  retained one. Use the original source START for eligibility, full
+  configuration-group identity, and the connected union of uncut projected
+  wholes. Clip to the owner only after the union.
+- **Conflicts.** Contributors that resolve to conflicting routes fail. The
+  resolver returns no route and no partial result.
+- **Barriers removed only on the issued path.** The issued children route
+  `NeedsJointGeometry` (`nested.rs:293`) and `index_stage_configuration`'s
+  static-clock reconstruction into the canonical geometry consumer instead of
+  refusing. Public `resolve_route` keeps both barriers and its current outputs.
+- **No VM access.** A missing retained record is refused without VM or callback
+  access.
+- **Songs without Index use.** These resolve through the attested site/policy
+  bindings and the existing structural checks. The issued path must not refuse
+  a song just because it has no retained Index records.
+
+### Wave 2b: shared issued query work
+
+- `SongSnapshot` and `PreparedSong` gain `query_issued_with_work(span, work,
+  depth)`, as declared in the plan. The legacy remaining-taking API wraps them.
+- `ReplayView::seed_collection` becomes additive.
+  - It first checks that the ledger is attached to the same original Song.
+  - It precharges a checked `view.len * (prior.len + 1)`.
+  - It appends each view execution that is not already present by `Rc::ptr_eq`.
+  - A prior record that is not authentic fails without changing the ledger.
+- For a fresh, empty collector, the result and the charge (`view.len`) equal the
+  current behavior. The call sites in `occupancy.rs` and `query/issued.rs` keep
+  their counts.
+- Scalar equality never grants membership. A fresh-only collector is not an
+  acceptable substitute for additive retention.
+
+### Wave 2c: structural clock hooks
+
+Follow the plan's six-path manifest:
+
+- Extract dispatch first.
+- Euclid passes its actual step timing event to `with_structural_sample`.
+- Ply, Arp, Chop, Striate, LoopAt and Fit keep their child clocks unchanged.
+  Each of the seven removed barriers needs an evaluated or frozen Index fixture.
+  The fixtures must show callback-denied replay with no independent re-reads.
+- Chunk keeps its Unknown barrier. Issued resolution then refuses truthfully.
+
+### Wave 3: issued playback
+
+- **Preparation.** In `SongHostPreparation::prepare`, before `resources::build`
+  and any Reserve or upload, the steps are: retain the Index occupancy, then
+  `issue_route_authority`, then `prepare_routes_issued`. These replace today's
+  fixed 1,000,000 charge plus `prepare_routes`. The route stage uses a local
+  `u32` counter set to the smaller of the owner's remaining work and 1,000,000.
+  The actual debit is written back to `cleanup.remaining` on both success and
+  failure. A missing or foreign authority refuses before Reserve.
+- **Ready.** Ready owns `PreparedRoutes`. Public `routes()` returns `plan()`,
+  and public descriptor `query()` is kept.
+- **Scheduler `realize`.** It creates one `SharedIndexWork` per realization
+  window from the scheduler limits. It calls `query_issued_with_work` and sorts
+  envelopes by onset, then handle. It resolves every envelope and every
+  contributor before coalescing. Equal-handle events are coalesced only when
+  their descriptors are consistent and their authenticated routes are equal.
+  This replaces the handle-only `dedup_by`, the per-event `max_nodes/count`
+  allowance and the scalar `resolve_route` in production. No scalar fallback
+  remains.
+- **`pools.rs`.**
+  - A charged staging copy of the projection state is taken before allocation.
+  - Assignments and encoded commands go only into the stage.
+  - Commit swaps the stage in and pushes the commands only after the whole batch
+    succeeds.
+  - On any route, encoding, work or capacity failure, the stage is dropped and
+    the old pools, queue, cursor and pending receipts stay unchanged.
+  - Acknowledgement and generation semantics are unchanged.
+- **Varying seeds in static songs.** A static Song has a finite set of
+  placements. Pre-Reserve retention executes every `:vary` and `:same`
+  placement's first execution under the original ledger. Additive seeding
+  (wave 2b) keeps those executions across later queries. Runtime replay
+  therefore never needs an unseen seed, and missing records refuse without the
+  VM. Evidence needs two `:vary` repeats of a random-dependent Part that differ
+  musically while authenticating distinct executions. `:same` must reproduce
+  identical events. Runtime first-time execution of seeds unknown at
+  preparation is out of scope (see the user-QA file).
+
+### Requirement-level end-to-end evidence
+
+`tests/song_issued_transport.rs` (playback manifest) drives public preparation,
+Ready, the production scheduler and native export with one static program. The
+program contains:
+
+- reusable Part generator functions, including nested function reuse;
+- `sequence`, plus `part-repeat` with both `:same` and `:vary`;
+- `part-events` with `delete-event`, and `overwrite-region`;
+- `transform-instrument` with `lpf` on one instrument, and `instrument-fx` on
+  one instrument branch;
+- at least one Index/Slice-sourced track, so retained issued routing is
+  exercised.
+
+The test asserts:
+
+- the transport ends on its own with no cycle argument;
+- the frame count equals arrangement frames plus tail frames exactly;
+- the deleted event is absent and the region content is overwritten;
+- only the selected branch has the effect;
+- `:vary` repeats differ and `:same` repeats are equal;
+- route resolution performs no callback reads;
+- export produces a finalized WAV whose metadata matches.
+
+The existing `tests/song_end_to_end.rs` cases must pass unchanged through the
+issued scheduler. Helper-only tests do not count as this evidence. Wave 4
+re-runs the evidence, records it and updates all six plans.
+
+### Verification gates and evidence
+
+Run each command in the foreground. Write its full log to
+`tmp/song-mode-riela/session249-<wave>-<gate>.log` and record the exit status.
+
+- `CARGO_TERM_QUIET=true cargo build`
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` (must pass
+  from wave 3 onward; see the warning-list rule for waves 1 and 2)
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final
+  NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run`, the full suite plus a focused
+  run with `--test song_route_preparation --test song_source_routes
+  --test song_end_to_end --test song_checker`, and `--test
+  song_issued_transport` from wave 3
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown
+  --no-default-features --features host-wasm` (the WASM gate; see below for how
+  it was confirmed)
+- `rustfmt --edition 2021 --check <touched files>`
+
+The WASM command is confirmed by the held artifact
+`target/wasm32-unknown-unknown/debug/vactr.wasm` in
+`ROOT-editor-route-meter-20261003.json`, by the `cdylib` crate type, and by the
+build command documented in `editor/vite.config.ts`. That command needs
+`--no-default-features --features host-wasm`, because the default feature
+`host-native` enables native-only dependencies. rustfmt follows `mod`
+declarations into child files. The format gate therefore passes when rustfmt
+reports no `Diff in` hunk for any touched file. Hunks it reports for untouched
+child files are recorded, not fixed. Do not format the whole crate.
+
+Regression baseline: the 425 distinct Rust tests at held0003 must not regress.
+The cohort count rises only by declared new files. The projection is 947 after
+wave 1, 952 after wave 2, 953 after wave 3 and 953 after wave 4. Each wave
+receipt confirms the actual count.
+
+### Pre-existing working-tree edits
+
+`git diff` shows three uncommitted, unattributed modifications:
+
+- `src/song/snapshot/resources.rs`
+- `src/song/snapshot/reservations_tests.rs`
+- `src/sched/runtime/song/clock_tests.rs`
+
+All three are pure reformatting of test assertions and struct literals, with no
+semantic change. No plan owns them. Keep them unstaged and unmodified. Every
+wave commit stages explicit declared paths only, and no wave may format them.
+The wave-1 cohort audit compares their hashes with held0003 and attributes any
+difference to this pre-existing drift.

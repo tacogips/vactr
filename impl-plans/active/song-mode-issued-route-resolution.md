@@ -586,3 +586,16 @@ fmt and `wc -l` commands only if it was edited.
   `source.rs` <= 993 and every path < 1000.
 - [ ] `git diff 1ac457f -- <nine paths> | grep -E '^\+.*#\[(allow|expect)'`
   prints nothing.
+
+
+### Session: 2026-10-04 session 251 implementation attempt
+
+**Status**: Blocked pending an authorized ownership amendment.
+
+**Tasks completed**: Repaired the nested issued fixtures to use statically admissible Index lists, made both equal-handle branches Slice sites, and changed the resolver to pass each contextual seal through the selector binder rather than filtering seals using duplicated scalar owner fields. Temporary diagnostics were removed from the source after investigation. `grep -c "\[cut nil\]" src/song/routing/nested/issued.rs` returned 0. `src/song/routing/density/index.rs` remained authorized and unedited.
+
+**Verification**: Focused reruns did not pass. The latest isolated equal-handle test failed (exit 100; 1 run, 0 passed, 1 failed) in `tmp/song-mode-riela/session249-resolution-nextest-focused.log`: prepared scope 4 retained only issuer `NodeId(3516997820)` with child-1 prefix, while the original frozen pattern contains another Slice issuer `NodeId(3172401064)` with child-0 prefix. The selector cannot authenticate the missing record. A prior same-snapshot NeedsJointGeometry witness run in the same append-only log failed with `original source membership missing` instead of the required legacy barrier text. The full build, clippy disposition receipt, legacy focused binaries, full nextest, WASM and scoped fmt/line-count gates were not rerun after these edits.
+
+**Ownership blocker**: The observed missing request points to request de-duplication in `src/song/snapshot/occupancy.rs` (`CanonicalIndexRequest::same_execution` does not distinguish issuer/prefix for otherwise shared recipe/scope/window). That file is not in this plan's nine concrete writePaths, the fanout `writePaths`, or the current accepted amendment. Repairing it and adding a regression test requires an explicit plan/manifest ownership amendment. No edit was made to that file, and no selector or route-index security checks were relaxed. Resume after the accepted plan and dispatch manifest add that exact path and test location to owned writePaths, then preserve every distinct issuer/prefix request and rerun the focused requirements before the remaining gates.
+
+**Progress**: Assigned implementation remains incomplete. Do not mark TASK-002, TASK-003, or the session-251 done criteria complete. Evidence and per-edit snapshots are under `tmp/song-s249/SONG-ISSUED-RESOLUTION/session251/`.

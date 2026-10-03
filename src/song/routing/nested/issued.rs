@@ -557,14 +557,6 @@ fn issued_index_stage_configuration(
                             .ok_or_else(|| invalid("issued invocation replenished shared work"))?;
                         budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
                         bridge.synced_remaining = budget.remaining();
-                        let owner_frame = actual.lookup_owner();
-                        if owner_frame.root != stage.output_owner.payload().id
-                            || owner_frame.track != stage.handle.track()
-                            || owner_frame.revision != stage.handle.revision()
-                            || owner_frame.placement != *stage.handle.placement()
-                        {
-                            continue;
-                        }
                         let policy_limits = budget.limits();
                         let policy = prepared.policy(
                             site,
@@ -589,6 +581,9 @@ fn issued_index_stage_configuration(
                         })?;
                         budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
                         bridge.synced_remaining = budget.remaining();
+                        let Some(operand) = operand else {
+                            continue;
+                        };
                         let policy_limits = budget.limits();
                         let selected = operand
                             .policy()
@@ -775,7 +770,7 @@ mod tests {
 
     #[test]
     fn cached_nested_slice_events_resolve_from_issued_transcript() -> Result<(), Failure> {
-        let program = "fn cut beat:\n\tfirst [0]\nfn inner p:\n\tslice {beat -> p} 2 [cut nil]\nfn outer p:\n\tslice {beat -> p} 2 [cut nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inside {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inside :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
+        let program = "fn cut beat:\n\tfirst [0]\nfn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tslice {beat -> p} 2 [0 nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inside {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inside :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
         let (authority, batch) = capture(program)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;
@@ -839,8 +834,23 @@ mod tests {
 
     #[test]
     fn issued_joint_geometry_resolves_where_legacy_keeps_its_barrier() -> Result<(), Failure> {
-        let program = "fn cut beat:\n\tfirst [0]\nfn indexed p:\n\teuclid {slice {beat -> p} 2 [cut nil]} 1 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 4}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
-        let (authority, batch) = capture(program)?;
+        let program = "fn indexed p:\n\teuclid {slice {beat -> p} 2 [0 nil]} 1 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 4}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
+        let mut song = prepared_song(program)?;
+        let policy = limits();
+        let window = TimeSpan::new(Ratio64::ZERO, song.snapshot().duration())?;
+        let legacy_plan = crate::song::routing::prepare_routes(
+            song.snapshot(),
+            &crate::dsp::caps::CapabilitySet::native(),
+            &capacities(),
+        )?;
+        let legacy_event = song
+            .query(window, &policy)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| invalid("legacy NeedsJointGeometry fixture emits no event"))?;
+        let mut remaining = policy.max_nodes;
+        let authority = song.issue_retained_route_authority(policy, &mut remaining, 0)?;
+        let batch = song.query_issued(window, &policy, &mut remaining, 0)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;
         let event = batch
@@ -848,17 +858,24 @@ mod tests {
             .first()
             .ok_or_else(|| invalid("joint-geometry fixture emits no issued event"))?;
         routes.resolve_issued_event(&batch, 0, &work, 0)?;
+        assert_eq!(legacy_event.handle, event.handle, "same issued occurrence");
+        let legacy = super::super::source::resolve_route(
+            &legacy_plan,
+            &legacy_event,
+            limits(),
+        )
+        .expect_err("legacy public route keeps the NeedsJointGeometry barrier");
         assert!(
-            super::super::source::resolve_route(routes.plan(), event.descriptor(), limits())
-                .is_err(),
-            "legacy public route keeps the NeedsJointGeometry barrier"
+            legacy.message.contains("sampled context requires joint mapping geometry"),
+            "legacy refusal comes from the NeedsJointGeometry barrier: {}",
+            legacy.message
         );
         Ok(())
     }
 
     #[test]
     fn distinct_equal_handle_invocations_are_all_resolved() -> Result<(), Failure> {
-        let program = "fn cut beat:\n\tfirst [0]\nfn inner p:\n\tslice p 2 [cut nil]\nfn outer p:\n\tstack [{slice p 2 [cut nil]} {slice p 2 [cut nil]}]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inner-part {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inner-part :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
+        let program = "fn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tstack [{slice {beat -> p} 2 [0 nil]} {slice {beat -> p} 2 [0 nil]}]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inner-part {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inner-part :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
         let (authority, batch) = capture(program)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;
@@ -878,13 +895,21 @@ mod tests {
             event.invocations().len() >= 2,
             "coalesced event retains its distinct invocations"
         );
+        let remaining_before = work.borrow().remaining();
         routes.resolve_issued_event(&batch, index, &work, 0)?;
+        let remaining_after = work.borrow().remaining();
+        let minimum_seal_debit = u32::try_from(event.invocations().len())
+            .map_err(|_| invalid("invocation seal count overflow"))?;
+        assert!(
+            remaining_before.saturating_sub(remaining_after) >= minimum_seal_debit,
+            "each invocation seal is authenticated through caller work"
+        );
         Ok(())
     }
 
     #[test]
     fn partitioned_nested_issued_queries_equal_the_full_route_set() -> Result<(), Failure> {
-        let program = "fn cut beat:\n\tfirst [0]\nfn inner p:\n\tslice {beat -> p} 2 [cut nil]\nfn outer p:\n\tslice {beat -> p} 2 [cut nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inside {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inside :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
+        let program = "fn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tslice {beat -> p} 2 [0 nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inside {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inside :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
         let mut song = prepared_song(program)?;
         let policy = limits();
         let mut remaining = policy.max_nodes;

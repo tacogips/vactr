@@ -261,6 +261,17 @@ pub(crate) fn bind_issued_owner<'a>(
     work: &crate::pattern::eval::song_observation::SharedIndexWork,
     depth: u32,
 ) -> Result<RetainedOwnerAddress<'a>, Failure> {
+    bind_issued_owner_if_matching(selector, transcript, seal, work, depth)?
+        .ok_or_else(|| invalid("required issued execution is not retained at site"))
+}
+
+fn bind_issued_owner_if_matching<'a>(
+    selector: &IssuedOwnerSelector<'a, '_>,
+    transcript: &'a crate::pattern::eval::song_provenance::IssuedQueryTranscript,
+    seal: &'a Rc<crate::pattern::eval::song_provenance::InvocationSeal>,
+    work: &crate::pattern::eval::song_observation::SharedIndexWork,
+    depth: u32,
+) -> Result<Option<RetainedOwnerAddress<'a>>, Failure> {
     let view = selector.site.authority();
     let authority = LookupAuthority::Issued(view);
     let original_payload = with_work(work, |limits, remaining| {
@@ -276,11 +287,12 @@ pub(crate) fn bind_issued_owner<'a>(
     // invocation() authenticates again and then searches the same immutable vector.
     work.borrow_mut().charge(u64::from(charged_scan))?;
     let actual = transcript.invocation(seal, work, depth)?;
-    let candidates = with_work(work, |limits, remaining| {
+    let (matched_request, candidates) = with_work(work, |limits, remaining| {
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         budget.enter(depth)?;
         budget.charge(view.records().len() as u64 + selector.prefix.len() as u64 + 1)?;
         let mut candidates = Vec::new();
+        let mut matched_request = false;
         for record in view.records() {
             let request = &record.request;
             budget.charge(request.prefix.len() as u64 + 1)?;
@@ -303,6 +315,7 @@ pub(crate) fn bind_issued_owner<'a>(
             ) {
                 return Err(invalid("foreign original prepared site"));
             }
+            matched_request = true;
             for retained in &record.invocations {
                 let old = retained.lookup_owner();
                 let fresh = actual.lookup_owner();
@@ -329,8 +342,11 @@ pub(crate) fn bind_issued_owner<'a>(
                 candidates.push((request, retained.as_ref()));
             }
         }
-        Ok(candidates)
+        Ok((matched_request, candidates))
     })?;
+    if !matched_request {
+        return Ok(None);
+    }
     let mut found = None;
     for (request, retained) in candidates {
         if transcript.authentic_retained_invocation(view.original(), seal, retained, work, depth)? {
@@ -344,8 +360,7 @@ pub(crate) fn bind_issued_owner<'a>(
             found.get_or_insert(request);
         }
     }
-    let request =
-        found.ok_or_else(|| invalid("required issued execution is not retained at site"))?;
+    let request = found.ok_or_else(|| invalid("required issued execution is not retained at site"))?;
     with_work(work, |limits, remaining| {
         let mut budget = ProjectionBudget::new(limits, remaining)?;
         actual
@@ -353,11 +368,11 @@ pub(crate) fn bind_issued_owner<'a>(
             .retained_sources(actual.lookup_owner(), depth, &mut budget)?;
         Ok(())
     })?;
-    Ok(RetainedOwnerAddress {
+    Ok(Some(RetainedOwnerAddress {
         authority,
         request,
         invocation: actual,
-    })
+    }))
 }
 
 /// Authenticate the fresh invocation and bind the selected original request.
@@ -368,13 +383,15 @@ pub(crate) fn bind_issued_index<'a>(
     policy: Option<crate::song::routing::PreparedPolicyRef<'a>>,
     work: &crate::pattern::eval::song_observation::SharedIndexWork,
     depth: u32,
-) -> Result<IssuedIndexOperand<'a>, Failure> {
-    let owner = bind_issued_owner(selector, transcript, seal, work, depth)?;
+) -> Result<Option<IssuedIndexOperand<'a>>, Failure> {
+    let Some(owner) = bind_issued_owner_if_matching(selector, transcript, seal, work, depth)? else {
+        return Ok(None);
+    };
     let request = owner.request;
-    Ok(IssuedIndexOperand {
+    Ok(Some(IssuedIndexOperand {
         request,
         address: RetainedIndexAddress { owner },
         site: selector.site,
         policy,
-    })
+    }))
 }

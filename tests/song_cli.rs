@@ -14,7 +14,8 @@ impl Directory {
             .unwrap()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "vactr-song-cli-{stamp}-{}",
+            "vactr-song-cli-{}-{stamp}-{}",
+            std::process::id(),
             NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         std::fs::create_dir(&path).unwrap();

@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (session 257: temp-dir harness fix in tests/song_export.rs and tests/song_cli.rs, then one acceptance gate rerun with six exact 2a-owned allowed failures; see "Session 257 amendment")
+**Status**: In Progress (assigned implementation complete in session 257; workflow-owned reviews and downstream Chunk selection remain)
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -17,23 +17,24 @@ Do not invent an affine map for either category.
 - **Previous**: Accepted canonical clock, sampling and query authority work.
 - **Next**: Separate Chunk output-anchor selection proof and production adoption.
 
-The session-250 implementation follows the accepted six-path manifest below.
-Session 255 corrected the Euclid projection fixtures and the unsupported
-sampling fixture; focused structural tests, native build and WASM pass. The
-full suite completes with six issued-resolution failures, including one test
-outside the session's five explicitly allowed resolver failures. That source
-path is owned by the downstream issued-resolution plan.
+The implementation follows the accepted manifest below. Session 255 corrected
+the Euclid projection fixtures and unsupported-sampling fixture. Session 257
+added the authorized process ID to the export and CLI test temp-directory
+names. The acceptance rerun passed the focused, route-regression, harness,
+native and WASM gates; full nextest completed with only the six allowed
+SONG-ISSUED-RESOLUTION failures. Receipt:
+`tmp/song-mode-riela/session249-structural-receipt.json`.
 
 ## Proposed bounded manifest
 
 | Path | Deliverable | Status |
 |---|---|---|
 | `src/pattern/eval/song_clock.rs` | Extract dispatch and register children | Complete |
-| `src/pattern/eval/song_clock/dispatch.rs` (new) | Exhaustive dispatch; remove only proven barriers | In Progress |
-| `src/pattern/combinators/structure.rs` | Genuine Euclid sampling hook and subdivision evidence | In Progress |
-| `src/pattern/combinators/region.rs` | Chop/Striate/LoopAt/Fit owning behavior | Evidence pending; unchanged-time pass-through |
-| `src/pattern/combinators/music.rs` | Arp owning behavior | Evidence pending; unchanged-time pass-through |
-| `src/pattern/eval/song_clock/structural_tests.rs` (new) | Actual Index clock regressions | Session 255 D4 corrections pass focused tests |
+| `src/pattern/eval/song_clock/dispatch.rs` (new) | Exhaustive dispatch; remove only proven barriers | Complete |
+| `src/pattern/combinators/structure.rs` | Genuine Euclid sampling hook and subdivision evidence | Complete |
+| `src/pattern/combinators/region.rs` | Chop/Striate/LoopAt/Fit owning behavior | Complete; unchanged-time pass-through evidenced |
+| `src/pattern/combinators/music.rs` | Arp owning behavior | Complete; unchanged-time pass-through evidenced |
+| `src/pattern/eval/song_clock/structural_tests.rs` (new) | Actual Index clock regressions | Complete; session 257 gates pass |
 
 Six candidate paths. The current clock parent is994 lines and existing tests896;
 extract dispatch before additions and put bulk fixtures in the new child. Keep
@@ -87,35 +88,79 @@ LoopAt/Fit retain current sample-header speed encoding semantics.
 
 ### TASK-002: Actual sampling and unchanged child clocks
 
-**Status**: In Progress
+**Status**: Complete (session 257)
 **Parallelizable**: No; depends on TASK-001
 
 - [x] Euclid passes its actual step timing event to structural sampling.
 - [x] Remove exactly seven dispatch barriers; Chunk remains Unknown.
-- [ ] Preserve each operator's output wholes, controls and occurrence identities.
-- [ ] Keep Chunk Unknown until its separate selection proof is implemented.
+- [x] Preserve each operator's output wholes, controls and occurrence identities.
+- [x] Keep Chunk Unknown until its separate selection proof is implemented.
 
 ### TASK-003: Genuine clock and replay evidence
 
-**Status**: In Progress
+**Status**: Complete (session 257)
 **Parallelizable**: No; depends on TASK-002
 
-- [ ] Real evaluated/frozen Index fixtures cover all seven operators.
-- [ ] Cover empty subjects, nested Fast/Rev/weighted steps, half-open boundaries
+- [x] Real evaluated/frozen Index fixtures cover all seven operators.
+- [x] Cover empty subjects, nested Fast/Rev/weighted steps, half-open boundaries
   and sampling points, and exact partition invariance.
-- [ ] Callback-denied replay proves no independent ranking/source rereads.
-- [ ] Full actual operation exact/one-less work and inherited depth failures pass.
-- [ ] Preserve existing pattern operator, trace-ranking and song geometry tests.
-- [ ] Independent native/lint/WASM/format and relevant regression gates pass.
+- [x] Callback-denied replay proves no independent ranking/source rereads.
+- [x] Full actual operation exact/one-less work and inherited depth failures pass.
+- [x] Preserve existing pattern operator, trace-ranking and song geometry tests.
+- [x] Independent native/lint/WASM/format and relevant regression gates pass.
 
 ## Completion criteria
 
-- [ ] All three tasks and actual owning fixtures pass on unchanged held inputs.
-- [ ] Every removed barrier has actual canonical Index clock evidence.
+- [x] All three tasks and actual owning fixtures pass on unchanged held inputs.
+- [x] Every removed barrier has actual canonical Index clock evidence.
 - [ ] Chunk selection, routing consumption, pre-Reserve admission and useful
   varying seeds remain required for the full goal.
 
 ## Progress log
+
+### 2026-10-04 — Session 257 implementation and acceptance rerun
+
+Applied the operator-authorized harness fix in `tests/song_export.rs` and
+`tests/song_cli.rs`: `Directory::new` now includes `std::process::id()` before
+the existing per-process counter. Each diff is exactly 2 additions/1 deletion;
+assertion counts are unchanged (29 and 20), and the files are 197 and 160
+lines. The plan-local pre/post hashes and intended hunks are recorded under
+`tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/`.
+
+Session 257 acceptance gates passed: focused structural/combinator/domain
+selection 37/37; legacy route regression binaries 105/105; harness binaries
+10/10 and five repeated runs 50/50; native build and WASM build exit 0. Full
+nextest completed with 2,793 run, 2,787 passed, six failed and three skipped;
+the failure set is exactly the six allowed `SONG-ISSUED-RESOLUTION` tests, with
+no `song_export` or `song_cli` failure. Strict Clippy exits 101 with no
+diagnostic in a 2c path; all diagnostics map to Route8, RES or SW. Structural
+rustfmt `--check` reports only unchanged baseline hunks at
+`structural_tests.rs:30` and `:95`; both harness files pass `--check`. The
+cohort is 953, all Rust files are below 1,000 lines, frozen/unowned path checks
+and the prior five-path Rust-diff check pass. The receipt records the new
+session-257 fingerprint and full logs.
+
+Key commands and logs:
+
+- `CARGO_TERM_QUIET=true cargo build` — exit 0;
+  `tmp/song-mode-riela/session249-structural-build.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` — exit
+  101, zero 2c diagnostics;
+  `tmp/song-mode-riela/session249-structural-clippy.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast` — exit 100 under the exact six-ID allowance;
+  `tmp/song-mode-riela/session249-structural-nextest-full.log`.
+- `CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit 0;
+  `tmp/song-mode-riela/session249-structural-wasm.log`.
+- `rustfmt --edition 2021 --check` on declared structural paths — exit 1 on
+  unchanged baseline hunks; changed-line comparison passed. Harness-file
+  `rustfmt --check` exits 0. Both logs are in
+  `tmp/song-mode-riela/session249-structural-fmt.log`.
+- Focused, route regression, and harness commands and counts are recorded in
+  the receipt and `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session257/`.
+
+TASK-012 through TASK-015 are complete for this plan. Test-integrity,
+adversarial and integration review remain workflow-owned; the accepted
+manifest's downstream issued-resolution work is not part of this predecessor.
 
 ### 2026-10-04 — Session 256 acceptance rerun
 
@@ -1067,7 +1112,7 @@ Rewrite
 
 ### TASK-012: Gates, receipt and progress log
 
-**Status**: In Progress (unclassified downstream full-suite failure)
+**Status**: Complete (session 257; the export harness collision is fixed and the six-ID rule passes)
 **Parallelizable**: No (last)
 
 Run the steps and the verification below.
@@ -1241,7 +1286,7 @@ Only these six test IDs may fail. All are owned by SONG-ISSUED-RESOLUTION.
 
 ### TASK-013: Session 256 gate rerun, receipt and progress log
 
-**Status**: In Progress (session256 gates ran; V4 includes one out-of-allowlist failure)
+**Status**: Complete (superseded by session 257 acceptance rerun)
 **Parallelizable**: No (only 2c task this session)
 **Deliverables**: the eight `tmp/song-mode-riela/session249-structural-*`
 files and a progress-log entry in this plan.
@@ -1313,8 +1358,8 @@ Pitfalls:
 ### Session 256 done criteria (mechanically checkable)
 
 - [x] V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
-- [ ] The V4 failure set is a subset of the six IDs, and the log has a
-  `Summary` line.
+- [x] Session 256's out-of-policy export failure was diagnosed and fixed by
+  TASK-014; session 257 V4 now has only the six allowed IDs and a `Summary`.
 - [x] V3 has no 2c-path diagnostic, V7 has no hunk on changed lines, and V8
   meets the line budget.
 - [x] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session255/sha256.txt` exists,
@@ -1380,7 +1425,7 @@ equal `88f5120`. The run starts on the commit that records this amendment
 
 ### TASK-014: Temp-directory name gains the process id
 
-**Status**: Not Started
+**Status**: Complete (authorized `Directory::new` process-ID fix)
 **Parallelizable**: No (it runs before TASK-015 in the same serial sub-wave)
 **Deliverables**: one edited `format!` call in `Directory::new` of
 `tests/song_export.rs` and of `tests/song_cli.rs`.
@@ -1425,7 +1470,7 @@ Tests (input -> expected outcome):
 
 ### TASK-015: Session 257 gate rerun, receipt and progress log
 
-**Status**: Not Started
+**Status**: Complete (session 257 acceptance gates, receipt and progress log recorded)
 **Parallelizable**: No (depends on TASK-014)
 **Deliverables**: the eight `tmp/song-mode-riela/session249-structural-*`
 files, the session 257 scratch logs and one progress-log entry in this plan.
@@ -1503,16 +1548,16 @@ print a subset of the six IDs, and specifically no `song_export` or
 
 ### Session 257 done criteria (mechanically checkable)
 
-- [ ] S257-V1, S257-V2 and S257-V5 pass, and S257-V4 and S257-V6 print the
+- [x] S257-V1, S257-V2 and S257-V5 pass, and S257-V4 and S257-V6 print the
   expected values.
-- [ ] Session 256 V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
-- [ ] The V4 failure set is a subset of the six IDs, with no `song_export` or
+- [x] Session 256 V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
+- [x] The V4 failure set is a subset of the six IDs, with no `song_export` or
   `song_cli` test, and the log has a `Summary` line.
-- [ ] V3 has no 2c-path diagnostic. V7 and S257-V3 have no hunk on changed
+- [x] V3 has no 2c-path diagnostic. V7 and S257-V3 have no hunk on changed
   lines.
-- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session256/sha256.txt`
+- [x] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session256/sha256.txt`
   exists, and `attempt-session255/`, `session255/` and `session256/` are
   unchanged.
-- [ ] The receipt has `session: 257`, the two `harness-collision` fixes, and a
+- [x] The receipt has `session: 257`, the two `harness-collision` fixes, and a
   fingerprint different from every earlier one.
-- [ ] One progress-log entry is added.
+- [x] One progress-log entry is added.

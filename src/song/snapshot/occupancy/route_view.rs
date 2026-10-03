@@ -28,6 +28,7 @@ pub(super) struct PublishedRetainedIndex {
     pub(super) request: CanonicalIndexRequest,
     site: Rc<SiteSeal>,
     pub(super) invocations: Vec<Rc<OwnerInvocation>>,
+    pub(super) site_alias: bool,
 }
 pub(crate) struct RouteAuthorityView {
     original: Rc<Song>,
@@ -398,6 +399,7 @@ pub(crate) fn publish_route_authority(
                 },
                 site: site.seal.clone(),
                 invocations: record.invocations.clone(),
+                site_alias: record.site_alias,
             });
         }
     }

@@ -15,6 +15,7 @@ pub(super) enum LookupAuthority<'a> {
 pub(super) struct AuthorityRecord<'a> {
     request: &'a CanonicalIndexRequest,
     invocations: &'a [Rc<OwnerInvocation>],
+    site_alias: bool,
 }
 enum AuthorityRecords<'a> {
     Snapshot(std::slice::Iter<'a, super::RetainedCanonicalIndex>),
@@ -27,10 +28,12 @@ impl<'a> Iterator for AuthorityRecords<'a> {
             Self::Snapshot(records) => records.next().map(|record| AuthorityRecord {
                 request: &record.request,
                 invocations: &record.invocations,
+                site_alias: record.site_alias,
             }),
             Self::Issued(records) => records.next().map(|record| AuthorityRecord {
                 request: &record.request,
                 invocations: &record.invocations,
+                site_alias: record.site_alias,
             }),
         }
     }
@@ -94,7 +97,8 @@ pub(crate) fn owner_addresses<'s>(
     let mut addresses = Vec::new();
     for record in &snapshot.occupancy {
         budget.charge(record.request.prefix.len() as u64 + 1)?;
-        if !Rc::ptr_eq(&record.request.original, &snapshot.song)
+        if record.site_alias
+            || !Rc::ptr_eq(&record.request.original, &snapshot.song)
             || record.request.window.begin > request.window.begin
             || record.request.window.end < request.window.end
         {
@@ -410,6 +414,9 @@ impl<'s> RetainedIndexAddress<'s> {
                 let mut budget = ProjectionBudget::new(limits, remaining)?;
                 budget.enter(depth)?;
                 budget.charge(record.request.prefix.len() as u64 + 1)?;
+                if record.site_alias {
+                    continue;
+                }
                 if !Rc::ptr_eq(&record.request.original, self.owner.authority.original()) {
                     return Err(invalid("foreign configuration record attachment"));
                 }

@@ -395,6 +395,25 @@ pub(in crate::song::routing) fn canonical_index_configuration_issued(
 ) -> Result<Option<TimeSpan>, Failure> {
     let address = operand.address();
     let limits = budget.limits();
+    let own_rows = budget.with_remaining(|left| address.rows(depth, limits, left))?;
+    let mut matched = None;
+    for row in &own_rows {
+        let producer = row
+            .original_producer()
+            .ok_or_else(|| invalid("issued Index producer absent"))?;
+        budget.charge(producer.steps.len() + bound.timing.index_trace().len() + 1)?;
+        if producer.steps == bound.timing.index_trace()
+            && row.original_whole() == bound.timing.index_whole()
+            && row.issuer_start() == bound.timing.sample_start()
+            && matched.replace(row).is_some()
+        {
+            return Err(invalid("ambiguous issued Index event"));
+        }
+    }
+    let Some(matched) = matched else {
+        return Ok(None);
+    };
+    let limits = budget.limits();
     if let Some(selected) = selected {
         budget.with_remaining(|left| {
             bind_member(
@@ -418,23 +437,6 @@ pub(in crate::song::routing) fn canonical_index_configuration_issued(
         },
         budget,
     )?;
-    let limits = budget.limits();
-    let own_rows = budget.with_remaining(|left| address.rows(depth, limits, left))?;
-    let mut matched = None;
-    for row in &own_rows {
-        let producer = row
-            .original_producer()
-            .ok_or_else(|| invalid("issued Index producer absent"))?;
-        budget.charge(producer.steps.len() + bound.timing.index_trace().len() + 1)?;
-        if producer.steps == bound.timing.index_trace()
-            && row.original_whole() == bound.timing.index_whole()
-            && row.issuer_start() == bound.timing.sample_start()
-            && matched.replace(row).is_some()
-        {
-            return Err(invalid("ambiguous issued Index event"));
-        }
-    }
-    let matched = matched.ok_or_else(|| invalid("issued Index absent from retained invocation"))?;
     let limits = budget.limits();
     if !budget.with_remaining(|left| matched.source_eligible(depth, limits, left))? {
         return Ok(None);

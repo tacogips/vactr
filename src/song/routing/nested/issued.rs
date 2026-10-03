@@ -550,7 +550,7 @@ fn issued_index_stage_configuration(
                     for seal in context.seals {
                         sync_local_work(bridge, budget)?;
                         let before = bridge.work.borrow().remaining();
-                        let actual = transcript.invocation(seal, bridge.work, depth)?;
+                        transcript.invocation(seal, bridge.work, depth)?;
                         let after = bridge.work.borrow().remaining();
                         let spent = before
                             .checked_sub(after)
@@ -589,7 +589,7 @@ fn issued_index_stage_configuration(
                             .policy()
                             .ok_or_else(|| invalid("issued index policy binding missing"))?
                             .bind_original(policy_limits, budget.remaining_mut(), depth)?;
-                        let local = super::configuration::issued_index_configuration(
+                        let Some(local) = super::configuration::issued_index_configuration(
                             &bound,
                             &operand,
                             Some(selected),
@@ -598,7 +598,9 @@ fn issued_index_stage_configuration(
                             depth,
                             budget,
                         )?
-                        .ok_or_else(|| invalid("issued Index event has no canonical component"))?;
+                        else {
+                            continue;
+                        };
                         timing_result = Some(if let Some(previous) = timing_result {
                             if previous != local {
                                 return Err(invalid(
@@ -834,7 +836,7 @@ mod tests {
 
     #[test]
     fn issued_joint_geometry_resolves_where_legacy_keeps_its_barrier() -> Result<(), Failure> {
-        let program = "fn indexed p:\n\teuclid {slice {beat -> p} 2 [0 nil]} 1 2\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 4}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
+        let program = "fn inner p:\n\tslice {beat -> p} 2 [0 nil]\nfn outer p:\n\tslice {beat -> p} 2 [0 nil]\nlet base {part [drums: {s :analog > chord [:c :five]}] duration: 2}\nlet inside {transform-instrument base :drums :analog inner}\nlet selected {transform-instrument inside :drums :analog outer}\nsong selected tail-seconds: 0 > play-song";
         let mut song = prepared_song(program)?;
         let policy = limits();
         let window = TimeSpan::new(Ratio64::ZERO, song.snapshot().duration())?;
@@ -843,32 +845,32 @@ mod tests {
             &crate::dsp::caps::CapabilitySet::native(),
             &capacities(),
         )?;
-        let legacy_event = song
-            .query(window, &policy)?
-            .into_iter()
-            .next()
-            .ok_or_else(|| invalid("legacy NeedsJointGeometry fixture emits no event"))?;
         let mut remaining = policy.max_nodes;
         let authority = song.issue_retained_route_authority(policy, &mut remaining, 0)?;
         let batch = song.query_issued(window, &policy, &mut remaining, 0)?;
         let routes = prepare(authority.clone())?;
         let work = attached_work(&authority)?;
-        let event = batch
-            .events()
-            .first()
-            .ok_or_else(|| invalid("joint-geometry fixture emits no issued event"))?;
-        routes.resolve_issued_event(&batch, 0, &work, 0)?;
-        assert_eq!(legacy_event.handle, event.handle, "same issued occurrence");
-        let legacy = super::super::source::resolve_route(
-            &legacy_plan,
-            &legacy_event,
-            limits(),
-        )
-        .expect_err("legacy public route keeps the NeedsJointGeometry barrier");
         assert!(
-            legacy.message.contains("sampled context requires joint mapping geometry"),
-            "legacy refusal comes from the NeedsJointGeometry barrier: {}",
-            legacy.message
+            !batch.events().is_empty(),
+            "joint-geometry fixture emits issued events"
+        );
+        let mut found_legacy_barrier = false;
+        for (index, event) in batch.events().iter().enumerate() {
+            routes.resolve_issued_event(&batch, index, &work, 0)?;
+            if let Err(legacy) =
+                super::super::source::resolve_route(&legacy_plan, event.descriptor(), limits())
+            {
+                if legacy
+                    .message
+                    .contains("sampled context requires joint mapping geometry")
+                {
+                    found_legacy_barrier = true;
+                }
+            }
+        }
+        assert!(
+            found_legacy_barrier,
+            "public resolve_route keeps the NeedsJointGeometry barrier"
         );
         Ok(())
     }

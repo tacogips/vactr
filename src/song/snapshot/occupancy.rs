@@ -140,7 +140,7 @@ impl CanonicalIndexRequest {
             depth,
         })
     }
-    fn same_execution(&self, other: &Self) -> bool {
+    fn shares_execution(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.original, &other.original)
             && Rc::ptr_eq(&self.recipe, &other.recipe)
             && self.scope == other.scope
@@ -149,6 +149,9 @@ impl CanonicalIndexRequest {
             && self.root == other.root
             && self.window == other.window
             && self.depth == other.depth
+    }
+    fn same_execution(&self, other: &Self) -> bool {
+        self.shares_execution(other) && self.issuer == other.issuer && self.prefix == other.prefix
     }
     fn matches(&self, row: &CanonicalIndexObservation) -> bool {
         row.owner.revision == self.revision
@@ -171,6 +174,7 @@ pub(crate) struct RetainedCanonicalIndex {
     #[allow(dead_code)] // Metered cost evidence for the next immutable consumer.
     vm_instructions: u64,
     admitted_depth: u32,
+    site_alias: bool,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CanonicalIndexReadiness {
@@ -211,11 +215,15 @@ pub(crate) fn retain_index_occupancy(
             // A successful mint was authenticated through the original prepared
             // path. Strong immutable Song and recipe identities are retained.
             let mut cached = None;
+            let mut execution = None;
             for record in snapshot.occupancy.iter().chain(&pending) {
                 work.borrow_mut().charge(request.prefix.len() as u64 + 1)?;
                 if record.request.same_execution(&request) {
                     cached = Some(record);
                     break;
+                }
+                if !record.site_alias && record.request.shares_execution(&request) {
+                    execution.get_or_insert(record);
                 }
             }
             if let Some(record) = cached {
@@ -226,6 +234,56 @@ pub(crate) fn retain_index_occupancy(
                         "cached canonical depth exceeds caller",
                     ));
                 }
+                continue;
+            }
+            if let Some(record) = execution {
+                if record.peak_depth > limits.max_depth || record.admitted_depth > limits.max_depth
+                {
+                    return Err(Failure::new(
+                        FailCode::DepthExceeded,
+                        "cached canonical depth exceeds caller",
+                    ));
+                }
+                let mut copy_work = 1_u64;
+                for observation in &record.observations {
+                    let observation_work = event_copy_work(&observation.event)?
+                        .checked_add(observation.prefix.steps.len() as u64)
+                        .and_then(|count| {
+                            count.checked_add(observation.owner.placement.0.len() as u64)
+                        })
+                        .ok_or_else(|| invalid("canonical alias observation work overflow"))?;
+                    copy_work = copy_work
+                        .checked_add(observation_work)
+                        .ok_or_else(|| invalid("canonical alias copy work overflow"))?;
+                }
+                for call in &record.calls {
+                    copy_work = copy_work
+                        .checked_add(call.arguments.len() as u64 + 1)
+                        .ok_or_else(|| invalid("canonical alias call work overflow"))?;
+                }
+                copy_work = copy_work
+                    .checked_add(record.invocations.len() as u64)
+                    .and_then(|count| count.checked_add(request.prefix.len() as u64))
+                    .ok_or_else(|| invalid("canonical alias copy work overflow"))?;
+                work.borrow_mut().charge(copy_work)?;
+                limits.check_events(
+                    snapshot
+                        .occupancy
+                        .len()
+                        .checked_add(pending.len())
+                        .and_then(|count| count.checked_add(1))
+                        .ok_or_else(|| invalid("canonical cache length overflow"))?,
+                )?;
+                pending.push(RetainedCanonicalIndex {
+                    request,
+                    observations: record.observations.clone(),
+                    invocations: record.invocations.clone(),
+                    calls: record.calls.clone(),
+                    peak_depth: record.peak_depth,
+                    vm_instructions: record.vm_instructions,
+                    admitted_depth: record.admitted_depth,
+                    site_alias: true,
+                });
                 continue;
             }
             work.borrow_mut().target = Some(CanonicalIndexTarget {
@@ -291,6 +349,7 @@ pub(crate) fn retain_index_occupancy(
                 peak_depth: collector.peak_depth,
                 vm_instructions: collector.vm_instructions,
                 admitted_depth: limits.max_depth,
+                site_alias: false,
             });
         }
         // Publish only the complete successful batch. Moves retain strong

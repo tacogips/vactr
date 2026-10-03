@@ -494,3 +494,164 @@ fn native_structural_thunk_retains_same_meter_and_dependent_result() {
     assert!(matches!(cuts(record)[0].result, Value::Int(0)));
     assert!(record.vm_instructions > 0);
 }
+
+#[test]
+fn distinct_sites_sharing_one_execution_are_retained_separately() {
+    fn site_requests(
+        snapshot: &SongSnapshot,
+        limits: SongLimits,
+        remaining: &mut u32,
+    ) -> Vec<CanonicalIndexRequest> {
+        let scope = snapshot
+            .routing
+            .parts
+            .iter()
+            .position(|part| {
+                matches!(
+                    &part.node,
+                    super::super::FrozenPartNode::Edit {
+                        edit: super::super::FrozenEdit::Transform { .. },
+                        ..
+                    }
+                )
+            })
+            .expect("transformed owner");
+        let payload = match &snapshot.routing.parts[scope].node {
+            super::super::FrozenPartNode::Edit {
+                edit: super::super::FrozenEdit::Transform { payload, .. },
+                ..
+            } => payload,
+            node => panic!("expected transformed owner, got {node:?}"),
+        };
+        let recipe = payload.index_timing().expect("Slice timing recipe");
+        let mut pending = vec![(recipe.root(), Vec::<FrozenUseTraceTerm>::new())];
+        let mut sites = Vec::new();
+        while let Some((node_index, prefix)) = pending.pop() {
+            let node = &recipe.nodes()[node_index as usize];
+            if node.operation() == FrozenUseOperation::Slice {
+                sites.push((node.issuer(), prefix));
+            } else {
+                for edge in node.children() {
+                    let mut child_prefix = prefix.clone();
+                    child_prefix.extend_from_slice(edge.trace());
+                    pending.push((edge.child(), child_prefix));
+                }
+            }
+        }
+        assert_eq!(sites.len(), 2, "two authentic Slice sites");
+        assert_ne!(sites[0].1, sites[1].1, "site prefixes remain distinct");
+        let window = TimeSpan::cycle(0).expect("valid cycle");
+        sites
+            .into_iter()
+            .map(|(issuer, prefix)| {
+                snapshot
+                    .canonical_index_request(
+                        scope,
+                        intern_kw("drums"),
+                        issuer,
+                        &prefix,
+                        window,
+                        0,
+                        limits,
+                        remaining,
+                    )
+                    .expect("authentic request")
+            })
+            .collect()
+    }
+
+    let program = "fn cut beat:\n\tfirst [0]\nfn indexed p:\n\trepeat {slice {beat -> p} 1 [cut]} 2\nlet base {part [drums: {s :analog}] duration: 2}\nlet selected {transform-instrument base :drums :analog indexed}\nsong selected tail-seconds: 0 > play-song";
+    let limits = SongLimits::default();
+
+    let mut single = from_code(program);
+    let mut single_remaining = limits.max_nodes;
+    let single_request = site_requests(&single.snapshot, limits, &mut single_remaining).remove(0);
+    retain_index_occupancy(
+        &mut single.snapshot,
+        vec![single_request],
+        limits,
+        &mut single_remaining,
+    )
+    .expect("retain one site");
+    let single_addresses = lookup::owner_addresses(
+        &single.snapshot,
+        &single.snapshot.occupancy[0].request,
+        0,
+        limits,
+        &mut single_remaining,
+    )
+    .expect("single-site owner addresses");
+    let single_calls = single.snapshot.occupancy[0].calls.len();
+
+    let mut prepared = from_code(program);
+    let mut remaining = limits.max_nodes;
+    let requests = site_requests(&prepared.snapshot, limits, &mut remaining);
+    assert!(requests[0].shares_execution(&requests[1]));
+    assert!(!requests[0].same_execution(&requests[1]));
+    retain_index_occupancy(&mut prepared.snapshot, requests, limits, &mut remaining)
+        .expect("retain both sites from one execution");
+
+    assert_eq!(prepared.snapshot.occupancy.len(), 2);
+    let alias_addresses = {
+        let primary = &prepared.snapshot.occupancy[0];
+        let alias = &prepared.snapshot.occupancy[1];
+        assert!(!primary.site_alias);
+        assert!(alias.site_alias);
+        assert_ne!(primary.request.prefix, alias.request.prefix);
+        assert_ne!(
+            (primary.request.issuer, &primary.request.prefix),
+            (alias.request.issuer, &alias.request.prefix),
+            "complete retained site keys differ"
+        );
+        assert_eq!(primary.calls.len(), single_calls, "one callback journal");
+        assert_eq!(
+            alias.calls.len(),
+            single_calls,
+            "alias shares one execution"
+        );
+        assert_eq!(primary.invocations.len(), alias.invocations.len());
+        assert!(primary
+            .invocations
+            .iter()
+            .zip(&alias.invocations)
+            .all(|(left, right)| Rc::ptr_eq(left, right)));
+        let failure = primary
+            .replay_site(
+                &alias.request,
+                TimeSpan::cycle(0).unwrap(),
+                limits,
+                &mut remaining,
+            )
+            .expect_err("site alias is not a primary replay address");
+        assert!(failure.message.contains("foreign canonical replay address"));
+        lookup::owner_addresses(
+            &prepared.snapshot,
+            &alias.request,
+            0,
+            limits,
+            &mut remaining,
+        )
+        .expect("alias owner addresses")
+    };
+    assert_eq!(alias_addresses.len(), single_addresses.len());
+
+    let mut repeated = site_requests(&prepared.snapshot, limits, &mut remaining);
+    retain_index_occupancy(
+        &mut prepared.snapshot,
+        vec![repeated.remove(0)],
+        limits,
+        &mut remaining,
+    )
+    .expect("same primary site coalesces");
+    let mut repeated = site_requests(&prepared.snapshot, limits, &mut remaining);
+    retain_index_occupancy(
+        &mut prepared.snapshot,
+        vec![repeated.remove(1)],
+        limits,
+        &mut remaining,
+    )
+    .expect("same alias site coalesces");
+    assert_eq!(prepared.snapshot.occupancy.len(), 2);
+    assert_eq!(prepared.snapshot.occupancy[0].calls.len(), single_calls);
+    assert_eq!(prepared.snapshot.occupancy[1].calls.len(), single_calls);
+}

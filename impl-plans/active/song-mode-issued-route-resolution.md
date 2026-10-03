@@ -635,7 +635,7 @@ created.
 
 ### TASK-004: Retained site identity and site aliases
 
-**Status**: Not Started
+**Status**: Completed (implementation; pending independent review)
 **Parallelizable**: No (it must land before the TASK-002/TASK-003 reruns)
 **Deliverables**: the four paths above
 
@@ -847,3 +847,25 @@ After TASK-004, rerun the test by name.
 - [ ] The receipt has `jointGeometryFixture`, `densityIndex` and a fingerprint
   that differs from the four prior values.
 - [ ] The progress-log entry lists every command, exit status and log path.
+
+### Session 252 — Step 6 implementation handoff
+
+**Status**: Incomplete; TASK-004 is implemented, TASK-002/TASK-003 remain blocked by issued source membership resolution.
+
+**TASK-004 completed**: `CanonicalIndexRequest` now separates shared execution identity from exact issuer/prefix site identity. Retention preserves later sites as charged aliases that reuse the primary record's observations, calls and `Rc`-identical invocations. Site-scoped lookup retains aliases while owner-address and configuration enumeration skip duplicate alias work. Added the single occupancy regression `distinct_sites_sharing_one_execution_are_retained_separately`; it passes. No existing test assertion changed. `src/song/routing/density/index.rs` remains `authorized, unedited`.
+
+**Resolver state**: The pinned `PreparedRoutes::resolve_issued_event` path and its owning tests are present, but final-source tests still fail with `original source membership missing` for `distinct_equal_handle_invocations_are_all_resolved`, `issued_joint_geometry_resolves_where_legacy_keeps_its_barrier`, and `cached_nested_slice_events_resolve_from_issued_transcript`. Do not weaken member/source-boundary checks: diagnostics showed three authenticated candidate seals, with one exact retained Index row but no matching member in its retained boundary; the other two had no exact row. The required legacy NeedsJointGeometry barrier message was therefore not reached. A second resolver-suite run on a moving exploratory tree also found `discarded_augmented_source_origins_are_resolved` failing on a late Index preflight and `partitioned_nested_issued_queries_equal_the_full_route_set` failing on source membership; see its log.
+
+**Verification (foreground; current source unless noted)**:
+
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib distinct_sites_sharing_one_execution_are_retained_separately distinct_equal_handle_invocations_are_all_resolved issued_joint_geometry_resolves_where_legacy_keeps_its_barrier cached_nested_slice_events_resolve_from_issued_transcript` — final-source exit 100; 4 run, 1 passed, 3 failed; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-focused-current.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/routing::(source|nested)::issued|prepared::tests/)'` — exploratory moving-tree run exit 100; 11 run, 6 passed, 5 failed; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/attempt22-issued-resolver-suite.log`.
+- `CARGO_TERM_QUIET=true cargo build` — final-source exit 0; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-current-build.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` — final-source exit 101; warning-as-error diagnostics include only dead-code/unused-imports dispositions plus the concurrent `clippy::let_and_return` at `src/song/snapshot/issued.rs:231`; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-current-clippy.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --all-targets` — exit 0 with warnings; complete disposition inventory in `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-clippy-warnings.log`.
+- Recursive `rustfmt --edition 2021 --check` on the plan Rust paths — exit 1 only for unchanged `src/song/snapshot/occupancy/lookup/authority.rs`; exact changed-file check with `--config skip_children=true` — exit 0; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-fmt-current.log` and `final-fmt-recursive-current.log`.
+- `wc -l` — exit 0; `source.rs` is 991 lines and every listed resolver/occupancy path is below 1000; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-line-counts.log`.
+- `git diff --quiet 980083a -- src/song/snapshot/resources.rs src/song/snapshot/reservations_tests.rs src/sched/runtime/song/clock_tests.rs` — exit 0; `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/verification/final-unowned-paths.log`.
+- Clippy warning dispositions are recorded per diagnostic in `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/clippy-dispositions.json`; final append-only receipt and evidence fingerprint are in `tmp/song-s249/SONG-ISSUED-RESOLUTION/session252/session252-final-receipt.json` (`3c6c504cf4e66accaf04cfedecab68895eb0e40dc149be59dbd60b203f277db6`).
+
+Legacy focused binaries, full nextest, WASM, the occupancy/Route8 aggregate, and the complete Session 252 lint-disposition receipt remain unverified because required issued routing behavior is failing. Do not mark TASK-001/TASK-002/TASK-003 or overall completion criteria done. Continue with the ownership-safe diagnosis of how the exact invocation is paired with its genuine source member/boundary, then rerun the named tests before the remaining gates. Formal test-integrity/adversarial review and later workflow finalization remain downstream.

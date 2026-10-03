@@ -117,6 +117,41 @@ LoopAt/Fit retain current sample-header speed encoding semantics.
 
 ## Progress log
 
+### 2026-10-04 — Session 256 acceptance rerun
+
+Reran the assigned gates on Rust sources identical to `88f5120` (current HEAD
+`09fc99f8e4336c2be8db68040279e6cf572d6272` is the committed documentation
+checkpoint). No Rust implementation was changed. The focused structural,
+combinator and domains selection passed 37/37; native build passed; legacy
+route regression binaries passed 105/105; WASM build passed. Clippy exited 101
+with no diagnostic in a 2c path; all reported paths map to Route8, RES or SW.
+`rustfmt --check` exited 1 only for unchanged hunks at
+`structural_tests.rs:30` and `:95`; the `git diff -U0 c7083fb` comparison shows
+no overlap with changed lines. File counts are 939, 61, 470, 526, 442, 353,
+896 and 675; cohort is 953; frozen/unowned and V11 Rust-diff checks pass.
+
+Full nextest completed with 2,793 run, 2,786 passed, 7 failed and 3 skipped.
+Six failures are the exact allowed SONG-ISSUED-RESOLUTION IDs. The additional
+`fractional_song_and_tail_write_exact_partial_block` fails in
+`tests/song_export.rs:20` with `AlreadyExists`, outside this plan's writePaths
+and not in the six-ID allowance. Therefore TASK-012/TASK-013 remain In Progress;
+no out-of-scope test/source edit was made. The resume criterion is to assign an
+owner to triage the export regression, then rerun full nextest and confirm the
+failure set is a subset of the six allowed resolver IDs.
+
+Gate evidence: V1 focused (`exit 0`, 37/37) and V5 route regressions (`exit 0`,
+105/105) are in `tmp/song-mode-riela/session249-structural-nextest-focused.log`;
+V2 build (`exit 0`) in `session249-structural-build.log`; V3 strict Clippy
+(`exit 101`, 0 plan-path diagnostics) in `session249-structural-clippy.log`;
+V4 full nextest (`exit 100`, seven failures) in
+`session249-structural-nextest-full.log`; V6 WASM (`exit 0`) in
+`session249-structural-wasm.log`; V7 rustfmt (`exit 1`, unchanged-only hunks)
+in `session249-structural-fmt.log`. V8 line counts, V9 frozen/unowned paths,
+V10 cohort, and V11 no-Rust-diff results are in
+`tmp/song-s249/SONG-STRUCTURAL-CLOCK/session256/` and the session256 receipt.
+Archived session255 artifacts and their hashes remain in
+`attempt-session255/`; its original `session255/` directory was preserved.
+
 ### 2026-10-04 — Session 255 implementation handoff
 
 Applied the accepted D4 test corrections in `structural_tests.rs`: added the
@@ -1206,7 +1241,7 @@ Only these six test IDs may fail. All are owned by SONG-ISSUED-RESOLUTION.
 
 ### TASK-013: Session 256 gate rerun, receipt and progress log
 
-**Status**: Not Started
+**Status**: In Progress (session256 gates ran; V4 includes one out-of-allowlist failure)
 **Parallelizable**: No (only 2c task this session)
 **Deliverables**: the eight `tmp/song-mode-riela/session249-structural-*`
 files and a progress-log entry in this plan.
@@ -1277,15 +1312,15 @@ Pitfalls:
 
 ### Session 256 done criteria (mechanically checkable)
 
-- [ ] V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
+- [x] V1, V2, V5, V6, V9 and V11 exit 0, and V10 prints 953.
 - [ ] The V4 failure set is a subset of the six IDs, and the log has a
   `Summary` line.
-- [ ] V3 has no 2c-path diagnostic, V7 has no hunk on changed lines, and V8
+- [x] V3 has no 2c-path diagnostic, V7 has no hunk on changed lines, and V8
   meets the line budget.
-- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session255/sha256.txt` exists,
+- [x] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session255/sha256.txt` exists,
   and `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session255/` is unchanged.
-- [ ] The receipt has `session: 256`, `allowedFailures` with six IDs, and a
+- [x] The receipt has `session: 256`, `allowedFailures` with six IDs, and a
   fingerprint different from `391d811a...`.
-- [ ] One progress-log entry is added. Test-integrity, adversarial and
+- [x] One progress-log entry is added. Test-integrity, adversarial and
   integration review follow; they are owned by the workflow, not by this
   task.

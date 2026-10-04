@@ -130,3 +130,9 @@ Recommendation: use the explicit 15.3.7 workload and budgets, retain measured
 results by named hardware, and leave unavailable native/iPad, IME, accessibility
 and synchronization evidence unchecked. These evidence gaps do not require a
 new editor architecture or block code-free plan authoring.
+
+Update (2026-10-05, design 15.3.8.8): headless Chromium and WebKit use the
+gating profile H, and the iPad simulator uses launch and self-check profile S.
+The 15.3.7 product profile, which needs a physical iPad and acoustic capture,
+stays pending until the equipment questions above are answered. The evidence
+document lists each pending check with its procedure.

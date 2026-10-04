@@ -1,0 +1,299 @@
+# Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
+
+**Status**: Ready
+**Plan ID**: CANVAS-EVIDENCE (wave 3; depends on CANVAS-CLOCK, NATIVE, RENDER, MOUNT, VISUAL and SHELL)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds), 15.3.8.9 (gates and closeout)
+**Manifest**: impl-plans/active/canvas-cutover-dispatch.json
+**Created**: 2026-10-05
+**Last Updated**: 2026-10-05
+
+---
+
+## Intent and Context
+
+The user wants evidence that editing, audio sync, existing features and resource limits work
+together, using real browsers and numbers measured against the design thresholds. The platform
+limitations and the physical-iPad checks that cannot be done here must be recorded honestly.
+
+This plan builds a Playwright-library harness and produces the evidence document. It then
+performs the closeout archival.
+
+**Sandbox boundary.** The Codex sandbox cannot bind localhost, so the implementer authors and
+unit-tests the harness only. The outside-sandbox verification step runs the harness. With
+`--write-evidence`, the harness itself writes the raw data files and the result section of the
+evidence document, so no human-typed numbers are ever committed.
+
+Facts:
+
+- `playwright` 1.62.1 is a devDependency (library only; there is no `@playwright/test`).
+- The browsers are cached: chromium-1243 and webkit-2359.
+- The existing pattern to imitate is `editor/dev-harness/run-headless.mjs`: Node built-ins, a
+  127.0.0.1 ephemeral-port server, and exit codes 0 for pass, 1 for fail and 2 for blocked.
+  Also `editor/test/canvas/package-browser-smoke.mjs` (Playwright launch plus a WebGL2 probe).
+- The visual language form is `osc 20 > rotate 0.5 > out o0`
+  (`editor/test/wasm/criteria.test.ts:462`).
+- `RENDER_SIZE` is 640x360 (`editor/src/visual/mount.ts:21`). Four outputs `o0..o3` are used at
+  that shipping size. This is recorded as a deviation from the 15.3.7 "1024x1024" product
+  workload.
+- Perf hook from CANVAS-MOUNT (pinned in `impl-plans/active/canvas-cutover-mount.md`, section
+  "`window.__vactrPerf` contract"). Under `?perf=1`, the page exposes
+  `window.__vactrPerf { perf, revision(), ledger, doc(), selection(), presented(), onsets(), transportSample(), counters(), disposeCode() }`.
+  The harness reads only these members, through `page.evaluate`, and never touches other
+  internals.
+- `editor/tsconfig.json` has `"types": []` and `allowJs: false`, and there is no `@types/node`.
+  The vitest files in this plan therefore load the `.mjs` modules and `node:*` APIs only through
+  the non-literal dynamic-import pattern of `editor/test/support/wasm.ts:14-24,67`
+  (`(await import(/* @vite-ignore */ spec)) as LocalInterface`, with `spec` held in a variable),
+  each cast to a locally declared interface. No `.d.mts` files are added. The `.mjs` scripts
+  themselves are not type-checked, because `tsconfig` includes only `.ts`/`.tsx` sources plus
+  `worklet/host.d.ts`.
+
+## Non-goals
+
+- No new npm or Cargo dependency, and no lockfile change. Only a `"e2e"` script line is added to
+  `editor/package.json` `scripts`.
+- No product-code change. If the harness finds a defect, record it as a failed check. Do not
+  patch `editor/src` from this plan.
+- No physical-device claims.
+
+## Ownership
+
+writePaths: see the manifest entry `CANVAS-EVIDENCE`. It covers the harness files, the evidence
+document, the raw data files for run id `run-001`, `impl-plans/README.md`, and every closeout
+move source and destination as concrete paths.
+
+## Contracts
+
+- `node editor/test/e2e/run.mjs [--browser chromium|webkit|all] [--profile behavior|measure|all] [--out <dir>] [--write-evidence] [--headed-webkit]`
+- Exit codes:
+  - `0`: every gated check passed;
+  - `1`: a check failed or a threshold was missed;
+  - `2`: blocked (browser missing, `dist` missing, or AudioContext never running for a profile
+    that needs it). Blocked is never a pass.
+- `--write-evidence` writes these files under
+  `design-docs/specs/evidence/canvas-cutover/run-001/`:
+  - `environment.json`: host, OS, browser versions, WebGL vendor and renderer strings,
+    headless/headed mode, and audio state;
+  - `chromium-behavior.json` and `webkit-behavior.json`;
+  - `chromium-measure.jsonl` and `webkit-measure.jsonl`: per-sample records, under 2 MiB total;
+  - `summary.json`.
+
+  It also replaces the text between `<!-- EVIDENCE:BEGIN -->` and `<!-- EVIDENCE:END -->` in
+  `design-docs/specs/design-canvas-editor-evidence.md`.
+- `node editor/test/e2e/ios-sim.mjs --app <path.app> --device "<name>"` boots the simulator,
+  installs, launches with `SIMCTL_CHILD_VACTR_SELF_CHECK=1`, captures the `VACTR_SELF_CHECK`
+  line and a screenshot, and writes `run-001/ios-sim.json`. It exits 2 when there is no
+  simulator.
+
+## Tasks
+
+### TASK-001: Harness core (serve.mjs, run.mjs, stats.mjs, stats.test.ts)
+
+- `serve.mjs` serves `editor/dist` (built with `VACTR_REQUIRE_SESSION_ABI=1 npm run build`) on
+  `127.0.0.1:0`, with correct MIME types for `.wasm` and `.js`.
+- `stats.mjs` provides:
+  - `percentile(values, p)` using the nearest-rank method;
+  - `evaluate(summary, thresholds)`, where the thresholds are exactly the design 15.3.8.8 table;
+  - `renderEvidence(summary)`, which returns the markdown for the marker section.
+
+  It is pure, with no I/O.
+- `stats.test.ts` (vitest, `// @vitest-environment node`) covers these cases:
+
+| Situation | Expected outcome |
+|-----------|------------------|
+| `percentile([1..100], 95)` | 95 |
+| Input p95 of 51 ms | Input check fails |
+| Sync with provenance `estimate` | Reported, not gated |
+| Sync with provenance `unavailable` | Listed under limitations |
+| `renderEvidence` | Output contains every metric row and the run id; contains no non-ASCII characters |
+
+### TASK-002: Workload generator (fixtures/large-doc.mjs)
+
+- The generator uses a seeded PRNG (mulberry32, seed 265). It produces 20,000 lines of
+  1.0 MiB plus or minus 5% of UTF-8, and asserts both values.
+- The head is an evaluable program: a pattern layered to reach 64 concurrently sounding voices
+  (record the actual peak from `playing` telemetry), plus four visual chains ending in
+  `out o0`, `out o1`, `out o2` and `out o3`. Validate the program in
+  `editor/test/e2e/large-doc.test.ts` (`// @vitest-environment node`) through the real Wasm
+  `session_check` (imitate `editor/test/wasm/criteria.test.ts` loading), so it produces zero
+  error diagnostics. The same test asserts the line count, byte size and character mix.
+- The body is `#` comment lines plus inert `let` definitions. It includes Japanese, emoji, and
+  at least 50 lines over 400 columns.
+
+### TASK-003: Behavioral checks (behavior.mjs), per browser
+
+Each check is pass, fail or limitation, with the reason. These are the design 15.3.8.8
+behavioral checks:
+
+1. **Canvas-only text.** No visible text node in `.vact-code` contains the document text. The
+   bridge textarea computed color is transparent or opacity is 0. Canvas `readPixels` shows
+   non-background pixels at the line-1 rectangle. Hiding the canvas leaves no visible source.
+2. **Typing.** Typing, undo and redo, and word, line and document navigation change the
+   document and selection as expected. Read them with `__vactrPerf.doc()` and
+   `__vactrPerf.selection()`.
+3. **Clipboard.** Chromium: grant permissions and use the real clipboard round trip. WebKit:
+   synthetic `ClipboardEvent`, recorded as a limitation.
+4. **IME.** Chromium uses CDP `Input.imeSetComposition` with the preedit
+   U+306B U+307B U+3093 U+3054 ("nihongo" in hiragana), then `Input.insertText` U+65E5 U+672C U+8A9E
+   ("nihongo" in kanji). Write these as JS escapes in the harness. Assert one transaction and no shortcut during composition.
+   WebKit: synthetic composition events, recorded as a limitation.
+5. **Touch.** `hasTouch` context: tap places the caret, and a long press selects a word
+   (Chromium uses CDP `Input.dispatchTouchEvent`; WebKit uses synthetic pointer events, a
+   limitation). Assert that `selection()` is the word and that the last `presented()` record has
+   `handles === 2`.
+6. **Context loss.** `WEBGL_lose_context`: lose, then restore. `doc()` is unchanged, and
+   `counters().gpuStatus.kind` goes `context-lost` then `ready` (or `degraded`).
+7. **DPR.** deviceScaleFactor 1 and 2. On Chromium, also apply a CDP
+   `Emulation.setDeviceMetricsOverride` in the middle of the run.
+   `counters().gpuStatus.effectiveDpr` updates and `selection()` is kept.
+8. **Resize and keyboard inset.** Viewport resize, plus a simulated visual-viewport shrink: the
+   caret rectangle (`selection().head` mapped through the bridge textarea position) stays inside
+   the visible viewport.
+9. **Backgrounding.** Synthetic `visibilitychange` to hidden for 2 s:
+   - the `perf.snapshot().frames` count does not grow while hidden;
+   - on return, the first `presented()` record's `activeKey` equals the analytic set computed
+     from `onsets()` at that record's `audibleTime`;
+   - no record shows a range whose onset `end <= audibleTime`.
+10. **Dispose.** Keep `const ledger = __vactrPerf.ledger`, call `__vactrPerf.disposeCode()`,
+    then assert `ledger.usedBytes === 0` and that `window.__vactrPerf` is undefined.
+
+### TASK-004: Measurement profile H (measure.mjs)
+
+- Phases: 10 s warmup, a 60 s editing run (at least 500 keystrokes at about 10/s, plus scrolling
+  and selection), and a 120 s cycle run (edit, font, DPR and resize every 5 s, with
+  `page.evaluate` busy-waiting 250 ms every 10 s as the injected stall).
+- Video: `MediaRecorder` from a canvas, about 3 s at 1280x720, loaded through the visual pane
+  file input path (`setInputFiles` with the Blob saved to a temp file) or through `VideoBackground.load`.
+- Metric definitions. Every metric uses only `__vactrPerf` members, CDP, or page-level
+  Playwright APIs:
+
+| Metric | Source and computation |
+|--------|------------------------|
+| Input latency | `perf.snapshot().keys` `[timeStamp, revision]` and `frames` `[frameMs, workMs, text, revision]`. For each key, find the first frame with `revision` greater than the key's revision; latency is the next frame's `frameMs` (the presentation proxy) minus `timeStamp`. IME latency is reported separately (Chromium CDP composition keys). |
+| Frame work and interval | `frames[i].workMs`, split by `text`; the interval is the delta between consecutive `frameMs`, excluding the frames immediately after an injected stall |
+| A/V sync (model) | For each `onsets()` record `o`, take the first `presented()` record `p` whose `activeKey` contains `o.from-o.to` and whose `p.audibleTime >= o.time`. Then `onsetPageMs = p.targetMs + (o.time - p.audibleTime) * 1000`, and `error = next record's frameMs - onsetPageMs`. Gated only when `p.provenance === 'measured'`. An early flash is any record containing the range with `audibleTime < o.time - 0.002`. |
+| Late frames | A stall is a frame interval over 200 ms. For the first `presented()` record after each stall, compare `activeKey` with the analytic set (`onsets()` entries with `time <= audibleTime < end`, keyed `from-to`). Replayed flashes count records showing a range whose `end <= audibleTime`. Beat drift is `beatCycle` minus the analytic cycle from `transportSample()` (`cycle + (audibleTime - sample_time) * bpm / 60 / beats_per_cycle`) at the end of the run. |
+| Memory | `counters().ledger` maximum per cap and `counters().usedBytes`; Chromium heap through CDP `HeapProfiler.collectGarbage` then `Runtime.getHeapUsage`; WebKit is ledger-only (a limitation) |
+| Audio | Worklet underrun and drop counters if exposed by the page, otherwise "not exposed" (a limitation). Also copy `counters().highlight`, `counters().client` and `counters().probe` into `summary.json`. |
+- Fallbacks:
+  - if WebKit headless lacks WebGL2, rerun WebKit with `--headed-webkit` and record the mode;
+  - if the AudioContext is not running after the gesture, mark sync and audio as unavailable,
+    and give the profile exit 2 only when Chromium is affected.
+
+### TASK-005: Evidence document (design-docs/specs/design-canvas-editor-evidence.md)
+
+Follow the `design-doc` skill format. The document has these sections:
+
+- purpose and design link (15.3.8.8);
+- an environment section, generated from `environment.json`;
+- the generated results section between the markers. Before the run it reads
+  "PENDING RUN: no results recorded".
+- raw data paths;
+- platform limitations, including:
+  - native-tier Hydra unavailable;
+  - native-tier and iPad video background composition unavailable, because `GlRenderHost`
+    exists only on the browser tier (`editor/src/visual/mount.ts:59-66`);
+  - headless audio, IME, clipboard and touch emulation limits;
+  - simulator performance not representative;
+  - the 640x360 visual output size deviation;
+  - cpal host-reported latency semantics;
+- the pending physical-iPad checks, each with an exact procedure, equipment and pass criterion:
+  - Japanese hardware and software keyboard IME;
+  - touch handles;
+  - VoiceOver;
+  - audio unlock;
+  - interruption and resume (phone call or Siri);
+  - route change (headphones and Bluetooth) with latency re-provenance;
+  - orientation;
+  - 120 Hz ProMotion frame time;
+  - 10-minute sustained thermal animation;
+  - camera and microphone A/V sync capture with the 15.3.7 thresholds.
+
+### TASK-006: Closeout (after the verification run and final gates)
+
+- Move each superseded file from `impl-plans/active/` to `impl-plans/completed/` as concrete
+  paths (git mv semantics: create the destination with identical content plus the first line
+  `> Superseded 2026-10 by the canvas-cutover plans (design 15.3.8); historical only.`, then
+  delete the source). The files:
+  - `canvas-editor-224-clock.md`, `-consumers.md`, `-contracts.md`,
+    `-dependency-evidence.md`, `-editor-join.md`, `-execution.md`, `-gpu.md`, `-input.md`,
+    `-native-clock.md`, `-native-shell.md`, `-package-preparation.md`, `-state.md`,
+    `-telemetry.md`, `-verification.md`, `-visual.md`;
+  - `canvas-editor-224-dispatch.json`. JSON cannot hold a comment line, so add a top-level
+    `"supersededNote"` string instead.
+- Move the seven `canvas-cutover-*.md` plans to `impl-plans/completed/` with Status
+  `Completed`, after their criteria are checked. `canvas-cutover-dispatch.json` stays in
+  `active/` for the workflow record.
+- `impl-plans/README.md`: add the completed canvas-cutover entries and remove the active
+  canvas-editor-224 rows, if any. Change nothing else.
+- Design erratum (one paragraph, appended at the end of
+  `design-docs/specs/design-implementation.md` 15.3.8.4, nothing else edited). It states that
+  the implemented `clock-probe` wire keeps the pre-existing field names: request
+  `{ page_send }` (ms); reply `clock-probe { page_send, engine_receive, engine_send, epoch, correlation?, latency_seconds, latency_kind, uncertainty_seconds }`,
+  with `processing_time = (engine_receive + engine_send) / 2`. This is equivalent to the
+  amendment's `page_time_ms`/`processing_time`/`clock-probe-reply` naming.
+
+## Pitfalls
+
+- Committing numbers typed by hand. Only harness output goes between the markers.
+- Treating a blocked run (exit 2) or a timeout as a pass.
+- Claiming physical-device, real IME hardware, VoiceOver or acoustic results.
+- Exceeding 2 MiB of committed raw data. Downsample per-sample records if needed and say so in
+  `summary.json`.
+- Listing directories instead of files for the moves.
+- Reaching into product internals other than the pinned `__vactrPerf` members, or editing
+  `editor/src` to add a hook. A missing datum is recorded as a limitation.
+- A literal `import 'node:fs'` or `import './stats.mjs'` in the `.ts` tests, adding
+  `@types/node`, editing `tsconfig.json`, or using `@ts-nocheck`.
+
+## Verification
+
+Inside the sandbox:
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cd editor && npm run check` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run test/e2e` | stats and generator tests pass |
+| `node --check` on each `editor/test/e2e/*.mjs` | exit 0 |
+
+Outside the sandbox (verification and review step; logs in `tmp/canvas-cutover/evidence/`):
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | exit 0 |
+| `cd editor && npm run e2e -- --browser all --profile all --write-evidence` | exit 0, or exit 1 with the failures written to the evidence file (a missed threshold is reported, never hidden); exit 2 is blocked, never a pass |
+| `node editor/test/e2e/ios-sim.mjs --app <SHELL .app> --device "<iPad simulator>"` | `ios-sim.json` with the self-check line |
+
+Final gates on the closeout commit (design 15.3.8.9):
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cargo build` | exit 0 |
+| `cargo clippy --locked --all-targets -- -D warnings` | exit 0 |
+| Full nextest (timeout >= 1500 s) | all pass |
+| `cargo build --lib --target wasm32-unknown-unknown` | exit 0 |
+| `cd editor && npm run check` | exit 0 |
+| vitest | all pass |
+| e2e | as above |
+| `cargo check --manifest-path editor/src-tauri/Cargo.toml` | exit 0 |
+| `rustfmt --check` on touched Rust files | exit 0 |
+
+## Overwrite and Drift Protocol
+
+Record fresh-read sha256 values before each edit or move (`tmp/canvas-cutover/evidence/intent.json`)
+and after it (`receipt.json`). Closeout runs serially, after all other plans are accepted. Edit
+only this plan's progress log and the plan files being archived.
+
+## Completion Criteria
+
+- [ ] Harness and unit tests in place; `run.mjs` exit-code semantics as specified
+- [ ] Evidence document with the generated results section, raw data paths, limitations and
+      pending physical-iPad procedures
+- [ ] Simulator evidence recorded, or the exact blocker recorded
+- [ ] Closeout moves done file by file; README updated
+- [ ] Final gates recorded with exit codes and log paths
+
+## Progress Log
+
+### Session: 2026-10-05
+**Tasks Completed**: Plan authored

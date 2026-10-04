@@ -2,6 +2,12 @@
 
 This directory contains implementation plans that translate design documents into actionable implementation specifications.
 
+The [GPU canvas editor cutover](active/canvas-cutover-dispatch.json) is Ready (design 15.3.8, 2026-10-05). It supersedes the historical canvas-editor-224 chain. It runs in three waves:
+
+- Wave 1: [clock](active/canvas-cutover-clock.md), [native](active/canvas-cutover-native.md) and [render](active/canvas-cutover-render.md).
+- Wave 2: [mount](active/canvas-cutover-mount.md), [visual](active/canvas-cutover-visual.md) and [shell](active/canvas-cutover-shell.md).
+- Wave 3: [evidence and closeout](active/canvas-cutover-evidence.md).
+
 [Query-issued song authority](active/song-mode-issued-query-authority.md) is In Progress. Its reviewed eight-path scope is released for the live query/replay provenance bridge after accepted retained geometry.
 
 [Immutable route authority](completed/song-mode-immutable-route-authority.md) is Completed (session 261 final receipt).

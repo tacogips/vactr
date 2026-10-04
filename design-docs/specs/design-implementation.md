@@ -6103,6 +6103,8 @@ session or audio was never unlocked).
 **Status:** author proposal for independent adversarial review; no implementation,
 performance, accessibility or physical-device acceptance is claimed here.
 Historical issue #5 describes the baseline, not a newly supplied issue number.
+**Amended:** 2026-10-05 by 15.3.8 (cutover amendment); where 15.3.8 names a
+rule explicitly as superseding, it replaces the baseline text below.
 
 #### 15.3.1 Baseline and boundary
 
@@ -6358,6 +6360,759 @@ plan commit and non-force push precede implementation fanout; task-only final
 commit/push follow review and improve self-review. Preserve recorded MusicDSP,
 rumble and dirty shared-file hunks, assigning one owner for shared protocol edits.
 Missing device/measurement evidence stays unchecked even if build checks pass.
+
+#### 15.3.8 2026-10 cutover amendment
+
+**Issue reference:** `workflow-input:opus-luna-design-and-implement-review-loop-session-265`
+(no GitHub issue number). **Status:** author amendment for review (2026-10-05).
+This is a fresh run. It supersedes the canvas-editor-224 plan chain, which is
+historical only: its dispatch, snapshot, fingerprint and recovery contracts are
+not resumed or repaired. Sections 15.3.1 to 15.3.7 remain the baseline. This
+amendment fills six gaps found by audit: (a) song mode, (b) the completion
+popup, (c) format and tree-sitter syntax, (d) the frame scheduler and
+backgrounding, (e) ABI batch bounds and incremental deltas, and (f) the
+measurement protocol. It also freezes the cross-plan contracts that the
+canvas-cutover plans implement. Nothing here is a measured result.
+
+##### 15.3.8.1 Baseline check (repository state at c9e5a05)
+
+These facts were confirmed on 2026-10-05:
+
+- Fifteen production files import `@codemirror/view`. `code/mount.ts` still
+  builds an `EditorView` with `lineNumbers`, `lintGutter` and decorations.
+  `CodeApi.surface` is optional, and production never sets it.
+- The headless pieces exist and are tested in jsdom: `code/surface.ts`,
+  `history.ts`, `input.ts`, `keyboard.ts`, `pointer.ts`, `accessibility.ts`,
+  `renderer.ts`, `atlas.ts`, `layout.ts` and `resources.ts`. The renderer has
+  no frame loop.
+- `code/language.ts` (StreamLanguage, HighlightStyle) imports
+  `@codemirror/language`, which imports `@codemirror/view` itself.
+  `code/diagnostics.ts` imports `@codemirror/lint`.
+- `app/clock.ts` returns `currentTime` or `performance.now()`.
+  `code/highlight.ts` anchors native event times at receipt.
+- `src/session/publish.rs` emits `TransportSample` with
+  `latency_kind: "unavailable"`. `LevelsBody` has no timestamp.
+- The native audio callback in `src/host/native/audio.rs` (981 lines) ignores
+  `cpal::OutputCallbackInfo`. No `src/host/native/clock.rs` exists.
+- `vactr serve` (`src/cli/serve.rs`) owns the only native session loop.
+  `editor/src-tauri/src/main.rs` has 16 lines, no `lib.rs`, no IPC and no iOS
+  project.
+- The session-half Wasm outbox is drained after every ABI call. Its capacity is
+  unfixed (`fix_outbox(0)`), so per-call output is the effective bound.
+- `doc-changed` already carries composed byte changes rather than whole text.
+- Only the `playwright` 1.62.1 library is installed. `@playwright/test` is not.
+
+**Superseded baseline rules.** Each is replaced as stated below:
+
+- 15.3.6 expected `editor/src-tauri/src/clock.rs` and a Tauri-specific probe
+  command. Section 15.3.8.5 replaces these with a Session Protocol
+  `clock-probe` that both native transports use.
+- The 15.3.7 workload durations apply only to the physical-device and desktop
+  product profile. Section 15.3.8.8 defines the shorter headless gating
+  profile.
+- The suggested separate CONSUMERS plan is merged into MOUNT
+  (see 15.3.8.9).
+
+##### 15.3.8.2 Frozen code-surface contract and consumer migration
+
+`app/apis.ts` gets the final contract in the MOUNT plan. Offsets are UTF-16
+and coordinates are viewport CSS pixels.
+
+- `CodeApi.view` is removed, and `CodeApi.surface: CodeSurface` becomes
+  required.
+- `CodeSurfaceUpdate` adds `userEvent: string | null`, taken from the last
+  transaction's `Transaction.userEvent`. Annotation-only updates carry `null`.
+- `CodeSurface` adds three members:
+  - `addKeymap(bindings: readonly { key: string; run(): boolean }[], precedence?: 'highest' | 'default'): () => void`
+  - `onBlur(cb: () => void): () => void`
+  - `onCompositionStart(cb: () => void): () => void`
+- `CodeSurface` also adds
+  `registerNumericDrag(provider: (event: PointerEvent, pos: number) => NumericGesture | null): () => void`.
+  The `PointerController` consults these providers in its existing
+  `numericDrag` option.
+- `undo()` and `redo()` remain class methods on the surface, and so does
+  `annotationRanges()`.
+- The `CodeAnnotation.kind` union adds `'call-head'`. For this kind, `label`
+  carries the params group id, and the renderer never draws it as text. It
+  draws a subtle underline mark only.
+
+The key notation is the CodeMirror subset already in use: `Mod-`, `Shift-`,
+`Alt-`, `Ctrl-` and `Meta-` prefixes plus `KeyboardEvent.key`. If Alt or Shift
+changes the produced character, matching falls back to `KeyboardEvent.code`
+(so Shift-Alt-f still matches on macOS). `Mod` means Meta on Apple platforms
+and Ctrl elsewhere.
+
+Key dispatch runs in this order:
+
+1. `highest` bindings, used by the completion popup.
+2. `default` bindings, used by eval and format.
+3. The built-in `KeyboardController` commands.
+
+During composition, no keymap runs. A binding that returns true calls
+`preventDefault`.
+
+Selection-only and annotation updates still do not increment revisions.
+`DocumentSync.extension()` (the EditorView listener) is deleted, so
+`DocumentSync.apply` is reached only through `CodeSurface.dispatch`.
+
+**Consumer migration rules.** These replace every EditorView use. Each rule
+preserves the asserted behavior of the existing tests, and those tests are
+ported to the surface rather than deleted.
+
+- **(a) Song mode (`app/song.ts`).** `deps.code.surface.subscribe` is the only
+  document observer, and the `EditorView.updateListener` branch is deleted.
+  `applyWholeCode` reads `surface.state.doc`.
+  `store.songDocumentChanged(file, revision)` runs on every `docChanged`
+  update. A pending candidate whose revision differs flushes `doc-changed`
+  immediately, as it does today. Song-transport `playing` events use the same
+  highlight path as live events. `test/app/song.test.ts` drives
+  `surface.dispatch`.
+- **(b) Completion (`code/completion-view.ts`).** `attachCompletion(surface, engine)`
+  builds the existing UI-agnostic `CompletionSurface` from the contract above:
+  - `text` and `selection` come from `surface.state`.
+  - `replace` is a single transaction with the existing completion `userEvent`
+    and selection.
+  - `caretRect(pos)` is `surface.coordsAtPos(pos)`, which comes from renderer
+    layout and includes scroll and visual-viewport offsets.
+  - `isComposing` is `surface.compositionRange !== null`.
+  - The completion keys use `addKeymap(..., 'highest')`. Their handlers return
+    false while the popup is closed.
+  - `onBlur` and `onCompositionStart` come from the input bridge.
+  - The popup host stays `document.body`. It is a DOM panel outside the source
+    surface.
+  - On a viewport change (scroll, resize, DPR) while the popup is open, the
+    popup re-anchors on the next frame, and it closes if the caret is
+    offscreen.
+
+  `completion.ts`, `completion-popup.ts` and `completion-types.ts` keep their
+  behavior. No `@codemirror/autocomplete` is added.
+- **(c) Format (`code/format.ts`).**
+  - `formatDocument(surface, formatter)` reads `surface.state`. It aborts if the
+    text changed during the await, and otherwise dispatches one `minimalChange`
+    transaction with `userEvent: 'format'` (a single undo step).
+  - `formatKeymap` becomes a default-precedence `addKeymap` binding for
+    `Shift-Alt-f`.
+  - During composition, format is refused. It is not deferred.
+- **(c) Syntax (`code/syntax.ts`, `syntax-core.ts`, `language.ts`).** Syntax
+  becomes a span provider and is no longer a ViewPlugin.
+  - **Tree-sitter.** The provider keeps one `ParsedVact`. After a document
+    revision it reparses at most once per text phase (15.3.8.3) and is never
+    run per transaction. It uses `tree.edit` plus `parser.parse(text, oldTree)`
+    (incremental), with edits taken from the transaction change sets coalesced
+    since the last parse. Any reparse error falls back to a full parse.
+    `styleSpans` runs only for the visible line range plus one viewport of
+    overscan.
+  - **Fallback tokenizer.** Before tree-sitter loads, or after it fails to
+    load, the fallback runs the existing `vactParser` token rules through a
+    local line-stream class in `language.ts`, so `@codemirror/language` is not
+    imported. Per-line start state (the `inString` flag) is cached up to the
+    viewport end and truncated at the first changed line.
+  - **Output.** Spans go to the renderer as `syntax` annotations, with a cap of
+    16,384 spans per text phase. Text beyond the cap is still drawn, in the
+    default color, and a `syntax-truncated` counter is recorded. Text is never
+    omitted.
+  - **Removed.** `vactLanguage()`, `vactHighlightStyle` and
+    `treeSitterHighlighting(Extension)` are deleted. `codePane.dataset.syntax`
+    (`fallback`/`tree-sitter`) is kept.
+- **Eval (`code/eval.ts`).**
+  - Mod-Enter (form), Mod-Shift-Enter (whole) and Mod-. (hush) become
+    default-precedence keymap bindings.
+  - The 200 ms flash becomes an animation-layer range (15.3.8.3) and is no
+    longer a StateField decoration.
+  - Flush-before-eval and the stale-generation checks stay unchanged.
+- **Diagnostics (`code/diagnostics.ts`).**
+  - `setDiagnostics`/`lintGutter` become
+    `surface.annotate('diagnostics', ...)` with `kind: 'diagnostic'`, a
+    severity `className` and the message `label`.
+  - The GPU draws underlines and a severity marker in the line-number gutter.
+  - Hovering an underlined range (through `onPointer` and `posAtCoords`) shows
+    a DOM tooltip outside the text layer.
+  - The transport-bar listing and the debounced local check stay unchanged.
+  - Diagnostics count changes are announced through the accessibility status
+    region (bounded).
+- **Bind and params.** These rules cover every `CodeApi.view` use found by
+  `grep -rn 'code\.view\|code?\.view' editor/src` at c9e5a05:
+  `app/song.ts:78,127` (rule (a)), `bind/mount.ts:79-337`,
+  `params/mount.ts:186,259,305,314` and `params/roll.ts:93`.
+  - `bind/mount.ts` holds `code.surface` in place of `code.view`. The
+    `text`/`slice` callbacks use `surface.state.sliceDoc`, `lineOf` uses
+    `surface.state.doc.lineAt`, the whole-text and `Utf8Index` reads use
+    `surface.state.doc.toString()`, and the writes use `surface.dispatch`. It
+    passes the surface, not a view, to the drag and write dependencies.
+  - Runtime-overlay values (the `bind/drag.ts` `OverlayWidget` point widget
+    driven by `bind/mount.ts` `updateOverlays`) become zero-width
+    `surface.annotate('bind-overlays', [{ from: pos, to: pos, kind: 'binding', label: ' = <value>' }])`.
+    The GPU draws the label text right after `pos`. `setOverlays` and
+    `overlayField` are deleted, and an empty list clears the overlays on
+    dispose.
+  - `bind/drag.ts` uses `registerNumericDrag`. Normal selection is untouched
+    unless a provider returns a gesture.
+  - `bind/write.ts` and `bind/routing.ts` dispatch through the surface and use
+    `deferSourceWrite` for composing ranges.
+  - **Parameter call heads (`params/mount.ts`).** The `headField` decoration,
+    `setHeads` and the `EditorView.domEventHandlers` click handler are
+    replaced:
+    - `markHeads()` publishes `surface.annotate('params-heads', ...)`. Each
+      entry has `kind: 'call-head'`, `className: 'params-call-head'` and
+      `label` set to the group id, with the ranges sorted, non-empty and
+      mapped through `mapWireSpan` at `evalRev` as today. Heads are re-marked
+      only from an eval-result, as today, and `dispose()` clears the owner
+      with an empty list.
+    - Click-to-open subscribes to `surface.onPointer`. On a primary-button
+      `pointerup` that moved at most 5 px since its `pointerdown`, with no
+      numeric gesture active and no composition, the handler takes
+      `posAtCoords` and looks for a `call-head` range containing it. On a
+      hit, it runs `showTab('editors')` and `open(groupId)`.
+    - The handler never calls `preventDefault`, so caret placement proceeds
+      exactly as the current handler, which returns false, allows.
+    - Numeric-drag providers have precedence. A gesture that started a
+      numeric drag never opens a call head, and call heads (call names) do
+      not overlap numeric sites.
+    - `formText` reads `surface.state.sliceDoc(r.from, r.to)`.
+  - **Pointer forwarding.** `code/mount.ts` forwards the canvas
+    `pointerdown`, `pointermove`, `pointerup` and `pointercancel` events to
+    `onPointer` subscribers before the `PointerController` handles them.
+  - **Roll text (`params/roll.ts`).** `sourceText` reads
+    `code.surface.state.sliceDoc(r.from, r.to)`.
+  - **Test port (`test/params/open.test.ts`).** The port keeps both
+    assertions:
+    - The head-list assertion
+      (`['peq', 'env-adsr', 'euclid', 'odd', 'wobble']`) reads the
+      `call-head` entries of `surface.annotationRanges()` through `sliceDoc`.
+    - The "click on a call head opens envelope-shape" assertion dispatches a
+      synthetic `pointerdown`/`pointerup` pair inside the `env-adsr` head
+      range. It uses a `posAtCoords` stub, because jsdom has no layout. The
+      handle, open-button, `transport.sent` and text assertions stay
+      unchanged.
+  - All existing rate-limit, expected-text and stale-generation behavior stays
+    unchanged.
+- **Import guard.** A new vitest test, `editor/test/canvas/no-editor-view.test.ts`,
+  scans every `editor/src/**/*.{ts,tsx}` file. It fails on any import of
+  `@codemirror/view`, `@codemirror/lint`, `@codemirror/language` or
+  `@codemirror/autocomplete`, and on any `EditorView` identifier.
+  - `@codemirror/state` and `@codemirror/commands` (history, undo and
+    `isolateHistory`) stay allowed.
+  - `@codemirror/commands` declares `@codemirror/view` as a package
+    dependency. Bundled module code is therefore not claimed to be
+    view-free. The claim is limited to "no production import and no view
+    instance".
+  - `editor/package.json` and `package-lock.json` are not changed by this
+    migration. Unused direct declarations are left in place to avoid
+    lockfile churn.
+
+##### 15.3.8.3 Frame scheduler, backgrounding, DPR and resize (d)
+
+A new file, `code/frame.ts`, defines `FrameScheduler`. It is the single
+`requestAnimationFrame` owner for the code pane, and `code/mount.ts` composes it
+with the surface, `InputController`, `PointerController`, `CanvasRenderer` and
+`ResourceLedger`.
+
+The scheduler tracks two dirty classes:
+
+- **Text-dirty** is triggered by: a document revision; a selection, cursor or
+  composition change; a scroll or viewport change; size; DPR; font
+  generation; atlas generation or eviction; syntax-span revision; and
+  diagnostic or binding annotation changes.
+- **Animation-active** is true when playing highlights are non-empty or
+  changed, an eval flash is live, the caret blinks (530 ms phase), the beat
+  indicator is visible, or the background visual canvas published a new frame.
+
+The scheduler requests a frame only when something is dirty or active. An idle
+editor requests no frames.
+
+Each frame runs these steps in order:
+
+1. Sample the audible clock once (15.3.8.4).
+2. Update the highlight scheduler and the transport bar.
+3. If text is dirty, run the text phase: re-layout the visible runs, upload
+   missing atlas tiles, run the syntax provider, and rebuild and upload only
+   the dirty geometry ranges into the reused buffer.
+4. Composite: background texture (if it changed), selection, playing and eval
+   quads, the cached text geometry, underlines, the cursor, badges and
+   handles.
+
+Animation-only frames reuse the cached text geometry and perform no shaping or
+geometry upload. `renderer.stats.textBuilds` and `frames` prove the split.
+Playing, eval and beat ranges go to the renderer's animation layer through the
+scheduler. They do not use `surface.annotate`, so they cause no
+surface-subscriber notification and no accessibility refresh at frame rate.
+
+**Backgrounding.**
+
+- On `visibilitychange` to hidden, or on the page-lifecycle `freeze` event, the
+  scheduler cancels the pending rAF and schedules nothing more.
+- The video pauses, and the visual loop uses its existing `setVisible(false)`.
+- Audio is never suspended by the editor. Telemetry keeps arriving; its queues
+  stay bounded, and expired entries are pruned against the audible clock on
+  arrival.
+- On becoming visible again (or on `resume`), the scheduler marks size and DPR
+  for revalidation and requests one frame. That frame derives the active
+  ranges, beat and visual time from the current absolute audible time.
+  Expired events and flashes are dropped and never replayed.
+- If the browser suspended the AudioContext, the clock reports that the
+  correlation is invalid, and the indicators stay hidden until it is valid
+  again.
+
+**DPR and resize.**
+
+- A `matchMedia('(resolution: <dpr>dppx)')` listener is re-registered after
+  each change. It calls `renderer.resize(dpr)`, which recomputes the effective
+  DPR under the 4-million-pixel target cap (and shows a quality status when the
+  DPR is reduced), and invalidates the atlas.
+- A `ResizeObserver` on the code pane, and `visualViewport` resize and scroll
+  events, are coalesced into at most one backing-store resize per frame.
+  Superseded targets are released.
+- The virtual-keyboard bottom inset is
+  `innerHeight - (visualViewport.height + visualViewport.offsetTop)`. It is a
+  viewport change that keeps the caret visible above the inset.
+- Selection and scroll offsets persist across these changes.
+
+**Context loss and disposal.**
+
+- WebGL context loss stops the text and composite phases. Editing, the
+  accessibility bridge and save keep working. Restore rebuilds GPU resources
+  from CPU state and marks everything dirty.
+- If GPU init fails, the renderer reports `unavailable`. The status shows that
+  editing and save remain available. No visible DOM source fallback is shown.
+- `dispose()` cancels the rAF and timers, disconnects observers and media
+  listeners, releases pointer captures and the bridge nodes, deletes GPU
+  objects, and returns the ledger's `usedBytes` to 0.
+
+**Perf instrumentation.** The scheduler keeps a fixed ring of 4,096 frame
+records: rAF timestamp, work duration, text phase yes/no, and the document
+revision presented. It also records key-event timestamps. It is enabled only
+by `?perf=1` and exposed as `window.__vactrPerf`. When disabled, it performs no
+per-frame allocation.
+
+##### 15.3.8.4 Audible clock and telemetry contract
+
+`app/clock.ts` adds `AudibleClock`. `app/deps.ts` adds the optional field
+`EditorDeps.audible?: AudibleClock`. `deps.clock: Clock` keeps its current
+meaning, processing time, so MIDI learn and forward and every other scheduling
+user is unchanged.
+
+`AudibleClock` provides two methods:
+
+- `now()` returns the audible processing time, in seconds, at
+  `performance.now()`.
+- `sample(frameMs)` returns `{ time, epoch, provenance, uncertainty, valid }`
+  for the expected presentation time, `frameMs + lead`. The lead is the EMA of
+  rAF intervals, clamped to [8.3, 33.4] ms. Results are cached per `frameMs`,
+  so every rAF callback in one frame (code pane, visual loop, transport bar)
+  sees the identical value.
+
+`boot` creates the clock for each tier. Display users (highlights, beat, Hydra
+uniforms, scopes) read `deps.audible`. When `deps.audible` is absent (test
+fixtures), they wrap `deps.clock` with provenance `unavailable`, which
+preserves the current behavior.
+
+**Correlation sources:**
+
+- **Browser.** When `ctx.getOutputTimestamp()` returns finite positive
+  `contextTime` and `performanceTime`, `|pageMs - performanceTime| <= 1000`,
+  and `contextTime <= currentTime`, the audible time at `pageMs` is
+  `contextTime + (pageMs - performanceTime) / 1000`, with provenance
+  `measured` and uncertainty of one render quantum. No latency is subtracted
+  again.
+  - Otherwise, if `ctx.outputLatency` is finite and positive, the time is
+    `currentTime - outputLatency`, with provenance `estimate`.
+  - Otherwise the time is `currentTime`, with provenance `unavailable`
+    (uncompensated, and excluded from sync acceptance).
+  - The CLOCK plan must confirm that browser `playing` and `TransportSample`
+    times use the AudioContext processing-time domain of the session tick.
+    Any other domain is a blocking contradiction to report.
+- **Native, over IPC or WebSocket.** `ProbeCorrelation` sends the Session
+  Protocol request
+  `clock-probe { page_time_ms }` once per second. The reply is
+  `clock-probe-reply { page_time_ms, processing_time, epoch, latency_seconds, latency_kind, uncertainty_seconds }`
+  and uses the existing request/reply correlation. It is a control reply, so
+  it is never dropped as telemetry.
+  - At most 8 samples are kept, and samples with RTT over 100 ms are rejected.
+  - From the minimum-RTT sample:
+    `offset = processing_time - (page_time_ms + rtt / 2) / 1000`.
+  - The audible time is then `pageMs / 1000 + offset - latency_seconds`.
+  - The uncertainty is `rtt / 2 + uncertainty_seconds`, and the provenance is
+    the reply's `latency_kind`.
+  - Samples reset on an epoch change. The correlation is invalid if no valid
+    sample has arrived for 3 s.
+  - Receipt anchoring (`TimeAnchor` `receipt`) remains only for legacy peers
+    that lack probe support. It is labeled unsynchronized.
+
+**Transport position and indicators.**
+
+- **Position.** The position comes from the latest `TransportSample` in the
+  current epoch with `sample_time <= audible`. If none qualifies, the earliest
+  sample is extrapolated backward, by at most 1 s. While running,
+  `cycle = s.cycle + (audible - s.sample_time) * bpm / 60 / beats_per_cycle`.
+  While paused, the cycle holds. It is never advanced by counting frames.
+- **Hiding.** Indicators hide when the snapshot is older than 2 s or the
+  correlation is invalid.
+- **Beat flash.** The beat flash is visible only while
+  `audible - beatTime` is in [0, 0.08) s. A beat whose window passed between
+  frames never flashes.
+- **Playing highlights.**
+  - An entry is active while `time <= audible < end_time`. Legacy events
+    without `end_time` use `durSeconds` with the tempo at receipt.
+  - Entries whose epoch does not match are dropped, and so are entries more
+    than 2 s in the future.
+  - There are at most 4,096 entries, and hush clears them.
+- **Eval flash.** The eval flash is UI feedback timed on page time (200 ms),
+  not on the audio clock. It is not replayed after a stall.
+
+**Additive protocol fields** (protocol v1, all optional):
+
+- The `clock-probe` and `clock-probe-reply` pair.
+- `LevelsBody.time`: the processing time of the publishing tick, which is
+  `host_now`.
+- `LevelsBody.epoch`.
+
+Ownership is split by language. The Rust producer side (`protocol.rs`,
+`codec.rs`, `publish.rs`, `session.rs`) belongs to NATIVE. The TypeScript side
+(`protocol/types.ts`, `envelope.ts` validation, `client.ts` `clockProbe`)
+belongs to CLOCK. Each side tests against the literal JSON above. Validation
+requires finite, non-negative times and latencies, and an envelope of at most
+1 MiB.
+
+**Deterministic tests** (`editor/test/canvas/clock.test.ts` and ported
+highlight and transport tests) use a simulated page and context clock, 60 Hz
+frames with random drops, and injected 250 ms stalls. They assert:
+
+- Each frame's active ranges equal the analytic set.
+- Beat phase error stays at or below 1e-9 cycles over 5 simulated minutes.
+- The number of flashes equals the number of beat windows that intersect a
+  frame target, so missed beats produce no flash.
+- An epoch change clears pending entries.
+- Latency is not double-subtracted when `getOutputTimestamp` is valid.
+- Probe sampling selects the minimum RTT, rejects RTT over 100 ms, and hides
+  indicators once data is stale.
+
+##### 15.3.8.5 Native clock, Tauri desktop IPC and iOS shell
+
+**`src/host/native/clock.rs` (new).** `OutputClock` is a seqlock of
+`AtomicU64` values: sequence number, frames at callback start, callback
+`Instant` in nanoseconds since the clock origin, and the playback-minus-callback
+duration in nanoseconds.
+
+The cpal output callback writes it:
+
+- The callback calls `record(&info, frames_before)`, which does one
+  `Instant::now()` and five atomic stores. It never allocates, locks, or waits
+  on rendering.
+- The playback duration is `info.timestamp().playback.duration_since(&callback)`.
+
+The owner thread reads it:
+
+- `read()` returns an `OutputClockReading`:
+  `{ processing_time, latency_seconds: Option<f64>, latency_kind, uncertainty_seconds: Option<f64> }`.
+  The processing time is extrapolated as the frames at the last callback
+  divided by the sample rate, plus `min(elapsed, one buffer period)`.
+- A torn read retries up to 4 times, then reuses the previous reading.
+- The latency kind is assigned as follows:
+  - `measured`: the host-reported playback timestamp is present, and the
+    reading is at most 1 s old.
+  - `estimate`: there is no usable playback timestamp, so the value is the
+    buffer frames divided by the sample rate.
+  - `unavailable`: there is no stream, the stream is interrupted, or the
+    reading is stale.
+- The uncertainty is one buffer period.
+
+`measured` means host-reported. cpal on CoreAudio may exclude some device or
+safety-offset latency, so a physical acoustic check is listed as pending.
+
+**Native host changes.**
+
+- `audio.rs` is touched to add the callback hook. Because it would reach 1,000
+  lines or more, the cpal stream construction (`open_with_outputs`) moves to a
+  new submodule, `src/host/native/audio/stream.rs`.
+- `NativeHosts` exposes the `OutputClock` and an owner-thread-only stream
+  control with `suspend()` and `resume()` (cpal pause and play).
+- If resume fails, a visible diagnostic says that audio is unavailable and
+  the session must be restarted. Stream rebuilding is out of scope.
+
+**Session changes.**
+
+- A new `Session::observe_clock(reading)` stores the latest reading.
+  `publish.rs` fills the `TransportSample` latency fields from it. When it is
+  absent (the browser Wasm tier), the existing `unavailable` output is kept.
+- The session answers `clock-probe` from the reading that was observed
+  immediately before the request was applied.
+- `Session::clock_discontinuity()` starts a new transport epoch, clears
+  pending telemetry, and is used for interruption, resume and route change.
+
+**Session owner (`src/cli/owner.rs`, new public module).** `SessionOwner`
+spawns one control thread that builds the session (through the existing
+`build_session`) and runs the loop that is now inside `serve.rs`. `serve.rs`
+is reduced to the WebSocket adapter on top of this loop, so the CLI and Tauri
+share one loop.
+
+The loop:
+
+- applies texts and connection events from an `mpsc` channel;
+- before each `apply_text` and each 5 ms tick, calls
+  `observe_clock(output_clock.read())`;
+- handles `AudioInterrupted`, `AudioResumed` and `RouteChanged` events;
+- shuts down when it receives `Shutdown` and joins the thread.
+
+The audio callback never runs any of this work.
+
+**Desktop Tauri.** `editor/src-tauri/src/lib.rs` (new) holds the shared
+bootstrap, and `main.rs` becomes a thin call to `vactr_editor_lib::run()`. A
+new file, `src-tauri/src/session.rs`, provides three commands:
+
+- `session_connect(channel: tauri::ipc::Channel<String>) -> u32`, where each
+  routed envelope becomes one channel message;
+- `session_send(id, text)`;
+- `session_close(id)`.
+
+The owner is created lazily on the first connect and shut down on
+`RunEvent::Exit`. The capability allowlist adds only these commands. If the
+owner cannot start (for example, audio is unavailable), `session_connect`
+rejects with the diagnostic.
+
+`editor/src/protocol/tauri.ts` (new) implements `Transport` over `invoke` and
+`Channel` from the already-pinned `@tauri-apps/api`. `app/main.ts` selects the
+native tier with `TauriTransport` and `ProbeCorrelation` when `isTauri(win)`.
+If the connect is rejected, it shows the error and falls back to the browser
+Wasm tier. The `?session=` WebSocket tier keeps working and uses the same
+probe. `editor/src-tauri/Cargo.toml` gains
+`[lib] crate-type = ["staticlib", "cdylib", "rlib"]` and no new dependencies.
+
+**iOS.** The iOS project is generated with
+`tmp/canvas/tools/cargo-tauri ios init` (tauri-cli 2.11.5) and committed under
+`editor/src-tauri/gen/apple/`, excluding build outputs. The SHELL plan
+enumerates the generated files by a scratch init under `tmp/` before it fixes
+its writePaths.
+
+- **Entry point.** `lib.rs` adds `#[cfg_attr(mobile, tauri::mobile_entry_point)]`.
+- **Audio session glue.** This lives only in the generated `main.mm`, as
+  Objective-C before `start_app`:
+  - set the `AVAudioSession` category to playback and make it active;
+  - observe interruption-began, interruption-ended (with `shouldResume`) and
+    route-change notifications;
+  - forward each to the Rust C ABI `vactr_audio_session_event(kind: u32)`,
+    exported from `lib.rs` for iOS only, which posts the matching owner event.
+- **Background audio.** `Info.plist` sets `UIBackgroundModes = [audio]`, so
+  audio continues in the background while the WebView stops its rAF (handled
+  by 15.3.8.3).
+- **Safe area.** `editor/index.html` gets `viewport-fit=cover`, and
+  `env(safe-area-inset-*)` padding is applied to the app root.
+- **Self-check.** When `VACTR_SELF_CHECK=1` (passed as
+  `SIMCTL_CHILD_VACTR_SELF_CHECK=1`), the frontend invokes a `self_check`
+  command once after mount. It reports tier, WebGL2, renderer status,
+  effective DPR, audio-session state and latency kind. Rust prints that as one
+  JSON line to stderr, which `xcrun simctl launch --console-pty` captures.
+- **Restrictions.** There is no Swift UI, no provisioning profile, no signing
+  change and no upload. Only simulator builds are made (`cargo tauri ios build`
+  for `aarch64-sim`, or `xcodebuild -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO`),
+  and the exact command is recorded.
+- **Toolchain.** Rust 1.83.0 is tried first. If the simulator build fails only
+  because of the toolchain, a per-command `RUSTUP_TOOLCHAIN=1.98.1` is used for
+  that iOS build alone and recorded as a limitation. All repository gates
+  stay on 1.83.0.
+- **Crate check.** If `vactr` `host-native` (cpal, midir) does not compile for
+  `aarch64-apple-ios-sim`, the SHELL plan gates only the failing native
+  capability by `target_os = "ios"` and reports it as unavailable. It does not
+  stub audio.
+
+##### 15.3.8.6 Visual composition
+
+The Hydra frame loop (`visual/frame.ts`) calls `core.frame(t)` and
+`host.draw(t)` with `t = audibleClock.sample(frameMs).time`, so the musical
+uniforms follow audible time. It keeps its own rAF and its existing visibility
+pause.
+
+**Scopes (`visual/scopes.ts`).** Scopes keep up to 8 timestamped level frames,
+in latest-wins order. Each frame presents the newest one whose `time` is at or
+before the audible time. Frames without a timestamp are shown immediately and
+labeled unsynchronized. Frames older than 2 s hide.
+
+**Video background (`visual/video.ts`, new).**
+
+- **Source and playback.** Video comes from one user-selected local file
+  chosen with a DOM file input in the visual pane. It plays through a muted,
+  `playsInline`, looping `HTMLVideoElement` from an object URL. Autoplay
+  starts after a user gesture, and decode failure is shown in the visual pane
+  status. Video time is never the musical clock.
+- **Upload.** New frames are detected with `requestVideoFrameCallback`, or by a
+  `currentTime` change when that is unavailable. Each new frame is uploaded to
+  one reused texture at no more than 30 Hz. Frames larger than 1280x720 are
+  aspect-fit downscaled through one reused 2D canvas. The 1280x720x4 bytes are
+  reserved in the ledger before allocation.
+- **Pause and disposal.** Playback pauses when the page is hidden. Replacement
+  or disposal revokes the URL, clears `src`, calls `load()` to release the
+  decoder, and deletes the texture.
+- **Composition.** `GlRenderHost` draws the video as the base layer of the
+  visual canvas. Hydra output `o0` is drawn over it using its alpha, so
+  programs with alpha below 1 reveal the video, and the default opaque output
+  covers it. This adds no language syntax.
+
+**Backdrop.** The existing `VisualApi.onBackgroundCanvas(cb)` stays unchanged.
+The visual mount calls `cb(canvas)` again after each newly drawn frame, and the
+editor renderer treats each call as a new background revision. It uploads at
+most once per frame, and only after a call. MOUNT wires this subscription
+lazily, because `deps.visual` mounts after `code`. The beat indicator remains
+the transport-bar DOM panel driven by 15.3.8.4.
+
+##### 15.3.8.7 ABI and transfer bounds (e)
+
+These bounds are enforced and tested:
+
+| Path | Bound |
+|------|-------|
+| Document deltas | `doc-changed` carries only changed byte ranges and inserted bytes, composed per 200 ms debounce or forced flush. A test asserts that a one-character edit in a 1 MiB document yields a `doc-changed` payload under 256 bytes, with no whole-text transfer. |
+| Allowed whole-text transfers | Only these: open/reset, song apply, format, completion request, debounced local check. Completion and check allow at most one request in flight (latest wins), are skipped while composing, and never run per frame. Check is also skipped when the revision is unchanged. |
+| JS to Wasm per animation frame | Exactly one `session_frame` from the visual loop. No document text. |
+| Wasm to JS | The outbox is drained synchronously per ABI call. Per drained batch: playing events at most 4,096 and telemetry envelopes at most 1 MiB (both already validated in `envelope.ts`). The telemetry backlog stays at 64 (the existing `MAX_TELEMETRY_QUEUE`: coalesce tempo and levels, drop expired playing first). Control replies are never dropped. In-flight requests stay capped at 64 (the existing `MAX_PENDING_REQUESTS` busy rejection). Tests assert these existing caps under the 4,096-event load. |
+| Native IPC | One channel message per routed envelope. Per 5 ms tick, at most one tempo, one levels, and playing events up to 4,096. Probe replies and other control replies are never coalesced. |
+| Frontend queues | Highlight entries at most 4,096, future horizon 2 s, scope frames 8, probe samples 8. Overflow and drop counters are exposed in status and in `__vactrPerf`. |
+| GPU per frame | Atlas tile uploads at most 1 MiB (the remainder draws on later frames under a `text-pending` status, and is never omitted); geometry uploads only dirty ranges within the 8 MiB staging cap; background canvas upload at most 1; video upload at most 1 per new video frame, at most 30 Hz. |
+| GPU and CPU caps | As in 15.3.5, enforced by `ResourceLedger` reservation tests: atlas 16 MiB, geometry and staging 8 MiB, layout cache 8 MiB, targets 4 million pixels, total at most 96 MiB, history 32 MiB, UTF-8 indexes 8 MiB. |
+
+##### 15.3.8.8 Measurement protocol and thresholds (f)
+
+**Harness.** The harness is a set of plain Node scripts in `editor/test/e2e/`
+that use the installed `playwright` library. It adds no `@playwright/test`
+and no new dependency. The scripts serve the built `dist` from a `node:http`
+server on 127.0.0.1 with an ephemeral port, and run outside the Codex sandbox.
+An `e2e` entry in `package.json` `scripts` is allowed and is not a dependency
+change.
+
+**Behavioral checks** (Chromium and WebKit, each pass or fail):
+
+- **Canvas-only text.** No visible DOM text node in the code pane contains
+  document text. The bridge textarea is transparent. Canvas pixel readback
+  shows glyph pixels at line positions, and hiding the canvas leaves no visible
+  source.
+- **Editing.** Typing, undo and redo, and word, line and document navigation
+  work.
+- **Clipboard.** On Chromium, clipboard permissions are granted and the real
+  clipboard is used. On WebKit, synthetic `ClipboardEvent` events are used,
+  and this is labeled as a limitation.
+- **IME.** On Chromium, Japanese composition is driven with CDP
+  `Input.imeSetComposition` and `Input.insertText`. On WebKit, only synthetic
+  composition events are possible, which is a limitation.
+- **Touch.** Contexts use `hasTouch`. Tap and long-press work on Chromium
+  through CDP touch events. WebKit uses synthetic pointer events (a
+  limitation).
+- **Context loss.** `WEBGL_lose_context` loses the context and then restores
+  it, and the document is unchanged afterward.
+- **DPR.** A deviceScaleFactor of 1 and of 2, plus a CDP metrics override in
+  the middle of a run on Chromium.
+- **Resize and keyboard.** Window resize, plus a `visualViewport` inset
+  simulated by viewport resizing.
+- **Backgrounding.** A synthetic `visibilitychange` must leave zero rAF
+  callbacks while hidden and produce no replayed flash on return.
+- **Disposal.** After dispose, `usedBytes` returns to 0.
+
+**Workload.** A seeded generator, `editor/test/e2e/fixtures/large-doc.mjs`,
+builds a 20,000-line document of 1.0 MiB plus or minus 5% of UTF-8. It
+includes Japanese, emoji, at least 50 lines over 400 columns, and a leading
+evaluable program with 64 sounding voices and four 1024x1024 synth outputs.
+The 720p video is produced in the page by `MediaRecorder` from a canvas and
+then loaded through the same object-URL path as a user file, so no binary
+fixture is committed. The scopes stay active throughout.
+
+**Headless gating profile H** runs per browser on the recorded host
+(Mac16,12, M4, 32 GiB): 10 s warmup, then a 60 s editing run (at least 500
+keystrokes at about 10/s, with scrolling and selection), and a 120 s cycle
+run (edit, font, DPR and resize every 5 s, with a 250 ms main-thread stall
+injected every 10 s).
+
+| Metric | Definition | Pass threshold (profile H) |
+|--------|------------|----------------------------|
+| Input latency | From keydown `event.timeStamp` to the rAF timestamp of the frame after the frame whose text phase presented that revision (a presentation proxy). IME is reported separately. | p95 <= 50 ms, p99 <= 100 ms |
+| Frame work | Duration of the code-pane frame callback, reported for animation-only and text-dirty frames | Animation-only: p50 <= 4 ms, p95 <= 8 ms, p99 <= 16.7 ms. Text-dirty: p95 <= 16.7 ms |
+| Frame interval | rAF timestamp deltas, excluding injected stalls | p95 <= 20 ms, p99 <= 50 ms |
+| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation | Gated only when provenance is `measured`: p95 of the absolute value <= 33.4 ms, p99 <= 50 ms, no highlight earlier than 2 ms before the onset. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
+| Late frames | The first frame after each stall | Active set equals the analytic set, 0 replayed flashes, absolute beat-phase drift at the end of the run <= 1 ms |
+| Memory | `ResourceLedger` maximum per cap and total. JS heap on Chromium after CDP `HeapProfiler.collectGarbage` (WebKit has no heap API: ledger only, a limitation). | No cap exceeded. Ledger total <= 96 MiB. Heap growth from end of warmup to end of the cycle run <= 8 MiB. Ledger returns to 0 on dispose. |
+| Audio | Worklet underrun and drop counters during stalls, hidden periods and context loss | Recorded. Any underrun attributable to a UI stall is a failure. |
+
+**Platform fallbacks.**
+
+- **WebGL2.** If headless WebKit lacks WebGL2, WebKit runs headed
+  (`headless: false`) on the same host, and the run records the mode. If WebGL2
+  is still unavailable, the GPU-unavailable path is verified and every WebKit
+  GPU metric is recorded as a limitation.
+- **Audio.** If an AudioContext cannot run (headless audio), its sync and audio
+  metrics are recorded as unavailable.
+- **Software GL.** If a browser renders with software GL, it is reported, and
+  failing frame metrics are kept as recorded failures. They are never
+  relabeled as passes.
+
+**iPad simulator profile S.** Records: the build log, `simctl install` and
+`launch` on a named iPad simulator, the self-check JSON line, and a
+`simctl io screenshot`. Performance in the simulator is not representative,
+so it is not gated.
+
+**Product profile.** This uses the 15.3.7 table, durations and E6 equipment,
+on a physical iPad and on desktop with external acoustic capture. It stays
+pending. The evidence document lists each pending check with its procedure:
+
+- Japanese hardware and software keyboard IME;
+- touch handles;
+- VoiceOver;
+- audio unlock, interruption and resume;
+- route-change latency (headphones and Bluetooth);
+- orientation;
+- 120 Hz frame time;
+- sustained thermal animation;
+- physical A/V sync by camera and microphone capture.
+
+**Evidence document.** `design-docs/specs/design-canvas-editor-evidence.md`
+records:
+
+- host, browser, OS and Xcode versions, the run id and the exact commands;
+- every metric, compared against its threshold, per platform;
+- the raw per-sample JSONL under
+  `design-docs/specs/evidence/canvas-cutover/<run-id>/`, at most 2 MiB
+  committed, with full logs under `tmp/canvas/evidence/<run-id>/`;
+- the platform limitations;
+- the pending physical-hardware checks.
+
+##### 15.3.8.9 Plans, waves, gates and closeout
+
+The new manifest is `impl-plans/active/canvas-cutover-dispatch.json`. Each plan
+lists concrete file writePaths and sharedPaths only, with no directories. The
+merge of CONSUMERS into MOUNT is intentional: removing `CodeApi.view` breaks
+every consumer at once, so the suite can stay green only if the cutover and
+the consumer ports land together.
+
+| Wave | Plan | Depends on | Scope (owned files, summarized) |
+|------|------|------------|---------------------------------|
+| 1 | `canvas-cutover-clock` | none | `app/clock.ts`, `app/deps.ts`, `app/main.ts` (clock wiring), `code/highlight.ts` (timing only; the decoration exports stay for MOUNT), `code/transport.ts`, `code/mount.ts` (clock wiring only), `protocol/{types,envelope,client}.ts`, clock, highlight and transport tests |
+| 1 | `canvas-cutover-native` | none | `src/host/native/{clock.rs,audio.rs,audio/stream.rs,mod.rs}`, `src/session/{publish,protocol,codec,session}.rs`, `src/cli/{owner.rs,serve.rs,mod.rs}`, `editor/src-tauri/src/{main,lib,session}.rs`, `editor/src-tauri/Cargo.toml`, `editor/src-tauri/capabilities/default.json`, `editor/src/protocol/tauri.ts`, Rust and TypeScript tests |
+| 2 | `canvas-cutover-mount` | clock | `code/*` cutover (adds `frame.ts`; the files named in 15.3.8.2 and 15.3.8.3), `app/apis.ts`, `app/song.ts`, `bind/{mount,drag,write,routing}.ts`, `params/{mount,roll}.ts`, the ported tests (including `test/params/open.test.ts`) and `test/bind/fixtures.ts`, `test/canvas/no-editor-view.test.ts`. Must not edit `app/main.ts`. |
+| 2 | `canvas-cutover-visual` | clock | `visual/{frame,mount,render-host,scopes,video}.ts` (plus a visual-pane file input in an existing visual file), visual tests |
+| 2 | `canvas-cutover-shell` | native, clock | `app/main.ts` (Tauri tier selection), `editor/index.html`, `editor/src-tauri/src/lib.rs` (mobile entry, C ABI, `self_check`), `editor/src-tauri/tauri.conf.json`, the enumerated `editor/src-tauri/gen/apple/*` files, `test/app/main.test.ts` |
+| 3 | `canvas-cutover-evidence` | all | `editor/test/e2e/*.mjs` and fixtures, `editor/package.json` (`scripts` only), the evidence document and raw data, then closeout |
+
+**Green after every plan.** Each plan ends with focused checks inside the
+sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
+
+- `cargo build --lib --target wasm32-unknown-unknown`;
+- full nextest with a timeout of at least 1500 s (a timeout kill counts as
+  neither a pass nor a failure);
+- `cargo check --manifest-path editor/src-tauri/Cargo.toml`;
+- rustfmt `--check` on touched Rust files only;
+- for shell: the simulator build and launch;
+- for evidence: the e2e harness.
+
+**Other rules.**
+
+- Clippy `-D warnings` must pass, with no new `allow` or `expect`.
+- A touched source file of 1,000 lines or more is split.
+- The audio callback and worklet never wait on, allocate for, or get driven
+  by rendering.
+
+**Closeout** (evidence plan):
+
+- Move the 15 `impl-plans/active/canvas-editor-224-*.md` files, plus
+  `canvas-editor-224-dispatch.json`, to `impl-plans/completed/`, each listed
+  as a concrete path with a one-line superseded note. Do the same for the
+  completed `canvas-cutover-*` plans.
+- Update `impl-plans/README.md`.
+- Record the final gate logs on the closeout commit.
 
 ## 16. Wasm and AudioWorklet Layout
 

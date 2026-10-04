@@ -2869,3 +2869,151 @@ writePath nor a declared sharedPath is stop condition 1.
   receipt.
 - The cohort count rises only by declared new files that are actually
   created. Each receipt lists them.
+
+### Session 261 resume amendments (2026-10-04)
+
+Session 260 stopped with SONG-ISSUED-PLAYBACK implemented. One strict-Clippy
+`dead_code` diagnostic on `bind_issued_owner` blocked it. The operator repair
+in `cbfe20c` added `#[cfg(test)]` to that wrapper (no `allow` or `expect`) and
+ran rustfmt on `src/sched/song/pools.rs`. The operator then ran the gates
+independently: strict Clippy exit 0, and full nextest with 2,800 passed,
+0 failed and 3 skipped. The wasm32 host-wasm build and rustfmt `--check` also
+passed. SONG-ROUTE8, SONG-ISSUED-RESOLUTION, SONG-STRUCTURAL-CLOCK and
+SONG-SHARED-WORK stay accepted and are not redispatched.
+
+The design above and the session 251-260 amendments stay the baseline. The
+session 260 amendment remains the contract for playback and SONG-16. This
+amendment adds only the operator-repair boundary, the session 261 evidence
+layout and the review checkpoints. Where it conflicts with an earlier
+amendment, this one wins. The manifest gets a `resumeSession261` entry in place
+and is never duplicated. Order is strict serial with `maxConcurrency: 1`:
+SONG-ISSUED-PLAYBACK (gate rerun, receipt, review, acceptance), then SONG-16.
+
+#### Operator repair boundary (`bind_issued_owner`)
+
+- `src/song/snapshot/occupancy/lookup/authority.rs` was already a playback
+  sharedPath, but only for the resolution-defect purpose. Its
+  `sharedPathNotes` purpose now also covers, retroactively, the one
+  `#[cfg(test)]` line at `:400` added in `cbfe20c`. That line is recorded in the
+  receipt `fixes[]` as class `join-repair` with commit `cbfe20c`. It replaces
+  the session 260 `verification-blocker` entry for TASK-105.
+- **Why gating hides no production path.** `bind_issued_owner`
+  (`authority.rs:401-410`) only maps `Ok(None)` from
+  `bind_issued_owner_if_matching` (`:412`) to the refusal `required issued
+  execution is not retained at site`. Its only callers are the tests in
+  `src/song/routing/prepared.rs:594-660`. Production owner binding runs through
+  `src/song/routing/nested/issued/members.rs:301` -> `bind_issued_index`
+  (`authority.rs:580`) -> `bind_issued_owner_if_matching` (`:588`). That path
+  performs the same selection, membership, owner, placement, seed and entry
+  checks.
+- **Review check.** Every production caller of the issued owner-binding helpers
+  reaches `bind_issued_owner_if_matching`. No production path builds a
+  `RetainedOwnerAddress` any other way. `rg -n "bind_issued_owner\b" src`
+  lists only `authority.rs:401` and `prepared.rs` test code. If this does not
+  hold, the reviewer records an authority finding against SONG-ISSUED-RESOLUTION
+  and applies stop condition 1.
+
+#### Playback evidence for session 261
+
+- **Preserve earlier evidence.** Before any gate runs, copy the current
+  `tmp/song-mode-riela/session249-playback-{build.log,intent.json,receipt.json}`
+  to `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session260/` with
+  `sha256.txt`. Existing directories (`attempt-session259/`, `session259/`,
+  `session260/`, `session260-resume/`) are never written to.
+- **Gate logs.** Run each gate in "Gates" below once in the foreground on
+  `cbfe20c`. Write each log to
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/session261-resume/<gate>.log` (`build`,
+  `clippy`, `nextest-full`, `nextest-focused`, `wasm`, `fmt`). This overrides
+  the session 260 log path `tmp/song-mode-riela/session249-playback-<gate>.log`.
+  Those log paths stay declared writePaths but are not written this session. A
+  playback fix made during review means rerunning every gate on the fix commit
+  into the same directory, with a `-after-fix` suffix.
+- **Receipt.** `tmp/song-mode-riela/session249-playback-receipt.json` is
+  rewritten in place after the copy. It records:
+  - `session: 261` and `baseCommit: cbfe20c`;
+  - `fixes[]`, with TASK-101..104 as recorded and TASK-105 as the join repair
+    above;
+  - `capacity.busSlots`, measured again in this session from a passing test log
+    and not copied: `required` (from `SongRoutePlan.required.bus_slots`,
+    checked against `tracks + 1 + sum(reserved_generations)`), `available`
+    (song-profile free slots, expected 50), and `engineProfile:
+    "song_engine_config"`;
+  - the measured route-stage work against the 1,000,000 allowance (SM1);
+  - `atomicityTrigger`, which keeps the `#[cfg(test)]` staging fault in
+    `src/sched/song/pools.rs`. The receipt must also state why no
+    within-capacity fixture reaches real pool exhaustion on a later batch
+    event, which the session 260 table requires before a fault point may be
+    used;
+  - `verification[]`, giving each gate's command, exit status, log path and,
+    for nextest, its Summary counts;
+  - `evidenceFingerprint`: the sha256 over the session 261 gate logs plus the
+    source hashes at the reviewed commit. It must differ from
+    `5b9ecddbdecf8224cc6ceafe2d67271a9def3f297a9489b113c4428edd1bb0ea` and from
+    every earlier receipt.
+- **Plan updates.** Tick TASK-101..105 in
+  `impl-plans/active/song-mode-issued-playback.md` only when the cited evidence
+  exists. Add one progress-log entry for session 261.
+- **No code change is expected.** A review finding is fixed only under the
+  session 260 writePaths and sharedPaths rules. Any other path is stop
+  condition 1.
+
+#### Playback review checkpoints
+
+The review range is `git diff 1ac457f <playback-accepted> --` over the playback
+writePaths and the edited sharedPaths (`authority.rs`). The test-integrity,
+adversarial and integration reviews each confirm:
+
+1. **Scheduler consumption.** `src/sched/song.rs` creates one `SharedIndexWork`
+   collector, passes it to Ready `query_issued_with_work`, and passes the same
+   collector to `resolve_issued` for every event (session 260 TASK-003
+   evidence, test `one_collector_spans_query_and_every_resolution`).
+2. **Atomic pools.** `pools.rs` stages projections and commands. Pools, pending
+   queue, cursor and receipts are committed only when the whole batch succeeds,
+   and on failure they equal their pre-`realize` values. The fault field and
+   its setter exist only under `#[cfg(test)]` and carry no lint attribute.
+3. **Fix scope.** `git diff 10c3eab -- src/pattern/eval/song_clock.rs` touches
+   only the body of `source_owns_owner`. `src/song/export.rs` uses
+   `song_engine_config`, with no `bus_slots = 32` override.
+4. **Owner binding.** The operator repair boundary above holds.
+5. **Hygiene.** `git diff 10c3eab | grep -E '^\+.*#\[(allow|expect)'` prints
+   nothing. The three unowned paths equal `HEAD`. Every touched Rust file is
+   below 1000 lines.
+
+Acceptance is recorded in `resumeSession261` together with the accepted commit.
+
+#### SONG-16 (unchanged contract, confirmed seams)
+
+The session 260 "SONG-16" section stays as is. SONG-16 starts from the
+playback-accepted commit. These repository facts confirm that the declared
+seams are enough:
+
+- **CLI path.** `vactr render <file> <out> --sample-rate N` is dispatched in
+  `src/cli/args.rs:401`. It then runs `src/cli/render.rs` `main`, which calls
+  `evaluate_song_candidate`, `prepare_song` and `export_song`, then prints
+  `rendered N frames at R Hz; ...; state Ended`. No cycle argument exists. The
+  CLI test parses this line.
+- **Requirement coverage.** The `tests/song_issued_transport.rs` `PROGRAM`
+  that becomes `examples/song-mode/requirement-song.vact` contains:
+  - reusable Part functions: `make`, `make-slice`, `remove-one`, `edit` and
+    `indexed`;
+  - composed generators: `chord`, `choose` and `slice` inside Parts;
+  - `sequence`, and `part-repeat` with both `:same` and `:vary`;
+  - `delete-event` and `overwrite-region`;
+  - instrument-selective filtering through `transform-instrument ... lpf`, and
+    an effect through `instrument-fx ... :room`.
+
+  The CLI test asserts automatic termination (`state Ended`) and a
+  byte-identical second export.
+- **New files.** `examples/song-mode/` does not exist yet. Creating
+  `requirement-song.vact` creates it, and no other file goes in that
+  directory.
+- **Evidence.** Final logs go to
+  `tmp/song-mode-riela/session249-final-<gate>.log` (none exist yet). Scratch
+  logs go to `tmp/song-s249/SONG-16/session261-resume/`. The final receipt
+  records the measured capacity need against capacity (31 of 50 expected) under
+  the [SM5](../user-qa/pending-song-mode-questions.md#sm5-song-bus-capacity-for-finite-export)
+  default (a). It lists the
+  [known resolution defect](#known-resolution-defect-not-in-scope) as residual
+  risk unless a required test reaches it.
+- **Serial join.** SONG-16 updates the plan progress logs, moves completed
+  plans to `impl-plans/completed/`, and updates `impl-plans/README.md`.

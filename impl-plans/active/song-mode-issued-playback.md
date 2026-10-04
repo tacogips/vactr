@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: In Progress (session 260 implementation completed except for the declared serial strict-Clippy join repair)
+**Status**: In Progress (session 260 implementation complete; operator join repair in cbfe20c; session 261 gate rerun, receipt and review pending)
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -1338,3 +1338,246 @@ never used), outside this plan's playback writePaths. The Clippy log is
 `session260-resume/clippy-retry1.log`; the runtime join protocol assigns this
 repair to the root reviewer. Full final-source nextest, WASM, and final scoped
 format gates are therefore pending. The plan remains In Progress.
+
+## Session 261 amendment (runs FIRST, on cbfe20c; serial)
+
+The source of truth is the design section "Session 261 resume amendments
+(2026-10-04)" in `design-docs/specs/design-song-mode.md`. The manifest entry
+is `resumeSession261` in `impl-plans/active/song-s249-dispatch.json`. The
+session 260 amendment above stays the contract for code. This amendment adds
+only evidence, receipt and review work.
+
+### Intent and context
+
+- Session 260 implemented TASK-101..104 and most of TASK-105. Strict Clippy
+  failed only on `bind_issued_owner` being unused
+  (`src/song/snapshot/occupancy/lookup/authority.rs:400`).
+- The operator repair `cbfe20c` added `#[cfg(test)]` to that wrapper. It also
+  ran rustfmt on `src/sched/song/pools.rs`. The operator's independent run was
+  green: strict Clippy exit 0; full nextest with 2,800 passed, 0 failed and
+  3 skipped; WASM exit 0; rustfmt `--check` clean.
+- This session reruns the gates once and writes fresh evidence. It completes
+  the receipt and ticks TASK-101..105. Then the workflow reviewers run
+  test-integrity, adversarial and integration review.
+- **No Rust edit is expected.** The source tree must stay equal to `cbfe20c`.
+  The only commits after it are docs and plan commits.
+
+### Non-goals
+
+- No Rust, test or `Cargo.*` edit, unless a reviewer finding requires a fix.
+  Such a fix follows the session 260 writePaths and sharedPaths rules and is
+  recorded in `fixes[]`. A fix anywhere else is stop condition 1.
+- Do not measure route-stage work here. Doing so needs a new test, and the
+  intake fixes the gate rerun on `cbfe20c`. SONG-16 measures it in its own new
+  file (see `song-mode-reconciliation.md`, Session 261 amendment, TASK-202).
+- Never delete or write into these directories:
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session259/`, `session259/`,
+  `session260/` and `session260-resume/`.
+- Never write the old log paths `tmp/song-mode-riela/session249-playback-<gate>.log`.
+  They stay declared but are not used this session.
+- Never run `cargo fmt` or rustfmt in write mode. Never run `git stash`,
+  `git checkout`, `git restore`, `git reset` or `git add`.
+- Do not touch `src/song/snapshot/resources.rs`,
+  `src/song/snapshot/reservations_tests.rs`,
+  `src/sched/runtime/song/clock_tests.rs`, `.agents/settings.local.json` or
+  `editor/`.
+
+### Owned paths for session 261
+
+The session 260 writePaths and sharedPaths are unchanged. These evidence
+files are added to writePaths:
+
+- `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session260/session249-playback-build.log`
+- `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session260/session249-playback-intent.json`
+- `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session260/session249-playback-receipt.json`
+- `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session260/sha256.txt`
+- `tmp/song-s249/SONG-ISSUED-PLAYBACK/session261-resume/` gate logs, one file
+  per gate: `source-equivalence.log`, `build.log`, `clippy.log`,
+  `nextest-focused.log`, `nextest-song-clock.log`, `nextest-realize.log`,
+  `nextest-full.log`, `wasm.log`, `fmt.log`, `capacity.log`, `audits.log`,
+  `fingerprint.txt`
+
+The `authority.rs` sharedPathNote now also covers, retroactively, the
+`#[cfg(test)]` line at `:400` from `cbfe20c`.
+
+### TASK-106: Preserve evidence and rerun gates on cbfe20c
+
+**Status**: Not Started. **Parallelizable**: No (serial).
+
+1. **Copy.**
+   - Copy `tmp/song-mode-riela/session249-playback-build.log`,
+     `session249-playback-intent.json` and `session249-playback-receipt.json`
+     to `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session260/`, keeping
+     their names.
+   - Write `sha256.txt` with `shasum -a 256` for the three copies.
+   - The copies must hash the same as the originals. The receipt to copy
+     carries `"session": 260` and fingerprint `5b9ecdd...`.
+2. **Source equivalence.** Write `git rev-parse HEAD` and the result of
+   `git diff --quiet cbfe20c -- src tests examples Cargo.toml Cargo.lock; echo
+   exit=$?` to `source-equivalence.log`. It must show `exit=0`. If it does
+   not, stop and report the drifted paths. Do not run gates on a different
+   tree.
+3. **Gates.** Run each manifest SONG-ISSUED-PLAYBACK `verification` command in
+   the foreground, in manifest order. Capture `echo exit=$?` after each. Every
+   gate must exit 0. Checks:
+   - `nextest-full.log` contains a `Summary` line with 0 failed. Do not pass
+     `--retries`.
+   - `capacity.log` comes from the `--no-capture` run of
+     `song_issued_transport`. It contains the line `capacity evidence:
+     tracks=2, reserved_generations=28, required_bus_slots=31, available=50`
+     or the actually measured values. Record the values as printed. If
+     `required_bus_slots > available`, stop and report.
+   - `audits.log` holds:
+     - `wc -l` for every playback Rust path, plus `authority.rs`; all must be
+       below 1000;
+     - the `dedup_by|resolve_route(` grep, which prints nothing;
+     - the `allow|expect` diff grep, which prints nothing;
+     - the unowned and frozen `git diff --quiet` checks (exit 0);
+     - `rg -n "bind_issued_owner\b" src`, which lists only `authority.rs:401`
+       and `src/song/routing/prepared.rs` lines inside its `#[cfg(test)] mod
+       tests` (from `:206`).
+4. **Fingerprint.** Write the sha256 of the concatenated `shasum -a 256`
+   output to `fingerprint.txt`. That output covers every `session261-resume/*.log`
+   plus the playback Rust paths and `authority.rs`. The fingerprint must
+   differ from `5b9ecddbdecf8224cc6ceafe2d67271a9def3f297a9489b113c4428edd1bb0ea`
+   and from every `evidenceFingerprint` under `tmp/song-mode-riela/` and
+   `tmp/song-s249/`.
+
+**Pitfalls.**
+- With `NEXTEST_STATUS_LEVEL=fail`, a passing test's stderr is hidden. That is
+  why the capacity line needs the separate `--no-capture` run.
+- Logs are complete only once the command has exited. Never return while a
+  command is running.
+
+### TASK-107: Complete the receipt and plan records
+
+**Status**: Not Started. **Depends on**: TASK-106.
+
+- **Receipt.** Rewrite `tmp/song-mode-riela/session249-playback-receipt.json`
+  in place. The session 260 version is preserved in `attempt-session260/`. The
+  fields are:
+  - `session: 261`;
+  - `baseCommit: "cbfe20ccf46f7bbac5bad43032e9301d0e7151fb"`;
+  - `head`, the value from `source-equivalence.log`;
+  - `sourceTreeEqualsBase: true`;
+  - `reviewDiffRange: "git diff 1ac457f <playback-accepted> --"` over the
+    playback writePaths plus `src/song/snapshot/occupancy/lookup/authority.rs`;
+  - `status: "gates green; awaiting review"`;
+  - `fixes[]`:
+    - TASK-101 and TASK-102 as `production-defect`, unchanged;
+    - TASK-103 and TASK-104 as `test-evidence`, unchanged;
+    - TASK-105 as `{"class": "join-repair", "commit": "cbfe20c", "path":
+      "src/song/snapshot/occupancy/lookup/authority.rs:400", "summary":
+      "#[cfg(test)] on the test-only bind_issued_owner wrapper; production
+      binding uses bind_issued_index -> bind_issued_owner_if_matching
+      (members.rs:301, authority.rs:580/:588); no allow/expect"}`;
+    - a second `join-repair` entry, `src/sched/song/pools.rs` (rustfmt only,
+      `cbfe20c`);
+  - `capacity.busSlots`: `{required, measuredFrom:
+    "SongRoutePlan.required.bus_slots == tracks+1+sum(reserved_generations)",
+    tracks, reservedGenerations, available, genericReplaced: 31,
+    engineProfile: "song_engine_config", log:
+    "tmp/song-s249/SONG-ISSUED-PLAYBACK/session261-resume/capacity.log"}`.
+    Take the values from `capacity.log` only, never from the session 260
+    receipt;
+  - `sm1`: `{refused: false, routeStageAllowance: 1000000, routeWork:
+    "measured by SONG-16 TASK-202 (tests/song_requirement_cli.rs)"}`;
+  - `sm5: "default (a): truthful refusal kept; 31-of-50 class fixture"`;
+  - `attemptSession258` (unchanged) and `attemptSession260` (the three copied
+    files and the `sha256.txt` path);
+  - `atomicityTrigger`: `{"kind": "cfg(test) injected staging fault",
+    "whyNotRealExhaustion": ...}`. The reason must be specific and must cover
+    every in-batch staging failure return in `src/sched/song/pools.rs`
+    (`PoolBook` assignment, roughly lines 125-180). Enumerate them from the
+    file, expect these five, and state per failure why a within-capacity
+    admitted fixture cannot hit it on a later event of the same batch:
+    - `projected receipt count overflow` (Overflow, about :141-144);
+    - `admitted physical branch pool exhausted by overlapping configurations`
+      (BeyondCapability, about :146-157);
+    - `song physical generation overflow` (Overflow, about :160-162);
+    - `song generation ceiling exceeded` (BeyondCapability, about :163-167;
+      it checks the generation against `slot.physical.initial.last_generation`);
+    - `projected receipt storage exhausted` (FuelExhausted, about :170-176).
+
+    For the first four, the worker must verify and cite why they are
+    unreachable. Candidate arguments to check, not asserted facts: pool and
+    generation sizing comes from route admission (`SongRoutePlan`
+    `reserved_generations` and the physical pools), and the overflow returns
+    are arithmetic guards. For the last one the chain is verified: the pending
+    limit is `max_cached_events`, passed as
+    `PoolBook::new(ready.pools(), limits.max_cached_events as usize)`
+    (`src/sched/song.rs:95`), and the same limit caps the batch event count
+    through `self.limits.check_events(batch.events().len())`
+    (`src/sched/song.rs:447`, `src/song/limits.rs:83-91`), so staging cannot
+    exceed receipt storage within capacity (`src/sched/song/pools.rs:170-176`).
+    Verify the cited lines before writing them, and correct them if they have
+    moved. If any listed failure is reachable by a within-capacity fixture, do
+    not write `whyNotRealExhaustion`; stop and report;
+  - `task003Evidence`, unchanged except for the log path, which becomes
+    `session261-resume/nextest-realize.log`;
+  - `verification[]`: each gate's command, `exitStatus`, `log`, and for
+    nextest the Summary counts (run, passed, failed, skipped);
+  - `incompleteGates: []` and no `blocker` key;
+  - `evidenceFingerprint`, the value from `fingerprint.txt`.
+- **Plan records** (this file only):
+  - Set TASK-101..105 to `**Status**: Completed`.
+  - Tick each "Session 260 done criteria" checkbox only when the cited
+    session 261 log shows it. The criterion "logs at the manifest paths" is
+    satisfied by the `session261-resume/` logs.
+  - Add one dated progress-log entry, "2026-10-04 — Session 261 gate rerun
+    and receipt", with the gate exits, nextest counts, the capacity line and
+    the fingerprint.
+  - Do not set the plan's top-level Status to Completed. SONG-16 TASK-203 does
+    that after the final gates.
+- Do not edit `impl-plans/active/song-s249-dispatch.json`. The root reviewer
+  records acceptance in `resumeSession261`.
+
+### Review checkpoints (for the workflow reviewers; not worker tasks)
+
+These are the design's "Playback review checkpoints". The review range is
+`git diff 1ac457f <playback-accepted> --` over the playback writePaths plus
+`authority.rs`. Each reviewer confirms:
+
+1. **Scheduler consumption.** `SongTransport::realize` (`src/sched/song.rs`)
+   creates one `SharedIndexWork` collector, uses it for Ready
+   `query_issued_with_work`, and passes the same collector to
+   `resolve_issued` for every event. The evidence is
+   `one_collector_spans_query_and_every_resolution`.
+2. **Atomic pools.** `PoolBook` (`src/sched/song/pools.rs`) stages
+   projections and commands. Pools, pending, cursor and receipts are committed
+   only on full success, and stay unchanged on failure (the evidence is
+   `realize_failure_after_staging_preserves_pools_queue_cursor_and_receipts`).
+   The fault fields and setter exist only under `#[cfg(test)]` and carry no
+   lint attribute. The receipt's `whyNotRealExhaustion` is specific, covers
+   every `pools.rs` staging failure return, and is true.
+   If it is absent or false, reject.
+3. **Fix scope.** `git diff 10c3eab -- src/pattern/eval/song_clock.rs` touches
+   only `source_owns_owner`. `src/song/export.rs` calls `song_engine_config`
+   and has no `bus_slots = 32`.
+4. **Owner binding.** No production path builds a `RetainedOwnerAddress`
+   except through `bind_issued_owner_if_matching`. If one does, record an
+   authority finding against SONG-ISSUED-RESOLUTION and apply stop condition 1.
+5. **Hygiene.**
+   - There are no new `allow` or `expect` lines.
+   - The three unowned files equal `HEAD`.
+   - Every touched Rust file is below 1000 lines.
+   - The test-integrity check: no existing assertion was weakened or deleted
+     between `10c3eab` and `cbfe20c` (`git diff 10c3eab cbfe20c -- tests
+     src/sched/song/realize_tests.rs`).
+
+### Session 261 done criteria
+
+- [ ] `attempt-session260/sha256.txt` exists and matches the three copies.
+- [ ] `source-equivalence.log` shows `exit=0`.
+- [ ] Every gate log in `session261-resume/` ends with `exit=0`.
+  `nextest-full.log` has a `Summary` line with 0 failed, and no `--retries`
+  was used.
+- [ ] `capacity.log` contains the `capacity evidence:` line, and the receipt
+  values equal it.
+- [ ] The receipt has `session: 261`, `baseCommit` `cbfe20c`, the TASK-105
+  `join-repair`, `atomicityTrigger.whyNotRealExhaustion`, empty
+  `incompleteGates`, and a fingerprint that differs from every earlier one.
+- [ ] TASK-101..105 are Completed, the session 260 done criteria are ticked
+  with evidence, and one session 261 progress-log entry exists.
+- [ ] `git diff --quiet cbfe20c -- src tests examples Cargo.toml Cargo.lock`
+  still exits 0 after TASK-107. No code changed.

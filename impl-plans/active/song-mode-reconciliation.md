@@ -1422,3 +1422,174 @@ unedited. A failure that needs another path is stop condition 1.
   exists.
 - [ ] Statuses and README lines are reconciled only after the gates pass. One
   progress-log entry is added.
+
+#### Session 261 amendment (runs last, on <playback-accepted>)
+
+The source of truth is the design section "Session 261 resume amendments
+(2026-10-04)", subsection "SONG-16 (unchanged contract, confirmed seams)". The
+manifest entry is `resumeSession261`. The session 260 amendment above (TASK-201,
+TASK-202 and TASK-203) stays in force. This amendment changes only what is
+listed below.
+
+##### Intent and context
+
+- SONG-ISSUED-PLAYBACK is reviewed and accepted first, at `<playback-accepted>`
+  (`cbfe20c` or a later fix commit). SONG-16 then shows the full objective
+  through the user-facing path. Static song code with reusable Part functions
+  composes generators, repeats and sequences Parts, and edits copies (remove
+  one event, overwrite a region, filter or effect selected instruments). The
+  CLI renders that code to a complete WAV that terminates by itself.
+- The CLI path is `vactr render <file> <out> --sample-rate N`. It is
+  dispatched at `src/cli/args.rs:401`. `src/cli/render.rs` `main` then calls
+  `evaluate_song_candidate`, `prepare_song` and `export_song`, and prints
+  `rendered {N} frames at {R} Hz; revision ..., epoch ..., seed ...; state
+  Ended`. This corrects the earlier `args.rs:103` citation.
+- The `PROGRAM` constant at `tests/song_issued_transport.rs:21` already covers
+  every requirement element, and is the TASK-201 source:
+  - Part functions `make`, `make-slice`, `remove-one`, `edit` and `indexed`;
+  - `chord`, `choose` and `slice`;
+  - `sequence`, and `part-repeat` with `:same` and `:vary`;
+  - `delete-event` and `overwrite-region`;
+  - `transform-instrument ... lpf` and `instrument-fx ... :room`.
+
+##### Changes from the session 260 amendment
+
+1. **Evidence paths.**
+   - Scratch logs go to `tmp/song-s249/SONG-16/session261-resume/`, which does
+     not exist yet. This replaces `session260-resume/`.
+   - No `tmp/song-mode-riela/session249-final-*` file exists. So TASK-203
+     copies nothing, and the receipt records
+     `attemptSession260: {"files": [], "reason": "no session249-final-* files
+     existed before session 261"}`. Do not create `attempt-session259/` or
+     `attempt-session260/` for SONG-16.
+   - TASK-201 writes `program.sha` to
+     `tmp/song-s249/SONG-16/session261-resume/program.sha`.
+2. **TASK-202 adds one test:**
+   `requirement_song_route_work_fits_default_allowance`, in
+   `tests/song_requirement_cli.rs`. It measures the route-stage work that the
+   design requires (SM1), which the playback receipt deferred to SONG-16.
+   - **Program source.** Build the program with
+     `include_str!("../examples/song-mode/requirement-song.vact")` and the same
+     `CandidateBuildCtx` and asset limits as
+     `tests/song_issued_transport.rs:candidate`. Give each probe a fresh
+     `SnapshotEpoch` from an atomic counter.
+   - **Probe(w).** Build a fresh candidate, then call
+     `SongHostPreparation::begin` with the
+     `preparation_refuses_before_upload_when_route_work_is_exhausted` limits,
+     except that `max_work: w`. Use a headless song-profile host. Pump with
+     that test's loop (`submit`, `side.render`, `host.drain`, `receive`), for
+     at most 64 iterations.
+     - Pass: `progress()` reaches `Uploading`, `AwaitingReady` or `Ready`.
+     - Fail: `submit` returns `Err` with code `FuelExhausted` before that.
+     - Any other error code, or neither outcome within 64 iterations: panic
+       with the message.
+     - After a pass, call `owner.cancel()` only if dropping mid-upload
+       panics. Otherwise drop the owner.
+   - **Search.**
+     - Assert `probe(1)` fails and `probe(1_000_000)` passes.
+     - Binary-search the smallest passing `w` (`W`), assuming monotonicity.
+     - Assert `probe(W)` passes and `probe(W - 1)` fails.
+     - Print `route work evidence: minimal_max_work={W}
+       allowance=1000000`.
+     - Assert `W <= 1_000_000`.
+   - `W` covers the work before the route stage and the route-stage debit. So
+     it is an upper bound on route-stage work, and the receipt says so.
+   - **Pitfalls.**
+     - Do not copy the program text.
+     - Do not add a public work accessor to `src/`.
+     - Do not change `SongPreparationLimits` defaults.
+     - Keep the whole file below 300 lines.
+3. **Gates (TASK-203).**
+   - Use the manifest SONG-16 `verification` list as updated in session 261.
+   - The fmt list now also includes
+     `src/host/caps/song/preparation/issued.rs`. It was missing from the
+     session 260 list.
+   - Add the `--no-capture` run of `song_requirement_cli`, written to
+     `tmp/song-s249/SONG-16/session261-resume/route-work.log`.
+   - Each command exits 0 and is followed by `echo exit=$?` in its log.
+4. **Final receipt (TASK-203) additions.**
+   - `session: 261`.
+   - `capacity.busSlots`, copied from the session 261 playback receipt, plus
+     its `capacity.log` path.
+   - `routeWork`: `{minimalMaxWork: W, allowance: 1000000, refused: false,
+     meaning: "upper bound on route-stage work", log}`.
+   - `requirementTests` adds `requirement_song_route_work_fits_default_allowance`.
+   - `sm1` and `sm5`: default (a).
+   - `attemptSession260` (item 1).
+   - `archive[]` and `notArchived[]` (TASK-204).
+   - A new fingerprint that differs from every earlier one.
+5. **Design checkpoint (TASK-203).** Append the dated evidence checkpoint of
+   about 15 lines at the end of `design-docs/specs/design-song-mode.md`, after
+   the "Session 261 resume amendments" section. It covers gate exits, log
+   paths, cohort, capacity, route work, and the SM1/SM5 outcomes.
+6. **Status (TASK-203).** This applies only if every final gate exits 0.
+   - Set the top-level `**Status**: Completed` on the five sibling plans and
+     on this plan.
+   - Add under each one a one-paragraph `Completion` note. It names the
+     accepting session and commit (from the manifest `acceptedDependencies`,
+     or `resumeSession261` for playback) and the final receipt path. It also
+     says that earlier amendment sections are history superseded by later ones.
+   - Do not rewrite the subtask statuses or checkboxes in historical
+     amendment sections.
+
+##### TASK-204: Archive and index join (serial, last action of SONG-16)
+
+**Status**: Not Started. **Depends on**: TASK-203, with every final gate green.
+
+- **Move.** Use plain `mv`; do not use `git mv` or any other git write.
+  Move each plan whose top-level Status was set to Completed in TASK-203 from
+  `impl-plans/active/` to `impl-plans/completed/`, keeping the same file name:
+  - `song-mode-immutable-route-authority.md`;
+  - `song-mode-issued-route-resolution.md`;
+  - `song-mode-shared-issued-query-work.md`;
+  - `song-mode-issued-playback.md`;
+  - `song-mode-structural-clock-hooks.md`;
+  - `song-mode-reconciliation.md` (moved last, after its own progress-log
+    entry is written).
+- **Before each move,** record the sha256. After the move, the file under
+  `completed/` must have the same hash. The receipt `archive[]` lists
+  `{from, to, sha256}`. A plan not set to Completed stays in `active/`, and
+  `notArchived[]` lists it with the reason.
+- **README.** In `impl-plans/README.md`, update only the lines that link these
+  six plans (currently `:7`, `:9` for issued playback only, `:13`, `:15`,
+  `:317` and `:327`):
+  - the link target becomes `completed/<name>.md`;
+  - the status text becomes `Completed (session 261 final receipt)`.
+
+  No other README line changes.
+- **Do not move** `impl-plans/active/song-s249-dispatch.json`. The root
+  reviewer updates its `planPath` values in `resumeSession261` after
+  acceptance.
+- **Do not rewrite** historical references to `impl-plans/active/...` in
+  `design-docs/` or in other plans.
+- **Reviewers** read the six plans at their `archive[].to` paths. If review
+  rejects SONG-16, the repair edits the `completed/` copies. Plans are not
+  moved back.
+
+##### Owned paths for session 261 (additions to the session 260 list)
+
+- writePaths:
+  - `tmp/song-s249/SONG-16/session261-resume/program.sha`;
+  - `tmp/song-s249/SONG-16/session261-resume/route-work.log`;
+  - the six `impl-plans/completed/<name>.md` targets listed in TASK-204.
+- The five sibling `impl-plans/active/` plans stay sharedPaths. Their
+  intended edit now also includes the Completion note and the TASK-204 move.
+- `src/host/caps/song/preparation/issued.rs` is not a SONG-16 path. It is
+  only added to the rustfmt `--check` list.
+
+##### Session 261 done criteria
+
+- [ ] The session 260 done criteria above hold. The "attempt-session259"
+  criterion is replaced by `attemptSession260` with `files: []`.
+- [ ] `route-work.log` contains `route work evidence: minimal_max_work=`
+  with a value at most 1,000,000. The receipt `routeWork` equals it.
+- [ ] Every final gate log ends with `exit=0`. `session249-final-nextest-full.log`
+  has a `Summary` line with 0 failed and no `--retries`.
+- [ ] The design checkpoint follows the Session 261 section.
+- [ ] Each archived plan exists only under `impl-plans/completed/`, with the
+  hash recorded in `archive[]`. The README link lines point to `completed/`.
+- [ ] `git diff --name-only <playback-accepted> -- '*.rs'` plus
+  `git ls-files -o --exclude-standard -- '*.rs'` list only:
+  - `tests/song_issued_transport.rs` (one-line `PROGRAM` diff);
+  - `tests/song_requirement_cli.rs`;
+  - the conditional sharedPaths recorded in `fixes[]`.

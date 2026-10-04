@@ -1,6 +1,6 @@
 //! Streaming finite-song export through the actual native host and owned transport.
 use super::wav::WavOutput;
-use crate::dsp::{arena::StoreKind, caps::CapabilitySet, engine::EngineConfig};
+use crate::dsp::{arena::StoreKind, caps::CapabilitySet};
 use crate::host::caps::{
     AudioHost, SampleSrc, SongHostPreparation, SongPreparationLimits, SongPreparationProgress,
 };
@@ -186,14 +186,14 @@ fn render(
         options.sample_rate,
     )?;
     let caps = CapabilitySet::native();
-    let mut config = EngineConfig::new(
-        &caps,
+    let config = crate::host::song_profile::song_engine_config(
         options.sample_rate as f32,
         MAX_BLOCK,
+        caps,
         StoreKind::NativeArc,
-    );
-    // Actual allocated pool, not a fabricated report or placement expansion.
-    config.bus_slots = 32;
+        2,
+    )
+    .map_err(|error| fail(format!("invalid song export engine profile: {error:?}")))?;
     let (mut host, mut side) = NativeAudioHost::headless_with_config(config, 4096)?;
     let mut owner = SongHostPreparation::begin(
         song,

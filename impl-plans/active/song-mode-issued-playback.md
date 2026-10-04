@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (session 260 resume amendment: owner-duration fix and export profile authorized; see "Session 260 amendment")
+**Status**: In Progress (session 260 implementation completed except for the declared serial strict-Clippy join repair)
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -1313,3 +1313,28 @@ path).
   exists. The receipt has the fields above.
 - [ ] TASK-003 is ticked in the shared-work plan. One progress-log entry is
   added here.
+
+### 2026-10-04 — Session 260 implementation handoff
+
+Implemented TASK-101's overwrite-region payload-duration check and TASK-102's
+song-profile export engine. Added pool staging fault/projection seams and four
+`realize_tests` cases for publication atomicity, work refusal, foreign batch
+authority, and one-collector exact/one-less work. Tightened the public transport
+capacity/frame/WAV assertions and added pre-upload route-work refusal coverage.
+The preparation-private fixture also proves route-work refusal leaves resource
+leases/reservations absent.
+
+Focused evidence before final Clippy-only edits: `session260-resume/nextest-realize-retry1.log`
+(4 passed), `session260-resume/nextest-song-issued-transport-retry1.log`
+(2 passed), `session260-resume/nextest-preparation-authority-retry1.log`
+(1 passed), and `session260-resume/nextest-song-clock.log` (15 passed).
+Baseline: `session260-resume/baseline-full.log` reports 2,793 passed, one known
+`foreign source child scope` failure, and 3 skipped. Build passed at
+`session260-resume/build.log`.
+
+Strict all-target Clippy remains blocked by the sole residual diagnostic
+`src/song/snapshot/occupancy/lookup/authority.rs:400` (`bind_issued_owner` is
+never used), outside this plan's playback writePaths. The Clippy log is
+`session260-resume/clippy-retry1.log`; the runtime join protocol assigns this
+repair to the root reviewer. Full final-source nextest, WASM, and final scoped
+format gates are therefore pending. The plan remains In Progress.

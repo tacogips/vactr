@@ -3,6 +3,13 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use vactr::dsp::arena::StoreKind;
+use vactr::dsp::caps::CapabilitySet;
+use vactr::host::caps::{
+    AudioHost, SongHostPreparation, SongPreparationLimits, SongPreparationProgress,
+};
+use vactr::host::native::audio::{NativeAudioHost, MAX_BLOCK};
+use vactr::host::wire::HostMsg;
 use vactr::song::assets::{DecodedSongAssetFactory, SongAssetLimits};
 use vactr::song::export::{export_song, SongExportOptions};
 use vactr::song::routing::{prepare_routes, SongHostCapacities};
@@ -106,15 +113,17 @@ fn issued_ready_transport_edits_repeats_slice_and_exports_exactly() {
     let measured_bus_slots =
         u32::try_from(route_plan.tracks.len()).unwrap() + 1 + reserved_generations;
     assert_eq!(route_plan.required.bus_slots, measured_bus_slots);
+    let available_bus_slots = u32::try_from(vactr::host::song_profile::SONG_BUS_SLOTS - 1).unwrap();
     eprintln!(
-        "capacity evidence: tracks={}, reserved_generations={}, required_bus_slots={}",
+        "capacity evidence: tracks={}, reserved_generations={}, required_bus_slots={}, available={}",
         route_plan.tracks.len(),
         reserved_generations,
-        measured_bus_slots
+        measured_bus_slots,
+        available_bus_slots
     );
     assert!(
-        measured_bus_slots <= 32,
-        "fixture requires {measured_bus_slots} bus slots; export provides 32"
+        measured_bus_slots <= available_bus_slots,
+        "fixture requires {measured_bus_slots} bus slots; song profile provides {available_bus_slots}"
     );
     let rows = full_query(&mut prepared);
     let drums = intern_kw("drums");
@@ -184,6 +193,24 @@ fn issued_ready_transport_edits_repeats_slice_and_exports_exactly() {
         first.total_frames,
         first.arrangement_frames + first.tail_frames
     );
+    let prepared = candidate();
+    let snapshot = prepared.snapshot();
+    let expected_frames = SongLimits::default()
+        .frames_at(
+            snapshot
+                .duration()
+                .checked_mul(snapshot.settings().seconds_per_cycle().unwrap())
+                .unwrap()
+                .checked_add(snapshot.settings().tail_seconds)
+                .unwrap(),
+            8000,
+        )
+        .unwrap();
+    assert_eq!(first.total_frames, expected_frames);
+    assert_eq!(
+        std::fs::metadata(&first_path).unwrap().len(),
+        44 + first.total_frames * 4
+    );
     assert_eq!(
         first.tail_frames,
         SongLimits::default()
@@ -196,4 +223,62 @@ fn issued_ready_transport_edits_repeats_slice_and_exports_exactly() {
         std::fs::read(first_path).unwrap(),
         std::fs::read(second_path).unwrap()
     );
+}
+
+#[test]
+fn preparation_refuses_before_upload_when_route_work_is_exhausted() {
+    let caps = CapabilitySet::native();
+    let config = vactr::host::song_profile::song_engine_config(
+        8000.,
+        MAX_BLOCK,
+        caps,
+        StoreKind::NativeArc,
+        2,
+    )
+    .unwrap();
+    let (mut host, mut side) = NativeAudioHost::headless_with_config(config, 4096).unwrap();
+    let mut owner = SongHostPreparation::begin(
+        candidate(),
+        SongPreparationLimits {
+            capabilities: caps,
+            song: SongLimits::default(),
+            max_resources: 256,
+            max_pending_records: 4096,
+            max_graph_bytes: 1_000_000,
+            max_work: 1,
+        },
+    )
+    .unwrap_or_else(|refusal| panic!("preparation refused: {}", refusal.failure));
+    let mut silence = [0.0; MAX_BLOCK * 2];
+    let mut observed_failure = None;
+    for _ in 0..16 {
+        if let Err(failure) = owner.submit(&mut host) {
+            observed_failure = Some(failure);
+            break;
+        }
+        assert!(!matches!(
+            owner.progress(),
+            SongPreparationProgress::Uploading
+                | SongPreparationProgress::AwaitingReady
+                | SongPreparationProgress::Ready
+        ));
+        side.render(&mut silence, 2);
+        let mut messages = Vec::new();
+        host.drain(&mut messages);
+        for message in messages {
+            if let HostMsg::Song(ack) = message {
+                if let Err(unhandled) = owner.receive(ack) {
+                    panic!("preparation returned an unowned acknowledgement: {unhandled:?}");
+                }
+            }
+        }
+    }
+    let failure = observed_failure.expect("route preparation should exhaust its work budget");
+    assert_eq!(failure.code, vactr::vm::fail::FailCode::FuelExhausted);
+    assert!(!matches!(
+        owner.progress(),
+        SongPreparationProgress::Uploading
+            | SongPreparationProgress::AwaitingReady
+            | SongPreparationProgress::Ready
+    ));
 }

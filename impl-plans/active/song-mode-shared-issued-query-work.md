@@ -86,17 +86,17 @@ Original constructor debit remains charged exactly once for that transaction.
 
 ### TASK-003: Playback adoption
 
-**Status**: Not Started
+**Status**: Completed
 **Parallelizable**: No; depends on issued playback phase
 
-- [ ] Actual Ready realization uses one collector through all proofs and output.
-- [ ] No batch field retains mutable work or evaluator ownership.
+- [x] Actual Ready realization uses one collector through all proofs and output.
+- [x] No batch field retains mutable work or evaluator ownership.
 
 ## Completion criteria
 
 - [ ] Shared engine and owning evidence accepted under exact source hold.
 - [x] Legacy wrapper preserves public behavior and original failures.
-- [ ] Actual playback adopts companion; unused helpers are insufficient.
+- [x] Actual playback adopts companion; unused helpers are insufficient.
 - [ ] Varying domains/pre-Reserve admission remain full-goal requirements.
 
 ## Progress log
@@ -884,6 +884,13 @@ Final-source verification (all logs under
 `TASK-003` and the completion items for actual playback consumption remain
 assigned to SONG-ISSUED-PLAYBACK. Formal review and later workflow finalization
 remain downstream.
+
+### 2026-10-04 — Session 260 playback adoption
+
+`SongTransport::realize` passes one collector through issued query, every route
+resolution, staged pools, and output. `realize_tests::one_collector_spans_query_and_every_resolution`
+passed with exact and one-less work (`tmp/song-s249/SONG-ISSUED-PLAYBACK/session260-resume/nextest-realize-retry1.log`). Playback receipt and serial strict-Clippy handoff:
+`tmp/song-mode-riela/session249-playback-receipt.json`.
 
 - [x] Eight shared-work tests pass on final source.
 - [x] Native build, full nextest and WASM build pass on final source.

@@ -208,6 +208,7 @@ fn source_owns_owner(
         return Ok(false);
     }
     let mut payload = None;
+    let mut payload_duration = None;
     let owns_child = match part.node() {
         PartNode::Capture(tracks) => {
             payload = tracks.get(&track);
@@ -236,12 +237,15 @@ fn source_owns_owner(
                     track: selected,
                     pattern,
                     ..
-                }
-                | PartEdit::OverwriteRegion {
-                    track: selected,
-                    pattern,
-                    ..
                 } if *selected == track => payload = Some(pattern),
+                PartEdit::OverwriteRegion {
+                    track: selected,
+                    region,
+                    pattern,
+                } if *selected == track => {
+                    payload = Some(pattern);
+                    payload_duration = Some(region.duration()?);
+                }
                 _ => {}
             }
             source_owns_owner(source, track, owner, depth + 1, work)?
@@ -249,7 +253,7 @@ fn source_owns_owner(
     };
     Ok(owns_child
         || (part.revision() == owner.revision
-            && part.duration() == owner.duration
+            && payload_duration.unwrap_or(part.duration()) == owner.duration
             && payload.is_some_and(|pattern| pattern.id == owner.root)))
 }
 impl CanonicalClockProjection {

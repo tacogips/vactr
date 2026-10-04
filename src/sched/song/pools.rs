@@ -19,7 +19,19 @@ struct Slot {
 pub(super) struct PoolBook {
     slots: Vec<Slot>,
     max_pending: usize,
+    #[cfg(test)]
+    fault: Option<usize>,
+    #[cfg(test)]
+    assign_calls: usize,
 }
+#[cfg(test)]
+pub(super) type PoolProjection = (
+    Option<SongResolvedRoute>,
+    u32,
+    u32,
+    u64,
+    Vec<SongBranchRebound>,
+);
 pub(super) struct Assignment {
     pub physical: SongPhysicalBranch,
     pub generation: u32,
@@ -30,6 +42,10 @@ impl PoolBook {
     pub(super) fn new(pools: &[SongPhysicalBranch], max_pending: usize) -> Self {
         Self {
             max_pending,
+            #[cfg(test)]
+            fault: None,
+            #[cfg(test)]
+            assign_calls: 0,
             slots: pools
                 .iter()
                 .map(|physical| Slot {
@@ -61,7 +77,31 @@ impl PoolBook {
         Ok(Self {
             slots: self.slots.clone(),
             max_pending: self.max_pending,
+            #[cfg(test)]
+            fault: self.fault,
+            #[cfg(test)]
+            assign_calls: self.assign_calls,
         })
+    }
+    #[cfg(test)]
+    pub(super) fn projection(&self) -> Vec<PoolProjection> {
+        self.slots
+            .iter()
+            .map(|slot| {
+                (
+                    slot.configuration.clone(),
+                    slot.projected,
+                    slot.acknowledged,
+                    slot.deadline,
+                    slot.expected.iter().copied().collect(),
+                )
+            })
+            .collect()
+    }
+    #[cfg(test)]
+    pub(super) fn inject_assign_fault(&mut self, fail_at_call: Option<usize>) {
+        self.fault = fail_at_call;
+        self.assign_calls = 0;
     }
     pub(super) fn assign(
         &mut self,
@@ -70,6 +110,16 @@ impl PoolBook {
         end: u64,
         deadline: u64,
     ) -> Result<Assignment, Failure> {
+        #[cfg(test)]
+        {
+            if self.fault == Some(self.assign_calls) {
+                return Err(Failure::new(
+                    FailCode::BeyondCapability,
+                    "injected staging fault",
+                ));
+            }
+            self.assign_calls += 1;
+        }
         if end < onset || deadline < end {
             return Err(Failure::new(
                 FailCode::Type,

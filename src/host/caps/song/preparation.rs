@@ -6,8 +6,8 @@ use crate::host::caps::{
     SongSubmitError,
 };
 use crate::host::wire::HostMsg;
-use crate::song::routing::{prepare_routes_issued, PreparedRoutes};
 use crate::song::routing::*;
+use crate::song::routing::{prepare_routes_issued, PreparedRoutes};
 use crate::song::snapshot::{
     FrozenSongEvent, SongApplyAck, SongPreparationState, SongResourceLease,
 };
@@ -22,13 +22,15 @@ pub use activation::{
 };
 #[path = "preparation/demand.rs"]
 mod demand;
+#[cfg(test)]
+#[path = "preparation/issued.rs"]
+mod issued;
 #[path = "preparation/ledger.rs"]
 mod ledger;
 #[path = "preparation/pools.rs"]
 mod pools;
 #[path = "preparation/resources.rs"]
 mod resources;
-
 fn fail(message: &str) -> Failure {
     Failure::new(FailCode::HostUnavailable, message)
 }
@@ -293,9 +295,13 @@ impl SongHostPreparation {
             clock,
             &mut self.cleanup.remaining,
         )?;
-        pools::finish(&mut assembly, routes.plan(), clock, &mut self.cleanup.remaining)?;
-        let demand =
-            demand::from_assembly(&assembly, routes.plan(), &mut self.cleanup.remaining)?;
+        pools::finish(
+            &mut assembly,
+            routes.plan(),
+            clock,
+            &mut self.cleanup.remaining,
+        )?;
+        let demand = demand::from_assembly(&assembly, routes.plan(), &mut self.cleanup.remaining)?;
         demand::verify_observation(&demand, report, clock)?;
         if demand.required.sample_resources != 0 {
             if let SongSampleSenderCapacity::Bounded {

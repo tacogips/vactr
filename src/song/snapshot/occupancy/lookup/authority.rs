@@ -397,6 +397,7 @@ impl<'a> IssuedIndexOperand<'a> {
 }
 
 /// Bind the actual fresh issued invocation, retaining its rebound entry clock.
+#[cfg(test)]
 pub(crate) fn bind_issued_owner<'a>(
     selector: &IssuedOwnerSelector<'a, '_>,
     transcript: &'a crate::pattern::eval::song_provenance::IssuedQueryTranscript,

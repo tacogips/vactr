@@ -17,6 +17,8 @@ use std::collections::VecDeque;
 mod encode;
 mod frames;
 mod pools;
+#[cfg(all(test, feature = "host-native", not(target_arch = "wasm32")))]
+mod realize_tests;
 mod receipts;
 
 /// Submission and guarded retirement are distinct from audio-side application.
@@ -496,7 +498,7 @@ impl SongTransport {
             )?;
             let event = encode::encode(
                 ready,
-                &row,
+                row,
                 branch,
                 assignment.physical,
                 assignment.generation,

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { EditorDeps, Mounted } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
+import { AudibleClock } from '../../src/app/clock';
 import { DOC_FILE, mount } from '../../src/code/mount';
 import { TransportBar, clockStatus, formatLevel } from '../../src/code/transport';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
-import type { TempoBody, WirePlaying } from '../../src/protocol/types';
+import type { TempoBody, TransportSample, WirePlaying } from '../../src/protocol/types';
 import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
@@ -27,6 +28,35 @@ const tempo = (extra: Partial<TempoBody> = {}): TempoBody => ({ bpm: 120, beats_
 const play = (slot: string, time: number): WirePlaying => ({ slot, beat: [0, 1], time, dur: [1, 4] });
 
 describe('TransportBar', () => {
+  it('projects the current transport sample at audible time and hides stale positions', () => {
+    const clock = new MockClock(10);
+    let audibleTime = 10.04;
+    let sample: TransportSample = {
+      epoch: 'run-1', sample_time: 10, cycle: [2, 1], bpm: 120, beats_per_cycle: 4,
+      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+    };
+    const client = new Client(new RecordingTransport());
+    const parent = document.createElement('div'); document.body.appendChild(parent);
+    const bar = new TransportBar(parent, { client, clock,
+      audible: new AudibleClock({ at: () => ({ time: audibleTime, uncertainty: 0, provenance: 'measured' }), }),
+      sample: () => sample });
+    const position = parent.querySelector<HTMLElement>('.vact-position');
+    bar.tick(0);
+    expect(bar.state.cycle).toBeCloseTo(2.02);
+    expect(bar.state.beatFlash).toBe(true);
+    expect(position?.dataset.sync).toBe('visible');
+    expect(position?.dataset.beatFlash).toBe('on');
+    audibleTime = 12.01;
+    bar.tick(16.7);
+    expect(bar.state).toEqual({ cycle: null, beatFlash: false, hidden: true });
+    expect(position?.dataset.sync).toBe('hidden');
+    sample = { ...sample, sample_time: 12.01, running: false };
+    audibleTime = 12.01;
+    bar.tick(33.4);
+    expect(bar.state.hidden).toBe(false);
+    bar.dispose();
+  });
+
   it('renders tempo and extrapolates cycle/beat on the clock between messages', () => {
     const { clock, bar, text, label } = setup();
     bar.onTempo(tempo());

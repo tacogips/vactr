@@ -18,11 +18,13 @@ vi.mock('../../src/params/mount', () => area('params'));
 vi.mock('../../src/pkg/mount', () => area('pkg'));
 
 import { MOUNT_ORDER, createEditor, tierFromUrl } from '../../src/app/main';
+import { audibleFor } from '../../src/app/clock';
 import { PANES } from '../../src/app/layout';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import { MockClock } from '../support/clock';
+import { SimulatedTime } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
 describe('createEditor', () => {
@@ -58,5 +60,40 @@ describe('tierFromUrl', () => {
     });
     expect(tierFromUrl('')).toEqual({ tier: 'browser' });
     expect(tierFromUrl('?other=1')).toEqual({ tier: 'browser' });
+  });
+});
+
+describe('audible tier wiring', () => {
+  it('uses output timestamps in browser mode', () => {
+    const result = audibleFor('browser', { ctx: {
+      currentTime: 3, sampleRate: 48000,
+      getOutputTimestamp: () => ({ contextTime: 2, performanceTime: performance.now() }),
+    } });
+    expect(result.audible.sample(performance.now()).provenance).toBe('measured');
+    result.dispose();
+  });
+
+  it('starts the native probe immediately, repeats, and stops on disposal', async () => {
+    const time = new SimulatedTime();
+    const result = audibleFor('native', { timers: time.timers, client: {
+      clockProbe: async (pageSend: number) => {
+        count += 1;
+        return { v: 1, seq: count, kind: 'clock-probe', body: {
+          page_send: pageSend, engine_receive: pageSend / 1000, engine_send: pageSend / 1000,
+          epoch: 'e1', latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+        } };
+      },
+    } as never });
+    let count = 0;
+    result.start(); await Promise.resolve();
+    expect(count).toBe(1);
+    expect(result.audible.sample(performance.now()).valid).toBe(true);
+    expect(result.audible.sample(performance.now()).provenance).toBe('unavailable');
+    time.advance(1000); await Promise.resolve();
+    expect(count).toBe(2);
+    result.dispose();
+    time.advance(5000); await Promise.resolve();
+    expect(count).toBe(2);
+    expect(result.audible.sample(time.pageMs).valid).toBe(false);
   });
 });

@@ -16,6 +16,7 @@
 
 pub mod audio;
 pub(crate) mod capture;
+pub mod clock;
 pub mod loader;
 pub mod midi;
 pub mod tap;
@@ -27,8 +28,9 @@ mod tests;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-pub use audio::{AudioSide, FrameClock, NativeAudioHost};
+pub use audio::{AudioSide, FrameClock, NativeAudioHost, StreamControl};
 pub use capture::CaptureStats;
+pub use clock::OutputClock;
 pub use loader::{parse_wav, NativeSampleLoader};
 pub use midi::{parse_midi, MidiOutQueue, NativeMidiIn, NativeMidiOut};
 pub use tick::{TickSource, TICK_PERIOD};
@@ -93,6 +95,10 @@ pub struct NativeHosts {
     pub cells: AtomicCells,
     /// The audio timebase (`Runtime::tick`'s `host_now`).
     pub clock: FrameClock,
+    /// Correlation between rendered frames and the host's playback timestamp.
+    pub output: OutputClock,
+    /// Owner-thread control for audio session interruptions.
+    pub stream: StreamControl,
     /// The loader; a clone is the evaluator's `SourceLoader`.
     pub loader: NativeSampleLoader,
     /// Capabilities that are absent (MIDI), each "not available on this
@@ -133,6 +139,8 @@ impl NativeHosts {
         }
         let cells = audio.cells();
         let clock = audio.clock();
+        let output = audio.output_clock();
+        let stream = audio.stream_control();
         let mut diags = Vec::new();
         let midi_in: Box<dyn MidiInHost> = if cfg.midi_in {
             match NativeMidiIn::open(cfg.midi_in_port.as_deref(), clock.clone()) {
@@ -169,6 +177,8 @@ impl NativeHosts {
             hosts,
             cells,
             clock,
+            output,
+            stream,
             loader,
             diags,
         })

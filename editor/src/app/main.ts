@@ -23,7 +23,7 @@ import { mount as mountMidi } from '../midi/mount';
 import { mount as mountParams } from '../params/mount';
 import { mount as mountPkg } from '../pkg/mount';
 import { mount as mountVisual } from '../visual/mount';
-import { AudioClock, PageClock } from './clock';
+import { AudioClock, PageClock, audibleFor } from './clock';
 import type { EditorDeps, Mounted, MountFn } from './deps';
 import { buildLayout, pane, type Layout } from './layout';
 import { mount as mountSong } from './song';
@@ -86,9 +86,11 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   const store = new Store();
   const files: FileAccess = isTauri(win) ? new TauriFiles() : new BrowserFiles(win);
   let deps: EditorDeps;
+  let audibleLifecycle: ReturnType<typeof audibleFor>;
   if (choice.tier === 'native') {
     const client = new Client(new SocketTransport(choice.url), { store });
-    deps = { client, store, clock: new PageClock(), tier: 'native', files };
+    audibleLifecycle = audibleFor('native', { client, epoch: () => store.transportSample?.epoch ?? null });
+    deps = { client, store, clock: new PageClock(), audible: audibleLifecycle.audible, tier: 'native', files };
   } else {
     const base = win.document.baseURI;
     const core = await WasmCore.start({
@@ -97,9 +99,10 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
     });
     const client = new Client(new WasmTransport(core), { store });
     const ctx = core.host.ctx;
+    audibleLifecycle = audibleFor('browser', { ctx, epoch: () => store.transportSample?.epoch ?? null });
     // Audio may start only after a user gesture.
     root.addEventListener('pointerdown', () => void ctx.resume(), { once: true });
-    deps = { client, store, clock: new AudioClock(ctx), tier: 'browser', files, core };
+    deps = { client, store, clock: new AudioClock(ctx), audible: audibleLifecycle.audible, tier: 'browser', files, core };
   }
   const formatterUrl = new URL('vactr.wasm', win.document.baseURI).href;
   const tool = new ToolWasm(formatterUrl);
@@ -107,8 +110,9 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   deps.completion = new WasmCompletionEngine(tool);
   deps.syntax = () => loadVactSyntax(win.document.baseURI);
   const editor = createEditor(root, deps);
+  audibleLifecycle.start();
   deps.client.subscribe({ telemetry: true, levels: true, diagnostics: true });
-  return editor;
+  return { ...editor, dispose() { audibleLifecycle.dispose(); editor.dispose(); } };
 }
 
 // Page entry: only the editor page carries #vactr-app.

@@ -79,6 +79,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
     map: (span, rev) => sync.mapWireSpan(span, rev),
     tempo: () => store.tempo,
     anchor,
+    ...(deps.audible ? { audible: deps.audible, epoch: () => store.transportSample?.epoch ?? null } : {}),
     apply: (ranges) => view?.dispatch({ effects: setPlaying.of(ranges) }),
   });
   // Filled once the transport exists: every eval starts audio (the key press
@@ -135,6 +136,7 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
     client,
     clock,
     anchor,
+    ...(deps.audible ? { audible: deps.audible, sample: () => store.transportSample } : {}),
     onHush: () => highlight.clear(),
     audio: deps.core?.host.ctx ?? null,
     onRun: () => void evalCtl.evalAll(),
@@ -215,9 +217,9 @@ export function mount(root: HTMLElement, deps: EditorDeps): Mounted {
 
   // Per animation frame: highlights and the transport bar.
   let frame: number | null = null;
-  const loop = (): void => {
-    highlight.tick();
-    transport.tick();
+  const loop = (frameMs: number): void => {
+    highlight.tick(frameMs);
+    transport.tick(frameMs);
     frame = win?.requestAnimationFrame?.(loop) ?? null;
   };
   frame = win?.requestAnimationFrame?.(loop) ?? null;

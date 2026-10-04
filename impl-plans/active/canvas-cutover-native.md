@@ -1,6 +1,6 @@
 # Canvas Cutover: Native Output Clock and Session Owner Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-NATIVE (wave 1, no dependencies)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.5 (and 15.3.8.4 protocol fields, 15.3.8.7)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
@@ -244,12 +244,22 @@ attributes.
 
 ## Completion Criteria
 
-- [ ] Contracts exactly as pinned; reply JSON matches `editor/src/protocol/types.ts:205-215`
-- [ ] The audio callback adds only the `record` call (reviewed by diff)
-- [ ] `audio.rs` and `protocol.rs` < 1000 lines
-- [ ] Build, clippy, focused nextest, Wasm build and src-tauri check pass
+- [x] Contracts exactly as pinned; reply JSON matches `editor/src/protocol/types.ts:205-215`
+- [x] The audio callback adds only the `record` call (reviewed by diff)
+- [x] `audio.rs` and `protocol.rs` < 1000 lines
+- [x] Build, clippy, focused nextest, Wasm build and src-tauri check pass
+- [x] Stale clock coverage uses nonzero samples on both sides of the one-second threshold; mutation without the age predicate fails
+- [x] Clock discontinuity drops pending telemetry while preserving diagnostics and requester replies
 
 ## Progress Log
 
 ### Session: 2026-10-05
-**Tasks Completed**: Plan authored
+**Tasks Completed**: TASK-001 through TASK-005 implemented; protocol contract, callback scope, file-size limits, and all assigned verification gates confirmed.
+**Evidence**: `tmp/canvas-cutover/native/checks.log`; final full-suite log `tmp/canvas-cutover/native/full-nextest-final-rerun.log`; post-edit hashes in `tmp/canvas-cutover/native/receipt.json`.
+**Verification**: build, strict clippy, focused nextest (493/493), wasm build, Tauri cargo check, touched-file rustfmt, and full nextest (2,810/2,810; 3 skipped) all exited 0. `audio.rs` is 896 lines and `protocol.rs` is 940 lines.
+**Notes**: The first final-suite wrapper completed nextest with all tests passing but then exited 1 because zsh reserves the variable name `status`; it is retained in `tmp/canvas-cutover/native/full-nextest-final.log`. The clean rerun captured exit 0 in the rerun log above. Independent review and workflow finalization remain downstream.
+
+### Session: 2026-10-05 (integrity review repairs)
+**Findings Addressed**: NATIVE-TI-001 and NATIVE-TI-002.
+**Changes**: Added a test-only backdated OutputClock constructor. The stale test now injects a nonzero sample 2 seconds old and a 0.5-second-old measured sample. `clock_discontinuity` now removes only Telemetry, Levels, and Tempo broadcasts; the regression test queues Playing, Diag, and Manifest messages and checks what is dropped and delivered.
+**Verification**: Mutation removal of `age_seconds <= 1.0` failed at the stale assertion (expected). Mutation to the old requester-only outbox predicate failed at the new Diag-preservation assertion (expected). Restored-source focused nextest passed 493/493, clippy with `-D warnings` passed, wasm build passed, rustfmt check passed, and full nextest passed 2,810/2,810 with 3 skipped. See `tmp/canvas-cutover/native/checks.log` and its referenced complete logs.

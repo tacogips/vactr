@@ -10,6 +10,7 @@ use crate::host::testing::AudioCall;
 use crate::ns::depgraph::FormState;
 use crate::ns::stage::SlotKey;
 use crate::session::protocol::{BindingsBody, ServerMsg, WireFormState, WireState, WireValue};
+use crate::session::{ClockReading, LatencyKind};
 
 /// The current defining generation of `name`.
 fn gen(rig: &Rig, name: &str) -> u64 {
@@ -585,4 +586,88 @@ fn invalid_host_samples_do_not_advance_or_publish_and_unsubscribed_samples_are_a
         },
     ));
     assert!(transport_samples(&rig.tick()).is_empty());
+}
+
+#[test]
+fn observed_latency_and_levels_share_the_transport_clock_sample() {
+    let mut rig = Rig::new();
+    rig.send(crate::session::protocol::ClientMsg::Subscribe(
+        crate::session::protocol::SubscribeBody {
+            telemetry: true,
+            levels: true,
+            diagnostics: true,
+        },
+    ));
+    rig.s.observe_clock(Some(ClockReading {
+        processing_time: 0.012,
+        latency_seconds: Some(0.012),
+        latency_kind: LatencyKind::Measured,
+        uncertainty_seconds: Some(0.001),
+    }));
+    let messages = rig.tick();
+    let sample = transport_samples(&messages)
+        .into_iter()
+        .next()
+        .expect("transport sample");
+    assert_eq!(sample.latency_kind, "measured");
+    assert_eq!(sample.latency_seconds, Some(0.012));
+    assert_eq!(sample.uncertainty_seconds, Some(0.001));
+    let levels = messages
+        .iter()
+        .find_map(|message| match message {
+            ServerMsg::Levels(levels) => Some(levels),
+            _ => None,
+        })
+        .expect("levels sample");
+    assert_eq!(levels.time, Some(0.0));
+    assert_eq!(levels.epoch.as_deref(), Some(sample.epoch.as_str()));
+}
+
+#[test]
+fn discontinuity_changes_epoch_clears_telemetry_and_keeps_control_replies() {
+    let mut rig = Rig::new();
+    let initial = transport_samples(&rig.tick())[0].epoch.clone();
+    let pending = rig
+        .s
+        .apply_text(7, r#"{"v":1,"seq":2,"kind":"manifest?","body":{}}"#);
+    rig.s.outbox.extend(pending);
+    let queued = rig.s.route(
+        7,
+        None,
+        vec![
+            ServerMsg::Playing(Default::default()),
+            ServerMsg::Diag(Default::default()),
+        ],
+    );
+    rig.s.outbox.extend(queued);
+    rig.s.clock_discontinuity();
+    assert_eq!(rig.s.outbox.len(), 2, "only pending telemetry was dropped");
+    assert!(rig
+        .s
+        .outbox
+        .iter()
+        .any(|out| matches!(&out.env.body, ServerMsg::Manifest(_))));
+    assert!(rig
+        .s
+        .outbox
+        .iter()
+        .any(|out| matches!(&out.env.body, ServerMsg::Diag(_))));
+    assert!(!rig
+        .s
+        .outbox
+        .iter()
+        .any(|out| matches!(&out.env.body, ServerMsg::Playing(_))));
+    rig.clock.set(0.05);
+    let messages = rig.tick();
+    assert!(messages
+        .iter()
+        .any(|message| matches!(message, ServerMsg::Manifest(_))));
+    assert!(messages
+        .iter()
+        .any(|message| matches!(message, ServerMsg::Diag(_))));
+    let next = transport_samples(&messages)
+        .into_iter()
+        .next()
+        .expect("transport sample");
+    assert_ne!(next.epoch, initial);
 }

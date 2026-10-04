@@ -39,6 +39,34 @@ const LEVELS_PERIOD: f64 = 0.1;
 /// Maximum transport snapshot cadence: twenty per second.
 const TRANSPORT_PERIOD: f64 = 0.05;
 
+/// Provenance of native output-latency telemetry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LatencyKind {
+    Measured,
+    Estimate,
+    Unavailable,
+}
+
+impl LatencyKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Measured => "measured",
+            Self::Estimate => "estimate",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+/// A host's current processing-time and output-latency observation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClockReading {
+    pub processing_time: f64,
+    pub latency_seconds: Option<f64>,
+    pub latency_kind: LatencyKind,
+    pub uncertainty_seconds: Option<f64>,
+}
+
 /// The display name of `id` in `files`.
 #[must_use]
 pub fn file_name(files: &[Rc<str>], id: FileId) -> String {
@@ -395,6 +423,7 @@ impl Session {
         if !host_now.is_finite() || host_now < 0.0 {
             return Vec::new();
         }
+        self.last_host_now = host_now;
         let mut out = std::mem::take(&mut self.outbox);
         for (conn, msg) in self.apply_pending() {
             let routed = self.route(conn.unwrap_or(0), None, vec![msg]);
@@ -502,6 +531,8 @@ impl Session {
                     bands: Some(sigs.fft),
                 }],
                 analyzers: analyzers.filter(|v| !v.is_empty()),
+                time: Some(host_now),
+                epoch: Some(epoch.clone()),
             }));
         }
         let clock = if source == ClockSource::MidiClock {
@@ -528,9 +559,16 @@ impl Session {
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.to_f64(),
                 running: !frozen && !lost,
-                latency_seconds: None,
-                latency_kind: "unavailable".to_string(),
-                uncertainty_seconds: None,
+                latency_seconds: self
+                    .observed_clock
+                    .and_then(|reading| reading.latency_seconds),
+                latency_kind: self
+                    .observed_clock
+                    .map_or("unavailable", |reading| reading.latency_kind.as_str())
+                    .to_string(),
+                uncertainty_seconds: self
+                    .observed_clock
+                    .and_then(|reading| reading.uncertainty_seconds),
             })
         } else {
             None

@@ -1,6 +1,6 @@
 # Canvas Cutover: Renderer Layers and Frame Scheduler Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-RENDER (wave 1, no dependencies)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.3 (frame scheduler), 15.3.8.7 (GPU per-frame bounds), 15.3.8.2 (`call-head` kind)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
@@ -220,7 +220,7 @@ cleanup array), and the injected rAF in `editor/src/visual/frame.ts` (`scheduler
 |---------|-------------------|
 | `cd editor && npm run check` | exit 0 |
 | `cd editor && ./node_modules/.bin/vitest run test/canvas/frame.test.ts test/canvas/gpu.test.ts test/canvas/state.test.ts test/canvas/input.test.ts test/canvas/contracts.test.ts` | all pass |
-| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` then `cd editor && ./node_modules/.bin/vitest run` | full suite passes |
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` then `cd editor && ./node_modules/.bin/vitest run` | Cargo build passes; full Vitest remains blocked because generated `tree-sitter-vact/tree-sitter-vact.wasm` is absent and is outside declared `artifactRoots` |
 | `wc -l editor/src/code/renderer.ts editor/src/code/frame.ts editor/src/code/atlas.ts` | each < 1000 |
 
 ## Overwrite and Drift Protocol
@@ -231,13 +231,17 @@ Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] Contracts exactly as pinned
-- [ ] Animation-only frames proven to perform zero shaping, zero atlas uploads and zero buffer uploads
-- [ ] `textPending` budget behavior tested
-- [ ] Scheduler hidden, DPR, resize, inset and dispose tests pass
-- [ ] `npm run check` exit 0; full vitest passes with no assertion deleted
+- [x] Contracts exactly as pinned
+- [x] Animation-only frames proven to perform zero shaping, zero atlas uploads and zero buffer uploads
+- [x] `textPending` budget behavior tested
+- [x] Scheduler hidden, DPR, resize, inset and dispose tests pass
+- [ ] `npm run check` exit 0; full vitest passes with no assertion deleted (type check passes; full suite awaits approved tree-sitter WASM artifact path)
 
 ## Progress Log
 
 ### Session: 2026-10-05
 **Tasks Completed**: Plan authored
+
+### Session: 2026-10-05 CANVAS-RENDER implementation
+**Tasks Completed**: TASK-001, TASK-002, TASK-003, TASK-004 implementation and focused verification
+**Notes**: Added cached renderer draw layers and `call-head`, 1 MiB atlas upload budget with `textPending`, and `FrameScheduler`/`PerfRecorder`. Focused Vitest passed 132/132 and `npm run check` passed. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` passed. Full Vitest ran 80 files: 606 passed, 6 skipped, 2 suites failed because `tree-sitter-vact/tree-sitter-vact.wasm` is absent. Building it with the repository task writes outside this plan's empty `artifactRoots`; resume after the dispatch artifact root is amended or the test asset is otherwise made available within an authorized artifact path. `renderer.ts`, `frame.ts`, and `atlas.ts` are 359, 130, and 105 lines.

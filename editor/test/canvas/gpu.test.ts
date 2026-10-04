@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TextLayout, type LayoutFont } from '../../src/code/layout';
 import { GlyphAtlas, type CanvasFactory } from '../../src/code/atlas';
 import { CanvasRenderer } from '../../src/code/renderer';
@@ -41,6 +41,7 @@ function recordingGL(maxTexture = 1024) {
   }
   for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram', 'bindVertexArray', 'bindBuffer', 'bufferData', 'enableVertexAttribArray', 'vertexAttribPointer', 'bindFramebuffer', 'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1i', 'activeTexture', 'scissor']) gl[name] = (...args: unknown[]) => calls.push({ name, args });
   gl.getParameter = () => maxTexture; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
+  gl.isTexture = (obj: object) => live.get(obj) === 'Texture';
   gl.getShaderInfoLog = () => ''; gl.getProgramInfoLog = () => ''; gl.getAttribLocation = () => 0; gl.getUniformLocation = (_p: object, name: string) => ({ name });
   gl.isContextLost = () => false;
   gl.bindTexture = (_target: number, texture: object | null) => { bound = texture; };
@@ -134,7 +135,7 @@ describe('GPU shaped-run atlas', () => {
   it('crops the whole run and masks syntax without reshaping substrings', () => {
     const r = recordingGL(64); const raster = rasterizer(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, raster.createCanvas);
     const run = { text: 'ffi日本', from: 0, to: 5, x: 0, width: 50 };
-    const tile = a.tile({ run, font, dpr: 1, x: 32, width: 18, styles: [{ from: 3, to: 5, color: '#ff0000' }] });
+    const tile = a.tile({ run, font, dpr: 1, x: 32, width: 18, styles: [{ from: 3, to: 5, color: '#ff0000' }] })!;
     expect(tile.width).toBe(18); expect(raster.text.map(t => t.text)).toEqual(['ffi日本', 'ffi日本']); expect(raster.text[0]!.x).toBe(-32);
     expect(raster.crops).toContainEqual([-14, 0, 32, 20]);
     a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
@@ -143,7 +144,7 @@ describe('GPU shaped-run atlas', () => {
     const r = recordingGL(); const b = new ResourceLedger(17000); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
     const run = { text: 'abc', from: 0, to: 3, x: 0, width: 24 };
     const req = { run, font, dpr: 1, x: 0, width: 24 };
-    const first = a.tile(req); expect(a.tile(req).texture).toBe(first.texture); expect(a.stats.uploads).toBe(1);
+    const first = a.tile(req)!; expect(a.tile(req)!.texture).toBe(first.texture); expect(a.stats.uploads).toBe(1);
     a.tile({ ...req, font: { ...font, fallback: 'other' } });
     a.tile({ ...req, color: '#ff0000' }); a.tile({ ...req, dpr: 2 });
     expect(a.stats.evictions).toBeGreaterThan(0); expect(b.usedBytes).toBeLessThanOrEqual(17000);
@@ -153,6 +154,14 @@ describe('GPU shaped-run atlas', () => {
     const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas); r.failNextUpload();
     expect(() => a.tile({ run: { text: 'a', from: 0, to: 1, x: 0, width: 8 }, font, dpr: 1, x: 0, width: 8 })).toThrow('refused');
     expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); expect(a.size).toBe(0);
+  });
+  it('bounds atlas misses per frame while allowing resident hits', () => {
+    const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
+    const req = { run: { text: 'a', from: 0, to: 1, x: 0, width: 8 }, font, dpr: 1, x: 0, width: 8 };
+    a.beginFrame(640); expect(a.tile(req)).not.toBeNull();
+    a.beginFrame(0); expect(a.tile(req)).not.toBeNull();
+    expect(a.tile({ ...req, x: 8 })).toBeNull(); expect(a.stats.uploads).toBe(1);
+    a.dispose(); expect(b.usedBytes).toBe(0);
   });
 });
 
@@ -186,6 +195,34 @@ describe('GPU code compositor', () => {
     f.renderer.setDocument('let x = 2\n日本'); f.renderer.render(); expect(f.renderer.atlasStats.uploads).toBe(uploads + 1);
     f.renderer.dispose();
   });
+  it('animation-only frames replay cached text without shaping or uploads', () => {
+    const f = fixture(); f.renderer.render({ textRevision: 1 });
+    const builds = f.renderer.stats.textBuilds, uploads = f.renderer.atlasStats.uploads, buffers = f.renderer.stats.bufferUploads;
+    const shape = vi.spyOn(f.l, 'shape');
+    expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+    expect(shape).not.toHaveBeenCalled(); expect(f.renderer.stats.textBuilds).toBe(builds);
+    expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.renderer.stats.bufferUploads).toBe(buffers);
+    expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 4, to: 8 }] })).toBe(true);
+    expect(shape).not.toHaveBeenCalled(); expect(f.renderer.atlasStats.uploads).toBe(uploads); f.renderer.dispose();
+  });
+  it('rebuilds static draw lists on revision and draws call-head underline without a label', () => {
+    const f = fixture('call()'); f.renderer.render({ textRevision: 1 }); const builds = f.renderer.stats.textBuilds;
+    expect(f.renderer.render({ textRevision: 2, annotations: [{ kind: 'call-head', from: 0, to: 4, label: 'must-not-render' }] })).toBe(true);
+    expect(f.renderer.stats.textBuilds).toBe(builds + 1);
+    expect(f.r.draws.some(draw => draw.color[0] === 0.55 && draw.color[1] === 0.6)).toBe(true);
+    expect(f.raster.text.some(entry => entry.text === 'must-not-render')).toBe(false); f.renderer.dispose();
+  });
+  it('keeps textPending until a bounded per-frame atlas upload completes', () => {
+    const r = recordingGL(1024); const raster = rasterizer(); const b = new ResourceLedger();
+    const text = Array.from({ length: 35 }, () => 'x'.repeat(800)).join('\n');
+    const renderer = new CanvasRenderer(document.createElement('canvas'), layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas });
+    renderer.setViewport({ width: 640, height: 1000, scrollLeft: 0, scrollTop: 0, gutter: 0 });
+    expect(renderer.render({ textRevision: 1 })).toBe(true); expect(renderer.textPending).toBe(true);
+    expect(renderer.atlasStats.uploads).toBeLessThan(35);
+    for (let i = 0; i < 3 && renderer.textPending; i++) expect(renderer.render({ textRevision: 1 })).toBe(true);
+    expect(renderer.textPending).toBe(false); expect(renderer.atlasStats.uploads).toBe(35);
+    renderer.dispose(); expect(b.usedBytes).toBe(0);
+  });
   it('copies changed background once per frame into a reusable texture', () => {
     const f = fixture(); const source = document.createElement('canvas'); source.width = 100; source.height = 100;
     f.renderer.setBackground(source, 1); f.renderer.render(); const textures = [...f.r.live.values()].filter(v => v === 'Texture').length;
@@ -198,10 +235,10 @@ describe('GPU code compositor', () => {
     f.renderer.setBackground(null); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
   });
   it('restores CPU source after context loss with fresh resources and empty targets', () => {
-    const f = fixture(); f.renderer.render(); f.r.lose();
+    const f = fixture(); f.renderer.render({ textRevision: 1 }); const builds = f.renderer.stats.textBuilds; f.r.lose();
     const lost = new Event('webglcontextlost', { cancelable: true }); f.c.dispatchEvent(lost);
     expect(lost.defaultPrevented).toBe(true); expect(f.b.usedBytes).toBe(0); expect(f.renderer.render()).toBe(false); expect(f.renderer.status.saveText()).toBe('let x = 1\n日本');
-    f.renderer.setDocument('retained edit'); f.c.dispatchEvent(new Event('webglcontextrestored')); expect(f.renderer.render()).toBe(true); expect(f.renderer.status.saveText()).toBe('retained edit');
+    f.renderer.setDocument('retained edit'); f.c.dispatchEvent(new Event('webglcontextrestored')); expect(f.renderer.render({ textRevision: 1 })).toBe(true); expect(f.renderer.stats.textBuilds).toBe(builds + 1); expect(f.renderer.status.saveText()).toBe('retained edit');
     f.renderer.dispose(); expect(f.b.usedBytes).toBe(0); expect(f.r.live.size).toBe(0);
     f.c.dispatchEvent(new Event('webglcontextrestored')); expect(f.b.usedBytes).toBe(0);
   });
@@ -312,7 +349,9 @@ describe('GPU code compositor', () => {
     const r = recordingGL(); const b = new ResourceLedger(2_100_000); const c = document.createElement('canvas'); const raster = rasterizer();
     const text = Array.from({ length: 50 }, (_, i) => `${i}:` + 'x'.repeat(58)).join('\n');
     const renderer = new CanvasRenderer(c, layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas }); renderer.setViewport({ width: 500, height: 1000, scrollLeft: 0, scrollTop: 0, gutter: 0 });
-    expect(renderer.render()).toBe(true); expect(renderer.atlasStats.evictions).toBeGreaterThan(0); expect(raster.text.filter(t => t.text.includes(':'))).toHaveLength(50);
+    expect(renderer.render()).toBe(true);
+    for (let i = 0; i < 10 && renderer.textPending; i++) expect(renderer.render()).toBe(true);
+    expect(renderer.textPending).toBe(true); expect(renderer.atlasStats.evictions).toBeGreaterThan(0); expect(raster.text.filter(t => t.text.includes(':')).length).toBeGreaterThanOrEqual(50);
     expect(b.usedBytes).toBeLessThanOrEqual(2_100_000); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
   it('releases initialization resources when shader or object setup fails', () => {

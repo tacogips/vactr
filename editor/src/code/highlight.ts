@@ -11,7 +11,7 @@
 
 import { StateEffect, StateField, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
-import type { Clock } from '../app/clock';
+import type { AudibleClock, Clock } from '../app/clock';
 import type { Ratio, Span, TempoBody, WirePlaying } from '../protocol/types';
 import type { Range16 } from './history';
 
@@ -74,6 +74,7 @@ interface Entry {
   end: number;
   span: Span;
   rev: number;
+  epoch: string | null;
 }
 
 export interface HighlightOptions {
@@ -84,16 +85,20 @@ export interface HighlightOptions {
   /** The latest `tempo` (read at event receipt). */
   tempo: () => TempoBody | null;
   anchor?: TimeAnchor;
+  audible?: AudibleClock;
+  epoch?: () => string | null;
   /** Receives the active ranges whenever they change. */
   apply?: (ranges: Range16[]) => void;
 }
 
 export class HighlightScheduler {
+  readonly stats = { received: 0, accepted: 0, overflow: 0, horizonDrops: 0, epochDrops: 0, unmapped: 0 };
   private readonly opts: HighlightOptions;
   private readonly anchor: TimeAnchor;
   private entries: Entry[] = [];
   private activeRanges: Range16[] = [];
   private activeKey = '';
+  private readonly acceptListeners = new Set<(e: { time: number; end: number; from: number; to: number; epoch: string | null }) => void>();
 
   constructor(opts: HighlightOptions) {
     this.opts = opts;
@@ -102,23 +107,53 @@ export class HighlightScheduler {
 
   /** Stores the highlightable events of one `playing` batch. */
   onPlaying(events: readonly WirePlaying[]): void {
+    this.stats.received += events.length;
     this.anchor.observe(events.map((e) => e.time));
     const tempo = this.opts.tempo();
     for (const ev of events) {
       const src = ev.src;
       if (!src || src.file !== this.opts.file) continue;
-      const start = this.anchor.local(ev.time);
-      this.entries.push({ start, end: start + durSeconds(ev.dur, tempo), span: src.span, rev: src.doc_revision });
+      const start = this.opts.audible ? ev.time : this.anchor.local(ev.time);
+      const end = this.opts.audible ? (ev.end_time ?? start + durSeconds(ev.dur, tempo)) : start + durSeconds(ev.dur, tempo);
+      const epoch = ev.epoch ?? null;
+      if (this.opts.audible) {
+        if (epoch !== null && epoch !== (this.opts.epoch?.() ?? null)) { this.stats.epochDrops += 1; continue; }
+        const t = this.opts.audible.now();
+        if (start > t + 2) { this.stats.horizonDrops += 1; continue; }
+      }
+      const mapped = this.opts.audible || this.acceptListeners.size > 0
+        ? this.opts.map(src.span, src.doc_revision)
+        : null;
+      if (this.opts.audible && !mapped) { this.stats.unmapped += 1; continue; }
+      this.entries.push({ start, end, span: src.span, rev: src.doc_revision, epoch });
+      this.stats.accepted += 1;
+      if (mapped) for (const cb of this.acceptListeners) cb({ time: start, end, from: mapped.from, to: mapped.to, epoch });
     }
-    if (this.entries.length > MAX_ENTRIES) this.entries.splice(0, this.entries.length - MAX_ENTRIES);
+    if (this.entries.length > MAX_ENTRIES) {
+      const overflow = this.entries.length - MAX_ENTRIES;
+      this.stats.overflow += overflow;
+      this.entries.splice(0, overflow);
+    }
   }
 
-  /** Recomputes the active set at `clock.now()`; returns the active ranges. */
-  tick(): Range16[] {
-    const now = this.opts.clock.now();
+  /** Recomputes the active set at the frame's audible presentation time. */
+  tick(frameMs?: number): Range16[] {
+    const sample = this.opts.audible?.sample(frameMs ?? performance.now());
+    if (sample && !sample.valid) {
+      this.activeKey = '';
+      this.activeRanges = [];
+      this.opts.apply?.([]);
+      return this.activeRanges;
+    }
+    const now = sample?.time ?? this.opts.clock.now();
     const keep: Entry[] = [];
     const ranges: Range16[] = [];
     for (const e of this.entries) {
+      if (this.opts.audible && e.epoch !== null && e.epoch !== (this.opts.epoch?.() ?? null)) {
+        this.stats.epochDrops += 1;
+        continue;
+      }
+      if (this.opts.audible && e.start > now + 2) { this.stats.horizonDrops += 1; continue; }
       if (e.end <= now) continue;
       if (e.start > now) {
         keep.push(e);
@@ -144,6 +179,11 @@ export class HighlightScheduler {
   /** The ranges decorated by the last `tick`. */
   active(): Range16[] {
     return this.activeRanges;
+  }
+
+  onAccept(cb: (e: { time: number; end: number; from: number; to: number; epoch: string | null }) => void): () => void {
+    this.acceptListeners.add(cb);
+    return () => { this.acceptListeners.delete(cb); };
   }
 
   /** Pending plus active entries. */

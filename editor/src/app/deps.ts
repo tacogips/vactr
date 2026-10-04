@@ -5,7 +5,7 @@ import type { Client } from '../protocol/client';
 import type { Store } from '../protocol/store';
 import type { WasmCore } from '../protocol/wasm';
 import type { BindApi, CodeApi, MidiApi, VisualApi, ResourceBudget, SongControls } from './apis';
-import type { Clock } from './clock';
+import type { AudibleClock, Clock } from './clock';
 import type { Formatter } from '../code/format';
 import type { CompletionEngine } from '../code/completion-types';
 import type { SyntaxLoader } from '../code/syntax';
@@ -16,6 +16,7 @@ export interface EditorDeps {
   client: Client;
   store: Store;
   clock: Clock;
+  audible?: AudibleClock;
   tier: Tier;
   files: FileAccess;
   /** The browser tier's wasm core. */

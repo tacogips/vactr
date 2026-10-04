@@ -231,6 +231,32 @@ pub struct SubscribeBody {
     pub diagnostics: bool,
 }
 
+/// Request a native output-clock correlation sample.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct ClockProbeBody {
+    pub page_send: f64,
+}
+
+/// Host-side correlation returned to the requesting transport.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct ClockProbeReply {
+    pub page_send: f64,
+    pub engine_receive: f64,
+    pub engine_send: f64,
+    pub epoch: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation: Option<ClockProbeCorrelation>,
+    pub latency_seconds: Option<f64>,
+    pub latency_kind: String,
+    pub uncertainty_seconds: Option<f64>,
+}
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct ClockProbeCorrelation {
+    pub engine_time: f64,
+    pub output_time: f64,
+}
+
 /// Explicit whole-code song application, separate from incremental eval.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -375,6 +401,7 @@ pub struct SongTransportStateBody {
 pub enum ClientMsg {
     ApplySong(ApplySongBody),
     MuteInstrument(SongInstrumentMuteBody),
+    ClockProbe(ClockProbeBody),
     Eval(EvalBody),
     Hush(Empty),
     Stop(StopBody),
@@ -389,7 +416,8 @@ pub enum ClientMsg {
 
 impl ClientMsg {
     /// Every client kind.
-    pub const KINDS: [&'static str; 11] = [
+    pub const KINDS: [&'static str; 12] = [
+        "clock-probe",
         "eval",
         "hush",
         "stop",
@@ -409,6 +437,7 @@ impl ClientMsg {
         match self {
             ClientMsg::ApplySong(_) => "apply-song",
             ClientMsg::MuteInstrument(_) => "mute-instrument",
+            ClientMsg::ClockProbe(_) => "clock-probe",
             ClientMsg::Eval(_) => "eval",
             ClientMsg::Hush(_) => "hush",
             ClientMsg::Stop(_) => "stop",
@@ -719,6 +748,10 @@ pub struct WireAnalyzer {
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct LevelsBody {
     pub levels: Vec<WireLevel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<String>,
     /// Every `EffectKind::Analyzer` unit of the installed bus graph with a
     /// constant `id` (TASK-010 G4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -770,6 +803,7 @@ pub enum ServerMsg {
     SongCandidateReady(SongCandidateReadyBody),
     SongCandidateApplied(crate::song::SongApplyAck),
     SongCandidateFailed(SongCandidateFailedBody),
+    ClockProbe(ClockProbeReply),
     EvalResult(EvalResultBody),
     StaleBinding(StaleBindingBody),
     DirectiveEdit(DirectiveEditBody),
@@ -806,7 +840,8 @@ pub enum Route {
 
 impl ServerMsg {
     /// Every server kind.
-    pub const KINDS: [&'static str; 15] = [
+    pub const KINDS: [&'static str; 16] = [
+        "clock-probe",
         "song-instrument-muted",
         "song-transport-state",
         "song-candidate-ready",
@@ -833,6 +868,7 @@ impl ServerMsg {
             ServerMsg::SongCandidateReady(_) => "song-candidate-ready",
             ServerMsg::SongCandidateApplied(_) => "song-candidate-applied",
             ServerMsg::SongCandidateFailed(_) => "song-candidate-failed",
+            ServerMsg::ClockProbe(_) => "clock-probe",
             ServerMsg::EvalResult(_) => "eval-result",
             ServerMsg::StaleBinding(_) => "stale-binding",
             ServerMsg::DirectiveEdit(_) => "directive-edit",
@@ -854,6 +890,7 @@ impl ServerMsg {
             | ServerMsg::SongCandidateReady(_)
             | ServerMsg::SongCandidateApplied(_)
             | ServerMsg::SongCandidateFailed(_)
+            | ServerMsg::ClockProbe(_)
             | ServerMsg::EvalResult(_)
             | ServerMsg::StaleBinding(_)
             | ServerMsg::DirectiveEdit(_)

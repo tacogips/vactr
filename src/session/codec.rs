@@ -147,6 +147,9 @@ fn validate_timing(kind: &str, body: &Json) -> Result<(), ProtocolError> {
         })
     };
     let bad = || err(ErrorCode::BadBody, "invalid telemetry timing");
+    if kind == "clock-probe" && !nonnegative(&body["page_send"]) {
+        return Err(err(ErrorCode::BadBody, "invalid clock-probe page_send"));
+    }
     if kind == "playing" {
         if let Some(events) = body.get("events").and_then(Json::as_array) {
             if events.len() > 4096 {

@@ -1,6 +1,6 @@
 import type { CodeAnnotation, CodeRect } from '../app/apis';
 import { GlyphAtlas, type CanvasFactory, type RunStyle } from './atlas';
-import { TextLayout, type LayoutViewport, type ShapedRun } from './layout';
+import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from './layout';
 import { ResourceLedger, effectiveSize, RESOURCE_LIMITS, type Reservation } from './resources';
 
 export interface GpuStatus {
@@ -10,7 +10,11 @@ export interface GpuStatus {
 export interface RenderFeedback {
   annotations?: readonly CodeAnnotation[]; cursor?: number | null;
   handles?: readonly { pos: number; end?: boolean }[];
+  textRevision?: number;
+  animated?: readonly CodeAnnotation[];
+  cursorVisible?: boolean;
 }
+interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; cursor?: boolean }
 export interface RendererOptions {
   ledger?: ResourceLedger; gl?: WebGL2RenderingContext; createCanvas?: CanvasFactory;
   onStatus?: (status: GpuStatus) => void;
@@ -56,13 +60,21 @@ export class CanvasRenderer {
   private view: LayoutViewport = { width: 1, height: 1, scrollLeft: 0, scrollTop: 0 };
   private requestedDpr = 1;
   private labels = new Map<string, ShapedRun>();
+  private beforeAnimation: DrawCommand[] | null = null;
+  private afterAnimation: DrawCommand[] | null = null;
+  private cacheKey = '';
+  private collecting: DrawCommand[] | null = null;
+  private pendingText = false;
+  private visibleLines: ShapedLine[] = [];
+  private pendingStartLine = 0;
+  private currentLineIndex = 0;
   private scale = 1;
   private lost = false;
   private disposed = false;
   private statusValue: GpuStatus;
   private readonly createCanvas: CanvasFactory;
   private readonly loss = (event: Event): void => {
-    event.preventDefault(); this.lost = true; this.releaseGpu(true); this.report('context-lost', 'GPU context lost; editing and save remain available');
+    event.preventDefault(); this.lost = true; this.clearDrawCache(); this.releaseGpu(true); this.report('context-lost', 'GPU context lost; editing and save remain available');
   };
   private readonly restore = (): void => {
     if (this.disposed) return;
@@ -84,8 +96,9 @@ export class CanvasRenderer {
     try { this.initialize(); this.reportReady(); } catch (e) { this.fail(e); }
   }
   get status(): GpuStatus { return this.statusValue; }
+  get textPending(): boolean { return this.pendingText; }
   get atlasStats(): Readonly<{ uploads: number; hits: number; evictions: number }> { return this.atlas?.stats ?? { uploads: 0, hits: 0, evictions: 0 }; }
-  setDocument(text: string): void { this.layout.setDocument(text); }
+  setDocument(text: string): void { this.layout.setDocument(text); this.clearDrawCache(); }
   setViewport(view: LayoutViewport, dpr = 1): void {
     if (![view.width, view.height, view.scrollLeft, view.scrollTop, view.left ?? 0, view.top ?? 0, view.gutter ?? 48].every(Number.isFinite) || view.width <= 0 || view.height <= 0 || view.scrollLeft < 0 || view.scrollTop < 0 || dpr <= 0 || !Number.isFinite(dpr)) throw new RangeError('Invalid viewport');
     this.view = { ...view }; this.requestedDpr = dpr;
@@ -150,7 +163,7 @@ export class CanvasRenderer {
     if (this.disposed || this.lost || !this.gl || !this.program || !this.atlas) return false;
     try {
       if (!this.target) this.resize(this.requestedDpr);
-      const gl = this.gl;
+      const gl = this.gl; this.atlas.beginFrame(); this.pendingText = false;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindVertexArray(this.vao); gl.useProgram(this.program);
       gl.viewport(0, 0, this.canvas.width, this.canvas.height); gl.disable(gl.SCISSOR_TEST);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -160,48 +173,55 @@ export class CanvasRenderer {
       if (this.backdrop) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [1, 1, 1, 1], this.backdrop.texture);
       this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
       const annotations = feedback.annotations ?? [];
-      this.clip(this.view.gutter ?? 48);
-      for (const kind of ['selection', 'playing', 'eval'] as const) {
-        for (const a of annotations) if (a.kind === kind) {
-          const color = kind === 'selection' ? [0.12, 0.22, 0.32, 0.55] : kind === 'playing' ? [0.35, 0.29, 0.13, 0.5] : a.className?.includes('error') ? [0.4, 0.12, 0.16, 0.5] : [0.2, 0.32, 0.36, 0.5];
-          for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), color);
-        }
-      }
-      const builds = this.layout.stats.builds;
+      const staticAnnotations = annotations.filter(a => a.kind !== 'playing' && a.kind !== 'eval');
+      const key = JSON.stringify([feedback.textRevision, this.view, this.scale, this.layout.font.generation, this.atlas.stats.evictions, staticAnnotations, feedback.cursor, feedback.handles]);
+      const rebuild = feedback.textRevision === undefined || this.beforeAnimation === null || this.afterAnimation === null || this.cacheKey !== key;
       let unsupported = false;
-      for (const line of this.layout.visible(this.view)) {
-        unsupported ||= line.rtlUnsupported;
-        const y = line.number * this.layout.font.lineHeight - this.view.scrollTop;
-        for (const run of line.runs) {
-          const styles = annotations;
-          this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, y, styles);
+      if (rebuild) {
+        const before: DrawCommand[] = [], after: DrawCommand[] = [];
+        this.collecting = before; this.clip(this.view.gutter ?? 48);
+        for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.12, 0.22, 0.32, 0.55]);
+        this.collecting = after; this.clip(this.view.gutter ?? 48);
+        const visibleLines = this.layout.visible(this.view); this.visibleLines = visibleLines;
+        for (let offset = 0; offset < visibleLines.length; offset++) {
+          const index = (this.pendingStartLine + offset) % visibleLines.length;
+          const line = visibleLines[index]!; this.currentLineIndex = index;
+          unsupported ||= line.rtlUnsupported; const y = line.number * this.layout.font.lineHeight - this.view.scrollTop;
+          for (const run of line.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, y, staticAnnotations);
         }
+        gl.disable(gl.SCISSOR_TEST);
+        for (const line of this.layout.visible(this.view)) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], '#7a7f87', true);
+        this.clip(this.view.gutter ?? 48);
+        for (const a of staticAnnotations) {
+          if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? [0.75, 0.2, 0.25, 1] : [0.53, 0.75, 0.82, 1]);
+          if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), [0.55, 0.6, 0.66, 0.6]);
+        }
+        if (feedback.cursor != null) { const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) after.push({ rect: this.local(r), color: [0.9, 0.92, 0.94, 1], cursor: true }); }
+        for (const a of staticAnnotations) {
+          if (a.kind === 'binding' && a.label) {
+            const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
+            const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
+            const width = Math.min(256, Math.max(16, a.label.length * 8 + 8));
+            this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, [0.15, 0.19, 0.25, 0.95]);
+            this.drawRun(this.labelRun(a.label, width), x + 4, y, [], '#ebcb8b');
+          }
+        }
+        for (const handle of feedback.handles ?? []) {
+          const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
+          const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
+          this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, [0.53, 0.75, 0.82, 1]);
+        }
+        this.collecting = null; this.stats.textBuilds++;
+        if (!this.pendingText) { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = key; this.pendingStartLine = 0; }
+        else { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = ''; }
       }
-      this.stats.textBuilds += this.layout.stats.builds - builds;
-      gl.disable(gl.SCISSOR_TEST);
-      for (const line of this.layout.visible(this.view)) {
-        const text = String(line.number + 1); const width = (this.view.gutter ?? 48) - 8;
-        this.drawRun(this.labelRun(text, width), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], '#7a7f87', true);
-      }
+      for (const command of this.beforeAnimation ?? []) this.replay(command);
       this.clip(this.view.gutter ?? 48);
-      for (const a of annotations) if (a.kind === 'diagnostic' || a.kind === 'composition') {
-        for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? [0.75, 0.2, 0.25, 1] : [0.53, 0.75, 0.82, 1]);
+      for (const a of [...annotations, ...(feedback.animated ?? [])]) if (a.kind === 'playing' || a.kind === 'eval') {
+        const color = a.kind === 'playing' ? [0.35, 0.29, 0.13, 0.5] : a.className?.includes('error') ? [0.4, 0.12, 0.16, 0.5] : [0.2, 0.32, 0.36, 0.5];
+        for (const r of this.animatedRects(a)) this.quad(this.local(r), color);
       }
-      if (feedback.cursor != null) {
-        const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.quad(this.local(r), [0.9, 0.92, 0.94, 1]);
-      }
-      for (const a of annotations) if (a.kind === 'binding' && a.label) {
-        const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
-        const x = r.left - (this.view.left ?? 0) + 3; const y = r.top - (this.view.top ?? 0);
-        const width = Math.min(256, Math.max(16, a.label.length * 8 + 8));
-        this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, [0.15, 0.19, 0.25, 0.95]);
-        this.drawRun(this.labelRun(a.label, width), x + 4, y, [], '#ebcb8b');
-      }
-      for (const handle of feedback.handles ?? []) {
-        const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
-        const x = r.left - (this.view.left ?? 0); const y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
-        this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, [0.53, 0.75, 0.82, 1]);
-      }
+      for (const command of this.afterAnimation ?? []) if (!command.cursor || feedback.cursorVisible !== false) this.replay(command);
       gl.disable(gl.SCISSOR_TEST);
       if (gl.getError() !== gl.NO_ERROR) throw new Error('GPU draw failed');
       this.stats.frames++;
@@ -216,6 +236,24 @@ export class CanvasRenderer {
     if (hit) { this.labels.delete(key); this.labels.set(key, hit); return hit; }
     if (this.labels.size >= 512) this.labels.delete(this.labels.keys().next().value!);
     const run = { text, from: 0, to: text.length, x: 0, width }; this.labels.set(key, run); return run;
+  }
+  private replay(command: DrawCommand): void {
+    if (command.texture && !this.gl!.isTexture(command.texture)) return;
+    this.quad(command.rect, command.color, command.texture);
+  }
+  private animatedRects(range: CodeAnnotation): CodeRect[] {
+    const from = this.layout.boundary(range.from), to = this.layout.boundary(range.to, 1);
+    const out: CodeRect[] = [];
+    for (const line of this.visibleLines) {
+      if (line.to < from || line.from > to) continue;
+      const start = Math.max(from, line.from), end = Math.min(to, line.to);
+      const left = Math.max((this.view.left ?? 0) + (this.view.gutter ?? 48), (this.view.left ?? 0) + (this.view.gutter ?? 48) + this.layout.advance(line, start) - this.view.scrollLeft);
+      const endX = (this.view.left ?? 0) + (this.view.gutter ?? 48) + this.layout.advance(line, end) - this.view.scrollLeft + (to > line.to ? 8 : 0);
+      const right = Math.min((this.view.left ?? 0) + this.view.width, endX);
+      const top = (this.view.top ?? 0) + line.number * this.layout.font.lineHeight - this.view.scrollTop;
+      if (right >= left) out.push({ left, right: Math.max(left + 1, right), top, bottom: top + this.layout.font.lineHeight });
+    }
+    return out;
   }
   private drawRun(run: ShapedRun, x: number, y: number, styles: readonly CodeAnnotation[], color?: string, gutter = false): void {
     const atlas = this.atlas!; const step = atlas.tilePixels / this.scale;
@@ -233,6 +271,7 @@ export class CanvasRenderer {
         tileStyles.push({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: GPU_TOKEN_COLORS[a.className ?? ''] ?? '#d8dee9' });
       }
       const tile = atlas.tile({ run, font: this.layout.font, dpr: this.scale, x: offset, width, styles: tileStyles, color });
+      if (!tile) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; continue; }
       this.quad({ left: x + offset, right: x + offset + width, top: y, bottom: y + this.layout.font.lineHeight }, [1, 1, 1, 1], tile.texture);
     }
   }
@@ -244,6 +283,7 @@ export class CanvasRenderer {
   }
   private quad(r: CodeRect, color: number[], texture = this.white): void {
     if (r.right <= 0 || r.left >= this.view.width || r.bottom <= 0 || r.top >= this.view.height) return;
+    if (this.collecting) { this.collecting.push({ rect: r, color, texture: texture ?? undefined }); return; }
     const gl = this.gl!; gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform4f(this.locations.u_rect, r.left, r.top, r.right - r.left, r.bottom - r.top);
     gl.uniform4f(this.locations.u_color, color[0]!, color[1]!, color[2]!, color[3]!);
@@ -291,8 +331,10 @@ export class CanvasRenderer {
     this.statusValue = { kind, message, effectiveDpr: this.scale, saveText: () => this.layout.document };
     if (changed) this.options.onStatus?.(this.statusValue);
   }
-  private fail(error: unknown): void { this.releaseGpu(false); this.report('unavailable', error instanceof Error ? error.message : String(error)); }
+  private fail(error: unknown): void { this.clearDrawCache(); this.releaseGpu(false); this.report('unavailable', error instanceof Error ? error.message : String(error)); }
+  private clearDrawCache(): void { this.beforeAnimation = null; this.afterAnimation = null; this.cacheKey = ''; this.visibleLines = []; }
   private releaseGpu(lost: boolean): void {
+    this.clearDrawCache();
     const gl = this.gl;
     if (lost) this.atlas?.contextLost(); else this.atlas?.dispose(); this.atlas = null;
     if (gl && !lost) {

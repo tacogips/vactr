@@ -16,6 +16,7 @@ use tungstenite::http::{Response as HttpResponse, StatusCode};
 use tungstenite::protocol::WebSocketConfig;
 use tungstenite::{Message, WebSocket};
 
+use crate::cli::owner::OwnerEvent;
 use crate::pkg::digest::hex;
 use crate::session::codec::MAX_FRAME;
 
@@ -152,7 +153,7 @@ pub(crate) fn spawn_accept_loop(
     listener: TcpListener,
     token: String,
     limit: ConnLimit,
-    events: mpsc::Sender<ConnEvent>,
+    events: mpsc::Sender<OwnerEvent>,
 ) {
     thread::spawn(move || {
         let mut next_id: u32 = 1;
@@ -181,7 +182,7 @@ pub(crate) fn spawn_accept_loop(
     });
 }
 
-fn handle_connection(stream: TcpStream, id: u32, token: &str, events: &mpsc::Sender<ConnEvent>) {
+fn handle_connection(stream: TcpStream, id: u32, token: &str, events: &mpsc::Sender<OwnerEvent>) {
     let token = token.to_string();
     let callback = move |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
         let pq = req
@@ -201,19 +202,19 @@ fn handle_connection(stream: TcpStream, id: u32, token: &str, events: &mpsc::Sen
     match tungstenite::accept_hdr_with_config(stream, callback, Some(config)) {
         Ok(ws) => run_connection(ws, id, events),
         Err(_) => {
-            let _ = events.send(ConnEvent::Closed { id });
+            let _ = events.send(OwnerEvent::Conn(ConnEvent::Closed { id }));
         }
     }
 }
 
-fn run_connection(mut ws: WebSocket<TcpStream>, id: u32, events: &mpsc::Sender<ConnEvent>) {
+fn run_connection(mut ws: WebSocket<TcpStream>, id: u32, events: &mpsc::Sender<OwnerEvent>) {
     let _ = ws.get_ref().set_read_timeout(Some(READ_TIMEOUT));
     let (out_tx, out_rx) = mpsc::channel::<String>();
     if events
-        .send(ConnEvent::Connected {
+        .send(OwnerEvent::Conn(ConnEvent::Connected {
             id,
             outbound: out_tx,
-        })
+        }))
         .is_err()
     {
         return;
@@ -223,28 +224,28 @@ fn run_connection(mut ws: WebSocket<TcpStream>, id: u32, events: &mpsc::Sender<C
         while let Ok(text) = out_rx.try_recv() {
             sent_any = true;
             if ws.send(Message::Text(text.into())).is_err() {
-                let _ = events.send(ConnEvent::Closed { id });
+                let _ = events.send(OwnerEvent::Conn(ConnEvent::Closed { id }));
                 return;
             }
         }
         if sent_any && ws.flush().is_err() {
-            let _ = events.send(ConnEvent::Closed { id });
+            let _ = events.send(OwnerEvent::Conn(ConnEvent::Closed { id }));
             return;
         }
         match ws.read() {
             Ok(Message::Text(text)) => {
                 if events
-                    .send(ConnEvent::Text {
+                    .send(OwnerEvent::Conn(ConnEvent::Text {
                         id,
                         text: text.to_string(),
-                    })
+                    }))
                     .is_err()
                 {
                     return;
                 }
             }
             Ok(Message::Close(_)) => {
-                let _ = events.send(ConnEvent::Closed { id });
+                let _ = events.send(OwnerEvent::Conn(ConnEvent::Closed { id }));
                 return;
             }
             Ok(_) => {}
@@ -254,7 +255,7 @@ fn run_connection(mut ws: WebSocket<TcpStream>, id: u32, events: &mpsc::Sender<C
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                 ) => {}
             Err(_) => {
-                let _ = events.send(ConnEvent::Closed { id });
+                let _ = events.send(OwnerEvent::Conn(ConnEvent::Closed { id }));
                 return;
             }
         }

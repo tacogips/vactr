@@ -21,6 +21,8 @@ export class GlyphAtlas {
   private disposed = false;
   private runIds = new WeakMap<ShapedRun, number>();
   private nextRunId = 1;
+  private frameBudget = 1 << 20;
+  private frameBytes = 0;
   readonly stats = { uploads: 0, hits: 0, evictions: 0 };
   readonly tilePixels: number;
   constructor(private gl: WebGL2RenderingContext, private ledger: ResourceLedger, private createCanvas: CanvasFactory = () => document.createElement('canvas')) {
@@ -28,7 +30,11 @@ export class GlyphAtlas {
     if (!Number.isInteger(this.tilePixels) || this.tilePixels < 1) throw new Error('Invalid texture limit');
   }
   get size(): number { return this.entries.size; }
-  tile(request: TileRequest): AtlasTile {
+  beginFrame(budgetBytes = 1 << 20): void {
+    if (!Number.isSafeInteger(budgetBytes) || budgetBytes < 0) throw new RangeError('Invalid atlas frame budget');
+    this.frameBudget = budgetBytes; this.frameBytes = 0;
+  }
+  tile(request: TileRequest): AtlasTile | null {
     if (this.disposed) throw new Error('Atlas disposed');
     const { run, font, dpr, x, width } = request;
     const w = Math.ceil(width * dpr); const h = Math.ceil(font.lineHeight * dpr);
@@ -43,6 +49,7 @@ export class GlyphAtlas {
     }
     if (hit) this.remove(key, hit); // Hash collision: equality above is authoritative.
     const bytes = w * h * 4;
+    if (this.frameBytes + bytes > this.frameBudget) return null;
     // Reserve persistent metadata and temporary raster staging together with the tile.
     // Weak run identities keep historical source strings out of the atlas entirely.
     let reservation: Reservation | null = null;
@@ -82,7 +89,7 @@ export class GlyphAtlas {
       this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas);
       if (this.gl.getError() !== this.gl.NO_ERROR) throw new Error('Text upload refused by GPU');
       const tile = { texture, width: w, height: h, x, cssWidth: width };
-      this.entries.set(key, { tile, reservation, identity, metadata }); this.stats.uploads++;
+      this.entries.set(key, { tile, reservation, identity, metadata }); this.stats.uploads++; this.frameBytes += bytes;
       return tile;
     } catch (error) {
       if (texture) this.gl.deleteTexture(texture); reservation.release(); metadata.release(); throw error;

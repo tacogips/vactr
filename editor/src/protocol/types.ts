@@ -396,6 +396,8 @@ export interface WireAnalyzer {
 export interface LevelsBody {
   levels: WireLevel[];
   analyzers?: WireAnalyzer[];
+  time?: number;
+  epoch?: string;
 }
 
 export interface TempoClock {

@@ -268,6 +268,8 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
       if (!env.body.levels.every((v) => isObject(v) && typeof v.source === 'string' &&
         nonnegative(v.rms) && (v.bands === undefined ||
         (Array.isArray(v.bands) && v.bands.every(nonnegative)))) ||
+        (env.body.time !== undefined && !nonnegative(env.body.time)) ||
+        (env.body.epoch !== undefined && !epoch(env.body.epoch)) ||
         (env.body.analyzers !== undefined && (!Array.isArray(env.body.analyzers) ||
         !env.body.analyzers.every((v) => isObject(v) && typeof v.bus === 'string' &&
           typeof v.kind === 'string' && integer(v.id) && Array.isArray(v.cells) && v.cells.every(finite)))))

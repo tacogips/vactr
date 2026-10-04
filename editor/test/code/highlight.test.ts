@@ -1,5 +1,6 @@
 import { EditorState, Text } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { AudibleClock } from '../../src/app/clock';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   HighlightScheduler,
@@ -64,6 +65,38 @@ function event(text: string, literal: string, time: number, dur: [number, number
 }
 
 describe('HighlightScheduler (criterion 1, mock clock)', () => {
+  it('uses audible end times, drops mismatched epochs and future horizon events, and reports accepted ranges', () => {
+    const text = 'd1 "bd sd"';
+    let now = 1;
+    let epoch: string | null = 'e1';
+    const client = new Client(new RecordingTransport());
+    const initial = Text.of(text.split('\n'));
+    const sync = new DocumentSync(client.document('main.vact'), initial);
+    const view = new EditorView({ parent: document.body, state: EditorState.create({ doc: initial, extensions: [sync.extension(), highlightExtension()] }) });
+    views.push(view);
+    const accepted: unknown[] = [];
+    const applied: number[][] = [];
+    const sched = new HighlightScheduler({
+      clock: new MockClock(), audible: new AudibleClock({ at: () => ({ time: now, uncertainty: 0, provenance: 'measured' }) }),
+      epoch: () => epoch, file: 'main.vact', map: (span, rev) => sync.mapWireSpan(span, rev), tempo: () => TEMPO,
+      apply: (ranges) => { applied.push(ranges.map((r) => r.from)); view.dispatch({ effects: setPlaying.of(ranges) }); },
+    });
+    sched.onAccept((eventValue) => accepted.push(eventValue));
+    const good = { ...event(text, 'bd', 1, [1, 1]), epoch: 'e1', end_time: 1.25 };
+    sched.onPlaying([good, { ...good, epoch: 'old' }, { ...good, time: 4, end_time: 5 }]);
+    expect(sched.stats).toMatchObject({ received: 3, accepted: 1, epochDrops: 1, horizonDrops: 1 });
+    expect(accepted).toEqual([{ time: 1, end: 1.25, from: 4, to: 6, epoch: 'e1' }]);
+    sched.tick(0);
+    expect(playingRanges(view)).toHaveLength(1);
+    now = 1.3;
+    sched.tick(16.7);
+    expect(playingRanges(view)).toEqual([]);
+    expect(applied.at(-1)).toEqual([]);
+    epoch = 'e2';
+    sched.onPlaying([good]);
+    expect(sched.size).toBe(0);
+  });
+
   it('computes dur_seconds from the latest tempo', () => {
     // `dur` is in beats on the wire (src/session/publish.rs dur_beats).
     expect(durSeconds([1, 1], TEMPO)).toBeCloseTo(0.5);

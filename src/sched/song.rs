@@ -4,10 +4,11 @@ use crate::host::caps::{
     SongReplacementCommit, SongReplacementCommitRefusal, SongReplacementPreparationRefusal,
     SongReplacementProgress, SongReplacementSource, SongReplacementSourceRefusal, SongSubmitError,
 };
+use crate::pattern::eval::song_observation::CanonicalIndexCollector;
 use crate::pattern::TimeSpan;
 use crate::song::routing::{
-    self, SongActivation, SongCommand, SongEndpoints, SongHostAck, SongHostClock, SongInitialMute,
-    SongMute, SongReplacement,
+    SongActivation, SongCommand, SongEndpoints, SongHostAck, SongHostClock, SongInitialMute,
+    SongMute, SongReplacement, SongResolvedRoute,
 };
 use crate::song::{PreparedSong, SnapshotEpoch, SongLimits, SongSettings};
 use crate::value::ratio::Ratio64;
@@ -439,32 +440,46 @@ impl SongTransport {
             .ready
             .as_mut()
             .ok_or_else(|| failure("Ready query authority missing"))?;
-        let mut rows = ready.query(TimeSpan::new(self.cursor, end)?, &self.limits)?;
-        self.limits.check_events(rows.len())?;
-        rows.sort_by(|a, b| {
-            a.whole
-                .unwrap_or(a.part)
+        let work = CanonicalIndexCollector::new(self.limits.max_nodes, self.limits)?;
+        let batch = ready.query_issued_with_work(TimeSpan::new(self.cursor, end)?, &work, 0)?;
+        self.limits.check_events(batch.events().len())?;
+        let mut order = (0..batch.events().len()).collect::<Vec<_>>();
+        order.sort_by(|left, right| {
+            let left = batch.events()[*left].descriptor();
+            let right = batch.events()[*right].descriptor();
+            left.whole
+                .unwrap_or(left.part)
                 .begin
-                .cmp(&b.whole.unwrap_or(b.part).begin)
-                .then_with(|| a.handle.cmp(&b.handle))
+                .cmp(&right.whole.unwrap_or(right.part).begin)
+                .then_with(|| left.handle.cmp(&right.handle))
         });
-        rows.dedup_by(|a, b| a.handle == b.handle);
-        let count = u32::try_from(rows.len()).map_err(|_| failure("event work count overflow"))?;
-        let allowance = self.limits.max_nodes / count.max(1);
-        if allowance == 0 {
-            return Err(Failure::new(
-                FailCode::FuelExhausted,
-                "route batch work exhausted",
-            ));
+        let mut resolved = Vec::with_capacity(order.len());
+        for index in order {
+            let route = ready.resolve_issued(&batch, index, &work, 0)?;
+            resolved.push((index, route));
         }
-        for row in rows {
+        let mut unique: Vec<(usize, SongResolvedRoute)> = Vec::with_capacity(resolved.len());
+        for (index, route) in resolved {
+            let descriptor = batch.events()[index].descriptor();
+            if let Some((previous, previous_route)) = unique.iter().find(|(previous, _)| {
+                batch.events()[*previous].descriptor().handle == descriptor.handle
+            }) {
+                if batch.events()[*previous].descriptor() != descriptor || *previous_route != route
+                {
+                    return Err(failure("conflicting issued routes for equal event handle"));
+                }
+                continue;
+            }
+            unique.push((index, route));
+        }
+        let mut staged = self.pools.staged(&work)?;
+        let mut commands = Vec::new();
+        for (index, route) in unique {
+            let row = batch.events()[index].descriptor();
             let onset = row.whole.unwrap_or(row.part).begin;
             if onset < self.cursor || onset >= end || onset >= self.duration {
                 continue;
             }
-            let mut route_limits = self.limits;
-            route_limits.max_nodes = allowance;
-            let route = routing::resolve_route(ready.routes(), &row, route_limits)?;
             let branch = ready
                 .routes()
                 .branches
@@ -473,7 +488,7 @@ impl SongTransport {
                 .ok_or_else(|| failure("logical song route missing"))?;
             let frame = self.map.at(onset)?;
             let component_end = route.configuration.end.min(self.duration);
-            let assignment = self.pools.assign(
+            let assignment = staged.assign(
                 route,
                 frame,
                 self.map.at(component_end)?,
@@ -489,15 +504,15 @@ impl SongTransport {
                 self.settings.seconds_per_cycle()?,
             )?;
             if let Some(rebind) = assignment.rebind {
-                self.pending
-                    .push_back(Box::new(SongCommand::RebindBranch(rebind)));
+                commands.push(Box::new(SongCommand::RebindBranch(rebind)));
             }
             if let Some(release) = assignment.release {
-                self.pending
-                    .push_back(Box::new(SongCommand::Release(release)));
+                commands.push(Box::new(SongCommand::Release(release)));
             }
-            self.pending.push_back(Box::new(SongCommand::Event(event)));
+            commands.push(Box::new(SongCommand::Event(event)));
         }
+        self.pools = staged;
+        self.pending.extend(commands);
         self.cursor = end;
         Ok(())
     }

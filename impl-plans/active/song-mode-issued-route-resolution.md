@@ -1,6 +1,6 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (session 259: runs FIRST on base 81c68e7; TASK-013 to TASK-016 apply the operator three-defect fix for the last failing test; see "Session 259 amendment")
+**Status**: In Progress (session 259 implementation complete; workflow-owned reviews and downstream plans remain pending)
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
 
@@ -1465,7 +1465,7 @@ unedited".
 > `prepared.plan().topology.parts[output_scope].revision`, not
 > `output_handle.revision()`. `root`, `track` and `placement` are unchanged.
 
-**Status**: Not started
+**Status**: Complete
 **Parallelizable**: No
 **Deliverables**: `members.rs`, plus one call-site line in `nested/issued.rs`
 
@@ -1496,7 +1496,7 @@ unedited".
 
 ### TASK-009: Retained execution versus site request (`bind_issued_owner_if_matching`)
 
-**Status**: Not started
+**Status**: Complete
 **Parallelizable**: No (after TASK-008)
 **Deliverable**: `src/song/snapshot/occupancy/lookup/authority.rs`
 
@@ -1558,7 +1558,7 @@ Pitfalls:
 
 ### TASK-010: Fixture repairs (`nested/issued.rs` tests)
 
-**Status**: Not started
+**Status**: Complete
 **Parallelizable**: No (verify with TASK-008 and TASK-009)
 
 Diff the tests module against `a8b8ed2` before and after the edits, and
@@ -1616,7 +1616,7 @@ classify every changed line in the receipt.
 
 ### TASK-011: Duplicate frozen `inside` investigation
 
-**Status**: Not started
+**Status**: Complete
 **Parallelizable**: No (after TASK-008 and TASK-009)
 
 In `cached_nested` and `partitioned_nested`, record in the receipt under
@@ -1997,7 +1997,7 @@ records 2c acceptance on `wf/route-authority`.
 
 ### TASK-012: SLICE fixture correction in `src/song/routing/source/issued.rs`
 
-**Status**: Not Started
+**Status**: Complete
 **Parallelizable**: No. It runs in the same serial 2a sub-wave and may go
 before or after TASK-008 to TASK-011. Running it first gives early evidence.
 **Deliverable**: one changed constant in the `#[cfg(test)]` module of
@@ -2501,7 +2501,7 @@ The owned paths are unchanged from the session 258 manifest entry, and
 
 ### TASK-013: Owner revision from the output scope part (design decision 1)
 
-**Status**: Not Started
+**Status**: Complete
 **Parallelizable**: No (serial 2a)
 **Deliverable**: `owner_matches` and `stage_owner_frame` in `members.rs`
 
@@ -2533,7 +2533,7 @@ The owned paths are unchanged from the session 258 manifest entry, and
 
 ### TASK-014: Cross-seal member agreement (design decision 2, operator-authorized)
 
-**Status**: Not Started
+**Status**: Complete
 **Parallelizable**: No (serial 2a)
 **Deliverable**: `bind_issued_member` in `lookup/authority.rs` (about lines
 217-285)
@@ -2571,7 +2571,7 @@ The owned paths are unchanged from the session 258 manifest entry, and
 
 ### TASK-015: Owner-local Index windows (design decision 3)
 
-**Status**: Not Started
+**Status**: Complete
 **Parallelizable**: No (serial 2a)
 **Deliverable**: `issued_index_stage_configuration` in `members.rs`
 
@@ -2601,7 +2601,7 @@ The owned paths are unchanged from the session 258 manifest entry, and
 
 ### TASK-016: Optional coverage for a nonzero offset at stage > 0 (design S259-D5)
 
-**Status**: Optional
+**Status**: Skipped (optional; residual risk recorded in the receipt)
 **Parallelizable**: No
 
 - **When.** Only if it is cheap.
@@ -2781,22 +2781,22 @@ Logs use the manifest names `tmp/song-mode-riela/session249-resolution-*`.
 
 ### Session 259 done criteria (mechanically checkable)
 
-- [ ] `.../session259-resume/reproduce.log` exists and shows the single
+- [x] `.../session259-resume/reproduce.log` exists and shows the single
   failure, or `reproduceDelta` is recorded.
-- [ ] Verification 1 passes 9 tests (10 if the TASK-016 test is added to it).
-- [ ] Verifications 2-5, 8 and 11 exit 0, and verification 12 prints 953.
-- [ ] Verification 7 exits 0 with a `Summary` line and 0 failures.
-- [ ] Verification 6 is fully dispositioned, with no diagnostic on a changed
+- [x] Verification 1 passes 9 tests (10 if the TASK-016 test is added to it).
+- [x] Verifications 2-5, 8 and 11 exit 0, and verification 12 prints 953.
+- [x] Verification 7 exits 0 with a `Summary` line and 0 failures.
+- [x] Verification 6 is fully dispositioned, with no diagnostic on a changed
   line.
-- [ ] Verifications 9, 10, 13 and 14 meet their rules.
-- [ ] `git diff --stat 81c68e7 -- src` lists only `members.rs` and
+- [x] Verifications 9, 10, 13 and 14 meet their rules.
+- [x] `git diff --stat 81c68e7 -- src` lists only `members.rs` and
   `lookup/authority.rs`, plus `nested/issued.rs` only if TASK-016 was done.
-- [ ] `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session258/sha256.txt`
+- [x] `tmp/song-s249/SONG-ISSUED-RESOLUTION/attempt-session258/sha256.txt`
   exists, and `session259/` is unchanged.
-- [ ] The receipt has `session: 259`, `baseCommit`, `reviewDiffRange`, the
+- [x] The receipt has `session: 259`, `baseCommit`, `reviewDiffRange`, the
   `fixes[]` entries above, `crossSealBindingAudit`,
   `nonzeroInnerOffsetCoverage` and a new fingerprint.
-- [ ] One progress-log entry is added.
+- [x] One progress-log entry is added.
 
 ### Review focus (workflow-owned test-integrity, adversarial and integration review)
 
@@ -2816,3 +2816,57 @@ Logs use the manifest names `tmp/song-mode-riela/session249-resolution-*`.
   fatal, so a skipped branch cannot let a foreign branch win.
 - **Scope.** The review covers `reviewDiffRange`, the full 2a diff since
   `1ac457f`.
+
+### Session 259 resume progress log
+
+**Status**: Implementation complete for the assigned resolver plan. TASK-016
+was skipped as optional; its nonzero inner-offset coverage remains a recorded
+residual risk. Test-integrity, adversarial and integration review are
+workflow-owned downstream steps, and no review approval is claimed here.
+
+**Changes**: TASK-013 derives owner revision from the output-scope topology
+part while retaining root/track/placement checks. TASK-014 accepts distinct
+genuine member allocations across independently authenticated seals only when
+their original-use edges agree; within-seal Rc identity and boundary
+`copy_origin` validation remain intact. TASK-015 converts owner spans to
+branch-local time once and restores song time with checked arithmetic.
+
+**Commands and evidence**:
+
+- Baseline focused reproduction is source-matched to `81c68e7` by both repair
+  target hashes (`e20a1873...` for `members.rs`, `e492e281...` for
+  `lookup/authority.rs`): 9 tests, 8 passed, 1 failed only in
+  `discarded_augmented_source_origins_are_resolved` with
+  `event does not match admitted route topology`;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/reproduce.log`.
+- After TASK-013/TASK-015, the named checkpoint was 9 tests, 8 passed, 1
+  failed with the expected intermediate `ambiguous original member binding`;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/named-TASK-013.log`.
+- TASK-013 build and TASK-014 build each exited 0;
+  `build-TASK-013.log` and `build-TASK-014.log` in
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/`.
+- Final focused named tests passed 9/9; occupancy/prepared passed 63/63;
+  issued routing passed 17/17; legacy binaries passed 105/105. Complete logs:
+  `tmp/song-mode-riela/session249-resolution-nextest-focused.log`.
+- `CARGO_TERM_QUIET=true cargo check` and native build exited 0;
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/post-change-check-agent.log`
+  and `tmp/song-mode-riela/session249-resolution-build.log`.
+- Strict all-target Clippy exited 101 with 67 diagnostics, all mapped in
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/clippy-dispositions.json`;
+  only the declared dead-code/unused-import dispositions and
+  `SW-let_and_return` remain. No diagnostic points to a changed line.
+- Final-source full nextest exited 0: 2,793 passed, 3 skipped, 0 failed;
+  `tmp/song-mode-riela/session249-resolution-nextest-full.log`.
+- WASM build exited 0 at `tmp/song-mode-riela/session249-resolution-wasm.log`.
+  Scoped three-path and 13-path rustfmt checks exited 0 at
+  `tmp/song-mode-riela/session249-resolution-fmt.log` and
+  `tmp/song-s249/SONG-ISSUED-RESOLUTION/session259-resume/fmt-13-paths.log`.
+- Source audit: `source.rs` 991 lines, `nested/issued.rs` 901, members 377,
+  authority 598; cohort 953. Frozen/unowned-path comparison against `81c68e7`
+  is empty. No Rust allow/expect additions. TASK-014 grep counts are 1/1/1;
+  output-scope missing check is once and `context.offset` appears twice.
+- `git diff --stat 81c68e7 -- src` lists only
+  `nested/issued/members.rs` and `occupancy/lookup/authority.rs`.
+
+Review focus remains recorded above. SONG-STRUCTURAL-CLOCK review, shared
+work, playback, and SONG-16 remain owned by later workflow steps.

@@ -1,8 +1,8 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (session 259: runs THIRD, on <2c-accepted>; see "Session 258 amendment" and "Session 259 amendment")
+**Status**: In Progress (session 260: final source verification recorded; see "Session 259 amendment")
 **Created**: 2026-10-03
-**Last Updated**: 2026-10-03
+**Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
 
 ## Purpose and dependencies
@@ -82,7 +82,7 @@ Original constructor debit remains charged exactly once for that transaction.
 - [x] Foreign existing execution records refuse without synthetic proof repair.
 - [x] Foreign attachment fails without callback access.
 - [x] Whole transaction exact/one-less/depth failures preserve spent work.
-- [ ] Independent focused/regression/native/lint/WASM/format gates pass.
+- [x] Independent focused/regression/native/lint/WASM/format gates complete with allowed diagnostics dispositioned; see session 260 progress and clippy evidence.
 
 ### TASK-003: Playback adoption
 
@@ -347,11 +347,11 @@ format, no stash/checkout/reset, and updates to this plan's log only.
 
 - [x] Both pinned signatures exist.
 - [x] `seed_collection` is additive, and the fresh-path charge is unchanged.
-- [ ] All seven tests above are present and pass.
-- [ ] Build, full tests and WASM exit 0.
-- [ ] In this plan's paths, Clippy reports only the two forwarders. Every
-  other diagnostic maps to a Route8 D-row or a `RES-` item in the receipt.
-- [x] fmt is clean on touched paths and every file is below 1000 lines; the
+- [x] All seven tests above are present and pass (eight shared-work tests pass).
+- [x] Build, full tests and WASM exit 0.
+- [x] In this plan's paths, Clippy reports only the two forwarders. Every
+  other diagnostic maps to a Route8 D-row or a `RES-` item in the session 260 disposition evidence.
+- [x] fmt is clean on the four declared paths and every file is below 1000 lines; the
   only `--check` hunks are in the two untouched child modules documented above.
 - [x] No new `allow`/`expect` attributes.
 - [x] The progress-log entry is recorded.
@@ -848,3 +848,46 @@ This amendment changes only these items:
 - [ ] `tmp/song-s249/SONG-SHARED-WORK/attempt-session258/sha256.txt` exists.
   The receipt has `session: 259` and a new fingerprint.
 - [ ] One progress-log entry is added.
+
+### 2026-10-04 — Session 260 source-matched verification
+
+The runtime-owned accepted dependency set includes SONG-ROUTE8,
+SONG-ISSUED-RESOLUTION and SONG-STRUCTURAL-CLOCK. The four declared Rust paths
+were already implemented and unchanged from checkpoint `f72a753`; the final
+clippy gate exposed the plan-owned `clippy::let_and_return` at
+`src/song/snapshot/issued.rs:231`, so the immediate closure result is now
+returned directly with no behavior change and no `allow`/`expect` attribute.
+The caller-owned shared collector, charged additive `Rc::ptr_eq` retention,
+fresh-collector charge and all eight genuine tests remain intact.
+
+Final-source verification (all logs under
+`tmp/song-s249/SONG-SHARED-WORK/session260/`):
+
+- Focused nextest: exit 0, 88 passed, 0 failed, including all eight
+  `shared_work_tests` (`focused-after-fix.log`).
+- Native build: exit 0 (`build-final.log`).
+- Full nextest: exit 0, 2,793 passed, 3 skipped, 0 failed
+  (`full-nextest.log`).
+- WASM build: exit 0 (`wasm.log`).
+- Strict all-target clippy: exit 101. The `SW-let_and_return` diagnostic is
+  absent; all 66 remaining diagnostics are mapped to Route8 D-rows,
+  issued-resolution RES-rows or the two expected SW forwarder rows in
+  `clippy-dispositions.json`. They are dead-code/unused-import dispositions
+  for the accepted earlier waves whose production callers are wired by the
+  downstream playback wave.
+- Rustfmt check: exit 1 with hunks only in the unowned child files
+  `src/song/snapshot/resources.rs` and
+  `src/song/snapshot/reservations_tests.rs`; no hunk names a declared path.
+  Both child files remain unchanged. All four declared paths are below 1,000
+  lines (`line-counts-final.log`).
+
+`TASK-003` and the completion items for actual playback consumption remain
+assigned to SONG-ISSUED-PLAYBACK. Formal review and later workflow finalization
+remain downstream.
+
+- [x] Eight shared-work tests pass on final source.
+- [x] Native build, full nextest and WASM build pass on final source.
+- [x] No shared-work clippy row remains; all other strict-clippy diagnostics
+  are recorded with disposition IDs.
+- [x] Declared paths are formatted, under the line limit, and unowned child
+  paths remain unchanged.

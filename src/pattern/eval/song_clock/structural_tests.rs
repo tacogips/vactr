@@ -30,11 +30,8 @@ impl DepthFixture {
             max_walk_nodes: 100_000,
             max_walk_depth: 256,
         };
-        let factory = DecodedSongAssetFactory::new(
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        );
+        let factory =
+            DecodedSongAssetFactory::new(BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
         let context = CandidateBuildCtx {
             assets: &factory,
             asset_limits,
@@ -95,10 +92,12 @@ impl DepthFixture {
         SharedIndexWork,
         std::result::Result<(), crate::vm::fail::Failure>,
     ) {
-        use crate::pattern::eval::song_observation::{CanonicalIndexCollector, CanonicalIndexTarget};
+        use crate::pattern::eval::song_observation::{
+            CanonicalIndexCollector, CanonicalIndexTarget,
+        };
         use crate::pattern::eval::InputCells;
-        use crate::vm::query_vm::MeteredSongQuery;
         use crate::value::intern::intern_kw;
+        use crate::vm::query_vm::MeteredSongQuery;
 
         let work = CanonicalIndexCollector::new(limits.max_nodes, limits).unwrap();
         work.borrow_mut().original = Some(self.original.clone());

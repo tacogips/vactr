@@ -224,11 +224,10 @@ pub(super) fn query_issued_with_work(
         }
         ledger.limits
     };
-    let result = (|| {
+    (|| {
         let batch = query_issued_rows(snapshot, span, &limits, work, depth)?;
         freeze_batch(batch, work, depth)
-    })();
-    result
+    })()
 }
 pub(super) fn query_issued(
     snapshot: &mut SongSnapshot,

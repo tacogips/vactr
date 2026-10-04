@@ -6,10 +6,11 @@ pub(super) fn owner_matches(
     frame: &CanonicalOwnerFrame,
     stage: &Stage<'_>,
     output_handle: &crate::song::EventHandle,
+    output_revision: crate::song::PartRevision,
 ) -> bool {
     frame.root == stage.output_owner.payload().id
         && frame.track == output_handle.track()
-        && frame.revision == output_handle.revision()
+        && frame.revision == output_revision
         && frame.placement == *output_handle.placement()
 }
 
@@ -17,6 +18,7 @@ pub(super) fn stage_owner_frame<'a>(
     context: &IssuedResolution<'a>,
     stage: &Stage<'_>,
     output_handle: &crate::song::EventHandle,
+    output_revision: crate::song::PartRevision,
     bridge: &mut WorkBridge<'_>,
     budget: &mut ResolutionBudget,
 ) -> Result<&'a CanonicalOwnerFrame, Failure> {
@@ -33,7 +35,7 @@ pub(super) fn stage_owner_frame<'a>(
         budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
         bridge.synced_remaining = budget.remaining();
         let frame = actual.lookup_owner();
-        if owner_matches(frame, stage, output_handle) {
+        if owner_matches(frame, stage, output_handle, output_revision) {
             return Ok(frame);
         }
     }
@@ -159,6 +161,7 @@ pub(super) fn issued_index_stage_configuration(
     let transcript = context.transcript;
     let depth = context.depth;
     let mut result = None;
+    let local_owner = owner.map(|time| time.checked_sub(context.offset))?;
     for (stage_index, stage) in stages.iter().enumerate() {
         let output_handle = output_handles
             .get(stage_index)
@@ -202,6 +205,13 @@ pub(super) fn issued_index_stage_configuration(
                     let output_scope = *output_scopes
                         .get(stage_index)
                         .ok_or_else(|| invalid("issued output scope missing"))?;
+                    let output_revision = prepared
+                        .plan()
+                        .topology
+                        .parts
+                        .get(output_scope)
+                        .ok_or_else(|| invalid("issued output scope part missing"))?
+                        .revision;
                     let output = super::super::super::index::output_operand_owner(
                         &prepared.plan().topology,
                         output_scope,
@@ -236,8 +246,14 @@ pub(super) fn issued_index_stage_configuration(
                         prefix: &prefix,
                         owner_window: stage.scope.interval,
                     };
-                    let stage_owner =
-                        stage_owner_frame(context, stage, output_handle, bridge, budget)?;
+                    let stage_owner = stage_owner_frame(
+                        context,
+                        stage,
+                        output_handle,
+                        output_revision,
+                        bridge,
+                        budget,
+                    )?;
                     bind_timing_member(context, stage, stage_owner, site, &bound, bridge, budget)?;
                     let mut parent_use = parent_use_policy(
                         context,
@@ -259,7 +275,12 @@ pub(super) fn issued_index_stage_configuration(
                             .ok_or_else(|| invalid("issued invocation replenished shared work"))?;
                         budget.charge(usize::try_from(spent).map_err(|_| capacity_overflow())?)?;
                         bridge.synced_remaining = budget.remaining();
-                        if !owner_matches(actual.lookup_owner(), stage, output_handle) {
+                        if !owner_matches(
+                            actual.lookup_owner(),
+                            stage,
+                            output_handle,
+                            output_revision,
+                        ) {
                             continue;
                         }
                         let address_policy = match parent_use.take() {
@@ -305,14 +326,15 @@ pub(super) fn issued_index_stage_configuration(
                             &bound,
                             &operand,
                             selected,
-                            intersect(stage.scope.interval, owner)?,
-                            owner,
+                            intersect(stage.scope.interval, local_owner)?,
+                            local_owner,
                             depth,
                             budget,
                         )?
                         else {
                             return Err(super::missing_issued_index_component());
                         };
+                        let local = local.map(|time| time.checked_add(context.offset))?;
                         timing_result = Some(if let Some(previous) = timing_result {
                             if previous != local {
                                 return Err(invalid(

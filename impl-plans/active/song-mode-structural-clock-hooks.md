@@ -1,6 +1,6 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: In Progress (session 259: runs SECOND, on <2a-accepted>; TASK-016 fixes the format hunks and reruns the gates with zero allowed failures; see "Session 258 amendment" and "Session 259 amendment")
+**Status**: Implementation complete (session 259 gates passed; formal workflow reviews pending)
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
@@ -117,6 +117,32 @@ LoopAt/Fit retain current sample-header speed encoding semantics.
   varying seeds remain required for the full goal.
 
 ## Progress log
+
+### 2026-10-04 — Session 259 implementation and green-tree verification
+
+Applied only the two rustfmt hunks authorized by TASK-016 in
+`src/pattern/eval/song_clock/structural_tests.rs`. The diff is formatting-only:
+6 insertions and 7 deletions; the assertion count remains 38. The pre-edit
+check showed exactly hunks A and B (exit 1); post-edit and scoped rustfmt checks
+exit 0. Per-edit intent, pre/post hashes, formatter outputs, and all session-259
+gate logs are in `tmp/song-s249/SONG-STRUCTURAL-CLOCK/session259/`. Earlier
+gate artifacts were preserved in `attempt-session257/` and
+`attempt-session258/`, each with a `sha256.txt` manifest.
+
+On the accepted SONG-ISSUED-RESOLUTION tree based at `81c68e7`, focused
+structural/combinator/domain nextest passed 37/37; the full suite passed
+2,793/2,793 with 3 skipped and 0 failures; route regression binaries passed
+105/105; export/CLI passed 10/10 plus five repeats (50/50). Native and WASM
+builds exit 0. Strict Clippy exits 101 because of resolver/snapshot diagnostics
+outside this plan; it reports no diagnostic in a structural-clock path. Scoped
+rustfmt exits 0, all listed Rust files are below 1,000 lines, the exact cohort
+is 953, the frozen-path and other-write-path checks exit 0, and the no-assertion
+change count remains 38. No runtime behavior changed.
+
+TASK-016 gates and plan-local evidence are complete. Formal test-integrity,
+adversarial, and integration reviews remain workflow-owned. Chunk selection,
+routing consumption, pre-Reserve admission, and varying-seed readiness remain
+outside this plan and stay unchecked in the full-goal criterion.
 
 ### 2026-10-04 — Session 257 implementation and acceptance rerun
 
@@ -1620,7 +1646,7 @@ and TASK-014.
 
 ### TASK-016: Format-only fix, gate rerun, receipt and progress log
 
-**Status**: Not Started
+**Status**: Complete (session 259 format-only fix and zero-failure gate rerun)
 **Parallelizable**: No (only 2c task this session; it starts after
 SONG-ISSUED-RESOLUTION is accepted)
 **Deliverables**: two hand-edited hunks in
@@ -1732,17 +1758,17 @@ Pitfalls:
 
 ### Session 258 done criteria (mechanically checkable)
 
-- [ ] `fmt-before.log` shows hunks A and B, and `fmt-after.log` is empty with
+- [x] `fmt-before.log` shows hunks A and B, and `fmt-after.log` is empty with
   exit 0. S258-V1 exits 0.
-- [ ] S258-V2 to S258-V5 pass.
-- [ ] Session 255 commands 1, 2, 5, 6, 9 and 10 exit 0 (10 prints 953).
+- [x] S258-V2 to S258-V5 pass.
+- [x] Session 255 commands 1, 2, 5, 6, 9 and 10 exit 0 (10 prints 953).
   Command 4 exits 0 with a `Summary` line and 0 failures. Command 3 has no
   2c-path diagnostic, and command 7 meets its rule.
-- [ ] S257-V1 exits 0, and S257-V5 assert counts are unchanged.
-- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session257/sha256.txt`
-  exists. The receipt has `session: 258`, the TASK-016 `format-only` fix,
+- [x] S257-V1 exits 0, and S257-V5 assert counts are unchanged.
+- [x] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session257/sha256.txt`
+  exists. The superseding session 259 receipt has `session: 259`, the TASK-016 `format-only` fix,
   `reviewDiffRange`, `failures: []` and a new fingerprint.
-- [ ] One progress-log entry is added. Test-integrity, adversarial and
+- [x] One progress-log entry is added. Test-integrity, adversarial and
   integration review over `reviewDiffRange` follow; the workflow owns them.
 
 ## Session 259 amendment (runs SECOND, on <2a-accepted>; serial, concurrency 1)
@@ -1774,11 +1800,11 @@ below.
 
 ### Session 259 done criteria
 
-- [ ] Every session 258 done criterion holds, with `<2a-accepted>` from
+- [x] Every session 258 done criterion holds, with `<2a-accepted>` from
   session 259.
-- [ ] The frozen-path check above exits 0.
-- [ ] Full nextest `--no-fail-fast` exits 0 with a `Summary` line and 0
+- [x] The frozen-path check above exits 0.
+- [x] Full nextest `--no-fail-fast` exits 0 with a `Summary` line and 0
   failures.
-- [ ] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session258/sha256.txt`
+- [x] `tmp/song-s249/SONG-STRUCTURAL-CLOCK/attempt-session258/sha256.txt`
   exists, and the receipt has `session: 259` and a new fingerprint.
-- [ ] One progress-log entry is added.
+- [x] One progress-log entry is added.

@@ -6,6 +6,7 @@ use crate::host::caps::{
     SongSubmitError,
 };
 use crate::host::wire::HostMsg;
+use crate::song::routing::{prepare_routes_issued, PreparedRoutes};
 use crate::song::routing::*;
 use crate::song::snapshot::{
     FrozenSongEvent, SongApplyAck, SongPreparationState, SongResourceLease,
@@ -151,7 +152,7 @@ pub struct SongPreparationCleanup {
 }
 pub struct SongHostPreparation {
     prepared: Option<PreparedSong>,
-    routes: Option<SongRoutePlan>,
+    routes: Option<PreparedRoutes>,
     report: Option<SongCapacityReport>,
     clock: Option<SongHostClock>,
     capacity_posted: bool,
@@ -161,7 +162,7 @@ pub struct SongHostPreparation {
 }
 pub struct SongReadyBundle {
     prepared: PreparedSong,
-    routes: SongRoutePlan,
+    routes: PreparedRoutes,
     resources: Vec<SongLeaseKey>,
     pools: Vec<SongPhysicalBranch>,
     stages: Vec<SongPhysicalStage>,
@@ -255,27 +256,46 @@ impl SongHostPreparation {
     fn prepare(&mut self, host: &dyn AudioHost) -> Result<(), Failure> {
         let report = self.report.ok_or_else(|| fail("capacity not observed"))?;
         let clock = self.clock.ok_or_else(|| fail("clock not observed"))?;
+        let mut local = self.cleanup.remaining.min(1_000_000);
+        let initial = local;
+        let song_limits = self.cleanup.limits.song;
+        let issued_limits = SongLimits {
+            max_nodes: initial,
+            ..song_limits
+        };
+        let capabilities = &self.cleanup.limits.capabilities;
         let prepared = self
             .prepared
             .as_mut()
             .ok_or_else(|| fail("candidate consumed"))?;
-        // This existing API owns a fixed bounded traversal. Reserve that full
-        // allowance from the original owner counter, never reset its quota.
-        charge(&mut self.cleanup.remaining, 1_000_000)?;
-        let routes = prepare_routes(
-            prepared.snapshot(),
-            &self.cleanup.limits.capabilities,
-            &report.available,
-        )?;
+        let routes_result = (|| {
+            let authority =
+                prepared.issue_retained_route_authority(issued_limits, &mut local, 0)?;
+            prepare_routes_issued(
+                authority,
+                prepared.snapshot().settings(),
+                capabilities,
+                &report.available,
+                issued_limits,
+                &mut local,
+                0,
+            )
+        })();
+        let debit = initial
+            .checked_sub(local)
+            .ok_or_else(|| fail("issued preparation work counter increased"))?;
+        charge(&mut self.cleanup.remaining, debit as usize)?;
+        let routes = routes_result?;
         let mut assembly = resources::build(
             prepared,
-            &routes,
+            routes.plan(),
             &self.cleanup.limits,
             clock,
             &mut self.cleanup.remaining,
         )?;
-        pools::finish(&mut assembly, &routes, clock, &mut self.cleanup.remaining)?;
-        let demand = demand::from_assembly(&assembly, &routes, &mut self.cleanup.remaining)?;
+        pools::finish(&mut assembly, routes.plan(), clock, &mut self.cleanup.remaining)?;
+        let demand =
+            demand::from_assembly(&assembly, routes.plan(), &mut self.cleanup.remaining)?;
         demand::verify_observation(&demand, report, clock)?;
         if demand.required.sample_resources != 0 {
             if let SongSampleSenderCapacity::Bounded {
@@ -857,7 +877,7 @@ impl SongReadyBundle {
         &self.prepared
     }
     pub fn routes(&self) -> &SongRoutePlan {
-        &self.routes
+        self.routes.plan()
     }
     pub fn resources(&self) -> &[SongLeaseKey] {
         &self.resources
@@ -899,5 +919,23 @@ impl SongReadyBundle {
         limits: &SongLimits,
     ) -> Result<Vec<FrozenSongEvent>, Failure> {
         self.prepared.query(span, limits)
+    }
+    pub(crate) fn query_issued_with_work(
+        &mut self,
+        span: crate::pattern::query::TimeSpan,
+        work: &crate::pattern::eval::song_observation::SharedIndexWork,
+        depth: u32,
+    ) -> Result<crate::song::snapshot::issued::FrozenIssuedBatch, Failure> {
+        self.prepared.query_issued_with_work(span, work, depth)
+    }
+    pub(crate) fn resolve_issued(
+        &self,
+        batch: &crate::song::snapshot::issued::FrozenIssuedBatch,
+        event_index: usize,
+        work: &crate::pattern::eval::song_observation::SharedIndexWork,
+        depth: u32,
+    ) -> Result<crate::song::routing::SongResolvedRoute, Failure> {
+        self.routes
+            .resolve_issued_event(batch, event_index, work, depth)
     }
 }

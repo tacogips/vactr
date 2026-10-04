@@ -1,11 +1,13 @@
 //! Bounded physical pool projections; submission is never an audio commitment.
 use crate::host::caps::SongPhysicalBranch;
+use crate::pattern::eval::song_observation::SharedIndexWork;
 use crate::song::routing::{
     SongBranchRebind, SongBranchRebound, SongBranchRelease, SongResolvedRoute,
 };
 use crate::vm::fail::{FailCode, Failure};
 use std::collections::VecDeque;
 
+#[derive(Clone)]
 struct Slot {
     physical: SongPhysicalBranch,
     configuration: Option<SongResolvedRoute>,
@@ -40,6 +42,26 @@ impl PoolBook {
                 })
                 .collect(),
         }
+    }
+    pub(super) fn staged(&self, work: &SharedIndexWork) -> Result<Self, Failure> {
+        let pending = self.slots.iter().try_fold(0usize, |total, slot| {
+            total
+                .checked_add(slot.expected.len())
+                .ok_or_else(|| Failure::new(FailCode::Overflow, "projected receipt count overflow"))
+        })?;
+        let count = self
+            .slots
+            .len()
+            .checked_add(pending)
+            .and_then(|count| count.checked_add(1))
+            .ok_or_else(|| Failure::new(FailCode::Overflow, "pool staging work overflow"))?;
+        let count = u64::try_from(count)
+            .map_err(|_| Failure::new(FailCode::Overflow, "pool staging work overflow"))?;
+        work.borrow_mut().charge(count)?;
+        Ok(Self {
+            slots: self.slots.clone(),
+            max_pending: self.max_pending,
+        })
     }
     pub(super) fn assign(
         &mut self,

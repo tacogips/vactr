@@ -270,9 +270,11 @@ pub(crate) fn bind_issued_member<'a>(
             Ok(matched)
         })?;
         if let Some((origin, edges)) = matched {
-            if let Some((previous, previous_edges)) = found.as_ref() {
-                if !std::ptr::eq(origin, *previous) || edges != *previous_edges {
-                    return Err(invalid("ambiguous original member binding"));
+            if let Some((_, previous_edges)) = found.as_ref() {
+                // Distinct authenticated seals may own distinct equal-handle allocations, but their
+                // original use edges must agree.
+                if edges != *previous_edges {
+                    return Err(invalid("conflicting original member bindings"));
                 }
             } else {
                 found = Some((origin, edges));

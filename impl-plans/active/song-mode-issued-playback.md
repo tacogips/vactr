@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Ready (session 259: runs FOURTH, on <2b-accepted>; see "Session 258 amendment" and "Session 259 amendment")
+**Status**: Blocked (session 260: export fails in predecessor-owned source provenance; capacity review finding addressed)
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -881,3 +881,67 @@ This amendment changes only the following:
 - [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session258/sha256.txt`
   exists. The receipt has `session: 259` and a new fingerprint.
 - [ ] One progress-log entry is added.
+
+### Session 259 implementation attempt — blocked at export capacity
+
+- Implemented metered issued authority and `PreparedRoutes` ownership in
+  `preparation.rs`; actual local work debit is written back before resource
+  construction on success and error.
+- Implemented Ready's shared-work query/resolution forwarders, issued batch
+  resolution before equal-handle reconciliation in `sched/song.rs`, and charged
+  pool staging before local command publication in `pools.rs`.
+- Added `tests/song_issued_transport.rs` with the required edits, `:same` and
+  `:vary` seed-dependent output checks, Slice source, instrument filter/effect,
+  and two-second tail. The pre-edit full baseline passed (2,793 passed,
+  0 failed, 3 skipped).
+- The current integration test reaches export, but `export_song` refuses the
+  required program with `insufficient measured song capacity: bus_slots`.
+  Attempts with fewer routed branches and a stateless named bus still refuse.
+  Resolving this through export host capacity requires `src/song/export.rs`,
+  which is outside the declared playback write paths. Stop until that write
+  path is explicitly assigned or the accepted test contract is revised.
+- Full current-source nextest, strict Clippy, WASM, formatter, private scheduler
+  atomicity fixtures, and final receipt remain incomplete. Completion criteria
+  remain unchecked. Evidence: `tmp/song-s249/SONG-ISSUED-PLAYBACK/session259/`.
+
+### Session 260 implementation attempt — capacity resolved, resolver dependency blocked
+
+- Addressed the integration review finding in `tests/song_issued_transport.rs`.
+  The fixture now measures route capacity from `SongRoutePlan.required.bus_slots`
+  and independently verifies `tracks + 1 + sum(reserved_generations)`. Final
+  measured values are 2 tracks + 1 master + 28 reserved generations = 31 bus
+  slots, within the exporter's fixed 32 slots. The tested program retains nested
+  reusable Part functions, `:same` and `:vary` repeats, delete/overwrite edits,
+  `lpf`, instrument FX, a Slice-sourced track and `tail-seconds 2`.
+- The focused fixture reaches production export after its capacity, event-edit,
+  and repeat-signature assertions pass. Export then fails with `foreign source
+  child scope` at beat 4, raised from `src/pattern/eval/song_provenance.rs:608`.
+  That provenance path is outside `SONG-ISSUED-PLAYBACK` writePaths, so the
+  playback worker cannot repair the resolver dependency here.
+- Focused current-source evidence is in
+  `tmp/song-s249/SONG-ISSUED-PLAYBACK/session260/nextest-final-focused.log`.
+  Earlier attempts and their measured outcomes remain in the same session
+  directory; no prior evidence was overwritten.
+- Strict Clippy, current-source full nextest, WASM build, formatting gate,
+  private preparation/atomicity fixtures and final acceptance receipt remain
+  incomplete because the required export fails in the predecessor-owned source
+  provenance path. Assigned completion criteria remain unchecked.
+- Resume when the source-provenance owner repairs the admitted child-scope
+  failure or an approved plan explicitly assigns its path; then rerun the
+  current-source focused export, full nextest, strict Clippy, WASM and fmt gates.
+- A fixture-only unique Slice track experiment was also measured: it raised
+  legacy bus demand to 32 and issued export then refused `bus_slots`. The final
+  fixture uses the same `hats` track name, requires 31 slots, passes issued
+  capacity admission, and remains blocked at source-provenance child validation.
+- Final restored-source verification: `cargo check --test song_issued_transport`
+  exits 0 (`session260/final-source-check.log`); focused nextest runs one test
+  and fails it at export (`session260/final-source-nextest.log`), recording
+  31 required bus slots and `foreign source child scope` at beat 4. The scoped
+  `rustfmt --check` for `tests/song_issued_transport.rs` exits 0
+  (`session260/fmt-check-final.log`). Full nextest, strict Clippy, WASM,
+  build, and private atomicity/preparation fixtures were not run on this source.
+- Authoritative own-run final-source logs with explicit exit markers:
+  `session260/verified-final-cargo-check.log` (0),
+  `session260/final-reverted-nextest.log` (100; 1 run, 0 passed, 1 failed),
+  and `session260/final-source-fmt.log` (0). Fixture source SHA256:
+  `bd5108d08788780552f8cf6933697c27325447ffdb085d660f9d44ae6e376d4a`.

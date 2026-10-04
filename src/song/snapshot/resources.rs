@@ -372,11 +372,10 @@ mod tests {
             .unwrap()
         {
             assert!(row.value.is_ok(), "{:?}", row.value);
-            assert!(
-                row.diags
-                    .iter()
-                    .all(|d| d.severity != crate::types::Severity::Error)
-            );
+            assert!(row
+                .diags
+                .iter()
+                .all(|d| d.severity != crate::types::Severity::Error));
         }
         ev
     }
@@ -457,16 +456,14 @@ mod tests {
         let cloned = captured.clone();
         assert_eq!(cloned.consumed_work, captured.consumed_work);
         let mut budget = captured.consumed_work;
-        assert!(
-            FrozenGraphResources::capture(
-                &original,
-                &r,
-                &mut assets,
-                &BTreeSet::new(),
-                &mut budget
-            )
-            .is_ok()
-        );
+        assert!(FrozenGraphResources::capture(
+            &original,
+            &r,
+            &mut assets,
+            &BTreeSet::new(),
+            &mut budget
+        )
+        .is_ok());
         assert_eq!(budget, 0);
         let mut short = captured.consumed_work - 1;
         assert_eq!(
@@ -477,10 +474,14 @@ mod tests {
         );
         let mut hostile = original.clone();
         hostile.instruments[0].graph = Arc::new((*hostile.instruments[0].graph).clone());
-        assert!(
-            FrozenGraphResources::capture(&hostile, &r, &mut assets, &BTreeSet::new(), &mut 10000)
-                .is_err()
-        );
+        assert!(FrozenGraphResources::capture(
+            &hostile,
+            &r,
+            &mut assets,
+            &BTreeSet::new(),
+            &mut 10000
+        )
+        .is_err());
         let mut graph = (*original.instruments[0].graph).clone();
         if let UGenSpec::Effect(effect) = graph.nodes.last_mut().unwrap() {
             effect.params[0].1 = Ctl::Const(1.0);
@@ -488,10 +489,14 @@ mod tests {
             panic!("actual effect node");
         }
         hostile.instruments[0].graph = Arc::new(graph);
-        assert!(
-            FrozenGraphResources::capture(&hostile, &r, &mut assets, &BTreeSet::new(), &mut 10000)
-                .is_err()
-        );
+        assert!(FrozenGraphResources::capture(
+            &hostile,
+            &r,
+            &mut assets,
+            &BTreeSet::new(),
+            &mut 10000
+        )
+        .is_err());
     }
     #[test]
     fn selected_default_and_overridden_bank_keep_fixed_ir() {
@@ -531,22 +536,18 @@ mod tests {
             let proof = BTreeSet::from([(inst, kw)]);
             let pins = FrozenGraphResources::pin_selections(&r, &[id], &proof, &mut 10000).unwrap();
             assert_eq!(pins.len(), expected);
-            assert!(
-                pins.iter().all(
-                    |pin| matches!(pin, SongAssetSelector::Bank(k) if *k == intern_kw("fixed"))
-                )
-            );
+            assert!(pins
+                .iter()
+                .all(|pin| matches!(pin, SongAssetSelector::Bank(k) if *k == intern_kw("fixed"))));
             let mut assets = closed_assets();
             let bindings =
                 FrozenGraphResources::capture(&original, &r, &mut assets, &proof, &mut 10000)
                     .unwrap();
             assert_eq!(bindings.entries().len(), expected);
-            assert!(
-                bindings
-                    .entries()
-                    .iter()
-                    .any(|b| matches!(b.site(), GraphResourceSite::EmbeddedEffect { .. }))
-            );
+            assert!(bindings
+                .entries()
+                .iter()
+                .any(|b| matches!(b.site(), GraphResourceSite::EmbeddedEffect { .. })));
             assert_eq!(
                 bindings
                     .entries()
@@ -559,16 +560,14 @@ mod tests {
         // A skipped BANK header does not bypass graph/issued identity validation.
         let mut hostile = original.clone();
         hostile.instruments[0].graph = Arc::new((*entry.def).clone());
-        assert!(
-            FrozenGraphResources::capture(
-                &hostile,
-                &r,
-                &mut closed_assets(),
-                &BTreeSet::new(),
-                &mut 10000
-            )
-            .is_err()
-        );
+        assert!(FrozenGraphResources::capture(
+            &hostile,
+            &r,
+            &mut closed_assets(),
+            &BTreeSet::new(),
+            &mut 10000
+        )
+        .is_err());
         let records = r.inst_resources(id).unwrap().resources();
         let mut graph = (*entry.def).clone();
         let (_, ctl) = graph
@@ -588,18 +587,16 @@ mod tests {
         let entry = registry.entry(id).unwrap();
         let records = registry.inst_resources(id).unwrap().resources();
         let ir = crate::dsp::effects::param_ctl(EffectKind::Convolution, "ir").unwrap();
-        assert!(
-            check_fixed(
-                records,
-                GraphResourceSite::EmbeddedEffect {
-                    node: u16::MAX,
-                    parameter: ir
-                },
-                Some(&Ctl::Const(0.0)),
-                &mut 10000
-            )
-            .is_err()
-        );
+        assert!(check_fixed(
+            records,
+            GraphResourceSite::EmbeddedEffect {
+                node: u16::MAX,
+                parameter: ir
+            },
+            Some(&Ctl::Const(0.0)),
+            &mut 10000
+        )
+        .is_err());
         let missing: &[DeclaredGraphResource] = &[];
         assert!(validate_inst(&entry.def, missing, &mut 10000).is_err());
     }

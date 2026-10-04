@@ -46,10 +46,9 @@ fn bounded_resource_limit_failure_preserves_state_and_allows_retry() {
     let mut song = prepared();
     let epoch = song.epoch();
     let mut remaining = WORK + 1;
-    assert!(
-        song.reserve_bounded(leases(), COUNT - 1, &mut remaining)
-            .is_err()
-    );
+    assert!(song
+        .reserve_bounded(leases(), COUNT - 1, &mut remaining)
+        .is_err());
     assert_eq!(remaining, WORK);
     assert_eq!(song.state(), SongPreparationState::Preparing);
     assert_eq!(song.epoch(), epoch);
@@ -94,8 +93,8 @@ fn bounded_duplicates_preserve_uninitialized_snapshot() {
     for generation in [1, 2] {
         let mut song = prepared();
         let mut remaining = 6;
-        assert!(
-            song.reserve_bounded(
+        assert!(song
+            .reserve_bounded(
                 vec![
                     SongResourceLease {
                         resource: u32::MAX,
@@ -109,8 +108,7 @@ fn bounded_duplicates_preserve_uninitialized_snapshot() {
                 2,
                 &mut remaining
             )
-            .is_err()
-        );
+            .is_err());
         assert_eq!(remaining, 0);
         assert_eq!(song.state(), SongPreparationState::Preparing);
         assert!(song.resources().is_empty());

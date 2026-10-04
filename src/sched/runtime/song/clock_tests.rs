@@ -190,14 +190,17 @@ fn genuine_ready(
         "clock.vact", 1, epoch, &context,
     ).unwrap();
     let prepared = crate::song::prepare_song(candidate).unwrap();
-    let mut owner = SongHostPreparation::begin(prepared, SongPreparationLimits {
-        capabilities: caps,
-        song: SongLimits::default(),
-        max_resources: 128,
-        max_pending_records: 4096,
-        max_graph_bytes: 65536,
-        max_work: 8_000_000,
-    })
+    let mut owner = SongHostPreparation::begin(
+        prepared,
+        SongPreparationLimits {
+            capabilities: caps,
+            song: SongLimits::default(),
+            max_resources: 128,
+            max_pending_records: 4096,
+            max_graph_bytes: 65536,
+            max_work: 8_000_000,
+        },
+    )
     .map_err(|r| r.failure)
     .unwrap();
     let mut pcm = [0.; 256];
@@ -342,14 +345,12 @@ fn rejected_new_epoch_clock_preserves_other_genuine_ready_owner() {
     let request = runtime.song.request.unwrap();
     assert_eq!(request.epoch, SnapshotEpoch(5));
     // The exact new request failure must not poison the valid old timebase owner.
-    assert!(
-        runtime
-            .song
-            .receive_clock(SongHostAck::ClockRejected(SongClockFailure {
-                request,
-                reason: SongRejectCode::HostFault,
-            }))
-    );
+    assert!(runtime
+        .song
+        .receive_clock(SongHostAck::ClockRejected(SongClockFailure {
+            request,
+            reason: SongRejectCode::HostFault,
+        })));
     let mut report = TickReport::default();
     runtime.tick_song(&mut report);
     assert_eq!(report.faults.len(), 1);

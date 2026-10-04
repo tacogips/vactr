@@ -100,3 +100,29 @@ Added 2026-10-04, session 251.
   NeedsJointGeometry resolved on the issued path) does not need dynamic Index
   values. Under (a), `density/index.rs` stays authorized but may stay
   unedited.
+
+## SM5: Song bus capacity for finite export
+
+Added 2026-10-04, session 260. The session 259 operator notes and the session
+260 intake call this question "SM1". It is a different question from SM1 above
+(work limits), so it is recorded here as SM5.
+
+- **Question**: A song needs `tracks + 1 + sum(reserved generations)` bus
+  slots. A nonzero tail reserves two generations per routed branch, because
+  release tails overlap the next placement. The song engine profile
+  (`src/host/song_profile.rs`) has 50 free bus slots. A measured requirement
+  fixture needed 53 and was refused with `insufficient measured song capacity:
+  bus_slots` (`tmp/song-mode-riela/session259-bus-slots-diagnosis.md`). Should
+  songs over that capacity be refused, or should capacity be raised?
+- **Options**:
+  - (a) Keep the truthful refusal. Size test fixtures within capacity and
+    record the measured need against the available slots.
+  - (b) Raise the song-profile bus-slot count (`SONG_BUS_SLOTS`). That changes
+    the native and export memory layout for every song.
+  - (c) Reduce demand, for example by sharing tail generations across
+    placements. That changes the rule in "Resource allocation and bounded
+    admission".
+- **Recommendation**: (a). The refusal is truthful and happens before Reserve.
+  Once export uses the song profile, the requirement program fits (31 of 50).
+  Options (b) and (c) are product and memory decisions that no accepted plan
+  declares.

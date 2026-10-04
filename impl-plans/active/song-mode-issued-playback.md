@@ -1,6 +1,6 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: Blocked (session 260: export fails in predecessor-owned source provenance; capacity review finding addressed)
+**Status**: Ready (session 260 resume amendment: owner-duration fix and export profile authorized; see "Session 260 amendment")
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
 
@@ -945,3 +945,371 @@ This amendment changes only the following:
   `session260/final-reverted-nextest.log` (100; 1 run, 0 passed, 1 failed),
   and `session260/final-source-fmt.log` (0). Fixture source SHA256:
   `bd5108d08788780552f8cf6933697c27325447ffdb085d660f9d44ae6e376d4a`.
+
+## Session 260 amendment (runs FIRST, on 10c3eab; serial)
+
+The source of truth is the design section "Session 260 resume amendments
+(2026-10-04)" in `design-docs/specs/design-song-mode.md`. The manifest entry
+is `resumeSession260` in `impl-plans/active/song-s249-dispatch.json`. Earlier
+amendments still apply where this one does not override them.
+
+### Intent and context
+
+The scheduler and Ready work from earlier sessions is already in `10c3eab`:
+
+- `SongHostPreparation::prepare` (`src/host/caps/song/preparation.rs:256-287`)
+  issues retained authority on a local counter. It writes the debit back
+  before `routes_result?`.
+- `SongTransport::realize` (`src/sched/song.rs:438-503`) uses one collector,
+  resolves every event, then reconciles equal handles. It stages pools through
+  `PoolBook::staged` and commits pools, pending and cursor only at the end.
+
+Two defects block acceptance:
+
+1. Export fails with `foreign source child scope` at beat 4. The cause is
+   `source_owns_owner` in `src/pattern/eval/song_clock.rs:192-257`: it compares
+   the edited Part's duration (4) with an overwrite-region owner frame's
+   duration (1).
+2. Export builds a generic 32-bus-slot engine instead of the song profile.
+
+Session 259 integration review also found these checks missing:
+
+- atomicity, authority, Ended and bit-exact tests;
+- the gates;
+- TASK-003 evidence;
+- evidence copies;
+- measured capacity in the receipt.
+
+This amendment closes all of them. Do not rewrite code that already meets the
+contract.
+
+### Non-goals
+
+- Do not change `SONG_BUS_SLOTS`, `SONG_TEMPLATE_SLOTS`, the generic
+  `EngineConfig` bus-slot default, or the two-generation tail reservation
+  (`src/song/routing/prepare.rs:189-211`).
+- Do not shrink the `tests/song_issued_transport.rs` program further. Do not
+  remove any requirement element or tail.
+- Do not fix the out-of-scope resolution defect `required issued execution is
+  not retained at site`, unless a required test reaches it.
+- Do not touch these files:
+  - `src/song/snapshot/resources.rs`;
+  - `src/song/snapshot/reservations_tests.rs`;
+  - `src/sched/runtime/song/clock_tests.rs`;
+  - `src/pattern/eval/song_clock/dispatch.rs`;
+  - `src/pattern/eval/song_clock/structural_tests.rs`;
+  - `src/pattern/combinators/structure.rs`;
+  - `.agents/settings.local.json`;
+  - anything under `editor/`.
+- Do not create `src/host/caps/song/preparation/issued.rs` unless
+  `preparation.rs` (941 lines) would reach 1000 lines.
+- Never run `cargo fmt` or rustfmt in write mode. Never run `git stash`,
+  `git checkout`, `git restore` or `git reset`.
+
+### Owned paths for session 260
+
+```json
+{
+  "planId": "SONG-ISSUED-PLAYBACK",
+  "planPath": "impl-plans/active/song-mode-issued-playback.md",
+  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK", "SONG-STRUCTURAL-CLOCK"],
+  "writePaths": [
+    "src/host/caps/song/preparation.rs",
+    "src/host/caps/song/preparation/issued.rs",
+    "src/sched/song.rs",
+    "src/sched/song/pools.rs",
+    "src/sched/song/realize_tests.rs",
+    "src/song/routing/prepared.rs",
+    "tests/song_issued_transport.rs",
+    "src/pattern/eval/song_clock.rs",
+    "src/song/export.rs",
+    "impl-plans/active/song-mode-issued-playback.md",
+    "tmp/song-mode-riela/session249-playback-intent.json",
+    "tmp/song-mode-riela/session249-playback-receipt.json",
+    "tmp/song-mode-riela/session249-playback-build.log",
+    "tmp/song-mode-riela/session249-playback-clippy.log",
+    "tmp/song-mode-riela/session249-playback-nextest-focused.log",
+    "tmp/song-mode-riela/session249-playback-nextest-full.log",
+    "tmp/song-mode-riela/session249-playback-wasm.log",
+    "tmp/song-mode-riela/session249-playback-fmt.log"
+  ],
+  "sharedPaths": [
+    "impl-plans/active/song-mode-shared-issued-query-work.md",
+    "src/song/routing.rs",
+    "src/pattern/eval/song_provenance.rs",
+    "src/song/snapshot.rs",
+    "src/song/snapshot/issued.rs",
+    "src/host/caps/song/preparation/pools.rs",
+    "src/host/song_profile.rs",
+    "src/song/routing/nested/issued/members.rs",
+    "src/song/snapshot/occupancy/lookup/authority.rs"
+  ]
+}
+```
+
+Every sharedPath except the shared-work plan file is conditional. Edit one only
+for a concrete defect that a required test or strict Clippy reproduces. Record
+each such edit in `fixes[]` with the test or diagnostic and its exact message.
+The manifest `sharedPathNotes` give each path's limits. If a fix needs any
+other path, stop with stop condition 1 and report the owner and the failing
+test.
+
+### TASK-101: Overwrite-region owner duration (song_clock.rs)
+
+**Status**: Not Started. **Parallelizable**: No (serial worker).
+
+- **Target.** Only the body of `source_owns_owner`
+  (`src/pattern/eval/song_clock.rs:192-257`). Its signature does not change.
+- **Change.**
+  - Add a local `payload_duration: Option<Ratio64>`, initially `None`.
+  - In the `PartNode::Edit` arm, split
+    `PartEdit::OverwriteRegion { track: selected, region, pattern }` out of the
+    or-pattern. When `*selected == track`, set `payload = Some(pattern)` and
+    `payload_duration = Some(region.duration()?)`.
+    `region.duration()` is `TimeSpan::duration` (`src/pattern/query.rs:108`)
+    and returns a `Result`.
+  - `ReplaceTrack` and `TransformInstrument` keep the shared arm and set only
+    `payload`.
+  - The final check becomes
+    `payload_duration.unwrap_or(part.duration()) == owner.duration`.
+  - Revision, root, track, recursion, `work.charge(1)` and the depth check stay
+    the same.
+- **Pitfalls.**
+  - Do not compare `owner.offset` or add any new check. The diagnosis fix is
+    exactly this predicate.
+  - Make sure `Ratio64` is in scope; use the path already used in this file.
+  - Do not touch `SelectedSourceBoundary::validate_issued_child` (`:79-96`)
+    or `song_provenance.rs`.
+- **Tests.**
+  - `tests/song_issued_transport.rs` -> passes past beat 4 with no
+    `foreign source child scope`.
+  - `cargo nextest run --lib song_clock` -> all pass. These are the
+    structural clock tests.
+- **Done.**
+  - `git diff 10c3eab -- src/pattern/eval/song_clock.rs` shows hunks only
+    inside `source_owns_owner`.
+  - `wc -l` is below 1000.
+
+### TASK-102: Export engine profile (export.rs)
+
+**Status**: Not Started. **Depends on**: none.
+
+- **Target.** `src/song/export.rs` `render` (lines 188-196 at `10c3eab`).
+- **Change.**
+  - Replace `EngineConfig::new(...)` plus `config.bus_slots = 32` with
+    `crate::host::song_profile::song_engine_config(options.sample_rate as f32,
+    MAX_BLOCK, caps, StoreKind::NativeArc, 2)`.
+  - Map its `ConfigError` to a `Failure`, for example with the module's
+    `fail(...)` helper and a message such as `export song engine profile:
+    {error:?}`.
+  - `song_engine_config` takes `CapabilitySet` by value, and `caps` is used
+    again for `SongPreparationLimits.capabilities`. Pass a clone, or rebuild
+    with `CapabilitySet::native()`. Do not change what preparation receives.
+  - Remove the now-unused `EngineConfig` import. Keep everything else.
+- **Imitate.** `src/host/song_profile.rs:song_engine_config` as native
+  playback uses it: `grep -rn "song_engine_config(" src` shows the call
+  sites.
+- **Pitfalls.**
+  - Do not edit `song_profile.rs`.
+  - Do not change `MAX_BLOCK`, the frame arithmetic, the tail, the warnings or
+    the second tail generation.
+- **Tests.** `tests/song_export.rs`, `tests/song_end_to_end.rs`,
+  `tests/song_issued_transport.rs` and `tests/song_cli.rs` all pass
+  unchanged, except for the TASK-104 assertions.
+
+### TASK-103: Private scheduler and Ready checks (realize_tests.rs)
+
+**Status**: Not Started. **Depends on**: TASK-101 (needs a working issued
+path).
+
+- **Declaration.** In `src/sched/song.rs`, add
+  `#[cfg(all(test, feature = "host-native", not(target_arch = "wasm32")))] mod realize_tests;`
+  next to the existing `mod pools;` declarations. The file is
+  `src/sched/song/realize_tests.rs`. It is a child of `sched::song`, so it can
+  reach `SongTransport` private fields and `realize`.
+- **Fixture helper** (private to the test file):
+  - Evaluate a program with `crate::session::song::evaluate_song_candidate` and
+    `prepare_song`, imitating `tests/song_issued_transport.rs:candidate`.
+  - Prepare to Ready with `NativeAudioHost::headless_with_config(
+    song_engine_config(...), 4096)`. Run `SongHostPreparation::begin`, then a
+    pump loop, imitating `src/song/export.rs:render` and `pump_owner`.
+    `pump_owner` is private there, so reimplement it as a small local helper.
+  - Use the small program from `tests/song_transport_core.rs:499`:
+    `inst tone ...; let a {part [tone: ...n 60...] duration: 1}; let b {... n 67 ...};
+    song {sequence [{part-repeat a 2} b]} tail-seconds: 0 > play-song`.
+    Give each Ready a distinct `SnapshotEpoch`.
+- **PoolBook test seams** (`src/sched/song/pools.rs`; `#[cfg(test)]` only, no
+  lint attributes):
+  - `fn projection(&self) -> Vec<(Option<SongResolvedRoute>, u32, u32, u64, Vec<SongBranchRebound>)>`
+    returns, per slot: configuration, projected, acknowledged, deadline and
+    expected. `SongPhysicalBranch` has no `PartialEq`, so do not derive
+    `PartialEq` on `Slot`.
+  - `fn inject_assign_fault(&mut self, fail_at_call: Option<usize>)` is backed
+    by `#[cfg(test)]` fields (`fault: Option<usize>`, `assign_calls: usize`).
+    `staged()` copies them. At the top of `assign`, if the fault equals the
+    current call count, return `Failure::new(FailCode::BeyondCapability,
+    "injected staging fault")`. Otherwise increment the counter.
+  - Make both `pub(super)`.
+  - Why a fault point: the only real in-batch staging failure is receipt
+    storage (`pools.rs:121`). It is bounded by `SongLimits.max_cached_events`,
+    which also caps the batch event count (`src/song/limits.rs:83-91`), so a
+    real trigger is fixture-fragile. The design allows this fallback. Record
+    the choice in the receipt.
+- **Tests (input -> expected outcome).**
+  - `realize_failure_after_staging_preserves_pools_queue_cursor_and_receipts`:
+    1. Build Ready, then `SongTransport::new(ready, activation,
+       SongLimits::default())`.
+    2. Inject a fault at call 1. That is the second `assign`, so the first
+       assignment has already mutated the stage.
+    3. Snapshot `pools.projection()`, `pending.len()` and `cursor`.
+    4. Call `realize(duration)` -> `Err` with the injected message. All three
+       snapshots are equal to their earlier values.
+    5. Clear the fault and call `realize(duration)` again -> `Ok`, and
+       `pending.len()` > 0.
+    6. Do the same on a second Ready that never failed. Its `pending.len()`
+       and the `(projected, acknowledged, deadline, expected.len())`
+       projection equal the recovered transport's.
+  - `realize_work_failure_preserves_state`: a transport with
+    `SongLimits { max_nodes: <small value that passes SongLimits::validate>, ..default }`
+    -> `realize(duration)` returns `Err`, and pools projection, pending and
+    cursor are unchanged. If `SongTransport::new` refuses the small value,
+    use the smallest value that `new` accepts and `realize` still refuses.
+    Record that value in the receipt.
+  - `foreign_issued_batch_is_refused_by_ready`: Ready A and Ready B come from
+    the same program with different epochs. Build a batch with
+    `B.query_issued_with_work(span, &work_b, 0)`.
+    - `A.resolve_issued(&batch_b, 0, &work_a, 0)` -> `Err`.
+    - `B.resolve_issued(&batch_b, 0, &work_b, 0)` -> `Ok` (control).
+  - `one_collector_spans_query_and_every_resolution` (TASK-003 evidence):
+    1. On a fresh Ready, create one `CanonicalIndexCollector::new(budget,
+       limits)`. Call `query_issued_with_work`, then `resolve_issued` for every
+       event index. `remaining()` strictly decreases after the query and does
+       not increase across the resolutions. The spent amount is
+       `W = budget - remaining`.
+    2. On a second fresh Ready, the same sequence with budget exactly `W` ->
+       `Ok`.
+    3. On a third, budget `W - 1` -> some call returns `Err`.
+- **Pitfalls.**
+  - Do not call `advance` with a real host for these checks. Call `realize`
+    directly so a failure does not go through `fail_and_retire`.
+  - Keep the file below 1000 lines (target < 400).
+  - No `#[allow]` or `#[expect]`.
+  - The module must not compile into the WASM build, which the `cfg` above
+    guarantees.
+
+### TASK-104: Requirement transport assertions (tests/song_issued_transport.rs)
+
+**Status**: Not Started. **Depends on**: TASK-101, TASK-102.
+
+- **Capacity.** Replace the bound `measured_bus_slots <= 32` with
+  `measured_bus_slots <= u32::try_from(vactr::host::song_profile::SONG_BUS_SLOTS - 1)`
+  (50, the song-profile free slots). Keep the existing equality assertion with
+  `route_plan.required.bus_slots`. Extend the `capacity evidence:` eprintln
+  line with `available=50`.
+- **Ended / frames.**
+  - Keep every existing assertion.
+  - Add: `first.total_frames == SongLimits::default().frames_at(duration *
+    seconds_per_cycle + tail_seconds, 8000)`. Compute this from
+    `candidate().snapshot()` (`duration()`, `settings().seconds_per_cycle()`,
+    `settings().tail_seconds`). This is the export formula
+    (`src/song/export.rs:180-186`); it is not the sum of the separately
+    rounded parts.
+- **Bit-exact.** Keep the byte-equality assertion. Add
+  `std::fs::metadata(first_path).len() == 44 + first.total_frames * 4`.
+- **Pre-Reserve refusal** (new test
+  `preparation_refuses_before_upload_when_route_work_is_exhausted`):
+  - Build `SongHostPreparation::begin(candidate(), limits)`, where
+    `limits.max_work` is small enough that the issued route stage cannot finish
+    but `begin` succeeds.
+  - Pump with a headless native host using the song profile.
+  - Expected:
+    - preparation ends in `SongPreparationProgress::Failed` (or `begin` or
+      `submit` returns the failure);
+    - progress never reports `Uploading`, `AwaitingReady` or `Ready`;
+    - the failure code is `FuelExhausted` or the work failure that the route
+      stage raises.
+  - Pick the `max_work` value empirically. Record it and the observed message
+    in the receipt.
+  - The design's authority table puts this in `preparation/issued.rs`. It is
+    placed here because the public API is enough, and no preparation code
+    change is required.
+- **Pitfalls.**
+  - Do not weaken or delete any existing assertion.
+  - The file stays below 1000 lines.
+  - Use the same `TempDir` helper.
+
+### TASK-105: Evidence, receipt and gates
+
+**Status**: Not Started. **Depends on**: TASK-101 to TASK-104.
+
+1. **Before editing.**
+   - Copy the current `tmp/song-mode-riela/session249-playback-build.log` and
+     `session249-playback-receipt.json` to
+     `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session259/`. Write
+     `sha256.txt` with `shasum -a 256` for each copy.
+   - Write the intent JSON (`tmp/song-mode-riela/session249-playback-intent.json`).
+     It records the original text and sha256 of every writePath you will edit.
+   - Run the baseline full nextest into
+     `tmp/song-s249/SONG-ISSUED-PLAYBACK/session260-resume/baseline-full.log`.
+     Expected: only `song_issued_transport` fails, with
+     `foreign source child scope`. Record the result as `baselineFailures`.
+2. **Every edit.** Re-read the file and compare it with the intent hash. If
+   the hash has drifted, stop and report.
+3. **Gates.** Run them in the foreground. Each must exit 0. Use the exact
+   commands in the manifest `verification` list for SONG-ISSUED-PLAYBACK.
+   - Build, strict all-target clippy, focused nextest (including `song_cli`),
+     `--lib song_clock` and `--lib sched::song::realize_tests` must all pass.
+   - Full nextest `--no-fail-fast`, with no `--retries`, must show a `Summary`
+     line with 0 failures.
+   - The WASM build must pass.
+   - rustfmt `--check` on touched files reports no `Diff in` for a touched
+     file. A hunk in an untouched child module is recorded, not fixed.
+   - `wc -l`: every touched file is below 1000.
+   - `grep -n "dedup_by\|resolve_route(" src/sched/song.rs` prints nothing.
+   - `git diff 10c3eab | grep -E '^\+.*#\[(allow|expect)'` prints nothing.
+   - `git diff --quiet 10c3eab -- <unowned and frozen paths>` exits 0.
+4. **Receipt** (`tmp/song-mode-riela/session249-playback-receipt.json`):
+   - `session: 260`, `baseCommit: 10c3eab02ab29d25203f7cd5847a2247af404c20`;
+   - `reviewDiffRange: "git diff 1ac457f <playback-accepted> -- <playback paths>"`;
+   - `baselineFailures`;
+   - `fixes[]`: TASK-101 and TASK-102 as `production-defect`, plus any
+     conditional sharedPath edit;
+   - `capacity.busSlots`: `{required, measuredFrom:
+     "SongRoutePlan.required.bus_slots == tracks+1+sum(reserved_generations)",
+     available: 50, genericReplaced: 31, engineProfile: "song_engine_config"}`,
+     with `required` taken from the test's `capacity evidence:` line in the
+     focused log;
+   - `sm1`: `{refused: false, routeStageAllowance: 1000000}`. If export
+     refuses for work, record the message and stop (SM1 option (a) needs
+     `src/cli/render.rs` or `export.rs` limits, which is a SONG-16 conditional
+     seam);
+   - `attemptSession258`: `{files: [], reason: "no session249-playback-* files existed before session 259"}`;
+   - `atomicityTrigger: "cfg(test) injected staging fault"`;
+   - `task003Evidence`: the test name, plus the call chain
+     `src/sched/song.rs:443-458 -> src/host/caps/song/preparation.rs:923 ->
+     src/song/snapshot.rs:306 -> :191`;
+   - each gate's command, exit status and log path;
+   - a fingerprint that differs from every earlier receipt.
+5. **Plan files.**
+   - Tick TASK-003 in
+     `impl-plans/active/song-mode-shared-issued-query-work.md` and add one
+     progress-log line there pointing to this receipt.
+   - Add one progress-log entry here.
+
+### Session 260 done criteria
+
+- [ ] `tests/song_issued_transport.rs` passes. No `foreign source child scope`
+  appears in the focused log.
+- [ ] `git diff 10c3eab -- src/pattern/eval/song_clock.rs` changes only
+  `source_owns_owner`, and `--lib song_clock` passes.
+- [ ] `grep -n "bus_slots = 32" src/song/export.rs` prints nothing, and
+  `grep -n "song_engine_config" src/song/export.rs` prints one call.
+- [ ] The four `realize_tests` tests and the new transport test pass.
+- [ ] Strict clippy, full nextest (0 failures), WASM and scoped fmt `--check`
+  all exit 0, with logs at the manifest paths.
+- [ ] There are no new `allow`/`expect` lines, and the unowned and frozen
+  paths are unchanged against `10c3eab`.
+- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session259/sha256.txt`
+  exists. The receipt has the fields above.
+- [ ] TASK-003 is ticked in the shared-work plan. One progress-log entry is
+  added here.

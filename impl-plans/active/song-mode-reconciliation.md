@@ -1217,3 +1217,208 @@ The source of truth is the design section "Session 259 resume amendments
   `crossSealBindingAudit` and `nonzeroInnerOffsetCoverage`.
 - [ ] The design checkpoint follows the Session 259 section.
   `tmp/song-s249/SONG-16/attempt-session258/sha256.txt` exists.
+
+#### Session 260 amendment (runs last, on <playback-accepted>)
+
+The source of truth is the design section "Session 260 resume amendments
+(2026-10-04)", subsection "SONG-16: requirement song through the production
+CLI". The manifest entry is `resumeSession260`. The session 255-259
+amendments stay in force except where this one overrides them.
+
+##### Intent and context
+
+The objective requires static song code to produce a complete,
+automatically terminating song and export through the production path. The
+playback wave proves this at library level in `tests/song_issued_transport.rs`.
+SONG-16 adds the user-facing CLI path: `vactr render` (`src/cli/args.rs:103`,
+`src/cli/render.rs:30-60`, which runs `evaluate_song_candidate`, then
+`prepare_song`, then `export_song`). It runs the same program text, then the
+final gates and the status reconciliation.
+
+##### Changes to the "no Rust or test edits" rule
+
+The rule is replaced for exactly these edits:
+
+- TASK-201: the new `examples/song-mode/requirement-song.vact`, and the
+  `PROGRAM` constant in `tests/song_issued_transport.rs`;
+- TASK-202: the new `tests/song_requirement_cli.rs`.
+
+`src/song/export.rs` and `src/cli/render.rs` are conditional sharedPaths. Edit
+them only for a concrete defect that `tests/song_requirement_cli.rs`
+reproduces, and record each such edit in `fixes[]`. Every other Rust file stays
+unedited. A failure that needs another path is stop condition 1.
+
+##### Non-goals
+
+- No new CLI flags or output format changes.
+- No capacity or limit changes, unless SM1 option (a) is triggered by a
+  measured refusal.
+- No edits under `editor/`.
+- No plan archiving.
+- Do not touch the three unowned files or `.agents/settings.local.json`.
+
+##### Owned paths for session 260
+
+```json
+{
+  "planId": "SONG-16",
+  "planPath": "impl-plans/active/song-mode-reconciliation.md",
+  "dependsOn": ["SONG-ROUTE8", "SONG-ISSUED-RESOLUTION", "SONG-SHARED-WORK", "SONG-STRUCTURAL-CLOCK", "SONG-ISSUED-PLAYBACK"],
+  "writePaths": [
+    "impl-plans/active/song-mode-reconciliation.md",
+    "design-docs/specs/design-song-mode.md",
+    "impl-plans/README.md",
+    "tmp/song-mode-riela/session249-final-receipt.json",
+    "tmp/song-mode-riela/session249-final-cohort.sha",
+    "tmp/song-mode-riela/session249-final-build.log",
+    "tmp/song-mode-riela/session249-final-clippy.log",
+    "tmp/song-mode-riela/session249-final-nextest-focused.log",
+    "tmp/song-mode-riela/session249-final-nextest-full.log",
+    "tmp/song-mode-riela/session249-final-wasm.log",
+    "tmp/song-mode-riela/session249-final-fmt.log",
+    "tmp/song-mode-riela/session249-final-editor-test.log",
+    "tmp/song-mode-riela/session249-final-editor-build.log",
+    "tests/song_requirement_cli.rs",
+    "examples/song-mode/requirement-song.vact"
+  ],
+  "sharedPaths": [
+    "impl-plans/active/song-mode-immutable-route-authority.md",
+    "impl-plans/active/song-mode-issued-route-resolution.md",
+    "impl-plans/active/song-mode-shared-issued-query-work.md",
+    "impl-plans/active/song-mode-issued-playback.md",
+    "impl-plans/active/song-mode-structural-clock-hooks.md",
+    "tests/song_issued_transport.rs",
+    "src/song/export.rs",
+    "src/cli/render.rs"
+  ]
+}
+```
+
+##### TASK-201: One program source
+
+**Status**: Not Started.
+
+- Create `examples/song-mode/requirement-song.vact`. Its content is exactly the
+  `PROGRAM` string of `tests/song_issued_transport.rs` at `<playback-accepted>`,
+  with each `\n` written as a real newline and each `\t` as a real tab. Add no
+  trailing newline, so `include_str!` yields the identical string.
+- In `tests/song_issued_transport.rs`, replace only the `const PROGRAM: &str =
+  "...";` line with `const PROGRAM: &str =
+  include_str!("../examples/song-mode/requirement-song.vact");`.
+- Verify the program is unchanged: before the edit, write the old constant's
+  sha256 to `tmp/song-s249/SONG-16/session260-resume/program.sha`. Then
+  `shasum -a 256 examples/song-mode/requirement-song.vact` must print the same
+  digest. Compute the old digest by evaluating the escapes, for example with
+  `printf '%b'` on the literal. Record both digests in the receipt.
+- `git diff <playback-accepted> -- tests/song_issued_transport.rs` shows
+  exactly one removed and one added line.
+- **Pitfall.** Do not edit `examples/song-mode/README.md` or
+  `generated-parts.vact`.
+
+##### TASK-202: CLI requirement test (tests/song_requirement_cli.rs)
+
+**Status**: Not Started. **Depends on**: TASK-201.
+
+- **Gate.** `#![cfg(all(feature = "host-native", not(target_arch = "wasm32")))]`.
+- **Imitate.**
+  - `tests/song_cli.rs:generated_parts_file_renders_exact_fifty_seconds_without_cycles`
+    for the binary call (`Command::new(env!("CARGO_BIN_EXE_vactr"))`,
+    `.current_dir(env!("CARGO_MANIFEST_DIR"))`).
+  - `tests/song_issued_transport.rs:TempDir` (process id + nanos + atomic
+    counter) for output paths.
+- **Test** `requirement_song_renders_through_cli_to_a_complete_terminating_wav`:
+  1. Run `vactr render examples/song-mode/requirement-song.vact <tmp>/first.wav
+     --sample-rate 8000` with no cycle argument -> exit 0. Every stderr line
+     starts with `vactr: warning:`, or stderr is empty.
+  2. Compute the expected `N` from the same file:
+     - read it, then use `vactr::session::song::evaluate_song_candidate` with
+       the `candidate()` context of `tests/song_issued_transport.rs`, then
+       `prepare_song`;
+     - `N = SongLimits::default().frames_at(duration *
+       settings.seconds_per_cycle()? + settings.tail_seconds, 8000)`.
+
+     Never hard-code `N`.
+  3. stdout contains `rendered {N} frames at 8000 Hz` and `state Ended`.
+  4. The WAV file length is `44 + N * 4`, and some byte after the 44-byte
+     header is nonzero.
+  5. Render again to `<tmp>/second.wav` -> exit 0, and the two files are
+     byte-identical.
+- **Pitfalls.**
+  - Use the crate-root-relative path. Do not copy the program text into this
+    test.
+  - Do not pass `--cycles`.
+  - Keep the file below 300 lines.
+  - Do not assert the musical edits here; `tests/song_issued_transport.rs`
+    owns those assertions on the same text.
+  - If the CLI refuses with `insufficient measured song capacity` or a work
+    failure, record the measured need and the message. Fix only through the
+    conditional sharedPaths under SM1/SM5 option (a), never by shrinking the
+    program.
+
+##### TASK-203: Final gates, receipt, checkpoint and status
+
+**Status**: Not Started. **Depends on**: TASK-202.
+
+- **Evidence copies.** Copy the prior `tmp/song-mode-riela/session249-final-*`
+  files to `tmp/song-s249/SONG-16/attempt-session259/` with `sha256.txt`.
+  Scratch logs go to `tmp/song-s249/SONG-16/session260-resume/`.
+- **Gates.** Run every command in the manifest `verification` list for SONG-16
+  in the foreground. Each must exit 0. The focused run now includes
+  `--test song_cli --test song_requirement_cli`. The fmt list includes
+  `src/sched/song/realize_tests.rs`, `src/song/export.rs`,
+  `tests/song_requirement_cli.rs`, and every sharedPath that the playback
+  receipt records as edited.
+- **Cohort.** The added files may be:
+  - `tests/song_requirement_cli.rs`;
+  - `src/sched/song/realize_tests.rs`;
+  - `src/host/caps/song/preparation/issued.rs`, only if playback created it.
+
+  Changed hashes are also allowed on:
+  - the playback session-260 writePaths;
+  - the SONG-16 writePaths;
+  - `tests/song_issued_transport.rs`;
+  - the conditional sharedPaths recorded as edited in a receipt.
+
+  `examples/song-mode/requirement-song.vact` is not `.rs`, so it is outside the
+  cohort command. List it separately in the receipt.
+- **Final receipt.** In addition to the session 258/259 fields:
+  - the requirement test names, all passed in the final full run:
+    - `issued_ready_transport_edits_repeats_slice_and_exports_exactly`;
+    - `preparation_refuses_before_upload_when_route_work_is_exhausted`;
+    - `requirement_song_renders_through_cli_to_a_complete_terminating_wav`;
+    - the four `sched::song::realize_tests` tests;
+    - `genuine_replay_fresh_seal_authenticates_without_callback_reads`;
+    - `striate_ranking_reuses_retained_work_without_callback_reads`;
+    - the `tests/song_end_to_end.rs` cases;
+  - `capacity.busSlots` copied from the playback receipt;
+  - `programSha` (TASK-201);
+  - `sm5: "default (a): truthful refusal kept"`;
+  - the residual risk `required issued execution is not retained at site`
+    for larger fixture variants (out of scope);
+  - a new fingerprint.
+- **Design checkpoint.** Append a dated evidence checkpoint of about 15 lines
+  after the "Session 260 resume amendments" section of
+  `design-docs/specs/design-song-mode.md`. It covers gate exits, log paths,
+  the cohort, and the SM1/SM2/SM5 outcomes.
+- **Status.** Only if every gate passes, set the five sibling plan statuses
+  and the six `impl-plans/README.md` lines (status and criteria only). Add one
+  progress-log entry here. SONG-16 does not edit
+  `impl-plans/active/song-s249-dispatch.json`. The root reviewer updates
+  `resumeSession260` serially.
+
+#### Session 260 done criteria
+
+- [ ] The `examples/song-mode/requirement-song.vact` sha256 equals the
+  unescaped old `PROGRAM` digest, and the `tests/song_issued_transport.rs` diff
+  is one line.
+- [ ] `tests/song_requirement_cli.rs` passes: exit 0, exact `N`, `Ended`,
+  WAV length, and byte-identical renders.
+- [ ] Every final gate exits 0 with full logs. The full run has a `Summary`
+  line, 0 failures and no `--retries`.
+- [ ] The cohort additions and changed hashes match the allowance, and
+  `unownedChanges` is empty.
+- [ ] The final receipt has the fields above. The design checkpoint follows
+  the Session 260 section. `tmp/song-s249/SONG-16/attempt-session259/sha256.txt`
+  exists.
+- [ ] Statuses and README lines are reconciled only after the gates pass. One
+  progress-log entry is added.

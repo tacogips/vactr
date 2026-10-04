@@ -1,9 +1,11 @@
 # Immutable route authority and attested topology copies
 
-**Status**: In Progress
+**Status**: Completed
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-03
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Route-view ownership gap](../../design-docs/references/song-mode/production-provenance-review-20261003.md#immutable-route-view-ownership-gap)
+
+**Completion**: SONG-ROUTE8 is reconciled in session 250 from accepted source commit `1ac457ff260e0d707fcfb05384ddcd5a815c72f1`. Final gate and requirement evidence is recorded in `tmp/song-mode-riela/session249-final-receipt.json`. Earlier amendment sections are historical and are superseded by later session amendments.
 
 ## Purpose and dependencies
 

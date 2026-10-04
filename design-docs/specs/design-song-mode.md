@@ -3017,3 +3017,15 @@ seams are enough:
   risk unless a required test reaches it.
 - **Serial join.** SONG-16 updates the plan progress logs, moves completed
   plans to `impl-plans/completed/`, and updates `impl-plans/README.md`.
+
+### Session 261 final evidence checkpoint (2026-10-04)
+
+- The accepted static-song source is `examples/song-mode/requirement-song.vact`; its SHA-256 is `1dc59ef3ed9edb771b0f85a04262ddde690d5d981d76772258024367269e7e7a`, matching the extracted former `PROGRAM` bytes.
+- `tests/song_requirement_cli.rs` verifies production CLI rendering to Ended, duration-derived frame count, WAV size/nonzero audio and byte-identical repeat output, plus the route-work threshold.
+- Final build, strict all-target clippy, focused nextest (119/119 across eight binaries), full nextest (2,802 passed, zero failed, three skipped), WASM host build, scoped rustfmt check, editor tests (590/590) and editor build exit 0.
+- Full gate logs: `tmp/song-mode-riela/session249-final-{build,clippy,nextest-focused,nextest-full,wasm,fmt,editor-test,editor-build}.log`; route-work evidence: `tmp/song-s249/SONG-16/session261-resume/route-work.log`.
+- Rust cohort: 954 accepted baseline files plus the one declared new `tests/song_requirement_cli.rs`; total projection is 957 entries including `Cargo.toml` and `Cargo.lock`. Changed Rust paths are only `tests/song_issued_transport.rs` and that new test; unowned changes are empty.
+- The SONG-ISSUED-PLAYBACK capacity receipt records 31 required bus slots against 50 available. Route-work binary search measured W=941,965, below the 1,000,000 allowance.
+- SM1 keeps truthful refusal above the default preparation allowance; SM2 keeps pre-Reserve retention without runtime first execution; SM5 keeps truthful capacity refusal under default (a).
+- SONG-16 requirement tests and all final gates pass on the session-261 working tree. The known out-of-scope resolution defect remains recorded as residual risk for larger fixture variants.
+- Evidence and final receipt: `tmp/song-mode-riela/session249-final-receipt.json`. Six completed plans are archived under `impl-plans/completed/`; the six README entries point there.

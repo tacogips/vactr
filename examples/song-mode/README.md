@@ -67,3 +67,28 @@ The repository CLI fixture executed this file through `render --sample-rate
 8000` and checked the complete 400000-frame (50-second) WAV, nonzero PCM, and
 actual `Ended` completion. This headless witness does not substitute for a live
 audio-device playback check.
+
+## Combined editing example
+
+`requirement-song.vact` combines the editing operations in one static song.
+Reusable `make` and `edit` functions return a Part. The song then removes one
+realized drum event, overwrites drum cycles `[1, 2)`, filters only the `:analog`
+drums, and routes them through the declared `:room` bus. A sliced one-cycle Part
+is sequenced ahead of two `part-repeat` blocks, one with `seed-mode: :same` and
+one with `seed-mode: :vary`. The song ends automatically after its two-second
+tail.
+
+```sh
+vactr render examples/song-mode/requirement-song.vact requirement-song.wav --sample-rate 8000
+```
+
+`tests/song_requirement_cli.rs` renders this file twice through the `vactr`
+binary. Each render must exit 0, reach `Ended`, and write the frame count
+calculated from the prepared song's duration plus tail. The WAV must be
+`44 + frames * 4` bytes and contain nonzero PCM. The two renders must be
+byte-identical. Playback and export resolve every event through the issued
+route authority prepared before admission. A song whose route preparation
+exceeds the default allowance, or whose buses exceed the song-profile capacity,
+is refused with a capacity or work error. It is not truncated. As with
+`generated-parts.vact`, this is headless evidence, not a live audio-device
+check.

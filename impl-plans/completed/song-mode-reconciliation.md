@@ -1,12 +1,14 @@
 # Serial integration evidence and documentation implementation plan
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: SONG-16
-**Plan Path**: impl-plans/active/song-mode-reconciliation.md
+**Plan Path**: impl-plans/completed/song-mode-reconciliation.md
 **Created**: 2026-09-30
 **Last Updated**: 2026-10-03
 **Session target**: 1–3 sessions
 **Design Reference**: [Accepted song-mode design](../../design-docs/specs/design-song-mode.md#plan-author-handoff)
+
+**Completion**: SONG-16 completed in session 261 from the accepted playback source commit `cbfe20ccf46f7bbac5bad43032e9301d0e7151fb`, with final evidence in `tmp/song-mode-riela/session249-final-receipt.json`. Earlier amendment sections are historical and are superseded by later session amendments.
 
 ## Intent and repository context
 
@@ -1534,7 +1536,7 @@ listed below.
 
 ##### TASK-204: Archive and index join (serial, last action of SONG-16)
 
-**Status**: Not Started. **Depends on**: TASK-203, with every final gate green.
+**Status**: Completed. **Depends on**: TASK-203, with every final gate green.
 
 - **Move.** Use plain `mv`; do not use `git mv` or any other git write.
   Move each plan whose top-level Status was set to Completed in TASK-203 from
@@ -1579,17 +1581,29 @@ listed below.
 
 ##### Session 261 done criteria
 
-- [ ] The session 260 done criteria above hold. The "attempt-session259"
+- [x] The session 260 done criteria above hold. The "attempt-session259"
   criterion is replaced by `attemptSession260` with `files: []`.
-- [ ] `route-work.log` contains `route work evidence: minimal_max_work=`
+- [x] `route-work.log` contains `route work evidence: minimal_max_work=`
   with a value at most 1,000,000. The receipt `routeWork` equals it.
-- [ ] Every final gate log ends with `exit=0`. `session249-final-nextest-full.log`
+- [x] Every final gate log ends with `exit=0`. `session249-final-nextest-full.log`
   has a `Summary` line with 0 failed and no `--retries`.
-- [ ] The design checkpoint follows the Session 261 section.
-- [ ] Each archived plan exists only under `impl-plans/completed/`, with the
+- [x] The design checkpoint follows the Session 261 section.
+- [x] Each archived plan exists only under `impl-plans/completed/`, with the
   hash recorded in `archive[]`. The README link lines point to `completed/`.
-- [ ] `git diff --name-only <playback-accepted> -- '*.rs'` plus
+- [x] `git diff --name-only <playback-accepted> -- '*.rs'` plus
   `git ls-files -o --exclude-standard -- '*.rs'` list only:
   - `tests/song_issued_transport.rs` (one-line `PROGRAM` diff);
   - `tests/song_requirement_cli.rs`;
   - the conditional sharedPaths recorded in `fixes[]`.
+
+### 2026-10-04 — Session 261 final reconciliation
+
+**Tasks completed**: TASK-201 through TASK-204; requirement fixture, CLI/export checks, route-work measurement, final gates, checkpoint, status reconciliation and archive/index join.
+
+**Verification**: `cargo build`, strict all-target clippy, focused nextest (119/119), full nextest (2,802 passed, 0 failed, 3 skipped), wasm32 host-wasm build, scoped rustfmt check, editor test (590/590) and editor build all exited 0. Logs are listed in `tmp/song-mode-riela/session249-final-receipt.json`; route-work W=941965 and capacity=31/50 are recorded there.
+
+**Cohort**: 954 accepted baseline Rust files plus one declared new Rust test; 957 entries including Cargo.toml and Cargo.lock. Only `tests/song_issued_transport.rs` changed among tracked Rust paths; `tests/song_requirement_cli.rs` is the one new Rust path. No unowned changes.
+
+**Archive/index**: The six completed-plan hashes and README targets are recorded in the final receipt. SONG-16 was moved last after this entry was written.
+
+**Residual risk**: Larger variants can hit the known out-of-scope issued-execution-retention defect; truthful bounded refusal remains.

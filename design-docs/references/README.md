@@ -131,7 +131,7 @@ independent algorithms and verification requirements.
 
 ## Song mode implementation evidence
 
-[Reconciliation checkpoint history](song-mode/reconciliation-checkpoints-20261003.md) preserves earlier design reviews, failed checks and bounded acceptance receipts. Current work remains tracked in [the active reconciliation plan](../../impl-plans/active/song-mode-reconciliation.md).
+[Reconciliation checkpoint history](song-mode/reconciliation-checkpoints-20261003.md) preserves earlier design reviews, failed checks and bounded acceptance receipts. The [completed reconciliation plan](../../impl-plans/completed/song-mode-reconciliation.md) records the session-261 final evidence.
 
 [Sampling and invocation checkpoint archive](song-mode/reconciliation-invocation-checkpoints-20261003.md) preserves the next set of checkpoint bodies verbatim, including failed checks and the historical extraction-equivalence limitation.
 

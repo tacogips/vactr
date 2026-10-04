@@ -1,9 +1,11 @@
 # Structural sampling and unchanged child clocks
 
-**Status**: Implementation complete (session 259 gates passed; formal workflow reviews pending)
+**Status**: Completed
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers and authentic capture](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
+
+**Completion**: SONG-STRUCTURAL-CLOCK is reconciled in session 259 from accepted source commit `10c3eab02ab29d25203f7cd5847a2247af404c20`. Final gate and requirement evidence is recorded in `tmp/song-mode-riela/session249-final-receipt.json`. Earlier amendment sections are historical and are superseded by later session amendments.
 
 ## Purpose and dependencies
 

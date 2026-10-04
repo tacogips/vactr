@@ -18,7 +18,7 @@ use vactr::song::{prepare_song, PreparedSong, SnapshotEpoch, SongLimits};
 use vactr::value::intern::intern_kw;
 use vactr::value::ratio::Ratio64;
 
-const PROGRAM: &str = "bus :room:\n\tgain 0.75\nfn make:\n\tpart [drums: {s :analog > chord [:c :maj] > gain 0.2} hats: {s :analog > note {choose 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75} > gain 0.2}] duration: 4\nfn make-slice:\n\tpart [hats: {s :analog > slow 64}] duration: 1\nfn remove-one p:\n\tlet events {part-events p :drums 0 4}\n\tlet handle {{first events} :handle}\n\tlet changed {delete-event p handle}\n\toverwrite-region changed :drums 1 2 {s :analog > note {choose 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75} > gain 0.2}\nfn edit p:\n\tremove-one p\nfn indexed p:\n\tslice {beat -> p} 2 [0]\nlet original {make & []}\nlet edited {edit original}\nlet filtered {transform-instrument edited :drums :analog {p -> lpf p 900}}\nlet effected {instrument-fx filtered :drums :analog :room}\nlet slice-source {make-slice & []}\nlet sliced {transform-instrument slice-source :hats :analog indexed}\nlet arrangement sequence [sliced {part-repeat effected 2 seed-mode: :same} {part-repeat effected 2 seed-mode: :vary}]\nsong arrangement bpm: 120 cycle-beats: 4 seed: 42 tail-seconds: 2 > play-song";
+const PROGRAM: &str = include_str!("../examples/song-mode/requirement-song.vact");
 
 struct TempDir(PathBuf);
 impl TempDir {

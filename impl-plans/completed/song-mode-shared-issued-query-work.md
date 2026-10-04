@@ -1,9 +1,11 @@
 # Shared work through issued query and resolution
 
-**Status**: In Progress (session 260: final source verification recorded; see "Session 259 amendment")
+**Status**: Completed
 **Created**: 2026-10-03
 **Last Updated**: 2026-10-04
 **Design Reference**: [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture)
+
+**Completion**: SONG-SHARED-WORK is reconciled in session 259 from accepted source commit `10c3eab02ab29d25203f7cd5847a2247af404c20`. Final gate and requirement evidence is recorded in `tmp/song-mode-riela/session249-final-receipt.json`. Earlier amendment sections are historical and are superseded by later session amendments.
 
 ## Purpose and dependencies
 
@@ -122,6 +124,15 @@ The replay parent is828 lines; keep all touched sources below1000. Preserve
 existing seed-domain admission/refusal; additive seeding does not establish
 useful varying/first executions or permission to execute unadmitted callbacks.
 No fourth-path Rust execution is authorized by this Planning declaration.
+
+### 2026-10-04 — Session 261 playback adoption verified
+
+The issued playback consumer adopts shared query/proof work through one
+collector. `tmp/song-mode-riela/session249-playback-receipt.json` records the
+session-261 gate receipt; `tmp/song-s249/SONG-ISSUED-PLAYBACK/session261-resume/nextest-realize.log`
+passes all four realization tests, including shared-collector and atomic
+failure behavior. Formal test-integrity, adversarial and integration review
+remain downstream.
 
 ## Session 249 executable contract (wave 2)
 

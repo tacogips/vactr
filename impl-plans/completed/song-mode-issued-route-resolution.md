@@ -1,8 +1,10 @@
 # Authenticated issued route resolution
 
-**Status**: In Progress (session 259 implementation complete; workflow-owned reviews and downstream plans remain pending)
+**Status**: Completed
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md), [Immutable consumers](../../design-docs/specs/design-song-mode.md#immutable-consumers-and-authentic-clock-capture), [Production integration contract](../../design-docs/specs/design-song-mode.md#production-integration-contract-route-authority-to-playback-2026-10-03)
+
+**Completion**: SONG-ISSUED-RESOLUTION is reconciled in session 259 from accepted source commit `10c3eab02ab29d25203f7cd5847a2247af404c20`. Final gate and requirement evidence is recorded in `tmp/song-mode-riela/session249-final-receipt.json`. Earlier amendment sections are historical and are superseded by later session amendments.
 
 ## Purpose and dependencies
 

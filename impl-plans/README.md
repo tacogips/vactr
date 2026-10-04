@@ -4,15 +4,15 @@ This directory contains implementation plans that translate design documents int
 
 [Query-issued song authority](active/song-mode-issued-query-authority.md) is In Progress. Its reviewed eight-path scope is released for the live query/replay provenance bridge after accepted retained geometry.
 
-[Immutable route authority](active/song-mode-immutable-route-authority.md) is Ready and its exact eight paths are released for snapshot-issued views, attested topology copies and caller-metered preparation. Production admission and route consumption remain required following phases.
+[Immutable route authority](completed/song-mode-immutable-route-authority.md) is Completed (session 261 final receipt).
 
-[Frozen issued events](active/song-mode-frozen-issued-events.md) is released for its five-path implementation. [Issued playback](active/song-mode-issued-playback.md) remains Planning. The authenticated geometry resolver and pre-Reserve admission remain explicit prerequisites for actual scheduler consumption.
+[Frozen issued events](active/song-mode-frozen-issued-events.md) is released for its five-path implementation. [Issued playback](completed/song-mode-issued-playback.md) is Completed (session 261 final receipt).
 
 [Retained execution membership](active/song-mode-retained-execution-membership.md) has its two-path source accepted after membership0003 verification; actual immutable-route consumer adoption remains open. It authenticates genuine retained executions without exporting raw records; varying seeds and permitted first executions still require admission work.
 
-[Authenticated issued route resolution](active/song-mode-issued-route-resolution.md) records the eight-path production consumer candidate and its genuine invocation/member evidence adapter prerequisite. It remains Planning.
+[Authenticated issued route resolution](completed/song-mode-issued-route-resolution.md) is Completed (session 261 final receipt).
 
-[Structural clock hooks](active/song-mode-structural-clock-hooks.md) records a bounded Planning phase for Euclid sampling and seven operators' clock evidence. Chunk output-anchor selection requires a separate proof.
+[Structural clock hooks](completed/song-mode-structural-clock-hooks.md) is Completed (session 261 final receipt).
 
 [Route preparation metering](active/song-mode-route-preparation-meter.md) has held0003 source accepted after eight focused tests, 425 broader Rust tests, and fresh frontend/build verification. Actual route-builder adoption is now released in the following phase. It preserves original nested depth and certification failure work before the immutable routing bridge.
 
@@ -314,7 +314,7 @@ Implementation is in progress; statuses and evidence are recorded per plan. Shar
 | SONG-13 | [Automatic run completion and render command](active/song-mode-cli.md) | SONG-12 |
 | SONG-14 | [Browser song protocol integration](active/song-mode-browser-session.md) | SONG-11 |
 | SONG-15 | [Whole-code Apply and instrument mute UI](active/song-mode-editor-controls.md) | SONG-14 |
-| SONG-16 | [Serial integration evidence and documentation](active/song-mode-reconciliation.md) | SONG-13, SONG-15 |
+| SONG-16 | [Serial integration evidence and documentation — Completed (session 261 final receipt)](completed/song-mode-reconciliation.md) | SONG-13, SONG-15 |
 
 ## Completed song runtime checkpoints
 
@@ -324,4 +324,4 @@ Implementation is in progress; statuses and evidence are recorded per plan. Shar
 
 - [Issued invocation compatibility witnesses](completed/song-mode-issued-invocation-compatibility.md): Completed; original full invocation witness preserved with fresh issued member proofs; joined405 Rust and590 frontend plus build gates accepted.
 
-[Shared issued query work](active/song-mode-shared-issued-query-work.md) is a separate Planning prerequisite for preserving the actual query collector through resolution. Its four paths (including charged additive replay seeding) are not part of the active routing release.
+[Shared issued query work](completed/song-mode-shared-issued-query-work.md) is Completed (session 261 final receipt).

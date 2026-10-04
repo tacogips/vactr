@@ -1,8 +1,10 @@
 # Issued song playback through Ready and scheduler
 
-**Status**: In Progress (session 260 implementation complete; operator join repair in cbfe20c; session 261 gate rerun, receipt and review pending)
+**Status**: Completed
 **Created**: 2026-10-03
 **Design Reference**: [Production provenance review](../../design-docs/references/song-mode/production-provenance-review-20261003.md)
+
+**Completion**: SONG-ISSUED-PLAYBACK is reconciled in session 261 from accepted source commit `cbfe20ccf46f7bbac5bad43032e9301d0e7151fb`. Final gate and requirement evidence is recorded in `tmp/song-mode-riela/session249-final-receipt.json`. Earlier amendment sections are historical and are superseded by later session amendments.
 
 ## Purpose and dependencies
 
@@ -1056,7 +1058,7 @@ test.
 
 ### TASK-101: Overwrite-region owner duration (song_clock.rs)
 
-**Status**: Not Started. **Parallelizable**: No (serial worker).
+**Status**: Completed. **Parallelizable**: No (serial worker).
 
 - **Target.** Only the body of `source_owns_owner`
   (`src/pattern/eval/song_clock.rs:192-257`). Its signature does not change.
@@ -1092,7 +1094,7 @@ test.
 
 ### TASK-102: Export engine profile (export.rs)
 
-**Status**: Not Started. **Depends on**: none.
+**Status**: Completed. **Depends on**: none.
 
 - **Target.** `src/song/export.rs` `render` (lines 188-196 at `10c3eab`).
 - **Change.**
@@ -1119,7 +1121,7 @@ test.
 
 ### TASK-103: Private scheduler and Ready checks (realize_tests.rs)
 
-**Status**: Not Started. **Depends on**: TASK-101 (needs a working issued
+**Status**: Completed. **Depends on**: TASK-101 (needs a working issued
 path).
 
 - **Declaration.** In `src/sched/song.rs`, add
@@ -1199,7 +1201,7 @@ path).
 
 ### TASK-104: Requirement transport assertions (tests/song_issued_transport.rs)
 
-**Status**: Not Started. **Depends on**: TASK-101, TASK-102.
+**Status**: Completed. **Depends on**: TASK-101, TASK-102.
 
 - **Capacity.** Replace the bound `measured_bus_slots <= 32` with
   `measured_bus_slots <= u32::try_from(vactr::host::song_profile::SONG_BUS_SLOTS - 1)`
@@ -1240,7 +1242,7 @@ path).
 
 ### TASK-105: Evidence, receipt and gates
 
-**Status**: Not Started. **Depends on**: TASK-101 to TASK-104.
+**Status**: Completed. **Depends on**: TASK-101 to TASK-104.
 
 1. **Before editing.**
    - Copy the current `tmp/song-mode-riela/session249-playback-build.log` and
@@ -1298,20 +1300,20 @@ path).
 
 ### Session 260 done criteria
 
-- [ ] `tests/song_issued_transport.rs` passes. No `foreign source child scope`
+- [x] `tests/song_issued_transport.rs` passes. No `foreign source child scope`
   appears in the focused log.
-- [ ] `git diff 10c3eab -- src/pattern/eval/song_clock.rs` changes only
+- [x] `git diff 10c3eab -- src/pattern/eval/song_clock.rs` changes only
   `source_owns_owner`, and `--lib song_clock` passes.
-- [ ] `grep -n "bus_slots = 32" src/song/export.rs` prints nothing, and
+- [x] `grep -n "bus_slots = 32" src/song/export.rs` prints nothing, and
   `grep -n "song_engine_config" src/song/export.rs` prints one call.
-- [ ] The four `realize_tests` tests and the new transport test pass.
-- [ ] Strict clippy, full nextest (0 failures), WASM and scoped fmt `--check`
+- [x] The four `realize_tests` tests and the new transport test pass.
+- [x] Strict clippy, full nextest (0 failures), WASM and scoped fmt `--check`
   all exit 0, with logs at the manifest paths.
-- [ ] There are no new `allow`/`expect` lines, and the unowned and frozen
+- [x] There are no new `allow`/`expect` lines, and the unowned and frozen
   paths are unchanged against `10c3eab`.
-- [ ] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session259/sha256.txt`
+- [x] `tmp/song-s249/SONG-ISSUED-PLAYBACK/attempt-session259/sha256.txt`
   exists. The receipt has the fields above.
-- [ ] TASK-003 is ticked in the shared-work plan. One progress-log entry is
+- [x] TASK-003 is ticked in the shared-work plan. One progress-log entry is
   added here.
 
 ### 2026-10-04 — Session 260 implementation handoff
@@ -1567,17 +1569,29 @@ These are the design's "Playback review checkpoints". The review range is
 
 ### Session 261 done criteria
 
-- [ ] `attempt-session260/sha256.txt` exists and matches the three copies.
-- [ ] `source-equivalence.log` shows `exit=0`.
-- [ ] Every gate log in `session261-resume/` ends with `exit=0`.
+- [x] `attempt-session260/sha256.txt` exists and matches the three copies.
+- [x] `source-equivalence.log` shows `exit=0`.
+- [x] Every gate log in `session261-resume/` ends with `exit=0`.
   `nextest-full.log` has a `Summary` line with 0 failed, and no `--retries`
   was used.
-- [ ] `capacity.log` contains the `capacity evidence:` line, and the receipt
+- [x] `capacity.log` contains the `capacity evidence:` line, and the receipt
   values equal it.
-- [ ] The receipt has `session: 261`, `baseCommit` `cbfe20c`, the TASK-105
+- [x] The receipt has `session: 261`, `baseCommit` `cbfe20c`, the TASK-105
   `join-repair`, `atomicityTrigger.whyNotRealExhaustion`, empty
   `incompleteGates`, and a fingerprint that differs from every earlier one.
-- [ ] TASK-101..105 are Completed, the session 260 done criteria are ticked
+- [x] TASK-101..105 are Completed, the session 260 done criteria are ticked
   with evidence, and one session 261 progress-log entry exists.
-- [ ] `git diff --quiet cbfe20c -- src tests examples Cargo.toml Cargo.lock`
+- [x] `git diff --quiet cbfe20c -- src tests examples Cargo.toml Cargo.lock`
   still exits 0 after TASK-107. No code changed.
+
+### 2026-10-04 — Session 261 gate rerun and receipt
+
+Build, strict all-target Clippy, focused nextest, song-clock, realization,
+full nextest without retries, WASM, scoped rustfmt, and capacity checks all
+passed. Test counts: focused 117/117, song-clock 15/15, realization 4/4,
+full 2,800/2,800 with 0 failures and 3 skipped. Capacity evidence measured
+tracks=2, reserved_generations=28, required_bus_slots=31, available=50.
+Receipt: `tmp/song-mode-riela/session249-playback-receipt.json`; evidence
+fingerprint: `4f7186f0b669c36b003f9dd995766805d239aaa83a65bac5a286b7718f629c05`.
+Test-integrity, adversarial and integration review remain downstream; the
+top-level plan remains In Progress pending review and SONG-16.

@@ -326,6 +326,25 @@ New tests in `editor/test/canvas/mount.test.ts` (jsdom, fake GL from `test/suppo
 - `mount.ts`, `view-host.ts` and every touched file must stay below 1000 lines (split helpers
   into `view-host.ts`).
 
+## Session 266 Amendment (operator decisions A and D)
+
+- **Artifact roots** (manifest `CANVAS-MOUNT.artifactRoots`, each also a writePath): `target`,
+  `tree-sitter-vact/tree-sitter-vact.wasm`, `tmp/canvas-cutover/mount`, `editor/node_modules/.vite`.
+  These are gitignored outputs and are never committed. If a command writes any other gitignored
+  in-repo path, stop, record the path in this progress log, and ask for a serial manifest
+  amendment.
+- **Setup (not gating)**: `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`,
+  then `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`.
+  The syntax tests need the grammar wasm. A missing grammar is an environment gap; never skip
+  those tests.
+- **Baseline**: MOUNT starts after wave-1 acceptance. Record the pre-plan full-Vitest count
+  (at least 612 at `40467f3`) in `checks.log` before the first edit. The final count must not be
+  lower.
+- **Rule D**: the gating list contains only final-source commands that are expected to pass.
+  A re-run after a fixed failure replaces the failed run, and the failure goes into history notes
+  only. Negative-control runs (for example, proving the no-editor-view guard fails on an injected
+  import) go under `mutationEvidence` with their log paths.
+
 ## Verification (record in tmp/canvas-cutover/mount/checks.log)
 
 | Command | Required evidence |
@@ -354,3 +373,6 @@ repair serially after the join. Edit only this plan's progress log.
 
 ### Session: 2026-10-05
 **Tasks Completed**: Plan authored
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared, setup separated from gating, pre-plan Vitest baseline rule added. Tasks and contracts are unchanged.

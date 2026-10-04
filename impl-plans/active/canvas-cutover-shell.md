@@ -202,6 +202,39 @@ Imitate `protocol/wasm.ts:WasmTransport` (the `closed` flag and `offs` list).
 - Forgetting that the iOS frontend needs `dist`. Build it first:
   `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`.
 
+## Session 266 Amendment (operator decisions A and D)
+
+- **Artifact roots** (manifest `CANVAS-SHELL.artifactRoots`, each also a writePath; all
+  gitignored and never committed):
+  - `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `tmp/canvas-cutover/shell`,
+    `tmp/canvas/ios-scratch`, `editor/node_modules/.vite`;
+  - `editor/dist` (from `npm run build`);
+  - `editor/src-tauri/target` and `editor/src-tauri/gen/schemas` (from the separate Tauri
+    workspace and tauri-build);
+  - `editor/src-tauri/gen/apple/build`, `editor/src-tauri/gen/apple/Externals` and
+    `editor/src-tauri/gen/apple/Pods`;
+  - `editor/src-tauri/gen/apple/vactr-editor.xcodeproj/xcuserdata` and
+    `editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/xcuserdata`.
+- **Tracked generated files stay writePaths.** The enumerated `editor/src-tauri/gen/apple/...`
+  project files are committed. The `editor/.gitignore` change (`src-tauri/gen/` becomes
+  `src-tauri/gen/schemas/`) and the generated `gen/apple/.gitignore` (`build/`, `Externals/`,
+  `xcuserdata/`, `Pods/`) keep every artifact root ignored. After `ios init`, check:
+  `git check-ignore -q` exits 0 for a probe path inside each artifact root and exits 1 for each
+  committed gen/apple path.
+- **DerivedData.** Record the DerivedData and `.app` locations that the cargo-tauri build
+  actually used in `tmp/canvas-cutover/shell/ios-build.log`. The default
+  `~/Library/Developer/Xcode/DerivedData` is outside the repository and is never committed. If
+  the xcodebuild fallback is used, run it from `editor/src-tauri/gen/apple` with
+  `-derivedDataPath build/DerivedData`, so its outputs land inside the `gen/apple/build` artifact
+  root. Any other gitignored in-repo output means: stop, record it, and amend the manifest
+  serially before acceptance.
+- **Setup (not gating)**: `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`,
+  then the host-wasm library build.
+- **Rule D**: the gating list contains only final-source commands that are expected to pass.
+  Failed-then-fixed runs go into history notes only, and negative controls go under
+  `mutationEvidence`. A simulator blocker is recorded as a blocker with its exact command, exit
+  and log path. It is never listed as a pass.
+
 ## Verification (record in tmp/canvas-cutover/shell/checks.log; simulator steps run outside the sandbox)
 
 | Command | Required evidence |
@@ -217,7 +250,7 @@ Imitate `protocol/wasm.ts:WasmTransport` (the `closed` flag and `offs` list).
 | `cd editor && npm run check && ./node_modules/.bin/vitest run test/protocol/tauri.test.ts test/app/main.test.ts` | exit 0, all pass |
 | Full `cd editor && ./node_modules/.bin/vitest run` (after the Wasm lib build) | all pass |
 | `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | exit 0 |
-| `cd editor/src-tauri && ../../tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim --debug` (fallback: `xcodebuild -project gen/apple/vactr-editor.xcodeproj -scheme vactr-editor_iOS -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build`) | exit 0; log `tmp/canvas-cutover/shell/ios-build.log`; exact command recorded |
+| `cd editor/src-tauri && ../../tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim --debug` (fallback, run from `editor/src-tauri/gen/apple`: `xcodebuild -project vactr-editor.xcodeproj -scheme vactr-editor_iOS -sdk iphonesimulator -configuration Debug -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`) | exit 0; log `tmp/canvas-cutover/shell/ios-build.log`; exact command recorded |
 | `xcrun simctl boot "<iPad simulator name from xcrun simctl list devices available>"`, then `xcrun simctl install booted <.app path>` | exit 0; `simctl-install.log` |
 | `SIMCTL_CHILD_VACTR_SELF_CHECK=1 xcrun simctl launch --console-pty booted me.tacogips.vactr`, with a 60 s capture | A `VACTR_SELF_CHECK {...}` line saved to `self-check.json` |
 | `xcrun simctl io booted screenshot tmp/canvas-cutover/shell/ipad-sim.png` | File exists |
@@ -245,3 +278,6 @@ Edit only this plan's progress log.
 **Notes**: A plan-time scratch `ios init` under `tmp/canvas/ios-scratch` needed approval that
 was not granted in the plan node. The template paths were extracted from the pinned tauri-cli
 binary instead.
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared, including the Xcode and Tauri outputs; the DerivedData rule and the fallback `-derivedDataPath` added; setup separated from gating. Tasks and contracts are unchanged.

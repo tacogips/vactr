@@ -7,6 +7,13 @@
   "remote": "origin",
   "originalHead": "c9e5a05bb528221ca766a5cee62582ef1c9563e2",
   "evidenceRoot": "tmp/canvas-cutover",
+  "resume": {
+    "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-266",
+    "resumes": "opus-luna-design-and-implement-review-loop-session-265",
+    "resumeHead": "40467f3b46e50b12b962717b05b6fff36fc36916",
+    "amendment": "Session 266 plan step (operator decisions A-D): every plan declares artifactRoots for the gitignored build and test outputs it may write, and every artifactRoots entry is also a writePaths entry; setup commands are listed separately from gating verification; NATIVE and EVIDENCE wasm commands aligned to the host-wasm feature build; CLOCK and RENDER full-Vitest floor raised to 612 tests. The design (15.3.8) and the plan decomposition are unchanged.",
+    "wave1State": "CANVAS-CLOCK, CANVAS-NATIVE and CANVAS-RENDER source is implemented at resumeHead but not accepted. Wave-1 implementers re-run final-source gating only (no source change unless a review finds a defect), then test-integrity, adversarial and integration review."
+  },
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/user-qa/pending-editor-questions.md"
@@ -99,7 +106,10 @@
     ],
     "rules": [
       "The accepted design and all plans are committed and pushed before wave 1 starts.",
-      "Within a wave, writePaths are disjoint. sharedPaths are conditional seams, edited only for the stated reason and recorded in the owning plan's progress log.",
+      "Within a wave, source writePaths are disjoint. sharedPaths are conditional seams, edited only for the stated reason and recorded in the owning plan's progress log.",
+      "artifactRoots (session 266, operator decision A): each plan lists the gitignored build and test outputs it may write. Every artifactRoots entry is also listed in that plan's writePaths and never in sharedPaths. The common roots target, tree-sitter-vact/tree-sitter-vact.wasm, editor/node_modules/.vite, editor/dist, editor/src-tauri/target and editor/src-tauri/gen/schemas are intentionally declared by several plans of one wave: they are gitignored tool outputs (Cargo and Vite take their own locks; the grammar build is idempotent), recorded as digest manifests, and never committed. Tracked files, including the generated gen/apple project files SHELL commits, stay ordinary writePaths. If a command writes a gitignored in-repo path outside the declared roots, stop, record the path in the plan's progress log, and amend the manifest serially before acceptance.",
+      "Setup is not gating: each plan's setup list prepares gitignored prerequisites in a clean snapshot (grammar wasm only when absent, then the host-wasm library build) and is not reported as verification.",
+      "Rule D (session 266, every implementer and verifier): the gating verification list contains only final-source commands that are expected to pass. Mutation and negative-control runs go to a separate mutationEvidence list with command, expected nonzero exit, actual exit and complete log path. A re-run after a fixed failure replaces the failed run in the gating list; the failed run, superseded compile failures and selector typos appear only in history notes.",
       "Each implementer records fresh-read sha256 values before each edit and post-edit hashes in its tmp/canvas-cutover/<plan>/intent.json and receipt.json. Drift in a not-yet-edited file stops edits to that file; repair is serial after the join.",
       "The suite must be green before each acceptance: npm run check exit 0, full vitest pass, clippy -D warnings exit 0, full nextest pass (timeout >= 1500 s; a timeout kill is neither pass nor fail).",
       "Implementers run focused checks in the sandbox. Playwright, HTTP servers, simulator launches and full nextest runs happen in the verification and review steps outside the sandbox.",
@@ -111,11 +121,20 @@
     {
       "planId": "CANVAS-CLOCK",
       "planPath": "impl-plans/active/canvas-cutover-clock.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/clock",
+        "editor/node_modules/.vite"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
       "acceptanceCriteria": [
         "TASK-001 to TASK-005 done with the AudibleClock, HighlightScheduler, TransportBar, ProbeCorrelation and AudibleSample contracts exactly as pinned in canvas-cutover-clock.md",
         "Time-domain confirmation recorded in the plan progress log",
-        "npm run check exit 0; full vitest passes (at least 590 tests) with no assertion deleted",
+        "Session 266: new final-source gating evidence on the 40467f3 bytes (or on the reviewed fix): npm run check exit 0; full vitest passes with at least 612 tests and no assertion deleted; host-wasm build exit 0",
         "No edits outside writePaths except recorded sharedPaths edits"
       ],
       "verification": [
@@ -144,7 +163,11 @@
         "impl-plans/active/canvas-cutover-clock.md",
         "tmp/canvas-cutover/clock/intent.json",
         "tmp/canvas-cutover/clock/receipt.json",
-        "tmp/canvas-cutover/clock/checks.log"
+        "tmp/canvas-cutover/clock/checks.log",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/clock",
+        "editor/node_modules/.vite"
       ],
       "sharedPaths": [
         "editor/test/code/reconcile.test.ts",
@@ -161,18 +184,27 @@
     {
       "planId": "CANVAS-NATIVE",
       "planPath": "impl-plans/active/canvas-cutover-native.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/native",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas"
+      ],
+      "setup": [],
       "acceptanceCriteria": [
         "OutputClock, clock-probe and session owner contracts exactly as pinned; reply JSON matches editor/src/protocol/types.ts:205-215",
         "The audio callback adds only the non-blocking record call (reviewed by diff)",
         "src/host/native/audio.rs and src/session/protocol.rs each under 1000 lines",
-        "Build, clippy -D warnings, focused nextest, wasm32 build and editor/src-tauri cargo check pass; full nextest passes outside the sandbox"
+        "Session 266: restored-source gating re-run on the 40467f3 bytes (or on the reviewed fix): build, clippy -D warnings, focused nextest, host-wasm build, editor/src-tauri cargo check and rustfmt --check pass; full nextest (timeout >= 1500 s) passes outside the sandbox",
+        "Mutation runs for NATIVE-TI-001 and NATIVE-TI-002 appear only under mutationEvidence with their log paths, never in the gating list",
+        "Independent test-integrity re-review accepts NATIVE-TI-001 (backdated OutputClock stale-age test) and NATIVE-TI-002 (clock_discontinuity drops only Broadcast Telemetry, Levels and Tempo; keeps Diag, Manifest and requester replies)"
       ],
       "verification": [
         "CARGO_TERM_QUIET=true cargo build",
         "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/clock|owner|publish|codec|serve|ws/)'",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
         "rustfmt --edition 2021 --check src/host/native/clock.rs src/host/native/audio.rs src/host/native/audio/stream.rs src/host/native/mod.rs src/host/native/tests/mod.rs src/host/native/tests/clock.rs src/session/protocol.rs src/session/codec.rs src/session/publish.rs src/session/session.rs src/session/mod.rs src/session/tests/publish.rs src/session/tests/codec.rs src/cli/owner.rs src/cli/serve.rs src/cli/mod.rs src/cli/ws.rs src/cli/tests/mod.rs src/cli/tests/owner.rs",
         "wc -l src/host/native/audio.rs src/session/protocol.rs",
@@ -203,7 +235,12 @@
         "impl-plans/active/canvas-cutover-native.md",
         "tmp/canvas-cutover/native/intent.json",
         "tmp/canvas-cutover/native/receipt.json",
-        "tmp/canvas-cutover/native/checks.log"
+        "tmp/canvas-cutover/native/checks.log",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/native",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas"
       ],
       "sharedPaths": [
         "src/cli/tests/ws.rs",
@@ -223,13 +260,22 @@
     {
       "planId": "CANVAS-RENDER",
       "planPath": "impl-plans/active/canvas-cutover-render.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/render",
+        "editor/node_modules/.vite"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
       "acceptanceCriteria": [
         "RenderFeedback, FrameScheduler and PerfRecorder contracts exactly as pinned in canvas-cutover-render.md",
         "Animation-only frames proven to perform zero shaping, zero atlas uploads and zero buffer uploads",
         "textPending per-frame atlas budget behavior tested",
         "Scheduler hidden, DPR, resize, inset and dispose tests pass",
-        "npm run check exit 0; full vitest passes with no assertion deleted; renderer.ts, frame.ts and atlas.ts each under 1000 lines"
+        "Session 266: new final-source gating evidence on the 40467f3 bytes (or on the reviewed fix): npm run check exit 0; full vitest passes with at least 612 tests and no assertion deleted; host-wasm build exit 0; renderer.ts, frame.ts and atlas.ts each under 1000 lines"
       ],
       "verification": [
         "cd editor && npm run check",
@@ -250,7 +296,11 @@
         "impl-plans/active/canvas-cutover-render.md",
         "tmp/canvas-cutover/render/intent.json",
         "tmp/canvas-cutover/render/receipt.json",
-        "tmp/canvas-cutover/render/checks.log"
+        "tmp/canvas-cutover/render/checks.log",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/render",
+        "editor/node_modules/.vite"
       ],
       "sharedPaths": [
         "editor/src/code/layout.ts",
@@ -267,7 +317,16 @@
     {
       "planId": "CANVAS-MOUNT",
       "planPath": "impl-plans/active/canvas-cutover-mount.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/mount",
+        "editor/node_modules/.vite"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
       "acceptanceCriteria": [
         "Frozen 15.3.8.2 code-surface contract applied; CodeApi.view removed; no-editor-view guard test passes",
         "All 15.3.8.2 consumer rules implemented (eval, diagnostics, format, tree-sitter syntax, completion popup, song, bind, params); every code.view use migrated",
@@ -335,7 +394,11 @@
         "impl-plans/active/canvas-cutover-mount.md",
         "tmp/canvas-cutover/mount/intent.json",
         "tmp/canvas-cutover/mount/receipt.json",
-        "tmp/canvas-cutover/mount/checks.log"
+        "tmp/canvas-cutover/mount/checks.log",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/mount",
+        "editor/node_modules/.vite"
       ],
       "sharedPaths": [
         "editor/src/code/layout.ts",
@@ -365,7 +428,16 @@
     {
       "planId": "CANVAS-VISUAL",
       "planPath": "impl-plans/active/canvas-cutover-visual.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/visual",
+        "editor/node_modules/.vite"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
       "acceptanceCriteria": [
         "Hydra uses audible time, with the same t for frame and draw",
         "Scopes are timestamp-presented with the 8-entry bound and the 2 s hide",
@@ -399,7 +471,11 @@
         "impl-plans/active/canvas-cutover-visual.md",
         "tmp/canvas-cutover/visual/intent.json",
         "tmp/canvas-cutover/visual/receipt.json",
-        "tmp/canvas-cutover/visual/checks.log"
+        "tmp/canvas-cutover/visual/checks.log",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/visual",
+        "editor/node_modules/.vite"
       ],
       "sharedPaths": [
         "editor/src/visual/panes-view.tsx",
@@ -413,7 +489,25 @@
     {
       "planId": "CANVAS-SHELL",
       "planPath": "impl-plans/active/canvas-cutover-shell.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/shell",
+        "tmp/canvas/ios-scratch",
+        "editor/node_modules/.vite",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "editor/src-tauri/gen/apple/build",
+        "editor/src-tauri/gen/apple/Externals",
+        "editor/src-tauri/gen/apple/Pods",
+        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/xcuserdata",
+        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/xcuserdata"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
       "acceptanceCriteria": [
         "Desktop: Tauri commands work in the SessionBridge tests; editor/src-tauri cargo check, clippy -D warnings and cargo test pass; TauriTransport tests pass",
         "app/main.ts selects the IPC native tier with ProbeCorrelation and the fallback works; CANVAS-CLOCK audibleFor and boot rows preserved",
@@ -490,7 +584,20 @@
         "tmp/canvas-cutover/shell/ios-build.log",
         "tmp/canvas-cutover/shell/simctl-install.log",
         "tmp/canvas-cutover/shell/self-check.json",
-        "tmp/canvas-cutover/shell/ipad-sim.png"
+        "tmp/canvas-cutover/shell/ipad-sim.png",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/shell",
+        "tmp/canvas/ios-scratch",
+        "editor/node_modules/.vite",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "editor/src-tauri/gen/apple/build",
+        "editor/src-tauri/gen/apple/Externals",
+        "editor/src-tauri/gen/apple/Pods",
+        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/xcuserdata",
+        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/xcuserdata"
       ],
       "sharedPaths": [
         "editor/src-tauri/Cargo.lock",
@@ -504,13 +611,29 @@
       ],
       "writePathNotes": [
         { "path": "editor/.gitignore", "intendedEdit": "Before ios init, replace the single line 'src-tauri/gen/' with 'src-tauri/gen/schemas/'; keep 'dist/' and 'src-tauri/target/'. Never git add -f." },
+        { "path": "editor/src-tauri/gen/apple/build", "intendedEdit": "Artifact root (gitignored by the generated gen/apple/.gitignore). If the xcodebuild fallback is used, pass -derivedDataPath build/DerivedData from editor/src-tauri/gen/apple so DerivedData lands here; record the actual DerivedData location of the cargo-tauri build in tmp/canvas-cutover/shell/ios-build.log." },
         { "path": "editor/test/app/main.test.ts", "intendedEdit": "Add Tauri tier rows; keep every CANVAS-CLOCK audibleFor and boot wiring row unchanged." }
       ]
     },
     {
       "planId": "CANVAS-EVIDENCE",
       "planPath": "impl-plans/active/canvas-cutover-evidence.md",
-      "artifactRoots": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/evidence",
+        "tmp/canvas/evidence",
+        "editor/node_modules/.vite",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "editor/src-tauri/gen/apple/build",
+        "editor/src-tauri/gen/apple/Externals"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
       "acceptanceCriteria": [
         "Playwright-library harness and unit tests in place; run.mjs exit codes 0 pass, 1 fail, 2 blocked (never a pass)",
         "design-docs/specs/design-canvas-editor-evidence.md contains the harness-generated results section, raw data paths under design-docs/specs/evidence/canvas-cutover/run-001/, platform limitations and pending physical-iPad procedures",
@@ -527,8 +650,9 @@
         "CARGO_TERM_QUIET=true cargo build",
         "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
         "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml"
       ],
       "wave": 3,
@@ -605,7 +729,17 @@
         "tmp/canvas-cutover/evidence/receipt.json",
         "tmp/canvas-cutover/evidence/checks.log",
         "tmp/canvas-cutover/evidence/e2e.log",
-        "tmp/canvas-cutover/evidence/final-gates.log"
+        "tmp/canvas-cutover/evidence/final-gates.log",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "tmp/canvas-cutover/evidence",
+        "tmp/canvas/evidence",
+        "editor/node_modules/.vite",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "editor/src-tauri/gen/apple/build",
+        "editor/src-tauri/gen/apple/Externals"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],

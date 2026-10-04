@@ -153,6 +153,18 @@ export class LevelsTimeline { push(body: LevelsBody, receivedAt: number): void; 
   after an actual `host.draw`.
 - Editing `code/*`, `app/*` or `protocol/*`.
 
+## Session 266 Amendment (operator decisions A and D)
+
+- **Artifact roots** (manifest `CANVAS-VISUAL.artifactRoots`, each also a writePath): `target`,
+  `tree-sitter-vact/tree-sitter-vact.wasm`, `tmp/canvas-cutover/visual`, `editor/node_modules/.vite`.
+  These are gitignored outputs and are never committed. If a command writes any other gitignored
+  in-repo path, stop and record it.
+- **Setup (not gating)**: `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`,
+  then the host-wasm library build.
+- **Rule D**: the gating list contains only final-source commands that are expected to pass.
+  Mutation and negative-control runs go under `mutationEvidence`, and failed-then-fixed runs go
+  into history notes only.
+
 ## Verification (record in tmp/canvas-cutover/visual/checks.log)
 
 | Command | Required evidence |
@@ -180,3 +192,6 @@ Edit only this plan's progress log.
 
 ### Session: 2026-10-05
 **Tasks Completed**: Plan authored
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared, setup separated from gating. Tasks and contracts are unchanged.

@@ -221,18 +221,59 @@ attributes.
 - Running crate-wide `cargo fmt`. Run `rustfmt` on touched files only.
 - Adding `#[allow]` or `#[expect]`. Dead code gets `#[cfg(test)]` or is removed.
 
+## Session 266 Resume Amendment (operator decisions A, C and D)
+
+The source for this plan is already implemented at `40467f3` (pushed WIP checkpoint), including
+the fixes for NATIVE-TI-001 and NATIVE-TI-002. It is not accepted yet. This session re-runs the
+restored-source gating commands, reports mutation runs separately, and sends the two fixes to an
+independent test-integrity re-review.
+
+- **Artifact roots** (manifest `CANVAS-NATIVE.artifactRoots`, each also a writePath): `target`,
+  `tree-sitter-vact/tree-sitter-vact.wasm`, `tmp/canvas-cutover/native`, `editor/src-tauri/target`,
+  `editor/src-tauri/gen/schemas`. The `editor/src-tauri` cargo check writes the last two (it is a
+  separate workspace, and tauri-build emits ACL schemas). This plan runs no Vitest. If a command
+  writes any other gitignored in-repo path, stop and record it.
+- **Decision C, gating list.** Exactly the rows of the Verification table below, run on the
+  restored final source. Before running, confirm that every writePath source hash equals
+  `git show 40467f3:<path> | shasum -a 256`, or equals the reviewed fix. If
+  `editor/src-tauri/Cargo.lock` changes, record the diff and stop: it is not this plan's file.
+- **mutationEvidence (separate field, never in the gating list).** Each entry records: the
+  mutated predicate, the command, the expected nonzero exit, the actual exit, the complete log
+  path, and confirmation that source hashes were restored afterward. The session-265 entries are:
+  - NATIVE-TI-001: `&& age_seconds <= 1.0` removed from `OutputClock::read`, focused
+    `cargo nextest run -E 'test(/clock/)'`, exit 100, log
+    `tmp/canvas-cutover/native/mutation-stale-rule-removed.log`.
+  - NATIVE-TI-002: the outbox predicate reverted to requester-only, focused nextest on
+    `discontinuity_changes_epoch_clears_telemetry_and_keeps_control_replies`, exit 100, recorded
+    inline in `tmp/canvas-cutover/native/checks.log`.
+  A new mutation run is optional. If one is made, restore the source and re-run the full gating
+  table afterward.
+- **History only (never gating).** The zsh `status` wrapper exit 1
+  (`full-nextest-final.log`), the E0499 compile failure (`focused-review-fix.log`) and the
+  unquoted-selector run (mutation exit 4).
+- **Test-integrity re-review targets** (independent reviewer, not the implementer):
+  - NATIVE-TI-001, the backdated-OutputClock test in `src/host/native/tests/clock.rs`. A nonzero
+    sample 2 s old must read `unavailable`, and a measured sample 0.5 s old must read `measured`.
+    The test-only constructor must be `#[cfg(test)]`, and the production `read()` path must stay
+    unchanged.
+  - NATIVE-TI-002, the discontinuity test in `src/session/tests/publish.rs`.
+    `clock_discontinuity` must start a new epoch and drop only Broadcast `Telemetry`, `Levels` and
+    `Tempo`. Queued `Playing`, `Diag`, `Manifest` and requester replies must survive, and the test
+    must assert both what is dropped and what is delivered.
+- **Rule D**: a re-run after a fixed failure replaces the failed run in the gating list.
+
 ## Verification (record exit codes and log paths in tmp/canvas-cutover/native/checks.log)
 
 | Command | Required evidence |
 |---------|-------------------|
 | `CARGO_TERM_QUIET=true cargo build` | exit 0 |
 | `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` | exit 0, zero diagnostics |
-| `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/clock|owner|publish|codec|serve|ws/)'` | all pass |
-| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown` | exit 0 (Session changes compile for Wasm) |
+| `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/clock|owner|publish|codec|serve|ws/)'` | all pass, nonzero test count (493 at `40467f3`) |
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 (Session changes compile for Wasm) |
 | `CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml` | exit 0 (shell still builds against the changed crate) |
-| `rustfmt --edition 2021 --check <each touched .rs file>` | exit 0 |
+| `rustfmt --edition 2021 --check src/host/native/clock.rs src/host/native/audio.rs src/host/native/audio/stream.rs src/host/native/mod.rs src/host/native/tests/mod.rs src/host/native/tests/clock.rs src/session/protocol.rs src/session/codec.rs src/session/publish.rs src/session/session.rs src/session/mod.rs src/session/tests/publish.rs src/session/tests/codec.rs src/cli/owner.rs src/cli/serve.rs src/cli/mod.rs src/cli/ws.rs src/cli/tests/mod.rs src/cli/tests/owner.rs` | exit 0 |
 | `wc -l src/host/native/audio.rs src/session/protocol.rs` | each < 1000 |
-| Outside the sandbox: full nextest with a timeout of at least 1500 s | all pass; a timeout kill counts as neither pass nor fail |
+| Outside the sandbox: `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` with a command timeout of at least 1500 s | all pass (2,810 passed / 3 skipped at `40467f3`); a timeout kill counts as neither pass nor fail |
 
 ## Overwrite and Drift Protocol
 
@@ -248,18 +289,29 @@ attributes.
 - [x] The audio callback adds only the `record` call (reviewed by diff)
 - [x] `audio.rs` and `protocol.rs` < 1000 lines
 - [x] Build, clippy, focused nextest, Wasm build and src-tauri check pass
-- [x] Stale clock coverage uses nonzero samples on both sides of the one-second threshold; mutation without the age predicate fails
+- [x] Stale clock coverage uses nonzero samples on both sides of the one-second threshold (the mutation without the age predicate is mutationEvidence, not gating)
 - [x] Clock discontinuity drops pending telemetry while preserving diagnostics and requester replies
+- [ ] Session 266: restored-source gating table re-run on the `40467f3` bytes (or the reviewed fix), every row passing, recorded in `checks.log` with log paths and source sha256 values
+- [ ] Session 266: mutation runs reported only under `mutationEvidence`
+- [ ] Session 266: independent test-integrity re-review accepts NATIVE-TI-001 and NATIVE-TI-002; adversarial and integration reviews accepted
 
 ## Progress Log
 
 ### Session: 2026-10-05
 **Tasks Completed**: TASK-001 through TASK-005 implemented; protocol contract, callback scope, file-size limits, and all assigned verification gates confirmed.
 **Evidence**: `tmp/canvas-cutover/native/checks.log`; final full-suite log `tmp/canvas-cutover/native/full-nextest-final-rerun.log`; post-edit hashes in `tmp/canvas-cutover/native/receipt.json`.
-**Verification**: build, strict clippy, focused nextest (493/493), wasm build, Tauri cargo check, touched-file rustfmt, and full nextest (2,810/2,810; 3 skipped) all exited 0. `audio.rs` is 896 lines and `protocol.rs` is 940 lines.
-**Notes**: The first final-suite wrapper completed nextest with all tests passing but then exited 1 because zsh reserves the variable name `status`; it is retained in `tmp/canvas-cutover/native/full-nextest-final.log`. The clean rerun captured exit 0 in the rerun log above. Independent review and workflow finalization remain downstream.
+**Verification (gating, final source)**: build, strict clippy, focused nextest (493/493), wasm build, Tauri cargo check, touched-file rustfmt, and full nextest (2,810/2,810; 3 skipped; `full-nextest-final-rerun.log`) all exited 0. `audio.rs` is 896 lines and `protocol.rs` is 940 lines.
+**History (non-gating)**: The first final-suite wrapper (`tmp/canvas-cutover/native/full-nextest-final.log`) ran nextest to completion with all tests passing, then exited 1 because zsh reserves the variable name `status`. The rerun above replaces it. Independent review and workflow finalization remain downstream.
 
 ### Session: 2026-10-05 (integrity review repairs)
 **Findings Addressed**: NATIVE-TI-001 and NATIVE-TI-002.
 **Changes**: Added a test-only backdated OutputClock constructor. The stale test now injects a nonzero sample 2 seconds old and a 0.5-second-old measured sample. `clock_discontinuity` now removes only Telemetry, Levels, and Tempo broadcasts; the regression test queues Playing, Diag, and Manifest messages and checks what is dropped and delivered.
-**Verification**: Mutation removal of `age_seconds <= 1.0` failed at the stale assertion (expected). Mutation to the old requester-only outbox predicate failed at the new Diag-preservation assertion (expected). Restored-source focused nextest passed 493/493, clippy with `-D warnings` passed, wasm build passed, rustfmt check passed, and full nextest passed 2,810/2,810 with 3 skipped. See `tmp/canvas-cutover/native/checks.log` and its referenced complete logs.
+**Verification (gating, restored final source)**: focused nextest passed 493/493 (`focused-review-fix-final.log`), clippy with `-D warnings` passed (`clippy-review-fix-final.log`), wasm build passed (`wasm-review-fix-final.log`), cargo build, Tauri cargo check and rustfmt check passed, and full nextest passed 2,810/2,810 with 3 skipped. See `tmp/canvas-cutover/native/checks.log`.
+**mutationEvidence (non-gating, expected nonzero)**:
+- NATIVE-TI-001: removing `&& age_seconds <= 1.0` from `OutputClock::read` failed the stale assertion, exit 100, `tmp/canvas-cutover/native/mutation-stale-rule-removed.log`.
+- NATIVE-TI-002: reverting to the old requester-only outbox predicate failed the new Diag-preservation assertion, exit 100, recorded inline in `tmp/canvas-cutover/native/checks.log`.
+Source hashes were restored after both mutations (20/20 receipt hashes matched).
+**History (non-gating)**: the E0499 compile failure (`focused-review-fix.log`) and an unquoted-selector mutation run (exit 4) were superseded.
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A, C and D. Artifact roots declared; the wasm row aligned to the host-wasm build; the rustfmt row made concrete; the session-265 log split into gating, mutationEvidence and history; re-verification and re-review criteria added. Source was not changed.

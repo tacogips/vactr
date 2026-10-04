@@ -214,13 +214,38 @@ cleanup array), and the injected rAF in `editor/src/visual/frame.ts` (`scheduler
 - Editing `editor/src/app/apis.ts` beyond the one union member, or touching
   `editor/test/canvas/contracts.test.ts`. CANVAS-CLOCK owns that file in this wave.
 
+## Session 266 Resume Amendment (operator decisions A, B and D)
+
+The source for this plan is already implemented at `40467f3` (pushed WIP checkpoint). It is not
+accepted yet. This session re-verifies that source; it does not re-implement it.
+
+- **Artifact roots** (manifest `CANVAS-RENDER.artifactRoots`, each also a writePath): `target`,
+  `tree-sitter-vact/tree-sitter-vact.wasm`, `tmp/canvas-cutover/render`, `editor/node_modules/.vite`.
+  These are gitignored outputs and are never committed. If a command writes any other gitignored
+  in-repo path, stop, record the path in this progress log, and ask for a serial manifest
+  amendment. Never `git add -f`.
+- **Setup (not gating)**: `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`,
+  then the host-wasm library build.
+- **Decision B**: run the Verification table below on the unchanged `40467f3` bytes and write new
+  evidence to `tmp/canvas-cutover/render/checks.log`: command, exit code, test count, complete log
+  path, and the sha256 of every writePath source file. Before running, confirm that each source
+  hash equals `git show 40467f3:<path> | shasum -a 256`. Do not edit source unless a review
+  finding requires it. If a review fix changes source, re-run the full table on the fixed bytes.
+- **Rule D**: the gating list contains only final-source commands that are expected to pass. A
+  failed run that was then fixed is replaced by its passing re-run, and the failure goes only into
+  a history note. Mutation and negative-control runs go under `mutationEvidence`. The session-265
+  ENOENT full-Vitest run is history, not gating evidence.
+- **Do not**: touch `editor/test/canvas/contracts.test.ts` (CANVAS-CLOCK owns it in this wave),
+  delete or skip assertions, or lower the 612 floor.
+
 ## Verification (record in tmp/canvas-cutover/render/checks.log)
 
 | Command | Required evidence |
 |---------|-------------------|
 | `cd editor && npm run check` | exit 0 |
 | `cd editor && ./node_modules/.bin/vitest run test/canvas/frame.test.ts test/canvas/gpu.test.ts test/canvas/state.test.ts test/canvas/input.test.ts test/canvas/contracts.test.ts` | all pass |
-| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` then `cd editor && ./node_modules/.bin/vitest run` | Cargo build passes; full Vitest remains blocked because generated `tree-sitter-vact/tree-sitter-vact.wasm` is absent and is outside declared `artifactRoots` |
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run` | all pass (full suite; at least 612 tests, none removed; 0 failed files) |
 | `wc -l editor/src/code/renderer.ts editor/src/code/frame.ts editor/src/code/atlas.ts` | each < 1000 |
 
 ## Overwrite and Drift Protocol
@@ -236,6 +261,8 @@ Edit only this plan's progress log.
 - [x] `textPending` budget behavior tested
 - [x] Scheduler hidden, DPR, resize, inset and dispose tests pass
 - [ ] `npm run check` exit 0; full vitest passes with no assertion deleted (type check passes; full suite awaits approved tree-sitter WASM artifact path)
+- [ ] Session 266: new final-source gating evidence on the `40467f3` bytes (or on the reviewed fix): `npm run check` exit 0, focused Vitest pass, host-wasm build exit 0, full Vitest pass (at least 612 tests, 0 failed files), line counts < 1000; source sha256 values recorded in `checks.log`
+- [ ] Session 266: test-integrity, adversarial and integration reviews accepted
 
 ## Progress Log
 
@@ -245,3 +272,7 @@ Edit only this plan's progress log.
 ### Session: 2026-10-05 CANVAS-RENDER implementation
 **Tasks Completed**: TASK-001, TASK-002, TASK-003, TASK-004 implementation and focused verification
 **Notes**: Added cached renderer draw layers and `call-head`, 1 MiB atlas upload budget with `textPending`, and `FrameScheduler`/`PerfRecorder`. Focused Vitest passed 132/132 and `npm run check` passed. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` passed. Full Vitest ran 80 files: 606 passed, 6 skipped, 2 suites failed because `tree-sitter-vact/tree-sitter-vact.wasm` is absent. Building it with the repository task writes outside this plan's empty `artifactRoots`; resume after the dispatch artifact root is amended or the test asset is otherwise made available within an authorized artifact path. `renderer.ts`, `frame.ts`, and `atlas.ts` are 359, 130, and 105 lines.
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A, B and D. Artifact roots declared, setup separated from gating, the blocked full-Vitest row replaced by a gating row with a 612-test floor, re-verification criteria added. Source was not changed.
+**Notes**: The operator generated `tree-sitter-vact/tree-sitter-vact.wasm` with `mise run ts-build-wasm` (gitignored). The operator's 612/612 run on `40467f3` is historical only; this session needs new gating evidence.

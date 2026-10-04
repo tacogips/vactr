@@ -280,6 +280,32 @@ Also:
   Record the evidence in the progress log. If it is a different domain, stop and report a
   blocking design contradiction.
 
+## Session 266 Resume Amendment (operator decisions A, B and D)
+
+The source for this plan is already implemented at `40467f3` (pushed WIP checkpoint). It is not
+accepted yet. This session re-verifies that source; it does not re-implement it.
+
+- **Artifact roots** (manifest `CANVAS-CLOCK.artifactRoots`, each also a writePath): `target`,
+  `tree-sitter-vact/tree-sitter-vact.wasm`, `tmp/canvas-cutover/clock`, `editor/node_modules/.vite`.
+  These are gitignored outputs and are never committed. If a command writes any other gitignored
+  in-repo path, stop, record the path in this progress log, and ask for a serial manifest
+  amendment. Never `git add -f`.
+- **Setup (not gating)**: `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`,
+  then the host-wasm library build. Without the grammar wasm, `test/code/syntax.test.ts` and
+  `syntax-core.test.ts` fail with ENOENT. That was the session-265 blocker; it is an environment
+  gap, not a test defect.
+- **Decision B**: run the Verification table below on the unchanged `40467f3` bytes and write new
+  evidence to `tmp/canvas-cutover/clock/checks.log`: command, exit code, test count, complete log
+  path, and the sha256 of every writePath source file. Before running, confirm that each source
+  hash equals `git show 40467f3:<path> | shasum -a 256`. Do not edit source unless a review
+  finding requires it. If a review fix changes source, re-run the full table on the fixed bytes.
+- **Rule D**: the gating list contains only final-source commands that are expected to pass. A
+  failed run that was then fixed is replaced by its passing re-run, and the failure goes only into
+  a history note. Mutation and negative-control runs (none are expected for this plan) go under
+  `mutationEvidence`. The session-265 ENOENT runs are history, not gating evidence.
+- **Do not**: edit tests to make them pass, delete or skip assertions, lower the 612 floor, or
+  count skipped tests as passes. Never edit `.agents/settings.local.json`.
+
 ## Verification (run from the repository root; record the exit codes in tmp/canvas-cutover/clock/checks.log)
 
 | Command | Required evidence |
@@ -287,7 +313,7 @@ Also:
 | `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 (provides the wasm artifact for vitest) |
 | `cd editor && npm run check` | exit 0 |
 | `cd editor && ./node_modules/.bin/vitest run test/canvas/clock.test.ts test/code/highlight.test.ts test/code/transport.test.ts test/canvas/contracts.test.ts test/code/reconcile.test.ts test/app/main.test.ts` | all pass |
-| `cd editor && ./node_modules/.bin/vitest run` | all pass (full suite; at least 590 tests, none removed) |
+| `cd editor && ./node_modules/.bin/vitest run` | all pass (full suite; at least 612 tests, none removed; 0 failed files) |
 
 ## Overwrite and Drift Protocol
 
@@ -303,6 +329,8 @@ Also:
 - [x] Time-domain confirmation recorded in the progress log
 - [ ] `npm run check` exit 0; full vitest passes with no assertion deleted (npm check passes; full vitest awaits the generated Tree-sitter grammar prerequisite)
 - [x] Source edits are within writePaths; sharedPaths were not edited
+- [ ] Session 266: new final-source gating evidence on the `40467f3` bytes (or on the reviewed fix): host-wasm build exit 0, `npm run check` exit 0, focused and full Vitest pass (full: at least 612 tests, 0 failed files); source sha256 values recorded in `checks.log`
+- [ ] Session 266: test-integrity, adversarial and integration reviews accepted
 
 ## Progress Log
 
@@ -317,3 +345,7 @@ Also:
 - Time-domain confirmation: `editor/worklet/processor.js:144` sends `worklet_now()`; `editor/worklet/host.js:88-94` forwards that value into `session_tick`; `src/host/wasm/session_half.rs:209-218` assigns it to host time before `Session::tick_routed`; `src/session/publish.rs:315-323` emits playing `time` and `end_time` from the scheduled event; `src/session/publish.rs:519-534` emits `TransportSample.sample_time: host_now`. Browser playing and transport timestamps therefore use the AudioContext/worklet processing-time domain. Native `?session=` uses the protocol clock-probe path.
 - Verification: wasm build exit 0; final `npm run check` exit 0; focused Vitest 6 files / 69 tests passed. Final-source full Vitest reported 594 passed, 6 skipped, and two suite failures because `tree-sitter-vact/tree-sitter-vact.wasm` is absent. The documented `mise run ts-build-wasm` writes that generated binary outside this plan's `writePaths`; no artifact root or write path is declared for it. The full-suite gate awaits a dispatch checkpoint amendment that authorizes the generated grammar artifact or supplies a prepared artifact.
 - Complete command logs and exit statuses are consolidated in `tmp/canvas-cutover/clock/checks.log`; source post-edit hashes are in `receipt.json`. Initial failed focused/type-check attempts are retained in the evidence log.
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A, B and D. Artifact roots declared, setup separated from gating, full-Vitest floor raised to 612, re-verification criteria added. Source was not changed.
+**Notes**: The operator generated `tree-sitter-vact/tree-sitter-vact.wasm` with `mise run ts-build-wasm` (gitignored; magic bytes verified). The operator's 612/612 run on `40467f3` is historical only; this session needs new gating evidence.

@@ -246,6 +246,28 @@ Follow the `design-doc` skill format. The document has these sections:
 - A literal `import 'node:fs'` or `import './stats.mjs'` in the `.ts` tests, adding
   `@types/node`, editing `tsconfig.json`, or using `@ts-nocheck`.
 
+## Session 266 Amendment (operator decisions A and D)
+
+- **Artifact roots** (manifest `CANVAS-EVIDENCE.artifactRoots`, each also a writePath; all
+  gitignored and never committed):
+  - `target`, `tree-sitter-vact/tree-sitter-vact.wasm`;
+  - `tmp/canvas-cutover/evidence` and `tmp/canvas/evidence` (full logs, per design 15.3.8.8);
+  - `editor/node_modules/.vite`, `editor/dist`;
+  - `editor/src-tauri/target`, `editor/src-tauri/gen/schemas`;
+  - `editor/src-tauri/gen/apple/build` and `editor/src-tauri/gen/apple/Externals` (only read or
+    refreshed when the iPad simulator `.app` is reused or rebuilt).
+- **No `editor/test-results` or `editor/playwright-report`.** The harness uses the `playwright`
+  library from plain Node scripts. `@playwright/test` is not installed, and these directories are
+  not produced. If either appears, that is a harness defect: record it and do not commit it.
+- **Committed evidence stays writePaths.** That covers `design-docs/specs/evidence/canvas-cutover/run-001/*`
+  and the evidence document. Raw committed data stays at or under 2 MiB.
+- **Setup (not gating)**: `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`,
+  then the host-wasm library build.
+- **Rule D**: the gating list contains only final-source commands that are expected to pass.
+  Harness self-tests that intentionally fail go under `mutationEvidence`. A measurement threshold
+  miss is a recorded failure in the evidence document and is never relabeled as a pass. Exit 2
+  (blocked) is never a pass.
+
 ## Verification
 
 Inside the sandbox:
@@ -271,9 +293,10 @@ Final gates on the closeout commit (design 15.3.8.9):
 | `cargo build` | exit 0 |
 | `cargo clippy --locked --all-targets -- -D warnings` | exit 0 |
 | Full nextest (timeout >= 1500 s) | all pass |
-| `cargo build --lib --target wasm32-unknown-unknown` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 |
 | `cd editor && npm run check` | exit 0 |
-| vitest | all pass |
+| `cd editor && ./node_modules/.bin/vitest run` | all pass |
+| `cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts` | pass (zero `@codemirror/view` or `EditorView` in production `editor/src`) |
 | e2e | as above |
 | `cargo check --manifest-path editor/src-tauri/Cargo.toml` | exit 0 |
 | `rustfmt --check` on touched Rust files | exit 0 |
@@ -297,3 +320,6 @@ only this plan's progress log and the plan files being archived.
 
 ### Session: 2026-10-05
 **Tasks Completed**: Plan authored
+
+### Session: 2026-10-05 (session 266 plan amendment)
+**Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared; the final-gate wasm row aligned to the host-wasm build; the explicit no-editor-view guard row added; setup separated from gating. Tasks, contracts and closeout list are unchanged.

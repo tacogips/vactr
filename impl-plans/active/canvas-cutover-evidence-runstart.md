@@ -1,8 +1,8 @@
 # Canvas Cutover: Large-Document Run Start Stall Fix Implementation Plan
 
-**Status**: Implementation incomplete (plan-listed default full Vitest gate did not pass three consecutive runs)
-**Plan ID**: CANVAS-EVIDENCE-RUNSTART (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.10 (session 269: wall-clock vitest gates, mutation evidence), #15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
+**Status**: Ready (session 271: serial perf-gate split, then gates; the Rust fix is implemented)
+**Plan ID**: CANVAS-EVIDENCE-RUNSTART (dispatch wave 3 in session 271; runs alone. CANVAS-EVIDENCE-EDITCOST depends on it.)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.11 (session 271: serial perf gate, operator decision P; supersedes the 15.3.8.10 "Wall-clock vitest gates" paragraph), #15.3.8.10 (mutation evidence), #15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-RUNSTART`)
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-05
@@ -304,6 +304,216 @@ Stop and report it for routing to the owner (design 15.3.8.10, selective redispa
 - [x] TASK-203 (outside the sandbox): full nextest exit 0, 2,810 passed and 3 skipped (`logs/s269-nextest-full.log`)
 - [x] TASK-204: triggered by full-suite default-timeout failures; focused duration 1.99 s; added only the 60-second timeout/comment (`editor/test/e2e/large-doc.test.ts`)
 
+## Session 271 Amendment (operator decision P; design 15.3.8.11)
+
+This section supersedes all earlier text wherever they conflict, including TASK-003, TASK-201
+and the TASK-203 full-vitest row.
+
+### Intent and context
+
+Session 269 blocked acceptance for one reason. The absolute 4,800 ms assertion in
+`editor/test/e2e/large-eval.test.ts:53` runs inside the default parallel vitest run, and under
+worker contention it passes or fails unpredictably:
+
+- default-worker full runs exited 0, 1 and 1, with 20,000-line medians of 4,924.1 and 5,685.6 ms;
+- three `--maxWorkers=1` full runs passed 696/696.
+
+The Rust fix is correct and stays as it is. The focused medians were 811.3 and 2,374.2 ms (ratio
+2.93). Against the pre-fix Wasm the medians were 20,566.3 and 141,240.7 ms (ratio 6.87).
+
+The work in this amendment:
+
+1. Move the absolute budget into a perf-only file that runs only through a new serial perf gate,
+   `npm run test:perf`.
+2. Keep deterministic checks in the default suite.
+3. Re-measure the budget.
+4. Re-run the negative control.
+5. Pass the gates.
+
+### Non-goals (session 271)
+
+- No Rust change. The six Rust writePaths, `src/session/eval.rs` and `src/session/tests/eval.rs`
+  stay byte-identical. Check with `git diff --stat 6dc176f -- src`, which must be empty.
+- No change to the frontend writePaths `editor/src/code/eval.ts`, `editor/src/code/diagnostics.ts`,
+  `editor/src/params/mount.ts` or `editor/src/bind/mount.ts`.
+- No edit to `editor/test/e2e/large-doc.test.ts`. TASK-204 is done.
+- No edit to EDITCOST files or to any other test file.
+- No change to `editor/package-lock.json`, to any dependency, or to the `check`, `test`, `build`,
+  `dev` or `e2e` scripts.
+- No `it.skip`, `it.skipIf`, `describe.runIf`, environment check or early `return` inside a test
+  file. Files are selected by vitest config only.
+- No assertion is deleted. The ratio limit is tightened from 8 to 6, never loosened.
+
+### Ownership additions (session 271)
+
+New writePaths (all concrete files):
+
+- `editor/test/e2e/large-eval.perf.test.ts` (new)
+- `editor/test/e2e/large-eval-shared.ts` (new)
+- `editor/vitest.config.ts`
+- `editor/package.json`: the `scripts.test:perf` entry only. CANVAS-EVIDENCE keeps this file as
+  a sharedPath for `scripts.e2e` only.
+
+### TASK-301: Perf selection in `editor/vitest.config.ts` and `editor/package.json`
+
+- `editor/vitest.config.ts`:
+  - Import `configDefaults` from `vitest/config`.
+  - Read the environment with the untyped-global idiom at `editor/vite.config.ts:27-28`:
+    `(globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env`.
+    `editor/tsconfig.json` has `"types": []`, so a bare `process` fails `npm run check`. Do not add
+    `@types/node`, and do not add a `types` entry.
+  - Set `const perf = env.VACTR_PERF === '1'`. Only the exact string `'1'` enables perf mode.
+  - `test.include`: when perf, `['test/**/*.perf.test.ts']`; otherwise the existing
+    `['test/**/*.test.ts', 'test/**/*.test.tsx']`, unchanged.
+  - `test.exclude`: when perf, `configDefaults.exclude`; otherwise
+    `[...configDefaults.exclude, 'test/**/*.perf.test.ts']`. Setting `exclude` replaces the
+    vitest defaults, so always spread `configDefaults.exclude`. Dropping it would collect
+    `node_modules` tests.
+  - Keep `environment: 'jsdom'`, the `solid()` plugin, `resolve.conditions` and the header
+    comment. Add one comment line citing design 15.3.8.11.
+- `editor/package.json`: add `"test:perf": "VACTR_PERF=1 vitest run --maxWorkers=1"` right after
+  the `"test"` entry. Keep 2-space JSON formatting. Change nothing else.
+
+### TASK-302: Split `large-eval`
+
+- `editor/test/e2e/large-eval-shared.ts` (new). The name must not end in `.test.ts`. Move the
+  measurement out of `large-eval.test.ts` with unchanged semantics:
+  - the non-literal fixture and helper imports (`large-eval.test.ts:7-10`);
+  - `evaluate` (fresh `session_init(48_000, 0)`, one `eval` envelope with `doc_revision: 1` and
+    `edit_epoch: 1`, record tag `0x71`, `eval-result` with `re === 1`);
+  - `median`;
+  - the three-iteration 5,000/20,000 loop with its per-run `expect`s (exactly one `eval-result`
+    each, zero `error` diagnostics on the 20,000-line run).
+
+  Pinned exports:
+
+  ```ts
+  export const LARGE_EVAL_RATIO_LIMIT = 6;
+  export interface LargeEvalMeasurement { smallMedian: number; largeMedian: number; ratio: number }
+  export async function measureLargeEval(label: string): Promise<LargeEvalMeasurement>
+  ```
+
+  `measureLargeEval` prints exactly one line:
+  `` `${label} medians: 5000=<x.x>ms 20000=<y.y>ms ratio=<r.rr>` ``.
+- `editor/test/e2e/large-eval.test.ts` (default suite):
+  - Keep `// @vitest-environment node`.
+  - One test: `measureLargeEval('large-eval node')`, then
+    `expect(ratio).toBeLessThanOrEqual(LARGE_EVAL_RATIO_LIMIT)`, with the `120_000` per-test
+    timeout.
+  - No `LARGE_EVAL_BUDGET_MS`, no other ms constant, and no comparison of an elapsed value with a
+    number.
+- `editor/test/e2e/large-eval.perf.test.ts` (perf gate only):
+  - Start with `// @vitest-environment node`.
+  - One test: `measureLargeEval('large-eval perf')`, then assert the ratio is at most
+    `LARGE_EVAL_RATIO_LIMIT`, then `expect(largeMedian).toBeLessThanOrEqual(LARGE_EVAL_BUDGET_MS)`,
+    with the `120_000` per-test timeout.
+  - `LARGE_EVAL_BUDGET_MS` lives here, with a one-line comment citing this plan, the three TASK-304
+    medians and `m`.
+
+Pitfalls:
+
+- Running `./node_modules/.bin/vitest run test/e2e/large-eval.perf.test.ts` without
+  `VACTR_PERF=1` finds no test file and exits 1. This is expected. Focused perf runs always use
+  `npm run test:perf` or
+  `VACTR_PERF=1 ./node_modules/.bin/vitest run --maxWorkers=1 test/e2e/large-eval.perf.test.ts`.
+- Do not import a `*.test.ts` file from another test file. Import only `large-eval-shared.ts`.
+- Do not switch to CPU time, `process.hrtime` or a work counter. The ratio of medians is the
+  default-suite guard (design 15.3.8.11).
+
+### TASK-303: Wall-clock audit on the final source
+
+Run each command and record its output in the progress log:
+
+- `grep -rnE "performance\.now\(\)|Date\.now\(\)|hrtime" editor/test --include='*.ts' --include='*.tsx'`
+  (quote the globs; zsh expands them otherwise).
+  Expected: only `large-eval-shared.ts` measures elapsed time. The other hits are clock injection:
+  `test/app/main.test.ts`, and the `Client` `now` in `test/code/sync.test.ts` and
+  `test/canvas/{state,edit-cost,input}.test.ts`.
+- `grep -nE "BUDGET|_MS\b" editor/test/e2e/large-eval.test.ts`. Expected: no match (grep exit 1).
+- `cd editor && ./node_modules/.bin/vitest list --filesOnly`. Expected: no `.perf.test.ts` path,
+  and `test/e2e/large-eval.test.ts` is present.
+- `cd editor && VACTR_PERF=1 ./node_modules/.bin/vitest list --filesOnly`. Expected: exactly
+  `test/e2e/large-eval.perf.test.ts`.
+
+If the first grep finds a new elapsed-time assertion in a default-suite file, stop and report it
+for routing (design 15.3.8.11). Do not edit that file.
+
+### TASK-304: Budget re-measurement (design 15.3.8.11 Budget)
+
+1. Rebuild the host-wasm library on the final source (setup command).
+2. With no other vitest, nextest, cargo or browser process running, run three times:
+   `cd editor && npm run test:perf > ../tmp/canvas-cutover/evidence-runstart/logs/s271-perf-measure-<n>.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-runstart/logs/s271-perf-measure-<n>.exit`
+   for n = 1, 2, 3.
+3. These are measurement runs, not gates. Record their exit codes either way.
+4. Take `m` = the median of the three printed `20000=` values. The budget is
+   `ceil(2 * m / 100) * 100` ms.
+5. If the budget equals 4,800, keep the constant and record that it was confirmed. Otherwise set
+   `LARGE_EVAL_BUDGET_MS` to the computed value. Never exceed `ceil(2 * m / 100) * 100`.
+6. Record the three medians, `m` and the budget in the progress log.
+
+### TASK-305: Negative control (mutationEvidence, never gating)
+
+Use the existing pre-fix scratch build at
+`tmp/canvas-cutover/evidence-runstart/scratch/pre-fix/target/wasm32-unknown-unknown/debug/vactr.wasm`.
+Note the `pre-fix/` segment; the TASK-202 text omitted it. If the file is absent, rebuild it per
+TASK-202 into `scratch/pre-fix`.
+
+Run each command alone. Each takes about 490 s.
+
+- Default file:
+  `cd editor && VACTR_WASM="$PWD/../tmp/canvas-cutover/evidence-runstart/scratch/pre-fix/target/wasm32-unknown-unknown/debug/vactr.wasm" timeout 900 ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-default.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-default.exit`
+- Perf file:
+  `cd editor && VACTR_PERF=1 VACTR_WASM="<same path>" timeout 900 ./node_modules/.bin/vitest run --maxWorkers=1 test/e2e/large-eval.perf.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-perf.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-perf.exit`
+
+Expected result for each: exit 1. Record which assertion failed (ratio, budget or test timeout).
+An outer `timeout` kill (124) is not valid evidence; record it and rerun once.
+
+If the default file passes against pre-fix Wasm (its ratio came out at 6 or below), record that
+honestly as a finding for review. Do not change the limit.
+
+Report `{ command, expectedExit: "1", actualExit, failingAssertion, logPath }` per file.
+
+### TASK-306: Gates (inside the sandbox; logs `tmp/canvas-cutover/evidence-runstart/logs/s271-*` with `.exit` files)
+
+| Command | Required evidence |
+|---------|-------------------|
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 |
+| `cd editor && npm run check` | exit 0 |
+| TASK-303 audit commands | outputs exactly as stated in TASK-303 |
+| `cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts` | exit 0; the `large-eval node medians:` line is recorded |
+| `cd editor && npm run test:perf` (run alone) | exit 0; 1 test; medians at or below the budget |
+| `cd editor && ./node_modules/.bin/vitest run`, three consecutive times (`s271-vitest-full-1..3`) | each exits 0 with at least 696 passed and 0 failed. Record the `ratio=` value from each run's `large-eval node medians:` line (step-3 review finding). |
+| `git diff --exit-code 6dc176f -- editor/package-lock.json src` | exit 0 |
+| `rustfmt --check src/ns/evaluator.rs src/ns/eval_doc.rs src/ns/journal.rs src/ns/depgraph.rs src/ns/insts.rs src/compile/compiler.rs` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` | exit 0 |
+
+Outside the sandbox (verification step, authoritative):
+
+- three consecutive default `./node_modules/.bin/vitest run`, each exit 0;
+- `npm run test:perf` alone, exit 0;
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run > tmp/canvas-cutover/evidence-runstart/logs/s271-nextest-full.log 2>&1`,
+  exit 0. A timeout kill is neither a pass nor a failure.
+
+### Invariants (session 271)
+
+- Eval semantics, diagnostics, the wire format and Rust source are unchanged.
+- The default suite contains no absolute ms budget. The perf gate contains every assertion the
+  default file has, plus the budget.
+- The test count of the default full suite does not drop: the default `large-eval.test.ts` still
+  contributes one test.
+
+### Completion criteria (session 271)
+
+- [ ] TASK-301: `vitest.config.ts` perf/default selection and the `test:perf` script are in place;
+  `npm run check` exits 0; `package-lock.json` is unchanged
+- [ ] TASK-302: `large-eval-shared.ts`, the ratio-only default file (limit 6) and the perf file with
+  `LARGE_EVAL_BUDGET_MS` exist; no assertion is deleted
+- [ ] TASK-303: audit outputs recorded; the `vitest list` default and perf sets are disjoint
+- [ ] TASK-304: three serial perf medians, `m` and the budget recorded
+- [ ] TASK-305: both negative-control runs recorded with exit code, failing assertion and log path
+  (not gating)
+- [ ] TASK-306: all gates exit 0 with log paths; three default full runs and their ratios recorded
+
 ## Completion Criteria
 
 - [x] Hot spot located with recorded timings and CPU profiles
@@ -312,7 +522,8 @@ Stop and report it for routing to the owner (design 15.3.8.10, selective redispa
 - [x] Controlled pre-fix mutation failure: scratch build exit 0; Vitest exit 1 on the budget assertion at 141,240.7 ms (`logs/s269-mutation-prefix.log`)
 - [x] `npm run check`, touched-file rustfmt, strict clippy, focused nextest and full nextest pass; full nextest passed 2,810 tests with 3 skipped
 - [x] Full Vitest passes three consecutive times with `--maxWorkers=1` (696/696 each; `logs/s269f-vitest-full-1..3.log`)
-- [ ] The plan-listed default `cd editor && ./node_modules/.bin/vitest run` gate passes three consecutive times. After TASK-204 it passed once, then exceeded the 4,800 ms eval budget at 4,924.1 and 5,685.6 ms (`logs/s269e-vitest-full-1..3.log`).
+- [ ] The plan-listed default `cd editor && ./node_modules/.bin/vitest run` gate passes three consecutive times. After TASK-204 it passed once, then exceeded the 4,800 ms eval budget at 4,924.1 and 5,685.6 ms (`logs/s269e-vitest-full-1..3.log`). Session 271: this is now met through the TASK-306 gates once the budget has moved to the perf gate.
+- [ ] Session 271: `npm run test:perf` passes alone on the final source
 
 ## Progress Log
 
@@ -334,3 +545,15 @@ Stop and report it for routing to the owner (design 15.3.8.10, selective redispa
 **TASK-203 focused and Rust gates**: The final host-wasm build passed (`logs/s269-wasm-build.log`); rustfmt check on all six Rust files, strict clippy, and focused nextest (283 passed, 2,530 skipped) passed (`logs/s269-rustfmt-check.log`, `s269-clippy.log`, `s269-nextest-focused.log`). `npm run check` passed after the TypeScript edits (`logs/s269f-npm-check.log`). The post-TASK-204 focused large-doc suite passed both tests in 1.95 s (`logs/s269f-large-doc-focused.log`).
 **TASK-203 full gates**: Full nextest exited 0: 2,810 passed and 3 skipped in 1,002.044 s (`logs/s269-nextest-full.log`). Default-parallel Vitest attempts are preserved in `s269-vitest-full-*`, `s269b-vitest-full-*`, `s269c-vitest-full-*`, `s269d-vitest-full-*`, and `s269e-vitest-full-*`; after TASK-204, one such run passed and two hit the eval wall-clock budget under worker contention (`s269e-vitest-full-1..3.log`). The joined tree passes three consecutive full runs with supported `--maxWorkers=1`, each 696/696 in 66.79, 68.05, and 66.32 s (`logs/s269f-vitest-full-1..3.log`). This is alternate full-suite evidence, but the plan-listed default command remains unresolved pending acceptance that the worker cap is valid for TASK-203. No test assertion was removed or changed.
 **TASK-204**: The default large-doc timeout failed in `logs/s269d-vitest-full-1.log` and `-3.log`; the post-join focused run passed in 1.99 s (`logs/s269d-large-doc-focused.log`). Added only a 60,000 ms per-test timeout and a plan citation. The pre-edit SHA-256 was `144a59a394e90b824db34df5efdc1c99dc2d311874a6c50d58fd0b706bc42516`; final SHA-256 is recorded in `tmp/canvas-cutover/evidence-runstart/receipt.json`.
+
+### Session: 2026-10-05 (session 271 plan amendment)
+**Tasks Completed**: Applied operator decision P and design 15.3.8.11. Added four writePaths: `editor/test/e2e/large-eval.perf.test.ts`, `editor/test/e2e/large-eval-shared.ts`, `editor/vitest.config.ts`, and `editor/package.json` (only the `scripts.test:perf` entry). Added these tasks:
+
+- TASK-301: `VACTR_PERF` include/exclude selection and the `test:perf` script.
+- TASK-302: split `large-eval` into a ratio-only default file (limit 6) and a perf file holding `LARGE_EVAL_BUDGET_MS`.
+- TASK-303: wall-clock audit.
+- TASK-304: re-measure the serial budget.
+- TASK-305: negative control against the pre-fix Wasm at `scratch/pre-fix`.
+- TASK-306: gates.
+
+No Rust or product source change. CANVAS-EVIDENCE-EDITCOST now depends on this plan, so the perf gate runs alone. The manifest entry was changed with this amendment.

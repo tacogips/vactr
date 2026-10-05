@@ -1,6 +1,6 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: Ready (session 267: wave 4)
+**Status**: Ready (session 267: wave 4; session 271: dispatch wave 5, after RUNSTART then EDITCOST)
 **Plan ID**: CANVAS-EVIDENCE (wave 4 since session 267; depends on CANVAS-CLOCK, NATIVE, RENDER, MOUNT, VISUAL, SHELL and the wave-3 plans CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST, -RUNSTART)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates, owner-file defect fixes and closeout)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
@@ -428,6 +428,27 @@ This section supersedes the earlier text wherever they conflict.
   15.3.8.10 amendment, committed at the plan checkpoint. The closeout edit to this file is still
   only the 15.3.8.4 clock-probe erratum paragraph.
 
+## Session 271 Amendment (operator decision P; design 15.3.8.11)
+
+This section supersedes the earlier text wherever they conflict.
+
+- **Order.** Dispatch wave 5. This is the design's "wave-4 CANVAS-EVIDENCE"; the number changed
+  only because RUNSTART (wave 3) and EDITCOST (wave 4) now run one after the other. This plan
+  starts after both are accepted. TASK-007 to TASK-009, the seam protocol and the closeout lists
+  are unchanged.
+- **`editor/package.json`.** Moves from writePaths to sharedPaths, limited to `scripts.e2e`, which
+  already exists, so no edit is expected. Never edit `scripts.test:perf`; RUNSTART owns it.
+  `editor/vitest.config.ts` and `editor/test/e2e/large-eval*.ts` are not owned by this plan.
+- **In-sandbox `vitest run test/e2e`.** The default config excludes
+  `test/e2e/large-eval.perf.test.ts`. This is expected and is not a missing test.
+- **Final gates.** Add `cd editor && npm run test:perf`, run alone with no other test, build or
+  browser process active. It must exit 0. The full-vitest gate is the default
+  `./node_modules/.bin/vitest run` (perf files excluded), which must exit 0.
+- **Design file.** 15.3.8.11 is committed at the session-271 plan checkpoint. The closeout edit to
+  `design-docs/specs/design-implementation.md` is still only the 15.3.8.4 clock-probe erratum
+  paragraph.
+- **README.** `impl-plans/README.md` lists all eleven completed canvas-cutover plans, as before.
+
 ## Verification
 
 Inside the sandbox:
@@ -455,7 +476,8 @@ Final gates on the closeout commit (design 15.3.8.9):
 | Full nextest (timeout >= 1500 s) | all pass |
 | `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 |
 | `cd editor && npm run check` | exit 0 |
-| `cd editor && ./node_modules/.bin/vitest run` | all pass |
+| `cd editor && ./node_modules/.bin/vitest run` | all pass (default config; perf files excluded) |
+| `cd editor && npm run test:perf` (alone) | exit 0 (session 271, design 15.3.8.11) |
 | `cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts` | pass (zero `@codemirror/view` or `EditorView` in production `editor/src`) |
 | e2e | as above |
 | `cargo check --manifest-path editor/src-tauri/Cargo.toml` | exit 0 |
@@ -524,3 +546,13 @@ only this plan's progress log and the plan files being archived.
 
 ### Session: 2026-10-05 (session 269 plan amendment)
 **Tasks Completed**: Applied operator authorizations 3, 5 and 6 and design 15.3.8.10. This plan now follows EDITCOST and RUNSTART acceptance. Added the pre-authorized product seam sharedPaths with an edit protocol (triage row, sha256 values, green owner tests, rerun), seam limits, the selective-redispatch rule for any other file, and re-measurement of the EDITCOST and RUNSTART targets. TASK-007 to TASK-009 and the closeout lists are unchanged.
+
+### Session: 2026-10-05 (session 271 plan amendment)
+**Tasks Completed**: Applied operator decision P and design 15.3.8.11. Changes:
+
+- Dispatch wave 5, after RUNSTART (wave 3) and then EDITCOST (wave 4).
+- `editor/package.json` moved to sharedPaths, limited to `scripts.e2e`.
+- `npm run test:perf`, run alone, added to the final gates.
+- The default full-vitest gate excludes perf files.
+
+TASK-007 to TASK-009, the seams and the closeout lists are unchanged.

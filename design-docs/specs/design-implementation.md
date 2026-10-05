@@ -6381,6 +6381,10 @@ Session 269 (resume of 267) adds 15.3.8.10: the bounded edit-path cost rule
 (no whole-document string per keystroke or frame), the timing-budget rule for
 wall-clock vitest gates, and selective redispatch as the alternative to the
 owner-file fix. It changes no accepted contract.
+Session 271 (resume of 269) adds 15.3.8.11: absolute wall-clock budgets move
+out of the default parallel vitest run into a serial perf gate (operator
+decision P). It replaces the "Wall-clock vitest gates" paragraph of 15.3.8.10
+and changes no product contract.
 
 ##### 15.3.8.1 Baseline check (repository state at c9e5a05)
 
@@ -7166,7 +7170,8 @@ sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
 - `cargo check --manifest-path editor/src-tauri/Cargo.toml`;
 - rustfmt `--check` on touched Rust files only;
 - for shell: the simulator build and launch;
-- for evidence: the e2e harness.
+- for evidence: the e2e harness;
+- from session 271: `cd editor && npm run test:perf`, run alone (15.3.8.11).
 
 **Other rules.**
 
@@ -7262,15 +7267,11 @@ Whole-document reads stay allowed only off the edit path:
 - Span output, the 16,384-span cap, `syntax-truncated` and
   `codePane.dataset.syntax` stay as specified.
 
-**Wall-clock vitest gates.** A jsdom or node vitest test that asserts wall
-time (for example the 20,000-line eval budget in
-`editor/test/e2e/large-eval.test.ts`) sets its budget to 2x the median of
-three focused runs on the final source, rounded up to 100 ms. The plan records
-the measured median and the budget. Structural guards stay as they are,
-including the 20,000/5,000-line ratio of at most 8. A plan with such a gate
-passes only when the full vitest suite is green on three consecutive runs.
-Raising a budget past 2x, or widening a harness timeout to hide a slow
-product path, is not allowed.
+**Wall-clock vitest gates.** Superseded by 15.3.8.11 (session 271). The
+budget rule (2x the median of three focused runs on the final source, rounded
+up to 100 ms, recorded in the plan; never raised past 2x; no harness timeout
+widened to hide a slow product path) is kept and now applies only inside the
+serial perf gate.
 
 **Mutation evidence.** Mutation and negative-control runs (the fix reverted
 in a scratch copy or through a test-only toggle that is off by default) must
@@ -7283,6 +7284,98 @@ to the owning accepted plan by selective redispatch, with a concrete
 writePaths amendment and a changed manifest fingerprint. It is never
 recorded as acceptable. Accepted plans without such a finding are not
 redispatched.
+
+##### 15.3.8.11 Serial perf gate (session 271, operator decision P)
+
+**Issue reference:** `workflowInput:RESUME-session-269` (resumed as session
+271). Session 269 found that the absolute 4,800 ms budget in
+`editor/test/e2e/large-eval.test.ts` passes or fails unpredictably in the
+default parallel vitest run: default-worker full runs exited 0, 1, 1, with
+20,000-line medians of 4,924.1 and 5,685.6 ms. Three `--maxWorkers=1` full
+runs passed 696/696. Only test files and test configuration change here. No
+product source, protocol, dependency or accepted plan scope changes.
+
+**Rule.** The default suite (`npm run test`, which is `vitest run`, and
+`./node_modules/.bin/vitest run`) contains no assertion on measured elapsed
+time. Every absolute wall-clock budget lives in a perf-only file that runs only
+in the serial perf gate. No assertion is skipped, deleted or made conditional
+inside a file. Test timeouts (the third `it` argument) are harness bounds, not
+budgets, and stay where they are.
+
+**Audit (2026-10-05, at 6dc176f).** `grep -rnE "performance\.now\(\)|Date\.now\(\)|hrtime" editor/test`
+over the `.ts`/`.tsx` tests finds exactly one elapsed-time assertion:
+`large-eval.test.ts:53` (`largeMedian <= LARGE_EVAL_BUDGET_MS`). The other
+hits are not budgets. `test/app/main.test.ts` passes `performance.now()` into
+the audible clock as a sample time. The `Client` in `test/code/sync.test.ts`,
+`test/canvas/{state,edit-cost,input}.test.ts` uses `Date.now` as its clock.
+`large-doc.test.ts` asserts bytes and has a 60,000 ms test timeout.
+`first-viewport.test.ts`, `frame.test.ts` and the other `test/canvas/*` tests
+use injected or simulated clocks. The RUNSTART plan repeats this audit on the
+final source and records the result. Any new hit moves under the same rule.
+
+**Selection mechanism (fixed, so plans do not choose).**
+
+- Perf-only files are named `editor/test/**/*.perf.test.ts`. The first one is
+  `editor/test/e2e/large-eval.perf.test.ts`.
+- `editor/vitest.config.ts` reads `process.env.VACTR_PERF`. When it is `1`,
+  `test.include` is only `test/**/*.perf.test.ts`. Otherwise `test.include`
+  stays as it is and `test.exclude` adds `test/**/*.perf.test.ts` to the
+  vitest defaults (`configDefaults.exclude`). The two sets never overlap.
+- `editor/package.json` adds
+  `"test:perf": "VACTR_PERF=1 vitest run --maxWorkers=1"`. The installed
+  vitest 5.0.2 accepts `--maxWorkers`; session 269 used it. The `test` and
+  `e2e` scripts do not change.
+- The perf gate runs alone. No other vitest, nextest, cargo build or browser
+  run is active on the host at the same time. A failed perf run is a failure.
+  It is not retried until it passes.
+
+**`large-eval` split.** The measurement helper (fresh `session_init`, one
+`eval` envelope, `performance.now()` around `session_apply`, median of three)
+may move into a non-test module, `editor/test/e2e/large-eval-shared.ts`. That
+name does not match `*.test.ts`, so vitest never collects it as a test.
+
+- `large-eval.test.ts` (default suite) keeps: one `eval-result` per run, zero
+  error diagnostics for the 20,000-line run, and the 20,000/5,000 median
+  ratio. The ratio limit drops from 8 to 6. Fixed source measured 2.93
+  (focused). The pre-fix Wasm mutation run measured 6.87
+  (`s269-mutation-prefix.log`: 20,566.3 and 141,240.7 ms), so 6 still fails
+  the pre-fix shape. A ratio of two medians taken in the same worker is
+  insensitive to contention. The default file has no absolute ms value.
+- `large-eval.perf.test.ts` (perf gate) asserts the same one-result and
+  zero-error checks, and the 20,000-line median at or below the absolute
+  budget. It also keeps the ratio at or below 6.
+- **Budget.** 2x the median of three focused serial runs of the perf file on
+  the final source, rounded up to 100 ms. The session-269 value was
+  m = 2,372.8 ms, so 4,800 ms. If the final source is unchanged, the plan may
+  keep 4,800 ms and must record that it re-measured and confirmed it. Either
+  way, `canvas-cutover-evidence-runstart.md` records the three medians and the
+  budget. The budget is never raised past 2x.
+- **Negative control** (reported separately, never gating): against the
+  pre-fix scratch Wasm (15.3.8.10 mutation evidence), each of the two files
+  exits nonzero. The log names the failing assertion or the test timeout.
+
+**Ownership.** RUNSTART owns these concrete paths:
+
+- `editor/test/e2e/large-eval.test.ts`;
+- `editor/test/e2e/large-eval.perf.test.ts` (new);
+- `editor/test/e2e/large-eval-shared.ts` (new, optional);
+- `editor/vitest.config.ts`;
+- `editor/package.json` (the `scripts.test:perf` entry only).
+
+`editor/package.json` stays a sharedPath of the evidence plan for
+`scripts.e2e`. RUNSTART lands first, and the evidence plan does not edit
+`test:perf`. EDITCOST's scope does not change.
+
+**Gates.** These replace the three-consecutive-run sentence of the old
+15.3.8.10 paragraph. EDITCOST and RUNSTART are accepted only when all of the
+following hold on the joined tree:
+
+- the default `./node_modules/.bin/vitest run` exits 0 three consecutive times
+  with default workers;
+- `cd editor && npm run test:perf` exits 0;
+- the other 15.3.8.9 "green after every plan" commands pass.
+
+The final closeout gates of 15.3.8.9 add `npm run test:perf`.
 
 ## 16. Wasm and AudioWorklet Layout
 

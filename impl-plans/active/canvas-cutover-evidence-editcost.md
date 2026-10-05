@@ -1,7 +1,7 @@
 # Canvas Cutover: Per-Keystroke and Per-Frame Edit Cost Fix Implementation Plan
 
 **Status**: In Progress (Step 6 implementation complete; pending independent review and post-join gates)
-**Plan ID**: CANVAS-EVIDENCE-EDITCOST (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -RUNSTART)
+**Plan ID**: CANVAS-EVIDENCE-EDITCOST (dispatch wave 4 in session 271; depends on CANVAS-EVIDENCE-RUNSTART; gates-only)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.10 (session 269: bounded edit-path rule, document sync, syntax provider), #15.3.8.3 (text redraw only on dirty revisions; animation independent), #15.3.8.7 (no whole-text transfers per frame), #15.3.8.8 (input latency p95 <= 50 ms, text-dirty p95 <= 16.7 ms, animation-only p50 <= 4 ms), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-EDITCOST`)
 **Created**: 2026-10-05
@@ -408,6 +408,48 @@ and the wasm build, all with exit 0 and log paths. This plan touches no Rust.
 - Editing `language.ts`, `utf8.ts`, `bind/*`, `params/*` or `app/main.ts`. They are not owned.
 - Growing any touched file past 1,000 lines.
 
+## Session 271 Amendment (operator decision P; design 15.3.8.11)
+
+This section supersedes the TASK-104 full-vitest row.
+
+**Intent.** The implementation is complete. Session 269 left this plan unaccepted for one reason:
+the RUNSTART-owned absolute eval budget failed in the default parallel full vitest run. That
+budget now moves to the serial perf gate (CANVAS-EVIDENCE-RUNSTART, TASK-301 to TASK-306).
+
+**Order.** In dispatch wave 4, this plan depends on CANVAS-EVIDENCE-RUNSTART, so no perf
+measurement runs while this plan's tests run. This plan is gates-only.
+
+**Non-goals.**
+
+- No source change unless a gate below fails in an EDITCOST-owned file. Such a fix stays within
+  this plan's writePaths and keeps every assertion.
+- Never edit `editor/vitest.config.ts`, `editor/package.json`, `editor/test/e2e/large-eval*.ts`,
+  `editor/test/e2e/large-doc.test.ts` or any RUNSTART file.
+- A failure located in a non-EDITCOST file is reported with its log path, not fixed.
+
+### TASK-105: Gates (logs `tmp/canvas-cutover/evidence-editcost/logs/s271-*`, each with an `.exit` file)
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cd editor && ./node_modules/.bin/vitest run test/canvas/edit-cost.test.ts test/canvas/mount.test.ts` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run test/code/sync.test.ts test/code/history.test.ts test/code/syntax.test.ts test/code/syntax-core.test.ts test/code/syntax-fallback.test.ts` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run test/canvas` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts` | exit 0 |
+| `cd editor && npm run check` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run`, three consecutive times (`s271-vitest-full-1..3`) | each exits 0, at least 696 passed and 0 failed; no exception for any file |
+| `cd editor && npm run test:perf` (alone; no other test process running) | exit 0 |
+| `grep -rn "presentation\.text" editor/src` | no match (grep exit 1) |
+| `grep -n "toString()" editor/src/code/sync.ts editor/src/code/syntax.ts` | no match (grep exit 1) |
+
+Outside the sandbox, the verification step repeats the three default full runs and
+`npm run test:perf` (alone), plus strict clippy, the wasm build and full nextest
+(timeout >= 1500 s). These results are authoritative. This plan touches no Rust.
+
+### Completion criteria (session 271)
+
+- [ ] TASK-105: every gate exits 0 with log paths; three consecutive default full runs pass on the
+  joined tree; `npm run test:perf` passes
+
 ## Completion Criteria
 
 - [x] Session 269: `s269-mutation-prefix.log` recorded before edits with exit 1 and the expected three operation-counter failures (mutationEvidence; not gating)
@@ -437,3 +479,6 @@ and the wasm build, all with exit 0 and log paths. This plan touches no Rust.
 **Tasks Completed**: Implemented cached per-line UTF-8 byte accounting in `sync.ts`; removed history index construction and full-document conversion from `DocumentSync.apply`; added seeded byte-equivalence coverage, a reset-identity operation-counter test, and explicit surrogate-interior mapping coverage. Reworked tree-sitter syntax tracking to use `Text` identity, transactional tree edits and chunked `parseDoc`; replaced fallback whole-document tokenization with cached per-line string state and visible-line tokenizing. Added large-document syntax equivalence and no-conversion tests. Existing canvas behavior and assertions remain in place.
 **Verification**: Pre-edit mutation run exited 1 as expected (16 passed, 3 failed): `logs/s269-mutation-prefix.log` and `.exit`. Final focused edit-cost/mount: 19 passed (`logs/vitest-editcost-mount-final.log`, exit 0). Sync/history/syntax focused: 32 passed (`logs/vitest-code-final.log`, exit 0). Canvas suite: 167 passed (`logs/vitest-canvas-final-step6.log`, exit 0). `npm run check` and no-EditorView: exit 0 (`logs/npm-check-final-step6.log`, `logs/vitest-no-editor-view-final-step6.log`). Full vitest: 695 passed, 1 failed (`logs/vitest-full-final-step6.log`, exit 1); the sole failure is `test/e2e/large-eval.test.ts`, the downstream RUNSTART-owned 5,000 ms threshold (measured median 8,267.3 ms, focused 5,000-line median 1,947.0 ms). No EDITCOST-owned test fails. `grep -n "toString()" editor/src/code/sync.ts editor/src/code/syntax.ts` and `grep -rn "presentation.text" editor/src` produced no matches (expected grep exit 1).
 **Compatibility note**: The installed web-tree-sitter 0.27.0 range query produced incomplete captures when `startIndex`/`endIndex` were supplied alongside the current UTF-16 offsets. The provider uses the equivalent `startPosition`/`endPosition` QueryOptions range, with UTF-16 row/column points; targeted indexed-option attempts and the passing position-range suite are retained in `logs/syntax-iter5.log` and `logs/syntax-iter6.log`.
+
+### Session: 2026-10-05 (session 271 plan amendment)
+**Tasks Completed**: Applied operator decision P and design 15.3.8.11. This plan now follows CANVAS-EVIDENCE-RUNSTART (dispatch wave 4) and is gates-only. Added TASK-105: focused gates, three consecutive default full vitest runs with no per-file exception, `npm run test:perf` run alone, and the greps. writePaths are unchanged. The manifest entry was changed with this amendment.

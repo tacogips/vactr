@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflowInput:RESUME-session-267 'RESUME session 267: authorize and finish EDITCOST/RUNSTART, silent CANVAS-EVIDENCE measurement, final review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-269, chain 265-266-267-269; findings IR-S267-001, IR-S267-002; no GitHub issue number)",
+  "issueReference": "workflowInput:RESUME-session-269 'RESUME session 269: serial perf gate for large-eval, accept EDITCOST/RUNSTART, silent CANVAS-EVIDENCE measurement, final review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-271, chain 265-266-267-269-271; operator decision P; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -44,6 +44,23 @@
       ],
       "amendment": "Operator authorizations 1-6 and design 15.3.8.10. (1) EDITCOST writePaths add editor/src/code/{sync,syntax,syntax-core,history,surface}.ts and editor/test/code/{sync,syntax,syntax-core,syntax-fallback,history}.test.ts (editor/test/canvas/history.test.ts does not exist; editor/test/code/history.test.ts substitutes) and the sync.ts non-goal is removed. (2) RUNSTART writePaths record src/ns/{evaluator,eval_doc,journal,depgraph,insts}.rs and src/compile/compiler.rs; the large-eval budget becomes 2x the focused median on the final source (about 5,200 ms); a bounded pre-fix mutation run uses a scratch copy of 968028c; full nextest runs outside the sandbox; full vitest must pass three consecutive times; editor/test/e2e/large-doc.test.ts is a conditional sharedPath limited to an explicit per-test timeout (DR-269-L1). (3) CANVAS-EVIDENCE pre-authorizes concrete product seam sharedPaths; any other defect goes to its owning accepted plan by selective redispatch. SILENT and VIEWPORT, accepted at 6f6b807, moved from plans to acceptedDependencies and are not redispatched.",
       "checkpointNote": "Session 269 plan checkpoint: plans lists only wave-3 CANVAS-EVIDENCE-EDITCOST and CANVAS-EVIDENCE-RUNSTART (parallel, disjoint writePaths) and wave-4 CANVAS-EVIDENCE. The design amendment 15.3.8.10 and these plan amendments are committed together before fanout."
+    },
+    "session271": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-271",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-269",
+      "resumeHead": "6dc176fe34ae7ca77ba7d1bd15a8a767a2d18f18",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT"
+      ],
+      "amendment": "Operator decision P and design 15.3.8.11 (serial perf gate). Absolute wall-clock budgets leave the default parallel vitest run. RUNSTART splits editor/test/e2e/large-eval.test.ts into a default ratio-only file (20k/5k ratio <= 6, one eval-result, zero error diagnostics) and editor/test/e2e/large-eval.perf.test.ts (adds LARGE_EVAL_BUDGET_MS = ceil(2*m/100)*100), sharing editor/test/e2e/large-eval-shared.ts. editor/vitest.config.ts selects *.perf.test.ts only when VACTR_PERF=1 and excludes them otherwise. editor/package.json gains scripts.test:perf = 'VACTR_PERF=1 vitest run --maxWorkers=1'. RUNSTART runs alone (wave 3); EDITCOST is gates-only and follows it (wave 4) so the perf gate never shares the host; CANVAS-EVIDENCE is wave 5 (the design's 'wave-4'). editor/package.json moves from CANVAS-EVIDENCE writePaths to its sharedPaths (scripts.e2e only).",
+      "checkpointNote": "Session 271 plan checkpoint: design 15.3.8.11 and the RUNSTART, EDITCOST and EVIDENCE plan amendments plus this manifest are committed together before fanout. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
@@ -53,7 +70,7 @@
   "designDocSections": [
     {
       "path": "design-docs/specs/design-implementation.md",
-      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.10; 15.3.8.10 added in session 269 for the edit-path cost rule, wall-clock vitest gates, mutation evidence and selective redispatch); 15.3.1-15.3.7 remain the baseline"
+      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.11; 15.3.8.10 added in session 269 for the edit-path cost rule, mutation evidence and selective redispatch; 15.3.8.11 added in session 271 for the serial perf gate, superseding the 15.3.8.10 wall-clock vitest gates paragraph); 15.3.1-15.3.7 remain the baseline"
     },
     {
       "path": "design-docs/user-qa/pending-editor-questions.md",
@@ -62,7 +79,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-267 'RESUME session 267: authorize and finish EDITCOST/RUNSTART, silent CANVAS-EVIDENCE measurement, final review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-269, chain 265-266-267-269; findings IR-S267-001, IR-S267-002; no GitHub issue number)",
+    "issueReference": "workflowInput:RESUME-session-269 'RESUME session 269: serial perf gate for large-eval, accept EDITCOST/RUNSTART, silent CANVAS-EVIDENCE measurement, final review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-271, chain 265-266-267-269-271; operator decision P; design accepted by step3-design-review comm-004102; plans accepted by step5-impl-plan-review comm-004104; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -75,7 +92,8 @@
       "Animation-only frames do zero shaping, atlas uploads and buffer uploads; per-frame atlas budget, caps and disposal are tested (CANVAS-RENDER).",
       "Playwright-library harness in Chromium and WebKit with behavioral checks and measurements on a 20,000-line ~1 MiB document, harness-written evidence in design-docs/specs/design-canvas-editor-evidence.md, honest limitations and pending physical-iPad procedures, final gates and closeout archival (CANVAS-EVIDENCE).",
       "Session 269 (design 15.3.8.10): a one-character edit and a word delete on the 20,000-line document make no Text.toString call and no slice over 64 KiB; DocumentSync byte conversion is line-based and byte-identical to Utf8Index; syntax providers use Text identity, chunked tree-sitter input and line-local fallback tokenizing (CANVAS-EVIDENCE-EDITCOST).",
-      "Session 269: the large-document eval fix is gated by a 2x focused-median budget, three consecutive green full vitest runs, bounded pre-fix mutation evidence, strict clippy and outside-sandbox full nextest (CANVAS-EVIDENCE-RUNSTART)."
+      "Session 269: the large-document eval fix is gated by a 2x focused-median budget, three consecutive green full vitest runs, bounded pre-fix mutation evidence, strict clippy and outside-sandbox full nextest (CANVAS-EVIDENCE-RUNSTART).",
+      "Session 271 (design 15.3.8.11): no absolute wall-clock assertion in the default vitest suite; the 2x focused-median budget runs only in npm run test:perf (VACTR_PERF=1, --maxWorkers=1, run alone); EDITCOST and RUNSTART are accepted on three consecutive default full vitest runs plus test:perf (CANVAS-EVIDENCE-RUNSTART, CANVAS-EVIDENCE-EDITCOST)."
     ],
     "nonGoals": [
       "No resume or repair of the canvas-editor-224 dispatch, snapshot, fingerprint or recovery contracts.",
@@ -92,7 +110,8 @@
       "Touched Rust or TypeScript source files must stay under 1000 lines.",
       "Audio processing never waits on, allocates for, or is driven by rendering; visuals read published telemetry only.",
       "Codex sandbox cannot bind localhost and keeps .git read-only: Playwright, HTTP servers, simulator launches and full nextest run in outside-sandbox verification steps.",
-      "Implementers record fresh-read and post-edit sha256 values under tmp/canvas-cutover/<plan>/; within a wave writePaths are disjoint; sharedPaths are edited only for the recorded reason."
+      "Implementers record fresh-read and post-edit sha256 values under tmp/canvas-cutover/<plan>/; within a wave writePaths are disjoint; sharedPaths are edited only for the recorded reason.",
+      "Session 271 (operator decision P): absolute wall-clock budgets never run inside the default parallel vitest suite; they run only in the dedicated serial perf gate cd editor && npm run test:perf (--maxWorkers=1), alone on the host; perf files are excluded from the default run by vitest config, never by skipping, deleting or env-gating an assertion."
     ],
     "designDecisionsAndRationale": [
       "Headless @codemirror/state EditorState is the single document authority because history and transactions are already tested; EditorView is removed entirely (15.3.8.2).",
@@ -101,7 +120,8 @@
       "The clock-probe wire keeps the existing tested field names (page_send, engine_receive, engine_send; kind clock-probe) instead of the design's draft names; EVIDENCE appends the erratum at closeout (clock.md:36-44).",
       "Both native transports (WebSocket and Tauri IPC) share one Session Protocol clock-probe instead of a Tauri-specific probe (15.3.8.5).",
       "A shorter headless gating measurement profile replaces 15.3.7 product durations for headless runs; physical-device profile stays pending (15.3.8.8).",
-      "The evidence harness writes raw data and the results section itself so no hand-typed numbers are committed (evidence.md:21-24)."
+      "The evidence harness writes raw data and the results section itself so no hand-typed numbers are committed (evidence.md:21-24).",
+      "Session 271 (15.3.8.11): large-eval splits into a contention-insensitive default file (one eval-result, zero error diagnostics, 20k/5k ratio <= 6) and editor/test/e2e/large-eval.perf.test.ts (absolute budget ceil(2*m/100)*100 ms) sharing large-eval-shared.ts, because session 269 showed the 4,800 ms budget failing only under default-worker contention (exits 0, 1, 1) while --maxWorkers=1 runs passed 696/696 three times."
     ],
     "intentionalTradeoffs": [
       "WebKit clipboard, IME and touch checks use synthetic events and are labeled limitations.",
@@ -156,8 +176,10 @@
       [
         "CANVAS-EVIDENCE-SILENT",
         "CANVAS-EVIDENCE-VIEWPORT",
-        "CANVAS-EVIDENCE-EDITCOST",
         "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      [
+        "CANVAS-EVIDENCE-EDITCOST"
       ],
       [
         "CANVAS-EVIDENCE"
@@ -178,7 +200,9 @@
       "Session 267 silence rule: every automated browser run installs the CANVAS-EVIDENCE-SILENT virtual sink and launches Chromium with --mute-audio; a run whose post-sink peak is not exactly 0 or that has a direct destination connection fails, regardless of other results.",
       "Session 269: SILENT and VIEWPORT are acceptedDependencies (commit 6f6b807) and are not redispatched. Wave 3 is EDITCOST and RUNSTART in parallel with disjoint writePaths; a full-vitest failure located only in the other plan's files is reported, not fixed; the post-join verification (including RUNSTART's three consecutive full vitest runs and outside-sandbox full nextest) is authoritative.",
       "Session 269 (design 15.3.8.10): wall-clock vitest budgets equal 2x the median of three focused runs on the final source, rounded up to 100 ms; widening a harness timeout to hide a slow product path is forbidden; mutation evidence is reported separately and never gates.",
-      "Session 269: CANVAS-EVIDENCE seam sharedPaths are edited only under the seam protocol in impl-plans/active/canvas-cutover-evidence.md (Session 269 Amendment); a product defect in any other file goes to its owning accepted plan by selective redispatch."
+      "Session 269: CANVAS-EVIDENCE seam sharedPaths are edited only under the seam protocol in impl-plans/active/canvas-cutover-evidence.md (Session 269 Amendment); a product defect in any other file goes to its owning accepted plan by selective redispatch.",
+      "Session 271 (design 15.3.8.11, supersedes the session-269 wall-clock rule): absolute wall-clock budgets live only in editor/test/**/*.perf.test.ts and run only through cd editor && npm run test:perf (VACTR_PERF=1 vitest run --maxWorkers=1), alone on the host with no concurrent vitest, nextest, cargo or browser run; a failed perf run is a failure, never retried until it passes. The default ./node_modules/.bin/vitest run excludes perf files by config and contains no absolute ms budget; no assertion is skipped, deleted or env-gated inside a file.",
+      "Session 271 waves: RUNSTART (wave 3) runs alone; EDITCOST (wave 4, gates-only) depends on RUNSTART; CANVAS-EVIDENCE (wave 5) depends on both. Acceptance of EDITCOST and RUNSTART requires three consecutive default full vitest runs (exit 0 each) plus npm run test:perf (exit 0, alone), npm run check, strict clippy, rustfmt --check on the six RUNSTART Rust files and outside-sandbox full nextest (timeout >= 1500 s)."
     ]
   },
   "plans": [
@@ -205,7 +229,8 @@
         "Session 269: s269-mutation-prefix.log recorded before any edit with a nonzero exit (mutationEvidence, not gating)",
         "Session 269: DocumentSync.apply has no history.index call and no whole-text conversion; seeded randomized byte-change and dirty-span equivalence against Utf8Index(doc.toString()) passes on ASCII, Japanese, emoji, a 100,000-character line and reset transactions",
         "Session 269: SyntaxSpans and FallbackTokenizerCache use Text identity, chunked parseDoc (chunks of at most 16 KiB) and line-local tokenizing; spans equal the full-parse or tokenizerSpans reference; no Text.toString",
-        "Session 269: edit-cost.test.ts:99 and mount.test.ts:168 pass; grep -n \"toString()\" editor/src/code/sync.ts editor/src/code/syntax.ts finds no match"
+        "Session 269: edit-cost.test.ts:99 and mount.test.ts:168 pass; grep -n \"toString()\" editor/src/code/sync.ts editor/src/code/syntax.ts finds no match",
+        "Session 271 TASK-105 (gates-only, after RUNSTART): three consecutive default full vitest runs exit 0 with >= 696 passed and 0 failed and no per-file exception; npm run test:perf exits 0 run alone; focused gates, npm run check and both greps as listed; no edit outside this plan's writePaths"
       ],
       "verification": [
         "cd editor && ./node_modules/.bin/vitest run test/canvas/edit-cost.test.ts test/canvas/mount.test.ts",
@@ -213,7 +238,10 @@
         "cd editor && ./node_modules/.bin/vitest run test/canvas",
         "cd editor && npm run check",
         "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run"
+        "cd editor && ./node_modules/.bin/vitest run (three consecutive runs: logs s271-vitest-full-1..3, each exit 0)",
+        "cd editor && npm run test:perf (alone; exit 0)",
+        "grep -rn \"presentation\\.text\" editor/src (no match; grep exit 1 expected)",
+        "grep -n \"toString()\" editor/src/code/sync.ts editor/src/code/syntax.ts (no match; grep exit 1 expected)"
       ],
       "mutationEvidence": [
         "Before the first edit: cd editor && ./node_modules/.bin/vitest run test/canvas/edit-cost.test.ts test/canvas/mount.test.ts > ../tmp/canvas-cutover/evidence-editcost/logs/s269-mutation-prefix.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-editcost/logs/s269-mutation-prefix.exit (expected nonzero)"
@@ -221,12 +249,15 @@
       "outsideSandboxVerification": [
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (exit 0; a timeout kill is neither pass nor fail)",
         "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings (exit 0)",
-        "cd editor && ./node_modules/.bin/vitest run (post-join, authoritative)"
+        "cd editor && ./node_modules/.bin/vitest run three consecutive times (post-join, authoritative; each exit 0)",
+        "cd editor && npm run test:perf (alone; exit 0)",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm (exit 0)"
       ],
-      "wave": 3,
+      "wave": 4,
       "dependsOn": [
         "CANVAS-MOUNT",
-        "CANVAS-RENDER"
+        "CANVAS-RENDER",
+        "CANVAS-EVIDENCE-RUNSTART"
       ],
       "writePaths": [
         "editor/src/code/input.ts",
@@ -306,26 +337,38 @@
         "Eval semantics, diagnostics and wire format unchanged; existing tests keep passing",
         "Session 269: s269-mutation-prefix.log shows vitest exit 1 against the pre-fix scratch wasm built from 968028c (mutationEvidence, not gating)",
         "Session 269: three consecutive full vitest runs pass on the joined tree; rustfmt --check on the six Rust files, strict clippy, focused nextest and outside-sandbox full nextest exit 0 with log paths",
-        "Session 269: the large-doc.test.ts sharedPath is either untouched (recorded) or edited exactly per TASK-204"
+        "Session 269: the large-doc.test.ts sharedPath is either untouched (recorded) or edited exactly per TASK-204",
+        "Session 271 TASK-301: editor/vitest.config.ts includes only test/**/*.perf.test.ts when VACTR_PERF === '1' and otherwise adds test/**/*.perf.test.ts to [...configDefaults.exclude]; env read via the vite.config.ts:27-28 globalThis idiom; editor/package.json scripts.test:perf = 'VACTR_PERF=1 vitest run --maxWorkers=1'; no other script, dependency or package-lock change",
+        "Session 271 TASK-302: editor/test/e2e/large-eval-shared.ts exports LARGE_EVAL_RATIO_LIMIT = 6, LargeEvalMeasurement and measureLargeEval(label); large-eval.test.ts asserts ratio <= 6 and contains no ms budget; large-eval.perf.test.ts asserts ratio <= 6 and largeMedian <= LARGE_EVAL_BUDGET_MS; per-run one eval-result and zero error diagnostics kept; no assertion deleted, skipped or env-gated",
+        "Session 271 TASK-303: audit recorded; vitest list --filesOnly shows no perf file by default and exactly test/e2e/large-eval.perf.test.ts with VACTR_PERF=1",
+        "Session 271 TASK-304: three serial npm run test:perf medians, m and LARGE_EVAL_BUDGET_MS = ceil(2*m/100)*100 recorded in the plan",
+        "Session 271 TASK-306: three consecutive default full vitest runs exit 0 (ratios recorded), npm run test:perf exit 0 alone, npm run check 0, rustfmt --check on the six Rust files 0, strict clippy 0, git diff --exit-code 6dc176f -- editor/package-lock.json src exit 0, outside-sandbox full nextest 0"
       ],
       "verification": [
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run test/e2e/large-doc.test.ts",
         "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run (three consecutive runs: logs s269-vitest-full-1..3)",
+        "grep -nE \"BUDGET|_MS\\b\" editor/test/e2e/large-eval.test.ts (no match; grep exit 1 expected)",
+        "cd editor && ./node_modules/.bin/vitest list --filesOnly (no .perf.test.ts path; test/e2e/large-eval.test.ts present)",
+        "cd editor && VACTR_PERF=1 ./node_modules/.bin/vitest list --filesOnly (exactly test/e2e/large-eval.perf.test.ts)",
+        "cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts",
+        "cd editor && npm run test:perf (alone; exit 0)",
+        "cd editor && ./node_modules/.bin/vitest run (three consecutive runs: logs s271-vitest-full-1..3, each exit 0, >= 696 passed)",
+        "git diff --exit-code 6dc176fe34ae7ca77ba7d1bd15a8a767a2d18f18 -- editor/package-lock.json src",
         "rustfmt --check src/ns/evaluator.rs src/ns/eval_doc.rs src/ns/journal.rs src/ns/depgraph.rs src/ns/insts.rs src/compile/compiler.rs",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run ns:: compile:: session::"
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings"
+      ],
+      "measurement": [
+        "TASK-304 (not gating): cd editor && npm run test:perf > ../tmp/canvas-cutover/evidence-runstart/logs/s271-perf-measure-<n>.log 2>&1 for n = 1, 2, 3, run alone; m = median of the three printed 20000= medians"
       ],
       "mutationEvidence": [
-        "rm -rf tmp/canvas-cutover/evidence-runstart/scratch && mkdir -p tmp/canvas-cutover/evidence-runstart/scratch && git archive 968028c92aff8442cb87948a09812b617e54ed8e Cargo.toml Cargo.lock src examples tests | tar -x -C tmp/canvas-cutover/evidence-runstart/scratch",
-        "cd tmp/canvas-cutover/evidence-runstart/scratch && CARGO_TERM_QUIET=true cargo build --offline --locked --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm (expected exit 0)",
-        "cd editor && VACTR_WASM=\"$PWD/../tmp/canvas-cutover/evidence-runstart/scratch/target/wasm32-unknown-unknown/debug/vactr.wasm\" timeout 900 ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s269-mutation-prefix.log 2>&1 (expected vitest exit 1; exit 124 is not valid evidence)"
+        "Session 271 TASK-305 (pre-fix Wasm at tmp/canvas-cutover/evidence-runstart/scratch/pre-fix/target/wasm32-unknown-unknown/debug/vactr.wasm; rebuild per TASK-202 into scratch/pre-fix only if absent): cd editor && VACTR_WASM=\"$PWD/../tmp/canvas-cutover/evidence-runstart/scratch/pre-fix/target/wasm32-unknown-unknown/debug/vactr.wasm\" timeout 900 ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-default.log 2>&1 (expected exit 1; record the failing assertion; exit 124 is not valid evidence)",
+        "Session 271 TASK-305: cd editor && VACTR_PERF=1 VACTR_WASM=\"<same path>\" timeout 900 ./node_modules/.bin/vitest run --maxWorkers=1 test/e2e/large-eval.perf.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-perf.log 2>&1 (expected exit 1; record the failing assertion)",
+        "Session 269 (recorded, historical): s269-mutation-prefix.log exit 1 at medians 20,566.3/141,240.7 ms, ratio 6.87"
       ],
       "outsideSandboxVerification": [
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run > tmp/canvas-cutover/evidence-runstart/logs/s269-nextest-full.log 2>&1 (exit 0; a timeout kill is neither pass nor fail)",
-        "cd editor && ./node_modules/.bin/vitest run three consecutive times on the joined tree (each exit 0)"
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run > tmp/canvas-cutover/evidence-runstart/logs/s271-nextest-full.log 2>&1 (exit 0; a timeout kill is neither pass nor fail)",
+        "cd editor && ./node_modules/.bin/vitest run three consecutive times on the joined tree (each exit 0)",
+        "cd editor && npm run test:perf (alone; exit 0)"
       ],
       "wave": 3,
       "dependsOn": [
@@ -334,6 +377,10 @@
       ],
       "writePaths": [
         "editor/test/e2e/large-eval.test.ts",
+        "editor/test/e2e/large-eval.perf.test.ts",
+        "editor/test/e2e/large-eval-shared.ts",
+        "editor/vitest.config.ts",
+        "editor/package.json",
         "editor/src/code/eval.ts",
         "editor/src/code/diagnostics.ts",
         "editor/src/params/mount.ts",
@@ -361,7 +408,7 @@
       "sharedPathNotes": [
         {
           "path": "editor/test/e2e/large-doc.test.ts",
-          "intendedEdit": "Session 269 TASK-204 (DR-269-L1), conditional. Edit only if a full-suite run fails on the vitest default 5,000 ms timeout and the focused run passed in under 5,000 ms. The edit adds an explicit 60_000 per-test timeout to the session_check it(...) with a one-line comment, and changes no assertion. Record the trigger log, the focused duration and the sha256 values."
+          "intendedEdit": "Session 269 TASK-204 (DR-269-L1), conditional. Edit only if a full-suite run fails on the vitest default 5,000 ms timeout and the focused run passed in under 5,000 ms. The edit adds an explicit 60_000 per-test timeout to the session_check it(...) with a one-line comment, and changes no assertion. Record the trigger log, the focused duration and the sha256 values. Done in session 269. Session 271: no further edit."
         }
       ],
       "writePathNotes": [
@@ -391,7 +438,23 @@
         },
         {
           "path": "editor/test/e2e/large-eval.test.ts",
-          "intendedEdit": "Session 269 TASK-201: replace the 5_000 literal with LARGE_EVAL_BUDGET_MS = ceil(2 * median of three focused 20000-line medians / 100) * 100, with a one-line comment. Keep every other assertion and the 120,000 ms per-test timeout."
+          "intendedEdit": "Session 271 TASK-302 (supersedes TASK-201): default-suite file. Calls measureLargeEval('large-eval node') from large-eval-shared.ts and asserts ratio <= LARGE_EVAL_RATIO_LIMIT (6) with the 120_000 per-test timeout. No LARGE_EVAL_BUDGET_MS and no ms constant. Keeps // @vitest-environment node."
+        },
+        {
+          "path": "editor/test/e2e/large-eval.perf.test.ts",
+          "intendedEdit": "Session 271 TASK-302/304 (new): perf-gate-only file. // @vitest-environment node; measureLargeEval('large-eval perf'); asserts ratio <= 6 and largeMedian <= LARGE_EVAL_BUDGET_MS (ceil(2*m/100)*100, session-269 value 4,800, re-measured in TASK-304) with a one-line comment citing the plan and medians; 120_000 per-test timeout."
+        },
+        {
+          "path": "editor/test/e2e/large-eval-shared.ts",
+          "intendedEdit": "Session 271 TASK-302 (new, not a test file): the moved evaluate/median/three-run loop with its per-run expects (one eval-result, zero error diagnostics). Exports LARGE_EVAL_RATIO_LIMIT = 6, LargeEvalMeasurement { smallMedian; largeMedian; ratio } and measureLargeEval(label): Promise<LargeEvalMeasurement>, printing one '<label> medians: 5000=..ms 20000=..ms ratio=..' line."
+        },
+        {
+          "path": "editor/vitest.config.ts",
+          "intendedEdit": "Session 271 TASK-301: perf = env.VACTR_PERF === '1' (env via the vite.config.ts:27-28 globalThis idiom; tsconfig types: [] so no bare process). include = perf ? ['test/**/*.perf.test.ts'] : the existing two globs; exclude = perf ? configDefaults.exclude : [...configDefaults.exclude, 'test/**/*.perf.test.ts']. Everything else unchanged."
+        },
+        {
+          "path": "editor/package.json",
+          "intendedEdit": "Session 271 TASK-301: add scripts.test:perf = 'VACTR_PERF=1 vitest run --maxWorkers=1' after scripts.test. No other change; package-lock.json unchanged."
         },
         {
           "path": "tmp/canvas-cutover/evidence-runstart/scratch",
@@ -427,7 +490,8 @@
         "Session 267: silent run-001 regenerated with --run-id run-001; per browser the sink was installed before the first connect, direct destination connections 0, post-sink peak exactly 0, workload pre-sink peak <= -1 dBFS, control >= 1 onset and peak > -60 dBFS; large-document start returned with workload onsets > 0; Chromium canvas backing > 1x1; Chromium cycle DPR 1 and 2; simulator playingEvents 0",
         "Session 267: the evidence document has the automated audio silence method, the native/simulator silence audit and a remaining-failure triage table; product defects are repaired, never recorded as acceptable",
         "Session 267: closeout also moves canvas-cutover-evidence-silent.md, canvas-cutover-evidence-viewport.md, canvas-cutover-evidence-editcost.md and canvas-cutover-evidence-runstart.md (listed as concrete paths in writePaths) to impl-plans/completed/",
-        "Session 269: starts after EDITCOST and RUNSTART are accepted. Re-measures text-dirty work p95, input latency, the editing-key count and the large-document start in both browsers. Every seam edit has a triage row, sha256 values and green owner tests. Any other product defect is routed by selective redispatch and never recorded as acceptable."
+        "Session 269: starts after EDITCOST and RUNSTART are accepted. Re-measures text-dirty work p95, input latency, the editing-key count and the large-document start in both browsers. Every seam edit has a triage row, sha256 values and green owner tests. Any other product defect is routed by selective redispatch and never recorded as acceptable.",
+        "Session 271: dispatch wave 5 (the design's 'wave-4'), after RUNSTART and EDITCOST acceptance; final gates add cd editor && npm run test:perf (alone, exit 0); editor/package.json is a sharedPath limited to scripts.e2e (no edit expected; scripts.test:perf is RUNSTART-owned)"
       ],
       "verification": [
         "cd editor && npm run check",
@@ -441,10 +505,11 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run test:perf (alone; exit 0)",
         "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
         "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml"
       ],
-      "wave": 4,
+      "wave": 5,
       "dependsOn": [
         "CANVAS-CLOCK",
         "CANVAS-NATIVE",
@@ -459,7 +524,6 @@
       ],
       "writePaths": [
         "editor/test/e2e/serve.mjs",
-        "editor/package.json",
         "design-docs/specs/design-canvas-editor-evidence.md",
         "design-docs/specs/design-implementation.md",
         "design-docs/specs/evidence/canvas-cutover/run-001/environment.json",
@@ -541,6 +605,7 @@
         "editor/src-tauri/gen/apple/Externals"
       ],
       "sharedPaths": [
+        "editor/package.json",
         "editor/test/e2e/silent-sink.mjs",
         "editor/test/e2e/run.mjs",
         "editor/test/e2e/behavior.mjs",
@@ -593,6 +658,10 @@
       ],
       "seamProtocol": "Session 269 (operator authorization 3). The product seam sharedPaths from editor/src/code/mount.ts through editor/test/visual/render-host.test.ts are pre-authorized. Edit one only to repair a product defect that the wave-4 run exposed and that is classified 'product defect' in the TASK-008 triage table. Make the smallest change in that file and its listed test file. Record the fresh-read and post-edit sha256 values and the triage row in the progress log. Owner tests and full vitest must stay green, and the run is repeated. Seam edits never change a public contract (CodeSurface, DocumentSync, __vactrPerf members, Session Protocol), never add a dependency, never touch Rust, and never weaken an assertion or a threshold. A defect in any other file goes to its owning accepted plan by selective redispatch, with a concrete writePaths amendment and a changed manifest fingerprint. It is never recorded as acceptable. Owners: code/{mount,renderer,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history}.ts = EDITCOST/MOUNT/RENDER; code/frame.ts = VIEWPORT; code/pointer.ts = RENDER/MOUNT (touch long-press and handles); code/highlight.ts, app/clock.ts, code/transport.ts = CLOCK; code/perf-hook.ts = MOUNT; code/eval.ts = RUNSTART; bind/{mount,write}.ts = MOUNT (DR-269-L2 per-change Utf8Index); visual/{frame,scopes,video,render-host}.ts = VISUAL.",
       "sharedPathNotes": [
+        {
+          "path": "editor/package.json",
+          "intendedEdit": "Session 271: scripts.e2e only (already present; no edit expected). Never edit scripts.test:perf (RUNSTART-owned) or any dependency."
+        },
         {
           "path": "editor/test/e2e/silent-sink.mjs",
           "intendedEdit": "Wave-4 serial repair only, after a review finding against the CANVAS-EVIDENCE-SILENT harness; recorded in the progress log."

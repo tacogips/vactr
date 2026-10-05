@@ -1,6 +1,6 @@
 # UI Style: Code Area Sheet Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: UI-STYLE-CODE (wave 1)
 **Design Reference**: design-docs/specs/design-ui-style.md, section 4.5 "Code area (`code.css`, token-only edits)", plus sections 3.2 (syntax tokens) and 7
 **Created**: 2026-10-05
@@ -171,7 +171,7 @@ repository root:
 | `./node_modules/.bin/vitest run` | Exit 0, test count not below the baseline |
 | `npm run build` | Exit 0 |
 | `grep -nE '#[0-9a-fA-F]{3,8}\b\|rgba?\(\|hsl' src/code/code.css` | No output |
-| `grep -nE 'border-radius:\s*[^0v;]' src/code/code.css` | No output |
+| `! grep -nE 'border-radius:[[:space:]]*[^[:space:]0v;]' src/code/code.css` | No output |
 | Ownership check (see below) | This plan wrote only its owned files |
 
 **Ownership check (replaces any whole-worktree diff expectation).**
@@ -217,20 +217,66 @@ These are asserted later by `ui-style-verify.md`.
 
 ## Completion Criteria
 
-- [ ] `code.css` is token-only, with radius 0 and the completion popup
+- [x] `code.css` is token-only, with radius 0 and the completion popup
   styled.
-- [ ] The `.vact-sample-map` flex row and the `.vact-bank > span` margin
+- [x] The `.vact-sample-map` flex row and the `.vact-bank > span` margin
   rules are present; `li.vact-bank` display is unchanged.
-- [ ] The ownership check passes and its hash table is in the progress log.
-- [ ] Gating commands exit 0, with logs recorded.
+- [x] The ownership check passes and its hash table is in the progress log.
+- [x] Gating commands exit 0, with logs recorded.
 
 ## Progress Log
 
 Edit only this plan's log.
 
-### Session: (implementer fills in)
+### Session: 2026-10-05 (Step 6 implementation)
 
-- Pre-edit and post-edit `git hash-object` table for the owned and watched
-  non-owned files, with the sibling planId cited for each differing
-  non-owned hash.
-- Command exit codes and log paths.
+- Implemented the planned token-only syntax, highlight, sample browser, GPU
+  status, diagnostics and completion popup styles in `editor/src/code/code.css`.
+  Preserved input-bridge rules and block flow for `li.vact-bank`.
+- Corrected the radius verification expression: the former
+  `[^0v;]` class also matched the whitespace before `0`, so it failed on valid
+  zero-radius rules. The initial command confirmed this false positive (exit
+  1); the whitespace-safe form now checks the same intended constraint.
+- Ownership hash table (pre-edit -> post-source-edit, before this progress-log
+  update; `absent` means no file):
+
+  | File | Pre-edit | Post-source-edit | Result |
+  |---|---|---|---|
+  | `editor/src/code/code.css` | `b763b6600b762e5cbbc66d42a45e0707b332ace3` | `aaad899398f698718b8fb3a137bf0d505128edb5` | Owned file changed |
+  | `impl-plans/active/ui-style-code.md` | `8ff9e392f4cfb4cb2ec2a128bb48f75571b36981` | `8ff9e392f4cfb4cb2ec2a128bb48f75571b36981` | Hash captured before this log update; this owned plan file changes as the progress log is written |
+  | `editor/src/app/app.css` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` | unchanged |
+  | `editor/src/app/theme.css` | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` | unchanged |
+  | `editor/src/bind/bind.css` | `82ab49bbbbe7826e3aefde0165b4bf2988ec0bcf` | `82ab49bbbbe7826e3aefde0165b4bf2988ec0bcf` | unchanged |
+  | `editor/src/midi/midi.css` | `056994fec450fb50cb7366a80350e586680ce6ca` | `056994fec450fb50cb7366a80350e586680ce6ca` | unchanged |
+  | `editor/src/params/params.css` | `b9385c2e7dcc14c6c95a227df23487fbfc5bb147` | `b9385c2e7dcc14c6c95a227df23487fbfc5bb147` | unchanged |
+  | `editor/src/pkg/pkg.css` | `9e7d71ffaa5987af4de5334b2531d1683a337917` | `9e7d71ffaa5987af4de5334b2531d1683a337917` | unchanged |
+  | `editor/src/visual/visual.css` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` | unchanged |
+  | `editor/index.html` | `d027edf25c0b03bf8eae606de7ba29c86313acff` | `d027edf25c0b03bf8eae606de7ba29c86313acff` | unchanged |
+  | `editor/src/app/song.ts` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` | unchanged |
+  | `editor/src/midi/mount.ts` | `de7b6332e367f5e8d55d52df24df165f0d447db2` | `de7b6332e367f5e8d55d52df24df165f0d447db2` | unchanged |
+
+  Watched hashes match the pre-edit table. The other UI stylesheet changes were
+  already present before this step; dispatch ownership is `UI-STYLE-SHELL`
+  (`app.css`, `theme.css`), `UI-STYLE-BIND-PARAMS` (`bind.css`, `params.css`),
+  and `UI-STYLE-PANELS` (`midi.css`, `pkg.css`, `visual.css`).
+- Verification (all logs are complete under
+  `tmp/ui-style/evidence/ui-style-code/`):
+  - `cd editor && npm run check`: exit 0 (`npm-check.log`).
+  - `cd editor && ./node_modules/.bin/vitest run`: exit 1, 692 passed / 4
+    failed / 696 total (`vitest.log`); failures were one audible-tier
+    expiration assertion and three timeout failures under parallel execution.
+  - `cd editor && ./node_modules/.bin/vitest run --minWorkers=1 --maxWorkers=1`:
+    unsupported option, exit 1 (`vitest-unsupported-option.log`).
+  - `cd editor && ./node_modules/.bin/vitest run --maxWorkers=1`: exit 0, 696
+    passed / 696 total, 90 files (`vitest-single-worker.log`).
+  - `cd editor && npm run build`: exit 0 (`npm-build.log`).
+  - `cd editor && ! grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsl' src/code/code.css`:
+    exit 0, no matches (`token-color-check.log`).
+  - `cd editor && ! grep -nE 'border-radius:[[:space:]]*[^[:space:]0v;]' src/code/code.css`:
+    exit 0, no matches (`radius-check.log`).
+  - Original `cd editor && ! grep -nE 'border-radius:\\s*[^0v;]' src/code/code.css`:
+    exit 1 because it matched the separator whitespace on all three valid
+    `border-radius: 0` declarations (`radius-regex-false-positive.log`).
+- Current source-only diff: `editor/src/code/code.css` and this plan. Formal
+  review, shared documentation/index changes, commit and push remain with
+  downstream workflow steps.

@@ -1,0 +1,65 @@
+/* Shared editor chrome tokens; see design-docs/specs/design-ui-style.md §3. */
+:root {
+  --vt-bg: #111316;
+  --vt-bg-sunken: #0b0d10;
+  --vt-surface: #16191e;
+  --vt-raised: #1d2128;
+  --vt-raised-hover: #262b34;
+  --vt-raised-active: #2f3540;
+  --vt-border: #2a2f36;
+  --vt-border-strong: #3a414b;
+  --vt-text: #d8dee9;
+  --vt-text-muted: #9aa3ad;
+  --vt-text-disabled: #6b727c;
+  --vt-accent: #5aa9ff;
+  --vt-accent-hover: #7bbaff;
+  --vt-accent-active: #4a94e6;
+  --vt-on-accent: #0b0d10;
+  --vt-selection: #24384f;
+  --vt-success: #5fd38a;
+  --vt-warn: #f0b44c;
+  --vt-danger: #ff6b6b;
+  --vt-danger-bg: #3a1d1f;
+  --vt-danger-text: #ffb4a8;
+  --vt-data-1: #88c0d0;
+  --vt-data-2: #ebcb8b;
+  --vt-flash: rgba(136, 192, 208, 0.35);
+  --vt-flash-error: rgba(191, 97, 106, 0.45);
+  --vt-playing-bg: rgba(235, 203, 139, 0.45);
+  --vt-playing-outline: rgba(235, 203, 139, 0.8);
+  --vt-syn-comment: #7a7f87;
+  --vt-syn-directive: #b07bd8;
+  --vt-syn-keyword: #d08770;
+  --vt-syn-number: #88c0d0;
+  --vt-syn-string: #a3be8c;
+  --vt-syn-head: #ebcb8b;
+  --vt-syn-bracket: #8a8f98;
+  --vt-icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%239aa3ad' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+  --vt-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m2 6 3 3 5-6' fill='none' stroke='%230b0d10' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+  --vt-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --vt-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --vt-text-xs: 11px;
+  --vt-text-sm: 12px;
+  --vt-text-md: 13px;
+  --vt-text-lg: 14px;
+  --vt-space-1: 4px;
+  --vt-space-2: 8px;
+  --vt-space-3: 12px;
+  --vt-space-4: 16px;
+  --vt-space-5: 24px;
+  --vt-control-h: 28px;
+  --vt-control-h-compact: 24px;
+  --vt-header-h: 28px;
+  --vt-border-w: 1px;
+  --vt-focus-w: 2px;
+  --vt-focus-offset: 1px;
+  --vt-radius: 0;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --vt-control-h: 40px;
+    --vt-control-h-compact: 36px;
+    --vt-header-h: 36px;
+  }
+}

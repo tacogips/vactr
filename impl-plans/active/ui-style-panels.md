@@ -215,18 +215,53 @@ These are asserted later by `ui-style-verify.md`.
 
 ## Completion Criteria
 
-- [ ] All three sheets are token-only, with uniform section padding,
+- [x] All three sheets are token-only, with uniform section padding,
   subsection titles and header rows.
-- [ ] Gating commands exit 0, with logs recorded.
-- [ ] The ownership check passes and its hash table is in the progress log.
+- [x] Gating commands exit 0, with logs recorded.
+- [x] The ownership check passes and its hash table is in the progress log.
 
 ## Progress Log
 
 Edit only this plan's log.
 
-### Session: (implementer fills in)
+### Session: 2026-10-05 — Step 6 implementation
 
-- Pre-edit and post-edit `git hash-object` table for the owned and watched
-  non-owned files, with the sibling planId cited for each differing
-  non-owned hash.
-- Command exit codes and log paths.
+- Implemented token-only MIDI, Packages, and Visuals styles. Preserved the
+  existing selectors, hidden behavior, and canvas sizing. The Proxy input now
+  has a sunken fill, token border, and token padding; the Visuals file input
+  uses the shared base styling owned by `UI-STYLE-SHELL`.
+- Ownership hash table (pre-edit and after the final source edit; plan-file
+  hash is before this progress-log append to avoid a self-referential hash):
+
+  | Path | Pre-edit hash | Post-source-edit hash |
+  |---|---|---|
+  | `editor/src/midi/midi.css` | `056994fec450fb50cb7366a80350e586680ce6ca` | `f62f2ac1f3468706aa6ad2da3552caf2b6034f20` |
+  | `editor/src/pkg/pkg.css` | `9e7d71ffaa5987af4de5334b2531d1683a337917` | `11822b0b10a4b34ecc1a834f287c82918182ea30` |
+  | `editor/src/visual/visual.css` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` | `61730469d89cc1dc7b1b7a27c811f29429240899` |
+  | `impl-plans/active/ui-style-panels.md` | `614c0b7cf747fe2946f11f44ec8a756bdccdb401` | `614c0b7cf747fe2946f11f44ec8a756bdccdb401` |
+  | `editor/src/app/app.css` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` |
+  | `editor/src/app/theme.css` | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` |
+  | `editor/index.html` | `d027edf25c0b03bf8eae606de7ba29c86313acff` | `d027edf25c0b03bf8eae606de7ba29c86313acff` |
+  | `editor/src/app/song.ts` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` |
+  | `editor/src/midi/mount.ts` | `de7b6332e367f5e8d55d52df24df165f0d447db2` | `de7b6332e367f5e8d55d52df24df165f0d447db2` |
+  | `editor/src/bind/bind.css` | `82ab49bbbbe7826e3aefde0165b4bf2988ec0bcf` | `82ab49bbbbe7826e3aefde0165b4bf2988ec0bcf` |
+  | `editor/src/params/params.css` | `b9385c2e7dcc14c6c95a227df23487fbfc5bb147` | `b9385c2e7dcc14c6c95a227df23487fbfc5bb147` |
+  | `editor/src/code/code.css` | `aaad899398f698718b8fb3a137bf0d505128edb5` | `aaad899398f698718b8fb3a137bf0d505128edb5` |
+
+- No watched non-owned path changed during this plan's edit window; the
+  sibling stylesheet changes were already present in the pre-edit snapshot.
+- Verification (all exit status 0):
+  - `cd editor && npm run check` — log:
+    `tmp/ui-style/UI-STYLE-PANELS/attempt-1/npm-check.log`.
+  - `cd editor && ./node_modules/.bin/vitest run` — 90 files and 696 tests
+    passed — log:
+    `tmp/ui-style/UI-STYLE-PANELS/attempt-1/vitest.log`.
+  - `cd editor && npm run build` — log:
+    `tmp/ui-style/UI-STYLE-PANELS/attempt-1/npm-build.log`.
+  - `cd editor && ! grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsl'
+    src/midi/midi.css src/pkg/pkg.css src/visual/visual.css — log:
+    `tmp/ui-style/UI-STYLE-PANELS/attempt-1/color-token-check.log`.
+  - `cd editor && ! grep -nE
+    'monospace|system-ui|sans-serif|font-weight:\s*bold'
+    src/midi/midi.css src/pkg/pkg.css src/visual/visual.css` — log:
+    `tmp/ui-style/UI-STYLE-PANELS/attempt-1/font-token-check.log`.

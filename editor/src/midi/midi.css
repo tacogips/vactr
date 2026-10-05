@@ -1,39 +1,52 @@
 /* The MIDI section of the right pane (design 15.1.9). */
 .midi-pane {
-  padding: 4px 8px;
-  border-bottom: 1px solid #2a2f36;
+  padding: var(--vt-space-2) var(--vt-space-3);
+  border-bottom: var(--vt-border-w) solid var(--vt-border);
 }
 
 .midi-header {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: var(--vt-space-2);
   align-items: center;
+  min-height: var(--vt-control-h);
 }
 
 .midi-title {
+  font-size: var(--vt-text-xs);
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vt-text-muted);
 }
 
 .midi-status {
-  color: #8b95a1;
+  color: var(--vt-text-muted);
 }
 
 .midi-devices {
   list-style: none;
-  margin: 4px 0 0;
+  margin: var(--vt-space-2) 0 0;
   padding: 0;
 }
 
+.midi-devices label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  min-height: var(--vt-control-h-compact);
+}
+
 .midi-devices-empty {
-  color: #8b95a1;
+  color: var(--vt-text-muted);
 }
 
 .midi-learn {
   display: flex;
-  gap: 8px;
+  gap: var(--vt-space-2);
   align-items: center;
-  margin-top: 4px;
-  color: #e0b050;
+  margin-top: var(--vt-space-2);
+  color: var(--vt-warn);
 }
 
 .midi-learn[hidden] {

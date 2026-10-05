@@ -3,24 +3,39 @@
 .pkg-pane {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  border-top: 1px solid #333;
-  font-size: 12px;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-2) var(--vt-space-3);
+  border-top: var(--vt-border-w) solid var(--vt-border);
+  font-size: var(--vt-text-sm);
 }
 
 .pkg-title {
-  font-weight: bold;
+  font-size: var(--vt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vt-text-muted);
+}
+
+.pkg-proxy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+  color: var(--vt-text-muted);
 }
 
 .pkg-proxy input {
   width: 100%;
   box-sizing: border-box;
   font: inherit;
+  padding: 0 var(--vt-space-2);
+  border: var(--vt-border-w) solid var(--vt-border-strong);
+  background: var(--vt-bg-sunken);
+  color: var(--vt-text);
 }
 
 .pkg-hint {
-  color: #b90;
+  color: var(--vt-warn);
 }
 
 .pkg-imports,
@@ -33,7 +48,8 @@
 .pkg-imports li {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--vt-space-2);
+  min-height: var(--vt-control-h);
 }
 
 .pkg-path {
@@ -45,12 +61,13 @@
 
 .pkg-imports code {
   user-select: all;
+  font-family: var(--vt-font-mono);
 }
 
 .pkg-diagnostics li {
-  color: #d55;
+  color: var(--vt-danger);
 }
 
 .pkg-status {
-  color: #888;
+  color: var(--vt-text-muted);
 }

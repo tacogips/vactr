@@ -357,22 +357,70 @@ targets them.
 
 ## Completion Criteria
 
-- [ ] `theme.css` is created with every listed token and the coarse block.
-- [ ] `index.html` links `theme.css` before `app.css`.
-- [ ] `app.css` holds the base rules, variants, icon buttons, transport
+- [x] `theme.css` is created with every listed token and the coarse block.
+- [x] `index.html` links `theme.css` before `app.css`.
+- [x] `app.css` holds the base rules, variants, icon buttons, transport
   groups, headers and status bar, and is token-only.
-- [ ] `song.ts` and `midi/mount.ts` class edits are made.
-- [ ] Gating commands exit 0; their logs are recorded in the progress log.
-- [ ] The ownership check passes and its hash table is in the progress log.
+- [x] `song.ts` and `midi/mount.ts` class edits are made.
+- [ ] The build emits the expected distinct theme stylesheet link in
+  `dist/index.html`; Vite currently bundles both source links into one CSS
+  asset, so the output-link requirement needs an ownership/acceptance decision.
+- [x] The gating build, type check and full Vitest suite exit 0; their logs
+  and the emitted CSS order evidence are recorded below.
+- [x] The ownership check passes and its hash table is in the progress log.
 
 ## Progress Log
 
 Edit only this plan's log.
 
-### Session: (implementer fills in)
+### Session: 2026-10-05 — Step 6 implementation
 
-- Baseline vitest count.
-- Pre-edit and post-edit `git hash-object` table for the owned and watched
-  non-owned files, with the sibling planId cited for each differing
-  non-owned hash.
-- Command exit codes and log paths.
+- Implemented the token layer, global zero-specificity form-control rules,
+  shell and status styling, and the assigned Apply song / Enable MIDI primary
+  classes. DOM order is unchanged. No files owned by sibling plans changed.
+- Baseline Vitest: 90 files, 696 tests passed. Final Vitest: 90 files, 696
+  tests passed (not below baseline).
+- Pre-edit and post-edit ownership hashes (`git hash-object`):
+
+  | Path | Pre-edit | Post-edit |
+  |---|---|---|
+  | `editor/src/app/theme.css` | absent | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` |
+  | `editor/index.html` | `a5c317e405af39166809f6463794c72a8041ccb4` | `d027edf25c0b03bf8eae606de7ba29c86313acff` |
+  | `editor/src/app/app.css` | `959e75b7bff9bf00b2e3c25454966fdc1a0264a6` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` |
+  | `editor/src/app/song.ts` | `2b1da647df7e4beda98d6d15e4a496bfb33efd9b` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` |
+  | `editor/src/midi/mount.ts` | `5f7019c7bce22dd4b2bd0bc4ba0f3e887b3c7fdb` | `de7b6332e367f5e8d55d52df24df165f0d447db2` |
+  | `impl-plans/active/ui-style-shell.md` | `b4fdcaa67fe69faff7a95ed1a47b0281c41de22d` | captured after this log update in `tmp/ui-style/evidence/ui-style-shell/hash-post-final.txt` |
+  | `editor/src/bind/bind.css` | `e8160f4aeb36a14d4ef328d803156b7480203126` | `e8160f4aeb36a14d4ef328d803156b7480203126` |
+  | `editor/src/code/code.css` | `b763b6600b762e5cbbc66d42a45e0707b332ace3` | `b763b6600b762e5cbbc66d42a45e0707b332ace3` |
+  | `editor/src/midi/midi.css` | `056994fec450fb50cb7366a80350e586680ce6ca` | `056994fec450fb50cb7366a80350e586680ce6ca` |
+  | `editor/src/params/params.css` | `0d47bbf2f3d1462f4d307875e51fa49625202aa7` | `0d47bbf2f3d1462f4d307875e51fa49625202aa7` |
+  | `editor/src/pkg/pkg.css` | `9e7d71ffaa5987af4de5334b2531d1683a337917` | `9e7d71ffaa5987af4de5334b2531d1683a337917` |
+  | `editor/src/visual/visual.css` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` |
+
+  Every changed source path is owned by `UI-STYLE-SHELL`; watched paths are
+  unchanged. Pre-edit table is also preserved at
+  `tmp/ui-style/evidence/ui-style-shell/hash-pre.txt`; the earlier
+  pre-audit snapshot remains at
+  `tmp/ui-style/evidence/ui-style-shell/hash-post-before-progress.txt`. The
+  final audited table, including the plan-file hash after this log update, is
+  captured at `tmp/ui-style/evidence/ui-style-shell/hash-post-final.txt`.
+- Verification (all commands were run in the foreground):
+  - `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit 0; complete log: `tmp/ui-style/evidence/ui-style-shell/wasm-build-baseline.log`.
+  - `cd editor && ./node_modules/.bin/vitest run` before edits — exit 0, 696/696 tests; log: `tmp/ui-style/evidence/ui-style-shell/vitest-baseline.log`.
+  - `cd editor && npm run check` on final source — exit 0; log: `tmp/ui-style/evidence/ui-style-shell/npm-check-final.log`.
+  - `cd editor && ./node_modules/.bin/vitest run` on final source — exit 0, 696/696 tests; log: `tmp/ui-style/evidence/ui-style-shell/vitest-final-audited.log`.
+  - `cd editor && npm run build` on final source — exit 0; log: `tmp/ui-style/evidence/ui-style-shell/npm-build-final.log`.
+  - Final CSS/token/source contract checks — exit 0; log: `tmp/ui-style/evidence/ui-style-shell/source-contract-final.log`.
+  - Built CSS verification — exit 0: theme tokens begin at byte 0, app base rules at byte 1849, all six file/range pseudo selectors are present, and no empty `:where()` selector remains; log: `tmp/ui-style/evidence/ui-style-shell/built-css-final-evidence.log`.
+  - Output link count — check exit 1: `dist/index.html` contains one link to Vite's bundled `assets/index-BXJd7dqC.css`, not two distinct stylesheet links; complete output: `tmp/ui-style/evidence/ui-style-shell/dist-stylesheet-order-final.log`.
+- A read-only audit caught that the CSS optimizer removes pseudo-elements nested
+  inside `:where()`. The source selectors now place pseudo-elements outside
+  `:where()` and put state selectors on the origin control; the final build
+  confirms the file and range rules survive minification.
+- The production CSS preserves effective cascade order, but the plan's
+  distinct-link assertion is not met because the existing Vite build bundles
+  linked CSS. Keeping separate links would require build configuration or a
+  different asset-loading approach; `editor/vite.config.ts` is outside this
+  plan's `writePaths`. Request a checkpoint amendment or acceptance clarification
+  before making that change. This is the sole implementation blocker; formal
+  review, wave-2 style testing and workflow finalization remain downstream.

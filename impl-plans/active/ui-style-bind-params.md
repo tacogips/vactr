@@ -1,6 +1,6 @@
 # UI Style: Bind and Params Sheets Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: UI-STYLE-BIND-PARAMS (wave 1)
 **Design Reference**: design-docs/specs/design-ui-style.md, sections 4.3 (bind-row icon buttons), 4.4 (tabs), 4.5 (side-pane sections, subsection titles, label/value rows, params canvases, bind status colors), 4.6 and 5
 **Created**: 2026-10-05
@@ -204,8 +204,8 @@ repository root:
 | `npm run check` | Exit 0 |
 | `./node_modules/.bin/vitest run` | Exit 0, test count not below the recorded baseline |
 | `npm run build` | Exit 0 |
-| `grep -nE '#[0-9a-fA-F]{3,8}\b\|rgba?\(\|hsl\|\bwhite\b\|\bblack\b' src/bind/bind.css src/params/params.css` | No output |
-| `grep -nE 'monospace\|system-ui\|sans-serif' src/bind/bind.css src/params/params.css` | No output |
+| `! grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsl|(^|[^[:alnum:]_-])(white|black)([^[:alnum:]_-]|$)' src/bind/bind.css src/params/params.css` | Exit 0 (no output) |
+| `! grep -nE 'monospace|system-ui|sans-serif' src/bind/bind.css src/params/params.css` | Exit 0 (no output) |
 | Ownership check (see below) | This plan wrote only its owned files |
 
 **Ownership check (replaces any whole-worktree diff expectation).**
@@ -251,20 +251,67 @@ These are asserted later by `ui-style-verify.md`.
 
 ## Completion Criteria
 
-- [ ] Both sheets are token-only, with section padding and subsection titles
+- [x] Both sheets are token-only, with section padding and subsection titles
   per the design.
-- [ ] Tabs are restyled with the active selectors unchanged.
-- [ ] Gating commands exit 0, with logs recorded.
-- [ ] The ownership check passes and its hash table is in the progress log.
+- [x] Tabs are restyled with the active selectors unchanged.
+- [x] Gating commands exit 0, with logs recorded.
+- [x] The ownership check passes and its hash table is in the progress log.
 
 ## Progress Log
 
 Edit only this plan's log.
 
-### Session: (implementer fills in)
+### Session: 2026-10-05 implementation
 
-- Baseline vitest count.
-- Pre-edit and post-edit `git hash-object` table for the owned and watched
-  non-owned files, with the sibling planId cited for each differing
-  non-owned hash.
-- Command exit codes and log paths.
+- Baseline Vitest: 696 tests, 695 passed, 1 failed (exit 1) before any owned
+  source edits. The baseline failure was `test/app/main.test.ts:118` in the
+  audible-tier disposal assertion; full log:
+  `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/vitest-baseline.log`.
+- Pre/post `git hash-object` table (owned and watched paths):
+
+  | Path | Pre-edit | Post-edit |
+  |---|---|---|
+  | `editor/src/bind/bind.css` | `e8160f4aeb36a14d4ef328d803156b7480203126` | `82ab49bbbbe7826e3aefde0165b4bf2988ec0bcf` |
+  | `editor/src/params/params.css` | `0d47bbf2f3d1462f4d307875e51fa49625202aa7` | `b9385c2e7dcc14c6c95a227df23487fbfc5bb147` |
+  | `impl-plans/active/ui-style-bind-params.md` | `4614b014372067611da6d8d096d5a66c670ea93b` | See exact final hash in `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/ownership-post.json` (self hash is external to avoid changing the hash by recording it). |
+  | `editor/src/app/app.css` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` | `b9f175a88968e7ba0982f04840d8a420cb1f5793` |
+  | `editor/src/app/theme.css` | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` | `ed05d7a7a7083d0e253eaa080f48aceae1aa4cf7` |
+  | `editor/index.html` | `d027edf25c0b03bf8eae606de7ba29c86313acff` | `d027edf25c0b03bf8eae606de7ba29c86313acff` |
+  | `editor/src/app/song.ts` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` | `4e50eb04d8695d5991a7ca66209260e2f84e9733` |
+  | `editor/src/midi/mount.ts` | `de7b6332e367f5e8d55d52df24df165f0d447db2` | `de7b6332e367f5e8d55d52df24df165f0d447db2` |
+  | `editor/src/code/code.css` | `b763b6600b762e5cbbc66d42a45e0707b332ace3` | `b763b6600b762e5cbbc66d42a45e0707b332ace3` |
+  | `editor/src/midi/midi.css` | `056994fec450fb50cb7366a80350e586680ce6ca` | `056994fec450fb50cb7366a80350e586680ce6ca` |
+  | `editor/src/pkg/pkg.css` | `9e7d71ffaa5987af4de5334b2531d1683a337917` | `9e7d71ffaa5987af4de5334b2531d1683a337917` |
+  | `editor/src/visual/visual.css` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` | `52d2ba6d19b67dffa5b0c23bbedfc4242cf1b800` |
+
+  The owned CSS hashes changed. No watched non-owned hash changed during this
+  plan; the shell files shown as modified in the shared worktree were already
+  present at the pre-edit snapshot and remained unchanged. Ownership passes.
+- Verification:
+  - `npm run check`: exit 0;
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/npm-check.log`.
+  - `./node_modules/.bin/vitest run` baseline: exit 1, 696 tests, 695 passed,
+    1 failed; log above.
+  - `./node_modules/.bin/vitest run` on final source first attempt: exit 1,
+    696 tests, 694 passed, 2 failed (large-eval timing ratio and first-track
+    5-second timeout); log:
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/vitest-final.log`.
+  - `./node_modules/.bin/vitest run` on the same final source rerun: exit 0,
+    696 tests, 696 passed; log:
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/vitest-final-rerun.log`.
+  - `npm run build`: exit 0;
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/npm-build.log`.
+  - The original color grep produced a false positive for the valid
+    `white-space` property; its empty-output check therefore exited 1. The
+    boundary-aware expression now in this plan excludes hyphenated property
+    names. The matching final-source command, font-token check, and active
+    selector identity check are recorded under
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/`.
+  - Boundary-aware color check: exit 0;
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/css-literals-boundary-aware.log`.
+  - Font-token check: exit 0;
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/css-fonts.log`.
+  - Active selector identity check: exit 0;
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/active-selectors.log`.
+  - `git diff --check` on the owned files and this plan: exit 0;
+    `tmp/ui-style/UI-STYLE-BIND-PARAMS/attempt-1/diff-check.log`.

@@ -51,7 +51,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MidiMountOption
   title.textContent = 'MIDI';
   const enable = doc.createElement('button');
   enable.type = 'button';
-  enable.className = 'midi-enable';
+  enable.className = 'midi-enable vact-primary';
   enable.textContent = 'Enable MIDI';
   const status = doc.createElement('span');
   status.className = 'midi-status';

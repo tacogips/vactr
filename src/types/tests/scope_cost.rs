@@ -2,7 +2,7 @@
 
 use crate::types::diag::{DiagCode, Severity};
 
-use super::{assert_has, check_src, diag_lines};
+use super::{check_src, diag_lines};
 
 #[test]
 fn unique_session_lets_scale_with_scope_probes() {
@@ -46,10 +46,9 @@ fn rebinding_diagnostic_still_points_to_first_slot_binding() {
 
 #[test]
 fn session_binding_shadowed_by_function_parameter_stays_a_warning() {
-    assert_has(
-        "let x 1\nfn f x:\n\tx",
-        DiagCode::Shadowing,
-        2,
-        Severity::Warning,
-    );
+    let src = "let x 1\nfn f x:\n\tx";
+    let result = check_src(src);
+    assert_eq!(diag_lines(src, &result), ["shadowing@2"]);
+    assert_eq!(result.diags[0].code, DiagCode::Shadowing);
+    assert_eq!(result.diags[0].severity, Severity::Warning);
 }

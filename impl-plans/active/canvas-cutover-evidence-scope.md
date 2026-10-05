@@ -237,7 +237,7 @@ is serial after the join. Edit only this plan's progress log.
 - [x] `Doc::new` builds `top_first` after the sort; `top_of` is O(1), with the counted fallback for hand-built docs
 - [x] New counter tests pass: `c8 <= 32000`, `c8 / c4 <= 2.2`, label build `steps <= 2 * targets`
 - [x] Existing `types::tests` and `directives::tests` pass unmodified
-- [ ] Strict clippy, rustfmt check, cargo build, the wasm32 build and the default vitest suite pass (Rust gates passed; the default vitest gate remains unresolved, see below)
+- [x] Strict clippy, rustfmt check, cargo build, the wasm32 build and the default vitest suite pass on the current source
 - [x] Outside the sandbox, full nextest and `npm run test:perf` pass
 - [x] Mutation runs exit nonzero and are recorded separately
 - [x] Progress log updated with commands, exit codes, log paths and sha256 values
@@ -368,3 +368,62 @@ three times in a row.
 
 **Done when**: every gating command above exits 0 on the current HEAD, with the complete log
 path recorded here, and the reviewers accept. Then tick the open completion criterion.
+
+### Session: 2026-10-06 (session 283: implementation gate closeout)
+**Tasks Completed**: Re-gated the assigned scope implementation on checkpoint `2d0a748` plus
+the local test-only correction. The focused review found the shadowing row asserted the
+presence of a warning but not that it was the only diagnostic. `src/types/tests/scope_cost.rs`
+now asserts the exact ordered result `shadowing@2` and Warning severity. Its final SHA-256 is
+`53a3b90f9be1fd3305c955b290361b1f93f8490c84449e5440384813113eb1f3`; `src/types/scope.rs`,
+`src/directives/attach.rs`, and the other test files retain their accepted implementation
+hashes. Pre-edit and post-edit intent records are under `tmp/canvas-cutover/scope/`.
+
+**Current-source verification** (complete logs under `tmp/canvas-cutover/scope/`):
+- `CARGO_TERM_QUIET=true cargo build`: exit 0, `s282-final-build.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0,
+  `s282-final-clippy.log`; `s282-final-allow-expect.log` confirms no added `allow`/`expect`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run types::tests directives::tests`:
+  exit 0, 184 passed/0 failed, `s282-final-nextest.log`; same-source post-modification
+  confirmation is also in `postmod-final/nextest.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-capture types::tests directives::tests`:
+  exit 0, 184 passed/0 failed; current-source counters are `c4=16000`, `c8=32000`,
+  `steps=20000`, `targets=20000`, `s283-final-counter-nextest.log`.
+- `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`:
+  exit 0, `s282-final-rustfmt.log`; post-modification confirmation is in
+  `postmod-final/rustfmt.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`:
+  exit 0, `s282-final-wasm-build.log`.
+- `cd editor && ./node_modules/.bin/vitest run`: exit 0, 90 files and 703 tests passed,
+  `s282-final-vitest.log`.
+- `cd editor && npm run check`: exit 0, `s282-final-npm-check.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`:
+  exit 0, 2816 passed/0 failed and 3 skipped in 1105.531 seconds,
+  `s282-final-full-nextest.log`.
+- `cd editor && npm run test:perf` (alone after the full nextest run): exit 0, 1 passed,
+  `s282-final-test-perf.log` (5k median 844.2 ms, 20k median 2275.2 ms, ratio 2.70).
+- Scope checks: `git diff --name-only 61c9216 c69314d` exits 0 and lists the seven original
+  SCOPE paths (`s282-final-impl-scope.log`). `git diff --name-only c69314d` exits 0 and lists
+  the five operator-repair tests, four session-282 checkpoint files, and the in-scope
+  `src/types/tests/scope_cost.rs` assertion correction (`s282-final-post-impl-scope.log`).
+  `git ls-files --others --exclude-standard` is empty (exit 0,
+  `s282-final-untracked.log`); existing scope/rebinding/shadowing/prelude test files remain
+  unchanged (exit 0, `s282-final-existing-tests.log`).
+- Current-source mutation controls are separate from gating runs and both fail as expected:
+  the linear `classify` mutant (`src/types/scope.rs` SHA-256
+  `0327027d07aec4536b90d0dbe970d4222b640c46a7e3425f45f8b3d2d7521e90`) reports
+  `c4=8010000`, `c8=32020000` and fails its counter assertion (command exit 100,
+  `s283-mutation-scope.log`); the linear `top_of` mutant (`src/directives/attach.rs`
+  SHA-256 `ba5720ef8230afd78cc97df676dc1ed11cdfb3462a3295bbf4de9b9a66d3bcb5`) reports
+  `steps=200010000` for 20000 targets and fails its assertion (command exit 100,
+  `s283-mutation-topof.log`). Both files were restored to their pre-mutation SHA-256 values
+  (`scope.rs` `59fd855cf277f883f79f7ea7a1793f20c0016564b93eb39ae889b64d728be84f`,
+  `attach.rs` `28e041a2ac1e6e1cb857c51cb547ca9125e846f7e9e992ea614664fbe62240b0`). After
+  restoration, the current-source counter suites pass: scope tests 3/3 with `c4=16000`,
+  `c8=32000` (`postmutation-final/scope-counter.log`); label tests 5/5 with 20000 steps
+  for 20000 targets (`postmutation-final/labels-counter.log`); rustfmt check exits 0
+  (`postmutation-final/rustfmt.log`). Earlier controls are retained in `mutation-scope.log`
+  and `mutation-topof.log`.
+
+Implementation gates for this plan are complete. Status stays `In Progress` until the
+downstream test-integrity, adversarial and integration reviews; later review-dependent
+documentation, archive/index updates, commit and push are also downstream workflow steps.

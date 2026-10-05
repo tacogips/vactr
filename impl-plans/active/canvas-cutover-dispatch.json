@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflowInput:RESUME-session-277 'RESUME session 277: accept EVIDENCE-SCOPE, then SCHED, FRAMECOST, silent release-wasm CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-282, chain 265-266-267-269-271-274-277-282; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; plans accepted by step5-impl-plan-review comm-004332; no GitHub issue number)",
+  "issueReference": "workflowInput:RESUME-session-282 'RESUME session 282: accept EVIDENCE-SCOPE (no negative controls in gating), then SCHED, FRAMECOST, silent CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-283, chain 265-266-267-269-271-274-277-282-283; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; riela issue #134; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -120,6 +120,26 @@
       ],
       "amendment": "CANVAS-EVIDENCE-SCOPE is implemented in c69314d and re-gated on the current HEAD, not reimplemented. The single-BASE scope row is replaced by three exact checks (S282-PLAN-SCOPE-DIFFGATE, verified-fixed by step5 comm-004332). Decision-D flag correction: the gating release wasm build uses CARGO_PROFILE_RELEASE_STRIP=debuginfo (name section kept, DWARF dropped; design 15.3.8.13 corrected in session 282); Cargo.toml strip = true is unchanged. The SCHED, FRAMECOST and CANVAS-EVIDENCE plan decomposition and the serial DAG are unchanged.",
       "checkpointNote": "Session 282 plan checkpoint: design 15.3.8.13 correction, the SCOPE and FRAMECOST plan amendments and this manifest are committed together before the SCOPE re-gate. Accepted plans are not redispatched."
+    },
+    "session283": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-283",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-282",
+      "resumeHead": "5e58d04fdbe38414826735a81a02bcf9de96ec1e",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      "blocker": "Session 282 was blocked only because intentional mutation negative controls (exit 100) and superseded failed vitest runs were listed in verification[]/priorVerification[]; the progress gate has no negative-control exemption (riela issue #134).",
+      "amendment": "workflowInput HARD RULE: no mutation, negative-control or intentionally failing command runs in session 283, and structured verification lists only final-source commands that exited 0 with positive counts. mutationEvidence lists are empty for this run. SCOPE cites tmp/canvas-cutover/scope/s283-mutation-scope.log, s283-mutation-topof.log, mutation-scope.log and mutation-topof.log in prose only. SCHED and FRAMECOST show sensitivity through in-test control cases (both branches asserted in one passing test; FRAMECOST adds wasm-profile.mjs gatingPreflight, which run.mjs calls before any write, server or browser). SCOPE re-gate checks are rebased on 5e58d04 because that commit changed src/types/tests/scope_cost.rs, so the session-282 c69314d byte-identity check no longer holds. Design 15.3.8.13, the plan decomposition, writePaths, sharedPaths, artifactRoots and the serial DAG are unchanged.",
+      "checkpointNote": "Session 283 plan checkpoint: the session-283 sections of the SCOPE, SCHED, FRAMECOST and EVIDENCE plans and this manifest are committed and pushed together before the SCOPE re-gate. No design change. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
@@ -138,7 +158,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-277 'RESUME session 277: accept EVIDENCE-SCOPE, then SCHED, FRAMECOST, silent release-wasm CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-282, chain 265-266-267-269-271-274-277-282; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; plans accepted by step5-impl-plan-review comm-004332; no GitHub issue number)",
+    "issueReference": "workflowInput:RESUME-session-282 'RESUME session 282: accept EVIDENCE-SCOPE (no negative controls in gating), then SCHED, FRAMECOST, silent CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-283, chain 265-266-267-269-271-274-277-282-283; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; riela issue #134; plans accepted by step5-impl-plan-review comm-004359; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -285,7 +305,8 @@
       "Session 271 waves: RUNSTART (wave 3) runs alone; EDITCOST (wave 4, gates-only) depends on RUNSTART; CANVAS-EVIDENCE (wave 5) depends on both. Acceptance of EDITCOST and RUNSTART requires three consecutive default full vitest runs (exit 0 each) plus npm run test:perf (exit 0, alone), npm run check, strict clippy, rustfmt --check on the six RUNSTART Rust files and outside-sandbox full nextest (timeout >= 1500 s).",
       "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch rule for this wave): EDITCOST and RUNSTART are acceptedDependencies (commit 2156699) and are not redispatched. plans lists only CANVAS-EVIDENCE, redispatched alone (no fanout peers) with the five session-271 integration-review briefs carried verbatim in the plan section 'Session 274 Amendment'. Its harness files, product seams and seam tests are concrete writePaths with CANVAS-EVIDENCE as the single active owner. Fix order: harness fixes, re-measure, product seam fixes with operation-counter or deterministic tests, re-measure. An unlisted dominant-cost TypeScript file is recorded by the implementer and added by a serial plan-author amendment and checkpoint; the run does not stop and no accepted plan is redispatched. Rust, public contract or dependency needs are operator blockers. Playwright, simulator, profile and full nextest runs happen outside the Codex sandbox in the verification and review steps.",
       "Session 277 (design 15.3.8.13, operator decisions A-G): plans lists CANVAS-EVIDENCE-SCOPE (wave 5), -SCHED (wave 6), -FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8), strictly serial through dependsOn. Each wave has exactly one plan, so at any time one plan writes each file. renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md are CANVAS-EVIDENCE sharedPaths, edited only after their wave-6/7 owner is accepted. SCOPE is the only plan that edits Rust (the 15.3.8.13 A files). SCHED and FRAMECOST prove no .rs, Cargo.toml or Cargo.lock change, so SCOPE's outside-sandbox full nextest stays authoritative for them; CANVAS-EVIDENCE reruns full nextest in its final gates. Every gating e2e and simulator run follows mise run build-wasm-release and the release-default npm run build; run.mjs exits 2 for any other gating build. Escalation F is reported by CANVAS-EVIDENCE TASK-504 with evidence and implemented only after a serial design 15.3.8.14 amendment and a new plan.",
-      "Session 282 (resume of 277 at acf33e2): CANVAS-EVIDENCE-SCOPE is implemented in c69314d and is re-gated, not reimplemented. Its gating list runs on the current HEAD. The single-BASE scope row is replaced by three exact checks (plan section 'session 282 resume'): git diff --name-only 61c9216 c69314d = exactly the 7 SCOPE paths; git diff --name-only c69314d is a subset of the 5 acf33e2 test files plus the 4 session-282 checkpoint files, with all 5 test files present; and no untracked files. BASE=61c9216 stays for the allow/expect grep and the existing-tests diff. The 6 c69314d source files must be byte-identical to c69314d (default vitest exit 0 is required; operator repair acf33e2 made the load-sensitive tests robust), followed by the test-integrity, adversarial and integration reviews and acceptance. SCHED (wave 6), FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8) then run strictly serially as in session 277. The only plan change is the decision-D flag correction (STRIP=debuginfo; design 15.3.8.13 as corrected in session 282). No accepted plan is redispatched."
+      "Session 282 (resume of 277 at acf33e2): CANVAS-EVIDENCE-SCOPE is implemented in c69314d and is re-gated, not reimplemented. Its gating list runs on the current HEAD. The single-BASE scope row is replaced by three exact checks (plan section 'session 282 resume'): git diff --name-only 61c9216 c69314d = exactly the 7 SCOPE paths; git diff --name-only c69314d is a subset of the 5 acf33e2 test files plus the 4 session-282 checkpoint files, with all 5 test files present; and no untracked files. BASE=61c9216 stays for the allow/expect grep and the existing-tests diff. The 6 c69314d source files must be byte-identical to c69314d (default vitest exit 0 is required; operator repair acf33e2 made the load-sensitive tests robust), followed by the test-integrity, adversarial and integration reviews and acceptance. SCHED (wave 6), FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8) then run strictly serially as in session 277. The only plan change is the decision-D flag correction (STRIP=debuginfo; design 15.3.8.13 as corrected in session 282). No accepted plan is redispatched.",
+      "Session 283 (resume of 282 at 5e58d04; supersedes Rule D's mutationEvidence clause for this run only): no mutation, negative-control or intentionally failing command is run. mutationEvidence stays empty. verification[] and priorVerification[] contain only final-source commands that exited 0 with positive test counts; failed, superseded, typo, timed-out or blocked runs never appear there and are fixed and rerun. SCOPE re-gates on its session-283 checks: (b') git diff --name-only c69314d 5e58d04 = the 10 listed paths; (b'') git diff --name-only 5e58d04 -- src editor Cargo.toml Cargo.lock mise.toml is empty; byte identity is against 5e58d04. SCHED and FRAMECOST prove sensitivity with in-test control cases per their session-283 plan sections. The serial order SCOPE -> SCHED -> FRAMECOST -> CANVAS-EVIDENCE is unchanged."
     ]
   },
   "plans": [
@@ -320,7 +341,7 @@
         "src/types/tests/scope_cost.rs (registered in src/types/tests/mod.rs): 4k vs 8k unique lets give c8 <= 32000 and c8/c4 <= 2.2; the rebinding-span and shadowing rows pass",
         "src/directives/tests/attach.rs and labels.rs appended rows: top_of equals the reference for nested and hand-built docs; 20,000 targets build with top_of steps <= 2 * targets",
         "Existing types::tests and directives::tests pass unmodified; strict clippy with no new allow/expect; rustfmt check on touched files; wasm32 build; default vitest; outside-sandbox full nextest and npm run test:perf pass",
-        "Mutation runs (linear scans restored) fail the counter tests and are reported separately"
+        "Session 283: mutation sensitivity is satisfied by the existing logs tmp/canvas-cutover/scope/s283-mutation-scope.log, s283-mutation-topof.log, mutation-scope.log and mutation-topof.log, cited in prose only; no mutation command is run"
       ],
       "verification": [
         "CARGO_TERM_QUIET=true cargo build",
@@ -329,15 +350,14 @@
         "rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "cd editor && ./node_modules/.bin/vitest run",
-        "Session 282 (replaces the single-BASE git diff --name-only $BASE row): git diff --name-only 61c9216 c69314d prints exactly the 7 SCOPE paths; git diff --name-only c69314d prints only paths among the 5 acf33e2 test files (all present) and the 4 session-282 checkpoint files; git ls-files --others --exclude-standard prints nothing; git diff --exit-code c69314d -- src/types/scope.rs src/types/tests/mod.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs exits 0",
+        "Session 283 (replaces the session-282 row): git diff --name-only 61c9216 c69314d prints exactly the 7 SCOPE paths; git diff --name-only c69314d 5e58d04 prints exactly the 10 paths listed in the plan's session-283 section; git diff --name-only 5e58d04 -- src editor Cargo.toml Cargo.lock mise.toml prints nothing; git ls-files --others --exclude-standard prints nothing; git diff --exit-code 5e58d04 -- src/types/scope.rs src/types/tests/mod.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs exits 0",
         "git diff --exit-code $BASE -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs (BASE=61c9216)",
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (outside the sandbox; exit 0; a timeout kill is neither pass nor fail)",
         "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)",
         "cd editor && npm run check"
       ],
-      "mutationEvidence": [
-        "Counter tests with the linear Scope.names scans or the linear top_of restored (scratch copy or temporary revert, sha256 recorded): expected nonzero exit; record command, exit code and log path under tmp/canvas-cutover/scope/"
-      ],
+      "mutationEvidence": [],
+      "mutationEvidenceNote": "Session 283: empty by the workflowInput HARD RULE. Historical controls (cite in prose only): tmp/canvas-cutover/scope/s283-mutation-scope.log, s283-mutation-topof.log, mutation-scope.log, mutation-topof.log.",
       "writePaths": [
         "src/types/scope.rs",
         "src/types/check.rs",
@@ -393,9 +413,8 @@
         "git diff --name-only $BASE -- '*.rs' Cargo.toml Cargo.lock (empty)",
         "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)"
       ],
-      "mutationEvidence": [
-        "Tick at m.t restored: the 200-stale-message test fails; revision skip removed: the runCheck-twice test fails. Record command, nonzero exit and log path under tmp/canvas-cutover/sched/"
-      ],
+      "mutationEvidence": [],
+      "mutationEvidenceNote": "Session 283: empty by the workflowInput HARD RULE. Sensitivity is shown by in-test control cases (fixture-sensitivity assertion in the 200-stale-message test, stale-offset contrast in the gap test, edit-then-recheck in the runCheck-twice and 20-edits tests) per the plan's session-283 section.",
       "writePaths": [
         "editor/worklet/host.js",
         "editor/test/protocol/host-js.test.ts",
@@ -450,10 +469,8 @@
         "git diff --name-only $BASE (only this plan's writePaths; no .rs, Cargo.toml or Cargo.lock)",
         "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)"
       ],
-      "mutationEvidence": [
-        "Negative control: cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build, then cd editor && node test/e2e/run.mjs --browser chromium --profile behavior --write-evidence --run-id s277-refusal --out ../tmp/canvas-cutover/framecost/refusal: expected exit 2 with wasm.profile debug and no file written; then rebuild the release dist and rerun the inspect command (exit 0)",
-        "Mutation: restoring isTexture or the per-frame getError fails the gpu animation-only test; restoring per-call segmentation in boundary fails the segmentation assertions"
-      ],
+      "mutationEvidence": [],
+      "mutationEvidenceNote": "Session 283: empty by the workflowInput HARD RULE. The debug refusal is shown by gatingPreflight rows in wasm-profile.test.ts (release accepted; debug, nameless and DWARF refused; non-gating accepted), and the counters by live-fake controls in gpu.test.ts and mount.test.ts, per the plan's session-283 section.",
       "writePaths": [
         "editor/src/code/renderer.ts",
         "editor/src/code/layout.ts",

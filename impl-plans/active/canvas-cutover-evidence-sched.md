@@ -229,3 +229,29 @@ editing it and report. Edit only this plan's progress log.
 ### Session: 2026-10-05 (session 277 plan authoring)
 **Tasks Completed**: Plan authored from design 15.3.8.13 B (as revised for DR-S277-B-TIMEBASE)
 and C. No source edits.
+
+### Session: 2026-10-06 (session 283 amendment: in-test controls replace mutation runs)
+**Hard rule (workflowInput, session 283)**: run no mutation or negative-control command.
+Structured `verification[]` and `priorVerification[]` list only final-source commands that
+exited 0 with positive test counts. Superseded, typo, timed-out or failed attempts never
+appear there. If a gate fails, fix it inside the writePaths, rerun it, and report only the
+final passing run.
+
+The "Mutation evidence" paragraph in Verification and the criterion "Mutation runs recorded
+separately" are replaced by sensitivity controls inside the passing tests. Each control
+asserts both branches in one `it` block:
+- **200-stale-message test (B)**: also assert the fixture sensitivity. The latest posted `t`
+  (9.9) lies below the window floor `(11.0 - 0.5) - tickEvery`, so a tick at `m.t` would fail
+  the window assertion. The actual tick time lies inside the window.
+- **Gap test (B)**: assert both that the tick is exactly 10.6 and that the stale-offset
+  candidate `11.8 - 0.5 = 11.3` differs from it. A host that kept the stale offset would
+  therefore fail.
+- **runCheck-twice test (C)**: after the second `runCheck()` (0 new checks), make one edit
+  and call `runCheck()` again -> exactly 1 new check. That proves the skip keys on the
+  revision and does not disable checking.
+- **20-edits test (C)**: after the single check, one more edit plus 300 ms -> exactly 1
+  more check.
+
+Tick the criterion as "Sensitivity shown by in-test controls (session 283)". Do not edit the
+existing test rows. Everything else in this plan (contracts B and C, writePaths, the
+no-Rust rule and gating commands) is unchanged.

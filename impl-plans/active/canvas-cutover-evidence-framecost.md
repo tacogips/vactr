@@ -391,3 +391,51 @@ editing it and report. Edit only this plan's progress log.
 `CARGO_PROFILE_RELEASE_STRIP=debuginfo` to match the session-282 correction of design
 15.3.8.13 D. Added the artifact-contract pitfall. No other contract, writePath or test row
 changed. Dispatch remains wave 7, after CANVAS-EVIDENCE-SCHED is accepted.
+
+### Session: 2026-10-06 (session 283 amendment: in-test controls replace negative controls)
+**Hard rule (workflowInput, session 283)**: run none of the negative controls 1-3 in the
+Verification section. Do not run the debug-build refusal command (expected exit 2) or any
+mutation. Structured `verification[]` and `priorVerification[]` list only final-source
+commands that exited 0 with positive test counts. If a gate fails, fix it inside the
+writePaths, rerun it, and report only the final passing run.
+
+Replacement sensitivity controls, each with both branches asserted inside one passing test:
+- **Debug refusal (replaces control 1)**: in `editor/test/e2e/wasm-profile.test.ts`, one
+  `it` block builds tiny synthetic modules in a temp dir:
+  - a module with a `name` section and no `.debug_*` sections, whose sha256 matches the
+    passed `releasePath` -> `inspectWasm` gives `profile: "release"` and
+    `gatingRefusal(...) === null`;
+  - a module with a `.debug_info` section, or whose sha256 matches `debugPath` ->
+    `profile: "debug"` and a non-null refusal reason;
+  - a module without a `name` section -> a non-null refusal.
+
+  `run.mjs` has no dist-path flag today (`editor/test/e2e/run.mjs:12-20`), and none is added.
+  Instead, `wasm-profile.mjs` exports
+  `gatingPreflight({ distWasm, releasePath, debugPath, writeEvidence }) -> Promise<{ wasm, refusal: string | null }>`.
+  `run.mjs` calls it before creating the out directory, starting the server or launching a
+  browser. When `refusal` is non-null it prints the reason and exits 2.
+
+  One `it` block calls `gatingPreflight` on temp-dir modules and covers four cases:
+  - release with `writeEvidence: true` -> `refusal === null`;
+  - debug with `writeEvidence: true` -> non-null refusal;
+  - nameless with `writeEvidence: true` -> non-null refusal;
+  - debug with `writeEvidence: false` -> `refusal === null` and `wasm.gating === false`.
+
+  The reviewer confirms by reading `run.mjs` that the preflight call precedes every write,
+  server and browser. `editor/dist` and the committed evidence are never touched by this
+  test.
+- **Restoring the release dist (replaces control 2)**: not needed, because the test uses temp
+  dirs. The gating sequence `mise run build-wasm-release` -> release `npm run build` ->
+  `inspectWasm` stays.
+- **Counters (replaces control 3)**: the gpu.test.ts and mount.test.ts animation-only tests
+  also assert, in the same `it` block, that the counting fakes are live. A text-dirty or
+  restore frame before the animation-only frames records `getError >= 1` (init or upload
+  path). A first shaping of a non-ASCII line records `segmentations >= 1`. A stale-generation
+  command after loss and restore is skipped (0 draws with a deleted texture). The
+  animation-only frames that follow record 0 `isTexture`, 0 `getError` and 0 segmentations.
+  `isTexture` liveness: the counting proxy is asserted to count one direct probe call made
+  by the test itself.
+
+Tick the criterion "negative controls recorded separately" as "Sensitivity shown by in-test
+controls (session 283)". Contracts D and E, writePaths, the gating commands and the no-Rust
+rule are unchanged.

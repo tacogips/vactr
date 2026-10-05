@@ -1386,3 +1386,25 @@ mid).**
   new plans are added to writePaths.
 
 No source, threshold or workload change.
+
+### Session: 2026-10-06 (session 283 amendment: no negative controls; closeout paths)
+**Hard rule (workflowInput, session 283)**: run no mutation, negative-control or
+intentionally failing harness self-test. Rule D's `mutationEvidence` list stays empty in this
+run. Earlier logs may be cited in prose only. Structured `verification[]` and
+`priorVerification[]` list only final-source commands that exited 0 with positive test
+counts. A failed, blocked (exit 2) or timed-out e2e or gate run is fixed and rerun, and only
+the final passing run is reported. Diagnostic `--profile-trace` runs (TASK-504) are not
+gating and are reported in notes with their log paths, never in the structured verification
+fields.
+
+**Closeout scope (TASK-507, concrete paths only; unchanged from the manifest writePaths)**:
+- Move each `impl-plans/active/canvas-editor-224-*.md` (15 files) plus
+  `impl-plans/active/canvas-editor-224-dispatch.json` to the same name under
+  `impl-plans/completed/`, each with a one-line superseded note.
+- Move the 14 `impl-plans/active/canvas-cutover-*.md` plans to `impl-plans/completed/`, each
+  with a completion note.
+- `impl-plans/active/canvas-cutover-dispatch.json` stays in `active/` as the run manifest. It
+  is not a plan and is not in the writePaths.
+- Update `impl-plans/README.md`.
+
+The evidence document, TASK-501 to TASK-507, thresholds and the workload are unchanged.

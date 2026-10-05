@@ -427,3 +427,43 @@ hashes. Pre-edit and post-edit intent records are under `tmp/canvas-cutover/scop
 Implementation gates for this plan are complete. Status stays `In Progress` until the
 downstream test-integrity, adversarial and integration reviews; later review-dependent
 documentation, archive/index updates, commit and push are also downstream workflow steps.
+
+### Session: 2026-10-06 (session 283 resume: re-gate on 5e58d04, no negative controls)
+**Why this amendment**: Commit `5e58d04` changed `src/types/tests/scope_cost.rs` (stricter
+shadowing row: exact `["shadowing@2"]` plus Warning severity). Two session-282 checks
+therefore no longer hold literally: check (b) does not list that file, and
+`git diff --exit-code c69314d -- <the 6 files>` now exits 1. Running them unchanged would put
+a failing command into the gating list. This section replaces checks (b) and the c69314d
+byte-identity check for session 283. Every other session-282 rule stays.
+
+**Hard rule (workflowInput, session 283)**: run no mutation or negative-control command. The
+existing controls are historical evidence. Cite them in prose only, never in `verification[]`
+or `priorVerification[]`: `tmp/canvas-cutover/scope/s283-mutation-scope.log`,
+`s283-mutation-topof.log`, `mutation-scope.log` and `mutation-topof.log`. The completion
+criterion "Mutation runs exit nonzero and are recorded separately" is satisfied by those logs.
+Structured verification lists only final-source commands that exited 0 with positive test
+counts. Superseded, typo, timed-out or failed attempts never appear there. If a gate fails,
+fix it inside the writePaths, rerun it, and report only the final passing run.
+
+**Gating checks on the current HEAD** (the session-283 checkpoint commit on top of `5e58d04`;
+logs go to `tmp/canvas-cutover/scope/s283-gate-*.log`):
+- The Verification-section commands: cargo build, strict clippy, focused nextest
+  `types::tests directives::tests` (184 passed; `--no-capture` shows `c4=16000`, `c8=32000`,
+  `steps=20000`, `targets=20000`), rustfmt check on the 5 listed files, host-wasm wasm32
+  build, default vitest (703 or more passed), `npm run check`.
+- The BASE=`61c9216` gates are unchanged: the allow/expect grep prints nothing, and
+  `git diff --exit-code 61c9216 -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs`
+  exits 0.
+- (a) is unchanged: `git diff --name-only 61c9216 c69314d` prints exactly the 7 SCOPE paths.
+- (b') `git diff --name-only c69314d 5e58d04` prints exactly these 10 paths (author-verified
+  2026-10-06): the 5 acf33e2 test files, the 4 session-282 checkpoint files, and
+  `src/types/tests/scope_cost.rs`.
+- (b'') `git diff --name-only 5e58d04 -- src editor Cargo.toml Cargo.lock mise.toml` prints
+  nothing. Only the session-283 plan checkpoint files may differ from `5e58d04`.
+- (c) `git ls-files --others --exclude-standard` prints nothing.
+- Byte identity: `git diff --exit-code 5e58d04 -- src/types/scope.rs src/types/tests/mod.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`
+  exits 0. Record `git rev-parse HEAD` and the sha256 of each of the 6 files as the new
+  fingerprint. `scope_cost.rs` must be `53a3b90f9be1fd3305c955b290361b1f93f8490c84449e5440384813113eb1f3`.
+- Outside the sandbox: full nextest with `timeout 2400` (exit 0, at least 2816 passed), then
+  `cd editor && npm run test:perf` alone on the host (exit 0).
+- Then the test-integrity, adversarial and integration reviews run.

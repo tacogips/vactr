@@ -7689,6 +7689,114 @@ dedicated Worker. That change needs its own appended amendment (15.3.8.14),
 written before its plan is dispatched. It must also come with deterministic
 tests. Until then, the main-thread tick of section 16 stays the design.
 
+**Session 285 scope record (edit-path repair; resume of session 284).**
+Issue reference: `workflowInput:RESUME-session-284` (resumed as session
+285; findings INT-S284-EV-WEBKIT-PERF and INT-S284-EV-CHROMIUM-TEXTWORK).
+The release-wasm silent run `run-001` fails 9 WebKit gates and Chromium
+`textWorkMs.p95` (18.7 ms against 16.7 ms). The same-run WebKit control
+passes, so these are product defects. This record extends the 15.3.8.10
+bounded edit-path rule to caret scrolling, horizontal scroll bounds and DOM
+geometry reads. It changes no threshold, workload, silent-sink rule,
+dependency, protocol field, `CodeSurface` member or production master
+output stage.
+
+- **Ownership (operator decision 1).** Every other canvas-cutover plan is
+  accepted, so CANVAS-EVIDENCE is the single writing plan for the product
+  and test files that decision 1 lists, in addition to its existing harness,
+  evidence and plan paths. The single-writer and serial rules of 15.3.8.13
+  ("Ownership and order") still apply. No accepted plan is redispatched.
+- **Phase attribution (TASK-508).** The attribution comes first and drives
+  the repair. It uses five exclusive phases, and time spent inside a nested
+  phase counts only for the innermost phase:
+  - *input handling*: the keydown, beforeinput and input handlers, from
+    entry to return, including the surface dispatch and its subscribers;
+  - *scroll/caret*: caret-visibility and scroll-clamp work;
+  - *layout/shaping*: `TextLayout` shaping and cache maintenance, and the
+    syntax-provider spans of the text phase, each reported as its own
+    sub-row;
+  - *renderer upload/draw*: `CanvasRenderer` text upload and render calls;
+  - *scheduler*: the rest of the frame callback, plus the main-thread
+    `session_tick` work in `editor/worklet/host.js`.
+
+  Timings are collected only when the measurement perf hook is enabled
+  (`FrameScheduler` `perf: true`, exposed through `window.__vactrPerf`). They
+  go into bounded rings of at most 4096 rows, like the existing presented
+  and onset rings. With the perf hook disabled, no timing call runs and
+  production behavior does not change. The attribution is diagnostic and
+  never gates. Profile traces are optional and also non-gating. The
+  evidence document records a before/after p95 table per phase for WebKit
+  and Chromium. "Before" is the first attribution run on the current
+  source. "After" is the final passing release-wasm run.
+- **Edit-path invariants (TASK-509).** Each invariant below applies when the
+  attribution shows its cost on the edit path. A cost counts when it is the
+  largest phase in either browser, or when it alone exceeds a gate
+  threshold. The repair repeats (measure, fix, re-measure) until the gates
+  pass.
+  1. *One caret-visibility evaluation per transaction.* A surface
+     transaction that sets the selection evaluates caret visibility at most
+     once. This covers typing, IME commit, paste, keyboard navigation and
+     undo/redo. The `scrollCaret` callbacks from `input.ts` and
+     `keyboard.ts` and the `selectionSet` subscription in `view-host.ts`
+     coalesce into that one evaluation. The evaluation stays synchronous with
+     the transaction, so `coordsAtPos` consumers (the completion popup and
+     the diagnostic tip) see the updated scroll offset. The vertical rule
+     does not change: after the transaction, the caret line lies inside the
+     viewport height minus the keyboard inset. The rule is computed from the
+     caret line index, `font.lineHeight` and `scrollTop`. It reads no DOM
+     geometry and shapes no line.
+  2. *No whole-prefix shaping for the horizontal bound.* The scroll clamp no
+     longer shapes up to 1024 lines. The maximum horizontal scroll uses a
+     widest-shaped-width watermark: the largest `ShapedLine.width` that
+     `TextLayout` has shaped since the last font change, `invalidate()` or
+     document reset. Keeping the watermark costs O(1) per shape. Vertical
+     scrolling into shorter lines does not snap `scrollLeft` back. The
+     watermark can overstate the width after the widest line is shortened.
+     That is accepted, and the watermark resets on document reset.
+  3. *No forced layout per keystroke.* The code element's client rect is
+     cached. The cache is refreshed at most once per frame, at frame start,
+     and on resize (`ResizeObserver`), `visualViewport` resize and scroll,
+     and window scroll. The `viewport` getter and the `coordsAtPos` and
+     `posAtCoords` bridges use the cached rect. A keystroke handler performs
+     no `getBoundingClientRect` read on the code element. Pointer gestures
+     may refresh the cache once on `pointerdown`.
+  4. *Layout cache maintenance proportional to the change.* If attribution
+     shows `TextLayout.setText` cache maintenance on the edit path, the work
+     per transaction is bounded by the changed lines plus the visible range.
+     It does not scan and compare every cached line, and a line insertion
+     does not force reshaping of all cached lines after it.
+  5. *Further dominant costs* found by attribution are fixed in the owning
+     file within the decision-1 list. They are not recorded as limitations.
+- **Proof.** Deterministic counter tests run in jsdom on the mounted
+  20,000-line document, with no wall-clock assertion. They live in
+  `editor/test/canvas/view-host.test.ts` (new) and/or
+  `editor/test/canvas/edit-cost.test.ts`. For one keystroke transaction:
+  - exactly 1 caret-visibility evaluation;
+  - 0 `getBoundingClientRect` reads on the code element inside the handler,
+    and at most 1 per frame;
+  - shaping builds per text-dirty frame of at most the visible lines plus
+    overscan, including Enter at line 10,000 and a caret jump to the end of
+    the document.
+
+  Each test also asserts an in-test control branch (for example a scroll
+  jump that must shape and must read geometry), so that sensitivity is shown
+  inside one passing test. The existing caret-visibility, IME, touch,
+  keyboard-inset, completion-popup and accessibility assertions stay
+  unchanged.
+- **Decision F boundary.** F triggers when both of these hold after the
+  TASK-509 fixes:
+  - WebKit (or Chromium) `syncAbsMs` p95 or p99 still fails;
+  - the scheduler phase or tick lateness shows main-thread work starving
+    `session_tick`.
+
+  F is not designed in this record. The trigger evidence is recorded first.
+  The 15.3.8.14 amendment is then appended before any Worker code is
+  written. The Worker files are reserved now as concrete paths, so that F
+  needs no ownership change:
+  - `editor/worklet/tick-worker.js`;
+  - `editor/test/protocol/tick-worker.test.ts`.
+
+  Neither file is created unless F triggers.
+
 ## 16. Wasm and AudioWorklet Layout
 
 No SharedArrayBuffer, no COOP/COEP (decided). Two instantiations of the

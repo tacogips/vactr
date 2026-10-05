@@ -1,8 +1,8 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: In Progress (session 277: re-measure on the release wasm after CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST; see "Session 277 Amendment")
+**Status**: In Progress (session 285: edit-path phase attribution and repair, silent release-wasm re-measure, closeout; see "Session 285 Amendment")
 **Plan ID**: CANVAS-EVIDENCE (dispatch wave 8 since session 277; depends on the ten accepted canvas-cutover plans and on CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope; "Session 285 scope record" for the edit-path repair)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-05
@@ -1155,6 +1155,480 @@ Integration reviewers return the exact runner envelope `{ "payload": {...}, "whe
   `wasm.dwarf === false`.
 - The silent sink holds in every browser run, including the headed WebKit fallback.
 
+## Session 285 Amendment (operator decisions 1-6; design 15.3.8.13 "Session 285 scope record")
+
+This section supersedes all earlier text where they conflict. That includes:
+
+- the Non-goal "No product-code change";
+- the session-277 rule that `editor/worklet/host.js`, `editor/src/code/diagnostics.ts`,
+  `renderer.ts` and `layout.ts` are not writable here;
+- the manifest non-goal that forbids edits to `editor/src/app/main.ts`.
+
+The session-283 hard rule and the session-284 record format still apply.
+
+### Intent and context
+
+Every other canvas-cutover plan is accepted. They are listed in the manifest
+`acceptedDependencies`, and SCOPE, SCHED and FRAMECOST were moved there at this checkpoint
+(accepted at 2e3361d). Do not redispatch or re-gate them.
+
+The canonical release-wasm silent run
+`cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`
+exits 1 with 10 measurement failures (`tmp/canvas-cutover/evidence/s285-continuation1-release-e2e-canonical.log`):
+
+- **INT-S284-EV-WEBKIT-PERF (high).** WebKit fails these gates:
+  - 162 editing keys (needs at least 500);
+  - input p95/p99 360/377 ms;
+  - animation p99 165 ms;
+  - text p95 178 ms;
+  - frame p95/p99 185/197 ms;
+  - sync p95/p99 62/66 ms.
+
+  The same-run WebKit control passes (642 keys, input 33/35 ms, frames 18/19 ms), so these are
+  product defects. Never relabel them as limitations.
+- **INT-S284-EV-CHROMIUM-TEXTWORK (mid).** Chromium `textWorkMs.p95` is 18.7 ms against the
+  unchanged 16.7 ms threshold.
+
+The source is confirmed by reading, but the cost is not yet measured. Per keystroke,
+`CodeViewHost.keepCaretVisible` (`editor/src/code/view-host.ts:57`) runs twice:
+
+1. from the `selectionSet` subscription (`view-host.ts:29-31`);
+2. from `scrollCaret`, called by `input.ts:169`, `keyboard.ts:99` and `keyboard.ts:110` and
+   wired at `mount.ts:143`.
+
+Each run costs:
+
+- two `getBoundingClientRect` reads: `view-host.ts:58`, plus the `viewport` getter at `:35`
+  through the `coordsAtPos` bridge at `:22`;
+- a `clampScroll` that shapes up to 1024 lines (`view-host.ts:69`).
+
+`TextLayout.setText` (`layout.ts:55-66`) evicts every cached line after an edit whose
+`from`/`to` shifted. An edit in the first 1024 lines therefore makes `clampScroll` reshape them
+all, with `measureText` per run.
+
+The `onFrame` path also reads `viewHost.viewport` (a forced layout read) on every frame
+(`mount.ts:179`, `:200`).
+
+### Ownership (manifest entry `CANVAS-EVIDENCE`, operator decision 1)
+
+writePaths now include every decision-1 product file and test:
+
+- `editor/src/app/{apis,clock,deps,layout,main,song}.ts`;
+- `editor/src/code/{accessibility,atlas,completion-popup,completion-view,completion,diagnostics,eval,frame,highlight,history,input,keyboard,layout,mount,perf-hook,pointer,renderer,resources,surface,sync,syntax-core,syntax,transport,view-host}.ts`;
+- `editor/worklet/host.js` and `editor/worklet/processor.js`;
+- `editor/test/canvas/{view-host (new),edit-cost,frame,gpu,input,mount,clock}.test.ts`;
+- `editor/test/code/{diagnostics,highlight,transport,completion-view}.test.ts`;
+- `editor/test/app/main.test.ts`;
+- `editor/test/protocol/{host-js,worklet-quad}.test.ts`.
+
+The manifest lists each of these as a concrete path. `renderer.ts`, `layout.ts`,
+`gpu.test.ts`, `mount.test.ts` and `diagnostics.test.ts` move from sharedPaths back to
+writePaths.
+
+The closeout adds two writePaths:
+
+- the top-level `README.md`;
+- `tmp/canvas-cutover/framecost/receipt.json`, gitignored, so it is also an artifactRoot.
+
+Reserved for escalation F only, and never created in this run unless TASK-511 triggers and
+design 15.3.8.14 exists:
+
+- `editor/worklet/tick-worker.js`;
+- `editor/test/protocol/tick-worker.test.ts`.
+
+`editor/test/e2e/run.mjs`, `editor/test/e2e/README.md` and the four frozen harness files stay
+sharedPaths. No edit to them is expected.
+
+Do not touch:
+
+- `editor/src/protocol/*`, `editor/src/visual/*` beyond the existing writePaths,
+  `editor/test/support/*`, Rust, `Cargo.*`, `package*.json` or `mise.toml`;
+- `editor/test/e2e/stats.mjs` `THRESHOLDS`;
+- `editor/test/e2e/fixtures/large-doc.mjs` and `editor/test/e2e/silent-sink.mjs`.
+
+### Non-goals
+
+- No threshold, workload, silent-sink, dependency, protocol-field or `CodeSurface` member
+  change.
+- No change to the production master output stage.
+- No Worker, unless TASK-511 triggers, and then only after a design-author 15.3.8.14 amendment.
+- No mutation or negative-control command. Cite historical logs in notes only.
+- No wall-clock assertion outside `npm run test:perf`.
+- No refactoring beyond what TASK-508 and TASK-509 need. Touched TypeScript files stay under
+  1000 lines.
+
+### Log naming
+
+Session 285 was already used as a log prefix by the previous run's continuation (`s285-*`).
+This run writes every log and intent file as `tmp/canvas-cutover/evidence/s285b-<name>.log`
+(or `.json`). Never overwrite an `s285-*` file.
+
+### TASK-508: Phase attribution instrumentation (sandbox; no behavior change)
+
+The perf hook is enabled only under `?perf=1` (`mount.ts:156`). All instrumentation must be
+inert when it is off: no `performance.now()` call, no ring allocation and no global is set.
+
+- **`editor/src/code/frame.ts`.** Export the phase type and timer. Pinned contract:
+
+  ```ts
+  export type PerfPhase = 'input' | 'caret' | 'shaping' | 'syntax' | 'upload' | 'frame' | 'tick';
+  export class PhaseTimer { begin(phase: PerfPhase): void; end(phase: PerfPhase): void; rows(): number[][] }
+  ```
+
+  Mapping to design phases:
+  - scroll/caret = `caret`;
+  - layout/shaping = `shaping` + `syntax` (two sub-rows);
+  - renderer upload/draw = `upload`;
+  - scheduler = `frame` + `tick`.
+
+  Semantics:
+  - `begin` and `end` nest on a stack.
+  - Each phase accumulates exclusive time: the elapsed time minus the time of nested phases.
+  - The outermost `begin` opens a span, and the matching `end` closes it.
+  - When a span closes, one row is written to a preallocated ring of 4096 rows, reusing rows
+    like `PerfRecorder.recordFrame`. The row shape is
+    `[spanKind, startMs, input, caret, shaping, syntax, upload, frame, tick]`, where
+    `spanKind` is the index of the outermost phase.
+  - An `end` that does not match the stack top is a programming error. In tests it throws. It
+    must not corrupt later rows.
+  - `PerfRecorder` gains `readonly phases: PhaseTimer`. `FrameScheduler.perf` is non-null only
+    when `perf: true`, so the timer exists only then.
+  - The frame callback wraps `onFrame` in `begin('frame')`/`end('frame')`.
+- **`editor/src/code/perf-hook.ts`.** Add the member
+  `phases(): { names: PerfPhase[]; rows: number[][] }` (additive; existing members unchanged).
+  It returns ordered copies.
+- **`editor/src/code/keyboard.ts` and `input.ts`.** Add `phases?: PhaseTimer | null` to
+  `KeyboardOptions` (inherited by `InputOptions`). Each top-level DOM handler body wraps
+  `phases?.begin('input')`/`end('input')` in `try/finally`. These are keydown, beforeinput,
+  input, composition and clipboard. `mount.ts` passes `scheduler.perf?.phases ?? null`.
+- **`editor/src/code/view-host.ts`.** `CodeViewHost` takes an optional
+  `phases: PhaseTimer | null`, either as a trailing constructor parameter or a `setPhases`
+  setter (the implementer's choice). It wraps the caret evaluation and `clampScroll` in
+  `caret`.
+- **`editor/src/code/layout.ts`.** Add `TextLayout.phases: PhaseTimer | null = null`. When a
+  cache miss builds a line in `shape()`, wrap the build in `shaping`. A cache hit is not
+  timed.
+- **`editor/src/code/mount.ts`.** In `onFrame`:
+  - wrap `syntaxProvider.spans` in `syntax`;
+  - wrap `renderer.setText`, `renderer.setViewport` and `renderer.render` in `upload`.
+
+  Set `layout.phases` only when perf is on. Set `globalThis.__vactrPhaseTimer = phases` only
+  when perf is on, and delete it on dispose.
+- **`editor/worklet/host.js`.** Around `this.x[this.fn.tick](this.now)`, read
+  `globalThis.__vactrPhaseTimer` once per tick. If it is present, wrap the tick in
+  `begin('tick')`/`end('tick')`. When it is absent, make no timing call. Add the global's
+  optional type to `editor/worklet/host.d.ts` only if `npm run check` needs it; that file is
+  not in writePaths, so prefer a local JSDoc and no type change.
+- **`editor/test/e2e/measure.mjs`** (a writePath since session 274). In each browser's measure
+  pass, read `__vactrPerf.phases()` at the end of the edit and cycle windows and store the raw
+  rows in the `*-measure.jsonl` sample records. Keep the per-file total under 2 MiB: store
+  rows only for the edit window, capped at 4096.
+- **`editor/test/e2e/stats.mjs`.** Add a pure export
+  `phaseSummary(rows) -> { [phase]: { spans, p50, p95, p99, totalMs } }`, computed over the
+  rows where that phase is greater than 0. `summary.json` gets a per-browser `phaseMs` block.
+  It is not gating: no `THRESHOLDS` entry, and it adds nothing to the failure list.
+  `renderEvidence` is unchanged.
+- **Tests:**
+  - `editor/test/canvas/frame.test.ts`, nested exclusive accounting:
+    `begin(input) 0, begin(caret) 2, end(caret) 7, end(input) 10` with a fake `now` ->
+    one row with `input = 5` and `caret = 5`. A mismatched `end` throws and the next span
+    records correctly. After 4097 spans the ring holds 4096 rows and drops the oldest.
+  - `editor/test/canvas/mount.test.ts`, existing "installs no performance hook without the
+    query flag" pattern: without `?perf=1`, `globalThis.__vactrPhaseTimer` is undefined and
+    `layout.phases` is null. With `?perf=1`, one keystroke plus one frame produce rows with
+    `spanKind` `input` and `frame` through `__vactrPerf.phases()`.
+  - `editor/test/protocol/host-js.test.ts`: with no global, a tick makes 0
+    `performance.now` calls (host.js has none today; spy it). With a fake
+    `globalThis.__vactrPhaseTimer` that counts calls, each tick calls `begin('tick')` and
+    `end('tick')` exactly once, and a message that does not tick calls neither. Assert both
+    branches in one test, and delete the global in `afterEach`.
+  - `editor/test/e2e/stats.test.ts`: `phaseSummary` on fixed rows gives the expected p95 per
+    phase, and a phase that is always 0 gives `spans: 0`.
+
+**Before measurement (outside the sandbox, non-gating, diagnostic).** Run it after TASK-508 and
+before any TASK-509 change:
+
+1. `mise run build-wasm-release`
+2. `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`
+3. `cd editor && npm run e2e -- --browser all --profile measure --run-id s285b-before --out ../tmp/canvas-cutover/evidence/s285b-before > ../tmp/canvas-cutover/evidence/s285b-before.log 2>&1`
+
+Exit 1 is expected, because the thresholds still fail. This run never uses `--write-evidence`
+and never appears in `verification[]`; cite it in notes. Record the before p95 per phase per
+browser in the progress log.
+
+If the implementer's environment can run the harness (the session-285 implementer did, see
+its progress log), run this immediately and continue to TASK-509 in the same pass. If it
+cannot bind localhost, stop after TASK-508 with a handoff note naming the three commands. The
+outside step runs them, and the implementer resumes from the recorded numbers.
+
+### TASK-509: Edit-path repair (sandbox; driven by the before table)
+
+Apply design invariants 1-3. They are expected to dominate, but confirm each one against the
+before table and record the phase share it removes. Apply invariant 4, or any further fix
+(invariant 5), only for a phase that is the largest in either browser or that alone exceeds a
+gate threshold after 1-3.
+
+1. **One caret evaluation per transaction** (`view-host.ts`).
+   - Add `readonly stats = { caretEvaluations: 0, rectReads: 0 }` to `CodeViewHost`, imitating
+     `TextLayout.stats` (`layout.ts:24`).
+   - Rewrite `keepCaretVisible` as arithmetic:
+     - `line = state.doc.lineAt(head).number - 1`;
+     - `top = line * lineHeight`, `bottom = top + lineHeight`;
+     - if `top < scrollTop`, set `scrollTop = top`;
+     - otherwise, if `bottom > scrollTop + (height - inset)`, set
+       `scrollTop = bottom - (height - inset)`;
+     - then clamp vertically.
+
+     This is identical to the old rule, because `layout.ts:190` gives
+     `top = view.top + line * lineHeight - scrollTop`. It reads no rect and calls no
+     `coordsAtPos`.
+   - **Authoritative line count (Step 5 finding S5-S285-CARET-COALESCE-STALE-LINECOUNT).**
+     The vertical clamp must read the authoritative line count `surface.state.doc.lines`,
+     never `layout.lineCount`. This applies to both the arithmetic caret rule and the
+     `clampScroll` vertical bound:
+     `maxTop = max(0, surface.state.doc.lines * lineHeight - max(1, height - inset))`.
+     The caret line index comes from `surface.state.doc.lineAt(head)`. The rule and the
+     clamp therefore use the same fresh source, and the result does not depend on subscriber
+     order. That is what makes the coalesced second `scrollCaret` truly redundant. Only
+     `font.lineHeight` is read from `layout`.
+   - Coalesce:
+     - Remember `lastEvaluated = { state, scrollTop, height, inset }` after each evaluation.
+     - `scrollCaret()` returns immediately when `surface.state === lastEvaluated.state` and
+       `scrollTop`, `height` and `inset` are unchanged.
+     - The `selectionSet` subscription keeps evaluating.
+     - A key or navigation that changes nothing, after the user has wheel-scrolled away, must
+       still scroll back. `scrollTop` differs in that case, so the evaluation runs.
+   - `setViewport` still evaluates.
+   - Do not move the evaluation into the frame. It stays synchronous, so the completion popup
+     and the diagnostic tip see the new scroll.
+2. **Horizontal watermark** (`layout.ts`, `view-host.ts`, `mount.ts`).
+   - `TextLayout` gains a private `widest = 0`, `get widestShaped(): number` and
+     `resetWidestShaped(): void`.
+   - Every `shape()` return, hit or build, does `widest = max(widest, line.width)`.
+   - `invalidate()`, `setFont` (through `invalidate`) and `setDocument` reset it.
+   - `mount.ts`'s surface subscriber calls `layout.resetWidestShaped()` when a transaction
+     replaces the whole previous document: exactly one change with `fromA === 0` and
+     `toA === startState.doc.length`. Use `update.changes.iterChanges`, which costs O(changes),
+     never a document read.
+   - `clampScroll` uses `layout.widestShaped` and shapes no line. Keep the existing
+     `+ 48 - width` gutter arithmetic.
+3. **Rect cache** (`view-host.ts`, `mount.ts`).
+   - `CodeViewHost` keeps `rect: { left: number; top: number } | null` and
+     `rectStale = true`.
+   - The `viewport` getter reads `element.getBoundingClientRect()` (incrementing
+     `stats.rectReads`) only when `rectStale` is true. It then caches the rect and clears the
+     flag.
+   - Set `rectStale = true`:
+     - in `setViewport`;
+     - on window `scroll` (capture, passive) and window `resize`, registered through the
+       existing `listen` helper and removed in `dispose`;
+     - in a new `invalidateRect()` that `mount.ts` calls at the start of each text-dirty
+       `onFrame`;
+     - on `pointerdown` on the element, so a gesture maps against a fresh rect.
+   - Animation-only frames reuse the cache. Do not read the rect anywhere else in
+     `view-host.ts`.
+4. **Conditional** (`layout.ts`, only if the after-1-3 measurement shows it):
+   - `setText` cache maintenance iterates `update.changes` instead of every cache entry.
+   - It drops entries for touched lines, and for shifted lines whose `from`/`to` no longer
+     match.
+   - It never compares the text of untouched cached lines.
+   - It keeps the `setText(doc === this.text)` early return.
+5. **Conditional, further costs.** Fix them in the owning decision-1 file with a counter test.
+   Examples: renderer upload or syntax spans, or diagnostics/eval scheduling on the main
+   thread. Record the phase evidence first.
+
+Pitfalls:
+
+- Subscriber order: layout is stale during the caret evaluation.
+  - `CodeViewHost` subscribes to the surface at `mount.ts:140`, before `InputController` at
+    `mount.ts:143`. `CodeSurface.publish` (`surface.ts:95`) calls listeners in insertion
+    order.
+  - The `selectionSet` evaluation therefore runs before `onPresentation -> layout.setText`.
+    Inside it, `layout` text and `layout.lineCount` still describe the previous document.
+  - Nothing in `keepCaretVisible` or the vertical path of `clampScroll` may read layout
+    document state (`lineCount`, `coordsAtPos`, `lineAt`). Use `surface.state` only.
+  - Today this staleness is masked by the second, uncoalesced `scrollCaret` from
+    `input.ts:169`. After coalescing it would leave the caret below the viewport on Enter or a
+    multi-line paste at the end of the document.
+  - Do not "fix" this by reordering the `mount.ts` subscriptions; other subscribers depend on
+    the current order.
+  - The horizontal clamp uses the `widestShaped` watermark, which may lag by one transaction.
+    That is accepted.
+- IME. During composition, the presentation document differs from `surface.state`. The caret
+  rule uses `surface.state.selection.main.head` as today. Do not switch to the presentation
+  doc.
+- `coordsAtPos` still returns `view.top`-relative values from the cached rect. The existing
+  completion-popup and diagnostic-tip tests must pass unchanged.
+- jsdom returns all-zero rects. Tests must not assume a nonzero `top`.
+- Do not add `ResizeObserver` here. `FrameScheduler` already delivers resizes through
+  `setViewport`.
+- Do not remove `scrollCaret` from `KeyboardOptions`. Coalescing makes the extra call free.
+
+Test cases. They are deterministic and use no wall-clock assertion.
+
+The new file `editor/test/canvas/view-host.test.ts` builds a unit rig:
+
+- `CodeSurface` with a 20,000-line document (lines as in `edit-cost.test.ts:14`);
+- `TextLayout` with a fake `measureText` (`width = length * 8`);
+- `CodeViewHost` on a jsdom element with a fake `FrameHost`, and `setViewport({ width: 800, height: 600, dpr: 1, keyboardInset: 0 })`;
+- `InputController` wired with `scrollCaret: () => viewHost.scrollCaret()`, as in `mount.ts:143`;
+- production wiring order is required:
+  - call `layout.setText(surface.state.doc)` at rig start;
+  - construct `CodeViewHost` first;
+  - then construct `InputController` with
+    `onPresentation: (p) => layout.setText(p.doc)` and
+    `scrollCaret: () => viewHost.scrollCaret()`.
+
+  This makes the layout stale inside the `selectionSet` evaluation exactly as in production.
+
+The rows:
+
+- one `beforeinput insertText` at line 10,000 -> `stats.caretEvaluations` grows by exactly 1;
+  a spied `element.getBoundingClientRect` is called 0 times inside the handler; and
+  `layout.stats.builds` grows by at most the visible lines plus 2 (no 1024-line shaping);
+- Enter (`beforeinput insertLineBreak`) at line 10,000, and a
+  `surface.dispatch({ selection: { anchor: doc.length } })` jump to the document end -> each
+  grows `caretEvaluations` by 1, and the caret line lies within
+  `[scrollTop, scrollTop + height - inset]`;
+- end of the document. Use a 200-line document in a viewport of height 600 with `lineHeight`
+  20, so the document is taller than the viewport. Put the caret at the end of the last line
+  and scroll to the bottom (`scrollTop` 3400).
+  - `beforeinput insertLineBreak` -> `stats.caretEvaluations` grows by exactly 1, and the
+    caret line lies within `[scrollTop, scrollTop + height - inset]` (expected `scrollTop`
+    3420).
+  - Separately, from the same starting state, paste 5 lines through
+    `input.replaceSelection('a\nb\nc\nd\ne')` -> `caretEvaluations` grows by exactly 1, and
+    the caret line is visible (expected `scrollTop` 3480).
+  - These rows fail if the vertical clamp reads the stale `layout.lineCount`;
+- control branch, in the same test: with the caret on line 1, `viewHost.scrollBy(0, 5000)`,
+  then `viewHost.scrollCaret()` with an unchanged state -> exactly 1 evaluation that scrolls
+  back to `scrollTop === 0`. A second `scrollCaret()` -> 0 evaluations. After
+  `invalidateRect()`, one `viewport` access -> exactly 1 rect read, and a second access -> 0;
+- watermark: shape a 400-column line, then scroll vertically to short lines -> `scrollLeft` is
+  not clamped below its previous value. `resetWidestShaped()` -> `widestShaped === 0`;
+- keyboard inset 300 -> the caret stays above the inset, matching the old rule's expectation in
+  the existing input/mount tests.
+
+Additions to `editor/test/canvas/mount.test.ts`, using the existing `setup(perf, withGl)` rig:
+
+- a 20,000-line document, one keystroke, then `rig.host.step` -> the text-dirty frame makes at
+  most 1 `getBoundingClientRect` call on the code host element (spy the prototype and filter
+  on `this`);
+- a `TextLayout.prototype.shape` build-count spy is at most
+  `3 * ceil(viewHeight / lineHeight) + 2`, the mount overscan window at `mount.ts:180-181`;
+- an animation-only frame -> 0 rect reads.
+
+`editor/test/canvas/edit-cost.test.ts` needs no change unless invariant 4 lands. In that case,
+add a row: one keystroke with N cached lines does at most (changed lines + 2) cache
+evictions.
+
+Existing caret, IME, touch, keyboard-inset, completion-popup, diagnostics and accessibility
+assertions are not modified. Any test that relied on two evaluations may be updated only to
+the new count, with the reason recorded.
+
+### TASK-510: Measure -> fix -> re-measure (outside the sandbox, then gating)
+
+After each TASK-509 round:
+
+1. `mise run build-wasm-release`
+2. `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`
+3. a non-gating attribution run:
+   `cd editor && npm run e2e -- --browser all --profile measure --run-id s285b-after-<n> --out ../tmp/canvas-cutover/evidence/s285b-after-<n>`
+
+Repeat until every gate metric passes in both browsers. Then run the canonical gating command
+`cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001 > ../tmp/canvas-cutover/evidence/s285b-e2e-run-001.log 2>&1`.
+It must exit 0. In both browsers, `summary.json` must show:
+
+- sink installed before the first connect;
+- 0 direct destination connections;
+- post-sink peak exactly 0;
+- numeric pre-sink peak dBFS, RMS and onsets;
+- `wasm.profile === "release"`, `nameSection === true` and `dwarf === false`.
+
+The "after" phase table is that run's `phaseMs`.
+
+### TASK-511: Escalation F check (replaces TASK-504 for this run)
+
+F triggers only when both of these hold after the TASK-509 fixes:
+
+- `syncAbsMs` p95 or p99 still fails in WebKit or Chromium;
+- the attribution shows main-thread starvation of `session_tick`. That means `tick` spans are
+  delayed behind long `input`, `frame` or `upload` spans: tick `startMs` gaps above the 120 ms
+  lookahead overlap spans longer than 50 ms.
+
+If F triggers:
+
+- record the failing metric, the overlapping spans (start, duration, kind) and the log paths in
+  the progress log and the triage table;
+- create no Worker file and stop. A design author must append 15.3.8.14 and checkpoint before
+  `editor/worklet/tick-worker.js` or `editor/test/protocol/tick-worker.test.ts` is created.
+
+If either condition is false, record "F not triggered" with the evidence.
+
+### TASK-512: Evidence document (sandbox)
+
+In `design-docs/specs/design-canvas-editor-evidence.md`, outside the harness marker section:
+
+- Add a static section "Edit-path phase attribution (session 285)": a table with rows
+  input, caret (scroll/caret), shaping, syntax, upload, frame and tick (scheduler). It has
+  before and after p95 columns for WebKit and Chromium, with the source paths
+  `tmp/canvas-cutover/evidence/s285b-before/` and `run-001/summary.json`.
+- Update the WebKit and Chromium triage rows. Remove the "outside this plan's writePaths"
+  wording, and name the fixed cause with its file and test.
+- Keep the silent-sink method and the pending physical-iPad procedures unchanged.
+
+### TASK-513: Final gates and simulator (outside the sandbox, serial)
+
+Run the Verification and final-gate tables below in order, release build first. Run the iOS
+simulator build and `ios-sim.mjs` after the release `npm run build`. `ios-sim.json` must show
+`selfCheck.playingEvents === 0`, `silent === true` and `pass === true`.
+
+Use the session-284 record format for every `verification[]` element.
+
+### TASK-507 additions (closeout, serial, after the final integration review accepts)
+
+Fresh-read and record sha256 before each edit, in `tmp/canvas-cutover/evidence/s285b-closeout-intent.json`.
+
+1. **`impl-plans/active/canvas-cutover-evidence-scope.md:483` and `:530`.** Replace
+   `fea4d7b7eee01383218e29c3b250ded35` with `fea4d4b7eee01383218e29c3b250ded35`, to match line
+   260. First confirm that `shasum -a 256 src/directives/tests/labels.rs` prints
+   `e11a8bc9a6c8f7c17963e0dde204b46fea4d4b7eee01383218e29c3b250ded35`. If it prints something
+   else, record the actual value and do not edit.
+2. **`tmp/canvas-cutover/framecost/receipt.json`.** Set `"editor/vite.config.ts"` to the
+   output of `shasum -a 256 editor/vite.config.ts`. It currently records `2b12445f...`.
+   Change only that value.
+3. **`README.md:210-214`.** State that `VACTR_WASM` overrides the artifact path and that the
+   defaults differ by consumer:
+   - the vite page build (`npm run dev` and `npm run build`) defaults to
+     `target/wasm32-unknown-unknown/release/vactr.wasm`, built by `mise run build-wasm-release`;
+   - the vitest real-wasm suites default to `target/wasm32-unknown-unknown/debug/vactr.wasm`.
+
+   Keep the `--lib` stub warning. Add `mise run build-wasm-release` to the code block above it.
+   Change nothing else in `README.md`.
+4. **Archive.** As TASK-507 and the session-283 closeout scope:
+   - `git mv` the 14 `impl-plans/active/canvas-cutover-*.md` plans to `impl-plans/completed/`,
+     each with `Status: Completed`;
+   - `git mv` the 15 `impl-plans/active/canvas-editor-224-*.md` plans and
+     `impl-plans/active/canvas-editor-224-dispatch.json`, each with a one-line superseded
+     note;
+   - make the typo fix of item 1 before moving `canvas-cutover-evidence-scope.md`.
+
+   `impl-plans/active/canvas-cutover-dispatch.json` stays in `active/` (session-283 decision:
+   it is the run manifest, not a plan). It is not moved.
+5. Update `impl-plans/README.md`. Append the 15.3.8.4 clock-probe erratum to
+   `design-docs/specs/design-implementation.md`, at the end of 15.3.8.4 only.
+6. Commit, then `git push origin wf/canvas` (non-force).
+
+### Session 285 checklist (mechanical)
+
+- `git diff 2e3361d -- editor/test/e2e/stats.mjs` shows no change inside `THRESHOLDS`.
+- `git diff 2e3361d -- editor/test/e2e/fixtures/large-doc.mjs editor/test/e2e/silent-sink.mjs editor/package.json editor/package-lock.json Cargo.toml Cargo.lock mise.toml`
+  is empty.
+- `git diff 2e3361d --name-only -- src editor/src-tauri` is empty.
+- `git status --porcelain editor/worklet/tick-worker.js editor/test/protocol/tick-worker.test.ts`
+  is empty unless TASK-511 triggered and 15.3.8.14 exists.
+- `wc -l` on every touched `.ts` file is under 1000.
+
 ## Verification
 
 Inside the sandbox:
@@ -1177,6 +1651,15 @@ Outside the sandbox (verification and review step; logs in `tmp/canvas-cutover/e
 | `tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim` (debug, unsigned; cwd and flags as in `canvas-cutover-shell.md`), then `git status --porcelain editor/src-tauri` | exit 0; the `Vactr.app/Vactr` mtime is later than the build start; no tracked change is kept |
 | `node editor/test/e2e/ios-sim.mjs --app editor/src-tauri/gen/apple/build/arm64-sim/Vactr.app --device "iPad Pro 11-inch (M5)" > tmp/canvas-cutover/evidence/s271b-ios-sim.log 2>&1` | exit 0; `ios-sim.json` has a non-null `selfCheck` from a Vactr-process line, `playingEvents === 0`, `silent === true`, `pass === true` and `appBinary.mtimeIso` |
 | Diagnostic, not gating: `cd editor && npm run e2e -- --browser chromium --profile measure --profile-trace --run-id s274-trace --out ../tmp/canvas-cutover/evidence/s274-trace` | writes `tmp/canvas-cutover/evidence/s271b-trace-chromium-{edit,cycle}.json`; the top-10 `rankSelfTime` output is recorded in the progress log |
+| Session 285, diagnostic, not gating: `cd editor && npm run e2e -- --browser all --profile measure --run-id s285b-before --out ../tmp/canvas-cutover/evidence/s285b-before` (after TASK-508, before TASK-509) and `... --run-id s285b-after-<n> --out ../tmp/canvas-cutover/evidence/s285b-after-<n>` | `phaseMs` per browser in the run summary; exit 1 is allowed; cited in notes only, never in `verification[]` |
+
+Session 285 sandbox rows (added; the rows above still apply):
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cd editor && ./node_modules/.bin/vitest run test/canvas/view-host.test.ts test/canvas/frame.test.ts test/canvas/mount.test.ts test/canvas/edit-cost.test.ts test/canvas/input.test.ts test/protocol/host-js.test.ts test/e2e/stats.test.ts` | exit 0; the TASK-508 and TASK-509 rows pass |
+| `cd editor && ./node_modules/.bin/vitest run test/code/completion-view.test.ts test/code/diagnostics.test.ts test/code/highlight.test.ts test/app/main.test.ts test/protocol/worklet-quad.test.ts test/canvas/gpu.test.ts test/canvas/clock.test.ts` | exit 0 (unchanged assertions) |
+| `git diff --check` | exit 0 |
 
 Final gates on the closeout commit (design 15.3.8.9):
 
@@ -1231,6 +1714,14 @@ only this plan's progress log and the plan files being archived.
 - [x] Session 277 TASK-504: F trigger evaluated and recorded; available Chromium trace shows no long-task overlap with late onsets, so no 15.3.8.14 amendment is triggered (`s285-profile-trace-chromium.log`)
 - [x] Session 277 TASK-505: evidence document has the "Measurement build" paragraph, current triage table and superseded-debug note
 - [x] Session 277 TASK-506 simulator portion: unsigned simulator build and silent self-check passed (`s285-ios-simulator-build-retry2.log`, `s285-ios-simulator-run.log`); final gates and TASK-507 remain downstream closeout work
+- [ ] Session 285 TASK-508: `PhaseTimer`/`PerfPhase` in `frame.ts`, `__vactrPerf.phases()`, input/caret/shaping/syntax/upload/frame/tick spans, `phaseSummary` and `phaseMs` in `summary.json`. Everything is inert without `?perf=1`. The frame, mount, host-js and stats rows pass.
+- [ ] Session 285 before table: the `s285b-before` p95 per phase for WebKit and Chromium is recorded in the progress log, with its log path.
+- [ ] Session 285 TASK-509: one caret evaluation per transaction (arithmetic over `surface.state.doc.lines`/`lineAt`, never `layout.lineCount`; no rect; no shaping), including Enter and a multi-line paste at document end, with the caret visible in the production-order rig; the `widestShaped` watermark replaces the 1024-line clamp shaping; the rect cache gives 0 reads in keystroke handlers and at most 1 per text-dirty frame. `view-host.test.ts` (new) and the `mount.test.ts` counter rows pass, each with an in-test control branch. Invariant 4 and invariant 5 fixes are recorded with their phase evidence, or recorded as not needed.
+- [ ] Session 285 TASK-510: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exits 0 on the release wasm. In both browsers, post-sink peak is 0 and the sink assertions hold. WebKit has at least 500 edit keys and input, animation, text, frame and sync are within threshold; Chromium `textWorkMs.p95` is at most 16.7. Thresholds and workload are unchanged.
+- [ ] Session 285 TASK-511: F evaluated and recorded. If F triggers, the plan stops for design 15.3.8.14, and no Worker file exists.
+- [ ] Session 285 TASK-512: the evidence document has the "Edit-path phase attribution (session 285)" before/after p95 table for both browsers, and updated triage rows.
+- [ ] Session 285 TASK-513: final gates and the silent simulator run pass. Every `verification[]` record has `exitStatus: 0` and `outcome: "passed"`, and test records also have `testsRun > 0` and `failureCount: 0`, with a log path.
+- [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
 ## Progress Log
 
@@ -1429,3 +1920,30 @@ The evidence document, TASK-501 to TASK-507, thresholds and the workload are unc
 - Continuation checks on the final source: focused highlight/e2e Vitest 45/45 (`s285-continuation1-focused.log`); full Vitest 722/722 (`s285-continuation1-vitest-full-final.log`); serial `npm run test:perf` 1/1, ratio 2.74 (`s285-continuation1-test-perf.log`); `npm run check` exit 0 (`s285-continuation1-check.log`); Node syntax check exit 0 (`s285-continuation1-node.log`); `git diff --check HEAD` exit 0 (`s285-continuation1-diff-check-final.log`). The canonical browser gate remains failed as detailed above.
 
 **Implementation blocker**: The required WebKit performance and A/V gates still fail against a passing same-run control, but no available WebKit trace localizes the product cost to an authorized seam. The suspected `editor/src/code/view-host.ts` path is outside this plan's writePaths and is not yet confirmed. Resume only after a serial plan-author amendment adds the confirmed owner, its regression test and the exact verification paths; then repair the product defect and rerun the canonical browser gate without changing thresholds or workload.
+
+### Session: 2026-10-06 (session 285 plan amendment, resume of 284)
+**Tasks Completed**: Applied operator decisions 1-6 and the design 15.3.8.13 "Session 285
+scope record".
+
+- This plan:
+  - added the "Session 285 Amendment" with TASK-508 to TASK-513 and the TASK-507 additions;
+  - added the session-285 sandbox verification rows and the non-gating attribution rows;
+  - added Session 285 Completion Criteria;
+  - adopted the `s285b-` log prefix, so the earlier `s285-*` logs are never overwritten.
+- Manifest `impl-plans/active/canvas-cutover-dispatch.json`:
+  - CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST move from `plans` to
+    `acceptedDependencies` (commit 2e3361d). `plans` lists only CANVAS-EVIDENCE.
+  - CANVAS-EVIDENCE writePaths gain the decision-1 product and test files that were missing,
+    and these move back from sharedPaths: `renderer.ts`, `layout.ts`, `gpu.test.ts`,
+    `mount.test.ts` and `diagnostics.test.ts`.
+  - writePaths also gain the closeout paths `README.md` and
+    `tmp/canvas-cutover/framecost/receipt.json` (also an artifactRoot), and the reserved F
+    paths `editor/worklet/tick-worker.js` and `editor/test/protocol/tick-worker.test.ts`.
+  - Also updated: the seamProtocol, verification, diagnostics, acceptance criteria,
+    `resume.session285`, `executionModel.rules`, `reviewContext` and
+    `designDocSections`.
+- Closeout decision: `canvas-cutover-dispatch.json` stays in `impl-plans/active/`, as the
+  session-283 closeout scope decided and as operator decision 6 lists. The intake signal that
+  also moves it is not adopted, because the runtime reads the manifest during this run.
+
+No source, threshold or workload change.

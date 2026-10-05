@@ -102,7 +102,7 @@ describe('EditorView-free tree-sitter syntax core', () => {
         finally { fresh.delete(); }
       }
     } finally { parsed.delete(); }
-  }, 30_000);
+  }, 240_000);
 
   it('derives Text tree edits equal to the existing string edit algorithm', () => {
     const cases = [

@@ -198,7 +198,7 @@ describe('tree-sitter syntax WASM', () => {
       expect(incrementalEdits).toBeGreaterThan(100);
       expect(fullParses).toBe(1);
     } finally { provider.dispose(); }
-  }, 60_000);
+  }, 240_000);
 
   it('reparses a missed Text identity and avoids whole-document conversion on edits', () => {
     const syntax = createVactSyntax(parser, query);

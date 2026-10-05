@@ -15,6 +15,10 @@ import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 import { CanvasRenderer } from '../../src/code/renderer';
+import { startFrameLoop } from '../../src/visual/frame';
+import { WasmCore } from '../../src/protocol/wasm';
+import { VactrHost } from '../../worklet/host.js';
+import { FakeCore, fakeNode } from '../support/fake-core';
 
 interface RafHost {
   requestAnimationFrame(cb: FrameRequestCallback): number;
@@ -58,7 +62,7 @@ function rendererGL(): WebGL2RenderingContext {
 
 interface Rig { root: HTMLElement; code: HTMLElement; deps: EditorDeps; mounted: ReturnType<typeof mount>; transport: RecordingTransport; fakes: CanvasFakes; host: RafHost; gl?: WebGL2RenderingContext }
 const rigs: Rig[] = [];
-function setup(perf = false, withGl = false, audible?: AudibleClock): Rig {
+function setup(perf = false, withGl = false, audible?: AudibleClock, core?: WasmCore): Rig {
   const gl = withGl ? rendererGL() : undefined;
   const fakes = installCanvasFakes(withGl ? { webgl2: () => gl! } : {});
   const context = fakes.ctx(document.createElement('canvas')) as unknown as Record<string, unknown>;
@@ -68,7 +72,7 @@ function setup(perf = false, withGl = false, audible?: AudibleClock): Rig {
   });
   const root = document.createElement('div'); document.body.append(root);
   const layout = buildLayout(root); const store = new Store(); const transport = new RecordingTransport();
-  const deps: EditorDeps = { client: new Client(transport, { store }), store, clock: new MockClock(), tier: 'browser', files: new MemoryFiles(), ...(audible ? { audible } : {}) };
+  const deps: EditorDeps = { client: new Client(transport, { store }), store, clock: new MockClock(), tier: 'browser', files: new MemoryFiles(), ...(audible ? { audible } : {}), ...(core ? { core } : {}) };
   const host = rafHost();
   if (perf) window.history.replaceState({}, '', '?perf=1');
   const mounted = mount(root, deps, { frameHost: host, ...(gl ? { gl } : {}) });
@@ -166,6 +170,42 @@ describe('headless canvas mount', () => {
     expect(sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024)).toBe(false);
     expect(perf.counters().renderer.textBuilds).toBe(builds);
     expect(editHadLargeSlice).toBe(false);
+  });
+
+  it('keeps each animation-only ABI frame bounded and free of layout and GL probes', () => {
+    vi.useFakeTimers();
+    const fake = new FakeCore(); const core = new WasmCore();
+    core.attach(new VactrHost(null, fakeNode(), fake.exports, { wasmUrl: '', processorUrl: '', init: 'session', onRecord: core.onRecord }));
+    const rig = setup(true, true, undefined, core); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    const surface = rig.deps.code!.surface, renderer = perf.counters().renderer, gl = rig.gl!;
+    const isTexture = vi.spyOn(gl, 'isTexture'), getError = vi.spyOn(gl, 'getError');
+    const segment = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+    const largeText = `const 日本 = "👨‍👩‍👧‍👦";\n${Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`).join('\n')}`;
+    surface.dispatch({ changes: { from: 0, insert: largeText } }); rig.host.step(16);
+    expect(getError).toHaveBeenCalled(); expect(segment).toHaveBeenCalled();
+    rig.transport.emit({ kind: 'playing', body: { events: [{ slot: 'd1', beat: [0, 1], time: 0, end_time: 100,
+      dur: [1, 1], src: { file: 'main.vact', span: { start: 0, end: 5 }, doc_revision: rig.deps.code!.currentRevision('main.vact'), form_gen: 1 } }] } });
+    rig.host.step(32);
+    gl.isTexture({} as WebGLTexture); gl.getError();
+    expect(isTexture).toHaveBeenCalledTimes(1); expect(getError).toHaveBeenCalled();
+    isTexture.mockClear(); getError.mockClear(); segment.mockClear();
+    fake.calls.length = 0;
+    const loop = startFrameLoop({ core, host: { draw() {} }, clock: rig.deps.clock,
+      scheduler: { request: cb => rig.host.requestAnimationFrame(cb), cancel: id => rig.host.cancelAnimationFrame(id) } });
+    const runRegistered = (time: number): void => {
+      const registered = [...rig.host.callbacks.entries()];
+      for (const [id, callback] of registered) if (rig.host.callbacks.delete(id)) callback(time);
+    };
+    const builds = renderer.textBuilds;
+    for (let frame = 0; frame < 10; frame++) runRegistered(48 + frame * 16);
+    loop.dispose();
+    expect(fake.callsOf('session_frame')).toHaveLength(10);
+    expect(fake.callsOf('session_check')).toHaveLength(0);
+    expect(fake.calls.every(call => !call.text || new TextEncoder().encode(call.text).byteLength <= 64 * 1024)).toBe(true);
+    expect(fake.calls.every(call => !call.bytes || call.bytes.byteLength <= 64 * 1024)).toBe(true);
+    expect(fake.calls.every(call => call.args.every(arg => typeof arg !== 'number' || arg <= 64 * 1024))).toBe(true);
+    expect(isTexture).not.toHaveBeenCalled(); expect(getError).not.toHaveBeenCalled(); expect(segment).not.toHaveBeenCalled();
+    expect(renderer.textBuilds).toBe(builds);
   });
 
   it('keeps syntax annotations stable across playing frames and recomputes them after wheel scrolling', () => {

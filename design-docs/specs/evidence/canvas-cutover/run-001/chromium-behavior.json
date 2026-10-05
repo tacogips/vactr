@@ -48,7 +48,7 @@
     {
       "id": "background-no-replay",
       "pass": true,
-      "detail": "frames hidden=114, resumed=124"
+      "detail": "frames hidden=76, resumed=86"
     },
     {
       "id": "dispose-ledger",
@@ -56,7 +56,5 @@
       "detail": "usedBytes=0"
     }
   ],
-  "limitations": [
-    "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
-  ]
+  "limitations": []
 }

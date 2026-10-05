@@ -2,6 +2,7 @@
   "runId": "run-001",
   "commands": [
     "cd editor && npm run e2e -- --browser all --profile all --run-id run-001 --write-evidence",
+    "mise run build-wasm-release",
     "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
   ],
   "browsers": [
@@ -61,7 +62,7 @@
         {
           "id": "background-no-replay",
           "pass": true,
-          "detail": "frames hidden=114, resumed=124"
+          "detail": "frames hidden=76, resumed=86"
         },
         {
           "id": "dispose-ledger",
@@ -69,44 +70,42 @@
           "detail": "usedBytes=0"
         }
       ],
-      "limitations": [
-        "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
-      ],
+      "limitations": [],
       "metrics": {
         "inputLatencyMs": {
-          "p95": 93.30000002383895,
-          "p99": 438.39999998807616
+          "p95": 31.400000011919474,
+          "p99": 46.60000002384186
         },
         "animationWorkMs": {
-          "p50": 7.600000023841858,
-          "p95": 11.100000023841858,
-          "p99": 17.5
+          "p50": 0.7000000476837158,
+          "p95": 1.199999988079071,
+          "p99": 1.399999976158142
         },
         "textWorkMs": {
-          "p95": 48.89999997615814
+          "p95": 18.700000047683716
         },
         "frameIntervalMs": {
-          "p95": 133.79999999998836,
-          "p99": 150.8000000000029
+          "p95": 18.299999999999272,
+          "p99": 18.60000000000582
         },
         "syncProvenance": "measured",
         "syncAbsMs": {
-          "p95": null,
-          "p99": null
+          "p95": 16.89800003576238,
+          "p99": 16.89800003576238
         },
         "earlyFlashCount": 0,
         "replayedFlashCount": 0,
-        "syncWindowStart": null,
-        "syncWindowEnd": null,
-        "syncWindowOnsets": 0,
-        "syncFramePairs": 0,
-        "syncExcludedFrames": 2843,
-        "ledgerMaxBytes": 8655274,
+        "syncWindowStart": 13.562580963558313,
+        "syncWindowEnd": 29,
+        "syncWindowOnsets": 960,
+        "syncFramePairs": 56128,
+        "syncExcludedFrames": 7314,
+        "ledgerMaxBytes": 13738510,
         "ledgerCounters": {
-          "usedBytes": 8655274,
+          "usedBytes": 13738510,
           "byKind": {
-            "atlas": 5034172,
-            "geometry": 67158,
+            "atlas": 10071076,
+            "geometry": 113490,
             "canvas": 2632344,
             "backdrop": 921600,
             "visualText": 0,
@@ -118,25 +117,25 @@
           "visualTargets": 0,
           "refusals": 0
         },
-        "heapGrowthBytes": -2270696,
-        "beatDriftMs": null,
-        "peakPlayingRanges": 0,
+        "heapGrowthBytes": -1122772,
+        "beatDriftMs": 0.08333333332188886,
+        "peakPlayingRanges": 64,
         "audioRunning": true,
-        "onsetCount": 0,
-        "controlOnsetCount": 64,
+        "onsetCount": 1472,
+        "controlOnsetCount": 192,
         "controlStartMethod": "toolbar-click",
         "runStartMethod": "toolbar-click",
-        "largeDocumentStartStatus": "toolbar-click-timeout",
-        "onsetAttribution": "product/full-document startup failure: proven toolbar click timed out on the large document",
+        "largeDocumentStartStatus": "toolbar-click-returned",
+        "onsetAttribution": "active-workload-onsets-observed",
         "workletCounters": "not exposed",
         "probe": null,
         "highlight": {
-          "received": 14336,
-          "accepted": 3840,
+          "received": 13504,
+          "accepted": 1664,
           "overflow": 0,
           "horizonDrops": 0,
           "epochDrops": 0,
-          "unmapped": 10496
+          "unmapped": 11840
         },
         "client": {
           "telemetryQueued": 0,
@@ -144,20 +143,20 @@
           "coalesced": 0,
           "pendingRequests": 0
         },
-        "frameCount": 2842,
-        "keyCount": 151,
-        "editKeyCount": 99,
-        "editPairedKeyCount": 10,
-        "inputSamplesUsed": 36,
-        "inputKeysNonEditing": 115,
+        "frameCount": 8192,
+        "keyCount": 678,
+        "editKeyCount": 551,
+        "editPairedKeyCount": 108,
+        "inputSamplesUsed": 133,
+        "inputKeysNonEditing": 513,
         "inputKeysExpired": 0,
-        "inputKeysUnpaired": 0,
-        "editPairedSamples": 10,
-        "editNonEditingKeys": 99,
+        "inputKeysUnpaired": 32,
+        "editPairedSamples": 108,
+        "editNonEditingKeys": 498,
         "editExpiredKeys": 0,
         "editUnpairedKeys": 0,
-        "workSamples": 2842,
-        "startedAt": "2026-10-05T12:34:06.387Z",
+        "workSamples": 8192,
+        "startedAt": "2026-10-05T20:49:56.161Z",
         "controlSink": {
           "installed": true,
           "installedBeforeFirstConnect": true,
@@ -168,13 +167,13 @@
           "violations": [],
           "suspendedOnViolation": false,
           "pre": {
-            "peak": 0.11190372705459595,
-            "peakDbfs": -19.023108973223998,
-            "rms": 0.015141242398252253,
-            "rmsDbfs": -36.39676975620651,
+            "peak": 0.22380739450454712,
+            "peakDbfs": -13.002511373180266,
+            "rms": 0.019215435212832765,
+            "rmsDbfs": -34.326995493947116,
             "onsetCount": 1,
             "onsetTimes": [
-              2.4896666666666665
+              4.020333333333333
             ]
           },
           "post": {
@@ -191,14 +190,15 @@
           "violations": [],
           "suspendedOnViolation": false,
           "pre": {
-            "peak": 0.22316671907901764,
-            "peakDbfs": -13.02741142748717,
-            "rms": 0.020793680197053903,
-            "rmsDbfs": -33.64137279362381,
-            "onsetCount": 2,
+            "peak": 0.22380739450454712,
+            "peakDbfs": -13.002511373180266,
+            "rms": 0.028923098904252396,
+            "rmsDbfs": -30.775103546418908,
+            "onsetCount": 3,
             "onsetTimes": [
-              2.4896666666666665,
-              22.503
+              4.020333333333333,
+              8.020333333333333,
+              9.013
             ]
           },
           "post": {
@@ -207,15 +207,15 @@
         },
         "hushQuiet": true,
         "hushQuietMs": 1038,
-        "largeRunClickMs": 8936.399999976158,
-        "largeRunCtxTime": 8.645333333333333,
-        "workloadOnsetCount": 3712,
+        "largeRunClickMs": 5977.5,
+        "largeRunCtxTime": 5.8933333333333335,
+        "workloadOnsetCount": 1472,
         "workloadOnsetsExcludedBaseline": 0,
-        "workloadOnsetsExcludedPreClick": 128,
-        "sinkOnsetsTotal": 2,
+        "workloadOnsetsExcludedPreClick": 192,
+        "sinkOnsetsTotal": 3,
         "sinkOnsetSplit": {
           "control": 1,
-          "workload": 1
+          "workload": 2
         },
         "sink": {
           "control": {
@@ -228,13 +228,13 @@
             "violations": [],
             "suspendedOnViolation": false,
             "pre": {
-              "peak": 0.11190372705459595,
-              "peakDbfs": -19.023108973223998,
-              "rms": 0.015141242398252253,
-              "rmsDbfs": -36.39676975620651,
+              "peak": 0.22380739450454712,
+              "peakDbfs": -13.002511373180266,
+              "rms": 0.019215435212832765,
+              "rmsDbfs": -34.326995493947116,
               "onsetCount": 1,
               "onsetTimes": [
-                2.4896666666666665
+                4.020333333333333
               ]
             },
             "post": {
@@ -251,14 +251,15 @@
             "violations": [],
             "suspendedOnViolation": false,
             "pre": {
-              "peak": 0.22316671907901764,
-              "peakDbfs": -13.02741142748717,
-              "rms": 0.020793680197053903,
-              "rmsDbfs": -33.64137279362381,
-              "onsetCount": 2,
+              "peak": 0.22380739450454712,
+              "peakDbfs": -13.002511373180266,
+              "rms": 0.028923098904252396,
+              "rmsDbfs": -30.775103546418908,
+              "onsetCount": 3,
               "onsetTimes": [
-                2.4896666666666665,
-                22.503
+                4.020333333333333,
+                8.020333333333333,
+                9.013
               ]
             },
             "post": {
@@ -266,7 +267,7 @@
             }
           }
         },
-        "lateFrameCount": 36,
+        "lateFrameCount": 10,
         "lateActiveMismatchCount": 0,
         "imeLatencyMs": {
           "p95": null,
@@ -278,23 +279,10 @@
       "measurement": {
         "pass": false,
         "failures": [
-          "editing keystrokes=99, expected at least 500",
-          "no playing onset telemetry; active audio/visual workload was not observed",
-          "inputLatencyMs.p95=93.30000002383895 exceeds 50",
-          "inputLatencyMs.p99=438.39999998807616 exceeds 100",
-          "animationWorkMs.p50=7.600000023841858 exceeds 4",
-          "animationWorkMs.p95=11.100000023841858 exceeds 8",
-          "animationWorkMs.p99=17.5 exceeds 16.7",
-          "textWorkMs.p95=48.89999997615814 exceeds 16.7",
-          "frameIntervalMs.p95=133.79999999998836 exceeds 20",
-          "frameIntervalMs.p99=150.8000000000029 exceeds 50",
-          "measured sync samples unavailable",
-          "Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n\u001b[2m    - click action done\u001b[22m\n\u001b[2m    - waiting for scheduled navigations to finish\u001b[22m\n"
+          "textWorkMs.p95=18.700000047683716 exceeds 16.7"
         ],
         "blocked": false,
-        "limitations": [
-          "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
-        ]
+        "limitations": []
       },
       "renderer": {
         "webgl2": true,
@@ -344,7 +332,7 @@
         {
           "id": "touch-selection",
           "pass": true,
-          "detail": "WebKit pointer event diagnostic=/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/tmp/canvas-cutover/evidence/s274-webkit-touch-events.json; {\"geometry\":{\"doc\":\"# canvas-visible-evidence\\n#e2e\",\"canvas\":{\"x\":0,\"y\":37,\"width\":767.40625,\"height\":858,\"top\":37,\"right\":767.40625,\"bottom\":895,\"left\":0},\"pane\":{\"x\":0,\"y\":37,\"width\":767.40625,\"height\":858,\"top\":37,\"right\":767.40625,\"bottom\":895,\"left\":0},\"touchX\":88,\"touchY\":47,\"word\":\"canvas\",\"wordStart\":2},\"tapSelection\":{\"anchor\":5,\"head\":5},\"atLongPress\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":2112},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":2117},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":2174}]},\"atEnd\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":2112},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":2117},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":2174},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":2704}]},\"handleWaitError\":null}"
+          "detail": "WebKit pointer event diagnostic=/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/tmp/canvas-cutover/evidence/s274-webkit-touch-events.json; {\"geometry\":{\"doc\":\"# canvas-visible-evidence\\n#e2e\",\"canvas\":{\"x\":0,\"y\":37,\"width\":767.40625,\"height\":858,\"top\":37,\"right\":767.40625,\"bottom\":895,\"left\":0},\"pane\":{\"x\":0,\"y\":37,\"width\":767.40625,\"height\":858,\"top\":37,\"right\":767.40625,\"bottom\":895,\"left\":0},\"touchX\":88,\"touchY\":47,\"word\":\"canvas\",\"wordStart\":2},\"tapSelection\":{\"anchor\":5,\"head\":5},\"atLongPress\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":490},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":492},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":548}]},\"atEnd\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":490},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":492},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":548},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":1073}]},\"handleWaitError\":null}"
         },
         {
           "id": "context-loss-restore",
@@ -367,7 +355,7 @@
         {
           "id": "background-no-replay",
           "pass": true,
-          "detail": "frames hidden=183, resumed=193"
+          "detail": "frames hidden=90, resumed=99"
         },
         {
           "id": "dispose-ledger",
@@ -378,57 +366,56 @@
       "limitations": [
         "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
         "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
-        "WebKit touch selection uses synthetic pointer events.",
-        "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
+        "WebKit touch selection uses synthetic pointer events."
       ],
       "metrics": {
         "inputLatencyMs": {
-          "p95": 351,
-          "p99": 550
+          "p95": 360,
+          "p99": 377
         },
         "animationWorkMs": {
-          "p50": 5,
-          "p95": 11,
-          "p99": 28
+          "p50": 2,
+          "p95": 4,
+          "p99": 165
         },
         "textWorkMs": {
-          "p95": 57
+          "p95": 178
         },
         "frameIntervalMs": {
-          "p95": 102,
-          "p99": 128
+          "p95": 185,
+          "p99": 197
         },
         "syncProvenance": "measured",
         "syncAbsMs": {
-          "p95": null,
-          "p99": null
+          "p95": 62,
+          "p99": 66
         },
         "earlyFlashCount": 0,
         "replayedFlashCount": 0,
-        "syncWindowStart": 34,
-        "syncWindowEnd": 97,
+        "syncWindowStart": 27,
+        "syncWindowEnd": 90,
         "syncWindowOnsets": 4032,
-        "syncFramePairs": 0,
-        "syncExcludedFrames": 1779,
-        "ledgerMaxBytes": 9149016,
+        "syncFramePairs": 227648,
+        "syncExcludedFrames": 1056,
+        "ledgerMaxBytes": 9891432,
         "ledgerCounters": {
-          "usedBytes": 9149016,
+          "usedBytes": 9891432,
           "byKind": {
-            "atlas": 5524996,
-            "geometry": 70076,
-            "canvas": 2632344,
+            "atlas": 6264004,
+            "geometry": 76552,
+            "canvas": 2629276,
             "backdrop": 921600,
             "visualText": 0,
             "visualTarget": 0,
             "video": 0,
             "other": 0
           },
-          "pixels": 888486,
+          "pixels": 887719,
           "visualTargets": 0,
           "refusals": 0
         },
         "heapGrowthBytes": null,
-        "beatDriftMs": null,
+        "beatDriftMs": 0.416666666637866,
         "peakPlayingRanges": 64,
         "audioRunning": true,
         "onsetCount": 4096,
@@ -440,12 +427,12 @@
         "workletCounters": "not exposed",
         "probe": null,
         "highlight": {
-          "received": 9664,
-          "accepted": 5760,
+          "received": 22336,
+          "accepted": 5568,
           "overflow": 0,
           "horizonDrops": 0,
           "epochDrops": 0,
-          "unmapped": 3904
+          "unmapped": 16768
         },
         "client": {
           "telemetryQueued": 0,
@@ -453,20 +440,20 @@
           "coalesced": 0,
           "pendingRequests": 0
         },
-        "frameCount": 2854,
-        "keyCount": 156,
-        "editKeyCount": 90,
-        "editPairedKeyCount": 15,
-        "inputSamplesUsed": 51,
-        "inputKeysNonEditing": 102,
+        "frameCount": 4801,
+        "keyCount": 231,
+        "editKeyCount": 162,
+        "editPairedKeyCount": 30,
+        "inputSamplesUsed": 66,
+        "inputKeysNonEditing": 163,
         "inputKeysExpired": 0,
-        "inputKeysUnpaired": 3,
-        "editPairedSamples": 15,
-        "editNonEditingKeys": 82,
+        "inputKeysUnpaired": 2,
+        "editPairedSamples": 30,
+        "editNonEditingKeys": 146,
         "editExpiredKeys": 0,
         "editUnpairedKeys": 2,
-        "workSamples": 2854,
-        "startedAt": "2026-10-05T12:38:10.906Z",
+        "workSamples": 4801,
+        "startedAt": "2026-10-05T20:53:36.316Z",
         "controlSink": {
           "installed": true,
           "installedBeforeFirstConnect": true,
@@ -479,11 +466,11 @@
           "pre": {
             "peak": 0.22380739450454712,
             "peakDbfs": -13.002511373180266,
-            "rms": 0.023406027424417695,
-            "rmsDbfs": -32.61344580898603,
+            "rms": 0.005923976068429911,
+            "rmsDbfs": -44.547734092043676,
             "onsetCount": 1,
             "onsetTimes": [
-              4.472333333333333
+              4.065666666666666
             ]
           },
           "post": {
@@ -502,12 +489,12 @@
           "pre": {
             "peak": 0.22380739450454712,
             "peakDbfs": -13.002511373180266,
-            "rms": 0.022095419486522352,
-            "rmsDbfs": -33.113954976894576,
+            "rms": 0.023650781922330614,
+            "rmsDbfs": -32.52308992817255,
             "onsetCount": 2,
             "onsetTimes": [
-              4.472333333333333,
-              18.822333333333333
+              4.065666666666666,
+              9.074333333333334
             ]
           },
           "post": {
@@ -515,9 +502,9 @@
           }
         },
         "hushQuiet": true,
-        "hushQuietMs": 1039,
-        "largeRunClickMs": 9405,
-        "largeRunCtxTime": 8.885333333333334,
+        "hushQuietMs": 1033,
+        "largeRunClickMs": 6073,
+        "largeRunCtxTime": 5.944,
         "workloadOnsetCount": 4096,
         "workloadOnsetsExcludedBaseline": 0,
         "workloadOnsetsExcludedPreClick": 0,
@@ -539,11 +526,11 @@
             "pre": {
               "peak": 0.22380739450454712,
               "peakDbfs": -13.002511373180266,
-              "rms": 0.023406027424417695,
-              "rmsDbfs": -32.61344580898603,
+              "rms": 0.005923976068429911,
+              "rmsDbfs": -44.547734092043676,
               "onsetCount": 1,
               "onsetTimes": [
-                4.472333333333333
+                4.065666666666666
               ]
             },
             "post": {
@@ -562,12 +549,12 @@
             "pre": {
               "peak": 0.22380739450454712,
               "peakDbfs": -13.002511373180266,
-              "rms": 0.022095419486522352,
-              "rmsDbfs": -33.113954976894576,
+              "rms": 0.023650781922330614,
+              "rmsDbfs": -32.52308992817255,
               "onsetCount": 2,
               "onsetTimes": [
-                4.472333333333333,
-                18.822333333333333
+                4.065666666666666,
+                9.074333333333334
               ]
             },
             "post": {
@@ -575,8 +562,8 @@
             }
           }
         },
-        "lateFrameCount": 200,
-        "lateActiveMismatchCount": 7,
+        "lateFrameCount": 187,
+        "lateActiveMismatchCount": 0,
         "imeLatencyMs": {
           "p95": null,
           "p99": null
@@ -587,23 +574,18 @@
       "measurement": {
         "pass": false,
         "failures": [
-          "editing keystrokes=90, expected at least 500",
-          "inputLatencyMs.p95=351 exceeds 50",
-          "inputLatencyMs.p99=550 exceeds 100",
-          "animationWorkMs.p50=5 exceeds 4",
-          "animationWorkMs.p95=11 exceeds 8",
-          "animationWorkMs.p99=28 exceeds 16.7",
-          "textWorkMs.p95=57 exceeds 16.7",
-          "frameIntervalMs.p95=102 exceeds 20",
-          "frameIntervalMs.p99=128 exceeds 50",
-          "measured sync samples unavailable",
-          "post-stall active-set mismatches=7",
-          "post-stall active-set mismatches=7"
+          "editing keystrokes=162, expected at least 500",
+          "inputLatencyMs.p95=360 exceeds 50",
+          "inputLatencyMs.p99=377 exceeds 100",
+          "animationWorkMs.p99=165 exceeds 16.7",
+          "textWorkMs.p95=178 exceeds 16.7",
+          "frameIntervalMs.p95=185 exceeds 20",
+          "frameIntervalMs.p99=197 exceeds 50",
+          "syncAbsMs.p95=62 exceeds 33.4",
+          "syncAbsMs.p99=66 exceeds 50"
         ],
         "blocked": false,
-        "limitations": [
-          "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
-        ]
+        "limitations": []
       },
       "renderer": {
         "webgl2": true,
@@ -612,14 +594,14 @@
       "control": {
         "frameIntervalMs": {
           "p95": 18,
-          "p99": 20
+          "p99": 19
         },
         "inputLatencyMs": {
           "p95": 33,
-          "p99": 34
+          "p99": 35
         },
-        "editKeyCount": 622,
-        "frames": 3598,
+        "editKeyCount": 642,
+        "frames": 3603,
         "mode": "headless"
       },
       "traceRanks": [],
@@ -640,8 +622,21 @@
     "runId": "run-001",
     "commands": [
       "cd editor && npm run e2e -- --browser all --profile all --run-id run-001 --write-evidence",
+      "mise run build-wasm-release",
       "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
     ],
+    "wasm": {
+      "path": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/dist/vactr.wasm",
+      "bytes": 6451635,
+      "sha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+      "nameSection": true,
+      "dwarf": false,
+      "profile": "release",
+      "releasePath": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/target/wasm32-unknown-unknown/release/vactr.wasm",
+      "releaseSha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+      "debugSha256": "02bf7e97f5de121e01d2d31b98ed2e8c82ca9b17d958e49c8d164a75d7e89ad3",
+      "gating": true
+    },
     "chromium": {
       "version": "151.0.7922.34",
       "headless": true
@@ -665,33 +660,31 @@
       "xcode": "/Applications/Xcode.app/Contents/Developer"
     }
   },
+  "wasm": {
+    "path": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/dist/vactr.wasm",
+    "bytes": 6451635,
+    "sha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+    "nameSection": true,
+    "dwarf": false,
+    "profile": "release",
+    "releasePath": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/target/wasm32-unknown-unknown/release/vactr.wasm",
+    "releaseSha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+    "debugSha256": "02bf7e97f5de121e01d2d31b98ed2e8c82ca9b17d958e49c8d164a75d7e89ad3",
+    "gating": true
+  },
   "pass": false,
   "blocked": false,
   "failures": [
-    "chromium:editing keystrokes=99, expected at least 500",
-    "chromium:no playing onset telemetry; active audio/visual workload was not observed",
-    "chromium:inputLatencyMs.p95=93.30000002383895 exceeds 50",
-    "chromium:inputLatencyMs.p99=438.39999998807616 exceeds 100",
-    "chromium:animationWorkMs.p50=7.600000023841858 exceeds 4",
-    "chromium:animationWorkMs.p95=11.100000023841858 exceeds 8",
-    "chromium:animationWorkMs.p99=17.5 exceeds 16.7",
-    "chromium:textWorkMs.p95=48.89999997615814 exceeds 16.7",
-    "chromium:frameIntervalMs.p95=133.79999999998836 exceeds 20",
-    "chromium:frameIntervalMs.p99=150.8000000000029 exceeds 50",
-    "chromium:measured sync samples unavailable",
-    "chromium:Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n\u001b[2m    - click action done\u001b[22m\n\u001b[2m    - waiting for scheduled navigations to finish\u001b[22m\n",
-    "webkit:editing keystrokes=90, expected at least 500",
-    "webkit:inputLatencyMs.p95=351 exceeds 50",
-    "webkit:inputLatencyMs.p99=550 exceeds 100",
-    "webkit:animationWorkMs.p50=5 exceeds 4",
-    "webkit:animationWorkMs.p95=11 exceeds 8",
-    "webkit:animationWorkMs.p99=28 exceeds 16.7",
-    "webkit:textWorkMs.p95=57 exceeds 16.7",
-    "webkit:frameIntervalMs.p95=102 exceeds 20",
-    "webkit:frameIntervalMs.p99=128 exceeds 50",
-    "webkit:measured sync samples unavailable",
-    "webkit:post-stall active-set mismatches=7",
-    "webkit:post-stall active-set mismatches=7"
+    "chromium:textWorkMs.p95=18.700000047683716 exceeds 16.7",
+    "webkit:editing keystrokes=162, expected at least 500",
+    "webkit:inputLatencyMs.p95=360 exceeds 50",
+    "webkit:inputLatencyMs.p99=377 exceeds 100",
+    "webkit:animationWorkMs.p99=165 exceeds 16.7",
+    "webkit:textWorkMs.p95=178 exceeds 16.7",
+    "webkit:frameIntervalMs.p95=185 exceeds 20",
+    "webkit:frameIntervalMs.p99=197 exceeds 50",
+    "webkit:syncAbsMs.p95=62 exceeds 33.4",
+    "webkit:syncAbsMs.p99=66 exceeds 50"
   ],
   "fatal": null
 }

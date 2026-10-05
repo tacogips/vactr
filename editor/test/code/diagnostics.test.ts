@@ -129,4 +129,51 @@ describe('DiagnosticsController', () => {
     expect(core?.check).toHaveBeenCalledTimes(1);
     expect(core?.check).toHaveBeenCalledWith(`ba${TEXT}`);
   });
+
+  it('runs one check after 20 edits spaced 50 ms apart', () => {
+    const { view, core } = setup('browser', () => []);
+    for (let i = 0; i < 20; i += 1) {
+      view.dispatch({ changes: { from: 0, insert: String(i % 10) } });
+      vi.advanceTimersByTime(50);
+    }
+    vi.advanceTimersByTime(CHECK_DEBOUNCE_MS);
+    expect(core?.check).toHaveBeenCalledTimes(1);
+
+    view.dispatch({ changes: { from: 0, insert: 'x' } });
+    vi.advanceTimersByTime(CHECK_DEBOUNCE_MS);
+    expect(core?.check).toHaveBeenCalledTimes(2);
+  });
+
+  it('checks an unchanged revision once and checks again after an edit', () => {
+    const { view, core, ctl } = setup('browser', () => []);
+    ctl.runCheck();
+    ctl.runCheck();
+    expect(core?.check).toHaveBeenCalledTimes(1);
+
+    view.dispatch({ changes: { from: 0, insert: 'x' } });
+    ctl.runCheck();
+    expect(core?.check).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not run checks from refreshes or elapsed frame time', () => {
+    const { core, ctl } = setup('browser', () => []);
+    ctl.runCheck();
+    vi.advanceTimersByTime(10_000);
+    for (let i = 0; i < 20; i += 1) ctl.refresh();
+    expect(core?.check).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a check that threw at the same revision', () => {
+    let attempts = 0;
+    const { core, ctl } = setup('browser', () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('transient check failure');
+      return [];
+    });
+    ctl.runCheck();
+    ctl.runCheck();
+    expect(core?.check).toHaveBeenCalledTimes(2);
+    ctl.runCheck();
+    expect(core?.check).toHaveBeenCalledTimes(2);
+  });
 });

@@ -151,4 +151,12 @@ describe('canvas evidence statistics', () => {
     expect(text).not.toContain('stack trace');
     expect(/[^\x00-\x7F]/.test(text)).toBe(false);
   });
+  it('renders wasm provenance and reports when it is absent', () => {
+    const wasm = { profile:'release', bytes:6451635, sha256:'abc123' };
+    expect(stats.renderEvidence({ runId:'run-001', wasm, browsers:[] }))
+      .toContain('WASM: release; 6451635 bytes; SHA-256 abc123.');
+    expect(stats.renderEvidence({ runId:'run-001', environment:{ wasm }, browsers:[] }))
+      .toContain('WASM: release; 6451635 bytes; SHA-256 abc123.');
+    expect(stats.renderEvidence({ runId:'run-001', browsers:[] })).toContain('WASM: not recorded.');
+  });
 });

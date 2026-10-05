@@ -371,15 +371,15 @@ editing it and report. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] No `isTexture` call remains in `renderer.ts`; commands carry a generation that is bumped on loss, restore, font change, DPR invalidation, eviction and dispose
-- [ ] No per-frame `getError`; init, resize, backdrop and atlas upload checks remain
-- [ ] `TextLayout` caches multi-unit grapheme clusters per shaped line (capped, byte-accounted); `boundary` is equivalent to the old loop for every position and bias
-- [ ] Per animation-only frame in `mount.test.ts`: exactly 1 `session_frame`, 0 `session_check`, no ABI argument over 64 KiB, 0 `isTexture`, 0 `getError`, 0 segmenter calls
-- [ ] `mise run build-wasm-release` exists; the vite default is the release artifact; the debug override works through `VACTR_WASM`
-- [ ] `wasm-profile.mjs` and its tests pass; `run.mjs` records the wasm block and refuses non-release gating runs with exit 2 and no writes
-- [ ] README updated; existing tests unmodified and passing; default vitest, `npm run check` and `node --check` pass
-- [ ] `npm run test:perf` passes outside the sandbox; negative controls recorded separately
-- [ ] Progress log updated
+- [x] No `isTexture` call remains in `renderer.ts`; commands carry a generation that is bumped on loss, restore, font change, DPR invalidation, eviction and dispose
+- [x] No per-frame `getError`; init, resize, backdrop and atlas upload checks remain
+- [x] `TextLayout` caches multi-unit grapheme clusters per shaped line (capped, byte-accounted); `boundary` is equivalent to the old loop for every position and bias
+- [x] Per animation-only frame in `mount.test.ts`: exactly 1 `session_frame`, 0 `session_check`, no ABI argument over 64 KiB, 0 `isTexture`, 0 `getError`, 0 segmenter calls
+- [x] `mise run build-wasm-release` exists; the vite default is the release artifact; the debug override works through `VACTR_WASM`
+- [x] `wasm-profile.mjs` and its tests pass; `run.mjs` records the wasm block and refuses non-release gating runs with exit 2 and no writes
+- [x] README updated; prior assertions retained; default vitest, `npm run check` and `node --check` pass
+- [x] `npm run test:perf` passes outside the sandbox; sensitivity is shown by in-test controls (session 283)
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -439,3 +439,34 @@ Replacement sensitivity controls, each with both branches asserted inside one pa
 Tick the criterion "negative controls recorded separately" as "Sensitivity shown by in-test
 controls (session 283)". Contracts D and E, writePaths, the gating commands and the no-Rust
 rule are unchanged.
+
+### Session: 2026-10-06 (CANVAS-EVIDENCE-FRAMECOST implementation)
+**Tasks Completed**: E1/E2 and D1/D2 implemented. Textured draw commands now carry the
+renderer generation and stale generations are skipped; the per-frame `getError` and
+`isTexture` probes are removed. Shaped layout cache entries retain bounded multi-unit
+grapheme pairs with byte accounting, and animated ranges snap only endpoints within the
+visible span. The release wasm task, release Vite default, provenance parser, gating
+preflight, refusal path, tests and README are in place. No Rust, Cargo manifest, lockfile or
+dependency changes.
+
+**Verification** (final-source logs under `tmp/canvas-cutover/framecost/`):
+- Focused FRAMECOST tests: `focused-final.log`, 61/61.
+- Scoped Vitest: `scoped-vitest-final.log`, 350/350.
+- Full default Vitest: `full-vitest-final.log`, 720/720.
+- `npm run check`: `npm-check-final.log`, exit 0.
+- Node syntax checks: `node-check.log`, exit 0.
+- `CARGO_TERM_QUIET=true mise run build-wasm-release`: `build-wasm-release.log`, exit 0.
+- `VACTR_REQUIRE_SESSION_ABI=1 npm run build`: `release-vite-build.log`, exit 0.
+- Release inspection: `wasm-dist-inspection.log`, 6,451,635 bytes,
+  sha256 `17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d`,
+  profile `release`, name section present, DWARF absent.
+- Serial `npm run test:perf`: `test-perf-final.log`, 1/1, ratio 2.89.
+- Renderer/layout line counts: 402 and 221. `git diff --check` passed; no Rust or Cargo
+  manifest/lockfile diff. Other worktree changes belong to the accepted SCHED and SCOPE
+  predecessors and were preserved.
+
+**Sensitivity Controls**: The passing GPU and mount tests prove counter liveness with explicit
+test probes, then assert zero `isTexture`, `getError`, and segmenter calls across animation-only
+frames. The wasm preflight test covers release acceptance and debug, nameless, and non-gating
+branches using temporary artifacts. Per session-283 instructions, no separate mutation or
+negative-control command was run.

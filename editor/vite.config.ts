@@ -4,7 +4,7 @@ import solid from 'vite-plugin-solid';
 // Build of the editor page (design 15.1.3 "Wasm artifact").
 //
 // The `vactr-assets` plugin reads the host-wasm artifact
-// (`$VACTR_WASM`, else `../target/wasm32-unknown-unknown/debug/vactr.wasm`)
+// (`$VACTR_WASM`, else `../target/wasm32-unknown-unknown/release/vactr.wasm`)
 // and emits it as `vactr.wasm`, `worklet/processor.js` and optional
 // tree-sitter syntax assets into the
 // RESOLVED output directory, so `vite build --outDir <dir>` keeps parallel
@@ -28,7 +28,7 @@ const env = (globalThis as unknown as { process: { env: Record<string, string | 
   .process.env;
 
 const WASM_MAGIC = [0x00, 0x61, 0x73, 0x6d];
-const DEFAULT_WASM = '../target/wasm32-unknown-unknown/debug/vactr.wasm';
+const DEFAULT_WASM = '../target/wasm32-unknown-unknown/release/vactr.wasm';
 const PROCESSOR = 'worklet/processor.js';
 const SYNTAX_ASSETS = [
   {
@@ -74,8 +74,8 @@ async function loadAssets(root: string): Promise<Assets> {
   } catch {
     throw new Error(
       `vactr-assets: the wasm artifact ${wasmPath} is missing. Build it with ` +
-        '`cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm` ' +
-        'or set VACTR_WASM.',
+        '`mise run build-wasm-release` or set VACTR_WASM ' +
+        '(for example VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm for a debug build).',
     );
   }
   if (wasm.length < 8 || !WASM_MAGIC.every((b, i) => wasm[i] === b)) {

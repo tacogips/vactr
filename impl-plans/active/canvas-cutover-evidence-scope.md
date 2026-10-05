@@ -516,3 +516,54 @@ byte-identical to `5e58d04`. SHA-256 values: `src/types/scope.rs`
 Implementation gates are complete on this source. Status remains `In Progress` pending the
 downstream test-integrity, adversarial and integration reviews; review-dependent documentation,
 archive/index updates, commit and push remain owned by later workflow steps.
+
+
+### Session: 2026-10-06 (session 284: current-source implementation re-gate)
+**Source identity**: `git rev-parse HEAD` is
+`8d65ddc7f74437def874a43ba0d310da32f7b7f3`. No implementation source was changed;
+the six implementation/test files remain byte-identical to `5e58d04`. SHA-256 values:
+`src/types/scope.rs` `59fd855cf277f883f79f7ea7a1793f20c0016564b93eb39ae889b64d728be84f`,
+`src/types/tests/mod.rs` `8356d5489a72176e31cfdbdf0c41a23ea85b5194668c1c2c96b43ca8624b6322`,
+`src/types/tests/scope_cost.rs` `53a3b90f9be1fd3305c955b290361b1f93f8490c84449e5440384813113eb1f3`,
+`src/directives/attach.rs` `28e041a2ac1e6e1cb857c51cb547ca9125e846f7e9e992ea614664fbe62240b0`,
+`src/directives/tests/attach.rs` `8bf2a2980f70db47afa04a753d7b222e8312702496792b995d26ad99837a2b8d`,
+`src/directives/tests/labels.rs` `e11a8bc9a6c8f7c17963e0dde204b46fea4d7b7eee01383218e29c3b250ded35`.
+Fresh-read hashes for every plan writePath and the intended progress hunk are recorded in
+`tmp/canvas-cutover/scope/intent-session-284.json` and
+`tmp/canvas-cutover/scope/intent-plan-session-284.md`.
+
+**Final-source verification** (complete logs include `exitStatus=0` and are under
+`tmp/canvas-cutover/scope/`):
+- `CARGO_TERM_QUIET=true cargo build`: exit 0, `s284-build.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0,
+  `s284-clippy.log`; no added `allow`/`expect` attributes, `s284-allow-expect.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-capture types::tests directives::tests`:
+  exit 0, 184 passed/0 failed; `c4=16000`, `c8=32000`, `steps=20000`, `targets=20000`;
+  `s284-focused-nextest.log`.
+- `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`:
+  exit 0, `s284-rustfmt.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`:
+  exit 0, `s284-wasm-build.log`.
+- `cd editor && ./node_modules/.bin/vitest run`: exit 0, 90 files and 703 tests passed,
+  `s284-vitest.log`.
+- `cd editor && npm run check`: exit 0, `s284-npm-check.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`:
+  exit 0, 2816 passed/0 failed and 3 skipped in 1634.296 seconds,
+  `s284-full-nextest-final.log`. An earlier invocation's tests also completed green, but its
+  zsh wrapper could not capture status because `status` is reserved; this corrected rerun is
+  authoritative.
+- `cd editor && npm run test:perf` (run alone after full nextest): exit 0, 1 passed/0 failed;
+  5k median 1310.8 ms, 20k median 3907.8 ms, ratio 2.98; `s284-test-perf.log`.
+- Scope identity and hygiene checks all passed: seven original SCOPE paths in
+  `s284-original-scope.log`; ten expected resume paths in `s284-resume-scope.log`; no source
+  drift from `5e58d04` in `s284-no-product-drift.log`; byte identity in
+  `s284-source-identity.log`; existing scope/rebinding/shadowing/prelude tests unchanged in
+  `s284-existing-tests.log`; no untracked files in `s284-untracked.log`; no added
+  `allow`/`expect` attributes in `s284-allow-expect.log`.
+- No mutation or negative-control command was run. Historical sensitivity evidence remains in
+  `s283-mutation-scope.log`, `s283-mutation-topof.log`, `mutation-scope.log` and
+  `mutation-topof.log`, cited as prose only.
+
+Implementation gates are complete on this source. Status remains `In Progress` pending the
+independent test-integrity, adversarial and integration reviews; review-dependent documentation,
+archive/index updates, commit and push remain later workflow steps.

@@ -10,6 +10,7 @@ export interface ShapedLine { number: number; from: number; to: number; runs: re
 interface LineIndex { from: number; to: number; next: number }
 const rtl = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u;
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+const MAX_CLUSTERS_PER_LINE = 4096;
 
 /** No per-character geometry arrays: huge lines are measured lazily, drawn as cropped run tiles. */
 export class TextLayout {
@@ -17,10 +18,10 @@ export class TextLayout {
   private text: Text | null = null;
   private documentCache: { doc: Text; value: string } | null = null;
   private lines: LineIndex[] = [{ from: 0, to: 0, next: 0 }];
-  private cache = new Map<number, { line: ShapedLine; bytes: number }>();
+  private cache = new Map<number, { line: ShapedLine; bytes: number; clusters: number[] | null }>();
   private bytes = 0;
   private readonly cacheLimit: number;
-  readonly stats = { builds: 0, evictions: 0 };
+  readonly stats = { builds: 0, evictions: 0, segmentations: 0 };
   constructor(private metrics: TextMetricsSource, public font: LayoutFont, cacheLimit = RESOURCE_LIMITS.layout) {
     this.cacheLimit = Math.min(RESOURCE_LIMITS.layout, Math.max(0, cacheLimit));
     this.validateFont(font);
@@ -104,11 +105,24 @@ export class TextLayout {
     }
     const lineText = this.slice(index.from, index.to);
     const line: ShapedLine = { number, from: index.from, to: index.to, runs, width: x, rtlUnsupported: rtl.test(lineText) };
-    const bytes = 128 + runs.reduce((n, r) => n + 64 + r.text.length * 2, 0);
+    let clusters: number[] | null = [];
+    if (/[^\x00-\x7f]/u.test(lineText)) {
+      clusters = [];
+      this.stats.segmentations++;
+      for (const part of segmenter.segment(lineText)) {
+        const end = part.index + part.segment.length;
+        if (end - part.index > 1) {
+          clusters.push(part.index, end);
+          if (clusters.length / 2 > MAX_CLUSTERS_PER_LINE) { clusters = null; break; }
+        }
+      }
+    }
+    const clusterBytes = clusters === null ? 0 : clusters.length * 4;
+    const bytes = 128 + runs.reduce((n, r) => n + 64 + r.text.length * 2, 0) + clusterBytes;
     while (this.bytes + bytes > this.cacheLimit && this.cache.size) {
       const first = this.cache.keys().next().value!; this.bytes -= this.cache.get(first)!.bytes; this.cache.delete(first); this.stats.evictions++;
     }
-    if (bytes <= this.cacheLimit) { this.cache.set(number, { line, bytes }); this.bytes += bytes; }
+    if (bytes <= this.cacheLimit) { this.cache.set(number, { line, bytes, clusters }); this.bytes += bytes; }
     this.stats.builds++; return line;
   }
   visible(view: LayoutViewport): ShapedLine[] {
@@ -126,9 +140,23 @@ export class TextLayout {
   /** Snap within a whole browser-shaped run, preserving surrogate/combining clusters. */
   boundary(pos: number, bias: -1 | 1 = -1): number {
     pos = Math.max(0, Math.min(this.length, pos));
-    const index = this.lineIndex(this.lineAt(pos))!;
+    const lineNumber = this.lineAt(pos), index = this.lineIndex(lineNumber)!;
     if (pos > index.to) return bias < 0 ? index.to : index.next;
-    const text = this.slice(index.from, index.to); const relative = pos - index.from;
+    const relative = pos - index.from;
+    const cached = this.cache.get(lineNumber)?.clusters;
+    if (cached !== undefined && cached !== null) {
+      let lo = 0, hi = cached.length / 2;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2), start = cached[mid * 2]!, end = cached[mid * 2 + 1]!;
+        if (relative <= start) hi = mid;
+        else if (relative >= end) lo = mid + 1;
+        else return index.from + (bias < 0 ? start : end);
+      }
+      return pos;
+    }
+    const text = this.slice(index.from, index.to);
+    if (!/[^\x00-\x7f]/u.test(text)) return pos;
+    this.stats.segmentations++;
     for (const part of segmenter.segment(text)) {
       const end = part.index + part.segment.length;
       if (part.index === relative || end === relative) return pos;

@@ -158,7 +158,7 @@ export class HighlightScheduler {
         continue;
       }
       const r = this.opts.map(e.span, e.rev);
-      if (!r) continue;
+      if (!r) { this.stats.unmapped += 1; continue; }
       keep.push(e);
       ranges.push(r);
     }

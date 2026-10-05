@@ -15,6 +15,23 @@ function width(text: string): number {
 function layout(text = '', cacheBytes?: number): TextLayout {
   const l = new TextLayout({ font: '', measureText: text => ({ width: width(text) }) }, font, cacheBytes); l.setDocument(text); return l;
 }
+function oldBoundary(text: string, pos: number, bias: -1 | 1): number {
+  pos = Math.max(0, Math.min(text.length, pos));
+  const starts = [...text.matchAll(/\r\n|\r|\n/g)];
+  let from = 0, to = text.length, next = text.length;
+  for (const match of starts) {
+    if (pos < match.index! + match[0].length) { to = match.index!; next = to + match[0].length; break; }
+    from = match.index! + match[0].length;
+  }
+  if (pos > to) return bias < 0 ? to : next;
+  const relative = pos - from, line = text.slice(from, to);
+  for (const part of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(line)) {
+    const end = part.index + part.segment.length;
+    if (part.index === relative || end === relative) return pos;
+    if (part.index < relative && relative < end) return from + (bias < 0 ? part.index : end);
+  }
+  return pos;
+}
 const view = { width: 320, height: 100, scrollLeft: 0, scrollTop: 0, left: 10, top: 20, gutter: 48 };
 function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: number; y: number; font: string; color: string }[]; crops: number[][] } {
   const text: { text: string; x: number; y: number; font: string; color: string }[] = []; const crops: number[][] = [];
@@ -118,6 +135,30 @@ describe('shaped UTF-16 layout', () => {
     expect(l.boundary(2)).toBe(1); expect(l.boundary(2, 1)).toBe(3); expect(l.boundary(4)).toBe(3); expect(l.boundary(4, 1)).toBe(5);
     const valid = new Set([0, 1, 3, 5, 16, 17]);
     for (let x = 58; x < 150; x++) expect(valid.has(l.posAtCoords({ x, y: 21 }, view)!)).toBe(true);
+  });
+  it('keeps cached and fallback boundaries identical to the previous grapheme loop', () => {
+    for (const text of ['plain ASCII', '日本語の行', '👨‍👩‍👧‍👦x', 'e\u0301x', 'a😀b', 'one\r\ntwo\rthree']) {
+      const l = layout(text); l.shape(0);
+      for (let pos = 0; pos <= text.length; pos++) for (const bias of [-1, 1] as const) {
+        expect(l.boundary(pos, bias), `cached ${JSON.stringify(text)} ${pos}/${bias}`).toBe(oldBoundary(text, pos, bias));
+      }
+      if (text === 'plain ASCII') expect(l.stats.segmentations).toBe(0);
+      l.invalidate();
+      for (let pos = 0; pos <= text.length; pos++) for (const bias of [-1, 1] as const) {
+        expect(l.boundary(pos, bias), `fallback ${JSON.stringify(text)} ${pos}/${bias}`).toBe(oldBoundary(text, pos, bias));
+      }
+      if (text === 'plain ASCII') expect(l.stats.segmentations).toBe(0);
+    }
+  });
+  it('caps cached clusters and charges eight bytes per pair', () => {
+    const ascii = layout('x'.repeat(8)); ascii.shape(0);
+    const emoji = layout('😀'.repeat(4)); emoji.shape(0);
+    expect(emoji.cacheBytes - ascii.cacheBytes).toBe(32);
+    const many = layout('😀'.repeat(4097)); many.shape(0);
+    expect((many as unknown as { cache: Map<number, { clusters: number[] | null }> }).cache.get(0)?.clusters).toBeNull();
+    const segmentations = many.stats.segmentations;
+    expect(many.boundary(1, -1)).toBe(0);
+    expect(many.stats.segmentations).toBe(segmentations + 1);
   });
   it('uses whole-run shaping and measured Japanese/ligature caret advances', () => {
     const l = layout('ffi日本'); const line = l.shape(0);
@@ -227,6 +268,30 @@ describe('GPU code compositor', () => {
     expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.renderer.stats.bufferUploads).toBe(buffers);
     expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 4, to: 8 }] })).toBe(true);
     expect(shape).not.toHaveBeenCalled(); expect(f.renderer.atlasStats.uploads).toBe(uploads); f.renderer.dispose();
+  });
+  it('does no liveness, error or segmentation probes on animation-only frames', () => {
+    const f = fixture(); const isTexture = vi.spyOn(f.r.gl, 'isTexture'), getError = vi.spyOn(f.r.gl, 'getError');
+    f.renderer.setViewport({ ...view, width: view.width + 1 });
+    expect(getError).toHaveBeenCalled();
+    expect(f.renderer.render({ textRevision: 1 })).toBe(true);
+    expect(f.l.stats.segmentations).toBeGreaterThan(0);
+    const segmentations = f.l.stats.segmentations, builds = f.renderer.stats.textBuilds, uploads = f.renderer.atlasStats.uploads;
+    const draws = f.r.draws.length, texture = [...f.r.live.keys()].find((key) => f.r.live.get(key) === 'Texture')!;
+    expect(f.r.gl.isTexture(texture)).toBe(true); expect(isTexture).toHaveBeenCalledTimes(1); isTexture.mockClear(); getError.mockClear();
+    for (let i = 0; i < 10; i++) expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }, { kind: 'playing', from: 11, to: 13 }] })).toBe(true);
+    expect(isTexture).not.toHaveBeenCalled(); expect(getError).not.toHaveBeenCalled();
+    expect(f.l.stats.segmentations).toBe(segmentations); expect(f.renderer.stats.textBuilds).toBe(builds);
+    expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.r.draws.length).toBeGreaterThan(draws);
+    f.renderer.dispose();
+  });
+  it('does not draw commands that reference textures deleted by context loss', () => {
+    const f = fixture(); expect(f.renderer.render({ textRevision: 1 })).toBe(true); f.r.lose();
+    f.c.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    f.c.dispatchEvent(new Event('webglcontextrestored'));
+    const start = f.r.draws.length;
+    expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+    expect(f.r.draws.slice(start).every(draw => draw.textureLiveAtDraw)).toBe(true);
+    f.renderer.dispose();
   });
   it('uses annotation revisions to reuse and invalidate static draw commands', () => {
     const f = fixture(); const first = [{ kind: 'syntax' as const, from: 0, to: 3, className: 'vact-tok-head' }];

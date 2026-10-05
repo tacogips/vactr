@@ -40,6 +40,10 @@ run = "cargo build"
 description = "Build the release binary"
 run = "cargo build --release"
 
+[tasks.build-wasm-release]
+description = "Release host-wasm with the name section (gating evidence build, design 15.3.8.13)"
+run = "CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+
 [tasks.run]
 description = "Run the application"
 run = "cargo run"

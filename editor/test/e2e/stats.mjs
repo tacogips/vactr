@@ -235,6 +235,10 @@ const cell = (value) => value === null || value === undefined ? 'unavailable' : 
 export function renderEvidence(summary) {
   const browsers = summary.browsers ?? [];
   const rows = [];
+  const wasm = summary.wasm ?? summary.environment?.wasm;
+  const wasmLine = wasm
+    ? `WASM: ${cell(wasm.profile)}; ${cell(wasm.bytes)} bytes; SHA-256 ${cell(wasm.sha256)}.`
+    : 'WASM: not recorded.';
   for (const browser of browsers) {
     const m = browser.metrics ?? {};
     if(browser.control?.mode==='headless')rows.push(`| ${browser.name} | Headless control p95/p99 frame interval (ms) | ${browser.control.frameIntervalMs?.p95} / ${browser.control.frameIntervalMs?.p99} | diagnostic control page |`,`| ${browser.name} | Headless control p95/p99 input latency (ms) | ${browser.control.inputLatencyMs?.p95} / ${browser.control.inputLatencyMs?.p99} | diagnostic control page |`,`| ${browser.name} | Headless control editing keys / frames | ${browser.control.editKeyCount} / ${browser.control.frames} | same 60 s key pacing |`);
@@ -273,6 +277,7 @@ export function renderEvidence(summary) {
   const ascii = (s) => String(s).replace(/[^\x00-\x7F]/g, '?');
   return ascii(`### Run ${summary.runId}: ${status}\n\n` +
     `Commands: \`${summary.commands?.join('; ') ?? 'not recorded'}\`.\n\n` +
+    `${wasmLine}\n\n` +
     '| Browser | Metric | Result | Threshold |\n|---|---|---:|---:|\n' + rows.join('\n') +
     `\n\nBehavior checks: ${browsers.map((b) => `${b.name} ${b.behavior?.passed ?? 0}/${b.behavior?.total ?? 0}`).join('; ')}. ` +
     `Failed checks: ${browsers.flatMap((b) => (b.checks ?? []).filter((c) => c.status !== 'limitation' && !c.pass).map((c) => `${b.name}:${c.id}`)).join(', ') || 'none'}. ` +

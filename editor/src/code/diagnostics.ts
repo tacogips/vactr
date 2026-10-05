@@ -59,6 +59,7 @@ export class DiagnosticsController {
   private surface: CodeSurface | null = null;
   private staticBatch: Batch | null = null;
   private checkBatch: Batch | null = null;
+  private checkedRevision: number | null = null;
   private readonly runtime = new Map<string, Batch[]>();
   private evalRev: number | null = null;
   private timer: unknown = null;
@@ -118,12 +119,14 @@ export class DiagnosticsController {
     const core = this.opts.core;
     if (!this.checksEnabled || !core) return;
     const rev = this.opts.sync.revision;
+    if (rev === this.checkedRevision) return;
     let diags: Diagnostic[];
     try {
       diags = core.check(this.opts.text());
     } catch {
       return;
     }
+    this.checkedRevision = rev;
     // `session_check` checks exactly the text it was given.
     this.checkBatch = { rev, diags };
     this.refresh();

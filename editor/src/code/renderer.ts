@@ -16,7 +16,7 @@ export interface RenderFeedback {
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
 }
-interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; cursor?: boolean; clipped: boolean }
+interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; generation?: number; cursor?: boolean; clipped: boolean }
 export interface RendererOptions {
   ledger?: ResourceLedger; gl?: WebGL2RenderingContext; createCanvas?: CanvasFactory;
   onStatus?: (status: GpuStatus) => void;
@@ -65,6 +65,8 @@ export class CanvasRenderer {
   private beforeAnimation: DrawCommand[] | null = null;
   private afterAnimation: DrawCommand[] | null = null;
   private cacheKey = '';
+  private textureGeneration = 0;
+  private seenEvictions = 0;
   private collecting: DrawCommand[] | null = null;
   private drawWhileCollecting = false;
   private cursorVisibleWhileCollecting = true;
@@ -79,16 +81,18 @@ export class CanvasRenderer {
   private statusValue: GpuStatus;
   private readonly createCanvas: CanvasFactory;
   private readonly loss = (event: Event): void => {
-    event.preventDefault(); this.lost = true; this.clearDrawCache(); this.releaseGpu(true); this.report('context-lost', 'GPU context lost; editing and save remain available');
+    event.preventDefault(); this.textureGeneration++; this.lost = true; this.clearDrawCache(); this.releaseGpu(true); this.report('context-lost', 'GPU context lost; editing and save remain available');
   };
   private readonly restore = (): void => {
     if (this.disposed) return;
+    this.textureGeneration++;
     this.lost = false;
     try { this.initialize(); this.resize(this.requestedDpr); this.reportReady(); }
     catch (e) { this.fail(e); }
   };
   private readonly fontsChanged = (): void => {
     this.layout.setFont({ ...this.layout.font, generation: (this.layout.font.generation ?? 0) + 1 });
+    this.textureGeneration++;
     this.atlas?.invalidate();
   };
   constructor(readonly canvas: HTMLCanvasElement, readonly layout: TextLayout, private options: RendererOptions = {}) {
@@ -149,7 +153,7 @@ export class CanvasRenderer {
     // Reserve old + new simultaneously. Reuse equal dimensions without a replacement.
     let size = effectiveSize(this.view.width, this.view.height, dpr, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number, RESOURCE_LIMITS.canvasPixels / 2);
     if (this.target && this.canvas.width === size.width && this.canvas.height === size.height) {
-      if (this.scale !== size.dpr) { this.atlas?.invalidate(); this.layout.invalidate(); }
+      if (this.scale !== size.dpr) { this.textureGeneration++; this.atlas?.invalidate(); this.layout.invalidate(); }
       this.scale = size.dpr; return;
     }
     const freePixels = RESOURCE_LIMITS.canvasPixels - this.ledger.counters.pixels;
@@ -162,12 +166,13 @@ export class CanvasRenderer {
       if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error('Canvas allocation failed');
     } catch (e) { allocation.release(); throw e; }
     this.target?.release(); this.target = allocation;
-    if (this.scale !== size.dpr) { this.atlas?.invalidate(); this.layout.invalidate(); }
+    if (this.scale !== size.dpr) { this.textureGeneration++; this.atlas?.invalidate(); this.layout.invalidate(); }
     this.scale = size.dpr;
   }
   render(feedback: RenderFeedback = {}): boolean {
     if (this.disposed || this.lost || !this.gl || !this.program || !this.atlas) return false;
     try {
+      if (this.atlas.stats.evictions !== this.seenEvictions) { this.textureGeneration++; this.seenEvictions = this.atlas.stats.evictions; }
       if (!this.target) this.resize(this.requestedDpr);
       const gl = this.gl; this.atlas.beginFrame(); this.pendingText = false;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindVertexArray(this.vao); gl.useProgram(this.program);
@@ -239,7 +244,6 @@ export class CanvasRenderer {
         for (const command of after) if (!command.cursor || feedback.cursorVisible !== false) this.replay(command);
       }
       this.unclip();
-      if (gl.getError() !== gl.NO_ERROR) throw new Error('GPU draw failed');
       this.stats.frames++;
       if (unsupported) this.report('degraded', 'Mixed RTL hit testing is unsupported'); else this.reportReady();
       return true;
@@ -257,7 +261,7 @@ export class CanvasRenderer {
     this.drawCommand(command);
   }
   private addCommand(command: Omit<DrawCommand, 'clipped'>): void {
-    const recorded = { ...command, clipped: this.scissorOn };
+    const recorded = { ...command, ...(command.texture ? { generation: this.textureGeneration } : {}), clipped: this.scissorOn };
     if (this.collecting) {
       this.collecting.push(recorded);
       if (this.drawWhileCollecting && (!recorded.cursor || this.cursorVisibleWhileCollecting)) this.drawCommand(recorded);
@@ -266,7 +270,7 @@ export class CanvasRenderer {
     this.drawCommand(recorded);
   }
   private drawCommand(command: DrawCommand): void {
-    if (command.texture && !this.gl!.isTexture(command.texture)) return;
+    if (command.texture && command.generation !== this.textureGeneration) return;
     const gl = this.gl!;
     if (command.clipped && !this.scissorOn) this.clip(this.view.gutter ?? 48);
     else if (!command.clipped && this.scissorOn) this.unclip();
@@ -276,7 +280,10 @@ export class CanvasRenderer {
     gl.drawArrays(gl.TRIANGLES, 0, 6); this.stats.drawCalls++;
   }
   private animatedRects(range: CodeAnnotation): CodeRect[] {
-    const from = this.layout.boundary(range.from), to = this.layout.boundary(range.to, 1);
+    if (this.visibleLines.length === 0) return [];
+    const visibleFrom = this.visibleLines[0]!.from, visibleTo = this.visibleLines[this.visibleLines.length - 1]!.to;
+    const from = range.from >= visibleFrom && range.from <= visibleTo ? this.layout.boundary(range.from) : range.from;
+    const to = range.to >= visibleFrom && range.to <= visibleTo ? this.layout.boundary(range.to, 1) : range.to;
     const out: CodeRect[] = [];
     for (const line of this.visibleLines) {
       if (line.to < from || line.from > to) continue;
@@ -387,6 +394,7 @@ export class CanvasRenderer {
   }
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
+    this.textureGeneration++;
     this.canvas.removeEventListener('webglcontextlost', this.loss); this.canvas.removeEventListener('webglcontextrestored', this.restore);
     document.fonts?.removeEventListener('loadingdone', this.fontsChanged);
     this.releaseGpu(this.lost); this.background = null; this.labels.clear(); this.layout.invalidate();

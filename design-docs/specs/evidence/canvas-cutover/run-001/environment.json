@@ -7,8 +7,21 @@
   "runId": "run-001",
   "commands": [
     "cd editor && npm run e2e -- --browser all --profile all --run-id run-001 --write-evidence",
+    "mise run build-wasm-release",
     "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
   ],
+  "wasm": {
+    "path": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/dist/vactr.wasm",
+    "bytes": 6451635,
+    "sha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+    "nameSection": true,
+    "dwarf": false,
+    "profile": "release",
+    "releasePath": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/target/wasm32-unknown-unknown/release/vactr.wasm",
+    "releaseSha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+    "debugSha256": "02bf7e97f5de121e01d2d31b98ed2e8c82ca9b17d958e49c8d164a75d7e89ad3",
+    "gating": true
+  },
   "chromium": {
     "version": "151.0.7922.34",
     "headless": true

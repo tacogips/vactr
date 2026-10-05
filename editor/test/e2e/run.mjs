@@ -9,15 +9,19 @@ import { runBehavior } from './behavior.mjs';
 import { runMeasurement } from './measure.mjs';
 import { countChecks, renderEvidence } from './stats.mjs';
 import { installSilentSink } from './silent-sink.mjs';
+import { gatingPreflight } from './wasm-profile.mjs';
 const args=process.argv.slice(2); const value=(key,def)=>{const i=args.indexOf(key);return i>=0?args[i+1]:def;};
 const list=(value('--browser','all')==='all'?['chromium','webkit']:[value('--browser','all')]);
 const profile=value('--profile','all'); const runId=value('--run-id','run-001'); const out=path.resolve(value('--out',path.join(repoRoot,'design-docs/specs/evidence/canvas-cutover',runId)));
 const writeEvidence=args.includes('--write-evidence'); const headedWebkit=args.includes('--headed-webkit'); const profileTrace=args.includes('--profile-trace');
 const command=`cd editor && npm run e2e -- --browser ${value('--browser','all')} --profile ${profile} --run-id ${runId}${writeEvidence?' --write-evidence':''}${headedWebkit?' --headed-webkit':''}${profileTrace?' --profile-trace':''}`;
 const evidencePath=(name)=>path.join(out,name); const browsers=[]; let blocked=false; let fatal=null;
-const host={hostname:os.hostname(),platform:os.platform(),release:os.release(),arch:os.arch(),node:process.version,runId,commands:[command,'cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build']};
+const host={hostname:os.hostname(),platform:os.platform(),release:os.release(),arch:os.arch(),node:process.version,runId,commands:[command,'mise run build-wasm-release','cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build']};
 try {
   if(!fs.existsSync(path.join(editorRoot,'dist','index.html'))) throw Object.assign(new Error(`built editor dist missing at ${path.join(editorRoot,'dist')}`),{blocked:true});
+  const preflight=await gatingPreflight({distWasm:path.join(editorRoot,'dist','vactr.wasm'),releasePath:path.join(repoRoot,'target/wasm32-unknown-unknown/release/vactr.wasm'),debugPath:path.join(repoRoot,'target/wasm32-unknown-unknown/debug/vactr.wasm'),writeEvidence});
+  const wasm=preflight.wasm; host.wasm=wasm;
+  if(preflight.refusal){fatal=preflight.refusal;blocked=true;const environment={...host,osVersion:os.version(),webgl:{},simulator:{xcode:process.env.DEVELOPER_DIR??'xcode-select default; see ios-sim.json'}};const summary={runId,commands:host.commands,browsers:[],environment,wasm,pass:false,blocked:true,failures:[],fatal};console.log(JSON.stringify({runId,pass:false,blocked:true,wasm,fatal,testsRun:0,testsPassed:0,failureCount:0,summary}));process.exit(2);}
   fs.mkdirSync(out,{recursive:true});
   const server=await startServer();
   try {
@@ -46,7 +50,7 @@ for(const browser of browsers)if(String(browser.renderer??'').includes('SwiftSha
 const environment={...host,osVersion:os.version(),webgl,simulator:{xcode:process.env.DEVELOPER_DIR??'xcode-select default; see ios-sim.json'}};
 for(const b of browsers)if(b.samples)b.sampleDownsampling={frame:'every 2nd sample',presented:'every 2nd sample',other:'all',analysis:'metrics use the complete in-memory samples'};
 const anyFailed=browsers.some((b)=>countChecks(b.checks??[]).failed>0||(b.measurement&&(!b.measurement.pass||(b.measurement.failures??[]).length>0)));
-const summary={runId,commands:host.commands,browsers:browsers.map(({samples,...b})=>b),environment,pass:!fatal&&!blocked&&!anyFailed,blocked,failures:browsers.flatMap((b)=>[...(b.checks??[]).filter((c)=>c.status!=='limitation'&&!c.pass).map((c)=>`${b.name}:${c.id}`),...(b.measurement?.failures??[]).map((x)=>`${b.name}:${x}`)]),fatal};
+const summary={runId,commands:host.commands,browsers:browsers.map(({samples,...b})=>b),environment,wasm:host.wasm,pass:!fatal&&!blocked&&!anyFailed,blocked,failures:browsers.flatMap((b)=>[...(b.checks??[]).filter((c)=>c.status!=='limitation'&&!c.pass).map((c)=>`${b.name}:${c.id}`),...(b.measurement?.failures??[]).map((x)=>`${b.name}:${x}`)]),fatal};
 const checkTotals=countChecks(browsers.flatMap((b)=>b.checks??[]));const result={runId,pass:summary.pass,blocked,testsRun:checkTotals.total,testsPassed:checkTotals.passed,failureCount:checkTotals.failed,summary};
 if(writeEvidence){
  fs.mkdirSync(out,{recursive:true}); fs.writeFileSync(evidencePath('environment.json'),JSON.stringify(environment,null,2)+'\n');

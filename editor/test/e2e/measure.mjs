@@ -21,7 +21,7 @@ export async function runMeasurement(page, context, browserName, { profile='all'
   if (!audioRunning) { limitations.push('AudioContext did not expose a running audio workload; A/V sync and audio counters are unavailable.'); if(browserName==='chromium') blocked=true; }
   let ledgerPeakBytes=0; let editingSnapshot=null; let telemetryAtEditEnd={presented:[],onsets:[]}; let control=null; let profiler=null; let profilerStartedAt=0; const traceRanks=[];
   const startTrace=async()=>{if(!profileTrace||browserName!=='chromium'||profiler)return;profiler=await context.newCDPSession(page);await profiler.send('Profiler.enable');await profiler.send('Profiler.start',{samplingInterval:1000});profilerStartedAt=Date.now();};
-  const stopTrace=async(phase)=>{if(!profiler)return;const {profile:cpuProfile}=await profiler.send('Profiler.stop');await profiler.send('Profiler.disable');await profiler.detach();profiler=null;const tracePath=path.resolve(process.cwd(),'../tmp/canvas-cutover/evidence',`s271b-trace-${browserName}-${phase}.json`);fs.mkdirSync(path.dirname(tracePath),{recursive:true});const ranking=rankSelfTime(cpuProfile);fs.writeFileSync(tracePath,JSON.stringify({phase,runId,profile:cpuProfile,ranking},null,2)+'\n');traceRanks.push({phase,path:tracePath,ranking});};
+  const stopTrace=async(phase)=>{if(!profiler)return;const {profile:cpuProfile}=await profiler.send('Profiler.stop');await profiler.send('Profiler.disable');await profiler.detach();profiler=null;const tracePath=path.resolve(process.cwd(),'../tmp/canvas-cutover/evidence',`s285-trace-${runId}-${browserName}-${phase}.json`);fs.mkdirSync(path.dirname(tracePath),{recursive:true});const ranking=rankSelfTime(cpuProfile);fs.writeFileSync(tracePath,JSON.stringify({phase,runId,profile:cpuProfile,ranking},null,2)+'\n');traceRanks.push({phase,path:tracePath,ranking});};
   if(profile!=='behavior') {
     const ta=page.locator('.vact-code-input-bridge textarea'); await ta.focus();
     await context.newPage().then(async(p)=>{
@@ -40,7 +40,7 @@ export async function runMeasurement(page, context, browserName, { profile='all'
       samples.push(...controlRows.keys.map((row)=>({phase:'control',...row})));await controlPage.close();
     }
     const editStart=Date.now(); let nextEditAt=editStart;let traceStopped=false; await startTrace();
-    while(Date.now()-editStart<60_000) { const now=Date.now();if(now<nextEditAt){await sleep(nextEditAt-now);continue;}await page.keyboard.press(editKeys[editKeyCount%editKeys.length]);editKeyCount++;nextEditAt=Date.now()+100;if(profileTrace&&!traceStopped&&Date.now()-profilerStartedAt>=10_000){await stopTrace('edit');traceStopped=true;}if(editKeyCount%10===0){await page.mouse.wheel(0,220);ledgerPeakBytes=Math.max(ledgerPeakBytes,await page.evaluate(()=>window.__vactrPerf.counters().usedBytes));samples.push({phase:'edit',at:Date.now(),editKeyCount});} }
+    while(Date.now()-editStart<60_000) { const now=Date.now();if(now<nextEditAt){await sleep(nextEditAt-now);continue;}await page.keyboard.press(editKeys[editKeyCount%editKeys.length]);editKeyCount++;nextEditAt=Date.now()+100;if(profileTrace&&!traceStopped&&Date.now()-profilerStartedAt>=10_000){await stopTrace('edit');traceStopped=true;}if(editKeyCount%10===0){await page.mouse.wheel(0,220);const counters=await page.evaluate(()=>window.__vactrPerf.counters());ledgerPeakBytes=Math.max(ledgerPeakBytes,counters.usedBytes);samples.push({phase:'edit',at:Date.now(),editKeyCount,highlightUnmapped:counters.highlight.unmapped});} }
     if(profiler)await stopTrace('edit');
     editingSnapshot=await api();telemetryAtEditEnd=await page.evaluate(()=>({presented:window.__vactrPerf.presented(),onsets:window.__vactrPerf.onsets()}));
     const cycleStart=Date.now(); let cycle=0; let cdp=null; const observedDprs=[];
@@ -54,7 +54,7 @@ export async function runMeasurement(page, context, browserName, { profile='all'
         await page.evaluate(()=>{ const c=document.querySelector('.vact-code-canvas'); c.style.fontSize=`${12+(Math.floor(performance.now()/5000)%3)}px`; window.dispatchEvent(new Event('resize')); });
         if(cycle%2===1) await page.evaluate(()=>{ const until=performance.now()+250; while(performance.now()<until){} });
         if(profileTrace&&!traceStopped&&Date.now()-profilerStartedAt>=10_000){await stopTrace('cycle');traceStopped=true;}
-        ledgerPeakBytes=Math.max(ledgerPeakBytes,await page.evaluate(()=>window.__vactrPerf.counters().usedBytes));samples.push({phase:'cycle',at,stall:cycle%2===1,devicePixelRatio:observedDpr}); cycle++; await sleep(5000);
+        const counters=await page.evaluate(()=>window.__vactrPerf.counters());ledgerPeakBytes=Math.max(ledgerPeakBytes,counters.usedBytes);samples.push({phase:'cycle',at,stall:cycle%2===1,devicePixelRatio:observedDpr,highlightUnmapped:counters.highlight.unmapped}); cycle++; await sleep(5000);
       }
     } finally { if(profiler)await stopTrace('cycle');if(cdp)await cdp.detach(); }
     if(browserName==='chromium'&&(!observedDprs.includes(1)||!observedDprs.includes(2)))startupFailures.push('dpr-cycle: devicePixelRatio never changed');

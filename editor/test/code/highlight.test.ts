@@ -60,6 +60,23 @@ function event(text: string, literal: string, time: number, dur: [number, number
 }
 
 describe('HighlightScheduler (criterion 1, mock clock)', () => {
+  it('counts a playing range that becomes unmappable after acceptance', () => {
+    const text = 'd1 "bd"';
+    const clock = new MockClock(0.1);
+    let mapAvailable = true;
+    const sched = new HighlightScheduler({
+      clock, file: 'main.vact', map: () => mapAvailable ? { from: 4, to: 6 } : null,
+      tempo: () => TEMPO,
+    });
+    sched.onAccept(() => {});
+    sched.onPlaying([event(text, 'bd', 0, [1, 1])]);
+    expect(sched.stats).toMatchObject({ accepted: 1, unmapped: 0 });
+    mapAvailable = false;
+    expect(sched.tick()).toEqual([]);
+    expect(sched.stats.unmapped).toBe(1);
+    expect(sched.size).toBe(0);
+  });
+
   it('uses audible end times, drops mismatched epochs and future horizon events, and reports accepted ranges', () => {
     const text = 'd1 "bd sd"';
     let now = 1;

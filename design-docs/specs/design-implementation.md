@@ -6990,6 +6990,12 @@ server on 127.0.0.1 with an ephemeral port, and run outside the Codex sandbox.
 An `e2e` entry in `package.json` `scripts` is allowed and is not a dependency
 change.
 
+**Measurement build.** Gating runs (`--write-evidence`) measure only the
+release wasm with the `name` section kept and no DWARF, built by
+`mise run build-wasm-release`. `run.mjs` records the wasm profile, bytes and
+sha256 and refuses any other build (exit 2, blocked). The full rule is in
+15.3.8.13, decision D.
+
 **Behavioral checks** (Chromium and WebKit, each pass or fail):
 
 - **Canvas-only text.** No visible DOM text node in the code pane contains
@@ -7517,12 +7523,25 @@ changes.
 - **Gating build.** Gating evidence is measured only on the release wasm
   with the `name` custom section kept and no DWARF. The single supported
   build is the mise task `build-wasm-release`:
-  `CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm`.
+  `CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm`.
   It writes `target/wasm32-unknown-unknown/release/vactr.wasm`.
 - **Profile settings.** The `[profile.release]` in `Cargo.toml` does not
   change. Native release binaries stay stripped, and `debug` stays unset
   (0). The environment override keeps function names, so profiles attribute
   frames to `vactr::` functions without debug-build cost.
+  - Session-282 correction: the override is `STRIP=debuginfo`. It replaces
+    the earlier `STRIP=none`.
+  - `Cargo.toml` sets `strip = true`. For wasm this links with
+    `--strip-all`, which drops the `name` section.
+  - `debuginfo` links with `--strip-debug`. That removes every `.debug_*`
+    section, including DWARF carried in from the prebuilt std, and keeps
+    the `name` section.
+  - `none` can carry the std DWARF into the module, and `debug=1` adds
+    DWARF. The gating check refuses both results.
+  - The artifact contract decides, not the flag. The verification step
+    inspects the built module and requires `nameSection === true` and
+    `dwarf === false`. If the module fails, that is a blocker for the plan
+    to fix inside its writePaths (`mise.toml`). It is never a pass.
 - **Page build default.** In `editor/vite.config.ts`, `DEFAULT_WASM` becomes
   `../target/wasm32-unknown-unknown/release/vactr.wasm`. `VACTR_WASM` still
   overrides it, so development may use the debug artifact explicitly. The

@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflowInput:RESUME-session-274 'RESUME session 274: fix quadratic scope lookup, scheduler starvation and frame costs; release-wasm silent evidence; closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-277, chain 265-266-267-269-271-274-277; operator decisions A-G and S; design 15.3.8.13 accepted by step3-design-review comm-004269 after DR-S277-B-TIMEBASE; no GitHub issue number)",
+  "issueReference": "workflowInput:RESUME-session-277 'RESUME session 277: accept EVIDENCE-SCOPE, then SCHED, FRAMECOST, silent release-wasm CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-282, chain 265-266-267-269-271-274-277-282; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; plans accepted by step5-impl-plan-review comm-004332; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -101,6 +101,25 @@
       "operatorDiagnosis": "tmp/canvas-cutover/diag-wasm/REPORT.md (gitignored, read-only): run-001 measured the debug wasm; quadratic Scopes and Doc::top_of; stale worklet-time session_tick; per-frame isTexture, getError and Intl.Segmenter",
       "amendment": "Operator decisions A-G and design 15.3.8.13. Three new serial plans precede the CANVAS-EVIDENCE re-measure: CANVAS-EVIDENCE-SCOPE (wave 5, decision A: O(1) Scopes name index and Doc::top_of with cfg(test) counters), CANVAS-EVIDENCE-SCHED (wave 6, decisions B and C: fresh monotonic engine-time tick with an offset estimate and backlog coalescing in editor/worklet/host.js; diagnostics check skipped on an unchanged revision) and CANVAS-EVIDENCE-FRAMECOST (wave 7, decisions E and D: texture generation instead of per-draw isTexture, no per-frame getError, cached grapheme clusters; mise build-wasm-release, release vite default, wasm provenance and gating refusal in run.mjs). CANVAS-EVIDENCE moves to wave 8; renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md move from its writePaths to its sharedPaths so each file has exactly one writing plan at a time. The commit.rs past-event drop is not adopted; escalation F is not triggered and needs design 15.3.8.14 first.",
       "checkpointNote": "Session 277 plan checkpoint: design 15.3.8.13, the three new plans, the CANVAS-EVIDENCE amendment and this manifest are committed and pushed together before fanout. Accepted plans are not redispatched."
+    },
+    "session282": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-282",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-277",
+      "resumeHead": "acf33e2",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      "amendment": "CANVAS-EVIDENCE-SCOPE is implemented in c69314d and re-gated on the current HEAD, not reimplemented. The single-BASE scope row is replaced by three exact checks (S282-PLAN-SCOPE-DIFFGATE, verified-fixed by step5 comm-004332). Decision-D flag correction: the gating release wasm build uses CARGO_PROFILE_RELEASE_STRIP=debuginfo (name section kept, DWARF dropped; design 15.3.8.13 corrected in session 282); Cargo.toml strip = true is unchanged. The SCHED, FRAMECOST and CANVAS-EVIDENCE plan decomposition and the serial DAG are unchanged.",
+      "checkpointNote": "Session 282 plan checkpoint: design 15.3.8.13 correction, the SCOPE and FRAMECOST plan amendments and this manifest are committed together before the SCOPE re-gate. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
@@ -119,7 +138,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-274 'RESUME session 274: fix quadratic scope lookup, scheduler starvation and frame costs; release-wasm silent evidence; closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-277, chain 265-266-267-269-271-274-277; operator decisions A-G and S; design 15.3.8.13 accepted by step3-design-review comm-004269 after DR-S277-B-TIMEBASE; no GitHub issue number)",
+    "issueReference": "workflowInput:RESUME-session-277 'RESUME session 277: accept EVIDENCE-SCOPE, then SCHED, FRAMECOST, silent release-wasm CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-282, chain 265-266-267-269-271-274-277-282; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; plans accepted by step5-impl-plan-review comm-004332; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -169,7 +188,7 @@
       "The evidence harness writes raw data and the results section itself so no hand-typed numbers are committed (evidence.md:21-24).",
       "Session 271 (15.3.8.11): large-eval splits into a contention-insensitive default file (one eval-result, zero error diagnostics, 20k/5k ratio <= 6) and editor/test/e2e/large-eval.perf.test.ts (absolute budget ceil(2*m/100)*100 ms) sharing large-eval-shared.ts, because session 269 showed the 4,800 ms budget failing only under default-worker contention (exits 0, 1, 1) while --maxWorkers=1 runs passed 696/696 three times.",
       "Session 277 (15.3.8.13 B, DR-S277-B-TIMEBASE): the tick stays on the engine timebase (worklet_now) because ctx.currentTime has a different origin; host.js estimates the origin offset as the minimum of ctx.currentTime - m.t and resets it when the posted gap or error counter grows.",
-      "Session 277 (15.3.8.13 D): the release-profile override CARGO_PROFILE_RELEASE_STRIP=none keeps the wasm name section without DWARF; run.mjs classifies the build by sha256 against the target release artifact and refuses any other gating build.",
+      "Session 277 (15.3.8.13 D; corrected in session 282): the release-profile override CARGO_PROFILE_RELEASE_STRIP=debuginfo (wasm-ld --strip-debug) keeps the wasm name section and removes all DWARF, including DWARF from the prebuilt std; Cargo.toml strip = true (--strip-all) would drop the name section, and STRIP=none could keep std DWARF. The built module's nameSection === true and dwarf === false decide, not the flag. run.mjs classifies the build by sha256 against the target release artifact and refuses any other gating build.",
       "Session 277: the four new plans run strictly serially (SCOPE -> SCHED -> FRAMECOST -> EVIDENCE) so both suites stay green after each acceptance and the serial perf gate never shares the host."
     ],
     "intentionalTradeoffs": [
@@ -265,7 +284,8 @@
       "Session 271 (design 15.3.8.11, supersedes the session-269 wall-clock rule): absolute wall-clock budgets live only in editor/test/**/*.perf.test.ts and run only through cd editor && npm run test:perf (VACTR_PERF=1 vitest run --maxWorkers=1), alone on the host with no concurrent vitest, nextest, cargo or browser run; a failed perf run is a failure, never retried until it passes. The default ./node_modules/.bin/vitest run excludes perf files by config and contains no absolute ms budget; no assertion is skipped, deleted or env-gated inside a file.",
       "Session 271 waves: RUNSTART (wave 3) runs alone; EDITCOST (wave 4, gates-only) depends on RUNSTART; CANVAS-EVIDENCE (wave 5) depends on both. Acceptance of EDITCOST and RUNSTART requires three consecutive default full vitest runs (exit 0 each) plus npm run test:perf (exit 0, alone), npm run check, strict clippy, rustfmt --check on the six RUNSTART Rust files and outside-sandbox full nextest (timeout >= 1500 s).",
       "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch rule for this wave): EDITCOST and RUNSTART are acceptedDependencies (commit 2156699) and are not redispatched. plans lists only CANVAS-EVIDENCE, redispatched alone (no fanout peers) with the five session-271 integration-review briefs carried verbatim in the plan section 'Session 274 Amendment'. Its harness files, product seams and seam tests are concrete writePaths with CANVAS-EVIDENCE as the single active owner. Fix order: harness fixes, re-measure, product seam fixes with operation-counter or deterministic tests, re-measure. An unlisted dominant-cost TypeScript file is recorded by the implementer and added by a serial plan-author amendment and checkpoint; the run does not stop and no accepted plan is redispatched. Rust, public contract or dependency needs are operator blockers. Playwright, simulator, profile and full nextest runs happen outside the Codex sandbox in the verification and review steps.",
-      "Session 277 (design 15.3.8.13, operator decisions A-G): plans lists CANVAS-EVIDENCE-SCOPE (wave 5), -SCHED (wave 6), -FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8), strictly serial through dependsOn. Each wave has exactly one plan, so at any time one plan writes each file. renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md are CANVAS-EVIDENCE sharedPaths, edited only after their wave-6/7 owner is accepted. SCOPE is the only plan that edits Rust (the 15.3.8.13 A files). SCHED and FRAMECOST prove no .rs, Cargo.toml or Cargo.lock change, so SCOPE's outside-sandbox full nextest stays authoritative for them; CANVAS-EVIDENCE reruns full nextest in its final gates. Every gating e2e and simulator run follows mise run build-wasm-release and the release-default npm run build; run.mjs exits 2 for any other gating build. Escalation F is reported by CANVAS-EVIDENCE TASK-504 with evidence and implemented only after a serial design 15.3.8.14 amendment and a new plan."
+      "Session 277 (design 15.3.8.13, operator decisions A-G): plans lists CANVAS-EVIDENCE-SCOPE (wave 5), -SCHED (wave 6), -FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8), strictly serial through dependsOn. Each wave has exactly one plan, so at any time one plan writes each file. renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md are CANVAS-EVIDENCE sharedPaths, edited only after their wave-6/7 owner is accepted. SCOPE is the only plan that edits Rust (the 15.3.8.13 A files). SCHED and FRAMECOST prove no .rs, Cargo.toml or Cargo.lock change, so SCOPE's outside-sandbox full nextest stays authoritative for them; CANVAS-EVIDENCE reruns full nextest in its final gates. Every gating e2e and simulator run follows mise run build-wasm-release and the release-default npm run build; run.mjs exits 2 for any other gating build. Escalation F is reported by CANVAS-EVIDENCE TASK-504 with evidence and implemented only after a serial design 15.3.8.14 amendment and a new plan.",
+      "Session 282 (resume of 277 at acf33e2): CANVAS-EVIDENCE-SCOPE is implemented in c69314d and is re-gated, not reimplemented. Its gating list runs on the current HEAD. The single-BASE scope row is replaced by three exact checks (plan section 'session 282 resume'): git diff --name-only 61c9216 c69314d = exactly the 7 SCOPE paths; git diff --name-only c69314d is a subset of the 5 acf33e2 test files plus the 4 session-282 checkpoint files, with all 5 test files present; and no untracked files. BASE=61c9216 stays for the allow/expect grep and the existing-tests diff. The 6 c69314d source files must be byte-identical to c69314d (default vitest exit 0 is required; operator repair acf33e2 made the load-sensitive tests robust), followed by the test-integrity, adversarial and integration reviews and acceptance. SCHED (wave 6), FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8) then run strictly serially as in session 277. The only plan change is the decision-D flag correction (STRIP=debuginfo; design 15.3.8.13 as corrected in session 282). No accepted plan is redispatched."
     ]
   },
   "plans": [
@@ -309,8 +329,8 @@
         "rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "cd editor && ./node_modules/.bin/vitest run",
-        "git diff --name-only $BASE (only this plan's writePaths)",
-        "git diff --exit-code $BASE -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs",
+        "Session 282 (replaces the single-BASE git diff --name-only $BASE row): git diff --name-only 61c9216 c69314d prints exactly the 7 SCOPE paths; git diff --name-only c69314d prints only paths among the 5 acf33e2 test files (all present) and the 4 session-282 checkpoint files; git ls-files --others --exclude-standard prints nothing; git diff --exit-code c69314d -- src/types/scope.rs src/types/tests/mod.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs exits 0",
+        "git diff --exit-code $BASE -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs (BASE=61c9216)",
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (outside the sandbox; exit 0; a timeout kill is neither pass nor fail)",
         "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)",
         "cd editor && npm run check"
@@ -413,7 +433,7 @@
         "layout.ts: shape-cache entries carry multi-unit grapheme clusters (ASCII lines need no segmenter; more than 4096 pairs -> null fallback; 8 bytes per pair counted); boundary uses them with results identical to the old loop; stats.segmentations counts segmenter calls; animatedRects snaps only positions inside the visible line span",
         "gpu.test.ts: animation-only frames make 0 isTexture, 0 getError and 0 layout segmentations; no draw with a deleted texture after loss and restore; boundary equivalence over ASCII, Japanese, ZWJ emoji, combining marks, surrogates, CRLF and CR, cached and fallback",
         "mount.test.ts: per animation-only frame exactly 1 session_frame, 0 session_check, no FakeCore call argument > 64 KiB, 0 isTexture, 0 getError and 0 Intl.Segmenter segment calls",
-        "mise.toml [tasks.build-wasm-release] runs CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm; vite.config.ts DEFAULT_WASM is the release artifact and the error names the task and VACTR_WASM",
+        "mise.toml [tasks.build-wasm-release] runs CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm; vite.config.ts DEFAULT_WASM is the release artifact and the error names the task and VACTR_WASM",
         "wasm-profile.mjs exports customSectionNames, classifyWasm, gatingRefusal and inspectWasm with wasm-profile.test.ts rows; run.mjs records host.wasm and summary.wasm and refuses a non-release, nameless or DWARF gating build with exit 2 before any write, server or browser; README updated",
         "Default vitest, npm run check and node --check pass; the release build and the release dist inspect as profile release, nameSection true, dwarf false; npm run test:perf passes outside the sandbox; renderer.ts and layout.ts stay under 1000 lines; no .rs, Cargo.toml or Cargo.lock change"
       ],

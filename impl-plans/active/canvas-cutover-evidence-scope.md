@@ -221,7 +221,7 @@ path.
 Optional diagnostic (not gating): copy `tmp/canvas-cutover/diag-wasm/scale.mjs` to
 `tmp/canvas-cutover/scope/scale.mjs` and point its import at
 `editor/test/e2e/fixtures/large-doc.mjs` (the original imports a removed worktree path). Run it
-against a release wasm (`CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm`)
+against a release wasm (`CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm`)
 and record the four `session_check` medians next to the REPORT.md values.
 
 ## Overwrite and Drift Protocol
@@ -299,3 +299,72 @@ No source changes were made outside this plan's write paths. Resume acceptance a
 resolves the observed test failures and a full default vitest run exits 0. Initial offset and
 formatting failures are retained in `agent-nextest.log` and `agent-rustfmt.log`; corrected final
 source gates are recorded separately above.
+
+### Session: 2026-10-06 (session 282 resume: re-gate only)
+**Context**: The implementation is committed in `c69314d`. Operator repair `acf33e2` (outside
+this plan) made the three load-sensitive tests robust: the `main.test.ts` native probe runs on
+fake timers, and the syntax/syntax-core 200-edit equivalence and first-track tests got
+load-tolerant timeouts. No assertion was weakened. The operator then ran full vitest 703/703
+three times in a row.
+
+**Session-282 scope (gates only):**
+- Re-run the gating commands of the Verification section on the current HEAD (`acf33e2`, or
+  the session-282 checkpoint commit on top of it). Logs go to
+  `tmp/canvas-cutover/scope/s282-*.log`.
+- Set `BASE=61c9216ef1409324e47a832dcd5c6864464629cb`, the session-277 checkpoint before
+  `c69314d`. Use it only for these two gates, which are unchanged:
+  - `git diff $BASE -- src | grep -E '^\+.*#\[(allow|expect)'` prints nothing;
+  - `git diff --exit-code $BASE -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs`
+    exits 0.
+- The single-BASE row `git diff --name-only $BASE` is replaced, for this session only, by the
+  three exact checks below. Two commits sit between BASE and HEAD that are not this plan's
+  work: operator repair `acf33e2` and the session-282 checkpoint. Record each command's output
+  in the log.
+  - (a) Implementation scope: `git diff --name-only 61c9216 c69314d` prints exactly these 7
+    paths, all in this plan's writePaths:
+    - `impl-plans/active/canvas-cutover-evidence-scope.md`
+    - `src/directives/attach.rs`
+    - `src/directives/tests/attach.rs`
+    - `src/directives/tests/labels.rs`
+    - `src/types/scope.rs`
+    - `src/types/tests/mod.rs`
+    - `src/types/tests/scope_cost.rs`
+
+    The author verified this output on 2026-10-06.
+  - (b) Later changes: `git diff --name-only c69314d` (HEAD plus working tree) prints a subset
+    of the 9 paths below, and nothing else:
+    - the 5 operator-repair test files from `acf33e2` (all 5 must appear):
+      - `editor/test/app/main.test.ts`
+      - `editor/test/code/syntax-core.test.ts`
+      - `editor/test/code/syntax.test.ts`
+      - `editor/test/wasm/abi.test.ts`
+      - `editor/test/wasm/first-track.test.ts`
+    - the 4 session-282 checkpoint files:
+      - `design-docs/specs/design-implementation.md`
+      - `impl-plans/active/canvas-cutover-dispatch.json`
+      - `impl-plans/active/canvas-cutover-evidence-framecost.md`
+      - `impl-plans/active/canvas-cutover-evidence-scope.md`
+
+    The author verified `git diff --name-only c69314d acf33e2` = exactly the 5 test files.
+  - (c) No new files: `git ls-files --others --exclude-standard` prints nothing (gitignored
+    `tmp/`, `target/` and the excluded `.agents/settings.local.json` do not appear).
+- Produce a new fingerprint: `git rev-parse HEAD` plus the sha256 of each of these 6 source
+  files (the code `c69314d` touched):
+  - `src/types/scope.rs`
+  - `src/types/tests/mod.rs`
+  - `src/types/tests/scope_cost.rs`
+  - `src/directives/attach.rs`
+  - `src/directives/tests/attach.rs`
+  - `src/directives/tests/labels.rs`
+
+  They must equal the `c69314d` blobs: `git diff --exit-code c69314d -- <the 6 files>` exits 0.
+- No source edit is expected. If a gate fails inside this plan's writePaths, fix it there and
+  record it. If a failure is outside the writePaths, report it with the log path and do not
+  fix it.
+- The default vitest gate must exit 0. Outside the sandbox, full nextest (`timeout 2400`) and
+  `npm run test:perf` (alone on the host) must exit 0.
+- Then the test-integrity, adversarial and integration reviews run. Mutation controls stay
+  reported separately, and the c69314d logs may be cited for them.
+
+**Done when**: every gating command above exits 0 on the current HEAD, with the complete log
+path recorded here, and the reviewers accept. Then tick the open completion criterion.

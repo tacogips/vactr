@@ -134,10 +134,14 @@ CANVAS-EVIDENCE starts only after this plan is accepted.
   ```toml
   [tasks.build-wasm-release]
   description = "Release host-wasm with the name section (gating evidence build, design 15.3.8.13)"
-  run = "CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+  run = "CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm"
   ```
 
-  Imitate `[tasks.build-release]`. `--lib` matters: without it, the `vactr` bin and the cdylib
+  Session 282 (design 15.3.8.13 D correction): the override is `STRIP=debuginfo`, not `none`.
+  `Cargo.toml` `strip = true` links wasm with `--strip-all`, which drops the `name` section.
+  `debuginfo` links with `--strip-debug`, which keeps `name` and removes every `.debug_*`
+  section, including DWARF that comes in from the prebuilt std. With `none`, that std DWARF
+  can stay in the module. Imitate `[tasks.build-release]`. `--lib` matters: without it, the `vactr` bin and the cdylib
   share the uplifted file name (`editor/test/support/wasm.ts:93`).
 - `editor/vite.config.ts`:
   - `DEFAULT_WASM = '../target/wasm32-unknown-unknown/release/vactr.wasm'`;
@@ -306,6 +310,12 @@ so count layout segmentation with `f.l.stats.segmentations`, not a prototype spy
   `startServer()`. The existing write-evidence block at the end must not run on refusal.
 - `customSectionNames` must handle LEB128 sizes up to 5 bytes and must not read past the
   buffer.
+- Session 282: the artifact contract decides, not the flag. If `inspectWasm` on the built
+  release module shows `nameSection: false` or `dwarf: true`, fix only the
+  `[tasks.build-wasm-release]` command in `mise.toml`. For example, strip DWARF while keeping
+  `name`; do not use `strip = true`/`symbols`. Record the corrected command and the
+  inspection result. Never relax `gatingRefusal`, never edit `Cargo.toml`, and never report the
+  failure as a pass.
 
 ## Verification
 
@@ -375,3 +385,9 @@ editing it and report. Edit only this plan's progress log.
 
 ### Session: 2026-10-05 (session 277 plan authoring)
 **Tasks Completed**: Plan authored from design 15.3.8.13 D and E. No source edits.
+
+### Session: 2026-10-06 (session 282 plan revision)
+**Tasks Completed**: D1 changed from `CARGO_PROFILE_RELEASE_STRIP=none` to
+`CARGO_PROFILE_RELEASE_STRIP=debuginfo` to match the session-282 correction of design
+15.3.8.13 D. Added the artifact-contract pitfall. No other contract, writePath or test row
+changed. Dispatch remains wave 7, after CANVAS-EVIDENCE-SCHED is accepted.

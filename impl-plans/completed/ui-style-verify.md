@@ -1,10 +1,10 @@
 # UI Style: Static Token Check and Playwright Style Test Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: UI-STYLE-VERIFY (wave 2)
 **Design Reference**: design-docs/specs/design-ui-style.md, sections 8.1, 8.2 and 8.3, plus 4.6 (tight groups) and 5 (coarse sizing)
 **Created**: 2026-10-05
-**Last Updated**: 2026-10-05 (session-276 amendment: whole-word named colors in check 2, probe child 11, assertion 7 "Packages Proxy")
+**Last Updated**: 2026-10-05 (session-276 implementation and verification)
 
 Session-276 note: the three residual items from the session-275 review are
 settled by design 8.1 and 8.2. They are white/black word boundaries, the
@@ -374,25 +374,42 @@ For `npm run test:style`, these files must exist:
 
 ## Completion Criteria
 
-- [ ] `style-tokens.test.ts` is added and passes in the gating vitest run.
-- [ ] `ui-style.mjs` is added and passes `node --check`.
-- [ ] The `test:style` script is added.
-- [ ] Negative controls are run and reverted, with evidence logged.
-- [ ] The outside-sandbox run is recorded by the verification step: exit
-  code, `report.json` path, the screenshot list, and the `coarse-mode` and
-  `file-pseudo` notes per engine.
-- [ ] Check 2 uses whole-word named-color matching, with the two added test
-  cases (`black` fails, `var(--vt-border)` passes) run as mutation checks.
-- [ ] `ui-style.mjs` contains probe child 11 and assertion 7, and
-  `report.json` carries the `proxy` object for every engine and viewport.
+- [x] `style-tokens.test.ts` is added and passes in the full vitest run (6 tests).
+- [x] `ui-style.mjs` is added and passes `node --check`.
+- [x] The `test:style` script is added as the only package script change; dependencies are unchanged.
+- [x] Negative controls are run and reverted, with evidence logged.
+- [x] The browser run is recorded: exit code, `report.json`, all four engine/viewport screenshots, `ui-full.png`, and coarse/file-pseudo notes per engine and viewport.
+- [x] Check 2 uses whole-word named-color matching; `black` fails and `var(--vt-border)` passes in separate mutation runs.
+- [x] `ui-style.mjs` contains probe child 11 and assertion 7; `report.json` carries the `proxy` object for every engine and viewport.
 
 ## Progress Log
 
 Edit only this plan's log.
 
-### Session: (implementer fills in)
+### Session: 2026-10-05 — session-276 UI-STYLE-VERIFY implementation
 
-- Baseline and final vitest counts.
-- Hashes of the files created.
-- Mutation-run outcomes.
-- Command exit codes and log paths.
+- Implemented the six static token checks and silent Chromium/WebKit harness. `editor/package.json` gains only `test:style`; no dependency or existing test changes.
+- Source SHA-256: `editor/test/ui/style-tokens.test.ts` `261be5c857951aefbfbe8467bb17f45f4c334db68ff8b4a6bb92fb698b4bbe82`; `editor/test/style/ui-style.mjs` `0c31d8b10651789b5aa29068654ebf8ffcef9239696b51071b1dd7c3de3834bb`; `editor/package.json` `d36c7cf11e5027c49df404210a5d5fa1db874d7f6c7a1ddb99988c8bda8b8ea5`.
+- Vitest baseline from the accepted wave-1 run: 90 files, 696 tests. Final full run with `./node_modules/.bin/vitest run --maxWorkers=1`: 91 files, 702 passed, exit 0; log `tmp/ui-style/UI-STYLE-VERIFY/attempt-1/vitest-serial-final-source.log`. The default parallel command was attempted three times and produced worker-load timeouts and a transient fake-clock assertion (complete logs `tmp/ui-style/UI-STYLE-VERIFY/attempt-1/vitest.log`, `tmp/ui-style/UI-STYLE-VERIFY/attempt-1/vitest-final-rerun.log`, and `tmp/ui-style/UI-STYLE-VERIFY/attempt-1/vitest-final-source.log`); the failed files passed in isolation (logs `focused-main.log`, `focused-first-track.log`, `focused-syntax-core.log`, `focused-syntax.log`). No failure remains on the final serialized full suite.
+- Final gating commands: `npm run check` exit 0 (`npm-check-final.log`); `npm run build` exit 0 (`npm-build-final.log`); `node --check test/style/ui-style.mjs` exit 0 (`node-check-final.log`); `npm run test:style` exit 0 (`npm-test-style-final-source.log`); `node ../tmp/ui-style/shot.mjs ../tmp/ui-style/after` exit 0 (`shot-harness-final.log`).
+- Browser report: `tmp/ui-style/after/report.json`, zero failures. Chromium and WebKit each passed 1440x900 and 1180x820 coarse; coarse mode was native and file pseudo was checked for all four runs. The real Proxy input was present/visible with four `0px` radii, `rgb(11, 13, 16)` fill, `1px` top border, and height 28px fine / 40px coarse; hidden probe display was `none`. Screenshots: `chromium-1440x900@2x.png`, `chromium-1180x820-coarse@2x.png`, `webkit-1440x900@2x.png`, `webkit-1180x820-coarse@2x.png`, plus `ui-full.png` from the screenshot harness.
+- Negative controls (non-gating): `.pkg-pane { border-radius: 4px }` failed static check 1 (1 failed, 5 passed), rebuilt successfully, and failed browser radius assertions; `pkg.css` was restored to its pre-mutation SHA-256 `625427d49dafc54e2ab694aadf2da2eccd4da2bf6f6ac6a97360efd974e38be5` (`mutation-radius-vitest.log`, `mutation-radius-build.log`, `mutation-radius-playwright.log`, pre/post hash files). `color: black` failed check 2; tokenized `border: var(--vt-border-w) solid var(--vt-border)` passed (mutation logs). Swapping theme/app stylesheet links failed check 5 and restored the exact original `index.html` hash (mutation-index-order log and pre/post hash files).
+- Browser interactions remained probe-only; sample panels were opened and reset by property. Chromium launched with `--mute-audio`; no app audio, transport, run, or song controls were activated.
+
+### Session 276 gate rerun — review finding IR-VERIFY-GATE-EVIDENCE
+
+- Readiness: `UI-STYLE-SHELL` is an accepted dependency. This was an evidence-only rerun; no test, harness, package, CSS, TS, or TSX source was edited.
+- Before the checks, `git hash-object` was recorded for the three VERIFY source files and eleven wave-1 source files in `tmp/ui-style/UI-STYLE-VERIFY/attempt-2/hash-pre.txt`. After verification, the matching hashes were recorded in `hash-post.txt`; `cmp` confirmed equality. The VERIFY hashes remain `552f4353f6a2382074ce33ac490faa540b5a14f0`, `5b0691d171d18ab9de2bba67daa617da8409b7f9`, and `c94ff1b9560306692b1c2c81bca3365daaa1a360`.
+- `cd editor && npm run check`: exit 0; complete log `tmp/ui-style/UI-STYLE-VERIFY/attempt-2/npm-check.log`.
+- Gate evidence: `cd editor && ./node_modules/.bin/vitest run` with default workers passed on attempt 1, 91 files and 702/702 tests; exit 0. Complete log `tmp/ui-style/UI-STYLE-VERIFY/attempt-2/vitest-default-1.log`. No failing retry occurred in this rerun. The earlier failed attempt-1 logs remain preserved and list only known pre-existing timeout/fake-clock failures; the prior serial 702/702 run is supplementary evidence, not the gate.
+- `cd editor && npm run build`: exit 0; complete log `tmp/ui-style/UI-STYLE-VERIFY/attempt-2/npm-build.log`.
+- `cd editor && node --check test/style/ui-style.mjs`: exit 0; complete log `tmp/ui-style/UI-STYLE-VERIFY/attempt-2/node-check.log`.
+- Browser evidence remains source-matched because the three VERIFY source hashes above are unchanged: `npm run test:style` exited 0 (`tmp/ui-style/UI-STYLE-VERIFY/attempt-1/npm-test-style-final-source.log`), and the screenshot harness exited 0 (`tmp/ui-style/UI-STYLE-VERIFY/attempt-1/shot-harness-final.log`). The report and all required screenshots are recorded above.
+- The exact default-worker suite now passes on the final source. Earlier attempt-1 failures and their logs are retained as historical flaky-run evidence, not unresolved gate failures.
+
+
+### Session: 2026-10-05 operator closeout (after session 276)
+**Tasks Completed**: Operator re-verification of UI-STYLE-VERIFY on the final source, replacing the blocked branch gate result.
+**Evidence**: `cd editor && npm run check` exit 0; `npm run build` exit 0; `npm run test:style` exit 0 (style assertions passed for Chromium and WebKit at 1440x900 and 1180x820 coarse); default `vitest run` results recorded in tmp/ui-style/operator-vitest-{1,2,3}.log. Four syntax/wasm suites timed out once under load average about 134 caused by a concurrent canvas workflow run and passed 21/21 in isolation; the default suite was rerun after the load dropped.
+**Notes**: Integration review accepted UI-STYLE-SHELL, UI-STYLE-BIND-PARAMS, UI-STYLE-CODE and UI-STYLE-PANELS. Follow-up F1 (canvas renderer palette mapping to --vt-syn-* tokens) stays open for after the wf/canvas merge.
+Default vitest operator runs: run 1 exit 1 (698/702; timeouts in syntax-core, syntax, first-track and the main.test.ts audible-probe timing test while load average was about 47); run 2 exit 0 (702/702); run 3 exit 0 (702/702). Logs: tmp/ui-style/operator-vitest-{1,2,3}.log. The load-sensitive timeouts are pre-existing tests outside this redesign; the main.test.ts probe test should move to fake timers (canvas CLOCK owner follow-up).

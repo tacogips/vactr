@@ -8,10 +8,7 @@ The [GPU canvas editor cutover](active/canvas-cutover-dispatch.json) is Ready (d
 - Wave 2: [mount](active/canvas-cutover-mount.md), [visual](active/canvas-cutover-visual.md) and [shell](active/canvas-cutover-shell.md).
 - Wave 3: [evidence and closeout](active/canvas-cutover-evidence.md).
 
-The [editor UI style redesign](active/ui-style-dispatch.json) is Ready (design-ui-style.md, 2026-10-05). It runs in two waves:
-
-- Wave 1: [shell](active/ui-style-shell.md), [bind and params](active/ui-style-bind-params.md), [code](active/ui-style-code.md) and [panels](active/ui-style-panels.md).
-- Wave 2: [verify](active/ui-style-verify.md).
+The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (design-ui-style.md, 2026-10-05): [shell](completed/ui-style-shell.md), [bind and params](completed/ui-style-bind-params.md), [code](completed/ui-style-code.md), [panels](completed/ui-style-panels.md) and [verify](completed/ui-style-verify.md). Follow-up F1 (canvas palette mapping) remains open.
 
 [Query-issued song authority](active/song-mode-issued-query-authority.md) is In Progress. Its reviewed eight-path scope is released for the live query/replay provenance bridge after accepted retained geometry.
 

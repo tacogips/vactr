@@ -11,6 +11,7 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:perf": "VACTR_PERF=1 vitest run --maxWorkers=1",
+    "test:style": "node test/style/ui-style.mjs",
     "build": "vite build",
     "dev": "vite",
     "e2e": "node test/e2e/run.mjs"

@@ -1,6 +1,6 @@
 # UI Style: Tokens, Base Rules and Shell Implementation Plan
 
-**Status**: In Progress (session-276 rerun: verification only)
+**Status**: Completed
 **Plan ID**: UI-STYLE-SHELL (wave 1)
 **Design Reference**: design-docs/specs/design-ui-style.md, sections 3 (including 3.1 Build output), 4.1-4.3, 4.5 (transport, side bar, section headers, status bar), 5 and 8.3
 **Created**: 2026-10-05
@@ -407,10 +407,10 @@ targets them.
 - [x] `app.css` holds the base rules, variants, icon buttons, transport
   groups, headers and status bar, and is token-only.
 - [x] `song.ts` and `midi/mount.ts` class edits are made.
-- [ ] Session 276: the source-order and built-order checks exit 0 on a fresh
+- [x] Session 276: the source-order and built-order checks exit 0 on a fresh
   `npm run build` (replaces the withdrawn two-link criterion, amendment
   IR-SHELL-DIST-LINK).
-- [ ] Session 276: the amended mechanical checks exit 0, and the current
+- [x] Session 276: the amended mechanical checks exit 0, and the current
   owned-file hashes are recorded in this log.
 - [x] The gating build, type check and full Vitest suite exit 0; their logs
   and the emitted CSS order evidence are recorded below.
@@ -482,3 +482,33 @@ Edit only this plan's log.
   `border-radius:[[:space:]]*[^[:space:]0v;]`, run with `/usr/bin/grep`.
 - No source change is requested. The implementer appends the rerun entry
   below.
+
+### Session: 2026-10-05 — session-276 Step 6 verification rerun
+
+- Reverified the existing shell implementation after the plan-author gate
+  amendment. No implementation source files changed.
+- Verification (foreground; each complete log includes its final exit status):
+  - `cd editor && npm run check` — exit 0; log:
+    `tmp/ui-style/UI-STYLE-SHELL/attempt-2/npm-check.log`.
+  - `cd editor && ./node_modules/.bin/vitest run` — exit 0, 90 files and
+    696 tests passed (baseline 696); log:
+    `tmp/ui-style/UI-STYLE-SHELL/attempt-2/vitest.log`.
+  - `cd editor && npm run build` — exit 0; log:
+    `tmp/ui-style/UI-STYLE-SHELL/attempt-2/npm-build.log`.
+  - Source-order, built-order and amended static token checks — exit 0;
+    source positions 410 < 467, built CSS `index-BXJd7dqC.css` positions
+    6 < 9969; log:
+    `tmp/ui-style/UI-STYLE-SHELL/attempt-2/source-and-static-checks.log`.
+- Ownership audit: the five implementation source hashes remained equal to
+  the expected post-edit hashes; the six watched sheets match the accepted
+  `waveAcceptanceRecord.currentHashes` for BIND-PARAMS, CODE and PANELS.
+  Pre-rerun and post-rerun hashes are recorded at
+  `tmp/ui-style/UI-STYLE-SHELL/attempt-2/ownership-pre.txt` and
+  `tmp/ui-style/UI-STYLE-SHELL/attempt-2/ownership-post-final-attempt-2.txt`.
+  The first post-capture command failed to retrieve hashes because its zsh
+  `path` variable assignment shadowed `PATH`; its output is preserved in
+  `ownership-post-final.txt` and is not treated as passing evidence.
+  The plan hash before this progress update was
+  `5a386419a791560da689546ddd8dc20de76058f6`; the post-update hash is in the
+  `ownership-post-final-attempt-3.txt` evidence file. The ownership check
+  passes; no sibling source files changed during this rerun.

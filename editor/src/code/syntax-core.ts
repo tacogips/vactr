@@ -1,4 +1,5 @@
 import { Edit, type Language, type Parser, type Query } from 'web-tree-sitter';
+import type { Text } from '@codemirror/state';
 
 export interface SyntaxCapture {
   name: string;
@@ -14,12 +15,14 @@ export interface ParsedVact {
 export interface VactSyntax {
   parse(text: string): ParsedVact;
   reparse?(parsed: ParsedVact, text: string, edits: readonly SyntaxEdit[]): ParsedVact;
+  parseDoc(doc: Text, old: ParsedVact | null): ParsedVact;
+  edit(parsed: ParsedVact, edit: SyntaxTreeEdit): void;
 }
 
 export interface SyntaxEdit { from: number; to: number; insert: string }
 
 interface TreePoint { row: number; column: number }
-interface TreeEdit { startIndex: number; oldEndIndex: number; newEndIndex: number; startPosition: TreePoint; oldEndPosition: TreePoint; newEndPosition: TreePoint }
+export interface SyntaxTreeEdit { startIndex: number; oldEndIndex: number; newEndIndex: number; startPosition: TreePoint; oldEndPosition: TreePoint; newEndPosition: TreePoint }
 
 function treeIndexLength(text: string): number { return text.length; }
 function pointAt(text: string, utf16: number): TreePoint {
@@ -30,7 +33,7 @@ function pointAt(text: string, utf16: number): TreePoint {
 }
 
 /** Convert UTF-16 document edits to web-tree-sitter JavaScript indices and points. */
-export function treeEdits(oldText: string, edits: readonly SyntaxEdit[]): TreeEdit[] {
+export function treeEdits(oldText: string, edits: readonly SyntaxEdit[]): SyntaxTreeEdit[] {
   return [...edits].sort((a, b) => b.from - a.from).map((edit) => {
     const startIndex = edit.from;
     const oldEndIndex = edit.to;
@@ -42,6 +45,23 @@ export function treeEdits(oldText: string, edits: readonly SyntaxEdit[]): TreeEd
       : { row: startPosition.row + insertedLines.length - 1, column: treeIndexLength(insertedLines[insertedLines.length - 1] ?? '') };
     return { startIndex, oldEndIndex, newEndIndex: startIndex + treeIndexLength(edit.insert), startPosition, oldEndPosition, newEndPosition };
   });
+}
+
+function pointAtDoc(doc: Text, pos: number): TreePoint {
+  const line = doc.lineAt(pos);
+  return { row: line.number - 1, column: pos - line.from };
+}
+
+/** Convert one UTF-16 transaction change using CodeMirror line coordinates. */
+export function treeEditFromDocs(base: Text, next: Text, fromA: number, toA: number, fromB: number, toB: number): SyntaxTreeEdit {
+  return {
+    startIndex: fromA,
+    oldEndIndex: toA,
+    newEndIndex: toB,
+    startPosition: pointAtDoc(base, fromA),
+    oldEndPosition: pointAtDoc(base, toA),
+    newEndPosition: pointAtDoc(next, toB),
+  };
 }
 
 export type SyntaxLoader = () => Promise<VactSyntax>;
@@ -89,17 +109,19 @@ export async function loadVactSyntax(base: string): Promise<VactSyntax> {
 export function createVactSyntax(parser: Parser, query: Query): VactSyntax {
   const trees = new WeakMap<ParsedVact, NonNullable<ReturnType<Parser['parse']>>>();
   const sources = new WeakMap<ParsedVact, string>();
-  const wrap = (tree: NonNullable<ReturnType<Parser['parse']>>, source: string): ParsedVact => {
+  const wrap = (tree: NonNullable<ReturnType<Parser['parse']>>, source: string | Text): ParsedVact => {
       const parsed: ParsedVact = {
         captures(from, to) {
-          return query.captures(tree.rootNode).map((capture) => ({ name: capture.name,
+          const startPosition = typeof source === 'string' ? pointAt(source, from) : pointAtDoc(source, from);
+          const endPosition = typeof source === 'string' ? pointAt(source, to) : pointAtDoc(source, to);
+          return query.captures(tree.rootNode, { startPosition, endPosition }).map((capture) => ({ name: capture.name,
             from: capture.node.startIndex, to: capture.node.endIndex }))
             .filter((capture) => capture.from < to && (capture.to > from || capture.from >= from));
         },
         delete: () => tree.delete(),
       };
       trees.set(parsed, tree);
-      sources.set(parsed, source);
+      if (typeof source === 'string') sources.set(parsed, source);
       return parsed;
   };
   return {
@@ -107,6 +129,17 @@ export function createVactSyntax(parser: Parser, query: Query): VactSyntax {
       const tree = parser.parse(text);
       if (!tree) throw new Error('Tree-sitter could not parse the document');
       return wrap(tree, text);
+    },
+    parseDoc(doc: Text, old: ParsedVact | null): ParsedVact {
+      const oldTree = old ? trees.get(old) : undefined;
+      const tree = parser.parse((index) => index < doc.length ? doc.sliceString(index, Math.min(doc.length, index + 16_384)) : undefined, oldTree);
+      if (!tree) throw new Error('Tree-sitter could not parse the document');
+      return wrap(tree, doc);
+    },
+    edit(parsed, edit) {
+      const tree = trees.get(parsed);
+      if (!tree) throw new Error('Unknown parsed syntax tree');
+      tree.edit(new Edit(edit));
     },
     reparse(parsed, text, edits) {
       const tree = trees.get(parsed);

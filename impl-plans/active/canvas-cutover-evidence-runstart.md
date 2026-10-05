@@ -1,6 +1,6 @@
 # Canvas Cutover: Large-Document Run Start Stall Fix Implementation Plan
 
-**Status**: Ready (session 269 resume: wave 3 redispatch for gates, budget and mutation evidence; parallel with CANVAS-EVIDENCE-EDITCOST)
+**Status**: Implementation incomplete (plan-listed default full Vitest gate did not pass three consecutive runs)
 **Plan ID**: CANVAS-EVIDENCE-RUNSTART (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.10 (session 269: wall-clock vitest gates, mutation evidence), #15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-RUNSTART`)
@@ -298,20 +298,21 @@ Stop and report it for routing to the owner (design 15.3.8.10, selective redispa
 
 ### Completion criteria (session 269)
 
-- [ ] TASK-201: three focused medians, `m` and `LARGE_EVAL_BUDGET_MS` recorded; budget equals `ceil(2*m/100)*100`
-- [ ] TASK-202: `s269-mutation-prefix.log` with vitest exit 1 against the pre-fix scratch wasm (mutationEvidence)
-- [ ] TASK-203: every in-sandbox gate exits 0 with its log path; three consecutive full vitest runs reported
-- [ ] TASK-203 (outside the sandbox): full nextest exit 0 with log path; three consecutive full vitest runs pass on the joined tree
-- [ ] TASK-204: either not triggered (recorded) or applied exactly as specified
+- [x] TASK-201: final-source focused 20,000-line medians 2,372.8, 2,366.7, and 2,382.9 ms; `m=2,372.8`; `LARGE_EVAL_BUDGET_MS=4,800`, exactly `ceil(2*m/100)*100` (`logs/s269d-focused-1..3.log`)
+- [x] TASK-202: pre-fix scratch Wasm build exit 0; `s269-mutation-prefix.log` exited 1 on the 4,800 ms budget assertion after a 141,240.7 ms 20,000-line median (outer timeout did not kill the run)
+- [ ] TASK-203: build, focused eval, focused large-doc, npm check, rustfmt, strict clippy and focused nextest pass. Three consecutive full-suite runs pass with `--maxWorkers=1`, but the plan-listed default `vitest run` command passed once and failed twice on the eval budget (`logs/s269e-vitest-full-1..3.log`)
+- [x] TASK-203 (outside the sandbox): full nextest exit 0, 2,810 passed and 3 skipped (`logs/s269-nextest-full.log`)
+- [x] TASK-204: triggered by full-suite default-timeout failures; focused duration 1.99 s; added only the 60-second timeout/comment (`editor/test/e2e/large-doc.test.ts`)
 
 ## Completion Criteria
 
 - [x] Hot spot located with recorded timings and CPU profiles
 - [x] Fix applied in the owning files; escalated paths recorded as sharedPaths
-- [x] `large-eval.test.ts` passes: 5,000-line median 811.7 ms, 20,000-line median 2,559.3 ms, ratio 3.15, one eval-result and zero error diagnostics (`tmp/canvas-cutover/evidence-runstart/logs/large-eval-final.log`)
-- [ ] A controlled pre-fix mutation failure is recorded; the pre-edit run was interrupted at exit 130 and is not mutation evidence
-- [x] `npm run check`, touched-file rustfmt, strict clippy and focused nextest pass
-- [ ] Full vitest passes; latest run had five failures: three in parallel edit-cost/mount tests, one large-doc timeout under suite load, and this plan's eval benchmark exceeded 5,000 ms under suite load (focused benchmark passes)
+- [x] `large-eval.test.ts` passes on final source: focused 5,000-line median 811.3 ms, 20,000-line median 2,374.2 ms, ratio 2.93, one eval-result and zero error diagnostics (`logs/s269e-large-eval-focused.log`); separate three-run budget sample is recorded under TASK-201
+- [x] Controlled pre-fix mutation failure: scratch build exit 0; Vitest exit 1 on the budget assertion at 141,240.7 ms (`logs/s269-mutation-prefix.log`)
+- [x] `npm run check`, touched-file rustfmt, strict clippy, focused nextest and full nextest pass; full nextest passed 2,810 tests with 3 skipped
+- [x] Full Vitest passes three consecutive times with `--maxWorkers=1` (696/696 each; `logs/s269f-vitest-full-1..3.log`)
+- [ ] The plan-listed default `cd editor && ./node_modules/.bin/vitest run` gate passes three consecutive times. After TASK-204 it passed once, then exceeded the 4,800 ms eval budget at 4,924.1 and 5,685.6 ms (`logs/s269e-vitest-full-1..3.log`).
 
 ## Progress Log
 
@@ -326,3 +327,10 @@ Stop and report it for routing to the owner (design 15.3.8.10, selective redispa
 
 ### Session: 2026-10-05 (session 269 plan amendment)
 **Tasks Completed**: Applied operator authorization 2 and design 15.3.8.10. The six session-267 Rust files are now writePaths with their escalation notes kept. Added the scratch artifact root, the conditional `editor/test/e2e/large-doc.test.ts` sharedPath (DR-269-L1) and tasks TASK-201 (2x focused-median budget), TASK-202 (pre-fix scratch mutation run), TASK-203 (gates: three consecutive full vitest, rustfmt on the six files, strict clippy, focused and outside-sandbox full nextest) and TASK-204 (bounded `large-doc.test.ts` timeout rule). The manifest entry changed with it.
+
+### Session: 2026-10-05 (session 269 implementation gates)
+**TASK-201**: On the final measurement logic, three focused runs printed 20,000-line medians 2,372.8, 2,366.7, and 2,382.9 ms (5,000-line values 813.0, 810.7, and 811.7 ms). Thus `m=2,372.8` and the exact budget is `ceil(2*m/100)*100=4,800` ms. `large-eval.test.ts` keeps the <=8 ratio, one result, zero error diagnostics, and 120,000 ms test timeout. The final focused check printed 811.3/2,374.2 ms and passed (`logs/s269e-large-eval-focused.log`).
+**TASK-202**: Built the 968028c pre-fix source in `scratch/pre-fix` (exit 0; `logs/s269-mutation-build.log`). The controlled run exited 1 on the budget assertion with medians 20,566.3/141,240.7 ms and ratio 6.87 (`logs/s269-mutation-prefix.log`, 488.38 s); it was not killed by the 900-second outer timeout.
+**TASK-203 focused and Rust gates**: The final host-wasm build passed (`logs/s269-wasm-build.log`); rustfmt check on all six Rust files, strict clippy, and focused nextest (283 passed, 2,530 skipped) passed (`logs/s269-rustfmt-check.log`, `s269-clippy.log`, `s269-nextest-focused.log`). `npm run check` passed after the TypeScript edits (`logs/s269f-npm-check.log`). The post-TASK-204 focused large-doc suite passed both tests in 1.95 s (`logs/s269f-large-doc-focused.log`).
+**TASK-203 full gates**: Full nextest exited 0: 2,810 passed and 3 skipped in 1,002.044 s (`logs/s269-nextest-full.log`). Default-parallel Vitest attempts are preserved in `s269-vitest-full-*`, `s269b-vitest-full-*`, `s269c-vitest-full-*`, `s269d-vitest-full-*`, and `s269e-vitest-full-*`; after TASK-204, one such run passed and two hit the eval wall-clock budget under worker contention (`s269e-vitest-full-1..3.log`). The joined tree passes three consecutive full runs with supported `--maxWorkers=1`, each 696/696 in 66.79, 68.05, and 66.32 s (`logs/s269f-vitest-full-1..3.log`). This is alternate full-suite evidence, but the plan-listed default command remains unresolved pending acceptance that the worker cap is valid for TASK-203. No test assertion was removed or changed.
+**TASK-204**: The default large-doc timeout failed in `logs/s269d-vitest-full-1.log` and `-3.log`; the post-join focused run passed in 1.99 s (`logs/s269d-large-doc-focused.log`). Added only a 60,000 ms per-test timeout and a plan citation. The pre-edit SHA-256 was `144a59a394e90b824db34df5efdc1c99dc2d311874a6c50d58fd0b706bc42516`; final SHA-256 is recorded in `tmp/canvas-cutover/evidence-runstart/receipt.json`.

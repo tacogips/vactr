@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Language, Parser, Query } from 'web-tree-sitter';
 import { EditorState } from '@codemirror/state';
 import { CAPTURE_CLASSES, createVactSyntax, FallbackSpans, SyntaxSpans } from '../../src/code/syntax';
@@ -157,13 +157,17 @@ describe('tree-sitter syntax WASM', () => {
 
   it('keeps SyntaxSpans equivalent to a fresh parse across 200 mixed edits', () => {
     const syntax = createVactSyntax(parser, query);
-    const reparse = syntax.reparse!;
-    const parse = syntax.parse;
     let incrementalEdits = 0, fullParses = 0;
-    const observedSyntax = { ...syntax, reparse: (...args: Parameters<NonNullable<typeof syntax.reparse>>) => {
-      incrementalEdits += 1;
-      return reparse(...args);
-    }, parse: (text: string) => { fullParses += 1; return parse(text); } };
+    const observedSyntax = { ...syntax,
+      edit: (parsed: import('../../src/code/syntax-core').ParsedVact, edit: import('../../src/code/syntax-core').SyntaxTreeEdit) => {
+        incrementalEdits += 1;
+        syntax.edit(parsed, edit);
+      },
+      parseDoc: (doc: import('@codemirror/state').Text, old: import('../../src/code/syntax-core').ParsedVact | null) => {
+        if (!old) fullParses += 1;
+        return syntax.parseDoc(doc, old);
+      },
+    };
     const provider = new SyntaxSpans(observedSyntax);
     let state = EditorState.create({ doc: Array.from({ length: 2000 }, (_, line) => `let value${line} ${line} # 日本`).join('\n') });
     let seed = 0x12345678;
@@ -192,7 +196,36 @@ describe('tree-sitter syntax WASM', () => {
         } finally { fresh.delete(); }
       }
       expect(incrementalEdits).toBeGreaterThan(100);
-      expect(fullParses).toBeGreaterThan(10);
+      expect(fullParses).toBe(1);
     } finally { provider.dispose(); }
+  }, 60_000);
+
+  it('reparses a missed Text identity and avoids whole-document conversion on edits', () => {
+    const syntax = createVactSyntax(parser, query);
+    const provider = new SyntaxSpans(syntax);
+    let state = EditorState.create({ doc: Array.from({ length: 20_000 }, (_, index) => `let value${index} ${index} # 日本`).join('\n') });
+    provider.spans(state, 0, 128, 64);
+    const base = state.doc;
+    const tr = state.update({ changes: { from: base.line(10_000).from + 4, insert: 'x' } });
+    provider.noteChanges(tr.changes, tr.state);
+    state = tr.state;
+    const proto = Object.getPrototypeOf(state.doc) as { toString: () => string; sliceString: (from: number, to?: number) => string };
+    const stringify = vi.spyOn(proto, 'toString');
+    const slices = vi.spyOn(proto, 'sliceString');
+    const line = state.doc.line(10_000);
+    provider.spans(state, line.from, line.to, 64);
+    expect(stringify.mock.contexts.some((doc) => (doc as import('@codemirror/state').Text).length > 65_536)).toBe(false);
+    expect(slices.mock.calls.every(([from, to]) => (to ?? Infinity) - from <= 65_536)).toBe(true);
+    stringify.mockRestore();
+    slices.mockRestore();
+
+    const missed = state.update({ changes: { from: 0, insert: '# skipped change\n' } }).state;
+    const result = provider.spans(missed, 0, missed.doc.length, 100_000).spans;
+    const fresh = syntax.parse(missed.doc.toString());
+    try {
+      expect(result.map(({ from, to, className }) => ({ from, to, className }))).toEqual(
+        styleSpans(fresh, 0, missed.doc.length).map(({ from, to, cls }) => ({ from, to, className: cls })),
+      );
+    } finally { fresh.delete(); provider.dispose(); }
   }, 30_000);
 });

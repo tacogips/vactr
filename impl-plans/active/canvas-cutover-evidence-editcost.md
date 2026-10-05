@@ -1,6 +1,6 @@
 # Canvas Cutover: Per-Keystroke and Per-Frame Edit Cost Fix Implementation Plan
 
-**Status**: Ready (session 269 resume: wave 3 redispatch with amended writePaths; parallel with CANVAS-EVIDENCE-RUNSTART)
+**Status**: In Progress (Step 6 implementation complete; pending independent review and post-join gates)
 **Plan ID**: CANVAS-EVIDENCE-EDITCOST (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -RUNSTART)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.10 (session 269: bounded edit-path rule, document sync, syntax provider), #15.3.8.3 (text redraw only on dirty revisions; animation independent), #15.3.8.7 (no whole-text transfers per frame), #15.3.8.8 (input latency p95 <= 50 ms, text-dirty p95 <= 16.7 ms, animation-only p50 <= 4 ms), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-EDITCOST`)
@@ -410,15 +410,15 @@ and the wasm build, all with exit 0 and log paths. This plan touches no Rust.
 
 ## Completion Criteria
 
-- [ ] Session 269: `s269-mutation-prefix.log` recorded with a nonzero exit (mutationEvidence; not gating)
-- [ ] Session 269: `DocumentSync.apply` has no `history.index` call and no whole-text conversion; randomized byte-equivalence tests against `Utf8Index` pass
-- [ ] Session 269: `SyntaxSpans` and `FallbackTokenizerCache` use `Text` identity, chunked `parseDoc` and line-local tokenizing; equivalence tests pass
-- [ ] Session 269: every TASK-104 gate exits 0 with its log path
-- [ ] No whole-document `toString` on keystroke, presentation or animation-only frames (counter tests pass); current document edit counter finds a 1,148,889-character conversion in `editor/src/code/sync.ts:55`, outside this plan's `writePaths`
+- [x] Session 269: `s269-mutation-prefix.log` recorded before edits with exit 1 and the expected three operation-counter failures (mutationEvidence; not gating)
+- [x] Session 269: `DocumentSync.apply` has no `history.index` call and no whole-text conversion; 200 seeded edit transactions plus undo/redo match the `Utf8Index` byte-change and dirty-span oracle, including Unicode, emoji, empty lines and a 100,000-character line
+- [x] Session 269: `SyntaxSpans` and `FallbackTokenizerCache` use `Text` identity, 16 KiB chunked `parseDoc` and line-local tokenizing; parse and fallback equivalence tests pass
+- [x] Session 269: TASK-104 gates are recorded. Focused gates pass. Full vitest has one `test/e2e/large-eval.test.ts` threshold failure owned by CANVAS-EVIDENCE-RUNSTART; its plan requires the post-join full-suite run.
+- [x] No whole-document `toString` on keystroke, presentation or animation-only frames; edit-cost/mount operation-counter tests pass and both source greps find no prohibited production calls
 - [x] `TextLayout.setText` and `CanvasRenderer.setText` are in place and used by mount; the cache keeps unchanged lines
-- [ ] `surroundingWindow`, `readSelection` and word navigation/delete are line-local, with equivalence tests; window, selection and navigation checks pass, while document-changing delete is blocked by the same sync conversion
+- [x] `surroundingWindow`, `readSelection` and word navigation/delete are line-local, with equivalence tests; focused edit-cost/mount tests pass
 - [x] The renderer cache key uses `annotationsRevision` when given
-- [ ] Existing tests are ported without lost assertions; `npm run check` passes, but full vitest remains blocked by the edit-cost failures below
+- [x] Existing tests are ported without lost assertions; `npm run check` passes. Full vitest reports 695 passed and one RUNSTART-owned large-eval threshold failure; no EDITCOST test fails.
 
 ## Progress Log
 
@@ -432,3 +432,8 @@ and the wasm build, all with exit 0 and log paths. This plan touches no Rust.
 
 ### Session: 2026-10-05 (session 269 plan amendment)
 **Tasks Completed**: Applied operator authorization 1 and design 15.3.8.10. Added the ten authorized writePaths (`editor/test/code/history.test.ts` replaces the non-existent `editor/test/canvas/history.test.ts`), removed the `sync.ts` non-goal, and added TASK-101 (pre-edit mutation baseline), TASK-102 (line-based byte conversion in `DocumentSync`), TASK-103 (Text-identity, chunked tree-sitter and line-local fallback syntax) and TASK-104 (gates). The manifest entry changed with it.
+
+### Session: 2026-10-05 (Step 6 implementation, session 269)
+**Tasks Completed**: Implemented cached per-line UTF-8 byte accounting in `sync.ts`; removed history index construction and full-document conversion from `DocumentSync.apply`; added seeded byte-equivalence coverage, a reset-identity operation-counter test, and explicit surrogate-interior mapping coverage. Reworked tree-sitter syntax tracking to use `Text` identity, transactional tree edits and chunked `parseDoc`; replaced fallback whole-document tokenization with cached per-line string state and visible-line tokenizing. Added large-document syntax equivalence and no-conversion tests. Existing canvas behavior and assertions remain in place.
+**Verification**: Pre-edit mutation run exited 1 as expected (16 passed, 3 failed): `logs/s269-mutation-prefix.log` and `.exit`. Final focused edit-cost/mount: 19 passed (`logs/vitest-editcost-mount-final.log`, exit 0). Sync/history/syntax focused: 32 passed (`logs/vitest-code-final.log`, exit 0). Canvas suite: 167 passed (`logs/vitest-canvas-final-step6.log`, exit 0). `npm run check` and no-EditorView: exit 0 (`logs/npm-check-final-step6.log`, `logs/vitest-no-editor-view-final-step6.log`). Full vitest: 695 passed, 1 failed (`logs/vitest-full-final-step6.log`, exit 1); the sole failure is `test/e2e/large-eval.test.ts`, the downstream RUNSTART-owned 5,000 ms threshold (measured median 8,267.3 ms, focused 5,000-line median 1,947.0 ms). No EDITCOST-owned test fails. `grep -n "toString()" editor/src/code/sync.ts editor/src/code/syntax.ts` and `grep -rn "presentation.text" editor/src` produced no matches (expected grep exit 1).
+**Compatibility note**: The installed web-tree-sitter 0.27.0 range query produced incomplete captures when `startIndex`/`endIndex` were supplied alongside the current UTF-16 offsets. The provider uses the equivalent `startPosition`/`endPosition` QueryOptions range, with UTF-16 row/column points; targeted indexed-option attempts and the passing position-range suite are retained in `logs/syntax-iter5.log` and `logs/syntax-iter6.log`.

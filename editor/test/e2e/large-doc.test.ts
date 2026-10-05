@@ -20,6 +20,7 @@ describe('large browser evidence workload', () => {
     expect(a.controlText).toContain('stack ['); expect(a.controlText).toContain('] > d1');
     expect(a.controlText).not.toContain('s :pad > note [60 64] > d1');
   });
+  // CANVAS-EVIDENCE-RUNSTART TASK-204: focused duration 1.99s; allow suite-load contention.
   it('validates the complete evaluable document with the real host-wasm session_check', async () => {
     const wasm = await helpers.loadVactrWasm();
     expect(wasm.call('session_init', 48_000, 0)).toBe(1);
@@ -37,5 +38,5 @@ describe('large browser evidence workload', () => {
     expect(controlChecks).toHaveLength(1);
     expect(controlChecks[0]?.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
     expect(encoder.encode(workload.text).length).toBe(workload.bytes);
-  });
+  }, 60_000);
 });

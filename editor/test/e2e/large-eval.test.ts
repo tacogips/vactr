@@ -9,6 +9,7 @@ const helperSpec: string = '../support/wasm.ts';
 const fixture = (await import(/* @vite-ignore */ fixtureSpec)) as FixtureModule;
 const helpers = (await import(/* @vite-ignore */ helperSpec)) as Helpers;
 const decode = new TextDecoder();
+const LARGE_EVAL_BUDGET_MS = 4_800;
 
 async function evaluate(code: string): Promise<{ elapsedMs: number; evalResults: EvalEnvelope[] }> {
   const wasm = await helpers.loadVactrWasm();
@@ -48,6 +49,7 @@ describe('large-document eval startup cost', () => {
     const ratio = largeMedian / Math.max(smallMedian, 0.01);
     console.info(`large-eval node medians: 5000=${smallMedian.toFixed(1)}ms 20000=${largeMedian.toFixed(1)}ms ratio=${ratio.toFixed(2)}`);
     expect(ratio).toBeLessThanOrEqual(8);
-    expect(largeMedian).toBeLessThanOrEqual(5_000);
+    // CANVAS-EVIDENCE-RUNSTART: 2x the focused median (2,372.8ms) rounded up to 100ms.
+    expect(largeMedian).toBeLessThanOrEqual(LARGE_EVAL_BUDGET_MS);
   }, 120_000);
 });

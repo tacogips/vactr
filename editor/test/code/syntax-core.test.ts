@@ -5,12 +5,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 vi.mock('@codemirror/view', () => {
   throw new Error('syntax-core must not load @codemirror/view');
 });
-vi.mock('@codemirror/state', () => {
-  throw new Error('syntax-core must not load @codemirror/state');
-});
 
+import { Text } from '@codemirror/state';
 import { Language, Parser, Query } from 'web-tree-sitter';
-import { createVactSyntax, styleSpans, type VactSyntax } from '../../src/code/syntax-core';
+import { createVactSyntax, styleSpans, treeEditFromDocs, treeEdits, type VactSyntax } from '../../src/code/syntax-core';
 
 interface NodeFs {
   readFileSync(path: string): Uint8Array<ArrayBuffer> | string;
@@ -33,7 +31,7 @@ function readText(path: string): string {
   return new TextDecoder().decode(value);
 }
 
-describe('CodeMirror-free tree-sitter syntax core', () => {
+describe('EditorView-free tree-sitter syntax core', () => {
   beforeAll(async () => {
     fs = await readFs();
     const root = proc.cwd();
@@ -77,7 +75,7 @@ describe('CodeMirror-free tree-sitter syntax core', () => {
       expect(spans).toEqual([...spans].sort((a, b) => a.from - b.from || a.to - b.to));
       expect(new Set(spans.map(({ from, to }) => `${from}:${to}`)).size).toBe(spans.length);
       expect(styleSpans(parsed, line3Start, text.length).every((span) => span.to >= line3Start)).toBe(true);
-      expect(readText(`${proc.cwd()}/src/code/syntax-core.ts`)).not.toContain('@codemirror/');
+      expect(readText(`${proc.cwd()}/src/code/syntax-core.ts`)).not.toContain('@codemirror/view');
     } finally {
       parsed.delete();
     }
@@ -104,5 +102,38 @@ describe('CodeMirror-free tree-sitter syntax core', () => {
         finally { fresh.delete(); }
       }
     } finally { parsed.delete(); }
+  }, 30_000);
+
+  it('derives Text tree edits equal to the existing string edit algorithm', () => {
+    const cases = [
+      { old: 'abc def', from: 2, to: 4, insert: 'XY' },
+      { old: 'let 日本 1', from: 5, to: 7, insert: '🎹' },
+      { old: 'one\ntwo\nthree', from: 4, to: 8, insert: '二\n三\n' },
+      { old: '🎹\n日本語', from: 2, to: 5, insert: '' },
+    ];
+    for (const item of cases) {
+      const base = Text.of(item.old.split('\n'));
+      const next = base.replace(item.from, item.to, Text.of(item.insert.split('\n')));
+      const actual = treeEditFromDocs(base, next, item.from, item.to, item.from, item.from + item.insert.length);
+      expect(actual).toEqual(treeEdits(item.old, [{ from: item.from, to: item.to, insert: item.insert }])[0]);
+    }
+  });
+
+  it('parses Text in bounded chunks and returns the same captures as the string path', () => {
+    const syntax = createVactSyntax(parser, query);
+    const source = `${Array.from({ length: 20_000 }, (_, index) => `let value${index} ${index} # 日本`).join('\n')}\n`;
+    const doc = Text.of(source.split('\n'));
+    const proto = Object.getPrototypeOf(doc) as { sliceString: (from: number, to?: number) => string };
+    const slice = vi.spyOn(proto, 'sliceString');
+    const parsed = syntax.parseDoc(doc, null);
+    const stringParsed = syntax.parse(source);
+    try {
+      expect(slice.mock.calls.every(([from, to]) => (to ?? doc.length) - from <= 16_384)).toBe(true);
+      expect(styleSpans(parsed, 0, doc.length)).toEqual(styleSpans(stringParsed, 0, source.length));
+    } finally {
+      parsed.delete();
+      stringParsed.delete();
+      slice.mockRestore();
+    }
   }, 30_000);
 });

@@ -1,7 +1,7 @@
 import { Text, type ChangeSet, type EditorState } from '@codemirror/state';
 import type { CodeAnnotation } from '../app/apis';
-import { styleSpans, type ParsedVact, type VactSyntax } from './syntax-core';
-import { tokenizerSpans } from './language';
+import { styleSpans, treeEditFromDocs, type ParsedVact, type VactSyntax } from './syntax-core';
+import { LineStream, vactParser } from './language';
 
 export { CAPTURE_CLASSES, createVactSyntax, loadVactSyntax } from './syntax-core';
 export type { ParsedVact, StyleSpan, SyntaxCapture, SyntaxLoader, VactSyntax } from './syntax-core';
@@ -21,57 +21,117 @@ function bounded(spans: readonly { from: number; to: number; className: string }
 
 export class FallbackSpans implements SpanProvider {
   private readonly tokenizer = new FallbackTokenizerCache();
-  noteChanges(changes: ChangeSet, state: EditorState): void { this.tokenizer.noteChanges(changes, state); }
+  private lastDoc: Text | null = null;
+  noteChanges(changes: ChangeSet, state: EditorState): void {
+    this.tokenizer.noteChanges(changes, this.lastDoc, state.doc);
+    this.lastDoc = state.doc;
+  }
   spans(state: EditorState, from: number, to: number, limit: number): SpanResult {
-    const spans = this.tokenizer.spans(state, from, to).map((span) => ({ from: span.from, to: span.to, className: span.className }));
+    const spans = this.tokenizer.spans(state.doc, from, to).map((span) => ({ from: span.from, to: span.to, className: span.className }));
+    this.lastDoc = state.doc;
     return bounded(spans, from, to, limit);
   }
 }
 
 class FallbackTokenizerCache {
-  private cachedText = '';
-  private cached: { from: number; to: number; className: string }[] = [];
-  private dirty = true;
-  noteChanges(changes: ChangeSet, state: EditorState): void {
-    if (changes.empty) return;
-    this.dirty = true;
-    this.cachedText = state.doc.toString();
-  }
-  spans(state: EditorState, from: number, to: number): { from: number; to: number; className: string }[] {
-    if (this.dirty || this.cachedText !== state.doc.toString()) {
-      this.cached = tokenizerSpans(state.doc).map((span) => ({ from: span.from, to: span.to, className: span.className }));
-      this.cachedText = state.doc.toString();
-      this.dirty = false;
+  private current: Text | null = null;
+  private startStates: { inString: boolean }[] = [{ inString: false }];
+  private validThrough = 0;
+
+  noteChanges(changes: ChangeSet, base: Text | null, next: Text): void {
+    if (changes.empty) { this.current = next; return; }
+    if (!base || this.current !== base) {
+      this.startStates = [{ inString: false }];
+      this.validThrough = 0;
+    } else {
+      let first = base.lines;
+      changes.iterChanges((fromA) => { first = Math.min(first, base.lineAt(fromA).number - 1); });
+      this.startStates.length = Math.min(this.startStates.length, first + 1);
+      this.validThrough = Math.min(this.validThrough, first);
     }
-    return this.cached.filter((span) => span.to > from && span.from < to);
+    this.current = next;
+  }
+
+  spans(doc: Text, from: number, to: number): { from: number; to: number; className: string }[] {
+    if (this.current !== doc) {
+      this.current = doc;
+      this.startStates = [{ inString: false }];
+      this.validThrough = 0;
+    }
+    const first = doc.lineAt(Math.max(0, Math.min(doc.length, from))).number - 1;
+    const last = doc.lineAt(Math.max(from, Math.min(doc.length, to > from ? to - 1 : to))).number - 1;
+    while (this.validThrough < first) this.advance(doc, this.validThrough);
+    const spans: { from: number; to: number; className: string }[] = [];
+    for (let index = first; index <= last; index += 1) {
+      const line = doc.line(index + 1);
+      const state = { ...(this.startStates[index] ?? { inString: false }) };
+      this.tokenizeLine(line.text, line.from, state, spans);
+      if (index === this.validThrough) {
+        this.startStates[index + 1] = { ...state };
+        this.validThrough += 1;
+      }
+    }
+    return spans;
+  }
+
+  private advance(doc: Text, index: number): void {
+    const line = doc.line(index + 1);
+    const state = { ...(this.startStates[index] ?? { inString: false }) };
+    this.tokenizeLine(line.text, line.from, state, null);
+    this.startStates[index + 1] = { ...state };
+    this.validThrough = index + 1;
+  }
+
+  private tokenizeLine(lineText: string, lineFrom: number, state: { inString: boolean }, out: { from: number; to: number; className: string }[] | null): void {
+    if (!lineText.length) vactParser.blankLine(state);
+    const stream = new LineStream(lineText);
+    while (!stream.eol()) {
+      stream.start = stream.pos;
+      const type = vactParser.token(stream, state);
+      if (stream.pos === stream.start) stream.next();
+      if (type && out) out.push({ from: lineFrom + stream.start, to: lineFrom + stream.pos, className: `vact-tok-${type}` });
+    }
   }
 }
 
 export class SyntaxSpans implements SpanProvider {
   private parsed: ParsedVact | null = null;
-  private text: string;
-  private nextText: string;
-  private pending: { from: number; to: number; insert: string }[] = [];
-  private fullReparse = false;
-  constructor(private readonly syntax: VactSyntax) {
-    this.text = '';
-    this.nextText = '';
+  private lastDoc: Text | null = null;
+  private dirty = true;
+  private fullParse = true;
+  constructor(private readonly syntax: VactSyntax) {}
+
+  noteChanges(changes: ChangeSet, state: EditorState): void {
+    const next = state.doc;
+    const base = this.lastDoc;
+    if (changes.empty) { this.lastDoc = next; return; }
+    if (!base || !this.parsed || this.fullParse) {
+      this.fullParse = true;
+    } else {
+      const edits: ReturnType<typeof treeEditFromDocs>[] = [];
+      changes.iterChanges((fromA, toA, fromB, toB) => edits.push(treeEditFromDocs(base, next, fromA, toA, fromB, toB)));
+      try {
+        for (const edit of edits.reverse()) this.syntax.edit(this.parsed, edit);
+      } catch {
+        this.fullParse = true;
+      }
+    }
+    this.lastDoc = next;
+    this.dirty = true;
   }
-  noteChanges(_changes: ChangeSet, state: EditorState): void {
-    const next = state.doc.toString();
-    if (next === this.nextText) return;
-    if (this.pending.length || this.fullReparse) this.fullReparse = true;
-    else _changes.iterChanges((fromA, toA, fromB, toB) => this.pending.push({ from: fromA, to: toA, insert: state.doc.sliceString(fromB, toB) }));
-    this.nextText = next;
-  }
+
   spans(state: EditorState, from: number, to: number, limit: number): SpanResult {
-    if (!this.parsed || this.nextText !== state.doc.toString()) { this.fullReparse = true; this.nextText = state.doc.toString(); }
-    if (this.fullReparse || this.pending.length) {
+    const missed = state.doc !== this.lastDoc;
+    if (missed) { this.lastDoc = state.doc; this.fullParse = true; this.dirty = true; }
+    if (!this.parsed || this.dirty) {
       const old = this.parsed;
-      try { this.parsed = old && !this.fullReparse && this.syntax.reparse ? this.syntax.reparse(old, this.nextText, this.pending) : this.syntax.parse(this.nextText); }
-      catch { this.parsed = this.syntax.parse(this.nextText); }
+      let next: ParsedVact;
+      try { next = this.syntax.parseDoc(state.doc, old && !this.fullParse ? old : null); }
+      catch { next = this.syntax.parseDoc(state.doc, null); }
+      this.parsed = next;
       if (old && old !== this.parsed) old.delete();
-      this.text = this.nextText; this.pending = []; this.fullReparse = false;
+      this.dirty = false;
+      this.fullParse = false;
     }
     const spans = styleSpans(this.parsed!, from, to).map((span) => ({ from: span.from, to: span.to, className: span.cls }));
     return bounded(spans, from, to, limit);

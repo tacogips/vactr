@@ -59,7 +59,10 @@ describe('canvas input bridge', () => {
     const { surface, sync, el, input } = setup('abc'); surface.dispatch({ selection: { anchor: 1, head: 2 } });
     composition(el, 'compositionstart'); composition(el, 'compositionupdate', 'に'); before(el, 'insertCompositionText', '日本', true);
     expect(surface.state.doc.toString()).toBe('abc'); expect(sync.revision).toBe(1);
-    expect(input.presentation).toEqual({ text: 'a日本c', cursor: 3, annotations: [{ from: 1, to: 3, kind: 'composition' }] });
+    expect(input.presentation.text).toBe('a日本c');
+    expect(input.presentation.doc.toString()).toBe('a日本c');
+    expect(input.presentation.cursor).toBe(3);
+    expect(input.presentation.annotations).toEqual([{ from: 1, to: 3, kind: 'composition' }]);
     composition(el, 'compositionend', '日本'); before(el, 'insertFromComposition', '日本', true);
     el.dispatchEvent(new InputEvent('input', { inputType: 'insertFromComposition', data: '日本' }));
     expect(surface.state.doc.toString()).toBe('a日本c'); expect(sync.revision).toBe(2);

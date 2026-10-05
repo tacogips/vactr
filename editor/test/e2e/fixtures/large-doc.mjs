@@ -9,7 +9,7 @@ function mulberry32(seed) {
 }
 export function createLargeDocument({ lines = 20_000, seed = 265 } = {}) {
   const random = mulberry32(seed);
-  const synthDefinition = ['inst pad freq: float = 440 amp: float = 0.5:', '\tsaw freq', '\t\t> * amp'];
+  const synthDefinition = ['inst pad freq: float = 440 amp: float = 0.005:', '\tsaw freq', '\t\t> * amp'];
   const voices = Array.from({ length: 64 }, () => '{s :pad > note [60 64]}').join(' ');
   const head = [
     ...synthDefinition,
@@ -39,5 +39,5 @@ export function createLargeDocument({ lines = 20_000, seed = 265 } = {}) {
   text = rows.join('\n'); bytes = encoder.encode(text).length;
   if (rows.length !== lines) throw new Error(`expected ${lines} lines, got ${rows.length}`);
   if (bytes < 1_048_576 * 0.95 || bytes > 1_048_576 * 1.05) throw new Error(`UTF-8 size out of range: ${bytes}`);
-  return { text, controlText: [...synthDefinition, 's :pad > note [60 64] > d1'].join('\n'), head: head.join('\n'), lines: rows.length, bytes, seed, voices: 64, visualOutputs: ['o0', 'o1', 'o2', 'o3'], longLines: rows.filter((line) => line.length > 400).length };
+  return { text, controlText: [...synthDefinition, `stack [${voices}] > d1`].join('\n'), head: head.join('\n'), lines: rows.length, bytes, seed, voices: 64, visualOutputs: ['o0', 'o1', 'o2', 'o3'], longLines: rows.filter((line) => line.length > 400).length };
 }

@@ -16,8 +16,9 @@ describe('large browser evidence workload', () => {
     expect(a.text).toBe(b.text); expect(a.lines).toBe(20_000); expect(a.bytes).toBeGreaterThanOrEqual(1_048_576 * 0.95);
     expect(a.bytes).toBeLessThanOrEqual(1_048_576 * 1.05); expect(a.text).toContain('日本語'); expect(a.text).toContain('🎹');
     expect(a.longLines).toBeGreaterThanOrEqual(50); expect(a.voices).toBe(64); expect(a.visualOutputs).toEqual(['o0','o1','o2','o3']);
-    expect(a.text).toContain('inst pad freq: float = 440 amp: float = 0.5:');
-    expect(a.controlText).toContain('s :pad > note [60 64] > d1');
+    expect(a.text).toContain('inst pad freq: float = 440 amp: float = 0.005:');
+    expect(a.controlText).toContain('stack ['); expect(a.controlText).toContain('] > d1');
+    expect(a.controlText).not.toContain('s :pad > note [60 64] > d1');
   });
   it('validates the complete evaluable document with the real host-wasm session_check', async () => {
     const wasm = await helpers.loadVactrWasm();
@@ -30,6 +31,11 @@ describe('large browser evidence workload', () => {
     expect(checks).toHaveLength(1);
     expect(checks[0]?.kind).toBe('check');
     expect(checks[0]?.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+    wasm.callStr('session_check', JSON.stringify({ file: 'main.vact', code: workload.controlText }));
+    const controlRecords = wasm.drainRecords().filter((record) => record.tag === 0x71);
+    const controlChecks = controlRecords.map((record) => JSON.parse(new TextDecoder().decode(record.bytes)) as SessionCheckRecord);
+    expect(controlChecks).toHaveLength(1);
+    expect(controlChecks[0]?.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
     expect(encoder.encode(workload.text).length).toBe(workload.bytes);
   });
 });

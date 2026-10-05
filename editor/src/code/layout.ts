@@ -1,3 +1,4 @@
+import { Text } from '@codemirror/state';
 import type { CodeRect, CodeRange } from '../app/apis';
 import { RESOURCE_LIMITS } from './resources';
 
@@ -13,6 +14,8 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 /** No per-character geometry arrays: huge lines are measured lazily, drawn as cropped run tiles. */
 export class TextLayout {
   private source = '';
+  private text: Text | null = null;
+  private documentCache: { doc: Text; value: string } | null = null;
   private lines: LineIndex[] = [{ from: 0, to: 0, next: 0 }];
   private cache = new Map<number, { line: ShapedLine; bytes: number }>();
   private bytes = 0;
@@ -22,12 +25,17 @@ export class TextLayout {
     this.cacheLimit = Math.min(RESOURCE_LIMITS.layout, Math.max(0, cacheLimit));
     this.validateFont(font);
   }
-  get document(): string { return this.source; }
-  get lineCount(): number { return this.lines.length; }
+  get document(): string {
+    if (!this.text) return this.source;
+    if (!this.documentCache || this.documentCache.doc !== this.text) this.documentCache = { doc: this.text, value: this.text.toString() };
+    return this.documentCache.value;
+  }
+  get lineCount(): number { return this.text?.lines ?? this.lines.length; }
   get cacheBytes(): number { return this.bytes; }
   setDocument(text: string): void {
-    if (text === this.source) return;
+    if (!this.text && text === this.source) return;
     const previous = this.source; const previousLines = this.lines;
+    this.text = null; this.documentCache = null;
     this.source = text; this.lines = [];
     let from = 0;
     for (const match of text.matchAll(/\r\n|\r|\n/g)) {
@@ -43,6 +51,28 @@ export class TextLayout {
       }
     }
   }
+  setText(doc: Text): void {
+    if (doc === this.text) return;
+    const previous = this.text, previousLines = this.lines, previousSource = this.source;
+    this.text = doc; this.source = ''; this.documentCache = null;
+    for (const [n, entry] of this.cache) {
+      const before = previous ? (n < previous.lines ? previous.line(n + 1) : null) : previousLines[n] ?? null;
+      const after = n < doc.lines ? doc.line(n + 1) : null;
+      const beforeFrom = before?.from ?? -1, beforeTo = before?.to ?? -1;
+      const beforeText = before ? (previous ? previous.line(n + 1).text : previousSource.slice(beforeFrom, beforeTo)) : '';
+      if (!after || beforeFrom !== after.from || beforeTo !== after.to || beforeText !== after.text) {
+        this.bytes -= entry.bytes; this.cache.delete(n);
+      }
+    }
+  }
+  private lineIndex(number: number): LineIndex | null {
+    if (!this.text) return this.lines[number] ?? null;
+    if (number < 0 || number >= this.text.lines) return null;
+    const line = this.text.line(number + 1);
+    return { from: line.from, to: line.to, next: line.to + (number + 1 < this.text.lines ? 1 : 0) };
+  }
+  private slice(from: number, to: number): string { return this.text ? this.text.sliceString(from, to) : this.source.slice(from, to); }
+  private get length(): number { return this.text?.length ?? this.source.length; }
   setFont(font: LayoutFont): void {
     this.validateFont(font);
     if (JSON.stringify(font) === JSON.stringify(this.font)) return;
@@ -55,22 +85,25 @@ export class TextLayout {
   shape(number: number): ShapedLine {
     const hit = this.cache.get(number);
     if (hit) { this.cache.delete(number); this.cache.set(number, hit); return hit.line; }
-    const index = this.lines[number];
+    const index = this.lineIndex(number);
     if (!index) throw new RangeError('Line outside document');
     this.metrics.font = this.font.font;
     const runs: ShapedRun[] = []; const stop = Math.max(1, this.metrics.measureText(' ').width * 4);
     let x = 0; let from = index.from;
     while (from < index.to) {
-      const tab = this.source.indexOf('\t', from);
+      const lineText = this.slice(index.from, index.to);
+      const tabOffset = lineText.indexOf('\t', from - index.from);
+      const tab = tabOffset < 0 ? -1 : index.from + tabOffset;
       const to = tab < 0 ? index.to : Math.min(tab, index.to);
       if (to > from) {
-        const text = this.source.slice(from, to); const width = this.metrics.measureText(text).width;
+        const text = this.slice(from, to); const width = this.metrics.measureText(text).width;
         runs.push({ text, from, to, x, width }); x += width;
       }
       if (to === index.to) break;
       x = (Math.floor(x / stop) + 1) * stop; from = to + 1;
     }
-    const line: ShapedLine = { number, from: index.from, to: index.to, runs, width: x, rtlUnsupported: rtl.test(this.source.slice(index.from, index.to)) };
+    const lineText = this.slice(index.from, index.to);
+    const line: ShapedLine = { number, from: index.from, to: index.to, runs, width: x, rtlUnsupported: rtl.test(lineText) };
     const bytes = 128 + runs.reduce((n, r) => n + 64 + r.text.length * 2, 0);
     while (this.bytes + bytes > this.cacheLimit && this.cache.size) {
       const first = this.cache.keys().next().value!; this.bytes -= this.cache.get(first)!.bytes; this.cache.delete(first); this.stats.evictions++;
@@ -86,16 +119,16 @@ export class TextLayout {
     return out;
   }
   private lineAt(pos: number): number {
-    let lo = 0, hi = this.lines.length - 1;
-    while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (this.lines[mid]!.from <= pos) lo = mid; else hi = mid - 1; }
+    let lo = 0, hi = this.lineCount - 1;
+    while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (this.lineIndex(mid)!.from <= pos) lo = mid; else hi = mid - 1; }
     return lo;
   }
   /** Snap within a whole browser-shaped run, preserving surrogate/combining clusters. */
   boundary(pos: number, bias: -1 | 1 = -1): number {
-    pos = Math.max(0, Math.min(this.source.length, pos));
-    const index = this.lines[this.lineAt(pos)]!;
+    pos = Math.max(0, Math.min(this.length, pos));
+    const index = this.lineIndex(this.lineAt(pos))!;
     if (pos > index.to) return bias < 0 ? index.to : index.next;
-    const text = this.source.slice(index.from, index.to); const relative = pos - index.from;
+    const text = this.slice(index.from, index.to); const relative = pos - index.from;
     for (const part of segmenter.segment(text)) {
       const end = part.index + part.segment.length;
       if (part.index === relative || end === relative) return pos;
@@ -123,7 +156,7 @@ export class TextLayout {
     return this.boundary(run.from + (bias < 0 ? Math.max(0, lo - 1) : lo), bias);
   }
   coordsAtPos(pos: number, view: LayoutViewport): CodeRect | null {
-    if (!Number.isInteger(pos) || pos < 0 || pos > this.source.length) return null;
+    if (!Number.isInteger(pos) || pos < 0 || pos > this.length) return null;
     const number = this.lineAt(pos); const line = this.shape(number);
     const left = (view.left ?? 0) + (view.gutter ?? 48) + this.advance(line, pos) - view.scrollLeft;
     const top = (view.top ?? 0) + number * this.font.lineHeight - view.scrollTop;

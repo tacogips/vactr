@@ -1,10 +1,11 @@
 import { isolateHistory } from '@codemirror/commands';
+import { Text } from '@codemirror/state';
 import type { CodeAnnotation } from '../app/apis';
 import { CodeSurface } from './surface';
 import { AccessibilityBridge, boundary } from './accessibility';
 import { KeyboardController, type KeyboardOptions } from './keyboard';
 
-export interface InputPresentation { text: string; cursor: number; annotations: readonly CodeAnnotation[] }
+export interface InputPresentation { doc: Text; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
 export interface InputOptions extends KeyboardOptions {
   label?: string;
   onPresentation?: (presentation: InputPresentation) => void;
@@ -19,6 +20,8 @@ export class InputController {
   private preedit = '';
   private original = '';
   private trailingComposition = false;
+  private cachedPresentation: InputPresentation | null = null;
+  private presentationKey: { stateDoc: Text; range: { from: number; to: number } | null; preedit: string; composing: boolean; cursor: number } | null = null;
   private stop: () => void;
   private listeners: (() => void)[] = [];
   private disposed = false;
@@ -59,10 +62,19 @@ export class InputController {
   }
   get isComposing(): boolean { return this.composing; }
   get presentation(): InputPresentation {
-    const text = this.surface.state.doc.toString(), range = this.surface.compositionRange;
-    if (!this.composing || !range) return { text, cursor: this.surface.state.selection.main.head, annotations: [] };
-    return { text: text.slice(0, range.from) + this.preedit + text.slice(range.to), cursor: range.from + this.preedit.length,
-      annotations: [{ from: range.from, to: range.from + this.preedit.length, kind: 'composition' }] };
+    const stateDoc = this.surface.state.doc, range = this.surface.compositionRange;
+    const cursor = this.composing && range ? range.from + this.preedit.length : this.surface.state.selection.main.head;
+    const key = this.presentationKey;
+    if (key && key.stateDoc === stateDoc && key.composing === this.composing && key.preedit === this.preedit && key.cursor === cursor &&
+      key.range?.from === range?.from && key.range?.to === range?.to) return this.cachedPresentation!;
+    const doc = this.composing && range ? stateDoc.replace(range.from, range.to, Text.of(this.preedit.split('\n'))) : stateDoc;
+    const annotations: readonly CodeAnnotation[] = this.composing && range
+      ? [{ from: range.from, to: range.from + this.preedit.length, kind: 'composition' }] : [];
+    const presentation = { doc, cursor, annotations } as InputPresentation;
+    Object.defineProperty(presentation, 'text', { enumerable: true, get: () => doc.toString() });
+    this.presentationKey = { stateDoc, range: range ? { ...range } : null, preedit: this.preedit, composing: this.composing, cursor };
+    this.cachedPresentation = presentation;
+    return presentation;
   }
   private listen(target: EventTarget, name: string, fn: EventListener): void {
     target.addEventListener(name, fn); this.listeners.push(() => target.removeEventListener(name, fn));

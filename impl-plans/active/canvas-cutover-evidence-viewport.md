@@ -1,6 +1,6 @@
 # Canvas Cutover: First-Viewport Delivery Fix (Chromium 1x1 Canvas Backing) Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (implementation complete; awaiting downstream review)
 **Plan ID**: CANVAS-EVIDENCE-VIEWPORT (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -EDITCOST, -RUNSTART)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.3 (DPR and resize), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-VIEWPORT`)
@@ -118,11 +118,18 @@ drifted before your first edit, stop and report it. Edit only this plan's progre
 
 ## Completion Criteria
 
-- [ ] `frame.ts` delivers the first viewport on the first visible tick
-- [ ] New `frame.test.ts` rows and `first-viewport.test.ts` pass; pre-fix failure recorded as mutation evidence
-- [ ] `npm run check` and full vitest pass
+- [x] `frame.ts` delivers the first viewport on the first visible tick and coalesces viewport-triggered text invalidation into that frame
+- [x] New `frame.test.ts` rows and `first-viewport.test.ts` pass; pre-fix failure recorded as mutation evidence
+- [x] `npm run check` and full vitest pass
 
 ## Progress Log
 
 ### Session: 2026-10-05 (session 267 plan)
 **Tasks Completed**: Plan authored; root cause diagnosed from `frame.ts:51-55,71` and `pixel-diagnostic.log`.
+
+### Session: 2026-10-05 (Step 6 implementation)
+**Tasks Completed**: First-visible-tick viewport delivery; change-only subsequent delivery; mount-level high-DPI backing regression; viewport invalidation coalescing.
+**Files**: `editor/src/code/frame.ts`, `editor/test/canvas/frame.test.ts`, `editor/test/canvas/first-viewport.test.ts`.
+**Mutation Evidence**: `tmp/canvas-cutover/evidence-viewport/logs/mutation-final-tests.log` (pre-fix simulation, exit 1; 5 failed and 8 passed, including unchanged viewport delivery and 2x2 backing failures).
+**Final Verification**: Focused Vitest 13/13 passed; `npm run check` exit 0; full Vitest 678/678 passed. Logs are in `tmp/canvas-cutover/evidence-viewport/logs/`.
+**Notes**: An initial full Vitest run exposed two redundant-frame assertions after first viewport delivery; fixed by consuming viewport callback text invalidation in that same frame and covered with a scheduler regression row. Formal review, integration review and workflow closeout remain downstream.

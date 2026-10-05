@@ -80,6 +80,19 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    /// Captures only the provided slots when the evaluator has proved its
+    /// write set is bounded to those slots.
+    #[must_use]
+    pub fn take_slots(slots: &[VarSlotRef]) -> Snapshot {
+        let mut captured = Vec::with_capacity(slots.len());
+        for slot in slots {
+            if !captured.iter().any(|snap: &SlotSnap| snap.slot.same(slot)) {
+                captured.push(SlotSnap::take(slot));
+            }
+        }
+        Snapshot { slots: captured }
+    }
+
     /// Captures every bound session slot of `ns` and each of `extra`.
     #[must_use]
     pub fn take(ns: &Namespace, extra: &[VarSlotRef]) -> Snapshot {
@@ -370,10 +383,8 @@ impl Evaluator {
                     form: f,
                     on: slot.name(),
                 });
-                if let Some(r) = self.graph.get_mut(f) {
-                    r.attempt = attempted;
-                    r.subs = vec![slot.clone()];
-                }
+                self.graph
+                    .set_failure_reads(f, attempted, vec![slot.clone()]);
                 self.settle_bad(f, FormState::Blocked { on: slot.name() }, was_bad, p);
             }
             (None, Err(e)) => self.fail(f, e, attempted, was_bad, p),
@@ -432,9 +443,7 @@ impl Evaluator {
                         version: r.version,
                     })
                     .collect();
-                if let Some(r) = self.graph.get_mut(f) {
-                    r.commit_edges(edges);
-                }
+                self.graph.commit_edges(f, edges);
                 p.reads.insert(f, a.reads);
                 p.writes.insert(f, members);
                 p.states.insert(f, FormState::Recomputed);
@@ -473,10 +482,7 @@ impl Evaluator {
             form: f,
             code: e.code,
         });
-        if let Some(r) = self.graph.get_mut(f) {
-            r.attempt = attempted;
-            r.subs.clear();
-        }
+        self.graph.set_failure_reads(f, attempted, Vec::new());
         self.settle_bad(f, FormState::Failed(e), was_bad, p);
     }
 
@@ -604,9 +610,7 @@ impl Evaluator {
                 if let Some(r) = hit {
                     let slot = r.slot.clone();
                     p.states.insert(f, FormState::Blocked { on: slot.name() });
-                    if let Some(rec) = self.graph.get_mut(f) {
-                        rec.subs = vec![slot];
-                    }
+                    self.graph.set_subscriptions(f, vec![slot]);
                     invalid.insert(f);
                     grew = true;
                 }
@@ -633,9 +637,10 @@ impl Evaluator {
             r.state = state.clone();
             if valid {
                 if let (Some(gen), Some(w)) = (new_gen, writes) {
-                    let old = std::mem::replace(&mut r.gen, gen);
                     r.writes = w;
-                    self.ns.tweaks().borrow_mut().retire(old);
+                    if let Some(old) = self.graph.set_generation(*f, gen) {
+                        self.ns.tweaks().borrow_mut().retire(old);
+                    }
                     for g in self.graph.claim(*f) {
                         self.refresh_tiers(g);
                     }

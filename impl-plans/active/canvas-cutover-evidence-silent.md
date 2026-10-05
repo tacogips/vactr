@@ -1,6 +1,6 @@
 # Canvas Cutover: Silent Evidence Harness Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CANVAS-EVIDENCE-SILENT (wave 3, session 267; parallel with CANVAS-EVIDENCE-VIEWPORT, -EDITCOST, -RUNSTART)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (Workload, Head-only control run, Silent automated audio, DPR bullet, profile H keystroke floor)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-SILENT`)
@@ -362,16 +362,16 @@ repair. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] `silent-sink.mjs` and its unit tests are in place and pass
-- [ ] Workload `amp` is 0.005 with 64 voices; `controlText` is the head stack and passes `session_check`
-- [ ] The control is hushed and re-baselined before the large-document Run. Workload onsets are post-click only (`attributeWorkloadOnsets`), sink onsets are split at `largeRunCtxTime` (`splitSinkOnsets`), and the four `stats.test.ts` attribution rows pass
-- [ ] `run.mjs` launches Chromium with `--mute-audio` and the GPU flags, installs the sink on every context, records the renderer per browser, and accepts `--run-id`
-- [ ] Silence gates and evidence rows are implemented in `stats.mjs` and tested
-- [ ] Canvas readback happens in-frame; WebKit synthetic touch sends `isPrimary: true`
-- [ ] DPR cycle assertion and 10/s keystroke pacing are done; the 500 floor stays on `editKeyCount`
-- [ ] `ios-sim.mjs` asserts `playingEvents === 0`; `main.ts` self-check reports `playingEvents` and is tested
-- [ ] Native audit recorded (with any test fix)
-- [ ] All verification commands pass with log paths recorded
+- [x] `silent-sink.mjs` and its unit tests are in place and pass
+- [x] Workload `amp` is 0.005 with 64 voices; `controlText` is the head stack and passes `session_check`
+- [x] The control is hushed and re-baselined before the large-document Run. Workload onsets are post-click only (`attributeWorkloadOnsets`), sink onsets are split at `largeRunCtxTime` (`splitSinkOnsets`), and the four `stats.test.ts` attribution rows pass
+- [x] `run.mjs` launches Chromium with `--mute-audio` and the GPU flags, installs the sink on every context, records the renderer per browser, and accepts `--run-id`
+- [x] Silence gates and evidence rows are implemented in `stats.mjs` and tested
+- [x] Canvas readback happens in-frame; WebKit synthetic touch sends `isPrimary: true`
+- [x] DPR cycle assertion and 10/s keystroke pacing are done; the 500 floor stays on `editKeyCount`
+- [x] `ios-sim.mjs` asserts `playingEvents === 0`; `main.ts` self-check reports `playingEvents` and is tested
+- [x] Native audit recorded (with any test fix)
+- [x] All verification commands pass with log paths recorded
 
 ## Progress Log
 
@@ -380,3 +380,13 @@ repair. Edit only this plan's progress log.
 
 ### Session: 2026-10-05 (session 267 plan revision, PR-S267-001)
 **Tasks Completed**: TASK-002 now requires the following sequence between the control and the workload Run: control Run, controlSink, `.vact-hush`, a bounded 1 s quiet wait, a post-hush re-baseline, `largeRunClickMs`/`largeRunCtxTime`, then the large-document click. It also requires post-click-only workload onsets, the sink onset split, the pure `attributeWorkloadOnsets`/`splitSinkOnsets` helpers with four tests, `__vactrSink.now()`, the related pitfalls and a completion checkbox. Gates, ownership and paths are unchanged.
+
+
+### Session: 2026-10-05 (Riela Step 6 implementation, CANVAS-EVIDENCE-SILENT)
+**Tasks Completed**: Added `silent-sink.mjs` and unit coverage; routed browser contexts through the virtual sink; lowered workload amplitude and switched the control to the 64-voice head stack; added hush, quiet wait, post-hush baseline and click/time attribution; added 10-key/s editing and DPR checks; captured per-browser renderer; required the iOS self-check to report zero playing events; added `playingEvents` to the self-check and tests; documented the silent method. No Rust tests opened a real output device.
+
+**Native silence audit**: `src/host/native/audio/stream.rs` contains the only CPAL output-device/stream openers; the production open path is `src/cli/mod.rs`. CLI test spawns are either `--host noop` for run/repl/serve or non-output verbs (`render`, `lsp`). No offending test needed modification. Audit logs: `tmp/canvas-cutover/evidence-silent/logs/native-audio-audit.log`, `native-cli-spawn-audit.log`, `native-host-flags-audit.log`.
+
+**Final verification** (exit 0 unless shown): `node --check ...` — `tmp/canvas-cutover/evidence-silent/logs/node-check-final3.log`; host-wasm build — `wasm-build.log`; focused evidence tests, 22/22 — `focused-vitest-final5.log`; self-check tests, 9/9 — `main-vitest.log`; `npm run check` — `npm-check-final5.log`; full Vitest, 674/674 across 87 files — `full-vitest-final5.log`; native audit greps — logs above.
+
+**Prior verification**: The initial focused run failed 2 assertions (fake connection edge count and a baseline row timestamp); both fixtures were corrected. `npm run check` then found one excess-property typing issue in the expanded attribution test; the local test interface was corrected. Final focused and full Vitest runs pass. Browser and simulator execution is assigned to outside-sandbox wave 4.

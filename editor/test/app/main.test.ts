@@ -1,17 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { order, area, socketMessages, tauriConnect, wasmStart } = vi.hoisted(() => {
+const { order, area, socketMessages, tauriConnect, wasmStart, invokeMock } = vi.hoisted(() => {
   const order: string[] = [];
   const socketMessages: string[] = [];
   const tauriConnect = vi.fn();
   const wasmStart = vi.fn();
+  const invokeMock = vi.fn(async (..._args: unknown[]) => false);
   const area = (name: string) => ({
     mount: () => {
       order.push(name);
       return { dispose: () => void order.push(`dispose:${name}`) };
     },
   });
-  return { order, area, socketMessages, tauriConnect, wasmStart };
+  return { order, area, socketMessages, tauriConnect, wasmStart, invokeMock };
 });
 vi.mock('../../src/code/mount', () => ({ ...area('code'), DOC_FILE: 'main.vact' }));
 vi.mock('../../src/midi/mount', () => area('midi'));
@@ -35,9 +36,9 @@ vi.mock('../../src/protocol/wasm', () => ({
     close(): void {}
   },
 }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(async () => false) }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { MOUNT_ORDER, boot, createEditor, tierFromUrl } from '../../src/app/main';
+import { MOUNT_ORDER, boot, createEditor, tierFromUrl, reportSelfCheck } from '../../src/app/main';
 import { audibleFor } from '../../src/app/clock';
 import { PANES } from '../../src/app/layout';
 import { MemoryFiles } from '../../src/platform/files';
@@ -182,5 +183,27 @@ describe('audible tier wiring', () => {
     } finally {
       root.remove();
     }
+  });
+});
+
+describe('native self-check', () => {
+  async function runSelfCheck(playingCount:number):Promise<string> {
+    invokeMock.mockReset();invokeMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const listeners=new Map<string,Array<(event:unknown)=>void>>();
+    const client={on:(kind:string,callback:(event:unknown)=>void)=>{const entries=listeners.get(kind)??[];entries.push(callback);listeners.set(kind,entries);return()=>listeners.set(kind,(listeners.get(kind)??[]).filter((entry)=>entry!==callback));}};
+    const root=document.createElement('div');
+    const pending=reportSelfCheck(root,{devicePixelRatio:2} as unknown as Window,{client,store:{transportSample:null},tier:'native'} as never);
+    for(let i=0;i<playingCount;i+=1)for(const callback of listeners.get('playing')??[])callback({});
+    for(const callback of listeners.get('tempo')??[])callback({});
+    await pending;
+    const args=invokeMock.mock.calls.find((call)=>call[0]==='self_check')?.[1] as {report:string}|undefined;
+    if(!args)throw new Error('self_check report was not invoked');
+    return args.report;
+  }
+  it('reports zero playing envelopes when the simulator self-check starts silent',async()=>{
+    expect(await runSelfCheck(0)).toContain('"playingEvents":0');
+  });
+  it('reports playing envelopes observed before the self-check report',async()=>{
+    expect(await runSelfCheck(1)).toContain('"playingEvents":1');
   });
 });

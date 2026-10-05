@@ -1,3 +1,4 @@
+import { Text } from '@codemirror/state';
 import { describe, expect, it, vi } from 'vitest';
 import { TextLayout, type LayoutFont } from '../../src/code/layout';
 import { GlyphAtlas, type CanvasFactory } from '../../src/code/atlas';
@@ -96,6 +97,16 @@ describe('GPU resource admission', () => {
 });
 
 describe('shaped UTF-16 layout', () => {
+  it('renders Text-backed and string-backed documents equivalently, including CRLF and CR line breaks', () => {
+    const raw = 'alpha\r\nbeta\rgamma';
+    const fromString = layout(raw), fromText = new TextLayout({ font: '', measureText: text => ({ width: width(text) }) }, font);
+    fromText.setText(Text.of(['alpha', 'beta', 'gamma']));
+    expect(fromText.lineCount).toBe(fromString.lineCount);
+    for (let n = 0; n < 3; n++) {
+      expect(fromText.shape(n).runs.map(run => run.text)).toEqual(fromString.shape(n).runs.map(run => run.text));
+      expect(fromText.coordsAtPos(fromText.shape(n).from, view)).toEqual(fromString.coordsAtPos(fromString.shape(n).from, view));
+    }
+  });
   it('keeps CRLF offsets, one break and four-space tab stops', () => {
     const l = layout('a\tb\r\n日語'); expect(l.lineCount).toBe(2);
     expect(l.shape(0).width).toBe(40); expect(l.shape(1).from).toBe(5);
@@ -169,6 +180,15 @@ describe('GPU shaped-run atlas', () => {
 });
 
 describe('GPU code compositor', () => {
+  it('keeps Text-backed and string-backed renderer commands identical', () => {
+    const first = fixture(), second = fixture();
+    const text = 'let x = 1\n日本';
+    first.renderer.setDocument(text); second.renderer.setText(Text.of(['let x = 1', '日本']));
+    const feedback = { annotations: [{ kind: 'syntax' as const, from: 0, to: 3, className: 'vact-tok-head' }], cursor: 4, textRevision: 1 };
+    expect(first.renderer.render(feedback)).toBe(true); expect(second.renderer.render(feedback)).toBe(true);
+    expect(second.r.draws.map(({ rect, color }) => ({ rect, color }))).toEqual(first.r.draws.map(({ rect, color }) => ({ rect, color })));
+    first.renderer.dispose(); second.renderer.dispose();
+  });
   function fixture(text = 'let x = 1\n日本') {
     const r = recordingGL(); const raster = rasterizer(); const b = new ResourceLedger(); const c = document.createElement('canvas'); const l = layout(text);
     const renderer = new CanvasRenderer(c, l, { gl: r.gl, ledger: b, createCanvas: raster.createCanvas }); renderer.setViewport(view, 1);
@@ -207,6 +227,15 @@ describe('GPU code compositor', () => {
     expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.renderer.stats.bufferUploads).toBe(buffers);
     expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 4, to: 8 }] })).toBe(true);
     expect(shape).not.toHaveBeenCalled(); expect(f.renderer.atlasStats.uploads).toBe(uploads); f.renderer.dispose();
+  });
+  it('uses annotation revisions to reuse and invalidate static draw commands', () => {
+    const f = fixture(); const first = [{ kind: 'syntax' as const, from: 0, to: 3, className: 'vact-tok-head' }];
+    expect(f.renderer.render({ annotations: first, textRevision: 1, annotationsRevision: 1 })).toBe(true);
+    const builds = f.renderer.stats.textBuilds;
+    expect(f.renderer.render({ annotations: first, textRevision: 1, annotationsRevision: 1 })).toBe(true);
+    expect(f.renderer.stats.textBuilds).toBe(builds);
+    expect(f.renderer.render({ annotations: [{ ...first[0]!, className: 'vact-tok-number' }], textRevision: 1, annotationsRevision: 2 })).toBe(true);
+    expect(f.renderer.stats.textBuilds).toBe(builds + 1); f.renderer.dispose();
   });
   it('replays gutter numbers unscissored and source text clipped on cached frames', () => {
     const f = fixture();

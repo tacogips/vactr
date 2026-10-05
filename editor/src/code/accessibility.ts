@@ -19,13 +19,17 @@ export function boundary(text: string, pos: number, bias: -1 | 1 = -1): number {
 }
 export interface InputWindow { start: number; end: number; value: string; anchor: number; head: number; outside: boolean }
 export function surroundingWindow(surface: CodeSurface): InputWindow {
-  const text = surface.state.doc.toString(), selection = surface.state.selection.main;
-  let start = boundary(text, Math.max(0, selection.head - INPUT_WINDOW_LIMIT / 2), 1);
-  let end = boundary(text, Math.min(text.length, start + INPUT_WINDOW_LIMIT), -1);
-  if (end === text.length) start = boundary(text, Math.max(0, end - INPUT_WINDOW_LIMIT), 1);
+  const doc = surface.state.doc, selection = surface.state.selection.main;
+  const from = Math.max(0, selection.head - INPUT_WINDOW_LIMIT - 4);
+  const to = Math.min(doc.length, selection.head + INPUT_WINDOW_LIMIT + 4);
+  const local = doc.sliceString(from, to);
+  const snap = (position: number, bias: -1 | 1): number => from + boundary(local, position - from, bias);
+  let start = snap(Math.max(0, selection.head - INPUT_WINDOW_LIMIT / 2), 1);
+  let end = snap(Math.min(doc.length, start + INPUT_WINDOW_LIMIT), -1);
+  if (end === doc.length) start = snap(Math.max(0, end - INPUT_WINDOW_LIMIT), 1);
   // A single oversized grapheme cannot fit: retain an empty caret window.
-  if (end < start || selection.head < start || selection.head > end) start = end = boundary(text, selection.head, -1);
-  return { start, end, value: text.slice(start, end), anchor: selection.anchor, head: selection.head,
+  if (end < start || selection.head < start || selection.head > end) start = end = snap(selection.head, -1);
+  return { start, end, value: doc.sliceString(start, end), anchor: selection.anchor, head: selection.head,
     outside: selection.from < start || selection.to > end };
 }
 
@@ -73,9 +77,13 @@ export class AccessibilityBridge {
     const el = this.textarea;
     if (el.selectionStart === this.projected.start && el.selectionEnd === this.projected.end && el.selectionDirection === this.projected.direction) return null;
     const backward = el.selectionDirection === 'backward';
-    const text = this.surface.state.doc.toString();
-    return { anchor: boundary(text, this.window.start + (backward ? el.selectionEnd : el.selectionStart), backward ? 1 : -1),
-      head: boundary(text, this.window.start + (backward ? el.selectionStart : el.selectionEnd), backward ? -1 : 1) };
+    const doc = this.surface.state.doc;
+    const anchor = this.window.start + (backward ? el.selectionEnd : el.selectionStart);
+    const head = this.window.start + (backward ? el.selectionStart : el.selectionEnd);
+    const from = Math.max(0, Math.min(anchor, head) - 4), to = Math.min(doc.length, Math.max(anchor, head) + 4);
+    const local = doc.sliceString(from, to);
+    return { anchor: from + boundary(local, anchor - from, backward ? 1 : -1),
+      head: from + boundary(local, head - from, backward ? -1 : 1) };
   }
   announce(message: string, visible = false): void {
     this.status.textContent = message.slice(0, 256);

@@ -1,4 +1,5 @@
 import { isolateHistory } from '@codemirror/commands';
+import type { Text } from '@codemirror/state';
 import { CodeSurface } from './surface';
 import { boundary } from './accessibility';
 
@@ -18,6 +19,35 @@ export function wordMove(text: string, position: number, direction: -1 | 1): num
   }
   for (const s of words.segment(text)) if (s.isWordLike && s.index + s.segment.length > position) return s.index + s.segment.length;
   return text.length;
+}
+function lineBoundary(doc: Text, position: number, bias: -1 | 1): number {
+  const line = doc.lineAt(Math.max(0, Math.min(doc.length, position)));
+  const first = Math.max(1, Math.min(doc.lines, line.number));
+  const last = position > line.to ? Math.min(doc.lines, first + 1) : first;
+  const from = doc.line(first).from, to = doc.line(last).to;
+  const local = doc.sliceString(from, to);
+  return from + boundary(local, position - from, bias);
+}
+function wordMoveAt(doc: Text, position: number, direction: -1 | 1): number {
+  const line = doc.lineAt(position), local = position - line.from;
+  if (direction < 0) {
+    let previous = -1;
+    for (const part of words.segment(line.text)) if (part.isWordLike && part.index < local) previous = part.index;
+    if (previous >= 0) return line.from + previous;
+    for (let number = line.number - 1; number >= 1; number--) {
+      const previous = doc.line(number);
+      const matches = [...words.segment(previous.text)].filter(part => part.isWordLike);
+      if (matches.length) return previous.from + matches[matches.length - 1]!.index;
+    }
+    return 0;
+  }
+  for (const part of words.segment(line.text)) if (part.isWordLike && part.index + part.segment.length > local)
+    return line.from + part.index + part.segment.length;
+  for (let number = line.number + 1; number <= doc.lines; number++) {
+    const next = doc.line(number);
+    for (const part of words.segment(next.text)) if (part.isWordLike) return next.from + part.index + part.segment.length;
+  }
+  return doc.length;
 }
 export interface KeyboardOptions {
   composing?: () => boolean;
@@ -42,18 +72,18 @@ export class KeyboardController {
       const s = this.surface.state.selection.main;
       this.surface.dispatch({ changes: { from: s.from, to: s.to, insert: '\t' }, selection: { anchor: s.from + 1 }, userEvent: 'input.type' });
     } else if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'home', 'end'].includes(key)) {
-      const s = this.surface.state.selection.main, text = this.surface.state.doc.toString();
+      const s = this.surface.state.selection.main, doc = this.surface.state.doc;
       const left = key === 'arrowleft', right = key === 'arrowright', backward = left || key === 'arrowup' || key === 'home';
       let position = s.head;
       if (!event.shiftKey && !s.empty && (left || right) && !mod && !event.altKey) position = left ? s.from : s.to;
       else if (key === 'home' || key === 'end') {
         const line = this.surface.state.doc.lineAt(position);
-        position = mod ? (key === 'home' ? 0 : text.length) : (key === 'home' ? line.from : line.to);
+        position = mod ? (key === 'home' ? 0 : doc.length) : (key === 'home' ? line.from : line.to);
       } else if (left || right) {
         position = event.metaKey ? (left ? this.surface.state.doc.lineAt(position).from : this.surface.state.doc.lineAt(position).to)
-          : event.ctrlKey || event.altKey ? wordMove(text, position, left ? -1 : 1)
-          : boundary(text, position + (left ? -1 : 1), left ? -1 : 1);
-      } else if (mod) position = backward ? 0 : text.length;
+          : event.ctrlKey || event.altKey ? wordMoveAt(doc, position, left ? -1 : 1)
+          : lineBoundary(doc, position + (left ? -1 : 1), left ? -1 : 1);
+      } else if (mod) position = backward ? 0 : doc.length;
       else {
         const rect = this.surface.coordsAtPos(position);
         const mapped = rect && this.surface.posAtCoords({ x: rect.left, y: (rect.top + rect.bottom) / 2 + (backward ? -1 : 1) * (rect.bottom - rect.top) });
@@ -61,7 +91,7 @@ export class KeyboardController {
         else {
           const line = this.surface.state.doc.lineAt(position), n = Math.max(1, Math.min(this.surface.state.doc.lines, line.number + (backward ? -1 : 1)));
           const target = this.surface.state.doc.line(n);
-          position = boundary(text, Math.min(target.to, target.from + position - line.from));
+          position = lineBoundary(doc, Math.min(target.to, target.from + position - line.from), -1);
         }
       }
       this.surface.dispatch({ selection: { anchor: event.shiftKey ? s.anchor : position, head: position } });
@@ -71,8 +101,8 @@ export class KeyboardController {
   }
   delete(direction: -1 | 1, word = false): void {
     if (this.options.composing?.() || this.surface.compositionRange) return;
-    const s = this.surface.state.selection.main, text = this.surface.state.doc.toString();
-    const end = word ? wordMove(text, s.head, direction) : boundary(text, s.head + direction, direction);
+    const s = this.surface.state.selection.main, doc = this.surface.state.doc;
+    const end = word ? wordMoveAt(doc, s.head, direction) : lineBoundary(doc, s.head + direction, direction);
     const from = s.empty ? Math.min(s.head, end) : s.from, to = s.empty ? Math.max(s.head, end) : s.to;
     if (from === to) return;
     this.surface.dispatch({ changes: { from, to }, selection: { anchor: from }, userEvent: direction < 0 ? 'delete.backward' : 'delete.forward',

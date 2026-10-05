@@ -24,9 +24,9 @@ use crate::ns::load::{read_forms, register_load, take_load_diags, LoaderHost, So
 use crate::ns::namespace::{FormGen, Namespace, Prelude, VarSlotRef};
 use crate::ns::stage::{EffectSink, SlotKey, StagedEffect};
 use crate::ns::tweak::{SiteOrigin, SiteTier, TweakId, TweakSite};
-use crate::reader::node::Node;
+use crate::reader::node::{Atom, Node, NodeKind};
 use crate::reader::span::FileId;
-use crate::types::check::check;
+use crate::types::check::{check, CheckResult};
 use crate::types::diag::Diagnostic;
 use crate::types::manifest::HostManifest;
 use crate::value::eq::deep_eq;
@@ -35,7 +35,39 @@ use crate::value::value::Value;
 use crate::vm::fail::{FailCode, Failure};
 use crate::vm::natives::pattern::reject_input_lanes;
 use crate::vm::natives::register_domain;
+use crate::vm::ops::Op;
 use crate::vm::vm::{ReadObserver, Vm};
+
+fn has_free_session_symbol(form: &Node) -> bool {
+    let definition = if matches!(form.kind, NodeKind::Call) {
+        let head = form.children.first();
+        let name = form.children.get(1);
+        let head_name = head.and_then(|node| match &node.kind {
+            NodeKind::Atom(Atom::Sym(name) | Atom::Builtin(name)) => Some(name.as_ref()),
+            _ => None,
+        });
+        let is_definition = matches!(
+            head_name,
+            Some("let" | "var" | "fn" | "inst" | "bus" | "look" | "struct" | "enum")
+        );
+        is_definition.then_some((head, name))
+    } else {
+        None
+    };
+    let mut found = false;
+    form.walk(&mut |node| {
+        if matches!(node.kind, NodeKind::Atom(Atom::Qualified { .. })) {
+            found = true;
+        } else if node.sym_name().is_some() {
+            let is_definition_token = definition.is_some_and(|(head, name)| {
+                head.is_some_and(|candidate| std::ptr::eq(candidate, node))
+                    || name.is_some_and(|candidate| std::ptr::eq(candidate, node))
+            });
+            found |= !is_definition_token;
+        }
+    });
+    found
+}
 
 /// The outcome of one top-level form.
 #[derive(Debug)]
@@ -164,6 +196,12 @@ pub(super) struct Attempt {
 }
 
 /// The top-level driver.
+pub(super) struct DynamicManifestCacheEntry {
+    pub(super) base: HostManifest,
+    pub(super) controls: Rc<BTreeSet<Rc<str>>>,
+    pub(super) manifest: Rc<HostManifest>,
+}
+
 pub struct Evaluator {
     pub(super) ns: Namespace,
     pub(super) graph: DepGraph,
@@ -171,6 +209,7 @@ pub struct Evaluator {
     form_gen: u64,
     sink: Box<dyn EffectSink>,
     gate: Rc<RefCell<Gate>>,
+    pub(super) dynamic_manifest_cache: RefCell<Vec<DynamicManifestCacheEntry>>,
     queued: Vec<(VarSlotRef, Value)>,
     last_pass: Option<PassReport>,
 }
@@ -246,6 +285,7 @@ impl Evaluator {
             form_gen: 0,
             sink,
             gate,
+            dynamic_manifest_cache: RefCell::new(Vec::new()),
             queued: Vec::new(),
             last_pass: None,
         }
@@ -320,15 +360,25 @@ impl Evaluator {
     /// form is checked first against the session; check diagnostics never
     /// gate compile or run (7.1.1).
     pub fn eval_form(&mut self, form: &Node) -> FormOutcome {
-        self.last_pass = None;
-        let checked_inputs = self.ns.checked_inputs();
         let checked = check(
             std::slice::from_ref(form),
-            &self.ns.check_env(),
+            &self.check_env_for(form),
             &self.dynamic_manifest(&HostManifest::spec_default()),
         );
+        self.eval_form_checked(form, checked)
+    }
+
+    pub(super) fn eval_form_checked(&mut self, form: &Node, checked: CheckResult) -> FormOutcome {
+        self.last_pass = None;
+        let checked_inputs = (!checked.callables.is_empty())
+            .then(|| self.ns.checked_inputs())
+            .flatten();
         let gen = self.next_gen();
-        let bad = self.durable_bad();
+        let bad = if has_free_session_symbol(form) {
+            self.durable_bad()
+        } else {
+            BTreeSet::new()
+        };
         let a = self.attempt(form, gen, None, &[], BTreeSet::new(), bad);
         let checked_callables = checked.callables;
         let mut diags = checked.diags;
@@ -433,6 +483,17 @@ impl Evaluator {
             value: Ok(value),
             diags,
             form_gen: gen,
+        }
+    }
+
+    /// The checker environment needed by one form. Forms without free
+    /// session symbols cannot observe session globals, so avoid cloning the
+    /// complete namespace for those independent declarations.
+    pub(super) fn check_env_for(&self, form: &Node) -> crate::types::ty::CheckEnv {
+        if has_free_session_symbol(form) {
+            self.ns.check_env()
+        } else {
+            crate::types::ty::CheckEnv::empty()
         }
     }
 
@@ -677,9 +738,7 @@ impl Evaluator {
         bad: BTreeSet<FormId>,
     ) -> Attempt {
         let mut cx = CompileCx::new(&self.ns, gen);
-        if let Some(insts) = &self.vm.dsp.registry {
-            cx.custom_controls.extend(insts.borrow().declared_names());
-        }
+        cx.custom_controls = self.dynamic_custom_controls();
         let compiled = compile(form, &mut cx);
         let mut diags = std::mem::take(&mut cx.diags);
         let sites = std::mem::take(&mut cx.sites);
@@ -702,11 +761,28 @@ impl Evaluator {
             self.migrate(old, &sites);
         }
         let targets = def_targets(&proto);
-        let snap = Snapshot::take(&self.ns, &targets);
+        let bounded_snapshot = proto.code.iter().all(|op| {
+            matches!(
+                op,
+                Op::LoadConst(_) | Op::DefGlobal(_) | Op::Force | Op::Deref | Op::Ret
+            )
+        }) && proto
+            .globals
+            .iter()
+            .all(|global| targets.iter().any(|target| target.same(global)));
+        let snap = if bounded_snapshot {
+            Snapshot::take_slots(&targets)
+        } else {
+            Snapshot::take(&self.ns, &targets)
+        };
         {
             let mut g = self.gate.borrow_mut();
             g.active = true;
-            g.owners = self.graph.name_owners().clone();
+            g.owners = if bounded_snapshot {
+                BTreeMap::new()
+            } else {
+                self.graph.name_owners().clone()
+            };
             g.own = targets
                 .iter()
                 .map(VarSlotRef::id)

@@ -88,13 +88,15 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let handles: readonly SelectionHandle[] = [];
   let syntaxProvider: SpanProvider = new FallbackSpans();
   let syntaxTruncated = 0;
-  let displayText = '';
+  let displayDoc: Text | null = null;
+  let renderedDoc: Text | null = null;
   let displayRevision = -1;
   let displayDirty = true;
   let perfApi: VactrPerf | null = null;
   let backgroundStop: (() => void) | null = null;
   let backgroundRevision = 0;
   let staticAnnotations: CodeAnnotation[] = [];
+  let staticRevision = 0;
   const hideDiagnosticTip = (): void => { diagTip.hidden = true; };
   const anchor = new TimeAnchor(clock, tier === 'browser' ? 'audio' : 'receipt');
   const highlight = new HighlightScheduler({ clock, file: DOC_FILE, map: (span, rev) => sync.mapWireSpan(span, rev),
@@ -140,7 +142,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   });
   input = new InputController(surface, inputContainer, { label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
     onPresentation: (presentation) => {
-      if (displayText !== presentation.text) { displayText = presentation.text; layout.setDocument(displayText); displayDirty = true; scheduler?.invalidateText(); }
+      if (displayDoc !== presentation.doc) { displayDoc = presentation.doc; layout.setText(displayDoc); displayDirty = true; scheduler?.invalidateText(); }
     } });
   viewHost.setFocus(() => input.focus());
   pointer = new PointerController(surface, canvas, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
@@ -169,9 +171,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       scheduler?.setActive('transport', !!store.tempo);
       if (ctx.textDirty && (displayDirty || displayRevision !== sync.revision)) {
         displayRevision = sync.revision;
-        displayText = input.presentation.text;
-        layout.setDocument(displayText);
-        renderer.setDocument(displayText);
+        const presentation = input.presentation;
+        if (renderedDoc !== presentation.doc) { renderedDoc = presentation.doc; renderer.setText(renderedDoc); }
         displayDirty = false;
       }
       if (ctx.textDirty) {
@@ -187,16 +188,17 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         staticAnnotations = [...result.spans, ...surface.annotationRanges(),
           ...(selection.empty ? [] : [{ from: selection.from, to: selection.to, kind: 'selection' as const }]),
           ...(input.presentation.annotations)];
+        staticRevision++;
         const animated: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
         const cursor = input.presentation.cursor;
         renderer.setViewport(view, viewport.dpr);
-        renderer.render({ annotations: staticAnnotations, animated, textRevision: displayRevision, cursor, cursorVisible: true, handles });
+        renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor, cursorVisible: true, handles });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
       } else {
         const animated: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
         renderer.setViewport(viewHost.viewport, viewport.dpr);
-        renderer.render({ annotations: staticAnnotations, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
+        renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
       }
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas((background) => {
         renderer.setBackground(background, ++backgroundRevision); scheduler?.request();

@@ -36,9 +36,11 @@ export class FrameScheduler {
   private hiddenValue: boolean;
   private disposed = false;
   private inFrame = false;
+  private deliveringViewport = false;
   private requestedDuringFrame = false;
   private dirtyText = false;
   private viewportDirty = true;
+  private viewportDelivered = false;
   private viewportValue: ViewportInfo;
   private owners = new Set<string>();
   private cleanups: (() => void)[] = [];
@@ -51,7 +53,10 @@ export class FrameScheduler {
     if (this.viewportDirty) {
       this.viewportDirty = false;
       const next = this.readViewport();
-      if (!this.sameViewport(next, this.viewportValue)) { this.viewportValue = next; this.opts.onViewport(next); }
+      if (!this.viewportDelivered || !this.sameViewport(next, this.viewportValue)) {
+        this.viewportValue = next; this.viewportDelivered = true; this.deliveringViewport = true;
+        try { this.opts.onViewport(next); } finally { this.deliveringViewport = false; }
+      }
     }
     const textDirty = this.dirtyText; this.dirtyText = false;
     const start = this.perf ? performance.now() : 0;
@@ -80,7 +85,7 @@ export class FrameScheduler {
     if (!this.hiddenValue) this.request();
   }
   get hidden(): boolean { return this.hiddenValue; }
-  invalidateText(): void { this.dirtyText = true; this.request(); }
+  invalidateText(): void { this.dirtyText = true; if (!this.deliveringViewport) this.request(); }
   setActive(owner: string, active: boolean): void {
     if (active) this.owners.add(owner); else this.owners.delete(owner);
     if (active) this.request();

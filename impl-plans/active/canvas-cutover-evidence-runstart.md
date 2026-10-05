@@ -1,6 +1,6 @@
 # Canvas Cutover: Large-Document Run Start Stall Fix Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-EVIDENCE-RUNSTART (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-RUNSTART`)
@@ -59,7 +59,17 @@ writePaths:
 - `tmp/canvas-cutover/evidence-runstart/intent.json` and `tmp/canvas-cutover/evidence-runstart/receipt.json`
 - artifact roots: `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules/.vite`, `tmp/canvas-cutover/evidence-runstart/logs`
 
-sharedPaths: none at authoring time.
+sharedPaths (diagnosis escalation, recorded before edits):
+
+- `src/ns/evaluator.rs`: checker environment reconstruction in `Evaluator::eval_form` is the measured hot path. Use an empty environment only for forms with no free session symbols/qualified references; avoid constructing callable certification snapshots when no callables were checked. The bounded snapshot bytecode proof also permits the compiler's `Force` on constant-only definitions.
+- `src/ns/eval_doc.rs`: apply the same environment selection to both manifest-specific checks in `eval_form_in` so the caller path does not reconstruct the full namespace for independent scalar definitions. Cache a small number of dynamic manifests keyed by base manifest and shared control-set identity.
+- `src/ns/journal.rs`: add an explicit subset snapshot constructor for statically pure constant definitions; the evaluator selects it only for `LoadConst`/`DefGlobal`/`Force`/`Deref`/`Ret` code with no non-definition globals, leaving all other transactions on the existing full rollback snapshot.
+- `src/ns/depgraph.rs`: maintain a reverse reader index for committed edges, failed-attempt reads, and recovery subscriptions; use it to avoid scanning every historical form for each newly defined name. Also maintain a generation-to-form index because `Session::note_revision` calls `form_of_gen` for each emitted form and its current full-form scan remains quadratic; journal validation updates that index when a form commits a new generation.
+- `src/compile/compiler.rs`: store installed custom-control names as a shared immutable set in `CompileCx`; the profile showed reconstructing the same `BTreeSet` for every independent form.
+- `src/ns/insts.rs`: maintain the deduplicated declared-control set when an instrument is installed or replaced, and expose its shared `Rc` so manifest and compiler consumers do not rebuild names from all instruments per form.
+- `src/ns/evaluator.rs` and `src/ns/eval_doc.rs`: reuse the already computed default `CheckResult` when `eval_form_in` runs the form, preserving checker diagnostics/callable certification while removing its duplicate default check.
+
+`src/ns/evaluator.rs`, `src/ns/eval_doc.rs`, `src/ns/journal.rs`, `src/ns/depgraph.rs`, `src/compile/compiler.rs`, and `src/ns/insts.rs` are not owned by another wave-3 plan. The initial controlled session is still within the original plan boundary; these files are added under its explicit escalation rule.
 
 Escalation rule: if diagnosis puts the hot spot in a file not listed above, check two things:
 
@@ -168,12 +178,20 @@ drifted before your first edit, stop and report it. Edit only this plan's progre
 
 ## Completion Criteria
 
-- [ ] Hot spot located with recorded timings or profile
-- [ ] Fix applied in the owning file(s); any escalated paths recorded as sharedPaths
-- [ ] `large-eval.test.ts` guard passes with recorded post-fix values; pre-fix failure recorded as mutation evidence
-- [ ] `npm run check`, full vitest, and (if Rust changed) rustfmt, clippy and focused nextest pass
+- [x] Hot spot located with recorded timings and CPU profiles
+- [x] Fix applied in the owning files; escalated paths recorded as sharedPaths
+- [x] `large-eval.test.ts` passes: 5,000-line median 811.7 ms, 20,000-line median 2,559.3 ms, ratio 3.15, one eval-result and zero error diagnostics (`tmp/canvas-cutover/evidence-runstart/logs/large-eval-final.log`)
+- [ ] A controlled pre-fix mutation failure is recorded; the pre-edit run was interrupted at exit 130 and is not mutation evidence
+- [x] `npm run check`, touched-file rustfmt, strict clippy and focused nextest pass
+- [ ] Full vitest passes; latest run had five failures: three in parallel edit-cost/mount tests, one large-doc timeout under suite load, and this plan's eval benchmark exceeded 5,000 ms under suite load (focused benchmark passes)
 
 ## Progress Log
 
-### Session: 2026-10-05 (session 267 plan)
-**Tasks Completed**: Plan authored; symptom and control attribution taken from run-001 and session 266 logs. Diagnosis pending.
+### Session: 2026-10-05 (session 267 implementation)
+**Tasks Completed**: Reproduced an unbounded host-wasm eval stall; profile localized repeated checker namespace BTreeMap reconstruction in `src/ns/evaluator.rs` via `Namespace::check_env` and `checked_inputs`. The follow-up source inspection found `Snapshot::take` copied every bound session slot and `DepGraph::dependents` scanned every prior form before each form completed. Recorded the explicit plan escalation to `src/ns/evaluator.rs`, `src/ns/eval_doc.rs`, and `src/ns/journal.rs` before source edits. The pre-fix benchmark was interrupted after 5.5 minutes at 100% CPU (log under `tmp/canvas-cutover/evidence-runstart/logs/large-eval-diagnosis.log`, exit 130); the sampled Wasm worker profile is `tmp/canvas-cutover/evidence-runstart/logs/CPU.20261005.133929.80426.1.002.cpuprofile` (39,980 samples).
+**Follow-up**: After the checker, snapshot and reverse-reader fixes, the measured 5k/20k medians remained 12,874.1/59,633.0 ms (ratio 4.63), exceeding the 5,000 ms 20k limit. Source tracing found another per-form full scan in `DepGraph::form_of_gen`, called by `Session::note_revision`; this authorized `depgraph.rs` escalation was recorded before changing source. Implementing a generation index and keeping it synchronized on journal commits.
+**Profile follow-up**: The generation-index revision still measured 5,000/20,000 medians 14,449.9/64,704.3 ms (ratio 4.48; `large-eval-final.log`). A fresh worker profile (`CPU.20261005.143324.16025.1.002.cpuprofile`, 49.75 sampled seconds) located repeated full `Snapshot::take` (14.79 s) and `dynamic_manifest` control-set construction (18.60 s) per-form costs. Adding the compiler-emitted `Force` to the bounded constant-definition proof and caching dynamic manifests by base and current control names.
+**Control-set follow-up**: After those changes, medians were 3,537.9/9,761.0 ms (ratio 2.76). The next profile (`CPU.20261005.144743.26560.1.002.cpuprofile`, 19.76 sampled seconds) showed controls being collected and cloned repeatedly; cache a deduplicated `Rc` set at instrument install/replacement and share it into manifests and compiler contexts.
+**Check-result follow-up**: Registry-owned control caching reduced the medians to 2,171.7/5,747.8 ms (ratio 2.65; current log `large-eval-final.log`). `eval_form_in` still performs the default check to compute its diagnostic split, then invokes `eval_form` which repeats that same check. Reuse that existing default `CheckResult` in the evaluator execution path and perform only the custom-manifest check separately.
+**Final-source verification**: `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`, `rustfmt --check` on all six touched Rust files, and `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` passed. Focused `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run session::` passed 149 tests (2,664 skipped). `cd editor && npm run check` passed. Focused `large-eval.test.ts` passed one test at 811.7/2,559.3 ms (ratio 3.15), and focused `large-doc.test.ts` passed both tests in 1.99 s.
+**Shared-suite disposition**: `cd editor && ./node_modules/.bin/vitest run` exited 1 with 683 passed and 5 failed. Three failures are in parallel-plan `test/canvas/edit-cost.test.ts` and `test/canvas/mount.test.ts`; the full-suite `test/e2e/large-doc.test.ts` timed out at its existing 5 s limit but passed in isolation; this plan's benchmark measured 5,033.5 ms under suite load but passed in isolation at 2,559.3 ms. Full Vitest remains unresolved for serial integration. The pre-edit stall run was manually interrupted after 5.5 minutes (exit 130), so controlled mutation evidence remains outstanding.

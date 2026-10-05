@@ -1,4 +1,5 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { installSilentSink } from './silent-sink.mjs';
 export async function runBehavior(browser, origin, name) {
   const results = []; const limitations = [];
   let context; let page; let api;
@@ -13,15 +14,18 @@ export async function runBehavior(browser, origin, name) {
   try {
     context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, hasTouch: true,
       permissions: name === 'chromium' ? ['clipboard-read', 'clipboard-write'] : [] });
+    await installSilentSink(context);
     page = await context.newPage();
     await page.goto(`${origin}/?perf=1`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(() => Boolean(window.__vactrPerf), { timeout: 30000 });
     await page.waitForSelector('.vact-code-canvas', { timeout: 30000 });
     api = await page.evaluate(() => Boolean(window.__vactrPerf));
     await check('canvas-only-text', async () => {
-      const ta=page.locator('.vact-code-input-bridge textarea');await ta.focus();await ta.fill('# canvas-visible-evidence');await page.waitForTimeout(100);
-      return page.evaluate(() => {
-      const pane = document.querySelector('.vact-code'); const canvas = document.querySelector('.vact-code-canvas');
+      const ta=page.locator('.vact-code-input-bridge textarea');await ta.focus();await ta.fill('# canvas-visible-evidence');await ta.type('x');await ta.press('Backspace');
+      return page.evaluate(() => new Promise((resolve, reject) => requestAnimationFrame(() => {
+      let canvas;
+      try {
+      const pane = document.querySelector('.vact-code'); canvas = document.querySelector('.vact-code-canvas');
       const bridge = document.querySelector('.vact-code-input-bridge textarea');
       if (!pane || !canvas || !bridge) throw Error('code pane, canvas, or bridge textarea missing');
       const source = window.__vactrPerf.doc();
@@ -30,12 +34,15 @@ export async function runBehavior(browser, origin, name) {
       if (style.opacity !== '0' && style.color !== 'rgba(0, 0, 0, 0)') throw Error('bridge textarea is visible');
       const gl = canvas.getContext('webgl2');
       if (!gl) throw Error('WebGL2 unavailable');
-      const pixels = new Uint8Array(128*24*4); gl.readPixels(0, Math.max(0,canvas.height-32), 128, 24, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      if(canvas.width<=1||canvas.height<=1)throw Error(`canvas backing size is ${canvas.width}x${canvas.height}`);const colors=new Set();for(let i=0;i<pixels.length;i+=4)colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]}`);if(colors.size<2)throw Error('canvas pixel readback has no glyph variation');
+      if(canvas.width<=1||canvas.height<=1) { reject(Error(`canvas backing size is ${canvas.width}x${canvas.height}`)); return; }
+      const probe=document.createElement('canvas');probe.width=canvas.width;probe.height=canvas.height;const ctx=probe.getContext('2d');ctx.drawImage(canvas,0,0);
+      const image=ctx.getImageData(0,Math.min(Math.max(0,canvas.height-32),canvas.height-1),Math.min(128,canvas.width),Math.min(24,canvas.height));
+      const pixels=image.data;const colors=new Set();for(let i=0;i<pixels.length;i+=4)colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]}`);if(colors.size<2) { reject(Error('canvas pixel readback has no glyph variation')); return; }
       const before = source; canvas.hidden = true; const stillVisible = [...pane.querySelectorAll('*')].some((el) => el.textContent?.includes(before) && before.length > 0); canvas.hidden = false;
       if (stillVisible) throw Error('hiding canvas leaves source visible');
-      return `source chars=${source.length}; bridge opacity=${style.opacity}; canvas=${canvas.width}x${canvas.height}; colors=${colors.size}`;
-      });
+      resolve(`source chars=${source.length}; bridge opacity=${style.opacity}; canvas=${canvas.width}x${canvas.height}; colors=${colors.size}`);
+      } catch (error) { if (canvas) canvas.hidden = false; reject(error); }
+      })));
     });
     await check('editing-undo-redo-navigation', async () => {
       const ta = page.locator('.vact-code-input-bridge textarea'); await ta.focus();
@@ -90,7 +97,7 @@ export async function runBehavior(browser, origin, name) {
     await check('touch-selection', async () => {
       const rect = await page.locator('.vact-code-canvas').boundingBox(); if (!rect) throw Error('canvas has no box');
       if (name === 'chromium') { const session = await context.newCDPSession(page); await session.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{x:rect.x+80,y:rect.y+20}] }); await sleep(650); await session.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{x:rect.x+155,y:rect.y+20}] }); await session.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] }); await session.detach(); }
-      else { limitations.push('WebKit touch selection uses synthetic pointer events.'); const c=page.locator('.vact-code-canvas');await c.dispatchEvent('pointerdown', { pointerId:1, pointerType:'touch', clientX:rect.x+80, clientY:rect.y+20, buttons:1 });await sleep(650);await c.dispatchEvent('pointermove',{pointerId:1,pointerType:'touch',clientX:rect.x+155,clientY:rect.y+20,buttons:1});await c.dispatchEvent('pointerup', { pointerId:1, pointerType:'touch', clientX:rect.x+155, clientY:rect.y+20, buttons:0 }); }
+      else { limitations.push('WebKit touch selection uses synthetic pointer events.'); const c=page.locator('.vact-code-canvas');const event={pointerId:1,pointerType:'touch',isPrimary:true,button:0};await c.dispatchEvent('pointerdown', { ...event, clientX:rect.x+80, clientY:rect.y+20, buttons:1 });await sleep(650);await c.dispatchEvent('pointermove',{...event,clientX:rect.x+155,clientY:rect.y+20,buttons:1});await c.dispatchEvent('pointerup', { ...event, clientX:rect.x+155, clientY:rect.y+20, buttons:0 }); }
       await page.waitForFunction(()=>window.__vactrPerf.selection().anchor!==window.__vactrPerf.selection().head&&window.__vactrPerf.presented().at(-1)?.handles===2,undefined,{timeout:2000});const state=await page.evaluate(() => ({selection:window.__vactrPerf.selection(),handles:window.__vactrPerf.presented().at(-1)?.handles}));if(state.selection.anchor===state.selection.head||state.handles!==2)throw Error(`long press did not create word selection handles: ${JSON.stringify(state)}`);return JSON.stringify(state);
     });
     await check('context-loss-restore', async () => {
@@ -122,7 +129,7 @@ export async function runBehavior(browser, origin, name) {
       try {
         if (name === 'chromium') { session = await context.newCDPSession(page); await session.send('Emulation.setDeviceMetricsOverride', { width:1100,height:760,deviceScaleFactor:2,mobile:false }); }
         await page.waitForTimeout(100); const after = await page.evaluate(() => window.__vactrPerf.selection());
-        if (JSON.stringify(before) !== JSON.stringify(after)) throw Error('selection changed after resize/DPR');const dpr=await page.evaluate(()=>({actual:devicePixelRatio,effective:window.__vactrPerf.counters().gpuStatus.effectiveDpr}));if(name==='chromium'&&(dpr.actual!==2||dpr.effective!==2))throw Error(`DPR did not update: ${JSON.stringify(dpr)}`);if(name==='webkit'){const c2=await browser.newContext({viewport:{width:900,height:700},deviceScaleFactor:2,hasTouch:true});try{const p2=await c2.newPage();await p2.goto(`${origin}/?perf=1`,{waitUntil:'domcontentloaded'});await p2.waitForFunction(()=>Boolean(window.__vactrPerf));await p2.waitForTimeout(100);const value=await p2.evaluate(()=>({actual:devicePixelRatio,effective:window.__vactrPerf.counters().gpuStatus.effectiveDpr}));if(value.actual!==2||value.effective!==2)throw Error(`DPR-2 context did not update: ${JSON.stringify(value)}`);}finally{await c2.close();}}const bounds=await page.evaluate(()=>{const r=document.querySelector('.vact-code-input-bridge textarea').getBoundingClientRect();const h=window.visualViewport?.height??innerHeight;return{right:r.right,bottom:r.bottom,height:h,width:innerWidth}});if(bounds.bottom>bounds.height||bounds.right>bounds.width)throw Error(`bridge bounds overflow: ${JSON.stringify(bounds)}`);return JSON.stringify(dpr);
+        if (JSON.stringify(before) !== JSON.stringify(after)) throw Error('selection changed after resize/DPR');const dpr=await page.evaluate(()=>({actual:devicePixelRatio,effective:window.__vactrPerf.counters().gpuStatus.effectiveDpr}));if(name==='chromium'&&(dpr.actual!==2||dpr.effective!==2))throw Error(`DPR did not update: ${JSON.stringify(dpr)}`);if(name==='webkit'){const c2=await browser.newContext({viewport:{width:900,height:700},deviceScaleFactor:2,hasTouch:true});try{await installSilentSink(c2);const p2=await c2.newPage();await p2.goto(`${origin}/?perf=1`,{waitUntil:'domcontentloaded'});await p2.waitForFunction(()=>Boolean(window.__vactrPerf));await p2.waitForTimeout(100);const value=await p2.evaluate(()=>({actual:devicePixelRatio,effective:window.__vactrPerf.counters().gpuStatus.effectiveDpr}));if(value.actual!==2||value.effective!==2)throw Error(`DPR-2 context did not update: ${JSON.stringify(value)}`);}finally{await c2.close();}}const bounds=await page.evaluate(()=>{const r=document.querySelector('.vact-code-input-bridge textarea').getBoundingClientRect();const h=window.visualViewport?.height??innerHeight;return{right:r.right,bottom:r.bottom,height:h,width:innerWidth}});if(bounds.bottom>bounds.height||bounds.right>bounds.width)throw Error(`bridge bounds overflow: ${JSON.stringify(bounds)}`);return JSON.stringify(dpr);
       } finally { if(session){await session.send('Emulation.clearDeviceMetricsOverride').catch(()=>{});await session.detach();} }
     });
     await check('visual-viewport-inset', async () => page.evaluate(async () => {

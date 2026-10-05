@@ -1,6 +1,6 @@
 # Canvas Cutover: Per-Keystroke and Per-Frame Edit Cost Fix Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-EVIDENCE-EDITCOST (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -RUNSTART)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.3 (text redraw only on dirty revisions; animation independent), #15.3.8.7 (no whole-text transfers per frame), #15.3.8.8 (input latency p95 <= 50 ms, text-dirty p95 <= 16.7 ms, animation-only p50 <= 4 ms), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-EDITCOST`)
@@ -200,13 +200,18 @@ drifted before your first edit, stop and report it. Edit only this plan's progre
 
 ## Completion Criteria
 
-- [ ] No whole-document `toString` on keystroke, presentation or animation-only frames (counter tests pass)
-- [ ] `TextLayout.setText` and `CanvasRenderer.setText` are in place and used by mount; the cache keeps unchanged lines
-- [ ] `surroundingWindow`, `readSelection` and word navigation/delete are line-local, with equivalence tests
-- [ ] The renderer cache key uses `annotationsRevision` when given
-- [ ] Existing tests are ported without lost assertions; `npm run check` and full vitest pass
+- [ ] No whole-document `toString` on keystroke, presentation or animation-only frames (counter tests pass); current document edit counter finds a 1,148,889-character conversion in `editor/src/code/sync.ts:55`, outside this plan's `writePaths`
+- [x] `TextLayout.setText` and `CanvasRenderer.setText` are in place and used by mount; the cache keeps unchanged lines
+- [ ] `surroundingWindow`, `readSelection` and word navigation/delete are line-local, with equivalence tests; window, selection and navigation checks pass, while document-changing delete is blocked by the same sync conversion
+- [x] The renderer cache key uses `annotationsRevision` when given
+- [ ] Existing tests are ported without lost assertions; `npm run check` passes, but full vitest remains blocked by the edit-cost failures below
 
 ## Progress Log
 
 ### Session: 2026-10-05 (session 267 plan)
 **Tasks Completed**: Plan authored; hot paths identified at `input.ts:61-66`, `mount.ts:143,170-199`, `layout.ts:28-45`, `accessibility.ts:22,76`, `keyboard.ts:45,74`, `renderer.ts:180`.
+
+### Session: 2026-10-05 (Step 6 implementation)
+**Tasks Completed**: Added Text-backed layout and renderer APIs; cached lazy `InputPresentation`; identity-based mount wiring and annotation revisions; bounded accessibility and line-local keyboard algorithms; ported composition assertion without dropping checks; added edit-cost, line-window/selection equivalence, cache-retention, renderer parity and annotation-revision tests. Ten animation-only mounted frames pass with no stringify, large slice or text rebuild.
+**Verification**: `cd editor && npm run check` exit 0 (`tmp/canvas-cutover/evidence-editcost/logs/npm-check-final.log`); input/GPU tests 73/73 passed (`vitest-input-gpu.log`); no-EditorView test 1/1 passed (`vitest-no-editor-view.log`). Focused canvas: 164 passed, 3 failed; full vitest: 684 passed, 3 failed in 89 files (`vitest-full.log`). The failures are the required operation counters: document edit and word delete call `Text.toString` on a 1,148,889-character receiver through `editor/src/code/sync.ts:55`; mounted edit also performs a >64 KiB slice in fallback syntax work (`editor/src/code/syntax.ts`).
+**Blocker**: `sync.ts` and `syntax.ts` are not in this plan's declared `writePaths`; the plan explicitly excludes `sync.ts`, and the fanout write contract forbids editing either file. Resume after an authorized plan/write-path amendment assigns these product defects to an owner; then rerun the exact edit-cost and full vitest gates. No baseline comparison exists, so the failed aggregate is not a pass or baseline candidate.

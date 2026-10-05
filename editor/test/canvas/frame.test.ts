@@ -32,8 +32,9 @@ class TestHost {
   static get currentHost(): TestHost { return TestHost.current; }
 }
 let thisHost: TestHost;
-function setup(hidden = false, onFrame = vi.fn(), onViewport = vi.fn(), perf = false) {
+function setup(hidden = false, onFrame = vi.fn(), onViewport = vi.fn(), perf = false, box = { width: 320, height: 200 }) {
   const host = new TestHost(); thisHost = host; TestHost.setCurrent(host);
+  host.box = { ...box };
   const doc = document.implementation.createHTMLDocument('frame-test');
   Object.defineProperty(doc, 'visibilityState', { configurable: true, get: () => hidden ? 'hidden' : 'visible' });
   const element = doc.createElement('div');
@@ -47,6 +48,27 @@ describe('FrameScheduler', () => {
   it('runs one initial frame then stays idle without animation owners', () => {
     const f = setup(); expect(f.host.callbacks.size).toBe(1); f.host.flush(123);
     expect(f.onFrame).toHaveBeenCalledWith({ frameMs: 123, textDirty: false }); expect(f.host.callbacks.size).toBe(0);
+    f.scheduler.dispose();
+  });
+  it('delivers the initial unchanged viewport before the first frame, then only on changes', () => {
+    const order: string[] = [];
+    const f = setup(false, vi.fn(() => order.push('frame')), vi.fn(() => order.push('viewport')), false, { width: 767, height: 858 });
+    f.host.flush(17);
+    expect(f.onViewport).toHaveBeenCalledExactlyOnceWith({ width: 767, height: 858, dpr: 1, keyboardInset: 0 });
+    expect(order.slice(0, 2)).toEqual(['viewport', 'frame']);
+    f.scheduler.invalidateText(); f.host.flush(33);
+    expect(f.onViewport).toHaveBeenCalledTimes(1);
+    f.host.box = { width: 800, height: 600 }; f.host.resizeCallback?.([], {} as ResizeObserver); f.host.flush(49);
+    expect(f.onViewport).toHaveBeenCalledTimes(2);
+    expect(f.onViewport).toHaveBeenLastCalledWith({ width: 800, height: 600, dpr: 1, keyboardInset: 0 });
+    f.scheduler.dispose();
+  });
+  it('coalesces viewport callback text invalidation into the first frame', () => {
+    let f: ReturnType<typeof setup>;
+    f = setup(false, vi.fn(), vi.fn(() => f.scheduler.invalidateText()));
+    f.host.flush(17);
+    expect(f.onFrame).toHaveBeenCalledExactlyOnceWith({ frameMs: 17, textDirty: true });
+    expect(f.host.callbacks.size).toBe(0);
     f.scheduler.dispose();
   });
   it('keeps exactly one rAF while an owner is active and stops when cleared', () => {
@@ -64,6 +86,13 @@ describe('FrameScheduler', () => {
     expect(f.host.callbacks.size).toBe(1); f.host.flush(); expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 16, textDirty: true });
     expect(f.onViewport).toHaveBeenCalledTimes(1); f.scheduler.dispose();
   });
+  it('delivers the unchanged constructor viewport on the first tick after becoming visible', () => {
+    const f = setup(true); expect(f.onViewport).not.toHaveBeenCalled();
+    Object.defineProperty(f.doc, 'visibilityState', { configurable: true, get: () => 'visible' }); f.doc.dispatchEvent(new Event('visibilitychange'));
+    f.host.flush(17);
+    expect(f.onViewport).toHaveBeenCalledExactlyOnceWith({ width: 320, height: 200, dpr: 1, keyboardInset: 0 });
+    f.scheduler.dispose();
+  });
   it('re-registers resolution media query when DPR changes', () => {
     const f = setup(); f.host.flush(); f.host.ratio = 2; (f.host.media[0] as MediaQueryList & { dispatch(): void }).dispatch(); f.host.flush();
     expect(f.host.media[1]!.media).toBe('(resolution: 2dppx)'); expect(f.onViewport).toHaveBeenLastCalledWith({ width: 320, height: 200, dpr: 2, keyboardInset: 0 }); f.scheduler.dispose();
@@ -73,7 +102,7 @@ describe('FrameScheduler', () => {
     Object.defineProperty(f.host, 'visualViewport', { value: f.host.viewport }); f.host.innerHeight = 800;
     f.host.resizeCallback?.([], {} as ResizeObserver); for (let i = 0; i < 10; i++) f.host.resizeCallback?.([], {} as ResizeObserver);
     f.host.viewport.dispatchEvent(new Event('resize')); f.host.flush();
-    expect(f.onViewport).toHaveBeenCalledTimes(1); expect(f.onViewport).toHaveBeenLastCalledWith({ width: 320, height: 200, dpr: 1, keyboardInset: 300 }); f.scheduler.dispose();
+    expect(f.onViewport).toHaveBeenCalledTimes(2); expect(f.onViewport).toHaveBeenLastCalledWith({ width: 320, height: 200, dpr: 1, keyboardInset: 300 }); f.scheduler.dispose();
   });
   it('keeps a pending viewport update when the last animation owner stops', () => {
     const f = setup(); f.host.flush(); f.scheduler.setActive('playing', true);

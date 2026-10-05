@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Text } from '@codemirror/state';
 import type { EditorDeps } from '../../src/app/deps';
 import { mount } from '../../src/code/mount';
 import { AudibleClock } from '../../src/app/clock';
@@ -141,6 +142,30 @@ describe('headless canvas mount', () => {
     expect(perf?.transportSample()).toMatchObject({ epoch: 'e1', cycle: [2, 1], sample_time: 1 });
     expect(perf?.onsets()).toHaveLength(1);
     expect(perf?.onsets()[0]).toMatchObject({ from: 0, to: 3, time: 1, end: 2, receivedMs: expect.any(Number) });
+  });
+
+  it('does no whole-document work on an edit frame or active animation-only frames', () => {
+    const rig = setup(true, true); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    const surface = rig.deps.code!.surface;
+    const largeText = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`).join('\n');
+    surface.dispatch({ changes: { from: 0, insert: largeText } }); rig.host.step(16);
+    rig.transport.emit({ kind: 'playing', body: { events: [{ slot: 'd1', beat: [0, 1], time: 0, end_time: 100,
+      dur: [1, 1], src: { file: 'main.vact', span: { start: 0, end: 5 }, doc_revision: rig.deps.code!.currentRevision('main.vact'), form_gen: 1 } }] } });
+    const position = surface.state.doc.line(10_001).from + 12;
+    surface.dispatch({ selection: { anchor: position } });
+    const textarea = rig.code.querySelector('textarea[aria-label="Code editor"]') as HTMLTextAreaElement;
+    const toString = vi.spyOn(Text.prototype, 'toString');
+    const sliceString = vi.spyOn(Object.getPrototypeOf(surface.state.doc) as Text & { sliceString: Text['sliceString'] }, 'sliceString');
+    textarea.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true }));
+    rig.host.step(32);
+    const editHadLargeSlice = sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024);
+    const builds = perf.counters().renderer.textBuilds;
+    toString.mockClear(); sliceString.mockClear();
+    for (let frame = 0; frame < 10; frame++) rig.host.step(48 + frame * 16);
+    expect(toString).not.toHaveBeenCalled();
+    expect(sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024)).toBe(false);
+    expect(perf.counters().renderer.textBuilds).toBe(builds);
+    expect(editHadLargeSlice).toBe(false);
   });
 
   it('keeps syntax annotations stable across playing frames and recomputes them after wheel scrolling', () => {

@@ -128,24 +128,122 @@ impl FormRec {
         self.attempt.clear();
         self.subs.clear();
     }
+
+    fn wake_slots(&self) -> BTreeSet<u64> {
+        self.edges
+            .iter()
+            .map(|edge| edge.slot.id())
+            .chain(self.attempt.iter().map(VarSlotRef::id))
+            .chain(self.subs.iter().map(VarSlotRef::id))
+            .collect()
+    }
 }
 
 /// The per-form records and the active-owner registry.
 #[derive(Debug, Default)]
 pub struct DepGraph {
     forms: Vec<FormRec>,
+    /// Committed generation -> form record.
+    generations: BTreeMap<u64, FormId>,
     /// Defined name (slot id) -> owning form.
     name_owner: BTreeMap<u64, FormId>,
     /// Bound playing slot -> owning form.
     bind_owner: BTreeMap<SlotKey, FormId>,
+    /// Slot -> forms that may wake through committed edges or failure metadata.
+    readers: BTreeMap<u64, BTreeSet<FormId>>,
 }
 
 impl DepGraph {
     /// Records a form; it does not own anything until `claim`.
     pub fn add(&mut self, rec: FormRec) -> FormId {
         let id = FormId::new(u32::try_from(self.forms.len()).unwrap_or(u32::MAX));
+        let slots = rec.wake_slots();
+        self.generations.insert(rec.gen.get(), id);
         self.forms.push(rec);
+        self.add_readers(id, slots);
         id
+    }
+
+    /// Replaces a form's committed generation and returns the retired one.
+    pub fn set_generation(&mut self, form: FormId, gen: FormGen) -> Option<FormGen> {
+        let rec = self.get_mut(form)?;
+        let old = std::mem::replace(&mut rec.gen, gen);
+        self.generations.remove(&old.get());
+        self.generations.insert(gen.get(), form);
+        Some(old)
+    }
+
+    fn add_readers(&mut self, form: FormId, slots: BTreeSet<u64>) {
+        for slot in slots {
+            self.readers.entry(slot).or_default().insert(form);
+        }
+    }
+
+    fn remove_readers(&mut self, form: FormId, slots: BTreeSet<u64>) {
+        for slot in slots {
+            if let Some(forms) = self.readers.get_mut(&slot) {
+                forms.remove(&form);
+                if forms.is_empty() {
+                    self.readers.remove(&slot);
+                }
+            }
+        }
+    }
+
+    fn replace_readers(&mut self, form: FormId, previous: BTreeSet<u64>, next: BTreeSet<u64>) {
+        self.remove_readers(form, previous.difference(&next).copied().collect());
+        self.add_readers(form, next.difference(&previous).copied().collect());
+    }
+
+    /// Commits a form's new dependency edges and updates the reverse index.
+    pub fn commit_edges(&mut self, form: FormId, edges: Vec<Edge>) {
+        let Some(rec) = self.get(form) else {
+            return;
+        };
+        let previous = rec.wake_slots();
+        if let Some(rec) = self.get_mut(form) {
+            rec.commit_edges(edges);
+        }
+        let next = self
+            .get(form)
+            .map_or_else(BTreeSet::new, FormRec::wake_slots);
+        self.replace_readers(form, previous, next);
+    }
+
+    /// Updates failed-attempt reads and recovery subscriptions.
+    pub fn set_failure_reads(
+        &mut self,
+        form: FormId,
+        attempt: Vec<VarSlotRef>,
+        subs: Vec<VarSlotRef>,
+    ) {
+        let Some(rec) = self.get(form) else {
+            return;
+        };
+        let previous = rec.wake_slots();
+        if let Some(rec) = self.get_mut(form) {
+            rec.attempt = attempt;
+            rec.subs = subs;
+        }
+        let next = self
+            .get(form)
+            .map_or_else(BTreeSet::new, FormRec::wake_slots);
+        self.replace_readers(form, previous, next);
+    }
+
+    /// Updates recovery subscriptions while preserving the attempted reads.
+    pub fn set_subscriptions(&mut self, form: FormId, subs: Vec<VarSlotRef>) {
+        let Some(rec) = self.get(form) else {
+            return;
+        };
+        let previous = rec.wake_slots();
+        if let Some(rec) = self.get_mut(form) {
+            rec.subs = subs;
+        }
+        let next = self
+            .get(form)
+            .map_or_else(BTreeSet::new, FormRec::wake_slots);
+        self.replace_readers(form, previous, next);
     }
 
     #[must_use]
@@ -183,8 +281,7 @@ impl DepGraph {
     /// The form whose committed generation is `gen`.
     #[must_use]
     pub fn form_of_gen(&self, gen: FormGen) -> Option<FormId> {
-        self.ids()
-            .find(|f| self.get(*f).is_some_and(|r| r.gen == gen))
+        self.generations.get(&gen.get()).copied()
     }
 
     /// Makes `f` the owner of every member of its write set and returns the
@@ -252,7 +349,11 @@ impl DepGraph {
     /// Eligible forms a write to `slot` wakes, in definition order.
     #[must_use]
     pub fn dependents(&self, slot: u64) -> Vec<FormId> {
-        self.ids()
+        self.readers
+            .get(&slot)
+            .into_iter()
+            .flatten()
+            .copied()
             .filter(|f| self.eligible(*f) && self.get(*f).is_some_and(|r| r.wakes_on(slot)))
             .collect()
     }
@@ -261,7 +362,11 @@ impl DepGraph {
     /// subscription to it (the targets of a status event).
     #[must_use]
     pub fn status_dependents(&self, slot: u64) -> Vec<FormId> {
-        self.ids()
+        self.readers
+            .get(&slot)
+            .into_iter()
+            .flatten()
+            .copied()
             .filter(|f| {
                 self.eligible(*f)
                     && self.get(*f).is_some_and(|r| {

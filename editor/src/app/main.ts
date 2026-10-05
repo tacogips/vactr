@@ -139,7 +139,9 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   return { ...editor, dispose() { audibleLifecycle.dispose(); editor.dispose(); } };
 }
 
-async function reportSelfCheck(root: HTMLElement, win: Window, deps: EditorDeps): Promise<void> {
+export async function reportSelfCheck(root: HTMLElement, win: Window, deps: EditorDeps): Promise<void> {
+  let playingEvents = 0;
+  const offPlaying = deps.client.on('playing', () => { playingEvents += 1; });
   try {
     if (!await invoke<boolean>('self_check_enabled')) return;
     let off = () => {};
@@ -160,9 +162,12 @@ async function reportSelfCheck(root: HTMLElement, win: Window, deps: EditorDeps)
       gpuStatus,
       effectiveDpr: win.devicePixelRatio,
       latencyKind,
+      playingEvents,
     }) });
   } catch {
     // Self-check is diagnostic only and must not take the editor down.
+  } finally {
+    offPlaying();
   }
 }
 

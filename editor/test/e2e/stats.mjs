@@ -63,6 +63,22 @@ export function countChecks(checks) {
   };
 }
 
+export function attributeWorkloadOnsets(rows, baselineKeys, clickMs) {
+  const baseline = baselineKeys instanceof Set ? baselineKeys : new Set(baselineKeys ?? []);
+  const workload = []; let excludedBaseline = 0; let excludedPreClick = 0;
+  for (const row of rows ?? []) {
+    if (!(Number(row.receivedMs) > clickMs)) { excludedPreClick += 1; continue; }
+    if (baseline.has(JSON.stringify(row))) { excludedBaseline += 1; continue; }
+    workload.push(row);
+  }
+  return { workload, count:workload.length, excludedBaseline, excludedPreClick };
+}
+
+export function splitSinkOnsets(times, ctxTime) {
+  const control = (times ?? []).filter((time) => Number(time) <= ctxTime).length;
+  return { control, workload:(times ?? []).filter((time) => Number(time) > ctxTime).length };
+}
+
 export function evaluate(summary, thresholds = THRESHOLDS) {
   const failures = [];
   const metrics = summary?.metrics ?? {};
@@ -73,6 +89,21 @@ export function evaluate(summary, thresholds = THRESHOLDS) {
   else if (metrics.editPairedKeyCount <= 0) failures.push('paired editing samples=0, expected at least 1');
   if (Number.isFinite(metrics.editKeyCount) && Number.isFinite(metrics.editUnpairedKeys) && metrics.editKeyCount > 0 && metrics.editUnpairedKeys / metrics.editKeyCount > 0.1) failures.push(`unpaired editing keys=${metrics.editUnpairedKeys}/${metrics.editKeyCount}, expected at most 10%`);
   if (metrics.audioRunning === true && (!Number.isFinite(metrics.onsetCount) || metrics.onsetCount === 0)) failures.push('no playing onset telemetry; active audio/visual workload was not observed');
+  if (summary.silentAudioRequired === true && !summary.controlSink) failures.push('silent-sink: control report unavailable');
+  if (summary.silentAudioRequired === true && !summary.workloadSink) failures.push('silent-sink: workload report unavailable');
+  for (const [label, sink] of [['control',summary.controlSink],['workload',summary.workloadSink]]) {
+    if (!sink) continue;
+    if (sink.installed !== true || sink.installedBeforeFirstConnect !== true) failures.push('silent-sink: not installed before first destination connection');
+    if (sink.directDestinationConnections !== 0) failures.push(`silent-sink: direct destination connections=${sink.directDestinationConnections}`);
+    if (sink.post?.peak !== 0) failures.push(`silent-sink: post-sink peak=${sink.post?.peak}`);
+    if ((sink.violations ?? []).length) failures.push(`silent-sink: ${sink.violations.join('; ')}`);
+    if (label === 'control' && (!(sink.pre?.onsetCount >= 1) || !(sink.pre?.peakDbfs > -60))) failures.push(`control: harness failure onsets=${sink.pre?.onsetCount ?? 'unavailable'} peak=${sink.pre?.peakDbfs ?? 'unavailable'} dBFS`);
+  }
+  const workloadSink = summary.workloadSink ?? summary.controlSink;
+  if (workloadSink && !Number.isFinite(workloadSink.pre?.peakDbfs)) failures.push('pre-sink peak unavailable');
+  else if (workloadSink && workloadSink.pre.peakDbfs > -1) failures.push(`pre-sink peak ${workloadSink.pre.peakDbfs} dBFS exceeds -1`);
+  if (summary.hushQuiet === false) failures.push('control: hush did not silence control');
+  if (summary.workloadOnsetCount !== undefined && summary.workloadOnsetCount <= 0) failures.push('no playing onset telemetry; active audio/visual workload was not observed');
   const limit = (key, p, max) => {
     const v = metrics[key]?.[`p${p}`];
     if (Number.isFinite(v) && v > max) failures.push(`${key}.p${p}=${v} exceeds ${max}`);
@@ -112,6 +143,12 @@ export function renderEvidence(summary) {
       ['Input samples (paired / expired)', m.inputSamplesUsed == null ? null : `${m.inputSamplesUsed} / ${m.inputKeysExpired ?? 0}`, 'expired keys are outside the retained frame ring'],
       ['Editing keystrokes / paired', m.editKeyCount == null ? null : `${m.editKeyCount} / ${m.editPairedKeyCount ?? 0}`, '>= 500 keys; paired > 0; unpaired <= 10%'],
       ['Audio control / run start', m.controlOnsetCount == null ? null : `${m.controlOnsetCount} onsets / ${m.controlStartMethod ?? 'unknown'}`, m.onsetAttribution ?? 'attribution unavailable'],
+      ['Silent sink post-sink peak', m.sink?.workload?.post?.peak ?? m.sink?.control?.post?.peak, '== 0'],
+      ['Direct destination connections', m.sink?.workload?.directDestinationConnections ?? m.sink?.control?.directDestinationConnections, '0'],
+      ['Pre-sink peak (dBFS)', m.sink?.workload?.pre?.peakDbfs ?? m.sink?.control?.pre?.peakDbfs, '<= -1'],
+      ['Pre-sink RMS (dBFS)', m.sink?.workload?.pre?.rmsDbfs ?? m.sink?.control?.pre?.rmsDbfs, 'reported'],
+      ['Pre-sink onsets (count)', m.sinkOnsetsTotal, 'reported'],
+      ['Control onsets / peak dBFS', m.controlSink?.pre ? `${m.controlSink.pre.onsetCount} / ${m.controlSink.pre.peakDbfs}` : null, '>= 1 / > -60'],
       ['Animation frame work p50 (ms)', m.animationWorkMs?.p50, '<= 4'],
       ['Animation frame work p95 (ms)', m.animationWorkMs?.p95, '<= 8'],
       ['Animation frame work p99 (ms)', m.animationWorkMs?.p99, '<= 16.7'],

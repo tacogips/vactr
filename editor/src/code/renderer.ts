@@ -1,3 +1,4 @@
+import { Text } from '@codemirror/state';
 import type { CodeAnnotation, CodeRect } from '../app/apis';
 import { GlyphAtlas, type CanvasFactory, type RunStyle } from './atlas';
 import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from './layout';
@@ -11,6 +12,7 @@ export interface RenderFeedback {
   annotations?: readonly CodeAnnotation[]; cursor?: number | null;
   handles?: readonly { pos: number; end?: boolean }[];
   textRevision?: number;
+  annotationsRevision?: number;
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
 }
@@ -102,6 +104,7 @@ export class CanvasRenderer {
   get textPending(): boolean { return this.pendingText; }
   get atlasStats(): Readonly<{ uploads: number; hits: number; evictions: number }> { return this.atlas?.stats ?? { uploads: 0, hits: 0, evictions: 0 }; }
   setDocument(text: string): void { this.layout.setDocument(text); this.clearDrawCache(); }
+  setText(doc: Text): void { this.layout.setText(doc); this.clearDrawCache(); }
   setViewport(view: LayoutViewport, dpr = 1): void {
     if (![view.width, view.height, view.scrollLeft, view.scrollTop, view.left ?? 0, view.top ?? 0, view.gutter ?? 48].every(Number.isFinite) || view.width <= 0 || view.height <= 0 || view.scrollLeft < 0 || view.scrollTop < 0 || dpr <= 0 || !Number.isFinite(dpr)) throw new RangeError('Invalid viewport');
     this.view = { ...view }; this.requestedDpr = dpr;
@@ -177,7 +180,8 @@ export class CanvasRenderer {
       this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
       const annotations = feedback.annotations ?? [];
       const staticAnnotations = annotations.filter(a => a.kind !== 'playing' && a.kind !== 'eval');
-      const key = JSON.stringify([feedback.textRevision, this.view, this.scale, this.layout.font.generation, this.atlas.stats.evictions, staticAnnotations, feedback.cursor, feedback.handles]);
+      const annotationKey = feedback.annotationsRevision === undefined ? staticAnnotations : feedback.annotationsRevision;
+      const key = JSON.stringify([feedback.textRevision, this.view, this.scale, this.layout.font.generation, this.atlas.stats.evictions, annotationKey, feedback.cursor, feedback.handles]);
       const rebuild = feedback.textRevision === undefined || this.beforeAnimation === null || this.afterAnimation === null || this.cacheKey !== key;
       let unsupported = false;
       let before = this.beforeAnimation ?? [];

@@ -8,11 +8,12 @@ import { startServer, editorRoot, repoRoot } from './serve.mjs';
 import { runBehavior } from './behavior.mjs';
 import { runMeasurement } from './measure.mjs';
 import { countChecks, renderEvidence } from './stats.mjs';
+import { installSilentSink } from './silent-sink.mjs';
 const args=process.argv.slice(2); const value=(key,def)=>{const i=args.indexOf(key);return i>=0?args[i+1]:def;};
 const list=(value('--browser','all')==='all'?['chromium','webkit']:[value('--browser','all')]);
-const profile=value('--profile','all'); const runId='run-001'; const out=path.resolve(value('--out',path.join(repoRoot,'design-docs/specs/evidence/canvas-cutover/run-001')));
+const profile=value('--profile','all'); const runId=value('--run-id','run-001'); const out=path.resolve(value('--out',path.join(repoRoot,'design-docs/specs/evidence/canvas-cutover',runId)));
 const writeEvidence=args.includes('--write-evidence'); const headedWebkit=args.includes('--headed-webkit');
-const command=`cd editor && npm run e2e -- --browser ${value('--browser','all')} --profile ${profile}${writeEvidence?' --write-evidence':''}${headedWebkit?' --headed-webkit':''}`;
+const command=`cd editor && npm run e2e -- --browser ${value('--browser','all')} --profile ${profile} --run-id ${runId}${writeEvidence?' --write-evidence':''}${headedWebkit?' --headed-webkit':''}`;
 const evidencePath=(name)=>path.join(out,name); const browsers=[]; let blocked=false; let fatal=null;
 const host={hostname:os.hostname(),platform:os.platform(),release:os.release(),arch:os.arch(),node:process.version,runId,commands:[command,'cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build']};
 try {
@@ -23,16 +24,16 @@ try {
     for(const name of list){
       const engine=name==='chromium'?chromium:webkit; let browser; let version=null; let actualHeadless=!(name==='webkit'&&headedWebkit); let behavior=null; let stage='browser-launch';
       try {
-        browser=await engine.launch({headless:!(name==='webkit'&&headedWebkit),timeout:30000});
-        if(name==='webkit'&&actualHeadless){const probe=await browser.newPage();await probe.setContent('<canvas></canvas>');const hasGl=await probe.evaluate(()=>Boolean(document.querySelector('canvas').getContext('webgl2')));await probe.close();if(!hasGl){await browser.close();browser=await engine.launch({headless:false,timeout:30000});actualHeadless=false;}}
+        browser=await engine.launch({headless:!(name==='webkit'&&headedWebkit),timeout:30000,args:name==='chromium'?['--mute-audio','--use-angle=metal','--enable-gpu','--ignore-gpu-blocklist']:[]});
+        if(name==='webkit'&&actualHeadless){const probeContext=await browser.newContext();await installSilentSink(probeContext);const probe=await probeContext.newPage();await probe.setContent('<canvas></canvas>');const hasGl=await probe.evaluate(()=>Boolean(document.querySelector('canvas').getContext('webgl2')));await probeContext.close();if(!hasGl){await browser.close();browser=await engine.launch({headless:false,timeout:30000});actualHeadless=false;}}
         version=browser.version(); stage='behavior'; behavior=profile==='measure'?null:await runBehavior(browser,server.origin,name);
         const b={name,version,headless:actualHeadless,behavior:behavior?countChecks(behavior.checks):null,checks:behavior?.checks??[],limitations:behavior?.limitations??[],metrics:null,measurement:null};
         if(profile==='measure'||profile==='all'){
           stage='measurement';
-          const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:1}); const page=await context.newPage();
+          const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:1}); await installSilentSink(context); const page=await context.newPage();
           await page.goto(`${server.origin}/?perf=1`,{waitUntil:'domcontentloaded',timeout:60000});
           const measured=await runMeasurement(page,context,name,{profile:'all',runId});
-          b.metrics=measured.metrics;b.measurement={pass:measured.pass,failures:measured.failures,blocked:measured.blocked,limitations:measured.limitations};b.samples=measured.samples;b.limitations.push(...measured.limitations);blocked ||= measured.blocked;
+          b.metrics=measured.metrics;b.renderer=measured.renderer??null;b.measurement={pass:measured.pass,failures:measured.failures,blocked:measured.blocked,limitations:measured.limitations};b.samples=measured.samples;b.limitations.push(...measured.limitations);blocked ||= measured.blocked;
           await page.evaluate(()=>window.__vactrPerf?.disposeCode()); await context.close();
         }
         host[name]={version,headless:b.headless}; browsers.push(b); await browser.close();
@@ -40,11 +41,9 @@ try {
     }
   } finally { await server.close(); }
 } catch(error){fatal=String(error?.stack??error);blocked=Boolean(error?.blocked);}
-let gl={};
-try {
-  const browser=await chromium.launch({headless:true}); const page=await browser.newPage(); await page.setContent('<canvas></canvas>'); gl=await page.evaluate(()=>{const g=document.querySelector('canvas').getContext('webgl2');if(!g)return{webgl2:false};const ext=g.getExtension('WEBGL_debug_renderer_info');return{webgl2:true,vendor:ext?g.getParameter(ext.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),renderer:ext?g.getParameter(ext.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)};}); await browser.close();
-}catch(error){gl={webgl2:false,error:String(error)};}
-const environment={...host,osVersion:os.version(),webgl:gl,simulator:{xcode:process.env.DEVELOPER_DIR??'xcode-select default; see ios-sim.json'}};
+const webgl=Object.fromEntries(browsers.map((browser)=>[browser.name,browser.renderer??null]));
+for(const browser of browsers)if(String(browser.renderer??'').includes('SwiftShader'))browser.limitations.push('Chromium rendered with software GL (SwiftShader); frame metrics are recorded failures, never relabeled as passes');
+const environment={...host,osVersion:os.version(),webgl,simulator:{xcode:process.env.DEVELOPER_DIR??'xcode-select default; see ios-sim.json'}};
 for(const b of browsers)if(b.samples)b.sampleDownsampling={frame:'every 2nd sample',presented:'every 2nd sample',other:'all',analysis:'metrics use the complete in-memory samples'};
 const anyFailed=browsers.some((b)=>countChecks(b.checks??[]).failed>0||(b.measurement&&(!b.measurement.pass||(b.measurement.failures??[]).length>0)));
 const summary={runId,commands:host.commands,browsers:browsers.map(({samples,...b})=>b),environment,pass:!fatal&&!blocked&&!anyFailed,blocked,failures:browsers.flatMap((b)=>[...(b.checks??[]).filter((c)=>c.status!=='limitation'&&!c.pass).map((c)=>`${b.name}:${c.id}`),...(b.measurement?.failures??[]).map((x)=>`${b.name}:${x}`)]),fatal};

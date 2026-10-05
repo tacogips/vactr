@@ -7111,6 +7111,8 @@ injected every 10 s).
 - **Software GL.** If a browser renders with software GL, it is reported, and
   failing frame metrics are kept as recorded failures. They are never
   relabeled as passes.
+- **Headless WebKit.** A failing metric becomes a platform limitation only
+  with the minimal control-page proof of 15.3.8.12.
 
 **iPad simulator profile S.** Records: the build log, `simctl install` and
 `launch` on a named iPad simulator, the self-check JSON line, and a
@@ -7185,7 +7187,8 @@ sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
   plan lists each such owner file as a concrete sharedPath with the intended
   edit, and the owning plan's tests must keep passing. A defect outside those
   listed paths goes back to its owning accepted plan by selective redispatch
-  (15.3.8.10).
+  (15.3.8.10). For the session-274 wave, 15.3.8.12 replaces this rule with a
+  serial writePaths amendment of the evidence plan.
 
 **Closeout** (evidence plan):
 
@@ -7283,7 +7286,7 @@ file that is not on the evidence plan's pre-listed seam paths, it goes back
 to the owning accepted plan by selective redispatch, with a concrete
 writePaths amendment and a changed manifest fingerprint. It is never
 recorded as acceptable. Accepted plans without such a finding are not
-redispatched.
+redispatched. Session 274 replaces this rule for its wave (15.3.8.12).
 
 ##### 15.3.8.11 Serial perf gate (session 271, operator decision P)
 
@@ -7376,6 +7379,122 @@ following hold on the joined tree:
 - the other 15.3.8.9 "green after every plan" commands pass.
 
 The final closeout gates of 15.3.8.9 add `npm run test:perf`.
+
+##### 15.3.8.12 Evidence repair wave (session 274, operator decisions A and B)
+
+**Issue reference:** `workflowInput:RESUME-session-271` (resumed as session
+274). The session-271 integration review rejected CANVAS-EVIDENCE with five
+high findings: INT-S271-EV-SIM, -SYNC-ATTRIBUTION, -READBACK, -TOUCH and
+-PERF. Their full briefs (reproduction, rootCause, orderedChanges,
+allowedWritePaths, forbiddenChanges, completionCriteria, verification) are in
+`tmp/canvas-cutover/s271-integration-review.json` and are carried verbatim into
+the CANVAS-EVIDENCE redispatch. Session 271 then failed at dispatch because
+brief paths were outside the manifest writePaths. This subsection fixes the
+ownership and the metric definitions that the briefs rely on. It adds no
+dependency, no protocol field, no surface member and no threshold change, and
+it changes no workload.
+
+**Ownership (decision A).** All owner plans of the seam files are accepted,
+so CANVAS-EVIDENCE is the single active owner of these files for this wave.
+They move from sharedPaths to writePaths:
+
+- the harness: `editor/test/e2e/{behavior,ios-sim,measure,run,stats}.mjs`,
+  `editor/test/e2e/stats.test.ts`, `editor/test/e2e/README.md`;
+- the product seams:
+  `editor/src/code/{pointer,perf-hook,renderer,mount,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history,frame,highlight,transport,eval}.ts`,
+  `editor/src/app/clock.ts`, `editor/src/bind/{mount,write}.ts`,
+  `editor/src/visual/{frame,scopes,video,render-host}.ts`;
+- the existing seam tests under `editor/test/{canvas,code,app,visual}/`,
+  each listed as a concrete file in the plan;
+- the evidence document, the run-001 files and the evidence plan.
+
+The plan and the manifest list concrete files only, with no directories. The
+artifact roots are `editor/dist`, `editor/src-tauri/target`,
+`editor/src-tauri/gen/apple/build` and `tmp/canvas-cutover/evidence`. The
+plan author makes this amendment serially and checkpoints it before the
+redispatch, so the manifest fingerprint changes. The session-269 seam protocol
+still governs every product-seam edit: a triage row, fresh-read and post-edit
+sha256 values, the smallest change, a green owner test with a new
+operation-counter or deterministic row, no public contract change
+(`CodeSurface`, `DocumentSync`, `__vactrPerf` members, Session Protocol), no
+Rust edit, and no new dependency. `perf-hook.ts` may gain additive record
+fields only, with the reason recorded.
+
+**Unlisted dominant cost.** This replaces the selective-redispatch rule of
+15.3.8.9 and 15.3.8.10 for this wave. If profiling shows the dominant cost in
+a TypeScript file that is not listed, the implementer records the exact path,
+the owning accepted plan and the measured share of main-thread self time. The
+plan author then adds that concrete path to the CANVAS-EVIDENCE writePaths
+serially and checkpoints it. The run continues, and no accepted plan is
+redispatched. A fix that needs a Rust edit, a public contract change or a new
+dependency cannot be resolved this way. It is reported as a blocker with that
+profile evidence for an operator decision, and it is never recorded as
+acceptable.
+
+**Fix order.** Harness fixes come first (SIM, SYNC-ATTRIBUTION, READBACK, and
+TOUCH when instrumented as a harness defect), then a re-measure. Product seam
+fixes (TOUCH when it is a product defect, PERF) come next, then another
+re-measure. This repeats until the gates below pass.
+
+**Metric and probe clarifications** (these define the 15.3.8.8 checks more
+precisely; the thresholds stay as they are):
+
+- **Sync attribution.** An onset occurrence is identified by its range, its
+  epoch and its audible window `[time, end)`. A presented frame's active
+  range is attributed to the one occurrence with the same range and epoch and
+  the largest `time <= audibleTime + 2 ms`. An early flash or a replayed flash
+  is counted at most once per frame-range pair. Sync samples, early flashes,
+  replays and the late-frame active-set comparison use only onsets inside the
+  window that the presented-frame buffer covers. Disjoint windows give no
+  samples, and that alone is not a failure. The attribution is a pure function
+  in `stats.mjs` with `stats.test.ts` rows for repeated ranges and window
+  mismatch.
+- **Canvas readback.** The probe reads a region on the line-1 text (after the
+  gutter, in device pixels), in the same frame as a draw (for example a
+  nested `requestAnimationFrame`). Production keeps `preserveDrawingBuffer`
+  false. The check stays: at least 2 colors in a region that contains glyphs,
+  and no document text in the DOM. If the corrected probe still reads uniform
+  pixels, it is a product defect in the renderer, mount or layout seam.
+- **Simulator self-check.** The self-check line comes only from the `Vactr`
+  process and is the most recent match after this launch. The app is rebuilt
+  from current source before the run, and the evidence records that the
+  binary mtime is later than the source commit. A null `selfCheck` is a
+  failure. `playingEvents === 0` and `silent === true` are required.
+- **Profiling.** `measure.mjs --profile-trace` captures a Chromium CDP trace
+  or CPU profile for 10 s of the edit run and 10 s of the cycle run under
+  `tmp/canvas-cutover/evidence/`. It is off by default and never changes the
+  gated numbers.
+
+**Platform limitation proof (decision B).** A gated metric may be recorded as
+a headless-WebKit platform limitation only with a minimal control-page
+measurement. The control page is served by the same harness and runs in the
+same browser, mode and host. It contains only a `requestAnimationFrame` loop
+(and, for an input metric, a key listener at the same pacing), with no app
+code. The limitation applies only to the metrics whose control value itself
+misses the 15.3.8.8 threshold. The product number is still recorded next to
+the control number, and the threshold does not change. If the control passes,
+the product failure stays a failure. For TOUCH, a limitation needs an
+instrumented page-side event log proving that WebKit does not deliver the
+events. These proofs are stored under `tmp/canvas-cutover/evidence/` and
+summarized in the evidence document.
+
+**Gates for this wave.** CANVAS-EVIDENCE is accepted only when all of the
+following hold:
+
+- `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`
+  exits 0. Post-sink peak is 0, direct destination connections are 0, and the
+  pre-sink levels are numeric.
+- `ios-sim.json` has `selfCheck.playingEvents === 0`, `silent === true` and
+  `pass === true`.
+- The default vitest suite, `npm run test:perf` (run alone) and
+  `npm run check` pass.
+- Strict clippy, the full nextest suite (timeout at least 1500 s), the wasm32
+  build, the `editor/src-tauri` cargo check and rustfmt `--check` on touched
+  Rust files pass.
+- The final integration review accepts.
+
+Then the 15.3.8.9 closeout runs, and the work is committed and pushed
+(non-force) to `origin wf/canvas`.
 
 ## 16. Wasm and AudioWorklet Layout
 

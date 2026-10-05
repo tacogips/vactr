@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflowInput:RESUME-session-269 'RESUME session 269: serial perf gate for large-eval, accept EDITCOST/RUNSTART, silent CANVAS-EVIDENCE measurement, final review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-271, chain 265-266-267-269-271; operator decision P; no GitHub issue number)",
+  "issueReference": "workflowInput:RESUME-session-271 'RESUME session 271: amend EVIDENCE write paths, apply five integration-review repairs, pass silent evidence gates, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-274, chain 265-266-267-269-271-274; operator decisions A, B and S; design 15.3.8.12 accepted by step3-design-review comm-004202; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -61,6 +61,26 @@
       ],
       "amendment": "Operator decision P and design 15.3.8.11 (serial perf gate). Absolute wall-clock budgets leave the default parallel vitest run. RUNSTART splits editor/test/e2e/large-eval.test.ts into a default ratio-only file (20k/5k ratio <= 6, one eval-result, zero error diagnostics) and editor/test/e2e/large-eval.perf.test.ts (adds LARGE_EVAL_BUDGET_MS = ceil(2*m/100)*100), sharing editor/test/e2e/large-eval-shared.ts. editor/vitest.config.ts selects *.perf.test.ts only when VACTR_PERF=1 and excludes them otherwise. editor/package.json gains scripts.test:perf = 'VACTR_PERF=1 vitest run --maxWorkers=1'. RUNSTART runs alone (wave 3); EDITCOST is gates-only and follows it (wave 4) so the perf gate never shares the host; CANVAS-EVIDENCE is wave 5 (the design's 'wave-4'). editor/package.json moves from CANVAS-EVIDENCE writePaths to its sharedPaths (scripts.e2e only).",
       "checkpointNote": "Session 271 plan checkpoint: design 15.3.8.11 and the RUNSTART, EDITCOST and EVIDENCE plan amendments plus this manifest are committed together before fanout. Accepted plans are not redispatched."
+    },
+    "session274": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-274",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-271",
+      "resumeHead": "215669937f9eaf8eacc371bce770f29f676d0906",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      "integrationReviewSource": "tmp/canvas-cutover/s271-integration-review.json (gitignored, read-only; loopGate.decision needs-work; findings INT-S271-EV-SIM, INT-S271-EV-SYNC-ATTRIBUTION, INT-S271-EV-READBACK, INT-S271-EV-TOUCH, INT-S271-EV-PERF)",
+      "amendment": "Operator decisions A and B and design 15.3.8.12. Session 271 failed at dispatch-plans because the briefs named editor/src/code/pointer.ts, editor/test/e2e/behavior.mjs, editor/test/e2e/ios-sim.mjs and editor/test/e2e/measure.mjs outside CANVAS-EVIDENCE writePaths. Every allowedWritePaths entry of the five briefs is now a concrete CANVAS-EVIDENCE writePath: the harness (run, behavior, measure, stats, ios-sim .mjs, stats.test.ts, README.md), 23 product seams, 38 existing seam tests, the evidence document, the seven run-001 files and the evidence plan; artifactRoots keep editor/dist, editor/src-tauri/target, editor/src-tauri/gen/apple/build and tmp/canvas-cutover/evidence. sharedPaths keep only editor/package.json, editor/test/e2e/silent-sink.mjs, editor/test/e2e/fixtures/large-doc.mjs and editor/test/e2e/large-doc.test.ts. CANVAS-EVIDENCE is the single active owner of these seams for this wave. EDITCOST and RUNSTART (accepted at 2156699) moved from plans to acceptedDependencies.",
+      "checkpointNote": "Session 274 plan checkpoint: design 15.3.8.12, the CANVAS-EVIDENCE plan amendment and this manifest are committed together before the single-plan redispatch, which changes the manifest fingerprint. plans lists only CANVAS-EVIDENCE. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
@@ -70,7 +90,7 @@
   "designDocSections": [
     {
       "path": "design-docs/specs/design-implementation.md",
-      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.11; 15.3.8.10 added in session 269 for the edit-path cost rule, mutation evidence and selective redispatch; 15.3.8.11 added in session 271 for the serial perf gate, superseding the 15.3.8.10 wall-clock vitest gates paragraph); 15.3.1-15.3.7 remain the baseline"
+      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.12; 15.3.8.10 added in session 269 for the edit-path cost rule, mutation evidence and selective redispatch; 15.3.8.11 added in session 271 for the serial perf gate, superseding the 15.3.8.10 wall-clock vitest gates paragraph; 15.3.8.12 added in session 274 for the evidence repair wave: single-owner seam writePaths, serial amendment for an unlisted dominant cost, occurrence-based sync attribution, same-frame line-1 readback, Vactr-process simulator self-check, opt-in profiling and the headless-WebKit control-page limitation proof); 15.3.1-15.3.7 remain the baseline"
     },
     {
       "path": "design-docs/user-qa/pending-editor-questions.md",
@@ -79,7 +99,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-269 'RESUME session 269: serial perf gate for large-eval, accept EDITCOST/RUNSTART, silent CANVAS-EVIDENCE measurement, final review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-271, chain 265-266-267-269-271; operator decision P; design accepted by step3-design-review comm-004102; plans accepted by step5-impl-plan-review comm-004104; no GitHub issue number)",
+    "issueReference": "workflowInput:RESUME-session-271 'RESUME session 271: amend EVIDENCE write paths, apply five integration-review repairs, pass silent evidence gates, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-274, chain 265-266-267-269-271-274; operator decisions A, B and S; design 15.3.8.12 accepted by step3-design-review comm-004202; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -96,6 +116,7 @@
       "Session 271 (design 15.3.8.11): no absolute wall-clock assertion in the default vitest suite; the 2x focused-median budget runs only in npm run test:perf (VACTR_PERF=1, --maxWorkers=1, run alone); EDITCOST and RUNSTART are accepted on three consecutive default full vitest runs plus test:perf (CANVAS-EVIDENCE-RUNSTART, CANVAS-EVIDENCE-EDITCOST)."
     ],
     "nonGoals": [
+      "Session 274 (design 15.3.8.12): supersedes the session-267 non-goal that CANVAS-EVIDENCE changes no product code. CANVAS-EVIDENCE may edit its listed product seams under the seamProtocol only; no threshold, workload, Rust, public contract or dependency change, and no edit to SHELL-owned files (editor/src-tauri/src/*.rs, editor/src/app/main.ts).",
       "No resume or repair of the canvas-editor-224 dispatch, snapshot, fingerprint or recovery contracts.",
       "No @codemirror/autocomplete or other view-bound extensions; no new runtime dependency and no lockfile change.",
       "No Apple provisioning profiles, uploads or signing-identity changes; simulator and unsigned builds only.",
@@ -202,266 +223,11 @@
       "Session 269 (design 15.3.8.10): wall-clock vitest budgets equal 2x the median of three focused runs on the final source, rounded up to 100 ms; widening a harness timeout to hide a slow product path is forbidden; mutation evidence is reported separately and never gates.",
       "Session 269: CANVAS-EVIDENCE seam sharedPaths are edited only under the seam protocol in impl-plans/active/canvas-cutover-evidence.md (Session 269 Amendment); a product defect in any other file goes to its owning accepted plan by selective redispatch.",
       "Session 271 (design 15.3.8.11, supersedes the session-269 wall-clock rule): absolute wall-clock budgets live only in editor/test/**/*.perf.test.ts and run only through cd editor && npm run test:perf (VACTR_PERF=1 vitest run --maxWorkers=1), alone on the host with no concurrent vitest, nextest, cargo or browser run; a failed perf run is a failure, never retried until it passes. The default ./node_modules/.bin/vitest run excludes perf files by config and contains no absolute ms budget; no assertion is skipped, deleted or env-gated inside a file.",
-      "Session 271 waves: RUNSTART (wave 3) runs alone; EDITCOST (wave 4, gates-only) depends on RUNSTART; CANVAS-EVIDENCE (wave 5) depends on both. Acceptance of EDITCOST and RUNSTART requires three consecutive default full vitest runs (exit 0 each) plus npm run test:perf (exit 0, alone), npm run check, strict clippy, rustfmt --check on the six RUNSTART Rust files and outside-sandbox full nextest (timeout >= 1500 s)."
+      "Session 271 waves: RUNSTART (wave 3) runs alone; EDITCOST (wave 4, gates-only) depends on RUNSTART; CANVAS-EVIDENCE (wave 5) depends on both. Acceptance of EDITCOST and RUNSTART requires three consecutive default full vitest runs (exit 0 each) plus npm run test:perf (exit 0, alone), npm run check, strict clippy, rustfmt --check on the six RUNSTART Rust files and outside-sandbox full nextest (timeout >= 1500 s).",
+      "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch rule for this wave): EDITCOST and RUNSTART are acceptedDependencies (commit 2156699) and are not redispatched. plans lists only CANVAS-EVIDENCE, redispatched alone (no fanout peers) with the five session-271 integration-review briefs carried verbatim in the plan section 'Session 274 Amendment'. Its harness files, product seams and seam tests are concrete writePaths with CANVAS-EVIDENCE as the single active owner. Fix order: harness fixes, re-measure, product seam fixes with operation-counter or deterministic tests, re-measure. An unlisted dominant-cost TypeScript file is recorded by the implementer and added by a serial plan-author amendment and checkpoint; the run does not stop and no accepted plan is redispatched. Rust, public contract or dependency needs are operator blockers. Playwright, simulator, profile and full nextest runs happen outside the Codex sandbox in the verification and review steps."
     ]
   },
   "plans": [
-    {
-      "planId": "CANVAS-EVIDENCE-EDITCOST",
-      "planPath": "impl-plans/active/canvas-cutover-evidence-editcost.md",
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/canvas-cutover/evidence-editcost/logs"
-      ],
-      "setup": [
-        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
-      ],
-      "acceptanceCriteria": [
-        "No Text.prototype.toString and no >64 KiB sliceString during a one-character edit frame, 10 animation-only frames, or word navigation/delete on a 20,000-line document (edit-cost.test.ts)",
-        "TextLayout.setText(Text) and CanvasRenderer.setText(Text) added; setDocument(string) kept; mount compares presentation.doc by identity; cached shaped lines before the edit retained",
-        "InputPresentation carries doc: Text with a lazy text getter and is cached; no production read of presentation.text",
-        "surroundingWindow/readSelection and keyboard word navigation/delete are line-local with equivalence tests against the previous algorithm",
-        "RenderFeedback.annotationsRevision replaces the stringified static annotations in the draw-cache key when present",
-        "Existing canvas tests ported without lost assertions; npm run check and full vitest pass",
-        "Session 269: s269-mutation-prefix.log recorded before any edit with a nonzero exit (mutationEvidence, not gating)",
-        "Session 269: DocumentSync.apply has no history.index call and no whole-text conversion; seeded randomized byte-change and dirty-span equivalence against Utf8Index(doc.toString()) passes on ASCII, Japanese, emoji, a 100,000-character line and reset transactions",
-        "Session 269: SyntaxSpans and FallbackTokenizerCache use Text identity, chunked parseDoc (chunks of at most 16 KiB) and line-local tokenizing; spans equal the full-parse or tokenizerSpans reference; no Text.toString",
-        "Session 269: edit-cost.test.ts:99 and mount.test.ts:168 pass; grep -n \"toString()\" editor/src/code/sync.ts editor/src/code/syntax.ts finds no match",
-        "Session 271 TASK-105 (gates-only, after RUNSTART): three consecutive default full vitest runs exit 0 with >= 696 passed and 0 failed and no per-file exception; npm run test:perf exits 0 run alone; focused gates, npm run check and both greps as listed; no edit outside this plan's writePaths"
-      ],
-      "verification": [
-        "cd editor && ./node_modules/.bin/vitest run test/canvas/edit-cost.test.ts test/canvas/mount.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run test/code/sync.test.ts test/code/history.test.ts test/code/syntax.test.ts test/code/syntax-core.test.ts test/code/syntax-fallback.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run test/canvas",
-        "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run (three consecutive runs: logs s271-vitest-full-1..3, each exit 0)",
-        "cd editor && npm run test:perf (alone; exit 0)",
-        "grep -rn \"presentation\\.text\" editor/src (no match; grep exit 1 expected)",
-        "grep -n \"toString()\" editor/src/code/sync.ts editor/src/code/syntax.ts (no match; grep exit 1 expected)"
-      ],
-      "mutationEvidence": [
-        "Before the first edit: cd editor && ./node_modules/.bin/vitest run test/canvas/edit-cost.test.ts test/canvas/mount.test.ts > ../tmp/canvas-cutover/evidence-editcost/logs/s269-mutation-prefix.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-editcost/logs/s269-mutation-prefix.exit (expected nonzero)"
-      ],
-      "outsideSandboxVerification": [
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (exit 0; a timeout kill is neither pass nor fail)",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings (exit 0)",
-        "cd editor && ./node_modules/.bin/vitest run three consecutive times (post-join, authoritative; each exit 0)",
-        "cd editor && npm run test:perf (alone; exit 0)",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm (exit 0)"
-      ],
-      "wave": 4,
-      "dependsOn": [
-        "CANVAS-MOUNT",
-        "CANVAS-RENDER",
-        "CANVAS-EVIDENCE-RUNSTART"
-      ],
-      "writePaths": [
-        "editor/src/code/input.ts",
-        "editor/src/code/layout.ts",
-        "editor/src/code/accessibility.ts",
-        "editor/src/code/keyboard.ts",
-        "editor/src/code/mount.ts",
-        "editor/src/code/renderer.ts",
-        "editor/test/canvas/input.test.ts",
-        "editor/test/canvas/gpu.test.ts",
-        "editor/test/canvas/mount.test.ts",
-        "editor/test/canvas/edit-cost.test.ts",
-        "editor/src/code/sync.ts",
-        "editor/src/code/syntax.ts",
-        "editor/src/code/syntax-core.ts",
-        "editor/src/code/history.ts",
-        "editor/src/code/surface.ts",
-        "editor/test/code/sync.test.ts",
-        "editor/test/code/syntax.test.ts",
-        "editor/test/code/syntax-core.test.ts",
-        "editor/test/code/syntax-fallback.test.ts",
-        "editor/test/code/history.test.ts",
-        "impl-plans/active/canvas-cutover-evidence-editcost.md",
-        "tmp/canvas-cutover/evidence-editcost/intent.json",
-        "tmp/canvas-cutover/evidence-editcost/receipt.json",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/canvas-cutover/evidence-editcost/logs"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "writePathNotes": [
-        {
-          "path": "editor/src/code/sync.ts",
-          "intendedEdit": "Session 269 TASK-102: a module-private per-line UTF-8 byte table. DocumentSync.apply converts changes without history.index or any whole-text Utf8Index, rebuilds from lines on reset, and produces output byte-identical to Utf8Index."
-        },
-        {
-          "path": "editor/src/code/history.ts",
-          "intendedEdit": "Session 269 TASK-102: edit only if needed so apply never triggers a whole-text index. Public RevisionHistory signatures stay unchanged; index(rev) is kept for mapWireSpan/toWireSpan."
-        },
-        {
-          "path": "editor/src/code/surface.ts",
-          "intendedEdit": "Session 269 TASK-102: no change expected. Edit only if a test shows dispatch converts whole text; the public CodeSurface API stays unchanged."
-        },
-        {
-          "path": "editor/src/code/syntax-core.ts",
-          "intendedEdit": "Session 269 TASK-103: add VactSyntax.parseDoc(doc, old) using ParseCallback chunks of at most 16 KiB, VactSyntax.edit(parsed, edit), treeEditFromDocs from Text.lineAt, and range-limited query captures. Keep the parse/reparse/treeEdits/pointAt and loadVactSyntax/createVactSyntax signatures."
-        },
-        {
-          "path": "editor/src/code/syntax.ts",
-          "intendedEdit": "Session 269 TASK-103: SyntaxSpans keyed by Text identity, with incremental tree edits in noteChanges. FallbackTokenizerCache keeps per-line start states, truncated at the first changed line, and tokenizes only the visible range. No toString and no string comparison."
-        },
-        {
-          "path": "editor/test/code/history.test.ts",
-          "intendedEdit": "Substitute for the authorized editor/test/canvas/history.test.ts, which does not exist. Add rows only if history.ts changes."
-        }
-      ]
-    },
-    {
-      "planId": "CANVAS-EVIDENCE-RUNSTART",
-      "planPath": "impl-plans/active/canvas-cutover-evidence-runstart.md",
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/canvas-cutover/evidence-runstart/logs",
-        "tmp/canvas-cutover/evidence-runstart/scratch"
-      ],
-      "setup": [
-        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
-      ],
-      "acceptanceCriteria": [
-        "The large-document eval main-thread stall is located with recorded node timings (5,000 vs 20,000 lines) or a cpuprofile, and fixed in the owning file(s); the six session-267 Rust files are recorded as writePaths with notes (session 269)",
-        "large-eval.test.ts: one eval-result with zero error diagnostics for the 20,000-line workload, a 20k/5k median ratio <= 8, and the debug-wasm eval <= LARGE_EVAL_BUDGET_MS. Session 269: the budget is 2x the median of three focused runs on the final source, rounded up to 100 ms (expected about 5,200 ms), recorded in the plan.",
-        "Eval semantics, diagnostics and wire format unchanged; existing tests keep passing",
-        "Session 269: s269-mutation-prefix.log shows vitest exit 1 against the pre-fix scratch wasm built from 968028c (mutationEvidence, not gating)",
-        "Session 269: three consecutive full vitest runs pass on the joined tree; rustfmt --check on the six Rust files, strict clippy, focused nextest and outside-sandbox full nextest exit 0 with log paths",
-        "Session 269: the large-doc.test.ts sharedPath is either untouched (recorded) or edited exactly per TASK-204",
-        "Session 271 TASK-301: editor/vitest.config.ts includes only test/**/*.perf.test.ts when VACTR_PERF === '1' and otherwise adds test/**/*.perf.test.ts to [...configDefaults.exclude]; env read via the vite.config.ts:27-28 globalThis idiom; editor/package.json scripts.test:perf = 'VACTR_PERF=1 vitest run --maxWorkers=1'; no other script, dependency or package-lock change",
-        "Session 271 TASK-302: editor/test/e2e/large-eval-shared.ts exports LARGE_EVAL_RATIO_LIMIT = 6, LargeEvalMeasurement and measureLargeEval(label); large-eval.test.ts asserts ratio <= 6 and contains no ms budget; large-eval.perf.test.ts asserts ratio <= 6 and largeMedian <= LARGE_EVAL_BUDGET_MS; per-run one eval-result and zero error diagnostics kept; no assertion deleted, skipped or env-gated",
-        "Session 271 TASK-303: audit recorded; vitest list --filesOnly shows no perf file by default and exactly test/e2e/large-eval.perf.test.ts with VACTR_PERF=1",
-        "Session 271 TASK-304: three serial npm run test:perf medians, m and LARGE_EVAL_BUDGET_MS = ceil(2*m/100)*100 recorded in the plan",
-        "Session 271 TASK-306: three consecutive default full vitest runs exit 0 (ratios recorded), npm run test:perf exit 0 alone, npm run check 0, rustfmt --check on the six Rust files 0, strict clippy 0, git diff --exit-code 6dc176f -- editor/package-lock.json src exit 0, outside-sandbox full nextest 0"
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cd editor && npm run check",
-        "grep -nE \"BUDGET|_MS\\b\" editor/test/e2e/large-eval.test.ts (no match; grep exit 1 expected)",
-        "cd editor && ./node_modules/.bin/vitest list --filesOnly (no .perf.test.ts path; test/e2e/large-eval.test.ts present)",
-        "cd editor && VACTR_PERF=1 ./node_modules/.bin/vitest list --filesOnly (exactly test/e2e/large-eval.perf.test.ts)",
-        "cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts",
-        "cd editor && npm run test:perf (alone; exit 0)",
-        "cd editor && ./node_modules/.bin/vitest run (three consecutive runs: logs s271-vitest-full-1..3, each exit 0, >= 696 passed)",
-        "git diff --exit-code 6dc176fe34ae7ca77ba7d1bd15a8a767a2d18f18 -- editor/package-lock.json src",
-        "rustfmt --check src/ns/evaluator.rs src/ns/eval_doc.rs src/ns/journal.rs src/ns/depgraph.rs src/ns/insts.rs src/compile/compiler.rs",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings"
-      ],
-      "measurement": [
-        "TASK-304 (not gating): cd editor && npm run test:perf > ../tmp/canvas-cutover/evidence-runstart/logs/s271-perf-measure-<n>.log 2>&1 for n = 1, 2, 3, run alone; m = median of the three printed 20000= medians"
-      ],
-      "mutationEvidence": [
-        "Session 271 TASK-305 (pre-fix Wasm at tmp/canvas-cutover/evidence-runstart/scratch/pre-fix/target/wasm32-unknown-unknown/debug/vactr.wasm; rebuild per TASK-202 into scratch/pre-fix only if absent): cd editor && VACTR_WASM=\"$PWD/../tmp/canvas-cutover/evidence-runstart/scratch/pre-fix/target/wasm32-unknown-unknown/debug/vactr.wasm\" timeout 900 ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-default.log 2>&1 (expected exit 1; record the failing assertion; exit 124 is not valid evidence)",
-        "Session 271 TASK-305: cd editor && VACTR_PERF=1 VACTR_WASM=\"<same path>\" timeout 900 ./node_modules/.bin/vitest run --maxWorkers=1 test/e2e/large-eval.perf.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s271-negative-perf.log 2>&1 (expected exit 1; record the failing assertion)",
-        "Session 269 (recorded, historical): s269-mutation-prefix.log exit 1 at medians 20,566.3/141,240.7 ms, ratio 6.87"
-      ],
-      "outsideSandboxVerification": [
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run > tmp/canvas-cutover/evidence-runstart/logs/s271-nextest-full.log 2>&1 (exit 0; a timeout kill is neither pass nor fail)",
-        "cd editor && ./node_modules/.bin/vitest run three consecutive times on the joined tree (each exit 0)",
-        "cd editor && npm run test:perf (alone; exit 0)"
-      ],
-      "wave": 3,
-      "dependsOn": [
-        "CANVAS-MOUNT",
-        "CANVAS-NATIVE"
-      ],
-      "writePaths": [
-        "editor/test/e2e/large-eval.test.ts",
-        "editor/test/e2e/large-eval.perf.test.ts",
-        "editor/test/e2e/large-eval-shared.ts",
-        "editor/vitest.config.ts",
-        "editor/package.json",
-        "editor/src/code/eval.ts",
-        "editor/src/code/diagnostics.ts",
-        "editor/src/params/mount.ts",
-        "editor/src/bind/mount.ts",
-        "src/session/eval.rs",
-        "src/session/tests/eval.rs",
-        "src/ns/evaluator.rs",
-        "src/ns/eval_doc.rs",
-        "src/ns/journal.rs",
-        "src/ns/depgraph.rs",
-        "src/ns/insts.rs",
-        "src/compile/compiler.rs",
-        "impl-plans/active/canvas-cutover-evidence-runstart.md",
-        "tmp/canvas-cutover/evidence-runstart/intent.json",
-        "tmp/canvas-cutover/evidence-runstart/receipt.json",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/canvas-cutover/evidence-runstart/logs",
-        "tmp/canvas-cutover/evidence-runstart/scratch"
-      ],
-      "sharedPaths": [
-        "editor/test/e2e/large-doc.test.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "editor/test/e2e/large-doc.test.ts",
-          "intendedEdit": "Session 269 TASK-204 (DR-269-L1), conditional. Edit only if a full-suite run fails on the vitest default 5,000 ms timeout and the focused run passed in under 5,000 ms. The edit adds an explicit 60_000 per-test timeout to the session_check it(...) with a one-line comment, and changes no assertion. Record the trigger log, the focused duration and the sha256 values. Done in session 269. Session 271: no further edit."
-        }
-      ],
-      "writePathNotes": [
-        {
-          "path": "src/ns/evaluator.rs",
-          "intendedEdit": "Session 267 fix kept: checker environment selection, no callable certification snapshot when no callables were checked, reuse of the default CheckResult. Session 269: no change unless a gate fails because of it."
-        },
-        {
-          "path": "src/ns/eval_doc.rs",
-          "intendedEdit": "Session 267 fix kept: the same environment selection for manifest-specific checks, a small dynamic-manifest cache, reuse of the default CheckResult. Session 269: no change unless a gate fails because of it."
-        },
-        {
-          "path": "src/ns/journal.rs",
-          "intendedEdit": "Session 267 fix kept: a subset snapshot constructor for statically pure constant definitions. Session 269: no change unless a gate fails because of it."
-        },
-        {
-          "path": "src/ns/depgraph.rs",
-          "intendedEdit": "Session 267 fix kept: a reverse reader index and a generation-to-form index. Session 269: no change unless a gate fails because of it."
-        },
-        {
-          "path": "src/ns/insts.rs",
-          "intendedEdit": "Session 267 fix kept: a deduplicated shared declared-control set maintained on install and replace. Session 269: no change unless a gate fails because of it."
-        },
-        {
-          "path": "src/compile/compiler.rs",
-          "intendedEdit": "Session 267 fix kept: a shared immutable custom-control name set in CompileCx. Session 269: no change unless a gate fails because of it."
-        },
-        {
-          "path": "editor/test/e2e/large-eval.test.ts",
-          "intendedEdit": "Session 271 TASK-302 (supersedes TASK-201): default-suite file. Calls measureLargeEval('large-eval node') from large-eval-shared.ts and asserts ratio <= LARGE_EVAL_RATIO_LIMIT (6) with the 120_000 per-test timeout. No LARGE_EVAL_BUDGET_MS and no ms constant. Keeps // @vitest-environment node."
-        },
-        {
-          "path": "editor/test/e2e/large-eval.perf.test.ts",
-          "intendedEdit": "Session 271 TASK-302/304 (new): perf-gate-only file. // @vitest-environment node; measureLargeEval('large-eval perf'); asserts ratio <= 6 and largeMedian <= LARGE_EVAL_BUDGET_MS (ceil(2*m/100)*100, session-269 value 4,800, re-measured in TASK-304) with a one-line comment citing the plan and medians; 120_000 per-test timeout."
-        },
-        {
-          "path": "editor/test/e2e/large-eval-shared.ts",
-          "intendedEdit": "Session 271 TASK-302 (new, not a test file): the moved evaluate/median/three-run loop with its per-run expects (one eval-result, zero error diagnostics). Exports LARGE_EVAL_RATIO_LIMIT = 6, LargeEvalMeasurement { smallMedian; largeMedian; ratio } and measureLargeEval(label): Promise<LargeEvalMeasurement>, printing one '<label> medians: 5000=..ms 20000=..ms ratio=..' line."
-        },
-        {
-          "path": "editor/vitest.config.ts",
-          "intendedEdit": "Session 271 TASK-301: perf = env.VACTR_PERF === '1' (env via the vite.config.ts:27-28 globalThis idiom; tsconfig types: [] so no bare process). include = perf ? ['test/**/*.perf.test.ts'] : the existing two globs; exclude = perf ? configDefaults.exclude : [...configDefaults.exclude, 'test/**/*.perf.test.ts']. Everything else unchanged."
-        },
-        {
-          "path": "editor/package.json",
-          "intendedEdit": "Session 271 TASK-301: add scripts.test:perf = 'VACTR_PERF=1 vitest run --maxWorkers=1' after scripts.test. No other change; package-lock.json unchanged."
-        },
-        {
-          "path": "tmp/canvas-cutover/evidence-runstart/scratch",
-          "intendedEdit": "Session 269 TASK-202: a git archive of 968028c (Cargo.toml, Cargo.lock, src, examples, tests) and its pre-fix wasm build for the mutation run. Never committed."
-        }
-      ]
-    },
     {
       "planId": "CANVAS-EVIDENCE",
       "planPath": "impl-plans/active/canvas-cutover-evidence.md",
@@ -491,23 +257,34 @@
         "Session 267: the evidence document has the automated audio silence method, the native/simulator silence audit and a remaining-failure triage table; product defects are repaired, never recorded as acceptable",
         "Session 267: closeout also moves canvas-cutover-evidence-silent.md, canvas-cutover-evidence-viewport.md, canvas-cutover-evidence-editcost.md and canvas-cutover-evidence-runstart.md (listed as concrete paths in writePaths) to impl-plans/completed/",
         "Session 269: starts after EDITCOST and RUNSTART are accepted. Re-measures text-dirty work p95, input latency, the editing-key count and the large-document start in both browsers. Every seam edit has a triage row, sha256 values and green owner tests. Any other product defect is routed by selective redispatch and never recorded as acceptable.",
-        "Session 271: dispatch wave 5 (the design's 'wave-4'), after RUNSTART and EDITCOST acceptance; final gates add cd editor && npm run test:perf (alone, exit 0); editor/package.json is a sharedPath limited to scripts.e2e (no edit expected; scripts.test:perf is RUNSTART-owned)"
+        "Session 271: dispatch wave 5 (the design's 'wave-4'), after RUNSTART and EDITCOST acceptance; final gates add cd editor && npm run test:perf (alone, exit 0); editor/package.json is a sharedPath limited to scripts.e2e (no edit expected; scripts.test:perf is RUNSTART-owned)",
+        "Session 274 (design 15.3.8.12): the five briefs INT-S271-EV-SIM, -SYNC-ATTRIBUTION, -READBACK, -TOUCH and -PERF from tmp/canvas-cutover/s271-integration-review.json are resolved per their completionCriteria (plan section 'Session 274 Amendment'), with no threshold or workload change and no failure relabeled as a limitation without the 15.3.8.12 control-page or instrumented proof",
+        "Session 274: cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001 exits 0; per browser the sink is installed before the first connect, direct destination connections are 0, post-sink peak is exactly 0, and pre-sink peak dBFS, RMS and onset counts are numeric",
+        "Session 274: run-001/ios-sim.json has a non-null selfCheck parsed from a Vactr-process line with playingEvents === 0, silent === true and pass === true, and records an app binary mtime later than commit 6f6b807",
+        "Session 274: every seam edit has a triage row, fresh-read and post-edit sha256 values and a new operation-counter or deterministic test row; an unlisted dominant-cost file is recorded and added by a serial plan-author amendment, never by redispatching an accepted plan",
+        "Session 274: default vitest, npm run test:perf (alone), npm run check, strict clippy, full nextest (timeout >= 1500 s), the host-wasm wasm32 build and the editor/src-tauri cargo check pass on the final source; the final integration review accepts; closeout moves the fifteen canvas-editor-224 plans, canvas-editor-224-dispatch.json and the eleven canvas-cutover plans file by file and updates impl-plans/README.md; commit and non-force push to origin wf/canvas"
       ],
       "verification": [
         "cd editor && npm run check",
+        "node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/silent-sink.mjs editor/test/e2e/fixtures/large-doc.mjs",
         "cd editor && ./node_modules/.bin/vitest run test/e2e",
-        "node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/fixtures/large-doc.mjs",
-        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
-        "cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001",
-        "node editor/test/e2e/ios-sim.mjs --app <SHELL .app> --device \"iPad Pro 11-inch (M5)\"",
-        "CARGO_TERM_QUIET=true cargo build",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas test/code test/app test/bind test/visual test/e2e",
         "cd editor && ./node_modules/.bin/vitest run",
         "cd editor && npm run test:perf (alone; exit 0)",
         "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
-        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml"
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001",
+        "tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim (debug, unsigned, no upload; cwd and flags as recorded in impl-plans/active/canvas-cutover-shell.md)",
+        "node editor/test/e2e/ios-sim.mjs --app editor/src-tauri/gen/apple/build/arm64-sim/Vactr.app --device \"iPad Pro 11-inch (M5)\" --out design-docs/specs/evidence/canvas-cutover/run-001/ios-sim.json",
+        "CARGO_TERM_QUIET=true cargo build",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (exit 0; a timeout kill is neither pass nor fail)",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
+        "rustfmt --check on touched Rust files only (none expected; Rust edits are forbidden by the seamProtocol)"
+      ],
+      "diagnostics": [
+        "Not gating: cd editor && npm run e2e -- --browser chromium --profile measure --profile-trace --run-id s274-trace --out ../tmp/canvas-cutover/evidence/s274-trace (profiles under tmp/canvas-cutover/evidence/; never --write-evidence; never writes design-docs)"
       ],
       "wave": 5,
       "dependsOn": [
@@ -588,6 +365,74 @@
         "impl-plans/completed/canvas-cutover-evidence-viewport.md",
         "impl-plans/completed/canvas-cutover-evidence-editcost.md",
         "impl-plans/completed/canvas-cutover-evidence-runstart.md",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
+        "editor/src/code/pointer.ts",
+        "editor/src/code/perf-hook.ts",
+        "editor/src/code/renderer.ts",
+        "editor/src/code/mount.ts",
+        "editor/src/code/layout.ts",
+        "editor/src/code/input.ts",
+        "editor/src/code/keyboard.ts",
+        "editor/src/code/accessibility.ts",
+        "editor/src/code/sync.ts",
+        "editor/src/code/syntax.ts",
+        "editor/src/code/syntax-core.ts",
+        "editor/src/code/history.ts",
+        "editor/src/code/frame.ts",
+        "editor/src/code/highlight.ts",
+        "editor/src/code/transport.ts",
+        "editor/src/code/eval.ts",
+        "editor/src/app/clock.ts",
+        "editor/src/bind/mount.ts",
+        "editor/src/bind/write.ts",
+        "editor/src/visual/frame.ts",
+        "editor/src/visual/scopes.ts",
+        "editor/src/visual/video.ts",
+        "editor/src/visual/render-host.ts",
+        "editor/test/canvas/clock.test.ts",
+        "editor/test/canvas/contracts.test.ts",
+        "editor/test/canvas/edit-cost.test.ts",
+        "editor/test/canvas/first-viewport.test.ts",
+        "editor/test/canvas/frame.test.ts",
+        "editor/test/canvas/gpu.test.ts",
+        "editor/test/canvas/input.test.ts",
+        "editor/test/canvas/mount.test.ts",
+        "editor/test/canvas/no-editor-view.test.ts",
+        "editor/test/canvas/state.test.ts",
+        "editor/test/code/completion-popup.test.ts",
+        "editor/test/code/completion-types.test.ts",
+        "editor/test/code/completion-view.test.ts",
+        "editor/test/code/completion.test.ts",
+        "editor/test/code/diagnostics.test.ts",
+        "editor/test/code/eval.test.ts",
+        "editor/test/code/format.test.ts",
+        "editor/test/code/highlight.test.ts",
+        "editor/test/code/history.test.ts",
+        "editor/test/code/language.test.ts",
+        "editor/test/code/reconcile.test.ts",
+        "editor/test/code/samples.test.ts",
+        "editor/test/code/sync.test.ts",
+        "editor/test/code/syntax-core.test.ts",
+        "editor/test/code/syntax-fallback.test.ts",
+        "editor/test/code/syntax.test.ts",
+        "editor/test/code/tool-wasm.test.ts",
+        "editor/test/code/transport.test.ts",
+        "editor/test/app/main.test.ts",
+        "editor/test/app/song.test.ts",
+        "editor/test/bind/write.test.ts",
+        "editor/test/visual/frame.test.ts",
+        "editor/test/visual/meters.test.ts",
+        "editor/test/visual/panes.test.ts",
+        "editor/test/visual/render-host.test.ts",
+        "editor/test/visual/scopes.test.ts",
+        "editor/test/visual/text-asset.test.ts",
+        "editor/test/visual/video.test.ts",
         "tmp/canvas-cutover/evidence/intent.json",
         "tmp/canvas-cutover/evidence/receipt.json",
         "tmp/canvas-cutover/evidence/checks.log",
@@ -607,56 +452,10 @@
       "sharedPaths": [
         "editor/package.json",
         "editor/test/e2e/silent-sink.mjs",
-        "editor/test/e2e/run.mjs",
-        "editor/test/e2e/behavior.mjs",
-        "editor/test/e2e/measure.mjs",
-        "editor/test/e2e/stats.mjs",
-        "editor/test/e2e/stats.test.ts",
-        "editor/test/e2e/ios-sim.mjs",
-        "editor/test/e2e/README.md",
         "editor/test/e2e/fixtures/large-doc.mjs",
-        "editor/test/e2e/large-doc.test.ts",
-        "editor/src/code/mount.ts",
-        "editor/src/code/renderer.ts",
-        "editor/src/code/layout.ts",
-        "editor/src/code/input.ts",
-        "editor/src/code/keyboard.ts",
-        "editor/src/code/accessibility.ts",
-        "editor/src/code/sync.ts",
-        "editor/src/code/syntax.ts",
-        "editor/src/code/syntax-core.ts",
-        "editor/src/code/history.ts",
-        "editor/src/code/frame.ts",
-        "editor/src/code/pointer.ts",
-        "editor/src/code/highlight.ts",
-        "editor/src/app/clock.ts",
-        "editor/src/code/transport.ts",
-        "editor/src/code/perf-hook.ts",
-        "editor/src/code/eval.ts",
-        "editor/src/bind/mount.ts",
-        "editor/src/bind/write.ts",
-        "editor/src/visual/frame.ts",
-        "editor/src/visual/scopes.ts",
-        "editor/src/visual/video.ts",
-        "editor/src/visual/render-host.ts",
-        "editor/test/canvas/mount.test.ts",
-        "editor/test/canvas/gpu.test.ts",
-        "editor/test/canvas/input.test.ts",
-        "editor/test/canvas/edit-cost.test.ts",
-        "editor/test/canvas/frame.test.ts",
-        "editor/test/canvas/clock.test.ts",
-        "editor/test/code/sync.test.ts",
-        "editor/test/code/syntax-fallback.test.ts",
-        "editor/test/code/highlight.test.ts",
-        "editor/test/code/transport.test.ts",
-        "editor/test/code/eval.test.ts",
-        "editor/test/bind/write.test.ts",
-        "editor/test/visual/frame.test.ts",
-        "editor/test/visual/scopes.test.ts",
-        "editor/test/visual/video.test.ts",
-        "editor/test/visual/render-host.test.ts"
+        "editor/test/e2e/large-doc.test.ts"
       ],
-      "seamProtocol": "Session 269 (operator authorization 3). The product seam sharedPaths from editor/src/code/mount.ts through editor/test/visual/render-host.test.ts are pre-authorized. Edit one only to repair a product defect that the wave-4 run exposed and that is classified 'product defect' in the TASK-008 triage table. Make the smallest change in that file and its listed test file. Record the fresh-read and post-edit sha256 values and the triage row in the progress log. Owner tests and full vitest must stay green, and the run is repeated. Seam edits never change a public contract (CodeSurface, DocumentSync, __vactrPerf members, Session Protocol), never add a dependency, never touch Rust, and never weaken an assertion or a threshold. A defect in any other file goes to its owning accepted plan by selective redispatch, with a concrete writePaths amendment and a changed manifest fingerprint. It is never recorded as acceptable. Owners: code/{mount,renderer,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history}.ts = EDITCOST/MOUNT/RENDER; code/frame.ts = VIEWPORT; code/pointer.ts = RENDER/MOUNT (touch long-press and handles); code/highlight.ts, app/clock.ts, code/transport.ts = CLOCK; code/perf-hook.ts = MOUNT; code/eval.ts = RUNSTART; bind/{mount,write}.ts = MOUNT (DR-269-L2 per-change Utf8Index); visual/{frame,scopes,video,render-host}.ts = VISUAL.",
+      "seamProtocol": "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch clause for this wave). The product seam files and seam tests are writePaths of CANVAS-EVIDENCE, the single active owner while every prior owner plan is accepted. Edit a product seam only for INT-S271-EV-TOUCH, -READBACK or -PERF, or to repair a defect that a corrected harness run or a recorded profile exposed and that is classified 'product defect' in the evidence triage table. Make the smallest change in that file and add an operation-counter or deterministic row to its listed test. Record the fresh-read and post-edit sha256 values and the triage row in the progress log. Owner tests and the full default vitest must stay green, and the run is repeated. Seam edits never change a public contract (CodeSurface, DocumentSync, PointerController, __vactrPerf member names and shapes, Session Protocol; perf-hook.ts may only add record fields, with the reason recorded), never add a dependency, never touch Rust, and never weaken an assertion or a threshold. If profiling shows the dominant cost in an unlisted TypeScript file, the implementer records the exact path, its prior owner plan and the measured share of main-thread self time in the progress log, and continues with listed seams; the plan author then adds that concrete path to writePaths serially and checkpoints; no accepted plan is redispatched. A fix that needs Rust, a public contract change or a new dependency is an operator blocker with that profile evidence, never recorded as acceptable. Prior owners (history only): code/{mount,renderer,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history}.ts = EDITCOST/MOUNT/RENDER; code/frame.ts = VIEWPORT; code/pointer.ts = RENDER/MOUNT; code/highlight.ts, app/clock.ts, code/transport.ts = CLOCK; code/perf-hook.ts = MOUNT; code/eval.ts = RUNSTART; bind/{mount,write}.ts = MOUNT; visual/{frame,scopes,video,render-host}.ts = VISUAL.",
       "sharedPathNotes": [
         {
           "path": "editor/package.json",
@@ -664,93 +463,36 @@
         },
         {
           "path": "editor/test/e2e/silent-sink.mjs",
-          "intendedEdit": "Wave-4 serial repair only, after a review finding against the CANVAS-EVIDENCE-SILENT harness; recorded in the progress log."
-        },
-        {
-          "path": "editor/test/e2e/run.mjs",
-          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
-        },
-        {
-          "path": "editor/test/e2e/behavior.mjs",
-          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
-        },
-        {
-          "path": "editor/test/e2e/measure.mjs",
-          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
-        },
-        {
-          "path": "editor/test/e2e/stats.mjs",
-          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
-        },
-        {
-          "path": "editor/test/e2e/stats.test.ts",
-          "intendedEdit": "Wave-4 serial repair only, matching a stats.mjs repair."
-        },
-        {
-          "path": "editor/test/e2e/ios-sim.mjs",
-          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
-        },
-        {
-          "path": "editor/test/e2e/README.md",
-          "intendedEdit": "Wave-4 serial repair only, to keep the documented commands in step with a repair."
+          "intendedEdit": "No edit expected in session 274. Serial repair only after a review finding against the silent sink; the post-sink-peak-0 and direct-connection-0 assertions are never weakened."
         },
         {
           "path": "editor/test/e2e/fixtures/large-doc.mjs",
-          "intendedEdit": "Wave-4 serial repair only, if the measured pre-sink peak exceeds -1 dBFS (amp lowered further, voices kept at 64)."
+          "intendedEdit": "No edit expected in session 274; the workload (20,000 lines, about 1 MiB, 64 voices at amp 0.005, four synth outputs at RENDER_SIZE) is frozen by INT-S271-EV-PERF forbiddenChanges."
         },
         {
           "path": "editor/test/e2e/large-doc.test.ts",
-          "intendedEdit": "Wave-4 serial repair only, matching a fixture repair."
-        },
-        { "path": "editor/src/code/mount.ts", "intendedEdit": "Session 269 seam (owner EDITCOST/MOUNT): edit-path cost or input-latency defect only, per seamProtocol." },
-        { "path": "editor/src/code/renderer.ts", "intendedEdit": "Session 269 seam (owner EDITCOST/RENDER): text-dirty frame-work defect only, per seamProtocol." },
-        { "path": "editor/src/code/layout.ts", "intendedEdit": "Session 269 seam (owner EDITCOST/RENDER): layout cost defect only, per seamProtocol." },
-        { "path": "editor/src/code/input.ts", "intendedEdit": "Session 269 seam (owner EDITCOST/RENDER): input or IME presentation defect only, per seamProtocol." },
-        { "path": "editor/src/code/keyboard.ts", "intendedEdit": "Session 269 seam (owner EDITCOST/RENDER): keyboard edit-path defect only, per seamProtocol." },
-        { "path": "editor/src/code/accessibility.ts", "intendedEdit": "Session 269 seam (owner EDITCOST/RENDER): accessibility-bridge cost defect only, per seamProtocol." },
-        { "path": "editor/src/code/sync.ts", "intendedEdit": "Session 269 seam (owner EDITCOST): document-sync cost defect only; output byte-identical to Utf8Index; per seamProtocol." },
-        { "path": "editor/src/code/syntax.ts", "intendedEdit": "Session 269 seam (owner EDITCOST): syntax-provider cost defect only, per seamProtocol." },
-        { "path": "editor/src/code/syntax-core.ts", "intendedEdit": "Session 269 seam (owner EDITCOST): tree-sitter input or capture defect only, per seamProtocol." },
-        { "path": "editor/src/code/history.ts", "intendedEdit": "Session 269 seam (owner EDITCOST): revision-history cost defect only; public signatures unchanged; per seamProtocol." },
-        { "path": "editor/src/code/frame.ts", "intendedEdit": "Session 269 seam (owner VIEWPORT/MOUNT): frame scheduling or backing-size defect only, per seamProtocol." },
-        { "path": "editor/src/code/pointer.ts", "intendedEdit": "Session 269 seam (owner RENDER/MOUNT): touch long-press word selection or handles defect only, per seamProtocol." },
-        { "path": "editor/src/code/highlight.ts", "intendedEdit": "Session 269 seam (owner CLOCK): playing-highlight timing or A/V sync defect only, per seamProtocol." },
-        { "path": "editor/src/app/clock.ts", "intendedEdit": "Session 269 seam (owner CLOCK): audible-clock correlation or provenance defect only, per seamProtocol." },
-        { "path": "editor/src/code/transport.ts", "intendedEdit": "Session 269 seam (owner CLOCK): beat-indicator or transport-bar defect only, per seamProtocol." },
-        { "path": "editor/src/code/perf-hook.ts", "intendedEdit": "Session 269 seam (owner MOUNT): __vactrPerf record defect only; members unchanged; per seamProtocol." },
-        { "path": "editor/src/code/eval.ts", "intendedEdit": "Session 269 seam (owner RUNSTART): large-document run-start defect only, per seamProtocol." },
-        { "path": "editor/src/bind/mount.ts", "intendedEdit": "Session 269 seam (owner MOUNT): per-change whole-text Utf8Index defect (DR-269-L2) only, per seamProtocol." },
-        { "path": "editor/src/bind/write.ts", "intendedEdit": "Session 269 seam (owner MOUNT): per-change whole-text Utf8Index defect (DR-269-L2) only, per seamProtocol." },
-        { "path": "editor/src/visual/frame.ts", "intendedEdit": "Session 269 seam (owner VISUAL): visual frame-loop defect only, per seamProtocol." },
-        { "path": "editor/src/visual/scopes.ts", "intendedEdit": "Session 269 seam (owner VISUAL): scope timing defect only, per seamProtocol." },
-        { "path": "editor/src/visual/video.ts", "intendedEdit": "Session 269 seam (owner VISUAL): video background defect only, per seamProtocol." },
-        { "path": "editor/src/visual/render-host.ts", "intendedEdit": "Session 269 seam (owner VISUAL): visual composition defect only, per seamProtocol." },
-        { "path": "editor/test/canvas/mount.test.ts", "intendedEdit": "Session 269 seam test: add rows for a seam repair in mount.ts or perf-hook.ts; no assertion removed." },
-        { "path": "editor/test/canvas/gpu.test.ts", "intendedEdit": "Session 269 seam test: add rows for a seam repair in renderer.ts or layout.ts; no assertion removed." },
-        { "path": "editor/test/canvas/input.test.ts", "intendedEdit": "Session 269 seam test: add rows for a seam repair in input.ts, keyboard.ts, accessibility.ts or pointer.ts; no assertion removed." },
-        { "path": "editor/test/canvas/edit-cost.test.ts", "intendedEdit": "Session 269 seam test: add rows for an edit-path cost repair; no assertion removed." },
-        { "path": "editor/test/canvas/frame.test.ts", "intendedEdit": "Session 269 seam test: add rows for a frame.ts repair; no assertion removed." },
-        { "path": "editor/test/canvas/clock.test.ts", "intendedEdit": "Session 269 seam test: add rows for an app/clock.ts repair; no assertion removed." },
-        { "path": "editor/test/code/sync.test.ts", "intendedEdit": "Session 269 seam test: add rows for a sync.ts or history.ts repair; no assertion removed." },
-        { "path": "editor/test/code/syntax-fallback.test.ts", "intendedEdit": "Session 269 seam test: add rows for a syntax.ts or syntax-core.ts repair; no assertion removed." },
-        { "path": "editor/test/code/highlight.test.ts", "intendedEdit": "Session 269 seam test: add rows for a highlight.ts repair; no assertion removed." },
-        { "path": "editor/test/code/transport.test.ts", "intendedEdit": "Session 269 seam test: add rows for a transport.ts repair; no assertion removed." },
-        { "path": "editor/test/code/eval.test.ts", "intendedEdit": "Session 269 seam test: add rows for an eval.ts repair; no assertion removed." },
-        { "path": "editor/test/bind/write.test.ts", "intendedEdit": "Session 269 seam test: add rows for a bind/mount.ts or bind/write.ts repair; no assertion removed." },
-        { "path": "editor/test/visual/frame.test.ts", "intendedEdit": "Session 269 seam test: add rows for a visual/frame.ts repair; no assertion removed." },
-        { "path": "editor/test/visual/scopes.test.ts", "intendedEdit": "Session 269 seam test: add rows for a visual/scopes.ts repair; no assertion removed." },
-        { "path": "editor/test/visual/video.test.ts", "intendedEdit": "Session 269 seam test: add rows for a visual/video.ts repair; no assertion removed." },
-        { "path": "editor/test/visual/render-host.test.ts", "intendedEdit": "Session 269 seam test: add rows for a visual/render-host.ts repair; no assertion removed." }
+          "intendedEdit": "No edit expected in session 274; matches the frozen fixture."
+        }
       ],
       "writePathNotes": [
         {
           "path": "design-docs/specs/design-canvas-editor-evidence.md",
-          "intendedEdit": "Session 267 TASK-008: static sections only (automated audio silence method, native and simulator silence audit, limitation updates, remaining-failure triage table); the marker section is written only by the harness."
+          "intendedEdit": "Static sections only (silence method, native and simulator silence audit, limitations with 15.3.8.12 proofs, remaining-failure triage table, pending physical-iPad procedures); the marker section is written only by the harness. Session 274: the simulator triage row no longer attributes INT-S271-EV-SIM to CANVAS-SHELL."
         },
         {
           "path": "design-docs/specs/design-implementation.md",
-          "intendedEdit": "Closeout only: append one erratum paragraph at the end of 15.3.8.4 recording that the clock-probe wire keeps the pre-existing field names (page_send, engine_receive, engine_send; reply kind clock-probe). Nothing else in the file changes."
-        }
+          "intendedEdit": "Closeout only: append one erratum paragraph at the end of 15.3.8.4 recording that the clock-probe wire keeps the pre-existing field names (page_send, engine_receive, engine_send; reply kind clock-probe). Nothing else in the file changes (15.3.8.12 is committed at the session-274 plan checkpoint)."
+        },
+        { "path": "editor/test/e2e/ios-sim.mjs", "intendedEdit": "INT-S271-EV-SIM: log predicate requires process == \"Vactr\" and eventMessage CONTAINS \"VACTR_SELF_CHECK {\"; select the most recent match after this launch; a null selfCheck fails; record the app binary mtime in ios-sim.json." },
+        { "path": "editor/test/e2e/measure.mjs", "intendedEdit": "INT-S271-EV-SYNC-ATTRIBUTION: call the pure stats.mjs attribution instead of the inline range-only loops; INT-S271-EV-PERF: opt-in --profile-trace (Chromium only, off by default, non-gating) and the 15.3.8.12 WebKit control-page measurement." },
+        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "INT-S271-EV-SYNC-ATTRIBUTION: export attributeSync(onsets, presented, { earlyToleranceS: 0.002 }) and occurrence-based late-frame comparison; 15.3.8.12 control-page classification. No threshold constant changes; the run-level 'measured sync samples unavailable' gate stays." },
+        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Rows for repeated ranges, early, replayed, disjoint windows, Chromium-like measured provenance, and control-page classification." },
+        { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "INT-S271-EV-READBACK: line-1 region read in the same frame as a draw; INT-S271-EV-TOUCH: page-side event instrumentation and, if the harness is at fault, real PointerEvent dispatch." },
+        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "INT-S271-EV-PERF: pass --profile-trace through to measure.mjs; exit-code semantics 0/1/2 unchanged." },
+        { "path": "editor/test/e2e/README.md", "intendedEdit": "Document --profile-trace, the control-page measurement and the ios-sim rebuild step." },
+        { "path": "editor/src/code/pointer.ts", "intendedEdit": "INT-S271-EV-TOUCH seam: only if instrumentation proves the product cancels or ignores a valid primary touch long-press; minimal fix plus an input.test.ts row." },
+        { "path": "editor/src/code/perf-hook.ts", "intendedEdit": "Seam: additive record fields only (for example onset epoch or occurrence end) if strictly required by attributeSync; member names and shapes unchanged; reason recorded." },
+        { "path": "editor/src/code/renderer.ts", "intendedEdit": "INT-S271-EV-READBACK seam only if the corrected probe proves glyphs are not drawn; INT-S271-EV-PERF seam per profile. preserveDrawingBuffer stays false." }
       ]
     }
   ],
@@ -802,6 +544,18 @@
       "planPath": "impl-plans/active/canvas-cutover-evidence-viewport.md",
       "commit": "6f6b8070c30b4fde1ada5d12fd5839c6d3a31e7d",
       "provides": "FrameScheduler first-viewport delivery (fixes the Chromium 1x1 canvas backing), with frame.test.ts and first-viewport.test.ts."
+    },
+    {
+      "planId": "CANVAS-EVIDENCE-RUNSTART",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-runstart.md",
+      "commit": "215669937f9eaf8eacc371bce770f29f676d0906",
+      "provides": "Large-document Run start fix and the serial perf gate (design 15.3.8.11): editor/test/e2e/large-eval.test.ts (ratio-only), editor/test/e2e/large-eval.perf.test.ts, editor/test/e2e/large-eval-shared.ts, editor/vitest.config.ts VACTR_PERF selection and editor/package.json scripts.test:perf."
+    },
+    {
+      "planId": "CANVAS-EVIDENCE-EDITCOST",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-editcost.md",
+      "commit": "215669937f9eaf8eacc371bce770f29f676d0906",
+      "provides": "Bounded edit path (design 15.3.8.10): no whole-document Text.toString or slice over 64 KiB per keystroke; line-based DocumentSync byte conversion byte-identical to Utf8Index; Text-identity syntax providers with chunked tree-sitter input; operation-counter tests in editor/test/canvas/edit-cost.test.ts and mount.test.ts."
     }
   ]
 }

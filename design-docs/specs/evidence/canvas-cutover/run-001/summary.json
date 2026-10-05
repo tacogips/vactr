@@ -1,7 +1,7 @@
 {
   "runId": "run-001",
   "commands": [
-    "cd editor && npm run e2e -- --browser all --profile all --write-evidence",
+    "cd editor && npm run e2e -- --browser all --profile all --run-id run-001 --write-evidence",
     "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
   ],
   "browsers": [
@@ -18,12 +18,12 @@
         {
           "id": "canvas-only-text",
           "pass": false,
-          "detail": "page.evaluate: Error: canvas backing size is 1x1\n    at eval (eval at evaluate (:311:30), <anonymous>:12:50)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:21:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+          "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at eval (eval at evaluate (:311:30), <anonymous>:16:171)\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:25:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:8:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:29:88"
         },
         {
           "id": "editing-undo-redo-navigation",
           "pass": true,
-          "detail": "undo=8; redo=9; home=0; word=8; end=30"
+          "detail": "undo=10; redo=11; home=0; word=8; end=30"
         },
         {
           "id": "clipboard-round-trip",
@@ -33,7 +33,7 @@
         {
           "id": "japanese-ime",
           "pass": true,
-          "detail": "one commit revision=10; Japanese text present"
+          "detail": "one commit revision=12; Japanese text present"
         },
         {
           "id": "touch-selection",
@@ -61,7 +61,7 @@
         {
           "id": "background-no-replay",
           "pass": true,
-          "detail": "frames hidden=84, resumed=94"
+          "detail": "frames hidden=78, resumed=88"
         },
         {
           "id": "dispose-ledger",
@@ -69,25 +69,23 @@
           "detail": "usedBytes=0"
         }
       ],
-      "limitations": [
-        "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
-      ],
+      "limitations": [],
       "metrics": {
         "inputLatencyMs": {
-          "p95": 49.200000023818575,
-          "p99": 250.39999999999418
+          "p95": 30.60000001192384,
+          "p99": 243.8000000000029
         },
         "animationWorkMs": {
-          "p50": 0.800000011920929,
-          "p95": 4,
-          "p99": 4.5
+          "p50": 4.5,
+          "p95": 8.300000011920929,
+          "p99": 9.199999988079071
         },
         "textWorkMs": {
-          "p95": 32.799999952316284
+          "p95": 22.099999964237213
         },
         "frameIntervalMs": {
-          "p95": 100,
-          "p99": 116.80000000001746
+          "p95": 18.699999999999932,
+          "p99": 101.39999999999418
         },
         "syncProvenance": "measured",
         "syncAbsMs": {
@@ -96,42 +94,42 @@
         },
         "earlyFlashCount": 0,
         "replayedFlashCount": 0,
-        "ledgerMaxBytes": 931364,
+        "ledgerMaxBytes": 10313788,
         "ledgerCounters": {
-          "usedBytes": 931364,
+          "usedBytes": 10313788,
           "byKind": {
-            "atlas": 8644,
-            "geometry": 1116,
-            "canvas": 4,
+            "atlas": 6677572,
+            "geometry": 82272,
+            "canvas": 2632344,
             "backdrop": 921600,
             "visualText": 0,
             "visualTarget": 0,
             "video": 0,
             "other": 0
           },
-          "pixels": 230401,
+          "pixels": 888486,
           "visualTargets": 0,
           "refusals": 0
         },
-        "heapGrowthBytes": 6881236,
-        "beatDriftMs": null,
+        "heapGrowthBytes": -2396452,
+        "beatDriftMs": -0.4166666666947094,
         "peakPlayingRanges": 0,
         "audioRunning": true,
-        "onsetCount": 0,
-        "controlOnsetCount": 1,
+        "onsetCount": 2176,
+        "controlOnsetCount": 192,
         "controlStartMethod": "toolbar-click",
         "runStartMethod": "toolbar-click",
-        "largeDocumentStartStatus": "toolbar-click-timeout",
-        "onsetAttribution": "product/full-document startup failure: proven toolbar click timed out on the large document",
+        "largeDocumentStartStatus": "toolbar-click-returned",
+        "onsetAttribution": "active-workload-onsets-observed",
         "workletCounters": "not exposed",
         "probe": null,
         "highlight": {
-          "received": 21892,
-          "accepted": 11073,
+          "received": 13248,
+          "accepted": 2368,
           "overflow": 0,
           "horizonDrops": 0,
           "epochDrops": 0,
-          "unmapped": 10819
+          "unmapped": 10880
         },
         "client": {
           "telemetryQueued": 0,
@@ -139,20 +137,132 @@
           "coalesced": 0,
           "pendingRequests": 0
         },
-        "frameCount": 5844,
-        "keyCount": 319,
-        "editKeyCount": 253,
-        "editPairedKeyCount": 37,
-        "inputSamplesUsed": 72,
-        "inputKeysNonEditing": 239,
+        "frameCount": 6370,
+        "keyCount": 318,
+        "editKeyCount": 226,
+        "editPairedKeyCount": 43,
+        "inputSamplesUsed": 82,
+        "inputKeysNonEditing": 228,
         "inputKeysExpired": 0,
         "inputKeysUnpaired": 8,
-        "editPairedSamples": 37,
-        "editNonEditingKeys": 216,
+        "editPairedSamples": 43,
+        "editNonEditingKeys": 206,
         "editExpiredKeys": 0,
         "editUnpairedKeys": 0,
-        "workSamples": 5844,
-        "startedAt": "2026-10-05T02:44:10.004Z",
+        "workSamples": 6370,
+        "startedAt": "2026-10-05T10:09:07.604Z",
+        "controlSink": {
+          "installed": true,
+          "installedBeforeFirstConnect": true,
+          "contexts": 1,
+          "wrappedDestinationConnections": 1,
+          "directDestinationConnections": 0,
+          "mediaElementsForcedMuted": 0,
+          "violations": [],
+          "suspendedOnViolation": false,
+          "pre": {
+            "peak": 0.22380739450454712,
+            "peakDbfs": -13.002511373180266,
+            "rms": 0.016539487421399986,
+            "rmsDbfs": -35.62955907766094,
+            "onsetCount": 1,
+            "onsetTimes": [
+              4.199666666666667
+            ]
+          },
+          "post": {
+            "peak": 0
+          }
+        },
+        "workloadSink": {
+          "installed": true,
+          "installedBeforeFirstConnect": true,
+          "contexts": 1,
+          "wrappedDestinationConnections": 1,
+          "directDestinationConnections": 0,
+          "mediaElementsForcedMuted": 0,
+          "violations": [],
+          "suspendedOnViolation": false,
+          "pre": {
+            "peak": 0.22380739450454712,
+            "peakDbfs": -13.002511373180266,
+            "rms": 0.035315347916657185,
+            "rmsDbfs": -29.040730216946585,
+            "onsetCount": 4,
+            "onsetTimes": [
+              4.199666666666667,
+              11.629000000000001,
+              12.201,
+              13.197666666666667
+            ]
+          },
+          "post": {
+            "peak": 0
+          }
+        },
+        "hushQuiet": true,
+        "hushQuietMs": 1030,
+        "largeRunClickMs": 7543.099999964237,
+        "largeRunCtxTime": 7.354666666666667,
+        "workloadOnsetCount": 2176,
+        "workloadOnsetsExcludedBaseline": 0,
+        "workloadOnsetsExcludedPreClick": 192,
+        "sinkOnsetsTotal": 4,
+        "sinkOnsetSplit": {
+          "control": 1,
+          "workload": 3
+        },
+        "sink": {
+          "control": {
+            "installed": true,
+            "installedBeforeFirstConnect": true,
+            "contexts": 1,
+            "wrappedDestinationConnections": 1,
+            "directDestinationConnections": 0,
+            "mediaElementsForcedMuted": 0,
+            "violations": [],
+            "suspendedOnViolation": false,
+            "pre": {
+              "peak": 0.22380739450454712,
+              "peakDbfs": -13.002511373180266,
+              "rms": 0.016539487421399986,
+              "rmsDbfs": -35.62955907766094,
+              "onsetCount": 1,
+              "onsetTimes": [
+                4.199666666666667
+              ]
+            },
+            "post": {
+              "peak": 0
+            }
+          },
+          "workload": {
+            "installed": true,
+            "installedBeforeFirstConnect": true,
+            "contexts": 1,
+            "wrappedDestinationConnections": 1,
+            "directDestinationConnections": 0,
+            "mediaElementsForcedMuted": 0,
+            "violations": [],
+            "suspendedOnViolation": false,
+            "pre": {
+              "peak": 0.22380739450454712,
+              "peakDbfs": -13.002511373180266,
+              "rms": 0.035315347916657185,
+              "rmsDbfs": -29.040730216946585,
+              "onsetCount": 4,
+              "onsetTimes": [
+                4.199666666666667,
+                11.629000000000001,
+                12.201,
+                13.197666666666667
+              ]
+            },
+            "post": {
+              "peak": 0
+            }
+          }
+        },
         "lateFrameCount": 59,
         "lateActiveMismatchCount": 0,
         "imeLatencyMs": {
@@ -165,19 +275,20 @@
       "measurement": {
         "pass": false,
         "failures": [
-          "editing keystrokes=253, expected at least 500",
-          "no playing onset telemetry; active audio/visual workload was not observed",
-          "inputLatencyMs.p99=250.39999999999418 exceeds 100",
-          "textWorkMs.p95=32.799999952316284 exceeds 16.7",
-          "frameIntervalMs.p95=100 exceeds 20",
-          "frameIntervalMs.p99=116.80000000001746 exceeds 50",
-          "measured sync samples unavailable",
-          "Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n"
+          "editing keystrokes=226, expected at least 500",
+          "inputLatencyMs.p99=243.8000000000029 exceeds 100",
+          "animationWorkMs.p50=4.5 exceeds 4",
+          "animationWorkMs.p95=8.300000011920929 exceeds 8",
+          "textWorkMs.p95=22.099999964237213 exceeds 16.7",
+          "frameIntervalMs.p99=101.39999999999418 exceeds 50",
+          "measured sync samples unavailable"
         ],
         "blocked": false,
-        "limitations": [
-          "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
-        ]
+        "limitations": []
+      },
+      "renderer": {
+        "webgl2": true,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
       },
       "sampleDownsampling": {
         "frame": "every 2nd sample",
@@ -199,12 +310,12 @@
         {
           "id": "canvas-only-text",
           "pass": false,
-          "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:21:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+          "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:25:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:8:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:29:88"
         },
         {
           "id": "editing-undo-redo-navigation",
           "pass": true,
-          "detail": "undo=8; redo=9; home=0; word=8; end=30"
+          "detail": "undo=10; redo=11; home=0; word=8; end=30"
         },
         {
           "id": "clipboard-synthetic-event",
@@ -221,7 +332,7 @@
         {
           "id": "touch-selection",
           "pass": false,
-          "detail": "page.waitForFunction: Timeout 2000ms exceeded.\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:94:18\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:90:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+          "detail": "page.waitForFunction: Timeout 2000ms exceeded.\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:101:18\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:8:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:97:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:29:88"
         },
         {
           "id": "context-loss-restore",
@@ -256,38 +367,39 @@
         "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
         "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
         "WebKit touch selection uses synthetic pointer events.",
+        "7 post-stall active highlight set mismatches.",
         "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
       ],
       "metrics": {
         "inputLatencyMs": {
-          "p95": 265,
-          "p99": 687
+          "p95": 328,
+          "p99": 374
         },
         "animationWorkMs": {
-          "p50": 3,
-          "p95": 4,
-          "p99": 6
+          "p50": 5,
+          "p95": 14,
+          "p99": 15
         },
         "textWorkMs": {
-          "p95": 34
+          "p95": 23
         },
         "frameIntervalMs": {
-          "p95": 164,
+          "p95": 170,
           "p99": 184
         },
         "syncProvenance": "measured",
         "syncAbsMs": {
-          "p95": null,
-          "p99": null
+          "p95": 2327.666666666668,
+          "p99": 4041.333333333334
         },
-        "earlyFlashCount": 0,
-        "replayedFlashCount": 0,
-        "ledgerMaxBytes": 9552436,
+        "earlyFlashCount": 702656,
+        "replayedFlashCount": 423168,
+        "ledgerMaxBytes": 10442332,
         "ledgerCounters": {
-          "usedBytes": 9552436,
+          "usedBytes": 10442332,
           "byKind": {
-            "atlas": 5926828,
-            "geometry": 71664,
+            "atlas": 6806884,
+            "geometry": 81504,
             "canvas": 2632344,
             "backdrop": 921600,
             "visualText": 0,
@@ -301,23 +413,23 @@
         },
         "heapGrowthBytes": null,
         "beatDriftMs": null,
-        "peakPlayingRanges": 0,
+        "peakPlayingRanges": 64,
         "audioRunning": true,
-        "onsetCount": 0,
-        "controlOnsetCount": 1,
+        "onsetCount": 2048,
+        "controlOnsetCount": 192,
         "controlStartMethod": "toolbar-click",
         "runStartMethod": "toolbar-click",
-        "largeDocumentStartStatus": "toolbar-click-timeout",
-        "onsetAttribution": "product/full-document startup failure: proven toolbar click timed out on the large document",
+        "largeDocumentStartStatus": "toolbar-click-returned",
+        "onsetAttribution": "active-workload-onsets-observed",
         "workletCounters": "not exposed",
         "probe": null,
         "highlight": {
-          "received": 11266,
-          "accepted": 2625,
+          "received": 8960,
+          "accepted": 2240,
           "overflow": 0,
           "horizonDrops": 0,
           "epochDrops": 0,
-          "unmapped": 8641
+          "unmapped": 6720
         },
         "client": {
           "telemetryQueued": 0,
@@ -325,22 +437,132 @@
           "coalesced": 0,
           "pendingRequests": 0
         },
-        "frameCount": 1523,
-        "keyCount": 232,
-        "editKeyCount": 187,
-        "editPairedKeyCount": 32,
-        "inputSamplesUsed": 49,
-        "inputKeysNonEditing": 181,
+        "frameCount": 2498,
+        "keyCount": 270,
+        "editKeyCount": 189,
+        "editPairedKeyCount": 37,
+        "inputSamplesUsed": 79,
+        "inputKeysNonEditing": 191,
         "inputKeysExpired": 0,
-        "inputKeysUnpaired": 2,
-        "editPairedSamples": 32,
-        "editNonEditingKeys": 155,
+        "inputKeysUnpaired": 0,
+        "editPairedSamples": 37,
+        "editNonEditingKeys": 171,
         "editExpiredKeys": 0,
         "editUnpairedKeys": 0,
-        "workSamples": 1523,
-        "startedAt": "2026-10-05T02:50:35.572Z",
-        "lateFrameCount": 74,
-        "lateActiveMismatchCount": 0,
+        "workSamples": 2498,
+        "startedAt": "2026-10-05T10:12:46.177Z",
+        "controlSink": {
+          "installed": true,
+          "installedBeforeFirstConnect": true,
+          "contexts": 1,
+          "wrappedDestinationConnections": 1,
+          "directDestinationConnections": 0,
+          "mediaElementsForcedMuted": 0,
+          "violations": [],
+          "suspendedOnViolation": false,
+          "pre": {
+            "peak": 0.22380739450454712,
+            "peakDbfs": -13.002511373180266,
+            "rms": 0.010074405517070565,
+            "rmsDbfs": -39.935611436289335,
+            "onsetCount": 1,
+            "onsetTimes": [
+              4.064333333333334
+            ]
+          },
+          "post": {
+            "peak": 0
+          }
+        },
+        "workloadSink": {
+          "installed": true,
+          "installedBeforeFirstConnect": true,
+          "contexts": 1,
+          "wrappedDestinationConnections": 1,
+          "directDestinationConnections": 0,
+          "mediaElementsForcedMuted": 0,
+          "violations": [],
+          "suspendedOnViolation": false,
+          "pre": {
+            "peak": 0.22380739450454712,
+            "peakDbfs": -13.002511373180266,
+            "rms": 0.03264485196941326,
+            "rmsDbfs": -29.72370592793426,
+            "onsetCount": 3,
+            "onsetTimes": [
+              4.064333333333334,
+              11.048333333333334,
+              12.063
+            ]
+          },
+          "post": {
+            "peak": 0
+          }
+        },
+        "hushQuiet": true,
+        "hushQuietMs": 1041,
+        "largeRunClickMs": 7476,
+        "largeRunCtxTime": 7.010666666666666,
+        "workloadOnsetCount": 2048,
+        "workloadOnsetsExcludedBaseline": 0,
+        "workloadOnsetsExcludedPreClick": 192,
+        "sinkOnsetsTotal": 3,
+        "sinkOnsetSplit": {
+          "control": 1,
+          "workload": 2
+        },
+        "sink": {
+          "control": {
+            "installed": true,
+            "installedBeforeFirstConnect": true,
+            "contexts": 1,
+            "wrappedDestinationConnections": 1,
+            "directDestinationConnections": 0,
+            "mediaElementsForcedMuted": 0,
+            "violations": [],
+            "suspendedOnViolation": false,
+            "pre": {
+              "peak": 0.22380739450454712,
+              "peakDbfs": -13.002511373180266,
+              "rms": 0.010074405517070565,
+              "rmsDbfs": -39.935611436289335,
+              "onsetCount": 1,
+              "onsetTimes": [
+                4.064333333333334
+              ]
+            },
+            "post": {
+              "peak": 0
+            }
+          },
+          "workload": {
+            "installed": true,
+            "installedBeforeFirstConnect": true,
+            "contexts": 1,
+            "wrappedDestinationConnections": 1,
+            "directDestinationConnections": 0,
+            "mediaElementsForcedMuted": 0,
+            "violations": [],
+            "suspendedOnViolation": false,
+            "pre": {
+              "peak": 0.22380739450454712,
+              "peakDbfs": -13.002511373180266,
+              "rms": 0.03264485196941326,
+              "rmsDbfs": -29.72370592793426,
+              "onsetCount": 3,
+              "onsetTimes": [
+                4.064333333333334,
+                11.048333333333334,
+                12.063
+              ]
+            },
+            "post": {
+              "peak": 0
+            }
+          }
+        },
+        "lateFrameCount": 99,
+        "lateActiveMismatchCount": 7,
         "imeLatencyMs": {
           "p95": null,
           "p99": null
@@ -351,20 +573,30 @@
       "measurement": {
         "pass": false,
         "failures": [
-          "editing keystrokes=187, expected at least 500",
-          "no playing onset telemetry; active audio/visual workload was not observed",
-          "inputLatencyMs.p95=265 exceeds 50",
-          "inputLatencyMs.p99=687 exceeds 100",
-          "textWorkMs.p95=34 exceeds 16.7",
-          "frameIntervalMs.p95=164 exceeds 20",
+          "editing keystrokes=189, expected at least 500",
+          "inputLatencyMs.p95=328 exceeds 50",
+          "inputLatencyMs.p99=374 exceeds 100",
+          "animationWorkMs.p50=5 exceeds 4",
+          "animationWorkMs.p95=14 exceeds 8",
+          "textWorkMs.p95=23 exceeds 16.7",
+          "frameIntervalMs.p95=170 exceeds 20",
           "frameIntervalMs.p99=184 exceeds 50",
-          "measured sync samples unavailable",
-          "Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n"
+          "syncAbsMs.p95=2327.666666666668 exceeds 33.4",
+          "syncAbsMs.p99=4041.333333333334 exceeds 50",
+          "early flashes=702656",
+          "expired highlights replayed after stall",
+          "post-stall active-set mismatches=7",
+          "post-stall active-set mismatches=7"
         ],
         "blocked": false,
         "limitations": [
+          "7 post-stall active highlight set mismatches.",
           "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
         ]
+      },
+      "renderer": {
+        "webgl2": true,
+        "renderer": "Apple GPU"
       },
       "sampleDownsampling": {
         "frame": "every 2nd sample",
@@ -382,7 +614,7 @@
     "node": "v26.10.0",
     "runId": "run-001",
     "commands": [
-      "cd editor && npm run e2e -- --browser all --profile all --write-evidence",
+      "cd editor && npm run e2e -- --browser all --profile all --run-id run-001 --write-evidence",
       "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
     ],
     "chromium": {
@@ -395,9 +627,14 @@
     },
     "osVersion": "Darwin Kernel Version 25.5.0: Tue Jun  9 22:26:22 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8132",
     "webgl": {
-      "webgl2": true,
-      "vendor": "Google Inc. (Google)",
-      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)"
+      "chromium": {
+        "webgl2": true,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+      },
+      "webkit": {
+        "webgl2": true,
+        "renderer": "Apple GPU"
+      }
     },
     "simulator": {
       "xcode": "/Applications/Xcode.app/Contents/Developer"
@@ -407,25 +644,29 @@
   "blocked": false,
   "failures": [
     "chromium:canvas-only-text",
-    "chromium:editing keystrokes=253, expected at least 500",
-    "chromium:no playing onset telemetry; active audio/visual workload was not observed",
-    "chromium:inputLatencyMs.p99=250.39999999999418 exceeds 100",
-    "chromium:textWorkMs.p95=32.799999952316284 exceeds 16.7",
-    "chromium:frameIntervalMs.p95=100 exceeds 20",
-    "chromium:frameIntervalMs.p99=116.80000000001746 exceeds 50",
+    "chromium:editing keystrokes=226, expected at least 500",
+    "chromium:inputLatencyMs.p99=243.8000000000029 exceeds 100",
+    "chromium:animationWorkMs.p50=4.5 exceeds 4",
+    "chromium:animationWorkMs.p95=8.300000011920929 exceeds 8",
+    "chromium:textWorkMs.p95=22.099999964237213 exceeds 16.7",
+    "chromium:frameIntervalMs.p99=101.39999999999418 exceeds 50",
     "chromium:measured sync samples unavailable",
-    "chromium:Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n",
     "webkit:canvas-only-text",
     "webkit:touch-selection",
-    "webkit:editing keystrokes=187, expected at least 500",
-    "webkit:no playing onset telemetry; active audio/visual workload was not observed",
-    "webkit:inputLatencyMs.p95=265 exceeds 50",
-    "webkit:inputLatencyMs.p99=687 exceeds 100",
-    "webkit:textWorkMs.p95=34 exceeds 16.7",
-    "webkit:frameIntervalMs.p95=164 exceeds 20",
+    "webkit:editing keystrokes=189, expected at least 500",
+    "webkit:inputLatencyMs.p95=328 exceeds 50",
+    "webkit:inputLatencyMs.p99=374 exceeds 100",
+    "webkit:animationWorkMs.p50=5 exceeds 4",
+    "webkit:animationWorkMs.p95=14 exceeds 8",
+    "webkit:textWorkMs.p95=23 exceeds 16.7",
+    "webkit:frameIntervalMs.p95=170 exceeds 20",
     "webkit:frameIntervalMs.p99=184 exceeds 50",
-    "webkit:measured sync samples unavailable",
-    "webkit:Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n"
+    "webkit:syncAbsMs.p95=2327.666666666668 exceeds 33.4",
+    "webkit:syncAbsMs.p99=4041.333333333334 exceeds 50",
+    "webkit:early flashes=702656",
+    "webkit:expired highlights replayed after stall",
+    "webkit:post-stall active-set mismatches=7",
+    "webkit:post-stall active-set mismatches=7"
   ],
   "fatal": null
 }

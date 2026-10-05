@@ -447,7 +447,7 @@ Outside the sandbox, the verification step repeats the three default full runs a
 
 ### Completion criteria (session 271)
 
-- [ ] TASK-105: every gate exits 0 with log paths; three consecutive default full runs pass on the
+- [x] TASK-105: every required gate passes with log paths; three consecutive default full runs pass on the
   joined tree; `npm run test:perf` passes
 
 ## Completion Criteria
@@ -482,3 +482,8 @@ Outside the sandbox, the verification step repeats the three default full runs a
 
 ### Session: 2026-10-05 (session 271 plan amendment)
 **Tasks Completed**: Applied operator decision P and design 15.3.8.11. This plan now follows CANVAS-EVIDENCE-RUNSTART (dispatch wave 4) and is gates-only. Added TASK-105: focused gates, three consecutive default full vitest runs with no per-file exception, `npm run test:perf` run alone, and the greps. writePaths are unchanged. The manifest entry was changed with this amendment.
+
+### Session: 2026-10-05 (Step 6 joined-tree gates, session 271)
+**Tasks Completed**: Completed TASK-105 on the joined RUNSTART tree. No product source or RUNSTART-owned file was edited in this gates-only session.
+**Verification**: Focused edit-cost/mount 19/19, sync/history/syntax 32/32, canvas 167/167, no-EditorView 1/1, and `npm run check` exited 0. Three consecutive default full vitest runs passed 696/696 in 90 files (`logs/s271-vitest-full-retry-1..3.log`). The serial `npm run test:perf` gate passed 1/1 with 20,000-line median 4,484.7 ms <= 4,800 ms (`logs/s271-test-perf.log`). Both source greps had no matches (expected exit 1; logs `s271-presentation-text-grep.log` and `s271-sync-syntax-toString-grep.log`).
+**Prior attempt**: The first full run (`logs/s271-vitest-full-1.log`) exited 1 with 695/696 passed due to the `test/app/main.test.ts` audible-probe staleness assertion; the focused `test/app/main.test.ts` diagnostic passed 9/9 and was followed by the three consecutive full-suite passes. This non-gating failed attempt is retained; no out-of-plan test change was made.

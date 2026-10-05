@@ -1,11 +1,11 @@
 # Canvas Cutover: Large-Document Run Start Stall Fix Implementation Plan
 
-**Status**: Ready (session 271: serial perf-gate split, then gates; the Rust fix is implemented)
+**Status**: Implementation complete (session 271 gates recorded; pending independent review and workflow integration)
 **Plan ID**: CANVAS-EVIDENCE-RUNSTART (dispatch wave 3 in session 271; runs alone. CANVAS-EVIDENCE-EDITCOST depends on it.)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.11 (session 271: serial perf gate, operator decision P; supersedes the 15.3.8.10 "Wall-clock vitest gates" paragraph), #15.3.8.10 (mutation evidence), #15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-RUNSTART`)
 **Created**: 2026-10-05
-**Last Updated**: 2026-10-05
+**Last Updated**: 2026-10-05 (session 271 implementation)
 
 ---
 
@@ -504,15 +504,15 @@ Outside the sandbox (verification step, authoritative):
 
 ### Completion criteria (session 271)
 
-- [ ] TASK-301: `vitest.config.ts` perf/default selection and the `test:perf` script are in place;
+- [x] TASK-301: `vitest.config.ts` perf/default selection and the `test:perf` script are in place;
   `npm run check` exits 0; `package-lock.json` is unchanged
-- [ ] TASK-302: `large-eval-shared.ts`, the ratio-only default file (limit 6) and the perf file with
+- [x] TASK-302: `large-eval-shared.ts`, the ratio-only default file (limit 6) and the perf file with
   `LARGE_EVAL_BUDGET_MS` exist; no assertion is deleted
-- [ ] TASK-303: audit outputs recorded; the `vitest list` default and perf sets are disjoint
-- [ ] TASK-304: three serial perf medians, `m` and the budget recorded
-- [ ] TASK-305: both negative-control runs recorded with exit code, failing assertion and log path
+- [x] TASK-303: audit outputs recorded; the `vitest list` default and perf sets are disjoint
+- [x] TASK-304: three serial perf medians, `m` and the budget recorded
+- [x] TASK-305: both negative-control runs recorded with exit code, failing assertion and log path
   (not gating)
-- [ ] TASK-306: all gates exit 0 with log paths; three default full runs and their ratios recorded
+- [x] TASK-306: all gates exit 0 with log paths; three default full runs and their ratios recorded
 
 ## Completion Criteria
 
@@ -522,8 +522,8 @@ Outside the sandbox (verification step, authoritative):
 - [x] Controlled pre-fix mutation failure: scratch build exit 0; Vitest exit 1 on the budget assertion at 141,240.7 ms (`logs/s269-mutation-prefix.log`)
 - [x] `npm run check`, touched-file rustfmt, strict clippy, focused nextest and full nextest pass; full nextest passed 2,810 tests with 3 skipped
 - [x] Full Vitest passes three consecutive times with `--maxWorkers=1` (696/696 each; `logs/s269f-vitest-full-1..3.log`)
-- [ ] The plan-listed default `cd editor && ./node_modules/.bin/vitest run` gate passes three consecutive times. After TASK-204 it passed once, then exceeded the 4,800 ms eval budget at 4,924.1 and 5,685.6 ms (`logs/s269e-vitest-full-1..3.log`). Session 271: this is now met through the TASK-306 gates once the budget has moved to the perf gate.
-- [ ] Session 271: `npm run test:perf` passes alone on the final source
+- [x] The plan-listed default `cd editor && ./node_modules/.bin/vitest run` gate passes three consecutive times after the budget moved to the serial perf gate: 696/696 on each run; ratios 2.59, 2.19 and 1.43 (`logs/s271-vitest-full-1..3.log`).
+- [x] Session 271: `npm run test:perf` passes alone on the final source at 3,204.4 ms, below the 4,800 ms budget (`logs/s271-final-test-perf.log`).
 
 ## Progress Log
 
@@ -557,3 +557,10 @@ Outside the sandbox (verification step, authoritative):
 - TASK-306: gates.
 
 No Rust or product source change. CANVAS-EVIDENCE-EDITCOST now depends on this plan, so the perf gate runs alone. The manifest entry was changed with this amendment.
+
+### Session: 2026-10-05 (session 271 implementation)
+**TASK-301/302**: Added default/perf file selection in `editor/vitest.config.ts` using the Vite `globalThis.process.env` typing pattern and retained `configDefaults.exclude`; added only `scripts.test:perf` in `editor/package.json` (no lockfile or dependency change). Split the large-eval measurement into `large-eval-shared.ts`, the default ratio-only test (limit 6), and the serial perf test (ratio plus `LARGE_EVAL_BUDGET_MS`). Each of the three runs per document size uses a fresh WASM session and asserts one eval-result; the 20k result retains its zero-error-diagnostics assertion. Default file list has no perf test and includes large-eval; `VACTR_PERF=1` lists exactly `test/e2e/large-eval.perf.test.ts` (`logs/s271-vitest-list-default.log`, `s271-vitest-list-perf.log`). The wall-clock audit found only the shared measurement plus existing injected-clock uses (`logs/s271-wallclock-audit.log`); the default test budget grep had no matches (expected grep exit 1, `logs/s271-default-budget-audit.log`).
+**TASK-304**: Three serial final-source perf measurements printed 5k/20k medians 816.7/2,401.2 ms, 816.3/2,396.3 ms, and 819.9/2,390.5 ms. Thus the 20k median `m=2,396.3 ms`; `ceil(2*m/100)*100=4,800 ms`, retained in the perf test comment. The first attempt passed but the Vitest reporter suppressed its console line (`s271-perf-measure-1.log`); helper now writes the one required measurement line directly to stdout. The three measured runs are `logs/s271-perf-measure-retry-1..3.log`.
+**TASK-305 mutation evidence (not gating)**: Against the preserved pre-fix scratch WASM, the default test exited 1 on ratio 11.20 > 6 after 863,948 ms (5k/20k medians 25,101.9/281,130.2 ms; `logs/s271-negative-default.log`). The perf test exited 1 on ratio 6.71 > 6 after 677,316 ms (27,623.3/185,475.8 ms; `logs/s271-negative-perf.log`). Neither was killed by the 900-second outer timeout. No assertions are gated or removed.
+**TASK-306 final-source gates**: WASM build, `npm run check`, `rustfmt --check` on all six session-267 Rust files, strict clippy, focused default large-eval, serial `npm run test:perf`, unchanged `src`/`editor/package-lock.json`, and full nextest passed. Full nextest: 2,810 passed, 3 skipped, exit 0 (`logs/s271-nextest-full.log`; 1,410.571 s). Three consecutive default full Vitest runs each passed 696/696, exit 0; their 20k/5k ratios were 2.59, 2.19 and 1.43 (`logs/s271-vitest-full-1..3.log`). Focused eval passed 1/1 with medians 994.4/2,906.9 ms and ratio 2.92; serial perf passed 1/1 at 3,204.4 ms and ratio 2.85. Gate logs use the `s271-final-*` names. The full `src`/package-lock diff from `6dc176f` is empty (exit 0).
+**Handoff**: Implementation-phase work and behavioral gates for RUNSTART are complete. Independent integrity/adversarial review, integration review, review-dependent evidence-document/index work, commit and push remain owned by later workflow steps.

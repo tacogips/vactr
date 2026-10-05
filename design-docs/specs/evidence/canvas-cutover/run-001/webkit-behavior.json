@@ -5,12 +5,12 @@
     {
       "id": "canvas-only-text",
       "pass": false,
-      "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:21:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+      "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:25:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:8:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:29:88"
     },
     {
       "id": "editing-undo-redo-navigation",
       "pass": true,
-      "detail": "undo=8; redo=9; home=0; word=8; end=30"
+      "detail": "undo=10; redo=11; home=0; word=8; end=30"
     },
     {
       "id": "clipboard-synthetic-event",
@@ -27,7 +27,7 @@
     {
       "id": "touch-selection",
       "pass": false,
-      "detail": "page.waitForFunction: Timeout 2000ms exceeded.\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:94:18\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:90:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+      "detail": "page.waitForFunction: Timeout 2000ms exceeded.\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:101:18\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:8:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:97:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:29:88"
     },
     {
       "id": "context-loss-restore",
@@ -62,6 +62,7 @@
     "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
     "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
     "WebKit touch selection uses synthetic pointer events.",
+    "7 post-stall active highlight set mismatches.",
     "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
   ]
 }

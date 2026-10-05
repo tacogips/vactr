@@ -1,6 +1,6 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: Ready (session 267: wave 4; session 271: dispatch wave 5, after RUNSTART then EDITCOST)
+**Status**: In Progress (session 271: wave 5; browser evidence captured, required defects remain open)
 **Plan ID**: CANVAS-EVIDENCE (wave 4 since session 267; depends on CANVAS-CLOCK, NATIVE, RENDER, MOUNT, VISUAL, SHELL and the wave-3 plans CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST, -RUNSTART)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates, owner-file defect fixes and closeout)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
@@ -495,11 +495,11 @@ only this plan's progress log and the plan files being archived.
 - [x] Full 20,000-line fixture is checked through host-WASM `session_check`, with exactly one check record and zero error diagnostics.
 - [x] Evidence document has the harness-generated results, raw paths, explicit browser limitations, paired-edit counts, and pending physical-iPad procedures.
 - [x] Active-workload attribution is control-backed: the built-in pad control emits an onset in both browsers; the same toolbar click times out on the 20,000-line document, which records zero workload onset and a product/full-document startup failure. Editing keystrokes and paired samples are reported separately, with the 500-key gate applied to editing keys. (Session 267: the timeout is now a product defect owned by CANVAS-EVIDENCE-RUNSTART.)
-- [x] Simulator evidence recorded: iPad Pro 11-inch (M5) launched and emitted the native-tier self-check
-- [ ] Session 267: wave-3 plans SILENT, VIEWPORT, EDITCOST and RUNSTART accepted (session 269: SILENT and VIEWPORT accepted at `6f6b807`; EDITCOST and RUNSTART pending)
+- [ ] Simulator evidence recorded: iPad Pro 11-inch (M5) launched, but the generated report did not parse the app self-check; the process-filtered line lacks the required `playingEvents` field. Route the contract/evidence repair to CANVAS-SHELL.
+- [x] Session 267: wave-3 plans SILENT, VIEWPORT, EDITCOST and RUNSTART accepted (the runtime fanout item lists all four in `acceptedPlanIds`)
 - [ ] Session 269: every seam edit (if any) has a triage row, before/after sha256 values and green owner tests; other defects were routed by selective redispatch
-- [ ] Session 267: silent run-001 regenerated; every TASK-007 sink assertion holds in Chromium and WebKit; simulator `playingEvents === 0`
-- [ ] Session 267: evidence document has the silence method, the native/simulator silence audit and the remaining-failure triage table
+- [ ] Session 267: silent run-001 regenerated; browser TASK-007 sink assertions hold, but simulator `playingEvents === 0` is not yet evidenced
+- [x] Session 267: evidence document has the silence method, the native/simulator silence audit and the remaining-failure triage table
 - [ ] Session 267: final integration review across the seven canvas-cutover plans and four wave-3 plans passes
 - [ ] Closeout moves done file by file, including the four wave-3 plans; README updated (serial closeout after review)
 - [ ] Final gates recorded with exit codes and log paths (closeout gate)
@@ -556,3 +556,16 @@ only this plan's progress log and the plan files being archived.
 - The default full-vitest gate excludes perf files.
 
 TASK-007 to TASK-009, the seams and the closeout lists are unchanged.
+
+### Session: 2026-10-05 (session 271 implementation)
+**Tasks Completed**: Regenerated silent `run-001` after the required ABI build, wrote both-browser raw data and harness-generated results, reran the iPad simulator launch, and added the required automated/native/simulator silence sections and remaining-failure triage table to the evidence document. No product source was changed. The accepted fanout dependencies CANVAS-EVIDENCE-EDITCOST and CANVAS-EVIDENCE-RUNSTART were admitted by the runtime `acceptedPlanIds` list.
+
+**Silent run evidence**: `design-docs/specs/evidence/canvas-cutover/run-001/summary.json` reports for both browsers: sink installed before the first connection, zero direct destination connections, exact post-sink peak zero, workload pre-sink peak -13.0 dBFS, a positive control onset, positive large-document workload onsets, and `largeDocumentStartStatus: toolbar-click-returned`; the 64-voice peak was observed. Chromium's canvas backing passed the >1x1 guard (the later glyph-readback probe failed); its behavior DPR check passed at 2 and measurement-cycle samples exercised DPR 1 and 2. Raw data: `chromium-behavior.json`, `webkit-behavior.json`, `chromium-measure.jsonl`, `webkit-measure.jsonl`, `environment.json`, `summary.json`.
+
+**Browser verification**: `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` exit 0 (`tmp/canvas-cutover/evidence/s271-canvas-evidence-abi-build.log`). `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exit 1, not blocked (`tmp/canvas-cutover/evidence/s271-canvas-evidence-e2e-rebuilt.log`): 18 behavior checks, 15 passed and 3 failed, plus gated measurement failures. Remaining defects include the canvas glyph readback probe, WebKit touch selection, missed input/frame thresholds, unavailable Chromium sync samples, and WebKit late/replayed highlight failures; each is listed in the evidence triage table and remains repair-required. The earlier pre-build attempt is retained at `tmp/canvas-cutover/evidence/s271-canvas-evidence-e2e.log` and is not used as final-source evidence.
+
+**Simulator**: `node editor/test/e2e/ios-sim.mjs --app editor/src-tauri/gen/apple/build/arm64-sim/Vactr.app --device "iPad Pro 11-inch (M5)" --out design-docs/specs/evidence/canvas-cutover/run-001/ios-sim.json` exit 1 (`tmp/canvas-cutover/evidence/s271-canvas-evidence-ios-sim.log`). Install, launch and screenshot commands returned 0, but the script matched its own `log show` command and left `selfCheck` null. The process-filtered diagnostic is at `tmp/canvas-cutover/evidence/s271-ios-self-check-process-filter-10m.log`; the app line omits `playingEvents`, so SHELL-owned work remains required.
+
+**Local verification**: `cd editor && npm run check` exit 0 (`tmp/canvas-cutover/evidence/s271-canvas-evidence-npm-check.log`); `node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/fixtures/large-doc.mjs editor/test/e2e/silent-sink.mjs` exit 0 (`tmp/canvas-cutover/evidence/s271-canvas-evidence-node-check.log`); `cd editor && ./node_modules/.bin/vitest run test/e2e` exit 0, 23/23 across 4 files (`tmp/canvas-cutover/evidence/s271-canvas-evidence-vitest-e2e.log`). Native silence audit logs are the three paths listed in `impl-plans/active/canvas-cutover-evidence-silent.md` and repeated in the evidence document.
+
+**Handoff**: Implementation remains incomplete until the harness/render probe is corrected, product failures are repaired by their accepted owners or selective redispatch, and the simulator self-check reports `playingEvents === 0`. Formal review, final integration review, closeout moves/index, final gates, commit and push remain downstream workflow work.

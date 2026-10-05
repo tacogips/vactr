@@ -1,6 +1,9 @@
 # Editor UI Style: Solid, Flat, Square
 
-Status: Proposed (2026-10-05, workflow session 275, branch `wf/ui-style`)
+Status: Proposed (2026-10-05, workflow session 275, branch `wf/ui-style`).
+Amended in session 276 (2026-10-05) with no redesign: the built-CSS order
+rule (3.1), named-color word boundaries (8.1), the Proxy input and
+native-tier `hidden` checks (8.2), and portable shell gates (8.3).
 
 This document defines the visual system for the editor chrome in the web and
 iPad (Tauri) editor: the toolbar and transport, the side pane (controls,
@@ -57,6 +60,11 @@ be reproduced with `node tmp/ui-style/shot.mjs <outdir>` from `editor/` after
   tags. Custom properties resolve at computed-value time, so those sheets can
   use the tokens no matter when they load. No `mount.ts` file changes. This
   matters because `code/mount.ts` and `bind/mount.ts` are protected.
+- Build output: Vite merges the two `index.html` sheets into one hashed asset
+  under `editor/dist/assets/`, in source order, so `dist/index.html` has a
+  single stylesheet link. The built-order rule is that the first `--vt-bg`
+  in that asset comes before the first `.vact-icon-button`. Nothing may
+  force two links (no `index.html`, `vite.config.ts` or CSS change for this).
 - Prefix: `--vt-`.
 
 ### 3.2 Color Tokens
@@ -489,7 +497,10 @@ New file: `editor/test/ui/style-tokens.test.ts`. It runs in the default
    `var(--vt-radius)`.
 2. **Colors.** Every CSS file except `src/app/theme.css` contains no color
    literal: no `#hex`, `rgb(`, `rgba(`, `hsl(`, or named colors other than
-   `transparent`, `currentColor` and `inherit`.
+   `transparent`, `currentColor` and `inherit`. Named colors are matched
+   only in values of color-bearing properties, and only as whole words. A
+   word joined to a letter, digit or `-` is not a color, so `white-space`,
+   `--vt-*` names and identifiers such as `blackout` never match.
 3. **Fonts.** Every CSS file except `theme.css` contains no generic font-family
    keyword (`monospace`, `sans-serif`, `system-ui`, `ui-monospace`,
    `ui-sans-serif`).
@@ -546,6 +557,10 @@ because it binds `127.0.0.1`.
   - `input`s of type `text` and `url`.
   - A `label` that wraps an `input[type=checkbox]`.
   - An `input[type=range]` and an `input[type=file]`.
+  - A `label.pkg-proxy` with the `hidden` attribute that wraps an
+    `input[type=url]`. This is the native-tier markup from `pkg-view.tsx`.
+    The test serves the browser tier (no `?session=`), so this is the only
+    deterministic way to check the native tier without a backend.
 - These cover base rules for controls that only appear after user actions,
   such as MIDI device checkboxes and bind sliders.
 - The probe is removed before screenshots.
@@ -589,6 +604,18 @@ A control counts as visible when all of these hold:
    bounding height of at least 36px.
 6. **Focus ring.** After `Tab` into the probe `button`, it computes
    `outline-style: solid` and `outline-width: 2px`.
+7. **Packages Proxy.**
+   - Browser tier: the real `.pkg-proxy input` (outside the probe) is
+     visible. All four corner radii are `0px`. `background-color` equals the
+     probe text input's (the `--vt-bg-sunken` fill). `border-top-width` is
+     `1px`. In viewport B its height is at least 36px.
+   - Native tier: the probe `label.pkg-proxy[hidden]` computes
+     `display: none`, so the global `[hidden]` rule beats the
+     `.pkg-proxy { display: flex }` rule. It and its input are left out of
+     every visibility-based check.
+   - No source change is needed for this. `pkg.css` sets the fill and
+     border, and the zero-specificity base rules supply radius 0 and the
+     minimum height.
 
 **Screenshots.** Written to `tmp/ui-style/after/`:
 
@@ -611,6 +638,19 @@ engines.
 - After a build, outside the sandbox:
   - `npm run test:style`
   - `node ../tmp/ui-style/shot.mjs ../tmp/ui-style/after`
+
+Shell gates in plans and the manifest must stay portable to BSD grep on
+macOS, which has no `\s`:
+
+- Radius: `! grep -nE 'border-radius:[[:space:]]*[^[:space:]0v;]' <css>`.
+  It passes on `0` and `var(--vt-radius)` and fails on any other literal.
+- Named colors: match whole words only, for example
+  `(^|[^-[:alnum:]])(white|black)([^-[:alnum:]]|$)`, so `white-space` does
+  not match (8.1 check 2).
+- Built order: a read-only Node check over `editor/dist/assets/*.css`. It
+  exits nonzero unless `indexOf('--vt-bg')` is at least 0 and less than
+  `indexOf('.vact-icon-button')` (3.1). No check expects two stylesheet
+  links in `dist/index.html`.
 
 Negative controls are reported separately and are not gating. For example,
 temporarily set `border-radius: 4px` in `pkg.css`; both the vitest token check

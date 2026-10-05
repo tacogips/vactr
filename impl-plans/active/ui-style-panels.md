@@ -169,7 +169,7 @@ repository root:
 | `./node_modules/.bin/vitest run` | Exit 0, test count not below the baseline |
 | `npm run build` | Exit 0 |
 | `grep -nE '#[0-9a-fA-F]{3,8}\b\|rgba?\(\|hsl' src/midi/midi.css src/pkg/pkg.css src/visual/visual.css` | No output |
-| `grep -nE 'monospace\|system-ui\|sans-serif\|font-weight:\s*bold' src/midi/midi.css src/pkg/pkg.css src/visual/visual.css` | No output |
+| `/usr/bin/grep -nE 'monospace\|system-ui\|sans-serif\|font-weight:[[:space:]]*bold' src/midi/midi.css src/pkg/pkg.css src/visual/visual.css` | No output (session-276 amendment: `[[:space:]]` replaces `\s`, which BSD grep lacks) |
 | Ownership check (see below) | This plan wrote only its owned files |
 
 **Ownership check (replaces any whole-worktree diff expectation).**

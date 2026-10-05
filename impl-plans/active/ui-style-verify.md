@@ -4,7 +4,12 @@
 **Plan ID**: UI-STYLE-VERIFY (wave 2)
 **Design Reference**: design-docs/specs/design-ui-style.md, sections 8.1, 8.2 and 8.3, plus 4.6 (tight groups) and 5 (coarse sizing)
 **Created**: 2026-10-05
-**Last Updated**: 2026-10-05
+**Last Updated**: 2026-10-05 (session-276 amendment: whole-word named colors in check 2, probe child 11, assertion 7 "Packages Proxy")
+
+Session-276 note: the three residual items from the session-275 review are
+settled by design 8.1 and 8.2. They are white/black word boundaries, the
+`.pkg-proxy` element hidden on the native tier, and the Proxy input radius
+and fill. This plan only tests them. It makes no CSS change.
 
 ## Related Plans
 
@@ -95,6 +100,12 @@ Check 2 details:
 - Reject a value that matches `#[0-9a-f]{3,8}`, `rgba?(`, `hsla?(`, or a
   bare named color word. Use a closed list: `white`, `black`, `red`,
   `green`, `blue`, `gray`, `grey`, `yellow`, `orange`, `silver`.
+- Match a named color only as a whole word inside the value (design 8.1).
+  The characters on both sides must be neither a letter, a digit, `_` nor
+  `-`, or must be the start or end of the value. Do not use plain JS `\b`
+  for this, because `\b` treats `-` as a boundary. So `var(--vt-border)`,
+  `--vt-danger-bg` and `blackout` never match, while `1px solid black`
+  does.
 - Allow `transparent`, `currentColor`, `inherit`, `none` and `var(...)`.
 - Do not scan selectors or other properties. `white-space` and the `canvas`
   type selectors must not trip this check (Step 3 finding).
@@ -113,6 +124,9 @@ Test cases (the situation, then the expected outcome):
   and value.
 - A sheet containing `color: #fff` -> check 2 fails.
 - A sheet containing `white-space: nowrap` -> check 2 does not fail.
+- A sheet containing `outline: 1px solid black` -> check 2 fails.
+- A sheet containing `border: var(--vt-border-w) solid var(--vt-border)` ->
+  check 2 does not fail.
 - `index.html` with the links swapped -> check 5 fails.
 
 Run the negative cases as separate, non-gating mutation runs (below). Do not
@@ -204,6 +218,12 @@ probe and assertions:
   8. `label` wrapping `input[type=checkbox]` and text
   9. `input[type=range]`
   10. `input[type=file]`
+  11. `label.pkg-proxy` with the `hidden` attribute, wrapping the text
+      `Proxy` and an `input[type=url]`. It copies the native-tier markup from
+      `editor/src/pkg/pkg-view.tsx:24`. The served app is the browser tier
+      (no `?session=`; `editor/src/app/main.ts:tierFromUrl`), so this
+      fixture is the only way to test the native tier. Do not add
+      `data-pkg="proxy"` to it, so no app code can pick it up.
 
 **Visibility.** A control is visible when its bounding box is non-zero, its
 computed `display` is not `none`, its `visibility` is not `hidden`, and the
@@ -254,6 +274,24 @@ value}`; never stop at the first one.
      `page.keyboard.press('Tab')`.
    - The active element must be the probe button, with computed
      `outlineStyle` `solid` and `outlineWidth` `2px`.
+7. **Packages Proxy (design 8.2 assertion 7).**
+   - Browser tier: select the real input with
+     `.pkg-proxy:not([data-style-probe] *) input[type=url]`. Equivalently,
+     take the `.pkg-proxy input` that is not inside the probe.
+     - It must exist and be visible. If it is absent or not visible, record
+       a failure (`check: 'proxy-present'`), not a skip.
+     - All four computed corner radii are `0px`.
+     - `backgroundColor` equals the probe `input[type=text]`'s
+       `backgroundColor`, which is the `--vt-bg-sunken` fill.
+     - `borderTopWidth` is `1px`.
+     - In viewport B, the bounding height is at least 36.
+   - Native tier: the probe `label.pkg-proxy[hidden]` computes `display`
+     `none`. That is the `[hidden] { display: none !important }` rule
+     (`app.css:10`) beating `.pkg-proxy { display: flex }` (`pkg.css:20`).
+     The hidden label and its input fail the visibility rule, so checks 2-5
+     skip them on their own. Do not special-case them.
+   - Record `proxy: {present, visible, radius, background, borderTop,
+     height, nativeHiddenDisplay}` per engine and viewport in `report.json`.
 
 **Teardown and exit.**
 
@@ -280,6 +318,11 @@ Do not touch dependencies or other scripts. Do not run `npm install`.
   skips `theme.css`; do not "fix" it there.
 - `getComputedStyle(el).appearance` may be empty in WebKit. Fall back to
   `webkitAppearance`.
+- `.pkg-proxy input` would also match the hidden probe fixture. Always
+  exclude `[data-style-probe]` descendants when selecting the real Proxy
+  input.
+- Do not "fix" a failing Proxy assertion by editing `pkg.css` or
+  `pkg-view.tsx`. Report it per the Non-Goals rule.
 
 ## Invariants
 
@@ -338,6 +381,10 @@ For `npm run test:style`, these files must exist:
 - [ ] The outside-sandbox run is recorded by the verification step: exit
   code, `report.json` path, the screenshot list, and the `coarse-mode` and
   `file-pseudo` notes per engine.
+- [ ] Check 2 uses whole-word named-color matching, with the two added test
+  cases (`black` fails, `var(--vt-border)` passes) run as mutation checks.
+- [ ] `ui-style.mjs` contains probe child 11 and assertion 7, and
+  `report.json` carries the `proxy` object for every engine and viewport.
 
 ## Progress Log
 

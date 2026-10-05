@@ -1,10 +1,37 @@
 # UI Style: Tokens, Base Rules and Shell Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (session-276 rerun: verification only)
 **Plan ID**: UI-STYLE-SHELL (wave 1)
-**Design Reference**: design-docs/specs/design-ui-style.md, sections 3, 4.1-4.3, 4.5 (transport, side bar, section headers, status bar) and 5
+**Design Reference**: design-docs/specs/design-ui-style.md, sections 3 (including 3.1 Build output), 4.1-4.3, 4.5 (transport, side bar, section headers, status bar), 5 and 8.3
 **Created**: 2026-10-05
-**Last Updated**: 2026-10-05
+**Last Updated**: 2026-10-05 (session 276 amendment)
+
+## Session-276 Rerun (read this first)
+
+The source work in this plan is already implemented on `wf/ui-style` at
+`364889b`. The only blocker was two gates that fail on correct code (two
+stylesheet links in `dist/index.html`, and a BSD-incompatible `\s` radius
+grep). Both are amended below. This rerun re-verifies; it does not
+re-implement.
+
+1. Before anything else, record `git hash-object` for the five owned source
+   files and the six watched sheets. The expected owned hashes are the
+   post-edit column in the progress log (`theme.css` `ed05d7a7...`,
+   `index.html` `d027edf2...`, `app.css` `b9f175a8...`, `song.ts`
+   `4e50eb04...`, `midi/mount.ts` `de7b6332...`). The watched sheets must
+   equal the accepted hashes in `tmp/ui-style/s275-integration-review.json`
+   (`waveAcceptanceRecord.currentHashes`).
+2. Run every gating command in "Verification" below, each with its full log
+   in `tmp/ui-style/UI-STYLE-SHELL/attempt-2/`.
+3. If every command passes, make no source edit. Tick the session-276
+   completion boxes, set Status to `Completed`, and append a session-276
+   progress entry (commands, exit codes, log paths, hash table).
+4. Edit a source file only if a gate fails on the current tree. In that case,
+   fix only within this plan's five owned source files, record the pre and
+   post hashes, and explain the failure in the log.
+
+Do not touch the three accepted plans' sheets, `vite.config.ts`, the
+dispatch manifest, or any protected file.
 
 ## Related Plans
 
@@ -304,15 +331,33 @@ build lock serializes concurrent runs from parallel plans.
 |---|---|
 | `npm run check` | Exit 0 |
 | `./node_modules/.bin/vitest run` | Exit 0. The test count is not lower than the baseline recorded before editing, and no existing test file changes. |
-| `npm run build` | Exit 0. `editor/dist/index.html` contains two stylesheet links, and the theme sheet comes first. Check with `grep -n 'stylesheet' dist/index.html`. |
+| `npm run build` | Exit 0 |
+| Source-order check (below) | Exit 0. Prints `source-order <t> <a>` with `0 <= t < a`. |
+| Built-order check (below) | Exit 0. Prints `built-order <asset> <a> <b>` with `0 <= a < b`. |
 
-Mechanical checks:
+Use the exact commands from the UI-STYLE-SHELL `verification` list in
+`impl-plans/active/ui-style-dispatch.json`. They are read-only node one-liners:
+
+- Source order: reads `index.html`, takes `indexOf('./src/app/theme.css')`
+  and `indexOf('./src/app/app.css')`, and exits 1 unless theme comes first.
+- Built order: finds the single CSS file in `dist/assets/` that contains
+  `--vt-bg`. It exits 1 if there is not exactly one, or unless
+  `indexOf('--vt-bg')` is at least 0 and less than
+  `indexOf('.vact-icon-button')`.
+
+Vite merges the two `index.html` sheets into one hashed asset, so
+`dist/index.html` has exactly one stylesheet link (design 3.1). That is
+correct. Do not count links, and do not change `index.html`,
+`vite.config.ts` or any CSS to produce two links.
+
+Mechanical checks (call `/usr/bin/grep` explicitly; plain `grep` may be
+ugrep here, and BSD grep has no `\s`):
 
 | Command | Must show |
 |---|---|
-| `grep -nE '#[0-9a-fA-F]{3,8}\b\|rgba?\(\|hsl' src/app/app.css` | No output |
-| `grep -nE 'border-radius:\s*[^0v;]' src/app/app.css` | No output |
-| `grep -nE 'system-ui\|sans-serif\|monospace' src/app/app.css` | No output |
+| `! /usr/bin/grep -nE '#[0-9a-fA-F]{3,8}\b\|rgba?\(\|hsl' src/app/app.css` | Exit 0, no output |
+| `! /usr/bin/grep -nE 'border-radius:[[:space:]]*[^[:space:]0v;]' src/app/theme.css src/app/app.css` | Exit 0, no output |
+| `! /usr/bin/grep -nE 'system-ui\|sans-serif\|monospace' src/app/app.css` | Exit 0, no output |
 | Ownership check (see below) | This plan wrote only its owned files |
 
 **Ownership check (replaces any whole-worktree diff expectation).**
@@ -362,9 +407,11 @@ targets them.
 - [x] `app.css` holds the base rules, variants, icon buttons, transport
   groups, headers and status bar, and is token-only.
 - [x] `song.ts` and `midi/mount.ts` class edits are made.
-- [ ] The build emits the expected distinct theme stylesheet link in
-  `dist/index.html`; Vite currently bundles both source links into one CSS
-  asset, so the output-link requirement needs an ownership/acceptance decision.
+- [ ] Session 276: the source-order and built-order checks exit 0 on a fresh
+  `npm run build` (replaces the withdrawn two-link criterion, amendment
+  IR-SHELL-DIST-LINK).
+- [ ] Session 276: the amended mechanical checks exit 0, and the current
+  owned-file hashes are recorded in this log.
 - [x] The gating build, type check and full Vitest suite exit 0; their logs
   and the emitted CSS order evidence are recorded below.
 - [x] The ownership check passes and its hash table is in the progress log.
@@ -424,3 +471,14 @@ Edit only this plan's log.
   plan's `writePaths`. Request a checkpoint amendment or acceptance clarification
   before making that change. This is the sole implementation blocker; formal
   review, wave-2 style testing and workflow finalization remain downstream.
+
+### Session: 2026-10-05 — session-276 plan-author amendment
+
+- IR-SHELL-DIST-LINK: the two-link criterion is withdrawn. It is replaced by
+  the source-order and built-order checks (design 3.1 and 8.3). The current
+  build has one link and the built order holds: `index-BXJd7dqC.css` has
+  `--vt-bg` at 6 and `.vact-icon-button` at 9969 (step-3 reviewer run).
+- IR-MANIFEST-RADIUS-GREP: the radius gate is now
+  `border-radius:[[:space:]]*[^[:space:]0v;]`, run with `/usr/bin/grep`.
+- No source change is requested. The implementer appends the rerun entry
+  below.

@@ -1,11 +1,11 @@
 # Canvas Cutover: O(1) Scope and Label Lookups (Decision A) Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-EVIDENCE-SCOPE (dispatch wave 5 of the session-277 run; runs alone; first of the serial chain SCOPE -> SCHED -> FRAMECOST -> CANVAS-EVIDENCE)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.13 (scope record A; "Ownership and order"), section 20 Q1 (scope chain rules, unchanged)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-SCOPE`)
 **Created**: 2026-10-05
-**Last Updated**: 2026-10-05
+**Last Updated**: 2026-10-06
 
 ---
 
@@ -233,17 +233,69 @@ is serial after the join. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] `Scope` has the name index; `classify`, `bind`, `session_lookup`, `lookup` and `update` probe each scope in O(1)
-- [ ] `Doc::new` builds `top_first` after the sort; `top_of` is O(1), with the counted fallback for hand-built docs
-- [ ] New counter tests pass: `c8 <= 32000`, `c8 / c4 <= 2.2`, label build `steps <= 2 * targets`
-- [ ] Existing `types::tests` and `directives::tests` pass unmodified
-- [ ] Strict clippy, rustfmt check, cargo build, the wasm32 build and the default vitest suite pass (sandbox)
-- [ ] Outside the sandbox, full nextest and `npm run test:perf` pass
-- [ ] Mutation runs exit nonzero and are recorded separately
-- [ ] Progress log updated with commands, exit codes, log paths and sha256 values
+- [x] `Scope` has the name index; `classify`, `bind`, `session_lookup`, `lookup` and `update` probe each scope in O(1)
+- [x] `Doc::new` builds `top_first` after the sort; `top_of` is O(1), with the counted fallback for hand-built docs
+- [x] New counter tests pass: `c8 <= 32000`, `c8 / c4 <= 2.2`, label build `steps <= 2 * targets`
+- [x] Existing `types::tests` and `directives::tests` pass unmodified
+- [ ] Strict clippy, rustfmt check, cargo build, the wasm32 build and the default vitest suite pass (Rust gates passed; the default vitest gate remains unresolved, see below)
+- [x] Outside the sandbox, full nextest and `npm run test:perf` pass
+- [x] Mutation runs exit nonzero and are recorded separately
+- [x] Progress log updated with commands, exit codes, log paths and sha256 values
 
 ## Progress Log
 
 ### Session: 2026-10-05 (session 277 plan authoring)
 **Tasks Completed**: Plan authored from design 15.3.8.13 A and the operator profile. No source
 edits.
+
+### Session: 2026-10-06 (CANVAS-EVIDENCE-SCOPE implementation)
+**Tasks Completed**: Added a per-scope `HashMap<Rc<str>, usize>` while retaining ordered `names`,
+and built `Doc::top_first` after sorting. Added the counter tests and compatibility cases. The
+existing scope/rebinding/shadowing/prelude test files remain unchanged. Source hashes after the
+negative controls were restored exactly to their pre-mutation values: `scope.rs`
+`59fd855cf277f883f79f7ea7a1793f20c0016564b93eb39ae889b64d728be84f`; `attach.rs`
+`28e041a2ac1e6e1cb857c51cb547ca9125e846f7e9e992ea614664fbe62240b0`; `scope_cost.rs`
+`c26f8a517e506c14634fdb5606ad81de651b345a406c6078ae57a969de4cf460`; attachment tests
+`8bf2a2980f70db47afa04a753d7b222e8312702496792b995d26ad99837a2b8d`; labels tests
+`e11a8bc9a6c8f7c17963e0dde204b46fea4d4b7eee01383218e29c3b250ded35`.
+
+The rebinding message contract from the unmodified `61c9216` implementation is
+`` `a` is already bound in this scope (at byte 12); a name is bound once per scope ``: the
+diagnostic uses the second line's identifier span, and `bind` replaces that slot. The final
+behavior test confirms both diagnostics and that exact message.
+
+**Verification** (complete logs are under `tmp/canvas-cutover/scope/`):
+- `CARGO_TERM_QUIET=true cargo build`: exit 0, `agent-build-final.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0,
+  `agent-clippy-final.log`; no added `allow`/`expect` attributes.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-capture types::tests directives::tests`:
+  exit 0, 184 passed/0 failed, `agent-nextest-final.log`; scope probes `c4=16000`,
+  `c8=32000`; label build `steps=20000`, `targets=20000`.
+- `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`:
+  exit 0, `agent-rustfmt-final.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`:
+  exit 0 on final production source, `wasm-final.log`.
+- `git diff --exit-code 61c9216ef1409324e47a832dcd5c6864464629cb -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs`:
+  exit 0. Changed tracked paths are only `src/types/scope.rs`, `src/types/tests/mod.rs`,
+  `src/directives/attach.rs`, `src/directives/tests/attach.rs`, and
+  `src/directives/tests/labels.rs`; the new test file is `src/types/tests/scope_cost.rs`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`:
+  exit 0, 2816 passed/0 failed, 3 skipped, `full-nextest.log` (1859.138 s).
+- `cd editor && npm run check`: exit 0, `npm-check.log`.
+- `cd editor && npm run test:perf`: exit 0, 1 passed/0 failed, `test-perf.log` (serial gate; ratio 2.81).
+- Mutation controls, separately from gating runs: scope linear-scan mutation failed with
+  `c8=95996000` (exit 100, `mutation-scope.log`); `top_of` linear-scan mutation failed with
+  `steps=200010000` for 20000 targets (exit 100, `mutation-topof.log`). Both production files
+  were restored to the hashes listed above.
+- Default `cd editor && ./node_modules/.bin/vitest run` did not pass in three attempts:
+  `vitest.log` (exit 1, 702/703; native probe stale-sample assertion), `vitest-rerun.log`
+  (exit 1, 701/703; two tree-sitter edit tests timed out), and `vitest-rerun-2.log` (exit 1,
+  699/703; native probe stale-sample assertion, the two tree-sitter timeouts, and the first-track
+  test timeout). These tests are outside this plan's `writePaths`; no frontend assertions were
+  removed or altered. This required gate remains open for the owner of those test seams.
+
+**Outstanding**: Default vitest is a required gate and is failing in out-of-plan editor tests.
+No source changes were made outside this plan's write paths. Resume acceptance after the owner
+resolves the observed test failures and a full default vitest run exits 0. Initial offset and
+formatting failures are retained in `agent-nextest.log` and `agent-rustfmt.log`; corrected final
+source gates are recorded separately above.

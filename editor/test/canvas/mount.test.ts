@@ -138,7 +138,7 @@ describe('headless canvas mount', () => {
     expect(perf?.counters().renderer.textBuilds).toBe(builds);
     expect(perf?.perf.snapshot().frames.length).toBeGreaterThan(0);
     const sample = audible.sample(48);
-    expect(perf?.presented().at(-1)).toMatchObject({ activeKey: '0-3', audibleTime: sample.time, targetMs: sample.targetMs, beatCycle: 2.025 });
+    expect(perf?.presented().at(-1)).toMatchObject({ activeKey: '0-3', audibleTime: sample.time, targetMs: sample.targetMs, beatCycle: 2.025, epoch: 'e1' });
     expect(perf?.transportSample()).toMatchObject({ epoch: 'e1', cycle: [2, 1], sample_time: 1 });
     expect(perf?.onsets()).toHaveLength(1);
     expect(perf?.onsets()[0]).toMatchObject({ from: 0, to: 3, time: 1, end: 2, receivedMs: expect.any(Number) });

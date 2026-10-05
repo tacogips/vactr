@@ -1,4 +1,6 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import fs from 'node:fs';
+import path from 'node:path';
 import { installSilentSink } from './silent-sink.mjs';
 export async function runBehavior(browser, origin, name) {
   const results = []; const limitations = [];
@@ -22,27 +24,25 @@ export async function runBehavior(browser, origin, name) {
     api = await page.evaluate(() => Boolean(window.__vactrPerf));
     await check('canvas-only-text', async () => {
       const ta=page.locator('.vact-code-input-bridge textarea');await ta.focus();await ta.fill('# canvas-visible-evidence');await ta.type('x');await ta.press('Backspace');
-      return page.evaluate(() => new Promise((resolve, reject) => requestAnimationFrame(() => {
-      let canvas;
-      try {
-      const pane = document.querySelector('.vact-code'); canvas = document.querySelector('.vact-code-canvas');
-      const bridge = document.querySelector('.vact-code-input-bridge textarea');
-      if (!pane || !canvas || !bridge) throw Error('code pane, canvas, or bridge textarea missing');
-      const source = window.__vactrPerf.doc();
-      if ([...pane.querySelectorAll('*')].some((el) => el !== bridge && el.textContent?.includes(source) && source.length > 0)) throw Error('document text appears in DOM');
-      const style = getComputedStyle(bridge);
-      if (style.opacity !== '0' && style.color !== 'rgba(0, 0, 0, 0)') throw Error('bridge textarea is visible');
-      const gl = canvas.getContext('webgl2');
-      if (!gl) throw Error('WebGL2 unavailable');
-      if(canvas.width<=1||canvas.height<=1) { reject(Error(`canvas backing size is ${canvas.width}x${canvas.height}`)); return; }
-      const probe=document.createElement('canvas');probe.width=canvas.width;probe.height=canvas.height;const ctx=probe.getContext('2d');ctx.drawImage(canvas,0,0);
-      const image=ctx.getImageData(0,Math.min(Math.max(0,canvas.height-32),canvas.height-1),Math.min(128,canvas.width),Math.min(24,canvas.height));
-      const pixels=image.data;const colors=new Set();for(let i=0;i<pixels.length;i+=4)colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]}`);if(colors.size<2) { reject(Error('canvas pixel readback has no glyph variation')); return; }
-      const before = source; canvas.hidden = true; const stillVisible = [...pane.querySelectorAll('*')].some((el) => el.textContent?.includes(before) && before.length > 0); canvas.hidden = false;
-      if (stillVisible) throw Error('hiding canvas leaves source visible');
-      resolve(`source chars=${source.length}; bridge opacity=${style.opacity}; canvas=${canvas.width}x${canvas.height}; colors=${colors.size}`);
-      } catch (error) { if (canvas) canvas.hidden = false; reject(error); }
-      })));
+      return page.evaluate(() => new Promise((resolve, reject) => {
+        const pane=document.querySelector('.vact-code');const canvas=document.querySelector('.vact-code-canvas');const bridge=document.querySelector('.vact-code-input-bridge textarea');
+        if(!pane||!canvas||!bridge){reject(Error('code pane, canvas, or bridge missing'));return;}
+        const source=window.__vactrPerf.doc();
+        if([...pane.querySelectorAll('*')].some((el)=>el!==bridge&&el.textContent?.includes(source)&&source.length>0)){reject(Error('document text appears in DOM'));return;}
+        const style=getComputedStyle(bridge);if(style.opacity!=='0'&&style.color!=='rgba(0, 0, 0, 0)'){reject(Error('bridge textarea is visible'));return;}
+        if(!canvas.getContext('webgl2')){reject(Error('WebGL2 unavailable'));return;}
+        if(canvas.width<=1||canvas.height<=1){reject(Error(`canvas backing size is ${canvas.width}x${canvas.height}`));return;}
+        const canvasRect=canvas.getBoundingClientRect();const caretRect=bridge.getBoundingClientRect();const scaleX=canvas.width/canvasRect.width;const scaleY=canvas.height/canvasRect.height;
+        const left=Math.max(0,Math.floor(48*scaleX));const right=Math.min(canvas.width,Math.max(left+1,Math.ceil((caretRect.left-canvasRect.left)*scaleX)));
+        const top=Math.max(0,Math.floor((caretRect.top-canvasRect.top)*scaleY));const bottom=Math.min(canvas.height,Math.max(top+1,Math.ceil(top+caretRect.height*scaleY)));
+        if(right-left<4){reject(Error(`line-1 glyph rectangle too narrow: ${right-left}px`));return;}
+        const originalRaf=window.requestAnimationFrame;let attempts=0;let done=false;
+        const finish=(error,detail)=>{if(done)return;done=true;window.requestAnimationFrame=originalRaf;if(error)reject(error);else resolve(detail);};
+        window.requestAnimationFrame=(callback)=>originalRaf((time)=>{const before=window.__vactrPerf.presented().at(-1)?.frameMs;callback(time);const after=window.__vactrPerf.presented().at(-1)?.frameMs;
+          if(after!==undefined&&after!==before){try{const probe=document.createElement('canvas');probe.width=canvas.width;probe.height=canvas.height;const ctx=probe.getContext('2d');ctx.drawImage(canvas,0,0);const image=ctx.getImageData(left,top,right-left,bottom-top);const colors=new Set();for(let i=0;i<image.data.length;i+=4)colors.add(`${image.data[i]},${image.data[i+1]},${image.data[i+2]}`);if(colors.size<2)throw Error(`canvas pixel readback has no glyph variation in line-1 rect ${left},${top},${right-left},${bottom-top}`);canvas.hidden=true;const stillVisible=[...pane.querySelectorAll('*')].some((el)=>el.textContent?.includes(source)&&source.length>0);canvas.hidden=false;if(stillVisible)throw Error('hiding canvas leaves source visible');finish(null,`source chars=${source.length}; bridge opacity=${style.opacity}; canvas=${canvas.width}x${canvas.height}; line1=${left},${top},${right-left},${bottom-top}; colors=${colors.size}`);}catch(error){canvas.hidden=false;finish(error);}}
+          else if(++attempts>=30)finish(Error('no frame recorded a new presented row within 30 animation frames'));});
+        originalRaf(()=>{});
+      }));
     });
     await check('editing-undo-redo-navigation', async () => {
       const ta = page.locator('.vact-code-input-bridge textarea'); await ta.focus();
@@ -97,7 +97,7 @@ export async function runBehavior(browser, origin, name) {
     await check('touch-selection', async () => {
       const rect = await page.locator('.vact-code-canvas').boundingBox(); if (!rect) throw Error('canvas has no box');
       if (name === 'chromium') { const session = await context.newCDPSession(page); await session.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{x:rect.x+80,y:rect.y+20}] }); await sleep(650); await session.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{x:rect.x+155,y:rect.y+20}] }); await session.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] }); await session.detach(); }
-      else { limitations.push('WebKit touch selection uses synthetic pointer events.'); const c=page.locator('.vact-code-canvas');const event={pointerId:1,pointerType:'touch',isPrimary:true,button:0};await c.dispatchEvent('pointerdown', { ...event, clientX:rect.x+80, clientY:rect.y+20, buttons:1 });await sleep(650);await c.dispatchEvent('pointermove',{...event,clientX:rect.x+155,clientY:rect.y+20,buttons:1});await c.dispatchEvent('pointerup', { ...event, clientX:rect.x+155, clientY:rect.y+20, buttons:0 }); }
+      else { limitations.push('WebKit touch selection uses synthetic pointer events.'); const c=page.locator('.vact-code-canvas');const event={pointerId:1,pointerType:'touch',isPrimary:true,button:0,width:1,height:1,pressure:0.5};const geometry=await page.evaluate(()=>{const canvas=document.querySelector('.vact-code-canvas');const pane=document.querySelector('.vact-code');window.__vactrTouchEvents=[];for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])canvas.addEventListener(type,e=>window.__vactrTouchEvents.push({type:e.type,constructor:e.constructor.name,pointerType:e.pointerType,isPrimary:e.isPrimary,pointerId:e.pointerId,button:e.button,buttons:e.buttons,width:e.width,height:e.height,timeStamp:e.timeStamp}),true);const doc=window.__vactrPerf.doc();const match=/[A-Za-z]+/.exec(doc);const start=match?.index??0;const word=match?.[0]??'';const line=doc.slice(0,start).split('\n').length-1;const column=start-doc.lastIndexOf('\n',start-1)-1;return{doc,canvas:canvas.getBoundingClientRect().toJSON(),pane:pane.getBoundingClientRect().toJSON(),touchX:pane.getBoundingClientRect().left+48+(column+Math.floor(word.length/2))*8,touchY:pane.getBoundingClientRect().top+line*20+10,word,wordStart:start};});const touchX=geometry.touchX,touchY=geometry.touchY;await c.dispatchEvent('pointerdown',{...event,clientX:touchX,clientY:touchY,buttons:1});await c.dispatchEvent('pointerup',{...event,clientX:touchX,clientY:touchY,buttons:0});await sleep(50);const tapSelection=await page.evaluate(()=>window.__vactrPerf.selection());await c.dispatchEvent('pointerdown',{...event,clientX:touchX,clientY:touchY,buttons:1});await sleep(520);const atLongPress=await page.evaluate(()=>({selection:window.__vactrPerf.selection(),handles:window.__vactrPerf.presented().at(-1)?.handles,events:window.__vactrTouchEvents}));await c.dispatchEvent('pointerup',{...event,clientX:touchX,clientY:touchY,buttons:0});let handleWaitError=null;try{await page.waitForFunction(()=>window.__vactrPerf.presented().at(-1)?.handles===2,undefined,{timeout:2000});}catch(error){handleWaitError=String(error);}const atEnd=await page.evaluate(()=>({selection:window.__vactrPerf.selection(),handles:window.__vactrPerf.presented().at(-1)?.handles,events:window.__vactrTouchEvents}));const detail=JSON.stringify({geometry,tapSelection,atLongPress,atEnd,handleWaitError});const diagnosticPath=path.resolve(process.cwd(),'../tmp/canvas-cutover/evidence/s274-webkit-touch-events.json');fs.mkdirSync(path.dirname(diagnosticPath),{recursive:true});fs.writeFileSync(diagnosticPath,detail+'\n');if(atLongPress.selection.anchor===atLongPress.selection.head||atEnd.selection.anchor===atEnd.selection.head||atEnd.handles!==2)throw Error(`WebKit touch diagnostic=${detail}`);return `WebKit pointer event diagnostic=${diagnosticPath}; ${detail}`; }
       await page.waitForFunction(()=>window.__vactrPerf.selection().anchor!==window.__vactrPerf.selection().head&&window.__vactrPerf.presented().at(-1)?.handles===2,undefined,{timeout:2000});const state=await page.evaluate(() => ({selection:window.__vactrPerf.selection(),handles:window.__vactrPerf.presented().at(-1)?.handles}));if(state.selection.anchor===state.selection.head||state.handles!==2)throw Error(`long press did not create word selection handles: ${JSON.stringify(state)}`);return JSON.stringify(state);
     });
     await check('context-loss-restore', async () => {

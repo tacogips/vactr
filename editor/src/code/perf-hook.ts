@@ -10,7 +10,7 @@ import type { TransportSample } from '../protocol/types';
 
 export interface PresentedRecord {
   frameMs: number; targetMs: number; audibleTime: number; provenance: Provenance; valid: boolean;
-  activeKey: string; beatCycle: number | null; beatFlash: boolean; revision: number; handles: number;
+  activeKey: string; beatCycle: number | null; beatFlash: boolean; revision: number; handles: number; epoch?: string | null;
 }
 export interface OnsetRecord { time: number; end: number; from: number; to: number; epoch: string | null; receivedMs: number }
 export interface VactrPerf {

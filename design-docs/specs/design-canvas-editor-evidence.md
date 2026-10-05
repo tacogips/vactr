@@ -15,60 +15,67 @@ Commands: `cd editor && npm run e2e -- --browser all --profile all --run-id run-
 
 | Browser | Metric | Result | Threshold |
 |---|---|---:|---:|
-| chromium | Input latency p95 (ms) | 30.60000001192384 | <= 50 |
-| chromium | Input latency p99 (ms) | 243.8000000000029 | <= 100 |
-| chromium | Input samples (paired / expired) | 82 / 0 | expired keys are outside the retained frame ring |
-| chromium | Editing keystrokes / paired | 226 / 43 | >= 500 keys; paired > 0; unpaired <= 10% |
-| chromium | Audio control / run start | 192 onsets / toolbar-click | active-workload-onsets-observed |
+| chromium | Input latency p95 (ms) | 93.30000002383895 | <= 50 |
+| chromium | Input latency p99 (ms) | 438.39999998807616 | <= 100 |
+| chromium | Input samples (paired / expired) | 36 / 0 | expired keys are outside the retained frame ring |
+| chromium | Editing keystrokes / paired | 99 / 10 | >= 500 keys; paired > 0; unpaired <= 10% |
+| chromium | Audio control / run start | 64 onsets / toolbar-click | product/full-document startup failure: proven toolbar click timed out on the large document |
 | chromium | Silent sink post-sink peak | 0 | == 0 |
 | chromium | Direct destination connections | 0 | 0 |
-| chromium | Pre-sink peak (dBFS) | -13.002511373180266 | <= -1 |
-| chromium | Pre-sink RMS (dBFS) | -29.040730216946585 | reported |
-| chromium | Pre-sink onsets (count) | 4 | reported |
-| chromium | Control onsets / peak dBFS | 1 / -13.002511373180266 | >= 1 / > -60 |
-| chromium | Animation frame work p50 (ms) | 4.5 | <= 4 |
-| chromium | Animation frame work p95 (ms) | 8.300000011920929 | <= 8 |
-| chromium | Animation frame work p99 (ms) | 9.199999988079071 | <= 16.7 |
-| chromium | Text-dirty frame work p95 (ms) | 22.099999964237213 | <= 16.7 |
-| chromium | Frame interval p95 (ms) | 18.699999999999932 | <= 20 |
-| chromium | Frame interval p99 (ms) | 101.39999999999418 | <= 50 |
+| chromium | Pre-sink peak (dBFS) | -13.02741142748717 | <= -1 |
+| chromium | Pre-sink RMS (dBFS) | -33.64137279362381 | reported |
+| chromium | Pre-sink onsets (count) | 2 | reported |
+| chromium | Control onsets / peak dBFS | 1 / -19.023108973223998 | >= 1 / > -60 |
+| chromium | Animation frame work p50 (ms) | 7.600000023841858 | <= 4 |
+| chromium | Animation frame work p95 (ms) | 11.100000023841858 | <= 8 |
+| chromium | Animation frame work p99 (ms) | 17.5 | <= 16.7 |
+| chromium | Text-dirty frame work p95 (ms) | 48.89999997615814 | <= 16.7 |
+| chromium | Frame interval p95 (ms) | 133.79999999998836 | <= 20 |
+| chromium | Frame interval p99 (ms) | 150.8000000000029 | <= 50 |
 | chromium | A/V model absolute error p99 (ms) | unavailable | measured only; <= 50 |
 | chromium | Early flashes | 0 | 0; none earlier than 2 ms |
+| chromium | A/V window start / end (s) | unavailable | intersection with onset eviction guard |
+| chromium | A/V window onsets / frame pairs / excluded frames | 0 / 0 / 2843 | excluded rows remain in raw JSONL |
 | chromium | Post-stall active-set mismatches | 0 | 0 |
 | chromium | A/V model absolute error p95 (ms) | unavailable | measured only; <= 33.4 |
-| chromium | Resource ledger peak (MiB) | 9.84 | <= 96 |
-| chromium | JS heap growth (MiB) | -2.29 | <= 8 |
-| chromium | Beat drift (ms) | -0.4166666666947094 | <= 1 |
+| chromium | Resource ledger peak (MiB) | 8.25 | <= 96 |
+| chromium | JS heap growth (MiB) | -2.17 | <= 8 |
+| chromium | Beat drift (ms) | unavailable | <= 1 |
 | chromium | Replayed flashes | 0 | 0 |
 | chromium | Ledger after dispose (bytes) | 0 | 0 |
-| webkit | Input latency p95 (ms) | 328 | <= 50 |
-| webkit | Input latency p99 (ms) | 374 | <= 100 |
-| webkit | Input samples (paired / expired) | 79 / 0 | expired keys are outside the retained frame ring |
-| webkit | Editing keystrokes / paired | 189 / 37 | >= 500 keys; paired > 0; unpaired <= 10% |
+| webkit | Headless control p95/p99 frame interval (ms) | 18 / 20 | diagnostic control page |
+| webkit | Headless control p95/p99 input latency (ms) | 33 / 34 | diagnostic control page |
+| webkit | Headless control editing keys / frames | 622 / 3598 | same 60 s key pacing |
+| webkit | Input latency p95 (ms) | 351 | <= 50 |
+| webkit | Input latency p99 (ms) | 550 | <= 100 |
+| webkit | Input samples (paired / expired) | 51 / 0 | expired keys are outside the retained frame ring |
+| webkit | Editing keystrokes / paired | 90 / 15 | >= 500 keys; paired > 0; unpaired <= 10% |
 | webkit | Audio control / run start | 192 onsets / toolbar-click | active-workload-onsets-observed |
 | webkit | Silent sink post-sink peak | 0 | == 0 |
 | webkit | Direct destination connections | 0 | 0 |
 | webkit | Pre-sink peak (dBFS) | -13.002511373180266 | <= -1 |
-| webkit | Pre-sink RMS (dBFS) | -29.72370592793426 | reported |
-| webkit | Pre-sink onsets (count) | 3 | reported |
+| webkit | Pre-sink RMS (dBFS) | -33.113954976894576 | reported |
+| webkit | Pre-sink onsets (count) | 2 | reported |
 | webkit | Control onsets / peak dBFS | 1 / -13.002511373180266 | >= 1 / > -60 |
 | webkit | Animation frame work p50 (ms) | 5 | <= 4 |
-| webkit | Animation frame work p95 (ms) | 14 | <= 8 |
-| webkit | Animation frame work p99 (ms) | 15 | <= 16.7 |
-| webkit | Text-dirty frame work p95 (ms) | 23 | <= 16.7 |
-| webkit | Frame interval p95 (ms) | 170 | <= 20 |
-| webkit | Frame interval p99 (ms) | 184 | <= 50 |
-| webkit | A/V model absolute error p99 (ms) | 4041.333333333334 | measured only; <= 50 |
-| webkit | Early flashes | 702656 | 0; none earlier than 2 ms |
+| webkit | Animation frame work p95 (ms) | 11 | <= 8 |
+| webkit | Animation frame work p99 (ms) | 28 | <= 16.7 |
+| webkit | Text-dirty frame work p95 (ms) | 57 | <= 16.7 |
+| webkit | Frame interval p95 (ms) | 102 | <= 20 |
+| webkit | Frame interval p99 (ms) | 128 | <= 50 |
+| webkit | A/V model absolute error p99 (ms) | unavailable | measured only; <= 50 |
+| webkit | Early flashes | 0 | 0; none earlier than 2 ms |
+| webkit | A/V window start / end (s) | 34 / 97 | intersection with onset eviction guard |
+| webkit | A/V window onsets / frame pairs / excluded frames | 4032 / 0 / 1779 | excluded rows remain in raw JSONL |
 | webkit | Post-stall active-set mismatches | 7 | 0 |
-| webkit | A/V model absolute error p95 (ms) | 2327.666666666668 | measured only; <= 33.4 |
-| webkit | Resource ledger peak (MiB) | 9.96 | <= 96 |
+| webkit | A/V model absolute error p95 (ms) | unavailable | measured only; <= 33.4 |
+| webkit | Resource ledger peak (MiB) | 8.73 | <= 96 |
 | webkit | JS heap growth (MiB) | unavailable | <= 8 |
 | webkit | Beat drift (ms) | unavailable | <= 1 |
-| webkit | Replayed flashes | 423168 | 0 |
+| webkit | Replayed flashes | 0 | 0 |
 | webkit | Ledger after dispose (bytes) | 0 | 0 |
 
-Behavior checks: chromium 9/10; webkit 6/8. Failed checks: chromium:canvas-only-text, webkit:canvas-only-text, webkit:touch-selection. Measurement failures: chromium:editing keystrokes=226, expected at least 500; chromium:inputLatencyMs.p99=243.8000000000029 exceeds 100; chromium:animationWorkMs.p50=4.5 exceeds 4; chromium:animationWorkMs.p95=8.300000011920929 exceeds 8; chromium:textWorkMs.p95=22.099999964237213 exceeds 16.7; chromium:frameIntervalMs.p99=101.39999999999418 exceeds 50; chromium:measured sync samples unavailable; webkit:editing keystrokes=189, expected at least 500; webkit:inputLatencyMs.p95=328 exceeds 50; webkit:inputLatencyMs.p99=374 exceeds 100; webkit:animationWorkMs.p50=5 exceeds 4; webkit:animationWorkMs.p95=14 exceeds 8; webkit:textWorkMs.p95=23 exceeds 16.7; webkit:frameIntervalMs.p95=170 exceeds 20; webkit:frameIntervalMs.p99=184 exceeds 50; webkit:syncAbsMs.p95=2327.666666666668 exceeds 33.4; webkit:syncAbsMs.p99=4041.333333333334 exceeds 50; webkit:early flashes=702656; webkit:expired highlights replayed after stall; webkit:post-stall active-set mismatches=7; webkit:post-stall active-set mismatches=7. Limitations: WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.; WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.; WebKit touch selection uses synthetic pointer events.; 7 post-stall active highlight set mismatches.; Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position..
+Behavior checks: chromium 10/10; webkit 8/8. Failed checks: none. Measurement failures: chromium:editing keystrokes=99, expected at least 500; chromium:no playing onset telemetry; active audio/visual workload was not observed; chromium:inputLatencyMs.p95=93.30000002383895 exceeds 50; chromium:inputLatencyMs.p99=438.39999998807616 exceeds 100; chromium:animationWorkMs.p50=7.600000023841858 exceeds 4; chromium:animationWorkMs.p95=11.100000023841858 exceeds 8; chromium:animationWorkMs.p99=17.5 exceeds 16.7; chromium:textWorkMs.p95=48.89999997615814 exceeds 16.7; chromium:frameIntervalMs.p95=133.79999999998836 exceeds 20; chromium:frameIntervalMs.p99=150.8000000000029 exceeds 50; chromium:measured sync samples unavailable; chromium:Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.; webkit:editing keystrokes=90, expected at least 500; webkit:inputLatencyMs.p95=351 exceeds 50; webkit:inputLatencyMs.p99=550 exceeds 100; webkit:animationWorkMs.p50=5 exceeds 4; webkit:animationWorkMs.p95=11 exceeds 8; webkit:animationWorkMs.p99=28 exceeds 16.7; webkit:textWorkMs.p95=57 exceeds 16.7; webkit:frameIntervalMs.p95=102 exceeds 20; webkit:frameIntervalMs.p99=128 exceeds 50; webkit:measured sync samples unavailable; webkit:post-stall active-set mismatches=7; webkit:post-stall active-set mismatches=7. Limitations: Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position.; WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.; WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.; WebKit touch selection uses synthetic pointer events..
 
 <!-- EVIDENCE:END -->
 
@@ -96,29 +103,28 @@ path; CLI test spawns use the no-op host or non-output verbs. Audit command evid
 `tmp/canvas-cutover/evidence-silent/logs/native-host-flags-audit.log`. No Tauri desktop
 automation exists; the desktop shell is checked with `cargo check` only.
 
-The iPad Pro 11-inch (M5) simulator installed and launched the app and captured a screenshot
-(`run-001/ios-sim.json`, `tmp/canvas-cutover/evidence/ios-sim.png`). The current generated
-report is a failure: the self-check collector matched its own `log show` command and saved
-`selfCheck: null`, so this run does not establish `playingEvents === 0`. A process-filtered
-diagnostic found the app's self-check line, but the line does not include `playingEvents`; the
-diagnostic is preserved at
-`tmp/canvas-cutover/evidence/s271-ios-self-check-process-filter-10m.log`. The simulator evidence
-path must be repaired by CANVAS-SHELL before acceptance.
+The iPad Pro 11-inch (M5) simulator installed and launched the freshly rebuilt app and captured
+a screenshot (`run-001/ios-sim.json`, `tmp/canvas-cutover/evidence/ios-sim.png`). The collector
+selected the latest `Vactr[PID:TID]` self-check line after launch. It reports
+`playingEvents === 0`; the evidence harness derives `silent === true` and `pass === true` from
+that result, successful launch/install/screenshot commands, and a binary mtime later than
+`6f6b807`. No playback or evaluation was started.
 
 ## Remaining failures triage
 
-Each row below remains open and requires a harness correction, product repair, or owner
-redispatch before acceptance. The corresponding raw evidence is under
+Each open row below requires a harness correction, product repair, or owner amendment before
+acceptance. The corresponding raw evidence is under
 `design-docs/specs/evidence/canvas-cutover/run-001/`.
 
 | Check | Observed result | Classification and required disposition | Evidence |
 |---|---|---|---|
-| Canvas text readback, Chromium and WebKit | No glyph variation was read back. The harness samples the canvas bottom strip, not the specified line-1 rectangle. | Harness defect; correct the probe after review and rerun. | `chromium-behavior.json`, `webkit-behavior.json` |
-| WebKit touch selection | Synthetic long press timed out before a word selection with two handles. | Product behavior requires owner reproduction and repair or selective redispatch; not accepted as a limitation. | `webkit-behavior.json` |
-| Chromium edit and presentation thresholds | Editing-key count, p99 input latency, animation work p50/p95, text-dirty work p95, frame interval p99 and measured sync samples miss or are unavailable against their gates. | Product/performance defect; repair in the owning plan and rerun. | `summary.json`, `chromium-measure.jsonl` |
-| WebKit edit and presentation thresholds | Editing-key count, p95/p99 input latency, animation work p50/p95, text-dirty work p95 and frame interval p95/p99 miss their gates. | Product/performance defect; repair in the owning plan and rerun. | `summary.json`, `webkit-measure.jsonl` |
-| WebKit highlight timing and recovery | A/V sync p95/p99 exceed thresholds; early/replayed flashes and post-stall active-set mismatches were observed. | Product defect owned by CANVAS-CLOCK; repair and rerun. | `summary.json`, `webkit-measure.jsonl` |
-| iPad simulator silent self-check | App launch and screenshot succeeded, but the generated report has `selfCheck: null`; the directly observed app line lacks `playingEvents`. | Evidence/contract gap owned by CANVAS-SHELL; repair or record an exact accepted blocker and rerun. | `ios-sim.json`, `tmp/canvas-cutover/evidence/s271-canvas-evidence-ios-sim.log`, `tmp/canvas-cutover/evidence/s271-ios-self-check-process-filter-10m.log` |
+| Canvas text readback, Chromium and WebKit | Same-frame line-1 glyph readback passed: Chromium `colors=364`, WebKit `colors=353`; both canvases were `767x858` and bridge opacity was 0. | Passed for this headless browser run; hardware GPU remains a separate platform check. | `chromium-behavior.json`, `webkit-behavior.json` |
+| Synthetic touch selection | Chromium selection was 30–33 with two handles. WebKit tapped at position 5, then long-pressed `canvas` and selected 2–8 with two handles; event constructor, `pointerType`, `isPrimary`, geometry and timestamps are recorded. | Passed synthetic browser behavior; physical touch handles remain pending hardware evidence. | `webkit-behavior.json`, `tmp/canvas-cutover/evidence/s274-webkit-touch-events.json` |
+| Chromium edit, presentation and large-document start | 99 editing keys; input p95/p99 93.3/438.4 ms; animation p50/p95/p99 7.6/11.1/17.5 ms; text-dirty p95 48.9 ms; frame interval p95/p99 133.8/150.8 ms. The toolbar click timed out on the 20,000-line document; no attributable workload onset or measured sync window was produced. | Product defects; do not relabel as headless limitations. Retry after profiling and repair by the authorized owner. | `summary.json`, `chromium-measure.jsonl`, `tmp/canvas-cutover/evidence/s274-e2e-03.log` |
+| WebKit edit and presentation | 90 editing keys; input p95/p99 351/550 ms; animation p50/p95/p99 5/11/28 ms; text-dirty p95 57 ms; frame interval p95/p99 102/128 ms. The control page passed input 33/34 ms, frame interval 18/20 ms, and 622 editing keys, so these product failures are not classified as headless limitations. | Product defects; repair and rerun. | `summary.json`, `webkit-measure.jsonl`, `tmp/canvas-cutover/evidence/s274-e2e-03.log` |
+| A/V sync attribution and late recovery | WebKit retained overlapping telemetry (34–97 s, 4,032 workload onsets), but found zero presented range pairs and no numeric sync percentiles; 7 post-stall active-set mismatches remained. Chromium's large-document start timed out and had no attributable workload range. | Product/highlight evidence remains failing; not attributed to CANVAS-CLOCK until a valid presented range window exists. | `summary.json`, `chromium-measure.jsonl`, `webkit-measure.jsonl` |
+| Main-thread profile and large-document performance | Chromium CPU profiles attribute 76.58% of edit-phase and 70.56% of cycle-phase self time to `wasm://wasm/vactr.wasm`; the profile also identifies `isTexture` in `editor/src/code/renderer.ts:269` at 3.86% edit and 8.5% cycle. The dominant module does not resolve to one Rust source file; `src/types/scope.rs` session lookup is only 2.36% of cycle samples. | Product performance issue with ownership gap: the dominant source is outside this plan's Rust write scope and cannot be safely routed to `scope.rs` from module-level attribution. Plan-author amendment must name the exact dominant source owner before a Rust repair. | `tmp/canvas-cutover/evidence/s271b-trace-chromium-edit.json`, `tmp/canvas-cutover/evidence/s271b-trace-chromium-cycle.json`, `tmp/canvas-cutover/evidence/s274-profile-by-url.log` |
+| iPad simulator silent self-check | The latest Vactr-process line records `playingEvents: 0`; derived `selfCheck.silent` and `selfCheck.pass` are true; app binary mtime is after `6f6b807`; simulator build, install, launch, log query and screenshot passed. | Passed. This is simulator launch/silence evidence only, not physical-iPad evidence. | `ios-sim.json`, `tmp/canvas-cutover/evidence/s274-ios-build-05.log`, `tmp/canvas-cutover/evidence/s274-ios-sim-05.log` |
 
 ## Raw evidence
 

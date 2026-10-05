@@ -211,7 +211,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const activeKey = ordered.map((r) => `${r.from}-${r.to}`).join(',');
         recordPresented(perfApi, { frameMs: ctx.frameMs, targetMs: sample.targetMs, audibleTime: sample.time,
           provenance: sample.provenance, valid: sample.valid, activeKey, beatCycle: transport.state.cycle,
-          beatFlash: transport.state.beatFlash, revision: sync.revision, handles: handles.length });
+          beatFlash: transport.state.beatFlash, revision: sync.revision, handles: handles.length, epoch: store.transportSample?.epoch ?? null });
       }
     } });
   scheduler.invalidateText();

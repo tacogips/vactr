@@ -5,10 +5,15 @@ interface StatsModule {
   percentile(values: number[], p: number): number | null;
   pairInputLatency(frames: number[][], keys: number[][]): { paired: Array<{ keyTime: number; frameTime: number; latencyMs: number }>; pairedKeys: number; nonEditingKeys: number; expiredKeys: number; unpairedKeys: number };
   countChecks(checks: Array<{ status?: string; pass?: boolean }>): { total: number; passed: number; failed: number };
-  evaluate(summary: Record<string, unknown>, thresholds?: Record<string, number>): { pass: boolean; failures: string[] };
+  evaluate(summary: Record<string, unknown>, thresholds?: Record<string, number>): { pass: boolean; failures: string[]; limitations: string[] };
   renderEvidence(summary: Record<string, unknown>): string;
   attributeWorkloadOnsets(rows: Array<{ receivedMs:number; [key:string]:unknown }>, baselineKeys: Set<string>, clickMs:number): { workload:Array<unknown>; count:number; excludedBaseline:number; excludedPreClick:number };
   splitSinkOnsets(times:number[], ctxTime:number): { control:number; workload:number };
+  syncWindow(onsets:Array<{time:number;end:number}>,presented:Array<{audibleTime:number}>): {windowStart:number|null;windowEnd:number|null;empty:boolean};
+  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number}): {sync:number[];earlyFlashCount:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
+  lateActiveMismatches(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number}>,stalls:number[]): number;
+  rankSelfTime(profile:Record<string,unknown>,top?:number):Array<{functionName:string;url:string;line:number;selfMs:number;share:number}>;
+  classifyWithControl(metricKey:string,path:string,productValue:number,controlValue:number,threshold:number):'pass'|'fail'|'limitation';
 }
 const spec: string = '../../test/e2e/stats.mjs';
 const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
@@ -60,6 +65,67 @@ describe('canvas evidence statistics', () => {
   });
   it('splits sink onset timestamps at the large-run context time', () => {
     expect(stats.splitSinkOnsets([0.5,1.0,3.2,4.0],2.0)).toEqual({control:2,workload:2});
+  });
+  it('attributes repeated ranges by onset occurrence and exact window', () => {
+    const onsets=[0,0.25,0.5,0.75,1].map((time)=>({time,end:time+0.2,from:1,to:2,epoch:'e'}));
+    const presented=Array.from({length:61},(_,i)=>{const audibleTime=i/60;const active=onsets.filter((o)=>o.time<=audibleTime&&audibleTime<o.end).map((o)=>`${o.from}-${o.to}`);return {audibleTime,activeKey:active.join(','),epoch:'e',frameMs:audibleTime*1000,targetMs:audibleTime*1000};});
+    const result=stats.attributeSync(onsets,presented);
+    expect(result.earlyFlashCount).toBe(0);expect(result.replayedFlashCount).toBe(0);
+    expect(result.earlyFlashCount+result.replayedFlashCount).toBeLessThanOrEqual(result.framePairs);
+    expect(result.sync.length).toBeGreaterThan(0);expect(result.sync.every((sample)=>Math.abs(sample)<=16.8)).toBe(true);
+  });
+  it('counts an early frame, an expired frame, and an epoch mismatch once each', () => {
+    const onsets=Array.from({length:9},(_,i)=>({time:i*0.25,end:i*0.25+0.2,from:1,to:2,epoch:'e'}));onsets.push({time:1,end:1.4,from:5,to:7,epoch:'e'});
+    const rows=[
+      {audibleTime:0.99,activeKey:'5-7',epoch:'e',frameMs:990,targetMs:990},
+      {audibleTime:1.1,activeKey:'5-7',epoch:'other',frameMs:1100,targetMs:1100},
+      {audibleTime:1.2,activeKey:'981-98,981-983',epoch:'e',frameMs:1200,targetMs:1200},
+      {audibleTime:1.42,activeKey:'5-7',epoch:'e',frameMs:1420,targetMs:1420},
+    ];
+    const result=stats.attributeSync(onsets,rows);
+    expect(result.earlyFlashCount).toBe(4);expect(result.replayedFlashCount).toBe(1);
+    expect(result.framePairs).toBe(5);
+  });
+  it('reports disjoint and evicted windows without false flash counts', () => {
+    const onsets=[{time:0,end:1,from:5,to:7,epoch:'e'}];
+    const presented=Array.from({length:3},(_,i)=>({audibleTime:5+i/2,activeKey:'5-7',epoch:'e',frameMs:5000+i*500,targetMs:5000+i*500}));
+    expect(stats.attributeSync(onsets,presented)).toMatchObject({sync:[],earlyFlashCount:0,replayedFlashCount:0,framePairs:0,excludedFrames:3});
+    const retained=Array.from({length:11},(_,i)=>({time:30+i*0.5,end:30.4+i*0.5,from:5,to:7,epoch:'e'}));
+    const oldRows=Array.from({length:11},(_,i)=>({audibleTime:25+i*0.5,activeKey:'5-7',epoch:'e',frameMs:25000+i*500,targetMs:25000+i*500}));
+    const evicted=stats.attributeSync(retained,oldRows);
+    expect(evicted.windowStart).toBe(30.4);expect(evicted.excludedFrames).toBeGreaterThan(0);expect(evicted.earlyFlashCount).toBe(0);
+  });
+  it('counts in-window ranges with no matching onset as early and excludes range substring matches', () => {
+    const onsets=Array.from({length:9},(_,i)=>({time:i*0.5,end:i*0.5+0.2,from:1,to:2,epoch:'e'}));
+    const presented=[{audibleTime:1,activeKey:'981-98,9-9',epoch:'e',frameMs:1000,targetMs:1000}];
+    expect(stats.attributeSync(onsets,presented).earlyFlashCount).toBe(2);
+  });
+  it('uses the in-window presented set for late active mismatch checks', () => {
+    const onsets=Array.from({length:9},(_,i)=>({time:i*0.5,end:i*0.5+0.2,from:1,to:2,epoch:'e'}));onsets.push({time:3.25,end:3.8,from:1,to:2,epoch:'e'});
+    const rows=[{audibleTime:3.4,activeKey:'1-2',epoch:'e',frameMs:3400},{audibleTime:3.5,activeKey:'1-2,8-9',epoch:'e',frameMs:3500}];
+    expect(stats.lateActiveMismatches(onsets,rows,[3300])).toBe(0);
+    expect(stats.lateActiveMismatches(onsets,rows,[3500])).toBe(1);
+  });
+  it('ranks CPU self time and classifies WebKit headless limits conservatively', () => {
+    const profile={nodes:[{id:1,callFrame:{functionName:'slow',url:'app.js',lineNumber:4}},{id:2,callFrame:{functionName:'fast',url:'app.js',lineNumber:8}}],samples:[1,2,1],timeDeltas:[6000,2000,2000]};
+    expect(stats.rankSelfTime(profile)).toEqual([{functionName:'slow',url:'app.js',line:4,selfMs:8,share:0.8},{functionName:'fast',url:'app.js',line:8,selfMs:2,share:0.2}]);
+    expect(stats.classifyWithControl('frameIntervalMs','p95',30,10,20)).toBe('fail');
+    expect(stats.classifyWithControl('frameIntervalMs','p95',30,30,20)).toBe('limitation');
+    expect(stats.classifyWithControl('frameIntervalMs','p95',10,30,20)).toBe('pass');
+    expect(stats.classifyWithControl('inputLatencyMs','p95',30,Number.NaN,20)).toBe('fail');
+  });
+  it('uses control limitations only for headless WebKit input, frame interval and key count', () => {
+    const base={...passingMetrics,editKeyCount:400,inputLatencyMs:{p95:60,p99:120},frameIntervalMs:{p95:30,p99:60}};
+    const control={mode:'headless',editKeyCount:300,inputLatencyMs:{p95:60,p99:120},frameIntervalMs:{p95:30,p99:60}};
+    const webkit=stats.evaluate({browser:'webkit',metrics:base,control});
+    expect(webkit.pass).toBe(true);expect(webkit.failures).toEqual([]);expect(webkit.limitations).toHaveLength(5);
+    const chromium=stats.evaluate({browser:'chromium',metrics:base,control});
+    expect(chromium.pass).toBe(false);expect(chromium.failures.some((failure)=>failure.includes('inputLatencyMs.p95'))).toBe(true);
+    const missing=stats.evaluate({browser:'webkit',metrics:base,control:{...control,inputLatencyMs:{p95:Number.NaN,p99:Number.NaN}}});
+    expect(missing.pass).toBe(false);expect(missing.failures.some((failure)=>failure.includes('inputLatencyMs.p95'))).toBe(true);
+    const nonLimited=stats.evaluate({browser:'webkit',metrics:{...base,animationWorkMs:{p50:30,p95:60,p99:70},syncProvenance:'measured',syncAbsMs:{p95:70,p99:80}},control});
+    expect(nonLimited.failures.some((failure)=>failure.includes('animationWorkMs.p50'))).toBe(true);
+    expect(nonLimited.failures.some((failure)=>failure.includes('syncAbsMs.p95'))).toBe(true);
   });
   it('requires a paired editing sample and caps unpaired keys at 10 percent', () => {
     expect(stats.evaluate({ metrics:{ ...passingMetrics, editPairedKeyCount:0 } }).failures).toContain('paired editing samples=0, expected at least 1');

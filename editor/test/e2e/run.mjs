@@ -12,8 +12,8 @@ import { installSilentSink } from './silent-sink.mjs';
 const args=process.argv.slice(2); const value=(key,def)=>{const i=args.indexOf(key);return i>=0?args[i+1]:def;};
 const list=(value('--browser','all')==='all'?['chromium','webkit']:[value('--browser','all')]);
 const profile=value('--profile','all'); const runId=value('--run-id','run-001'); const out=path.resolve(value('--out',path.join(repoRoot,'design-docs/specs/evidence/canvas-cutover',runId)));
-const writeEvidence=args.includes('--write-evidence'); const headedWebkit=args.includes('--headed-webkit');
-const command=`cd editor && npm run e2e -- --browser ${value('--browser','all')} --profile ${profile} --run-id ${runId}${writeEvidence?' --write-evidence':''}${headedWebkit?' --headed-webkit':''}`;
+const writeEvidence=args.includes('--write-evidence'); const headedWebkit=args.includes('--headed-webkit'); const profileTrace=args.includes('--profile-trace');
+const command=`cd editor && npm run e2e -- --browser ${value('--browser','all')} --profile ${profile} --run-id ${runId}${writeEvidence?' --write-evidence':''}${headedWebkit?' --headed-webkit':''}${profileTrace?' --profile-trace':''}`;
 const evidencePath=(name)=>path.join(out,name); const browsers=[]; let blocked=false; let fatal=null;
 const host={hostname:os.hostname(),platform:os.platform(),release:os.release(),arch:os.arch(),node:process.version,runId,commands:[command,'cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build']};
 try {
@@ -32,8 +32,8 @@ try {
           stage='measurement';
           const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:1}); await installSilentSink(context); const page=await context.newPage();
           await page.goto(`${server.origin}/?perf=1`,{waitUntil:'domcontentloaded',timeout:60000});
-          const measured=await runMeasurement(page,context,name,{profile:'all',runId});
-          b.metrics=measured.metrics;b.renderer=measured.renderer??null;b.measurement={pass:measured.pass,failures:measured.failures,blocked:measured.blocked,limitations:measured.limitations};b.samples=measured.samples;b.limitations.push(...measured.limitations);blocked ||= measured.blocked;
+          const measured=await runMeasurement(page,context,name,{profile:'all',runId,profileTrace:profileTrace&&name==='chromium',headless:actualHeadless});
+          b.metrics=measured.metrics;b.renderer=measured.renderer??null;b.control=measured.control??null;b.traceRanks=measured.traceRanks??[];b.measurement={pass:measured.pass,failures:measured.failures,blocked:measured.blocked,limitations:measured.limitations};b.samples=measured.samples;b.limitations.push(...measured.limitations);blocked ||= measured.blocked;
           await page.evaluate(()=>window.__vactrPerf?.disposeCode()); await context.close();
         }
         host[name]={version,headless:b.headless}; browsers.push(b); await browser.close();

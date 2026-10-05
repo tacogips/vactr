@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflowInput:RESUME-session-282 'RESUME session 282: accept EVIDENCE-SCOPE (no negative controls in gating), then SCHED, FRAMECOST, silent CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-283, chain 265-266-267-269-271-274-277-282-283; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; riela issue #134; no GitHub issue number)",
+  "issueReference": "workflowInput:RESUME-session-283 'RESUME session 283: accept EVIDENCE-SCOPE with exitStatus records, then SCHED, FRAMECOST, silent CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-284, chain 265-266-267-269-271-274-277-282-283-284; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; riela issue #134; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -140,6 +140,26 @@
       "blocker": "Session 282 was blocked only because intentional mutation negative controls (exit 100) and superseded failed vitest runs were listed in verification[]/priorVerification[]; the progress gate has no negative-control exemption (riela issue #134).",
       "amendment": "workflowInput HARD RULE: no mutation, negative-control or intentionally failing command runs in session 283, and structured verification lists only final-source commands that exited 0 with positive counts. mutationEvidence lists are empty for this run. SCOPE cites tmp/canvas-cutover/scope/s283-mutation-scope.log, s283-mutation-topof.log, mutation-scope.log and mutation-topof.log in prose only. SCHED and FRAMECOST show sensitivity through in-test control cases (both branches asserted in one passing test; FRAMECOST adds wasm-profile.mjs gatingPreflight, which run.mjs calls before any write, server or browser). SCOPE re-gate checks are rebased on 5e58d04 because that commit changed src/types/tests/scope_cost.rs, so the session-282 c69314d byte-identity check no longer holds. Design 15.3.8.13, the plan decomposition, writePaths, sharedPaths, artifactRoots and the serial DAG are unchanged.",
       "checkpointNote": "Session 283 plan checkpoint: the session-283 sections of the SCOPE, SCHED, FRAMECOST and EVIDENCE plans and this manifest are committed and pushed together before the SCOPE re-gate. No design change. Accepted plans are not redispatched."
+    },
+    "session284": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-284",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-283",
+      "resumeHead": "271412c",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      "blocker": "Session 283 gates were all green, but scripts/implementation-progress-check.py verification_succeeded() counts a record as successful only when it has a numeric exitStatus (or exitCode) of 0 or an outcome of exactly pass, passed, success, succeeded or ok. The four test records put the exit code only in the outcome text ('exit 0; ...'), so the check classified them as failed.",
+      "amendment": "Mandatory verification record format for every step-6 implementer. Test commands use {command, exitStatus: 0, testsRun > 0, testsPassed, failureCount: 0, outcome: 'passed', log}. Other commands use {command, exitStatus: 0, outcome: 'passed', log}. Timings, counters, skipped counts and ratios go in a separate notes field and never in outcome or status. priorVerification[] is empty or uses the same passing format. The session-283 hard rule still holds: no mutation or negative-control runs, and historical logs are cited in notes only. Design 15.3.8.13, the four plans, writePaths, sharedPaths, artifactRoots, verification commands and the serial DAG are unchanged; step5 comm-004372 accepted them with no findings.",
+      "checkpointNote": "Session 284 plan checkpoint: only this manifest changes, to record the session-284 resume and the record format. CANVAS-EVIDENCE-SCOPE source is final at 271412c (byte-identical to 5e58d04) and is re-gated, not reimplemented. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
@@ -158,7 +178,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-282 'RESUME session 282: accept EVIDENCE-SCOPE (no negative controls in gating), then SCHED, FRAMECOST, silent CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-283, chain 265-266-267-269-271-274-277-282-283; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; riela issue #134; plans accepted by step5-impl-plan-review comm-004359; no GitHub issue number)",
+    "issueReference": "workflowInput:RESUME-session-283 'RESUME session 283: accept EVIDENCE-SCOPE with exitStatus records, then SCHED, FRAMECOST, silent CANVAS-EVIDENCE, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-284, chain 265-266-267-269-271-274-277-282-283-284; operator decisions A-G and S; design 15.3.8.13 with the session-282 decision-D correction; riela issue #134; plans accepted by step5-impl-plan-review comm-004372; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -196,7 +216,8 @@
       "Audio processing never waits on, allocates for, or is driven by rendering; visuals read published telemetry only.",
       "Codex sandbox cannot bind localhost and keeps .git read-only: Playwright, HTTP servers, simulator launches and full nextest run in outside-sandbox verification steps.",
       "Implementers record fresh-read and post-edit sha256 values under tmp/canvas-cutover/<plan>/; within a wave writePaths are disjoint; sharedPaths are edited only for the recorded reason.",
-      "Session 271 (operator decision P): absolute wall-clock budgets never run inside the default parallel vitest suite; they run only in the dedicated serial perf gate cd editor && npm run test:perf (--maxWorkers=1), alone on the host; perf files are excluded from the default run by vitest config, never by skipping, deleting or env-gating an assertion."
+      "Session 271 (operator decision P): absolute wall-clock budgets never run inside the default parallel vitest suite; they run only in the dedicated serial perf gate cd editor && npm run test:perf (--maxWorkers=1), alone on the host; perf files are excluded from the default run by vitest config, never by skipping, deleting or env-gating an assertion.",
+      "Session 284: every verification[] record has a numeric exitStatus of 0 and outcome 'passed'. Test records also carry testsRun > 0, testsPassed and failureCount 0. Details go in notes. No mutation or negative-control commands appear in structured verification fields."
     ],
     "designDecisionsAndRationale": [
       "Headless @codemirror/state EditorState is the single document authority because history and transactions are already tested; EditorView is removed entirely (15.3.8.2).",

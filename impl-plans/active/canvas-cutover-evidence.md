@@ -1,8 +1,8 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: In Progress (session 274: single-plan redispatch with the five session-271 integration-review briefs; see "Session 274 Amendment")
-**Plan ID**: CANVAS-EVIDENCE (dispatch wave 5; all ten other canvas-cutover plans, including CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST and -RUNSTART, are accepted dependencies)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave)
+**Status**: In Progress (session 277: re-measure on the release wasm after CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST; see "Session 277 Amendment")
+**Plan ID**: CANVAS-EVIDENCE (dispatch wave 8 since session 277; depends on the ten accepted canvas-cutover plans and on CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-05
@@ -1003,6 +1003,158 @@ Then:
 - `grep -n "preserveDrawingBuffer" editor/src` finds no match (grep exit 1).
 - Every touched TypeScript source stays under 1,000 lines (`wc -l`).
 
+## Session 277 Amendment (operator decisions A-G; design 15.3.8.13)
+
+This section supersedes all earlier text wherever they conflict. That includes the session-274
+checklist line `git diff 2156699 --stat -- src ...`: CANVAS-EVIDENCE-SCOPE now changes Rust
+by design. It also includes the "Unlisted dominant cost" blocker that stopped session 274.
+
+### Intent and context
+
+Session 274 implemented TASK-401 to TASK-405 (see its progress log). It stopped on two items:
+
+- INT-S271-EV-PERF: `vactr.wasm` took 70.56-76.58% of main-thread self time, with no Rust
+  owner in this plan.
+- TASK-402: WebKit presented zero sync pairs.
+
+The operator's read-only diagnosis (`tmp/canvas-cutover/diag-wasm/REPORT.md`) found four causes.
+Operator decisions A to E fix them in three serial plans that run before this one:
+
+| Wave | Plan | Decisions | Fixes |
+|------|------|-----------|-------|
+| 5 | `canvas-cutover-evidence-scope.md` (CANVAS-EVIDENCE-SCOPE) | A | O(1) `Scopes` name index and `Doc::top_of` (quadratic `session_check` and eval) |
+| 6 | `canvas-cutover-evidence-sched.md` (CANVAS-EVIDENCE-SCHED) | B, C | fresh engine-time tick with backlog coalescing in `editor/worklet/host.js`; diagnostics check skipped on an unchanged revision |
+| 7 | `canvas-cutover-evidence-framecost.md` (CANVAS-EVIDENCE-FRAMECOST) | E, D | no per-draw `isTexture`, no per-frame `getError`, cached grapheme clusters; release wasm with the name section as the vite default, `mise run build-wasm-release`, wasm provenance and gating refusal in `run.mjs` |
+| 8 | this plan (CANVAS-EVIDENCE) | G | silent re-measure on the release wasm in Chromium and WebKit, evidence, final gates, integration review, closeout, push |
+
+Thresholds and the workload stay unchanged (decision G). The 15.3.8.8 silent-sink rule
+applies to every run. That includes the headed WebKit GL fallback, where the sink must be
+installed before any audio node connects.
+
+### Ownership changes (manifest entry `CANVAS-EVIDENCE`)
+
+- `dependsOn` adds CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST; `wave` becomes 8.
+- These files move from writePaths to sharedPaths:
+  - `editor/src/code/renderer.ts`
+  - `editor/src/code/layout.ts`
+  - `editor/test/canvas/gpu.test.ts`
+  - `editor/test/canvas/mount.test.ts`
+  - `editor/test/code/diagnostics.test.ts`
+  - `editor/test/e2e/run.mjs`
+  - `editor/test/e2e/README.md`
+
+  They are owned by SCHED or FRAMECOST in waves 6 and 7, as design 15.3.8.13 "Ownership and
+  order" requires. After those plans are accepted, this plan may edit them only under the
+  seamProtocol, for a re-measure finding, with the reason recorded.
+- writePaths add the closeout paths of the three new plans:
+  - `impl-plans/active/canvas-cutover-evidence-{scope,sched,framecost}.md`, listed in the
+    manifest as three concrete paths;
+  - their `impl-plans/completed/` counterparts.
+- `editor/worklet/host.js`, `editor/src/code/diagnostics.ts` and the decision-A Rust files are
+  not paths of this plan. A re-measure finding there follows the "Unlisted dominant cost" rule:
+  a serial plan-author amendment and checkpoint. For Rust, the design lifts the
+  "no Rust edit" rule only for the SCOPE files, so the amendment names them explicitly. No
+  accepted plan is redispatched.
+
+### TASK-501: Release build setup (outside the sandbox, before every browser or simulator run)
+
+1. `mise run build-wasm-release`, exit 0.
+2. `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` with no `VACTR_WASM`. This builds
+   the release default.
+3. Run the FRAMECOST `inspectWasm` check command. It must print `profile: "release"`,
+   `nameSection: true` and `dwarf: false`. Record bytes and sha256 in the progress log.
+4. The debug wasm (`cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`)
+   is still built for vitest. Never point `VACTR_WASM` at it for an e2e or simulator build.
+
+### TASK-502: Evidence rendering of the wasm build (sandbox)
+
+- `editor/test/e2e/stats.mjs` `renderEvidence(summary)` adds one line to the generated section.
+  It shows the wasm profile, bytes and sha256 from `summary.wasm`, or
+  `summary.environment.wasm` when `summary.wasm` is absent.
+- Add a `stats.test.ts` row: a summary with a `wasm` block renders the line, and a summary
+  without one renders `wasm: not recorded`.
+- No `THRESHOLDS` change.
+
+### TASK-503: Silent re-measure (outside the sandbox)
+
+- Run `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`
+  on the TASK-501 dist. The run must not be refused (exit 2) for its wasm.
+- Then, non-gating: run the Chromium `--profile-trace` diagnostic and record the top-10
+  `rankSelfTime`, including the `vactr.wasm` share, next to the session-274 numbers.
+- Triage every remaining failure as in TASK-407.
+  - A product defect inside this plan's writePaths or sharedPaths is fixed under the
+    seamProtocol.
+  - A defect elsewhere follows the "Unlisted dominant cost" rule.
+  - Re-measure after each fix round.
+
+### TASK-504: Escalation F check (decision F; this plan never implements F)
+
+F is triggered only when both of the following hold:
+
+- after TASK-503, the release-wasm A/V sync or input-latency gate still fails in Chromium or
+  WebKit;
+- the `--profile-trace` evidence shows main-thread long tasks overlapping the late onsets.
+
+When it triggers, stop seam work on that metric and record in the progress log and the triage
+table:
+
+- the failing metric;
+- the late-onset times;
+- the overlapping long tasks with their durations and trace paths.
+
+Report it as the F trigger. The plan author then appends design 15.3.8.14 and a Worker plan
+serially, before any implementation. Do not create a Worker, and do not edit
+`editor/worklet/host.js`. If either condition is false, F is not triggered; record that with
+the evidence.
+
+### TASK-505: Evidence document (sandbox, static sections only)
+
+- Add a "Measurement build" paragraph:
+  - gating numbers come from the release wasm with the name section kept
+    (`mise run build-wasm-release`);
+  - the profile, bytes and sha256 are generated into the results section;
+  - the run-001 numbers from sessions 271 and 274 were measured on the debug wasm and are
+    superseded by this run.
+- Update the triage table and the TASK-402 sync row with the new `summary.json` paths.
+- Keep the silent-sink method and the pending physical-iPad procedures.
+
+### TASK-506: Final gates and simulator (outside the sandbox, serial)
+
+- The Verification and final-gate tables, with TASK-501 run first.
+- The iOS simulator build bundles `editor/dist`, so it runs after TASK-501, and `ios-sim.json`
+  must still show `selfCheck.playingEvents === 0`, `silent === true` and `pass === true`.
+- The SCOPE Rust files get `rustfmt --edition 2021 --check`.
+
+### TASK-507: Final integration review, closeout, push
+
+As TASK-409. The move list adds the three new plans, so it is the fourteen
+`impl-plans/active/canvas-cutover-*.md` plans: clock, native, render, mount, visual, shell,
+evidence, evidence-silent, evidence-viewport, evidence-editcost, evidence-runstart,
+evidence-scope, evidence-sched and evidence-framecost. Each is moved by `git mv` as a concrete
+path with `Status: Completed`. The fifteen canvas-editor-224 plans and
+`canvas-editor-224-dispatch.json` get one-line superseded notes, as before. Then:
+
+- update `impl-plans/README.md`;
+- append the 15.3.8.4 clock-probe erratum;
+- commit;
+- run `git push origin wf/canvas` (non-force).
+
+Integration reviewers return the exact runner envelope `{ "payload": {...}, "when": {...} }`.
+
+### Session 277 checklist
+
+- `git diff 3e69e16 -- editor/test/e2e/stats.mjs` shows no change inside `THRESHOLDS`.
+- `git diff 3e69e16 -- editor/test/e2e/fixtures/large-doc.mjs editor/test/e2e/silent-sink.mjs editor/package.json editor/package-lock.json Cargo.toml Cargo.lock`
+  is empty.
+- `git diff 3e69e16 --name-only -- src` lists only the CANVAS-EVIDENCE-SCOPE files:
+  `src/types/scope.rs`, `src/types/tests/mod.rs`, `src/types/tests/scope_cost.rs`,
+  `src/directives/attach.rs`, `src/directives/tests/attach.rs` and
+  `src/directives/tests/labels.rs`, plus `src/types/check.rs` or `src/directives/labels.rs` only
+  if SCOPE recorded a compiler-required edit.
+- `summary.json` has `wasm.profile === "release"`, `wasm.nameSection === true` and
+  `wasm.dwarf === false`.
+- The silent sink holds in every browser run, including the headed WebKit fallback.
+
 ## Verification
 
 Inside the sandbox:
@@ -1019,7 +1171,8 @@ Outside the sandbox (verification and review step; logs in `tmp/canvas-cutover/e
 
 | Command | Required evidence |
 |---------|-------------------|
-| `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | exit 0 |
+| `mise run build-wasm-release` (session 277, first) | exit 0; `target/wasm32-unknown-unknown/release/vactr.wasm` exists |
+| `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | exit 0 (no `VACTR_WASM`; release default since session 277); the FRAMECOST `inspectWasm` check prints `profile: "release"`, `nameSection: true`, `dwarf: false` |
 | `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` | exit 0 is required for acceptance (session 267). Exit 1 is written to the evidence file and triaged under TASK-008. A product defect blocks acceptance until it is repaired; only a recorded environment limitation (for example software GL frame metrics) may remain as a documented failure, and that is a review decision. Exit 2 is blocked, never a pass. The silent-sink assertions of TASK-007 must hold in every case. |
 | `tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim` (debug, unsigned; cwd and flags as in `canvas-cutover-shell.md`), then `git status --porcelain editor/src-tauri` | exit 0; the `Vactr.app/Vactr` mtime is later than the build start; no tracked change is kept |
 | `node editor/test/e2e/ios-sim.mjs --app editor/src-tauri/gen/apple/build/arm64-sim/Vactr.app --device "iPad Pro 11-inch (M5)" > tmp/canvas-cutover/evidence/s271b-ios-sim.log 2>&1` | exit 0; `ios-sim.json` has a non-null `selfCheck` from a Vactr-process line, `playingEvents === 0`, `silent === true`, `pass === true` and `appBinary.mtimeIso` |
@@ -1039,7 +1192,8 @@ Final gates on the closeout commit (design 15.3.8.9):
 | `cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts` | pass (zero `@codemirror/view` or `EditorView` in production `editor/src`) |
 | e2e | as above |
 | `cargo check --manifest-path editor/src-tauri/Cargo.toml` | exit 0 |
-| `rustfmt --check` on touched Rust files | exit 0 |
+| `rustfmt --check` on touched Rust files (session 277: `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`) | exit 0 |
+| iOS simulator build and `ios-sim.mjs`, as above, after `mise run build-wasm-release` and the release `npm run build` | exit 0; `playingEvents === 0`, `silent === true`, `pass === true` |
 
 ## Overwrite and Drift Protocol
 
@@ -1070,6 +1224,13 @@ only this plan's progress log and the plan files being archived.
 - [ ] Session 267: final integration review across the seven canvas-cutover plans and four wave-3 plans passes
 - [ ] Closeout moves done file by file, including the four wave-3 plans; README updated (serial closeout after review)
 - [ ] Final gates recorded with exit codes and log paths (closeout gate)
+- [ ] Session 277: CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST accepted (runtime `acceptedPlanIds`)
+- [ ] Session 277 TASK-501: release wasm built with `mise run build-wasm-release`; dist inspected as `profile: "release"`, `nameSection: true`, `dwarf: false`; bytes and sha256 recorded
+- [ ] Session 277 TASK-502: `renderEvidence` shows the wasm line; `stats.test.ts` rows pass
+- [ ] Session 277 TASK-503: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exits 0 on the release wasm with every silent-sink assertion holding in Chromium and WebKit (including the headed WebKit fallback); TASK-402 sync has numeric percentiles within threshold
+- [ ] Session 277 TASK-504: F trigger evaluated and recorded (not triggered, or reported with evidence for a 15.3.8.14 amendment)
+- [ ] Session 277 TASK-505: evidence document "Measurement build" paragraph, triage table and superseded-debug note
+- [ ] Session 277 TASK-506/507: final gates, simulator silence, integration review, closeout of fourteen canvas-cutover plans plus the canvas-editor-224 set, README, erratum, commit and non-force push
 
 ## Progress Log
 
@@ -1205,3 +1366,23 @@ mid).**
 **Implementation blocker**: The E2E performance gates remain failing. The dominant module profile does not resolve to a specific Rust file, while this plan forbids Rust edits and its authorized writePaths contain no Rust source. Resume after a serial plan-author amendment identifies the exact profile-resolved source owner, adds its concrete write/test paths, and defines the owner regression test. Do not route the whole 70.56%–76.58% module share to `src/types/scope.rs` from its 2.36% function sample.
 
 **Downstream pending**: Independent Opus integration review, review-dependent closeout/archive/index updates, clock-probe erratum, final closeout-commit gates, commit and non-force push remain owned by later workflow steps.
+
+### Session: 2026-10-05 (session 277 plan amendment)
+**Tasks Completed**: Applied operator decisions A-G and design 15.3.8.13.
+
+- New serial plans:
+  - `impl-plans/active/canvas-cutover-evidence-scope.md` (wave 5, decision A);
+  - `impl-plans/active/canvas-cutover-evidence-sched.md` (wave 6, decisions B and C, with the
+    engine-timebase tick from DR-S277-B-TIMEBASE);
+  - `impl-plans/active/canvas-cutover-evidence-framecost.md` (wave 7, decisions E and D).
+- This plan moves to wave 8 and gains:
+  - the "Session 277 Amendment" (TASK-501 to TASK-507);
+  - new Verification rows (the release build first, the SCOPE rustfmt files, and the simulator
+    after the release build);
+  - new Completion Criteria.
+- Manifest: seven files (`renderer.ts`, `layout.ts`, `gpu.test.ts`, `mount.test.ts`,
+  `diagnostics.test.ts`, `run.mjs`, `README.md`) move from this plan's writePaths to its
+  sharedPaths, so exactly one plan writes each file at a time. The closeout paths of the three
+  new plans are added to writePaths.
+
+No source, threshold or workload change.

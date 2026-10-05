@@ -1,0 +1,249 @@
+# Canvas Cutover: O(1) Scope and Label Lookups (Decision A) Implementation Plan
+
+**Status**: Ready
+**Plan ID**: CANVAS-EVIDENCE-SCOPE (dispatch wave 5 of the session-277 run; runs alone; first of the serial chain SCOPE -> SCHED -> FRAMECOST -> CANVAS-EVIDENCE)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.13 (scope record A; "Ownership and order"), section 20 Q1 (scope chain rules, unchanged)
+**Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-SCOPE`)
+**Created**: 2026-10-05
+**Last Updated**: 2026-10-05
+
+---
+
+## Intent and Context
+
+The user wants the canvas editor to stay responsive on a 20,000-line document while audio
+plays. The operator profile (`tmp/canvas-cutover/diag-wasm/REPORT.md`, sections 1-3) found that
+`session_check` is quadratic in the number of bindings, and the shared `analyze` makes eval
+(Run) slow for the same reason. Release `session_check` times: 2,500 lines 7.2 ms, 5,000 lines
+28 ms, 10,000 lines 123 ms, 20,000 lines 182 ms. A comments-only 20,000-line document takes
+2.1 ms. Two linear scans cause this:
+
+1. `src/types/scope.rs`: `Scope.names` is a `Vec<(Rc<str>, Binding)>`. `Scopes::classify`
+   (line 166), `Scopes::bind` (line 194), `Scopes::session_lookup` (line 204),
+   `Scopes::lookup` (line 215) and `Scopes::update` (line 227) each scan it linearly per call.
+   `Checker::declare` (line 342) calls `classify` and then `bind` for every binding. The caller
+   `src/types/check.rs:68` calls `session_lookup` for every top-level `fn`/`let`.
+2. `src/directives/attach.rs`: `Doc::top_of` (line 363) runs
+   `self.targets.iter().position(|x| x.top == top)` for every call.
+   `LabelRegistry::build` (`src/directives/labels.rs:89`) calls it once per target.
+
+Design 15.3.8.13 A fixes both with O(1) lookups. Resolution order, the section 20 Q1 rules and
+the order and text of diagnostics must stay identical. The design lifts the 15.3.8.12
+"no Rust edit" rule for the files listed under Ownership, and only for them.
+
+## Non-goals
+
+- No change to any diagnostic code, message, severity, span or order. The 7.1.4 / Q1 scope
+  model (prelude -> session -> fn/block; one binding per name per scope; child scopes may
+  shadow) does not change.
+- No change to `Doc::target_on_line`, `Doc::preceding`, the call-site `defs.iter().find` in
+  `Doc::new`, or any other function not named here. Do not optimize anything the operator
+  profile did not name.
+- No change to `src/types/check.rs` unless the compiler requires it. No edit is expected
+  there; it is listed only because the design authorizes it.
+- No edit to `src/directives/labels.rs` unless the compiler requires it. No edit is expected
+  there.
+- No new dependency, no `Cargo.toml` or `Cargo.lock` change, no new `allow` or `expect`
+  attribute, no crate-wide `cargo fmt`, no edit of `.agents/settings.local.json`.
+- No TypeScript, harness, design-doc or manifest edit.
+
+## Ownership
+
+writePaths (concrete files; the directories are gitignored artifact roots):
+
+- `src/types/scope.rs`
+- `src/types/check.rs` (no edit expected)
+- `src/types/tests/mod.rs` (one added line: `mod scope_cost;`)
+- `src/types/tests/scope_cost.rs` (new)
+- `src/directives/attach.rs`
+- `src/directives/labels.rs` (no edit expected)
+- `src/directives/tests/attach.rs` (tests appended; existing tests untouched)
+- `src/directives/tests/labels.rs` (tests appended; existing tests untouched)
+- `impl-plans/active/canvas-cutover-evidence-scope.md` (this plan's progress log and checkboxes only)
+- artifact roots: `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules/.vite`, `tmp/canvas-cutover/scope`
+
+sharedPaths: none.
+
+Plan note: design 15.3.8.13 names "a new `src/types/tests/scope.rs` registered in
+`src/types/tests/mod.rs`". `src/types/tests/scope.rs` already exists (109 lines of the
+rebinding, shadowing and prelude tests that must stay unchanged). The new counter tests go
+into a new file, `src/types/tests/scope_cost.rs`, so the existing file stays byte-identical.
+
+## Contracts and Key Points
+
+### A1. Per-scope name index (`src/types/scope.rs`)
+
+- `struct Scope` keeps `names: Vec<(Rc<str>, Binding)>` (insertion order, used by `Debug`) and
+  gains `index: HashMap<Rc<str>, usize>`. The index maps each name to its slot in `names`.
+  Within one scope a name occurs at most once. `bind` already replaces in place, so the
+  invariant holds today. `HashMap` is already imported in this file (it is used by
+  `query_effects`).
+- Add a private constructor (for example `Scope::empty()`) and use it in `Scopes::new` and
+  `Scopes::push`. Do not change `truncate`: dropping a scope drops its index.
+- Method behavior, which must be identical to today:
+  - `classify(name, env)`:
+    - inner scope `index.get(name)` -> `DeclNote::Rebinding(names[slot].1.span)`;
+    - any outer scope `index.contains_key(name)` -> `Shadowing`;
+    - then the unchanged `env.global` / `NativeTable` branches.
+  - `bind(name, b)`: on an index hit, replace `names[slot].1 = b` (the slot does not move).
+    On a miss, push and insert `(name, names.len() - 1)`.
+  - `session_lookup(name)`: `stack[0].index.get(name)`.
+  - `lookup(name)`: scan scopes innermost-first; the first scope whose index has the name
+    wins.
+  - `update(name, ...)`: the same innermost-first scope search, then mutate that slot.
+- Keys are `Rc<str>`. Look up with `&str` through `HashMap::get(name)`; `Rc<str>: Borrow<str>`
+  makes this work without allocation. Do not allocate a new `Rc<str>` per lookup.
+- Test-only counter. Add one `thread_local!` cell, for example
+  `static NAME_PROBES: Cell<u64>`, and two functions, `pub(crate) fn name_probes() -> u64` and
+  `pub(crate) fn reset_name_probes()`, all under `#[cfg(test)]`. Every per-scope index probe in
+  `classify`, `bind`, `session_lookup`, `lookup` and `update` adds 1. Production code must
+  carry no counter. Use a `#[cfg(test)] fn note_probe()` that increments, plus a
+  `#[cfg(not(test))] #[inline(always)] fn note_probe() {}`. Strict clippy must stay clean
+  without `allow`. Imitate the `thread_local!` with a `const` initializer at
+  `src/complete/mod.rs:149`.
+
+### A2. Constant-time `top_of` (`src/directives/attach.rs`)
+
+- `Doc` gains a private field, for example `top_first: Vec<usize>`. It is indexed by the
+  top-level node index `top`. Each entry is the index of the first target with that `top` in
+  the final, sorted `targets`, or `usize::MAX` when there is none.
+- Compute it at the very end of `Doc::new`, after
+  `doc.targets.sort_by_key(|t| (t.extent.start, t.first_line))` (line 287). A table computed
+  before the sort is wrong.
+- Rewrite `top_of(t)`:
+  - When `top_first` covers `targets[t].top` with a real index, return it. This is one step.
+  - Otherwise (a `Doc` built through `Doc::default()` and filled by hand), fall back to the
+    current linear `position` scan, counting each element examined. The fallback keeps
+    behavior identical for any hand-built `Doc`.
+- `Doc` derives `Clone, Debug, Default`. The new field must keep all three derives compiling.
+  `Doc` is built with a struct literal only inside `attach.rs` (line 228, `..Doc::default()`).
+  `src/lsp/analysis.rs:221` builds a different `Doc` type and is unaffected.
+- Test-only counter: `#[cfg(test)]` `TOP_OF_STEPS` with `top_of_steps()` and
+  `reset_top_of_steps()`, in the same `note_*` pattern as A1. The fast path adds 1 per call;
+  the fallback adds 1 per element examined.
+
+## Tasks
+
+### TASK-A1: Scope index
+**Deliverables**: `src/types/scope.rs`, `src/types/tests/scope_cost.rs`, `src/types/tests/mod.rs`
+**Completion criteria**: the A1 contract is implemented; the new tests pass; all existing
+`types::tests::*` tests pass unmodified.
+
+### TASK-A2: top_of table
+**Deliverables**: `src/directives/attach.rs`, `src/directives/tests/attach.rs`, `src/directives/tests/labels.rs`
+**Completion criteria**: the A2 contract is implemented; the new tests pass; all existing
+`directives::tests::*` tests pass unmodified.
+
+### TASK-A3: Verification and progress log
+**Deliverables**: this plan's progress log, plus logs under `tmp/canvas-cutover/scope/`.
+
+## Test Cases (add exactly these; all are counter-based, with no wall-clock assertion)
+
+`src/types/tests/scope_cost.rs` (use the existing helpers in `src/types/tests/mod.rs`, such as
+`check_src`):
+
+- 4,000 versus 8,000 unique session `let`s. The source is lines of the form
+  `let v<i> <i>`, joined with `\n`. Reset, check, read `c4`; reset, check, read `c8`.
+  Expect `c4 > 0`, `c8 <= 4 * 8000` and `c8 as f64 <= 2.2 * c4 as f64`. Also expect the check
+  of each document to produce no error diagnostics; imitate `assert_clean` in `mod.rs`.
+- A rebinding still reports the first span after the index change. `let a 1\nlet a 2\nlet a 3`
+  yields two `rebinding` diagnostics, at lines 2 and 3. The line-3 message names the byte offset
+  of the line-2 binding, because `bind` replaced the slot in place. Assert the line-3 message
+  text equals the one produced before the change. The implementer records it from the
+  unmodified code first (record the pre-change output in the progress log).
+- Shadowing across scopes still works: a `fn` parameter named like a session `let` produces
+  one `shadowing` warning (imitate the existing cases in `scope.rs`, without editing that
+  file).
+
+`src/directives/tests/attach.rs` (appended):
+
+- A document with nested targets: top-level `fn`, `inst` and `bus` forms with body targets, plus
+  plain lines. For every target index `k`, `doc.top_of(k)` equals a reference computed in the
+  test the old way (first index `j` with `targets[j].top == targets[k].top`).
+- `Doc::default()` with targets pushed by hand: `top_of` still returns the reference answer
+  through the fallback.
+
+`src/directives/tests/labels.rs` (appended):
+
+- 20,000 top-level `let a<i> <i>` lines. Reset `top_of_steps`, build the table through the
+  existing `table(src)` helper, and expect `steps <= 2 * table.doc.targets.len()` and
+  `table.doc.targets.len() >= 20000`. Before the fix this sum is quadratic, so the mutation run
+  must fail.
+
+## Pitfalls
+
+- Do not replace `Vec` with `HashMap` alone. `Debug` and insertion order are kept by the
+  `Vec`; the index sits beside it.
+- `bind` must not push a second entry for an existing name, or `classify` and `update` would
+  diverge from today.
+- `lookup` and `update` must stay innermost-first across scopes.
+- The `top_first` table must be built after the sort.
+- Counters must not exist in non-test builds, including the wasm32 build. Run the wasm
+  build to prove it.
+- Do not run `cargo fmt`. Run `rustfmt --edition 2021 --check` on the touched files only.
+  rustfmt follows `mod` declarations from `src/types/tests/mod.rs` into sibling test modules.
+  If an untouched sibling reports a diff, record it in the progress log and leave that file
+  alone; do not reformat it.
+
+## Verification
+
+Setup (not gating): `test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm`.
+At start, record `BASE=$(git rev-parse HEAD)` and the fresh-read sha256 values of every
+writePath in `tmp/canvas-cutover/scope/intent.json`.
+
+Gating, inside the sandbox (logs in `tmp/canvas-cutover/scope/`, each with its exit code):
+
+| Command | Required evidence |
+|---------|-------------------|
+| `CARGO_TERM_QUIET=true cargo build` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` | exit 0, no warnings, no new `allow`/`expect` (`git diff $BASE -- src \| grep -E '^\+.*#\[(allow\|expect)'` prints nothing) |
+| `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run types::tests directives::tests` | exit 0; the new tests appear in the run (record their names and the counter values `c4`, `c8`, `steps`) |
+| `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 (also the debug wasm the vitest suite loads) |
+| `cd editor && ./node_modules/.bin/vitest run` | exit 0 (default config; perf files excluded) |
+| `git diff --name-only $BASE` | lists only this plan's writePaths |
+| `git diff --exit-code $BASE -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs` | exit 0 (existing scope, shadowing and prelude tests untouched) |
+
+Outside the sandbox (verification and review step):
+
+| Command | Required evidence |
+|---------|-------------------|
+| `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run` | exit 0 (a timeout kill is neither a pass nor a failure) |
+| `cd editor && npm run test:perf` (alone on the host) | exit 0 |
+| `cd editor && npm run check` | exit 0 |
+
+Mutation evidence (reported separately, never gating): in a scratch copy under
+`tmp/canvas-cutover/scope/`, or by temporarily restoring the linear scans in the working tree
+and then restoring the fix (record the sha256 values before and after), run the two
+counter tests. Each must exit nonzero. Record the command, the actual exit code and the log
+path.
+
+Optional diagnostic (not gating): copy `tmp/canvas-cutover/diag-wasm/scale.mjs` to
+`tmp/canvas-cutover/scope/scale.mjs` and point its import at
+`editor/test/e2e/fixtures/large-doc.mjs` (the original imports a removed worktree path). Run it
+against a release wasm (`CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm`)
+and record the four `session_check` medians next to the REPORT.md values.
+
+## Overwrite and Drift Protocol
+
+Before each edit, record the fresh-read sha256 in `tmp/canvas-cutover/scope/intent.json`;
+after it, record the post-edit sha256 in `receipt.json`. If a file changed since the
+fresh read and this plan did not change it, stop editing that file and report the drift. Repair
+is serial after the join. Edit only this plan's progress log.
+
+## Completion Criteria
+
+- [ ] `Scope` has the name index; `classify`, `bind`, `session_lookup`, `lookup` and `update` probe each scope in O(1)
+- [ ] `Doc::new` builds `top_first` after the sort; `top_of` is O(1), with the counted fallback for hand-built docs
+- [ ] New counter tests pass: `c8 <= 32000`, `c8 / c4 <= 2.2`, label build `steps <= 2 * targets`
+- [ ] Existing `types::tests` and `directives::tests` pass unmodified
+- [ ] Strict clippy, rustfmt check, cargo build, the wasm32 build and the default vitest suite pass (sandbox)
+- [ ] Outside the sandbox, full nextest and `npm run test:perf` pass
+- [ ] Mutation runs exit nonzero and are recorded separately
+- [ ] Progress log updated with commands, exit codes, log paths and sha256 values
+
+## Progress Log
+
+### Session: 2026-10-05 (session 277 plan authoring)
+**Tasks Completed**: Plan authored from design 15.3.8.13 A and the operator profile. No source
+edits.

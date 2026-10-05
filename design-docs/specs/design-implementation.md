@@ -7496,6 +7496,180 @@ following hold:
 Then the 15.3.8.9 closeout runs, and the work is committed and pushed
 (non-force) to `origin wf/canvas`.
 
+##### 15.3.8.13 Release-wasm evidence build and session-277 repair scope (operator decisions A-F)
+
+**Issue reference:** `workflowInput:RESUME-session-274` (resumed as session
+277). CANVAS-EVIDENCE stayed blocked on INT-S271-EV-PERF (70-77% of
+main-thread self time in `vactr.wasm`) and TASK-402 (WebKit presented zero
+sync pairs). The read-only operator diagnosis is in
+`tmp/canvas-cutover/diag-wasm/REPORT.md`. It found four causes: the gating
+run measured the debug wasm; `session_check` is quadratic; `session_tick`
+runs at a stale worklet time; and per-frame JS costs. This subsection changes
+the 15.3.8.8 measurement protocol (decision D) only. For decisions A, B, C and
+E it records scope and invariants and nothing else: each fixes an
+implementation under the existing contracts (15.3.8.7, 15.3.8.10 and
+section 16), so none of them changes behavior. No threshold, workload,
+dependency, protocol field, surface member or production master output stage
+changes.
+
+**Measurement build (decision D; amends 15.3.8.8).**
+
+- **Gating build.** Gating evidence is measured only on the release wasm
+  with the `name` custom section kept and no DWARF. The single supported
+  build is the mise task `build-wasm-release`:
+  `CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm`.
+  It writes `target/wasm32-unknown-unknown/release/vactr.wasm`.
+- **Profile settings.** The `[profile.release]` in `Cargo.toml` does not
+  change. Native release binaries stay stripped, and `debug` stays unset
+  (0). The environment override keeps function names, so profiles attribute
+  frames to `vactr::` functions without debug-build cost.
+- **Page build default.** In `editor/vite.config.ts`, `DEFAULT_WASM` becomes
+  `../target/wasm32-unknown-unknown/release/vactr.wasm`. `VACTR_WASM` still
+  overrides it, so development may use the debug artifact explicitly. The
+  missing-artifact error names `mise run build-wasm-release` and
+  `VACTR_WASM`. The vitest wasm resolution (`editor/test/support/wasm.ts`,
+  debug by default) does not change, so the 15.3.8.11 serial perf budgets
+  stay calibrated.
+- **Wasm provenance.** `editor/test/e2e/run.mjs` inspects the served
+  artifact `editor/dist/vactr.wasm` before launching any browser. It records
+  a `wasm` block in `environment.json` and `summary.json`: bytes, sha256,
+  `nameSection` (the module's `name` custom section is present),
+  `dwarf` (any `.debug_*` custom section is present) and `profile`.
+  - `profile` is `release` only when the sha256 equals that of
+    `target/wasm32-unknown-unknown/release/vactr.wasm`.
+  - Otherwise `profile` is `debug` when the sha256 equals the debug artifact
+    or `dwarf` is true. In every other case it is `unknown`.
+- **Gating runs.** A gating run is any run with `--write-evidence`. It
+  requires `profile === 'release'`, `nameSection === true` and
+  `dwarf === false`. If any of these fails, the run exits 2 (blocked) with
+  the reason, writes no evidence, and does not launch a browser. A blocked
+  run is never a pass.
+- **Non-gating runs.** Runs without `--write-evidence` may use any build.
+  They record the same `wasm` block with `gating: false`.
+- **Superseded evidence.** The earlier run-001 numbers came from the debug
+  wasm. The re-measure overwrites them under the same run id. The evidence
+  document states the wasm profile, size and sha256 next to the results.
+- **Documentation.** `editor/test/e2e/README.md` lists `mise run build-wasm-release`
+  before `VACTR_REQUIRE_SESSION_ABI=1 npm run build`. The run's recorded
+  command list includes both commands.
+- **Silent-sink rule unchanged.** The silent virtual-sink rule of 15.3.8.8
+  still applies. It includes the headed WebKit GL fallback: the sink is
+  installed in every context before any audio node connects, post-sink peak
+  is 0, direct destination connections are 0, and Chromium runs with
+  `--mute-audio`.
+
+**Scope record for the other decisions** (implementation fixes; no
+contract change):
+
+- **A. Scope and label lookups (Rust).** Each scope in
+  `src/types/scope.rs` gets a name index (`HashMap<Rc<str>, usize>`). With
+  it, classify, bind, lookup, session_lookup and update cost O(1) per scope.
+  The resolution order, the section 20 Q1 rules (prelude, then session, then
+  fn/block scope; no rebinding within one scope; shadow hint and warning)
+  and the order and text of diagnostics stay identical.
+  `Doc::new` in `src/directives/attach.rs` precomputes the first target
+  index per top, so `top_of` is O(1).
+  - Proof uses `cfg(test)` comparison and step counters, with no
+    wall-clock assertion: with 4k and 8k unique `let`s, the comparison ratio
+    is at most 2.2 and the count is at most 4N. `LabelRegistry::build` on
+    20k targets stays within its bounded `top_of` steps.
+  - The existing rebinding, shadowing and prelude tests are not modified.
+  - This decision lifts the "no Rust edit" seam rule of 15.3.8.12 for these
+    files only: `src/types/{scope,check}.rs`, `src/types/tests/mod.rs` (or a
+    new `src/types/tests/scope.rs` registered there),
+    `src/directives/{attach,labels}.rs` and
+    `src/directives/tests/{attach,labels}.rs`.
+- **B. Tick time (`editor/worklet/host.js`).**
+  - **Two clocks.** The posted `t` is `worklet_now()`, the engine render
+    clock (`editor/worklet/processor.js`, `Engine::now`, the 12.8.4
+    `host_now`). It counts frames rendered since worklet init. It runs at
+    the same rate as `ctx.currentTime`, but its origin trails it by
+    `delta >= 0`, from context start until engine init plus any skipped
+    quanta. The tick time stays on the engine timebase. Raw
+    `ctx.currentTime` is never passed to the tick.
+  - **Fresh engine time** (computed in `host.js` only):
+    - `offset` is the minimum, over messages, of `ctx.currentTime` at
+      handler entry minus `m.t`. Queueing delay only adds to a sample, so
+      the minimum approximates `delta`.
+    - `offset` starts unset in each host instance. It is reset to the
+      current sample whenever the posted gap or error counter (`m.js[3]`,
+      `m.js[2]`) increases, because a skipped or failed quantum grows
+      `delta`.
+    - `fresh = max(latest m.t, ctx.currentTime - offset)`. The tick time
+      is `max(previous tick time, fresh)`, so it never decreases and never
+      exceeds `ctx.currentTime - offset`.
+  - The worklet message still triggers the tick. A tick runs only when the
+    fresh engine time is at least `tickEvery` past the last tick, so a
+    queued backlog coalesces into at most one catch-up tick.
+  - `Runtime::tick` queries the spans that are not yet covered, starting
+    from its cursor. Coalescing therefore only reduces the number of calls.
+    No event is skipped and none is doubled.
+  - Events found late follow section 16 unchanged: they play immediately,
+    are counted, and widen the latency window.
+  - The optional past-event drop in `src/sched/commit.rs` is not adopted in
+    this wave. It would change the section 16 late-event semantics, and
+    the fresh tick time removes the backlog that causes those late events.
+  - Proof: `editor/test/protocol/host-js.test.ts` uses a fake context
+    whose engine starts 0.5 s after the context, so the true offset is
+    0.5 s. It shows:
+    - 200 queued stale messages produce at most 1 tick;
+    - each tick time lies in
+      `[(currentTime - offset) - tickEvery, currentTime - offset]`;
+    - tick times never decrease;
+    - after a gap-counter increase, the offset is re-estimated.
+
+    The MIDI clock, song mode and transport-epoch tests stay green. B's
+    write paths stay `editor/worklet/host.js` and
+    `editor/test/protocol/host-js.test.ts`.
+- **C. Diagnostics scheduling (`editor/src/code/diagnostics.ts`).** The
+  local check is latest-wins and is skipped when the document revision
+  equals the revision last checked. Proof uses fake timers in
+  `editor/test/code/diagnostics.test.ts`:
+  - 20 edits 50 ms apart produce 1 check;
+  - an unchanged revision produces 0 checks;
+  - animation frames produce 0 checks.
+- **E. Frame costs (`editor/src/code/renderer.ts`,
+  `editor/src/code/layout.ts`).** Texture validity is tracked by a
+  context generation counter, which bumps on context loss and restore. Each
+  texture records the generation it was created in when it is registered
+  with the `ResourceLedger`. `gl.isTexture` is never called per draw.
+  `gl.getError` runs only on init, restore, upload and diagnostic paths.
+  Per-frame failure detection relies on the existing `webglcontextlost`
+  handling and the GPU-unavailable path. Line grapheme boundaries are cached
+  per line and revision, so animation-only frames never call
+  `Intl.Segmenter`. Counting-fake tests in
+  `editor/test/canvas/{mount,gpu}.test.ts` show, per animation-only frame:
+  - exactly 1 `session_frame`;
+  - 0 `session_check`;
+  - no ABI argument over 64 KiB;
+  - 0 `isTexture` calls;
+  - 0 segmenter calls.
+
+**Ownership and order.** The plan author decides the split, for example
+EVIDENCE-SCOPE (A), EVIDENCE-SCHED (B and C) and EVIDENCE-FRAMECOST (E and
+D), followed by the CANVAS-EVIDENCE re-measure. The split must follow these
+rules:
+
+- At any time, each file has exactly one writing plan.
+- `renderer.ts`, `layout.ts`, `run.mjs` and `README.md` move out of
+  CANVAS-EVIDENCE writePaths while another plan owns them.
+- Plans run serially, and the Rust and frontend suites stay green after each
+  acceptance.
+- No accepted plan is redispatched.
+
+**Escalation (decision F; pre-authorized, not yet triggered).** F is
+triggered only if both of the following hold after A to E:
+
+- the release-wasm re-measure still fails the A/V sync or input-latency
+  gate in Chromium or WebKit;
+- the `--profile-trace` evidence shows main-thread long tasks overlapping
+  the late onsets.
+
+If F triggers, `session_tick` scheduling moves off the main thread into a
+dedicated Worker. That change needs its own appended amendment (15.3.8.14),
+written before its plan is dispatched. It must also come with deterministic
+tests. Until then, the main-thread tick of section 16 stays the design.
+
 ## 16. Wasm and AudioWorklet Layout
 
 No SharedArrayBuffer, no COOP/COEP (decided). Two instantiations of the

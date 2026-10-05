@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflowInput:RESUME-session-271 'RESUME session 271: amend EVIDENCE write paths, apply five integration-review repairs, pass silent evidence gates, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-274, chain 265-266-267-269-271-274; operator decisions A, B and S; design 15.3.8.12 accepted by step3-design-review comm-004202; no GitHub issue number)",
+  "issueReference": "workflowInput:RESUME-session-274 'RESUME session 274: fix quadratic scope lookup, scheduler starvation and frame costs; release-wasm silent evidence; closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-277, chain 265-266-267-269-271-274-277; operator decisions A-G and S; design 15.3.8.13 accepted by step3-design-review comm-004269 after DR-S277-B-TIMEBASE; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -81,6 +81,26 @@
       "integrationReviewSource": "tmp/canvas-cutover/s271-integration-review.json (gitignored, read-only; loopGate.decision needs-work; findings INT-S271-EV-SIM, INT-S271-EV-SYNC-ATTRIBUTION, INT-S271-EV-READBACK, INT-S271-EV-TOUCH, INT-S271-EV-PERF)",
       "amendment": "Operator decisions A and B and design 15.3.8.12. Session 271 failed at dispatch-plans because the briefs named editor/src/code/pointer.ts, editor/test/e2e/behavior.mjs, editor/test/e2e/ios-sim.mjs and editor/test/e2e/measure.mjs outside CANVAS-EVIDENCE writePaths. Every allowedWritePaths entry of the five briefs is now a concrete CANVAS-EVIDENCE writePath: the harness (run, behavior, measure, stats, ios-sim .mjs, stats.test.ts, README.md), 23 product seams, 38 existing seam tests, the evidence document, the seven run-001 files and the evidence plan; artifactRoots keep editor/dist, editor/src-tauri/target, editor/src-tauri/gen/apple/build and tmp/canvas-cutover/evidence. sharedPaths keep only editor/package.json, editor/test/e2e/silent-sink.mjs, editor/test/e2e/fixtures/large-doc.mjs and editor/test/e2e/large-doc.test.ts. CANVAS-EVIDENCE is the single active owner of these seams for this wave. EDITCOST and RUNSTART (accepted at 2156699) moved from plans to acceptedDependencies.",
       "checkpointNote": "Session 274 plan checkpoint: design 15.3.8.12, the CANVAS-EVIDENCE plan amendment and this manifest are committed together before the single-plan redispatch, which changes the manifest fingerprint. plans lists only CANVAS-EVIDENCE. Accepted plans are not redispatched."
+    },
+    "session277": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-277",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-274",
+      "resumeHead": "3e69e16a045b04935e0c89ae8848aab47847ebc9",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      "operatorDiagnosis": "tmp/canvas-cutover/diag-wasm/REPORT.md (gitignored, read-only): run-001 measured the debug wasm; quadratic Scopes and Doc::top_of; stale worklet-time session_tick; per-frame isTexture, getError and Intl.Segmenter",
+      "amendment": "Operator decisions A-G and design 15.3.8.13. Three new serial plans precede the CANVAS-EVIDENCE re-measure: CANVAS-EVIDENCE-SCOPE (wave 5, decision A: O(1) Scopes name index and Doc::top_of with cfg(test) counters), CANVAS-EVIDENCE-SCHED (wave 6, decisions B and C: fresh monotonic engine-time tick with an offset estimate and backlog coalescing in editor/worklet/host.js; diagnostics check skipped on an unchanged revision) and CANVAS-EVIDENCE-FRAMECOST (wave 7, decisions E and D: texture generation instead of per-draw isTexture, no per-frame getError, cached grapheme clusters; mise build-wasm-release, release vite default, wasm provenance and gating refusal in run.mjs). CANVAS-EVIDENCE moves to wave 8; renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md move from its writePaths to its sharedPaths so each file has exactly one writing plan at a time. The commit.rs past-event drop is not adopted; escalation F is not triggered and needs design 15.3.8.14 first.",
+      "checkpointNote": "Session 277 plan checkpoint: design 15.3.8.13, the three new plans, the CANVAS-EVIDENCE amendment and this manifest are committed and pushed together before fanout. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
@@ -90,7 +110,7 @@
   "designDocSections": [
     {
       "path": "design-docs/specs/design-implementation.md",
-      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.12; 15.3.8.10 added in session 269 for the edit-path cost rule, mutation evidence and selective redispatch; 15.3.8.11 added in session 271 for the serial perf gate, superseding the 15.3.8.10 wall-clock vitest gates paragraph; 15.3.8.12 added in session 274 for the evidence repair wave: single-owner seam writePaths, serial amendment for an unlisted dominant cost, occurrence-based sync attribution, same-frame line-1 readback, Vactr-process simulator self-check, opt-in profiling and the headless-WebKit control-page limitation proof); 15.3.1-15.3.7 remain the baseline"
+      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.13; 15.3.8.13 added in session 277 for the release-wasm gating build (decision D), the scope records of decisions A, B (engine-timebase tick), C and E, the ownership order and the escalation-F trigger;15.3.8.10 added in session 269 for the edit-path cost rule, mutation evidence and selective redispatch; 15.3.8.11 added in session 271 for the serial perf gate, superseding the 15.3.8.10 wall-clock vitest gates paragraph; 15.3.8.12 added in session 274 for the evidence repair wave: single-owner seam writePaths, serial amendment for an unlisted dominant cost, occurrence-based sync attribution, same-frame line-1 readback, Vactr-process simulator self-check, opt-in profiling and the headless-WebKit control-page limitation proof); 15.3.1-15.3.7 remain the baseline"
     },
     {
       "path": "design-docs/user-qa/pending-editor-questions.md",
@@ -99,7 +119,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-271 'RESUME session 271: amend EVIDENCE write paths, apply five integration-review repairs, pass silent evidence gates, closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-274, chain 265-266-267-269-271-274; operator decisions A, B and S; design 15.3.8.12 accepted by step3-design-review comm-004202; no GitHub issue number)",
+    "issueReference": "workflowInput:RESUME-session-274 'RESUME session 274: fix quadratic scope lookup, scheduler starvation and frame costs; release-wasm silent evidence; closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-277, chain 265-266-267-269-271-274-277; operator decisions A-G and S; design 15.3.8.13 accepted by step3-design-review comm-004269 after DR-S277-B-TIMEBASE; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -113,7 +133,11 @@
       "Playwright-library harness in Chromium and WebKit with behavioral checks and measurements on a 20,000-line ~1 MiB document, harness-written evidence in design-docs/specs/design-canvas-editor-evidence.md, honest limitations and pending physical-iPad procedures, final gates and closeout archival (CANVAS-EVIDENCE).",
       "Session 269 (design 15.3.8.10): a one-character edit and a word delete on the 20,000-line document make no Text.toString call and no slice over 64 KiB; DocumentSync byte conversion is line-based and byte-identical to Utf8Index; syntax providers use Text identity, chunked tree-sitter input and line-local fallback tokenizing (CANVAS-EVIDENCE-EDITCOST).",
       "Session 269: the large-document eval fix is gated by a 2x focused-median budget, three consecutive green full vitest runs, bounded pre-fix mutation evidence, strict clippy and outside-sandbox full nextest (CANVAS-EVIDENCE-RUNSTART).",
-      "Session 271 (design 15.3.8.11): no absolute wall-clock assertion in the default vitest suite; the 2x focused-median budget runs only in npm run test:perf (VACTR_PERF=1, --maxWorkers=1, run alone); EDITCOST and RUNSTART are accepted on three consecutive default full vitest runs plus test:perf (CANVAS-EVIDENCE-RUNSTART, CANVAS-EVIDENCE-EDITCOST)."
+      "Session 271 (design 15.3.8.11): no absolute wall-clock assertion in the default vitest suite; the 2x focused-median budget runs only in npm run test:perf (VACTR_PERF=1, --maxWorkers=1, run alone); EDITCOST and RUNSTART are accepted on three consecutive default full vitest runs plus test:perf (CANVAS-EVIDENCE-RUNSTART, CANVAS-EVIDENCE-EDITCOST).",
+      "Session 277 (design 15.3.8.13 A): Scopes classify/bind/lookup/session_lookup/update and Doc::top_of are O(1) per scope or call; cfg(test) counters prove a 4k vs 8k unique-let probe ratio <= 2.2 and <= 4N probes, and LabelRegistry::build on 20k targets <= 2N top_of steps; existing scope tests unchanged (CANVAS-EVIDENCE-SCOPE).",
+      "Session 277 (B, C): host.js ticks at a fresh, monotonic engine time (minimum-offset estimate, reset on a gap or error counter increase) and coalesces a backlog into at most one tick; diagnostics skip the check on an unchanged revision (CANVAS-EVIDENCE-SCHED).",
+      "Session 277 (E, D): animation-only frames make 1 session_frame, 0 session_check, 0 isTexture, 0 getError, 0 segmenter calls and no ABI argument > 64 KiB; gating evidence uses the release wasm with the name section and any other gating build is refused with exit 2 (CANVAS-EVIDENCE-FRAMECOST).",
+      "Session 277 (G): silent release-wasm re-measure in Chromium and WebKit exits 0 with thresholds and workload unchanged; final gates, integration review, closeout of fourteen canvas-cutover plans and the canvas-editor-224 set, commit and non-force push (CANVAS-EVIDENCE)."
     ],
     "nonGoals": [
       "Session 274 (design 15.3.8.12): supersedes the session-267 non-goal that CANVAS-EVIDENCE changes no product code. CANVAS-EVIDENCE may edit its listed product seams under the seamProtocol only; no threshold, workload, Rust, public contract or dependency change, and no edit to SHELL-owned files (editor/src-tauri/src/*.rs, editor/src/app/main.ts).",
@@ -123,7 +147,8 @@
       "No physical-iPad, real-IME-hardware, VoiceOver-on-device or physical audio-latency claims.",
       "Session 267 (design 15.3.8.9): product defects found by the harness are fixed in their owner files by the wave-3 plans CANVAS-EVIDENCE-VIEWPORT, -EDITCOST and -RUNSTART, never recorded as acceptable; CANVAS-EVIDENCE itself (wave 4) changes no product code.",
       "No change to the production master output stage, no system audio driver install, never read or change macOS system volume (operator decision S).",
-      "No crate-wide cargo fmt and no edit of the untracked .agents/settings.local.json."
+      "No crate-wide cargo fmt and no edit of the untracked .agents/settings.local.json.",
+      "Session 277: no src/sched/commit.rs past-event drop (section 16 late-event semantics stay); no Worker-based session_tick (escalation F needs design 15.3.8.14 first); no change to editor/test/support/wasm.ts (vitest stays on the debug wasm), Cargo.toml [profile.release], thresholds or the workload."
     ],
     "constraints": [
       "Work only on wf/canvas; non-force push to origin wf/canvas is authorized; no push to main, no PRs.",
@@ -142,7 +167,10 @@
       "Both native transports (WebSocket and Tauri IPC) share one Session Protocol clock-probe instead of a Tauri-specific probe (15.3.8.5).",
       "A shorter headless gating measurement profile replaces 15.3.7 product durations for headless runs; physical-device profile stays pending (15.3.8.8).",
       "The evidence harness writes raw data and the results section itself so no hand-typed numbers are committed (evidence.md:21-24).",
-      "Session 271 (15.3.8.11): large-eval splits into a contention-insensitive default file (one eval-result, zero error diagnostics, 20k/5k ratio <= 6) and editor/test/e2e/large-eval.perf.test.ts (absolute budget ceil(2*m/100)*100 ms) sharing large-eval-shared.ts, because session 269 showed the 4,800 ms budget failing only under default-worker contention (exits 0, 1, 1) while --maxWorkers=1 runs passed 696/696 three times."
+      "Session 271 (15.3.8.11): large-eval splits into a contention-insensitive default file (one eval-result, zero error diagnostics, 20k/5k ratio <= 6) and editor/test/e2e/large-eval.perf.test.ts (absolute budget ceil(2*m/100)*100 ms) sharing large-eval-shared.ts, because session 269 showed the 4,800 ms budget failing only under default-worker contention (exits 0, 1, 1) while --maxWorkers=1 runs passed 696/696 three times.",
+      "Session 277 (15.3.8.13 B, DR-S277-B-TIMEBASE): the tick stays on the engine timebase (worklet_now) because ctx.currentTime has a different origin; host.js estimates the origin offset as the minimum of ctx.currentTime - m.t and resets it when the posted gap or error counter grows.",
+      "Session 277 (15.3.8.13 D): the release-profile override CARGO_PROFILE_RELEASE_STRIP=none keeps the wasm name section without DWARF; run.mjs classifies the build by sha256 against the target release artifact and refuses any other gating build.",
+      "Session 277: the four new plans run strictly serially (SCOPE -> SCHED -> FRAMECOST -> EVIDENCE) so both suites stay green after each acceptance and the serial perf gate never shares the host."
     ],
     "intentionalTradeoffs": [
       "WebKit clipboard, IME and touch checks use synthetic events and are labeled limitations.",
@@ -178,6 +206,9 @@
       "impl-plans/active/canvas-cutover-evidence.md",
       "impl-plans/active/canvas-cutover-evidence-editcost.md",
       "impl-plans/active/canvas-cutover-evidence-runstart.md",
+      "impl-plans/active/canvas-cutover-evidence-scope.md",
+      "impl-plans/active/canvas-cutover-evidence-sched.md",
+      "impl-plans/active/canvas-cutover-evidence-framecost.md",
       "impl-plans/README.md"
     ]
   },
@@ -203,6 +234,15 @@
         "CANVAS-EVIDENCE-EDITCOST"
       ],
       [
+        "CANVAS-EVIDENCE-SCOPE"
+      ],
+      [
+        "CANVAS-EVIDENCE-SCHED"
+      ],
+      [
+        "CANVAS-EVIDENCE-FRAMECOST"
+      ],
+      [
         "CANVAS-EVIDENCE"
       ]
     ],
@@ -224,10 +264,197 @@
       "Session 269: CANVAS-EVIDENCE seam sharedPaths are edited only under the seam protocol in impl-plans/active/canvas-cutover-evidence.md (Session 269 Amendment); a product defect in any other file goes to its owning accepted plan by selective redispatch.",
       "Session 271 (design 15.3.8.11, supersedes the session-269 wall-clock rule): absolute wall-clock budgets live only in editor/test/**/*.perf.test.ts and run only through cd editor && npm run test:perf (VACTR_PERF=1 vitest run --maxWorkers=1), alone on the host with no concurrent vitest, nextest, cargo or browser run; a failed perf run is a failure, never retried until it passes. The default ./node_modules/.bin/vitest run excludes perf files by config and contains no absolute ms budget; no assertion is skipped, deleted or env-gated inside a file.",
       "Session 271 waves: RUNSTART (wave 3) runs alone; EDITCOST (wave 4, gates-only) depends on RUNSTART; CANVAS-EVIDENCE (wave 5) depends on both. Acceptance of EDITCOST and RUNSTART requires three consecutive default full vitest runs (exit 0 each) plus npm run test:perf (exit 0, alone), npm run check, strict clippy, rustfmt --check on the six RUNSTART Rust files and outside-sandbox full nextest (timeout >= 1500 s).",
-      "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch rule for this wave): EDITCOST and RUNSTART are acceptedDependencies (commit 2156699) and are not redispatched. plans lists only CANVAS-EVIDENCE, redispatched alone (no fanout peers) with the five session-271 integration-review briefs carried verbatim in the plan section 'Session 274 Amendment'. Its harness files, product seams and seam tests are concrete writePaths with CANVAS-EVIDENCE as the single active owner. Fix order: harness fixes, re-measure, product seam fixes with operation-counter or deterministic tests, re-measure. An unlisted dominant-cost TypeScript file is recorded by the implementer and added by a serial plan-author amendment and checkpoint; the run does not stop and no accepted plan is redispatched. Rust, public contract or dependency needs are operator blockers. Playwright, simulator, profile and full nextest runs happen outside the Codex sandbox in the verification and review steps."
+      "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch rule for this wave): EDITCOST and RUNSTART are acceptedDependencies (commit 2156699) and are not redispatched. plans lists only CANVAS-EVIDENCE, redispatched alone (no fanout peers) with the five session-271 integration-review briefs carried verbatim in the plan section 'Session 274 Amendment'. Its harness files, product seams and seam tests are concrete writePaths with CANVAS-EVIDENCE as the single active owner. Fix order: harness fixes, re-measure, product seam fixes with operation-counter or deterministic tests, re-measure. An unlisted dominant-cost TypeScript file is recorded by the implementer and added by a serial plan-author amendment and checkpoint; the run does not stop and no accepted plan is redispatched. Rust, public contract or dependency needs are operator blockers. Playwright, simulator, profile and full nextest runs happen outside the Codex sandbox in the verification and review steps.",
+      "Session 277 (design 15.3.8.13, operator decisions A-G): plans lists CANVAS-EVIDENCE-SCOPE (wave 5), -SCHED (wave 6), -FRAMECOST (wave 7) and CANVAS-EVIDENCE (wave 8), strictly serial through dependsOn. Each wave has exactly one plan, so at any time one plan writes each file. renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md are CANVAS-EVIDENCE sharedPaths, edited only after their wave-6/7 owner is accepted. SCOPE is the only plan that edits Rust (the 15.3.8.13 A files). SCHED and FRAMECOST prove no .rs, Cargo.toml or Cargo.lock change, so SCOPE's outside-sandbox full nextest stays authoritative for them; CANVAS-EVIDENCE reruns full nextest in its final gates. Every gating e2e and simulator run follows mise run build-wasm-release and the release-default npm run build; run.mjs exits 2 for any other gating build. Escalation F is reported by CANVAS-EVIDENCE TASK-504 with evidence and implemented only after a serial design 15.3.8.14 amendment and a new plan."
     ]
   },
   "plans": [
+    {
+      "planId": "CANVAS-EVIDENCE-SCOPE",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-scope.md",
+      "wave": 5,
+      "dependsOn": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/scope"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm"
+      ],
+      "acceptanceCriteria": [
+        "Scope keeps the names Vec plus a HashMap<Rc<str>, usize> index; classify, bind, session_lookup, lookup and update probe each scope in O(1) with identical results, order and diagnostics",
+        "Doc::new builds top_first after the target sort; top_of is O(1), with a counted linear fallback for hand-built Doc values",
+        "src/types/tests/scope_cost.rs (registered in src/types/tests/mod.rs): 4k vs 8k unique lets give c8 <= 32000 and c8/c4 <= 2.2; the rebinding-span and shadowing rows pass",
+        "src/directives/tests/attach.rs and labels.rs appended rows: top_of equals the reference for nested and hand-built docs; 20,000 targets build with top_of steps <= 2 * targets",
+        "Existing types::tests and directives::tests pass unmodified; strict clippy with no new allow/expect; rustfmt check on touched files; wasm32 build; default vitest; outside-sandbox full nextest and npm run test:perf pass",
+        "Mutation runs (linear scans restored) fail the counter tests and are reported separately"
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run types::tests directives::tests",
+        "rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "git diff --name-only $BASE (only this plan's writePaths)",
+        "git diff --exit-code $BASE -- src/types/tests/scope.rs src/types/tests/check_basic.rs src/types/tests/diags.rs",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (outside the sandbox; exit 0; a timeout kill is neither pass nor fail)",
+        "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)",
+        "cd editor && npm run check"
+      ],
+      "mutationEvidence": [
+        "Counter tests with the linear Scope.names scans or the linear top_of restored (scratch copy or temporary revert, sha256 recorded): expected nonzero exit; record command, exit code and log path under tmp/canvas-cutover/scope/"
+      ],
+      "writePaths": [
+        "src/types/scope.rs",
+        "src/types/check.rs",
+        "src/types/tests/mod.rs",
+        "src/types/tests/scope_cost.rs",
+        "src/directives/attach.rs",
+        "src/directives/labels.rs",
+        "src/directives/tests/attach.rs",
+        "src/directives/tests/labels.rs",
+        "impl-plans/active/canvas-cutover-evidence-scope.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/scope"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "writePathNotes": [
+        { "path": "src/types/check.rs", "intendedEdit": "No edit expected; listed because design 15.3.8.13 A authorizes it. Edit only if the compiler requires it, and record why." },
+        { "path": "src/directives/labels.rs", "intendedEdit": "No edit expected; LabelRegistry::build keeps calling Doc::top_of once per target." },
+        { "path": "src/types/tests/mod.rs", "intendedEdit": "One added line: mod scope_cost; (the existing src/types/tests/scope.rs stays byte-identical)." }
+      ]
+    },
+    {
+      "planId": "CANVAS-EVIDENCE-SCHED",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-sched.md",
+      "wave": 6,
+      "dependsOn": [
+        "CANVAS-EVIDENCE-SCOPE"
+      ],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/sched"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
+      "acceptanceCriteria": [
+        "host.js onWorklet ticks at max(lastTick, max(m.t, ctx.currentTime - engineOffset)), where engineOffset is the minimum of ctx.currentTime - m.t, reset when m.js[3] (gaps) or m.js[2] (errors) increases; ctx null keeps m.t; the tickEvery gate applies to that value; processor.js, host.d.ts and Rust untouched",
+        "host-js.test.ts with a 0.5 s engine offset: 200 queued stale messages give <= 1 tick, with tick time in [(currentTime - 0.5) - tickEvery, currentTime - 0.5], monotonic; the gap case ticks at the engine time (10.6), not the stale-offset time (11.3)",
+        "diagnostics.ts skips runCheck when sync.revision equals the last checked revision (set only after a successful check); tests: 20 edits 50 ms apart -> 1 check; runCheck twice -> 1; frames and refresh -> 0; retry after a throw",
+        "Existing host-js and diagnostics tests unmodified and passing; default vitest and npm run check pass; npm run test:perf passes outside the sandbox; no .rs, Cargo.toml or Cargo.lock change"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/vitest run test/protocol/host-js.test.ts test/code/diagnostics.test.ts",
+        "cd editor && ./node_modules/.bin/vitest run test/protocol test/code test/app test/midi",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run check",
+        "git diff --name-only $BASE (only this plan's writePaths)",
+        "git diff --name-only $BASE -- '*.rs' Cargo.toml Cargo.lock (empty)",
+        "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)"
+      ],
+      "mutationEvidence": [
+        "Tick at m.t restored: the 200-stale-message test fails; revision skip removed: the runCheck-twice test fails. Record command, nonzero exit and log path under tmp/canvas-cutover/sched/"
+      ],
+      "writePaths": [
+        "editor/worklet/host.js",
+        "editor/test/protocol/host-js.test.ts",
+        "editor/src/code/diagnostics.ts",
+        "editor/test/code/diagnostics.test.ts",
+        "impl-plans/active/canvas-cutover-evidence-sched.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/sched"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": []
+    },
+    {
+      "planId": "CANVAS-EVIDENCE-FRAMECOST",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-framecost.md",
+      "wave": 7,
+      "dependsOn": [
+        "CANVAS-EVIDENCE-SCHED"
+      ],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "editor/dist",
+        "tmp/canvas-cutover/framecost"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
+      "acceptanceCriteria": [
+        "renderer.ts: DrawCommand.generation is stamped at record time; drawCommand skips stale generations and never calls gl.isTexture; textureGeneration bumps on loss, restore, font change, DPR atlas invalidation, eviction-count change and dispose; the per-frame getError is removed (init, resize, backdrop and atlas upload checks remain)",
+        "layout.ts: shape-cache entries carry multi-unit grapheme clusters (ASCII lines need no segmenter; more than 4096 pairs -> null fallback; 8 bytes per pair counted); boundary uses them with results identical to the old loop; stats.segmentations counts segmenter calls; animatedRects snaps only positions inside the visible line span",
+        "gpu.test.ts: animation-only frames make 0 isTexture, 0 getError and 0 layout segmentations; no draw with a deleted texture after loss and restore; boundary equivalence over ASCII, Japanese, ZWJ emoji, combining marks, surrogates, CRLF and CR, cached and fallback",
+        "mount.test.ts: per animation-only frame exactly 1 session_frame, 0 session_check, no FakeCore call argument > 64 KiB, 0 isTexture, 0 getError and 0 Intl.Segmenter segment calls",
+        "mise.toml [tasks.build-wasm-release] runs CARGO_PROFILE_RELEASE_STRIP=none cargo build --lib --release --target wasm32-unknown-unknown --no-default-features --features host-wasm; vite.config.ts DEFAULT_WASM is the release artifact and the error names the task and VACTR_WASM",
+        "wasm-profile.mjs exports customSectionNames, classifyWasm, gatingRefusal and inspectWasm with wasm-profile.test.ts rows; run.mjs records host.wasm and summary.wasm and refuses a non-release, nameless or DWARF gating build with exit 2 before any write, server or browser; README updated",
+        "Default vitest, npm run check and node --check pass; the release build and the release dist inspect as profile release, nameSection true, dwarf false; npm run test:perf passes outside the sandbox; renderer.ts and layout.ts stay under 1000 lines; no .rs, Cargo.toml or Cargo.lock change"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/gpu.test.ts test/canvas/mount.test.ts test/e2e/wasm-profile.test.ts",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas test/code test/e2e",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run check",
+        "node --check editor/test/e2e/run.mjs editor/test/e2e/wasm-profile.mjs",
+        "CARGO_TERM_QUIET=true mise run build-wasm-release",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && node --input-type=module -e \"import { inspectWasm } from './test/e2e/wasm-profile.mjs'; const w = await inspectWasm('dist/vactr.wasm', { releasePath: '../target/wasm32-unknown-unknown/release/vactr.wasm', debugPath: '../target/wasm32-unknown-unknown/debug/vactr.wasm' }); console.log(JSON.stringify(w)); if (w.profile !== 'release' || !w.nameSection || w.dwarf) process.exit(1);\"",
+        "wc -l editor/src/code/renderer.ts editor/src/code/layout.ts (each < 1000)",
+        "git diff --name-only $BASE (only this plan's writePaths; no .rs, Cargo.toml or Cargo.lock)",
+        "cd editor && npm run test:perf (outside the sandbox, alone; exit 0)"
+      ],
+      "mutationEvidence": [
+        "Negative control: cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build, then cd editor && node test/e2e/run.mjs --browser chromium --profile behavior --write-evidence --run-id s277-refusal --out ../tmp/canvas-cutover/framecost/refusal: expected exit 2 with wasm.profile debug and no file written; then rebuild the release dist and rerun the inspect command (exit 0)",
+        "Mutation: restoring isTexture or the per-frame getError fails the gpu animation-only test; restoring per-call segmentation in boundary fails the segmentation assertions"
+      ],
+      "writePaths": [
+        "editor/src/code/renderer.ts",
+        "editor/src/code/layout.ts",
+        "editor/test/canvas/gpu.test.ts",
+        "editor/test/canvas/mount.test.ts",
+        "editor/vite.config.ts",
+        "mise.toml",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/README.md",
+        "editor/test/e2e/wasm-profile.mjs",
+        "editor/test/e2e/wasm-profile.test.ts",
+        "impl-plans/active/canvas-cutover-evidence-framecost.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "editor/dist",
+        "tmp/canvas-cutover/framecost"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": []
+    },
     {
       "planId": "CANVAS-EVIDENCE",
       "planPath": "impl-plans/active/canvas-cutover-evidence.md",
@@ -245,7 +472,8 @@
       ],
       "setup": [
         "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run build-wasm-release (session 277; outside the sandbox, before every browser or simulator run)"
       ],
       "acceptanceCriteria": [
         "Playwright-library harness and unit tests in place; run.mjs exit codes 0 pass, 1 fail, 2 blocked (never a pass)",
@@ -262,7 +490,11 @@
         "Session 274: cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001 exits 0; per browser the sink is installed before the first connect, direct destination connections are 0, post-sink peak is exactly 0, and pre-sink peak dBFS, RMS and onset counts are numeric",
         "Session 274: run-001/ios-sim.json has a non-null selfCheck parsed from a Vactr-process line with playingEvents === 0, silent === true and pass === true, and records an app binary mtime later than commit 6f6b807",
         "Session 274: every seam edit has a triage row, fresh-read and post-edit sha256 values and a new operation-counter or deterministic test row; an unlisted dominant-cost file is recorded and added by a serial plan-author amendment, never by redispatching an accepted plan",
-        "Session 274: default vitest, npm run test:perf (alone), npm run check, strict clippy, full nextest (timeout >= 1500 s), the host-wasm wasm32 build and the editor/src-tauri cargo check pass on the final source; the final integration review accepts; closeout moves the fifteen canvas-editor-224 plans, canvas-editor-224-dispatch.json and the eleven canvas-cutover plans file by file and updates impl-plans/README.md; commit and non-force push to origin wf/canvas"
+        "Session 274: default vitest, npm run test:perf (alone), npm run check, strict clippy, full nextest (timeout >= 1500 s), the host-wasm wasm32 build and the editor/src-tauri cargo check pass on the final source; the final integration review accepts; closeout moves the fifteen canvas-editor-224 plans, canvas-editor-224-dispatch.json and the eleven canvas-cutover plans file by file and updates impl-plans/README.md; commit and non-force push to origin wf/canvas",
+        "Session 277 (design 15.3.8.13): starts after CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST are accepted; TASK-501 to TASK-507 in the plan section 'Session 277 Amendment'",
+        "Session 277: every gating e2e and simulator run uses the release wasm with the name section (summary.json wasm.profile release, nameSection true, dwarf false); cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001 exits 0 with the silent-sink assertions holding in Chromium and WebKit, including the headed WebKit fallback; thresholds and workload unchanged",
+        "Session 277: escalation F evaluated and recorded (TASK-504); never implemented in this plan",
+        "Session 277: closeout moves fourteen canvas-cutover plans (adding evidence-scope, evidence-sched and evidence-framecost), the fifteen canvas-editor-224 plans and canvas-editor-224-dispatch.json file by file; README updated; erratum appended; commit and non-force push to origin wf/canvas"
       ],
       "verification": [
         "cd editor && npm run check",
@@ -272,7 +504,9 @@
         "cd editor && ./node_modules/.bin/vitest run",
         "cd editor && npm run test:perf (alone; exit 0)",
         "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
-        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "mise run build-wasm-release",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build (release default, no VACTR_WASM)",
+        "cd editor && node --input-type=module -e \"import { inspectWasm } from './test/e2e/wasm-profile.mjs'; const w = await inspectWasm('dist/vactr.wasm', { releasePath: '../target/wasm32-unknown-unknown/release/vactr.wasm', debugPath: '../target/wasm32-unknown-unknown/debug/vactr.wasm' }); console.log(JSON.stringify(w)); if (w.profile !== 'release' || !w.nameSection || w.dwarf) process.exit(1);\"",
         "cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001",
         "tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim (debug, unsigned, no upload; cwd and flags as recorded in impl-plans/active/canvas-cutover-shell.md)",
         "node editor/test/e2e/ios-sim.mjs --app editor/src-tauri/gen/apple/build/arm64-sim/Vactr.app --device \"iPad Pro 11-inch (M5)\" --out design-docs/specs/evidence/canvas-cutover/run-001/ios-sim.json",
@@ -281,12 +515,13 @@
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (exit 0; a timeout kill is neither pass nor fail)",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
-        "rustfmt --check on touched Rust files only (none expected; Rust edits are forbidden by the seamProtocol)"
+        "rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs (the CANVAS-EVIDENCE-SCOPE files; this plan edits no Rust)"
       ],
       "diagnostics": [
-        "Not gating: cd editor && npm run e2e -- --browser chromium --profile measure --profile-trace --run-id s274-trace --out ../tmp/canvas-cutover/evidence/s274-trace (profiles under tmp/canvas-cutover/evidence/; never --write-evidence; never writes design-docs)"
+        "Not gating: cd editor && npm run e2e -- --browser chromium --profile measure --profile-trace --run-id s274-trace --out ../tmp/canvas-cutover/evidence/s274-trace (profiles under tmp/canvas-cutover/evidence/; never --write-evidence; never writes design-docs)",
+        "Session 277, not gating: cd editor && npm run e2e -- --browser chromium --profile measure --profile-trace --run-id s277-trace --out ../tmp/canvas-cutover/evidence/s277-trace (top-10 rankSelfTime including the vactr.wasm share; evidence for the TASK-504 F check)"
       ],
-      "wave": 5,
+      "wave": 8,
       "dependsOn": [
         "CANVAS-CLOCK",
         "CANVAS-NATIVE",
@@ -297,7 +532,10 @@
         "CANVAS-EVIDENCE-SILENT",
         "CANVAS-EVIDENCE-VIEWPORT",
         "CANVAS-EVIDENCE-EDITCOST",
-        "CANVAS-EVIDENCE-RUNSTART"
+        "CANVAS-EVIDENCE-RUNSTART",
+        "CANVAS-EVIDENCE-SCOPE",
+        "CANVAS-EVIDENCE-SCHED",
+        "CANVAS-EVIDENCE-FRAMECOST"
       ],
       "writePaths": [
         "editor/test/e2e/serve.mjs",
@@ -365,18 +603,20 @@
         "impl-plans/completed/canvas-cutover-evidence-viewport.md",
         "impl-plans/completed/canvas-cutover-evidence-editcost.md",
         "impl-plans/completed/canvas-cutover-evidence-runstart.md",
-        "editor/test/e2e/run.mjs",
+        "impl-plans/active/canvas-cutover-evidence-scope.md",
+        "impl-plans/completed/canvas-cutover-evidence-scope.md",
+        "impl-plans/active/canvas-cutover-evidence-sched.md",
+        "impl-plans/completed/canvas-cutover-evidence-sched.md",
+        "impl-plans/active/canvas-cutover-evidence-framecost.md",
+        "impl-plans/completed/canvas-cutover-evidence-framecost.md",
         "editor/test/e2e/behavior.mjs",
         "editor/test/e2e/measure.mjs",
         "editor/test/e2e/stats.mjs",
         "editor/test/e2e/stats.test.ts",
         "editor/test/e2e/ios-sim.mjs",
-        "editor/test/e2e/README.md",
         "editor/src/code/pointer.ts",
         "editor/src/code/perf-hook.ts",
-        "editor/src/code/renderer.ts",
         "editor/src/code/mount.ts",
-        "editor/src/code/layout.ts",
         "editor/src/code/input.ts",
         "editor/src/code/keyboard.ts",
         "editor/src/code/accessibility.ts",
@@ -400,16 +640,13 @@
         "editor/test/canvas/edit-cost.test.ts",
         "editor/test/canvas/first-viewport.test.ts",
         "editor/test/canvas/frame.test.ts",
-        "editor/test/canvas/gpu.test.ts",
         "editor/test/canvas/input.test.ts",
-        "editor/test/canvas/mount.test.ts",
         "editor/test/canvas/no-editor-view.test.ts",
         "editor/test/canvas/state.test.ts",
         "editor/test/code/completion-popup.test.ts",
         "editor/test/code/completion-types.test.ts",
         "editor/test/code/completion-view.test.ts",
         "editor/test/code/completion.test.ts",
-        "editor/test/code/diagnostics.test.ts",
         "editor/test/code/eval.test.ts",
         "editor/test/code/format.test.ts",
         "editor/test/code/highlight.test.ts",
@@ -453,9 +690,16 @@
         "editor/package.json",
         "editor/test/e2e/silent-sink.mjs",
         "editor/test/e2e/fixtures/large-doc.mjs",
-        "editor/test/e2e/large-doc.test.ts"
+        "editor/test/e2e/large-doc.test.ts",
+        "editor/src/code/renderer.ts",
+        "editor/src/code/layout.ts",
+        "editor/test/canvas/gpu.test.ts",
+        "editor/test/canvas/mount.test.ts",
+        "editor/test/code/diagnostics.test.ts",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/README.md"
       ],
-      "seamProtocol": "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch clause for this wave). The product seam files and seam tests are writePaths of CANVAS-EVIDENCE, the single active owner while every prior owner plan is accepted. Edit a product seam only for INT-S271-EV-TOUCH, -READBACK or -PERF, or to repair a defect that a corrected harness run or a recorded profile exposed and that is classified 'product defect' in the evidence triage table. Make the smallest change in that file and add an operation-counter or deterministic row to its listed test. Record the fresh-read and post-edit sha256 values and the triage row in the progress log. Owner tests and the full default vitest must stay green, and the run is repeated. Seam edits never change a public contract (CodeSurface, DocumentSync, PointerController, __vactrPerf member names and shapes, Session Protocol; perf-hook.ts may only add record fields, with the reason recorded), never add a dependency, never touch Rust, and never weaken an assertion or a threshold. If profiling shows the dominant cost in an unlisted TypeScript file, the implementer records the exact path, its prior owner plan and the measured share of main-thread self time in the progress log, and continues with listed seams; the plan author then adds that concrete path to writePaths serially and checkpoints; no accepted plan is redispatched. A fix that needs Rust, a public contract change or a new dependency is an operator blocker with that profile evidence, never recorded as acceptable. Prior owners (history only): code/{mount,renderer,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history}.ts = EDITCOST/MOUNT/RENDER; code/frame.ts = VIEWPORT; code/pointer.ts = RENDER/MOUNT; code/highlight.ts, app/clock.ts, code/transport.ts = CLOCK; code/perf-hook.ts = MOUNT; code/eval.ts = RUNSTART; bind/{mount,write}.ts = MOUNT; visual/{frame,scopes,video,render-host}.ts = VISUAL.",
+      "seamProtocol": "Session 274 (design 15.3.8.12, operator decisions A and B; supersedes the session-269 selective-redispatch clause for this wave). The product seam files and seam tests are writePaths of CANVAS-EVIDENCE, the single active owner while every prior owner plan is accepted. Edit a product seam only for INT-S271-EV-TOUCH, -READBACK or -PERF, or to repair a defect that a corrected harness run or a recorded profile exposed and that is classified 'product defect' in the evidence triage table. Make the smallest change in that file and add an operation-counter or deterministic row to its listed test. Record the fresh-read and post-edit sha256 values and the triage row in the progress log. Owner tests and the full default vitest must stay green, and the run is repeated. Seam edits never change a public contract (CodeSurface, DocumentSync, PointerController, __vactrPerf member names and shapes, Session Protocol; perf-hook.ts may only add record fields, with the reason recorded), never add a dependency, never touch Rust, and never weaken an assertion or a threshold. If profiling shows the dominant cost in an unlisted TypeScript file, the implementer records the exact path, its prior owner plan and the measured share of main-thread self time in the progress log, and continues with listed seams; the plan author then adds that concrete path to writePaths serially and checkpoints; no accepted plan is redispatched. A fix that needs Rust, a public contract change or a new dependency is an operator blocker with that profile evidence, never recorded as acceptable. Prior owners (history only): code/{mount,renderer,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history}.ts = EDITCOST/MOUNT/RENDER; code/frame.ts = VIEWPORT; code/pointer.ts = RENDER/MOUNT; code/highlight.ts, app/clock.ts, code/transport.ts = CLOCK; code/perf-hook.ts = MOUNT; code/eval.ts = RUNSTART; bind/{mount,write}.ts = MOUNT; visual/{frame,scopes,video,render-host}.ts = VISUAL. Session 277 (design 15.3.8.13): renderer.ts, layout.ts, gpu.test.ts, mount.test.ts, diagnostics.test.ts, run.mjs and README.md are sharedPaths of this plan, owned by CANVAS-EVIDENCE-SCHED or -FRAMECOST in waves 6-7, and edited here only after their acceptance, for a re-measure finding, under this protocol. editor/worklet/host.js, editor/src/code/diagnostics.ts and the decision-A Rust files are not paths of this plan: a finding there is recorded and routed by a serial plan-author amendment. Escalation F is reported (TASK-504), never implemented here.",
       "sharedPathNotes": [
         {
           "path": "editor/package.json",
@@ -472,27 +716,52 @@
         {
           "path": "editor/test/e2e/large-doc.test.ts",
           "intendedEdit": "No edit expected in session 274; matches the frozen fixture."
+        },
+        {
+          "path": "editor/src/code/renderer.ts",
+          "intendedEdit": "Session 277: owned by CANVAS-EVIDENCE-FRAMECOST in wave 7 (generation-tracked textures, no per-frame getError, visible-span snapping). After FRAMECOST acceptance, seamProtocol edits only for a re-measure finding; preserveDrawingBuffer stays false."
+        },
+        {
+          "path": "editor/src/code/layout.ts",
+          "intendedEdit": "Session 277: owned by CANVAS-EVIDENCE-FRAMECOST in wave 7 (cached grapheme clusters). After FRAMECOST acceptance, seamProtocol edits only for a re-measure finding."
+        },
+        {
+          "path": "editor/test/canvas/gpu.test.ts",
+          "intendedEdit": "Session 277: owned by FRAMECOST in wave 7. After acceptance, only a new operation-counter row for a seam fix; existing rows unmodified."
+        },
+        {
+          "path": "editor/test/canvas/mount.test.ts",
+          "intendedEdit": "Session 277: owned by FRAMECOST in wave 7. After acceptance, only a new operation-counter row for a seam fix; existing rows unmodified."
+        },
+        {
+          "path": "editor/test/code/diagnostics.test.ts",
+          "intendedEdit": "Session 277: owned by CANVAS-EVIDENCE-SCHED in wave 6 (decision C rows). No edit expected in wave 8."
+        },
+        {
+          "path": "editor/test/e2e/run.mjs",
+          "intendedEdit": "Session 277: owned by FRAMECOST in wave 7 (wasm provenance and gating refusal). After acceptance, only a harness repair found by the re-measure; the refusal, exit codes 0/1/2 and the --profile-trace pass-through stay."
+        },
+        {
+          "path": "editor/test/e2e/README.md",
+          "intendedEdit": "Session 277: owned by FRAMECOST in wave 7. After acceptance, wave 8 may add re-measure notes only."
         }
       ],
       "writePathNotes": [
         {
           "path": "design-docs/specs/design-canvas-editor-evidence.md",
-          "intendedEdit": "Static sections only (silence method, native and simulator silence audit, limitations with 15.3.8.12 proofs, remaining-failure triage table, pending physical-iPad procedures); the marker section is written only by the harness. Session 274: the simulator triage row no longer attributes INT-S271-EV-SIM to CANVAS-SHELL."
+          "intendedEdit": "Static sections only (silence method, native and simulator silence audit, limitations with 15.3.8.12 proofs, remaining-failure triage table, pending physical-iPad procedures); the marker section is written only by the harness. Session 274: the simulator triage row no longer attributes INT-S271-EV-SIM to CANVAS-SHELL. Session 277 TASK-505: a 'Measurement build' paragraph (release wasm with the name section; profile, bytes and sha256 generated into the results; the debug-measured run-001 numbers of sessions 271 and 274 superseded), plus the updated triage table and TASK-402 sync row."
         },
         {
           "path": "design-docs/specs/design-implementation.md",
-          "intendedEdit": "Closeout only: append one erratum paragraph at the end of 15.3.8.4 recording that the clock-probe wire keeps the pre-existing field names (page_send, engine_receive, engine_send; reply kind clock-probe). Nothing else in the file changes (15.3.8.12 is committed at the session-274 plan checkpoint)."
+          "intendedEdit": "Closeout only: append one erratum paragraph at the end of 15.3.8.4 recording that the clock-probe wire keeps the pre-existing field names (page_send, engine_receive, engine_send; reply kind clock-probe). Nothing else in the file changes (15.3.8.12 is committed at the session-274 plan checkpoint; 15.3.8.13 at the session-277 plan checkpoint)."
         },
         { "path": "editor/test/e2e/ios-sim.mjs", "intendedEdit": "INT-S271-EV-SIM: log predicate requires process == \"Vactr\" and eventMessage CONTAINS \"VACTR_SELF_CHECK {\"; select the most recent match after this launch; a null selfCheck fails; record the app binary mtime in ios-sim.json." },
         { "path": "editor/test/e2e/measure.mjs", "intendedEdit": "INT-S271-EV-SYNC-ATTRIBUTION: call the pure stats.mjs attribution instead of the inline range-only loops; INT-S271-EV-PERF: opt-in --profile-trace (Chromium only, off by default, non-gating) and the 15.3.8.12 WebKit control-page measurement." },
-        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "INT-S271-EV-SYNC-ATTRIBUTION: export attributeSync(onsets, presented, { earlyToleranceS: 0.002 }) and occurrence-based late-frame comparison; 15.3.8.12 control-page classification. No threshold constant changes; the run-level 'measured sync samples unavailable' gate stays." },
-        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Rows for repeated ranges, early, replayed, disjoint windows, Chromium-like measured provenance, and control-page classification." },
+        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "INT-S271-EV-SYNC-ATTRIBUTION: export attributeSync(onsets, presented, { earlyToleranceS: 0.002 }) and occurrence-based late-frame comparison; 15.3.8.12 control-page classification. No threshold constant changes; the run-level 'measured sync samples unavailable' gate stays. Session 277 TASK-502: renderEvidence adds one line with the wasm profile, bytes and sha256 from summary.wasm (or summary.environment.wasm); no THRESHOLDS change." },
+        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Rows for repeated ranges, early, replayed, disjoint windows, Chromium-like measured provenance, and control-page classification. Session 277 TASK-502: rows for the wasm line present and absent." },
         { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "INT-S271-EV-READBACK: line-1 region read in the same frame as a draw; INT-S271-EV-TOUCH: page-side event instrumentation and, if the harness is at fault, real PointerEvent dispatch." },
-        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "INT-S271-EV-PERF: pass --profile-trace through to measure.mjs; exit-code semantics 0/1/2 unchanged." },
-        { "path": "editor/test/e2e/README.md", "intendedEdit": "Document --profile-trace, the control-page measurement and the ios-sim rebuild step." },
         { "path": "editor/src/code/pointer.ts", "intendedEdit": "INT-S271-EV-TOUCH seam: only if instrumentation proves the product cancels or ignores a valid primary touch long-press; minimal fix plus an input.test.ts row." },
-        { "path": "editor/src/code/perf-hook.ts", "intendedEdit": "Seam: additive record fields only (for example onset epoch or occurrence end) if strictly required by attributeSync; member names and shapes unchanged; reason recorded." },
-        { "path": "editor/src/code/renderer.ts", "intendedEdit": "INT-S271-EV-READBACK seam only if the corrected probe proves glyphs are not drawn; INT-S271-EV-PERF seam per profile. preserveDrawingBuffer stays false." }
+        { "path": "editor/src/code/perf-hook.ts", "intendedEdit": "Seam: additive record fields only (for example onset epoch or occurrence end) if strictly required by attributeSync; member names and shapes unchanged; reason recorded." }
       ]
     }
   ],

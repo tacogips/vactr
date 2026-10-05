@@ -6377,6 +6377,10 @@ Session 267 (resume of 266) adds to 15.3.8.8 the silent automated audio rule
 (operator decision S), the head-only control run, the lowered workload
 amplitude and two harness clarifications, and to 15.3.8.9 the owner-file
 defect-fix rule. Nothing else changes.
+Session 269 (resume of 267) adds 15.3.8.10: the bounded edit-path cost rule
+(no whole-document string per keystroke or frame), the timing-budget rule for
+wall-clock vitest gates, and selective redispatch as the alternative to the
+owner-file fix. It changes no accepted contract.
 
 ##### 15.3.8.1 Baseline check (repository state at c9e5a05)
 
@@ -6501,9 +6505,10 @@ ported to the surface rather than deleted.
   becomes a span provider and is no longer a ViewPlugin.
   - **Tree-sitter.** The provider keeps one `ParsedVact`. After a document
     revision it reparses at most once per text phase (15.3.8.3) and is never
-    run per transaction. It uses `tree.edit` plus `parser.parse(text, oldTree)`
+    run per transaction. It uses `tree.edit` plus `parser.parse(input, oldTree)`
     (incremental), with edits taken from the transaction change sets coalesced
-    since the last parse. Any reparse error falls back to a full parse.
+    since the last parse. `input` is the chunked document read of 15.3.8.10,
+    never a whole-document string. Any reparse error falls back to a full parse.
     `styleSpans` runs only for the visible line range plus one viewport of
     overscan.
   - **Fallback tokenizer.** Before tree-sitter loads, or after it fails to
@@ -7173,7 +7178,9 @@ sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
   1x1 canvas backing, or a Run start that times out on the large document) is
   fixed in its owning source file, never recorded as acceptable. The evidence
   plan lists each such owner file as a concrete sharedPath with the intended
-  edit, and the owning plan's tests must keep passing.
+  edit, and the owning plan's tests must keep passing. A defect outside those
+  listed paths goes back to its owning accepted plan by selective redispatch
+  (15.3.8.10).
 
 **Closeout** (evidence plan):
 
@@ -7183,6 +7190,99 @@ sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
   completed `canvas-cutover-*` plans.
 - Update `impl-plans/README.md`.
 - Record the final gate logs on the closeout commit.
+
+##### 15.3.8.10 Edit-path cost and timing gates (session 269)
+
+**Issue reference:** `workflowInput:RESUME-session-267` (resumed as session
+269; findings IR-S267-001 and IR-S267-002). This subsection clarifies how
+15.3.8.3, 15.3.8.7 and 15.3.8.8 apply to the edit path. It adds no
+dependency, no protocol field and no new surface member.
+
+**Bounded edit-path rule.** These paths are the edit path:
+
+- a document-changing transaction from typing, IME commit, paste of at most
+  64 KiB, word or line delete, or undo/redo replay through `CodeSurface`;
+- the `DocumentSync.apply` call that follows it;
+- the syntax-provider work on the next text-dirty frame;
+- every animation-only frame.
+
+On the edit path, no code calls `Text.toString()` on the document, and no
+`Text.sliceString` call, string `slice` or chunk read covers more than 64 KiB.
+Text read is proportional to the changed lines plus the visible range, not to
+the document. Numeric per-line bookkeeping may be linear in the line count. The proof is operation counters in jsdom
+(`editor/test/canvas/edit-cost.test.ts` and the mounted case in
+`editor/test/canvas/mount.test.ts`) on the 20,000-line document. These tests
+use no wall-clock assertion.
+
+Whole-document reads stay allowed only off the edit path:
+
+- the whole-text transfers of 15.3.8.7 (open/reset, song apply, format,
+  completion request, debounced local check, eval);
+- save;
+- building a `Utf8Index` to map a wire span of a revision that a received
+  message references, cached by `RevisionHistory` as today.
+
+**Document sync (`code/sync.ts`, `code/history.ts`).**
+
+- `DocumentSync.apply` converts UTF-16 changes to byte changes and dirty
+  spans without `RevisionHistory.index` and without a whole-text
+  `Utf8Index`.
+- The sync keeps the per-line UTF-8 byte lengths of the current revision, plus
+  a prefix structure over them. The byte offset of a position is the bytes
+  of the lines before it plus the bytes of its line prefix. The line prefix
+  is read in chunks of at most 64 KiB.
+- Each applied change set updates only the lines it touches.
+- When the transaction's start document is not the recorded current text (a
+  history reset or revision gap), the table is rebuilt from that document's
+  lines. This is linear in the line count and never calls `toString`.
+- Undo and redo are ordinary surface transactions, so they take the same
+  path.
+- The `doc-changed` bytes, dirty spans, revisions, epochs and
+  `mapWireSpan`/`toWireSpan` results are byte-identical to the current
+  implementation. Tests compare against a reference `Utf8Index` on
+  documents with ASCII, Japanese, emoji (surrogate pairs) and CRLF content.
+- The `CodeSurface`, `DocumentSync` and `RevisionHistory` public signatures
+  that the accepted MOUNT and consumer code use do not change. Making
+  history internals line-aware is allowed.
+
+**Syntax provider (`code/syntax.ts`, `code/syntax-core.ts`).**
+
+- Change detection uses the `Text` identity plus the change sets reported
+  through `noteChanges`. String comparison is not used.
+- **Tree-sitter.** `parse` and `reparse` read through web-tree-sitter's
+  `ParseCallback` (pinned 0.27.0), served from `Text.sliceString` in chunks
+  of at most 64 KiB. Edit points come from `Text.lineAt`
+  (`row = line.number - 1`, `column = pos - line.from`), in the same index
+  units as today. Captures use `query.captures(root, { startIndex, endIndex })`
+  for the visible range plus overscan. The first parse after mount or reset
+  reads the whole document in chunks; that read is off the edit path.
+- **Fallback tokenizer.** As 15.3.8.2(c) already requires: per-line start
+  state is cached up to the viewport end, truncated at the first changed
+  line, and only visible lines plus overscan are tokenized per text phase.
+- Span output, the 16,384-span cap, `syntax-truncated` and
+  `codePane.dataset.syntax` stay as specified.
+
+**Wall-clock vitest gates.** A jsdom or node vitest test that asserts wall
+time (for example the 20,000-line eval budget in
+`editor/test/e2e/large-eval.test.ts`) sets its budget to 2x the median of
+three focused runs on the final source, rounded up to 100 ms. The plan records
+the measured median and the budget. Structural guards stay as they are,
+including the 20,000/5,000-line ratio of at most 8. A plan with such a gate
+passes only when the full vitest suite is green on three consecutive runs.
+Raising a budget past 2x, or widening a harness timeout to hide a slow
+product path, is not allowed.
+
+**Mutation evidence.** Mutation and negative-control runs (the fix reverted
+in a scratch copy or through a test-only toggle that is off by default) must
+exit nonzero. They are reported with log paths, separately from the gating
+list, and never gate acceptance.
+
+**Selective redispatch.** If wave-4 measurement finds a product defect in a
+file that is not on the evidence plan's pre-listed seam paths, it goes back
+to the owning accepted plan by selective redispatch, with a concrete
+writePaths amendment and a changed manifest fingerprint. It is never
+recorded as acceptable. Accepted plans without such a finding are not
+redispatched.
 
 ## 16. Wasm and AudioWorklet Layout
 

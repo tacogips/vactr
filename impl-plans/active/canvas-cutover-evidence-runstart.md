@@ -1,8 +1,8 @@
 # Canvas Cutover: Large-Document Run Start Stall Fix Implementation Plan
 
-**Status**: In Progress
+**Status**: Ready (session 269 resume: wave 3 redispatch for gates, budget and mutation evidence; parallel with CANVAS-EVIDENCE-EDITCOST)
 **Plan ID**: CANVAS-EVIDENCE-RUNSTART (wave 3, session 267; parallel with CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.10 (session 269: wall-clock vitest gates, mutation evidence), #15.3.8.8 (head-only control attribution; an active 64-voice workload on the 1 MiB document), #15.3.8.9 (owner-file defect-fix rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-EVIDENCE-RUNSTART`)
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-05
@@ -37,8 +37,9 @@ acceptable.
 - No change to the workload fixture (CANVAS-EVIDENCE-SILENT owns `fixtures/large-doc.mjs`). This
   plan imports `createLargeDocument()` read-only.
 - No change to any `editor/src/code/*` file owned by CANVAS-EVIDENCE-EDITCOST (`input.ts`,
-  `layout.ts`, `accessibility.ts`, `keyboard.ts`, `mount.ts`, `renderer.ts`) or VIEWPORT
-  (`frame.ts`).
+  `layout.ts`, `accessibility.ts`, `keyboard.ts`, `mount.ts`, `renderer.ts`, and since session 269
+  `sync.ts`, `syntax.ts`, `syntax-core.ts`, `history.ts`, `surface.ts`) or to the EDITCOST test
+  files, or to VIEWPORT (`frame.ts`).
 - No change to evaluation semantics, diagnostics content, the protocol wire format or audio
   output.
 - No generalized background-worker architecture. Fix the measured hot spot with the smallest
@@ -55,11 +56,24 @@ writePaths:
 - `editor/src/bind/mount.ts`
 - `src/session/eval.rs`
 - `src/session/tests/eval.rs`
+- Session 269 operator authorization 2: the six Rust files edited in session 267 under the
+  escalation rule below are now writePaths. RUNSTART is their only active owner. Their intended
+  edits are the notes in the escalation list below, and the edits already exist at `6f6b807`.
+  - `src/ns/evaluator.rs`
+  - `src/ns/eval_doc.rs`
+  - `src/ns/journal.rs`
+  - `src/ns/depgraph.rs`
+  - `src/ns/insts.rs`
+  - `src/compile/compiler.rs`
 - this plan file
 - `tmp/canvas-cutover/evidence-runstart/intent.json` and `tmp/canvas-cutover/evidence-runstart/receipt.json`
-- artifact roots: `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules/.vite`, `tmp/canvas-cutover/evidence-runstart/logs`
+- artifact roots: `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules/.vite`, `tmp/canvas-cutover/evidence-runstart/logs`, `tmp/canvas-cutover/evidence-runstart/scratch` (session 269 mutation build; gitignored)
 
-sharedPaths (diagnosis escalation, recorded before edits):
+sharedPaths (session 269): `editor/test/e2e/large-doc.test.ts`, conditional and limited to
+TASK-204 below.
+
+Historical session-267 escalation notes (recorded before the edits; these files are now
+writePaths):
 
 - `src/ns/evaluator.rs`: checker environment reconstruction in `Evaluator::eval_form` is the measured hot path. Use an empty environment only for forms with no free session symbols/qualified references; avoid constructing callable certification snapshots when no callables were checked. The bounded snapshot bytecode proof also permits the compiler's `Force` on constant-only definitions.
 - `src/ns/eval_doc.rs`: apply the same environment selection to both manifest-specific checks in `eval_form_in` so the caller path does not reconstruct the full namespace for independent scalar definitions. Cache a small number of dynamic manifests keyed by base manifest and shared control-set identity.
@@ -176,6 +190,120 @@ onsets are observed in both browsers. The full nextest suite runs there (timeout
 Record the sha256 before and after each edit in `intent.json` and `receipt.json`. If a file
 drifted before your first edit, stop and report it. Edit only this plan's progress log.
 
+## Session 269 Amendment (operator authorization 2; design 15.3.8.10)
+
+This section supersedes the earlier text wherever they conflict.
+
+### Intent
+
+The Rust fix from session 267 (in the six writePaths above) is kept. Do not change Rust
+source unless a gate below fails because of it. The remaining work is:
+
+- the budget rule;
+- the bounded pre-fix mutation evidence;
+- the full gates;
+- a rule for the `large-doc.test.ts` suite-load timeout (step-3 finding DR-269-L1).
+
+Eval semantics, diagnostics and the wire format stay unchanged.
+
+### TASK-201: Large-eval budget (design 15.3.8.10 "Wall-clock vitest gates")
+
+- Build the host-wasm library on the final source (setup command), then run the focused test
+  three times. Each run writes its own log and `.exit` file:
+  `cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s269-focused-<n>.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-runstart/logs/s269-focused-<n>.exit`
+  for n = 1, 2, 3.
+- Take `m` = the median of the three printed `20000=` values. The budget is
+  `ceil(2 * m / 100) * 100` ms; the operator expects about 5,200 ms.
+- Edit only `editor/test/e2e/large-eval.test.ts`:
+  - replace the literal `5_000` at line 51 with a named constant `LARGE_EVAL_BUDGET_MS`, set to
+    the computed budget;
+  - add a one-line comment citing this plan, the three measured medians and `m`.
+- Keep every other assertion, including the 20000/5000 ratio of at most 8, exactly one
+  `eval-result` and zero error diagnostics, and the 120,000 ms per-test timeout.
+- Record the three medians, `m` and the budget in the progress log.
+- Do not raise the budget above `ceil(2 * m / 100) * 100`. Do not change the ratio guard. Do not
+  move the measurement to CPU time.
+
+### TASK-202: Bounded pre-fix mutation evidence (not gating)
+
+Build a pre-fix wasm from a scratch copy of the pre-RUNSTART source, then run today's
+`large-eval.test.ts` against it. `968028c92aff8442cb87948a09812b617e54ed8e` is the parent state
+whose `src/` equals today's except for the six RUNSTART files (verified by
+`git diff --stat 968028c 6f6b807 -- src`).
+
+1. `rm -rf tmp/canvas-cutover/evidence-runstart/scratch && mkdir -p tmp/canvas-cutover/evidence-runstart/scratch`
+2. `git archive 968028c92aff8442cb87948a09812b617e54ed8e Cargo.toml Cargo.lock src examples tests | tar -x -C tmp/canvas-cutover/evidence-runstart/scratch`
+   (`git archive` only reads `.git`, so it works in the read-only sandbox).
+3. `cd tmp/canvas-cutover/evidence-runstart/scratch && CARGO_TERM_QUIET=true cargo build --offline --locked --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > ../logs/s269-mutation-build.log 2>&1; echo $? > ../logs/s269-mutation-build.exit`
+   Expected exit: 0. The scratch build writes only inside the scratch artifact root.
+4. `cd editor && VACTR_WASM="$PWD/../tmp/canvas-cutover/evidence-runstart/scratch/target/wasm32-unknown-unknown/debug/vactr.wasm" timeout 900 ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts > ../tmp/canvas-cutover/evidence-runstart/logs/s269-mutation-prefix.log 2>&1; echo $? > ../tmp/canvas-cutover/evidence-runstart/logs/s269-mutation-prefix.exit`
+   - Expected: vitest exit 1, with a test failure caused by the 120,000 ms per-test timeout or
+     the budget assertion.
+   - Session 267 measured pre-fix 20,000-line evals of about 60 s, so three runs exceed the test
+     timeout.
+   - An outer `timeout` kill (exit 124) is neither a pass nor valid mutation evidence. Record it
+     and rerun once.
+5. Report `mutationEvidence`: `{ command, expectedExit: "nonzero (1)", actualExit, logPath }`.
+   Never put it in the gating list.
+
+Pitfalls:
+
+- Do not revert the six files in the shared working tree. Use the scratch copy only.
+- Do not use `git worktree`, `git stash` or `git checkout`.
+- Do not point the default `target/` wasm at the pre-fix build. Use `VACTR_WASM` only.
+- Leave the scratch directory in place. It is an artifact root and is never committed.
+
+### TASK-203: Gates (inside the sandbox; logs under `tmp/canvas-cutover/evidence-runstart/logs/s269-*`, each with an `.exit` file)
+
+| Command | Required evidence |
+|---------|-------------------|
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 (final source) |
+| `cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts` | exit 0; medians printed and recorded |
+| `cd editor && ./node_modules/.bin/vitest run test/e2e/large-doc.test.ts` | exit 0; record the test duration |
+| `cd editor && npm run check` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run` three consecutive times (`s269-vitest-full-1..3`) | Each run exits 0 on the joined tree. In the sandbox, before EDITCOST lands, failures only in EDITCOST-owned tests (`test/canvas/edit-cost.test.ts`, `test/canvas/mount.test.ts`, `test/code/sync.test.ts`, `test/code/syntax*.test.ts`, `test/code/history.test.ts`) are reported with log paths and not fixed here. Any failure in `large-eval.test.ts` or `large-doc.test.ts` blocks acceptance. The post-join verification step repeats the three consecutive runs and is authoritative. |
+| `rustfmt --check src/ns/evaluator.rs src/ns/eval_doc.rs src/ns/journal.rs src/ns/depgraph.rs src/ns/insts.rs src/compile/compiler.rs` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` | exit 0, with no new `allow` or `expect` |
+| `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run ns:: compile:: session::` | exit 0 |
+
+Outside the sandbox (verification step, authoritative):
+
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run > tmp/canvas-cutover/evidence-runstart/logs/s269-nextest-full.log 2>&1; echo $? > tmp/canvas-cutover/evidence-runstart/logs/s269-nextest-full.exit`
+  must exit 0. A timeout kill (124) is neither a pass nor a failure; rerun it.
+  `complete::tests::robust::every_prefix_and_mutant_is_panic_free` takes about 500 s.
+- Three consecutive full `vitest run` passes on the joined tree.
+
+### TASK-204: `large-doc.test.ts` suite-load timeout (conditional sharedPath; DR-269-L1)
+
+`editor/test/e2e/large-doc.test.ts` is owned by the accepted CANVAS-EVIDENCE-SILENT plan. Its
+test `validates the complete evaluable document with the real host-wasm session_check` has no
+wall-clock assertion. It failed once only at the vitest default 5,000 ms timeout under full-suite
+load, and passed alone in 1.99 s. A full-document `session_check` is an allowed whole-text,
+off-edit-path operation (design 15.3.8.7), and no design budget exists for it.
+
+Edit the file only if both conditions hold:
+
+1. one of the three TASK-203 full runs fails on that test's default timeout;
+2. the focused TASK-203 `large-doc.test.ts` run passed in under 5,000 ms.
+
+The edit is limited to an explicit per-test timeout of `60_000` as the third argument of that one
+`it(...)`, plus a one-line comment citing this plan and the measured focused duration. Change no
+assertion and no other test.
+
+Record the trigger log path, the focused duration and the edit in the progress log, with
+fresh-read and post-edit sha256 values.
+
+If the focused run itself takes 5,000 ms or more, this is a product cost. Do not edit the test.
+Stop and report it for routing to the owner (design 15.3.8.10, selective redispatch).
+
+### Completion criteria (session 269)
+
+- [ ] TASK-201: three focused medians, `m` and `LARGE_EVAL_BUDGET_MS` recorded; budget equals `ceil(2*m/100)*100`
+- [ ] TASK-202: `s269-mutation-prefix.log` with vitest exit 1 against the pre-fix scratch wasm (mutationEvidence)
+- [ ] TASK-203: every in-sandbox gate exits 0 with its log path; three consecutive full vitest runs reported
+- [ ] TASK-203 (outside the sandbox): full nextest exit 0 with log path; three consecutive full vitest runs pass on the joined tree
+- [ ] TASK-204: either not triggered (recorded) or applied exactly as specified
+
 ## Completion Criteria
 
 - [x] Hot spot located with recorded timings and CPU profiles
@@ -195,3 +323,6 @@ drifted before your first edit, stop and report it. Edit only this plan's progre
 **Check-result follow-up**: Registry-owned control caching reduced the medians to 2,171.7/5,747.8 ms (ratio 2.65; current log `large-eval-final.log`). `eval_form_in` still performs the default check to compute its diagnostic split, then invokes `eval_form` which repeats that same check. Reuse that existing default `CheckResult` in the evaluator execution path and perform only the custom-manifest check separately.
 **Final-source verification**: `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`, `rustfmt --check` on all six touched Rust files, and `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` passed. Focused `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run session::` passed 149 tests (2,664 skipped). `cd editor && npm run check` passed. Focused `large-eval.test.ts` passed one test at 811.7/2,559.3 ms (ratio 3.15), and focused `large-doc.test.ts` passed both tests in 1.99 s.
 **Shared-suite disposition**: `cd editor && ./node_modules/.bin/vitest run` exited 1 with 683 passed and 5 failed. Three failures are in parallel-plan `test/canvas/edit-cost.test.ts` and `test/canvas/mount.test.ts`; the full-suite `test/e2e/large-doc.test.ts` timed out at its existing 5 s limit but passed in isolation; this plan's benchmark measured 5,033.5 ms under suite load but passed in isolation at 2,559.3 ms. Full Vitest remains unresolved for serial integration. The pre-edit stall run was manually interrupted after 5.5 minutes (exit 130), so controlled mutation evidence remains outstanding.
+
+### Session: 2026-10-05 (session 269 plan amendment)
+**Tasks Completed**: Applied operator authorization 2 and design 15.3.8.10. The six session-267 Rust files are now writePaths with their escalation notes kept. Added the scratch artifact root, the conditional `editor/test/e2e/large-doc.test.ts` sharedPath (DR-269-L1) and tasks TASK-201 (2x focused-median budget), TASK-202 (pre-fix scratch mutation run), TASK-203 (gates: three consecutive full vitest, rustfmt on the six files, strict clippy, focused and outside-sandbox full nextest) and TASK-204 (bounded `large-doc.test.ts` timeout rule). The manifest entry changed with it.

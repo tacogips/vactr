@@ -6373,6 +6373,10 @@ popup, (c) format and tree-sitter syntax, (d) the frame scheduler and
 backgrounding, (e) ABI batch bounds and incremental deltas, and (f) the
 measurement protocol. It also freezes the cross-plan contracts that the
 canvas-cutover plans implement. Nothing here is a measured result.
+Session 267 (resume of 266) adds to 15.3.8.8 the silent automated audio rule
+(operator decision S), the head-only control run, the lowered workload
+amplitude and two harness clarifications, and to 15.3.8.9 the owner-file
+defect-fix rule. Nothing else changes.
 
 ##### 15.3.8.1 Baseline check (repository state at c9e5a05)
 
@@ -6997,7 +7001,10 @@ change.
 - **Context loss.** `WEBGL_lose_context` loses the context and then restores
   it, and the document is unchanged afterward.
 - **DPR.** A deviceScaleFactor of 1 and of 2, plus a CDP metrics override in
-  the middle of a run on Chromium.
+  the middle of a run on Chromium. The CDP session that issued
+  `Emulation.setDeviceMetricsOverride` stays attached until the DPR assertions
+  (and, in the cycle run, the last DPR step) complete, because detaching it
+  clears the override.
 - **Resize and keyboard.** Window resize, plus a `visualViewport` inset
   simulated by viewport resizing.
 - **Backgrounding.** A synthetic `visibilitychange` must leave zero rAF
@@ -7012,9 +7019,65 @@ The 720p video is produced in the page by `MediaRecorder` from a canvas and
 then loaded through the same object-URL path as a user file, so no binary
 fixture is committed. The scopes stay active throughout.
 
+The sounding voices use a built-in synth `inst` (no external samples). Its
+amplitude is lowered so that 64 voices of 2 notes do not saturate: at most
+`amp = 0.005` per voice, which bounds a coherent 128-saw sum at 0.64 (about
+-3.9 dBFS) before any engine gain. The 64-voice, 2-note load is kept for load
+realism. The measured pre-sink peak must be at most -1 dBFS and is recorded.
+
+**Head-only control run.** Before the large-document run, the same page
+evaluates only the workload head (the `inst` definition and the `stack ... > d1`
+line), started by the same start method the large-document run uses. The
+control proves the method and the voice sound: at least one onset and a
+pre-sink peak above -60 dBFS. Control onsets are excluded from workload
+counts. If the large-document run then shows zero onsets, the failure is
+attributed to the large document (product cost or defect to triage), not to
+the harness. If the control itself fails, the run is a harness failure.
+
+**Silent automated audio (operator decision S, session 267).** No automated
+run may produce audible sound. The production master output stage is not
+changed, no system audio driver is installed, and the macOS system volume is
+never read or changed.
+
+- **Browser virtual sink.** Every Playwright context, for Chromium and WebKit,
+  in `behavior.mjs`, `measure.mjs` and the control run, gets one init script
+  that runs before any page script. It wraps `AudioNode.prototype.connect` so
+  that a connection whose target is a realtime `AudioContext`'s
+  `AudioDestinationNode` is redirected into a per-context sink:
+  `app output -> pre-sink AnalyserNode -> GainNode(constructed with gain 0, never automated) -> post-sink
+  AnalyserNode -> real destination`. The real destination stays in the graph,
+  so the device clock, `outputLatency` and `getOutputTimestamp` remain the ones
+  the product sees. The pre-sink meter polls `getFloatTimeDomainData` at an
+  interval shorter than its window (fftSize 32768) and records peak dBFS, RMS
+  and onset times and count (an onset is a 10 ms RMS block above -40 dBFS
+  after at least 50 ms below -50 dBFS). The post-sink meter records peak.
+- **Silence assertions.** Each run asserts: the sink was installed before the
+  first destination connection; the count of direct (unwrapped) destination
+  connections is 0; the post-sink peak is exactly 0. A violation suspends the
+  AudioContext immediately and fails the run. The pre-sink peak dBFS, RMS and
+  onset count and times are reported per browser in the evidence.
+- **Chromium defense in depth.** Chromium launches with `--mute-audio`.
+  WebKit has no equivalent flag, so the sink and its assertions are its guard.
+- **Simulator and desktop shell.** Automated Tauri launches (the iPad
+  simulator through `VACTR_SELF_CHECK=1`, and any desktop automation) never
+  evaluate a document or start playback; an opened output stream renders
+  silence. The self-check report adds the count of `playing` envelopes
+  received before the report, and `ios-sim.mjs` asserts it is 0 in addition to
+  the self-check line. No new launch flag is introduced unless this proves
+  impossible; any such flag is test-only, off by default, documented, and
+  listed in the plan's sharedPaths.
+- **Native tests.** Automated Rust tests never open a real output device.
+  `NativeHosts::open_with_bus_names` (reached from `src/cli/mod.rs` with the
+  default `--host native`) is the only output-opening path; every test that
+  spawns the CLI uses `--host noop`, and the Tauri session tests use
+  `HostChoice::Noop`. The evidence plan records this audit and fixes any test
+  that does not.
+
 **Headless gating profile H** runs per browser on the recorded host
 (Mac16,12, M4, 32 GiB): 10 s warmup, then a 60 s editing run (at least 500
-keystrokes at about 10/s, with scrolling and selection), and a 120 s cycle
+keystrokes at about 10/s, with scrolling and selection; the floor counts all
+editing-run keystrokes, while the count of keys paired with a presented
+document revision is reported separately and must be above 0), and a 120 s cycle
 run (edit, font, DPR and resize every 5 s, with a 250 ms main-thread stall
 injected every 10 s).
 
@@ -7068,7 +7131,9 @@ records:
   `design-docs/specs/evidence/canvas-cutover/<run-id>/`, at most 2 MiB
   committed, with full logs under `tmp/canvas/evidence/<run-id>/`;
 - the platform limitations;
-- the pending physical-hardware checks.
+- the pending physical-hardware checks;
+- that every automated run was silent, how silence was enforced and
+  asserted, and the measured pre-sink levels.
 
 ##### 15.3.8.9 Plans, waves, gates and closeout
 
@@ -7104,6 +7169,11 @@ sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
 - A touched source file of 1,000 lines or more is split.
 - The audio callback and worklet never wait on, allocate for, or get driven
   by rendering.
+- A product defect found by the evidence harness (for example the Chromium
+  1x1 canvas backing, or a Run start that times out on the large document) is
+  fixed in its owning source file, never recorded as acceptable. The evidence
+  plan lists each such owner file as a concrete sharedPath with the intended
+  edit, and the owning plan's tests must keep passing.
 
 **Closeout** (evidence plan):
 

@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-cutover",
   "workflowMode": "issue-resolution",
-  "issueReference": "workflow-input:opus-luna-design-and-implement-review-loop-session-265",
+  "issueReference": "workflowInput issue 'RESUME session 266: finish CANVAS-EVIDENCE with silent virtual-sink audio measurement, final integration review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-267, chain 265-266-267; no GitHub issue number)",
   "implementationBranch": "wf/canvas",
   "baseBranch": "wf/canvas",
   "remote": "origin",
@@ -12,19 +12,40 @@
     "resumes": "opus-luna-design-and-implement-review-loop-session-265",
     "resumeHead": "40467f3b46e50b12b962717b05b6fff36fc36916",
     "amendment": "Session 266 plan step (operator decisions A-D): every plan declares artifactRoots for the gitignored build and test outputs it may write, and every artifactRoots entry is also a writePaths entry; setup commands are listed separately from gating verification; NATIVE and EVIDENCE wasm commands aligned to the host-wasm feature build; CLOCK and RENDER full-Vitest floor raised to 612 tests. The design (15.3.8) and the plan decomposition are unchanged.",
-    "wave1State": "CANVAS-CLOCK, CANVAS-NATIVE and CANVAS-RENDER source is implemented at resumeHead but not accepted. Wave-1 implementers re-run final-source gating only (no source change unless a review finds a defect), then test-integrity, adversarial and integration review."
+    "wave1State": "CANVAS-CLOCK, CANVAS-NATIVE and CANVAS-RENDER source is implemented at resumeHead but not accepted. Wave-1 implementers re-run final-source gating only (no source change unless a review finds a defect), then test-integrity, adversarial and integration review.",
+    "session267": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-267",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-266",
+      "resumeHead": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL"
+      ],
+      "amendment": "Operator decision S (automated tests never audible) and the design 15.3.8.8/15.3.8.9 session-267 amendment. The remaining CANVAS-EVIDENCE work is split into four parallel wave-3 plans: CANVAS-EVIDENCE-SILENT (harness silence and EVID-TI-001/006/007), CANVAS-EVIDENCE-VIEWPORT (Chromium 1x1 backing fix in frame.ts), CANVAS-EVIDENCE-EDITCOST (per-keystroke and per-frame whole-document work in code/*) and CANVAS-EVIDENCE-RUNSTART (large-document Run start stall). CANVAS-EVIDENCE becomes wave 4 (silent run, evidence document, final integration review, closeout). The six accepted plans are not redispatched; their owner files are edited only by the authorized wave-3 defect-fix plans.",
+      "checkpointNote": "Session 267 plan checkpoint: the six plans accepted by the session-266 integration review moved from plans to acceptedDependencies (commit 968028c) so they are not redispatched. plans lists only the remaining wave-3 CANVAS-EVIDENCE-SILENT, CANVAS-EVIDENCE-VIEWPORT, CANVAS-EVIDENCE-EDITCOST, CANVAS-EVIDENCE-RUNSTART and wave-4 CANVAS-EVIDENCE. executionModel.waves keeps waves 1-2 for history only."
+    }
   },
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
     "design-docs/user-qa/pending-editor-questions.md"
   ],
   "designDocSections": [
-    { "path": "design-docs/specs/design-implementation.md", "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.9); 15.3.1-15.3.7 remain the baseline" },
-    { "path": "design-docs/user-qa/pending-editor-questions.md", "section": "E6. Canvas editor measurement and physical iPad evidence" }
+    {
+      "path": "design-docs/specs/design-implementation.md",
+      "section": "15.3.8 2026-10 cutover amendment (15.3.8.1-15.3.8.9); 15.3.1-15.3.7 remain the baseline"
+    },
+    {
+      "path": "design-docs/user-qa/pending-editor-questions.md",
+      "section": "E6. Canvas editor measurement and physical iPad evidence"
+    }
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflow-input:opus-luna-design-and-implement-review-loop-session-265 (no GitHub issue number)",
+    "issueReference": "workflowInput issue 'RESUME session 266: finish CANVAS-EVIDENCE with silent virtual-sink audio measurement, final integration review and closeout' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-267, chain 265-266-267; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",
@@ -42,7 +63,8 @@
       "No @codemirror/autocomplete or other view-bound extensions; no new runtime dependency and no lockfile change.",
       "No Apple provisioning profiles, uploads or signing-identity changes; simulator and unsigned builds only.",
       "No physical-iPad, real-IME-hardware, VoiceOver-on-device or physical audio-latency claims.",
-      "No product-code changes from CANVAS-EVIDENCE; defects found by the harness are recorded as failed checks.",
+      "Session 267 (design 15.3.8.9): product defects found by the harness are fixed in their owner files by the wave-3 plans CANVAS-EVIDENCE-VIEWPORT, -EDITCOST and -RUNSTART, never recorded as acceptable; CANVAS-EVIDENCE itself (wave 4) changes no product code.",
+      "No change to the production master output stage, no system audio driver install, never read or change macOS system volume (operator decision S).",
       "No crate-wide cargo fmt and no edit of the untracked .agents/settings.local.json."
     ],
     "constraints": [
@@ -100,9 +122,25 @@
   "executionModel": {
     "implementer": "GPT-6 Luna (Codex) per plan, native fanout on wf/canvas",
     "waves": [
-      ["CANVAS-CLOCK", "CANVAS-NATIVE", "CANVAS-RENDER"],
-      ["CANVAS-MOUNT", "CANVAS-VISUAL", "CANVAS-SHELL"],
-      ["CANVAS-EVIDENCE"]
+      [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER"
+      ],
+      [
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL"
+      ],
+      [
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
+      [
+        "CANVAS-EVIDENCE"
+      ]
     ],
     "rules": [
       "The accepted design and all plans are committed and pushed before wave 1 starts.",
@@ -114,506 +152,235 @@
       "The suite must be green before each acceptance: npm run check exit 0, full vitest pass, clippy -D warnings exit 0, full nextest pass (timeout >= 1500 s; a timeout kill is neither pass nor fail).",
       "Implementers run focused checks in the sandbox. Playwright, HTTP servers, simulator launches and full nextest runs happen in the verification and review steps outside the sandbox.",
       "No crate-wide cargo fmt; rustfmt only on touched files. Never edit .agents/settings.local.json. No new dependencies; no lockfile changes.",
-      "impl-plans/README.md and archival moves are edited only by CANVAS-EVIDENCE closeout, serially."
+      "impl-plans/README.md and archival moves are edited only by CANVAS-EVIDENCE closeout, serially.",
+      "Session 267 wave 3: the four plans run concurrently on wf/canvas with disjoint source writePaths. A full-vitest failure located only in another wave-3 plan's files is reported with its log path and not fixed by the observing implementer; the post-join verification run is authoritative.",
+      "Session 267 silence rule: every automated browser run installs the CANVAS-EVIDENCE-SILENT virtual sink and launches Chromium with --mute-audio; a run whose post-sink peak is not exactly 0 or that has a direct destination connection fails, regardless of other results."
     ]
   },
   "plans": [
     {
-      "planId": "CANVAS-CLOCK",
-      "planPath": "impl-plans/active/canvas-cutover-clock.md",
+      "planId": "CANVAS-EVIDENCE-SILENT",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-silent.md",
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/clock",
-        "editor/node_modules/.vite"
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-silent/logs"
       ],
       "setup": [
         "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
       ],
       "acceptanceCriteria": [
-        "TASK-001 to TASK-005 done with the AudibleClock, HighlightScheduler, TransportBar, ProbeCorrelation and AudibleSample contracts exactly as pinned in canvas-cutover-clock.md",
-        "Time-domain confirmation recorded in the plan progress log",
-        "Session 266: new final-source gating evidence on the 40467f3 bytes (or on the reviewed fix): npm run check exit 0; full vitest passes with at least 612 tests and no assertion deleted; host-wasm build exit 0",
-        "No edits outside writePaths except recorded sharedPaths edits"
+        "silent-sink.mjs wraps AudioNode.prototype.connect to realtime destinations into pre-sink AnalyserNode -> GainNode(gain 0, never automated) -> post-sink AnalyserNode -> destination, counts wrapped/direct connections, forces media elements muted, suspends on violation, and reports pre-sink peak/RMS dBFS and onset count/times; unit tests pass",
+        "stats.mjs gates: sink installed before first connect, 0 direct connections, post-sink peak exactly 0, workload pre-sink peak <= -1 dBFS, control >= 1 onset and peak > -60 dBFS; renderEvidence rows added; tests pass",
+        "large-doc.mjs amp 0.005 with 64 voices x 2 notes kept; controlText is the inst definition plus the head stack line and passes session_check",
+        "measure.mjs hushes the control (.vact-hush), waits >= 1 s with no new onsets (bounded; otherwise failure 'control: hush did not silence control'), re-baselines, and records largeRunClickMs/largeRunCtxTime before the large-document Run. Workload onsets are post-click rows not in the post-hush baseline (stats.mjs attributeWorkloadOnsets), and sink onsets are split at largeRunCtxTime (splitSinkOnsets); the cumulative sink count is never the workload count. Four stats.test.ts attribution rows pass.",
+        "run.mjs launches Chromium with --mute-audio and hardware-GL flags, installs the sink on every context, records the per-browser renderer, accepts --run-id; behavior.mjs reads canvas pixels in-frame and sends isPrimary:true synthetic touch; measure.mjs paces about 10 keys/s, keeps the CDP session through the DPR cycle and asserts DPR 1 and 2",
+        "ios-sim.mjs passes only with the self-check line and playingEvents === 0; main.ts reportSelfCheck adds playingEvents with main.test.ts rows",
+        "Native silence audit recorded (greps and conclusion), with any offending test switched to --host noop"
       ],
       "verification": [
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "node --check editor/test/e2e/silent-sink.mjs editor/test/e2e/run.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/fixtures/large-doc.mjs",
+        "cd editor && ./node_modules/.bin/vitest run test/e2e/silent-sink.test.ts test/e2e/stats.test.ts test/e2e/large-doc.test.ts",
+        "cd editor && ./node_modules/.bin/vitest run test/app/main.test.ts",
         "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run test/canvas/clock.test.ts test/code/highlight.test.ts test/code/transport.test.ts test/canvas/contracts.test.ts test/code/reconcile.test.ts test/app/main.test.ts",
         "cd editor && ./node_modules/.bin/vitest run"
       ],
-      "wave": 1,
-      "dependsOn": [],
+      "wave": 3,
+      "dependsOn": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL"
+      ],
       "writePaths": [
-        "editor/src/app/clock.ts",
-        "editor/src/app/deps.ts",
+        "editor/test/e2e/silent-sink.mjs",
+        "editor/test/e2e/silent-sink.test.ts",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/fixtures/large-doc.mjs",
+        "editor/test/e2e/large-doc.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
         "editor/src/app/main.ts",
-        "editor/src/code/highlight.ts",
-        "editor/src/code/transport.ts",
-        "editor/src/code/mount.ts",
-        "editor/src/protocol/types.ts",
-        "editor/src/protocol/envelope.ts",
-        "editor/test/canvas/clock.test.ts",
-        "editor/test/code/highlight.test.ts",
-        "editor/test/code/transport.test.ts",
-        "editor/test/canvas/contracts.test.ts",
-        "editor/test/support/clock.ts",
         "editor/test/app/main.test.ts",
-        "impl-plans/active/canvas-cutover-clock.md",
-        "tmp/canvas-cutover/clock/intent.json",
-        "tmp/canvas-cutover/clock/receipt.json",
-        "tmp/canvas-cutover/clock/checks.log",
+        "impl-plans/active/canvas-cutover-evidence-silent.md",
+        "tmp/canvas-cutover/evidence-silent/intent.json",
+        "tmp/canvas-cutover/evidence-silent/receipt.json",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/clock",
-        "editor/node_modules/.vite"
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-silent/logs"
       ],
-      "sharedPaths": [
-        "editor/test/code/reconcile.test.ts",
-        "editor/src/protocol/store.ts"
-      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
       "writePathNotes": [
-        { "path": "editor/test/app/main.test.ts", "intendedEdit": "Add the audibleFor and boot tier-wiring rows (browser measured provenance, native probe start, dispose stops probing, boot ?session= wiring); keep every existing assertion. CANVAS-SHELL must preserve these rows in wave 2." }
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/test/code/reconcile.test.ts", "intendedEdit": "Only if HighlightScheduler option changes break construction; keep every assertion. Expected unedited." },
-        { "path": "editor/src/protocol/store.ts", "intendedEdit": "Only to expose the latest transport sample epoch if Store.transportSample is insufficient. Expected unedited." }
+        {
+          "path": "editor/src/app/main.ts",
+          "intendedEdit": "reportSelfCheck only: count 'playing' envelopes from the start of the function and add playingEvents to the self-check JSON; unsubscribe on every path. No other change (CANVAS-SHELL and CANVAS-CLOCK wiring stays)."
+        },
+        {
+          "path": "editor/test/app/main.test.ts",
+          "intendedEdit": "Add two self-check rows (playingEvents 0 and 1); keep every existing row."
+        }
       ]
     },
     {
-      "planId": "CANVAS-NATIVE",
-      "planPath": "impl-plans/active/canvas-cutover-native.md",
+      "planId": "CANVAS-EVIDENCE-VIEWPORT",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-viewport.md",
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/native",
-        "editor/src-tauri/target",
-        "editor/src-tauri/gen/schemas"
-      ],
-      "setup": [],
-      "acceptanceCriteria": [
-        "OutputClock, clock-probe and session owner contracts exactly as pinned; reply JSON matches editor/src/protocol/types.ts:205-215",
-        "The audio callback adds only the non-blocking record call (reviewed by diff)",
-        "src/host/native/audio.rs and src/session/protocol.rs each under 1000 lines",
-        "Session 266: restored-source gating re-run on the 40467f3 bytes (or on the reviewed fix): build, clippy -D warnings, focused nextest, host-wasm build, editor/src-tauri cargo check and rustfmt --check pass; full nextest (timeout >= 1500 s) passes outside the sandbox",
-        "Mutation runs for NATIVE-TI-001 and NATIVE-TI-002 appear only under mutationEvidence with their log paths, never in the gating list",
-        "Independent test-integrity re-review accepts NATIVE-TI-001 (backdated OutputClock stale-age test) and NATIVE-TI-002 (clock_discontinuity drops only Broadcast Telemetry, Levels and Tempo; keeps Diag, Manifest and requester replies)"
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo build",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/clock|owner|publish|codec|serve|ws/)'",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
-        "rustfmt --edition 2021 --check src/host/native/clock.rs src/host/native/audio.rs src/host/native/audio/stream.rs src/host/native/mod.rs src/host/native/tests/mod.rs src/host/native/tests/clock.rs src/session/protocol.rs src/session/codec.rs src/session/publish.rs src/session/session.rs src/session/mod.rs src/session/tests/publish.rs src/session/tests/codec.rs src/cli/owner.rs src/cli/serve.rs src/cli/mod.rs src/cli/ws.rs src/cli/tests/mod.rs src/cli/tests/owner.rs",
-        "wc -l src/host/native/audio.rs src/session/protocol.rs",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run"
-      ],
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "src/host/native/clock.rs",
-        "src/host/native/audio.rs",
-        "src/host/native/audio/stream.rs",
-        "src/host/native/mod.rs",
-        "src/host/native/tests/mod.rs",
-        "src/host/native/tests/clock.rs",
-        "src/session/protocol.rs",
-        "src/session/codec.rs",
-        "src/session/publish.rs",
-        "src/session/session.rs",
-        "src/session/mod.rs",
-        "src/session/tests/publish.rs",
-        "src/session/tests/codec.rs",
-        "src/cli/owner.rs",
-        "src/cli/serve.rs",
-        "src/cli/mod.rs",
-        "src/cli/ws.rs",
-        "src/cli/tests/mod.rs",
-        "src/cli/tests/owner.rs",
-        "impl-plans/active/canvas-cutover-native.md",
-        "tmp/canvas-cutover/native/intent.json",
-        "tmp/canvas-cutover/native/receipt.json",
-        "tmp/canvas-cutover/native/checks.log",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/native",
-        "editor/src-tauri/target",
-        "editor/src-tauri/gen/schemas"
-      ],
-      "sharedPaths": [
-        "src/cli/tests/ws.rs",
-        "src/cli/repl.rs",
-        "src/cli/run.rs",
-        "src/host/native/audio/song.rs",
-        "src/session/protocol/clock.rs"
-      ],
-      "sharedPathNotes": [
-        { "path": "src/cli/tests/ws.rs", "intendedEdit": "Only if the spawn_accept_loop Sender<OwnerEvent> signature breaks the test; keep every assertion." },
-        { "path": "src/cli/repl.rs", "intendedEdit": "One-line HostClock::Native pattern update only if compilation requires it." },
-        { "path": "src/cli/run.rs", "intendedEdit": "One-line HostClock::Native pattern update only if compilation requires it." },
-        { "path": "src/host/native/audio/song.rs", "intendedEdit": "Only if the audio.rs stream split moves an item this file imports. Expected unedited." },
-        { "path": "src/session/protocol/clock.rs", "intendedEdit": "New file only if src/session/protocol.rs would reach 1000 lines; holds the clock-probe types." }
-      ]
-    },
-    {
-      "planId": "CANVAS-RENDER",
-      "planPath": "impl-plans/active/canvas-cutover-render.md",
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/render",
-        "editor/node_modules/.vite"
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-viewport/logs"
       ],
       "setup": [
         "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
       ],
       "acceptanceCriteria": [
-        "RenderFeedback, FrameScheduler and PerfRecorder contracts exactly as pinned in canvas-cutover-render.md",
-        "Animation-only frames proven to perform zero shaping, zero atlas uploads and zero buffer uploads",
-        "textPending per-frame atlas budget behavior tested",
-        "Scheduler hidden, DPR, resize, inset and dispose tests pass",
-        "Session 266: new final-source gating evidence on the 40467f3 bytes (or on the reviewed fix): npm run check exit 0; full vitest passes with at least 612 tests and no assertion deleted; host-wasm build exit 0; renderer.ts, frame.ts and atlas.ts each under 1000 lines"
+        "FrameScheduler delivers onViewport on the first visible tick even when the reading equals the constructor reading; afterwards delivery stays change-only; never from the constructor",
+        "frame.test.ts rows and the mount-level first-viewport.test.ts (backing equals effectiveSize(767, 858, 2), not 1x1) pass; pre-fix failure recorded as mutation evidence",
+        "npm run check and full vitest pass with no assertion deleted"
       ],
       "verification": [
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/frame.test.ts test/canvas/first-viewport.test.ts",
         "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run test/canvas/frame.test.ts test/canvas/gpu.test.ts test/canvas/state.test.ts test/canvas/input.test.ts test/canvas/contracts.test.ts",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cd editor && ./node_modules/.bin/vitest run",
-        "wc -l editor/src/code/renderer.ts editor/src/code/frame.ts editor/src/code/atlas.ts"
+        "cd editor && ./node_modules/.bin/vitest run"
       ],
-      "wave": 1,
-      "dependsOn": [],
+      "wave": 3,
+      "dependsOn": [
+        "CANVAS-MOUNT"
+      ],
       "writePaths": [
         "editor/src/code/frame.ts",
-        "editor/src/code/renderer.ts",
-        "editor/src/code/atlas.ts",
-        "editor/src/app/apis.ts",
         "editor/test/canvas/frame.test.ts",
-        "editor/test/canvas/gpu.test.ts",
-        "impl-plans/active/canvas-cutover-render.md",
-        "tmp/canvas-cutover/render/intent.json",
-        "tmp/canvas-cutover/render/receipt.json",
-        "tmp/canvas-cutover/render/checks.log",
+        "editor/test/canvas/first-viewport.test.ts",
+        "impl-plans/active/canvas-cutover-evidence-viewport.md",
+        "tmp/canvas-cutover/evidence-viewport/intent.json",
+        "tmp/canvas-cutover/evidence-viewport/receipt.json",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/render",
-        "editor/node_modules/.vite"
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-viewport/logs"
       ],
-      "sharedPaths": [
-        "editor/src/code/layout.ts",
-        "editor/test/support/gl.ts"
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/src/code/layout.ts", "intendedEdit": "Only if zero-width ranges need a coordsAtPos or rangeRects fix. Expected unedited." },
-        { "path": "editor/test/support/gl.ts", "intendedEdit": "Only to add fake GL methods required by new renderer tests." }
-      ],
-      "writePathNotes": [
-        { "path": "editor/src/app/apis.ts", "intendedEdit": "Add the 'call-head' member to CodeAnnotation.kind only; no other edit (CANVAS-MOUNT applies the full frozen contract in wave 2)." }
-      ]
+      "sharedPaths": [],
+      "sharedPathNotes": []
     },
     {
-      "planId": "CANVAS-MOUNT",
-      "planPath": "impl-plans/active/canvas-cutover-mount.md",
+      "planId": "CANVAS-EVIDENCE-EDITCOST",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-editcost.md",
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/mount",
-        "editor/node_modules/.vite"
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-editcost/logs"
       ],
       "setup": [
         "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
       ],
       "acceptanceCriteria": [
-        "Frozen 15.3.8.2 code-surface contract applied; CodeApi.view removed; no-editor-view guard test passes",
-        "All 15.3.8.2 consumer rules implemented (eval, diagnostics, format, tree-sitter syntax, completion popup, song, bind, params); every code.view use migrated",
-        "window.__vactrPerf contract implemented in editor/src/code/perf-hook.ts exactly as pinned",
-        "Ported tests keep their assertions; new mount and syntax tests pass; test count not below the pre-plan count",
-        "npm run check exit 0; full vitest passes; zero @codemirror/view or EditorView in editor/src; every touched source file under 1000 lines"
+        "No Text.prototype.toString and no >64 KiB sliceString during a one-character edit frame, 10 animation-only frames, or word navigation/delete on a 20,000-line document (edit-cost.test.ts)",
+        "TextLayout.setText(Text) and CanvasRenderer.setText(Text) added; setDocument(string) kept; mount compares presentation.doc by identity; cached shaped lines before the edit retained",
+        "InputPresentation carries doc: Text with a lazy text getter and is cached; no production read of presentation.text",
+        "surroundingWindow/readSelection and keyboard word navigation/delete are line-local with equivalence tests against the previous algorithm",
+        "RenderFeedback.annotationsRevision replaces the stringified static annotations in the draw-cache key when present",
+        "Existing canvas tests ported without lost assertions; npm run check and full vitest pass"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/vitest run test/canvas",
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts"
+      ],
+      "wave": 3,
+      "dependsOn": [
+        "CANVAS-MOUNT",
+        "CANVAS-RENDER"
+      ],
+      "writePaths": [
+        "editor/src/code/input.ts",
+        "editor/src/code/layout.ts",
+        "editor/src/code/accessibility.ts",
+        "editor/src/code/keyboard.ts",
+        "editor/src/code/mount.ts",
+        "editor/src/code/renderer.ts",
+        "editor/test/canvas/input.test.ts",
+        "editor/test/canvas/gpu.test.ts",
+        "editor/test/canvas/mount.test.ts",
+        "editor/test/canvas/edit-cost.test.ts",
+        "impl-plans/active/canvas-cutover-evidence-editcost.md",
+        "tmp/canvas-cutover/evidence-editcost/intent.json",
+        "tmp/canvas-cutover/evidence-editcost/receipt.json",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-editcost/logs"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": []
+    },
+    {
+      "planId": "CANVAS-EVIDENCE-RUNSTART",
+      "planPath": "impl-plans/active/canvas-cutover-evidence-runstart.md",
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/canvas-cutover/evidence-runstart/logs"
+      ],
+      "setup": [
+        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+      ],
+      "acceptanceCriteria": [
+        "The large-document eval main-thread stall is located with recorded node timings (5,000 vs 20,000 lines) or a cpuprofile, and fixed in the owning file(s); escalated paths recorded as sharedPaths with notes",
+        "large-eval.test.ts: one eval-result with zero error diagnostics for the 20,000-line workload, a 20k/5k median ratio <= 8, debug-wasm eval <= 5,000 ms, and a frontend consumer time <= 1,000 ms when the fix was in the frontend; pre-fix failure recorded as mutation evidence",
+        "Eval semantics, diagnostics and wire format unchanged; existing tests keep passing",
+        "If Rust changed: rustfmt --check on touched files, clippy -D warnings and focused nextest session:: pass"
       ],
       "verification": [
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts",
         "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run test/canvas test/code test/bind test/params test/app/song.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run",
-        "! grep -rn '@codemirror/view\\|EditorView' editor/src"
+        "cd editor && ./node_modules/.bin/vitest run"
       ],
-      "wave": 2,
-      "dependsOn": ["CANVAS-CLOCK", "CANVAS-RENDER"],
+      "conditionalVerification": [
+        "rustfmt --check src/session/eval.rs src/session/tests/eval.rs",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run session::"
+      ],
+      "wave": 3,
+      "dependsOn": [
+        "CANVAS-MOUNT",
+        "CANVAS-NATIVE"
+      ],
       "writePaths": [
-        "editor/src/app/apis.ts",
-        "editor/src/app/song.ts",
-        "editor/src/code/mount.ts",
-        "editor/src/code/view-host.ts",
-        "editor/src/code/perf-hook.ts",
-        "editor/src/code/surface.ts",
-        "editor/src/code/input.ts",
-        "editor/src/code/keyboard.ts",
-        "editor/src/code/pointer.ts",
-        "editor/src/code/accessibility.ts",
-        "editor/src/code/highlight.ts",
+        "editor/test/e2e/large-eval.test.ts",
         "editor/src/code/eval.ts",
         "editor/src/code/diagnostics.ts",
-        "editor/src/code/format.ts",
-        "editor/src/code/syntax.ts",
-        "editor/src/code/syntax-core.ts",
-        "editor/src/code/language.ts",
-        "editor/src/code/completion-view.ts",
-        "editor/src/code/sync.ts",
-        "editor/src/code/code-view.tsx",
-        "editor/src/code/code.css",
-        "editor/src/bind/mount.ts",
-        "editor/src/bind/drag.ts",
-        "editor/src/bind/write.ts",
-        "editor/src/bind/routing.ts",
         "editor/src/params/mount.ts",
-        "editor/src/params/roll.ts",
-        "editor/test/app/song.test.ts",
-        "editor/test/bind/fixtures.ts",
-        "editor/test/bind/multisite.test.ts",
-        "editor/test/bind/reconcile.test.ts",
-        "editor/test/bind/write.test.ts",
-        "editor/test/code/completion-view.test.ts",
-        "editor/test/code/diagnostics.test.ts",
-        "editor/test/code/eval.test.ts",
-        "editor/test/code/format.test.ts",
-        "editor/test/code/highlight.test.ts",
-        "editor/test/code/reconcile.test.ts",
-        "editor/test/code/syntax-core.test.ts",
-        "editor/test/code/syntax-fallback.test.ts",
-        "editor/test/code/syntax.test.ts",
-        "editor/test/code/language.test.ts",
-        "editor/test/code/transport.test.ts",
-        "editor/test/params/open.test.ts",
-        "editor/test/canvas/contracts.test.ts",
-        "editor/test/canvas/no-editor-view.test.ts",
-        "editor/test/canvas/mount.test.ts",
-        "impl-plans/active/canvas-cutover-mount.md",
-        "tmp/canvas-cutover/mount/intent.json",
-        "tmp/canvas-cutover/mount/receipt.json",
-        "tmp/canvas-cutover/mount/checks.log",
+        "editor/src/bind/mount.ts",
+        "src/session/eval.rs",
+        "src/session/tests/eval.rs",
+        "impl-plans/active/canvas-cutover-evidence-runstart.md",
+        "tmp/canvas-cutover/evidence-runstart/intent.json",
+        "tmp/canvas-cutover/evidence-runstart/receipt.json",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/mount",
-        "editor/node_modules/.vite"
-      ],
-      "sharedPaths": [
-        "editor/src/code/layout.ts",
-        "editor/src/code/renderer.ts",
-        "editor/src/code/frame.ts",
-        "editor/test/bind/drag.test.ts",
-        "editor/test/bind/routing.test.ts",
-        "editor/test/params/kinds.test.ts",
-        "editor/test/params/sampler.test.ts",
-        "editor/test/params/euclid.test.ts",
-        "editor/test/canvas/state.test.ts",
-        "editor/test/canvas/input.test.ts"
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/src/code/layout.ts", "intendedEdit": "Only for integration defects found while composing the mount; record each." },
-        { "path": "editor/src/code/renderer.ts", "intendedEdit": "Only for integration defects; keep the CANVAS-RENDER pinned RenderFeedback contract." },
-        { "path": "editor/src/code/frame.ts", "intendedEdit": "Only for integration defects; keep the CANVAS-RENDER pinned FrameScheduler contract." },
-        { "path": "editor/test/bind/drag.test.ts", "intendedEdit": "Fixture adaptation only if the bind fixture change requires it; keep every assertion." },
-        { "path": "editor/test/bind/routing.test.ts", "intendedEdit": "Fixture adaptation only; keep every assertion." },
-        { "path": "editor/test/params/kinds.test.ts", "intendedEdit": "Fixture adaptation only; keep every assertion." },
-        { "path": "editor/test/params/sampler.test.ts", "intendedEdit": "Fixture adaptation only; keep every assertion." },
-        { "path": "editor/test/params/euclid.test.ts", "intendedEdit": "Fixture adaptation only; keep every assertion." },
-        { "path": "editor/test/canvas/state.test.ts", "intendedEdit": "Only if surface contract additions (userEvent, keymaps) require fixture changes; keep every assertion." },
-        { "path": "editor/test/canvas/input.test.ts", "intendedEdit": "Only if keymap routing changes require fixture changes; keep every assertion." }
-      ]
-    },
-    {
-      "planId": "CANVAS-VISUAL",
-      "planPath": "impl-plans/active/canvas-cutover-visual.md",
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/visual",
-        "editor/node_modules/.vite"
-      ],
-      "setup": [
-        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
-      ],
-      "acceptanceCriteria": [
-        "Hydra uses audible time, with the same t for frame and draw",
-        "Scopes are timestamp-presented with the 8-entry bound and the 2 s hide",
-        "Video background is capped, reused, paused when hidden, and disposed correctly",
-        "onBackgroundCanvas implemented per the pinned contract",
-        "npm run check exit 0; full vitest passes; each editor/src/visual/*.ts under 1000 lines"
-      ],
-      "verification": [
-        "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run test/visual",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cd editor && ./node_modules/.bin/vitest run",
-        "wc -l editor/src/visual/frame.ts editor/src/visual/mount.ts editor/src/visual/render-host.ts editor/src/visual/video.ts editor/src/visual/meters.ts editor/src/visual/scopes.ts editor/src/visual/panes.ts"
-      ],
-      "wave": 2,
-      "dependsOn": ["CANVAS-CLOCK"],
-      "writePaths": [
-        "editor/src/visual/frame.ts",
-        "editor/src/visual/mount.ts",
-        "editor/src/visual/render-host.ts",
-        "editor/src/visual/video.ts",
-        "editor/src/visual/meters.ts",
-        "editor/src/visual/scopes.ts",
-        "editor/src/visual/panes.ts",
-        "editor/test/visual/frame.test.ts",
-        "editor/test/visual/render-host.test.ts",
-        "editor/test/visual/scopes.test.ts",
-        "editor/test/visual/meters.test.ts",
-        "editor/test/visual/panes.test.ts",
-        "editor/test/visual/video.test.ts",
-        "impl-plans/active/canvas-cutover-visual.md",
-        "tmp/canvas-cutover/visual/intent.json",
-        "tmp/canvas-cutover/visual/receipt.json",
-        "tmp/canvas-cutover/visual/checks.log",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/visual",
-        "editor/node_modules/.vite"
-      ],
-      "sharedPaths": [
-        "editor/src/visual/panes-view.tsx",
-        "editor/src/visual/visual.css"
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/src/visual/panes-view.tsx", "intendedEdit": "Only if the video file input must render through the Solid panes view." },
-        { "path": "editor/src/visual/visual.css", "intendedEdit": "Only for the video control and data-sync state styles." }
-      ]
-    },
-    {
-      "planId": "CANVAS-SHELL",
-      "planPath": "impl-plans/active/canvas-cutover-shell.md",
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/shell",
-        "tmp/canvas/ios-scratch",
         "editor/node_modules/.vite",
-        "editor/dist",
-        "editor/src-tauri/target",
-        "editor/src-tauri/gen/schemas",
-        "editor/src-tauri/gen/apple/build",
-        "editor/src-tauri/gen/apple/Externals",
-        "editor/src-tauri/gen/apple/Pods",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/xcuserdata",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/xcuserdata"
+        "tmp/canvas-cutover/evidence-runstart/logs"
       ],
-      "setup": [
-        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
-      ],
-      "acceptanceCriteria": [
-        "Desktop: Tauri commands work in the SessionBridge tests; editor/src-tauri cargo check, clippy -D warnings and cargo test pass; TauriTransport tests pass",
-        "app/main.ts selects the IPC native tier with ProbeCorrelation and the fallback works; CANVAS-CLOCK audibleFor and boot rows preserved",
-        "iOS project committed with manifest gen/apple files only (at most 5 recorded additions); main.mm audio-session glue present; editor/.gitignore changes exactly src-tauri/gen/ to src-tauri/gen/schemas/",
-        "iPad simulator build, install, launch and self-check evidence captured under tmp/canvas-cutover/shell/, or an exact blocker recorded",
-        "No signing or provisioning changes"
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
-        "git check-ignore -q editor/src-tauri/gen/apple/build/x",
-        "git check-ignore -q editor/src-tauri/gen/schemas/x",
-        "git check-ignore -q editor/src-tauri/gen/apple/Externals/x",
-        "git status --porcelain --untracked-files=all editor/src-tauri/gen",
-        "git diff editor/.gitignore",
-        "CARGO_TERM_QUIET=true cargo clippy --manifest-path editor/src-tauri/Cargo.toml --all-targets -- -D warnings",
-        "CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml",
-        "rustfmt --edition 2021 --check editor/src-tauri/src/lib.rs editor/src-tauri/src/main.rs editor/src-tauri/src/session.rs",
-        "cd editor && npm run check && ./node_modules/.bin/vitest run test/protocol/tauri.test.ts test/app/main.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run",
-        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
-        "cd editor/src-tauri && ../../tmp/canvas/tools/cargo-tauri ios build --target aarch64-sim --debug"
-      ],
-      "wave": 2,
-      "dependsOn": ["CANVAS-NATIVE", "CANVAS-CLOCK"],
-      "writePaths": [
-        "editor/src-tauri/src/lib.rs",
-        "editor/src-tauri/src/main.rs",
-        "editor/src-tauri/src/session.rs",
-        "editor/src-tauri/Cargo.toml",
-        "editor/src-tauri/tauri.conf.json",
-        "editor/src/protocol/tauri.ts",
-        "editor/src/app/main.ts",
-        "editor/index.html",
-        "editor/.gitignore",
-        "editor/test/protocol/tauri.test.ts",
-        "editor/test/app/main.test.ts",
-        "editor/src-tauri/gen/apple/.gitignore",
-        "editor/src-tauri/gen/apple/ExportOptions.plist",
-        "editor/src-tauri/gen/apple/LaunchScreen.storyboard",
-        "editor/src-tauri/gen/apple/Podfile",
-        "editor/src-tauri/gen/apple/project.yml",
-        "editor/src-tauri/gen/apple/Assets.xcassets/Contents.json",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/Contents.json",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-20x20@1x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-20x20@2x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-20x20@2x-1.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-20x20@3x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-29x29@1x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-29x29@2x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-29x29@2x-1.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-29x29@3x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-40x40@1x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-40x40@2x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-40x40@2x-1.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-40x40@3x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-60x60@2x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-60x60@3x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-76x76@1x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-76x76@2x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-83.5x83.5@2x.png",
-        "editor/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",
-        "editor/src-tauri/gen/apple/Sources/vactr-editor/main.mm",
-        "editor/src-tauri/gen/apple/Sources/vactr-editor/bindings/bindings.h",
-        "editor/src-tauri/gen/apple/vactr-editor_iOS/Info.plist",
-        "editor/src-tauri/gen/apple/vactr-editor_iOS/vactr-editor_iOS.entitlements",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.pbxproj",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/xcshareddata/xcschemes/vactr-editor_iOS.xcscheme",
-        "impl-plans/active/canvas-cutover-shell.md",
-        "tmp/canvas-cutover/shell/intent.json",
-        "tmp/canvas-cutover/shell/receipt.json",
-        "tmp/canvas-cutover/shell/checks.log",
-        "tmp/canvas-cutover/shell/ios-build.log",
-        "tmp/canvas-cutover/shell/simctl-install.log",
-        "tmp/canvas-cutover/shell/self-check.json",
-        "tmp/canvas-cutover/shell/ipad-sim.png",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "tmp/canvas-cutover/shell",
-        "tmp/canvas/ios-scratch",
-        "editor/node_modules/.vite",
-        "editor/dist",
-        "editor/src-tauri/target",
-        "editor/src-tauri/gen/schemas",
-        "editor/src-tauri/gen/apple/build",
-        "editor/src-tauri/gen/apple/Externals",
-        "editor/src-tauri/gen/apple/Pods",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/xcuserdata",
-        "editor/src-tauri/gen/apple/vactr-editor.xcodeproj/project.xcworkspace/xcuserdata"
-      ],
-      "sharedPaths": [
-        "editor/src-tauri/Cargo.lock",
-        "editor/src-tauri/capabilities/default.json",
-        "editor/src-tauri/Info.ios.plist"
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/src-tauri/Cargo.lock", "intendedEdit": "Expected unchanged; if cargo check rewrites it, record the diff and confirm no new crate." },
-        { "path": "editor/src-tauri/capabilities/default.json", "intendedEdit": "Only if Tauri rejects the app commands without explicit permission entries." },
-        { "path": "editor/src-tauri/Info.ios.plist", "intendedEdit": "New file with UIBackgroundModes [audio]; if Tauri does not merge it, use gen/apple/vactr-editor_iOS/Info.plist instead and delete this file." }
-      ],
-      "writePathNotes": [
-        { "path": "editor/.gitignore", "intendedEdit": "Before ios init, replace the single line 'src-tauri/gen/' with 'src-tauri/gen/schemas/'; keep 'dist/' and 'src-tauri/target/'. Never git add -f." },
-        { "path": "editor/src-tauri/gen/apple/build", "intendedEdit": "Artifact root (gitignored by the generated gen/apple/.gitignore). If the xcodebuild fallback is used, pass -derivedDataPath build/DerivedData from editor/src-tauri/gen/apple so DerivedData lands here; record the actual DerivedData location of the cargo-tauri build in tmp/canvas-cutover/shell/ios-build.log." },
-        { "path": "editor/test/app/main.test.ts", "intendedEdit": "Add Tauri tier rows; keep every CANVAS-CLOCK audibleFor and boot wiring row unchanged." }
-      ]
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "escalation": "If the profiled hot spot is in a file not listed here and not owned by another wave-3 plan, add it to sharedPaths with a sharedPathNotes entry and record it in the plan progress log before editing; otherwise stop and report for serial repair."
     },
     {
       "planId": "CANVAS-EVIDENCE",
@@ -639,14 +406,18 @@
         "design-docs/specs/design-canvas-editor-evidence.md contains the harness-generated results section, raw data paths under design-docs/specs/evidence/canvas-cutover/run-001/, platform limitations and pending physical-iPad procedures",
         "iPad simulator evidence recorded, or the exact blocker recorded",
         "Closeout: fifteen canvas-editor-224 plans plus canvas-editor-224-dispatch.json and the seven canvas-cutover plans moved file by file to impl-plans/completed/ with superseded or completion notes; impl-plans/README.md updated; 15.3.8.4 clock-probe erratum appended",
-        "Final gates on the closeout commit recorded with exit codes and log paths"
+        "Final gates on the closeout commit recorded with exit codes and log paths",
+        "Session 267: silent run-001 regenerated with --run-id run-001; per browser the sink was installed before the first connect, direct destination connections 0, post-sink peak exactly 0, workload pre-sink peak <= -1 dBFS, control >= 1 onset and peak > -60 dBFS; large-document start returned with workload onsets > 0; Chromium canvas backing > 1x1; Chromium cycle DPR 1 and 2; simulator playingEvents 0",
+        "Session 267: the evidence document has the automated audio silence method, the native/simulator silence audit and a remaining-failure triage table; product defects are repaired, never recorded as acceptable",
+        "Session 267: closeout also moves canvas-cutover-evidence-silent.md, canvas-cutover-evidence-viewport.md, canvas-cutover-evidence-editcost.md and canvas-cutover-evidence-runstart.md (listed as concrete paths in writePaths) to impl-plans/completed/"
       ],
       "verification": [
         "cd editor && npm run check",
         "cd editor && ./node_modules/.bin/vitest run test/e2e",
         "node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/fixtures/large-doc.mjs",
         "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
-        "cd editor && npm run e2e -- --browser all --profile all --write-evidence",
+        "cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001",
+        "node editor/test/e2e/ios-sim.mjs --app <SHELL .app> --device \"iPad Pro 11-inch (M5)\"",
         "CARGO_TERM_QUIET=true cargo build",
         "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
         "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
@@ -655,19 +426,21 @@
         "cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts",
         "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml"
       ],
-      "wave": 3,
-      "dependsOn": ["CANVAS-CLOCK", "CANVAS-NATIVE", "CANVAS-RENDER", "CANVAS-MOUNT", "CANVAS-VISUAL", "CANVAS-SHELL"],
+      "wave": 4,
+      "dependsOn": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART"
+      ],
       "writePaths": [
-        "editor/test/e2e/run.mjs",
         "editor/test/e2e/serve.mjs",
-        "editor/test/e2e/behavior.mjs",
-        "editor/test/e2e/measure.mjs",
-        "editor/test/e2e/stats.mjs",
-        "editor/test/e2e/stats.test.ts",
-        "editor/test/e2e/ios-sim.mjs",
-        "editor/test/e2e/README.md",
-        "editor/test/e2e/fixtures/large-doc.mjs",
-        "editor/test/e2e/large-doc.test.ts",
         "editor/package.json",
         "design-docs/specs/design-canvas-editor-evidence.md",
         "design-docs/specs/design-implementation.md",
@@ -725,6 +498,14 @@
         "impl-plans/completed/canvas-cutover-visual.md",
         "impl-plans/completed/canvas-cutover-shell.md",
         "impl-plans/completed/canvas-cutover-evidence.md",
+        "impl-plans/active/canvas-cutover-evidence-silent.md",
+        "impl-plans/active/canvas-cutover-evidence-viewport.md",
+        "impl-plans/active/canvas-cutover-evidence-editcost.md",
+        "impl-plans/active/canvas-cutover-evidence-runstart.md",
+        "impl-plans/completed/canvas-cutover-evidence-silent.md",
+        "impl-plans/completed/canvas-cutover-evidence-viewport.md",
+        "impl-plans/completed/canvas-cutover-evidence-editcost.md",
+        "impl-plans/completed/canvas-cutover-evidence-runstart.md",
         "tmp/canvas-cutover/evidence/intent.json",
         "tmp/canvas-cutover/evidence/receipt.json",
         "tmp/canvas-cutover/evidence/checks.log",
@@ -741,11 +522,108 @@
         "editor/src-tauri/gen/apple/build",
         "editor/src-tauri/gen/apple/Externals"
       ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
+      "sharedPaths": [
+        "editor/test/e2e/silent-sink.mjs",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
+        "editor/test/e2e/fixtures/large-doc.mjs",
+        "editor/test/e2e/large-doc.test.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/test/e2e/silent-sink.mjs",
+          "intendedEdit": "Wave-4 serial repair only, after a review finding against the CANVAS-EVIDENCE-SILENT harness; recorded in the progress log."
+        },
+        {
+          "path": "editor/test/e2e/run.mjs",
+          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
+        },
+        {
+          "path": "editor/test/e2e/behavior.mjs",
+          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
+        },
+        {
+          "path": "editor/test/e2e/measure.mjs",
+          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
+        },
+        {
+          "path": "editor/test/e2e/stats.mjs",
+          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
+        },
+        {
+          "path": "editor/test/e2e/stats.test.ts",
+          "intendedEdit": "Wave-4 serial repair only, matching a stats.mjs repair."
+        },
+        {
+          "path": "editor/test/e2e/ios-sim.mjs",
+          "intendedEdit": "Wave-4 serial repair only, after a review finding; recorded in the progress log."
+        },
+        {
+          "path": "editor/test/e2e/README.md",
+          "intendedEdit": "Wave-4 serial repair only, to keep the documented commands in step with a repair."
+        },
+        {
+          "path": "editor/test/e2e/fixtures/large-doc.mjs",
+          "intendedEdit": "Wave-4 serial repair only, if the measured pre-sink peak exceeds -1 dBFS (amp lowered further, voices kept at 64)."
+        },
+        {
+          "path": "editor/test/e2e/large-doc.test.ts",
+          "intendedEdit": "Wave-4 serial repair only, matching a fixture repair."
+        }
+      ],
       "writePathNotes": [
-        { "path": "design-docs/specs/design-implementation.md", "intendedEdit": "Closeout only: append one erratum paragraph at the end of 15.3.8.4 recording that the clock-probe wire keeps the pre-existing field names (page_send, engine_receive, engine_send; reply kind clock-probe). Nothing else in the file changes." }
+        {
+          "path": "design-docs/specs/design-canvas-editor-evidence.md",
+          "intendedEdit": "Session 267 TASK-008: static sections only (automated audio silence method, native and simulator silence audit, limitation updates, remaining-failure triage table); the marker section is written only by the harness."
+        },
+        {
+          "path": "design-docs/specs/design-implementation.md",
+          "intendedEdit": "Closeout only: append one erratum paragraph at the end of 15.3.8.4 recording that the clock-probe wire keeps the pre-existing field names (page_send, engine_receive, engine_send; reply kind clock-probe). Nothing else in the file changes."
+        }
       ]
+    }
+  ],
+  "acceptedDependencies": [
+    {
+      "planId": "CANVAS-CLOCK",
+      "planPath": "impl-plans/active/canvas-cutover-clock.md",
+      "commit": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "provides": "Frontend audible clock: transport-sample consumption, AudioContext output-timestamp correlation, epochs, pause, staleness hide and drift-free late-frame recovery feeding highlights, beat display and transport bar."
+    },
+    {
+      "planId": "CANVAS-NATIVE",
+      "planPath": "impl-plans/active/canvas-cutover-native.md",
+      "commit": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "provides": "Native CPAL output-latency clock (src/host/native/clock.rs), real latency provenance in published transport samples, native session owner and clock probe, Tauri shared lib.rs bootstrap."
+    },
+    {
+      "planId": "CANVAS-RENDER",
+      "planPath": "impl-plans/active/canvas-cutover-render.md",
+      "commit": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "provides": "WebGL2 renderer layers (text, syntax, diagnostics, playing, selection, composition), glyph atlas and geometry reuse, resource ledger caps, and the dirty-text versus animation frame scheduler."
+    },
+    {
+      "planId": "CANVAS-MOUNT",
+      "planPath": "impl-plans/active/canvas-cutover-mount.md",
+      "commit": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "provides": "Production canvas mount cutover (surface, renderer, input bridge, ledger), visibility/DPR/resize and disposal, eval/diagnostics/format/syntax/completion/song/bind/params on the surface API, zero @codemirror/view imports enforced."
+    },
+    {
+      "planId": "CANVAS-VISUAL",
+      "planPath": "impl-plans/active/canvas-cutover-visual.md",
+      "commit": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "provides": "Audible-clock-synchronized visual composition: Hydra layer reuse, oscilloscope cells, beat indicator and one muted capped video background (editor/src/visual/video.ts) paused on background."
+    },
+    {
+      "planId": "CANVAS-SHELL",
+      "planPath": "impl-plans/active/canvas-cutover-shell.md",
+      "commit": "968028c92aff8442cb87948a09812b617e54ed8e",
+      "provides": "Tauri desktop Session Protocol IPC (editor/src/protocol/tauri.ts) and Tauri iOS project with audio session, interruption and background glue, iPad simulator build and launch evidence."
     }
   ]
 }

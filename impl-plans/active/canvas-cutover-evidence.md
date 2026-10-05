@@ -1,8 +1,8 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: Ready
-**Plan ID**: CANVAS-EVIDENCE (wave 3; depends on CANVAS-CLOCK, NATIVE, RENDER, MOUNT, VISUAL and SHELL)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds), 15.3.8.9 (gates and closeout)
+**Status**: Ready (session 267: wave 4)
+**Plan ID**: CANVAS-EVIDENCE (wave 4 since session 267; depends on CANVAS-CLOCK, NATIVE, RENDER, MOUNT, VISUAL, SHELL and the wave-3 plans CANVAS-EVIDENCE-SILENT, -VIEWPORT, -EDITCOST, -RUNSTART)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates, owner-file defect fixes and closeout)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-05
@@ -268,6 +268,98 @@ Follow the `design-doc` skill format. The document has these sections:
   miss is a recorded failure in the evidence document and is never relabeled as a pass. Exit 2
   (blocked) is never a pass.
 
+## Session 267 Amendment (operator decision S, open EVID-TI findings, owner-file defect fixes)
+
+This section supersedes the earlier text wherever they conflict.
+
+- **Split.** The remaining harness repairs and product-defect fixes move to four wave-3 plans
+  that run in parallel:
+  - `impl-plans/active/canvas-cutover-evidence-silent.md` (CANVAS-EVIDENCE-SILENT): silent
+    virtual sink and `--mute-audio`; workload `amp` 0.005; head-stack control; EVID-TI-001,
+    -006 and -007 alignment; in-frame readback; WebKit `isPrimary` touch; keystroke pacing;
+    `ios-sim.mjs` and the `playingEvents` self-check; native silence audit.
+  - `impl-plans/active/canvas-cutover-evidence-viewport.md` (CANVAS-EVIDENCE-VIEWPORT):
+    `frame.ts` first-viewport delivery. This fixes the Chromium 1x1 backing.
+  - `impl-plans/active/canvas-cutover-evidence-editcost.md` (CANVAS-EVIDENCE-EDITCOST): no
+    whole-document string work per keystroke or per animation frame.
+  - `impl-plans/active/canvas-cutover-evidence-runstart.md` (CANVAS-EVIDENCE-RUNSTART): the
+    large-document Run start stall.
+
+  This plan becomes wave 4. It owns only the outside-sandbox evidence run, the evidence
+  document, the final integration review inputs, and closeout.
+- **Non-goal change.** The non-goal "No product-code change" is superseded by design 15.3.8.9.
+  Product defects are fixed in their owner files by the wave-3 plans. If the wave-4 run exposes
+  a further product defect, it goes back to the owning wave-3 plan for repair (or to a serial
+  repair recorded in the manifest). It is never recorded as acceptable.
+- **Harness ownership.** The harness files are writePaths of CANVAS-EVIDENCE-SILENT in wave 3.
+  Here they are sharedPaths, edited only in serial wave-4 repair after a review finding, with the
+  edit recorded in the progress log.
+- **Run id.** The silent run overwrites `run-001` (`--run-id run-001`). The audible session-266
+  data is replaced, and the evidence document records that run-001 was regenerated silently in
+  session 267.
+
+### TASK-007 (wave 4): Silent evidence run (outside the sandbox, by the verification step)
+
+The run is preceded by the setup builds and `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`.
+
+- `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`.
+  The log goes to `tmp/canvas-cutover/evidence/s267-e2e.log`.
+- `node editor/test/e2e/ios-sim.mjs --app <SHELL .app> --device "iPad Pro 11-inch (M5)"`. The log
+  goes to `tmp/canvas-cutover/evidence/s267-ios-sim.log`. Pass requires the self-check line and
+  `playingEvents === 0`.
+- Required evidence in `summary.json`, per browser:
+  - sink `installedBeforeFirstConnect: true`;
+  - `directDestinationConnections: 0`;
+  - post-sink peak exactly 0;
+  - workload pre-sink peak <= -1 dBFS;
+  - control >= 1 onset with peak above -60 dBFS;
+  - large-document start returned and workload onsets > 0;
+  - Chromium canvas backing larger than 1x1;
+  - Chromium cycle samples showing DPR 1 and 2.
+
+### TASK-008 (wave 4): Evidence document update
+
+Edit the static sections of `design-docs/specs/design-canvas-editor-evidence.md`. The marker
+section is written only by the harness.
+
+- Add an "Automated audio silence" section. It states that every automated run was silent and
+  describes the method:
+  - the init-script virtual sink (pre-sink AnalyserNode, then zero gain, then post-sink
+    AnalyserNode, then the real destination);
+  - Chromium `--mute-audio`;
+  - the numeric assertions;
+  - that macOS volume was never read or changed and no audio driver was installed.
+
+  It also states how levels were measured: fftSize 32768, 100 ms polling of new samples only, and
+  the 10 ms block RMS onset rule (on at -40 dBFS after 50 ms below -50 dBFS). It cites the
+  measured pre-sink values from `summary.json` by path, never as hand-typed numbers.
+- Add a "Native and simulator silence" paragraph:
+  - the TASK-005 audit result from CANVAS-EVIDENCE-SILENT, with command log paths;
+  - the simulator `playingEvents: 0` evidence path;
+  - a statement that no Tauri desktop automation exists (the desktop shell is verified by
+    `cargo check` only).
+- Update the limitations:
+  - add the SwiftShader software-GL line if the renderer string still shows it;
+  - remove limitations that the wave-3 fixes resolved (for example the WebKit synthetic touch
+    failure, if it now passes).
+- Add a "Remaining failures triage" table. Each gated failure still present after the wave-3
+  fixes gets one row: metric or check, value, classification (`product defect` -> repair
+  required before acceptance; `environment limitation` such as software GL), and the evidence
+  path.
+
+### TASK-009 (wave 4, serial): Final integration review and closeout
+
+- The final integration review covers all seven canvas-cutover plans plus the four wave-3
+  evidence plans.
+- TASK-006 closeout additionally moves these four plans file by file to `impl-plans/completed/`
+  with Status `Completed`:
+  - `impl-plans/active/canvas-cutover-evidence-silent.md`
+  - `impl-plans/active/canvas-cutover-evidence-viewport.md`
+  - `impl-plans/active/canvas-cutover-evidence-editcost.md`
+  - `impl-plans/active/canvas-cutover-evidence-runstart.md`
+- `impl-plans/README.md` lists all eleven completed canvas-cutover plans.
+- Commit and non-force push to `origin wf/canvas`.
+
 ## Verification
 
 Inside the sandbox:
@@ -283,8 +375,8 @@ Outside the sandbox (verification and review step; logs in `tmp/canvas-cutover/e
 | Command | Required evidence |
 |---------|-------------------|
 | `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | exit 0 |
-| `cd editor && npm run e2e -- --browser all --profile all --write-evidence` | exit 0, or exit 1 with the failures written to the evidence file (a missed threshold is reported, never hidden); exit 2 is blocked, never a pass |
-| `node editor/test/e2e/ios-sim.mjs --app <SHELL .app> --device "<iPad simulator>"` | `ios-sim.json` with the self-check line |
+| `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` | exit 0 is required for acceptance (session 267). Exit 1 is written to the evidence file and triaged under TASK-008. A product defect blocks acceptance until it is repaired; only a recorded environment limitation (for example software GL frame metrics) may remain as a documented failure, and that is a review decision. Exit 2 is blocked, never a pass. The silent-sink assertions of TASK-007 must hold in every case. |
+| `node editor/test/e2e/ios-sim.mjs --app <SHELL .app> --device "<iPad simulator>"` | `ios-sim.json` with the self-check line and `playingEvents === 0` |
 
 Final gates on the closeout commit (design 15.3.8.9):
 
@@ -312,9 +404,13 @@ only this plan's progress log and the plan files being archived.
 - [x] Harness and unit tests in place; `run.mjs` preserves exit 0/1/2 semantics and fails on any measurement failure.
 - [x] Full 20,000-line fixture is checked through host-WASM `session_check`, with exactly one check record and zero error diagnostics.
 - [x] Evidence document has the harness-generated results, raw paths, explicit browser limitations, paired-edit counts, and pending physical-iPad procedures.
-- [x] Active-workload attribution is control-backed: the built-in pad control emits an onset in both browsers; the same toolbar click times out on the 20,000-line document, which records zero workload onset and a product/full-document startup failure. Editing keystrokes and paired samples are reported separately, with the 500-key gate applied to editing keys.
+- [x] Active-workload attribution is control-backed: the built-in pad control emits an onset in both browsers; the same toolbar click times out on the 20,000-line document, which records zero workload onset and a product/full-document startup failure. Editing keystrokes and paired samples are reported separately, with the 500-key gate applied to editing keys. (Session 267: the timeout is now a product defect owned by CANVAS-EVIDENCE-RUNSTART.)
 - [x] Simulator evidence recorded: iPad Pro 11-inch (M5) launched and emitted the native-tier self-check
-- [ ] Closeout moves done file by file; README updated (serial closeout after review)
+- [ ] Session 267: wave-3 plans SILENT, VIEWPORT, EDITCOST and RUNSTART accepted
+- [ ] Session 267: silent run-001 regenerated; every TASK-007 sink assertion holds in Chromium and WebKit; simulator `playingEvents === 0`
+- [ ] Session 267: evidence document has the silence method, the native/simulator silence audit and the remaining-failure triage table
+- [ ] Session 267: final integration review across the seven canvas-cutover plans and four wave-3 plans passes
+- [ ] Closeout moves done file by file, including the four wave-3 plans; README updated (serial closeout after review)
 - [ ] Final gates recorded with exit codes and log paths (closeout gate)
 
 ## Progress Log
@@ -347,3 +443,12 @@ only this plan's progress log and the plan files being archived.
 **Remaining product evidence**: The active control confirms the voice and start method work. The large-document toolbar click still times out after Playwright dispatches the action; classify as full-document startup failure. Threshold failures, including fewer than 500 editing keys in the fixed 60-second window, remain recorded failures and were not relabeled as passes. No editor product source was changed.
 
 **Downstream pending**: Independent Opus review of the current repairs, serial closeout archival/README/clock-probe erratum, combined-tree final gates and commit/push remain owned by later workflow steps.
+
+### Session: 2026-10-05 (session 267 plan amendment)
+**Tasks Completed**: Plan amended in place for operator decision S and design 15.3.8.8/15.3.8.9 (session-267 amendment). The remaining work is split into four parallel wave-3 plans (SILENT, VIEWPORT, EDITCOST, RUNSTART), and this plan moves to wave 4 (TASK-007 silent run, TASK-008 evidence document, TASK-009 review and closeout). Root causes recorded at plan time:
+
+- Chromium 1x1 backing: `frame.ts` never delivers the first viewport when the size is unchanged since construction.
+- WebKit readback: read outside the frame with `preserveDrawingBuffer: false`.
+- WebKit touch: synthetic events lack `isPrimary`.
+- Edit cost: whole-document `toString` in `input.ts`, `mount.ts`, `accessibility.ts` and `keyboard.ts`; `layout.ts` full rescans; the renderer cache key stringify.
+- Run start: a main-thread stall during large-document eval, to be located by RUNSTART.

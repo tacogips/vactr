@@ -467,3 +467,52 @@ logs go to `tmp/canvas-cutover/scope/s283-gate-*.log`):
 - Outside the sandbox: full nextest with `timeout 2400` (exit 0, at least 2816 passed), then
   `cd editor && npm run test:perf` alone on the host (exit 0).
 - Then the test-integrity, adversarial and integration reviews run.
+
+### Session: 2026-10-06 (Step 6 current-source execution on checkpoint dfe5f6b)
+**Source identity**: `git rev-parse HEAD` is
+`dfe5f6b676241f4ea0994e7aec0c65664058d953`; the six implementation/test source files are
+byte-identical to `5e58d04`. SHA-256 values: `src/types/scope.rs`
+`59fd855cf277f883f79f7ea7a1793f20c0016564b93eb39ae889b64d728be84f`,
+`src/types/tests/mod.rs` `8356d5489a72176e31cfdbdf0c41a23ea85b5194668c1c2c96b43ca8624b6322`,
+`src/types/tests/scope_cost.rs`
+`53a3b90f9be1fd3305c955b290361b1f93f8490c84449e5440384813113eb1f3`,
+`src/directives/attach.rs` `28e041a2ac1e6e1cb857c51cb547ca9125e846f7e9e992ea614664fbe62240b0`,
+`src/directives/tests/attach.rs`
+`8bf2a2980f70db47afa04a753d7b222e8312702496792b995d26ad99837a2b8d`,
+`src/directives/tests/labels.rs`
+`e11a8bc9a6c8f7c17963e0dde204b46fea4d7b7eee01383218e29c3b250ded35`.
+
+**Final-source verification** (complete logs under `tmp/canvas-cutover/scope/`):
+- `CARGO_TERM_QUIET=true cargo build`: exit 0, `s283-gate-build-current.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0,
+  `s283-gate-clippy-final.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-capture types::tests directives::tests`:
+  exit 0, 184 passed/0 failed; counters `c4=16000`, `c8=32000`, `steps=20000`,
+  `targets=20000`; `s283-gate-focused-nextest.log`.
+- `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`:
+  exit 0, `s283-gate-rustfmt.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`:
+  exit 0, `s283-gate-wasm-build.log`.
+- `cd editor && ./node_modules/.bin/vitest run`: exit 0, 90 files and 703 tests passed,
+  `s283-gate-vitest.log`.
+- `cd editor && npm run check`: exit 0, `s283-gate-npm-check.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`:
+  exit 0, 2816 passed/0 failed and 3 skipped in 1010.466 seconds,
+  `s283-gate-full-nextest.log`.
+- `cd editor && npm run test:perf` (run alone after full nextest): exit 0, 1 passed/0 failed;
+  5k median 804.9 ms, 20k median 2262.5 ms, ratio 2.81;
+  `s283-gate-test-perf.log`.
+- Scope identity and hygiene checks all exit 0: seven original SCOPE paths only in
+  `s283-gate-original-scope.log`; ten expected resume paths in
+  `s283-gate-resume-scope.log`; no source drift from `5e58d04` in
+  `s283-gate-no-product-drift.log`; exact source identity in
+  `s283-gate-source-identity.log`; existing scope/rebinding/shadowing/prelude tests unchanged
+  in `s283-gate-existing-tests.log`; no untracked files in `s283-gate-untracked.log`; no added
+  `allow`/`expect` attributes in `s283-gate-allow-expect.log`.
+- Mutation commands were not run in this resume, per the workflow hard rule. Historical
+  sensitivity evidence remains in `s283-mutation-scope.log` and `s283-mutation-topof.log`;
+  those paths are cited here as prose evidence only.
+
+Implementation gates are complete on this source. Status remains `In Progress` pending the
+downstream test-integrity, adversarial and integration reviews; review-dependent documentation,
+archive/index updates, commit and push remain owned by later workflow steps.

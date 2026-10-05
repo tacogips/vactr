@@ -1,18 +1,19 @@
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { Transaction } from '@codemirror/state';
-import { EditorView, runScopeHandlers } from '@codemirror/view';
+import { Text, Transaction } from '@codemirror/state';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EditorDeps } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
 import { mount } from '../../src/code/mount';
 import { formatDocument, formatKeymap, FORMAT_KEY, minimalChange, type Formatter } from '../../src/code/format';
+import { CodeSurface } from '../../src/code/surface';
+import { DocumentSync } from '../../src/code/sync';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
-const views: EditorView[] = [];
+const views: CodeSurface[] = [];
 
 interface NodeFs {
   readFileSync(path: string): Uint8Array<ArrayBuffer> | string;
@@ -21,24 +22,23 @@ interface NodeFs {
 const proc = (globalThis as unknown as { process: { cwd(): string } }).process;
 
 afterEach(() => {
-  for (const view of views.splice(0)) view.destroy();
+  for (const view of views.splice(0)) view.dispose();
   document.body.replaceChildren();
 });
 
-function viewWith(text: string): EditorView {
-  const transactions: Transaction[] = [];
-  const view = new EditorView({
-    parent: document.body,
-    doc: text,
-    extensions: [EditorView.updateListener.of((update) => transactions.push(...update.transactions))],
-  });
-  (view as EditorView & { seenTransactions: Transaction[] }).seenTransactions = transactions;
+function viewWith(text: string): CodeSurface {
+  const client = new Client(new RecordingTransport(), { store: new Store() });
+  const sync = new DocumentSync(client.document('main.vact'), Text.of(text.split('\n')));
+  const view = new CodeSurface({ sync });
+  const transactions: { changes: Transaction['changes']; userEvent: string | null }[] = [];
+  view.subscribe((update) => { if (update.docChanged) transactions.push({ changes: update.changes, userEvent: update.userEvent }); });
+  (view as CodeSurface & { seenTransactions: typeof transactions }).seenTransactions = transactions;
   views.push(view);
   return view;
 }
 
-function seen(view: EditorView): Transaction[] {
-  return (view as EditorView & { seenTransactions: Transaction[] }).seenTransactions;
+function seen(view: CodeSurface): { changes: Transaction['changes']; userEvent: string | null }[] {
+  return (view as CodeSurface & { seenTransactions: { changes: Transaction['changes']; userEvent: string | null }[] }).seenTransactions;
 }
 
 function deps(): EditorDeps {
@@ -59,7 +59,7 @@ describe('formatDocument', () => {
     await expect(formatDocument(view, formatter)).resolves.toBe(true);
     expect(view.state.doc.toString()).toBe('a\n\tb\n');
     expect(seen(view)).toHaveLength(1);
-    expect(seen(view)[0]?.annotation(Transaction.userEvent)).toBe('format');
+    expect(seen(view)[0]?.userEvent).toBe('format');
     const changes: { from: number; to: number; insert: string }[] = [];
     seen(view)[0]?.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
       changes.push({ from: fromA, to: toA, insert: inserted.toString() });
@@ -96,10 +96,12 @@ describe('formatKeymap', () => {
   it('does not conflict with the default or history keymaps and reports unavailable without a formatter', () => {
     expect(FORMAT_KEY).toBe('Shift-Alt-f');
     expect([...defaultKeymap, ...historyKeymap].some((binding) => binding.key === FORMAT_KEY)).toBe(false);
-    const view = new EditorView({ parent: document.body, extensions: [formatKeymap(() => undefined)] });
+    const view = viewWith('');
+    const dispose = formatKeymap(view, () => undefined);
     views.push(view);
     const event = new KeyboardEvent('keydown', { key: 'f', altKey: true, shiftKey: true, bubbles: true });
-    expect(runScopeHandlers(view, event, 'editor')).toBe(false);
+    expect(view.runKeymaps(event)).toBe(false);
+    dispose();
   });
 
   it('formats through the mounted code pane keymap', async () => {
@@ -110,11 +112,11 @@ describe('formatKeymap', () => {
     const format = vi.fn(async (text: string) => ({ status: 0, text: 'let x 1\n' }));
     editorDeps.formatter = { format };
     const mounted = mount(root, editorDeps);
-    const view = editorDeps.code?.view;
+    const view = editorDeps.code?.surface as CodeSurface | undefined;
     expect(view).toBeDefined();
     view?.dispatch({ changes: { from: 0, insert: 'let x 1' } });
     const event = new KeyboardEvent('keydown', { key: 'f', altKey: true, shiftKey: true, bubbles: true });
-    expect(runScopeHandlers(view as EditorView, event, 'editor')).toBe(true);
+    expect(view?.runKeymaps(event)).toBe(true);
     await vi.waitFor(() => expect(view?.state.doc.toString()).toBe('let x 1\n'));
     expect(format).toHaveBeenCalledWith('let x 1');
     mounted.dispose();

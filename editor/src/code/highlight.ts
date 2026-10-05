@@ -9,8 +9,6 @@
 // forgets expired ones. An event without `src`, of another file, or whose
 // span no longer maps (edited, or older than the history) is dropped.
 
-import { StateEffect, StateField, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import type { AudibleClock, Clock } from '../app/clock';
 import type { Ratio, Span, TempoBody, WirePlaying } from '../protocol/types';
 import type { Range16 } from './history';
@@ -195,44 +193,4 @@ export class HighlightScheduler {
   clear(): void {
     this.entries = [];
   }
-}
-
-// ------------------------------------------------------------ decorations
-
-export const setPlaying = StateEffect.define<Range16[]>();
-
-const playingMark = Decoration.mark({ class: PLAYING_CLASS });
-
-export const playingField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(deco, tr) {
-    let next = deco.map(tr.changes);
-    for (const e of tr.effects) {
-      if (e.is(setPlaying)) {
-        const len = tr.state.doc.length;
-        next = Decoration.set(
-          e.value
-            .filter((r) => r.from < r.to && r.to <= len)
-            .map((r) => playingMark.range(r.from, r.to)),
-          true,
-        );
-      }
-    }
-    return next;
-  },
-  provide: (f) => EditorView.decorations.from(f),
-});
-
-/** The playing-step decoration field. */
-export function highlightExtension(): Extension {
-  return playingField;
-}
-
-/** The decorated ranges of a view (tests, status). */
-export function playingRanges(view: EditorView): Range16[] {
-  const out: Range16[] = [];
-  view.state.field(playingField).between(0, view.state.doc.length, (from, to) => {
-    out.push({ from, to });
-  });
-  return out;
 }

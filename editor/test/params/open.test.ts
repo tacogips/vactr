@@ -155,10 +155,15 @@ describe('call groups and editor kinds (criterion 4)', () => {
     const { h, params } = rig();
     const rows = [...h.root.querySelectorAll('.params-group')].map((r) => r.querySelector('.params-open')?.textContent);
     expect(rows).toEqual(['eq-curve', 'envelope-shape', 'euclid-ring', 'scalar', 'scalar']);
-    const heads = [...h.view.dom.querySelectorAll('.params-call-head')].map((e) => e.textContent);
+    const heads = h.view.annotationRanges().filter((r) => r.kind === 'call-head').map((r) => r.label?.split(':').at(-2));
     expect(heads).toEqual(['peq', 'env-adsr', 'euclid', 'odd', 'wobble']);
-    const env = h.view.dom.querySelector('.params-call-head[data-group$=":env-adsr:1"]') as HTMLElement;
-    env.click();
+    const env = h.view.annotationRanges().find((r) => r.kind === 'call-head' && r.label?.endsWith(':env-adsr:1'));
+    expect(env).toBeDefined();
+    const pointer = (type: string): PointerEvent => Object.assign(new Event(type), {
+      button: 0, clientX: env!.from, clientY: 1, pointerId: 1, isPrimary: true,
+    }) as PointerEvent;
+    h.view.notifyPointer(pointer('pointerdown'));
+    h.view.notifyPointer(pointer('pointerup'));
     expect(params.current?.kind).toBe('envelope-shape');
     expect(params.current?.handles.map((x) => [x.param, x.siteId])).toEqual([
       ['attack', 3],

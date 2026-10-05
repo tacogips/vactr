@@ -1,5 +1,5 @@
 // Inline diagnostics (design 15.1.5): three sources merged into one
-// `@codemirror/lint` diagnostic set.
+// presentation ranges are owned by the canvas surface.
 //
 // - static: the `diagnostics` of the file's latest `eval-result`, at that
 //   reply's `doc_revision`;
@@ -12,8 +12,7 @@
 // Every span is mapped from its revision to the current text; an
 // unmappable one is dropped.
 
-import { setDiagnostics, type Diagnostic as LintDiagnostic } from '@codemirror/lint';
-import type { EditorView } from '@codemirror/view';
+import type { CodeAnnotation, CodeSurface } from '../app/apis';
 import type { Tier } from '../app/deps';
 import type { Client } from '../protocol/client';
 import { defaultTimers, type Timers } from '../protocol/document';
@@ -42,11 +41,10 @@ export interface DiagnosticsOptions {
   timers?: Timers;
   /** The current document text (for the check). */
   text: () => string;
+  announce?: (message: string) => void;
 }
 
-function lintSeverity(s: Severity): LintDiagnostic['severity'] {
-  return s === 'hint' ? 'hint' : s;
-}
+export interface PresentedDiagnostic extends CodeAnnotation { severity: Severity; message: string; source: string }
 
 function runtimeMessage(d: Diagnostic): string {
   const where: string[] = [];
@@ -58,13 +56,14 @@ function runtimeMessage(d: Diagnostic): string {
 export class DiagnosticsController {
   private readonly opts: DiagnosticsOptions;
   private readonly timers: Timers;
-  private view: EditorView | null = null;
+  private surface: CodeSurface | null = null;
   private staticBatch: Batch | null = null;
   private checkBatch: Batch | null = null;
   private readonly runtime = new Map<string, Batch[]>();
   private evalRev: number | null = null;
   private timer: unknown = null;
-  private merged: LintDiagnostic[] = [];
+  private merged: PresentedDiagnostic[] = [];
+  private announcedCount = -1;
   private readonly offs: (() => void)[] = [];
 
   constructor(opts: DiagnosticsOptions) {
@@ -99,14 +98,18 @@ export class DiagnosticsController {
     return this.opts.tier === 'browser' && this.opts.core !== undefined;
   }
 
-  attach(view: EditorView): void {
-    this.view = view;
+  attach(surface: CodeSurface): void {
+    this.surface = surface;
     this.refresh();
   }
 
   /** The merged diagnostics last pushed to the view. */
-  current(): readonly LintDiagnostic[] {
+  current(): readonly PresentedDiagnostic[] {
     return this.merged;
+  }
+
+  diagnosticAt(pos: number): PresentedDiagnostic | null {
+    return this.merged.find((diagnostic) => diagnostic.from <= pos && pos <= diagnostic.to) ?? null;
   }
 
   /** Runs the typing-time check now (browser tier only). */
@@ -128,7 +131,7 @@ export class DiagnosticsController {
 
   /** Recomputes the merged set and pushes it to the view. */
   refresh(): void {
-    const out: LintDiagnostic[] = [];
+    const out: PresentedDiagnostic[] = [];
     const seen = new Set<string>();
     const add = (b: Batch | null, source: DiagSource): void => {
       if (!b) return;
@@ -139,7 +142,8 @@ export class DiagnosticsController {
         const key = `${r.from}:${r.to}:${d.severity}:${message}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ from: r.from, to: r.to, severity: lintSeverity(d.severity), message, source: `${source}:${d.code}` });
+        out.push({ from: r.from, to: r.to, kind: 'diagnostic', className: `vact-diag-${d.severity}`,
+          label: message, severity: d.severity, message, source: `${source}:${d.code}` });
       }
     };
     add(this.staticBatch, 'static');
@@ -147,15 +151,19 @@ export class DiagnosticsController {
     for (const batches of this.runtime.values()) for (const b of batches) add(b, 'runtime');
     out.sort((a, b) => a.from - b.from || a.to - b.to);
     this.merged = out;
-    const view = this.view;
-    if (view) view.dispatch(setDiagnostics(view.state, out));
+    this.surface?.annotate('diagnostics', out);
+    if (this.announcedCount !== out.length) {
+      this.announcedCount = out.length;
+      this.opts.announce?.(out.length === 1 ? '1 diagnostic' : `${out.length} diagnostics`);
+    }
   }
 
   dispose(): void {
     this.disarm();
     for (const off of this.offs) off();
     this.offs.length = 0;
-    this.view = null;
+    this.surface?.annotate('diagnostics', []);
+    this.surface = null;
   }
 
   private scheduleCheck(): void {

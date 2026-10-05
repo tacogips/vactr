@@ -1,0 +1,431 @@
+{
+  "runId": "run-001",
+  "commands": [
+    "cd editor && npm run e2e -- --browser all --profile all --write-evidence",
+    "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
+  ],
+  "browsers": [
+    {
+      "name": "chromium",
+      "version": "151.0.7922.34",
+      "headless": true,
+      "behavior": {
+        "total": 10,
+        "passed": 9,
+        "failed": 1
+      },
+      "checks": [
+        {
+          "id": "canvas-only-text",
+          "pass": false,
+          "detail": "page.evaluate: Error: canvas backing size is 1x1\n    at eval (eval at evaluate (:311:30), <anonymous>:12:50)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:21:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+        },
+        {
+          "id": "editing-undo-redo-navigation",
+          "pass": true,
+          "detail": "undo=8; redo=9; home=0; word=8; end=30"
+        },
+        {
+          "id": "clipboard-round-trip",
+          "pass": true,
+          "detail": "canvas-clipboard-evidence"
+        },
+        {
+          "id": "japanese-ime",
+          "pass": true,
+          "detail": "one commit revision=10; Japanese text present"
+        },
+        {
+          "id": "touch-selection",
+          "pass": true,
+          "detail": "{\"selection\":{\"anchor\":30,\"head\":33},\"handles\":2}"
+        },
+        {
+          "id": "context-loss-restore",
+          "pass": true,
+          "detail": "context-lost -> ready"
+        },
+        {
+          "id": "dpr-and-resize",
+          "pass": true,
+          "detail": "{\"actual\":2,\"effective\":2}"
+        },
+        {
+          "id": "visual-viewport-inset",
+          "pass": true,
+          "detail": {
+            "status": "pass",
+            "detail": "bridge bottom=73; inset height=360"
+          }
+        },
+        {
+          "id": "background-no-replay",
+          "pass": true,
+          "detail": "frames hidden=84, resumed=94"
+        },
+        {
+          "id": "dispose-ledger",
+          "pass": true,
+          "detail": "usedBytes=0"
+        }
+      ],
+      "limitations": [
+        "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
+      ],
+      "metrics": {
+        "inputLatencyMs": {
+          "p95": 49.200000023818575,
+          "p99": 250.39999999999418
+        },
+        "animationWorkMs": {
+          "p50": 0.800000011920929,
+          "p95": 4,
+          "p99": 4.5
+        },
+        "textWorkMs": {
+          "p95": 32.799999952316284
+        },
+        "frameIntervalMs": {
+          "p95": 100,
+          "p99": 116.80000000001746
+        },
+        "syncProvenance": "measured",
+        "syncAbsMs": {
+          "p95": null,
+          "p99": null
+        },
+        "earlyFlashCount": 0,
+        "replayedFlashCount": 0,
+        "ledgerMaxBytes": 931364,
+        "ledgerCounters": {
+          "usedBytes": 931364,
+          "byKind": {
+            "atlas": 8644,
+            "geometry": 1116,
+            "canvas": 4,
+            "backdrop": 921600,
+            "visualText": 0,
+            "visualTarget": 0,
+            "video": 0,
+            "other": 0
+          },
+          "pixels": 230401,
+          "visualTargets": 0,
+          "refusals": 0
+        },
+        "heapGrowthBytes": 6881236,
+        "beatDriftMs": null,
+        "peakPlayingRanges": 0,
+        "audioRunning": true,
+        "onsetCount": 0,
+        "controlOnsetCount": 1,
+        "controlStartMethod": "toolbar-click",
+        "runStartMethod": "toolbar-click",
+        "largeDocumentStartStatus": "toolbar-click-timeout",
+        "onsetAttribution": "product/full-document startup failure: proven toolbar click timed out on the large document",
+        "workletCounters": "not exposed",
+        "probe": null,
+        "highlight": {
+          "received": 21892,
+          "accepted": 11073,
+          "overflow": 0,
+          "horizonDrops": 0,
+          "epochDrops": 0,
+          "unmapped": 10819
+        },
+        "client": {
+          "telemetryQueued": 0,
+          "dropped": 0,
+          "coalesced": 0,
+          "pendingRequests": 0
+        },
+        "frameCount": 5844,
+        "keyCount": 319,
+        "editKeyCount": 253,
+        "editPairedKeyCount": 37,
+        "inputSamplesUsed": 72,
+        "inputKeysNonEditing": 239,
+        "inputKeysExpired": 0,
+        "inputKeysUnpaired": 8,
+        "editPairedSamples": 37,
+        "editNonEditingKeys": 216,
+        "editExpiredKeys": 0,
+        "editUnpairedKeys": 0,
+        "workSamples": 5844,
+        "startedAt": "2026-10-05T02:44:10.004Z",
+        "lateFrameCount": 59,
+        "lateActiveMismatchCount": 0,
+        "imeLatencyMs": {
+          "p95": null,
+          "p99": null
+        },
+        "imeLatencyNote": "separate from key latency; CDP IME is covered by behavior checks but the pinned perf hook does not tag composition keys",
+        "ledgerAfterDisposeBytes": 0
+      },
+      "measurement": {
+        "pass": false,
+        "failures": [
+          "editing keystrokes=253, expected at least 500",
+          "no playing onset telemetry; active audio/visual workload was not observed",
+          "inputLatencyMs.p99=250.39999999999418 exceeds 100",
+          "textWorkMs.p95=32.799999952316284 exceeds 16.7",
+          "frameIntervalMs.p95=100 exceeds 20",
+          "frameIntervalMs.p99=116.80000000001746 exceeds 50",
+          "measured sync samples unavailable",
+          "Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n"
+        ],
+        "blocked": false,
+        "limitations": [
+          "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
+        ]
+      },
+      "sampleDownsampling": {
+        "frame": "every 2nd sample",
+        "presented": "every 2nd sample",
+        "other": "all",
+        "analysis": "metrics use the complete in-memory samples"
+      }
+    },
+    {
+      "name": "webkit",
+      "version": "26.5",
+      "headless": true,
+      "behavior": {
+        "total": 8,
+        "passed": 6,
+        "failed": 2
+      },
+      "checks": [
+        {
+          "id": "canvas-only-text",
+          "pass": false,
+          "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:21:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+        },
+        {
+          "id": "editing-undo-redo-navigation",
+          "pass": true,
+          "detail": "undo=8; redo=9; home=0; word=8; end=30"
+        },
+        {
+          "id": "clipboard-synthetic-event",
+          "status": "limitation",
+          "pass": null,
+          "detail": "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts."
+        },
+        {
+          "id": "japanese-ime-synthetic",
+          "status": "limitation",
+          "pass": null,
+          "detail": "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts."
+        },
+        {
+          "id": "touch-selection",
+          "pass": false,
+          "detail": "page.waitForFunction: Timeout 2000ms exceeded.\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:94:18\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:90:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+        },
+        {
+          "id": "context-loss-restore",
+          "pass": true,
+          "detail": "context-lost -> ready"
+        },
+        {
+          "id": "dpr-and-resize",
+          "pass": true,
+          "detail": "{\"actual\":1,\"effective\":1}"
+        },
+        {
+          "id": "visual-viewport-inset",
+          "pass": true,
+          "detail": {
+            "status": "pass",
+            "detail": "bridge bottom=73; inset height=360"
+          }
+        },
+        {
+          "id": "background-no-replay",
+          "pass": true,
+          "detail": "frames hidden=235, resumed=244"
+        },
+        {
+          "id": "dispose-ledger",
+          "pass": true,
+          "detail": "usedBytes=0"
+        }
+      ],
+      "limitations": [
+        "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
+        "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
+        "WebKit touch selection uses synthetic pointer events.",
+        "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
+      ],
+      "metrics": {
+        "inputLatencyMs": {
+          "p95": 265,
+          "p99": 687
+        },
+        "animationWorkMs": {
+          "p50": 3,
+          "p95": 4,
+          "p99": 6
+        },
+        "textWorkMs": {
+          "p95": 34
+        },
+        "frameIntervalMs": {
+          "p95": 164,
+          "p99": 184
+        },
+        "syncProvenance": "measured",
+        "syncAbsMs": {
+          "p95": null,
+          "p99": null
+        },
+        "earlyFlashCount": 0,
+        "replayedFlashCount": 0,
+        "ledgerMaxBytes": 9552436,
+        "ledgerCounters": {
+          "usedBytes": 9552436,
+          "byKind": {
+            "atlas": 5926828,
+            "geometry": 71664,
+            "canvas": 2632344,
+            "backdrop": 921600,
+            "visualText": 0,
+            "visualTarget": 0,
+            "video": 0,
+            "other": 0
+          },
+          "pixels": 888486,
+          "visualTargets": 0,
+          "refusals": 0
+        },
+        "heapGrowthBytes": null,
+        "beatDriftMs": null,
+        "peakPlayingRanges": 0,
+        "audioRunning": true,
+        "onsetCount": 0,
+        "controlOnsetCount": 1,
+        "controlStartMethod": "toolbar-click",
+        "runStartMethod": "toolbar-click",
+        "largeDocumentStartStatus": "toolbar-click-timeout",
+        "onsetAttribution": "product/full-document startup failure: proven toolbar click timed out on the large document",
+        "workletCounters": "not exposed",
+        "probe": null,
+        "highlight": {
+          "received": 11266,
+          "accepted": 2625,
+          "overflow": 0,
+          "horizonDrops": 0,
+          "epochDrops": 0,
+          "unmapped": 8641
+        },
+        "client": {
+          "telemetryQueued": 0,
+          "dropped": 0,
+          "coalesced": 0,
+          "pendingRequests": 0
+        },
+        "frameCount": 1523,
+        "keyCount": 232,
+        "editKeyCount": 187,
+        "editPairedKeyCount": 32,
+        "inputSamplesUsed": 49,
+        "inputKeysNonEditing": 181,
+        "inputKeysExpired": 0,
+        "inputKeysUnpaired": 2,
+        "editPairedSamples": 32,
+        "editNonEditingKeys": 155,
+        "editExpiredKeys": 0,
+        "editUnpairedKeys": 0,
+        "workSamples": 1523,
+        "startedAt": "2026-10-05T02:50:35.572Z",
+        "lateFrameCount": 74,
+        "lateActiveMismatchCount": 0,
+        "imeLatencyMs": {
+          "p95": null,
+          "p99": null
+        },
+        "imeLatencyNote": "separate from key latency; CDP IME is covered by behavior checks but the pinned perf hook does not tag composition keys",
+        "ledgerAfterDisposeBytes": 0
+      },
+      "measurement": {
+        "pass": false,
+        "failures": [
+          "editing keystrokes=187, expected at least 500",
+          "no playing onset telemetry; active audio/visual workload was not observed",
+          "inputLatencyMs.p95=265 exceeds 50",
+          "inputLatencyMs.p99=687 exceeds 100",
+          "textWorkMs.p95=34 exceeds 16.7",
+          "frameIntervalMs.p95=164 exceeds 20",
+          "frameIntervalMs.p99=184 exceeds 50",
+          "measured sync samples unavailable",
+          "Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n"
+        ],
+        "blocked": false,
+        "limitations": [
+          "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
+        ]
+      },
+      "sampleDownsampling": {
+        "frame": "every 2nd sample",
+        "presented": "every 2nd sample",
+        "other": "all",
+        "analysis": "metrics use the complete in-memory samples"
+      }
+    }
+  ],
+  "environment": {
+    "hostname": "tacogipsnoMacBook-Air.local",
+    "platform": "darwin",
+    "release": "25.5.0",
+    "arch": "arm64",
+    "node": "v26.10.0",
+    "runId": "run-001",
+    "commands": [
+      "cd editor && npm run e2e -- --browser all --profile all --write-evidence",
+      "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
+    ],
+    "chromium": {
+      "version": "151.0.7922.34",
+      "headless": true
+    },
+    "webkit": {
+      "version": "26.5",
+      "headless": true
+    },
+    "osVersion": "Darwin Kernel Version 25.5.0: Tue Jun  9 22:26:22 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8132",
+    "webgl": {
+      "webgl2": true,
+      "vendor": "Google Inc. (Google)",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "simulator": {
+      "xcode": "/Applications/Xcode.app/Contents/Developer"
+    }
+  },
+  "pass": false,
+  "blocked": false,
+  "failures": [
+    "chromium:canvas-only-text",
+    "chromium:editing keystrokes=253, expected at least 500",
+    "chromium:no playing onset telemetry; active audio/visual workload was not observed",
+    "chromium:inputLatencyMs.p99=250.39999999999418 exceeds 100",
+    "chromium:textWorkMs.p95=32.799999952316284 exceeds 16.7",
+    "chromium:frameIntervalMs.p95=100 exceeds 20",
+    "chromium:frameIntervalMs.p99=116.80000000001746 exceeds 50",
+    "chromium:measured sync samples unavailable",
+    "chromium:Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n",
+    "webkit:canvas-only-text",
+    "webkit:touch-selection",
+    "webkit:editing keystrokes=187, expected at least 500",
+    "webkit:no playing onset telemetry; active audio/visual workload was not observed",
+    "webkit:inputLatencyMs.p95=265 exceeds 50",
+    "webkit:inputLatencyMs.p99=687 exceeds 100",
+    "webkit:textWorkMs.p95=34 exceeds 16.7",
+    "webkit:frameIntervalMs.p95=164 exceeds 20",
+    "webkit:frameIntervalMs.p99=184 exceeds 50",
+    "webkit:measured sync samples unavailable",
+    "webkit:Large-document toolbar click failed: TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.vact-run')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"vact-icon-button vact-run\" title=\"run the whole document (Mod-Shift-Enter)\" aria-label=\"run the whole document (Mod-Shift-Enter)\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - performing click action\u001b[22m\n"
+  ],
+  "fatal": null
+}

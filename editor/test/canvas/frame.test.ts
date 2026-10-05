@@ -75,6 +75,14 @@ describe('FrameScheduler', () => {
     f.host.viewport.dispatchEvent(new Event('resize')); f.host.flush();
     expect(f.onViewport).toHaveBeenCalledTimes(1); expect(f.onViewport).toHaveBeenLastCalledWith({ width: 320, height: 200, dpr: 1, keyboardInset: 300 }); f.scheduler.dispose();
   });
+  it('keeps a pending viewport update when the last animation owner stops', () => {
+    const f = setup(); f.host.flush(); f.scheduler.setActive('playing', true);
+    f.host.box.width = 400; f.host.resizeCallback?.([], {} as ResizeObserver);
+    f.scheduler.setActive('playing', false);
+    expect(f.host.callbacks.size).toBe(1); f.host.flush();
+    expect(f.onViewport).toHaveBeenCalledWith({ width: 400, height: 200, dpr: 1, keyboardInset: 0 });
+    expect(f.host.callbacks.size).toBe(0); f.scheduler.dispose();
+  });
   it('cancels on freeze, resumes without hidden rAF, and disposes observers/listeners', () => {
     const f = setup(); const host = thisHost;
     f.doc.dispatchEvent(new Event('freeze')); expect(f.scheduler.hidden).toBe(true); expect(f.host.callbacks.size).toBe(0);

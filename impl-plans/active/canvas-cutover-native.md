@@ -291,8 +291,8 @@ independent test-integrity re-review.
 - [x] Build, clippy, focused nextest, Wasm build and src-tauri check pass
 - [x] Stale clock coverage uses nonzero samples on both sides of the one-second threshold (the mutation without the age predicate is mutationEvidence, not gating)
 - [x] Clock discontinuity drops pending telemetry while preserving diagnostics and requester replies
-- [ ] Session 266: restored-source gating table re-run on the `40467f3` bytes (or the reviewed fix), every row passing, recorded in `checks.log` with log paths and source sha256 values
-- [ ] Session 266: mutation runs reported only under `mutationEvidence`
+- [x] Session 266: restored-source gating table re-run on the `40467f3` bytes (or the reviewed fix), every row passing, recorded in `checks.log` with log paths and source sha256 values
+- [x] Session 266: mutation runs reported only under `mutationEvidence`
 - [ ] Session 266: independent test-integrity re-review accepts NATIVE-TI-001 and NATIVE-TI-002; adversarial and integration reviews accepted
 
 ## Progress Log
@@ -315,3 +315,10 @@ Source hashes were restored after both mutations (20/20 receipt hashes matched).
 
 ### Session: 2026-10-05 (session 266 plan amendment)
 **Tasks Completed**: Plan amended per operator decisions A, C and D. Artifact roots declared; the wasm row aligned to the host-wasm build; the rustfmt row made concrete; the session-265 log split into gating, mutationEvidence and history; re-verification and re-review criteria added. Source was not changed.
+
+### Session: 2026-10-05 (session 266 implementation verification)
+**Tasks Completed**: Re-ran every restored-source gating command on the `40467f3` native source hashes. All native source hashes matched the checkpoint; only this progress log changed afterward.
+**Verification (gating, final source)**: build, strict clippy, focused nextest (493/493), host-Wasm build, Tauri cargo check, touched-file rustfmt, line-count check (896/940), and full nextest (2,810 passed, 3 skipped) exited 0. Full nextest completed in 855.070 seconds under the 1,800-second timeout budget. Complete logs: `tmp/canvas-cutover/native/session266-{build,clippy,focused-nextest,host-wasm,tauri-check,rustfmt,line-count,full-nextest}.log`; aggregate: `tmp/canvas-cutover/native/checks.log`.
+**mutationEvidence (non-gating, expected nonzero)**: NATIVE-TI-001 removed the one-second staleness predicate, focused clock test failed as expected with exit 100, `tmp/canvas-cutover/native/mutation-stale-rule-removed.log`. NATIVE-TI-002 restored the old requester-only outbox predicate, the targeted discontinuity assertion failed as expected with exit 100; complete log is recorded in `tmp/canvas-cutover/native/checks.log`. Both mutations were restored and source hashes matched afterward. These runs are reported separately from the passing gating commands.
+**Contract clarification for review**: `ServerMsg::Playing` routes as `Broadcast(Topic::Telemetry)` in `src/session/protocol.rs`, so it is dropped by `clock_discontinuity` together with other pending telemetry. Diag, Manifest and requester replies are preserved. This follows the assigned acceptance contract; the Session 266 bullet above that says queued Playing survives is inconsistent and should be reconciled during independent review.
+**Downstream**: Independent test-integrity re-review of NATIVE-TI-001/NATIVE-TI-002, adversarial review, integration review and closeout remain pending workflow steps.

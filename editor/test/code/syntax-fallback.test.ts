@@ -3,6 +3,7 @@ import type { EditorDeps, Mounted } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
 import { mount } from '../../src/code/mount';
 import type { VactSyntax } from '../../src/code/syntax';
+import { FallbackSpans } from '../../src/code/syntax';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
@@ -35,7 +36,7 @@ async function flushLoader(): Promise<void> {
 }
 
 function enterCode(deps: EditorDeps): void {
-  deps.code?.view.dispatch({ changes: { from: 0, insert: 'let x 1' } });
+  deps.code?.surface.dispatch({ changes: { from: 0, insert: 'let x 1' } });
 }
 
 afterEach(() => {
@@ -46,20 +47,22 @@ afterEach(() => {
 });
 
 describe('tree-sitter highlighting fallback', () => {
-  it('keeps StreamLanguage active when loading rejects', async () => {
+  it('keeps the tokenizer fallback active when loading rejects', async () => {
     const { layout, deps } = setup(() => Promise.reject(new Error('load failed')));
     await flushLoader();
     enterCode(deps);
     await flushLoader();
     expect(layout.code.dataset.syntax).toBe('fallback');
-    expect(layout.code.querySelector('.vact-tok-head')).not.toBeNull();
-    expect(layout.code.querySelector('.vact-tok-number')).not.toBeNull();
+    expect(deps.code?.surface.state.doc.toString()).toBe('let x 1');
+    expect(layout.code.textContent).not.toContain('let x 1');
+    const spans = new FallbackSpans().spans(deps.code!.surface.state, 0, 7, 64).spans;
+    expect(spans.map((span) => span.className)).toEqual(expect.arrayContaining(['vact-tok-head', 'vact-tok-number']));
   });
 
   it('switches to tree-sitter only after its loader resolves', async () => {
     const syntax: VactSyntax = {
       parse: (text) => ({
-        captures: () => (text ? [{ name: 'keyword', from: 0, to: 3 }] : []),
+        captures: () => (text ? [{ name: 'keyword', from: 0, to: 3 }, { name: 'number', from: 6, to: 7 }] : []),
         delete: () => undefined,
       }),
     };
@@ -69,7 +72,11 @@ describe('tree-sitter highlighting fallback', () => {
     enterCode(deps);
     await flushLoader();
     expect(layout.code.dataset.syntax).toBe('tree-sitter');
-    expect(layout.code.querySelector('.vact-tok-head')).not.toBeNull();
+    expect(deps.code?.surface.state.doc.toString()).toBe('let x 1');
+    expect(layout.code.textContent).not.toContain('let x 1');
+    const { SyntaxSpans } = await import('../../src/code/syntax');
+    const spans = new SyntaxSpans(syntax).spans(deps.code!.surface.state, 0, 7, 64).spans;
+    expect(spans.map((span) => span.className)).toEqual(expect.arrayContaining(['vact-tok-head', 'vact-tok-number']));
   });
 
   it('keeps the fallback when no loader is provided', () => {

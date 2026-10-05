@@ -10,8 +10,7 @@
 // 3. the change set is recorded in the `RevisionHistory` under the new
 //    revision, so any span of a kept revision maps to the current text.
 
-import type { ChangeSet, Extension, Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import type { ChangeSet, Text } from '@codemirror/state';
 import type { CodeSurface } from './surface';
 import type { DocSync } from '../protocol/document';
 import type { Span } from '../protocol/types';
@@ -90,10 +89,4 @@ export class DocumentSync {
     return surface.subscribe((update) => { if (update.docChanged) cb(this.revision); });
   }
 
-  /** Legacy compatibility until CE-JOIN; never install on a headless surface. */
-  extension(): Extension {
-    return EditorView.updateListener.of((update) => {
-      for (const tr of update.transactions) this.apply(tr);
-    });
-  }
 }

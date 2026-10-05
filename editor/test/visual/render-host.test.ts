@@ -69,6 +69,13 @@ const program = (out: 0 | 1 | 2 | 3, source: string, uniform_names: string[] = [
 
 function setup(): { gl: RecordingGL; host: GlRenderHost; diags: HostDiagnostic[] } {
   const gl = new RecordingGL();
+  Object.assign(gl, {
+    BLEND: 0x0be2, SRC_ALPHA: 0x0302, ONE_MINUS_SRC_ALPHA: 0x0303,
+    texSubImage2D: (...args: unknown[]) => gl.calls.push({ fn: 'texSubImage2D', args }),
+    enable: (...args: unknown[]) => gl.calls.push({ fn: 'enable', args }),
+    disable: (...args: unknown[]) => gl.calls.push({ fn: 'disable', args }),
+    blendFunc: (...args: unknown[]) => gl.calls.push({ fn: 'blendFunc', args }),
+  });
   const host = new GlRenderHost(gl.as(), { width: 640, height: 360 });
   const diags: HostDiagnostic[] = [];
   host.onDiagnostic((d) => diags.push(d));
@@ -216,5 +223,37 @@ describe('GlRenderHost', () => {
     host.onRecord(program(0, OSC_ROTATE));
     expect(gl.since(mark)).toEqual([]);
     expect(gl.named('deleteFramebuffer')).toHaveLength(8);
+  });
+
+  it('uploads only changed video revisions and composites video below the output', () => {
+    const { gl, host } = setup();
+    host.onRecord(program(0, OSC_ROTATE));
+    const frame = { width: 640, height: 360 } as TexImageSource;
+    host.setVideoSource(frame, 1);
+    host.draw(0);
+    expect(gl.named('texImage2D').filter((c) => c.args.at(-1) === frame)).toHaveLength(1);
+    host.setVideoSource(frame, 1);
+    host.draw(1 / 60);
+    expect(gl.named('texSubImage2D')).toHaveLength(0);
+    host.setVideoSource({ width: 640, height: 360 } as TexImageSource, 2);
+    host.draw(2 / 60);
+    expect(gl.named('texSubImage2D')).toHaveLength(1);
+    const mark = gl.calls.length;
+    host.present(0);
+    const calls = gl.since(mark);
+    const draws = calls.map((call, index) => ({ call, index })).filter(({ call }) => call.fn === 'drawArrays');
+    const drawTexture = (drawIndex: number) =>
+      calls.slice(0, drawIndex).reverse().find((call) => call.fn === 'bindTexture')?.args[1];
+    const uploadIndex = gl.calls.findIndex((call) => call.fn === 'texImage2D' && call.args.at(-1) === frame);
+    const videoTexture = gl.calls.slice(0, uploadIndex).reverse().find((call) => call.fn === 'bindTexture')?.args[1];
+    const firstEnableIndex = calls.findIndex((call) => call.fn === 'enable');
+    expect(draws).toHaveLength(2);
+    expect(draws[0]?.index).toBeLessThan(firstEnableIndex);
+    expect(firstEnableIndex).toBeLessThan(draws[1]?.index ?? -1);
+    expect(drawTexture(draws[0]?.index ?? -1)).toBe(videoTexture);
+    expect(drawTexture(draws[1]?.index ?? -1)).toBe(host.texture(0));
+    expect(host.texture(0)).not.toBe(videoTexture);
+    expect(draws[0]?.call.args[4]).toBe(draws[1]?.call.args[4]);
+    host.dispose();
   });
 });

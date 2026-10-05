@@ -2,7 +2,9 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Language, Parser, Query } from 'web-tree-sitter';
-import { CAPTURE_CLASSES, createVactSyntax } from '../../src/code/syntax';
+import { EditorState } from '@codemirror/state';
+import { CAPTURE_CLASSES, createVactSyntax, FallbackSpans, SyntaxSpans } from '../../src/code/syntax';
+import { styleSpans } from '../../src/code/syntax-core';
 import { HEADS } from '../../src/code/language';
 
 interface Entry {
@@ -143,4 +145,54 @@ describe('tree-sitter syntax WASM', () => {
     expect(keywordLists).toHaveLength(2);
     for (const keywords of keywordLists) expect(keywords).toEqual(HEADS);
   });
+
+  it('produces head and number spans through both fallback and tree-sitter providers', () => {
+    const state = EditorState.create({ doc: 'let x 1' });
+    const expected = expect.arrayContaining(['vact-tok-head', 'vact-tok-number']);
+    expect(new FallbackSpans().spans(state, 0, state.doc.length, 32).spans.map((span) => span.className)).toEqual(expected);
+    const provider = new SyntaxSpans(createVactSyntax(parser, query));
+    try { expect(provider.spans(state, 0, state.doc.length, 32).spans.map((span) => span.className)).toEqual(expected); }
+    finally { provider.dispose(); }
+  });
+
+  it('keeps SyntaxSpans equivalent to a fresh parse across 200 mixed edits', () => {
+    const syntax = createVactSyntax(parser, query);
+    const reparse = syntax.reparse!;
+    const parse = syntax.parse;
+    let incrementalEdits = 0, fullParses = 0;
+    const observedSyntax = { ...syntax, reparse: (...args: Parameters<NonNullable<typeof syntax.reparse>>) => {
+      incrementalEdits += 1;
+      return reparse(...args);
+    }, parse: (text: string) => { fullParses += 1; return parse(text); } };
+    const provider = new SyntaxSpans(observedSyntax);
+    let state = EditorState.create({ doc: Array.from({ length: 2000 }, (_, line) => `let value${line} ${line} # 日本`).join('\n') });
+    let seed = 0x12345678;
+    const random = (max: number): number => { seed = (1664525 * seed + 1013904223) >>> 0; return seed % max; };
+    const inserts = ['x', '日本', '\nlet fresh 7\n', '日本\n'];
+    try {
+      for (let i = 0; i < 200; i += 1) {
+        const length = state.doc.length;
+        const from = random(length + 1);
+        const kind = i % 3;
+        const to = kind === 0 ? from : Math.min(length, from + 1 + random(Math.max(1, Math.min(8, length - from))));
+        const insert = kind === 1 ? '' : inserts[random(inserts.length)]!;
+        const tr = state.update({ changes: { from, to, insert } });
+        provider.noteChanges(tr.changes, tr.state);
+        state = tr.state;
+        if (i % 17 === 0 && i < 199) {
+          const second = state.update({ changes: { from: 0, insert: '# coalesced 日本\n' } });
+          provider.noteChanges(second.changes, second.state);
+          state = second.state;
+        }
+        const actual = provider.spans(state, 0, state.doc.length, 100_000).spans;
+        const fresh = syntax.parse(state.doc.toString());
+        try {
+          const expectedSpans = styleSpans(fresh, 0, state.doc.length).map((span) => ({ from: span.from, to: span.to, className: span.cls }));
+          expect(actual.map(({ from: start, to: end, className }) => ({ from: start, to: end, className }))).toEqual(expectedSpans);
+        } finally { fresh.delete(); }
+      }
+      expect(incrementalEdits).toBeGreaterThan(100);
+      expect(fullParses).toBeGreaterThan(10);
+    } finally { provider.dispose(); }
+  }, 30_000);
 });

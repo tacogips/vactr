@@ -1,15 +1,12 @@
-import { EditorState, Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { Text } from '@codemirror/state';
 import { AudibleClock } from '../../src/app/clock';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   HighlightScheduler,
   TimeAnchor,
   durSeconds,
-  highlightExtension,
-  playingRanges,
-  setPlaying,
 } from '../../src/code/highlight';
+import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
 import { Client } from '../../src/protocol/client';
 import type { TempoBody, WirePlaying } from '../../src/protocol/types';
@@ -27,26 +24,24 @@ const FRAME_S = 1 / 60;
 const TEMPO: TempoBody = { bpm: 120, beats_per_cycle: 4, cycle: [0, 1] };
 const enc = new TextEncoder();
 
-const views: EditorView[] = [];
+const views: CodeSurface[] = [];
 afterEach(() => {
-  for (const v of views.splice(0)) v.destroy();
+  for (const v of views.splice(0)) v.dispose();
 });
+const playingRanges = (surface: CodeSurface) => surface.annotationRanges().filter((range) => range.kind === 'playing');
 
 function setup(text: string, clock = new MockClock()) {
   const client = new Client(new RecordingTransport());
   const initial = Text.of(text.split('\n'));
   const sync = new DocumentSync(client.document('main.vact'), initial);
-  const view = new EditorView({
-    parent: document.body,
-    state: EditorState.create({ doc: initial, extensions: [sync.extension(), highlightExtension()] }),
-  });
+  const view = new CodeSurface({ sync });
   views.push(view);
   const sched = new HighlightScheduler({
     clock,
     file: 'main.vact',
     map: (span, rev) => sync.mapWireSpan(span, rev),
     tempo: () => TEMPO,
-    apply: (ranges) => view.dispatch({ effects: setPlaying.of(ranges) }),
+    apply: (ranges) => view.annotate('playing', ranges.map((range) => ({ ...range, kind: 'playing' }))),
   });
   return { clock, sync, view, sched };
 }
@@ -72,14 +67,14 @@ describe('HighlightScheduler (criterion 1, mock clock)', () => {
     const client = new Client(new RecordingTransport());
     const initial = Text.of(text.split('\n'));
     const sync = new DocumentSync(client.document('main.vact'), initial);
-    const view = new EditorView({ parent: document.body, state: EditorState.create({ doc: initial, extensions: [sync.extension(), highlightExtension()] }) });
+    const view = new CodeSurface({ sync });
     views.push(view);
     const accepted: unknown[] = [];
     const applied: number[][] = [];
     const sched = new HighlightScheduler({
       clock: new MockClock(), audible: new AudibleClock({ at: () => ({ time: now, uncertainty: 0, provenance: 'measured' }) }),
       epoch: () => epoch, file: 'main.vact', map: (span, rev) => sync.mapWireSpan(span, rev), tempo: () => TEMPO,
-      apply: (ranges) => { applied.push(ranges.map((r) => r.from)); view.dispatch({ effects: setPlaying.of(ranges) }); },
+      apply: (ranges) => { applied.push(ranges.map((r) => r.from)); view.annotate('playing', ranges.map((range) => ({ ...range, kind: 'playing' }))); },
     });
     sched.onAccept((eventValue) => accepted.push(eventValue));
     const good = { ...event(text, 'bd', 1, [1, 1]), epoch: 'e1', end_time: 1.25 };
@@ -95,6 +90,58 @@ describe('HighlightScheduler (criterion 1, mock clock)', () => {
     epoch = 'e2';
     sched.onPlaying([good]);
     expect(sched.size).toBe(0);
+  });
+
+  it('re-derives active ranges after invalid correlation and a late frame without replaying expired events', () => {
+    const text = 'd1 "bd sd"';
+    let now = 1.1;
+    let valid = true;
+    let epoch = 'e1';
+    const client = new Client(new RecordingTransport());
+    const initial = Text.of(text.split('\n'));
+    const sync = new DocumentSync(client.document('main.vact'), initial);
+    const view = new CodeSurface({ sync });
+    views.push(view);
+    const applied: string[][] = [];
+    const sched = new HighlightScheduler({
+      clock: new MockClock(),
+      audible: new AudibleClock({ at: () => valid ? { time: now, uncertainty: 0, provenance: 'measured' } : null }),
+      epoch: () => epoch, file: 'main.vact', map: (span, rev) => sync.mapWireSpan(span, rev), tempo: () => TEMPO,
+      apply: (ranges) => {
+        applied.push(ranges.map((range) => view.state.doc.sliceString(range.from, range.to)));
+        view.annotate('playing', ranges.map((range) => ({ ...range, kind: 'playing' })));
+      },
+    });
+    const long = { ...event(text, 'bd', 1, [1, 1]), epoch: 'e1', end_time: 3 };
+    const short = { ...event(text, 'sd', 1, [1, 1]), epoch: 'e1', end_time: 1.5 };
+    sched.onPlaying([long, short]);
+    sched.tick(0);
+    expect(playingRanges(view).map((r) => view.state.doc.sliceString(r.from, r.to))).toEqual(['bd', 'sd']);
+    valid = false;
+    sched.tick(16.7);
+    expect(playingRanges(view)).toEqual([]);
+    valid = true;
+    now = 1.2;
+    sched.tick(33.4);
+    expect(playingRanges(view).map((r) => view.state.doc.sliceString(r.from, r.to))).toEqual(['bd', 'sd']);
+    now = 2;
+    sched.tick(283.4);
+    expect(playingRanges(view).map((r) => view.state.doc.sliceString(r.from, r.to))).toEqual(['bd']);
+    expect(applied).not.toContainEqual(['sd']);
+    epoch = 'e2';
+    now = 2.1;
+    sched.tick(300);
+    expect(playingRanges(view)).toEqual([]);
+    expect(sched.size).toBe(0);
+  });
+
+  it('caps pending entries at 4096 and reports overflow', () => {
+    const text = 'd1 "bd"';
+    const { sched } = setup(text);
+    const item = event(text, 'bd', 0, [1, 1]);
+    sched.onPlaying(Array.from({ length: 4100 }, () => item));
+    expect(sched.size).toBe(4096);
+    expect(sched.stats.overflow).toBe(4);
   });
 
   it('computes dur_seconds from the latest tempo', () => {

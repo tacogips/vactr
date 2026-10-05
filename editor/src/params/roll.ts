@@ -90,7 +90,7 @@ export class PianoRoll {
     const code = this.code();
     if (!e.src || !code) return '';
     const r = code.mapWireSpan(e.src.span, e.src.doc_revision);
-    return r ? code.view.state.sliceDoc(r.from, r.to) : '';
+    return r ? code.surface.state.sliceDoc(r.from, r.to) : '';
   }
 
   private draw(): void {

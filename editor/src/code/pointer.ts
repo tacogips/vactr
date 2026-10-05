@@ -72,8 +72,8 @@ export class PointerController {
       this.lastPress = { time: now, x: g.x, y: g.y, count: clicks };
     }
     if (!touch && event.pointerType === 'mouse' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && clicks === 1) {
-      g.numeric = this.options.numericDrag?.(event, position) ?? undefined;
-      if (g.numeric) { event.preventDefault(); this.capture(g.id); return; }
+      g.numeric = (this.options.numericDrag?.(event, position) ?? this.surface.numericDrag(event, position)) ?? undefined;
+      if (g.numeric) { (event as PointerEvent & { vactrNumericGesture?: boolean }).vactrNumericGesture = true; event.preventDefault(); this.capture(g.id); return; }
     }
     if (touch) {
       g.handle = this.hitHandle(event.clientX, event.clientY);

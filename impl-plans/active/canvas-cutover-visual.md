@@ -1,6 +1,6 @@
 # Canvas Cutover: Synchronized Visual Composition Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-VISUAL (wave 2; depends on CANVAS-CLOCK)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.6 (also the 15.3.5 caps and 15.3.8.7 per-frame uploads)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
@@ -182,11 +182,11 @@ Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] Hydra uses audible time, with the same `t` for frame and draw
-- [ ] Scopes are timestamp-presented with the 8-entry bound and the 2 s hide
-- [ ] Video background is capped, reused, paused when hidden, and disposed correctly
-- [ ] `onBackgroundCanvas` is implemented per the contract
-- [ ] `npm run check` exit 0; full vitest passes
+- [x] Hydra uses audible time, with the same `t` for frame and draw
+- [x] Scopes are timestamp-presented with the 8-entry bound and the 2 s hide
+- [x] Video background is capped, reused, paused when hidden, and disposed correctly
+- [x] `onBackgroundCanvas` is implemented per the contract
+- [x] `npm run check` exit 0; full vitest passes
 
 ## Progress Log
 
@@ -195,3 +195,19 @@ Edit only this plan's progress log.
 
 ### Session: 2026-10-05 (session 266 plan amendment)
 **Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared, setup separated from gating. Tasks and contracts are unchanged.
+
+### Session: 2026-10-05 (CANVAS-VISUAL implementation)
+**Tasks Completed**: TASK-001 through TASK-004 implemented. Hydra core and render host consume one audible-clock sample per rAF timestamp. Analyzer levels use an eight-entry timeline, timestamp selection and the two-second stale hide; native presentation uses the latest levels update. Added a muted local video background with 30 Hz frame admission, a reused 1280x720 aspect-fit canvas, budget reservation, one reused GL texture and alpha composition below `o0`. Added the visual-pane file control/status and `onBackgroundCanvas` immediate, per-drawn-frame, unsubscribe and dispose notifications.
+**Verification**: `npm run check` exit 0; focused visual Vitest 7 files/37 tests passed; full Vitest 83 files/644 tests passed; host-wasm build exit 0; visual TypeScript files all below 1000 lines; scoped `git diff --check` exit 0. Final logs and final-source SHA-256 values are in `tmp/canvas-cutover/visual/checks.log` and `receipt.json`.
+**History**: Initial TypeScript/visual attempts exposed callback typing, test assumptions, source-size narrowing, and a decoded-frame notification that could be consumed twice after a rate-limit skip. The implementation and regression test were corrected; the final2 source-matched gates pass. Complete logs are retained under `tmp/canvas-cutover/visual/initial-*`, `retry-*`, `fix2-*`, `final-*`, and `final2-*`.
+**Handoff**: Implementation and required behavioral verification are complete. Independent test-integrity, adversarial and combined-tree integration reviews remain assigned to later workflow steps. When CANVAS-MOUNT supplies `deps.resourceBudget`, video reservations share the code renderer ledger; visual mount uses its own bounded `ResourceLedger` if that optional dependency is absent.
+
+### Session: 2026-10-05 (VIS-TI-001 / VIS-TI-002 revision)
+**Tasks Completed**: Strengthened the existing compositor test to associate each `drawArrays` call with its preceding `bindTexture`, asserting video first and `o0` second while preserving draw-count, blend-order and program-identity assertions. Added media `error` event status coverage including post-dispose silence, and rejected `play()` status coverage. No production source change remains.
+**Verification**: `cd editor && ./node_modules/.bin/vitest run test/visual/render-host.test.ts test/visual/video.test.ts` passed 2 files/14 tests; `cd editor && ./node_modules/.bin/vitest run test/visual` passed 7 files/39 tests; `cd editor && npm run check` exit 0; full Vitest passed 83 files/646 tests; host-wasm build exit 0. Mutation controls are recorded separately: swapping compositor draws failed at the video texture assertion, and removing the error listener failed at the media error assertion. Both production visual source SHA-256 values match their pre-mutation values. Logs and final hashes are in `tmp/canvas-cutover/visual/revision-*`, `mutation-vis-ti-001.log`, `mutation-vis-ti-002.log`, `checks.log` and `receipt.json`.
+**Handoff**: The two test-integrity findings are implemented with current-source behavioral evidence. Independent Opus test-integrity and adversarial re-review, then combined-tree integration review, remain downstream.
+
+### Session: 2026-10-05 (Step 6 final-source rerun)
+**Tasks Completed**: Re-ran the assigned final-source checks on the combined working tree; no source behavior changed. `npm run check` passed; focused visual Vitest passed 39/39; full Vitest passed 650/650; host-wasm build passed; all seven visual TypeScript files remain below 1000 lines; scoped `git diff --check` passed.
+**Evidence**: Complete logs are `tmp/canvas-cutover/visual/step6-final-npm-check-rerun.log`, `step6-final-visual.log`, `step6-final-full-vitest.log`, and `step6-final-host-wasm.log`. Line counts and diff-check were observed directly in the Step 6 command output.
+**Handoff**: Implementation verification is current. Independent review and combined-tree integration review remain downstream.

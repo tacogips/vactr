@@ -27,6 +27,7 @@ export interface VisualPanesOptions {
   source?: CanvasImageSource & { width: number; height: number };
   notice?: string;
   selection?: PaneSelection;
+  onVideoFile?: (file: File) => void;
 }
 
 interface Pane {
@@ -43,6 +44,8 @@ export class VisualPanes {
   private readonly setBanner: Setter<string>;
   private readonly disposeView: () => void;
   private readonly source: VisualPanesOptions['source'];
+  readonly videoInput: HTMLInputElement;
+  private readonly videoStatus: HTMLElement;
   private sel: PaneSelection;
 
   constructor(parent: HTMLElement, opts: VisualPanesOptions = {}) {
@@ -62,6 +65,20 @@ export class VisualPanes {
       onSelect: (value) => this.select(value),
     }), holder);
     this.el = holder.firstElementChild as HTMLElement;
+    const docHeader = this.el.querySelector('.visual-header')!;
+    this.videoInput = doc.createElement('input');
+    this.videoInput.type = 'file';
+    this.videoInput.accept = 'video/*';
+    this.videoInput.setAttribute('aria-label', 'Video background');
+    this.videoInput.dataset.role = 'video-input';
+    this.videoInput.addEventListener('change', () => {
+      const file = this.videoInput.files?.[0];
+      if (file) opts.onVideoFile?.(file);
+    });
+    this.videoStatus = doc.createElement('span');
+    this.videoStatus.className = 'visual-video-status';
+    this.videoStatus.dataset.role = 'video-status';
+    docHeader.append(this.videoInput, this.videoStatus);
     if (this.source) {
       for (const out of OUTPUTS) {
         const pane = this.el.querySelector<HTMLElement>(`[data-output="o${out}"]`)!;
@@ -105,6 +122,10 @@ export class VisualPanes {
 
   clearDiagnostic(out: OutputIndex): void {
     if (this.banners.delete(out)) this.renderBanner();
+  }
+
+  showVideoStatus(status: string): void {
+    this.videoStatus.textContent = status;
   }
 
   dispose(): void {

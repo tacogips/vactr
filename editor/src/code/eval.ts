@@ -12,8 +12,8 @@
 // client flushes the pending `doc-changed` first). The span flashes for
 // 200 ms; forms of the reply whose `failure` is set flash the error class.
 
-import { Prec, StateEffect, StateField, type Extension, type Text } from '@codemirror/state';
-import { Decoration, EditorView, keymap, type DecorationSet } from '@codemirror/view';
+import type { Text } from '@codemirror/state';
+import type { CodeRange, CodeSurface } from '../app/apis';
 import type { Client } from '../protocol/client';
 import { defaultTimers, type Timers } from '../protocol/document';
 import type { ServerEnvelope } from '../protocol/types';
@@ -57,61 +57,6 @@ export function formSpanAt(doc: Text, pos: number): Range16 {
   return { from: doc.line(first).from, to: doc.line(last).to };
 }
 
-// ------------------------------------------------------------ flash field
-
-interface FlashSpec {
-  id: number;
-  from: number;
-  to: number;
-  cls: string;
-}
-
-export const addFlash = StateEffect.define<FlashSpec>();
-export const removeFlash = StateEffect.define<number>();
-
-interface FlashState {
-  specs: FlashSpec[];
-  deco: DecorationSet;
-}
-
-function build(specs: FlashSpec[]): DecorationSet {
-  const ranges = specs
-    .filter((s) => s.from < s.to)
-    .map((s) => Decoration.mark({ class: s.cls, attributes: { 'data-flash': String(s.id) } }).range(s.from, s.to));
-  return Decoration.set(ranges, true);
-}
-
-export const flashField = StateField.define<FlashState>({
-  create: () => ({ specs: [], deco: Decoration.none }),
-  update(value, tr) {
-    let specs = value.specs;
-    if (tr.docChanged) {
-      specs = specs.map((s) => ({
-        ...s,
-        from: tr.changes.mapPos(s.from, 1),
-        to: tr.changes.mapPos(s.to, -1),
-      }));
-    }
-    let changed = tr.docChanged;
-    for (const e of tr.effects) {
-      if (e.is(addFlash)) {
-        specs = [...specs, e.value];
-        changed = true;
-      } else if (e.is(removeFlash)) {
-        specs = specs.filter((s) => s.id !== e.value);
-        changed = true;
-      }
-    }
-    return changed ? { specs, deco: build(specs) } : value;
-  },
-  provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
-});
-
-/** The live flashes of a view (tests). */
-export function flashes(view: EditorView): { from: number; to: number; cls: string }[] {
-  return view.state.field(flashField).specs.map(({ from, to, cls }) => ({ from, to, cls }));
-}
-
 // ------------------------------------------------------------ controller
 
 export interface EvalOptions {
@@ -127,8 +72,9 @@ export interface EvalOptions {
 export class EvalController {
   private readonly opts: EvalOptions;
   private readonly timers: Timers;
-  private view: EditorView | null = null;
-  private nextId = 1;
+  private surface: CodeSurface | null = null;
+  private removeKeymap: (() => void) | null = null;
+  private readonly flashListeners = new Set<(range: CodeRange, kind: string | null) => void>();
   private readonly pending = new Set<unknown>();
 
   constructor(opts: EvalOptions) {
@@ -136,27 +82,36 @@ export class EvalController {
     this.timers = opts.timers ?? defaultTimers;
   }
 
-  attach(view: EditorView): void {
-    this.view = view;
+  attach(surface: CodeSurface): void {
+    this.surface = surface;
+    this.removeKeymap = surface.addKeymap([
+      { key: 'Mod-Enter', run: () => this.evalAtCursor() !== null },
+      { key: 'Mod-Shift-Enter', run: () => this.evalAll() !== null },
+      { key: 'Mod-.', run: () => (this.hush(), true) },
+    ], 'default');
+  }
+
+  onFlash(cb: (range: CodeRange, kind: string | null) => void): () => void {
+    this.flashListeners.add(cb); return () => this.flashListeners.delete(cb);
   }
 
   /** `Mod-Enter`: the form at the main cursor. */
   evalAtCursor(): Promise<ServerEnvelope> | null {
-    const view = this.view;
-    if (!view) return null;
-    const range = formSpanAt(view.state.doc, view.state.selection.main.head);
+    const surface = this.surface;
+    if (!surface) return null;
+    const range = formSpanAt(surface.state.doc, surface.state.selection.main.head);
     const span = this.opts.sync.toWireSpan(range.from, range.to);
-    const reply = this.opts.client.eval(this.opts.sync.file, view.state.doc.toString(), span);
+    const reply = this.opts.client.eval(this.opts.sync.file, surface.state.doc.toString(), span);
     this.flash(range, FLASH_CLASS);
     return this.watch(reply);
   }
 
   /** `Mod-Shift-Enter`: the whole document. */
   evalAll(): Promise<ServerEnvelope> | null {
-    const view = this.view;
-    if (!view) return null;
-    const reply = this.opts.client.eval(this.opts.sync.file, view.state.doc.toString());
-    this.flash({ from: 0, to: view.state.doc.length }, FLASH_CLASS);
+    const surface = this.surface;
+    if (!surface) return null;
+    const reply = this.opts.client.eval(this.opts.sync.file, surface.state.doc.toString());
+    this.flash({ from: 0, to: surface.state.doc.length }, FLASH_CLASS);
     return this.watch(reply);
   }
 
@@ -168,36 +123,20 @@ export class EvalController {
 
   /** Flashes `range` for `FLASH_MS`. */
   flash(range: Range16, cls: string): void {
-    const view = this.view;
-    if (!view || range.from >= range.to) return;
-    const id = this.nextId;
-    this.nextId += 1;
-    view.dispatch({ effects: addFlash.of({ id, from: range.from, to: range.to, cls }) });
+    if (!this.surface || range.from >= range.to) return;
+    for (const listener of this.flashListeners) listener(range, cls);
     const handle = this.timers.set(() => {
       this.pending.delete(handle);
-      this.view?.dispatch({ effects: removeFlash.of(id) });
+      for (const listener of this.flashListeners) listener(range, null);
     }, FLASH_MS);
     this.pending.add(handle);
-  }
-
-  /** The CodeMirror extensions: the keymap and the flash field. */
-  extension(): Extension {
-    return [
-      flashField,
-      Prec.high(
-        keymap.of([
-          { key: 'Mod-Enter', run: () => this.evalAtCursor() !== null },
-          { key: 'Mod-Shift-Enter', run: () => this.evalAll() !== null },
-          { key: 'Mod-.', run: () => (this.hush(), true) },
-        ]),
-      ),
-    ];
   }
 
   dispose(): void {
     for (const h of this.pending) this.timers.clear(h);
     this.pending.clear();
-    this.view = null;
+    this.removeKeymap?.(); this.removeKeymap = null;
+    this.flashListeners.clear(); this.surface = null;
   }
 
   /** Flashes the failed forms of the reply. */

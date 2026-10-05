@@ -260,9 +260,11 @@ Edit only this plan's progress log.
 - [x] Animation-only frames proven to perform zero shaping, zero atlas uploads and zero buffer uploads
 - [x] `textPending` budget behavior tested
 - [x] Scheduler hidden, DPR, resize, inset and dispose tests pass
-- [ ] `npm run check` exit 0; full vitest passes with no assertion deleted (type check passes; full suite awaits approved tree-sitter WASM artifact path)
-- [ ] Session 266: new final-source gating evidence on the `40467f3` bytes (or on the reviewed fix): `npm run check` exit 0, focused Vitest pass, host-wasm build exit 0, full Vitest pass (at least 612 tests, 0 failed files), line counts < 1000; source sha256 values recorded in `checks.log`
-- [ ] Session 266: test-integrity, adversarial and integration reviews accepted
+- [x] `npm run check` exit 0; full vitest passes with no assertion deleted
+- [x] Session 266: new final-source gating evidence on the reviewed fix: `npm run check` exit 0, focused Vitest pass, host-wasm build exit 0, full Vitest pass (at least 612 tests, 0 failed files), line counts < 1000; source sha256 values recorded in `checks.log`
+- [x] RENDER-TI-001: rebuild frames draw cached-layer commands before later atlas misses can evict their textures; overflow test proves all rasterized prefixes are drawn with live textures and covers lines 0 through 49
+- [x] RENDER-ADV-001: each cached draw command records its scissor state; gutter labels replay unscissored and source text replay clipped on rebuild and cached frames
+- [ ] Session 266: independent re-review of RENDER-TI-001 and RENDER-ADV-001, plus integration review accepted (downstream workflow gates)
 
 ## Progress Log
 
@@ -276,3 +278,15 @@ Edit only this plan's progress log.
 ### Session: 2026-10-05 (session 266 plan amendment)
 **Tasks Completed**: Plan amended per operator decisions A, B and D. Artifact roots declared, setup separated from gating, the blocked full-Vitest row replaced by a gating row with a 612-test floor, re-verification criteria added. Source was not changed.
 **Notes**: The operator generated `tree-sitter-vact/tree-sitter-vact.wasm` with `mise run ts-build-wasm` (gitignored). The operator's 612/612 run on `40467f3` is historical only; this session needs new gating evidence.
+
+### Session: 2026-10-05 Session 266 Step 6 final verification
+**Tasks Completed**: Final-source type check, focused and full Vitest, host-wasm build, line-count gate, plus a scheduler viewport-dirty cancellation repair found during scoped review.
+**Notes**: `FrameScheduler.setActive` now keeps the queued frame when `viewportDirty` is set after the last animation owner stops; `frame.test.ts` covers the pending resize callback. Final verification is recorded in `tmp/canvas-cutover/render/checks.log` with complete logs in `tmp/canvas-cutover/render/{reviewfix-npm-check.log,reviewfix-focused-vitest.log,reviewfix-host-wasm-build.log,reviewfix-full-vitest.log,reviewfix-line-counts.log,reviewfix-diff-check.log}`. Results: npm check exit 0; focused Vitest 133/133; full Vitest 617/617 across 80 files; host-wasm build exit 0; renderer/frame/atlas line counts 359/130/105. Formal integrity, adversarial and integration review remain downstream workflow gates.
+
+### Session: 2026-10-05 RENDER-TI-001 repair
+**Tasks Completed**: Reordered rebuild rendering to draw the selection list, animation layer, then draw-through after-list commands; restored strict atlas-overflow coverage and draw-time texture liveness checks.
+**Notes**: `renderer.ts` retains each after-list command while drawing it immediately during rebuild, so a later atlas LRU eviction cannot delete its texture before presentation. Cached-list replay retains its stale-texture guard and eviction-count cache key. `gpu.test.ts` now proves each newly rasterized line is drawn in that frame with a live texture and accumulates exactly the 50 prefixes `0:` through `49:` while preserving ledger/disposal assertions. It continues to assert `textPending` under persistent ledger pressure; the separate bounded-budget test proves it clears when capacity suffices. A first focused run failed because the test assumed a fixed 480 px draw width; the matcher was corrected to identify white 20 px text rows, and the passing rerun supersedes that attempt. Final gates and hashes are recorded in `tmp/canvas-cutover/render/checks.log`; independent test-integrity re-review remains pending.
+
+### Session: 2026-10-05 RENDER-ADV-001 repair
+**Tasks Completed**: Recorded scissor state per draw command and added a regression test covering rebuild and cached animation frames.
+**Notes**: `drawCommand` now restores the scissor state captured by `addCommand`; `clip()` and `unclip()` keep renderer state synchronized and render starts/ends unscissored. `gpu.test.ts` records scissor state at each draw and verifies gutter glyphs stay unscissored, source glyphs stay clipped, gutter counts match, and the cached frame does not rebuild. Focused Vitest passed 134/134, full Vitest passed 618/618 across 80 files, `npm run check` and the host-wasm build passed, and source line counts remain below 1000. Complete logs and SHA-256 fingerprints are in `tmp/canvas-cutover/render/checks.log`. Independent test-integrity, adversarial and integration review remain downstream.

@@ -6,12 +6,6 @@
   min-height: 12rem;
 }
 
-.vact-code .cm-editor {
-  height: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-}
-
 /* Tokens (language.ts). */
 .vact-tok-comment { color: #7a7f87; font-style: italic; }
 .vact-tok-directive { color: #b07bd8; font-style: normal; }
@@ -41,7 +35,7 @@
 .vact-preview { width: 96px; height: 24px; }
 .vact-samples-status { color: #7a7f87; }
 
-/* GPU surface; legacy CM styles stay until the serial CE-JOIN cutover. */
+/* GPU surface. */
 .vact-code-surface { position: relative; overflow: hidden; height: 100%; }
 .vact-code-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .vact-code-input-bridge {
@@ -63,3 +57,15 @@
 }
 .vact-code-input-bridge::selection { background: transparent; color: transparent; }
 .vact-code-gpu-status { position: absolute; bottom: 0; left: 0; padding: 0.25rem; }
+.vact-code-diag-tooltip {
+  position: absolute;
+  z-index: 2;
+  max-width: min(32rem, calc(100% - 1rem));
+  padding: 0.25rem 0.4rem;
+  color: #eceff4;
+  background: #2e3440;
+  border: 1px solid #d08770;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: pre-wrap;
+}

@@ -10,6 +10,20 @@
 // Decoding returns frames oldest first; an out-of-range index reads as 0.
 
 import { dbFraction, num, SPECTRUM_FLOOR_DB } from './spectrum';
+import type { LevelsBody } from '../protocol/types';
+
+export interface TimedLevels { body: LevelsBody; receivedAt: number }
+
+/** Select the newest timestamped level body that is not ahead of audible time. */
+export function pickFrame(frames: readonly TimedLevels[], t: number): LevelsBody | null {
+  let picked: TimedLevels | null = null;
+  for (const frame of frames) {
+    const time = frame.body.time;
+    if (typeof time === 'number' && Number.isFinite(time) && time <= t && (!picked || time >= (picked.body.time as number))) picked = frame;
+  }
+  if (!picked || t - (picked.body.time as number) > 2) return null;
+  return picked.body;
+}
 
 /** What the last cell of a ring holds. */
 export type RingIndex = 'newest' | 'next';

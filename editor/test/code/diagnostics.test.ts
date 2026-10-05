@@ -1,9 +1,8 @@
-import { diagnosticCount, forEachDiagnostic } from '@codemirror/lint';
-import { EditorState, Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CHECK_DEBOUNCE_MS, DiagnosticsController } from '../../src/code/diagnostics';
 import { DocumentSync } from '../../src/code/sync';
+import { CodeSurface } from '../../src/code/surface';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import type { Diagnostic } from '../../src/protocol/types';
@@ -23,14 +22,14 @@ function diag(literal: string, message: string, extra: Partial<Diagnostic> = {},
   return { code: 'x', severity: 'error', message, span: span(text, literal), file: 'main.vact', ...extra };
 }
 
-const views: EditorView[] = [];
+const views: CodeSurface[] = [];
 
 function setup(tier: 'browser' | 'native', check?: (text: string) => Diagnostic[]) {
   const transport = new RecordingTransport();
   const client = new Client(transport, { store: new Store() });
   const initial = Text.of(TEXT.split('\n'));
   const sync = new DocumentSync(client.document('main.vact'), initial);
-  let view: EditorView | null = null;
+  let view: CodeSurface | null = null;
   const core = check ? { check: vi.fn(check) } : undefined;
   const ctl = new DiagnosticsController({
     client,
@@ -39,10 +38,7 @@ function setup(tier: 'browser' | 'native', check?: (text: string) => Diagnostic[
     ...(core ? { core } : {}),
     text: () => view?.state.doc.toString() ?? '',
   });
-  view = new EditorView({
-    parent: document.body,
-    state: EditorState.create({ doc: initial, extensions: [sync.extension()] }),
-  });
+  view = new CodeSurface({ sync });
   views.push(view);
   ctl.attach(view);
   const evalResult = (diagnostics: Diagnostic[], rev = 1) =>
@@ -50,23 +46,22 @@ function setup(tier: 'browser' | 'native', check?: (text: string) => Diagnostic[
       kind: 'eval-result',
       body: { file: 'main.vact', doc_revision: rev, forms: [], diagnostics, sites: [], directives: { file_level: {}, entries: [] } },
     });
-  const shown = (v: EditorView) => {
-    const out: { text: string; message: string; source: string | undefined }[] = [];
-    forEachDiagnostic(v.state, (d, from, to) => out.push({ text: v.state.doc.sliceString(from, to), message: d.message, source: d.source }));
-    return out;
-  };
-  return { transport, client, sync, ctl, view, core, evalResult, shown };
+  const shown = (_v: CodeSurface) => ctl.current().map((d) => ({ text: view!.state.doc.sliceString(d.from, d.to), message: d.message, source: d.source }));
+  const annotated = () => view!.annotationRanges().filter((range) => range.kind === 'diagnostic').map((range) => ({
+    text: view!.state.doc.sliceString(range.from, range.to), label: range.label, className: range.className,
+  }));
+  return { transport, client, sync, ctl, view, core, evalResult, shown, annotated };
 }
 
 describe('DiagnosticsController', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
-    for (const v of views.splice(0)) v.destroy();
+    for (const v of views.splice(0)) v.dispose();
     vi.useRealTimers();
   });
 
   it('merges static, check and runtime diagnostics', () => {
-    const { transport, view, evalResult, shown } = setup('browser', (t) =>
+    const { transport, view, ctl, evalResult, shown, annotated } = setup('browser', (t) =>
       t.includes('# ok') ? [diag('hh', 'check: unknown sound', {}, t)] : [],
     );
     evalResult([diag('bd sd', 'static: bad pattern', { severity: 'warning' })]);
@@ -81,7 +76,12 @@ describe('DiagnosticsController', () => {
       { text: 'd2', message: 'late event (slot d2, beat 3/4)', source: 'runtime:x' },
       { text: 'hh', message: 'check: unknown sound', source: 'check:x' },
     ]);
-    expect(diagnosticCount(view.state)).toBe(3);
+    expect(ctl.current()).toHaveLength(3);
+    expect(annotated()).toEqual([
+      { text: 'bd sd', label: 'static: bad pattern', className: 'vact-diag-warning' },
+      { text: 'd2', label: 'late event (slot d2, beat 3/4)', className: 'vact-diag-error' },
+      { text: 'hh', label: 'check: unknown sound', className: 'vact-diag-error' },
+    ]);
   });
 
   it('removes a slot runtime markers on clear', () => {

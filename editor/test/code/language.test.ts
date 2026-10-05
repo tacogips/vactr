@@ -1,7 +1,6 @@
-import { EditorState } from '@codemirror/state';
-import { syntaxTree } from '@codemirror/language';
+import { Text } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
-import { HEADS, tokenize, vactLanguage, type LineToken } from '../../src/code/language';
+import { HEADS, tokenize, tokenizerSpans, type LineToken } from '../../src/code/language';
 
 const types = (line: string): LineToken[] => tokenize([line])[0] ?? [];
 const typeOf = (line: string, text: string): string | null | undefined => types(line).find((t) => t.text === text)?.type;
@@ -48,9 +47,13 @@ describe('.vact tokenizer', () => {
     expect(d?.[0]?.type).toBe('name');
   });
 
-  it('parses a document through the CodeMirror language', () => {
-    const state = EditorState.create({ doc: '#@ cc 1\nlet a 1', extensions: vactLanguage() });
-    const tree = syntaxTree(state);
-    expect(tree.length).toBe(state.doc.length);
+  it('produces equivalent bounded document spans for the canvas renderer', () => {
+    const text = '#@ cc 1\nlet a 1';
+    expect(tokenizerSpans(Text.of(text.split('\n')))).toEqual([
+      expect.objectContaining({ from: 0, to: 7, type: 'directive', className: 'vact-tok-directive' }),
+      expect.objectContaining({ from: 8, to: 11, type: 'head', className: 'vact-tok-head' }),
+      expect.objectContaining({ from: 12, to: 13, type: 'name', className: 'vact-tok-name' }),
+      expect.objectContaining({ from: 14, to: 15, type: 'number', className: 'vact-tok-number' }),
+    ]);
   });
 });

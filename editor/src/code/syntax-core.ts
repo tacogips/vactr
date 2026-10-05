@@ -1,4 +1,4 @@
-import type { Language, Parser, Query } from 'web-tree-sitter';
+import { Edit, type Language, type Parser, type Query } from 'web-tree-sitter';
 
 export interface SyntaxCapture {
   name: string;
@@ -13,6 +13,35 @@ export interface ParsedVact {
 
 export interface VactSyntax {
   parse(text: string): ParsedVact;
+  reparse?(parsed: ParsedVact, text: string, edits: readonly SyntaxEdit[]): ParsedVact;
+}
+
+export interface SyntaxEdit { from: number; to: number; insert: string }
+
+interface TreePoint { row: number; column: number }
+interface TreeEdit { startIndex: number; oldEndIndex: number; newEndIndex: number; startPosition: TreePoint; oldEndPosition: TreePoint; newEndPosition: TreePoint }
+
+function treeIndexLength(text: string): number { return text.length; }
+function pointAt(text: string, utf16: number): TreePoint {
+  const prefix = text.slice(0, utf16);
+  const row = (prefix.match(/\n/g) ?? []).length;
+  const columnText = prefix.slice(prefix.lastIndexOf('\n') + 1);
+  return { row, column: treeIndexLength(columnText) };
+}
+
+/** Convert UTF-16 document edits to web-tree-sitter JavaScript indices and points. */
+export function treeEdits(oldText: string, edits: readonly SyntaxEdit[]): TreeEdit[] {
+  return [...edits].sort((a, b) => b.from - a.from).map((edit) => {
+    const startIndex = edit.from;
+    const oldEndIndex = edit.to;
+    const oldEndPosition = pointAt(oldText, edit.to);
+    const insertedLines = edit.insert.split('\n');
+    const startPosition = pointAt(oldText, edit.from);
+    const newEndPosition = insertedLines.length === 1
+      ? { row: startPosition.row, column: startPosition.column + treeIndexLength(edit.insert) }
+      : { row: startPosition.row + insertedLines.length - 1, column: treeIndexLength(insertedLines[insertedLines.length - 1] ?? '') };
+    return { startIndex, oldEndIndex, newEndIndex: startIndex + treeIndexLength(edit.insert), startPosition, oldEndPosition, newEndPosition };
+  });
 }
 
 export type SyntaxLoader = () => Promise<VactSyntax>;
@@ -58,28 +87,36 @@ export async function loadVactSyntax(base: string): Promise<VactSyntax> {
 }
 
 export function createVactSyntax(parser: Parser, query: Query): VactSyntax {
+  const trees = new WeakMap<ParsedVact, NonNullable<ReturnType<Parser['parse']>>>();
+  const sources = new WeakMap<ParsedVact, string>();
+  const wrap = (tree: NonNullable<ReturnType<Parser['parse']>>, source: string): ParsedVact => {
+      const parsed: ParsedVact = {
+        captures(from, to) {
+          return query.captures(tree.rootNode).map((capture) => ({ name: capture.name,
+            from: capture.node.startIndex, to: capture.node.endIndex }))
+            .filter((capture) => capture.from < to && (capture.to > from || capture.from >= from));
+        },
+        delete: () => tree.delete(),
+      };
+      trees.set(parsed, tree);
+      sources.set(parsed, source);
+      return parsed;
+  };
   return {
     parse(text: string): ParsedVact {
       const tree = parser.parse(text);
       if (!tree) throw new Error('Tree-sitter could not parse the document');
-      return {
-        captures(from, to) {
-          // web-tree-sitter interprets QueryOptions startIndex/endIndex as byte offsets
-          // (2 per UTF-16 code unit), so range in code units by filtering instead.
-          return query
-            .captures(tree.rootNode)
-            .filter(
-              (capture) =>
-                capture.node.startIndex < to && (capture.node.endIndex > from || capture.node.startIndex >= from),
-            )
-            .map((capture) => ({
-              name: capture.name,
-              from: capture.node.startIndex,
-              to: capture.node.endIndex,
-            }));
-        },
-        delete: () => tree.delete(),
-      };
+      return wrap(tree, text);
+    },
+    reparse(parsed, text, edits) {
+      const tree = trees.get(parsed);
+      if (!tree) return this.parse(text);
+      const oldText = sources.get(parsed);
+      if (oldText === undefined) return this.parse(text);
+      for (const edit of treeEdits(oldText, edits)) tree.edit(new Edit(edit));
+      const next = parser.parse(text, tree);
+      if (!next) throw new Error('Tree-sitter could not incrementally parse the document');
+      return wrap(next, text);
     },
   };
 }

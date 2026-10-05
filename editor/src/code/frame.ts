@@ -58,7 +58,7 @@ export class FrameScheduler {
     try { this.opts.onFrame({ frameMs: timestamp, textDirty }); this.stats.frames++; if (textDirty) this.stats.textFrames++; }
     finally {
       const work = this.perf ? performance.now() - start : 0;
-      this.perf?.recordFrame(timestamp, work, textDirty, 0);
+      this.perf?.recordFrame(timestamp, work, textDirty, this.opts.revision?.() ?? 0);
       this.inFrame = false;
     }
     if (this.requestedDuringFrame || this.owners.size > 0) this.schedule();
@@ -66,7 +66,7 @@ export class FrameScheduler {
   readonly perf: PerfRecorder | null;
   readonly stats = { frames: 0, textFrames: 0 };
   constructor(private host: FrameHost, private doc: Document, private element: HTMLElement,
-    private opts: { onFrame(ctx: FrameContext): void; onViewport(v: ViewportInfo): void; perf?: boolean }) {
+    private opts: { onFrame(ctx: FrameContext): void; onViewport(v: ViewportInfo): void; perf?: boolean; revision?: () => number }) {
     this.perf = opts.perf ? new PerfRecorder() : null;
     this.viewportValue = this.readViewport(); this.hiddenValue = doc.visibilityState === 'hidden';
     this.listen(doc, 'visibilitychange', () => this.visibilityChanged());
@@ -84,7 +84,7 @@ export class FrameScheduler {
   setActive(owner: string, active: boolean): void {
     if (active) this.owners.add(owner); else this.owners.delete(owner);
     if (active) this.request();
-    else if (this.owners.size === 0 && !this.dirtyText && this.pending !== null) { this.host.cancelAnimationFrame(this.pending); this.pending = null; }
+    else if (this.owners.size === 0 && !this.dirtyText && !this.viewportDirty && this.pending !== null) { this.host.cancelAnimationFrame(this.pending); this.pending = null; }
   }
   request(): void {
     if (this.disposed || this.hiddenValue) return;

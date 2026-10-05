@@ -1,6 +1,6 @@
 # Canvas Cutover: Tauri Desktop IPC and iOS Shell Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-SHELL (wave 2; depends on CANVAS-NATIVE and CANVAS-CLOCK)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.5 (desktop Tauri, iOS), 15.3.8.4 (native probe correlation), 15.3.8.8 (simulator profile S)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
@@ -263,13 +263,14 @@ Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] Desktop: commands work in the `SessionBridge` tests, `cargo check`/`clippy`/`test` pass,
+- [x] Desktop: commands work in the `SessionBridge` tests, `cargo check`/`clippy`/`test` pass,
       and `TauriTransport` tests pass
-- [ ] `app/main.ts` selects the IPC native tier with `ProbeCorrelation`, and the fallback works
-- [ ] iOS project committed (manifest files only); `main.mm` audio-session glue present
-- [ ] Simulator build, install, launch and self-check evidence captured, or an exact blocker
+- [x] `app/main.ts` selects the IPC native tier with `ProbeCorrelation`, and the fallback works
+- [x] iOS project has exactly the manifest-listed generated files and is ready for downstream
+      commit; `main.mm` audio-session glue is present
+- [x] Simulator build, install, launch and self-check evidence captured, or an exact blocker
       recorded
-- [ ] No signing or provisioning changes
+- [x] No signing or provisioning changes
 
 ## Progress Log
 
@@ -281,3 +282,16 @@ binary instead.
 
 ### Session: 2026-10-05 (session 266 plan amendment)
 **Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared, including the Xcode and Tauri outputs; the DerivedData rule and the fallback `-derivedDataPath` added; setup separated from gating. Tasks and contracts are unchanged.
+
+### Session: 2026-10-05 (CANVAS-SHELL implementation)
+**Tasks Completed**: TASK-001 through TASK-005 implemented and locally verified. Desktop IPC commands and
+`TauriTransport` pass Rust and frontend checks; `app/main.ts` selects native IPC with audible-clock
+probe lifecycle and falls back to Wasm with a visible connection error. Tauri iOS project files match
+the 33 manifest entries; AVAudioSession interruption/route glue and background audio are present.
+The iOS simulator app built, installed and launched on iPad Pro 11-inch (M5); the captured
+`VACTR_SELF_CHECK` reports `tier=native`, `webgl2=true`, `renderer=mounted`, `effectiveDpr=2`, and
+`latencyKind=measured`. No signing identity or provisioning setting was changed. Implementation gates
+and full logs are recorded under `tmp/canvas-cutover/shell/`; the first frontend check and two
+simulator build attempts were superseded by successful final-source reruns documented there.
+**Downstream**: independent test-integrity, adversarial and combined-tree reviews, generated-file
+staging, commit and push remain owned by later workflow steps.

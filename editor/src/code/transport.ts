@@ -295,10 +295,15 @@ export class TransportBar {
         const age = audible.time - s.sample_time;
         if (age >= 0 ? age <= 2 : age >= -1) {
           const bpc = s.beats_per_cycle > 0 ? s.beats_per_cycle : DEFAULT_BEATS_PER_CYCLE;
-          cycle = s.cycle[1] === 0 ? 0 : s.cycle[0] / s.cycle[1];
-          if (s.running) cycle += age * s.bpm / 60 / bpc;
-          const beatAge = s.running ? age - Math.floor(Math.max(0, age) * s.bpm / 60) * 60 / s.bpm : age;
-          beatFlash = beatAge >= 0 && beatAge < 0.08;
+          const sampleCycle = s.cycle[1] === 0 ? 0 : s.cycle[0] / s.cycle[1];
+          const bpm = s.bpm > 0 ? s.bpm : DEFAULT_BPM;
+          const beatDuration = 60 / bpm;
+          cycle = sampleCycle;
+          if (s.running) cycle += age * bpm / 60 / bpc;
+          const sampleBeatPhase = (sampleCycle - Math.floor(sampleCycle)) * bpc;
+          const beatElapsed = ((sampleBeatPhase % 1) * beatDuration) + (s.running ? age : 0);
+          const beatAge = ((beatElapsed % beatDuration) + beatDuration) % beatDuration;
+          beatFlash = s.running && beatAge < 0.08;
           const whole = Math.floor(cycle);
           const beat = Math.floor((cycle - whole) * bpc + 1e-9) + 1;
           this.setPosition({ cycle: whole, beat, beatsPerCycle: bpc });

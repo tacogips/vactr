@@ -6,14 +6,18 @@ rust-version = "1.83"
 publish = false
 description = "Tauri shell wrapping the Vactr editor frontend"
 
+[lib]
+name = "vactr_editor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 # Standalone crate: the root vactr crate never builds it.
 [workspace]
 
 [build-dependencies]
-tauri-build = "=2.6.3"
+tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
-tauri = "=2.11.6"
+tauri = { version = "=2.11.6", features = [] }
 tauri-plugin-dialog = "=2.7.3"
 tauri-plugin-fs = "=2.5.2"
 vactr = { path = "../..", default-features = false, features = ["host-native"] }

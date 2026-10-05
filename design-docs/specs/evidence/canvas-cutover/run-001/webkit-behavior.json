@@ -1,0 +1,67 @@
+{
+  "browser": "webkit",
+  "version": "26.5",
+  "checks": [
+    {
+      "id": "canvas-only-text",
+      "pass": false,
+      "detail": "page.evaluate: Error: canvas pixel readback has no glyph variation\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:23:19\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:21:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+    },
+    {
+      "id": "editing-undo-redo-navigation",
+      "pass": true,
+      "detail": "undo=8; redo=9; home=0; word=8; end=30"
+    },
+    {
+      "id": "clipboard-synthetic-event",
+      "status": "limitation",
+      "pass": null,
+      "detail": "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts."
+    },
+    {
+      "id": "japanese-ime-synthetic",
+      "status": "limitation",
+      "pass": null,
+      "detail": "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts."
+    },
+    {
+      "id": "touch-selection",
+      "pass": false,
+      "detail": "page.waitForFunction: Timeout 2000ms exceeded.\n    at /Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:94:18\n    at async check (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:7:22)\n    at async runBehavior (/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/behavior.mjs:90:5)\n    at async file:///Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/test/e2e/run.mjs:28:88"
+    },
+    {
+      "id": "context-loss-restore",
+      "pass": true,
+      "detail": "context-lost -> ready"
+    },
+    {
+      "id": "dpr-and-resize",
+      "pass": true,
+      "detail": "{\"actual\":1,\"effective\":1}"
+    },
+    {
+      "id": "visual-viewport-inset",
+      "pass": true,
+      "detail": {
+        "status": "pass",
+        "detail": "bridge bottom=73; inset height=360"
+      }
+    },
+    {
+      "id": "background-no-replay",
+      "pass": true,
+      "detail": "frames hidden=235, resumed=244"
+    },
+    {
+      "id": "dispose-ledger",
+      "pass": true,
+      "detail": "usedBytes=0"
+    }
+  ],
+  "limitations": [
+    "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
+    "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
+    "WebKit touch selection uses synthetic pointer events.",
+    "Beat phase drift unavailable because transport sample/presentation did not provide a running correlated position."
+  ]
+}

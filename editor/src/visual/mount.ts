@@ -17,6 +17,8 @@ import { AnalyzerArea } from './meters';
 import { VisualPanes } from './panes';
 import { GlRenderHost, type RenderSize } from './render-host';
 import { mountSpectrum } from './spectrum';
+import { VideoBackground } from './video';
+import { ResourceLedger } from '../code/resources';
 
 export const RENDER_SIZE: RenderSize = { width: 640, height: 360 };
 export const NATIVE_NOTICE = 'visuals: browser tier only';
@@ -47,17 +49,25 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
   const stylesheet = addStylesheet(doc);
   const layout = buildLayout(root);
   const cleanups: (() => void)[] = [];
+  const backgroundListeners = new Set<(canvas: HTMLCanvasElement | null) => void>();
+  let glCanvas: HTMLCanvasElement | null = null;
 
-  const analyzers = new AnalyzerArea(layout.analyzers, deps.store);
+  const analyzers = new AnalyzerArea(layout.analyzers, deps.store,
+    () => deps.audible?.now() ?? deps.clock.now(), deps.tier === 'native');
   cleanups.push(() => analyzers.dispose());
 
   const api: VisualApi = {
     mountSpectrum: (el, source) => mountSpectrum(el, deps.store, source),
+    onBackgroundCanvas: (cb) => {
+      backgroundListeners.add(cb);
+      if (glCanvas) cb(glCanvas);
+      return () => { backgroundListeners.delete(cb); };
+    },
   };
   deps.visual = api;
 
   const core = deps.tier === 'browser' ? deps.core : undefined;
-  const glCanvas = core ? doc.createElement('canvas') : null;
+  glCanvas = core ? doc.createElement('canvas') : null;
   const gl = glCanvas ? glCanvas.getContext('webgl2') : null;
   if (!core || !glCanvas || !gl) {
     const notice = deps.tier === 'native' ? NATIVE_NOTICE : core ? NO_WEBGL2_NOTICE : 'visuals: no render source';
@@ -67,23 +77,44 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
     glCanvas.width = RENDER_SIZE.width;
     glCanvas.height = RENDER_SIZE.height;
     const host = new GlRenderHost(gl, RENDER_SIZE, { createCanvas: () => doc.createElement('canvas') });
-    const panes = new VisualPanes(layout.visual, { source: glCanvas });
+    let panes!: VisualPanes;
+    const video = new VideoBackground(doc, { ledger: deps.resourceBudget ?? new ResourceLedger(), onStatus: (s) => panes?.showVideoStatus(s) });
+    let videoRevision = 0;
+    panes = new VisualPanes(layout.visual, { source: glCanvas, onVideoFile: (file) => {
+      host.setVideoSource(null, ++videoRevision);
+      void video.load(file);
+    } });
     cleanups.push(host.onDiagnostic((d) => panes.showDiagnostic(d)));
     cleanups.push(host.onProgram((out) => panes.clearDiagnostic(out)));
     cleanups.push(core.onRender((rec) => host.onRecord(rec)));
+    const drawHost = { draw: (t: number): void => {
+      const frame = video.frame();
+      if (frame) host.setVideoSource(frame.source, frame.revision);
+      host.draw(t);
+    } };
     const loop: FrameLoop = startFrameLoop({
       core,
-      host,
+      host: drawHost,
       clock: deps.clock,
+      audible: deps.audible,
       scheduler: opts.scheduler ?? windowScheduler(doc.defaultView),
-      onFrame: () => panes.present(host),
+      onFrame: (t) => {
+        analyzers.present(t);
+        panes.present(host);
+        for (const cb of [...backgroundListeners]) cb(glCanvas);
+      },
       onError: (e) => panes.showDiagnostic({ code: 'frame-loop', out: 0, message: `stopped: ${String(e)}` }),
     });
-    const onVisibility = (): void => loop.setVisible(doc.visibilityState !== 'hidden');
+    const onVisibility = (): void => {
+      const visible = doc.visibilityState !== 'hidden';
+      loop.setVisible(visible);
+      video.setVisible(visible);
+    };
     doc.addEventListener('visibilitychange', onVisibility);
     onVisibility();
     cleanups.push(() => doc.removeEventListener('visibilitychange', onVisibility));
     cleanups.push(() => loop.dispose());
+    cleanups.push(() => video.dispose());
     cleanups.push(() => host.dispose());
     cleanups.push(() => panes.dispose());
   }
@@ -91,6 +122,9 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
   return {
     dispose(): void {
       for (const c of cleanups.splice(0)) c();
+      for (const cb of [...backgroundListeners]) cb(null);
+      backgroundListeners.clear();
+      glCanvas = null;
       if (deps.visual === api) delete deps.visual;
       stylesheet?.remove();
     },

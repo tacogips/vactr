@@ -6,9 +6,7 @@
 // numbers (int, float, ratio), strings, path/url literals (6.5.8) and the
 // definition heads.
 
-import { HighlightStyle, StreamLanguage, StringStream, syntaxHighlighting, type StreamParser } from '@codemirror/language';
-import type { Extension } from '@codemirror/state';
-import { Tag, tags } from '@lezer/highlight';
+import type { Text } from '@codemirror/state';
 
 /** The token class names the tokenizer emits. */
 export type VactToken =
@@ -38,24 +36,35 @@ export const HEADS: readonly string[] = [
 
 const HEAD_SET = new Set(HEADS);
 
-/** A `#@` directive comment (a sub-tag of `meta`). */
-export const directiveTag = Tag.define(tags.meta);
-
-const TOKEN_TABLE: Record<VactToken, Tag> = {
-  directive: directiveTag,
-  comment: tags.lineComment,
-  keyword: tags.atom,
-  number: tags.number,
-  string: tags.string,
-  path: tags.url,
-  head: tags.definitionKeyword,
-  bracket: tags.bracket,
-  name: tags.variableName,
-};
-
 interface State {
   /** Inside a string that continues on the next line. */
   inString: boolean;
+}
+
+/** Minimal local stream API used by the existing token rules. */
+export class LineStream {
+  pos = 0;
+  start = 0;
+  constructor(readonly string: string) {}
+  sol(): boolean { return this.pos === 0; }
+  eol(): boolean { return this.pos >= this.string.length; }
+  peek(): string | undefined { return this.string.charAt(this.pos) || undefined; }
+  next(): string | undefined { return this.eol() ? undefined : this.string.charAt(this.pos++); }
+  eat(pattern: RegExp | string): string | undefined {
+    const ch = this.peek(); if (ch === undefined) return undefined;
+    const ok = typeof pattern === 'string' ? ch === pattern : pattern.test(ch);
+    if (!ok) return undefined; this.pos++; return ch;
+  }
+  eatWhile(pattern: RegExp): boolean { const from = this.pos; while (this.eat(pattern)) {} return this.pos > from; }
+  match(pattern: RegExp | string): RegExpMatchArray | true | false {
+    if (typeof pattern === 'string') {
+      if (!this.string.startsWith(pattern, this.pos)) return false; this.pos += pattern.length; return true;
+    }
+    const found = this.string.slice(this.pos).match(pattern);
+    if (!found || found.index !== 0) return false; this.pos += found[0].length; return found;
+  }
+  skipToEnd(): void { this.pos = this.string.length; }
+  current(): string { return this.string.slice(this.start, this.pos); }
 }
 
 const PATH_RE = /^(?:\.\.\/|\.\/|~\/|\/)[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*/;
@@ -64,13 +73,13 @@ const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:\/\d+)?(?:e[+-]?\d+)?/i;
 const NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*/;
 
 /** A path or url may start only at a line start or after whitespace, `{` or `[` (6.5.8). */
-function atTokenBoundary(stream: StringStream): boolean {
+function atTokenBoundary(stream: LineStream): boolean {
   if (stream.pos === 0) return true;
   const prev = stream.string.charAt(stream.pos - 1);
   return /\s/.test(prev) || prev === '{' || prev === '[';
 }
 
-function readString(stream: StringStream, state: State): VactToken {
+function readString(stream: LineStream, state: State): VactToken {
   while (!stream.eol()) {
     const c = stream.next();
     if (c === '\\') stream.next();
@@ -83,12 +92,11 @@ function readString(stream: StringStream, state: State): VactToken {
   return 'string';
 }
 
-export const vactParser: StreamParser<State> = {
-  name: 'vactr',
-  startState: () => ({ inString: false }),
-  token(stream, state): VactToken | null {
+export const vactParser = {
+  startState: (_indentUnit?: number): State => ({ inString: false }),
+  token(stream: LineStream, state: State): VactToken | null {
     if (state.inString) return readString(stream, state);
-    if (stream.eatSpace()) return null;
+    if (stream.eatWhile(/\s/)) return null;
     const ch = stream.peek();
     if (ch === '#') {
       const directive = stream.string.startsWith('#@', stream.pos);
@@ -126,29 +134,11 @@ export const vactParser: StreamParser<State> = {
     stream.next();
     return null;
   },
-  blankLine(state) {
+  blankLine(state: State, _indentUnit?: number) {
     // A string never spans a blank line in highlighting.
     state.inString = false;
   },
-  tokenTable: TOKEN_TABLE,
-  languageData: { commentTokens: { line: '#' } },
 };
-
-export const vactHighlightStyle = HighlightStyle.define([
-  { tag: directiveTag, class: 'vact-tok-directive' },
-  { tag: tags.lineComment, class: 'vact-tok-comment' },
-  { tag: tags.atom, class: 'vact-tok-keyword' },
-  { tag: tags.number, class: 'vact-tok-number' },
-  { tag: tags.string, class: 'vact-tok-string' },
-  { tag: tags.url, class: 'vact-tok-path' },
-  { tag: tags.definitionKeyword, class: 'vact-tok-head' },
-  { tag: tags.bracket, class: 'vact-tok-bracket' },
-]);
-
-/** The `.vact` language plus its highlight style. */
-export function vactLanguage(): Extension {
-  return [StreamLanguage.define(vactParser), syntaxHighlighting(vactHighlightStyle)];
-}
 
 /** One highlighted token of a line (tests and diagnostics of the mode). */
 export interface LineToken {
@@ -163,7 +153,7 @@ export function tokenize(lines: readonly string[]): LineToken[][] {
   for (const line of lines) {
     const toks: LineToken[] = [];
     if (line.length === 0) vactParser.blankLine?.(state, 2);
-    const stream = new StringStream(line, 4, 2);
+    const stream = new LineStream(line);
     while (!stream.eol()) {
       stream.start = stream.pos;
       const type = vactParser.token(stream, state) as VactToken | null;
@@ -183,7 +173,7 @@ export function tokenizerSpans(doc: import('@codemirror/state').Text): TokenSpan
   for (let i = 1; i <= doc.lines; i += 1) {
     const line = doc.line(i);
     if (!line.length) vactParser.blankLine?.(state, 2);
-    const stream = new StringStream(line.text, 4, 2);
+    const stream = new LineStream(line.text);
     while (!stream.eol()) {
       stream.start = stream.pos;
       const type = vactParser.token(stream, state) as VactToken | null;

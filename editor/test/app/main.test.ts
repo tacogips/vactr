@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { order, area } = vi.hoisted(() => {
+const { order, area, socketMessages, tauriConnect, wasmStart } = vi.hoisted(() => {
   const order: string[] = [];
+  const socketMessages: string[] = [];
+  const tauriConnect = vi.fn();
+  const wasmStart = vi.fn();
   const area = (name: string) => ({
     mount: () => {
       order.push(name);
       return { dispose: () => void order.push(`dispose:${name}`) };
     },
   });
-  return { order, area };
+  return { order, area, socketMessages, tauriConnect, wasmStart };
 });
 vi.mock('../../src/code/mount', () => ({ ...area('code'), DOC_FILE: 'main.vact' }));
 vi.mock('../../src/midi/mount', () => area('midi'));
@@ -16,8 +19,25 @@ vi.mock('../../src/visual/mount', () => area('visual'));
 vi.mock('../../src/bind/mount', () => area('bind'));
 vi.mock('../../src/params/mount', () => area('params'));
 vi.mock('../../src/pkg/mount', () => area('pkg'));
+vi.mock('../../src/protocol/socket', () => ({
+  SocketTransport: class {
+    send(text: string): void { socketMessages.push(text); }
+    onText(_callback: (text: string) => void): void {}
+    close(): void {}
+  },
+}));
+vi.mock('../../src/protocol/tauri', () => ({ TauriTransport: { connect: tauriConnect } }));
+vi.mock('../../src/protocol/wasm', () => ({
+  WasmCore: { start: wasmStart },
+  WasmTransport: class {
+    send(_text: string): void {}
+    onText(_callback: (text: string) => void): void {}
+    close(): void {}
+  },
+}));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(async () => false) }));
 
-import { MOUNT_ORDER, createEditor, tierFromUrl } from '../../src/app/main';
+import { MOUNT_ORDER, boot, createEditor, tierFromUrl } from '../../src/app/main';
 import { audibleFor } from '../../src/app/clock';
 import { PANES } from '../../src/app/layout';
 import { MemoryFiles } from '../../src/platform/files';
@@ -95,5 +115,72 @@ describe('audible tier wiring', () => {
     time.advance(5000); await Promise.resolve();
     expect(count).toBe(2);
     expect(result.audible.sample(time.pageMs).valid).toBe(false);
+  });
+
+  it('wires and disposes the native audible clock when booting with ?session=', async () => {
+    vi.useFakeTimers();
+    socketMessages.length = 0;
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const win = {
+      location: { search: '?session=ws://127.0.0.1:7777/session' },
+      document: root.ownerDocument,
+    } as Window;
+    try {
+      const editor = await boot(root, win);
+      expect(editor.deps.audible).toBeDefined();
+      const probes = () => socketMessages.filter((text) => JSON.parse(text).kind === 'clock-probe');
+      expect(probes()).toHaveLength(1);
+      editor.dispose();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(probes()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      root.remove();
+    }
+  });
+
+  it('selects Tauri IPC as the native tier and starts clock probes', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const transport = new RecordingTransport();
+    tauriConnect.mockResolvedValue(transport);
+    const win = {
+      location: { search: '' },
+      document: root.ownerDocument,
+      __TAURI_INTERNALS__: {},
+    } as unknown as Window;
+    try {
+      const editor = await boot(root, win);
+      expect(editor.deps.tier).toBe('native');
+      expect(editor.deps.audible).toBeDefined();
+      expect(tauriConnect).toHaveBeenCalledOnce();
+      expect(transport.sent.map((text) => JSON.parse(text).kind)).toContain('clock-probe');
+      editor.dispose();
+    } finally {
+      root.remove();
+    }
+  });
+
+  it('falls back to browser Wasm and shows the native connection error', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    tauriConnect.mockRejectedValue(new Error('IPC unavailable'));
+    const ctx = { currentTime: 1, sampleRate: 48000, resume: vi.fn(async () => {}) };
+    wasmStart.mockResolvedValue({ host: { ctx } });
+    const win = {
+      location: { search: '' },
+      document: root.ownerDocument,
+      __TAURI_INTERNALS__: {},
+    } as unknown as Window;
+    try {
+      const editor = await boot(root, win);
+      expect(editor.deps.tier).toBe('browser');
+      expect(wasmStart).toHaveBeenCalledOnce();
+      expect(root.querySelector('[data-tauri-fallback="true"]')?.textContent).toContain('IPC unavailable');
+      editor.dispose();
+    } finally {
+      root.remove();
+    }
   });
 });

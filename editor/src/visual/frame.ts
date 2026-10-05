@@ -5,10 +5,10 @@
 // calls read the same audio-clock time. The loop pauses while the page or
 // pane is hidden and stops for good on dispose or on a thrown frame.
 
-import type { Clock } from '../app/clock';
+import { uncorrelated, type AudibleClock, type Clock } from '../app/clock';
 
 export interface FrameScheduler {
-  request(cb: () => void): number;
+  request(cb: (frameMs: number) => void): number;
   cancel(id: number): void;
 }
 
@@ -16,9 +16,10 @@ export interface FrameLoopOptions {
   core: { frame(now: number): void };
   host: { draw(timeSec: number): void };
   clock: Clock;
+  audible?: AudibleClock;
   scheduler: FrameScheduler;
   /** Called after each draw (pane presentation). */
-  onFrame?: () => void;
+  onFrame?: (timeSec: number) => void;
   /** A thrown frame stops the loop and is reported here. */
   onError?: (e: unknown) => void;
 }
@@ -34,17 +35,18 @@ export interface FrameLoop {
 export function windowScheduler(win: Window | null): FrameScheduler {
   if (win && typeof win.requestAnimationFrame === 'function') {
     return {
-      request: (cb) => win.requestAnimationFrame(() => cb()),
+      request: (cb) => win.requestAnimationFrame((frameMs) => cb(frameMs)),
       cancel: (id) => win.cancelAnimationFrame(id),
     };
   }
   return {
-    request: (cb) => setTimeout(cb, 16) as unknown as number,
+    request: (cb) => setTimeout(() => cb(performance.now()), 16) as unknown as number,
     cancel: (id) => clearTimeout(id),
   };
 }
 
 export function startFrameLoop(opts: FrameLoopOptions): FrameLoop {
+  const audible = opts.audible ?? uncorrelated(opts.clock);
   let pending: number | null = null;
   let visible = true;
   let stopped = false;
@@ -54,13 +56,15 @@ export function startFrameLoop(opts: FrameLoopOptions): FrameLoop {
     pending = opts.scheduler.request(tick);
   };
 
-  const tick = (): void => {
+  const tick = (frameMs: number): void => {
     pending = null;
     if (stopped || !visible) return;
     try {
-      opts.core.frame(opts.clock.now());
-      opts.host.draw(opts.clock.now());
-      opts.onFrame?.();
+      const sample = audible.sample(frameMs);
+      const t = sample.valid ? sample.time : opts.clock.now();
+      opts.core.frame(t);
+      opts.host.draw(t);
+      opts.onFrame?.(t);
     } catch (e) {
       stopped = true;
       opts.onError?.(e);

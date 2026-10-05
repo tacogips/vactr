@@ -24,7 +24,7 @@ describe('canvas predecessor contracts', () => {
     const annotation: CodeAnnotation = { from: 0, to: 3, kind: 'playing' };
     expect(state.doc.sliceString(annotation.from, annotation.to)).toBe('日本語');
     expectTypeOf<CodeSurface['state']>().toEqualTypeOf<EditorState>();
-    expectTypeOf<CodeApi['surface']>().toEqualTypeOf<CodeSurface | undefined>();
+    expectTypeOf<CodeApi['surface']>().toEqualTypeOf<CodeSurface>();
     expectTypeOf<ResourceBudget['reserve']>().toEqualTypeOf<(bytes: number) => boolean>();
   });
 

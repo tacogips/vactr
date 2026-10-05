@@ -1,5 +1,3 @@
-import { Compartment, StateEffect } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
 import type { InstrumentSelector, SongSound } from '../protocol/types';
 import { songKey, songSelectorKey } from '../protocol/store';
 import type { SongControls } from './apis';
@@ -75,7 +73,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, file = 'main.vact'): 
       if (disposed || !deps.code) throw new Error('Code editor unavailable');
       error = '';
       try {
-        const state = deps.code.surface?.state ?? deps.code.view.state;
+        const state = deps.code.surface.state;
         const response = await deps.client.applySong(file, state.doc.toString());
         if (response.kind === 'song-candidate-failed') throw new Error(response.body.message);
         if (response.kind !== 'song-candidate-ready' && response.kind !== 'song-candidate-applied')
@@ -121,16 +119,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, file = 'main.vact'): 
     if (pending && revision !== pending.revision) deps.client.document(file).flush();
   }
   let stopObserving: () => void = () => {};
-  if (deps.code?.surface) {
-    stopObserving = deps.code.surface.subscribe((update) => { if (update.docChanged) documentChanged(); });
-  } else if (deps.code) {
-    const view = deps.code.view;
-    const compartment = new Compartment();
-    view.dispatch({ effects: StateEffect.appendConfig.of(compartment.of(EditorView.updateListener.of((update) => {
-      if (update.docChanged) documentChanged();
-    }))) });
-    stopObserving = () => view.dispatch({ effects: compartment.reconfigure([]) });
-  }
+  if (deps.code) stopObserving = deps.code.surface.subscribe((update) => { if (update.docChanged) documentChanged(); });
   deps.song = controls;
   refresh();
   return controls;

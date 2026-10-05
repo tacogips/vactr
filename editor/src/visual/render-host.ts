@@ -69,6 +69,24 @@ interface Output {
   values: number[];
 }
 
+interface CompositeProgram {
+  program: WebGLProgram;
+  sampler: WebGLUniformLocation | null;
+  resolution: WebGLUniformLocation | null;
+  fragment: WebGLShader;
+}
+
+const COMPOSITE_FRAGMENT = `#version 300 es
+precision highp float;
+uniform sampler2D u_image;
+uniform vec2 resolution;
+out vec4 fragColor;
+void main() {
+  vec2 uv = gl_FragCoord.xy / resolution;
+  fragColor = texture(u_image, uv);
+}
+`;
+
 const SAMPLER_DECL = /uniform\s+sampler2D\s+(u_out|u_text)(\d+)\s*;/g;
 
 export class GlRenderHost {
@@ -79,6 +97,12 @@ export class GlRenderHost {
   private readonly diagListeners: ((d: HostDiagnostic) => void)[] = [];
   private readonly programListeners: ((out: OutputIndex) => void)[] = [];
   private vertex: WebGLShader | null = null;
+  private videoTexture: WebGLTexture | null = null;
+  private videoSize: { width: number; height: number } | null = null;
+  private videoSource: TexImageSource | null = null;
+  private videoRevision = -1;
+  private uploadedVideoRevision = -1;
+  private composite: CompositeProgram | null = null;
   private disposed = false;
 
   constructor(gl: WebGL2RenderingContext, size: RenderSize, opts: { createCanvas?: CanvasFactory } = {}) {
@@ -114,6 +138,15 @@ export class GlRenderHost {
   texture(out: OutputIndex): WebGLTexture {
     const o = this.output(out);
     return o.targets[o.cur].tex;
+  }
+
+  /** Sets the current video frame; an unchanged revision is never uploaded again. */
+  setVideoSource(source: TexImageSource | null, revision: number): void {
+    if (this.disposed) return;
+    if (this.videoRevision === revision && this.videoSource === source) return;
+    this.videoSource = source;
+    this.videoRevision = revision;
+    if (source === null) this.uploadedVideoRevision = -1;
   }
 
   onRecord(rec: RenderRecord): void {
@@ -153,6 +186,7 @@ export class GlRenderHost {
   draw(timeSec: number): void {
     if (this.disposed) return;
     const gl = this.gl;
+    this.uploadVideo();
     // `u_out<k>` is output k's previous frame, whatever order outputs draw in.
     const prev = this.outputs.map((o) => o.targets[o.cur].tex);
     for (const o of this.outputs) {
@@ -185,10 +219,24 @@ export class GlRenderHost {
     if (this.disposed) return;
     const gl = this.gl;
     const { width, height } = this.size;
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.output(out).targets[this.output(out).cur].fb);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-    gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    const outputTexture = this.output(out).targets[this.output(out).cur].tex;
+    if (!this.videoTexture || this.uploadedVideoRevision < 0) {
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.output(out).targets[this.output(out).cur].fb);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      return;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, width, height);
+    const program = this.compositeProgram();
+    if (!program) return;
+    gl.disable(gl.BLEND);
+    this.drawComposite(program, this.videoTexture);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    this.drawComposite(program, outputTexture);
+    gl.disable(gl.BLEND);
   }
 
   dispose(): void {
@@ -201,6 +249,14 @@ export class GlRenderHost {
         gl.deleteFramebuffer(t.fb);
         gl.deleteTexture(t.tex);
       }
+    }
+    if (this.videoTexture) gl.deleteTexture(this.videoTexture);
+    this.videoTexture = null;
+    this.videoSource = null;
+    if (this.composite) {
+      gl.deleteProgram(this.composite.program);
+      gl.deleteShader(this.composite.fragment);
+      this.composite = null;
     }
     if (this.vertex) gl.deleteShader(this.vertex);
     this.vertex = null;
@@ -232,6 +288,62 @@ export class GlRenderHost {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, null);
     return { fb, tex };
+  }
+
+  private uploadVideo(): void {
+    const source = this.videoSource;
+    if (!source || this.videoRevision === this.uploadedVideoRevision) return;
+    const size = sourceSize(source);
+    if (!size.width || !size.height) return;
+    const gl = this.gl;
+    if (!this.videoTexture) this.videoTexture = gl.createTexture();
+    if (!this.videoTexture) return;
+    gl.bindTexture(gl.TEXTURE_2D, this.videoTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    if (!this.videoSize || size.width !== this.videoSize.width || size.height !== this.videoSize.height) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size.width, size.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      this.videoSize = size;
+    } else {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    this.uploadedVideoRevision = this.videoRevision;
+  }
+
+  private compositeProgram(): CompositeProgram | null {
+    if (this.composite) return this.composite;
+    const gl = this.gl;
+    const vertex = this.vertexShader();
+    if (!vertex) return null;
+    const fragment = this.compile(gl.FRAGMENT_SHADER, COMPOSITE_FRAGMENT);
+    if (!fragment.shader) return null;
+    const program = gl.createProgram();
+    if (!program) { gl.deleteShader(fragment.shader); return null; }
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment.shader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      gl.deleteProgram(program);
+      gl.deleteShader(fragment.shader);
+      return null;
+    }
+    this.composite = { program, fragment: fragment.shader,
+      sampler: gl.getUniformLocation(program, 'u_image'),
+      resolution: gl.getUniformLocation(program, 'resolution') };
+    return this.composite;
+  }
+
+  private drawComposite(program: CompositeProgram, texture: WebGLTexture): void {
+    const gl = this.gl;
+    gl.useProgram(program.program);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    if (program.sampler) gl.uniform1i(program.sampler, 0);
+    if (program.resolution) gl.uniform2f(program.resolution, this.size.width, this.size.height);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   /** Clears both buffers of `o` to opaque black. */
@@ -330,6 +442,11 @@ export class GlRenderHost {
   private emitProgram(out: OutputIndex): void {
     for (const cb of [...this.programListeners]) cb(out);
   }
+}
+
+function sourceSize(source: TexImageSource): { width: number; height: number } {
+  const s = source as unknown as { width?: number; height?: number; videoWidth?: number; videoHeight?: number; naturalWidth?: number; naturalHeight?: number };
+  return { width: s.videoWidth || s.naturalWidth || s.width || 0, height: s.videoHeight || s.naturalHeight || s.height || 0 };
 }
 
 function listen<T>(list: T[], cb: T): () => void {

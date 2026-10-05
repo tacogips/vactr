@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 
-/** The stable mount point owned by Solid; CodeMirror manages its contents. */
+/** The stable host owned by Solid; CanvasRenderer and the DOM input bridge are mounted inside. */
 export function CodeSurface(): JSX.Element {
   return <div class="vact-code" />;
 }

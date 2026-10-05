@@ -4,13 +4,13 @@
 // examples, and every 14.5.5 `bindings` batch shape as the session tests
 // (src/session/tests/publish.rs) expect them.
 
-import { EditorState, Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { Text } from '@codemirror/state';
 import type { CodeApi } from '../../src/app/apis';
 import type { EditorDeps } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
 import { BindArea, type BindOptions } from '../../src/bind/mount';
 import { DocumentSync } from '../../src/code/sync';
+import { CodeSurface } from '../../src/code/surface';
 import { CcStream } from '../../src/midi/learn';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
@@ -139,7 +139,7 @@ export interface Harness {
   transport: RecordingTransport;
   client: Client;
   store: Store;
-  view: EditorView;
+  view: CodeSurface;
   sync: DocumentSync;
   deps: EditorDeps;
   root: HTMLElement;
@@ -176,12 +176,11 @@ export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[]
   const client = new Client(transport, { store, timers, now: () => (t += 1000) });
   const initial = Text.of(text.split('\n'));
   const sync = new DocumentSync(client.document(opts.file ?? FILE), initial);
-  const view = new EditorView({
-    parent: document.body,
-    state: EditorState.create({ doc: initial, extensions: [sync.extension()] }),
-  });
+  const view = new CodeSurface({ sync });
+  view.attachBridge({ focus() {}, posAtCoords: ({ x }) => Math.max(0, Math.min(view.state.doc.length, Math.round(x))),
+    coordsAtPos: (pos) => ({ left: pos, right: pos, top: 0, bottom: 1 }) });
   const code: CodeApi = {
-    view,
+    surface: view,
     mapWireSpan: (span, rev) => sync.mapWireSpan(span, rev),
     currentRevision: () => sync.revision,
     selectedSiteId: () => null,
@@ -253,7 +252,7 @@ export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[]
     },
     dispose() {
       area.dispose();
-      view.destroy();
+      view.dispose();
       root.remove();
       client.close();
     },

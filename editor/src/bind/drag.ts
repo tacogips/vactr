@@ -11,9 +11,9 @@
 // Overlay widget: an active overlay value is rendered right after its
 // literal; the document text never changes.
 
-import { StateEffect, StateField, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import type { BindApi } from '../app/apis';
+import type { CodeSurface } from '../app/apis';
+import type { NumericGesture } from '../code/pointer';
 import type { EditorDecl } from '../protocol/types';
 import type { SiteEntry, SiteTable } from './sites';
 import { fromUnit, isIntegerLiteral, paramMeta, round6, toUnit } from './write';
@@ -28,53 +28,6 @@ export const DRAG_SLOP_PX = 3;
 export interface OverlayMark {
   pos: number;
   text: string;
-}
-
-export const setOverlays = StateEffect.define<OverlayMark[]>();
-
-class OverlayWidget extends WidgetType {
-  constructor(readonly text: string) {
-    super();
-  }
-
-  override eq(other: OverlayWidget): boolean {
-    return other.text === this.text;
-  }
-
-  toDOM(): HTMLElement {
-    const el = document.createElement('span');
-    el.className = 'bind-overlay';
-    el.textContent = this.text;
-    return el;
-  }
-}
-
-export const overlayField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(deco, tr) {
-    let next = deco.map(tr.changes);
-    for (const e of tr.effects) {
-      if (!e.is(setOverlays)) continue;
-      const marks = [...e.value].sort((a, b) => a.pos - b.pos);
-      next = Decoration.set(
-        marks.map((m) => Decoration.widget({ widget: new OverlayWidget(m.text), side: 1 }).range(m.pos)),
-      );
-    }
-    return next;
-  },
-  provide: (f) => EditorView.decorations.from(f),
-});
-
-/** The overlay widgets currently shown (tests and the panel). */
-export function overlayMarks(view: EditorView): OverlayMark[] {
-  const out: OverlayMark[] = [];
-  const deco = view.state.field(overlayField, false);
-  if (!deco) return out;
-  deco.between(0, view.state.doc.length, (from, _to, value) => {
-    const w = value.spec.widget as OverlayWidget | undefined;
-    if (w) out.push({ pos: from, text: w.text });
-  });
-  return out;
 }
 
 // ------------------------------------------------------------------ drag
@@ -156,30 +109,17 @@ export class DragController {
     return moved;
   }
 
-  /** The CodeMirror extension: pointer events on the editor content. */
-  extension(): Extension {
-    return EditorView.domEventHandlers({
-      mousedown: (ev, view) => {
-        if (ev.button !== 0 || ev.shiftKey || ev.altKey || ev.metaKey || ev.ctrlKey) return false;
-        const pos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
-        if (pos === null || !this.begin(pos, ev.clientY)) return false;
-        ev.preventDefault();
-        const win = view.dom.ownerDocument.defaultView;
-        if (!win) {
-          this.end();
-          return false;
-        }
-        const onMove = (m: MouseEvent): void => this.move(m.clientY);
-        const onUp = (): void => {
-          win.removeEventListener('mousemove', onMove);
-          win.removeEventListener('mouseup', onUp);
-          if (!this.end()) view.dispatch({ selection: { anchor: pos } });
-          view.focus();
-        };
-        win.addEventListener('mousemove', onMove);
-        win.addEventListener('mouseup', onUp);
-        return true;
-      },
+  /** Registers this drag as an ordered surface numeric gesture provider. */
+  attach(surface: CodeSurface): () => void {
+    return surface.registerNumericDrag((event, pos): NumericGesture | null => {
+      if (event.button !== 0 || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey || !this.begin(pos, event.clientY)) return null;
+      return {
+        move: (pointer) => this.move(pointer.clientY),
+        end: (cancelled) => {
+          if (!this.end() && !cancelled) surface.dispatch({ selection: { anchor: pos } });
+          if (!cancelled) surface.focus();
+        },
+      };
     });
   }
 

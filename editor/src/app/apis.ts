@@ -4,8 +4,8 @@
 // example `midi` on a tier without WebMIDI). CE-JOIN finalizes the canvas cutover contract.
 
 import type { EditorState, Transaction, TransactionSpec, ChangeSet } from '@codemirror/state';
-import type { EditorView } from '@codemirror/view';
 import type { InstrumentSelector, Span, WireSite } from '../protocol/types';
+import type { NumericGesture } from '../code/pointer';
 
 export interface SongControls {
   applyWholeCode(): Promise<void>;
@@ -45,6 +45,7 @@ export interface CodeSurfaceUpdate {
   changes: ChangeSet;
   docChanged: boolean;
   selectionSet: boolean;
+  userEvent: string | null;
 }
 
 /** Concrete headless authority. Offsets are UTF-16; coordinates are viewport CSS pixels. */
@@ -58,15 +59,17 @@ export interface CodeSurface {
   /** Replace one owner's presentation ranges; never modifies the document. */
   annotate(owner: string, ranges: readonly CodeAnnotation[]): void;
   onPointer(cb: (event: PointerEvent) => void): () => void;
+  addKeymap(bindings: readonly { key: string; run(): boolean }[], precedence?: 'highest' | 'default'): () => void;
+  onBlur(cb: () => void): () => void;
+  onCompositionStart(cb: () => void): () => void;
+  registerNumericDrag(provider: (event: PointerEvent, pos: number) => NumericGesture | null): () => void;
   readonly compositionRange: CodeRange | null;
   /** Defer overlapping writes until composition ends; callback revalidates site/text. */
   deferSourceWrite(range: CodeRange, write: () => void): void;
 }
 
 export interface CodeApi {
-  /** Supplied by CE-STATE; CE-JOIN makes this required and removes view. */
-  surface?: CodeSurface;
-  view: EditorView;
+  surface: CodeSurface;
   /** A wire span of revision `rev` mapped to the current UTF-16 range, or null when gone. */
   mapWireSpan(span: Span, rev: number): { from: number; to: number } | null;
   currentRevision(file: string): number;

@@ -75,6 +75,22 @@ describe('VisualPanes', () => {
     panes.clearDiagnostic(1);
     expect(banner.hidden).toBe(true);
   });
+
+  it('exposes local video selection and status text', () => {
+    fakes = installCanvasFakes();
+    const parent = document.createElement('div');
+    let selected: File | undefined;
+    const panes = new VisualPanes(parent, { notice: 'no render', onVideoFile: (file) => { selected = file; } });
+    const input = parent.querySelector<HTMLInputElement>('[data-role="video-input"]')!;
+    expect(input.accept).toBe('video/*');
+    const file = new File(['video'], 'background.mp4', { type: 'video/mp4' });
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    expect(selected).toBe(file);
+    panes.showVideoStatus('video decode failed');
+    expect(parent.querySelector('[data-role="video-status"]')?.textContent).toBe('video decode failed');
+    panes.dispose();
+  });
 });
 
 function deps(tier: 'browser' | 'native', core?: WasmCore): EditorDeps {
@@ -117,9 +133,9 @@ class FakeRenderCore {
 }
 
 class StepRaf implements FrameScheduler {
-  pending: (() => void) | null = null;
+  pending: ((frameMs: number) => void) | null = null;
 
-  request(cb: () => void): number {
+  request(cb: (frameMs: number) => void): number {
     this.pending = cb;
     return 1;
   }
@@ -131,7 +147,7 @@ class StepRaf implements FrameScheduler {
   step(): void {
     const cb = this.pending;
     this.pending = null;
-    cb?.();
+    cb?.(1000);
   }
 }
 
@@ -176,7 +192,12 @@ describe('visual mount', () => {
     document.body.appendChild(root);
     const core = new FakeRenderCore();
     const raf = new StepRaf();
-    const m = mount(root, deps('browser', core.as()), { scheduler: raf });
+    const d = deps('browser', core.as());
+    const m = mount(root, d, { scheduler: raf });
+    const background: (HTMLCanvasElement | null)[] = [];
+    const stopBackground = d.visual?.onBackgroundCanvas?.((canvas) => background.push(canvas));
+    const canvas = background[0] as HTMLCanvasElement;
+    expect(background).toEqual([canvas]);
     expect(root.querySelectorAll('[data-pane="visual"] [data-output]')).toHaveLength(4);
 
     core.emit({ op: 'program', out: 0, source: SOURCE, uniform_names: [], assets: [] });
@@ -186,6 +207,10 @@ describe('visual mount', () => {
     expect(core.frames).toEqual([2]);
     expect(gl.since(mark).filter((c) => c.fn === 'drawArrays')).toHaveLength(1);
     expect(gl.since(mark).filter((c) => c.fn === 'blitFramebuffer')).toHaveLength(1);
+    expect(background).toEqual([canvas, canvas]);
+    const stopped: (HTMLCanvasElement | null)[] = [];
+    const unsubscribe = d.visual?.onBackgroundCanvas?.((value) => stopped.push(value));
+    unsubscribe?.();
 
     gl.failNextCompile('bad shader');
     core.emit({ op: 'program', out: 0, source: 'x', uniform_names: [], assets: [] });
@@ -195,6 +220,9 @@ describe('visual mount', () => {
     expect(banner.hidden).toBe(true);
 
     m.dispose();
+    expect(background).toEqual([canvas, canvas, null]);
+    expect(stopped).toEqual([canvas]);
+    stopBackground?.();
     expect(core.listening).toBe(0);
     expect(raf.pending).toBeNull();
     expect(root.querySelector('[data-area="visual"]')).toBeNull();

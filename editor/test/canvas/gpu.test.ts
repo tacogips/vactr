@@ -30,8 +30,8 @@ function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: n
 function recordingGL(maxTexture = 1024) {
   let next = 1; let error = 0; let failUpload = false;
   const live = new Map<object, string>(); const deleted: string[] = []; const calls: { name: string; args: unknown[] }[] = [];
-  let rect: number[] = []; let color: number[] = []; let bound: object | null = null;
-  const draws: { rect: number[]; color: number[]; texture: object | null }[] = [];
+  let rect: number[] = []; let color: number[] = []; let bound: object | null = null; let scissor = false;
+  const draws: { rect: number[]; color: number[]; texture: object | null; textureLiveAtDraw: boolean; scissor: boolean }[] = [];
   const gl: Record<string, unknown> = {};
   ['MAX_TEXTURE_SIZE', 'TEXTURE_2D', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'LINEAR', 'NEAREST', 'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'UNPACK_PREMULTIPLY_ALPHA_WEBGL', 'RGBA', 'UNSIGNED_BYTE', 'VERTEX_SHADER', 'FRAGMENT_SHADER', 'COMPILE_STATUS', 'LINK_STATUS', 'ARRAY_BUFFER', 'STATIC_DRAW', 'FLOAT', 'FRAMEBUFFER', 'SCISSOR_TEST', 'BLEND', 'ONE', 'ONE_MINUS_SRC_ALPHA', 'COLOR_BUFFER_BIT', 'TEXTURE0', 'TRIANGLES'].forEach((name, i) => gl[name] = i + 1);
   gl.NO_ERROR = 0;
@@ -39,14 +39,17 @@ function recordingGL(maxTexture = 1024) {
     gl[`create${kind}`] = () => { const object = { id: next++ }; live.set(object, kind); return object; };
     gl[`delete${kind}`] = (obj: object) => { expect(live.get(obj)).toBe(kind); live.delete(obj); deleted.push(kind); };
   }
-  for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram', 'bindVertexArray', 'bindBuffer', 'bufferData', 'enableVertexAttribArray', 'vertexAttribPointer', 'bindFramebuffer', 'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1i', 'activeTexture', 'scissor']) gl[name] = (...args: unknown[]) => calls.push({ name, args });
+  for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram', 'bindVertexArray', 'bindBuffer', 'bufferData', 'enableVertexAttribArray', 'vertexAttribPointer', 'bindFramebuffer', 'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1i', 'activeTexture', 'scissor']) gl[name] = (...args: unknown[]) => {
+    if (args[0] === gl.SCISSOR_TEST) scissor = name === 'enable';
+    calls.push({ name, args });
+  };
   gl.getParameter = () => maxTexture; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
   gl.isTexture = (obj: object) => live.get(obj) === 'Texture';
   gl.getShaderInfoLog = () => ''; gl.getProgramInfoLog = () => ''; gl.getAttribLocation = () => 0; gl.getUniformLocation = (_p: object, name: string) => ({ name });
   gl.isContextLost = () => false;
   gl.bindTexture = (_target: number, texture: object | null) => { bound = texture; };
   gl.uniform4f = (loc: { name: string }, ...args: number[]) => { if (loc.name === 'u_rect') rect = args; if (loc.name === 'u_color') color = args; };
-  gl.drawArrays = () => draws.push({ rect: [...rect], color: [...color], texture: bound });
+  gl.drawArrays = () => draws.push({ rect: [...rect], color: [...color], texture: bound, textureLiveAtDraw: bound !== null && live.get(bound) === 'Texture', scissor });
   for (const name of ['texImage2D', 'texSubImage2D']) gl[name] = (...args: unknown[]) => { calls.push({ name, args }); if (failUpload) { error = 1285; failUpload = false; } };
   gl.getError = () => { const result = error; error = 0; return result; };
   return { gl: gl as unknown as WebGL2RenderingContext, live, deleted, calls, draws, failNextUpload: () => { failUpload = true; }, lose: () => live.clear() };
@@ -205,6 +208,27 @@ describe('GPU code compositor', () => {
     expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 4, to: 8 }] })).toBe(true);
     expect(shape).not.toHaveBeenCalled(); expect(f.renderer.atlasStats.uploads).toBe(uploads); f.renderer.dispose();
   });
+  it('replays gutter numbers unscissored and source text clipped on cached frames', () => {
+    const f = fixture();
+    const frameDraws = (start: number) => f.r.draws.slice(start).filter(draw => draw.color.every(channel => channel === 1) && draw.rect[3] === font.lineHeight);
+    const gutterDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => draw.rect[0] + draw.rect[2] <= 48);
+    const sourceDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => draw.rect[0] >= 48);
+    const firstStart = f.r.draws.length;
+    expect(f.renderer.render({ textRevision: 1 })).toBe(true);
+    const rebuildDraws = frameDraws(firstStart);
+    const builds = f.renderer.stats.textBuilds;
+    const cachedStart = f.r.draws.length;
+    expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+    expect(f.renderer.stats.textBuilds).toBe(builds);
+    const cachedDraws = frameDraws(cachedStart);
+    const rebuildGutter = gutterDraws(rebuildDraws), cachedGutter = gutterDraws(cachedDraws);
+    const rebuildSource = sourceDraws(rebuildDraws), cachedSource = sourceDraws(cachedDraws);
+    expect(rebuildGutter.length).toBeGreaterThan(0); expect(cachedGutter.length).toBe(rebuildGutter.length);
+    expect(rebuildSource.length).toBeGreaterThan(0); expect(cachedSource.length).toBeGreaterThan(0);
+    expect(rebuildGutter.every(draw => !draw.scissor)).toBe(true); expect(cachedGutter.every(draw => !draw.scissor)).toBe(true);
+    expect(rebuildSource.every(draw => draw.scissor)).toBe(true); expect(cachedSource.every(draw => draw.scissor)).toBe(true);
+    f.renderer.dispose();
+  });
   it('rebuilds static draw lists on revision and draws call-head underline without a label', () => {
     const f = fixture('call()'); f.renderer.render({ textRevision: 1 }); const builds = f.renderer.stats.textBuilds;
     expect(f.renderer.render({ textRevision: 2, annotations: [{ kind: 'call-head', from: 0, to: 4, label: 'must-not-render' }] })).toBe(true);
@@ -349,9 +373,26 @@ describe('GPU code compositor', () => {
     const r = recordingGL(); const b = new ResourceLedger(2_100_000); const c = document.createElement('canvas'); const raster = rasterizer();
     const text = Array.from({ length: 50 }, (_, i) => `${i}:` + 'x'.repeat(58)).join('\n');
     const renderer = new CanvasRenderer(c, layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas }); renderer.setViewport({ width: 500, height: 1000, scrollLeft: 0, scrollTop: 0, gutter: 0 });
-    expect(renderer.render()).toBe(true);
-    for (let i = 0; i < 10 && renderer.textPending; i++) expect(renderer.render()).toBe(true);
-    expect(renderer.textPending).toBe(true); expect(renderer.atlasStats.evictions).toBeGreaterThan(0); expect(raster.text.filter(t => t.text.includes(':')).length).toBeGreaterThanOrEqual(50);
+    const renderedPrefixes = new Set<number>();
+    const assertNewlyRasterizedLinesWereDrawn = (rasterStart: number, drawStart: number): void => {
+      const rasterized = raster.text.slice(rasterStart).map(entry => /^(\d+):/.exec(entry.text)?.[1]).filter((line): line is string => line !== undefined).map(Number);
+      const frameDraws = r.draws.slice(drawStart);
+      expect(frameDraws.every(draw => draw.textureLiveAtDraw)).toBe(true);
+      const drawnLines = new Set(frameDraws.filter(draw => draw.rect[3] === 20 && draw.color.every(channel => channel === 1)).map(draw => draw.rect[1] / 20));
+      for (const line of rasterized) {
+        renderedPrefixes.add(line);
+        expect(drawnLines.has(line), `rasterized line ${line} has no same-frame text draw; drawn lines: ${JSON.stringify([...drawnLines])}`).toBe(true);
+      }
+    };
+    let rasterStart = raster.text.length; let drawStart = r.draws.length;
+    expect(renderer.render()).toBe(true); expect(renderer.atlasStats.evictions).toBeGreaterThan(0);
+    assertNewlyRasterizedLinesWereDrawn(rasterStart, drawStart);
+    for (let i = 0; i < 10 && renderer.textPending; i++) {
+      rasterStart = raster.text.length; drawStart = r.draws.length;
+      expect(renderer.render()).toBe(true); assertNewlyRasterizedLinesWereDrawn(rasterStart, drawStart);
+    }
+    expect(renderer.textPending).toBe(true);
+    expect([...renderedPrefixes].sort((a, b) => a - b)).toEqual(Array.from({ length: 50 }, (_, i) => i));
     expect(b.usedBytes).toBeLessThanOrEqual(2_100_000); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
   it('releases initialization resources when shader or object setup fails', () => {

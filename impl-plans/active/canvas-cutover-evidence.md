@@ -309,12 +309,13 @@ only this plan's progress log and the plan files being archived.
 
 ## Completion Criteria
 
-- [ ] Harness and unit tests in place; `run.mjs` exit-code semantics as specified
-- [ ] Evidence document with the generated results section, raw data paths, limitations and
-      pending physical-iPad procedures
-- [ ] Simulator evidence recorded, or the exact blocker recorded
-- [ ] Closeout moves done file by file; README updated
-- [ ] Final gates recorded with exit codes and log paths
+- [x] Harness and unit tests in place; `run.mjs` preserves exit 0/1/2 semantics and fails on any measurement failure.
+- [x] Full 20,000-line fixture is checked through host-WASM `session_check`, with exactly one check record and zero error diagnostics.
+- [x] Evidence document has the harness-generated results, raw paths, explicit browser limitations, paired-edit counts, and pending physical-iPad procedures.
+- [x] Active-workload attribution is control-backed: the built-in pad control emits an onset in both browsers; the same toolbar click times out on the 20,000-line document, which records zero workload onset and a product/full-document startup failure. Editing keystrokes and paired samples are reported separately, with the 500-key gate applied to editing keys.
+- [x] Simulator evidence recorded: iPad Pro 11-inch (M5) launched and emitted the native-tier self-check
+- [ ] Closeout moves done file by file; README updated (serial closeout after review)
+- [ ] Final gates recorded with exit codes and log paths (closeout gate)
 
 ## Progress Log
 
@@ -323,3 +324,26 @@ only this plan's progress log and the plan files being archived.
 
 ### Session: 2026-10-05 (session 266 plan amendment)
 **Tasks Completed**: Plan amended per operator decisions A and D. Artifact roots declared; the final-gate wasm row aligned to the host-wasm build; the explicit no-editor-view guard row added; setup separated from gating. Tasks, contracts and closeout list are unchanged.
+
+### Session: 2026-10-05 (CANVAS-EVIDENCE implementation)
+**Tasks Completed**: Playwright-library harness, workload and unit tests; generated Chromium/WebKit behavior and profile-H evidence; iPad simulator launch evidence. `npm run e2e -- --browser all --profile all --write-evidence` returned 1 as designed because required checks and thresholds exposed current product failures. Final browser run observed 583 Chromium and 550 WebKit key events, canvas backing 1x1 in Chromium, no canvas glyph readback in WebKit, missing long-press selection handles in both, Chromium DPR remaining 1, 5.77s/5.64s input p95, 114.2ms/96ms text-work p95, no measured sync samples and no playing onset telemetry. Raw files and the generated results section are at `design-docs/specs/evidence/canvas-cutover/run-001/`. The iPad Pro 11-inch (M5) simulator self-check succeeded. No product code was changed. Remaining archive moves, README update, clock-probe erratum, formal reviews and closeout gates belong to serial downstream closeout.
+
+### Session: 2026-10-05 (test-integrity repair, comm-003981)
+**Tasks Completed**: Corrected the workload to valid vact definitions and comments; the full 20,000-line/1 MiB document now has one parsed `session_check` record and zero error diagnostics, asserted by `large-doc.test.ts`. Added tested bounded key/frame pairing with editing snapshots, a paired-sample >=500 gate, and onset/failure-aware exit status. Added behavioral assertions for undo/redo, navigation, context loss/restore, single-transaction Chromium IME and a synthetic visual-viewport inset. WebKit synthetic clipboard and IME are explicit limitation statuses excluded from pass/fail counts and from generated failed-check text. `stats.mjs` renders the paired-edit count.
+
+**Final-source verification**: `node --check ...` exit 0 (`tmp/canvas-cutover/evidence/ti-node-check-final.log`); `cd editor && ./node_modules/.bin/vitest run test/e2e` 13/13 exit 0 (`ti-vitest-e2e-final.log`); `cd editor && npm run check` exit 0 (`ti-npm-check-final.log`); `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` exit 0 (`ti-abi-build-final.log`). Full browser command `cd editor && npm run e2e -- --browser all --profile all --write-evidence` exited 1, not blocked (`ti-e2e-final.log`): Chromium 8/10 behavior checks and 40 paired editing keys; WebKit 6/8 with two synthetic limitations excluded and 22 paired editing keys. Both reported audio running with zero onsets/playing ranges; Chromium's run shortcut timed out at 120 seconds. Current performance thresholds also fail, as captured in `run-001/summary.json` and generated results. The full run result section was regenerated through `stats.mjs` (`ti-render-evidence-final.log`).
+
+**Correction to earlier evidence**: The previous session's fixture-based diagnosis and profile numbers were invalid because the generated document contained parse errors and only its head had been checked. Do not reuse those numbers; current files under `design-docs/specs/evidence/canvas-cutover/run-001/` are the regenerated source-matched evidence. No product code was changed; browser and playback defects remain recorded findings for downstream disposition.
+
+**Downstream pending**: Independent Opus re-review of EVID-TI-001 through EVID-TI-005, serial closeout archival/README/clock-probe erratum, combined-tree final gates, and commit/push remain owned by later workflow steps.
+
+### Session: 2026-10-05 (test-integrity repair, comm-003984)
+**Tasks Completed**: Replaced the sample-bank `bd` workload with the built-in `pad` synth (64 voices) and added a same-page head-only control using the same `.vact-run` toolbar click. The control produced one onset in Chromium and WebKit; the full-document click timed out in both, so control records are excluded from workload onset/playing-range counts and the evidence records a diagnosed large-document startup failure. The results include the control count, start method/status and attribution. Kept the Chromium CDP session attached through `dpr-and-resize` assertions and through the cycle loop; Chromium cycle samples alternate DPR 1/2. Changed the 500 floor to `editKeyCount`, retained `editPairedKeyCount`, and gated paired samples >0 plus unpaired <=10%; stats tests cover 499 fail, 500/100 pass, zero pairs fail and >10% unpaired fail. EVID-TI-002 through EVID-TI-005 were retained.
+
+**Final-source verification**: `node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/fixtures/large-doc.mjs` exit 0 (`tmp/canvas-cutover/evidence/ti-source-check.log`); `cd editor && ./node_modules/.bin/vitest run test/e2e` 15/15 exit 0 (`ti-source-vitest.log`); `cd editor && npm run check` exit 0 (`ti-source-npm-check.log`). `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` exit 0 (`ti-rerun-editor-build.log`). The head-only Chromium control command logged `controlOnsetCount=1`, `audioState=audio running`, `controlStartMethod=toolbar-click` (`ti-audio-control-chromium.log`). Final `cd editor && npm run e2e -- --browser all --profile all --write-evidence` exited 1, not blocked (`ti-final-e2e-browser-v2.log`): 18 behavior checks, 15 passed and 3 failed; both controls emitted one onset, both large-document toolbar clicks timed out, and both workload onset counts/playing ranges are zero. Chromium DPR behavior observed actual/effective 2; its cycle samples alternate 1/2. Editing counts are Chromium 253 with 37 paired and 0 unpaired, WebKit 187 with 32 paired and 0 unpaired; the 500-key floor and product latency/frame/sync thresholds correctly remain failed. The full failure list and raw source-matched samples are in `run-001/summary.json`, `chromium-measure.jsonl`, `webkit-measure.jsonl`, and generated marker section.
+
+**Prior attempt disposition**: `ti-rerun-e2e-browser.log` exited 1 before measurement because the toolbar was absent when audio state was queried after the full-document load. The corrected run captures audio state immediately after the user gesture; the final run completed measurement and produced current run-001 artifacts. `ti-final-e2e-browser.log` (before isolating control onset records) also exited 1 and was superseded by the final artifact-producing run; both logs are retained.
+
+**Remaining product evidence**: The active control confirms the voice and start method work. The large-document toolbar click still times out after Playwright dispatches the action; classify as full-document startup failure. Threshold failures, including fewer than 500 editing keys in the fixed 60-second window, remain recorded failures and were not relabeled as passes. No editor product source was changed.
+
+**Downstream pending**: Independent Opus review of the current repairs, serial closeout archival/README/clock-probe erratum, combined-tree final gates and commit/push remain owned by later workflow steps.

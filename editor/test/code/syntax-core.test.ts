@@ -10,7 +10,7 @@ vi.mock('@codemirror/state', () => {
 });
 
 import { Language, Parser, Query } from 'web-tree-sitter';
-import { createVactSyntax, styleSpans } from '../../src/code/syntax-core';
+import { createVactSyntax, styleSpans, type VactSyntax } from '../../src/code/syntax-core';
 
 interface NodeFs {
   readFileSync(path: string): Uint8Array<ArrayBuffer> | string;
@@ -82,4 +82,27 @@ describe('CodeMirror-free tree-sitter syntax core', () => {
       parsed.delete();
     }
   });
+
+  it('keeps incremental tree edits equivalent to a fresh parse over 200 edits', () => {
+    const syntax: VactSyntax = createVactSyntax(parser, query);
+    let text = Array.from({ length: 2000 }, (_, line) => `let value${line} ${line} # 日本`).join('\n');
+    let parsed = syntax.parse(text);
+    let seed = 0x12345678;
+    const random = (max: number): number => { seed = (1664525 * seed + 1013904223) >>> 0; return seed % max; };
+    try {
+      for (let i = 0; i < 200; i += 1) {
+        const lines = text.split('\n');
+        const line = random(lines.length);
+        const from = lines.slice(0, line).join('\n').length + (line ? 1 : 0);
+        const insert = `# edit ${i} 日本\n`;
+        const next = `${text.slice(0, from)}${insert}${text.slice(from)}`;
+        const incremental = syntax.reparse?.(parsed, next, [{ from, to: from, insert }]);
+        if (!incremental) throw new Error('syntax provider does not support incremental reparse');
+        parsed.delete(); parsed = incremental; text = next;
+        const fresh = syntax.parse(text);
+        try { expect(styleSpans(parsed, 0, text.length)).toEqual(styleSpans(fresh, 0, text.length)); }
+        finally { fresh.delete(); }
+      }
+    } finally { parsed.delete(); }
+  }, 30_000);
 });

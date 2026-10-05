@@ -327,9 +327,9 @@ accepted yet. This session re-verifies that source; it does not re-implement it.
 
 - [x] TASK-001 to TASK-005 implemented with the contracts above
 - [x] Time-domain confirmation recorded in the progress log
-- [ ] `npm run check` exit 0; full vitest passes with no assertion deleted (npm check passes; full vitest awaits the generated Tree-sitter grammar prerequisite)
+- [x] `npm run check` exit 0; full vitest passes with no assertion deleted
 - [x] Source edits are within writePaths; sharedPaths were not edited
-- [ ] Session 266: new final-source gating evidence on the `40467f3` bytes (or on the reviewed fix): host-wasm build exit 0, `npm run check` exit 0, focused and full Vitest pass (full: at least 612 tests, 0 failed files); source sha256 values recorded in `checks.log`
+- [x] Session 266: new final-source gating evidence on the `40467f3` bytes (or on the reviewed fix): host-wasm build exit 0, `npm run check` exit 0, focused and full Vitest pass (full: at least 612 tests, 0 failed files); source sha256 values recorded in `checks.log`
 - [ ] Session 266: test-integrity, adversarial and integration reviews accepted
 
 ## Progress Log
@@ -343,9 +343,17 @@ accepted yet. This session re-verifies that source; it does not re-implement it.
 **Notes**:
 - Added browser output timestamp correlation, native clock-probe correlation, frame-cached AudibleClock samples, audible highlight scheduling and sample-derived transport position/beat flash. Added optional levels timestamp/epoch validation and boot lifecycle wiring. Existing legacy timing paths and assertions remain.
 - Time-domain confirmation: `editor/worklet/processor.js:144` sends `worklet_now()`; `editor/worklet/host.js:88-94` forwards that value into `session_tick`; `src/host/wasm/session_half.rs:209-218` assigns it to host time before `Session::tick_routed`; `src/session/publish.rs:315-323` emits playing `time` and `end_time` from the scheduled event; `src/session/publish.rs:519-534` emits `TransportSample.sample_time: host_now`. Browser playing and transport timestamps therefore use the AudioContext/worklet processing-time domain. Native `?session=` uses the protocol clock-probe path.
-- Verification: wasm build exit 0; final `npm run check` exit 0; focused Vitest 6 files / 69 tests passed. Final-source full Vitest reported 594 passed, 6 skipped, and two suite failures because `tree-sitter-vact/tree-sitter-vact.wasm` is absent. The documented `mise run ts-build-wasm` writes that generated binary outside this plan's `writePaths`; no artifact root or write path is declared for it. The full-suite gate awaits a dispatch checkpoint amendment that authorizes the generated grammar artifact or supplies a prepared artifact.
+- Session 265 historical verification: wasm build and `npm run check` passed; focused Vitest had 6 files / 69 tests passed. Full Vitest reported 594 passed, 6 skipped, and two suite failures because `tree-sitter-vact/tree-sitter-vact.wasm` was absent. The generated grammar artifact was then outside the plan's declared writes. Session 266's authorized artifact root and final-source pass below supersede this blocked status.
 - Complete command logs and exit statuses are consolidated in `tmp/canvas-cutover/clock/checks.log`; source post-edit hashes are in `receipt.json`. Initial failed focused/type-check attempts are retained in the evidence log.
 
 ### Session: 2026-10-05 (session 266 plan amendment)
 **Tasks Completed**: Plan amended per operator decisions A, B and D. Artifact roots declared, setup separated from gating, full-Vitest floor raised to 612, re-verification criteria added. Source was not changed.
 **Notes**: The operator generated `tree-sitter-vact/tree-sitter-vact.wasm` with `mise run ts-build-wasm` (gitignored; magic bytes verified). The operator's 612/612 run on `40467f3` is historical only; this session needs new gating evidence.
+
+### Session: 2026-10-05 (session 266 implementation re-verification)
+**Tasks Completed**: Re-verified TASK-001 through TASK-005 on the checkpoint source, corrected a beat-flash phase defect, added missing assigned edge-case coverage, and passed all final-source gates.
+**Notes**:
+- Fresh SHA-256 comparison confirmed all 14 assigned source/test files matched `40467f3` before the correction. Time-domain inspection reconfirmed that worklet `worklet_now()` reaches `session_tick`, then publishes playing event and transport sample times in the AudioContext processing-time domain; native session mode uses the clock-probe correlation.
+- Self-check found that transport beat flash was measured from each sample's `sample_time`, which could flash on every periodic telemetry sample even when it was outside the beat's 80 ms window. `editor/src/code/transport.ts` now derives the beat phase from the sample cycle plus audible elapsed time. Added a five-minute analytic cycle/window test with seeded frame drops and 250 ms stalls every ten seconds, highlight invalid-correlation recovery and late-frame/epoch/overflow checks, and boot-level `?session=` probe lifecycle coverage. Existing assertions remain.
+- Final-source verification: host-wasm build exit 0; `npm run check` exit 0; focused Vitest 6 files / 73 tests passed; full Vitest 80 files / 616 tests passed. Complete command output and exits are in `tmp/canvas-cutover/clock/checks.log`; final source fingerprints are recorded there and in `session266-final-receipt.json`.
+- Test-integrity, adversarial and integration review remain downstream workflow steps and are not claimed here.

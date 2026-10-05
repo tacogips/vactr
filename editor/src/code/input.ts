@@ -26,7 +26,7 @@ export class InputController {
     this.accessibility = new AccessibilityBridge(surface, container, options.label);
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
-    this.listen(el, 'compositionstart', () => this.beginComposition());
+    this.listen(el, 'compositionstart', () => { this.surface.notifyCompositionStart(); this.beginComposition(); });
     this.listen(el, 'compositionupdate', (event) => this.updateComposition((event as CompositionEvent).data));
     this.listen(el, 'compositionend', (event) => this.endComposition((event as CompositionEvent).data));
     this.listen(el, 'beforeinput', (event) => this.beforeInput(event as InputEvent));
@@ -40,12 +40,12 @@ export class InputController {
       const key = event as KeyboardEvent;
       if (this.composing && key.key === 'Escape') { key.preventDefault(); this.cancelComposition(); return; }
       if (!this.composing) this.trailingComposition = false;
-      this.keyboard.handle(key);
+      if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);
     });
     this.listen(el, 'copy', (event) => this.clipboard(event as ClipboardEvent, 'copy'));
     this.listen(el, 'cut', (event) => this.clipboard(event as ClipboardEvent, 'cut'));
     this.listen(el, 'paste', (event) => this.clipboard(event as ClipboardEvent, 'paste'));
-    this.listen(el, 'blur', () => this.cancelComposition());
+    this.listen(el, 'blur', () => { this.surface.notifyBlur(); this.cancelComposition(); });
     const position = () => this.accessibility.position();
     this.listen(window, 'resize', position);
     this.listen(window, 'orientationchange', position);

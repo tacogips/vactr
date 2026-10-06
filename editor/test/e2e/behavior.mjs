@@ -24,7 +24,21 @@ export async function runBehavior(browser, origin, name) {
     api = await page.evaluate(() => Boolean(window.__vactrPerf));
     await check('canvas-only-text', async () => {
       const ta=page.locator('.vact-code-input-bridge textarea');await ta.focus();await ta.fill('# canvas-visible-evidence');await ta.type('x');await ta.press('Backspace');
-      return page.evaluate(() => new Promise((resolve, reject) => {
+      return page.evaluate(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const bridge = document.querySelector('.vact-code-input-bridge textarea');
+        if (!bridge) throw Error('bridge missing');
+        const canvas = document.querySelector('.vact-code-canvas');
+        if (!canvas) throw Error('canvas missing');
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / canvasRect.width;
+        const lineStart = Math.floor(48 * scaleX);
+        let bridgeFrames = 0;
+        while (Math.floor((bridge.getBoundingClientRect().left - canvasRect.left) * scaleX) <= lineStart + 3) {
+          if (++bridgeFrames >= 30) throw Error('bridge did not receive positioned bounds within 30 animation frames');
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+        return new Promise((resolve, reject) => {
         const pane=document.querySelector('.vact-code');const canvas=document.querySelector('.vact-code-canvas');const bridge=document.querySelector('.vact-code-input-bridge textarea');
         if(!pane||!canvas||!bridge){reject(Error('code pane, canvas, or bridge missing'));return;}
         const source=window.__vactrPerf.doc();
@@ -32,7 +46,7 @@ export async function runBehavior(browser, origin, name) {
         const style=getComputedStyle(bridge);if(style.opacity!=='0'&&style.color!=='rgba(0, 0, 0, 0)'){reject(Error('bridge textarea is visible'));return;}
         if(!canvas.getContext('webgl2')){reject(Error('WebGL2 unavailable'));return;}
         if(canvas.width<=1||canvas.height<=1){reject(Error(`canvas backing size is ${canvas.width}x${canvas.height}`));return;}
-        const canvasRect=canvas.getBoundingClientRect();const caretRect=bridge.getBoundingClientRect();const scaleX=canvas.width/canvasRect.width;const scaleY=canvas.height/canvasRect.height;
+        const caretRect=bridge.getBoundingClientRect();const scaleY=canvas.height/canvasRect.height;
         const left=Math.max(0,Math.floor(48*scaleX));const right=Math.min(canvas.width,Math.max(left+1,Math.ceil((caretRect.left-canvasRect.left)*scaleX)));
         const top=Math.max(0,Math.floor((caretRect.top-canvasRect.top)*scaleY));const bottom=Math.min(canvas.height,Math.max(top+1,Math.ceil(top+caretRect.height*scaleY)));
         if(right-left<4){reject(Error(`line-1 glyph rectangle too narrow: ${right-left}px`));return;}
@@ -42,7 +56,8 @@ export async function runBehavior(browser, origin, name) {
           if(after!==undefined&&after!==before){try{const probe=document.createElement('canvas');probe.width=canvas.width;probe.height=canvas.height;const ctx=probe.getContext('2d');ctx.drawImage(canvas,0,0);const image=ctx.getImageData(left,top,right-left,bottom-top);const colors=new Set();for(let i=0;i<image.data.length;i+=4)colors.add(`${image.data[i]},${image.data[i+1]},${image.data[i+2]}`);if(colors.size<2)throw Error(`canvas pixel readback has no glyph variation in line-1 rect ${left},${top},${right-left},${bottom-top}`);canvas.hidden=true;const stillVisible=[...pane.querySelectorAll('*')].some((el)=>el.textContent?.includes(source)&&source.length>0);canvas.hidden=false;if(stillVisible)throw Error('hiding canvas leaves source visible');finish(null,`source chars=${source.length}; bridge opacity=${style.opacity}; canvas=${canvas.width}x${canvas.height}; line1=${left},${top},${right-left},${bottom-top}; colors=${colors.size}`);}catch(error){canvas.hidden=false;finish(error);}}
           else if(++attempts>=30)finish(Error('no frame recorded a new presented row within 30 animation frames'));});
         originalRaf(()=>{});
-      }));
+        });
+      });
     });
     await check('editing-undo-redo-navigation', async () => {
       const ta = page.locator('.vact-code-input-bridge textarea'); await ta.focus();

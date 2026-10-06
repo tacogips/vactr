@@ -2,6 +2,7 @@
    transport bar and sample browser. */
 
 .vact-code {
+  position: relative;
   height: 100%;
   min-height: 12rem;
 }
@@ -45,7 +46,8 @@
 
 /* GPU surface. */
 .vact-code-surface { position: relative; overflow: hidden; height: 100%; }
-.vact-code-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.vact-code-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.vact-code-canvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; touch-action: none; }
 .vact-code-input-bridge {
   position: absolute;
   width: 1px;

@@ -25,6 +25,7 @@ import { PointerController, type SelectionHandle } from './pointer';
 import { TextLayout } from './layout';
 import { createMeasureContext } from './advances';
 import { CanvasRenderer } from './renderer';
+import { readPalette } from './palette';
 import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
 import { installPerfHook, recordOnset, recordPresented, removePerfHook, type VactrPerf } from './perf-hook';
@@ -72,7 +73,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const textMetrics = metrics ?? { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
   const layout = new TextLayout(textMetrics, { font: '13px ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 18, baseline: 14 });
   const ledger = new ResourceLedger();
-  const renderer = new CanvasRenderer(canvas, layout, { ledger, ...(opts.gl ? { gl: opts.gl } : {}),
+  const renderer = new CanvasRenderer(canvas, layout, { ledger, palette: readPalette(doc.documentElement), ...(opts.gl ? { gl: opts.gl } : {}),
     ...(opts.createCanvas ? { createCanvas: opts.createCanvas } : {}), onStatus: (status) => {
       gpuStatus.textContent = status.kind === 'unavailable' ? 'GPU unavailable; editing and save remain available' : status.message;
       gpuStatus.dataset.gpu = status.kind;
@@ -94,7 +95,15 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let displayDirty = true;
   let perfApi: VactrPerf | null = null;
   let backgroundStop: (() => void) | null = null;
-  let backgroundRevision = 0;
+  let backgroundCanvas: HTMLCanvasElement | null = null;
+  const placeBackground = (next: HTMLCanvasElement | null): void => {
+    if (backgroundCanvas && backgroundCanvas !== next) backgroundCanvas.remove();
+    backgroundCanvas = next;
+    if (!next) return;
+    next.classList.add('vact-code-backdrop');
+    next.setAttribute('aria-hidden', 'true');
+    hostEl.insertBefore(next, canvas);
+  };
   let staticAnnotations: CodeAnnotation[] = [];
   let syntaxSpans: CodeAnnotation[] = [];
   let syntaxWindow: { from: number; to: number } | null = null;
@@ -146,9 +155,14 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   });
   input = new InputController(surface, inputContainer, { label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
     onPresentation: (presentation) => {
-      const documentChanged = displayDoc === null || displayRevision !== sync.revision || surface.compositionRange !== null;
-      displayDoc = presentation.doc;
-      if (documentChanged) { layout.setText(displayDoc, presentation.changes); displayDirty = true; scheduler?.invalidateText('doc'); }
+      const previousDoc = displayDoc;
+      if (previousDoc !== presentation.doc) {
+        const changes = presentation.changesBase === previousDoc ? presentation.changes : undefined;
+        layout.setText(presentation.doc, changes);
+        displayDoc = presentation.doc;
+        displayDirty = true;
+        scheduler?.invalidateText('doc');
+      }
     } });
   viewHost.setFocus(() => input.focus());
   pointer = new PointerController(surface, canvas, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
@@ -218,9 +232,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
           renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
         });
       }
-      if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas((background) => {
-        renderer.setBackground(background, ++backgroundRevision); scheduler?.request();
-      });
+      if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);
       if (renderer.textPending) scheduler?.request();
       const perf = scheduler?.perf;
       if (perf && perfApi) {
@@ -303,6 +315,10 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
     disposeCode: () => mounted.dispose() });
 
+  const colorScheme = win.matchMedia?.('(prefers-color-scheme: dark)');
+  const updatePalette = (): void => { renderer.setPalette(readPalette(doc.documentElement)); scheduler?.invalidateText('gpu'); };
+  colorScheme?.addEventListener('change', updatePalette);
+
   const mounted: Mounted = {
     dispose() {
       if (disposed) return; disposed = true;
@@ -311,6 +327,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       canvas.removeEventListener('pointermove', showDiagnosticTip); canvas.removeEventListener('pointerleave', hideDiagnosticTip);
       for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
       disposeFormat(); completion?.dispose(); syntaxProvider.dispose?.(); backgroundStop?.();
+      colorScheme?.removeEventListener('change', updatePalette);
+      backgroundCanvas?.remove(); backgroundCanvas = null;
       transport.dispose(); browser.dispose(); surface.dispose(); disposeCanvasHost(); hostEl.remove();
       if (deps.code === api) delete deps.code;
       if (phaseTimer && (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer === phaseTimer)

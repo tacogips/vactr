@@ -101,7 +101,6 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
       onFrame: (t) => {
         analyzers.present(t);
         panes.present(host);
-        for (const cb of [...backgroundListeners]) cb(glCanvas);
       },
       onError: (e) => panes.showDiagnostic({ code: 'frame-loop', out: 0, message: `stopped: ${String(e)}` }),
     });

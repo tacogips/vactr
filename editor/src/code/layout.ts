@@ -80,13 +80,14 @@ export class TextLayout {
   }
   setText(doc: Text, changes?: ChangeSet): void {
     if (doc === this.text) return;
-    this.stringDocumentMode = false;
     const previous = this.text;
-    if (!previous || !changes) {
+    if (!previous || !changes || changes.length !== previous.length || changes.newLength !== doc.length) {
+      this.stringDocumentMode = false;
       this.text = doc; this.source = ''; this.documentCache = null;
       this.invalidate();
       return;
     }
+    this.stringDocumentMode = false;
     const changed: Array<{ from: number; to: number }> = [];
     changes.iterChangedRanges((fromA, toA) => {
       changed.push({ from: previous.lineAt(fromA).number - 1, to: previous.lineAt(Math.min(previous.length, toA)).number - 1 });

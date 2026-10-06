@@ -93,7 +93,7 @@ export interface MidiApi {
 }
 
 export interface VisualApi {
-  /** Context-local canvas copy source; subscribers release their listener on disposal. */
+  /** Calls once when the render canvas exists, then with null on disposal; callers may place it in their DOM. */
   onBackgroundCanvas?(cb: (canvas: HTMLCanvasElement | null) => void): () => void;
   budget?: ResourceBudget;
   mountSpectrum(el: HTMLElement, source: { bus?: string }): { dispose(): void };

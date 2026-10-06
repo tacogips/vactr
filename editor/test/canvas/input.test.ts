@@ -1,8 +1,9 @@
-import { Text } from '@codemirror/state';
+import { ChangeSet, Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
-import { InputController } from '../../src/code/input';
+import { InputController, type InputPresentation } from '../../src/code/input';
+import { TextLayout } from '../../src/code/layout';
 import { boundary, INPUT_WINDOW_LIMIT } from '../../src/code/accessibility';
 import { PointerController } from '../../src/code/pointer';
 import { Client } from '../../src/protocol/client';
@@ -10,14 +11,14 @@ import { Store } from '../../src/protocol/store';
 import { RecordingTransport } from '../support/recording';
 
 const cleanup: (() => void)[] = [];
-function setup(text = '日本😀 abc') {
+function setup(text = '日本😀 abc', onPresentation?: (presentation: InputPresentation) => void) {
   const transport = new RecordingTransport();
   const client = new Client(transport, { store: new Store(), now: () => Date.now() });
   const sync = new DocumentSync(client.document('main.vact'), Text.of(text.split('\n')));
   const surface = new CodeSurface({ sync });
   const container = document.createElement('div'); document.body.append(container);
   const evalSelection = vi.fn(), evalAll = vi.fn(), hush = vi.fn(), scrollCaret = vi.fn(), onError = vi.fn();
-  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret, onError });
+  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret, onError, onPresentation });
   cleanup.push(() => { input.dispose(); surface.dispose(); container.remove(); });
   return { surface, sync, input, container, el: input.accessibility.textarea, transport, evalSelection, evalAll, hush, scrollCaret, onError };
 }
@@ -55,6 +56,31 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { for (const fn of cleanup.splice(0).reverse()) fn(); vi.useRealTimers(); });
 
 describe('canvas input bridge', () => {
+  it('clears a pending document delta before composition and full-invalidates a mismatched layout delta', () => {
+    const { el, surface, input } = setup('a\nb\n', () => {});
+    surface.dispatch({ selection: { anchor: 3 } });
+    input.replaceSelection('x', 'input.type');
+    const typed = input.presentation;
+    const staleChanges = typed.changes;
+    expect(staleChanges).toBeDefined();
+    expect(staleChanges).toBeInstanceOf(ChangeSet);
+
+    composition(el, 'compositionstart');
+    const preedit = input.presentation;
+    expect(preedit.doc.toString()).toBe('a\nbx\n');
+    expect(preedit.changes).toBeUndefined();
+    expect(preedit.changesBase).toBeUndefined();
+
+    const layout = new TextLayout({ font: '', measureText: text => ({ width: text.length * 8 }) },
+      { font: '12px monospace', lineHeight: 20, baseline: 15 });
+    layout.setText(typed.doc);
+    layout.shape(2);
+    expect(layout.cacheBytes).toBeGreaterThan(0);
+    expect(() => layout.setText(preedit.doc, staleChanges)).not.toThrow();
+    expect(layout.cacheBytes).toBe(0);
+    expect(layout.shape(2).number).toBe(2);
+  });
+
   it('keeps preedit on presentation only and commits Japanese exactly once with one undo group', () => {
     const { surface, sync, el, input } = setup('abc'); surface.dispatch({ selection: { anchor: 1, head: 2 } });
     composition(el, 'compositionstart');

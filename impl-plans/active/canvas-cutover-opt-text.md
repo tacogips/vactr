@@ -597,3 +597,50 @@ adversarial and integration review are pending.
 for repaired findings, and the corrected test path `editor/test/code/syntax.test.ts`.
 **Notes**: No scope, contract, writePaths or criteria change. Next: the final-source re-gate,
 then test-integrity, adversarial and integration review.
+
+### Session: 2026-10-06 (session 289 final-source re-gate)
+**Tasks Completed**: Re-ran every assigned final-source verification gate on HEAD
+`19c17989876f17cf32cc489166e2432b9c2f7370`. No product source or test changes were needed.
+
+**Verification**: focused canvas 151/151 (`focused-session289-final.log`); `test/code`
+154/154 (`code-session289-final.log`); default Vitest 776/776
+(`vitest-session289-final.log`); `npm run check` exit 0 (`check-session289-final.log`);
+serial `npm run test:perf` 1/1, median ratio 2.83 (`test-perf-session289-final.log`);
+strict Clippy exit 0 (`clippy-session289-final.log`); full nextest 2816/2816 passed,
+3 configured skips, exit 0 (`nextest-session289-final.log`); wasm32 build exit 0
+(`wasm32-session289-final.log`); and Tauri cargo check exit 0
+(`tauri-check-session289-final.log`). All logs are under `tmp/canvas-cutover/opt-text/`.
+The required line-count check passed: `layout.ts` 429, `advances.ts` 93, `syntax.ts` 244,
+`mount.ts` 328.
+
+**Notes**: Source HEAD is unchanged, all implementation criteria remain complete, and harness
+sharedPaths remain unchanged. OPTTEXT-TI-01 and OPTTEXT-TI-02 are repaired with their evidence
+recorded under `addressedFeedback`; independent test-integrity, adversarial and integration
+review remain downstream workflow steps.
+
+### Session: 2026-10-06 (session 289 adversarial repair)
+**Tasks Completed**: Repaired both adversarial findings inside the authorized OPT-TEXT paths.
+`InputController.publish` now assigns the pending delta on every publish and records its base
+Text identity; the surface subscriber supplies only a delta for its matching previous
+presentation, and composition updates identify their prior presentation. `TextLayout.setText`
+falls back to full invalidation when the delta's old or new length does not match, before
+changing cache state. `mount.ts` again detects document changes by Text identity and passes a
+delta only when its recorded base is the currently displayed document.
+
+**Regression coverage**: `editor/test/canvas/input.test.ts` covers typing before a trailing
+empty line, composition start clearing the old delta, and mismatched-delta full invalidation
+with cache-byte reset. `editor/test/canvas/mount.test.ts` covers Japanese preedit rendering,
+empty composition-end cancellation rendering the state document, and successful subsequent
+typing. Existing 20k edit-cost and caret-only/scroll controls were retained.
+
+**Verification** (final repair source; logs under `tmp/canvas-cutover/opt-text/`): focused
+canvas 153/153 (`focused-adv-repair-02.log`); `test/code` 154/154
+(`code-adv-repair.log`); full Vitest 778/778 (`vitest-adv-repair.log`);
+`npm run check` exit 0 (`check-adv-repair-final.log`); serial `npm run test:perf` 1/1,
+ratio 2.87 (`test-perf-adv-repair-final.log`). Rust sources were unchanged; session-289
+strict Clippy, nextest, wasm32 and Tauri checks remain applicable and passed.
+
+**Notes**: The first targeted attempt (`focused-adv-repair.log`) showed the new unit-test
+fixture had no `onPresentation` subscriber, leaving its presentation cache uninitialized. The
+fixture was corrected to capture presentations; the final focused and full suites pass. ADV-01
+and ADV-02 are reported as repaired, with independent adversarial re-review pending.

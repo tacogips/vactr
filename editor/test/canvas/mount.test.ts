@@ -312,6 +312,36 @@ describe('headless canvas mount', () => {
     expect(spans).toHaveBeenCalled();
   });
 
+  it('renders the state document after cancelling IME preedit and continues editing', () => {
+    const setText = vi.spyOn(CanvasRenderer.prototype, 'setText');
+    const rig = setup(false, true);
+    const surface = rig.deps.code!.surface;
+    const textarea = rig.code.querySelector('textarea[aria-label="Code editor"]') as HTMLTextAreaElement;
+    surface.dispatch({ changes: { from: 0, insert: 'abc' } });
+    surface.dispatch({ selection: { anchor: 3 } });
+    rig.host.step(16);
+
+    setText.mockClear();
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    textarea.dispatchEvent(new CompositionEvent('compositionupdate', { data: 'にほん', bubbles: true }));
+    rig.host.step(32);
+    expect(setText.mock.calls.at(-1)?.[0].toString()).toBe('abcにほん');
+
+    setText.mockClear();
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { data: '', bubbles: true }));
+    expect(rig.host.callbacks.size).toBeGreaterThan(0);
+    rig.host.step(48);
+    expect(setText.mock.calls.at(-1)?.[0].toString()).toBe('abc');
+    expect(surface.state.doc.toString()).toBe('abc');
+
+    setText.mockClear();
+    const edit = new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true });
+    expect(() => textarea.dispatchEvent(edit)).not.toThrow();
+    expect(surface.state.doc.toString()).toBe('abcx');
+    rig.host.step(64);
+    expect(setText.mock.calls.at(-1)?.[0].toString()).toBe('abcx');
+  });
+
   it('shows diagnostic messages in a positioned tooltip and hides it on leave, outside, scroll and document change', () => {
     vi.useFakeTimers();
     const rig = setup(true, true); const surface = rig.deps.code!.surface;

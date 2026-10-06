@@ -4,6 +4,7 @@ import { GlyphAtlas, type CanvasFactory, type RunStyle } from './atlas';
 import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from './layout';
 import { ResourceLedger, effectiveSize, RESOURCE_LIMITS, type Reservation } from './resources';
 import type { PhaseTimer } from './frame';
+import { FALLBACK_PALETTE, rgbaCss, type Palette } from './palette';
 
 export interface GpuStatus {
   kind: 'ready' | 'degraded' | 'unavailable' | 'context-lost'; message: string;
@@ -20,6 +21,7 @@ export interface RenderFeedback {
 interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; generation?: number; cursor?: boolean; clipped: boolean }
 export interface RendererOptions {
   ledger?: ResourceLedger; gl?: WebGL2RenderingContext; createCanvas?: CanvasFactory;
+  palette?: Palette;
   onStatus?: (status: GpuStatus) => void;
 }
 const VERTEX = `#version 300 es
@@ -48,7 +50,7 @@ export const GPU_TOKEN_COLORS: Readonly<Record<string, string>> = Object.freeze(
 /** GPU presentation only. Mount/input owns editing, callbacks, scrolling and frame scheduling. */
 export class CanvasRenderer {
   readonly ledger: ResourceLedger;
-  readonly stats = { frames: 0, textBuilds: 0, backgroundUploads: 0, bufferUploads: 0, drawCalls: 0 };
+  readonly stats = { frames: 0, textBuilds: 0, bufferUploads: 0, drawCalls: 0 };
   private gl: WebGL2RenderingContext | null;
   private atlas: GlyphAtlas | null = null;
   private program: WebGLProgram | null = null;
@@ -57,8 +59,8 @@ export class CanvasRenderer {
   private white: WebGLTexture | null = null;
   private allocations: Reservation[] = [];
   private target: Reservation | null = null;
-  private backdrop: { texture: WebGLTexture; allocation: Reservation; width: number; height: number; revision: number; source: HTMLCanvasElement } | null = null;
-  private background: { canvas: HTMLCanvasElement; revision: number } | null = null;
+  private maxTextureSize = 0;
+  private palette: Palette;
   private locations: Record<string, WebGLUniformLocation | null> = {};
   private view: LayoutViewport = { width: 1, height: 1, scrollLeft: 0, scrollTop: 0 };
   private requestedDpr = 1;
@@ -98,6 +100,7 @@ export class CanvasRenderer {
   };
   constructor(readonly canvas: HTMLCanvasElement, readonly layout: TextLayout, private options: RendererOptions = {}) {
     this.ledger = options.ledger ?? new ResourceLedger();
+    this.palette = options.palette ?? FALLBACK_PALETTE;
     this.createCanvas = options.createCanvas ?? (() => document.createElement('canvas'));
     this.gl = options.gl ?? canvas.getContext('webgl2', { alpha: true, antialias: false, depth: false, stencil: false });
     this.statusValue = { kind: 'unavailable', message: 'GPU not initialized', effectiveDpr: 1, saveText: () => this.layout.document };
@@ -111,18 +114,16 @@ export class CanvasRenderer {
   setPhases(phases: PhaseTimer | null): void { this.layout.phases = phases; }
   setDocument(text: string): void { this.layout.setDocument(text); this.clearDrawCache(); }
   setText(doc: Text): void { this.layout.setText(doc); this.clearDrawCache(); }
+  setPalette(palette: Palette): void { this.palette = palette; this.clearDrawCache(); }
   setViewport(view: LayoutViewport, dpr = 1): void {
     if (![view.width, view.height, view.scrollLeft, view.scrollTop, view.left ?? 0, view.top ?? 0, view.gutter ?? 48].every(Number.isFinite) || view.width <= 0 || view.height <= 0 || view.scrollLeft < 0 || view.scrollTop < 0 || dpr <= 0 || !Number.isFinite(dpr)) throw new RangeError('Invalid viewport');
     this.view = { ...view }; this.requestedDpr = dpr;
     if (!this.gl || this.lost || this.disposed || !this.program) return;
     try { this.resize(dpr); this.reportReady(); } catch (e) { this.fail(e); }
   }
-  setBackground(canvas: HTMLCanvasElement | null, revision = 0): void {
-    this.background = canvas ? { canvas, revision } : null;
-    if (!canvas && this.backdrop) { this.gl?.deleteTexture(this.backdrop.texture); this.backdrop.allocation.release(); this.backdrop = null; }
-  }
   private initialize(): void {
     const gl = this.gl; if (!gl) throw new Error('WebGL2 unavailable');
+    this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
     const geometry = this.ledger.allocate('geometry', 12 * 4);
     const white = this.ledger.allocate('atlas', 4);
     if (!geometry || !white) { geometry?.release(); white?.release(); throw new Error('GPU initialization budget exhausted'); }
@@ -153,14 +154,14 @@ export class CanvasRenderer {
   private resize(dpr: number): void {
     const gl = this.gl!;
     // Reserve old + new simultaneously. Reuse equal dimensions without a replacement.
-    let size = effectiveSize(this.view.width, this.view.height, dpr, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number, RESOURCE_LIMITS.canvasPixels / 2);
+    let size = effectiveSize(this.view.width, this.view.height, dpr, this.maxTextureSize, RESOURCE_LIMITS.canvasPixels / 2);
     if (this.target && this.canvas.width === size.width && this.canvas.height === size.height) {
       if (this.scale !== size.dpr) { this.textureGeneration++; this.atlas?.invalidate(); this.layout.invalidate(); }
       this.scale = size.dpr; return;
     }
     const freePixels = RESOURCE_LIMITS.canvasPixels - this.ledger.counters.pixels;
     const freeBytes = this.ledger.limitBytes - this.ledger.usedBytes;
-    size = effectiveSize(this.view.width, this.view.height, dpr, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number, Math.min(RESOURCE_LIMITS.canvasPixels / 2, freePixels, Math.floor(freeBytes / 4)));
+    size = effectiveSize(this.view.width, this.view.height, dpr, this.maxTextureSize, Math.min(RESOURCE_LIMITS.canvasPixels / 2, freePixels, Math.floor(freeBytes / 4)));
     const allocation = this.ledger.allocate('canvas', size.width * size.height * 4, size);
     if (!allocation) throw new Error('Canvas replacement budget exhausted');
     try {
@@ -182,8 +183,6 @@ export class CanvasRenderer {
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(this.locations.u_view, this.view.width, this.view.height); gl.uniform1i(this.locations.u_texture, 0); gl.activeTexture(gl.TEXTURE0);
-      this.uploadBackground();
-      if (this.backdrop) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [1, 1, 1, 1], this.backdrop.texture);
       this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
       const annotations = feedback.annotations ?? [];
       const staticAnnotations = annotations.filter(a => a.kind !== 'playing' && a.kind !== 'eval');
@@ -218,26 +217,26 @@ export class CanvasRenderer {
           for (const run of line.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, y, staticAnnotations);
         }
         this.unclip();
-        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], '#7a7f87', true);
+        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], this.palette.gutter, true);
         this.clip(this.view.gutter ?? 48);
         for (const a of staticAnnotations) {
-          if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? [0.75, 0.2, 0.25, 1] : [0.53, 0.75, 0.82, 1]);
-          if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), [0.55, 0.6, 0.66, 0.6]);
+          if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? this.palette.diagnostic : this.palette.composition);
+          if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), this.palette.callHead);
         }
-        if (feedback.cursor != null) { const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.addCommand({ rect: this.local(r), color: [0.9, 0.92, 0.94, 1], cursor: true }); }
+        if (feedback.cursor != null) { const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.addCommand({ rect: this.local(r), color: this.palette.cursor, cursor: true }); }
         for (const a of staticAnnotations) {
           if (a.kind === 'binding' && a.label) {
             const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
             const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
             const width = Math.min(256, Math.max(16, a.label.length * 8 + 8));
-            this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, [0.15, 0.19, 0.25, 0.95]);
-            this.drawRun(this.labelRun(a.label, width), x + 4, y, [], '#ebcb8b');
+            this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
+            this.drawRun(this.labelRun(a.label, width), x + 4, y, [], this.palette.labelText);
           }
         }
         for (const handle of feedback.handles ?? []) {
           const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
           const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
-          this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, [0.53, 0.75, 0.82, 1]);
+          this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, this.palette.handle);
         }
       this.collecting = null; this.drawWhileCollecting = false; this.stats.textBuilds++;
         if (!this.pendingText) { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = key; this.pendingStartLine = 0; }
@@ -307,7 +306,7 @@ export class CanvasRenderer {
     const fullRunRaster = atlas.supportsRunRaster(run, this.layout.font, this.scale);
     const runStyles: RunStyle[] = fullRunRaster
       ? styles.filter(a => a.kind === 'syntax' && a.to > run.from && a.from < run.to)
-        .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: GPU_TOKEN_COLORS[a.className ?? ''] ?? '#d8dee9' }))
+        .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: rgbaCss(this.palette.token[a.className ?? ''] ?? this.palette.text) }))
       : [];
     // Draw during rebuild before a later miss can evict this tile from the atlas.
     for (let i = first; i < last; i++) {
@@ -318,9 +317,9 @@ export class CanvasRenderer {
         const from = this.layout.offsetInRun(run, offset, -1);
         const to = this.layout.offsetInRun(run, offset + width, 1);
         tileStyles = styles.filter(a => a.kind === 'syntax' && a.to > from && a.from < to)
-          .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: GPU_TOKEN_COLORS[a.className ?? ''] ?? '#d8dee9' }));
+          .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: rgbaCss(this.palette.token[a.className ?? ''] ?? this.palette.text) }));
       }
-      const tile = atlas.tile({ run, font: this.layout.font, dpr: this.scale, x: offset, width, styles: tileStyles, color });
+      const tile = atlas.tile({ run, font: this.layout.font, dpr: this.scale, x: offset, width, styles: tileStyles, color: color ?? rgbaCss(this.palette.text) });
       if (!tile) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; continue; }
       this.quad({ left: x + offset, right: x + offset + width, top: y, bottom: y + this.layout.font.lineHeight }, [1, 1, 1, 1], tile.texture);
     }
@@ -340,42 +339,6 @@ export class CanvasRenderer {
     if (r.right <= 0 || r.left >= this.view.width || r.bottom <= 0 || r.top >= this.view.height) return;
     this.addCommand({ rect: r, color, texture: texture ?? undefined });
   }
-  private uploadBackground(): void {
-    const source = this.background; if (!source || (this.backdrop?.revision === source.revision && this.backdrop.source === source.canvas)) return;
-    const gl = this.gl!;
-    const available = RESOURCE_LIMITS.canvasPixels - this.ledger.counters.pixels;
-    // Leave text headroom even when the backdrop precedes the first glyph upload.
-    // Animation copies must never reclaim resident glyph metadata to fit staging.
-    const stagingBytes = Math.min(RESOURCE_LIMITS.geometry / 2, RESOURCE_LIMITS.geometry - this.ledger.counters.byKind.geometry);
-    const size = this.backdrop && this.backdrop.width <= source.canvas.width && this.backdrop.height <= source.canvas.height
-      && this.backdrop.width * this.backdrop.height * 4 <= stagingBytes
-      ? { width: this.backdrop.width, height: this.backdrop.height }
-      : effectiveSize(source.canvas.width, source.canvas.height, 1, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number, Math.min(available, Math.floor((this.ledger.limitBytes - this.ledger.usedBytes) / 8), Math.floor(stagingBytes / 4)));
-    const reuse = this.backdrop?.width === size.width && this.backdrop.height === size.height;
-    const allocation = reuse ? null : this.ledger.allocate('backdrop', size.width * size.height * 4, size);
-    if (!reuse && !allocation) throw new Error('Backdrop replacement budget exhausted');
-    const staging = this.ledger.allocate('geometry', size.width * size.height * 4);
-    if (!staging) { allocation?.release(); throw new Error('Backdrop staging budget exhausted'); }
-    let texture: WebGLTexture | null = reuse ? this.backdrop!.texture : null; let canvas: HTMLCanvasElement | null = null;
-    try {
-      canvas = this.createCanvas(); canvas.width = size.width; canvas.height = size.height;
-      const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('Backdrop copy unavailable');
-      ctx.drawImage(source.canvas, 0, 0, size.width, size.height);
-      if (!texture) texture = gl.createTexture(); if (!texture) throw new Error('Backdrop texture allocation failed');
-      gl.bindTexture(gl.TEXTURE_2D, texture); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      if (reuse) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-      if (gl.getError() !== gl.NO_ERROR) throw new Error('Backdrop upload failed');
-      if (!reuse) {
-        if (this.backdrop) { gl.deleteTexture(this.backdrop.texture); this.backdrop.allocation.release(); }
-        this.backdrop = { texture, allocation: allocation!, width: size.width, height: size.height, revision: source.revision, source: source.canvas };
-      } else { this.backdrop!.revision = source.revision; this.backdrop!.source = source.canvas; }
-      this.stats.backgroundUploads++;
-    } catch (e) { if (!reuse && texture) gl.deleteTexture(texture); allocation?.release(); throw e; }
-    finally { staging.release(); if (canvas) { canvas.width = 0; canvas.height = 0; } }
-  }
   private reportReady(): void { this.report(this.scale < this.requestedDpr ? 'degraded' : 'ready', this.scale < this.requestedDpr ? 'Effective DPR reduced to respect GPU budget' : 'GPU ready'); }
   private report(kind: GpuStatus['kind'], message: string): void {
     const changed = this.statusValue.kind !== kind || this.statusValue.message !== message || this.statusValue.effectiveDpr !== this.scale;
@@ -389,13 +352,11 @@ export class CanvasRenderer {
     const gl = this.gl;
     if (lost) this.atlas?.contextLost(); else this.atlas?.dispose(); this.atlas = null;
     if (gl && !lost) {
-      if (this.backdrop) gl.deleteTexture(this.backdrop.texture);
       if (this.white) gl.deleteTexture(this.white);
       if (this.buffer) gl.deleteBuffer(this.buffer);
       if (this.vao) gl.deleteVertexArray(this.vao);
       if (this.program) gl.deleteProgram(this.program);
     }
-    this.backdrop?.allocation.release(); this.backdrop = null;
     this.target?.release(); this.target = null;
     for (const allocation of this.allocations) allocation.release(); this.allocations = [];
     this.program = null; this.buffer = null; this.white = null; this.vao = null;
@@ -406,6 +367,6 @@ export class CanvasRenderer {
     this.textureGeneration++;
     this.canvas.removeEventListener('webglcontextlost', this.loss); this.canvas.removeEventListener('webglcontextrestored', this.restore);
     document.fonts?.removeEventListener('loadingdone', this.fontsChanged);
-    this.releaseGpu(this.lost); this.background = null; this.labels.clear(); this.layout.invalidate();
+    this.releaseGpu(this.lost); this.labels.clear(); this.layout.invalidate();
   }
 }

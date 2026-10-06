@@ -5,6 +5,8 @@ interface StatsModule {
   THRESHOLDS: Readonly<Record<string, number>>;
   TARGETS: Readonly<{ textWorkP95Ms: number; animationWorkP50Ms: number }>;
   percentile(values: number[], p: number): number | null;
+  beatResidualMs(row:{epoch:string|null;beatCycle:number;audibleTime:number},transport:{running:boolean;epoch:string|null;cycle:[number,number];sample_time:number;bpm:number;beats_per_cycle:number}):number|null;
+  classifyStallSamples(samples:Array<{time:number;frameIndex:number;value:number;onset:{time:number;end:number;from:number;to:number;epoch:string|null};frame:{frameMs:number;targetMs:number;audibleTime:number;epoch:string|null;activeKey:string}}>,presented:Array<{frameMs:number;audibleTime:number;epoch:string|null;activeKey:string;targetMs:number;beatCycle?:number}>,windows:Array<{index:number;startMs:number;endMs:number;beatResidualMs?:number|null}>,onsets?:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>):{stall:Array<{frameIndex:number;stallClass:string;stallConditions:{a:boolean;b:boolean};value:number}>;nonStall:Array<{frameIndex:number;stallClass:string;stallConditions:{a:boolean;b:boolean};value:number}>;windows:Array<{index:number;startMs:number;endMs:number;firstFrameMs:number|null;firstFrameLagMs:number|null;samples:number;activeSetMatch:boolean|null;replayed:boolean|null;early:number;beatResidualMs:number|null;audited:boolean}>;counts:{a:number;b:number;both:number}};
   pairInputLatency(frames: number[][], keys: number[][]): { paired: Array<{ keyTime: number; frameTime: number; latencyMs: number }>; pairedKeys: number; nonEditingKeys: number; expiredKeys: number; unpairedKeys: number };
   countChecks(checks: Array<{ status?: string; pass?: boolean }>): { total: number; passed: number; failed: number };
   evaluate(summary: Record<string, unknown>, thresholds?: Record<string, number>): { pass: boolean; failures: string[]; limitations: string[]; targets: { textWorkP95Met: boolean | null; animationWorkP50Met: boolean | null } };
@@ -23,7 +25,7 @@ interface StatsModule {
 const spec: string = '../../test/e2e/stats.mjs';
 const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
 
-const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:6}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, onsetCount:1 };
+const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:6}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, beatDriftMs:0, onsetCount:1 };
 describe('canvas evidence statistics', () => {
   it('uses nearest rank percentiles', () => expect(stats.percentile(Array.from({ length: 100 }, (_, i) => i + 1), 95)).toBe(95));
   it('summarizes exclusive phase rows and leaves empty phases unmeasured', () => {
@@ -144,6 +146,77 @@ describe('canvas evidence statistics', () => {
     ];
     expect(stats.attributeSync(onset,medianRows).samples[0].droppedFrames).toBe(2);
     expect(stats.attributeSync(onset,[]).samples).toEqual([]);
+  });
+  it('classifies sync samples by the recorded page-time interval (condition a)', () => {
+    const onset={time:0.2,end:0.4,from:1,to:2,epoch:'e'};
+    const sample={time:0.2,frameIndex:0,value:300,onset,frame:{frameMs:1000,targetMs:1000,audibleTime:0.2,epoch:'e',activeKey:'1-2'}};
+    const result=stats.classifyStallSamples([sample],[sample.frame],[{index:0,startMs:1000,endMs:1250}]);
+    expect(result.stall[0]).toMatchObject({stallClass:'stall',stallConditions:{a:true,b:true}});
+    expect(result.nonStall).toEqual([]);
+  });
+  it('classifies a last pre-stall frame with F as proxy by condition b', () => {
+    const onset={time:0.19,end:0.4,from:1,to:2,epoch:'e'};
+    const sample={time:0.19,frameIndex:0,value:20,onset,frame:{frameMs:990,targetMs:990,audibleTime:0.19,epoch:'e',activeKey:'1-2'}};
+    const rows=[sample.frame,{frameMs:1000,targetMs:1000,audibleTime:0.2,epoch:'e',activeKey:'1-2'}];
+    const result=stats.classifyStallSamples([sample],rows,[{index:0,startMs:1000,endMs:1250}]);
+    expect(result.stall[0]).toMatchObject({stallClass:'stall',stallConditions:{a:false,b:true}});
+  });
+  it('keeps F for a frame timestamp inside the explicit window and leaves the second post-F frame non-stall', () => {
+    const first={time:0.25,end:0.5,from:1,to:2,epoch:'e'};
+    const rows=[0,1,2].map((i)=>({frameMs:990+i*10,targetMs:990+i*10,audibleTime:0.25+i*0.01,epoch:'e',activeKey:'1-2'}));
+    const samples=[
+      {time:0.26,frameIndex:1,value:1,onset:first,frame:rows[1]},
+      {time:0.53,frameIndex:2,value:2,onset:{...first,time:0.53},frame:rows[2]},
+    ];
+    const result=stats.classifyStallSamples(samples,rows,[{index:0,startMs:1000,endMs:1250}]);
+    expect(result.windows[0].firstFrameMs).toBe(1000);
+    expect(result.stall.map((row)=>row.frameIndex)).toEqual([1]);
+    expect(result.nonStall.map((row)=>row.frameIndex)).toEqual([2]);
+  });
+  it('classifies by timing rather than latency value and gates only non-stall sync', () => {
+    const onset={time:0.2,end:0.4,from:1,to:2,epoch:'e'};
+    const sample={time:0.2,frameIndex:0,value:300,onset,frame:{frameMs:1000,targetMs:1000,audibleTime:0.2,epoch:'e',activeKey:'1-2'}};
+    const outside=stats.classifyStallSamples([sample],[sample.frame],[]);
+    expect(outside.nonStall[0].stallClass).toBe('non-stall');
+    expect(stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:300,p99:300},stallWindowSync:{earlyCount:0},stallWindowsInjected:0,stallWindows:[]}}).failures).toContain('syncAbsMs.p99=300 exceeds 50');
+    const inside=stats.classifyStallSamples([sample],[sample.frame],[{index:0,startMs:1000,endMs:1250}]);
+    expect(inside.stall[0].stallClass).toBe('stall');
+    const recovery={...inside.windows[0],audited:true,beatResidualMs:0};
+    const gated=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},stallWindowSync:{earlyCount:0},stallWindowsInjected:1,stallWindows:[recovery]}});
+    expect(gated.pass).toBe(true);
+  });
+  it('gates stall-window early flashes, missing windows, short windows, F residual and unavailable beat drift', () => {
+    const base={...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},stallWindowSync:{earlyCount:1},stallWindowsInjected:1,stallWindows:[{startMs:0,endMs:249,audited:true,beatResidualMs:1.01}]};
+    const failed=stats.evaluate({metrics:base});
+    expect(failed.failures).toContain('stall-window early flashes=1');
+    expect(failed.failures).toContain('stall window shorter than 250 ms');
+    expect(failed.failures).toContain('stall-frame beat residual exceeded 1 ms');
+    expect(stats.evaluate({metrics:{...base,stallWindowsInjected:2}}).failures).toContain('stall windows injected=2, recorded=1');
+    expect(stats.evaluate({metrics:{...base,stallWindowSync:{earlyCount:0},stallWindows:[{startMs:0,endMs:250,audited:true,beatResidualMs:1}]}}).pass).toBe(true);
+    expect(stats.evaluate({metrics:{...base,beatDriftMs:null}}).failures).toContain('beat drift unavailable');
+  });
+  it('rejects a -3 ms stall-window sync sample as early', () => {
+    const onset={time:0.2,end:0.4,from:1,to:2,epoch:'e'};
+    const sample={time:0.2,frameIndex:0,value:-3,onset,frame:{frameMs:1000,targetMs:1000,audibleTime:0.2,epoch:'e',activeKey:'1-2'}};
+    const classified=stats.classifyStallSamples([sample],[sample.frame],[{index:0,startMs:1000,endMs:1250}]);
+    const result=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},stallWindowSync:{earlyCount:classified.stall.filter((row)=>row.value < -2).length},stallWindowsInjected:0,stallWindows:[]}});
+    expect(result.failures).toContain('stall-window early flashes=1');
+  });
+  it('audits full workload onsets and gates an expired highlight still active on F', () => {
+    const onset={time:1,end:1.8,from:1,to:2,epoch:'e'};
+    const frame={frameMs:1000,targetMs:1000,audibleTime:1.8,epoch:'e',activeKey:'1-2'};
+    const sample={time:1.7,frameIndex:0,value:0,onset,frame};
+    const classified=stats.classifyStallSamples([sample],[frame],[{index:0,startMs:1000,endMs:1250,beatResidualMs:0}],[onset]);
+    expect(classified.windows[0]).toMatchObject({audited:true,activeSetMatch:false,replayed:true});
+    const result=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},stallWindowSync:{earlyCount:0},stallWindowsInjected:1,stallWindows:classified.windows}});
+    expect(result.failures).toContain('stall-window active-set mismatches=1');
+    expect(result.failures).toContain('expired highlights replayed after stall');
+  });
+  it('computes beat residual only for the running matching epoch', () => {
+    const transport={running:true,epoch:'e',cycle:[1,2] as [number,number],sample_time:2,bpm:120,beats_per_cycle:4};
+    expect(stats.beatResidualMs({epoch:'other',beatCycle:1,audibleTime:2},transport)).toBeNull();
+    expect(stats.beatResidualMs({epoch:'e',beatCycle:1,audibleTime:2},{...transport,running:false})).toBeNull();
+    expect(stats.beatResidualMs({epoch:'e',beatCycle:0.501,audibleTime:2},transport)).toBeCloseTo(2,8);
   });
   it('attributes a stall gap before the first active frame to that sync sample', () => {
     const onsets=[{time:0,end:0.1,from:100,to:101,epoch:'e'},{time:0.2,end:0.3,from:1,to:2,epoch:'e'}];

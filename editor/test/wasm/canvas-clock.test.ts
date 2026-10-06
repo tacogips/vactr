@@ -99,10 +99,15 @@ describe('canvas transport telemetry (real host-wasm artifact)', () => {
     const rig = await start();
     evaluate(rig, 'main.vact', 'use-bpm 120', 17);
     const out: TransportSample[] = [];
+    const tickTimes: number[] = [];
     for (let ms = 0; ms < 1000; ms += 1) {
-      for (const sample of samples(tick(rig, ms / 1000))) {
-        expect(sample.sample_time).toBe(ms / 1000);
+      const hostNow = ms / 1000;
+      for (const sample of samples(tick(rig, hostNow))) {
+        const gridPeriod = 1 / (960 * 0.5);
+        expect(hostNow - sample.sample_time).toBeGreaterThanOrEqual(0);
+        expect(hostNow - sample.sample_time).toBeLessThan(gridPeriod + 1e-9);
         out.push(sample);
+        tickTimes.push(hostNow);
       }
     }
     expect(out.length).toBeGreaterThanOrEqual(18);
@@ -115,13 +120,15 @@ describe('canvas transport telemetry (real host-wasm artifact)', () => {
       expect(sample.beats_per_cycle).toBe(4);
       expect(sample.running).toBe(true);
       expect(sample.cycle[1]).toBeGreaterThan(0);
-      // Runtime position is quantized to its cycle grid, rather than receipt time.
-      expect(sample.cycle[0] / sample.cycle[1]).toBeCloseTo(sample.sample_time / 2, 2);
+      // Runtime position is quantized to its cycle grid and paired with its host time.
+      const cycleTime = (sample.cycle[0] / sample.cycle[1]) / 0.5;
+      expect(Math.abs(cycleTime - sample.sample_time)).toBeLessThanOrEqual(1e-9);
       expect(sample.latency_seconds).toBeNull();
       expect(sample.latency_kind).toBe('unavailable');
       expect(sample.uncertainty_seconds).toBeNull();
       if (i > 0) {
-        expect(sample.sample_time - (out[i - 1] as TransportSample).sample_time).toBeGreaterThanOrEqual(0.05 - 1e-12);
+        const spacing = (tickTimes[i] as number) - (tickTimes[i - 1] as number);
+        expect(spacing).toBeGreaterThanOrEqual(0.05 - 1e-12);
       }
     }
   });
@@ -171,7 +178,7 @@ describe('canvas transport telemetry (real host-wasm artifact)', () => {
     expect(samples(tick(rig, 0.049))).toEqual([]);
     const next = onlySample(tick(rig, 0.05));
     expect(next.epoch).toBe(first.epoch);
-    expect(next.sample_time).toBe(0.05);
+    expect(next.sample_time).toBeCloseTo(0.05, 9);
     expect(next.cycle[0] / next.cycle[1]).toBeCloseTo(0.025, 2);
   });
 

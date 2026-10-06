@@ -48,7 +48,7 @@
     {
       "id": "background-no-replay",
       "pass": true,
-      "detail": "frames hidden=91, resumed=101"
+      "detail": "frames hidden=92, resumed=102"
     },
     {
       "id": "dispose-ledger",

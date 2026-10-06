@@ -372,14 +372,17 @@ fn transport_samples(msgs: &[ServerMsg]) -> Vec<crate::session::protocol::Transp
 }
 
 #[test]
-fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceiling() {
+fn periodic_transport_pairs_cycle_with_host_time_and_keeps_rate_ceiling() {
     let mut rig = Rig::new();
     let mut samples = Vec::new();
     for n in 0..=1000 {
         let time = f64::from(n) / 1000.0;
         rig.clock.set(time);
         for sample in transport_samples(&rig.tick()) {
-            assert_eq!(sample.sample_time, time);
+            let cps = sample.bpm / 60.0 / sample.beats_per_cycle;
+            let grid_period = 1.0 / (960.0 * cps);
+            assert!(time - sample.sample_time >= 0.0);
+            assert!(time - sample.sample_time < grid_period + 1e-9);
             assert_eq!(
                 sample.cycle,
                 crate::session::publish::ratio_pair(rig.s.runtime().clock().pos())
@@ -387,7 +390,7 @@ fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceilin
             assert!(sample.running);
             assert_eq!(sample.latency_kind, "unavailable");
             assert_eq!(sample.latency_seconds, None);
-            samples.push(sample);
+            samples.push((time, sample));
         }
     }
     assert!(
@@ -396,14 +399,87 @@ fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceilin
         samples.len()
     );
     for pair in samples.windows(2) {
-        assert!(pair[1].sample_time - pair[0].sample_time >= 0.05);
-        assert_eq!(pair[0].epoch, pair[1].epoch);
+        assert!(pair[1].0 - pair[0].0 >= 0.05);
+        assert_eq!(pair[0].1.epoch, pair[1].1.epoch);
     }
-    let before = samples.last().unwrap().epoch.clone();
+    let before = samples.last().unwrap().1.epoch.clone();
     rig.clock.set(0.0);
     let restarted = transport_samples(&rig.tick());
     assert_ne!(restarted[0].epoch, before);
     assert_eq!(restarted[0].sample_time, 0.0);
+}
+
+#[test]
+fn transport_sample_time_matches_cycle_at_quantum_ticks() {
+    fn cycle(sample: &crate::session::protocol::TransportSample) -> f64 {
+        crate::value::ratio::Ratio64::new(sample.cycle[0], sample.cycle[1])
+            .unwrap_or(crate::value::ratio::Ratio64::ZERO)
+            .to_f64()
+    }
+
+    let mut rig = Rig::new();
+    let mut samples = Vec::new();
+    for n in 0..=7500 {
+        let host_now = f64::from(n * 128) / 48_000.0;
+        rig.clock.set(host_now);
+        if n == 3750 {
+            rig.ok("use-bpm 137", 1);
+        }
+        for sample in transport_samples(&rig.tick()) {
+            samples.push((host_now, sample));
+        }
+    }
+
+    for bpm in [120.0, 137.0] {
+        let phase: Vec<_> = samples
+            .iter()
+            .filter(|(_, sample)| sample.bpm == bpm)
+            .collect();
+        assert!(phase.len() > 10, "not enough samples at {bpm} bpm");
+        let cps = bpm / 60.0 / 4.0;
+        let grid_period = 1.0 / (960.0 * cps);
+        for (host_now, sample) in &phase {
+            assert!(host_now - sample.sample_time >= 0.0);
+            assert!(host_now - sample.sample_time < grid_period + 1e-9);
+        }
+        for (index, left) in phase.iter().enumerate() {
+            let (_, sample_i) = *left;
+            for right in phase.iter().skip(index + 1) {
+                let (_, sample_j) = *right;
+                if sample_i.epoch != sample_j.epoch {
+                    continue;
+                }
+                assert!(sample_j.sample_time >= sample_i.sample_time);
+                let cycle_i = cycle(sample_i);
+                let cycle_j = cycle(sample_j);
+                let paired_error = ((cycle_j - cycle_i) / cps
+                    - (sample_j.sample_time - sample_i.sample_time))
+                    .abs();
+                assert!(
+                    paired_error <= 1e-9,
+                    "{bpm} bpm paired error {paired_error}"
+                );
+            }
+        }
+    }
+
+    let default_phase: Vec<_> = samples
+        .iter()
+        .filter(|(_, sample)| sample.bpm == 120.0)
+        .collect();
+    let mut max_host_error = 0.0_f64;
+    for (index, left) in default_phase.iter().enumerate() {
+        let (host_i, sample_i) = *left;
+        for right in default_phase.iter().skip(index + 1) {
+            let (host_j, sample_j) = *right;
+            if sample_i.epoch != sample_j.epoch {
+                continue;
+            }
+            let host_error = ((cycle(sample_j) - cycle(sample_i)) / 0.5 - (host_j - host_i)).abs();
+            max_host_error = max_host_error.max(host_error);
+        }
+    }
+    assert!(max_host_error > 0.001, "control error {max_host_error}");
 }
 
 #[test]

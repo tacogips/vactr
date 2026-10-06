@@ -290,6 +290,77 @@ export function lateActiveMismatches(onsets, presented, stalls) {
   return lateActiveMismatchDetails(onsets, presented, stalls).filter((audit) => audit.mismatch).length;
 }
 
+export function beatResidualMs(row, transport) {
+  if (!transport?.running || row?.epoch !== transport.epoch || !Number.isFinite(row?.beatCycle)) return null;
+  const bpm = Number(transport.bpm);
+  const beatsPerCycle = Number(transport.beats_per_cycle);
+  const sampleTime = Number(transport.sample_time);
+  const denominator = Number(transport.cycle?.[1]);
+  if (![bpm, beatsPerCycle, sampleTime, denominator].every(Number.isFinite) || bpm <= 0 || beatsPerCycle <= 0 || denominator === 0) return null;
+  const cycle = Number(transport.cycle[0]) / denominator;
+  const expected = cycle + (row.audibleTime - sampleTime) * bpm / 60 / beatsPerCycle;
+  return (row.beatCycle - expected) * 60 * beatsPerCycle / bpm * 1000;
+}
+
+export function classifyStallSamples(samples, presented, windows, onsets = (samples ?? []).map((sample) => sample.onset)) {
+  const prepared = (windows ?? []).map((window) => {
+    const firstFrameIndex = (presented ?? []).findIndex((row) => row.frameMs >= window.startMs);
+    const first = firstFrameIndex < 0 ? null : presented[firstFrameIndex];
+    return { ...window, firstFrameIndex, firstFrameMs:first?.frameMs ?? null };
+  });
+  const matchingBySample = new Map();
+  const classified = (samples ?? []).map((sample) => {
+    const onsetPageMs = sample.frame.targetMs + (sample.time - sample.frame.audibleTime) * 1000;
+    let a = false;
+    let b = false;
+    const matchingWindows = [];
+    for (const window of prepared) {
+      const first = window.firstFrameIndex;
+      const conditionA = onsetPageMs >= window.startMs && onsetPageMs <= window.endMs;
+      const conditionB = first >= 0 && (sample.frameIndex === first || sample.frameIndex + 1 === first);
+      if (conditionA || conditionB) matchingWindows.push({ window, conditionA, conditionB });
+      a ||= conditionA;
+      b ||= conditionB;
+    }
+    const classifiedSample = { ...sample, onsetPageMs, stallClass:matchingWindows.length ? 'stall' : 'non-stall', stallConditions:{ a, b } };
+    matchingBySample.set(classifiedSample, matchingWindows);
+    return classifiedSample;
+  });
+  const auditedRows = lateActiveMismatchDetails(
+    onsets, presented,
+    prepared.filter((window) => window.firstFrameMs !== null).map((window) => window.startMs),
+  );
+  const auditByStart = new Map(auditedRows.map((row) => [row.stallFrameMs, row]));
+  const windowRows = prepared.map((window) => {
+    const audit = auditByStart.get(window.startMs);
+    const windowSamples = classified.filter((sample) => matchingBySample.get(sample).some((match) => match.window === window));
+    const expectedRanges = new Set(audit?.expectedRanges ?? []);
+    const expiredActive = audit?.actualRanges.some((key) => !expectedRanges.has(key) && (onsets ?? []).some((onset) =>
+      sameEpoch(onset, audit) && rangeKey(onset) === key && onset.end <= audit.audibleTime)) ?? false;
+    return {
+      index:window.index, startMs:window.startMs, endMs:window.endMs,
+      firstFrameMs:window.firstFrameMs,
+      firstFrameLagMs:window.firstFrameMs === null ? null : window.firstFrameMs - window.endMs,
+      samples:windowSamples.length,
+      activeSetMatch:audit ? !audit.mismatch : null,
+      replayed:audit ? expiredActive : null,
+      early:windowSamples.filter((sample) => sample.value < -2).length,
+      beatResidualMs:window.beatResidualMs ?? null,
+      audited:Boolean(audit),
+    };
+  });
+  const stall = classified.filter((sample) => sample.stallClass === 'stall');
+  const nonStall = classified.filter((sample) => sample.stallClass === 'non-stall');
+  return {
+    stall, nonStall, windows:windowRows,
+    counts:{
+      a:classified.filter((sample) => sample.stallConditions.a).length,
+      b:classified.filter((sample) => sample.stallConditions.b).length,
+      both:classified.filter((sample) => sample.stallConditions.a && sample.stallConditions.b).length,
+    },
+  };
+}
+
 export function tickStarvationEvidence(phaseRows, { lookaheadMs = 120, longSpanMs = 50 } = {}) {
   const ticks = (phaseRows ?? []).filter((row) => row[0] === 6)
     .map((row) => Number(row[1])).filter(Number.isFinite).sort((a, b) => a - b);
@@ -396,9 +467,18 @@ export function evaluate(summary, thresholds = THRESHOLDS) {
     limit('syncAbsMs', 95, thresholds.syncAbsP95Ms);
     limit('syncAbsMs', 99, thresholds.syncAbsP99Ms);
     if ((metrics.earlyFlashCount ?? 0) > 0) failures.push(`early flashes=${metrics.earlyFlashCount}`);
+    if (metrics.stallWindowSync && (metrics.stallWindowSync.earlyCount ?? 0) > 0) failures.push(`stall-window early flashes=${metrics.stallWindowSync.earlyCount}`);
+    if (metrics.stallWindowsInjected !== undefined && metrics.stallWindowsInjected !== (metrics.stallWindows ?? []).length) failures.push(`stall windows injected=${metrics.stallWindowsInjected}, recorded=${(metrics.stallWindows ?? []).length}`);
+    if ((metrics.stallWindows ?? []).some((window) => window.endMs - window.startMs < 250)) failures.push('stall window shorter than 250 ms');
+    if (metrics.stallWindowsInjected > 0 && !(metrics.stallWindows ?? []).some((window) => window.audited)) failures.push('stall windows were not audited');
+    const activeSetMismatches = (metrics.stallWindows ?? []).filter((window) => window.audited && window.activeSetMatch === false).length;
+    if (activeSetMismatches > 0) failures.push(`stall-window active-set mismatches=${activeSetMismatches}`);
+    if ((metrics.stallWindows ?? []).some((window) => window.audited && window.replayed === true)) failures.push('expired highlights replayed after stall');
+    if ((metrics.stallWindows ?? []).some((window) => window.audited && Number.isFinite(window.beatResidualMs) && Math.abs(window.beatResidualMs) > thresholds.lateBeatDriftMs)) failures.push('stall-frame beat residual exceeded 1 ms');
   }
   if ((metrics.ledgerMaxBytes ?? 0) > thresholds.ledgerMiB * 1024 * 1024) failures.push('resource ledger exceeded 96 MiB');
   if (Number.isFinite(metrics.heapGrowthBytes) && metrics.heapGrowthBytes > thresholds.heapGrowthMiB * 1024 * 1024) failures.push('heap growth exceeded 8 MiB');
+  if (metrics.audioRunning === true && !Number.isFinite(metrics.beatDriftMs)) failures.push('beat drift unavailable');
   if (Number.isFinite(metrics.beatDriftMs) && Math.abs(metrics.beatDriftMs) > thresholds.lateBeatDriftMs) failures.push('beat drift exceeded 1 ms');
   if ((metrics.replayedFlashCount ?? 0) > 0) failures.push('expired highlights replayed after stall');
   if ((metrics.lateActiveMismatchCount ?? 0) > 0) failures.push(`post-stall active-set mismatches=${metrics.lateActiveMismatchCount}`);
@@ -439,15 +519,22 @@ export function renderEvidence(summary) {
       ['Text-dirty frame work p95 (ms)', m.textWorkMs?.p95, '<= 8 (target 4, recorded)'],
       ['Frame interval p95 (ms)', m.frameIntervalMs?.p95, '<= 20'],
       ['Frame interval p99 (ms)', m.frameIntervalMs?.p99, '<= 50'],
-      ['A/V model absolute error p99 (ms)', m.syncAbsMs?.p99, 'measured only; <= 50'],
-      ['A/V sync dropped-frame samples', m.syncDroppedFrameSamples, 'reported separately; sync gate includes all samples'],
+      ['A/V model absolute error p95/p99 (non-stall samples, ms)', m.syncAbsMs == null ? null : `${m.syncAbsMs.p95} / ${m.syncAbsMs.p99}`, 'measured only; <= 33.4 / 50'],
+      ['A/V model all-sample absolute error p95/p99 (ms)', m.syncAbsMsAll == null ? null : `${m.syncAbsMsAll.p95} / ${m.syncAbsMsAll.p99}`, 'informational; includes stall-window samples'],
+      ['A/V stall-window sync samples by condition (a / b / both)', m.stallWindowSync?.counts == null ? null : `${m.stallWindowSync.counts.a} / ${m.stallWindowSync.counts.b} / ${m.stallWindowSync.counts.both}`, 'informational; classified by recorded page-time windows'],
+      ['A/V stall-window sample count / p50 / p95 / max absolute error (ms)', m.stallWindowSync == null ? null : `${m.stallWindowSync.count} / ${m.stallWindowSync.p50} / ${m.stallWindowSync.p95} / ${m.stallWindowSync.max}`, 'informational; recovery gates apply'],
+      ['Stall windows injected / recorded / audited', m.stallWindowsInjected == null ? null : `${m.stallWindowsInjected} / ${(m.stallWindows ?? []).length} / ${(m.stallWindows ?? []).filter((window) => window.audited).length}`, 'equal counts; all windows >= 250 ms; >= 1 audited'],
+      ['Stall-window early flashes', m.stallWindowSync?.earlyCount, '0'],
+      ['F beat residual max (ms)', m.beatResidual?.maxAbsStallFrameMs, '<= 1'],
+      ['Frame interval exclusions (stall / non-stall)', m.frameIntervalExcluded == null ? null : `${m.frameIntervalExcluded.stall} / ${m.frameIntervalExcluded.nonStall}`, 'informational; intervals > 200 ms excluded'],
+      ['A/V sync dropped-frame samples', m.syncDroppedFrameSamples, 'reported separately; sync gate covers non-stall samples'],
       ['A/V sync duplicates folded', m.syncDuplicateSamples, 'one sample per onset time, epoch and presented frame'],
       ['A/V model absolute error p95/p99 without dropped frames (informational)', m.syncAbsMsNoDrop == null ? null : `${m.syncAbsMsNoDrop.p95} / ${m.syncAbsMsNoDrop.p99}`, 'informational; not gated'],
       ['Early flashes', m.earlyFlashCount, '0; none earlier than 2 ms'],
       ['A/V window start / end (s)', m.syncWindowStart == null ? null : `${m.syncWindowStart} / ${m.syncWindowEnd}`, 'intersection with onset eviction guard'],
       ['A/V window onsets / frame pairs / excluded frames', m.syncWindowOnsets == null ? null : `${m.syncWindowOnsets} / ${m.syncFramePairs} / ${m.syncExcludedFrames}`, 'excluded rows remain in raw JSONL'],
       ['Post-stall active-set mismatches', m.lateActiveMismatchCount, '0'],
-      ['A/V model absolute error p95 (ms)', m.syncAbsMs?.p95, 'measured only; <= 33.4'],
+      ['A/V model absolute error p95 (non-stall samples, ms)', m.syncAbsMs?.p95, 'measured only; <= 33.4'],
       ['Resource ledger peak (MiB)', m.ledgerMaxBytes == null ? null : (m.ledgerMaxBytes / 1048576).toFixed(2), '<= 96'],
       ['JS heap growth (MiB)', m.heapGrowthBytes == null ? null : (m.heapGrowthBytes / 1048576).toFixed(2), '<= 8'],
       ['Beat drift (ms)', m.beatDriftMs, '<= 1'],

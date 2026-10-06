@@ -552,9 +552,23 @@ impl Session {
             .is_none_or(|t| host_now - t >= TRANSPORT_PERIOD || host_now < t);
         let transport = if due && self.subs.values().any(|s| s.telemetry) {
             self.last_transport = Some(host_now);
+            // `sched::runtime::GRID` is private; keep its current value here for the guard.
+            let cps = tempo.bpm.to_f64() / 60.0 / tempo.beats_per_cycle.to_f64();
+            let grid_period = 1.0 / (960.0 * cps);
+            let candidate = self.rt.clock().to_host(self.transport_cycle);
+            let sample_time = if !frozen
+                && !lost
+                && candidate.is_finite()
+                && candidate >= 0.0
+                && (candidate - host_now).abs() <= grid_period + 1e-9
+            {
+                candidate
+            } else {
+                host_now
+            };
             Some(TransportSample {
                 epoch,
-                sample_time: host_now,
+                sample_time,
                 cycle: ratio_pair(self.transport_cycle),
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.to_f64(),

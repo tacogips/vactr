@@ -12,14 +12,14 @@
   ],
   "wasm": {
     "path": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/dist/vactr.wasm",
-    "bytes": 6451635,
-    "sha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
+    "bytes": 6451822,
+    "sha256": "fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f",
     "nameSection": true,
     "dwarf": false,
     "profile": "release",
     "releasePath": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/target/wasm32-unknown-unknown/release/vactr.wasm",
-    "releaseSha256": "17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d",
-    "debugSha256": "02bf7e97f5de121e01d2d31b98ed2e8c82ca9b17d958e49c8d164a75d7e89ad3",
+    "releaseSha256": "fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f",
+    "debugSha256": "502fad8958b149088258dd331538414716461f01abca435daef2d8f16631e9f4",
     "gating": true
   },
   "chromium": {

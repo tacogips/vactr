@@ -2298,8 +2298,8 @@ only this plan's progress log and the plan files being archived.
 - [ ] Session 291 TASK-601: latest auditable canonical release `run-001` is incomplete (runner exit 1): sync p99 is 140.93 ms Chromium / 200.67 ms WebKit; Chromium has three post-stall active-set/receipt-timing discrepancies; behavior checks are 18/18 and silent-sink assertions pass. Beat drift passes in both browsers. The F condition is false, so continue product/harness attribution without a tick Worker.
 - [ ] Session 291 TASK-604/605 and final integration: downstream final gates on the accepted source, review-dependent archive/index updates, commit and non-force push remain pending.
 - [x] Session 302 plan amendment: design 15.3.8.15 records the 2026-10-07 Option A user approval; this plan has TASK-701 to TASK-706; the manifest `operatorRules` records the approval; the design, plan and manifest are checkpoint-committed before CANVAS-EVIDENCE is redispatched
-- [ ] Session 302 TASK-701: `publish.rs` pairs a running sample's `sample_time` with `Clock::to_host(cycle)` under the one-grid-period guard; the ported and new `session::tests::publish` rows pass, including the in-test control branch; `canvas-clock.test.ts` is ported with no assertion deleted and passes on the rebuilt host-wasm artifact; strict clippy and rustfmt on the two Rust files exit 0
-- [ ] Session 302 TASK-702: `measure.mjs` records `{index,startMs,endMs}` stall windows and no longer infers stalls from frame gaps; `classifyStallSamples` and `beatResidualMs` are exported; `evaluate` gates non-stall `syncAbsMs`, stall-window early flashes, window integrity, audited F residuals and a missing `beatDriftMs`; the `stats.test.ts` rows, including the latency-independence control, pass; `THRESHOLDS` and `TARGETS` are unchanged
+- [x] Session 302 TASK-701: `publish.rs` pairs a running sample's `sample_time` with `Clock::to_host(cycle)` under the one-grid-period guard; the ported and new `session::tests::publish` rows pass, including the in-test control branch; `canvas-clock.test.ts` is ported with no assertion deleted and passes on the rebuilt host-wasm artifact; strict clippy and rustfmt on the two Rust files exit 0
+- [x] Session 302 TASK-702: `measure.mjs` records `{index,startMs,endMs}` stall windows and no longer infers stalls from frame gaps; `classifyStallSamples` and `beatResidualMs` are exported; `evaluate` gates non-stall `syncAbsMs`, stall-window early flashes, window integrity, audited F residuals and a missing `beatDriftMs`; the `stats.test.ts` rows, including the latency-independence control, pass; `THRESHOLDS` and `TARGETS` are unchanged
 - [ ] Session 302 TASK-703: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exits 0 on the release wasm; in both browsers non-stall sync p95 <= 33.4 ms and p99 <= 50 ms, stall-recovery criteria hold, beat drift <= 1 ms, the session-286 gates hold, behavior is 18/18, post-sink peak is 0 and direct destination connections are 0
 - [ ] Session 302 TASK-704: the evidence document has the "Stall-window sync classification (session 293, design 15.3.8.15)" section with the per-window table, the side-by-side sync figures and the beat-drift diagnosis, and its triage table cites the new run
 - [ ] Session 302 TASK-705: all eleven final gates pass serially, with full nextest run alone under `timeout 2400`
@@ -2688,3 +2688,50 @@ TASK-701 to TASK-706.
 - **Unchanged.** No threshold, workload, stall, dependency, protocol field or frontend clock
   formula changes.
 - **Rules.** Never run two heavy suites at once. No mutation or negative-control commands.
+
+### Session: 2026-10-07 (session 293 Step 6 implementation)
+
+**Tasks Completed**: TASK-701 transport-sample pairing; TASK-702 explicit stall-window
+classification and recovery evidence. A late-active-range audit fixture now supplies the
+full onset set and distinguishes a genuine expired active range from a range reused by a
+current onset. Thresholds and targets remain unchanged.
+
+**Final-source verification**:
+
+- `rustfmt --edition 2021 --check src/session/publish.rs src/session/tests/publish.rs`: exit 0
+  (`tmp/canvas-cutover/evidence/s302-task701/rustfmt-check.log`).
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/session::tests::publish/)'`: 21/21, exit 0
+  (`tmp/canvas-cutover/evidence/s302-task701/nextest-publish.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0
+  (`tmp/canvas-cutover/evidence/s302-task701/clippy.log`).
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`: exit 0
+  (`tmp/canvas-cutover/evidence/s302-task701/host-wasm-build.log`).
+- `cd editor && ./node_modules/.bin/vitest run test/wasm/canvas-clock.test.ts`: 7/7, exit 0
+  (`tmp/canvas-cutover/evidence/s302-task701/vitest-canvas-clock.log`).
+- `cd editor && ./node_modules/.bin/vitest run test/e2e`: 54/54, exit 0
+  (`tmp/canvas-cutover/evidence/s302-vitest-e2e-replay-final.log`).
+- `cd editor && npm run check`: exit 0 (`tmp/canvas-cutover/evidence/s302-npm-check-final.log`).
+- `node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/silent-sink.mjs editor/test/e2e/fixtures/large-doc.mjs`: exit 0
+  (`tmp/canvas-cutover/evidence/s302-node-check-final.log`).
+
+**TASK-703 canonical re-measure**: release wasm identity was verified as profile `release`,
+`nameSection=true`, `dwarf=false` (SHA-256
+`fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f`). Both behavior runs
+pass 18/18. The run keeps the silent-sink assertions and stall recovery active, with zero
+post-sink peak and zero direct destination connections. Chromium passes non-stall sync and
+beat drift. WebKit beat drift is 0 ms and non-stall sync p95/p99 is 21.33/41.33 ms, within
+the 33.4/50 ms limits. However, the latest run reports one WebKit stall-window early flash
+(-15.33 ms) and exits as failed (`tmp/canvas-cutover/evidence/s302-run-001-e2e-replay-final.log`;
+raw records in `design-docs/specs/evidence/canvas-cutover/run-001/webkit-measure.jsonl`).
+The automated suite reports 18/18 browser behavior checks; the overall evidence gate fails.
+
+**Disposition**: TASK-703 remains incomplete. Do not relabel the early-flash failure or loosen
+the accepted metric. Its sample’s rAF record has `audibleTime=243.0122`, after onset time 243,
+while the current proxy-frame calculation compares `next.frameMs` against the correlated
+onset-page timestamp and reports -15.33 ms. This exposes a need to confirm the intended
+presentation timestamp seam before repair. The approved 15.3.8.15 amendment explicitly keeps
+the frontend clock formula unchanged, and the plan’s non-goals prohibit product edits; a
+serial plan-author amendment must resolve this conflict and name any changed owner paths and
+deterministic proof before further implementation. TASK-704 evidence prose, final gates,
+closeout, formal review, commit and push remain pending downstream or blocked by TASK-703.
+No source file reached 1,000 lines. No thresholds or workload changed.

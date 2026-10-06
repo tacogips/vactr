@@ -215,3 +215,16 @@ stop editing it and report. Edit only this plan's progress log.
 ### Session: 2026-10-06 (session 286 plan authoring)
 **Tasks Completed**: Plan authored from design 15.3.8.14 sections 5 and 6.
 **Notes**: Wave 8, runs alone. Product files are untouched.
+
+### Session: 2026-10-06 (session 287 restart; plan-author note, no re-plan)
+**Tasks Completed**: None accepted. Session 286 stopped for host memory pressure. Commit
+28ed027 holds unreviewed partial edits to `stats.mjs`, `stats.test.ts` and `measure.mjs`.
+**Notes**: Contracts, tests and criteria are unchanged. Two restart rules apply:
+- **Diff base.** `$BASE` in the Verification table and the Completion Criteria means
+  `1d17ced`, the plan checkpoint. Do not use the current HEAD. Record `START=$(git rev-parse HEAD)`
+  separately in `intent.json`. `git diff --name-only 1d17ced` must list only this plan's
+  writePaths. `git diff 1d17ced -- editor/test/e2e/stats.mjs` must show only
+  `textWorkP95Ms` changed inside `THRESHOLDS`.
+- **Starting state.** Treat the 28ed027 edits as a draft. Check them line by line against
+  contracts 1-3 and every Test Cases bullet. Complete or fix anything missing, then run the
+  full verification table. Do not revert the draft wholesale.

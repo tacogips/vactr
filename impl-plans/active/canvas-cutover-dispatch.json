@@ -206,10 +206,35 @@
       "operatorDiagnosis": "tmp/canvas-cutover/diag-shape/REPORT.md (measured; stale bind rows with opacity 0.7 dominate WebKit; retainedBytes full-copy charge kills highlights after about 9 edits; harness counts 64 identical sync samples per onset; proto-c.patch reference) and tmp/canvas-cutover/diag-shape/FABLE-STATIC-REPORT.md (static hot-path inventory), both gitignored and read-only",
       "amendment": "Operator decisions 1-8 and design 15.3.8.14 (WebKit-first performance wave). Six new serial plans precede the CANVAS-EVIDENCE re-measure: CANVAS-OPT-HARNESS (wave 8: sync sample de-duplication per onset time, epoch and first frame; dropped frames reported separately; textWork gate 16.7 -> 8 ms; targets 4 ms and 1 ms recorded), CANVAS-OPT-HISTORY (wave 9: delta-charged revisions, pinned revisions with composed change sets, Uint32 line tables instead of Utf8Index, CodeApi.toWireSpan, bounded pointer and word moves), CANVAS-OPT-DOM (wave 10: color dimming, virtualized bind panel with a test seam, indexed Store.notify, incremental piano roll, lazy accessibility bridge), CANVAS-OPT-TEXT (wave 11: OffscreenCanvas measurement, ASCII advance table with an additivity probe, change-set layout, deferred tree-sitter reparse with span reuse, 150 ms completion debounce, dirty reasons), CANVAS-OPT-BACKDROP (wave 12: visual canvas stacked in the DOM under the code canvas, cached MAX_TEXTURE_SIZE, palette F1) and CANVAS-OPT-RENDER (wave 13: append-only cell atlas, instanced per-line geometry with a slot table, at most 4 draw calls). The design's single OPT-RENDER plan is refined into BACKDROP and RENDER (15.3.8.14 section 8 allows it). CANVAS-EVIDENCE moves to wave 14 with TASK-601 to TASK-605. Every '15.3.8.14' reference to escalation F in this manifest and in the evidence plan now means 'a new F design amendment at the next free 15.3.8.x number'.",
       "checkpointNote": "Session 286 plan checkpoint: design 15.3.8.14 (with its in-place pointers in 15.3.3, 15.3.5, 15.3.8.3, 15.3.8.6, 15.3.8.7, 15.3.8.8, 15.3.8.10 and 15.3.8.13), the six canvas-cutover-opt-*.md plans, the CANVAS-EVIDENCE 'Session 286 Amendment' and this manifest are committed and pushed together before dispatch. Accepted plans are not redispatched."
+    },
+    "session287": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-287",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-286",
+      "resumeHead": "28ed027",
+      "planCheckpoint": "1d17ced",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART",
+        "CANVAS-EVIDENCE-SCOPE",
+        "CANVAS-EVIDENCE-SCHED",
+        "CANVAS-EVIDENCE-FRAMECOST"
+      ],
+      "blocker": "Session 286 was stopped by host memory pressure during step 6 (not a workflow failure). Commit 28ed027 holds unreviewed partial CANVAS-OPT-HARNESS edits to editor/test/e2e/measure.mjs, stats.mjs and stats.test.ts.",
+      "amendment": "Restart only: no redesign and no re-plan (step 3 comm-004455 and step 5 comm-004457 confirm design 15.3.8.14, the seven OPT and EVIDENCE plans and the plan entries of this manifest unchanged since 1d17ced). CANVAS-OPT-HARNESS continues from the 28ed027 draft, checks it line by line against contracts 1-3 and every Test Cases bullet, and runs its full verification table. Its $BASE for the diff criteria is the plan checkpoint 1d17ced, not the current HEAD; intent.json records BASE=1d17ced and a separate START. The session-287 progress-log entry in impl-plans/active/canvas-cutover-opt-harness.md records this. Memory rule: run heavy suites one at a time (full nextest alone, test:perf alone, vitest with default workers, never two heavy suites at once).",
+      "checkpointNote": "Session 287 plan checkpoint: the OPT-HARNESS session-287 progress-log entry and this manifest's session287 record are committed together. Plans, writePaths, sharedPaths, artifactRoots, verification and the serial DAG CANVAS-OPT-HARNESS -> OPT-HISTORY -> OPT-DOM -> OPT-TEXT -> OPT-BACKDROP -> OPT-RENDER -> CANVAS-EVIDENCE are unchanged. Accepted plans are not redispatched."
     }
   },
   "designDocPaths": [
     "design-docs/specs/design-implementation.md",
+    "design-docs/specs/design-ui-style.md",
     "design-docs/user-qa/pending-editor-questions.md"
   ],
   "designDocSections": [
@@ -228,7 +253,7 @@
   ],
   "supersedes": "canvas-editor-224 chain (historical only; its dispatch, snapshot, fingerprint and recovery contracts are not resumed)",
   "reviewContext": {
-    "issueReference": "workflowInput:RESUME-session-285 'Performance optimization wave (WebKit-first)' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-286, chain 265-266-267-269-271-274-277-282-283-284-285-286; operator decisions 1-8; design 15.3.8.14 accepted by step3-design-review comm-004444; riela issues #132 and #134; no GitHub issue number)",
+    "issueReference": "workflowInput:RESTART-session-286 'RESTART session 286: performance optimization wave (WebKit-first) from the committed OPT plans' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-287, step5 comm-004457), restarting workflowInput:RESUME-session-285 'Performance optimization wave (WebKit-first)' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-286, chain 265-266-267-269-271-274-277-282-283-284-285-286; operator decisions 1-8; design 15.3.8.14 accepted by step3-design-review comm-004444; riela issues #132 and #134; no GitHub issue number)",
     "userProblem": "The production vactr editor still renders through CodeMirror EditorView (15 production files import @codemirror/view), visuals follow message receipt or raw AudioContext.currentTime instead of audible time, native output latency is always 'unavailable', the Tauri shell has no IPC or iOS project, and there is no real-browser evidence. The user wants a GPU canvas code editor for browsers and iPad with audio-clock synchronized visuals, bounded resources and measured evidence.",
     "requiredOutcomes": [
       "Design amendment 15.3.8 covering song mode, completion popup, format/syntax migration, frame scheduler and backgrounding, ABI batch bounds and incremental deltas, and the measurement protocol with numeric thresholds (accepted; committed in this checkpoint).",

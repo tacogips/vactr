@@ -157,6 +157,111 @@ describe('bind panel virtualization', () => {
     expect(insertBefore.mock.contexts.some((parent) => parent === group)).toBe(true);
     insertBefore.mockRestore(); appendChild.mockRestore(); append.mockRestore();
   });
+
+  it('tracks .pane-right scrolling without the viewport seam and tolerates missing matchMedia', () => {
+    const count = 240;
+    const text = Array(count).fill('let x 0.5').join('\n');
+    const sites: WireSite[] = Array.from({ length: count }, (_, i) => ({
+      id: i + 1, span: { start: i * 10 + 6, end: i * 10 + 9 }, tier: 'direct', origin: 'binding', value: 0.5, form_gen: 1,
+    }));
+    let nextFrame = 0;
+    const frames = new Map<number, FrameRequestCallback>();
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      nextFrame += 1;
+      frames.set(nextFrame, callback);
+      return nextFrame;
+    });
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => { frames.delete(id); });
+    const matchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    let paneRect: ReturnType<typeof vi.spyOn> | undefined;
+    let panelRect: ReturnType<typeof vi.spyOn> | undefined;
+    const runFrame = (): void => {
+      const pending = [...frames.entries()];
+      expect(pending).toHaveLength(1);
+      const [id, callback] = pending[0]!;
+      frames.delete(id);
+      callback(0);
+    };
+    const rect = (top: number): DOMRect => ({
+      x: 0, y: top, top, left: 0, right: 600, bottom: top + 600, width: 600, height: 600,
+      toJSON: () => ({}),
+    });
+
+    try {
+      Object.defineProperty(window, 'matchMedia', { configurable: true, value: undefined });
+      const h = setup(text, { nativePanelViewport: true });
+      const pane = h.root.querySelector<HTMLElement>('.pane-right')!;
+      const panel = h.area.panel;
+      Object.defineProperty(pane, 'clientHeight', { configurable: true, value: 600 });
+      Object.defineProperty(pane, 'clientTop', { configurable: true, value: 0 });
+      Object.defineProperty(pane, 'scrollTop', { configurable: true, writable: true, value: 0 });
+      paneRect = vi.spyOn(pane, 'getBoundingClientRect').mockImplementation(() => rect(100));
+      panelRect = vi.spyOn(panel.el, 'getBoundingClientRect').mockImplementation(() => rect(100 - pane.scrollTop));
+
+      h.evalResult(sites, { forms: [] });
+      runFrame();
+      const first = h.area.table.byId(1)!;
+      const scrolled = h.area.table.byId(151)!;
+      const mounted = () => h.root.querySelectorAll('.bind-row').length;
+      expect(panel.row(first.bindingId)).toBeDefined();
+      expect(panel.row(scrolled.bindingId)).toBeUndefined();
+      expect(mounted()).toBeLessThanOrEqual(35);
+
+      pane.scrollTop = 150 * 32;
+      pane.dispatchEvent(new Event('scroll'));
+      runFrame();
+      expect(panel.row(scrolled.bindingId)).toBeDefined();
+      expect(panel.row(first.bindingId)).toBeUndefined();
+      expect(mounted()).toBeLessThanOrEqual(Math.ceil(600 / 32) + 16);
+    } finally {
+      paneRect?.mockRestore();
+      panelRect?.mockRestore();
+      cancelFrame.mockRestore();
+      requestFrame.mockRestore();
+      if (matchMediaDescriptor) Object.defineProperty(window, 'matchMedia', matchMediaDescriptor);
+      else Reflect.deleteProperty(window, 'matchMedia');
+    }
+  });
+
+  it('keeps eval-result renders pending through a bindings batch before the frame', () => {
+    const text = 'let root 0.5\nlet child 0.25';
+    const rootSite = (value: number): WireSite => site(text, '0.5', 1, { origin: 'binding', value });
+    const childSite = (value: number): WireSite => site(text, '0.25', 2, { origin: 'binding', value });
+    let nextFrame = 0;
+    const frames = new Map<number, FrameRequestCallback>();
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      nextFrame += 1;
+      frames.set(nextFrame, callback);
+      return nextFrame;
+    });
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => { frames.delete(id); });
+    const runFrame = (): void => {
+      const pending = [...frames.entries()];
+      expect(pending).toHaveLength(1);
+      const [id, callback] = pending[0]!;
+      frames.delete(id);
+      callback(0);
+    };
+
+    try {
+      const h = setup(text, { nativePanelViewport: true });
+      h.evalResult([rootSite(0.5), childSite(0.25)], { forms: [] });
+      runFrame();
+      const root = h.area.table.byId(1)!;
+      const rootRow = h.area.panel.row(root.bindingId)!;
+      const rendersBefore = h.area.panel.renderCount(`binding:${root.bindingId}`);
+
+      h.evalResult([rootSite(0.9), childSite(0.25)], { forms: [] });
+      h.store.apply({ kind: 'bindings', body: { pass: 2, changed: [], sites: [childSite(0.4)], states: [] } });
+      runFrame();
+
+      expect(q(rootRow, '.bind-value')).toBe('0.9');
+      expect(h.area.panel.renderCount(`binding:${root.bindingId}`)).toBe(rendersBefore + 1);
+    } finally {
+      cancelFrame.mockRestore();
+      requestFrame.mockRestore();
+    }
+  });
 });
 
 // DDRUM-006: the manifest's `ParamMeta.label`/`default`/`choices` show up

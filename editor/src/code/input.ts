@@ -1,12 +1,12 @@
 import { isolateHistory } from '@codemirror/commands';
-import { Text } from '@codemirror/state';
+import { ChangeSet, Text, type ChangeSet as ChangeSetType } from '@codemirror/state';
 import type { CodeAnnotation } from '../app/apis';
 import { CodeSurface } from './surface';
 import { AccessibilityBridge, boundary } from './accessibility';
 import { KeyboardController, type KeyboardOptions } from './keyboard';
 import type { PhaseTimer } from './frame';
 
-export interface InputPresentation { doc: Text; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
+export interface InputPresentation { doc: Text; changes?: ChangeSetType; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
 export interface InputOptions extends KeyboardOptions {
   label?: string;
   onPresentation?: (presentation: InputPresentation) => void;
@@ -22,11 +22,14 @@ export class InputController {
   private original = '';
   private trailingComposition = false;
   private cachedPresentation: InputPresentation | null = null;
+  private pendingChanges: ChangeSetType | undefined;
+  private lastStateDoc: Text;
   private presentationKey: { stateDoc: Text; range: { from: number; to: number } | null; preedit: string; composing: boolean; cursor: number } | null = null;
   private stop: () => void;
   private listeners: (() => void)[] = [];
   private disposed = false;
   constructor(readonly surface: CodeSurface, container: HTMLElement, private options: InputOptions = {}) {
+    this.lastStateDoc = surface.state.doc;
     this.accessibility = new AccessibilityBridge(surface, container, options.label);
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
@@ -57,7 +60,10 @@ export class InputController {
     this.listen(window, 'orientationchange', position);
     this.listen(window, 'scroll', position);
     if (window.visualViewport) { this.listen(window.visualViewport, 'resize', position); this.listen(window.visualViewport, 'scroll', position); }
-    this.stop = surface.subscribe(() => {
+    this.stop = surface.subscribe((update) => {
+      const previous = this.cachedPresentation;
+      this.pendingChanges = update.docChanged && !this.composing && previous?.doc === this.lastStateDoc ? update.changes : undefined;
+      this.lastStateDoc = update.state.doc;
       if (!this.composing) this.accessibility.markDirty();
       this.publish();
     });
@@ -78,7 +84,7 @@ export class InputController {
     const doc = this.composing && range ? stateDoc.replace(range.from, range.to, Text.of(this.preedit.split('\n'))) : stateDoc;
     const annotations: readonly CodeAnnotation[] = this.composing && range
       ? [{ from: range.from, to: range.from + this.preedit.length, kind: 'composition' }] : [];
-    const presentation = { doc, cursor, annotations } as InputPresentation;
+    const presentation = { doc, changes: this.pendingChanges, cursor, annotations } as InputPresentation;
     Object.defineProperty(presentation, 'text', { enumerable: true, get: () => doc.toString() });
     this.presentationKey = { stateDoc, range: range ? { ...range } : null, preedit: this.preedit, composing: this.composing, cursor };
     this.cachedPresentation = presentation;
@@ -101,7 +107,12 @@ export class InputController {
     phases?.begin('input');
     try { return run(); } finally { phases?.end('input'); }
   }
-  private publish(): void { if (!this.disposed) this.options.onPresentation?.(this.presentation); }
+  private publish(changes?: ChangeSetType): void {
+    if (this.disposed) return;
+    if (changes) this.pendingChanges = changes;
+    this.presentationKey = null;
+    this.options.onPresentation?.(this.presentation);
+  }
   beginComposition(): void {
     if (this.composing || this.disposed) return;
     this.trailingComposition = false;
@@ -112,7 +123,9 @@ export class InputController {
   }
   updateComposition(text: string): void {
     if (!this.composing) this.beginComposition();
-    this.preedit = text; this.publish();
+    const previous = this.presentation, range = this.surface.compositionRange;
+    const changes = range ? ChangeSet.of({ from: range.from, to: range.from + this.preedit.length, insert: text }, previous.doc.length) : undefined;
+    this.preedit = text; this.publish(changes);
   }
   endComposition(text: string): void {
     if (!this.composing) return;

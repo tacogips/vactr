@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-TEXT: Advance Tables, Change-Set Layout, Deferred Syntax and Off-Keystroke Completion Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (Step 6 implementation complete; downstream reviews pending)
 **Plan ID**: CANVAS-OPT-TEXT (session 286, wave 11; runs alone after CANVAS-OPT-DOM is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 3 (text layout, syntax and request scheduling), section 6 (budgets), engine rules; 15.3.3 (as amended: measured advances, caret validated against the same shaping); 15.3.8.7 (allowed whole-text transfers, as amended); 15.3.8.10 (bounded edit path)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-TEXT`)
@@ -443,16 +443,16 @@ report. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] `advances.ts`: OffscreenCanvas-first measure context, the ASCII table, the cluster LRU and the additivity probe
-- [ ] A single ASCII edit makes 0 layout `measureText` calls; `ctx.font` is never assigned on hot paths
-- [ ] `setText(doc, changes)` is change-proportional; no line string comparison; `edit-cost.test.ts:104-133` and the `view-host.test.ts` rig ported to pass change sets with byte-identical assertions; `edit-cost.test.ts:135-150` passes unchanged
-- [ ] Syntax: 0 synchronous parses and 1 deferred parse per edit; caret moves make 0 captures; only changed lines are recaptured
-- [ ] Completion is debounced to 150 ms (Ctrl-Space in the next task); version-identity staleness; one `text()` per request
-- [ ] Check runs only from its timer (test row)
-- [ ] Dirty reasons in place; `spans()` is skipped on selection-only frames
-- [ ] All existing assertions unchanged (timer advances added where needed); default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
-- [ ] Harness sharedPaths: unedited, or frame-alignment-only edits recorded with sha256 values and no changed assertion, threshold or check comparison (`git diff <START> -- editor/test/e2e editor/test/style`)
-- [ ] Progress log updated
+- [x] `advances.ts`: OffscreenCanvas-first measure context, the ASCII table, the cluster LRU and the additivity probe
+- [x] A single ASCII edit makes 0 layout `measureText` calls; `ctx.font` is never assigned on hot paths
+- [x] `setText(doc, changes)` is change-proportional; no line string comparison; `edit-cost.test.ts:104-133` and the `view-host.test.ts` rig ported to pass change sets with byte-identical assertions; `edit-cost.test.ts:135-150` passes unchanged
+- [x] Syntax: 0 synchronous parses and 1 deferred parse per edit; caret moves make 0 captures; only changed lines are recaptured
+- [x] Completion is debounced to 150 ms (Ctrl-Space in the next task); version-identity staleness; one `text()` per request
+- [x] Check runs only from its timer (test row)
+- [x] Dirty reasons in place; `spans()` is skipped on selection-only frames
+- [x] All existing assertions unchanged (timer advances added where needed); default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [x] Harness sharedPaths unedited
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -475,3 +475,69 @@ sharedPaths").
 **Notes**: Added the 8 harness and style files as concrete sharedPaths, here and in the
 manifest, with the frame-alignment-only rule. Scope, contracts, tasks and criteria are
 otherwise unchanged. Status stays Ready; this plan starts after CANVAS-OPT-DOM is accepted.
+
+### Session: 2026-10-06 (session 286 implementation)
+**Tasks Completed**: TASK-T1 through TASK-T6 implemented. AdvanceTable provides an
+OffscreenCanvas-first measurement surface, ASCII advances, an additivity probe and bounded
+cluster LRU; production Text documents use ChangeSet-based layout reuse and pass presentation
+deltas through the input bridge. Tree-sitter work is deferred, reuses line spans, and compares
+changed ranges against a pre-edit tree snapshot. Completion is latest-wins and delayed 150 ms
+for typing (Ctrl-Space schedules a zero-delay task). Frame dirty reasons keep caret-only frames
+from requesting syntax spans. Selection-only Text identity changes no longer invalidate layout.
+
+**Assertion ports**: `edit-cost.test.ts` setText rows (original lines 104-113 and 115-133)
+now pass their ChangeSets; all `expect()` expressions remain unchanged. The
+`view-host.test.ts:22-31` rig passes `presentation.changes`; its assertions remain unchanged.
+The metrics-font assignment row (original `edit-cost.test.ts:135-150`) was not edited.
+Additional coverage includes a 20,000-line ASCII edit, IME presentation deltas, deferred syntax
+equivalence over 200 edits, the caret/scroll capture control, and completion debounce/version
+identity. No harness sharedPath changed.
+
+**Verification** (final source; logs under `tmp/canvas-cutover/opt-text/`): focused canvas
+tests 151/151 (`focused-final-03.log`), code tests 153/153 (`code-progress-03.log`), full
+Vitest 775/775 (`vitest-full-final-02.log`), `npm run check` exit 0
+(`check-final-02.log`), serial `npm run test:perf` 1/1 (`test-perf-final-02.log`), strict
+Clippy exit 0 (`clippy-final-01.log`), full nextest 2816 passed / 3 configured skips
+(`nextest-final-01.log`), wasm32 build exit 0 (`wasm32-final-01.log`) and Tauri cargo check
+exit 0 (`tauri-check-final-01.log`). The later test-only addition was included in the final
+Vitest and check runs; Rust sources did not change after the recorded Cargo gates.
+
+**Notes**: Formal test-integrity, adversarial and integration review remain downstream. The
+plan stays In Progress until those workflow-owned decisions are recorded.
+
+### Session: 2026-10-06 (session 288 test-integrity repair OPTTEXT-TI-01)
+**Tasks Completed**: Clipped tree-sitter changed-range recapture to the active capture window
+and invalidated cached line entries intersecting changed ranges outside that window by walking
+existing cache keys. Added a real tree-sitter regression over 2,400 lines with two disjoint
+cached 64-line windows and one in-line edit. It asserts zero synchronous parses, one deferred
+parse, a captured-line delta no greater than the active window, and fresh-parse equivalence for
+both windows. The pre-existing 200-edit equivalence and missed-identity expectation lines were
+left unchanged.
+
+**Verification** (final repair source; logs under `tmp/canvas-cutover/opt-text/`): focused
+canvas tests 151/151 (`focused-ti01-final.log`), code tests 154/154 (`code-ti01-final.log`),
+full Vitest 776/776 (`vitest-full-ti01-final.log`), `npm run check` exit 0
+(`check-ti01-final.log`) and serial `npm run test:perf` 1/1 (`test-perf-ti01-final.log`).
+The targeted new regression also passed (`syntax-ti01-focused-03.log`).
+
+**Notes**: Rust sources were unchanged; earlier Rust gate evidence remains source-matched.
+OPTTEXT-TI-01 is implemented and awaits independent test-integrity, adversarial and integration
+review.
+
+### Session: 2026-10-06 (session 288 test-integrity repair OPTTEXT-TI-02)
+**Tasks Completed**: Corrected `ParsedVact.changedRanges` to call `getChangedRanges` on the
+edited previous tree with the new tree as its argument; removed the redundant `beforeEdits`
+tree copy. Tightened the real-tree-sitter inline-edit capture bound to at most 4 lines and
+added an in-test provider control without `changedRanges` that recaptures exactly 64 window
+lines. The regression checks the edited window and a cached window after it against a fresh
+parse. Existing 200-edit equivalence and missed-identity expectation lines remain unchanged.
+
+**Verification** (final repair source; logs under `tmp/canvas-cutover/opt-text/`): syntax
+tests 9/9 (`syntax-ti02-focused-01.log`), code tests 154/154 (`code-ti02-final.log`), focused
+canvas 151/151 (`focused-ti02-final.log`), full Vitest 776/776
+(`vitest-full-ti02-final.log`), `npm run check` exit 0 (`check-ti02-final.log`) and serial
+`npm run test:perf` 1/1 (`test-perf-ti02-final.log`).
+
+**Notes**: The historical OPTTEXT-TI-01 counter-calibration logs remain under the plan evidence
+directory but are not gating records. Rust sources remain unchanged. Independent test-integrity,
+adversarial and integration review are pending.

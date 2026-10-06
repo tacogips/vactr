@@ -140,7 +140,7 @@ export class SliderPanel {
       }
       doc.fonts?.addEventListener('loadingdone', dirty);
       this.removeViewportListeners.push(() => doc.fonts?.removeEventListener('loadingdone', dirty));
-      const coarse = view?.matchMedia('(pointer: coarse)');
+      const coarse = typeof view?.matchMedia === 'function' ? view.matchMedia('(pointer: coarse)') : null;
       coarse?.addEventListener?.('change', dirty);
       this.removeViewportListeners.push(() => coarse?.removeEventListener?.('change', dirty));
     }
@@ -232,7 +232,7 @@ export class SliderPanel {
       this.rows.delete(id);
     }
     for (const [origin, ids] of next) this.model.set(origin, ids);
-    this.pendingRender = render;
+    for (const id of render) this.pendingRender.add(id);
     if (this.host.viewport) this.updateWindow();
     else this.requestWindow();
   }
@@ -263,7 +263,10 @@ export class SliderPanel {
     if (!container) return { top: 0, height: 0 };
     const panelRect = this.el.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    return { top: container.scrollTop + panelRect.top - containerRect.top, height: container.clientHeight };
+    return {
+      top: containerRect.top + container.clientTop - panelRect.top,
+      height: container.clientHeight,
+    };
   }
 
   private updateWindow(): void {

@@ -25,6 +25,7 @@ export function attachCompletion(code: CodeSurface, engine: CompletionEngine): {
   };
   const surface: CompletionSurface = {
     text: () => code.state.doc.toString(),
+    version: () => code.state.doc,
     selection: () => code.state.selection.main,
     replace(from, to, insert) {
       if (from > to) return;

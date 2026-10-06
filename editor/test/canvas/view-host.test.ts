@@ -27,7 +27,7 @@ function rig(source = twentyThousandLines) {
   host.setViewport({ width: 800, height: 600, dpr: 1, keyboardInset: 0 });
   const input = new InputController(surface, inputContainer, {
     scrollCaret: () => host.scrollCaret(),
-    onPresentation: (presentation) => layout.setText(presentation.doc),
+    onPresentation: (presentation) => layout.setText(presentation.doc, presentation.changes),
   });
   cleanups.push(() => { input.dispose(); host.dispose(); surface.dispose(); client.close(); store.dispose(); element.remove(); inputContainer.remove(); });
   return { surface, layout, host, input, element };

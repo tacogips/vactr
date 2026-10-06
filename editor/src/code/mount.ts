@@ -23,6 +23,7 @@ import { CodeSurface as HeadlessSurface } from './surface';
 import { InputController } from './input';
 import { PointerController, type SelectionHandle } from './pointer';
 import { TextLayout } from './layout';
+import { createMeasureContext } from './advances';
 import { CanvasRenderer } from './renderer';
 import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
@@ -67,8 +68,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
 
   const sync = new DocumentSync(client.document(DOC_FILE), Text.of(['']));
   const surface = new HeadlessSurface({ sync });
-  const metricsCanvas = doc.createElement('canvas');
-  const metrics = metricsCanvas.getContext('2d');
+  const metrics = createMeasureContext(doc);
   const textMetrics = metrics ?? { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
   const layout = new TextLayout(textMetrics, { font: '13px ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 18, baseline: 14 });
   const ledger = new ResourceLedger();
@@ -96,6 +96,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let backgroundStop: (() => void) | null = null;
   let backgroundRevision = 0;
   let staticAnnotations: CodeAnnotation[] = [];
+  let syntaxSpans: CodeAnnotation[] = [];
+  let syntaxWindow: { from: number; to: number } | null = null;
   let staticRevision = 0;
   const hideDiagnosticTip = (): void => { diagTip.hidden = true; };
   const anchor = new TimeAnchor(clock, tier === 'browser' ? 'audio' : 'receipt');
@@ -140,15 +142,17 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
 
   const viewport = { width: 1, height: 1, dpr: schedulerHost.devicePixelRatio || 1, keyboardInset: 0 };
   viewHost = new CodeViewHost(hostEl, surface, layout, schedulerHost, () => {
-    hideDiagnosticTip(); scheduler?.invalidateText();
+    hideDiagnosticTip(); scheduler?.invalidateText('view');
   });
   input = new InputController(surface, inputContainer, { label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
     onPresentation: (presentation) => {
-      if (displayDoc !== presentation.doc) { displayDoc = presentation.doc; layout.setText(displayDoc); displayDirty = true; scheduler?.invalidateText(); }
+      const documentChanged = displayDoc === null || displayRevision !== sync.revision || surface.compositionRange !== null;
+      displayDoc = presentation.doc;
+      if (documentChanged) { layout.setText(displayDoc, presentation.changes); displayDirty = true; scheduler?.invalidateText('doc'); }
     } });
   viewHost.setFocus(() => input.focus());
   pointer = new PointerController(surface, canvas, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
-    onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText(); },
+    onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText('selection'); },
     composing: () => input.isComposing });
   const forwardPointer = (event: Event): void => surface.notifyPointer(event as PointerEvent);
   const pointerNames = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
@@ -185,7 +189,12 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const from = surface.state.doc.line(Math.min(surface.state.doc.lines, first + 1)).from;
         const to = surface.state.doc.line(Math.max(1, last)).to;
         const range = { view, from, to };
-        const result = timed('syntax', () => syntaxProvider.spans(surface.state, range.from, range.to, 16384));
+        const windowChanged = !syntaxWindow || syntaxWindow.from !== range.from || syntaxWindow.to !== range.to;
+        const syntaxDirty = ctx.reasons.has('doc') || ctx.reasons.has('syntax') || ctx.reasons.has('gpu') || windowChanged;
+        const result = syntaxDirty
+          ? timed('syntax', () => syntaxProvider.spans(surface.state, range.from, range.to, 16384))
+          : { spans: syntaxSpans, truncated: false };
+        if (syntaxDirty) { syntaxSpans = result.spans; syntaxWindow = { from: range.from, to: range.to }; }
         syntaxTruncated += result.truncated ? 1 : 0;
         if (syntaxProvider instanceof FallbackSpans) codePane.dataset.syntax = 'fallback';
         const selection = surface.state.selection.main;
@@ -226,7 +235,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const phaseTimer = scheduler.perf?.phases ?? null;
   input.setPhases(phaseTimer); viewHost.setPhases(phaseTimer); renderer.setPhases(phaseTimer);
   if (phaseTimer) (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer = phaseTimer;
-  scheduler.invalidateText();
+  scheduler.invalidateText('doc');
 
   const keyRecord = (event: Event): void => scheduler?.perf?.recordKey((event as KeyboardEvent).timeStamp, sync.revision);
   input.accessibility.textarea.addEventListener('keydown', keyRecord);
@@ -237,7 +246,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   });
   let surfaceDocLength = surface.state.doc.length;
   const stopSurface = surface.subscribe((update) => {
-    scheduler.invalidateText();
+    scheduler.invalidateText(update.docChanged ? 'doc' : update.selectionSet ? 'selection' : 'annotations');
     if (update.docChanged) {
       let changeCount = 0, wholeDocumentReplacement = false;
       update.changes.iterChanges((fromA, toA) => {
@@ -288,7 +297,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
 
   if (deps.syntax) void deps.syntax().then((syntax) => {
     if (disposed) return;
-    syntaxProvider = new SyntaxSpans(syntax); codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText();
+    syntaxProvider = new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax')); codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText('syntax');
   }, () => undefined);
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
     ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,

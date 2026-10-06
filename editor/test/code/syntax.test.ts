@@ -151,8 +151,82 @@ describe('tree-sitter syntax WASM', () => {
     const expected = expect.arrayContaining(['vact-tok-head', 'vact-tok-number']);
     expect(new FallbackSpans().spans(state, 0, state.doc.length, 32).spans.map((span) => span.className)).toEqual(expected);
     const provider = new SyntaxSpans(createVactSyntax(parser, query));
-    try { expect(provider.spans(state, 0, state.doc.length, 32).spans.map((span) => span.className)).toEqual(expected); }
+    try { provider.spans(state, 0, state.doc.length, 32); provider.flush(); expect(provider.spans(state, 0, state.doc.length, 32).spans.map((span) => span.className)).toEqual(expected); }
     finally { provider.dispose(); }
+  });
+
+  it('bounds changed-range captures and refreshes a second cached window after an inline edit', () => {
+    const syntax = createVactSyntax(parser, query);
+    const provider = new SyntaxSpans(syntax);
+    const source = Array.from({ length: 2400 }, (_, line) => `let value${line} ${line} # 日本`).join('\n');
+    let state = EditorState.create({ doc: source });
+    const controlState = EditorState.create({ doc: source });
+    const withoutChangedRanges = (): import('../../src/code/syntax-core').VactSyntax => {
+      const originals = new WeakMap<import('../../src/code/syntax-core').ParsedVact, import('../../src/code/syntax-core').ParsedVact>();
+      return {
+        ...syntax,
+        parseDoc(doc, old) {
+          const parsed = syntax.parseDoc(doc, old ? originals.get(old) ?? old : null);
+          const wrapped: import('../../src/code/syntax-core').ParsedVact = {
+            captures: parsed.captures.bind(parsed),
+            delete: parsed.delete.bind(parsed),
+          };
+          originals.set(wrapped, parsed);
+          return wrapped;
+        },
+        edit(parsed, edit) { syntax.edit(originals.get(parsed) ?? parsed, edit); },
+      };
+    };
+    const controlProvider = new SyntaxSpans(withoutChangedRanges());
+    const windowFor = (doc: EditorState['doc'], firstLine: number) => ({
+      from: doc.line(firstLine).from,
+      to: doc.line(firstLine + 63).to,
+    });
+    const prime = (targetProvider: SyntaxSpans, targetState: EditorState, window: { from: number; to: number }) => {
+      targetProvider.spans(targetState, window.from, window.to, 10_000);
+      targetProvider.flush();
+      targetProvider.spans(targetState, window.from, window.to, 10_000);
+    };
+    try {
+      const secondWindow = windowFor(state.doc, 2100);
+      let activeWindow = windowFor(state.doc, 1100);
+      prime(provider, state, secondWindow);
+      prime(provider, state, activeWindow);
+      prime(controlProvider, controlState, windowFor(controlState.doc, 2100));
+      prime(controlProvider, controlState, windowFor(controlState.doc, 1100));
+      const beforeDeferredParses = provider.stats.deferredParses;
+      const beforeCapturedLines = provider.stats.capturedLines;
+      const line = state.doc.line(1100);
+      const tr = state.update({ changes: { from: line.from + 'let '.length + 2, insert: 'x' } });
+      provider.noteChanges(tr.changes, tr.state);
+      state = tr.state;
+      activeWindow = windowFor(state.doc, 1100);
+      expect(provider.stats.syncParses).toBe(0);
+      provider.flush();
+      expect(provider.stats.deferredParses).toBe(beforeDeferredParses + 1);
+      expect(provider.stats.capturedLines - beforeCapturedLines).toBeLessThanOrEqual(4);
+
+      const controlBeforeParses = controlProvider.stats.deferredParses;
+      const controlBeforeCapturedLines = controlProvider.stats.capturedLines;
+      const controlLine = controlState.doc.line(1100);
+      const controlTr = controlState.update({ changes: { from: controlLine.from + 'let '.length + 2, insert: 'x' } });
+      controlProvider.noteChanges(controlTr.changes, controlTr.state);
+      expect(controlProvider.stats.syncParses).toBe(0);
+      controlProvider.flush();
+      expect(controlProvider.stats.deferredParses).toBe(controlBeforeParses + 1);
+      expect(controlProvider.stats.capturedLines - controlBeforeCapturedLines).toBe(64);
+
+      const fresh = syntax.parse(state.doc.toString());
+      try {
+        const expected = (window: { from: number; to: number }) => styleSpans(fresh, window.from, window.to)
+          .map(({ from, to, cls }) => ({ from, to, className: cls }));
+        const actual = (window: { from: number; to: number }) => provider.spans(state, window.from, window.to, 10_000).spans
+          .map(({ from, to, className }) => ({ from, to, className }));
+        const afterWindow = windowFor(state.doc, 2100);
+        expect(actual(activeWindow)).toEqual(expected(activeWindow));
+        expect(actual(afterWindow)).toEqual(expected(afterWindow));
+      } finally { fresh.delete(); }
+    } finally { provider.dispose(); controlProvider.dispose(); }
   });
 
   it('keeps SyntaxSpans equivalent to a fresh parse across 200 mixed edits', () => {
@@ -188,6 +262,7 @@ describe('tree-sitter syntax WASM', () => {
           provider.noteChanges(second.changes, second.state);
           state = second.state;
         }
+        provider.flush();
         const actual = provider.spans(state, 0, state.doc.length, 100_000).spans;
         const fresh = syntax.parse(state.doc.toString());
         try {
@@ -205,6 +280,7 @@ describe('tree-sitter syntax WASM', () => {
     const provider = new SyntaxSpans(syntax);
     let state = EditorState.create({ doc: Array.from({ length: 20_000 }, (_, index) => `let value${index} ${index} # 日本`).join('\n') });
     provider.spans(state, 0, 128, 64);
+    provider.flush();
     const base = state.doc;
     const tr = state.update({ changes: { from: base.line(10_000).from + 4, insert: 'x' } });
     provider.noteChanges(tr.changes, tr.state);
@@ -214,12 +290,17 @@ describe('tree-sitter syntax WASM', () => {
     const slices = vi.spyOn(proto, 'sliceString');
     const line = state.doc.line(10_000);
     provider.spans(state, line.from, line.to, 64);
+    expect(provider.stats.syncParses).toBe(0);
+    provider.flush();
+    expect(provider.stats.deferredParses).toBe(2);
     expect(stringify.mock.contexts.some((doc) => (doc as import('@codemirror/state').Text).length > 65_536)).toBe(false);
     expect(slices.mock.calls.every(([from, to]) => (to ?? Infinity) - from <= 65_536)).toBe(true);
     stringify.mockRestore();
     slices.mockRestore();
 
     const missed = state.update({ changes: { from: 0, insert: '# skipped change\n' } }).state;
+    provider.spans(missed, 0, missed.doc.length, 100_000);
+    provider.flush();
     const result = provider.spans(missed, 0, missed.doc.length, 100_000).spans;
     const fresh = syntax.parse(missed.doc.toString());
     try {

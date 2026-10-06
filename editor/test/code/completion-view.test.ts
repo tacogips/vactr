@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { Text, Transaction } from '@codemirror/state';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompletionEngine, RawCompletion } from '../../src/code/completion-types';
 import { attachCompletion } from '../../src/code/completion-view';
 import { CodeSurface } from '../../src/code/surface';
@@ -20,10 +20,12 @@ const fsSpec: string = 'node:fs';
 const fs = await import(/* @vite-ignore */ fsSpec) as { readFileSync(path: string): Uint8Array<ArrayBuffer> | string };
 const proc = (globalThis as unknown as { process: { cwd(): string } }).process;
 
+beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   for (const attachment of attachments.splice(0)) attachment.dispose();
   for (const view of views.splice(0)) view.dispose();
   document.body.replaceChildren();
+  vi.useRealTimers();
 });
 
 function engine(result: (text: string) => RawCompletion | null = (text) => ({
@@ -52,7 +54,10 @@ function type(view: CodeSurface, text: string): void {
 }
 
 async function flushPopup(): Promise<void> {
-  await vi.waitFor(() => expect(document.querySelector('.vact-completion')).not.toBeNull());
+  vi.advanceTimersByTime(150);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(document.querySelector('.vact-completion')).not.toBeNull();
 }
 
 function key(view: CodeSurface, name: string): boolean {

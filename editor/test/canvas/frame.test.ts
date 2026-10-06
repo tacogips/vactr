@@ -47,7 +47,7 @@ function setup(hidden = false, onFrame = vi.fn(), onViewport = vi.fn(), perf = f
 describe('FrameScheduler', () => {
   it('runs one initial frame then stays idle without animation owners', () => {
     const f = setup(); expect(f.host.callbacks.size).toBe(1); f.host.flush(123);
-    expect(f.onFrame).toHaveBeenCalledWith({ frameMs: 123, textDirty: false }); expect(f.host.callbacks.size).toBe(0);
+    expect(f.onFrame).toHaveBeenCalledWith({ frameMs: 123, textDirty: false, reasons: new Set() }); expect(f.host.callbacks.size).toBe(0);
     f.scheduler.dispose();
   });
   it('delivers the initial unchanged viewport before the first frame, then only on changes', () => {
@@ -67,7 +67,7 @@ describe('FrameScheduler', () => {
     let f: ReturnType<typeof setup>;
     f = setup(false, vi.fn(), vi.fn(() => f.scheduler.invalidateText()));
     f.host.flush(17);
-    expect(f.onFrame).toHaveBeenCalledExactlyOnceWith({ frameMs: 17, textDirty: true });
+    expect(f.onFrame).toHaveBeenCalledExactlyOnceWith({ frameMs: 17, textDirty: true, reasons: new Set(['doc']) });
     expect(f.host.callbacks.size).toBe(0);
     f.scheduler.dispose();
   });
@@ -78,12 +78,12 @@ describe('FrameScheduler', () => {
   });
   it('coalesces text invalidations into one dirty frame', () => {
     const f = setup(); f.host.flush(); f.scheduler.invalidateText(); f.scheduler.invalidateText(); f.host.flush(33);
-    expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 33, textDirty: true }); expect(f.host.callbacks.size).toBe(0); f.scheduler.dispose();
+    expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 33, textDirty: true, reasons: new Set(['doc']) }); expect(f.host.callbacks.size).toBe(0); f.scheduler.dispose();
   });
   it('defers hidden invalidation until visible and refreshes viewport once', () => {
     const f = setup(true); f.host.box.width = 400; f.scheduler.invalidateText(); expect(f.host.callbacks.size).toBe(0);
     Object.defineProperty(f.doc, 'visibilityState', { configurable: true, get: () => 'visible' }); f.doc.dispatchEvent(new Event('visibilitychange'));
-    expect(f.host.callbacks.size).toBe(1); f.host.flush(); expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 16, textDirty: true });
+    expect(f.host.callbacks.size).toBe(1); f.host.flush(); expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 16, textDirty: true, reasons: new Set(['doc']) });
     expect(f.onViewport).toHaveBeenCalledTimes(1); f.scheduler.dispose();
   });
   it('delivers the unchanged constructor viewport on the first tick after becoming visible', () => {
@@ -91,6 +91,13 @@ describe('FrameScheduler', () => {
     Object.defineProperty(f.doc, 'visibilityState', { configurable: true, get: () => 'visible' }); f.doc.dispatchEvent(new Event('visibilitychange'));
     f.host.flush(17);
     expect(f.onViewport).toHaveBeenCalledExactlyOnceWith({ width: 320, height: 200, dpr: 1, keyboardInset: 0 });
+    f.scheduler.dispose();
+  });
+  it('accumulates explicit dirty reasons and defaults to document changes', () => {
+    const f = setup(); f.host.flush(); f.scheduler.invalidateText('selection'); f.host.flush(33);
+    expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 33, textDirty: true, reasons: new Set(['selection']) });
+    f.scheduler.invalidateText(); f.host.flush(49);
+    expect(f.onFrame).toHaveBeenLastCalledWith({ frameMs: 49, textDirty: true, reasons: new Set(['doc']) });
     f.scheduler.dispose();
   });
   it('re-registers resolution media query when DPR changes', () => {

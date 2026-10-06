@@ -9,6 +9,7 @@ export interface SyntaxCapture {
 
 export interface ParsedVact {
   captures(from: number, to: number): SyntaxCapture[];
+  changedRanges?(previous: ParsedVact): { from: number; to: number }[];
   delete(): void;
 }
 
@@ -111,6 +112,10 @@ export function createVactSyntax(parser: Parser, query: Query): VactSyntax {
   const sources = new WeakMap<ParsedVact, string>();
   const wrap = (tree: NonNullable<ReturnType<Parser['parse']>>, source: string | Text): ParsedVact => {
       const parsed: ParsedVact = {
+        changedRanges(previous) {
+          const previousTree = trees.get(previous);
+          return previousTree ? previousTree.getChangedRanges(tree).map((range) => ({ from: range.startIndex, to: range.endIndex })) : [];
+        },
         captures(from, to) {
           const startPosition = typeof source === 'string' ? pointAt(source, from) : pointAtDoc(source, from);
           const endPosition = typeof source === 'string' ? pointAt(source, to) : pointAtDoc(source, to);

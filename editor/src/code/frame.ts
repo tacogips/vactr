@@ -8,7 +8,8 @@ export interface FrameHost {
   ResizeObserver?: typeof ResizeObserver;
 }
 export interface ViewportInfo { width: number; height: number; dpr: number; keyboardInset: number }
-export interface FrameContext { frameMs: number; textDirty: boolean }
+export type TextDirtyReason = 'doc' | 'selection' | 'view' | 'syntax' | 'annotations' | 'gpu';
+export interface FrameContext { frameMs: number; textDirty: boolean; reasons: ReadonlySet<TextDirtyReason> }
 export interface PerfSnapshot { frames: number[][]; keys: number[][] }
 
 export type PerfPhase = 'input' | 'caret' | 'shaping' | 'syntax' | 'upload' | 'frame' | 'tick';
@@ -77,7 +78,7 @@ export class FrameScheduler {
   private inFrame = false;
   private deliveringViewport = false;
   private requestedDuringFrame = false;
-  private dirtyText = false;
+  private dirtyReasons = new Set<TextDirtyReason>();
   private viewportDirty = true;
   private viewportDelivered = false;
   private viewportValue: ViewportInfo;
@@ -97,10 +98,11 @@ export class FrameScheduler {
         try { this.opts.onViewport(next); } finally { this.deliveringViewport = false; }
       }
     }
-    const textDirty = this.dirtyText; this.dirtyText = false;
+    const reasons = this.dirtyReasons; this.dirtyReasons = new Set<TextDirtyReason>();
+    const textDirty = reasons.size > 0;
     const start = this.perf ? performance.now() : 0;
     this.perf?.phases.begin('frame');
-    try { this.opts.onFrame({ frameMs: timestamp, textDirty }); this.stats.frames++; if (textDirty) this.stats.textFrames++; }
+    try { this.opts.onFrame({ frameMs: timestamp, textDirty, reasons }); this.stats.frames++; if (textDirty) this.stats.textFrames++; }
     finally {
       this.perf?.phases.end('frame');
       const work = this.perf ? performance.now() - start : 0;
@@ -126,11 +128,11 @@ export class FrameScheduler {
     if (!this.hiddenValue) this.request();
   }
   get hidden(): boolean { return this.hiddenValue; }
-  invalidateText(): void { this.dirtyText = true; if (!this.deliveringViewport) this.request(); }
+  invalidateText(reason: TextDirtyReason = 'doc'): void { this.dirtyReasons.add(reason); if (!this.deliveringViewport) this.request(); }
   setActive(owner: string, active: boolean): void {
     if (active) this.owners.add(owner); else this.owners.delete(owner);
     if (active) this.request();
-    else if (this.owners.size === 0 && !this.dirtyText && !this.viewportDirty && this.pending !== null) { this.host.cancelAnimationFrame(this.pending); this.pending = null; }
+    else if (this.owners.size === 0 && this.dirtyReasons.size === 0 && !this.viewportDirty && this.pending !== null) { this.host.cancelAnimationFrame(this.pending); this.pending = null; }
   }
   request(): void {
     if (this.disposed || this.hiddenValue) return;
@@ -164,7 +166,7 @@ export class FrameScheduler {
     const media = this.media; media.addEventListener('change', this.dprChanged);
     this.cleanups.push(() => media.removeEventListener('change', this.dprChanged));
   }
-  private readonly dprChanged = (): void => { this.watchDpr(); this.markViewportDirty(); this.invalidateText(); };
+  private readonly dprChanged = (): void => { this.watchDpr(); this.markViewportDirty(); this.invalidateText('gpu'); };
   private listen(target: EventTarget, name: string, callback: EventListener): void {
     target.addEventListener(name, callback); this.cleanups.push(() => target.removeEventListener(name, callback));
   }

@@ -17,6 +17,7 @@ import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 import { CanvasRenderer } from '../../src/code/renderer';
 import { CodeViewHost } from '../../src/code/view-host';
 import { TextLayout } from '../../src/code/layout';
+import { FallbackSpans } from '../../src/code/syntax';
 import { startFrameLoop } from '../../src/visual/frame';
 import { WasmCore } from '../../src/protocol/wasm';
 import { VactrHost } from '../../worklet/host.js';
@@ -289,6 +290,26 @@ describe('headless canvas mount', () => {
     expect(surface.posAtCoords({ x: 55, y: 5 })).not.toBe(positionBeforeScroll);
     const scrollSyntax = renderSpy.mock.calls.at(-1)?.[0]?.annotations?.filter((a) => a.kind === 'syntax');
     expect(scrollSyntax).toEqual(expect.arrayContaining([expect.objectContaining({ className: 'vact-tok-head' }), expect.objectContaining({ className: 'vact-tok-number' })]));
+  });
+
+  it('does not request syntax spans for a caret-only frame and captures after scrolling', () => {
+    const spans = vi.spyOn(FallbackSpans.prototype, 'spans');
+    const rig = setup();
+    const host = rig.code.firstElementChild as HTMLElement;
+    host.getBoundingClientRect = () => ({ left: 0, right: 600, top: 0, bottom: 800, x: 0, y: 0, width: 600, height: 800, toJSON: () => ({}) });
+    const surface = rig.deps.code!.surface;
+    surface.dispatch({ changes: { from: 0, insert: 'let x 1\n'.repeat(200) } });
+    rig.host.step(16);
+    for (let frame = 0; frame < 5 && rig.host.callbacks.size; frame += 1) rig.host.step(24 + frame * 8);
+    expect(spans).toHaveBeenCalled();
+    spans.mockClear();
+    const head = surface.state.selection.main.head, line = surface.state.doc.lineAt(head);
+    surface.dispatch({ selection: { anchor: head < line.to ? head + 1 : Math.max(line.from, head - 1) } });
+    rig.host.step(32);
+    expect(spans).not.toHaveBeenCalled();
+    rig.code.querySelector('canvas.vact-code-canvas')!.dispatchEvent(new WheelEvent('wheel', { deltaY: 180, bubbles: true, cancelable: true }));
+    rig.host.step(48);
+    expect(spans).toHaveBeenCalled();
   });
 
   it('shows diagnostic messages in a positioned tooltip and hides it on leave, outside, scroll and document change', () => {

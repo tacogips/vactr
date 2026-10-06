@@ -168,7 +168,8 @@ export function cleanup(): void {
   for (const h of harnesses.splice(0)) h.dispose();
 }
 
-export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[] } = {}): Harness {
+export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[]; nativePanelViewport?: boolean } = {}): Harness {
+  const { nativePanelViewport, ...bindOpts } = opts;
   const transport = new RecordingTransport();
   const store = new Store();
   const timers = new ManualTimers();
@@ -197,8 +198,8 @@ export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[]
   }
   const renders: [string, string][] = [];
   const area = new BindArea(root, deps, code, {
-    ...opts,
-    panelViewport: opts.panelViewport ?? (() => ({ top: 0, height: 1e9 })),
+    ...bindOpts,
+    panelViewport: nativePanelViewport ? undefined : bindOpts.panelViewport ?? (() => ({ top: 0, height: 1e9 })),
     onRender: (key, el) => {
       const v = el.querySelector('.bind-value, .bind-name-value');
       renders.push([key, v?.textContent ?? '']);

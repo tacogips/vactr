@@ -1,8 +1,8 @@
-import { Text } from '@codemirror/state';
+import { ChangeSet, Text } from '@codemirror/state';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TextLayout } from '../../src/code/layout';
 import { PhaseTimer } from '../../src/code/frame';
-import { InputController } from '../../src/code/input';
+import { InputController, type InputPresentation } from '../../src/code/input';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
 import { LineTable } from '../../src/code/line-bytes';
@@ -12,6 +12,7 @@ import { boundary, INPUT_WINDOW_LIMIT, surroundingWindow } from '../../src/code/
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import { RecordingTransport } from '../support/recording';
+import { SyntaxSpans, type ParsedVact, type VactSyntax } from '../../src/code/syntax';
 
 const cleanups: (() => void)[] = [];
 const lines = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`);
@@ -19,12 +20,12 @@ function spySlices(...docs: Text[]) {
   const prototypes = new Set(docs.map(doc => Object.getPrototypeOf(doc)));
   return [...prototypes].map(prototype => vi.spyOn(prototype as Text & { sliceString: Text['sliceString'] }, 'sliceString'));
 }
-function setup(inputLines = lines) {
+function setup(inputLines = lines, onPresentation?: (presentation: InputPresentation) => void) {
   const transport = new RecordingTransport(), store = new Store();
   const client = new Client(transport, { store, now: () => Date.now() });
   const sync = new DocumentSync(client.document('main.vact'), Text.of(inputLines));
   const surface = new CodeSurface({ sync }), container = document.createElement('div'); document.body.append(container);
-  const input = new InputController(surface, container);
+  const input = new InputController(surface, container, { onPresentation });
   cleanups.push(() => { input.dispose(); surface.dispose(); client.close(); store.dispose(); container.remove(); });
   return { surface, input, container };
 }
@@ -38,6 +39,38 @@ function oldWindow(text: string, head: number, anchor: number): { start: number;
 afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); vi.restoreAllMocks(); document.body.replaceChildren(); });
 
 describe('bounded document edit costs', () => {
+  it('keeps a 20,000-line ASCII edit bounded across layout and deferred syntax', () => {
+    const metrics = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
+    const layout = new TextLayout(metrics, { font: '16px mono', lineHeight: 20, baseline: 16 });
+    let presented: Text | null = null;
+    const { surface, input } = setup(lines, (presentation) => {
+      const documentChanged = presented === null || presentation.changes !== undefined;
+      presented = presentation.doc;
+      if (documentChanged) layout.setText(presentation.doc, presentation.changes);
+    });
+    const parsed = (): ParsedVact => ({ captures: () => [], changedRanges: () => [], delete: () => {} });
+    const syntax = new SyntaxSpans({ parse: () => parsed(), parseDoc: () => parsed(), edit: () => {} } satisfies VactSyntax);
+    syntax.spans(surface.state, 0, 64, 32); syntax.flush(); syntax.stats.deferredParses = 0;
+    const stop = surface.subscribe((update) => { if (update.docChanged) syntax.noteChanges(update.changes, update.state); });
+    cleanups.push(stop, () => syntax.dispose());
+
+    const line = surface.state.doc.line(10_001);
+    surface.dispatch({ selection: { anchor: line.from + 12 } });
+    layout.shape(10_000);
+    const measures = layout.stats.measuredTextCalls, builds = layout.stats.builds;
+    const toString = vi.spyOn(Text.prototype, 'toString');
+    input.replaceSelection('x', 'input.type');
+    layout.shape(10_000);
+
+    expect(layout.stats.measuredTextCalls - measures).toBe(0);
+    expect(layout.stats.builds - builds).toBeLessThanOrEqual(1);
+    expect(toString.mock.contexts.filter((context) => (context as Text).length >= 64 * 1024)).toHaveLength(0);
+    expect(syntax.stats.syncParses).toBe(0);
+    expect(syntax.stats.deferredParses).toBe(0);
+    syntax.flush();
+    expect(syntax.stats.deferredParses).toBe(1);
+  });
+
   it('defers textarea edits, then patches only the changed window without a layout read', () => {
     const { surface, input } = setup();
     const textarea = input.accessibility.textarea;
@@ -147,8 +180,9 @@ describe('bounded document edit costs', () => {
     layout.setText(doc);
     for (let n = 0; n < 10_000; n++) layout.shape(n);
     const builds = layout.stats.builds;
-    const changed = doc.replace(doc.line(10_001).from, doc.line(10_001).from, Text.of(['x']));
-    layout.setText(changed); layout.shape(9_999);
+    const changes = ChangeSet.of({ from: doc.line(10_001).from, insert: 'x' }, doc.length);
+    const changed = changes.apply(doc);
+    layout.setText(changed, changes); layout.shape(9_999);
     expect(layout.stats.builds).toBe(builds);
   });
 
@@ -160,8 +194,9 @@ describe('bounded document edit costs', () => {
     const shapedFrom = shaped.from, shapedTo = shaped.to, firstRun = shaped.runs[0]!;
     const runFrom = firstRun.from, runTo = firstRun.to;
     const builds = layout.stats.builds;
-    const changed = doc.replace(0, 0, Text.of(['x']));
-    layout.setText(changed);
+    const changes = ChangeSet.of({ from: 0, insert: 'x' }, doc.length);
+    const changed = changes.apply(doc);
+    layout.setText(changed, changes);
     const reused = layout.shape(lineNumber);
     expect(layout.stats.builds).toBe(builds);
     expect(reused).not.toBe(shaped);
@@ -170,6 +205,19 @@ describe('bounded document edit costs', () => {
     expect(reused.runs[0]).toBe(firstRun);
     expect(reused.runs[0]?.from).toBe(runFrom + 1);
     expect(reused.runs[0]?.to).toBe(runTo + 1);
+  });
+
+  it('keeps earlier line identity and renumbers cached lines after an Enter change set', () => {
+    const doc = Text.of(lines), layout = new TextLayout({ font: '', measureText: text => ({ width: text.length * 8 }) },
+      { font: '16px mono', lineHeight: 20, baseline: 16 });
+    layout.setText(doc);
+    const before = layout.shape(9_998), shifted = layout.shape(15_000), run = shifted.runs[0]!;
+    const changes = ChangeSet.of({ from: doc.line(10_001).from, insert: '\n' }, doc.length);
+    layout.setText(changes.apply(doc), changes);
+    expect(layout.shape(9_998)).toBe(before);
+    const renumbered = layout.shape(15_001);
+    expect(renumbered.runs[0]).toBe(run);
+    expect(renumbered.from).toBe(shifted.from + 1);
   });
 
   it('sets the canvas metrics font once and only updates it after a font change', () => {

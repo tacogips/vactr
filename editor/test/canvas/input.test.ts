@@ -57,7 +57,14 @@ afterEach(() => { for (const fn of cleanup.splice(0).reverse()) fn(); vi.useReal
 describe('canvas input bridge', () => {
   it('keeps preedit on presentation only and commits Japanese exactly once with one undo group', () => {
     const { surface, sync, el, input } = setup('abc'); surface.dispatch({ selection: { anchor: 1, head: 2 } });
-    composition(el, 'compositionstart'); composition(el, 'compositionupdate', 'に'); before(el, 'insertCompositionText', '日本', true);
+    composition(el, 'compositionstart');
+    const beforePreedit = input.presentation;
+    composition(el, 'compositionupdate', 'に');
+    const firstPreedit = input.presentation;
+    expect(firstPreedit.changes?.apply(beforePreedit.doc).eq(firstPreedit.doc)).toBe(true);
+    before(el, 'insertCompositionText', '日本', true);
+    const secondPreedit = input.presentation;
+    expect(secondPreedit.changes?.apply(firstPreedit.doc).eq(secondPreedit.doc)).toBe(true);
     expect(surface.state.doc.toString()).toBe('abc'); expect(sync.revision).toBe(1);
     expect(input.presentation.text).toBe('a日本c');
     expect(input.presentation.doc.toString()).toBe('a日本c');

@@ -422,14 +422,16 @@ report. Edit only this plan's progress log.
 
 - [x] `bind.css` has no `opacity` and no `:has(`; stale and unbound rows are dimmed by `--vt-text-muted`; fixed token-derived row height
 - [x] Mounted rows `<=` viewport rows plus 2x8 overscan, including after the mass stale transition; 0 node moves when order is unchanged
+- [x] The production no-seam viewport follows `.pane-right` scrolling; the non-seam rAF path works without `matchMedia`
+- [x] A non-seam eval-result render-all set is retained across a same-frame bindings refresh; each affected mounted row renders once
 - [x] The fixture seam keeps every existing bind assertion unchanged
 - [x] Store notify visits only the subs of changed keys, in registration order
 - [x] The roll reuses elements across batches in a cycle and updates lanes in place
 - [x] Accessibility bridge: 0 full value writes and 0 rect reads in the keystroke task; flush before input-reading handlers; one frame flush
-- [ ] `ui-style.mjs`, the style-token test and the behavior e2e pass in both browsers
-- [ ] Any harness sharedPath edit is frame alignment only and is recorded with its sha256 values; `git diff ff49fd1 -- editor/test/e2e editor/test/style` touches only `behavior.mjs` (the 842cf6e frame wait) and changes no assertion, threshold or check comparison
-- [ ] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
-- [ ] Progress log updated
+- [x] `ui-style.mjs`, the style-token test and the behavior e2e pass in both browsers
+- [x] Any harness sharedPath edit is frame alignment only and is recorded with its sha256 values; `git diff ff49fd1 -- editor/test/e2e editor/test/style` touches only `behavior.mjs` (the 842cf6e frame wait) and changes no assertion, threshold or check comparison
+- [x] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -451,5 +453,97 @@ sharedPaths").
   OPT-BACKDROP and OPT-RENDER, here and in `impl-plans/active/canvas-cutover-dispatch.json`.
 - Operator repair 842cf6e fixed the `canvas-only-text` frame wait in `behavior.mjs`
   (silent behavior e2e 18/18, assertions unchanged).
+- Shared-path hash record for that frame-only adjustment: fresh read at `ff49fd1`,
+  `3a03ac897a0ade62d19c2318cf1b4de96275d2dbbe68c36d547dd72541706f2a`; post-edit at
+  `842cf6e` and current HEAD, `f9fbd8b50453e9d8993b3847c95208cb21e088aac57c79d2ed69464daad7b0bc`.
 - Next: run the session 288 resume gates, then the test-integrity, adversarial and
   integration reviews. Scope, contracts and criteria are otherwise unchanged.
+
+### Session: 2026-10-06 (session 288 final-source verification)
+**Tasks Completed**: TASK-D6 final-source verification and progress record.
+**Notes**:
+- Focused bind/store/roll/input/mount suite: 161/161 (`focused-session288-final.log`);
+  UI token suite: 18/18 (`ui-session288-final.log`); default vitest: 766/766
+  (`vitest-full-session288-final.log`); `npm run check` exit 0
+  (`check-session288-final.log`). The serial performance gate passed 1/1 with
+  20k/5k ratio 2.80 (`test-perf-session288-final.log`).
+- Release WASM and ABI frontend build passed (`wasm-release-session288-final.log`,
+  `frontend-build-session288-final.log`). Browser style assertions passed in four
+  Chromium/WebKit viewport combinations (`style-session288-final.log`). The behavior
+  profile passed 18/18: Chromium 10/10 and WebKit 8/8
+  (`e2e-behavior-session288-final.log`). WebKit clipboard and IME checks remain labeled
+  synthetic-event limitations by the harness.
+- Strict clippy and Tauri cargo check exited 0; full nextest passed 2816/2816 with
+  3 configured skips, exit 0 after 1683.857 seconds; the standalone wasm32 build exited
+  0 (`clippy-session288-final.log`, `nextest-session288-final.log`,
+  `tauri-check-session288-final.log`, `wasm32-session288-final.log`).
+- `grep -c opacity` and `grep -c ':has('` both returned 0 for `bind.css`. The shared
+  harness diff from `ff49fd1` touches only `behavior.mjs` and aligns sampling to a
+  presented frame; no check assertion or pass/fail comparison was changed.
+- The implementation plan is complete for this step. Test-integrity, adversarial and
+  integration reviews remain downstream workflow steps.
+
+### Session: 2026-10-06 (OPTDOM-TI-01 test-integrity repair)
+**Tasks Completed**: Corrected production viewport coordinates, guarded optional
+`matchMedia`, added a fixture seam opt-out and a no-seam scroll regression.
+**Notes**:
+- `editor/src/bind/panel.ts`: fresh-read SHA-256
+  `9903f80d71ab0f81f476e92a9ed0169e3c1add9b880c6b811a4c02ac746c3282`; post-edit
+  `5c8ee385759fa0fa08bf5e09aed8d5ca5cda3bdce6ab251c335dd9bbb388d5f5`.
+- `editor/test/bind/fixtures.ts`: fresh-read SHA-256
+  `44fe11e998663bbb3a1c7b9a120724dcf027bdd6177312574c00aa4296b45ed4`; post-edit
+  `fe5465ef0658c785c3ab698d339d5b5b729a180f0c0471aa95d2fc5da78ccd9a`.
+- `editor/test/bind/panel.test.ts`: fresh-read SHA-256
+  `82664e8843fb83c545feeaf3ab354f55b7a1b6cb9d4d223e2192bcece6d432fd`; post-edit
+  `6f6adfcb095c70d92365715ca9b4cf6fce4695044c24bf212beb4d0ed86da6b1`.
+- The new regression explicitly removes `matchMedia`, uses deterministic rAF callbacks
+  and pane/panel rectangles, and verifies that scrolling to row 150 mounts row 151,
+  unmounts row 1 and keeps mounted rows at or below 35. It appears by name in
+  `panel-ti-01-verbose.log` (10/10 panel tests pass).
+- Current-source gates: focused suite 162/162 (`focused-ti-01-final.log`), full vitest
+  767/767 (`vitest-full-ti-01-final.log`), `npm run check` exit 0
+  (`check-ti-01-final.log`), style 4/4 browser/viewport combinations
+  (`style-ti-01-final.log`), behavior 18/18: Chromium 10/10 and WebKit 8/8
+  (`e2e-behavior-ti-01-final.log`). Existing test assertions and the default seam
+  remain unchanged.
+
+### Session: 2026-10-06 (OPTDOM-ADV-01 adversarial repair)
+**Tasks Completed**: Preserved deferred row renders across same-frame refreshes and
+added a production-path eval-result/bindings regression.
+**Notes**:
+- `SliderPanel.syncRows` now unions requested IDs into `pendingRender`; `updateWindow`
+  remains the single consumer and clears the accumulated set after the frame.
+- The non-seam test evaluates site 1 from 0.5 to 0.9, applies a bindings batch for
+  site 2 before rAF, then verifies site 1 displays 0.9 and renders exactly once more.
+- Final repair-source SHA-256 values: `panel.ts`
+  `60fdb23334daef37eda9738492c28553389499475dc341269c0d6053836a9873`,
+  `panel.test.ts` `1b15375936eb0d33a9dbc3ca13a81c0bef93349e8aeb69dee6eef96b1f70c262`,
+  and `fixtures.ts` `fe5465ef0658c785c3ab698d339d5b5b729a180f0c0471aa95d2fc5da78ccd9a`.
+- Fresh-read and post-edit SHA-256 values and final-source gate logs are recorded in
+  `tmp/canvas-cutover/opt-dom/intent.json` and `receipt.json`.
+- Final-source verification passed: focused 163/163, full vitest 768/768,
+  `npm run check`, style 4/4, behavior e2e 18/18, serial `npm run test:perf` 1/1,
+  strict clippy, full nextest 2816 passed/3 configured skips, wasm32 build and
+  src-tauri cargo check. Logs are `focused-adv-01-final.log`,
+  `vitest-full-adv-01-final.log`, `check-adv-01-final.log`, `style-adv-01-final.log`,
+  `e2e-behavior-adv-01-final.log`, `test-perf-adv-01-final.log`,
+  `clippy-adv-01-final.log`, `nextest-adv-01-final.log`, `wasm32-adv-01-final.log`
+  and `tauri-check-adv-01-final.log`. Review acceptance remains downstream.
+
+### Session: 2026-10-06 (OPTDOM-INT-01 rebuilt-bundle repair)
+**Tasks Completed**: Rebuilt the frontend bundle and reran the style and behavior
+browser gates against the final OPT-DOM source.
+**Notes**:
+- Before verification, `panel.ts`, `panel.test.ts` and `fixtures.ts` SHA-256 values
+  matched `receipt.json` exactly; no product source or test file changed.
+- The rebuilt `editor/dist/index.html` timestamp is later than `panel.ts`, and
+  `grep -rl clientTop editor/dist/assets` finds
+  `editor/dist/assets/index-CUhTDdDO.js`. Bundle hashes and freshness proof are in
+  `tmp/canvas-cutover/opt-dom/dist-freshness-int-01.log` and `receipt.json`.
+- `npm run test:style` passed 4/4 engine/viewport combinations. Behavior e2e passed
+  18/18: Chromium 10/10 and WebKit 8/8, using release wasm SHA-256
+  `17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d`.
+- Logs: `frontend-build-int-01-rerun.log`, `dist-freshness-int-01.log`,
+  `style-int-01-final.log`, and `e2e-behavior-int-01-final.log`. An initial shell
+  wrapper had a zsh reserved-variable error after the build; that attempt is not
+  counted as verification and its log is retained without overwriting.

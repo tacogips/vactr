@@ -166,6 +166,27 @@ describe('shaped UTF-16 layout', () => {
     expect(l.coordsAtPos(3, view)?.left).toBe(76); expect(l.coordsAtPos(4, view)?.left).toBe(92);
     expect(l.posAtCoords({ x: 94, y: 21 }, view)).toBe(4);
   });
+  it('reuses the additive advance table across ASCII lines and caret queries', () => {
+    const measureText = vi.fn((text: string) => ({ width: text.length * 8 }));
+    const l = new TextLayout({ font: '', measureText }, font);
+    l.setText(Text.of(Array.from({ length: 51 }, (_, index) => `let value${index} = alpha`)));
+    l.shape(0);
+    const initialCalls = l.stats.measuredTextCalls;
+    for (let number = 1; number < 51; number += 1) l.shape(number);
+    l.coordsAtPos(l.document.indexOf('alpha'), view);
+    l.posAtCoords({ x: 100, y: 21 }, view);
+    expect(l.stats.measuredTextCalls).toBe(initialCalls);
+  });
+  it('measures each distinct additive-font Japanese cluster once', () => {
+    const measureText = vi.fn((text: string) => ({ width: text.length * 8 }));
+    const l = new TextLayout({ font: '', measureText }, font);
+    l.setText(Text.of(['日本', '日語']));
+    l.shape(0);
+    expect(measureText.mock.calls.filter(([text]) => text === '日')).toHaveLength(1);
+    l.shape(1);
+    expect(measureText.mock.calls.filter(([text]) => text === '日')).toHaveLength(1);
+    expect(measureText.mock.calls.filter(([text]) => text === '語')).toHaveLength(1);
+  });
   it('maps viewport origin/scroll and clips source selection at gutter', () => {
     const l = layout('abcdef\nsecond'); const v = { ...view, scrollLeft: 16, scrollTop: 20 };
     expect(l.coordsAtPos(9, v)).toEqual({ left: 58, right: 59, top: 20, bottom: 40 });

@@ -1,7 +1,8 @@
-import { Text } from '@codemirror/state';
+import { Text, type ChangeSet } from '@codemirror/state';
 import type { CodeRect, CodeRange } from '../app/apis';
 import { RESOURCE_LIMITS } from './resources';
 import type { PhaseTimer } from './frame';
+import { AdvanceTable } from './advances';
 
 export interface TextMetricsSource { font: string; measureText(text: string): { width: number } }
 export interface LayoutFont { font: string; fallback?: string; generation?: number; lineHeight: number; baseline: number }
@@ -14,8 +15,9 @@ interface RunWidthChunk {
   prefixWidths: Map<number, number>; boundaries?: number[];
 }
 interface MeasuredChunk { start: number; end: number; width: number }
-interface RunWidthIndex { chunks: RunWidthChunk[]; clusterRanges: Array<[number, number]> }
+interface RunWidthIndex { chunks: RunWidthChunk[]; clusterRanges: Array<[number, number]>; additive: boolean }
 const rtl = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u;
+const complexScript = /[\u0590-\u08ff\u0900-\u0dff\u0e00-\u0eff\u1000-\u109f\u1780-\u17ff\ufb1d-\ufeff]/u;
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const MAX_CLUSTERS_PER_LINE = 4096;
 const MAX_RUN_CHARS = 256;
@@ -36,6 +38,9 @@ export class TextLayout {
   private bytes = 0;
   private widest = 0;
   private metricsFont = '';
+  private advances: AdvanceTable | null = null;
+  private stringDocumentMode = false;
+  private measuredSpace: number | null = null;
   phases: PhaseTimer | null = null;
   private readonly cacheLimit: number;
   readonly stats = { builds: 0, evictions: 0, segmentations: 0, measuredTextCalls: 0, measuredTextChars: 0, maxMeasuredTextLength: 0 };
@@ -55,6 +60,7 @@ export class TextLayout {
   resetWidestShaped(): void { this.widest = 0; }
   setDocument(text: string): void {
     if (!this.text && text === this.source) return;
+    this.stringDocumentMode = true;
     const previous = this.source; const previousLines = this.lines; this.widest = 0;
     this.text = null; this.documentCache = null;
     this.source = text; this.lines = [];
@@ -72,24 +78,42 @@ export class TextLayout {
       }
     }
   }
-  setText(doc: Text): void {
+  setText(doc: Text, changes?: ChangeSet): void {
     if (doc === this.text) return;
-    const previous = this.text, previousLines = this.lines, previousSource = this.source;
+    this.stringDocumentMode = false;
+    const previous = this.text;
+    if (!previous || !changes) {
+      this.text = doc; this.source = ''; this.documentCache = null;
+      this.invalidate();
+      return;
+    }
+    const changed: Array<{ from: number; to: number }> = [];
+    changes.iterChangedRanges((fromA, toA) => {
+      changed.push({ from: previous.lineAt(fromA).number - 1, to: previous.lineAt(Math.min(previous.length, toA)).number - 1 });
+    });
     this.text = doc; this.source = ''; this.documentCache = null;
-    for (const [n, entry] of this.cache) {
-      const before = previous ? (n < previous.lines ? previous.line(n + 1) : null) : previousLines[n] ?? null;
-      const after = n < doc.lines ? doc.line(n + 1) : null;
-      const beforeFrom = before?.from ?? -1, beforeTo = before?.to ?? -1;
-      const beforeText = before ? (previous ? previous.line(n + 1).text : previousSource.slice(beforeFrom, beforeTo)) : '';
-      if (!after || beforeText !== after.text) {
-        this.bytes -= entry.bytes; this.cache.delete(n);
-      } else if (entry.line.from !== after.from || entry.line.to !== after.to) {
-        const delta = after.from - entry.line.from;
+    const moved = new Map<number, { line: ShapedLine; bytes: number; clusters: number[] | null }>();
+    for (const [number, entry] of this.cache) {
+      if (changed.some((range) => number >= range.from && number <= range.to)) {
+        this.bytes -= entry.bytes; this.cache.delete(number);
+        continue;
+      }
+      const from = changes.mapPos(entry.line.from, 1);
+      const to = changes.mapPos(entry.line.to, -1);
+      if (from > to || from > doc.length) { this.bytes -= entry.bytes; this.cache.delete(number); continue; }
+      const lineNumber = doc.lineAt(from).number - 1;
+      const after = doc.line(lineNumber + 1);
+      if (after.to - after.from !== entry.line.to - entry.line.from) { this.bytes -= entry.bytes; this.cache.delete(number); continue; }
+      const delta = after.from - entry.line.from;
+      if (delta !== 0 || lineNumber !== number) {
         const runs = entry.line.runs;
         for (const run of runs) { run.from += delta; run.to += delta; }
-        entry.line = { ...entry.line, from: after.from, to: after.to, runs };
+        entry.line = { ...entry.line, number: lineNumber, from: after.from, to: after.to, runs };
       }
+      this.cache.delete(number);
+      moved.set(lineNumber, entry);
     }
+    for (const [number, entry] of moved) this.cache.set(number, entry);
   }
   private lineIndex(number: number): LineIndex | null {
     if (!this.text) return this.lines[number] ?? null;
@@ -103,6 +127,8 @@ export class TextLayout {
     if (font === this.metricsFont) return;
     this.metrics.font = font;
     this.metricsFont = font;
+    this.advances = null;
+    this.measuredSpace = null;
   }
   private measureText(text: string, clusters: number[] | null = null, lineOffset = 0, measured?: MeasuredChunk[]): number {
     let width = 0;
@@ -152,7 +178,7 @@ export class TextLayout {
         if (part.segment.length > 1) clusterRanges.push([part.index, part.index + part.segment.length]);
       }
     }
-    const index: RunWidthIndex = { chunks: [], clusterRanges };
+    const index: RunWidthIndex = { chunks: [], clusterRanges, additive: false };
     let cumulative = 0;
     if (measured) {
       for (const chunk of measured) {
@@ -199,17 +225,21 @@ export class TextLayout {
     const local = offset - chunk.start;
     let width = chunk.prefixWidths.get(local);
     if (width === undefined) {
-      width = this.measureDirect(run.text.slice(chunk.start, offset));
+      if (index.additive && this.advances) {
+        const clusters: number[] = [];
+        for (const [start, end] of index.clusterRanges) {
+          if (start >= chunk.start && end <= offset) clusters.push(start - chunk.start, end - chunk.start);
+        }
+        width = this.advances.width(run.text.slice(chunk.start, offset), clusters);
+      } else width = this.measureDirect(run.text.slice(chunk.start, offset));
       chunk.prefixWidths.set(local, width);
     }
     return chunk.cumulative - chunk.width + width;
   }
   private measureDirect(text: string): number {
-    if (this.phases) {
-      this.stats.measuredTextCalls++;
-      this.stats.measuredTextChars += text.length;
-      this.stats.maxMeasuredTextLength = Math.max(this.stats.maxMeasuredTextLength, text.length);
-    }
+    this.stats.measuredTextCalls++;
+    this.stats.measuredTextChars += text.length;
+    this.stats.maxMeasuredTextLength = Math.max(this.stats.maxMeasuredTextLength, text.length);
     return this.metrics.measureText(text).width;
   }
   setFont(font: LayoutFont): void {
@@ -217,7 +247,7 @@ export class TextLayout {
     if (JSON.stringify(font) === JSON.stringify(this.font)) return;
     this.font = font; this.setMetricsFont(font.font); this.invalidate();
   }
-  invalidate(): void { this.cache.clear(); this.bytes = 0; this.widest = 0; }
+  invalidate(): void { this.cache.clear(); this.bytes = 0; this.widest = 0; this.advances = null; }
   private validateFont(font: LayoutFont): void {
     if (!font.font || !Number.isFinite(font.lineHeight) || font.lineHeight <= 0 || !Number.isFinite(font.baseline) || font.baseline < 0 || font.baseline > font.lineHeight) throw new RangeError('Invalid layout font');
   }
@@ -246,9 +276,13 @@ export class TextLayout {
     const index = this.lineIndex(number);
     if (!index) throw new RangeError('Line outside document');
     this.setMetricsFont(this.font.font);
+    const advances = this.stringDocumentMode ? null : (this.advances ??= new AdvanceTable((text) => this.measureDirect(text)));
     const lineText = this.slice(index.from, index.to);
     const clusters = this.clustersForLine(lineText);
-    const runs: ShapedRun[] = []; const stop = Math.max(1, this.measureText(' ') * 4);
+    const additive = !!advances && advances.additive && !complexScript.test(lineText) && clusters !== null;
+    const runs: ShapedRun[] = [];
+    const space = advances?.ascii[0x20] ?? (this.measuredSpace ??= this.measureDirect(' '));
+    const stop = Math.max(1, space * 4);
     let x = 0;
     let from = index.from;
     while (from < index.to) {
@@ -257,10 +291,21 @@ export class TextLayout {
       const to = tab < 0 ? index.to : Math.min(tab, index.to);
       if (to > from) {
         const text = this.slice(from, to), measured: MeasuredChunk[] = [];
-        const width = this.measureText(text, clusters, from - index.from, measured);
+        const offset = from - index.from;
+        const localClusters: number[] = [];
+        if (clusters) for (let i = 0; i < clusters.length; i += 2) {
+          const start = clusters[i]!, end = clusters[i + 1]!;
+          if (start >= offset && end <= offset + text.length) localClusters.push(start - offset, end - offset);
+        }
+        let width: number;
+        if (additive) {
+          const parts = advances.chunks(text, localClusters, MAX_RUN_CHARS);
+          measured.push(...parts);
+          width = parts.reduce((sum, part) => sum + part.width, 0);
+        } else width = this.measureText(text, clusters, offset, measured);
         const run = { text, from, to, x, width };
         this.runClusters.set(run, { lineFrom: index.from, clusters });
-        this.runWidthIndex(run, measured);
+        this.runWidthIndex(run, measured).additive = additive;
         runs.push(run); x += width;
       }
       if (to === index.to) break;
@@ -317,7 +362,6 @@ export class TextLayout {
   }
   advance(line: ShapedLine, pos: number): number {
     pos = this.boundary(Math.max(line.from, Math.min(line.to, pos)));
-    this.metrics.font = this.font.font;
     for (const run of line.runs) {
       if (pos < run.from) return run.x;
       if (pos <= run.to) {
@@ -331,7 +375,6 @@ export class TextLayout {
   }
   offsetInRun(run: ShapedRun, x: number, bias: -1 | 1): number {
     if (x <= 0) return run.from; if (x >= run.width) return run.to;
-    this.metrics.font = this.font.font;
     const index = this.runWidthIndex(run);
     let chunkLo = 0, chunkHi = index.chunks.length;
     while (chunkLo < chunkHi) {

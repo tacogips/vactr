@@ -81,5 +81,9 @@ export function readPalette(root: Element | null): Palette {
 }
 
 export function rgbaCss([red, green, blue, alpha]: Rgba): string {
+  if (alpha === 1) {
+    const channel = (value: number): string => Math.round(value * 255).toString(16).padStart(2, '0');
+    return `#${channel(red)}${channel(green)}${channel(blue)}`;
+  }
   return `rgba(${Math.round(red * 255)}, ${Math.round(green * 255)}, ${Math.round(blue * 255)}, ${alpha})`;
 }

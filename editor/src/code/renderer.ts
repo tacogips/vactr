@@ -18,7 +18,7 @@ export interface RenderFeedback {
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
 }
-interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; generation?: number; cursor?: boolean; clipped: boolean }
+interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; uv?: [number, number, number, number]; generation?: number; cursor?: boolean; clipped: boolean }
 export interface RendererOptions {
   ledger?: ResourceLedger; gl?: WebGL2RenderingContext; createCanvas?: CanvasFactory;
   palette?: Palette;
@@ -29,8 +29,9 @@ in vec2 a_pos;
 uniform vec4 u_rect;
 uniform vec2 u_view;
 out vec2 v_uv;
+uniform vec4 u_uv;
 void main() {
-  v_uv = a_pos;
+  v_uv = mix(u_uv.xy, u_uv.zw, a_pos);
   vec2 p = u_rect.xy + a_pos * u_rect.zw;
   gl_Position = vec4(p.x / u_view.x * 2.0 - 1.0, 1.0 - p.y / u_view.y * 2.0, 0., 1.);
 }`;
@@ -146,7 +147,7 @@ export class CanvasRenderer {
       gl.bindTexture(gl.TEXTURE_2D, this.white);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-      for (const name of ['u_rect', 'u_view', 'u_color', 'u_texture']) this.locations[name] = gl.getUniformLocation(this.program, name);
+      for (const name of ['u_rect', 'u_view', 'u_color', 'u_texture', 'u_uv']) this.locations[name] = gl.getUniformLocation(this.program, name);
       if (gl.getError() !== gl.NO_ERROR) throw new Error('GPU initialization failed');
       this.atlas = new GlyphAtlas(gl, this.ledger, this.createCanvas);
     } finally { for (const shader of shaders) gl.deleteShader(shader); }
@@ -217,7 +218,7 @@ export class CanvasRenderer {
           for (const run of line.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, y, staticAnnotations);
         }
         this.unclip();
-        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], this.palette.gutter, true);
+        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], rgbaCss(this.palette.gutter), true);
         this.clip(this.view.gutter ?? 48);
         for (const a of staticAnnotations) {
           if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? this.palette.diagnostic : this.palette.composition);
@@ -230,7 +231,7 @@ export class CanvasRenderer {
             const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
             const width = Math.min(256, Math.max(16, a.label.length * 8 + 8));
             this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
-            this.drawRun(this.labelRun(a.label, width), x + 4, y, [], this.palette.labelText);
+            this.drawRun(this.labelRun(a.label, width), x + 4, y, [], rgbaCss(this.palette.labelText));
           }
         }
         for (const handle of feedback.handles ?? []) {
@@ -279,6 +280,8 @@ export class CanvasRenderer {
     gl.bindTexture(gl.TEXTURE_2D, command.texture ?? this.white);
     gl.uniform4f(this.locations.u_rect, command.rect.left, command.rect.top, command.rect.right - command.rect.left, command.rect.bottom - command.rect.top);
     gl.uniform4f(this.locations.u_color, command.color[0]!, command.color[1]!, command.color[2]!, command.color[3]!);
+    const uv = command.uv ?? [0, 0, 1, 1];
+    gl.uniform4f(this.locations.u_uv, uv[0]!, uv[1]!, uv[2]!, uv[3]!);
     gl.drawArrays(gl.TRIANGLES, 0, 6); this.stats.drawCalls++;
   }
   private animatedRects(range: CodeAnnotation): CodeRect[] {
@@ -321,7 +324,8 @@ export class CanvasRenderer {
       }
       const tile = atlas.tile({ run, font: this.layout.font, dpr: this.scale, x: offset, width, styles: tileStyles, color: color ?? rgbaCss(this.palette.text) });
       if (!tile) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; continue; }
-      this.quad({ left: x + offset, right: x + offset + width, top: y, bottom: y + this.layout.font.lineHeight }, [1, 1, 1, 1], tile.texture);
+      this.quad({ left: x + offset, right: x + offset + width, top: y, bottom: y + this.layout.font.lineHeight }, [1, 1, 1, 1], tile.texture,
+        [tile.cell.u0, tile.cell.v0, tile.cell.u1, tile.cell.v1]);
     }
   }
   private local(r: CodeRect): CodeRect { return { left: r.left - (this.view.left ?? 0), right: r.right - (this.view.left ?? 0), top: r.top - (this.view.top ?? 0), bottom: r.bottom - (this.view.top ?? 0) }; }
@@ -335,9 +339,9 @@ export class CanvasRenderer {
     this.gl!.disable(this.gl!.SCISSOR_TEST);
     this.scissorOn = false;
   }
-  private quad(r: CodeRect, color: number[], texture = this.white): void {
+  private quad(r: CodeRect, color: number[], texture = this.white, uv?: [number, number, number, number]): void {
     if (r.right <= 0 || r.left >= this.view.width || r.bottom <= 0 || r.top >= this.view.height) return;
-    this.addCommand({ rect: r, color, texture: texture ?? undefined });
+    this.addCommand({ rect: r, color, texture: texture ?? undefined, ...(uv ? { uv } : {}) });
   }
   private reportReady(): void { this.report(this.scale < this.requestedDpr ? 'degraded' : 'ready', this.scale < this.requestedDpr ? 'Effective DPR reduced to respect GPU budget' : 'GPU ready'); }
   private report(kind: GpuStatus['kind'], message: string): void {

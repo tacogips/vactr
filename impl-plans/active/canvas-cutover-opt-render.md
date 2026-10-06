@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-RENDER: Append-Only Cell Atlas, Instanced Per-Line Geometry and Four Draw Calls Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-OPT-RENDER (session 286, wave 13; runs alone after CANVAS-OPT-BACKDROP is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 4 ("Glyph atlas", "Per-line geometry cache", "Layers and draw calls", "GL hygiene", "Context loss, DPR and disposal", "Ported tests", "Proof") and section 6; 15.3.3 (as amended: cluster rasterization, run cells for complex lines); 15.3.5 caps; 15.3.8.7 "GPU per frame" (as amended)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-RENDER`)
@@ -472,3 +472,20 @@ sections 4 and 8, session-290 amendment).
 - Aligned the "GL calls" wording with the amended getParameter rule.
 - Scope, contracts, tasks and criteria are otherwise unchanged. This plan starts only after
   CANVAS-OPT-BACKDROP is accepted.
+
+### Session: 2026-10-06 (session 293 implementation attempt)
+**Tasks Completed**: Partial R1 atlas and UV sampling migration; initial 32-byte geometry
+packing helper.
+**Notes**:
+- Preserved the accepted uncommitted BACKDROP palette and DOM-layer changes.
+- `atlas.ts` now has a single texture, append-only cell allocation, persistent staging
+  canvas ownership, per-frame byte budget counters and generation/reset bookkeeping. The
+  renderer samples atlas cell UVs. `geometry.ts` currently only defines the instance format
+  and encoder; renderer instancing, slot tables, segment caching and draw batching are not
+  implemented.
+- Fresh TypeScript check passed: `tmp/canvas-cutover/opt-render/check-current.log`.
+- Focused GPU tests are not green: `focused-atlas-2.log` reports 16 failed / 33 passed.
+  Failures expose unported old atlas semantics (canvas-size/resource expectations, upload
+  rollback and cumulative counters) and renderer assumptions that still require migration.
+- No completion criteria are checked. The implementation and required behavior/e2e/gate
+  verification remain incomplete.

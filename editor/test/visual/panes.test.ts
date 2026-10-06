@@ -207,7 +207,7 @@ describe('visual mount', () => {
     expect(core.frames).toEqual([2]);
     expect(gl.since(mark).filter((c) => c.fn === 'drawArrays')).toHaveLength(1);
     expect(gl.since(mark).filter((c) => c.fn === 'blitFramebuffer')).toHaveLength(1);
-    expect(background).toEqual([canvas, canvas]);
+    expect(background).toEqual([canvas]);
     const stopped: (HTMLCanvasElement | null)[] = [];
     const unsubscribe = d.visual?.onBackgroundCanvas?.((value) => stopped.push(value));
     unsubscribe?.();
@@ -220,7 +220,7 @@ describe('visual mount', () => {
     expect(banner.hidden).toBe(true);
 
     m.dispose();
-    expect(background).toEqual([canvas, canvas, null]);
+    expect(background).toEqual([canvas, null]);
     expect(stopped).toEqual([canvas]);
     stopBackground?.();
     expect(core.listening).toBe(0);

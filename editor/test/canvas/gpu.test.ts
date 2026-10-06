@@ -2,9 +2,10 @@ import { Text } from '@codemirror/state';
 import { describe, expect, it, vi } from 'vitest';
 import { TextLayout, type LayoutFont } from '../../src/code/layout';
 import { GlyphAtlas, type CanvasFactory } from '../../src/code/atlas';
-import { CanvasRenderer } from '../../src/code/renderer';
+import { CanvasRenderer, GPU_TOKEN_COLORS } from '../../src/code/renderer';
 import { MiB, ResourceLedger, RESOURCE_LIMITS, effectiveSize } from '../../src/code/resources';
 import type { CodeAnnotation } from '../../src/app/apis';
+import { FALLBACK_PALETTE, readPalette, rgbaCss } from '../../src/code/palette';
 
 const font: LayoutFont = { font: '16px test-mono', fallback: 'test-ja', lineHeight: 20, baseline: 16 };
 function width(text: string): number {
@@ -33,17 +34,23 @@ function oldBoundary(text: string, pos: number, bias: -1 | 1): number {
   return pos;
 }
 const view = { width: 320, height: 100, scrollLeft: 0, scrollTop: 0, left: 10, top: 20, gutter: 48 };
-function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: number; y: number; font: string; color: string }[]; crops: number[][] } {
+function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: number; y: number; font: string; color: string }[]; crops: number[][]; drawImages: number; canvases: number } {
   const text: { text: string; x: number; y: number; font: string; color: string }[] = []; const crops: number[][] = [];
-  return { text, crops, createCanvas: () => {
-    const canvas = document.createElement('canvas');
-    const ctx = { font: '', fillStyle: '', textBaseline: '', setTransform() {}, clearRect() {}, save() {}, restore() {}, beginPath() {}, clip() {}, drawImage() {},
-      rect(...args: number[]) { crops.push(args); },
-      measureText(t: string) { return { width: width(t) }; },
-      fillText(t: string, x: number, y: number) { text.push({ text: t, x, y, font: this.font, color: this.fillStyle }); },
-    };
-    Object.defineProperty(canvas, 'getContext', { value: () => ctx }); return canvas;
-  } };
+  let drawImages = 0; let canvases = 0;
+  return { text, crops,
+    createCanvas: () => {
+      canvases++;
+      const canvas = document.createElement('canvas');
+      const ctx = { font: '', fillStyle: '', textBaseline: '', setTransform() {}, clearRect() {}, save() {}, restore() {}, beginPath() {}, clip() {}, drawImage() { drawImages++; },
+        rect(...args: number[]) { crops.push(args); },
+        getImageData(_x: number, _y: number, w: number, h: number) { return { data: new Uint8ClampedArray(w * h * 4) }; },
+        measureText(t: string) { return { width: width(t) }; },
+        fillText(t: string, x: number, y: number) { text.push({ text: t, x, y, font: this.font, color: this.fillStyle }); },
+      };
+      Object.defineProperty(canvas, 'getContext', { value: () => ctx }); return canvas;
+    },
+    get drawImages() { return drawImages; }, get canvases() { return canvases; },
+  };
 }
 function recordingGL(maxTexture = 1024) {
   let next = 1; let error = 0; let failUpload = false;
@@ -61,7 +68,7 @@ function recordingGL(maxTexture = 1024) {
     if (args[0] === gl.SCISSOR_TEST) scissor = name === 'enable';
     calls.push({ name, args });
   };
-  gl.getParameter = () => maxTexture; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
+  gl.getParameter = (...args: unknown[]) => { calls.push({ name: 'getParameter', args }); return maxTexture; }; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
   gl.isTexture = (obj: object) => live.get(obj) === 'Texture';
   gl.getShaderInfoLog = () => ''; gl.getProgramInfoLog = () => ''; gl.getAttribLocation = () => 0; gl.getUniformLocation = (_p: object, name: string) => ({ name });
   gl.isContextLost = () => false;
@@ -294,7 +301,7 @@ describe('GPU code compositor', () => {
     return { r, raster, b, c, l, renderer };
   }
   it('draws all required feedback in order on GPU and clips source against gutter', () => {
-    const f = fixture(); const source = document.createElement('canvas'); source.width = 100; source.height = 100; f.renderer.setBackground(source, 1);
+    const f = fixture();
     const annotations: CodeAnnotation[] = [
       { kind: 'selection', from: 0, to: 3 }, { kind: 'playing', from: 4, to: 5 }, { kind: 'eval', from: 0, to: 9 },
       { kind: 'syntax', from: 0, to: 3, className: 'vact-tok-head' }, { kind: 'diagnostic', from: 4, to: 5 },
@@ -302,9 +309,9 @@ describe('GPU code compositor', () => {
     ];
     expect(f.renderer.render({ annotations, cursor: 5, handles: [{ pos: 0 }, { pos: 9, end: true }] })).toBe(true);
     const colors = f.r.draws.map(d => d.color);
-    expect(colors.slice(0, 5)).toEqual([[1, 1, 1, 1], [0.04, 0.05, 0.07, 0.85], [0.12, 0.22, 0.32, 0.55], [0.35, 0.29, 0.13, 0.5], [0.2, 0.32, 0.36, 0.5]]);
+    expect(colors.slice(0, 4)).toEqual([[0.04, 0.05, 0.07, 0.85], [0.12, 0.22, 0.32, 0.55], [0.35, 0.29, 0.13, 0.5], [0.2, 0.32, 0.36, 0.5]]);
     const diagnostic = colors.findIndex(c => c[0] === 0.75); const cursor = colors.findIndex(c => c[0] === 0.9); const badge = colors.findIndex(c => c[0] === 0.15);
-    expect(diagnostic).toBeGreaterThan(4); expect(cursor).toBeGreaterThan(diagnostic); expect(badge).toBeGreaterThan(cursor);
+    expect(diagnostic).toBeGreaterThan(3); expect(cursor).toBeGreaterThan(diagnostic); expect(badge).toBeGreaterThan(cursor);
     expect(colors.slice(-2)).toEqual([[0.53, 0.75, 0.82, 1], [0.53, 0.75, 0.82, 1]]);
     expect(f.r.calls.some(c => c.name === 'scissor' && c.args[0] === 48)).toBe(true);
     expect(f.raster.text.some(t => t.text === 'let x = 1' && t.color === '#ebcb8b')).toBe(true); expect(f.raster.text.some(t => t.text === '1')).toBe(true);
@@ -399,16 +406,17 @@ describe('GPU code compositor', () => {
     expect(renderer.textPending).toBe(false); expect(renderer.atlasStats.uploads).toBe(35);
     renderer.dispose(); expect(b.usedBytes).toBe(0);
   });
-  it('copies changed background once per frame into a reusable texture', () => {
-    const f = fixture(); const source = document.createElement('canvas'); source.width = 100; source.height = 100;
-    f.renderer.setBackground(source, 1); f.renderer.render(); const textures = [...f.r.live.values()].filter(v => v === 'Texture').length;
-    f.renderer.render(); expect(f.renderer.stats.backgroundUploads).toBe(1);
-    f.renderer.setBackground(source, 2); f.renderer.render(); expect(f.renderer.stats.backgroundUploads).toBe(2);
+  it('animation frames never copy or upload a backdrop', () => {
+    const f = fixture(); expect(f.renderer.render({ textRevision: 1 })).toBe(true);
+    const textureUploads = f.r.calls.filter(c => c.name === 'texImage2D' || c.name === 'texSubImage2D').length;
+    const canvases = f.raster.canvases; const drawImages = f.raster.drawImages;
+    const textures = [...f.r.live.values()].filter(v => v === 'Texture').length;
+    for (let frame = 0; frame < 100; frame++) expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+    expect(f.r.calls.filter(c => c.name === 'texImage2D' || c.name === 'texSubImage2D')).toHaveLength(textureUploads);
+    expect(f.raster.canvases).toBe(canvases); expect(f.raster.drawImages).toBe(drawImages);
     expect([...f.r.live.values()].filter(v => v === 'Texture')).toHaveLength(textures);
-    expect(f.r.calls.filter(c => c.name === 'texSubImage2D')).toHaveLength(1);
-    const replacement = document.createElement('canvas'); replacement.width = 100; replacement.height = 100;
-    f.renderer.setBackground(replacement, 2); f.renderer.render(); expect(f.renderer.stats.backgroundUploads).toBe(3);
-    f.renderer.setBackground(null); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
+    expect(f.b.counters.byKind.backdrop).toBe(0);
+    f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
   });
   it('restores CPU source after context loss with fresh resources and empty targets', () => {
     const f = fixture(); f.renderer.render({ textRevision: 1 }); const builds = f.renderer.stats.textBuilds; f.r.lose();
@@ -436,36 +444,32 @@ describe('GPU code compositor', () => {
     expect(f.renderer.status.effectiveDpr).toBe(1); expect(f.renderer.render()).toBe(true);
     expect(f.r.calls.filter(c => c.name === 'scissor').at(-1)?.args[0]).toBe(48); f.renderer.dispose();
   });
-  it('large backgrounds downsample within staging and aggregate pixel caps', () => {
-    const f = fixture(); const source = document.createElement('canvas'); source.width = 3840; source.height = 2160;
-    f.renderer.setBackground(source, 1); expect(f.renderer.render()).toBe(true);
+  it('large viewports stay within geometry and aggregate pixel caps without a backdrop reservation', () => {
+    const f = fixture(); expect(f.renderer.render()).toBe(true);
     expect(f.b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry); expect(f.b.counters.pixels).toBeLessThanOrEqual(4_000_000);
     const uploads = f.r.calls.filter(c => c.name === 'texImage2D');
     const copied = uploads.find(c => c.args.length === 6 && (c.args[5] as HTMLCanvasElement).width > 0);
-    // Copy staging canvases are explicitly cleared after upload; retained targets stay accounted.
-    expect(copied).toBeUndefined(); expect(f.renderer.stats.backgroundUploads).toBe(1); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
+    // A canvas-backed texture source here would indicate a backdrop copy; atlas uploads use typed arrays.
+    expect(copied).toBeUndefined(); expect(f.b.counters.byKind.backdrop).toBe(0); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
   });
-  it('reuses a near-staging-cap backdrop after text metadata has grown', () => {
+  it('keeps text metadata within geometry caps without backdrop staging', () => {
     const r = recordingGL(4096); const raster = rasterizer(); const b = new ResourceLedger(); const c = document.createElement('canvas');
     const text = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n');
     const renderer = new CanvasRenderer(c, layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas });
     renderer.setViewport({ width: 640, height: 800, scrollLeft: 0, scrollTop: 0 });
-    const source = document.createElement('canvas'); source.width = 3840; source.height = 2160;
-    renderer.setBackground(source, 1); expect(renderer.render()).toBe(true);
-    renderer.setBackground(source, 2); expect(renderer.render()).toBe(true); expect(renderer.stats.backgroundUploads).toBe(2);
-    expect(b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
+    expect(renderer.render({ textRevision: 1 })).toBe(true);
+    expect(renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+    expect(b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry);
+    expect(b.counters.byKind.backdrop).toBe(0); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
-  it('retains every unchanged text tile with animated near-cap backgrounds from the first frame', () => {
+  it('retains every unchanged text tile across animation frames without backdrop uploads', () => {
     const r = recordingGL(4096); const raster = rasterizer(); const b = new ResourceLedger();
     const text = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n');
     const renderer = new CanvasRenderer(document.createElement('canvas'), layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas });
     renderer.setViewport({ width: 640, height: 800, scrollLeft: 0, scrollTop: 0 });
-    const source = document.createElement('canvas'); source.width = 3840; source.height = 2160;
     const allocate = b.allocate.bind(b);
-    let peakGeometry = 0;
     b.allocate = (...args) => {
       const allocation = allocate(...args);
-      peakGeometry = Math.max(peakGeometry, b.counters.byKind.geometry);
       expect(b.usedBytes).toBeLessThanOrEqual(RESOURCE_LIMITS.total);
       expect(b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry);
       expect(b.counters.byKind.atlas).toBeLessThanOrEqual(RESOURCE_LIMITS.atlas);
@@ -474,9 +478,10 @@ describe('GPU code compositor', () => {
     };
     let firstUploads = 0; let firstTextures: unknown[] = []; let firstBytes = 0;
     try {
+      expect(renderer.render({ textRevision: 1 })).toBe(true);
       for (let revision = 1; revision <= 4; revision++) {
         const start = r.draws.length;
-        renderer.setBackground(source, revision); expect(renderer.render()).toBe(true);
+        expect(renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: revision, to: revision + 1 }] })).toBe(true);
         const textures = r.draws.slice(start).map(draw => draw.texture);
         if (revision === 1) {
           firstUploads = renderer.atlasStats.uploads; firstTextures = textures; firstBytes = b.usedBytes;
@@ -488,25 +493,55 @@ describe('GPU code compositor', () => {
           expect(b.usedBytes).toBe(firstBytes);
         }
         expect(renderer.atlasStats.evictions).toBe(0);
-        expect(renderer.stats.backgroundUploads).toBe(revision);
+        expect(b.counters.byKind.backdrop).toBe(0);
       }
-      expect(peakGeometry).toBeGreaterThan(4 * MiB - 20_000);
-      expect(r.calls.filter(call => call.name === 'texSubImage2D')).toHaveLength(3);
-      expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(82); // White, backdrop, 80 glyph tiles.
+    expect(r.calls.filter(call => call.name === 'texSubImage2D')).toHaveLength(0);
+      expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(81); // White and 80 glyph tiles; no backdrop texture.
     } finally { renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); }
   });
-  it('shrinks animated backdrop staging under new geometry pressure without evicting text', () => {
-    const f = fixture(); const source = document.createElement('canvas'); source.width = 3840; source.height = 2160;
-    f.renderer.setBackground(source, 1); expect(f.renderer.render()).toBe(true);
-    const uploads = f.renderer.atlasStats.uploads; const backdropBytes = f.b.counters.byKind.backdrop;
+  it('geometry pressure during animation does not evict text or allocate backdrop storage', () => {
+    const f = fixture(); expect(f.renderer.render({ textRevision: 1 })).toBe(true);
+    const uploads = f.renderer.atlasStats.uploads;
     const pressure = f.b.allocate('geometry', RESOURCE_LIMITS.geometry - f.b.counters.byKind.geometry - 100_000)!;
     expect(pressure).not.toBeNull();
     try {
-      f.renderer.setBackground(source, 2); expect(f.renderer.render()).toBe(true);
-      expect(f.b.counters.byKind.backdrop).toBeLessThan(backdropBytes);
+      expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+      expect(f.b.counters.byKind.backdrop).toBe(0);
       expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.renderer.atlasStats.evictions).toBe(0);
-      expect(f.renderer.stats.backgroundUploads).toBe(2);
     } finally { pressure.release(); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0); expect(f.r.live.size).toBe(0); }
+  });
+  it('keeps texture-limit queries off viewport and animation frames and refreshes on restore', () => {
+    const f = fixture();
+    const initReads = f.r.calls.filter(call => call.name === 'getParameter').length;
+    expect(initReads).toBeGreaterThanOrEqual(2); // The renderer and atlas initialization reads are allowed.
+    f.r.calls.length = 0;
+    for (let frame = 0; frame < 100; frame++) {
+      f.renderer.setViewport({ ...view, width: view.width + frame % 2 });
+      expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+    }
+    expect(f.r.calls.filter(call => call.name === 'getParameter')).toHaveLength(0);
+    f.c.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    f.c.dispatchEvent(new Event('webglcontextrestored'));
+    expect(f.r.calls.filter(call => call.name === 'getParameter' && call.args[0] === f.r.gl.MAX_TEXTURE_SIZE).length).toBeGreaterThanOrEqual(1);
+    f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
+  });
+  it('maps the diagnostic underline and fallback palette to the UI tokens and legacy colors', () => {
+    const f = fixture();
+    f.renderer.setPalette({ ...FALLBACK_PALETTE, diagnostic: [1, 0, 0, 1] });
+    expect(f.renderer.render({ annotations: [{ kind: 'diagnostic', from: 0, to: 3 }] })).toBe(true);
+    expect(f.r.draws.some(draw => draw.color[0] === 1 && draw.color[1] === 0 && draw.color[2] === 0)).toBe(true);
+    const expected = {
+      text: '#d8dee9', gutter: '#7a7f87', diagnostic: '#bf3340',
+      composition: '#87bfd1', callHead: 'rgba(140, 153, 168, 0.6)', cursor: '#e6ebf0',
+      labelFill: 'rgba(38, 48, 64, 0.95)', labelText: '#ebcb8b', handle: '#87bfd1',
+    };
+    expect(Object.fromEntries(Object.entries(expected).map(([name]) => [name, rgbaCss(FALLBACK_PALETTE[name as keyof typeof expected])]))).toEqual(expected);
+    expect(Object.fromEntries(Object.entries(FALLBACK_PALETTE.token).map(([name, color]) => [name, rgbaCss(color)]))).toEqual(GPU_TOKEN_COLORS);
+    const root = document.createElement('div'); root.style.setProperty('--vt-danger', '#ff0000'); document.body.append(root);
+    expect(readPalette(root).diagnostic).toEqual([1, 0, 0, 1]);
+    root.style.setProperty('--vt-danger', 'invalid');
+    expect(readPalette(root).diagnostic).toEqual(FALLBACK_PALETTE.diagnostic);
+    root.remove(); f.renderer.dispose();
   });
   it('dense offscreen syntax on a 1MiB line cannot overflow visible-tile metadata', () => {
     const f = fixture('x'.repeat(1024 * 1024));

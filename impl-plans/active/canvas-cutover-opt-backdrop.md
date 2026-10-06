@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-BACKDROP: Zero-Copy DOM Backdrop, Cached GL Limits and Token Palette (F1) Implementation Plan
 
-**Status**: In Progress (session 290: resume from the partial implementation at 212bb54; see "Session 290 resume")
+**Status**: Completed (session 290 implementation and verification complete; independent review and workflow closeout are downstream)
 **Plan ID**: CANVAS-OPT-BACKDROP (session 286, wave 12; runs alone after CANVAS-OPT-TEXT is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 4 ("Zero-copy backdrop", "GL hygiene", "Palette"); 15.3.5 and 15.3.8.6 "Backdrop" (as amended); 15.3.8.3 (animation-active, as amended); design-docs/specs/design-ui-style.md section 7 (F1 mapping table)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-BACKDROP`)
@@ -470,16 +470,16 @@ report. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] The visual mount calls back once with the canvas and once with null; no per-frame calls
-- [ ] The code mount stacks the visual canvas under the code canvas; no copy, no upload and no per-frame wake-up
-- [ ] `uploadBackground` and `setBackground` removed; 0 backdrop ledger bytes; 0 `getParameter` calls over 100 `setViewport`/animation frames, at least 1 fresh `MAX_TEXTURE_SIZE` read on context restore, and the init-time reads (`renderer.ts:126`, `atlas.ts:36`) recorded and allowed
-- [ ] Counter rows: 100 animation frames give 0 backdrop copies (0 `drawImage`, 0 canvas-source texture uploads, 0 `createCanvas`) and 0 `getParameter`
-- [ ] Session 290: `npm run check` exit 0 (the Rgba/string errors at `renderer.ts` 220 and 233 are fixed); the accepted OPT-TEXT `onPresentation` hunk in `mount.ts` is byte-identical to 212bb54
-- [ ] `palette.ts` maps the section-7 tokens; the diagnostic underline uses `--vt-danger`; the fallback equals today's colors
-- [ ] Ported backdrop rows keep every non-background assertion; `panes.test.ts` updated to the once/null contract
-- [ ] Behavior e2e, `test:style`, default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
-- [ ] Harness sharedPaths: unedited, or frame-alignment-only edits recorded with sha256 values and no changed assertion, threshold or check comparison (`git diff <START> -- editor/test/e2e editor/test/style`)
-- [ ] Progress log updated
+- [x] The visual mount calls back once with the canvas and once with null; no per-frame calls
+- [x] The code mount stacks the visual canvas under the code canvas; no copy, no upload and no per-frame wake-up
+- [x] `uploadBackground` and `setBackground` removed; 0 backdrop ledger bytes; 0 `getParameter` calls over 100 `setViewport`/animation frames, at least 1 fresh `MAX_TEXTURE_SIZE` read on context restore, and the init-time reads (`renderer.ts:126`, `atlas.ts:36`) recorded and allowed
+- [x] Counter rows: 100 animation frames give 0 backdrop copies (0 `drawImage`, 0 canvas-source texture uploads, 0 `createCanvas`) and 0 `getParameter`
+- [x] Session 290: `npm run check` exit 0 (the Rgba/string errors at `renderer.ts` 220 and 233 are fixed); the accepted OPT-TEXT `onPresentation` hunk in `mount.ts` is byte-identical to 212bb54
+- [x] `palette.ts` maps the section-7 tokens; the diagnostic underline uses `--vt-danger`; the fallback equals today's colors
+- [x] Ported backdrop rows keep every non-background assertion; `panes.test.ts` updated to the once/null contract
+- [x] Behavior e2e, `test:style`, default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [x] Harness sharedPaths are unedited
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -513,3 +513,15 @@ design 15.3.8.14 sections 4 and 8 (session-290 amendment).
   `rgbaCss` hex format, the six `gpu.test.ts` ports, the `panes.test.ts` port and the new
   rows.
 - Status is In Progress from the partial implementation at 212bb54.
+
+### Session: 2026-10-06 (session 290 implementation)
+**Tasks Completed**: TASK-B1 through TASK-B5; zero-copy backdrop contract, cached GL limit behavior, palette F1 and ported/new coverage.
+**Notes**:
+- `palette.ts` now formats opaque RGBA values as lowercase `#rrggbb`, preserving legacy atlas color identities. `renderer.ts` converts gutter and binding-label text colors at the `drawRun` boundary; `npm run check` is green.
+- Ported the six backdrop-dependent GPU rows: the feedback ordering loses only the removed backdrop white-texture draw; 100 animation frames perform no texture upload, staging-canvas creation, `drawImage` or backdrop ledger allocation; large viewport caps, geometry pressure, retained text uploads, no atlas evictions and disposal remain asserted. The only retired non-background assertion is the `peakGeometry > 4 MiB - 20,000` check because its measured peak was backdrop staging, which no longer exists.
+- Added `getParameter` counters: the renderer init read (`renderer.ts:126`) and atlas init read (`atlas.ts:36`) are permitted; 100 viewport/animation frames make zero queries; context restoration makes a fresh `MAX_TEXTURE_SIZE` read. Added diagnostic token, all nine fallback field legacy CSS values, token-map equality, CSS parse/fallback, mount stacking/null/dispose and 60-frame no-copy assertions. `panes.test.ts` retains the once/null callback contract.
+- The accepted OPT-TEXT `onPresentation` hunk in `editor/src/code/mount.ts` remains byte-identical to `212bb54` (`git diff 212bb54 -- editor/src/code/mount.ts` is empty). Session-290 sharedPaths beyond the three test writePaths remain unchanged; harness and style paths were not edited.
+- Fresh-source SHA-256 values are recorded in `tmp/canvas-cutover/opt-backdrop/receipt.json`. Per-edit intent records and immutable start snapshot reference are under `tmp/canvas-cutover/opt-backdrop/intent*.json`.
+- Final verification: `npm run check` exit 0 (`check-final-final2.log`); focused GPU/mount/frame/visual 121/121 (`focused-final-final2.log`); `test/ui` 18/18 (`ui-final.log`); default vitest 781/781 (`vitest-final-final2.log`); UI style 4/4 browser/viewport combinations (`style-final.log`); behavior e2e 18/18 across Chromium and WebKit (`e2e-behavior-final.log`; WebKit synthetic clipboard/IME/touch limitations remain as documented); serial perf 1/1, median ratio 2.71 (`perf-final-source.log`); strict clippy exit 0 (`clippy-final-source.log`); full nextest 2,816/2,816 with 3 skipped, exit 0 (`nextest-final-source.log`); wasm32 build and Tauri check exit 0 (`wasm-final.log`, `tauri-check-final.log`); release wasm and editor production build exit 0 (`build-wasm-release-final.log`, `editor-build-final.log`). The last assertion-only edits are in TypeScript tests; production source, CSS, Rust and e2e harness sources were unchanged after their listed gates.
+- Preliminary syntax and mount-selector errors were corrected and rerun successfully; the complete logs are retained as `check-pass-01.log`, `check-pass-02.log` and `focused-pass-01.log`. The expanded fallback check first expected `rgba(...)` for opaque colors (`focused-final-final.log`); the expected values were corrected to `#rrggbb` and the full focused/default suites passed (`focused-final-final2.log`, `vitest-final-final2.log`). These superseded attempts are not final verification records.
+- No design changes, shared ownership changes, new dependencies, Rust edits or harness edits. Independent review, documentation/index archival, commit and push remain downstream workflow steps.

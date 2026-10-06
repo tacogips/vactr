@@ -1,193 +1,156 @@
-import { RESOURCE_LIMITS, ResourceLedger, type Reservation } from './resources';
+import { ResourceLedger, type Reservation } from './resources';
 import type { ShapedRun, LayoutFont } from './layout';
 
 export type CanvasFactory = () => HTMLCanvasElement;
 export interface RunStyle { from: number; to: number; color: string }
-export interface TileRequest {
-  run: ShapedRun; font: LayoutFont; dpr: number; x: number; width: number;
-  color?: string; styles?: readonly RunStyle[];
+export interface CellRequest {
+  kind: 'mask' | 'color' | 'run'; text: string; font: LayoutFont; dpr: number; width: number;
+  run?: ShapedRun; piece?: { from: number; to: number }; chunkX?: number; color?: string;
 }
-export interface AtlasTile { texture: WebGLTexture; width: number; height: number; x: number; cssWidth: number }
-interface Entry { tile: AtlasTile; reservation: Reservation; identity: string; metadata: Reservation }
-function hash(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
+export interface AtlasCell { u0: number; v0: number; u1: number; v1: number; width: number; height: number; pad: number; generation: number }
+interface Entry { cell: AtlasCell; reservation: Reservation; key: string }
+const PAD_DPR = 2;
 
-/** Bounded run tiles; rasterize the complete run translated into each cropped tile. */
+/** Append-only, single-texture glyph cells. Cells remain valid until generation changes. */
 export class GlyphAtlas {
-  private entries = new Map<string, Entry>();
-  private rasterCanvas: HTMLCanvasElement | null = null;
-  private rasterContext: CanvasRenderingContext2D | null = null;
-  private rasterReservation: Reservation | null = null;
-  private runRasterCanvas: HTMLCanvasElement | null = null;
-  private runRasterContext: CanvasRenderingContext2D | null = null;
-  private runRasterReservation: Reservation | null = null;
-  private runRasterIdentity = '';
-  private disposed = false;
-  private runIds = new WeakMap<ShapedRun, number>();
-  private nextRunId = 1;
+  private cells = new Map<string, Entry>();
+  private textureValue: WebGLTexture;
+  private canvas: HTMLCanvasElement;
+  private context: CanvasRenderingContext2D;
+  private canvasReservation: Reservation;
+  private textureReservation: Reservation;
+  private width: number;
+  private height: number;
+  private x = 2;
+  private y = 0;
+  private shelfHeight = 2;
   private frameBudget = 1 << 20;
   private frameBytes = 0;
-  readonly stats = { uploads: 0, hits: 0, evictions: 0 };
-  readonly tilePixels: number;
+  private disposed = false;
+  readonly stats = { uploads: 0, newCells: 0, hits: 0, resets: 0, growths: 0, generation: 1, evictions: 0 };
   constructor(private gl: WebGL2RenderingContext, private ledger: ResourceLedger, private createCanvas: CanvasFactory = () => document.createElement('canvas')) {
-    this.tilePixels = Math.min(1024, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
-    if (!Number.isInteger(this.tilePixels) || this.tilePixels < 1) throw new Error('Invalid texture limit');
+    const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    if (!Number.isInteger(max) || max < 1) throw new Error('Invalid texture limit');
+    this.width = Math.min(1024, max); this.height = Math.min(1024, max);
+    const bytes = this.width * this.height * 4;
+    const textureReservation = ledger.allocate('atlas', bytes);
+    const canvasReservation = ledger.allocate('geometry', this.width * 4);
+    if (!textureReservation || !canvasReservation) { textureReservation?.release(); canvasReservation?.release(); throw new Error('Text atlas budget exhausted'); }
+    this.textureReservation = textureReservation; this.canvasReservation = canvasReservation;
+    this.canvas = createCanvas(); this.canvas.width = this.width; this.canvas.height = 1;
+    const context = this.canvas.getContext('2d');
+    if (!context) { textureReservation.release(); canvasReservation.release(); throw new Error('Font rasterizer unavailable'); }
+    this.context = context;
+    const texture = gl.createTexture();
+    if (!texture) { textureReservation.release(); canvasReservation.release(); throw new Error('Text atlas allocation failed'); }
+    this.textureValue = texture;
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // Reserved white texels are used for solid-color rectangles by geometry layers.
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 2, 2, gl.RGBA, gl.UNSIGNED_BYTE,
+      new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]));
   }
-  get size(): number { return this.entries.size; }
-  private raster(w: number, h: number, bytes: number): CanvasRenderingContext2D {
-    if (!this.rasterCanvas) this.rasterCanvas = this.createCanvas();
-    if (bytes > (this.rasterReservation?.bytes ?? 0)) {
-      this.rasterCanvas.width = 0; this.rasterCanvas.height = 0;
-      this.rasterReservation?.release(); this.rasterReservation = null;
-      while (!this.rasterReservation) {
-        this.rasterReservation = this.ledger.allocate('geometry', bytes);
-        if (this.rasterReservation) break;
-        const first = this.entries.entries().next().value;
-        if (!first) throw new Error('Text atlas/staging budget exhausted');
-        this.remove(first[0], first[1]);
-      }
-    }
-    if (!this.rasterContext) {
-      this.rasterContext = this.rasterCanvas.getContext('2d');
-      if (!this.rasterContext) { this.releaseRaster(); throw new Error('Font rasterizer unavailable'); }
-    }
-    if (this.rasterCanvas.width !== w || this.rasterCanvas.height !== h) {
-      this.rasterCanvas.width = w; this.rasterCanvas.height = h;
-    }
-    return this.rasterContext;
-  }
-  private releaseRaster(): void {
-    if (this.rasterCanvas) { this.rasterCanvas.width = 0; this.rasterCanvas.height = 0; }
-    this.rasterReservation?.release(); this.rasterReservation = null;
-    this.rasterContext = null; this.rasterCanvas = null;
-  }
+  get texture(): WebGLTexture { return this.textureValue; }
+  get size(): number { return this.cells.size; }
   beginFrame(budgetBytes = 1 << 20): void {
     if (!Number.isSafeInteger(budgetBytes) || budgetBytes < 0) throw new RangeError('Invalid atlas frame budget');
-    this.frameBudget = budgetBytes; this.frameBytes = 0;
+    this.frameBudget = budgetBytes; this.frameBytes = 0; this.stats.newCells = 0; this.stats.uploads = 0;
   }
-  endFrame(): void {
-    if (this.rasterCanvas) { this.rasterCanvas.width = 0; this.rasterCanvas.height = 0; }
-    this.rasterReservation?.release(); this.rasterReservation = null;
-    this.releaseRunRaster();
+  endFrame(): void { /* staging storage is persistent across frames */ }
+  private grow(): boolean {
+    const next = this.width < 2048 ? Math.min(2048, this.width * 2) : this.width;
+    const nextHeight = next === this.width ? Math.min(2048, this.height * 2) : this.height;
+    if (next === this.width && nextHeight === this.height) return false;
+    const bytes = next * nextHeight * 4;
+    const reservation = this.ledger.allocate('atlas', bytes);
+    if (!reservation) return false;
+    const texture = this.gl.createTexture();
+    if (!texture) { reservation.release(); return false; }
+    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, next, nextHeight, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+    this.gl.deleteTexture(this.textureValue); this.textureReservation.release();
+    this.textureValue = texture; this.textureReservation = reservation;
+    this.width = next; this.height = nextHeight; this.x = 2; this.y = 0; this.shelfHeight = 2;
+    this.clearCells(); this.stats.generation++; this.stats.growths++;
+    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+    this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 2, 2, this.gl.RGBA, this.gl.UNSIGNED_BYTE,
+      new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]));
+    return true;
   }
-  private releaseRunRaster(): void {
-    if (this.runRasterCanvas) { this.runRasterCanvas.width = 0; this.runRasterCanvas.height = 0; }
-    this.runRasterReservation?.release(); this.runRasterReservation = null;
-    this.runRasterContext = null; this.runRasterCanvas = null; this.runRasterIdentity = '';
+  private clearCells(): void {
+    for (const entry of this.cells.values()) entry.reservation.release();
+    this.cells.clear();
   }
-  supportsRunRaster(run: ShapedRun, font: LayoutFont, dpr: number): boolean {
-    const width = Math.ceil(run.width * dpr), height = Math.ceil(font.lineHeight * dpr);
-    const bytes = width * height * 4;
-    return Number.isFinite(dpr) && dpr > 0 && width > this.tilePixels && width <= 16_384 && height >= 1 && bytes <= RESOURCE_LIMITS.geometry;
-  }
-  private prepareRunRaster(request: TileRequest, identity: string): HTMLCanvasElement | null {
-    const { run, font, dpr } = request;
-    const width = Math.ceil(run.width * dpr), height = Math.ceil(font.lineHeight * dpr);
-    const bytes = width * height * 4;
-    if (!this.supportsRunRaster(run, font, dpr)) return null;
-    if (this.runRasterIdentity === identity && this.runRasterCanvas) return this.runRasterCanvas;
-    this.releaseRunRaster();
-    const reservation = this.ledger.allocate('geometry', bytes);
-    if (!reservation) return null;
-    const canvas = this.createCanvas();
-    canvas.width = width; canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) { reservation.release(); canvas.width = 0; canvas.height = 0; return null; }
-    try {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, run.width, font.lineHeight);
-      ctx.font = font.font; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = request.color ?? '#d8dee9';
-      ctx.fillText(run.text, 0, font.baseline);
-      for (const style of request.styles ?? []) {
-        const left = ctx.measureText(run.text.slice(0, Math.max(0, style.from - run.from))).width;
-        const right = ctx.measureText(run.text.slice(0, Math.max(0, style.to - run.from))).width;
-        ctx.save(); ctx.beginPath(); ctx.rect(left, 0, right - left, font.lineHeight); ctx.clip();
-        ctx.clearRect(left, 0, right - left, font.lineHeight); ctx.fillStyle = style.color;
-        ctx.fillText(run.text, 0, font.baseline); ctx.restore();
-      }
-    } catch {
-      reservation.release(); canvas.width = 0; canvas.height = 0; return null;
-    }
-    this.runRasterCanvas = canvas; this.runRasterContext = ctx;
-    this.runRasterReservation = reservation; this.runRasterIdentity = identity;
-    return canvas;
-  }
-  tile(request: TileRequest): AtlasTile | null {
+  cell(request: CellRequest): AtlasCell | null {
     if (this.disposed) throw new Error('Atlas disposed');
-    const { run, font, dpr, x, width } = request;
-    const w = Math.ceil(width * dpr); const h = Math.ceil(font.lineHeight * dpr);
-    if (![dpr, x, width].every(Number.isFinite) || dpr <= 0 || x < 0 || w < 1 || w > this.tilePixels || h < 1 || h > this.tilePixels) throw new RangeError('Invalid atlas tile');
-    const styles = (request.styles ?? []).map(style => [style.from - run.from, style.to - run.from, style.color]);
-    const identity = JSON.stringify([font, dpr, x, width, request.color, styles]);
-    let id = this.runIds.get(run);
-    if (id === undefined) { id = this.nextRunId++; this.runIds.set(run, id); }
-    const key = `${id}:${hash(identity)}:${x}`;
-    const hit = this.entries.get(key);
-    if (hit && hit.identity === identity) {
-      this.entries.delete(key); this.entries.set(key, hit); this.stats.hits++; return hit.tile;
-    }
-    if (hit) this.remove(key, hit); // Hash collision: equality above is authoritative.
+    const { text, font, dpr } = request;
+    if (!Number.isFinite(dpr) || dpr <= 0 || !Number.isFinite(request.width) || request.width <= 0) throw new RangeError('Invalid atlas cell');
+    const pad = Math.ceil(PAD_DPR * dpr);
+    const w = Math.max(1, Math.ceil(request.width * dpr) + pad * 2);
+    const h = Math.max(1, Math.ceil(font.lineHeight * dpr));
+    const key = `${request.kind}|${font.font}|${font.fallback ?? ''}|${font.generation ?? 0}|${dpr}|${text}|${request.piece?.from ?? 0}|${request.piece?.to ?? text.length}|${request.chunkX ?? 0}`;
+    const hit = this.cells.get(key);
+    if (hit) { this.stats.hits++; return hit.cell; }
     const bytes = w * h * 4;
-    if (this.frameBytes + bytes > this.frameBudget) return null;
-    const runIdentity = `${id}:${JSON.stringify([font, dpr, run.width, run.text, request.color, styles])}`;
-    const runRaster = this.prepareRunRaster(request, runIdentity);
-    // Keep one accounted staging canvas so raster setup does not allocate per tile.
-    // Weak run identities keep historical source strings out of the atlas entirely.
-    let reservation: Reservation | null = null;
-    let metadata: Reservation | null = null;
-    const ctx = this.raster(w, h, bytes);
-    while (true) {
-      reservation = this.ledger.allocate('atlas', bytes);
-      metadata = reservation ? this.ledger.allocate('geometry', 128 + identity.length * 2) : null;
-      if (reservation && metadata) break;
-      reservation?.release(); metadata?.release();
-      reservation = null; metadata = null;
-      if (!this.entries.size) { this.releaseRaster(); throw new Error('Text atlas/staging budget exhausted'); }
-      const first = this.entries.entries().next().value!; this.remove(first[0], first[1]);
+    if (bytes > this.frameBudget - this.frameBytes) return null;
+    if (w > this.width || h > this.height) return null;
+    if (this.x + w > this.width) { this.x = 0; this.y += this.shelfHeight; this.shelfHeight = 0; }
+    if (this.y + h > this.height) {
+      if (!this.grow()) { this.reset(); if (this.y + h > this.height) return null; }
     }
-    let texture: WebGLTexture | null = null;
-    try {
-      const canvas = this.rasterCanvas;
-      if (!canvas) throw new Error('Font rasterizer unavailable');
-      if (runRaster && this.runRasterContext) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(runRaster, Math.round(x * dpr), 0, w, h, 0, 0, w, h);
-      } else {
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, width, font.lineHeight);
-        ctx.font = font.font; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = request.color ?? '#d8dee9';
-        ctx.fillText(run.text, -x, font.baseline);
-        // Color masks reuse whole-run shaping; token boundaries never reshape substrings.
-        for (const style of request.styles ?? []) {
-          const left = ctx.measureText(run.text.slice(0, Math.max(0, style.from - run.from))).width - x;
-          const right = ctx.measureText(run.text.slice(0, Math.max(0, style.to - run.from))).width - x;
-          ctx.save(); ctx.beginPath(); ctx.rect(left, 0, right - left, font.lineHeight); ctx.clip();
-          ctx.clearRect(left, 0, right - left, font.lineHeight);
-          ctx.fillStyle = style.color; ctx.fillText(run.text, -x, font.baseline); ctx.restore();
-        }
-      }
-      texture = this.gl.createTexture(); if (!texture) throw new Error('Text texture allocation failed');
-      this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-      this.gl.pixelStorei(this.gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas);
-      if (this.gl.getError() !== this.gl.NO_ERROR) throw new Error('Text upload refused by GPU');
-      const tile = { texture, width: w, height: h, x, cssWidth: width };
-      this.entries.set(key, { tile, reservation, identity, metadata }); this.stats.uploads++; this.frameBytes += bytes;
-      return tile;
-    } catch (error) {
-      if (texture) this.gl.deleteTexture(texture); reservation.release(); metadata.release(); this.releaseRaster(); throw error;
+    const reservation = this.ledger.allocate('geometry', 96 + key.length * 2);
+    if (!reservation) return null;
+    if (this.canvas.height < h) {
+      const nextStaging = this.ledger.allocate('geometry', this.width * h * 4);
+      if (!nextStaging) { reservation.release(); return null; }
+      this.canvasReservation.release(); this.canvasReservation = nextStaging; this.canvas.height = h;
     }
+    const ctx = this.context;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.font = font.font; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = request.kind === 'mask' ? '#ffffff' : (request.color ?? '#d8dee9');
+    const run = request.run;
+    const offset = request.piece?.from ?? 0;
+    if (run && request.kind === 'run') {
+      ctx.save(); ctx.beginPath(); ctx.rect(pad / dpr, 0, request.width, font.lineHeight); ctx.clip();
+      ctx.fillText(text, pad / dpr - (request.chunkX ?? 0), font.baseline); ctx.restore();
+    } else ctx.fillText(text, pad / dpr - offset, font.baseline);
+    const px = this.x, py = this.y;
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureValue);
+    const pixels = this.context.getImageData(0, 0, w, h).data;
+    this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, px, py, w, h, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
+    const cell: AtlasCell = { u0: px / this.width, v0: py / this.height, u1: (px + w) / this.width, v1: (py + h) / this.height, width: w, height: h, pad, generation: this.stats.generation };
+    this.cells.set(key, { cell, reservation, key }); this.x += w; this.shelfHeight = Math.max(this.shelfHeight, h);
+    this.frameBytes += bytes; this.stats.uploads++; this.stats.newCells++;
+    return cell;
   }
-  private remove(key: string, entry: Entry): void {
-    this.gl.deleteTexture(entry.tile.texture); entry.reservation.release(); entry.metadata.release(); this.entries.delete(key); this.stats.evictions++;
+  /** Temporary adapter for consumers not yet migrated to cell geometry. */
+  tile(request: { run: ShapedRun; font: LayoutFont; dpr: number; x: number; width: number; color?: string; styles?: readonly RunStyle[] }): { texture: WebGLTexture; width: number; height: number; x: number; cssWidth: number; cell: AtlasCell } | null {
+    const cell = this.cell({ kind: request.styles?.length ? 'run' : 'mask', text: request.run.text, run: request.run, piece: { from: request.x, to: request.x + request.width }, chunkX: request.x, font: request.font, dpr: request.dpr, width: request.width, color: request.color });
+    return cell ? { texture: this.textureValue, width: cell.width, height: cell.height, x: request.x, cssWidth: request.width, cell } : null;
   }
-  invalidate(): void { for (const [key, entry] of this.entries) this.remove(key, entry); }
-  /** Lost-context objects have already been invalidated by WebGL. */
-  contextLost(): void { for (const e of this.entries.values()) { e.reservation.release(); e.metadata.release(); } this.entries.clear(); this.releaseRaster(); this.releaseRunRaster(); }
-  dispose(): void { if (this.disposed) return; this.invalidate(); this.releaseRaster(); this.releaseRunRaster(); this.disposed = true; }
+  get tilePixels(): number { return this.width; }
+  supportsRunRaster(run: ShapedRun, _font: LayoutFont, _dpr: number): boolean { return run.width > this.width; }
+  reset(): void {
+    this.clearCells(); this.x = 2; this.y = 0; this.shelfHeight = 2;
+    this.stats.generation++; this.stats.resets++; this.stats.evictions++;
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureValue);
+    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.width, this.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+  }
+  invalidate(): void { this.reset(); }
+  contextLost(): void { this.clearCells(); this.canvasReservation.release(); this.textureReservation.release(); this.disposed = true; }
+  dispose(): void {
+    if (this.disposed) return;
+    this.clearCells(); this.canvasReservation.release(); this.textureReservation.release();
+    this.gl.deleteTexture(this.textureValue); this.canvas.width = 0; this.canvas.height = 0; this.disposed = true;
+  }
 }

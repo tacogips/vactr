@@ -133,6 +133,35 @@ describe('headless canvas mount', () => {
     expect(rig.deps.code).toBeUndefined();
   });
 
+  it('stacks the visual canvas under code and never copies it during animation', () => {
+    const rig = setup(true, true); const visualCanvas = document.createElement('canvas');
+    let notify: ((canvas: HTMLCanvasElement | null) => void) | undefined;
+    rig.deps.visual = {
+      onBackgroundCanvas(callback) { notify = callback; callback(visualCanvas); return () => {}; },
+      mountSpectrum() { return { dispose() {} }; },
+    };
+    const codeHost = rig.code.querySelector<HTMLElement>('.vact-code')!;
+    const gl = rig.gl!;
+    const textureUploads = vi.spyOn(gl, 'texImage2D'); const textureSubUploads = vi.spyOn(gl, 'texSubImage2D');
+    const drawImageCount = (): number => rig.fakes.canvases2d.reduce((count, canvas) => count + rig.fakes.ctx(canvas).named('drawImage').length, 0);
+    rig.host.step(16);
+    const codeCanvas = rig.code.querySelector('canvas.vact-code-canvas')!;
+    expect(codeHost.firstElementChild).toBe(visualCanvas);
+    expect(visualCanvas.nextElementSibling).toBe(codeCanvas);
+    expect(visualCanvas.classList.contains('vact-code-backdrop')).toBe(true);
+    expect(visualCanvas.getAttribute('aria-hidden')).toBe('true');
+    const images = drawImageCount(), imagesBefore = textureUploads.mock.calls.length, subsBefore = textureSubUploads.mock.calls.length;
+    rig.transport.emit({ kind: 'playing', body: { events: [{ slot: 'd1', beat: [0, 1], time: 0, end_time: 100,
+      dur: [1, 1], src: { file: 'main.vact', span: { start: 0, end: 3 }, doc_revision: rig.deps.code!.currentRevision('main.vact'), form_gen: 1 } }] } });
+    for (let frame = 0; frame < 60; frame++) rig.host.step(32 + frame * 16);
+    expect(drawImageCount()).toBe(images);
+    expect(textureUploads).toHaveBeenCalledTimes(imagesBefore);
+    expect(textureSubUploads).toHaveBeenCalledTimes(subsBefore);
+    notify?.(null); expect(codeHost.contains(visualCanvas)).toBe(false);
+    notify?.(visualCanvas); expect(codeHost.firstElementChild).toBe(visualCanvas);
+    rig.mounted.dispose(); expect(codeHost.contains(visualCanvas)).toBe(false);
+  });
+
   it('installs no performance hook without the query flag', () => {
     const install = vi.spyOn(PerfHook, 'installPerfHook');
     const rig = setup();

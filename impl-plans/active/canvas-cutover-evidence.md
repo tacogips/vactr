@@ -1,8 +1,8 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: In Progress (session 291: canonical release-wasm re-measure; TASK-601 remains incomplete due to unresolved A/V and playback measurements; see Session 291 progress)
-**Plan ID**: CANVAS-EVIDENCE (dispatch wave 8 since session 277; depends on the ten accepted canvas-cutover plans and on CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope; "Session 285 scope record" for the edit-path repair)
+**Status**: In Progress (session 293: redispatched under the "Session 302 Amendment", TASK-701 to TASK-706, design 15.3.8.15; TASK-601 is superseded by TASK-703)
+**Plan ID**: CANVAS-EVIDENCE (dispatch wave 16 since session 291; every dependency is accepted)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope; "Session 285 scope record" for the edit-path repair), 15.3.8.14 (session-286 performance wave), 15.3.8.15 (session-293 stall-window sync classification and transport-sample pairing)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-07
@@ -1757,6 +1757,434 @@ These are writePaths in the manifest, for re-measure repairs only, under the sea
 - `editor/worklet/tick-worker.js` does not exist. `editor/src/code/syntax-worker.ts` exists
   only if S triggered.
 
+## Session 302 Amendment (user approval 2026-10-07, Option A; design 15.3.8.15)
+
+**Issue reference.** `workflowInput:RESUME-session-292`, resumed as session 293
+(workflow execution `opus-luna-design-and-implement-review-loop-session-293`). The finding
+is INT-S302-EV-STALL-SYNC-GATE.
+
+**User approval.** The user was asked about this on 2026-10-07 and approved Option A. Stall
+windows are recorded explicitly. Sync samples are classified by those windows. Stall-window
+samples are gated by stall-recovery criteria instead of `syncAbsMs`. Thresholds, the 250 ms
+stall and the workload stay unchanged. No sample is ever excluded by its latency value. The
+approval is also recorded in design 15.3.8.15 and in the manifest's `operatorRules`.
+
+### Intent and context
+
+All OPT plans and every earlier canvas-cutover plan are accepted. Only this plan remains.
+
+The canonical silent release-wasm `run-001` (`tmp/canvas-cutover/evidence/s291-final-bundle-e2e.log`)
+fails three gates:
+
+- Chromium `syncAbsMs.p99`: 157.4 ms;
+- WebKit `syncAbsMs.p99`: 155.7 ms;
+- WebKit `beatDriftMs`: 1.50 ms, against the 1 ms gate.
+
+Every other gate passes:
+
+- input, frame and text p95;
+- behavior checks, 18/18;
+- post-sink peak 0;
+- 0 direct destination connections.
+
+Design 15.3.8.15 gives two fixes:
+
+- **Part A (harness).** Classify sync samples by stall windows that `measure.mjs`
+  records.
+- **Part B (product).** The beat drift comes from `src/session/publish.rs`. It pairs
+  `sample_time = host_now` with `cycle = rt.pos`, and `rt.pos` is floored to the 1/960-cycle
+  `GRID` (`src/sched/runtime.rs:48` and `:544`). This makes each sample up to 2.083 ms
+  inconsistent at 120 bpm with 4 beats per cycle. The run-001 drift values, 0.1667 ms and
+  1.5000 ms, are exact multiples of 1/12 ms, and stall windows cannot produce lattice-exact
+  values.
+
+The tasks below run in order: TASK-701 (B), TASK-702 (A), TASK-703 (re-measure), then the
+evidence document, final gates and closeout. TASK-701 and TASK-702 touch disjoint files, so
+either may come first. Both must pass their focused checks before TASK-703.
+
+### Non-goals
+
+- No threshold, workload, stall duration (250 ms), stall period (every other 5 s cycle),
+  silent-sink rule, `large-doc.mjs` fixture or `editor/package.json` change.
+- No Session Protocol field, frontend clock formula (`editor/src/code/transport.ts`,
+  `editor/src/app/clock.ts`), wasm ABI, `CodeSurface` or `__vactrPerf` shape change.
+  `__vactrPerf` is not touched at all, because the stall windows come from `measure.mjs`.
+- The frame-interval computation (`measure.mjs`, the `dt <= 200` filter) is not changed. It
+  is only reported, split into stall and non-stall exclusions.
+- No widening of the classification beyond conditions (a) and (b). A second or later late
+  frame after a stall stays a non-stall sample.
+- No tick Worker (escalation F) and no syntax Worker (S). If either is ever needed, it takes
+  design 15.3.8.16.
+- No mutation or negative-control commands. Sensitivity is shown only by in-test control
+  branches.
+- No edit to `.agents/settings.local.json`. No crate-wide `cargo fmt`.
+
+### Ownership changes (manifest entry `CANVAS-EVIDENCE`)
+
+- New writePaths:
+  - `src/session/publish.rs`
+  - `src/session/tests/publish.rs`
+  - `editor/test/wasm/canvas-clock.test.ts`
+
+  The wasm test asserts `sample_time` equals the tick time exactly, at `:104`, `:124` and
+  `:174`. Part B changes that contract, so the test is ported, not weakened.
+- `editor/test/e2e/README.md` moves from sharedPaths to writePaths. It documents the stall
+  classification.
+- `editor/test/e2e/measure.mjs`, `stats.mjs`, `stats.test.ts`, the evidence document, the
+  `run-001` files, `design-implementation.md` (closeout erratum only) and every archive path
+  are already writePaths.
+- `editor/test/e2e/run.mjs` stays a sharedPath. Edit it only if the summary wiring needs the
+  new metrics, and record the reason.
+- artifactRoots are unchanged. They already cover `target`, `tmp/canvas-cutover/evidence`,
+  `tmp/canvas/evidence`, `editor/dist` and the Apple build outputs. Logs for this amendment
+  use the prefix `tmp/canvas-cutover/evidence/s293-`.
+
+### TASK-701: Transport-sample pairing fix (part B; sandbox)
+
+**Files:**
+
+- `src/session/publish.rs` (590 lines);
+- `src/session/tests/publish.rs` (673 lines);
+- `editor/test/wasm/canvas-clock.test.ts`.
+
+**Change.** Change the `TransportSample { .. }` construction near `publish.rs:555`. Nothing
+else in `publish.rs` changes.
+
+- **Running sample.** When `!frozen && !lost`, compute
+  `candidate = self.rt.clock().to_host(self.transport_cycle)`, using `Clock::to_host` at
+  `src/clock/clock.rs:179`. Use it as `sample_time` only when all three hold:
+  - `candidate` is finite;
+  - `candidate >= 0`;
+  - `(candidate - host_now).abs() <= grid_period + 1e-9`.
+
+  Here `grid_period = 1 / (960 * cps)` seconds, and
+  `cps = tempo.bpm / 60 / tempo.beats_per_cycle`, taken from the `tempo` already read at
+  `:466`. Otherwise `sample_time = host_now`.
+- **Not running** (paused, frozen or lost): `sample_time = host_now`.
+- **Unchanged:**
+  - `last_transport = Some(host_now)`, which drives the rate ceiling;
+  - the `transport_state` tuple and every epoch rule (`:470-:494`);
+  - `LevelsBody.time = Some(host_now)`;
+  - the `cycle` field (still `ratio_pair(self.transport_cycle)`).
+- **Grid period.** Use the runtime grid constant. `GRID` is private in
+  `src/sched/runtime.rs`. Do not make it public and do not edit `runtime.rs` (it is not owned).
+  Use a local `960.0` constant in `publish.rs` with a comment naming `sched::runtime::GRID`.
+  The test then pins the value: it asserts the bound against a grid period computed
+  independently.
+
+**Pitfalls.**
+
+- Never move `last_transport` or the epoch state onto the derived time. The rate-ceiling test
+  and the rollback epoch must keep keying on `host_now`.
+- After a host-clock rollback, `rt.pos` keeps its maximum (`.max(self.pos)`). So
+  `to_host(pos)` lies far from `host_now`, and the guard must fall back. The wasm test at
+  `canvas-clock.test.ts:178-195` (rewind to 0.25 s, resume at 0.301 s) relies on this and
+  must still see `sample_time` equal to 0.25 and 0.301 exactly.
+- `to_host` returns `0.0` when there is no anchor. The guard handles this through the
+  distance check.
+- Do not add `#[allow]` or `expect` to silence clippy. Clippy's cast and float lints apply.
+  Compare with `abs()`, never with float equality.
+
+**Rust test changes** (`src/session/tests/publish.rs`; imitate the existing `Rig`,
+`transport_samples` and `rig.clock.set` usage at `:365-:407`, and `Rig::ok` in
+`src/session/tests/support.rs:103`).
+
+- Port `periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceiling`. A
+  rename is allowed (for example
+  `periodic_transport_pairs_cycle_with_its_exact_host_time_with_rate_ceiling`).
+  - Keep `cycle == ratio_pair(runtime pos)`, `running`, `latency_kind` and the 19-21 sample
+    count.
+  - Replace `sample_time == time` with `0 <= time - sample_time < 1/(960*cps) + 1e-9`.
+  - Measure the 0.05 s rate ceiling on the rig tick times recorded alongside each sample, not
+    on `sample_time`.
+  - Keep the restart assertions: a new epoch, and `sample_time == 0.0` at clock 0.
+- Add a new test, for example `transport_sample_time_matches_cycle_at_quantum_ticks`.
+  - Drive `rig.clock.set(n * 128 / 48000)` for `n` covering at least 20 simulated seconds.
+  - Case 1 is the default 120 bpm with 4 beats per cycle.
+  - Case 2 is a non-lattice tempo set with `rig.ok("use-bpm 137 ...", rev)`. Use 3 beats per
+    cycle if the language exposes a beats-per-cycle directive; otherwise keep 137 bpm at
+    4 beats and say so in the progress log. Only assert pairs whose samples both come after
+    the tempo change.
+  - Assert, for every pair of running samples in one epoch:
+    `|((c_j - c_i) / cps) - (t_j - t_i)| <= 1e-9`.
+  - Assert, for every running sample: `0 <= host_now - sample_time < 1/(960*cps) + 1e-9`.
+  - Assert that `sample_time` is non-decreasing within an epoch.
+  - *In-test control branch:* re-pair the same samples' cycles with their tick `host_now` and
+    assert the maximum pair inconsistency is above 1 ms. This shows the defect class is
+    real at this tick lattice.
+- Keep every other test in the file (pause, lost, MIDI restart, epoch) unchanged, and keep it
+  passing.
+
+**Wasm test port** (`editor/test/wasm/canvas-clock.test.ts`).
+
+- `:104`: replace `toBe(ms / 1000)` with `0 <= ms/1000 - sample_time < 1/(960*0.5) + 1e-9`.
+  Also assert `cycle[0]/cycle[1]` equals `sample_time * 0.5` within `1e-9`, since the
+  workload is 120 bpm with 4 beats per cycle, so cps is 0.5.
+- `:119`: keep it.
+- `:124`: measure the spacing on the recorded tick times, not on `sample_time`.
+- `:174`: replace `toBe(0.05)` with `toBeCloseTo(0.05, 9)`. Position 24/960 lies exactly on
+  the grid.
+- `:183`, `:186` and `:193`: keep them exact. These are the fallback and zero cases.
+- No other assertion changes, and no assertion is deleted.
+
+**Done when:**
+
+- the focused nextest filter `session::tests::publish` passes;
+- `cargo clippy --locked --all-targets -- -D warnings` exits 0;
+- `rustfmt --edition 2021 --check src/session/publish.rs src/session/tests/publish.rs`
+  exits 0;
+- the host-wasm wasm32 build exits 0, and then
+  `cd editor && ./node_modules/.bin/vitest run test/wasm/canvas-clock.test.ts` passes;
+- `git diff --name-only HEAD -- src` lists only the two publish files.
+
+### TASK-702: Stall-window classification (part A; sandbox)
+
+**Files:**
+
+- `editor/test/e2e/measure.mjs`;
+- `editor/test/e2e/stats.mjs` (468 lines);
+- `editor/test/e2e/stats.test.ts`;
+- `editor/test/e2e/README.md`.
+
+**`measure.mjs`:**
+
+- **Record the window.** The busy loop at `:56` becomes one `page.evaluate` that returns
+  `{ startMs, endMs }`:
+  - read `startMs = performance.now()` once;
+  - loop until `performance.now() >= startMs + 250`, deriving the deadline from that same
+    reading, because WebKit coarsens the clock to 1 ms;
+  - read `endMs = performance.now()` after the loop.
+
+  Push `{ index, startMs, endMs }` to a `stallWindows` array, and count the injected stalls
+  in `injectedStallCount`, incremented in the same `if (cycle % 2 === 1)` branch. Push each
+  window to `samples` as a `{ phase: 'stall-window', ... }` row.
+- **Late-frame audit.** Replace the gap inference at `:91` (frame delta over 200 ms) with
+  `stallWindows.map((w) => w.startMs)` passed to `lateActiveMismatchDetails`. That function
+  already selects the first presented row with `frameMs >= stall`, which is F. Delete the gap
+  loop.
+- **Classification.** After `attributeSync` runs, call the new stats function (below) with
+  the sync samples, `presented` and `stallWindows`. Then set:
+  - `metrics.syncAbsMs`: non-stall samples, gated;
+  - `metrics.syncAbsMsAll`: every sample, informational;
+  - `metrics.stallWindowSync`;
+  - `metrics.stallWindows`;
+  - `metrics.stallWindowsInjected`.
+
+  Keep `syncAbsMsNoDrop` as it is. Keep `sync-sample` raw rows, and add a
+  `stallClass: 'stall' | 'non-stall'` field and the condition flags `{ a, b }` to each.
+- **Beat residual.** Replace the single-point computation at `:87` with the new stats
+  function `beatResidualMs(row, transport)`.
+  - `metrics.beatDriftMs` is the residual of the last presented row that is not an F frame.
+  - `metrics.beatResidual` is `{ maxAbsNonStallMs, maxAbsStallFrameMs, frames }`, informational.
+  - Each window entry carries its F residual.
+- **Frame intervals.** Keep the `dt <= 200` filter at `:74`. Add
+  `metrics.frameIntervalExcluded = { stall, nonStall }`. An excluded interval is `stall` when
+  its later frame is the F of a recorded window, and `nonStall` otherwise.
+
+**`stats.mjs`** (new exports, pure data, no browser):
+
+- **Classification.** The signature is
+  `classifyStallSamples(samples, presented, windows) -> { stall, nonStall, windows: [...], counts: { a, b, both } }`.
+  - **F.** F of a window is the first index in `presented` with `frameMs >= startMs`.
+  - **Onset page time.** It is
+    `sample.frame.targetMs + (sample.time - sample.frame.audibleTime) * 1000`, computed from
+    those fields. Never derive it from `sample.value`.
+  - **Condition (a)** holds when the onset page time is in `[startMs, endMs]`.
+  - **Condition (b)** holds when `sample.frameIndex === F` or `sample.frameIndex + 1 === F`.
+  - Every sample lands in exactly one of `stall` or `nonStall`.
+- **Window entries.** Each entry is
+  `{ index, startMs, endMs, firstFrameMs, firstFrameLagMs, samples, activeSetMatch, replayed, early, beatResidualMs, audited }`:
+  - `firstFrameLagMs = firstFrameMs - endMs`;
+  - `audited` uses the same sync-window and coverage test as `lateActiveMismatchDetails`.
+- **Beat residual.** The signature is `beatResidualMs(row, transport)`. It returns `null`
+  unless all of these hold:
+  - `transport.running`;
+  - `row.epoch === transport.epoch`;
+  - `row.beatCycle` is finite.
+
+  Otherwise it returns
+  `(row.beatCycle - (c + (row.audibleTime - transport.sample_time) * bpm / 60 / bpc)) * 60 * bpc / bpm * 1000`,
+  where `c = cycle[0] / cycle[1]`. This is the formula at `measure.mjs:87`, plus the epoch
+  check.
+- **Gates in `evaluate`.** When `metrics.syncProvenance === 'measured'`:
+  - `syncAbsMs` keeps its existing `limit` calls; it now holds non-stall samples only.
+  - Fail when `stallWindowSync.earlyCount > 0`.
+  - Fail when `stallWindowsInjected !== stallWindows.length`.
+  - Fail when any window has `endMs - startMs < 250`.
+  - Fail when `stallWindowsInjected > 0` and zero windows are audited.
+  - Fail when any audited window has `|beatResidualMs| > thresholds.lateBeatDriftMs`.
+  - Fail, with the message `beat drift unavailable`, when `metrics.audioRunning === true` and
+    `beatDriftMs` is not finite. This replaces the limitation in `measure.mjs:94`.
+
+  The existing replayed-flash and active-mismatch failures stay. No `THRESHOLDS` value
+  changes.
+- **`renderEvidence` rows.** Relabel the sync rows "non-stall samples". Add rows for:
+  - all-sample p95/p99 (informational);
+  - stall-window sample count by condition, and their p50/p95/max (informational);
+  - stall windows injected, recorded and audited;
+  - stall-window early flashes (`0`);
+  - F beat residual max (`<= 1`);
+  - frame-interval exclusions, stall and non-stall (informational).
+
+  Change the dropped-frame row text to say the gate covers non-stall samples.
+
+**`stats.test.ts` rows** (plain data; imitate the existing `attributeSync` and
+`lateActiveMismatches` rows). Each row is a situation and its expected outcome:
+
+- An onset page time inside `[startMs, endMs]` is `stall` with `a`.
+- An onset 10 ms before `startMs`, shown on the last pre-stall frame, with F as the proxy
+  frame, is `stall` with `b`.
+- An onset first shown at F is `stall` with `b`.
+- F's timestamp in `[startMs, endMs)` (a straddling frame) is still F.
+- *Latency-independence control,* in one test: a sample with value 300 ms and no window is
+  `nonStall`, and `evaluate` fails `syncAbsMs.p99`. The same sample placed inside a
+  recorded window is `stall`, and the non-stall p99 passes. Both branches are asserted.
+- A sample on the second frame after F, with an onset after `endMs`, stays `nonStall`.
+- A stall-window sample with value -3 ms fails the early rule.
+- An F residual of 1.01 ms fails and 1.0 ms passes.
+- `stallWindowsInjected` 11 against 10 recorded windows fails.
+- A window of 249 ms fails.
+- Audio running with `beatDriftMs: null` fails with `beat drift unavailable`.
+- `beatResidualMs` returns `null` on an epoch mismatch and on `running: false`.
+- Existing rows stay unchanged and keep passing. Any row that relied on gap-inferred stalls
+  is ported to explicit windows, with the same expectations.
+
+**`README.md`.** Add one paragraph on stall-window recording, classification and the
+stall-recovery gates, citing design 15.3.8.15.
+
+**Pitfalls.**
+
+- Never filter, cap or sort samples by `value` to classify them. The control row exists to
+  catch this.
+- `presented` is the merged, `frameMs`-sorted array built at `measure.mjs:81`. The F index
+  and `sample.frameIndex` must refer to that same array. `attributeSync` indexes it, so pass
+  the same array.
+- Window `startMs` and `endMs` are page `performance.now()` values. Never use Node
+  `Date.now()` for them.
+- `stats.mjs` must stay under 1,000 lines. Split helpers into a new
+  `editor/test/e2e/stall.mjs` only if it would cross the limit; that file is then a recorded
+  addition to writePaths.
+
+**Done when:**
+
+- `cd editor && ./node_modules/.bin/vitest run test/e2e` passes, with the new rows included;
+- `node --check` passes on the harness files;
+- `cd editor && npm run check` exits 0;
+- `git diff -- editor/test/e2e/stats.mjs` shows no change inside `THRESHOLDS` or `TARGETS`.
+
+### TASK-703: Release re-measure (replaces TASK-601; outside the sandbox, quiet host)
+
+1. Run `mise run build-wasm-release`, then
+   `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` (inspection `profile: "release"`,
+   `nameSection: true`, `dwarf: false`).
+2. Run `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`.
+   Nothing else may run at the same time: no vitest, nextest, cargo or other browser run.
+3. It must exit 0. In Chromium and WebKit:
+   - non-stall `syncAbsMs` p95 <= 33.4 ms and p99 <= 50 ms;
+   - stall-window early count 0, 0 active-set mismatches, 0 replayed flashes, and F beat
+     residuals <= 1 ms;
+   - `beatDriftMs` finite and <= 1 ms in absolute value;
+   - window integrity holds;
+   - every session-286 gate still passes: input p95 <= 50 ms and p99 <= 100 ms; frame
+     interval p95 <= 20 ms and p99 <= 50 ms; textWork p95 <= 8 ms; animation-work gates;
+     at least 500 edit keys;
+   - behavior 18/18;
+   - post-sink peak 0, 0 direct destination connections, and the sink installed before the
+     first connect, including the headed WebKit GL fallback.
+4. **If non-stall p99 still fails.** Look at the failing samples' `stallClass`, onset page
+   time and frame indices in the JSONL. A late sample outside conditions (a) and (b) is a
+   product finding. Attribute it with the session-285 phase rows (non-gating runs
+   `s293-after-<n>` with `--out ../tmp/canvas-cutover/evidence/s293-after-<n>`, cited in
+   notes only). Repair it in a writePath with a deterministic counter row. Never widen the
+   classification and never change a threshold. If the fix needs a file outside writePaths,
+   stop and report the exact path for a serial plan-author amendment.
+5. **Beat drift data.** Record the post-fix `beatResidual` maxima per browser, which are
+   expected at f64 noise level. Next to them, record the pre-fix run-001 values
+   (0.1667 ms and 1.5000 ms) and the 1/12 ms lattice explanation.
+
+### TASK-704: Evidence document (extends TASK-603; sandbox)
+
+Work in `design-docs/specs/design-canvas-editor-evidence.md`, outside the harness markers.
+Add a static section "Stall-window sync classification (session 293, design 15.3.8.15)"
+containing:
+
+- the user approval (2026-10-07, Option A);
+- the classification rule;
+- a per-browser stall-window table, one row per window from `metrics.stallWindows`;
+- non-stall, all-sample and stall-window sync figures side by side;
+- the frame-interval exclusion split;
+- the beat-drift diagnosis: the defect, the fix, the lattice values before and the
+  residuals after.
+
+Update the triage table so the three run-001 failures are resolved, citing the new run. Keep
+the raw data paths, the silent virtual-sink method, the platform limitations and the pending
+physical-iPad procedures. Never claim physical-iPad, real-IME, VoiceOver or physical latency
+results.
+
+### TASK-705: Final gates (replaces TASK-604; outside the sandbox, strictly serial)
+
+Run these in order on the closeout source, one heavy command at a time. Each record uses the
+session-286 format.
+
+1. `CARGO_TERM_QUIET=true cargo build`
+2. `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+3. Full nextest, alone:
+   `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`
+4. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+5. `cd editor && npm run check`
+6. `cd editor && ./node_modules/.bin/vitest run`
+7. `cd editor && npm run test:perf`, alone
+8. `cd editor && npm run test:style`
+9. `CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml`
+10. `rustfmt --edition 2021 --check src/session/publish.rs src/session/tests/publish.rs`
+11. The silent iOS simulator build and `ios-sim.mjs` run (`playingEvents === 0`,
+    `silent === true`, `pass === true`), after the release wasm and page build.
+
+The TASK-703 `run-001` is the e2e record. If any source changes after it, repeat TASK-703.
+
+### TASK-706: Closeout (TASK-507 and TASK-605 sets; serial, after the final integration review accepts)
+
+- **Archive.** `git mv` every path below to `impl-plans/completed/` with `Status: Completed`
+  or a one-line superseded note. Each is a concrete writePath. `canvas-cutover-dispatch.json`
+  stays in `active/`.
+  - The 23 canvas-cutover plans: `clock`, `native`, `render`, `mount`, `visual`, `shell`,
+    `evidence`, `evidence-silent`, `evidence-viewport`, `evidence-editcost`,
+    `evidence-runstart`, `evidence-scope`, `evidence-sched`, `evidence-framecost`,
+    `opt-harness`, `opt-history`, `opt-dom`, `opt-text`, `opt-backdrop`, `opt-render`,
+    `opt-render-a`, `opt-render-b` and `opt-render-c`.
+  - The 15 `canvas-editor-224-*.md` plans.
+  - `canvas-editor-224-dispatch.json`.
+- **Index.** Update `impl-plans/README.md`.
+- **Erratum and typos.** Append the 15.3.8.4 clock-probe erratum to `design-implementation.md`.
+  Apply the deferred typo fixes of the TASK-507 session-285 additions (the scope-plan sha256
+  typo, the framecost receipt hash, and the README wasm default text).
+- **Commit and push.** Commit, then push non-force to `origin wf/canvas`.
+
+### Invariants (must hold after every task)
+
+- `THRESHOLDS` and `TARGETS` in `stats.mjs` are byte-identical to HEAD `c10ab72`.
+- `git diff c10ab72 -- editor/test/e2e/fixtures/large-doc.mjs editor/test/e2e/silent-sink.mjs editor/package.json editor/package-lock.json Cargo.toml Cargo.lock mise.toml`
+  is empty.
+- `git diff c10ab72 --name-only -- src editor/src-tauri` lists only `src/session/publish.rs`
+  and `src/session/tests/publish.rs`.
+- `src/session/protocol.rs` and `src/session/codec.rs` are unchanged, so no protocol field
+  changes.
+- `editor/src/code/transport.ts`, `editor/src/app/clock.ts` and
+  `editor/src/code/perf-hook.ts` are unchanged.
+- No touched source file reaches 1,000 lines.
+- Every automated audio run stays silent.
+
+### Session 302 checklist (mechanical)
+
+- `grep -n "stall-window" editor/test/e2e/measure.mjs` finds the window row.
+  `grep -n "frames\[i\]\[0\]-frames\[i-1\]\[0\]>200" editor/test/e2e/measure.mjs` finds
+  nothing, because the gap inference is gone.
+- `grep -n "classifyStallSamples\|beatResidualMs" editor/test/e2e/stats.mjs` finds both
+  exports.
+- The `stats.test.ts` latency-independence control row exists and passes.
+- `git diff c10ab72 -- src/session/tests/publish.rs` contains the in-test control branch
+  (pair inconsistency above 1 ms when re-paired with `host_now`).
+
 ## Verification
 
 Inside the sandbox:
@@ -1805,6 +2233,17 @@ Final gates on the closeout commit (design 15.3.8.9):
 | `cargo check --manifest-path editor/src-tauri/Cargo.toml` | exit 0 |
 | `rustfmt --check` on touched Rust files (session 277: `rustfmt --edition 2021 --check src/types/scope.rs src/types/tests/scope_cost.rs src/directives/attach.rs src/directives/tests/attach.rs src/directives/tests/labels.rs`) | exit 0 |
 | iOS simulator build and `ios-sim.mjs`, as above, after `mise run build-wasm-release` and the release `npm run build` | exit 0; `playingEvents === 0`, `silent === true`, `pass === true` |
+
+Session 302 rows (added; the rows above still apply). These run inside the sandbox unless
+marked:
+
+| Command | Required evidence |
+|---------|-------------------|
+| `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(/session::tests::publish/)'` | exit 0; the ported periodic-transport row and the new quantum-tick pairing row pass, with their in-test control branch |
+| `rustfmt --edition 2021 --check src/session/publish.rs src/session/tests/publish.rs` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`, then `cd editor && ./node_modules/.bin/vitest run test/wasm/canvas-clock.test.ts` | exit 0; every ported row passes and none is deleted |
+| `cd editor && ./node_modules/.bin/vitest run test/e2e` | exit 0; the TASK-702 rows pass, including the latency-independence control |
+| `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` (outside the sandbox, alone) | exit 0, as specified in TASK-703 |
 
 ## Overwrite and Drift Protocol
 
@@ -1858,6 +2297,13 @@ only this plan's progress log and the plan files being archived.
 - [x] Session 291 TASK-603: evidence document has the session-286 baseline/final table, current failure triage, raw paths, silent-sink results, and pending physical-iPad procedures.
 - [ ] Session 291 TASK-601: latest auditable canonical release `run-001` is incomplete (runner exit 1): sync p99 is 140.93 ms Chromium / 200.67 ms WebKit; Chromium has three post-stall active-set/receipt-timing discrepancies; behavior checks are 18/18 and silent-sink assertions pass. Beat drift passes in both browsers. The F condition is false, so continue product/harness attribution without a tick Worker.
 - [ ] Session 291 TASK-604/605 and final integration: downstream final gates on the accepted source, review-dependent archive/index updates, commit and non-force push remain pending.
+- [x] Session 302 plan amendment: design 15.3.8.15 records the 2026-10-07 Option A user approval; this plan has TASK-701 to TASK-706; the manifest `operatorRules` records the approval; the design, plan and manifest are checkpoint-committed before CANVAS-EVIDENCE is redispatched
+- [ ] Session 302 TASK-701: `publish.rs` pairs a running sample's `sample_time` with `Clock::to_host(cycle)` under the one-grid-period guard; the ported and new `session::tests::publish` rows pass, including the in-test control branch; `canvas-clock.test.ts` is ported with no assertion deleted and passes on the rebuilt host-wasm artifact; strict clippy and rustfmt on the two Rust files exit 0
+- [ ] Session 302 TASK-702: `measure.mjs` records `{index,startMs,endMs}` stall windows and no longer infers stalls from frame gaps; `classifyStallSamples` and `beatResidualMs` are exported; `evaluate` gates non-stall `syncAbsMs`, stall-window early flashes, window integrity, audited F residuals and a missing `beatDriftMs`; the `stats.test.ts` rows, including the latency-independence control, pass; `THRESHOLDS` and `TARGETS` are unchanged
+- [ ] Session 302 TASK-703: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exits 0 on the release wasm; in both browsers non-stall sync p95 <= 33.4 ms and p99 <= 50 ms, stall-recovery criteria hold, beat drift <= 1 ms, the session-286 gates hold, behavior is 18/18, post-sink peak is 0 and direct destination connections are 0
+- [ ] Session 302 TASK-704: the evidence document has the "Stall-window sync classification (session 293, design 15.3.8.15)" section with the per-window table, the side-by-side sync figures and the beat-drift diagnosis, and its triage table cites the new run
+- [ ] Session 302 TASK-705: all eleven final gates pass serially, with full nextest run alone under `timeout 2400`
+- [ ] Session 302 TASK-706: 23 canvas-cutover plans, 15 canvas-editor-224 plans and `canvas-editor-224-dispatch.json` are archived file by file; `impl-plans/README.md` is updated; the erratum and typo fixes are applied; the commit is pushed non-force to `origin wf/canvas`
 - [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
 ## Progress Log
@@ -2208,6 +2654,8 @@ source file reached 1,000 lines.
 as limitations, then produce a passing canonical run. Formal review, closeout archival/index
 updates, final closeout gates, commit and non-force push remain downstream workflow work.
 
+**Superseded by the session 293 plan amendment below.**
+
 **Current sync attribution**: the WebKit `syncAbsMsNoDrop.p99` remains 125.333 ms. The two
 no-drop samples above 50 ms are at audio times 190 s and 243 s (`webkit-measure.jsonl:25087`
 and `:25140`); both onset receipts and first active frames occur immediately after the explicit
@@ -2219,3 +2667,24 @@ these samples or change thresholds/workload. The synthetic stall is not represen
 named input/frame/upload phase spans, so the strict F overlap criterion remains unmet in the
 current evidence. Keep TASK-601 incomplete and route any changed escalation/design disposition
 through the serial plan-author step before implementing a Worker.
+
+### Session: 2026-10-07 (session 293 plan amendment, Session 302 Amendment)
+
+**Tasks Completed**: Plan amendment only. Added the section "Session 302 Amendment",
+TASK-701 to TASK-706.
+
+**Notes**:
+
+- **User approval and design.** The user approved Option A on 2026-10-07. Design 15.3.8.15
+  (accepted by step 3, comm-004674) defines two parts. Part A classifies sync samples by stall
+  windows that `measure.mjs` records, never by latency value. Part B fixes the
+  `TransportSample` pairing defect in `src/session/publish.rs`, which caused the WebKit 1.50 ms
+  beat drift.
+- **Ownership.** New writePaths: `src/session/publish.rs`, `src/session/tests/publish.rs` and
+  `editor/test/wasm/canvas-clock.test.ts`. The wasm test asserts the old exact host-time
+  pairing at `:104`, `:124` and `:174`, which part B changes. `editor/test/e2e/README.md`
+  moves from sharedPaths to writePaths.
+- **Superseded tasks.** TASK-601 and TASK-604 are superseded by TASK-703 and TASK-705.
+- **Unchanged.** No threshold, workload, stall, dependency, protocol field or frontend clock
+  formula changes.
+- **Rules.** Never run two heavy suites at once. No mutation or negative-control commands.

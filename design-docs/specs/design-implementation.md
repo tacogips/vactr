@@ -6396,6 +6396,9 @@ Session 271 (resume of 269) adds 15.3.8.11: absolute wall-clock budgets move
 out of the default parallel vitest run into a serial perf gate (operator
 decision P). It replaces the "Wall-clock vitest gates" paragraph of 15.3.8.10
 and changes no product contract.
+Session 293 (resume of 292) adds 15.3.8.15: the user-approved (2026-10-07,
+Option A) stall-window sync classification and the exact `TransportSample`
+time/cycle pairing that removes the WebKit beat drift. No threshold changes.
 
 ##### 15.3.8.1 Baseline check (repository state at c9e5a05)
 
@@ -6774,6 +6777,8 @@ preserves the current behavior.
   sample is extrapolated backward, by at most 1 s. While running,
   `cycle = s.cycle + (audible - s.sample_time) * bpm / 60 / beats_per_cycle`.
   While paused, the cycle holds. It is never advanced by counting frames.
+  (Amended by 15.3.8.15 part B: while running, a sample's `sample_time` is
+  the host time of its published `cycle`, so the pair is exact.)
 - **Hiding.** Indicators hide when the snapshot is older than 2 s or the
   correlation is invalid.
 - **Beat flash.** The beat flash is visible only while
@@ -7120,8 +7125,8 @@ injected every 10 s).
 | Input latency | From keydown `event.timeStamp` to the rAF timestamp of the frame after the frame whose text phase presented that revision (a presentation proxy). IME is reported separately. | p95 <= 50 ms, p99 <= 100 ms |
 | Frame work | Duration of the code-pane frame callback, reported for animation-only and text-dirty frames | Animation-only: p50 <= 4 ms, p95 <= 8 ms, p99 <= 16.7 ms (a 1 ms p50 target is recorded, not gated). Text-dirty: p95 <= 8 ms, tightened from 16.7 ms by 15.3.8.14 (a 4 ms target is recorded, not gated) |
 | Frame interval | rAF timestamp deltas, excluding injected stalls | p95 <= 20 ms, p99 <= 50 ms |
-| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation. One sample per distinct (onset time, epoch, first presented frame); dropped frames are reported separately (15.3.8.14 section 5) | Gated only when provenance is `measured`: p95 of the absolute value <= 33.4 ms, p99 <= 50 ms, no highlight earlier than 2 ms before the onset. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
-| Late frames | The first frame after each stall | Active set equals the analytic set, 0 replayed flashes, absolute beat-phase drift at the end of the run <= 1 ms |
+| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation. One sample per distinct (onset time, epoch, first presented frame); dropped frames are reported separately (15.3.8.14 section 5). Samples are classified by recorded stall windows (15.3.8.15) | Gated only when provenance is `measured`: non-stall samples p95 of the absolute value <= 33.4 ms, p99 <= 50 ms; every sample: no highlight earlier than 2 ms before the onset; stall-window samples: the stall-recovery criteria of 15.3.8.15. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
+| Late frames | The first frame after each recorded stall window (15.3.8.15) | Active set equals the analytic set, 0 replayed flashes, beat residual at that frame <= 1 ms, absolute beat-phase drift at the end of the run <= 1 ms |
 | Memory | `ResourceLedger` maximum per cap and total. JS heap on Chromium after CDP `HeapProfiler.collectGarbage` (WebKit has no heap API: ledger only, a limitation). | No cap exceeded. Ledger total <= 96 MiB. Heap growth from end of warmup to end of the cycle run <= 8 MiB. Ledger returns to 0 on dispose. |
 | Audio | Worklet underrun and drop counters during stalls, hidden periods and context loss | Recorded. Any underrun attributable to a UI stall is a failure. |
 
@@ -8365,7 +8370,8 @@ correctness fix, not a threshold change.
   `syncDroppedFrameSamples`, `syncDroppedFrames` and an informational
   `syncAbsMsNoDrop` p95/p99. The gate still uses `syncAbsMs` over all
   de-duplicated samples, with the unchanged 33.4 ms (p95) and 50 ms (p99)
-  thresholds.
+  thresholds. (Amended by 15.3.8.15: the gate covers non-stall samples, and
+  stall-window samples are gated by stall-recovery criteria.)
 - **Thresholds.**
   - `THRESHOLDS.textWorkP95Ms` becomes 8.
   - `targets: { textWorkP95Ms: 4, animationWorkP50Ms: 1 }` is recorded,
@@ -8765,6 +8771,269 @@ Chromium.
   frames.
 - **Large refactors.** Virtualization and the cluster atlas are large
   refactors. They are bounded by ported tests and the e2e behavior profile.
+
+##### 15.3.8.15 Stall-window sync classification and transport-sample pairing (session 293)
+
+**Issue reference:** `workflowInput:RESUME-session-292` (resumed as session
+293; finding INT-S302-EV-STALL-SYNC-GATE). **User approval:** the user was
+asked and answered on 2026-10-07, approving Option A. This subsection records
+that approval. The evidence plan records it as its "Session 302 Amendment"
+tasks, and `impl-plans/active/canvas-cutover-dispatch.json` records it in
+`operatorRules`. Both are checkpoint-committed before CANVAS-EVIDENCE is
+redispatched.
+
+**Baseline.** All OPT plans and every earlier canvas-cutover plan are
+accepted. The canonical silent release-wasm `run-001`
+(`design-docs/specs/evidence/canvas-cutover/run-001/summary.json`) fails three
+gates:
+
+| Gate | Chromium | WebKit |
+|------|----------|--------|
+| `syncAbsMs.p99` (limit 50 ms) | 157.4 ms | 155.7 ms |
+| `beatDriftMs` (limit 1 ms) | 0.1667 ms (pass) | 1.5000 ms |
+
+Every other gate passes. Chromium's `syncAbsMsNoDrop.p99` is 21.6 ms. The
+large p99 values come from the 250 ms busy-loop stalls injected every 10 s in
+the cycle run (15.3.8.8 profile H).
+
+**What this subsection changes.**
+
+- 15.3.8.8 "A/V sync, model": samples are now classified by recorded stall
+  windows (part A).
+- 15.3.8.8 "Late frames": the post-stall frame is now taken from recorded
+  windows, not inferred from frame gaps (part A).
+- 15.3.8.14 section 5: the sync gate no longer covers every de-duplicated
+  sample. It covers only non-stall samples (part A).
+- 15.3.8.4 "Position": a `TransportSample` pairs `cycle` with the host time of
+  that exact cycle (part B).
+
+**What it does not change.**
+
+- No threshold changes. `syncAbsMs` stays at p95 <= 33.4 ms and p99 <= 50 ms,
+  the early-flash tolerance stays at 2 ms, and the 1 ms beat-drift gate stays.
+- The 250 ms stall, its 10 s period, the workload and every other profile H
+  rule are unchanged.
+- The silent-sink rule and the production master output stage are unchanged.
+- No Session Protocol field, dependency, Cargo profile or `CodeSurface` member
+  changes.
+- The frame-interval computation is unchanged (part A records what it
+  excludes).
+
+This amendment allows exactly two Rust files, which 15.3.8.14 excluded:
+`src/session/publish.rs` and `src/session/tests/publish.rs` (part B). If
+escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
+
+**A. Stall-window classification (the approved Option A).**
+
+- **Recorded windows.** `editor/test/e2e/measure.mjs` records each injected
+  stall inside the same `page.evaluate` that runs the busy loop. It returns
+  `{ index, startMs, endMs }`:
+  - `startMs` is the page's `performance.now()` just before the loop.
+  - `endMs` is the page's `performance.now()` just after the loop.
+  - These are in the same page timeline as the rAF `frameMs`, `targetMs` and
+    the onset page times. The windows are written to the raw JSONL as
+    `phase: 'stall-window'` rows and to `metrics.stallWindows`.
+  - No window is ever inferred from frame gaps or latency values. The
+    current gap inference (frame delta over 200 ms) is removed from the late
+    frame audit.
+- **Window integrity** (gated harness checks):
+  - the number of recorded windows equals the number of injected stalls;
+  - every window has `endMs - startMs >= 250`.
+- **First post-stall frame F.** For each window, F is the first presented row
+  with `frameMs >= startMs`. A frame callback cannot run during the busy loop,
+  and its rAF timestamp is never later than its callback start. So any frame
+  whose timestamp is at or after `startMs` ran after the loop, even if the
+  timestamp falls before `endMs`. This settles the case of a frame that
+  straddles the stall end: it is F.
+- **Classification rule.** It uses only the recorded windows and the sample's
+  frame indices. It never reads the sample's latency value. Each
+  de-duplicated sync sample (15.3.8.14 section 5) has:
+  - an onset page time, `row.targetMs + (onset.time - row.audibleTime) * 1000`;
+  - a first showing frame, `row`;
+  - a presentation-proxy frame, `next`.
+
+  The sample is a **stall-window sample** if either of these holds:
+  - (a) its onset page time lies in `[startMs, endMs]` of some window (the
+    onset became audible inside the stall);
+  - (b) for some window, F is the sample's first showing frame or its
+    presentation-proxy frame.
+
+  Condition (b) applies the approved wording "first presentable frame is the
+  first frame after that window" to the presentation proxy of 15.3.8.8. The
+  presented time of a highlight is the proxy frame. A highlight drawn just
+  before the stall is presented, by that definition, at F.
+
+  Every other sample is a **non-stall sample**. No sample is dropped: each
+  is reported in exactly one class. A second or later late frame after a
+  stall is not classified as a stall-window sample.
+- **Gates for non-stall samples.** `syncAbsMs` p95 <= 33.4 ms and p99 <= 50
+  ms, computed over the non-stall samples only. The early rule (no highlight
+  earlier than 2 ms before the onset) also applies, with provenance gating as
+  in 15.3.8.8.
+- **Gates for stall-window samples** (stall-recovery criteria, replacing
+  `syncAbsMs` for this class):
+  1. *Active set.* For each window whose F lies in the sync window and the
+     onset coverage, the active set at F equals the analytic set
+     (`lateActiveMismatchDetails`, now keyed by recorded windows). Post-stall
+     active-set mismatches must be 0.
+  2. *No replay.* No range expired before F's audible time is shown at F or
+     later. Replayed flashes must be 0, counted over all frames and reported
+     separately for F frames.
+  3. *No early flash.* No stall-window sample has a value below -2 ms.
+  4. *No accumulated drift.* At each audited F, the beat residual (defined in
+     part B) is at most 1 ms. The audited window count is reported. If the
+     sync gate is active and no window is audited, the run fails.
+- **Reporting** (in `metrics` and the summary):
+  - `syncAbsMs`: non-stall samples, gated.
+  - `syncAbsMsAll`: every sample, informational.
+  - `syncAbsMsNoDrop`: unchanged, informational.
+  - `stallWindowSync`: the sample count per condition (a), (b) and both,
+    plus value p50, p95 and max, all informational. It also holds the early
+    count, which is gated.
+  - `stallWindows[]`: per window, `index`, `startMs`, `endMs`, `F.frameMs`,
+    `F.frameMs - endMs`, the stall-window sample count, the active-set
+    result, replayed count, early count, beat residual and the audited flag.
+  - `frameIntervalExcluded`: intervals the existing over-200 ms exclusion
+    removed, split into those whose later frame is an F (stall) and the
+    others (non-stall). This is informational and makes any non-stall
+    exclusion visible.
+- **Deterministic proof** (`editor/test/e2e/stats.test.ts`, plain data with
+  no browser and no wall clock). Each row asserts the class and the
+  gate outcome:
+  - an onset inside a window is classified stall-window by condition (a);
+  - an onset before `startMs` drawn on the last pre-stall frame, with F as
+    its proxy frame, is classified stall-window by condition (b);
+  - an onset first shown at F is classified stall-window by condition (b);
+  - a straddling F with `startMs <= frameMs < endMs` is identified as F;
+  - *latency-independence control:* a 300 ms sample with no window stays
+    non-stall and fails the p99 gate. The same sample inside a recorded
+    window is classified stall-window. Both branches are asserted in one
+    passing test.
+  - a stall-window sample at -3 ms fails the early rule;
+  - an active-set mismatch at F fails;
+  - a beat residual of 1.01 ms at F fails, and 1.0 ms passes;
+  - a window count that differs from the injected count fails.
+
+**B. WebKit beat drift: source and product fix.**
+
+- **Current metric.** `beatDriftMs` is measured at one point:
+  - the last presented frame's displayed `beatCycle`,
+  - minus that frame's audible time extrapolated through the final
+    `TransportSample` the harness reads after the cycle run,
+  - converted to ms.
+
+  The last stall ends at least 5 s before the run ends, so this frame is not
+  a stall-window frame. The drift therefore does not come from stall windows,
+  and the stall classification does not apply to it.
+- **Source (product defect).** `src/session/publish.rs` builds
+  `TransportSample` with these two values:
+  - `sample_time = host_now`, the quantum-aligned AudioContext time of the
+    tick;
+  - `cycle = rt.pos`, which `src/sched/runtime.rs` floors to the 1/960-cycle
+    `GRID`.
+
+  So each sample's cycle trails its own `sample_time` by a varying amount in
+  `[0, 1/960)` cycle. At the workload tempo (120 bpm, 4 beats per cycle) that
+  is up to 2.083 ms, more than the 1 ms gate. The frontend extrapolates from
+  whichever sample it holds (15.3.8.4). So the displayed beat phase moves by
+  up to 2.083 ms whenever the sample changes, and the harness compares two
+  different samples.
+
+  **Data.** The run-001 values, 0.1667 ms (Chromium) and 1.5000 ms (WebKit),
+  are both exact multiples of 1/12 ms. That is the lattice made by 1/960-cycle
+  steps (25/12 ms) and 128-frame quanta at 48 kHz (32/12 ms). A stall cannot
+  produce lattice-exact values. Chromium passed only because its pair of
+  samples happened to differ by less than 1 ms.
+- **Fix** (`src/session/publish.rs`).
+  - When the published sample is running, `sample_time` is the host time of
+    the published `cycle` on the runtime clock (`Clock::to_host`). This makes
+    the (`sample_time`, `cycle`) pair exact.
+  - The value is used only when it is finite, at least 0, and within one grid
+    period (1/960 cycle at the current tempo) of `host_now`. Otherwise
+    `sample_time` is `host_now`.
+  - When the sample is not running (paused, frozen or lost), `sample_time`
+    stays `host_now`, because a held position is consistent at any time.
+  - The rate ceiling (`last_transport`), the epoch rules and `LevelsBody.time`
+    keep using `host_now`.
+  - Within an epoch `sample_time` stays non-decreasing, because `rt.pos` is
+    monotonic. So the client and store ordering checks
+    (`next.sample_time < prev.sample_time`) and envelope validation
+    (non-negative) are unaffected.
+  - No protocol field, frontend formula or wasm ABI changes. The native and
+    browser tiers share this publisher, so both get the fix.
+- **Deterministic simulated-clock test** (`src/session/tests/publish.rs`). The
+  existing `periodic_transport_...` test is ported. It asserts that `cycle`
+  still equals the runtime position, and it keeps the rate-ceiling and
+  restart-epoch assertions, measured on the rig's tick times. The new
+  test drives the rig clock at 48 kHz quantum-aligned times (`n * 128 /
+  48000`) for at least 20 simulated seconds. It does this at 120 bpm with 4
+  beats per cycle, and again at a non-lattice tempo (137 bpm, 3 beats per
+  cycle). It asserts:
+  - for every pair of running samples in one epoch,
+    `|(cycle_j - cycle_i) / cps - (sample_time_j - sample_time_i)| <= 1e-9`
+    s;
+  - `0 <= host_now - sample_time < 1 / (960 * cps) + 1e-9`;
+  - `sample_time` is non-decreasing within an epoch.
+
+  *In-test control:* the same samples re-paired with each tick's `host_now`
+  have a maximum pair inconsistency above 1 ms. Both branches are asserted in
+  the same passing test.
+- **Harness beat residual** (`measure.mjs`, `stats.mjs`). For every presented
+  frame with a finite `beatCycle`, the residual is the displayed `beatCycle`
+  minus that frame's `audibleTime` extrapolated through the final transport
+  sample, in ms. The frame must be in the same epoch as that sample, and the
+  sample must be running.
+  - `beatDriftMs` (gated, <= 1 ms) is the residual of the last presented
+    non-stall frame. In a gating run with audio running, a missing
+    `beatDriftMs` is a failure, not a limitation.
+  - The F residuals feed stall-recovery criterion 4.
+  - Max absolute residual over non-stall frames and over F frames is
+    reported, informational. After the fix, all residuals are expected to be
+    at f64 noise level.
+
+**C. Owner files and order** (CANVAS-EVIDENCE, Session 302 Amendment):
+
+- **writePaths:**
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/README.md`
+  - `src/session/publish.rs`
+  - `src/session/tests/publish.rs`
+  - `editor/test/wasm/canvas-clock.test.ts` (its exact `sample_time` equality
+    assertions are ported to the part B contract; added at the plan step)
+  - `design-docs/specs/design-canvas-editor-evidence.md`
+  - the concrete `design-docs/specs/evidence/canvas-cutover/run-001/` files
+    that the run rewrites
+- **sharedPath:** `editor/test/e2e/run.mjs`, only if summary wiring needs it.
+  artifactRoots cover `tmp/canvas-cutover/evidence/` and
+  `tmp/canvas/evidence/run-001/`.
+- **Order:**
+  1. Part B fix and test, then part A harness and tests.
+  2. Rebuild with `mise run build-wasm-release` and
+     `VACTR_REQUIRE_SESSION_ABI=1 npm run build`.
+  3. Run `npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`
+     on a quiet host until it exits 0.
+  4. TASK-602 to TASK-605 (15.3.8.14 section 9).
+- **Evidence document.** It adds a stall-window classification table per
+  browser (one row per window, from `stallWindows[]`). It also adds the
+  non-stall, all-sample and stall-window sync figures side by side, and the
+  beat-drift diagnosis (the run-001 lattice values and the post-fix
+  residuals).
+- **Final gates** run serially: the 15.3.8.14 section 8 set, `npm run
+  test:style`, rustfmt `--check` on the two touched Rust files, and the
+  silent iOS simulator pass. Full nextest runs alone, with a timeout of at
+  least 2400 s.
+
+**Residual risks.**
+
+- **Non-stall WebKit p99.** It is not yet measured under recorded-window
+  classification. If it exceeds 50 ms, that is a product finding fixed in its
+  owner file. Thresholds are never relaxed.
+- **Grid-period guard fallback.** If tempo re-anchoring makes `Clock::to_host`
+  fall outside one grid period, the sample falls back to `host_now` and keeps
+  the old sub-grid error for that sample. The constant workload tempo never
+  takes this path.
 
 ## 16. Wasm and AudioWorklet Layout
 

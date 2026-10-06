@@ -1629,6 +1629,120 @@ Fresh-read and record sha256 before each edit, in `tmp/canvas-cutover/evidence/s
   is empty unless TASK-511 triggered and 15.3.8.14 exists.
 - `wc -l` on every touched `.ts` file is under 1000.
 
+## Session 286 Amendment (operator decisions 1-8; design 15.3.8.14)
+
+**Issue reference:** `workflowInput:RESUME-session-285` (resumed as session 286, the
+WebKit-first performance wave).
+
+**Order.** This plan runs after these six serial plans are accepted:
+
+- CANVAS-OPT-HARNESS (`impl-plans/active/canvas-cutover-opt-harness.md`);
+- CANVAS-OPT-HISTORY (`canvas-cutover-opt-history.md`);
+- CANVAS-OPT-DOM (`canvas-cutover-opt-dom.md`);
+- CANVAS-OPT-TEXT (`canvas-cutover-opt-text.md`);
+- CANVAS-OPT-BACKDROP (`canvas-cutover-opt-backdrop.md`);
+- CANVAS-OPT-RENDER (`canvas-cutover-opt-render.md`).
+
+The design's single OPT-RENDER plan is refined into BACKDROP and RENDER, as 15.3.8.14
+section 8 allows.
+
+**Baseline.** The session-285 WIP at `cea81cd` (TASK-508 attribution, TASK-509 edit-path
+invariants) is the baseline. It is not redone. Its rows must still pass.
+
+**Numbering.** Every reference in this plan to "15.3.8.14" for escalation F now means "a
+new F design amendment at the next free 15.3.8.x number". 15.3.8.14 is the session-286
+performance wave (design 15.3.8.13, as edited in session 286).
+
+### TASK-601: Release re-measure (outside the sandbox)
+
+- **Build.** `mise run build-wasm-release`, then `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`.
+- **Gating run.** `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`
+  on a quiet host (no concurrent vitest, nextest, cargo or browser run). It must exit 0
+  with the session-286 thresholds:
+  - in both WebKit and Chromium: input p95 at most 50 ms and p99 at most 100 ms; frame
+    interval p95 at most 20 ms and p99 at most 50 ms; text-dirty work p95 at most 8 ms;
+    the animation-work and A/V sync gates of 15.3.8.8, computed on de-duplicated sync
+    samples;
+  - at least 500 edit keys;
+  - post-sink peak 0, 0 direct destination connections, and the sink installed before the
+    first connect (including the headed WebKit GL fallback);
+  - `wasm.profile === "release"`, `nameSection === true` and `dwarf === false`.
+- **Targets.** `summary.json` records the non-gating targets (textWork p95 4 ms, animation
+  p50 1 ms) and the dropped-frame counts.
+- **Failure handling.** If the run fails, attribute the failure with the session-285 phase
+  rows (`?perf=1`; non-gating runs `s286-after-<n>` with
+  `--out ../tmp/canvas-cutover/evidence/s286-after-<n>`, cited in notes only). Repair it
+  in the owning file, which is a writePath of this plan (session-286 additions below), with
+  a deterministic counter row. Re-run. Never loosen a threshold or change the workload.
+
+### TASK-602: Escalations S and F
+
+- **S (syntax Worker, design 15.3.8.14 section 7).** It triggers only if TASK-601 fails the
+  input p95, frame p95 or textWork p95 gate and the attribution shows the deferred reparse
+  task as the dominant long task overlapping late frames.
+  - If it triggers: record the evidence. Append the S scope record to 15.3.8.14 (a design
+    edit, serial, by the plan author). Then create `editor/src/code/syntax-worker.ts` and
+    `editor/test/code/syntax-worker.test.ts` per section 7, and re-run TASK-601.
+  - Otherwise: record "S not triggered" with the phase evidence.
+- **F (tick Worker).** Same rule as TASK-511. If it triggers, stop for a new design
+  amendment. The reserved tick-worker files are not created.
+
+### TASK-603: Evidence document
+
+In `design-docs/specs/design-canvas-editor-evidence.md`, outside the harness markers:
+
+- add a static section "Performance wave (session 286)". It is a table of the diagnosis
+  baseline (`tmp/canvas-cutover/diag-shape/REPORT.md`: WebKit 181 keys, input p95 307 ms,
+  frame p95 174 ms, text p95 154 ms; Chromium text p95 16.8 ms) against the final
+  `run-001` numbers, with raw data paths;
+- note the sync de-duplication and dropped-frame reporting (a correctness fix, not a
+  threshold change);
+- record the S and F outcomes;
+- keep the platform limitations and the pending physical-iPad procedures unchanged.
+
+### TASK-604: Final gates and simulator
+
+Run the final-gate table and the silent iOS simulator run (`playingEvents === 0`) on the
+closeout source. Use the session-286 record format.
+
+### TASK-605: Closeout additions
+
+These extend TASK-507 and its session-285 additions:
+
+- **Archive.** Also `git mv` the six `canvas-cutover-opt-*.md` plans to
+  `impl-plans/completed/`, each with `Status: Completed`. That makes 20 canvas-cutover plans
+  plus 15 canvas-editor-224 plans plus `canvas-editor-224-dispatch.json`.
+  `canvas-cutover-dispatch.json` stays in `active/`.
+- **Index.** `impl-plans/README.md` lists the session-286 plans as completed.
+- **Erratum and typo fixes.** The 15.3.8.4 erratum and the deferred typo fixes of the
+  session-285 additions stay as specified.
+- **Push.** Commit and push (non-force) to `origin wf/canvas`.
+
+### Session-286 path additions
+
+These are writePaths in the manifest, for re-measure repairs only, under the seam protocol
+(smallest change, counter row, hashes recorded):
+
+- the OPT-plan source files and tests: `editor/src/code/{line-bytes,advances,geometry,palette}.ts`,
+  `editor/src/code/{completion-types,code-view}.ts(x)`, `editor/src/code/code.css`,
+  `editor/src/bind/{panel.ts,panel-view.tsx,bind.css}`, `editor/src/protocol/{store,utf8}.ts`,
+  `editor/src/params/{roll.ts,telemetry-view.tsx}`, `editor/src/visual/{mount,panes}.ts`,
+  `editor/test/bind/*` (listed file by file), `editor/test/protocol/{store,utf8}.test.ts`,
+  `editor/test/params/displays.test.ts` and `editor/test/support/{gl,canvas}.ts`;
+- the reserved S files;
+- the six OPT plan files (active and completed).
+
+### Session 286 checklist (mechanical)
+
+- `git diff b9093e2 -- editor/test/e2e/stats.mjs` changes only `textWorkP95Ms` (16.7 to 8)
+  inside `THRESHOLDS`.
+- `git diff b9093e2 -- editor/test/e2e/fixtures/large-doc.mjs editor/test/e2e/silent-sink.mjs editor/package.json editor/package-lock.json Cargo.toml Cargo.lock mise.toml`
+  is empty.
+- `git diff b9093e2 --name-only -- src editor/src-tauri` is empty.
+- `grep -c opacity editor/src/bind/bind.css` is 0.
+- `editor/worklet/tick-worker.js` does not exist. `editor/src/code/syntax-worker.ts` exists
+  only if S triggered.
+
 ## Verification
 
 Inside the sandbox:
@@ -1721,6 +1835,11 @@ only this plan's progress log and the plan files being archived.
 - [ ] Session 285 TASK-511: F evaluated and recorded. If F triggers, the plan stops for design 15.3.8.14, and no Worker file exists.
 - [ ] Session 285 TASK-512: the evidence document has the "Edit-path phase attribution (session 285)" before/after p95 table for both browsers, and updated triage rows.
 - [ ] Session 285 TASK-513: final gates and the silent simulator run pass. Every `verification[]` record has `exitStatus: 0` and `outcome: "passed"`, and test records also have `testsRun > 0` and `failureCount: 0`, with a log path.
+- [ ] Session 286: CANVAS-OPT-HARNESS, -HISTORY, -DOM, -TEXT, -BACKDROP and -RENDER accepted (runtime `acceptedPlanIds`)
+- [ ] Session 286 TASK-601: release `run-001` exits 0 in WebKit and Chromium with textWork p95 at most 8 ms, input p95 at most 50 ms, frame p95 at most 20 ms, at least 500 edit keys, de-duplicated sync within threshold, post-sink peak 0
+- [ ] Session 286 TASK-602: S and F evaluated and recorded (S implemented only on its trigger, with the scope record appended first)
+- [ ] Session 286 TASK-603: evidence document "Performance wave (session 286)" baseline/final table with raw paths
+- [ ] Session 286 TASK-604/605: final gates and the silent simulator pass; the six OPT plans archived along with the TASK-507 set; README updated; pushed non-force
 - [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
 ## Progress Log
@@ -1979,3 +2098,17 @@ scope record".
   also moves it is not adopted, because the runtime reads the manifest during this run.
 
 No source, threshold or workload change.
+
+### Session: 2026-10-06 (session 286 plan amendment, performance wave)
+
+**Tasks Completed**: Plan amendment only. Added the section "Session 286 Amendment",
+TASK-601 to TASK-605.
+
+**Notes**:
+
+- Six serial OPT plans precede this plan: HARNESS, HISTORY, DOM, TEXT, BACKDROP, RENDER.
+- The session-286 product and test paths were added to writePaths for re-measure repairs,
+  along with the reserved S paths and the OPT plan archive paths.
+- The F references are renumbered to the next free 15.3.8.x number.
+- The textWork gate is now 8 ms (HARNESS). No other threshold or workload change.
+

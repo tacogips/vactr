@@ -6173,6 +6173,12 @@ load/DPR changes invalidate metrics. Run-level shaping preserves ligatures and
 Japanese glyphs; caret boundary advances must be validated against the same
 shaping. Mixed RTL text requires visual-order hit testing and selection evidence;
 if unsupported it is reported as an input limitation, not claimed supported.
+Amended 2026-10-06 (15.3.8.14 section 4): glyphs are rasterized once per
+grapheme cluster into an append-only atlas and placed at measured advances
+(an ASCII advance table plus cached cluster widths). Lines that contain
+complex-script characters keep run-level rasterization per style segment, so
+contextual shaping is preserved there. The editor font is monospace without
+programming ligatures, so no ligature is lost on other lines.
 
 Use a focusable textarea with a bounded surrounding-text window as the DOM
 bridge. Keep it transparent at the caret rectangle (including visual viewport
@@ -6247,9 +6253,10 @@ A gap/overflow makes affected transient evidence incomplete, without blocking au
 #### 15.3.5 Composition and resources
 
 Reuse GlRenderHost for Hydra synth effects and o0..o3 feedback. Keep its GL
-textures within their owning context. A code compositor may upload the latest
-visual canvas image to one reusable background texture at most once per frame;
-this explicit copy avoids claiming cross-context texture sharing or zero-copy.
+textures within their owning context. The code pane shows the latest visual
+canvas as a DOM layer stacked under its transparent code canvas
+(amended 2026-10-06, 15.3.8.14 section 4). No pixel copy is made, and no
+texture is shared across contexts.
 Layer background/video, subdued contrast scrim, selections/playing/eval,
 syntax text, diagnostic underlines, cursor and GPU badges/selection handles.
 DOM tooltips/panels are allowed outside the source surface. Oscilloscopes reuse
@@ -6277,10 +6284,14 @@ small feedback geometry only; dirty text/layout rebuilds occur only on edit,
 scroll, font, viewport or atlas eviction. Reuse buffers and upload dirty regions.
 
 Keep 256 history entries as a count ceiling and impose a 32 MiB history/undo
-retention ceiling (evict oldest complete undo groups and report reduced depth),
-with four UTF-8 indexes totaling at most 8 MiB. The current document is never
+retention ceiling (evict oldest complete undo groups and report reduced depth).
+Line tables and wire-offset memos total at most 8 MiB; they replace the four
+UTF-8 indexes (15.3.8.14 section 2). Pinned revisions live outside the count
+ceiling, under the byte ceilings. The current document is never
 evicted; documents above the measured 1 MiB profile report unverified performance.
 Account cached copies explicitly rather than assuming rope sharing bounds bytes.
+A revision that shares rope structure with its successor is charged by its
+change delta, as defined in 15.3.8.14 section 2.
 Context loss cancels GPU work without changing the document or audio; restore
 from CPU state with empty feedback targets and fresh resources. On allocation
 failure retain editing state and accessible save, display GPU-unavailable status;
@@ -6627,8 +6638,9 @@ The scheduler tracks two dirty classes:
   generation; atlas generation or eviction; syntax-span revision; and
   diagnostic or binding annotation changes.
 - **Animation-active** is true when playing highlights are non-empty or
-  changed, an eval flash is live, the caret blinks (530 ms phase), the beat
-  indicator is visible, or the background visual canvas published a new frame.
+  changed, an eval flash is live, the caret blinks (530 ms phase), or the beat
+  indicator is visible. (Amended by 15.3.8.14: the visual canvas is a DOM layer
+  under the code canvas, so a new visual frame no longer wakes the code pane.)
 
 The scheduler requests a frame only when something is dirty or active. An idle
 editor requests no frames.
@@ -6640,9 +6652,13 @@ Each frame runs these steps in order:
 3. If text is dirty, run the text phase: re-layout the visible runs, upload
    missing atlas tiles, run the syntax provider, and rebuild and upload only
    the dirty geometry ranges into the reused buffer.
-4. Composite: background texture (if it changed), selection, playing and eval
-   quads, the cached text geometry, underlines, the cursor, badges and
-   handles.
+4. Composite: the scrim, selection, playing and eval quads, the cached text
+   geometry, underlines, the cursor, badges and handles.
+
+15.3.8.14 sections 3 and 4 refine steps 3 and 4. Text-dirty frames record
+why they are dirty. The syntax provider runs only for document, syntax,
+viewport-window and GPU reasons, and a caret-only frame rebuilds only the
+overlay layers. The composite issues at most four draw calls.
 
 Animation-only frames reuse the cached text geometry and perform no shaping or
 geometry upload. `renderer.stats.textBuilds` and `frames` prove the split.
@@ -6959,12 +6975,15 @@ labeled unsynchronized. Frames older than 2 s hide.
   programs with alpha below 1 reveal the video, and the default opaque output
   covers it. This adds no language syntax.
 
-**Backdrop.** The existing `VisualApi.onBackgroundCanvas(cb)` stays unchanged.
-The visual mount calls `cb(canvas)` again after each newly drawn frame, and the
-editor renderer treats each call as a new background revision. It uploads at
-most once per frame, and only after a call. MOUNT wires this subscription
-lazily, because `deps.visual` mounts after `code`. The beat indicator remains
-the transport-bar DOM panel driven by 15.3.8.4.
+**Backdrop** (amended 2026-10-06 by 15.3.8.14 section 4). The
+`VisualApi.onBackgroundCanvas(cb)` signature is unchanged. The visual mount
+calls `cb(canvas)` once when its render canvas exists and `cb(null)` on
+disposal; it no longer calls `cb` per frame. The code mount places that canvas
+element in the DOM under its transparent code canvas, so the browser
+compositor shows it with no copy. The code renderer uploads no background
+texture. MOUNT still wires this subscription lazily, because `deps.visual`
+mounts after `code`. The beat indicator remains the transport-bar DOM panel
+driven by 15.3.8.4.
 
 ##### 15.3.8.7 ABI and transfer bounds (e)
 
@@ -6973,13 +6992,13 @@ These bounds are enforced and tested:
 | Path | Bound |
 |------|-------|
 | Document deltas | `doc-changed` carries only changed byte ranges and inserted bytes, composed per 200 ms debounce or forced flush. A test asserts that a one-character edit in a 1 MiB document yields a `doc-changed` payload under 256 bytes, with no whole-text transfer. |
-| Allowed whole-text transfers | Only these: open/reset, song apply, format, completion request, debounced local check. Completion and check allow at most one request in flight (latest wins), are skipped while composing, and never run per frame. Check is also skipped when the revision is unchanged. |
+| Allowed whole-text transfers | Only these: open/reset, song apply, format, completion request, debounced local check. Completion and check allow at most one request in flight (latest wins), are skipped while composing, and never run per frame. Check is also skipped when the revision is unchanged. Neither runs inside a keystroke task: a typing-triggered completion request runs at least 150 ms after the last trigger, Ctrl-Space runs in the next task, and the check keeps its 300 ms debounce (15.3.8.14 section 3). |
 | JS to Wasm per animation frame | Exactly one `session_frame` from the visual loop. No document text. |
 | Wasm to JS | The outbox is drained synchronously per ABI call. Per drained batch: playing events at most 4,096 and telemetry envelopes at most 1 MiB (both already validated in `envelope.ts`). The telemetry backlog stays at 64 (the existing `MAX_TELEMETRY_QUEUE`: coalesce tempo and levels, drop expired playing first). Control replies are never dropped. In-flight requests stay capped at 64 (the existing `MAX_PENDING_REQUESTS` busy rejection). Tests assert these existing caps under the 4,096-event load. |
 | Native IPC | One channel message per routed envelope. Per 5 ms tick, at most one tempo, one levels, and playing events up to 4,096. Probe replies and other control replies are never coalesced. |
 | Frontend queues | Highlight entries at most 4,096, future horizon 2 s, scope frames 8, probe samples 8. Overflow and drop counters are exposed in status and in `__vactrPerf`. |
-| GPU per frame | Atlas tile uploads at most 1 MiB (the remainder draws on later frames under a `text-pending` status, and is never omitted); geometry uploads only dirty ranges within the 8 MiB staging cap; background canvas upload at most 1; video upload at most 1 per new video frame, at most 30 Hz. |
-| GPU and CPU caps | As in 15.3.5, enforced by `ResourceLedger` reservation tests: atlas 16 MiB, geometry and staging 8 MiB, layout cache 8 MiB, targets 4 million pixels, total at most 96 MiB, history 32 MiB, UTF-8 indexes 8 MiB. |
+| GPU per frame | Atlas cell uploads at most 1 MiB (the remainder draws on later frames under a `text-pending` status, and is never omitted); geometry uploads only changed line segments within the 8 MiB staging cap; no background canvas upload (the visual canvas is a DOM layer, 15.3.8.14); at most 4 draw calls on the code canvas; video upload at most 1 per new video frame, at most 30 Hz. |
+| GPU and CPU caps | As in 15.3.5, enforced by `ResourceLedger` reservation tests: atlas 16 MiB, geometry and staging 8 MiB, layout cache 8 MiB, targets 4 million pixels, total at most 96 MiB, history 32 MiB, line tables and wire-offset memos 8 MiB (these replace the UTF-8 indexes, 15.3.8.14). |
 
 ##### 15.3.8.8 Measurement protocol and thresholds (f)
 
@@ -7099,9 +7118,9 @@ injected every 10 s).
 | Metric | Definition | Pass threshold (profile H) |
 |--------|------------|----------------------------|
 | Input latency | From keydown `event.timeStamp` to the rAF timestamp of the frame after the frame whose text phase presented that revision (a presentation proxy). IME is reported separately. | p95 <= 50 ms, p99 <= 100 ms |
-| Frame work | Duration of the code-pane frame callback, reported for animation-only and text-dirty frames | Animation-only: p50 <= 4 ms, p95 <= 8 ms, p99 <= 16.7 ms. Text-dirty: p95 <= 16.7 ms |
+| Frame work | Duration of the code-pane frame callback, reported for animation-only and text-dirty frames | Animation-only: p50 <= 4 ms, p95 <= 8 ms, p99 <= 16.7 ms (a 1 ms p50 target is recorded, not gated). Text-dirty: p95 <= 8 ms, tightened from 16.7 ms by 15.3.8.14 (a 4 ms target is recorded, not gated) |
 | Frame interval | rAF timestamp deltas, excluding injected stalls | p95 <= 20 ms, p99 <= 50 ms |
-| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation | Gated only when provenance is `measured`: p95 of the absolute value <= 33.4 ms, p99 <= 50 ms, no highlight earlier than 2 ms before the onset. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
+| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation. One sample per distinct (onset time, epoch, first presented frame); dropped frames are reported separately (15.3.8.14 section 5) | Gated only when provenance is `measured`: p95 of the absolute value <= 33.4 ms, p99 <= 50 ms, no highlight earlier than 2 ms before the onset. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
 | Late frames | The first frame after each stall | Active set equals the analytic set, 0 replayed flashes, absolute beat-phase drift at the end of the run <= 1 ms |
 | Memory | `ResourceLedger` maximum per cap and total. JS heap on Chromium after CDP `HeapProfiler.collectGarbage` (WebKit has no heap API: ledger only, a limitation). | No cap exceeded. Ledger total <= 96 MiB. Heap growth from end of warmup to end of the cycle run <= 8 MiB. Ledger returns to 0 on dispose. |
 | Audio | Worklet underrun and drop counters during stalls, hidden periods and context loss | Recorded. Any underrun attributable to a UI stall is a failure. |
@@ -7233,8 +7252,9 @@ Whole-document reads stay allowed only off the edit path:
 - the whole-text transfers of 15.3.8.7 (open/reset, song apply, format,
   completion request, debounced local check, eval);
 - save;
-- building a `Utf8Index` to map a wire span of a revision that a received
-  message references, cached by `RevisionHistory` as today.
+- building the line table of a revision that a received message references.
+  This replaced the whole-text `Utf8Index` (15.3.8.14 section 2). A pinned
+  revision, or one that is current when pinned, needs no text read at all.
 
 **Document sync (`code/sync.ts`, `code/history.ts`).**
 
@@ -7685,8 +7705,9 @@ triggered only if both of the following hold after A to E:
   the late onsets.
 
 If F triggers, `session_tick` scheduling moves off the main thread into a
-dedicated Worker. That change needs its own appended amendment (15.3.8.14),
-written before its plan is dispatched. It must also come with deterministic
+dedicated Worker. That change needs its own appended amendment, written
+before its plan is dispatched. It takes the next free 15.3.8.x number;
+15.3.8.14 is now the session-286 performance wave. It must also come with deterministic
 tests. Until then, the main-thread tick of section 16 stays the design.
 
 **Session 285 scope record (edit-path repair; resume of session 284).**
@@ -7789,13 +7810,708 @@ output stage.
     `session_tick`.
 
   F is not designed in this record. The trigger evidence is recorded first.
-  The 15.3.8.14 amendment is then appended before any Worker code is
+  A new amendment, at the next free 15.3.8.x number (15.3.8.14 is the
+  session-286 performance wave), is then appended before any Worker code is
   written. The Worker files are reserved now as concrete paths, so that F
   needs no ownership change:
   - `editor/worklet/tick-worker.js`;
   - `editor/test/protocol/tick-worker.test.ts`.
 
   Neither file is created unless F triggers.
+
+##### 15.3.8.14 WebKit-first performance wave (session 286, operator decisions 1-8)
+
+**Issue reference:** `workflowInput:RESUME-session-285` (resumed as session
+286). User directives: "performance最適化せよ" ("optimize performance") and
+"chromeでなくても早くして" ("make it fast even outside Chrome"). WebKit
+(Safari, and the iPad Tauri WKWebView) is the primary performance target, and
+Chromium comes second.
+
+**Inputs.** Two operator diagnoses, both under the gitignored
+`tmp/canvas-cutover/diag-shape/`:
+
+- `REPORT.md` was measured with the silent harness, with logs in `r-*.log`.
+  - Most of the WebKit slowdown is not shaping. About 7,400 bind-panel rows
+    turn `data-state='stale'` after a few edits, and each then gets
+    `opacity: 0.7`. From then on WebKit renders at about 8 fps.
+  - The rows turn stale because of a product bug.
+    `RevisionHistory.retainedBytes` charges every revision as a full text
+    copy, about 3.3 MB at 1 MiB. So after about 9 edits the evaluated
+    revision is trimmed, its spans stop mapping, the sites go stale, and
+    playing highlights die.
+  - The harness also counts 64 identical sync samples per onset.
+  - The prototype `proto-c.patch` took WebKit from 181 keys (input p95
+    307 ms, frame p95 174 ms, text p95 154 ms) to 549 keys (20, 20 and
+    3 ms).
+- `FABLE-STATIC-REPORT.md` is a static hot-path inventory with file:line
+  references.
+
+**What this subsection changes.** It amends these existing rules in place,
+each with a pointer back here:
+
+- 15.3.3: cluster rasterization;
+- 15.3.5: backdrop layering and history charging;
+- 15.3.8.3: dirty reasons and animation wake-ups;
+- 15.3.8.6: backdrop;
+- 15.3.8.7: request timing, per-frame GPU limits and the index budget;
+- 15.3.8.8: the textWork gate tightens from 16.7 ms to 8 ms, and the sync
+  samples are de-duplicated;
+- 15.3.8.10: line tables instead of `Utf8Index`.
+
+**What it does not change.** It changes no workload, no other threshold, no
+silent-sink rule, no Session Protocol field, no Rust source, no dependency,
+no Cargo profile and no production master output stage. Two interface
+changes are allowed:
+
+- `CodeApi` gains one additive member, `toWireSpan(from, to): Span`
+  (section 2).
+- `VisualApi.onBackgroundCanvas` keeps its signature but is called only on
+  availability and disposal (section 4).
+
+The design through 15.3.8.13 and the accepted plans remain the baseline. No
+accepted plan is redispatched.
+
+**Engine rules (apply to every section).**
+
+- **One path for every engine.** Every optimization runs the same code path
+  in WebKit and Chromium. There is no Chromium-only fast path.
+- **Scheduling.** Deferred work uses `setTimeout` or `requestAnimationFrame`,
+  never `requestIdleCallback`, which is absent in Safari. "Never in the
+  keystroke task" means the work runs in a later task, not in the
+  keydown, beforeinput or input handler, and not in a microtask queued from
+  one.
+- **OffscreenCanvas.** Text measurement and glyph rasterization use an
+  `OffscreenCanvas` 2D context when `OffscreenCanvas` exists and its
+  `getContext('2d')` succeeds (Safari 16.4+). Otherwise they use a detached
+  `HTMLCanvasElement`, with the same behavior.
+- **No `SharedArrayBuffer`.** Section 16 still applies.
+- **The prototype is a reference only.** `proto-c.patch` is not accepted
+  source. Implementers re-implement to this subsection, and its `__diag`
+  hooks never land.
+
+**1. Bind panel, store and DOM (decision 1).** Owner files:
+`editor/src/bind/{panel.ts,panel-view.tsx,mount.ts,bind.css}`,
+`editor/src/protocol/store.ts`, `editor/src/params/{roll.ts,telemetry-view.tsx}`
+and `editor/src/code/{accessibility.ts,input.ts}`.
+
+- **Stale dimming by color.** `.bind-row[data-state='stale']` and
+  `[data-state='unbound']` set `color: var(--vt-text-muted)`. No row gets
+  `opacity`, `filter` or another compositing property. The state label keeps
+  `--vt-danger`. The styles stay square and token-based, and
+  `editor/test/style/ui-style.mjs` plus the static token test must pass.
+- **Virtualized rows.**
+  - *Scope.* Both the slider rows and the value-display rows are virtualized.
+    Each `.bind-group` keeps its header and holds a top spacer, the mounted
+    window of rows and a bottom spacer. The `.bind-names` section has the same
+    structure.
+  - *Fixed row height.* A row has one height, set in CSS from tokens:
+    `calc(var(--vt-control-h-compact) + 2 * var(--vt-space-1))`, with
+    `white-space: nowrap` and ellipsis. A long `failed:` or `blocked on`
+    badge is truncated, and its full text goes in the `title` attribute.
+  - *Height measurement.* The panel measures the height once from the first
+    mounted row. It measures again when `matchMedia('(pointer: coarse)')`
+    changes and after `document.fonts` `loadingdone`. Until the first
+    measurement it assumes 32 px.
+  - *Mounted window.* A row is in the DOM only while it intersects the
+    visible range of the scroll container (`.pane-right`) plus
+    `PANEL_OVERSCAN_ROWS = 8` rows above and below. "Viewport rows" in the
+    budgets means `ceil(visibleHeight / rowHeight) + 2 * 8`.
+  - *Window recomputation.* A passive scroll listener and a `ResizeObserver`
+    only mark the window dirty. The window is recomputed in one
+    `requestAnimationFrame` callback with at most one layout read: the scroll
+    container's `scrollTop` and `clientHeight` and the panel's offset. When
+    the page is hidden, no frame runs.
+  - *Row lifecycle.* A row's Solid root and its store subscription exist only
+    while the row is mounted. A row that enters the window renders once from
+    the current model (the `SiteTable` entry, the writer state and the
+    `Store`).
+  - *Test seams.* `PanelHost` gains an optional
+    `viewport(): { top: number; height: number }`, exposed as
+    `BindOptions.panelViewport`. jsdom tests, including
+    `editor/test/bind/fixtures.ts`, inject a viewport that covers their
+    rows, so every existing assertion is kept unchanged. `row(id)` and
+    `nameRow(name)` return `undefined` for unmounted rows, and `renderCount`
+    counts renders of mounted rows only.
+- **Order.** A row's DOM position changes only when its order key changes.
+  The order key is the site's current range start, or `MAX_SAFE_INTEGER` when
+  the site is unmapped. When the order is unchanged, a refresh moves 0 nodes.
+  The `:has()` rule is replaced by a `data-empty` attribute on `.bind-group`,
+  which the panel maintains from its model.
+- **Indexed store notification.** `Store` keeps `Map<key, Set<Sub>>`, and
+  each sub has a registration sequence number.
+  - `notify(changed)` takes the union of the subs registered under the
+    changed keys, de-duplicates it, and calls the subs in registration order.
+    This keeps the "table subscription before rows" rule of
+    `bind/mount.ts`.
+  - The existing semantics are kept: a sub added during a notification is
+    not called for that notification, and an unsubscribed sub is skipped.
+  - Subscribe and unsubscribe cost O(keys of that sub).
+- **Incremental piano roll.** A note keeps one display object and one DOM
+  element for as long as it stays in the current cycle, keyed by
+  `slot`, `pos`, `len` and `text`.
+  - A batch that does not change the pitch range creates elements only for
+    added notes, removes only dropped notes, and leaves the others
+    untouched.
+  - A pitch-range change updates the existing elements' lane styles in place.
+- **Accessibility bridge (edit path).** A surface transaction only marks the
+  bridge dirty, which costs O(1). The bridge flushes at the start of the next
+  code-pane frame. It also flushes synchronously before any input-event
+  handler reads the textarea, so the textarea is never stale for an input
+  event. Those handlers are `keydown`, `beforeinput`, `compositionstart`,
+  `select`/`selectionchange`, `focus`, `copy`, `cut` and `paste`. A flush
+  writes only what changed:
+  - if the window bounds and text are unchanged, it writes no value;
+  - if an edit falls inside a window whose start is unchanged, it calls
+    `setRangeText` for the changed range only;
+  - if the window moved, it writes the full value (at most once per flush);
+  - it writes the selection only when the projected selection differs.
+
+  `position()` runs only in the frame flush. It uses the cached code rect of
+  15.3.8.13 item 3, so it performs no layout read, and it writes styles only
+  when the rect changed. During composition the bridge is not reset, as
+  today.
+- **Proof** (jsdom, deterministic, default suite). Existing assertions in
+  `editor/test/bind/*.test.ts`, `editor/test/params/displays.test.ts` and
+  `editor/test/canvas/input.test.ts` stay unchanged. New rows assert:
+  - *Panel.* With 10,000 bound sites and a 600 px injected viewport, the
+    mounted rows are at most the viewport rows. After the mass stale
+    transition, 0 rows carry `opacity`, the mounted rows are still at most
+    the viewport rows, and a refresh with unchanged order moves 0 nodes.
+  - *Store.* With 10,000 single-key subs, a notify of one changed key visits
+    exactly the subs of that key. Registration order is preserved across
+    keys.
+  - *Roll.* A batch that adds k notes to an unchanged cycle creates k
+    elements and removes 0.
+  - *Bridge.* A single-character edit inside the window performs 0 full
+    `value` writes and 0 `getBoundingClientRect` reads in the keystroke
+    task. A caret move inside the window performs 0 `value` writes. A
+    `beforeinput` after an unflushed edit sees a flushed textarea.
+
+**2. History, pinned revisions and wire mapping (decision 4).** Owner files:
+`editor/src/code/{history.ts,sync.ts,surface.ts,highlight.ts,diagnostics.ts,eval.ts,mount.ts,pointer.ts,keyboard.ts}`,
+`editor/src/app/apis.ts`, `editor/src/protocol/utf8.ts`,
+`editor/src/bind/{mount.ts,write.ts}`, and a new
+`editor/src/code/line-bytes.ts` (the `LineBytes` class extracted from
+`sync.ts`).
+
+- **Delta charging.** Each kept revision is charged
+  `512 + sum over its changes of (2 * insertedLength + 2 * baseLinesLength + 64 * baseLineCount)`
+  bytes, where:
+  - `baseLinesLength` is the UTF-16 length of the base-revision lines that
+    the change spans, including their line breaks;
+  - `baseLineCount` is the number of those lines.
+
+  This bounds the rope leaves that a revision can retain apart from its
+  successor. A whole-document replacement (format, song apply, reset) is
+  therefore charged as a full copy.
+  - The current revision is not charged, as today.
+  - The total is maintained incrementally: O(changes) on record and O(1) on
+    eviction.
+  - Undo-history events are charged once each: their bytes are memoized by
+    event identity in a `WeakMap`. `boundHistory` therefore performs no
+    object walk for events it has already charged.
+  - The 32 MiB undo and history ceiling and the 256-entry count ceiling are
+    unchanged.
+- **Pinned revisions.** `DocumentSync.pin(owner, rev): boolean` and
+  `unpin(owner)` delegate to `RevisionHistory`.
+  - *Owners.* An owner holds at most one revision, and several owners may
+    share one. At most `MAX_PINS = 32` owners exist. Pinning a 33rd owner
+    releases the owner pinned least recently, and `pinsEvicted` counts it.
+  - *Pin record.* A pinned revision keeps three things:
+    - its `Text`;
+    - a composed `ChangeSet` from it to the current revision, extended by
+      one `compose` per recorded revision (at most 32 composes per edit);
+    - its line table and wire-offset memo (next bullet).
+  - *Independence from the chain.* Pins do not depend on the history chain,
+    so the count ceiling and chain trimming never remove a pinned revision.
+  - *When a pin fails.* `pin` returns `false` when the revision is neither in
+    the history nor already pinned. A history restart (a revision gap or
+    reset) drops all pins.
+  - *Charges.* The composed sets are charged to the 32 MiB budget. The line
+    tables and memos are charged to the 8 MiB budget.
+  - *Byte pressure.* When a new pin would exceed the 8 MiB budget, on-demand
+    tables are evicted first. If the pin still does not fit, it is refused
+    (`pinsRefused`). A pin is never evicted to make room for an on-demand
+    table.
+  - *Pin owners:*
+    - `eval`: `code/mount.ts` pins the latest `eval-result` `doc_revision`
+      for the document. This covers the `evalRev` mappings of the bind,
+      params and `selectedSiteId` code.
+    - `playing:<rev>`: `HighlightScheduler` pins it when it accepts an event
+      whose `src.doc_revision` is `rev`. It unpins when no entry for `rev`
+      remains and none was accepted for 2 s (the future horizon), and on
+      `clear()`.
+    - `diag:static`, `diag:check` and `diag:runtime:<batch key>`:
+      `DiagnosticsController` pins each batch's revision while the batch is
+      held.
+- **Line tables instead of `Utf8Index`.** A line table is a `Uint32Array` of
+  the UTF-8 byte start of every line of one revision (lines + 1 entries).
+  - *Byte to UTF-16.* The line is found by binary search. Inside the line,
+    the text is scanned in chunks of at most 64 KiB. The results and the
+    rejection of invalid offsets are byte-identical to `Utf8Index`. Tests
+    compare the two on ASCII, Japanese, emoji (surrogate pairs) and CRLF
+    documents, as 15.3.8.10 requires.
+  - *Building a pin's table.*
+    - If the revision is current, the table is a numeric copy of the live
+      `LineBytes` prefix, with no text read.
+    - Otherwise it is built once by reading that revision's lines, with no
+      `toString`. `lineTableBuilds` counts these builds. This happens off
+      the edit path.
+  - *Memo.* Each pin memoizes converted wire spans (`start:end` to the UTF-16
+    range at that revision), with at most 32,768 entries, cleared FIFO.
+    Repeated mapping of the same sites (`SiteTable.refreshMapping`, about
+    7,400 sites per edit) therefore stays O(1) per site plus the composed
+    mapping.
+  - *`mapWireSpan(span, rev)` resolves in this order:*
+    1. *Pinned:* the memo or line table, then the composed set.
+    2. *Current:* the live `LineBytes`.
+    3. *In the history but not pinned:* a line table built on demand and
+       kept in an LRU of 4 within the 8 MiB budget, then the chain as today.
+    4. *Otherwise:* `null`.
+  - *Touch semantics.* A span maps to `null` when a change on the way touches
+    it, as `touches()` defines today. For a pinned revision this is
+    evaluated on the composed set. That agrees with the sequential chain
+    except when intermediate edits cancel exactly; the span then maps
+    unchanged over identical text, and a test documents this case.
+  - *Remaining `Utf8Index` users.* `RevisionHistory` and `DocumentSync` build
+    no `Utf8Index`. A static `Utf8Index.builds` counter makes builds
+    countable. The class remains as the test reference and for off-path
+    tools.
+- **Current-revision byte spans.** `CodeApi.toWireSpan(from, to)` is
+  additive. It maps a current UTF-16 range to bytes through the live
+  `LineBytes`. `bind/mount.ts` `bytes()` and `bind/write.ts` use it instead of
+  `new Utf8Index(doc.toString())`, so a slider drag in source-edit mode
+  costs O(changed lines), not O(document). The whole-text `client.eval` call
+  stays as an allowed transfer.
+- **Highlight mapping per revision.** `HighlightScheduler` caches each
+  entry's current range per document revision. An animation-only frame whose
+  revision did not change calls `mapWireSpan` 0 times.
+- **Pointer and keyboard bounds.**
+  - `pointer.ts` double-click, long-press and drag extension segment only the
+    containing line, read as at most 64 KiB around the position. They never
+    call `doc.toString()`.
+  - Keyboard word moves scan at most 64 KiB of text. If no word boundary is
+    found within that bound, the caret stops at the start (backward) or end
+    (forward) of the last line scanned.
+- **Proof** (deterministic, default suite: `editor/test/code/{history,sync,highlight,diagnostics}.test.ts`,
+  `editor/test/canvas/{edit-cost,input}.test.ts`,
+  `editor/test/bind/write.test.ts`):
+  - *Pinned mapping survives.* On the 20,000-line fixture, after an eval pin
+    and 300 single-character edits outside the span,
+    `mapWireSpan(evalSpan, evalRev)` is non-null and equals the sequential
+    reference mapping.
+  - *Bytes grow by the delta.* The retained bytes grow by at most
+    300 * (512 + 2 * (edited line length + 1) + 64 + 2) in total.
+  - *No index on the edit path.* A single-character edit performs 0
+    `Utf8Index` builds and 0 `lineTableBuilds`.
+  - *Pinning the current revision* reads no text.
+  - *Pin cap.* The 33rd owner releases the least recently pinned owner.
+  - *Reset* drops all pins.
+  - *Cancelling edits.* The cancelling-edit case is documented in a test.
+
+**3. Text layout, syntax and request scheduling (decision 3).** Owner files:
+`editor/src/code/{layout.ts,syntax.ts,syntax-core.ts,completion-popup.ts,completion-view.ts,completion.ts,diagnostics.ts,frame.ts,mount.ts}`,
+and a new `editor/src/code/advances.ts`.
+
+- **Advances.** `advances.ts` owns one measurement context per layout font.
+  It sets `ctx.font` only when the font or its generation changes; no hot
+  path assigns `ctx.font`.
+  - *ASCII.* The widths of U+0020-U+007E are measured once per (font,
+    generation, effective DPR), 95 `measureText` calls in all. An ASCII run
+    is the sum of its table widths, and tab stops use the space width from
+    the table. The per-shape `measureText(' ')` is removed.
+  - *Non-ASCII clusters.* A non-ASCII grapheme cluster is measured on a
+    cache miss. Results go in an LRU of at most 8,192 entries per font
+    generation.
+  - *Complex-script lines* measure their runs in chunks as today. A line is
+    complex-script when it contains a character in U+0590-U+08FF,
+    U+0900-U+0DFF, U+0E00-U+0EFF, U+1000-U+109F, U+1780-U+17FF or
+    U+FB1D-U+FEFF.
+  - *Consistency.* The renderer places glyphs at these same advances
+    (section 4), so drawing, caret and hit testing agree by construction.
+- **Layout maintenance by change set.** `TextLayout.setText(doc, changes?)`
+  receives the change set from the previously presented document when one
+  exists: the surface transaction, composed with the preedit insert or
+  removal.
+  - Cached lines outside the changed line ranges are renumbered and shifted
+    numerically. They are not compared as strings.
+  - The lines inside the changed ranges are dropped.
+  - Without a change set (reset or gap), the cache is cleared.
+- **Deferred syntax with span reuse.** These rules apply to `SyntaxSpans`:
+  1. *Edit.* `noteChanges` applies the tree edits synchronously, which is
+     cheap and needed for incremental parsing. It marks a reparse pending
+     and schedules one `setTimeout(0)` task, with at most one pending.
+     First parses (mount, reset, recovery) also run in a scheduled task.
+     Until the first tree exists, the fallback tokenizer provides spans.
+  2. *Span cache.* Spans are cached per line, relative to the line start,
+     for the capture window (visible range plus one viewport above and
+     below).
+     - On a change, cached lines outside the change are renumbered.
+     - Spans of touched lines are mapped through the change set; inserted
+       text takes no style unless it falls inside a span.
+     - The mapped spans are shown until the reparse completes, so an edited
+       line never flickers to plain text.
+  3. *Reparse task.* The task parses the current document incrementally. It
+     then recaptures only the touched lines plus the lines in
+     `tree.getChangedRanges(oldTree)` that lie inside the window, deletes
+     the old tree, bumps the syntax revision and invalidates text for
+     reason `syntax`.
+  4. *Spans for the frame.* `spans()` returns cached lines. Lines that newly
+     enter the window are captured incrementally, and only when the tree is
+     current. While a reparse is pending, entering lines show unstyled text
+     until the reparse completes.
+  5. *Limits.* The 16,384-span cap, `syntax-truncated` and
+     `codePane.dataset.syntax` are unchanged. Disposal cancels the pending
+     task.
+
+  `stats` exposes `syncParses`, `deferredParses`, `captures` and
+  `capturedLines`.
+- **Completion off the keystroke.** A typing trigger (or typing while the
+  panel is open) arms a 150 ms debounce (`COMPLETION_DEBOUNCE_MS`), and each
+  later trigger re-arms it. Ctrl-Space schedules the request for the next
+  task (`setTimeout(0)`).
+  - *Request.* The request reads the whole text once (an allowed transfer,
+    15.3.8.7). It decides staleness by document identity (the `Text` object
+    or the revision) instead of a second `toString()`. Latest wins, and the
+    request is skipped while composing.
+  - *Shown items.* While a request is pending, the shown items stay. The
+    panel closes when the caret moves before `result.from`, as today.
+    Accept uses the current state.
+  - *Ported tests.* Tests that awaited microtasks now advance fake timers.
+    Their assertions stay unchanged.
+- **Check.** It keeps its 300 ms debounce, its latest-wins rule and its
+  skip of unchanged revisions (15.3.8.13 C). It never runs in a keystroke
+  task or a frame callback.
+- **Dirty reasons.** `FrameScheduler.invalidateText(reason)` takes one of
+  `doc`, `selection`, `view`, `syntax`, `annotations` or `gpu`. The `gpu`
+  reason covers font, DPR, atlas and context changes. The mount calls the
+  syntax provider only for `doc`, `syntax`, `gpu`, or a `view` change that
+  moves the capture window. A frame that is dirty only for `selection`
+  updates only the overlay and background layers (section 4). A frame counts
+  as text-dirty for the perf record when any reason is set.
+- **Proof** (deterministic, default suite: `editor/test/canvas/{edit-cost,mount,state}.test.ts`,
+  `editor/test/code/{syntax,syntax-core,completion-popup,completion-view,diagnostics}.test.ts`).
+  A single-character ASCII edit on the 20,000-line fixture, run through the
+  keystroke task and the next frame, shows:
+  - `shape()` builds at most 1 plus newly exposed lines;
+  - `measureText` calls 0;
+  - `Text.toString` calls 0;
+  - `syncParses` 0, then exactly 1 deferred parse after the task flush;
+  - completion requests 0 before 150 ms and exactly 1 after;
+  - checks 0 before 300 ms.
+
+  A caret move shows `captures` 0 and `spans()` calls 0. Each test also
+  asserts an in-test control branch (for example a non-ASCII edit that must
+  measure, or a scroll that must capture new lines).
+
+**4. Rendering (decision 2).** Owner files:
+`editor/src/code/{renderer.ts,atlas.ts,resources.ts,mount.ts,code.css,code-view.tsx}`,
+`editor/src/visual/{mount.ts,panes.ts}`, `editor/src/app/apis.ts` (the
+`VisualApi` doc comment only), and new files
+`editor/src/code/{geometry.ts,palette.ts}`. Any touched file that reaches
+1,000 lines is split.
+
+- **Zero-copy backdrop** (amends 15.3.5 and 15.3.8.6).
+  - *Placement.* The code mount inserts the canvas from `onBackgroundCanvas`
+    as the first child of the code host, under the code canvas. It is
+    absolutely positioned to fill the code host, stretched like today's
+    quad, with `pointer-events: none` and `aria-hidden="true"`. On
+    `cb(null)` the mount removes it.
+  - *What the visual mount still does.* It keeps drawing the render host
+    canvas once per visual frame. The panes still copy from it, which is
+    the visual pane's own display and is not changed by this wave.
+  - *Compositing.* The browser compositor shows the canvas's last presented
+    frame. The code canvas still clears to transparent and draws the scrim
+    (`[0.04, 0.05, 0.07, 0.85]`) first. With premultiplied alpha, the result
+    equals today's backdrop quad under the scrim.
+  - *Removed.* `uploadBackground`, the `backdrop` ledger reservation and the
+    per-frame `cb(canvas)` calls are removed. On the native tier, with no
+    visual canvas, nothing is inserted.
+- **Glyph atlas.** One RGBA8 atlas texture holds every cell.
+  - *Cell kinds.*
+    - *Mask cells:* one per (grapheme cluster, font, generation, effective
+      DPR), rasterized in white.
+    - *Color cells:* emoji clusters (`\p{Extended_Pictographic}`), drawn
+      untinted.
+    - *Run cells:* complex-script runs, one per style segment, rasterized as
+      the full run clipped to the segment so contextual shaping is
+      preserved.
+    - *A reserved white texel.*
+  - *Allocation and growth.* The atlas is allocated at init at 1024 x 1024.
+    Cells are packed append-only into shelves. When the atlas is full it is
+    reallocated at double area, up to `min(2048, MAX_TEXTURE_SIZE)` square
+    and within the 16 MiB atlas cap, both reserved in the ledger first.
+    Visible cells are re-rasterized under the 1 MiB per-frame upload budget
+    with the existing `text-pending` rule. At the maximum size, a full atlas
+    resets at the same size.
+  - *Atlas generation.* Every reallocation or reset bumps the atlas
+    generation, which invalidates the geometry segments.
+  - *Staging.* New cells are rasterized into one persistent staging canvas
+    (OffscreenCanvas where available). Its font and fill are set only on a
+    font or generation change. The staging canvas is never created or
+    resized on a frame unless the maximum cell size grows (on a font or DPR
+    change).
+  - *Uploads.* They happen in the frame, never in the keystroke task. They
+    cover dirty rectangles of new cells: either one `texSubImage2D` per new
+    cell, or one per shelf strip using the WebGL2 sub-rectangle unpack form.
+    The upload count is at most the number of new cells.
+  - *Keys.* Cell keys are plain strings or numeric hashes with an equality
+    check. `JSON.stringify` identities are removed.
+- **Per-line geometry cache.** Text geometry is a set of instanced quads in
+  one persistent `ARRAY_BUFFER`.
+  - *Segments.* Geometry is built per segment. A segment is one (line,
+    256-cluster chunk), keyed by (line text identity or hash, font
+    generation, effective DPR, the line's style-span hash, atlas
+    generation). Only segments of visible lines plus overscan, and only
+    chunks that intersect `[scrollLeft - width, scrollLeft + 2 * width]`,
+    are built.
+  - *Slot table.* An instance carries its slot index and its slot-local x.
+    The per-slot line y and origin come from a small slot table, either a
+    uniform array or a one-row float texture read with `texelFetch`.
+    Inserting or deleting lines therefore rewrites only the slot table and
+    the changed lines' segments.
+  - *Scroll* is a uniform.
+  - *Uploads.* A changed segment is written with `bufferSubData`. The buffer
+    is reallocated with `bufferData` only on capacity growth, atlas
+    reset, or context restore, at most once per frame. Its capacity is
+    reserved in the ledger `geometry` kind within the 8 MiB cap.
+  - *Gutter.* Line-number digits are atlas cells. Their instances are
+    rewritten only for lines whose number changed.
+- **Layers and draw calls.** One program, one VAO and one bound texture (the
+  atlas) draw four layers, each with at most one draw call:
+  1. *Background:* the scrim, the selection, and the playing and eval rects.
+     The playing and eval rects are a small dynamic region rewritten on
+     animation frames. Its size is bounded by the active ranges times the
+     visible lines they span. The first line is found by binary search, so
+     there is no loop over ranges times viewport lines.
+  2. *Text:* the glyph instances, including the gutter.
+  3. *Overlays:* the diagnostic, composition and call-head underlines, the
+     binding-label boxes, the caret and the handles.
+  4. *Overlay text:* the binding-label glyphs.
+
+  Gutter clipping is a per-instance flag tested in the fragment shader, so
+  the renderer does not toggle scissor state. A caret move, selection
+  change or blink rewrites only the overlay region, never text geometry.
+  The rebuild key no longer contains `cursor` or `annotationsRevision`.
+- **GL hygiene.**
+  - *Parameters.* `getParameter` (`MAX_TEXTURE_SIZE` and the other limits)
+    runs once at init and once on restore, and the values are cached.
+  - *Errors.* `getError` runs only at init, on restore, when the canvas
+    backing store, atlas texture or instance buffer is (re)allocated, and in
+    an explicit diagnostic method. It never runs per frame or per upload.
+  - *Texture validity.* `isTexture` is never called per draw (15.3.8.13 E
+    stays). Failure detection on the hot path relies on `webglcontextlost`.
+- **Palette (follow-up F1, `design-ui-style.md` section 7).**
+  - *Reading tokens.* `palette.ts` reads `--vt-syn-*`, `--vt-text`,
+    `--vt-danger`, `--vt-data-1`, `--vt-text-muted` and `--vt-raised` with
+    `getComputedStyle` once at mount and when the theme changes, and parses
+    them to RGBA.
+  - *Fallback.* `GPU_TOKEN_COLORS` stays as the fallback map with equal
+    values, for hosts without CSS such as jsdom.
+  - *Mapping.* The mapping is the section-7 table. The diagnostic underline
+    moves to `--vt-danger`.
+  - *Hot paths* never read styles.
+- **Context loss, DPR and disposal.**
+  - *Restore* rebuilds the atlas, buffer and slot table from the CPU caches
+    (layout and spans) and marks every segment dirty.
+  - *DPR change* resets the atlas (cells are keyed by DPR) and the segments.
+  - *Dispose* releases everything, and the ledger `usedBytes` returns to 0.
+- **Ported tests.** The `editor/test/canvas/gpu.test.ts` backdrop-upload rows
+  are rewritten to assert the layering contract:
+  - the element is inserted once, under the code canvas, and removed on
+    `null`;
+  - 0 `drawImage` and 0 texture uploads from the visual canvas;
+  - 0 `backdrop` ledger reservations;
+  - the ledger returns to 0 on dispose.
+
+  The run-tile atlas rows are rewritten in cell terms with the same budget,
+  `text-pending`, eviction or reset, and ledger-return assertions.
+  `editor/test/visual/panes.test.ts` asserts the once/`null` callback
+  contract. No other assertion is removed.
+- **Proof** (counting fake GL and canvas factory, default suite:
+  `editor/test/canvas/{gpu,mount,edit-cost}.test.ts`):
+  - *Single-character edit.* `getError` 0, `getParameter` 0, atlas uploads
+    at most the new cells, geometry bytes at most the changed line's
+    segment bytes (slot-table bytes reported separately), and at most 4
+    draw calls.
+  - *Caret move.* `textBuilds` 0.
+  - *Animation-only frame.* 0 atlas uploads, 0 layout builds, 0 staging
+    canvases created, 0 backdrop copies, 0 `mapWireSpan` calls with the
+    revision unchanged, and at most 4 draw calls.
+  - *Behavior.* The behavior checks of 15.3.8.8 (canvas-only text, the
+    readback probe, IME, context loss, DPR, resize) keep passing in both
+    browsers.
+
+**5. Harness correctness (decision 5).** Owner files:
+`editor/test/e2e/{stats.mjs,stats.test.ts,measure.mjs,run.mjs}`. This is a
+correctness fix, not a threshold change.
+
+- **De-duplicated sync samples.** `attributeSync` emits one sample per
+  distinct (onset time, epoch, first presented frame showing it).
+  - Voices that share an onset time and first appear on the same frame
+    yield one sample. Voices first shown on different frames yield one
+    sample per frame.
+  - The sample formula is unchanged.
+- **Dropped frames, reported separately.** Each sample records
+  `droppedFrames = max(0, round((next.frameMs - row.frameMs) / nominal) - 1)`,
+  where `nominal` is the run's median frame interval. The summary reports
+  `syncDroppedFrameSamples`, `syncDroppedFrames` and an informational
+  `syncAbsMsNoDrop` p95/p99. The gate still uses `syncAbsMs` over all
+  de-duplicated samples, with the unchanged 33.4 ms (p95) and 50 ms (p99)
+  thresholds.
+- **Thresholds.**
+  - `THRESHOLDS.textWorkP95Ms` becomes 8.
+  - `targets: { textWorkP95Ms: 4, animationWorkP50Ms: 1 }` is recorded,
+    without gating, in the summary and the evidence table.
+  - Every other threshold is unchanged, and the 250 ms injected stall stays.
+- **Proof** (`stats.test.ts` rows):
+  - 64 voices with one onset on one frame give 1 sample;
+  - the same voices split over 2 frames give 2 samples;
+  - dropped-frame counting is checked;
+  - `evaluate` fails a textWork p95 of 8.1 ms and passes 8.0 ms.
+
+**6. Budgets (decision 6).** These are deterministic counters in the
+default vitest suite, with no wall clock:
+
+| Case (20,000-line fixture where applicable) | Budget |
+|------|--------|
+| Single-char ASCII edit, keystroke task plus next frame | `shape()` <= 1 + newly exposed lines; `measureText` 0; `Text.toString` 0; `Utf8Index` builds 0; synchronous parses 0 (exactly 1 deferred); `getError`/`getParameter` 0; atlas uploads <= new cells; geometry bytes <= changed line segments; draw calls <= 4 |
+| Caret move | `textBuilds` 0; syntax `captures` 0 |
+| Animation-only frame | 0 atlas uploads, 0 layout builds, 0 staging canvases, 0 backdrop copies, 0 `mapWireSpan` (revision unchanged), draw calls <= 4 |
+| Bind panel | mounted rows <= viewport rows (section 1 definition); 0 nodes moved when order is unchanged; 0 rows with `opacity` |
+| Store | notify visits only subscribers of the changed keys |
+| History | after 300 edits, `mapWireSpan(evalSpan, evalRev)` is non-null |
+
+Wall-clock gates run only in the e2e harness: the release wasm and the silent
+harness, the unchanged workload, gating run `run-001`, in WebKit and
+Chromium.
+
+- **Gated:** input p95 <= 50 ms and p99 <= 100 ms; frame interval p95 <= 20
+  ms and p99 <= 50 ms; text-dirty work p95 <= 8 ms; the animation work and
+  A/V sync gates of 15.3.8.8, unchanged.
+- **Recorded, not gated:** a textWork p95 target of 4 ms and an animation
+  p50 target of 1 ms.
+- **Serial perf gate:** `npm run test:perf` (15.3.8.11) is unchanged.
+
+**7. Escalation S: syntax in a Worker (pre-authorized, not yet triggered).**
+
+- **Trigger.** S triggers only when both of these hold after the TEXT and
+  RENDER plans:
+  - the release run fails the input p95, frame p95 or textWork p95 gate in
+    WebKit or Chromium;
+  - the 15.3.8.13 attribution shows the deferred reparse task as the
+    dominant long task overlapping the late frames.
+- **Contract.**
+  - A module Worker, `editor/src/code/syntax-worker.ts`, owns the
+    tree-sitter instance and the tree. It is created with
+    `new Worker(new URL(...), { type: 'module' })`, which needs no new
+    dependency.
+  - The main thread sends the full text once on mount or reset, and after
+    that only per-transaction change lists.
+  - The Worker returns per-line spans for requested line ranges, tagged with
+    the revision. Latest wins.
+  - Until spans for the current revision arrive, the main thread shows the
+    mapped spans of section 3.
+  - If the Worker fails to start, the main-thread deferred mode is used.
+- **Reserved paths.** `editor/src/code/syntax-worker.ts` and
+  `editor/test/code/syntax-worker.test.ts`. Neither file is created unless
+  S triggers.
+- **When S triggers,** a scope record (trigger evidence plus the owning plan)
+  is appended here, and no new design subsection is needed.
+- **Decision F** of 15.3.8.13 (the tick Worker) is separate. If it triggers,
+  it still needs its own amendment.
+
+**8. Plans, order and ownership (decision 8).**
+
+- **Plans.** New serial plans live in `impl-plans/active/canvas-cutover-opt-*.md`.
+  The suggested split and order follow. The plan author may refine the split
+  but must keep the order rules: correctness first, then the plans whose
+  output the later ones consume.
+  1. `canvas-cutover-opt-harness`: section 5.
+  2. `canvas-cutover-opt-history`: section 2. The stale flip goes away once
+     the evaluated revision is pinned.
+  3. `canvas-cutover-opt-dom`: section 1.
+  4. `canvas-cutover-opt-text`: section 3. It keeps the
+     `ShapedLine`/`ShapedRun` contract so the existing renderer keeps
+     working.
+  5. `canvas-cutover-opt-render`: section 4. It consumes the section-3
+     advances and may extend the layout contract additively.
+  6. `canvas-cutover-evidence`: the pending plan, amended for the release
+     re-measure and closeout. It is not an accepted plan, so continuing it is
+     not a redispatch.
+- **Ownership.** Each plan lists concrete files only, with no directories,
+  far below the 512-entry snapshot cap.
+  - *Pre-authorization.* Each plan pre-authorizes generously from
+    `editor/src/{bind,params,code,app,visual,protocol}/*.ts(x)`,
+    `editor/src/bind/bind.css`, `editor/src/code/code.css`,
+    `editor/src/app/theme.css`, their tests,
+    `editor/test/e2e/{stats,measure,run}.mjs` and `stats.test.ts`
+    (riela #132).
+  - *Overlap.* Files may appear in several plans, because only one plan is
+    active at a time. `code/mount.ts` is written by HISTORY, TEXT and RENDER
+    in turn.
+  - *Fixes and additions.* Implementers fix problems inside their writePaths.
+    A small additional path is recorded in the plan and the manifest.
+  - *Manifest.* `impl-plans/active/canvas-cutover-dispatch.json` is amended
+    and checkpoint-committed before dispatch. That changes the fingerprint.
+    The F reference in TASK-511 is renumbered in the same amendment.
+- **Green after every plan.** These must pass after each plan:
+  - the 15.3.8.9 command set;
+  - `npm run check`;
+  - default vitest;
+  - `npm run test:perf`, run alone;
+  - strict clippy;
+  - full nextest (timeout >= 1500 s);
+  - the wasm32 build;
+  - the `editor/src-tauri` cargo check.
+
+  DOM and RENDER verification, outside the sandbox, also runs
+  `cd editor && npm run e2e -- --browser all --profile behavior` without
+  `--write-evidence`.
+- **Verification records.** They follow the session-286 record format:
+  - numeric `exitStatus` 0, outcome `"passed"`, and a positive test count
+    for test commands;
+  - no mutation or negative-control commands;
+  - sensitivity shown by in-test control branches only.
+
+**9. Re-measure and closeout.** CANVAS-EVIDENCE closes the wave.
+
+- **Re-measure.** It rebuilds with `mise run build-wasm-release` and
+  `VACTR_REQUIRE_SESSION_ABI=1 npm run build`. It then runs
+  `npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`
+  on a quiet host until the run exits 0. Post-sink peak is 0 and direct
+  destination connections are 0. The headed WebKit GL fallback installs the
+  sink before any audio node connects.
+- **Evidence document.** `design-docs/specs/design-canvas-editor-evidence.md`
+  records:
+  - the diagnosis baseline (`REPORT.md` table) next to the final numbers;
+  - the raw data paths;
+  - the platform limitations;
+  - the pending physical-iPad checks.
+- **Closeout** (15.3.8.9, with the session-285 additions) does all of the
+  following:
+  - archives the fifteen `canvas-editor-224-*.md` plans, plus
+    `canvas-editor-224-dispatch.json`, and the completed `canvas-cutover-*`
+    plans including `canvas-cutover-opt-*`, each as a concrete path with a
+    superseded or completion note;
+  - updates `impl-plans/README.md`;
+  - appends the 15.3.8.4 erratum and applies the deferred typo fixes;
+  - runs the final gates, including the iOS simulator silent pass;
+  - commits and pushes (non-force) to `origin wf/canvas`.
+
+**Residual risks.**
+
+- **Unexplained WebKit p99.** The WebKit input p99 of 647 ms in proto-c is
+  unexplained. The 100 ms p99 gate stays. Attribution runs before any repair
+  is chosen.
+- **Load-sensitive WebKit numbers.** Headless WebKit numbers are
+  load-sensitive, because WebKit opens a headed GL fallback window. Gating
+  runs need a quiet host.
+- **Deferred reparse cost.** The deferred reparse still costs about 12 ms per
+  edit on the main thread. Escalation S covers the case where it starves
+  frames.
+- **Large refactors.** Virtualization and the cluster atlas are large
+  refactors. They are bounded by ported tests and the e2e behavior profile.
 
 ## 16. Wasm and AudioWorklet Layout
 

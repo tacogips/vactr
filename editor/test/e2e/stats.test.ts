@@ -14,6 +14,7 @@ interface StatsModule {
   lateActiveMismatches(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number}>,stalls:number[]): number;
   rankSelfTime(profile:Record<string,unknown>,top?:number):Array<{functionName:string;url:string;line:number;selfMs:number;share:number}>;
   classifyWithControl(metricKey:string,path:string,productValue:number,controlValue:number,threshold:number):'pass'|'fail'|'limitation';
+  phaseSummary(rows:number[][]):Record<string,{spans:number;p50:number|null;p95:number|null;p99:number|null;totalMs:number}>;
 }
 const spec: string = '../../test/e2e/stats.mjs';
 const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
@@ -21,6 +22,15 @@ const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
 const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:12}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, onsetCount:1 };
 describe('canvas evidence statistics', () => {
   it('uses nearest rank percentiles', () => expect(stats.percentile(Array.from({ length: 100 }, (_, i) => i + 1), 95)).toBe(95));
+  it('summarizes exclusive phase rows and leaves empty phases unmeasured', () => {
+    const rows=[[0,0,1,2,0,0,0,0,0],[5,10,3,0,0,0,4,0,0],[5,20,5,0,0,0,0,0,0]];
+    const result=stats.phaseSummary(rows);
+    expect(result.input).toMatchObject({spans:3,p50:3,p95:5,p99:5,totalMs:9});
+    expect(result.caret).toMatchObject({spans:1,p50:2,p95:2,p99:2,totalMs:2});
+    expect(result.syntax).toMatchObject({spans:0,p50:null,p95:null,p99:null,totalMs:0});
+    expect(result.upload).toMatchObject({spans:1,p50:4,p95:4,p99:4,totalMs:4});
+    expect(Object.keys(result)).toEqual(['input','caret','shaping','syntax','upload','frame','tick']);
+  });
   it('fails an input p95 of 51 ms', () => expect(stats.evaluate({ metrics: { ...passingMetrics, inputLatencyMs: { p95: 51, p99:80 } } }).pass).toBe(false));
   it('pairs a post-dispatch revision with its next presentation frame', () => {
     const result = stats.pairInputLatency([[100, 1, 0, 3], [111, 1, 0, 4]], [[105, 4]]);

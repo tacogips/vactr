@@ -187,12 +187,39 @@ describe('shaped UTF-16 layout', () => {
 });
 
 describe('GPU shaped-run atlas', () => {
+  it('reuses one ledger-accounted raster canvas until disposal', () => {
+    const r = recordingGL(); const raster = rasterizer(); const createCanvas = vi.fn(raster.createCanvas);
+    const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, createCanvas);
+    const run = { text: 'abc', from: 0, to: 3, x: 0, width: 24 };
+    a.tile({ run, font, dpr: 1, x: 0, width: 24 });
+    a.tile({ run: { ...run, from: 3, to: 6 }, font, dpr: 1, x: 0, width: 24 });
+    expect(createCanvas).toHaveBeenCalledTimes(1);
+    expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(2);
+    const geometryWithStaging = b.counters.byKind.geometry;
+    expect(geometryWithStaging).toBeGreaterThanOrEqual(24 * 20 * 4);
+    a.endFrame(); expect(b.counters.byKind.geometry).toBeLessThan(geometryWithStaging);
+    a.beginFrame(); a.tile({ run: { ...run, from: 6, to: 9 }, font, dpr: 1, x: 0, width: 24 });
+    expect(createCanvas).toHaveBeenCalledTimes(1);
+    a.dispose(); expect(b.usedBytes).toBe(0);
+  });
   it('crops the whole run and masks syntax without reshaping substrings', () => {
     const r = recordingGL(64); const raster = rasterizer(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, raster.createCanvas);
     const run = { text: 'ffi日本', from: 0, to: 5, x: 0, width: 50 };
     const tile = a.tile({ run, font, dpr: 1, x: 32, width: 18, styles: [{ from: 3, to: 5, color: '#ff0000' }] })!;
     expect(tile.width).toBe(18); expect(raster.text.map(t => t.text)).toEqual(['ffi日本', 'ffi日本']); expect(raster.text[0]!.x).toBe(-32);
     expect(raster.crops).toContainEqual([-14, 0, 32, 20]);
+    a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
+  });
+  it('rasterizes a styled multi-tile run once and releases its bounded raster', () => {
+    const r = recordingGL(64); const raster = rasterizer(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, raster.createCanvas);
+    const run = { text: 'a'.repeat(32), from: 0, to: 32, x: 0, width: 256 };
+    const styles = [{ from: 8, to: 12, color: '#ff0000' }];
+    for (const x of [0, 64, 128, 192]) expect(a.tile({ run, font, dpr: 1, x, width: 64, styles })).not.toBeNull();
+    expect(raster.text.map(t => t.text)).toEqual([run.text, run.text]);
+    expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(4);
+    const cachedRasterBytes = b.counters.byKind.geometry;
+    expect(cachedRasterBytes).toBeGreaterThan(0);
+    a.endFrame(); expect(b.counters.byKind.geometry).toBeLessThan(cachedRasterBytes);
     a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
   it('caches by text/font/fallback/DPR/style and deletes evicted tiles', () => {
@@ -204,6 +231,16 @@ describe('GPU shaped-run atlas', () => {
     a.tile({ ...req, color: '#ff0000' }); a.tile({ ...req, dpr: 2 });
     expect(a.stats.evictions).toBeGreaterThan(0); expect(b.usedBytes).toBeLessThanOrEqual(17000);
     a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
+  });
+  it('reuses syntax tiles when an unchanged run shifts in document offsets', () => {
+    const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
+    const run = { text: 'abc', from: 10, to: 13, x: 0, width: 24 };
+    const first = a.tile({ run, font, dpr: 1, x: 0, width: 24, styles: [{ from: 11, to: 12, color: '#ff0000' }] })!;
+    run.from += 10; run.to += 10;
+    const shifted = a.tile({ run, font, dpr: 1, x: 0, width: 24, styles: [{ from: 21, to: 22, color: '#ff0000' }] })!;
+    expect(shifted.texture).toBe(first.texture);
+    expect(a.stats).toMatchObject({ uploads: 1, hits: 1 });
+    a.dispose(); expect(b.usedBytes).toBe(0);
   });
   it('rolls back reservations and textures on upload failure', () => {
     const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas); r.failNextUpload();

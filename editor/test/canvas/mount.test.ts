@@ -15,6 +15,8 @@ import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 import { CanvasRenderer } from '../../src/code/renderer';
+import { CodeViewHost } from '../../src/code/view-host';
+import { TextLayout } from '../../src/code/layout';
 import { startFrameLoop } from '../../src/visual/frame';
 import { WasmCore } from '../../src/protocol/wasm';
 import { VactrHost } from '../../worklet/host.js';
@@ -86,6 +88,26 @@ afterEach(() => {
 });
 
 describe('headless canvas mount', () => {
+  it('invalidates the cached rect on text frames and resets width for one full-document replacement', () => {
+    const rig = setup();
+    const invalidate = vi.spyOn(CodeViewHost.prototype, 'invalidateRect');
+    const refresh = vi.spyOn(CodeViewHost.prototype, 'refreshRect');
+    const reset = vi.spyOn(TextLayout.prototype, 'resetWidestShaped');
+    rig.host.step(16);
+    invalidate.mockClear(); refresh.mockClear();
+    const surface = rig.deps.code!.surface, oldLength = surface.state.doc.length;
+    surface.dispatch({ changes: { from: 0, to: oldLength, insert: 'replacement document' } });
+    expect(reset).toHaveBeenCalledOnce();
+    rig.host.step(32);
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenCalledOnce();
+    refresh.mockClear();
+    rig.transport.emit({ kind: 'playing', body: { events: [] } });
+    rig.host.step(48);
+    expect(invalidate).toHaveBeenCalledOnce();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it('edits through the accessibility bridge and keeps visible source off the DOM', () => {
     const rig = setup(); const surface = rig.deps.code?.surface;
     expect(surface).toBeDefined();
@@ -114,6 +136,7 @@ describe('headless canvas mount', () => {
     const install = vi.spyOn(PerfHook, 'installPerfHook');
     const rig = setup();
     expect((window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf).toBeUndefined();
+    expect((globalThis as typeof globalThis & { __vactrPhaseTimer?: unknown }).__vactrPhaseTimer).toBeUndefined();
     expect(install).not.toHaveBeenCalled();
     rig.mounted.dispose();
   });
@@ -122,9 +145,19 @@ describe('headless canvas mount', () => {
     const audible = new AudibleClock({ at: () => ({ time: 1.05, uncertainty: 0.002, provenance: 'measured' }) });
     const rig = setup(true, true, audible); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf;
     expect(perf).toBeDefined();
+    expect((globalThis as typeof globalThis & { __vactrPhaseTimer?: unknown }).__vactrPhaseTimer).toBeDefined();
+    const textarea = rig.code.querySelector('textarea')!;
+    textarea.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: 'a', bubbles: true, cancelable: true }));
     const surface = rig.deps.code!.surface;
     surface.dispatch({ changes: { from: 0, insert: 'let x 1' } });
     rig.host.step(16);
+    const phaseRows = perf!.phases().rows;
+    expect(perf!.phases().names).toEqual(['input', 'caret', 'shaping', 'syntax', 'upload', 'frame', 'tick']);
+    expect(phaseRows.some((row) => row[0] === perf!.phases().names.indexOf('input'))).toBe(true);
+    expect(phaseRows.some((row) => row[0] === perf!.phases().names.indexOf('frame'))).toBe(true);
+    expect(phaseRows.every((row) => row.length === 9)).toBe(true);
+    expect(phaseRows.some((row) => row[perf!.phases().names.indexOf('shaping') + 2]! > 0)).toBe(true);
+    expect(phaseRows.some((row) => row[perf!.phases().names.indexOf('upload') + 2]! > 0)).toBe(true);
     expect(perf!.counters().gpuStatus.kind).not.toBe('unavailable');
     expect(perf!.counters().renderer.textBuilds).toBeGreaterThan(0);
     rig.deps.store.apply({ kind: 'tempo', body: { bpm: 120, beats_per_cycle: 4, cycle: [0, 1], transport: {
@@ -151,17 +184,32 @@ describe('headless canvas mount', () => {
   it('does no whole-document work on an edit frame or active animation-only frames', () => {
     const rig = setup(true, true); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
     const surface = rig.deps.code!.surface;
-    const largeText = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`).join('\n');
+    const longLine = `const ${'x'.repeat(1_530)} 日本 👨‍👩‍👧‍👦`;
+    const documentLines = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`);
+    documentLines[0] = longLine;
+    const largeText = documentLines.join('\n');
     surface.dispatch({ changes: { from: 0, insert: largeText } }); rig.host.step(16);
     rig.transport.emit({ kind: 'playing', body: { events: [{ slot: 'd1', beat: [0, 1], time: 0, end_time: 100,
-      dur: [1, 1], src: { file: 'main.vact', span: { start: 0, end: 5 }, doc_revision: rig.deps.code!.currentRevision('main.vact'), form_gen: 1 } }] } });
-    const position = surface.state.doc.line(10_001).from + 12;
+      dur: [1, 1], src: { file: 'main.vact', span: { start: 0, end: longLine.length }, doc_revision: rig.deps.code!.currentRevision('main.vact'), form_gen: 1 } }] } });
+    const position = surface.state.doc.line(2).from + 12;
     surface.dispatch({ selection: { anchor: position } });
     const textarea = rig.code.querySelector('textarea[aria-label="Code editor"]') as HTMLTextAreaElement;
+    rig.host.step(20);
+    const layoutStats = perf.counters().layout;
+    const segment = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+    const animationCalls = layoutStats.measuredTextCalls, animationChars = layoutStats.measuredTextChars;
+    const animationSegments = layoutStats.segmentations;
+    for (let frame = 0; frame < 3; frame++) rig.host.step(24 + frame * 16);
+    expect(layoutStats.measuredTextCalls).toBe(animationCalls);
+    expect(layoutStats.measuredTextChars).toBe(animationChars);
+    expect(layoutStats.segmentations).toBe(animationSegments);
+    expect(segment).not.toHaveBeenCalled();
+    const measuredBeforeEdit = layoutStats.measuredTextChars;
     const toString = vi.spyOn(Text.prototype, 'toString');
     const sliceString = vi.spyOn(Object.getPrototypeOf(surface.state.doc) as Text & { sliceString: Text['sliceString'] }, 'sliceString');
     textarea.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true }));
-    rig.host.step(32);
+    rig.host.step(72);
+    expect(layoutStats.measuredTextChars - measuredBeforeEdit).toBeLessThanOrEqual(4 * documentLines[1]!.length + 4_096);
     const editHadLargeSlice = sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024);
     const builds = perf.counters().renderer.textBuilds;
     toString.mockClear(); sliceString.mockClear();
@@ -170,6 +218,11 @@ describe('headless canvas mount', () => {
     expect(sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024)).toBe(false);
     expect(perf.counters().renderer.textBuilds).toBe(builds);
     expect(editHadLargeSlice).toBe(false);
+    rig.mounted.dispose();
+    const controlRig = setup(true, true); const controlPerf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    controlRig.deps.code!.surface.dispatch({ changes: { from: 0, insert: 'const fresh = 1' } }); controlRig.host.step(16);
+    expect(controlPerf.counters().layout.measuredTextCalls).toBeGreaterThan(0);
+    segment.mockRestore();
   });
 
   it('keeps each animation-only ABI frame bounded and free of layout and GL probes', () => {

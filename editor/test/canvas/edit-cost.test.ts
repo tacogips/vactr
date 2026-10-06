@@ -1,6 +1,7 @@
 import { Text } from '@codemirror/state';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TextLayout } from '../../src/code/layout';
+import { PhaseTimer } from '../../src/code/frame';
 import { InputController } from '../../src/code/input';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
@@ -109,5 +110,97 @@ describe('bounded document edit costs', () => {
     const changed = doc.replace(doc.line(10_001).from, doc.line(10_001).from, Text.of(['x']));
     layout.setText(changed); layout.shape(9_999);
     expect(layout.stats.builds).toBe(builds);
+  });
+
+  it('reuses unchanged shaped lines after a prefix edit shifts their document offsets', () => {
+    const doc = Text.of(lines), layout = new TextLayout({ font: '', measureText: text => ({ width: text.length * 8 }) },
+      { font: '16px mono', lineHeight: 20, baseline: 16 });
+    layout.setText(doc);
+    const lineNumber = 15_000, shaped = layout.shape(lineNumber);
+    const shapedFrom = shaped.from, shapedTo = shaped.to, firstRun = shaped.runs[0]!;
+    const runFrom = firstRun.from, runTo = firstRun.to;
+    const builds = layout.stats.builds;
+    const changed = doc.replace(0, 0, Text.of(['x']));
+    layout.setText(changed);
+    const reused = layout.shape(lineNumber);
+    expect(layout.stats.builds).toBe(builds);
+    expect(reused).not.toBe(shaped);
+    expect(reused.from).toBe(shapedFrom + 1);
+    expect(reused.to).toBe(shapedTo + 1);
+    expect(reused.runs[0]).toBe(firstRun);
+    expect(reused.runs[0]?.from).toBe(runFrom + 1);
+    expect(reused.runs[0]?.to).toBe(runTo + 1);
+  });
+
+  it('sets the canvas metrics font once and only updates it after a font change', () => {
+    let currentFont = '', assignments = 0;
+    const metrics = {
+      get font() { return currentFont; },
+      set font(value: string) { currentFont = value; assignments++; },
+      measureText(text: string) { return { width: text.length * 8 }; },
+    };
+    const layout = new TextLayout(metrics, { font: '13px mono', lineHeight: 18, baseline: 14 });
+    layout.setText(Text.of(lines.slice(0, 100)));
+    layout.shape(0); layout.shape(1); layout.shape(2);
+    expect(assignments).toBe(1);
+    layout.setFont({ ...layout.font, font: '14px mono' });
+    expect(assignments).toBe(2);
+    layout.shape(0);
+    expect(assignments).toBe(2);
+  });
+  it('bounds long-line measurements without splitting grapheme clusters', () => {
+    const text = `${'x'.repeat(1546)}e\u0301${'y'.repeat(300)}`;
+    const measured: string[] = [];
+    const segment = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+    const layout = new TextLayout({ font: '', measureText: value => { measured.push(value); return { width: value.length * 8 }; } },
+      { font: '13px mono', lineHeight: 18, baseline: 14 });
+    layout.phases = new PhaseTimer(() => 0);
+    layout.setDocument(text);
+    const line = layout.shape(0);
+    expect(segment).toHaveBeenCalledTimes(1);
+    expect(line.runs.map(run => run.text).join('')).toBe(text);
+    expect(line.runs).toHaveLength(1);
+    expect(measured.every(part => part.length <= 256)).toBe(true);
+    expect(measured.filter(part => part.includes('e\u0301'))).toHaveLength(1);
+    expect(measured.some(part => part.endsWith('e'))).toBe(false);
+    expect(line.width).toBe(text.length * 8);
+    expect(layout.stats.maxMeasuredTextLength).toBeLessThanOrEqual(256);
+    expect(layout.stats.measuredTextCalls).toBe(measured.length);
+    const calls = layout.stats.measuredTextCalls;
+    const midpoint = layout.offsetInRun(line.runs[0]!, line.width / 2, 1);
+    expect(midpoint).toBeGreaterThanOrEqual(922);
+    expect(midpoint).toBeLessThanOrEqual(924);
+    expect(layout.stats.measuredTextCalls).toBeGreaterThan(calls);
+    const indexedCalls = layout.stats.measuredTextCalls;
+    expect(layout.offsetInRun(line.runs[0]!, line.width / 2, 1)).toBe(midpoint);
+    expect(layout.stats.measuredTextCalls - indexedCalls).toBe(0);
+    const beforeAdvance = layout.stats.measuredTextCalls;
+    expect(layout.advance(line, line.from + midpoint)).toBe(midpoint * 8);
+    const afterAdvance = layout.stats.measuredTextCalls;
+    expect(layout.advance(line, line.from + midpoint)).toBe(midpoint * 8);
+    expect(layout.stats.measuredTextCalls).toBe(afterAdvance);
+    expect(afterAdvance - beforeAdvance).toBeLessThanOrEqual(1);
+    expect(layout.stats.maxMeasuredTextLength).toBeLessThanOrEqual(256);
+    expect(segment).toHaveBeenCalledTimes(1);
+    layout.invalidate();
+    layout.shape(0);
+    expect(segment).toHaveBeenCalledTimes(2);
+  });
+  it('caches short-run prefix widths shared by caret and tile position lookups', () => {
+    const measured: string[] = [];
+    const layout = new TextLayout({ font: '', measureText: text => { measured.push(text); return { width: text.length * 8 }; } },
+      { font: '13px mono', lineHeight: 18, baseline: 14 });
+    layout.phases = new PhaseTimer(() => 0);
+    layout.setDocument('abcdefghij');
+    const line = layout.shape(0), run = line.runs[0]!;
+    const before = layout.stats.measuredTextCalls;
+    const position = layout.offsetInRun(run, 32, 1);
+    const afterFirstLookup = layout.stats.measuredTextCalls;
+    expect(position).toBe(run.from + 4);
+    expect(afterFirstLookup).toBeGreaterThan(before);
+    expect(layout.offsetInRun(run, 32, 1)).toBe(position);
+    expect(layout.advance(line, position)).toBe(32);
+    expect(layout.stats.measuredTextCalls).toBe(afterFirstLookup);
+    expect(measured.every(text => text.length <= 256)).toBe(true);
   });
 });

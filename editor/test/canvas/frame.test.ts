@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FrameScheduler, PerfRecorder, type FrameHost } from '../../src/code/frame';
+import { FrameScheduler, PerfRecorder, PhaseTimer, type FrameHost } from '../../src/code/frame';
 
 class TestHost {
   ratio = 1; innerHeight = 800; next = 1;
@@ -123,6 +123,18 @@ describe('FrameScheduler', () => {
 });
 
 describe('PerfRecorder', () => {
+  it('records exclusive nested phase times, recovers after a mismatch and wraps its ring', () => {
+    const times = [0, 2, 7, 10]; let nextTime = 11;
+    const timer = new PhaseTimer(() => times.shift() ?? nextTime++);
+    timer.begin('input'); timer.begin('caret'); timer.end('caret'); timer.end('input');
+    const row = timer.rows()[0]!;
+    expect(row.slice(0, 4)).toEqual([0, 0, 5, 5]);
+    expect(row.slice(4).every((value) => value === 0)).toBe(true);
+    expect(() => timer.end('input')).toThrow('Mismatched performance phase end: input');
+    for (let i = 0; i < 4097; i++) { timer.begin('frame'); timer.end('frame'); }
+    const rows = timer.rows(); expect(rows).toHaveLength(4096);
+    expect(rows[0]![1]).toBeGreaterThan(10); expect(rows.at(-1)![1]).toBeGreaterThan(rows[0]![1]!);
+  });
   it('retains only the newest 4096 frame and key records', () => {
     const perf = new PerfRecorder(); for (let i = 0; i < 5000; i++) { perf.recordFrame(i, 1, i % 2 === 0, 7); perf.recordKey(i, 7); }
     const snapshot = perf.snapshot(); expect(snapshot.frames).toHaveLength(4096); expect(snapshot.keys).toHaveLength(4096);

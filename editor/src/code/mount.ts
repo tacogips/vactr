@@ -163,16 +163,16 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     },
     onFrame(ctx) {
       if (disposed) return;
+      if (ctx.textDirty) { viewHost.invalidateRect(); viewHost.refreshRect(); }
       const audible = deps.audible?.sample(ctx.frameMs) ?? { time: clock.now(), targetMs: ctx.frameMs, provenance: 'unavailable' as const, valid: false };
-      const active = highlight.tick(ctx.frameMs);
-      playingRanges = active;
+      playingRanges = highlight.tick(ctx.frameMs);
       scheduler?.setActive('playing', highlight.size > 0);
       transport.tick(ctx.frameMs);
       scheduler?.setActive('transport', !!store.tempo);
       if (ctx.textDirty && (displayDirty || displayRevision !== sync.revision)) {
         displayRevision = sync.revision;
         const presentation = input.presentation;
-        if (renderedDoc !== presentation.doc) { renderedDoc = presentation.doc; renderer.setText(renderedDoc); }
+        if (renderedDoc !== presentation.doc) { renderedDoc = presentation.doc; timed('upload', () => renderer.setText(renderedDoc!)); }
         displayDirty = false;
       }
       if (ctx.textDirty) {
@@ -181,24 +181,30 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const last = Math.min(surface.state.doc.lines, Math.ceil((view.scrollTop + view.height * 2) / layout.font.lineHeight));
         const from = surface.state.doc.line(Math.min(surface.state.doc.lines, first + 1)).from;
         const to = surface.state.doc.line(Math.max(1, last)).to;
-        const result = syntaxProvider.spans(surface.state, from, to, 16384);
+        const range = { view, from, to };
+        const result = timed('syntax', () => syntaxProvider.spans(surface.state, range.from, range.to, 16384));
         syntaxTruncated += result.truncated ? 1 : 0;
         if (syntaxProvider instanceof FallbackSpans) codePane.dataset.syntax = 'fallback';
         const selection = surface.state.selection.main;
-        staticAnnotations = [...result.spans, ...surface.annotationRanges(),
+        const staticRows = [...result.spans, ...surface.annotationRanges(),
           ...(selection.empty ? [] : [{ from: selection.from, to: selection.to, kind: 'selection' as const }]),
-          ...(input.presentation.annotations)];
+          ...input.presentation.annotations];
+        const animatedRows: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
+        const annotations = { staticRows, animatedRows, cursor: input.presentation.cursor };
+        staticAnnotations = annotations.staticRows;
         staticRevision++;
-        const animated: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
-        const cursor = input.presentation.cursor;
-        renderer.setViewport(view, viewport.dpr);
-        renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor, cursorVisible: true, handles });
+        timed('upload', () => {
+          renderer.setViewport(range.view, viewport.dpr);
+          renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated: annotations.animatedRows, textRevision: displayRevision, cursor: annotations.cursor, cursorVisible: true, handles });
+        });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
       } else {
-        const animated: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
-        renderer.setViewport(viewHost.viewport, viewport.dpr);
-        renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
+        const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
+        timed('upload', () => {
+          renderer.setViewport(viewHost.viewport, viewport.dpr);
+          renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
+        });
       }
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas((background) => {
         renderer.setBackground(background, ++backgroundRevision); scheduler?.request();
@@ -214,6 +220,9 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
           beatFlash: transport.state.beatFlash, revision: sync.revision, handles: handles.length, epoch: store.transportSample?.epoch ?? null });
       }
     } });
+  const phaseTimer = scheduler.perf?.phases ?? null;
+  input.setPhases(phaseTimer); viewHost.setPhases(phaseTimer); renderer.setPhases(phaseTimer);
+  if (phaseTimer) (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer = phaseTimer;
   scheduler.invalidateText();
 
   const keyRecord = (event: Event): void => scheduler?.perf?.recordKey((event as KeyboardEvent).timeStamp, sync.revision);
@@ -223,10 +232,19 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     else evalRanges = evalRanges.filter((r) => !(r.from === range.from && r.to === range.to));
     scheduler.setActive('eval', evalRanges.length > 0); scheduler.request();
   });
+  let surfaceDocLength = surface.state.doc.length;
   const stopSurface = surface.subscribe((update) => {
     scheduler.invalidateText();
-    if (update.docChanged) hideDiagnosticTip();
-    if (update.docChanged) syntaxProvider.noteChanges?.(update.changes, update.state);
+    if (update.docChanged) {
+      let changeCount = 0, wholeDocumentReplacement = false;
+      update.changes.iterChanges((fromA, toA) => {
+        changeCount++;
+        if (fromA === 0 && toA === surfaceDocLength) wholeDocumentReplacement = true;
+      });
+      if (changeCount === 1 && wholeDocumentReplacement) layout.resetWidestShaped();
+      surfaceDocLength = update.state.doc.length;
+      hideDiagnosticTip(); syntaxProvider.noteChanges?.(update.changes, update.state);
+    }
   });
   diagnostics.attach(surface);
   const showDiagnosticTip = (event: Event): void => {
@@ -283,8 +301,16 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       disposeFormat(); completion?.dispose(); syntaxProvider.dispose?.(); backgroundStop?.();
       transport.dispose(); browser.dispose(); surface.dispose(); disposeCanvasHost(); hostEl.remove();
       if (deps.code === api) delete deps.code;
+      if (phaseTimer && (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer === phaseTimer)
+        delete (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer;
       removePerfHook(win);
     },
   };
   return mounted;
+}
+
+function timed<T>(phase: import('./frame').PerfPhase, run: () => T): T {
+  const timer = (globalThis as typeof globalThis & { __vactrPhaseTimer?: import('./frame').PhaseTimer }).__vactrPhaseTimer;
+  timer?.begin(phase);
+  try { return run(); } finally { timer?.end(phase); }
 }

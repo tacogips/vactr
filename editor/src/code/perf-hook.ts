@@ -5,7 +5,7 @@ import type { CodeSurface } from './surface';
 import type { HighlightScheduler } from './highlight';
 import type { CanvasRenderer } from './renderer';
 import type { ResourceLedger } from './resources';
-import type { PerfRecorder } from './frame';
+import { PERF_PHASES, type PerfPhase, type PerfRecorder } from './frame';
 import type { TransportSample } from '../protocol/types';
 
 export interface PresentedRecord {
@@ -15,6 +15,7 @@ export interface PresentedRecord {
 export interface OnsetRecord { time: number; end: number; from: number; to: number; epoch: string | null; receivedMs: number }
 export interface VactrPerf {
   perf: PerfRecorder;
+  phases(): { names: PerfPhase[]; rows: number[][] };
   revision(): number;
   ledger: ResourceLedger;
   doc(): string;
@@ -24,7 +25,7 @@ export interface VactrPerf {
   transportSample(): TransportSample | null;
   counters(): { highlight: HighlightScheduler['stats']; probe: null; client: Client['queueStats']; syntaxTruncated: number;
     textPending: boolean; renderer: CanvasRenderer['stats']; gpuStatus: { kind: string; effectiveDpr: number };
-    ledger: ResourceLedger['counters']; usedBytes: number };
+    layout: CanvasRenderer['layout']['stats']; ledger: ResourceLedger['counters']; usedBytes: number };
   disposeCode(): void;
 }
 
@@ -44,7 +45,8 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
     return out;
   };
   const api: VactrPerf = {
-    perf: input.perf, revision: input.revision, ledger: input.ledger,
+    perf: input.perf, phases: () => ({ names: [...PERF_PHASES], rows: input.perf.phases.rows() }),
+    revision: input.revision, ledger: input.ledger,
     doc: () => input.surface.state.doc.toString(),
     selection: () => ({ anchor: input.surface.state.selection.main.anchor, head: input.surface.state.selection.main.head }),
     presented: () => ordered(presentedRows, presentedNext, presentedCount),
@@ -53,7 +55,7 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
     counters: () => ({ highlight: input.highlight.stats, probe: null, client: input.client.queueStats,
       syntaxTruncated: input.syntaxTruncated(), textPending: input.renderer.textPending, renderer: input.renderer.stats,
       gpuStatus: { kind: input.renderer.status.kind, effectiveDpr: input.renderer.status.effectiveDpr },
-      ledger: input.ledger.counters, usedBytes: input.ledger.usedBytes }),
+      layout: input.renderer.layout.stats, ledger: input.ledger.counters, usedBytes: input.ledger.usedBytes }),
     disposeCode: input.disposeCode,
   };
   Object.defineProperty(api, 'recordPresented', { value: (record: PresentedRecord) => {

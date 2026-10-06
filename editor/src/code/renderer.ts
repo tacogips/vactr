@@ -3,6 +3,7 @@ import type { CodeAnnotation, CodeRect } from '../app/apis';
 import { GlyphAtlas, type CanvasFactory, type RunStyle } from './atlas';
 import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from './layout';
 import { ResourceLedger, effectiveSize, RESOURCE_LIMITS, type Reservation } from './resources';
+import type { PhaseTimer } from './frame';
 
 export interface GpuStatus {
   kind: 'ready' | 'degraded' | 'unavailable' | 'context-lost'; message: string;
@@ -107,6 +108,7 @@ export class CanvasRenderer {
   get status(): GpuStatus { return this.statusValue; }
   get textPending(): boolean { return this.pendingText; }
   get atlasStats(): Readonly<{ uploads: number; hits: number; evictions: number }> { return this.atlas?.stats ?? { uploads: 0, hits: 0, evictions: 0 }; }
+  setPhases(phases: PhaseTimer | null): void { this.layout.phases = phases; }
   setDocument(text: string): void { this.layout.setDocument(text); this.clearDrawCache(); }
   setText(doc: Text): void { this.layout.setText(doc); this.clearDrawCache(); }
   setViewport(view: LayoutViewport, dpr = 1): void {
@@ -237,7 +239,7 @@ export class CanvasRenderer {
           const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
           this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, [0.53, 0.75, 0.82, 1]);
         }
-        this.collecting = null; this.drawWhileCollecting = false; this.stats.textBuilds++;
+      this.collecting = null; this.drawWhileCollecting = false; this.stats.textBuilds++;
         if (!this.pendingText) { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = key; this.pendingStartLine = 0; }
         else { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = ''; }
       } else {
@@ -246,8 +248,9 @@ export class CanvasRenderer {
       this.unclip();
       this.stats.frames++;
       if (unsupported) this.report('degraded', 'Mixed RTL hit testing is unsupported'); else this.reportReady();
+      this.atlas.endFrame();
       return true;
-    } catch (e) { this.fail(e); return false; }
+    } catch (e) { this.atlas.endFrame(); this.fail(e); return false; }
   }
   private labelRun(text: string, width: number): ShapedRun {
     // Labels are bounded overlays, not document source. Keep stable identity across idle frames.
@@ -301,15 +304,21 @@ export class CanvasRenderer {
     const left = gutter ? 0 : this.view.gutter ?? 48; const right = gutter ? this.view.gutter ?? 48 : this.view.width;
     const first = Math.max(0, Math.floor((left - x) / step));
     const last = Math.min(Math.ceil(run.width / step), Math.ceil((right - x) / step));
+    const fullRunRaster = atlas.supportsRunRaster(run, this.layout.font, this.scale);
+    const runStyles: RunStyle[] = fullRunRaster
+      ? styles.filter(a => a.kind === 'syntax' && a.to > run.from && a.from < run.to)
+        .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: GPU_TOKEN_COLORS[a.className ?? ''] ?? '#d8dee9' }))
+      : [];
     // Draw during rebuild before a later miss can evict this tile from the atlas.
     for (let i = first; i < last; i++) {
       const offset = i * step; const width = Math.min(step, run.width - offset);
       if (width <= 0) continue;
-      const from = styles.length ? this.layout.offsetInRun(run, offset, -1) : run.from;
-      const to = styles.length ? this.layout.offsetInRun(run, offset + width, 1) : run.to;
-      const tileStyles: RunStyle[] = [];
-      for (const a of styles) if (a.kind === 'syntax' && a.to > from && a.from < to) {
-        tileStyles.push({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: GPU_TOKEN_COLORS[a.className ?? ''] ?? '#d8dee9' });
+      let tileStyles = runStyles;
+      if (!fullRunRaster && styles.length) {
+        const from = this.layout.offsetInRun(run, offset, -1);
+        const to = this.layout.offsetInRun(run, offset + width, 1);
+        tileStyles = styles.filter(a => a.kind === 'syntax' && a.to > from && a.from < to)
+          .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: GPU_TOKEN_COLORS[a.className ?? ''] ?? '#d8dee9' }));
       }
       const tile = atlas.tile({ run, font: this.layout.font, dpr: this.scale, x: offset, width, styles: tileStyles, color });
       if (!tile) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; continue; }

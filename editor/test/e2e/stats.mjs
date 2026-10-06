@@ -13,6 +13,15 @@ export function percentile(values, p) {
   return sorted[Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)];
 }
 
+export function phaseSummary(rows) {
+  const names = ['input', 'caret', 'shaping', 'syntax', 'upload', 'frame', 'tick'];
+  return Object.fromEntries(names.map((name, index) => {
+    const values = (rows ?? []).map((row) => Number(row[index + 2])).filter((value) => Number.isFinite(value) && value > 0);
+    return [name, { spans: values.length, p50: percentile(values, 50), p95: percentile(values, 95),
+      p99: percentile(values, 99), totalMs: values.reduce((sum, value) => sum + value, 0) }];
+  }));
+}
+
 export function pairInputLatency(frames, keys) {
   const orderedFrames = frames.filter((row) => Number.isFinite(Number(row[0])) && Number.isFinite(Number(row[3])))
     .map((row) => row.map(Number)).sort((a, b) => a[0] - b[0]);

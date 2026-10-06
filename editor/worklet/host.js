@@ -111,7 +111,13 @@ export class VactrHost {
       this.now = Math.max(this.lastTick, fresh);
       if (this.lastTick < 0 || this.now - this.lastTick >= this.tickEvery) {
         this.lastTick = this.now;
-        this.x[this.fn.tick](this.now);
+        const phases = globalThis.__vactrPhaseTimer;
+        if (phases) phases.begin('tick');
+        try {
+          this.x[this.fn.tick](this.now);
+        } finally {
+          if (phases) phases.end('tick');
+        }
       }
     }
     this.flush();

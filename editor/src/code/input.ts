@@ -4,6 +4,7 @@ import type { CodeAnnotation } from '../app/apis';
 import { CodeSurface } from './surface';
 import { AccessibilityBridge, boundary } from './accessibility';
 import { KeyboardController, type KeyboardOptions } from './keyboard';
+import type { PhaseTimer } from './frame';
 
 export interface InputPresentation { doc: Text; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
 export interface InputOptions extends KeyboardOptions {
@@ -29,25 +30,25 @@ export class InputController {
     this.accessibility = new AccessibilityBridge(surface, container, options.label);
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
-    this.listen(el, 'compositionstart', () => { this.surface.notifyCompositionStart(); this.beginComposition(); });
-    this.listen(el, 'compositionupdate', (event) => this.updateComposition((event as CompositionEvent).data));
-    this.listen(el, 'compositionend', (event) => this.endComposition((event as CompositionEvent).data));
-    this.listen(el, 'beforeinput', (event) => this.beforeInput(event as InputEvent));
-    this.listen(el, 'input', (event) => this.input(event as InputEvent));
+    this.listen(el, 'compositionstart', () => this.withInput(() => { this.surface.notifyCompositionStart(); this.beginComposition(); }));
+    this.listen(el, 'compositionupdate', (event) => this.withInput(() => this.updateComposition((event as CompositionEvent).data)));
+    this.listen(el, 'compositionend', (event) => this.withInput(() => this.endComposition((event as CompositionEvent).data)));
+    this.listen(el, 'beforeinput', (event) => this.withInput(() => this.beforeInput(event as InputEvent)));
+    this.listen(el, 'input', (event) => this.withInput(() => this.input(event as InputEvent)));
     this.listen(el, 'select', () => {
       if (this.composing || el.value !== this.accessibility.window.value) return;
       const selection = this.accessibility.readSelection();
       if (selection) this.surface.dispatch({ selection });
     });
-    this.listen(el, 'keydown', (event) => {
+    this.listen(el, 'keydown', (event) => this.withInput(() => {
       const key = event as KeyboardEvent;
       if (this.composing && key.key === 'Escape') { key.preventDefault(); this.cancelComposition(); return; }
       if (!this.composing) this.trailingComposition = false;
       if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);
-    });
-    this.listen(el, 'copy', (event) => this.clipboard(event as ClipboardEvent, 'copy'));
-    this.listen(el, 'cut', (event) => this.clipboard(event as ClipboardEvent, 'cut'));
-    this.listen(el, 'paste', (event) => this.clipboard(event as ClipboardEvent, 'paste'));
+    }));
+    this.listen(el, 'copy', (event) => this.withInput(() => this.clipboard(event as ClipboardEvent, 'copy')));
+    this.listen(el, 'cut', (event) => this.withInput(() => this.clipboard(event as ClipboardEvent, 'cut')));
+    this.listen(el, 'paste', (event) => this.withInput(() => this.clipboard(event as ClipboardEvent, 'paste')));
     this.listen(el, 'blur', () => { this.surface.notifyBlur(); this.cancelComposition(); });
     const position = () => this.accessibility.position();
     this.listen(window, 'resize', position);
@@ -60,6 +61,7 @@ export class InputController {
     });
     this.publish();
   }
+  setPhases(phases: PhaseTimer | null): void { this.options.phases = phases; this.keyboard.setPhases(phases); }
   get isComposing(): boolean { return this.composing; }
   get presentation(): InputPresentation {
     const stateDoc = this.surface.state.doc, range = this.surface.compositionRange;
@@ -78,6 +80,11 @@ export class InputController {
   }
   private listen(target: EventTarget, name: string, fn: EventListener): void {
     target.addEventListener(name, fn); this.listeners.push(() => target.removeEventListener(name, fn));
+  }
+  private withInput<T>(run: () => T): T {
+    const phases = this.options.phases;
+    phases?.begin('input');
+    try { return run(); } finally { phases?.end('input'); }
   }
   private publish(): void { if (!this.disposed) this.options.onPresentation?.(this.presentation); }
   beginComposition(): void {

@@ -2,6 +2,7 @@ import { isolateHistory } from '@codemirror/commands';
 import type { Text } from '@codemirror/state';
 import { CodeSurface } from './surface';
 import { boundary } from './accessibility';
+import type { PhaseTimer } from './frame';
 
 const words = new Intl.Segmenter(undefined, { granularity: 'word' });
 export function wordRange(text: string, position: number): { from: number; to: number } {
@@ -55,11 +56,15 @@ export interface KeyboardOptions {
   evalAll?: () => void;
   hush?: () => void;
   scrollCaret?: () => void;
+  phases?: PhaseTimer | null;
 }
 export class KeyboardController {
   constructor(private surface: CodeSurface, private options: KeyboardOptions = {}) {}
+  setPhases(phases: PhaseTimer | null): void { this.options.phases = phases; }
   handle(event: KeyboardEvent): boolean {
     if (event.isComposing || event.keyCode === 229 || this.options.composing?.() || this.surface.compositionRange) return false;
+    this.options.phases?.begin('input');
+    try {
     const mod = event.metaKey || event.ctrlKey, key = event.key.toLowerCase();
     let handled = true;
     if (mod && key === 'enter') { if (event.shiftKey) this.options.evalAll?.(); else this.options.evalSelection?.(); }
@@ -98,6 +103,7 @@ export class KeyboardController {
     } else handled = false;
     if (handled) { event.preventDefault(); this.options.scrollCaret?.(); }
     return handled;
+    } finally { this.options.phases?.end('input'); }
   }
   delete(direction: -1 | 1, word = false): void {
     if (this.options.composing?.() || this.surface.compositionRange) return;

@@ -11,11 +11,50 @@ export interface ViewportInfo { width: number; height: number; dpr: number; keyb
 export interface FrameContext { frameMs: number; textDirty: boolean }
 export interface PerfSnapshot { frames: number[][]; keys: number[][] }
 
+export type PerfPhase = 'input' | 'caret' | 'shaping' | 'syntax' | 'upload' | 'frame' | 'tick';
+export const PERF_PHASES: readonly PerfPhase[] = ['input', 'caret', 'shaping', 'syntax', 'upload', 'frame', 'tick'];
+interface PhaseSpan { phase: PerfPhase; startMs: number; childMs: number }
+
+/** Bounded exclusive phase spans. It is created only when performance recording is enabled. */
+export class PhaseTimer {
+  private readonly ring = Array.from({ length: 4096 }, () => Array<number>(2 + PERF_PHASES.length).fill(0));
+  private readonly stack: PhaseSpan[] = [];
+  private next = 0;
+  private count = 0;
+  private startMs = 0;
+  private exclusive = PERF_PHASES.map(() => 0);
+  constructor(private readonly now: () => number = () => performance.now()) {}
+  begin(phase: PerfPhase): void {
+    const startMs = this.now();
+    if (!this.stack.length) { this.startMs = startMs; this.exclusive = PERF_PHASES.map(() => 0); }
+    this.stack.push({ phase, startMs, childMs: 0 });
+  }
+  end(phase: PerfPhase): void {
+    const span = this.stack[this.stack.length - 1];
+    if (!span || span.phase !== phase) throw new Error(`Mismatched performance phase end: ${phase}`);
+    const endMs = this.now(); const duration = Math.max(0, endMs - span.startMs);
+    this.exclusive[PERF_PHASES.indexOf(phase)]! += Math.max(0, duration - span.childMs);
+    this.stack.pop();
+    const parent = this.stack[this.stack.length - 1];
+    if (parent) parent.childMs += duration;
+    else {
+      const row = this.ring[this.next]!; row[0] = PERF_PHASES.indexOf(phase); row[1] = this.startMs;
+      for (let i = 0; i < this.exclusive.length; i++) row[i + 2] = this.exclusive[i]!;
+      this.next = (this.next + 1) % this.ring.length; this.count = Math.min(this.ring.length, this.count + 1);
+    }
+  }
+  rows(): number[][] {
+    const start = (this.next - this.count + this.ring.length) % this.ring.length;
+    return Array.from({ length: this.count }, (_, i) => [...this.ring[(start + i) % this.ring.length]!]);
+  }
+}
+
 /** Fixed-size telemetry rings. Writes reuse preallocated rows; copies are made only on snapshot. */
 export class PerfRecorder {
   private readonly frameRows = Array.from({ length: 4096 }, () => [0, 0, 0, 0]);
   private readonly keyRows = Array.from({ length: 4096 }, () => [0, 0]);
   private frameNext = 0; private frameCount = 0; private keyNext = 0; private keyCount = 0;
+  readonly phases = new PhaseTimer();
   recordFrame(frameMs: number, workMs: number, text: boolean, revision: number): void {
     const row = this.frameRows[this.frameNext]!; row[0] = frameMs; row[1] = workMs; row[2] = text ? 1 : 0; row[3] = revision;
     this.frameNext = (this.frameNext + 1) % this.frameRows.length; this.frameCount = Math.min(this.frameRows.length, this.frameCount + 1);
@@ -60,8 +99,10 @@ export class FrameScheduler {
     }
     const textDirty = this.dirtyText; this.dirtyText = false;
     const start = this.perf ? performance.now() : 0;
+    this.perf?.phases.begin('frame');
     try { this.opts.onFrame({ frameMs: timestamp, textDirty }); this.stats.frames++; if (textDirty) this.stats.textFrames++; }
     finally {
+      this.perf?.phases.end('frame');
       const work = this.perf ? performance.now() - start : 0;
       this.perf?.recordFrame(timestamp, work, textDirty, this.opts.revision?.() ?? 0);
       this.inFrame = false;

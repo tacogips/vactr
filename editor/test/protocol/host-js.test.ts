@@ -23,6 +23,7 @@ function timedHost(fake: FakeCore, currentTime: number) {
 
 describe('worklet/host.js', () => {
   afterEach(() => {
+    delete (globalThis as typeof globalThis & { __vactrPhaseTimer?: unknown }).__vactrPhaseTimer;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -155,6 +156,22 @@ describe('worklet/host.js', () => {
     h.putSample('bd:0', new Float32Array([0.25]), 48000, 1);
     expect(fake.callsOf('session_sample_put')).toHaveLength(1);
     expect(fake.callsOf('sample_put')).toHaveLength(0);
+  });
+
+  it('times session_tick only when the optional phase timer is present', () => {
+    const fake = new FakeCore(); const absent = timedHost(fake, 1.25);
+    const now = vi.spyOn(performance, 'now');
+    absent.h.onWorklet({ t: 1.25 });
+    expect(fake.callsOf('session_tick')).toHaveLength(1);
+    expect(now).not.toHaveBeenCalled();
+    const begin = vi.fn(), end = vi.fn();
+    vi.stubGlobal('__vactrPhaseTimer', { begin, end });
+    const timed = timedHost(fake, 2);
+    timed.h.onWorklet({ t: 2 });
+    expect(begin).toHaveBeenCalledExactlyOnceWith('tick');
+    expect(end).toHaveBeenCalledExactlyOnceWith('tick');
+    timed.h.onWorklet({});
+    expect(begin).toHaveBeenCalledTimes(1); expect(end).toHaveBeenCalledTimes(1);
   });
 
   it('delivers each editor record once when onRecord re-enters wasm', () => {

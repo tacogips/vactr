@@ -37,7 +37,7 @@ try {
           const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:1}); await installSilentSink(context); const page=await context.newPage();
           await page.goto(`${server.origin}/?perf=1`,{waitUntil:'domcontentloaded',timeout:60000});
           const measured=await runMeasurement(page,context,name,{profile:'all',runId,profileTrace:profileTrace&&name==='chromium',headless:actualHeadless});
-          b.metrics=measured.metrics;b.renderer=measured.renderer??null;b.control=measured.control??null;b.traceRanks=measured.traceRanks??[];b.measurement={pass:measured.pass,failures:measured.failures,blocked:measured.blocked,limitations:measured.limitations};b.samples=measured.samples;b.limitations.push(...measured.limitations);blocked ||= measured.blocked;
+          b.metrics=measured.metrics;b.phaseMs=measured.metrics.phaseMs??null;b.renderer=measured.renderer??null;b.control=measured.control??null;b.traceRanks=measured.traceRanks??[];b.measurement={pass:measured.pass,failures:measured.failures,blocked:measured.blocked,limitations:measured.limitations};b.samples=measured.samples;b.limitations.push(...measured.limitations);blocked ||= measured.blocked;
           await page.evaluate(()=>window.__vactrPerf?.disposeCode()); await context.close();
         }
         host[name]={version,headless:b.headless}; browsers.push(b); await browser.close();

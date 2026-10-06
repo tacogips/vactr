@@ -78,6 +78,47 @@ sharedPaths:
 
 - `editor/test/support/canvas.ts`: an additive fake member only (for example a
   `measureText` call counter), if a test needs one. Record the reason.
+- Harness sharedPaths (session-288 ownership amendment; design 15.3.8.14 section 8). No
+  edit is expected. They are listed so that a frame-timing harness fix never blocks this
+  plan:
+  - `editor/test/e2e/behavior.mjs`
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/run.mjs`
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/ios-sim.mjs`
+  - `editor/test/e2e/README.md`
+  - `editor/test/style/ui-style.mjs`
+
+### Harness sharedPaths (session 288)
+
+The rules are identical to the "Harness sharedPaths (session 288)" section of
+`impl-plans/active/canvas-cutover-opt-dom.md`. They are restated here so this plan stands
+alone.
+
+**Allowed edit.** Only frame alignment of harness sampling (wait for a presented frame,
+then a bounded poll; reference 842cf6e), or documentation of that alignment.
+
+**Never change:**
+- a check name, assertion, expected value or comparison;
+- `THRESHOLDS` or `TARGETS` (the accepted textWork gate is 8 ms with a 4 ms target);
+- the workload, the fixtures or the silent sink;
+- `run.mjs` exit codes or its gating refusal;
+- the `ios-sim.mjs` predicate;
+- the `ui-style.mjs` checks.
+
+A non-alignment harness change is a blocker for a serial plan-author amendment.
+
+**Recording.** Record the path, reason and sha256 values in the progress log and in
+`tmp/canvas-cutover/opt-text/intent.json` and `receipt.json`.
+
+**Check.** `git diff <START> -- <path>` shows no removed or changed line containing
+`expect(`, `assert`, `THRESHOLDS`, `TARGETS` or a check comparison.
+
+**Deferred work in harness checks.** OPT-TEXT defers the reparse (`setTimeout(0)`) and the
+completion request (150 ms). A harness check that reads syntax or completion state after an
+edit may need to wait for that state. Do this by frame-aligned or bounded polling only,
+never by weakening the check.
 
 ## Contracts and Key Points
 
@@ -410,6 +451,7 @@ report. Edit only this plan's progress log.
 - [ ] Check runs only from its timer (test row)
 - [ ] Dirty reasons in place; `spans()` is skipped on selection-only frames
 - [ ] All existing assertions unchanged (timer advances added where needed); default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [ ] Harness sharedPaths: unedited, or frame-alignment-only edits recorded with sha256 values and no changed assertion, threshold or check comparison (`git diff <START> -- editor/test/e2e editor/test/style`)
 - [ ] Progress log updated
 
 ## Progress Log
@@ -426,3 +468,10 @@ report. Edit only this plan's progress log.
 **Notes**: Wave 11, after DOM. The additivity probe is a plan-level safeguard required by
 15.3.3 ("caret boundary advances must be validated against the same shaping") and by the
 existing ligature row in `gpu.test.ts`.
+
+### Session: 2026-10-06 (session 288 plan amendment)
+**Tasks Completed**: Ownership amendment only (design 15.3.8.14 section 8, "Harness
+sharedPaths").
+**Notes**: Added the 8 harness and style files as concrete sharedPaths, here and in the
+manifest, with the frame-alignment-only rule. Scope, contracts, tasks and criteria are
+otherwise unchanged. Status stays Ready; this plan starts after CANVAS-OPT-DOM is accepted.

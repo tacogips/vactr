@@ -230,6 +230,32 @@
       "blocker": "Session 286 was stopped by host memory pressure during step 6 (not a workflow failure). Commit 28ed027 holds unreviewed partial CANVAS-OPT-HARNESS edits to editor/test/e2e/measure.mjs, stats.mjs and stats.test.ts.",
       "amendment": "Restart only: no redesign and no re-plan (step 3 comm-004455 and step 5 comm-004457 confirm design 15.3.8.14, the seven OPT and EVIDENCE plans and the plan entries of this manifest unchanged since 1d17ced). CANVAS-OPT-HARNESS continues from the 28ed027 draft, checks it line by line against contracts 1-3 and every Test Cases bullet, and runs its full verification table. Its $BASE for the diff criteria is the plan checkpoint 1d17ced, not the current HEAD; intent.json records BASE=1d17ced and a separate START. The session-287 progress-log entry in impl-plans/active/canvas-cutover-opt-harness.md records this. Memory rule: run heavy suites one at a time (full nextest alone, test:perf alone, vitest with default workers, never two heavy suites at once).",
       "checkpointNote": "Session 287 plan checkpoint: the OPT-HARNESS session-287 progress-log entry and this manifest's session287 record are committed together. Plans, writePaths, sharedPaths, artifactRoots, verification and the serial DAG CANVAS-OPT-HARNESS -> OPT-HISTORY -> OPT-DOM -> OPT-TEXT -> OPT-BACKDROP -> OPT-RENDER -> CANVAS-EVIDENCE are unchanged. Accepted plans are not redispatched."
+    },
+    "session288": {
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-288",
+      "resumes": "opus-luna-design-and-implement-review-loop-session-287",
+      "resumeHead": "842cf6e29858b6eb4a4388c52328896d800fe72b",
+      "planBase": "1d17ced",
+      "acceptedPlans": [
+        "CANVAS-CLOCK",
+        "CANVAS-NATIVE",
+        "CANVAS-RENDER",
+        "CANVAS-MOUNT",
+        "CANVAS-VISUAL",
+        "CANVAS-SHELL",
+        "CANVAS-EVIDENCE-SILENT",
+        "CANVAS-EVIDENCE-VIEWPORT",
+        "CANVAS-EVIDENCE-EDITCOST",
+        "CANVAS-EVIDENCE-RUNSTART",
+        "CANVAS-EVIDENCE-SCOPE",
+        "CANVAS-EVIDENCE-SCHED",
+        "CANVAS-EVIDENCE-FRAMECOST",
+        "CANVAS-OPT-HARNESS",
+        "CANVAS-OPT-HISTORY"
+      ],
+      "blocker": "Session 287 blocked CANVAS-OPT-DOM (implemented in ff49fd1) only because editor/test/e2e/behavior.mjs canvas-only-text sampled the input bridge before the frame that positions it, and that file was outside OPT-DOM's paths (riela #132 class). Operator repair 842cf6e: two rAFs plus a poll bounded at 30 frames; silent behavior e2e 18/18 (Chromium 10/10, WebKit 8/8), assertions unchanged.",
+      "amendment": "Ownership amendment only (design 15.3.8.14 section 8, 'Harness sharedPaths (session-288 amendment)'). editor/test/e2e/behavior.mjs, measure.mjs, run.mjs, stats.mjs, stats.test.ts, ios-sim.mjs, README.md and editor/test/style/ui-style.mjs are concrete sharedPaths of CANVAS-OPT-DOM, -TEXT, -BACKDROP and -RENDER, in the plans and here. They are edited only for frame alignment (presented-frame wait plus bounded poll, reference 842cf6e). No edit may change an assertion, a check comparison, THRESHOLDS, TARGETS, the workload, the silent sink, run.mjs exit codes or the ios-sim predicate, and each edit is recorded with sha256 values. CANVAS-OPT-HARNESS and CANVAS-OPT-HISTORY were accepted by the session-287 integration review (commit ff49fd1), so they move from plans to acceptedDependencies and are not redispatched. CANVAS-OPT-DOM re-runs its final-source gates on HEAD (plan section 'Session 288 resume'), then goes through test-integrity, adversarial and integration review. OPT-TEXT, OPT-BACKDROP, OPT-RENDER and CANVAS-EVIDENCE then run serially as planned. Memory rule: never run two heavy suites at once; full nextest runs alone with timeout 2400; test:perf runs alone with --maxWorkers=1.",
+      "checkpointNote": "Session 288 plan checkpoint: the design 15.3.8.14 section-8 edits, the four OPT plan ownership amendments, the OPT-HARNESS and OPT-HISTORY status updates, this session288 record and the acceptedDependencies move are committed and pushed together before dispatch. Scope, contracts, verification, artifactRoots and the serial DAG OPT-DOM -> OPT-TEXT -> OPT-BACKDROP -> OPT-RENDER -> CANVAS-EVIDENCE are otherwise unchanged."
     }
   },
   "designDocPaths": [
@@ -438,139 +464,6 @@
   },
   "plans": [
     {
-      "planId": "CANVAS-OPT-HARNESS",
-      "planPath": "impl-plans/active/canvas-cutover-opt-harness.md",
-      "wave": 8,
-      "dependsOn": [],
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/canvas-cutover/opt-harness"
-      ],
-      "setup": [
-        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
-      ],
-      "intendedChanges": "Design 15.3.8.14 section 5: attributeSync emits one sample per (onset time, epoch, first presented frame) and returns samples, duplicateSamples, droppedFrameSamples and droppedFrames (nominal = median presented frame delta or options.nominalMs); measure.mjs reports syncDroppedFrameSamples, syncDroppedFrames, syncDuplicateSamples, syncAbsMsNoDrop and targets; THRESHOLDS.textWorkP95Ms 16.7 -> 8 and nothing else; TARGETS {textWorkP95Ms: 4, animationWorkP50Ms: 1} recorded without gating; renderEvidence rows; stats.test.ts fixture passingMetrics.textWorkMs.p95 12 -> 6 (follows the tightened gate).",
-      "acceptanceCriteria": [
-        "64 voices sharing an onset on one frame give 1 sync sample; split over two frames give 2",
-        "droppedFrames counted per sample and reported separately; syncAbsMs still gates all de-duplicated samples at 33.4/50 ms",
-        "THRESHOLDS.textWorkP95Ms === 8 and every other THRESHOLDS value unchanged (guard row)",
-        "evaluate fails textWork p95 8.1 and passes 8.0; targets never gate",
-        "default vitest, npm run check, npm run test:perf, strict clippy, full nextest, the wasm32 build and the src-tauri cargo check exit 0"
-      ],
-      "verification": [
-        "node --check editor/test/e2e/stats.mjs editor/test/e2e/measure.mjs",
-        "cd editor && ./node_modules/.bin/vitest run test/e2e/stats.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run test/e2e",
-        "cd editor && ./node_modules/.bin/vitest run",
-        "cd editor && npm run check",
-        "cd editor && npm run test:perf (alone; outside the sandbox)",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (outside the sandbox)",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml"
-      ],
-      "writePaths": [
-        "editor/test/e2e/stats.mjs",
-        "editor/test/e2e/stats.test.ts",
-        "editor/test/e2e/measure.mjs",
-        "impl-plans/active/canvas-cutover-opt-harness.md",
-        "tmp/canvas-cutover/opt-harness",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite"
-      ],
-      "sharedPaths": [
-        "editor/test/e2e/run.mjs"
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "No edit expected; only if measure.mjs metric fields cannot reach summary.json, with the reason recorded. Exit codes 0/1/2 and the wasm gating refusal stay." }
-      ]
-    },
-    {
-      "planId": "CANVAS-OPT-HISTORY",
-      "planPath": "impl-plans/active/canvas-cutover-opt-history.md",
-      "wave": 9,
-      "dependsOn": ["CANVAS-OPT-HARNESS"],
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/canvas-cutover/opt-history"
-      ],
-      "setup": [
-        "test -f tree-sitter-vact/tree-sitter-vact.wasm || mise run ts-build-wasm",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
-      ],
-      "intendedChanges": "Design 15.3.8.14 section 2. New editor/src/code/line-bytes.ts: LineBytes moved from sync.ts with starts(), plus LineTable (build, toByte, toUtf16, spanToUtf16, spanToBytes, byteLength, bytes, static builds), byte-identical to Utf8Index. RevisionHistory: delta charge 512 + sum(2*inserted + 2*baseLinesLength + 64*baseLineCount) with an O(1) running total; pin(owner, rev)/unpin(owner) with at most 32 LRU owners, composed ChangeSet, line table and 32,768-entry memo; restart drops pins; mapWireSpan order pinned -> current -> on-demand LineTable LRU 4 -> null; lineTable(rev) replaces index(rev). Utf8Index.builds counter. trimUndoHistory memo WeakMap. CodeApi.toWireSpan (additive). Pin owners eval (mount.ts), playing:<rev> (highlight.ts, released 2 s after the last acceptance and on clear) and diag:static, diag:check, diag:runtime:<slot> (diagnostics.ts). Highlight per-revision mapping cache. bind/mount.ts and bind/write.ts use toWireSpan. pointer.ts uses line-local wordRangeAt and boundary. Keyboard wordMoveAt is bounded to 65,536 units.",
-      "acceptanceCriteria": [
-        "After pin('eval', r) and 300 edits outside the span on 20,000 lines, mapWireSpan(span, r) is non-null and equals the sequential reference; the unpinned control is null",
-        "retainedBytes growth over 300 edits <= 300*(512 + 2*(L+1) + 64 + 2)",
-        "A single-character edit makes 0 Utf8Index builds, 0 LineTable builds and no whole-document toString; pinning the current revision reads no text",
-        "The eval pin survives 8 playing and 16 diag:runtime owners; the 33rd owner evicts the LRU owner; a revision gap drops all pins",
-        "LineTable equals Utf8Index on the ASCII, Japanese, emoji and CRLF corpus",
-        "state.test.ts ceiling rows ported to lineTable() with identical expect() lines (indexByteLimit 400 -> 128 at :235; 1,048,576-empty-line fixture at :249); bind write, pointer and keyboard rows pass",
-        "Pin refusal follows 128 + 4*(lines+1) bytes per table: a@A ok, b@A shared, c@B refused (pinsRefused 1), c@B ok after unpin; a cached on-demand table is evicted before a pin is refused",
-        "default vitest, npm run check, npm run test:perf, strict clippy, full nextest, the wasm32 build and the src-tauri cargo check exit 0"
-      ],
-      "verification": [
-        "cd editor && ./node_modules/.bin/vitest run test/code/history.test.ts test/code/sync.test.ts test/protocol/utf8.test.ts test/canvas/state.test.ts test/canvas/edit-cost.test.ts test/code/highlight.test.ts test/code/diagnostics.test.ts test/bind/write.test.ts test/canvas/input.test.ts",
-        "cd editor && ./node_modules/.bin/vitest run test/bind test/params test/app test/code test/canvas",
-        "cd editor && ./node_modules/.bin/vitest run",
-        "cd editor && npm run check",
-        "cd editor && npm run test:perf (alone; outside the sandbox)",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run (outside the sandbox)",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml"
-      ],
-      "writePaths": [
-        "editor/src/code/line-bytes.ts",
-        "editor/src/code/history.ts",
-        "editor/src/code/sync.ts",
-        "editor/src/code/surface.ts",
-        "editor/src/code/highlight.ts",
-        "editor/src/code/diagnostics.ts",
-        "editor/src/code/eval.ts",
-        "editor/src/code/mount.ts",
-        "editor/src/code/pointer.ts",
-        "editor/src/code/keyboard.ts",
-        "editor/src/app/apis.ts",
-        "editor/src/protocol/utf8.ts",
-        "editor/src/bind/mount.ts",
-        "editor/src/bind/write.ts",
-        "editor/test/code/history.test.ts",
-        "editor/test/code/sync.test.ts",
-        "editor/test/code/highlight.test.ts",
-        "editor/test/code/diagnostics.test.ts",
-        "editor/test/canvas/state.test.ts",
-        "editor/test/canvas/edit-cost.test.ts",
-        "editor/test/canvas/input.test.ts",
-        "editor/test/canvas/mount.test.ts",
-        "editor/test/canvas/contracts.test.ts",
-        "editor/test/protocol/utf8.test.ts",
-        "editor/test/bind/write.test.ts",
-        "editor/test/bind/fixtures.ts",
-        "editor/test/app/song.test.ts",
-        "editor/test/params/sampler.test.ts",
-        "impl-plans/active/canvas-cutover-opt-history.md",
-        "tmp/canvas-cutover/opt-history",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite"
-      ],
-      "sharedPaths": [
-        "editor/src/params/mount.ts",
-        "editor/src/params/roll.ts"
-      ],
-      "sharedPathNotes": [
-        { "path": "editor/src/params/mount.ts", "intendedEdit": "No edit expected (the evalRev mapping is covered by the eval pin); only a type fix forced by the CodeApi change, recorded." },
-        { "path": "editor/src/params/roll.ts", "intendedEdit": "No edit expected; only a type fix forced by the CodeApi change, recorded. CANVAS-OPT-DOM owns the roll changes." }
-      ]
-    },
-    {
       "planId": "CANVAS-OPT-DOM",
       "planPath": "impl-plans/active/canvas-cutover-opt-dom.md",
       "wave": 10,
@@ -643,13 +536,27 @@
       ],
       "sharedPaths": [
         "editor/src/app/theme.css",
-        "editor/test/style/ui-style.mjs",
-        "editor/test/ui/style-tokens.test.ts"
+        "editor/test/ui/style-tokens.test.ts",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
+        "editor/test/style/ui-style.mjs"
       ],
       "sharedPathNotes": [
         { "path": "editor/src/app/theme.css", "intendedEdit": "No edit expected; add a token only if a needed value has none, recorded. Existing token values never change." },
-        { "path": "editor/test/style/ui-style.mjs", "intendedEdit": "No edit; must keep passing (npm run test:style)." },
-        { "path": "editor/test/ui/style-tokens.test.ts", "intendedEdit": "No edit; must keep passing." }
+        { "path": "editor/test/ui/style-tokens.test.ts", "intendedEdit": "No edit; must keep passing." },
+        { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "Session 288: already edited by operator repair 842cf6e (canvas-only-text waits two rAFs and polls at most 30 frames before sampling the bridge; assertions unchanged). Further edits only for frame alignment, recorded with sha256." },
+        { "path": "editor/test/e2e/measure.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment of sampling only; metric definitions, workload and silent-sink use unchanged." },
+        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "Session 288: no edit expected; frame-alignment plumbing only; exit codes 0/1/2, wasm gating refusal, --out and --profile unchanged." },
+        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "Session 288: no edit expected; THRESHOLDS and TARGETS never change (textWork gate 8 ms, target 4 ms)." },
+        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Session 288: no edit expected; existing rows unchanged." },
+        { "path": "editor/test/e2e/ios-sim.mjs", "intendedEdit": "Session 288: no edit expected; self-check predicate and silent launch unchanged." },
+        { "path": "editor/test/e2e/README.md", "intendedEdit": "Session 288: documents a frame-alignment change only." },
+        { "path": "editor/test/style/ui-style.mjs", "intendedEdit": "Session 288: frame alignment only (wait for a presented frame before sampling); square and token checks unchanged; must keep passing (npm run test:style)." }
       ]
     },
     {
@@ -722,10 +629,26 @@
         "editor/node_modules/.vite"
       ],
       "sharedPaths": [
-        "editor/test/support/canvas.ts"
+        "editor/test/support/canvas.ts",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
+        "editor/test/style/ui-style.mjs"
       ],
       "sharedPathNotes": [
-        { "path": "editor/test/support/canvas.ts", "intendedEdit": "Additive fake member only (for example a measureText call counter), recorded; existing fake behavior unchanged." }
+        { "path": "editor/test/support/canvas.ts", "intendedEdit": "Additive fake member only (for example a measureText call counter), recorded; existing fake behavior unchanged." },
+        { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment only (presented-frame wait plus bounded poll, for example for deferred reparse or debounced completion state); assertions unchanged; recorded with sha256." },
+        { "path": "editor/test/e2e/measure.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment of sampling only; metric definitions, workload and silent-sink use unchanged." },
+        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "Session 288: no edit expected; frame-alignment plumbing only; exit codes 0/1/2 and wasm gating refusal unchanged." },
+        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "Session 288: no edit expected; THRESHOLDS and TARGETS never change." },
+        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Session 288: no edit expected; existing rows unchanged." },
+        { "path": "editor/test/e2e/ios-sim.mjs", "intendedEdit": "Session 288: no edit expected; self-check predicate and silent launch unchanged." },
+        { "path": "editor/test/e2e/README.md", "intendedEdit": "Session 288: documents a frame-alignment change only." },
+        { "path": "editor/test/style/ui-style.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment only; checks unchanged." }
       ]
     },
     {
@@ -789,11 +712,27 @@
       ],
       "sharedPaths": [
         "editor/src/code/resources.ts",
-        "editor/test/support/gl.ts"
+        "editor/test/support/gl.ts",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
+        "editor/test/style/ui-style.mjs"
       ],
       "sharedPathNotes": [
         { "path": "editor/src/code/resources.ts", "intendedEdit": "No edit expected; the backdrop ledger kind stays defined though unused. Record any edit." },
-        { "path": "editor/test/support/gl.ts", "intendedEdit": "Additive fake members only, if a ported row needs one; recorded." }
+        { "path": "editor/test/support/gl.ts", "intendedEdit": "Additive fake members only, if a ported row needs one; recorded." },
+        { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "Session 288: frame alignment only (for example a presented-frame wait after the backdrop canvas is inserted before the line-1 readback); assertions unchanged; recorded with sha256. A failure after alignment is a product defect in this plan's writePaths." },
+        { "path": "editor/test/e2e/measure.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment of sampling only; no new metric reader (backgroundUploads has no harness reader)." },
+        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "Session 288: no edit expected; frame-alignment plumbing only; exit codes 0/1/2 and wasm gating refusal unchanged." },
+        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "Session 288: no edit expected; THRESHOLDS and TARGETS never change." },
+        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Session 288: no edit expected; existing rows unchanged." },
+        { "path": "editor/test/e2e/ios-sim.mjs", "intendedEdit": "Session 288: no edit expected; self-check predicate and silent launch unchanged." },
+        { "path": "editor/test/e2e/README.md", "intendedEdit": "Session 288: documents a frame-alignment change only." },
+        { "path": "editor/test/style/ui-style.mjs", "intendedEdit": "Session 288: frame alignment only (wait for a presented frame after backdrop insertion before sampling); square and token checks unchanged." }
       ]
     },
     {
@@ -862,12 +801,26 @@
         "tmp/ui-style"
       ],
       "sharedPaths": [
+        "editor/src/code/frame.ts",
         "editor/test/e2e/behavior.mjs",
-        "editor/src/code/frame.ts"
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/run.mjs",
+        "editor/test/e2e/stats.mjs",
+        "editor/test/e2e/stats.test.ts",
+        "editor/test/e2e/ios-sim.mjs",
+        "editor/test/e2e/README.md",
+        "editor/test/style/ui-style.mjs"
       ],
       "sharedPathNotes": [
-        { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "No edit expected; the line-1 readback probe must pass unchanged. Edit only if a probe reads a removed renderer stat, recorded." },
-        { "path": "editor/src/code/frame.ts", "intendedEdit": "No edit expected (dirty reasons exist since CANVAS-OPT-TEXT); recorded if any." }
+        { "path": "editor/src/code/frame.ts", "intendedEdit": "No edit expected (dirty reasons exist since CANVAS-OPT-TEXT); recorded if any." },
+        { "path": "editor/test/e2e/behavior.mjs", "intendedEdit": "Session 288 (replaces the session-286 removed-stat exception): frame alignment only; the line-1 readback probe keeps its assertions; a probe that reads a renderer stat is served by keeping that stat, not by editing the probe; recorded with sha256." },
+        { "path": "editor/test/e2e/measure.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment of sampling only; metric definitions, workload and silent-sink use unchanged." },
+        { "path": "editor/test/e2e/run.mjs", "intendedEdit": "Session 288: no edit expected; frame-alignment plumbing only; exit codes 0/1/2 and wasm gating refusal unchanged." },
+        { "path": "editor/test/e2e/stats.mjs", "intendedEdit": "Session 288: no edit expected; THRESHOLDS and TARGETS never change." },
+        { "path": "editor/test/e2e/stats.test.ts", "intendedEdit": "Session 288: no edit expected; existing rows unchanged." },
+        { "path": "editor/test/e2e/ios-sim.mjs", "intendedEdit": "Session 288: no edit expected; self-check predicate and silent launch unchanged." },
+        { "path": "editor/test/e2e/README.md", "intendedEdit": "Session 288: documents a frame-alignment change only." },
+        { "path": "editor/test/style/ui-style.mjs", "intendedEdit": "Session 288: no edit expected; frame alignment only; checks unchanged." }
       ]
     },
     {
@@ -1345,6 +1298,18 @@
       "planPath": "impl-plans/active/canvas-cutover-evidence-framecost.md",
       "commit": "2e3361da1e7fee357e25dd20e6ed0997216bcea9",
       "provides": "Design 15.3.8.13 E and D: generation-tracked textures (no per-draw isTexture, no per-frame getError), cached grapheme clusters, release wasm with the name section as the vite default, mise run build-wasm-release, wasm provenance and gating refusal (exit 2) in editor/test/e2e/run.mjs and editor/test/e2e/wasm-profile.mjs."
+    },
+    {
+      "planId": "CANVAS-OPT-HARNESS",
+      "planPath": "impl-plans/active/canvas-cutover-opt-harness.md",
+      "commit": "ff49fd10f24b43a74f8d69c5efe38d859fc0a1a2",
+      "provides": "Design 15.3.8.14 section 5: one sync sample per (onset time, epoch, first presented frame); dropped frames reported separately; THRESHOLDS.textWorkP95Ms 8 with every other threshold unchanged; TARGETS {textWorkP95Ms 4, animationWorkP50Ms 1} recorded, not gated."
+    },
+    {
+      "planId": "CANVAS-OPT-HISTORY",
+      "planPath": "impl-plans/active/canvas-cutover-opt-history.md",
+      "commit": "ff49fd10f24b43a74f8d69c5efe38d859fc0a1a2",
+      "provides": "Design 15.3.8.14 section 2: delta-charged RevisionHistory, pinned eval, playing and diag revisions (at most 32 LRU owners), LineTable instead of Utf8Index on the edit path, CodeApi.toWireSpan, mapWireSpan(evalSpan, evalRev) non-null after 300 edits, line-local pointer word ranges and bounded keyboard word moves."
     }
   ]
 }

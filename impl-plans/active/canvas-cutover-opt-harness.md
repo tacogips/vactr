@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-HARNESS: Sync Sample De-duplication, Dropped Frames and the 8 ms textWork Gate Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (accepted by the session-287 integration review, commit ff49fd1; manifest acceptedDependencies since session 288; archived at CANVAS-EVIDENCE closeout)
 **Plan ID**: CANVAS-OPT-HARNESS (session 286, wave 8; first of the serial OPT chain)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 5 (harness correctness) and section 6 (budgets); 15.3.8.8 table rows "Frame work" and "A/V sync, model"; 15.3.8.12 "Sync attribution"
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-HARNESS`)

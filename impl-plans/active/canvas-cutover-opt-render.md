@@ -78,10 +78,46 @@ writePaths:
 
 sharedPaths:
 
-- `editor/test/e2e/behavior.mjs`: no edit expected. The readback probe (15.3.8.12) must
-  keep passing unchanged. Edit only if a probe relies on a removed renderer stat, and record
-  the reason.
 - `editor/src/code/frame.ts`: no edit expected (the dirty reasons exist since OPT-TEXT).
+- Harness sharedPaths (session-288 ownership amendment; design 15.3.8.14 section 8). These
+  are edited only for frame alignment. The readback probe (15.3.8.12) in `behavior.mjs` must
+  keep its assertions unchanged:
+  - `editor/test/e2e/behavior.mjs`
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/run.mjs`
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/ios-sim.mjs`
+  - `editor/test/e2e/README.md`
+  - `editor/test/style/ui-style.mjs`
+
+### Harness sharedPaths (session 288)
+
+The rules are identical to the "Harness sharedPaths (session 288)" section of
+`impl-plans/active/canvas-cutover-opt-dom.md`. They are restated here so this plan stands
+alone.
+
+**Allowed edit.** Only frame alignment of harness sampling (wait for a presented frame,
+then a bounded poll; reference 842cf6e), or documentation of that alignment.
+
+**Never change:**
+- a check name, assertion, expected value or comparison;
+- `THRESHOLDS` or `TARGETS`;
+- the workload, the fixtures or the silent sink;
+- `run.mjs` exit codes or its gating refusal;
+- the `ios-sim.mjs` predicate;
+- the `ui-style.mjs` checks.
+
+**Removed renderer stats.** This replaces the session-286 exception: if a probe reads a
+renderer stat this plan would remove, keep that stat (the `RenderFeedback` shape is
+already kept). Do not edit the probe. A non-alignment harness change is a blocker for a
+serial plan-author amendment.
+
+**Recording.** Record the path, reason and sha256 values in the progress log and in
+`tmp/canvas-cutover/opt-render/intent.json` and `receipt.json`.
+
+**Check.** `git diff <START> -- <path>` shows no removed or changed line containing
+`expect(`, `assert`, `THRESHOLDS`, `TARGETS` or a check comparison.
 
 ## Contracts and Key Points
 
@@ -386,6 +422,7 @@ report. Edit only this plan's progress log.
 - [ ] Animation-only frame: 0 uploads, 0 layout builds, 0 staging canvases, at most 4 draws
 - [ ] Ported `gpu.test.ts` rows keep their intent; the resource and layout describes are unchanged
 - [ ] Behavior e2e (both browsers), `test:style`, default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [ ] Harness sharedPaths: unedited, or frame-alignment-only edits recorded with sha256 values and no changed assertion, threshold or check comparison (`git diff <START> -- editor/test/e2e editor/test/style`)
 - [ ] Progress log updated
 
 ## Progress Log
@@ -394,3 +431,12 @@ report. Edit only this plan's progress log.
 **Tasks Completed**: Plan authored from design 15.3.8.14 section 4.
 **Notes**: Wave 13, after BACKDROP. The non-additive test stub keeps the existing run-tile
 rows meaningful as run-cell rows. New rows use an additive stub for the cluster path.
+
+### Session: 2026-10-06 (session 288 plan amendment)
+**Tasks Completed**: Ownership amendment only (design 15.3.8.14 section 8, "Harness
+sharedPaths").
+**Notes**:
+- Added the 8 harness and style files as concrete sharedPaths, here and in the manifest.
+  `behavior.mjs` was already a sharedPath.
+- Removed-stat probes are handled by keeping the stat, not by editing the probe.
+- Scope, contracts, tasks and criteria are otherwise unchanged.

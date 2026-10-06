@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-HISTORY: Delta-Charged History, Pinned Revisions and Line-Table Wire Mapping Implementation Plan
 
-**Status**: In Progress (implementation complete; pending independent review and workflow closeout)
+**Status**: Completed (accepted by the session-287 integration review, commit ff49fd1; manifest acceptedDependencies since session 288; archived at CANVAS-EVIDENCE closeout)
 **Plan ID**: CANVAS-OPT-HISTORY (session 286, wave 9; runs alone after CANVAS-OPT-HARNESS is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 2 (history, pinned revisions and wire mapping) and section 6 (budgets); 15.3.5 (history ceilings, as amended); 15.3.8.10 (bounded edit path, line-based sync)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-HISTORY`)

@@ -77,8 +77,83 @@ sharedPaths:
 
 - `editor/src/app/theme.css`: no edit expected. Add a token only if a needed value has none,
   and record it.
-- `editor/test/style/ui-style.mjs`: no edit. It must keep passing.
 - `editor/test/ui/style-tokens.test.ts`: no edit. It must keep passing.
+- Harness sharedPaths (session-288 ownership amendment; design 15.3.8.14 section 8). The
+  binding rules are in "Harness sharedPaths (session 288)" below:
+  - `editor/test/e2e/behavior.mjs`
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/run.mjs`
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/ios-sim.mjs`
+  - `editor/test/e2e/README.md`
+  - `editor/test/style/ui-style.mjs`
+
+### Harness sharedPaths (session 288)
+
+These rules are identical in CANVAS-OPT-DOM, -TEXT, -BACKDROP and -RENDER.
+
+**Why.** Session 287 blocked this plan only because `editor/test/e2e/behavior.mjs` sat
+outside its paths. The `canvas-only-text` check sampled the input bridge before the frame
+that positions it.
+
+**Allowed edit.** Only frame alignment of harness sampling, or documentation of that
+alignment. Frame alignment means waiting for a presented frame (requestAnimationFrame),
+then polling a bounded number of frames before reading DOM, canvas or perf state. The
+reference is 842cf6e: two rAFs, then a poll bounded at 30 frames.
+
+**Never change:**
+- a check name, assertion, expected value or comparison;
+- `THRESHOLDS` or `TARGETS` in `stats.mjs`;
+- the workload or the fixtures;
+- the silent-sink install or its post-sink-peak-0 and direct-connection-0 checks;
+- `run.mjs` exit codes 0/1/2 or its wasm gating refusal;
+- the `ios-sim.mjs` self-check predicate or its silent launch;
+- the square and token checks in `ui-style.mjs`.
+
+A harness change that is not frame alignment (for example a new metric reader) is not
+allowed under this amendment. Record it as a blocker for a serial plan-author amendment.
+
+**Recording.** For each edit, record in this plan's progress log the path, the reason, and
+the fresh-read and post-edit sha256 values (also in `tmp/canvas-cutover/<plan>/intent.json`
+and `receipt.json`). Record the check that motivated it, with its failing log path in the
+notes.
+
+**Check.** For every edited harness path, `git diff <HARNESS_BASE> -- <path>` removes or
+changes no line containing `expect(`, `assert`, `THRESHOLDS`, `TARGETS` or a check's
+pass/fail comparison. Reviewers verify this.
+
+`HARNESS_BASE` is the plan's `START` commit. For CANVAS-OPT-DOM it is ff49fd1, so the
+842cf6e repair is reviewed too. It is not the plan-base 1d17ced, because the accepted
+OPT-HARNESS legitimately tightened `THRESHOLDS.textWorkP95Ms` after 1d17ced.
+
+### Session 288 resume (CANVAS-OPT-DOM only)
+
+**Source state.** The source is final at HEAD 842cf6e: product changes in ff49fd1, plus
+the operator harness repair 842cf6e to `behavior.mjs` (frame alignment, 18 insertions and
+3 deletions, assertions unchanged). Do not reimplement TASK-D1 to TASK-D5. Change source
+only if a gate or a review finding exposes a defect, and then fix it inside this plan's
+writePaths.
+
+**Base.** `BASE=1d17ced` (the session-286 plan checkpoint) for the diff criteria. Record a
+separate `START` (the session-288 plan checkpoint commit) in
+`tmp/canvas-cutover/opt-dom/intent.json`.
+
+**Gates.** Run every row of the Verification tables on the current HEAD, one heavy suite
+at a time:
+- default vitest;
+- the behavior e2e (Chromium and WebKit, silent);
+- `test:style`;
+- `test:perf`, run alone with `--maxWorkers=1`;
+- `npm run check`;
+- strict clippy;
+- full nextest, run alone with `timeout 2400`;
+- the wasm32 build;
+- the `editor/src-tauri` cargo check.
+
+Report only final passing runs, in the mandatory record format.
+
+**Behavior run expectation.** 18/18 checks (Chromium 10/10, WebKit 8/8), exit 0.
 
 ## Contracts and Key Points
 
@@ -352,6 +427,7 @@ report. Edit only this plan's progress log.
 - [x] The roll reuses elements across batches in a cycle and updates lanes in place
 - [x] Accessibility bridge: 0 full value writes and 0 rect reads in the keystroke task; flush before input-reading handlers; one frame flush
 - [ ] `ui-style.mjs`, the style-token test and the behavior e2e pass in both browsers
+- [ ] Any harness sharedPath edit is frame alignment only and is recorded with its sha256 values; `git diff ff49fd1 -- editor/test/e2e editor/test/style` touches only `behavior.mjs` (the 842cf6e frame wait) and changes no assertion, threshold or check comparison
 - [ ] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
 - [ ] Progress log updated
 
@@ -366,3 +442,14 @@ report. Edit only this plan's progress log.
 ### Session: 2026-10-06 (session 286 implementation handoff)
 **Tasks Completed**: TASK-D1 through TASK-D5 and focused regressions in TASK-D6.
 **Notes**: Focused bind/store/roll/input/mount tests passed 161/161 (`tmp/canvas-cutover/opt-dom/focused-final.log`); UI tests passed 18/18 (`ui-final.log`); npm check passed (`check-final-rerun.log`); full vitest passed 766/766 before the final bridge input reconciliation (`vitest-full-final.log`); the post-change focused bridge suite passed 74/74 (`focused-repair5.log`). Style passed in Chromium and WebKit (`style-final.log`); release wasm and ABI frontend build passed (`wasm-release-final.log`, `frontend-build-repair2.log`). The behavior e2e still fails only `canvas-only-text` in both touch-enabled browsers (16/18 checks passed; see `e2e-behavior-retry2.log`): the bridge rectangle is sampled before the next canvas frame positions it, yielding a 1 px glyph sample. Fixing the test's frame synchronization requires editing `editor/test/e2e/behavior.mjs`, outside this plan's writePaths. Resume after a plan/manifest checkpoint authorizes that path or assigns the test update to its owner. Full aggregate/perf/native cargo gates remain pending because implementation is blocked at this required browser verification.
+
+### Session: 2026-10-06 (session 288 plan amendment)
+**Tasks Completed**: Ownership amendment only (design 15.3.8.14 section 8, "Harness
+sharedPaths").
+**Notes**:
+- The 8 harness and style files are now concrete sharedPaths of this plan and of OPT-TEXT,
+  OPT-BACKDROP and OPT-RENDER, here and in `impl-plans/active/canvas-cutover-dispatch.json`.
+- Operator repair 842cf6e fixed the `canvas-only-text` frame wait in `behavior.mjs`
+  (silent behavior e2e 18/18, assertions unchanged).
+- Next: run the session 288 resume gates, then the test-integrity, adversarial and
+  integration reviews. Scope, contracts and criteria are otherwise unchanged.

@@ -69,6 +69,46 @@ sharedPaths:
 - `editor/src/code/resources.ts`: no edit expected. The `backdrop` ledger kind stays
   defined, even though the renderer no longer reserves it. Record any edit.
 - `editor/test/support/gl.ts`: additive fake members only, if needed.
+- Harness sharedPaths (session-288 ownership amendment; design 15.3.8.14 section 8). These
+  are edited only for frame alignment:
+  - `editor/test/e2e/behavior.mjs`
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/run.mjs`
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/ios-sim.mjs`
+  - `editor/test/e2e/README.md`
+  - `editor/test/style/ui-style.mjs`
+
+### Harness sharedPaths (session 288)
+
+The rules are identical to the "Harness sharedPaths (session 288)" section of
+`impl-plans/active/canvas-cutover-opt-dom.md`. They are restated here so this plan stands
+alone.
+
+**Allowed edit.** Only frame alignment of harness sampling (wait for a presented frame,
+then a bounded poll; reference 842cf6e), or documentation of that alignment.
+
+**Never change:**
+- a check name, assertion, expected value or comparison;
+- `THRESHOLDS` or `TARGETS`;
+- the workload, the fixtures or the silent sink;
+- `run.mjs` exit codes or its gating refusal;
+- the `ios-sim.mjs` predicate;
+- the `ui-style.mjs` square and token checks.
+
+A non-alignment harness change is a blocker for a serial plan-author amendment.
+
+**Recording.** Record the path, reason and sha256 values in the progress log and in
+`tmp/canvas-cutover/opt-backdrop/intent.json` and `receipt.json`.
+
+**Check.** `git diff <START> -- <path>` shows no removed or changed line containing
+`expect(`, `assert`, `THRESHOLDS`, `TARGETS` or a check comparison.
+
+**Likely need.** The DOM-stacked backdrop changes compositing. If the line-1 readback
+(`behavior.mjs`) or a `ui-style.mjs` screenshot samples before the first frame after the
+backdrop is inserted, add a frame wait. If a check still fails after alignment, treat it as
+a product defect in this plan's writePaths, never as a harness issue.
 
 ## Contracts and Key Points
 
@@ -218,9 +258,12 @@ Each task's completion criterion is its contract plus its test rows, passing.
   premultiplied scrim must stay, so the backdrop shows through.
 - *Element ownership.* Do not move the element anywhere else, and do not resize it.
   `GlRenderHost` owns its 640x360 drawing buffer. CSS only stretches it.
-- *`backgroundUploads` readers.* `perf-hook.ts` and the e2e `measure.mjs` may read
-  `renderer.stats`. Grep, and if one reads `backgroundUploads`, either keep the field at 0 or
-  update the reader; prefer keeping the perf record shape. Record the decision.
+- *`backgroundUploads` readers.* At the session-288 checkpoint (842cf6e),
+  `grep -rn backgroundUploads editor/src editor/test` matches only `renderer.ts` and
+  `gpu.test.ts`. No harness file and no `perf-hook.ts` reads it, so removing it needs no
+  harness edit. Re-run the grep. If a new reader has appeared, keep the field at 0 instead
+  of editing the reader, because a harness reader change is not a frame-alignment edit.
+  Record the decision.
 
 ## Verification
 
@@ -269,6 +312,7 @@ report. Edit only this plan's progress log.
 - [ ] `palette.ts` maps the section-7 tokens; the diagnostic underline uses `--vt-danger`; the fallback equals today's colors
 - [ ] Ported backdrop rows keep every non-background assertion; `panes.test.ts` updated to the once/null contract
 - [ ] Behavior e2e, `test:style`, default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [ ] Harness sharedPaths: unedited, or frame-alignment-only edits recorded with sha256 values and no changed assertion, threshold or check comparison (`git diff <START> -- editor/test/e2e editor/test/style`)
 - [ ] Progress log updated
 
 ## Progress Log
@@ -278,3 +322,13 @@ report. Edit only this plan's progress log.
 palette).
 **Notes**: Wave 12, after TEXT. Split from OPT-RENDER so the zero-copy change is verified
 alone.
+
+### Session: 2026-10-06 (session 288 plan amendment)
+**Tasks Completed**: Ownership amendment only (design 15.3.8.14 section 8, "Harness
+sharedPaths").
+**Notes**:
+- Added the 8 harness and style files as concrete sharedPaths, here and in the manifest,
+  with the frame-alignment-only rule.
+- Resolved the `backgroundUploads` reader pitfall: no harness reader exists (step3 review
+  finding, low).
+- Scope, contracts, tasks and criteria are otherwise unchanged.

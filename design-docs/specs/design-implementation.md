@@ -8435,7 +8435,12 @@ Chromium.
      `ShapedLine`/`ShapedRun` contract so the existing renderer keeps
      working.
   5. `canvas-cutover-opt-render`: section 4. It consumes the section-3
-     advances and may extend the layout contract additively.
+     advances and may extend the layout contract additively. The session-286
+     plan author split section 4 in two. `canvas-cutover-opt-backdrop` runs
+     first and takes the zero-copy backdrop, the GL-limit caching and the
+     palette. `canvas-cutover-opt-render` then takes the atlas, the geometry,
+     the layers, the remaining GL hygiene, and context loss, DPR and
+     disposal.
   6. `canvas-cutover-evidence`: the pending plan, amended for the release
      re-measure and closeout. It is not an accepted plan, so continuing it is
      not a redispatch.
@@ -8447,6 +8452,26 @@ Chromium.
     `editor/src/app/theme.css`, their tests,
     `editor/test/e2e/{stats,measure,run}.mjs` and `stats.test.ts`
     (riela #132).
+  - *Harness sharedPaths (session-288 amendment).* The OPT-DOM block was
+    caused by `editor/test/e2e/behavior.mjs` sitting outside the plan's
+    writePaths. To stop that recurring, `canvas-cutover-opt-dom`,
+    `-opt-text`, `-opt-backdrop` and `-opt-render` each list these eight
+    files as concrete sharedPaths, in the plan and in the manifest:
+    - `editor/test/e2e/behavior.mjs`
+    - `editor/test/e2e/measure.mjs`
+    - `editor/test/e2e/run.mjs`
+    - `editor/test/e2e/stats.mjs`
+    - `editor/test/e2e/stats.test.ts`
+    - `editor/test/e2e/ios-sim.mjs`
+    - `editor/test/e2e/README.md`
+    - `editor/test/style/ui-style.mjs`
+
+    Edits to these files may only align harness sampling to presented frames
+    (for example the two-rAF wait plus the 30-frame bounded poll in
+    842cf6e) or document that alignment. No assertion, threshold, workload
+    or silent-sink rule is weakened. Every such edit is recorded in the
+    owning plan's progress log. This changes ownership only; the plans'
+    scope, order and criteria stay as they are.
   - *Overlap.* Files may appear in several plans, because only one plan is
     active at a time. `code/mount.ts` is written by HISTORY, TEXT and RENDER
     in turn.

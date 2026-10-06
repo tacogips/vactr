@@ -2,15 +2,17 @@
 import { describe, expect, it } from 'vitest';
 
 interface StatsModule {
+  THRESHOLDS: Readonly<Record<string, number>>;
+  TARGETS: Readonly<{ textWorkP95Ms: number; animationWorkP50Ms: number }>;
   percentile(values: number[], p: number): number | null;
   pairInputLatency(frames: number[][], keys: number[][]): { paired: Array<{ keyTime: number; frameTime: number; latencyMs: number }>; pairedKeys: number; nonEditingKeys: number; expiredKeys: number; unpairedKeys: number };
   countChecks(checks: Array<{ status?: string; pass?: boolean }>): { total: number; passed: number; failed: number };
-  evaluate(summary: Record<string, unknown>, thresholds?: Record<string, number>): { pass: boolean; failures: string[]; limitations: string[] };
+  evaluate(summary: Record<string, unknown>, thresholds?: Record<string, number>): { pass: boolean; failures: string[]; limitations: string[]; targets: { textWorkP95Met: boolean | null; animationWorkP50Met: boolean | null } };
   renderEvidence(summary: Record<string, unknown>): string;
   attributeWorkloadOnsets(rows: Array<{ receivedMs:number; [key:string]:unknown }>, baselineKeys: Set<string>, clickMs:number): { workload:Array<unknown>; count:number; excludedBaseline:number; excludedPreClick:number };
   splitSinkOnsets(times:number[], ctxTime:number): { control:number; workload:number };
   syncWindow(onsets:Array<{time:number;end:number}>,presented:Array<{audibleTime:number}>): {windowStart:number|null;windowEnd:number|null;empty:boolean};
-  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number}): {sync:number[];earlyFlashCount:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
+  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number;nominalMs?:number}): {sync:number[];samples:Array<{time:number;epoch:string|null;frameIndex:number;value:number;droppedFrames:number}>;duplicateSamples:number;droppedFrameSamples:number;droppedFrames:number;earlyFlashCount:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
   lateActiveMismatches(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number}>,stalls:number[]): number;
   rankSelfTime(profile:Record<string,unknown>,top?:number):Array<{functionName:string;url:string;line:number;selfMs:number;share:number}>;
   classifyWithControl(metricKey:string,path:string,productValue:number,controlValue:number,threshold:number):'pass'|'fail'|'limitation';
@@ -19,7 +21,7 @@ interface StatsModule {
 const spec: string = '../../test/e2e/stats.mjs';
 const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
 
-const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:12}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, onsetCount:1 };
+const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:6}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, onsetCount:1 };
 describe('canvas evidence statistics', () => {
   it('uses nearest rank percentiles', () => expect(stats.percentile(Array.from({ length: 100 }, (_, i) => i + 1), 95)).toBe(95));
   it('summarizes exclusive phase rows and leaves empty phases unmeasured', () => {
@@ -83,6 +85,76 @@ describe('canvas evidence statistics', () => {
     expect(result.earlyFlashCount).toBe(0);expect(result.replayedFlashCount).toBe(0);
     expect(result.earlyFlashCount+result.replayedFlashCount).toBeLessThanOrEqual(result.framePairs);
     expect(result.sync.length).toBeGreaterThan(0);expect(result.sync.every((sample)=>Math.abs(sample)<=16.8)).toBe(true);
+  });
+  it('folds 64 voices sharing an onset and first presented frame into one sync sample', () => {
+    const voices=Array.from({length:64},(_,i)=>({time:0.2,end:0.3,from:i*2,to:i*2+1,epoch:'e'}));
+    const active=voices.map((voice)=>`${voice.from}-${voice.to}`).join(',');
+    const rows=[200,216.7].map((frameMs)=>({audibleTime:frameMs/1000,activeKey:active,epoch:'e',frameMs,targetMs:frameMs}));
+    const result=stats.attributeSync([{time:0,end:0.1,from:1000,to:1001,epoch:'e'},...voices],rows,{nominalMs:16.7});
+    expect(result.sync).toHaveLength(1);
+    expect(result.samples).toHaveLength(1);
+    expect(result.duplicateSamples).toBe(63);
+    expect(result.samples[0]).toMatchObject({time:0.2,epoch:'e',frameIndex:0,droppedFrames:0});
+  });
+  it('keeps distinct first presented frames and distinct onset times as separate samples', () => {
+    const voices=Array.from({length:64},(_,i)=>({time:0.2,end:0.3,from:i*2,to:i*2+1,epoch:'e'}));
+    const first=voices.slice(0,32).map((voice)=>`${voice.from}-${voice.to}`).join(',');
+    const second=voices.slice(32).map((voice)=>`${voice.from}-${voice.to}`).join(',');
+    const rows=[
+      {audibleTime:0.2,activeKey:first,epoch:'e',frameMs:200,targetMs:200},
+      {audibleTime:0.2167,activeKey:`${first},${second}`,epoch:'e',frameMs:216.7,targetMs:216.7},
+      {audibleTime:0.2334,activeKey:`${first},${second}`,epoch:'e',frameMs:233.4,targetMs:233.4},
+    ];
+    const result=stats.attributeSync([{time:0,end:0.1,from:1000,to:1001,epoch:'e'},...voices],rows,{nominalMs:16.7});
+    expect(result.sync).toHaveLength(2);
+    expect(result.samples.map((sample)=>sample.frameIndex)).toEqual([0,1]);
+    expect(result.duplicateSamples).toBe(62);
+    const distinctTimes=stats.attributeSync([
+      {time:0,end:0.1,from:1000,to:1001,epoch:'e'},
+      {time:0.2,end:0.3,from:1,to:2,epoch:'e'},
+      {time:0.21,end:0.3,from:3,to:4,epoch:'e'},
+    ],[
+      {audibleTime:0.2,activeKey:'1-2,3-4',epoch:'e',frameMs:200,targetMs:200},
+      {audibleTime:0.22,activeKey:'1-2,3-4',epoch:'e',frameMs:220,targetMs:220},
+      {audibleTime:0.24,activeKey:'1-2,3-4',epoch:'e',frameMs:240,targetMs:240},
+    ],{nominalMs:20});
+    expect(distinctTimes.sync).toHaveLength(2);
+  });
+  it('counts dropped frames per sample using the override or median nominal interval', () => {
+    const onset=[{time:0,end:0.1,from:100,to:101,epoch:'e'},{time:0.2,end:0.3,from:1,to:2,epoch:'e'}];
+    const rows=[
+      {audibleTime:0.2,activeKey:'1-2',epoch:'e',frameMs:200,targetMs:200},
+      {audibleTime:0.25,activeKey:'1-2',epoch:'e',frameMs:250,targetMs:250},
+    ];
+    const dropped=stats.attributeSync(onset,rows,{nominalMs:16.7});
+    expect(dropped).toMatchObject({droppedFrames:2,droppedFrameSamples:1});
+    expect(dropped.samples[0].droppedFrames).toBe(2);
+    const normal=stats.attributeSync(onset,[rows[0],{...rows[1],frameMs:216.7}],{nominalMs:16.7});
+    expect(normal).toMatchObject({droppedFrames:0,droppedFrameSamples:0});
+    const medianRows=[
+      {audibleTime:0.2,activeKey:'',epoch:'e',frameMs:200,targetMs:200},
+      {audibleTime:0.216,activeKey:'',epoch:'e',frameMs:216,targetMs:216},
+      {audibleTime:0.217,activeKey:'',epoch:'e',frameMs:233,targetMs:233},
+      {audibleTime:0.218,activeKey:'1-2',epoch:'e',frameMs:249,targetMs:249},
+      {audibleTime:0.299,activeKey:'1-2',epoch:'e',frameMs:299,targetMs:299},
+    ];
+    expect(stats.attributeSync(onset,medianRows).samples[0].droppedFrames).toBe(2);
+    expect(stats.attributeSync(onset,[]).samples).toEqual([]);
+  });
+  it('tightens textWork to 8 ms while recording non-gating targets', () => {
+    const over=stats.evaluate({metrics:{...passingMetrics,textWorkMs:{p95:8.1}}});
+    const equal=stats.evaluate({metrics:{...passingMetrics,textWorkMs:{p95:8.0}}});
+    const targetMiss=stats.evaluate({metrics:{...passingMetrics,textWorkMs:{p95:5}}});
+    expect(over.pass).toBe(false);
+    expect(over.failures.some((failure)=>failure.includes('textWorkMs.p95'))).toBe(true);
+    expect(equal.pass).toBe(true);
+    expect(targetMiss).toMatchObject({pass:true,targets:{textWorkP95Met:false,animationWorkP50Met:false}});
+    expect(stats.evaluate({metrics:{...passingMetrics,textWorkMs:{p95:Number.NaN},animationWorkMs:{p50:Number.NaN}}}).targets)
+      .toEqual({textWorkP95Met:null,animationWorkP50Met:null});
+    expect(stats.TARGETS).toEqual({textWorkP95Ms:4,animationWorkP50Ms:1});
+  });
+  it('keeps every non-text-work threshold unchanged', () => {
+    expect(stats.THRESHOLDS).toEqual({inputP95Ms:50,inputP99Ms:100,animationWorkP50Ms:4,animationWorkP95Ms:8,animationWorkP99Ms:16.7,textWorkP95Ms:8,frameIntervalP95Ms:20,frameIntervalP99Ms:50,syncAbsP95Ms:33.4,syncAbsP99Ms:50,earlyFlashMs:2,ledgerMiB:96,heapGrowthMiB:8,lateBeatDriftMs:1});
   });
   it('counts an early frame, an expired frame, and an epoch mismatch once each', () => {
     const onsets=Array.from({length:9},(_,i)=>({time:i*0.25,end:i*0.25+0.2,from:1,to:2,epoch:'e'}));onsets.push({time:1,end:1.4,from:5,to:7,epoch:'e'});
@@ -154,7 +226,9 @@ describe('canvas evidence statistics', () => {
   it('renders all metric rows and an ASCII run id', () => {
     const text = stats.renderEvidence({ runId: 'run-001', browsers: [{ name: 'Chromium', metrics: { editKeyCount:499, editPairedKeyCount:100, controlOnsetCount:3, controlStartMethod:'toolbar-click', onsetAttribution:'control sounded' }, checks:[{ id:'real-failure', pass:false }, { id:'synthetic-ime', status:'limitation', pass:null }], measurement:{ failures:['no playing onset telemetry', 'Run shortcut timeout\nstack trace'] }, behavior: { passed: 4, total: 4 } }] });
     expect(text).toContain('run-001');
-    for (const row of ['Input latency p95', 'Editing keystrokes / paired', 'Audio control / run start', 'Silent sink post-sink peak', 'Direct destination connections', 'Pre-sink peak (dBFS)', 'Pre-sink RMS (dBFS)', 'Animation frame work p95', 'Frame interval p95', 'A/V model absolute error', 'Resource ledger peak', 'JS heap growth', 'Beat drift', 'Replayed flashes']) expect(text).toContain(row);
+    for (const row of ['Input latency p95', 'Editing keystrokes / paired', 'Audio control / run start', 'Silent sink post-sink peak', 'Direct destination connections', 'Pre-sink peak (dBFS)', 'Pre-sink RMS (dBFS)', 'Animation frame work p95', 'Frame interval p95', 'A/V model absolute error', 'A/V sync dropped-frame samples', 'A/V sync duplicates folded', 'Resource ledger peak', 'JS heap growth', 'Beat drift', 'Replayed flashes']) expect(text).toContain(row);
+    expect(text).toContain('<= 8 (target 4, recorded)');
+    expect(text).toContain('<= 4 (target 1, recorded)');
     expect(text).toContain('Chromium:real-failure');
     expect(text).not.toContain('Chromium:synthetic-ime');
     expect(text).toContain('Measurement failures: Chromium:no playing onset telemetry; Chromium:Run shortcut timeout.');

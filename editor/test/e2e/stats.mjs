@@ -1,10 +1,11 @@
 export const THRESHOLDS = Object.freeze({
   inputP95Ms: 50, inputP99Ms: 100,
   animationWorkP50Ms: 4, animationWorkP95Ms: 8, animationWorkP99Ms: 16.7,
-  textWorkP95Ms: 16.7, frameIntervalP95Ms: 20, frameIntervalP99Ms: 50,
+  textWorkP95Ms: 8, frameIntervalP95Ms: 20, frameIntervalP99Ms: 50,
   syncAbsP95Ms: 33.4, syncAbsP99Ms: 50, earlyFlashMs: 2,
   ledgerMiB: 96, heapGrowthMiB: 8, lateBeatDriftMs: 1,
 });
+export const TARGETS = Object.freeze({ textWorkP95Ms: 4, animationWorkP50Ms: 1 });
 
 export function percentile(values, p) {
   if (!Array.isArray(values) || values.length === 0 || !Number.isFinite(p) || p < 0 || p > 100) return null;
@@ -101,7 +102,7 @@ export function syncWindow(onsets, presented) {
   return { windowStart, windowEnd, empty:windowStart > windowEnd };
 }
 
-export function attributeSync(onsets, presented, { earlyToleranceS = 0.002 } = {}) {
+export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nominalMs: nominalOverride } = {}) {
   const window = syncWindow(onsets ?? [], presented ?? []);
   const { windowStart, windowEnd, empty } = window;
   const inWindow = (time) => !empty && time >= windowStart && time <= windowEnd;
@@ -120,7 +121,23 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002 } = {
       else if (candidate.end <= row.audibleTime) replayedFlashCount += 1;
     }
   }
+  const positiveDeltas = [];
+  for (let index = 1; index < (presented ?? []).length; index += 1) {
+    const delta = Number(presented[index].frameMs) - Number(presented[index - 1].frameMs);
+    if (Number.isFinite(delta) && delta > 0) positiveDeltas.push(delta);
+  }
+  const nominalCandidates = positiveDeltas.sort((a, b) => a - b);
+  const middle = Math.floor(nominalCandidates.length / 2);
+  const medianNominal = nominalCandidates.length === 0 ? 1000 / 60
+    : nominalCandidates.length % 2 === 1 ? nominalCandidates[middle]
+      : (nominalCandidates[middle - 1] + nominalCandidates[middle]) / 2;
+  const nominal = Number.isFinite(nominalOverride) && nominalOverride > 0 ? nominalOverride : medianNominal;
   const sync = [];
+  const samples = [];
+  const sampleKeys = new Set();
+  let duplicateSamples = 0;
+  let droppedFrameSamples = 0;
+  let droppedFrames = 0;
   for (const onset of windowOnsets) {
     const key = rangeKey(onset);
     for (let index = 0; index < (presented ?? []).length - 1; index += 1) {
@@ -128,12 +145,24 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002 } = {
       if (!activeRanges(row.activeKey).has(key) || !sameEpoch(onset, row) || row.audibleTime < onset.time - earlyToleranceS) continue;
       if (candidateFor(row, key) !== onset) continue;
       const next = presented[index + 1];
-      sync.push(next.frameMs - (row.targetMs + (onset.time - row.audibleTime) * 1000));
+      const sampleKey = `${onset.time}|${onset.epoch ?? ''}|${index}`;
+      if (sampleKeys.has(sampleKey)) {
+        duplicateSamples += 1;
+        break;
+      }
+      sampleKeys.add(sampleKey);
+      const value = next.frameMs - (row.targetMs + (onset.time - row.audibleTime) * 1000);
+      const sampleDroppedFrames = Math.max(0, Math.round((next.frameMs - row.frameMs) / nominal) - 1);
+      sync.push(value);
+      samples.push({ time: onset.time, epoch: onset.epoch ?? null, frameIndex: index, value, droppedFrames: sampleDroppedFrames });
+      if (sampleDroppedFrames >= 1) droppedFrameSamples += 1;
+      droppedFrames += sampleDroppedFrames;
       break;
     }
   }
   return { sync, earlyFlashCount, replayedFlashCount, framePairs, windowOnsets:windowOnsets.length,
-    excludedFrames:(presented ?? []).length - evaluated.length, windowStart, windowEnd };
+    excludedFrames:(presented ?? []).length - evaluated.length, windowStart, windowEnd,
+    samples, duplicateSamples, droppedFrameSamples, droppedFrames };
 }
 
 export function lateActiveMismatches(onsets, presented, stalls) {
@@ -237,7 +266,11 @@ export function evaluate(summary, thresholds = THRESHOLDS) {
   if ((metrics.replayedFlashCount ?? 0) > 0) failures.push('expired highlights replayed after stall');
   if ((metrics.lateActiveMismatchCount ?? 0) > 0) failures.push(`post-stall active-set mismatches=${metrics.lateActiveMismatchCount}`);
   if (metrics.ledgerAfterDisposeBytes !== undefined && metrics.ledgerAfterDisposeBytes !== 0) failures.push(`ledger after dispose=${metrics.ledgerAfterDisposeBytes}`);
-  return { pass: failures.length === 0, failures, limitations };
+  const targets = {
+    textWorkP95Met: Number.isFinite(metrics.textWorkMs?.p95) ? metrics.textWorkMs.p95 <= TARGETS.textWorkP95Ms : null,
+    animationWorkP50Met: Number.isFinite(metrics.animationWorkMs?.p50) ? metrics.animationWorkMs.p50 <= TARGETS.animationWorkP50Ms : null,
+  };
+  return { pass: failures.length === 0, failures, limitations, targets };
 }
 
 const cell = (value) => value === null || value === undefined ? 'unavailable' : String(value);
@@ -263,13 +296,16 @@ export function renderEvidence(summary) {
       ['Pre-sink RMS (dBFS)', m.sink?.workload?.pre?.rmsDbfs ?? m.sink?.control?.pre?.rmsDbfs, 'reported'],
       ['Pre-sink onsets (count)', m.sinkOnsetsTotal, 'reported'],
       ['Control onsets / peak dBFS', m.controlSink?.pre ? `${m.controlSink.pre.onsetCount} / ${m.controlSink.pre.peakDbfs}` : null, '>= 1 / > -60'],
-      ['Animation frame work p50 (ms)', m.animationWorkMs?.p50, '<= 4'],
+      ['Animation frame work p50 (ms)', m.animationWorkMs?.p50, '<= 4 (target 1, recorded)'],
       ['Animation frame work p95 (ms)', m.animationWorkMs?.p95, '<= 8'],
       ['Animation frame work p99 (ms)', m.animationWorkMs?.p99, '<= 16.7'],
-      ['Text-dirty frame work p95 (ms)', m.textWorkMs?.p95, '<= 16.7'],
+      ['Text-dirty frame work p95 (ms)', m.textWorkMs?.p95, '<= 8 (target 4, recorded)'],
       ['Frame interval p95 (ms)', m.frameIntervalMs?.p95, '<= 20'],
       ['Frame interval p99 (ms)', m.frameIntervalMs?.p99, '<= 50'],
       ['A/V model absolute error p99 (ms)', m.syncAbsMs?.p99, 'measured only; <= 50'],
+      ['A/V sync dropped-frame samples', m.syncDroppedFrameSamples, 'reported separately; sync gate includes all samples'],
+      ['A/V sync duplicates folded', m.syncDuplicateSamples, 'one sample per onset time, epoch and presented frame'],
+      ['A/V model absolute error p95/p99 without dropped frames (informational)', m.syncAbsMsNoDrop == null ? null : `${m.syncAbsMsNoDrop.p95} / ${m.syncAbsMsNoDrop.p99}`, 'informational; not gated'],
       ['Early flashes', m.earlyFlashCount, '0; none earlier than 2 ms'],
       ['A/V window start / end (s)', m.syncWindowStart == null ? null : `${m.syncWindowStart} / ${m.syncWindowEnd}`, 'intersection with onset eviction guard'],
       ['A/V window onsets / frame pairs / excluded frames', m.syncWindowOnsets == null ? null : `${m.syncWindowOnsets} / ${m.syncFramePairs} / ${m.syncExcludedFrames}`, 'excluded rows remain in raw JSONL'],

@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-BACKDROP: Zero-Copy DOM Backdrop, Cached GL Limits and Token Palette (F1) Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (session 290: resume from the partial implementation at 212bb54; see "Session 290 resume")
 **Plan ID**: CANVAS-OPT-BACKDROP (session 286, wave 12; runs alone after CANVAS-OPT-TEXT is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 4 ("Zero-copy backdrop", "GL hygiene", "Palette"); 15.3.5 and 15.3.8.6 "Backdrop" (as amended); 15.3.8.3 (animation-active, as amended); design-docs/specs/design-ui-style.md section 7 (F1 mapping table)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-BACKDROP`)
@@ -79,6 +79,24 @@ sharedPaths:
   - `editor/test/e2e/ios-sim.mjs`
   - `editor/test/e2e/README.md`
   - `editor/test/style/ui-style.mjs`
+- Backdrop seam sharedPaths (session-290 ownership amendment; design 15.3.8.14 section 8,
+  "Backdrop and render sharedPaths"). These are the 15-file list minus the three that are
+  already writePaths here (`gpu.test.ts`, `mount.test.ts`, `panes.test.ts`). Edit them only
+  to finish this plan's contract, and record each edit with sha256 values:
+  - `editor/src/code/atlas.ts`: no edit expected. Its init-time `getParameter` (line 36) is
+    allowed and recorded. If the palette CSS string changes a tile identity, fix that in
+    `renderer.ts`, not here. The atlas rewrite belongs to CANVAS-OPT-RENDER.
+  - `editor/src/visual/panes.ts`, `editor/src/visual/render-host.ts`,
+    `editor/src/visual/frame.ts`: only a removed `onBackgroundCanvas` per-frame dependency
+    or a doc comment. Pane presentation, `GlRenderHost` and frame timing do not change.
+  - `editor/src/app/theme.css`: only if a section-7 token the palette reads is missing. Do
+    not change any existing token value.
+  - `editor/test/canvas/frame.test.ts`, `editor/test/visual/frame.test.ts`,
+    `editor/test/visual/meters.test.ts`, `editor/test/visual/render-host.test.ts`,
+    `editor/test/visual/scopes.test.ts`, `editor/test/visual/text-asset.test.ts`,
+    `editor/test/visual/video.test.ts`: port a row only if it depends on the removed
+    per-frame background callback or on `setBackground`/`backgroundUploads`. Keep its
+    intent, keep every other assertion byte-identical, and record the port.
 
 ### Harness sharedPaths (session 288)
 
@@ -109,6 +127,146 @@ A non-alignment harness change is a blocker for a serial plan-author amendment.
 (`behavior.mjs`) or a `ui-style.mjs` screenshot samples before the first frame after the
 backdrop is inserted, add a frame wait. If a check still fails after alignment, treat it as
 a product defect in this plan's writePaths, never as a harness issue.
+
+## Session 290 resume (brief INT-S289-BD-IMPL-INCOMPLETE)
+
+This section governs the session-290 dispatch. Where it is more specific than the sections
+below, it wins. The contracts below are otherwise unchanged.
+
+**Bases.**
+- `BASE=212bb54` is the operator WIP checkpoint that holds the partial implementation.
+- `START` is HEAD at dispatch: the session-290 plan checkpoint commit, whose source tree
+  equals 212bb54.
+- Record both, with fresh-read sha256 values, in `tmp/canvas-cutover/opt-backdrop/intent.json`.
+  Continue from the working tree. Do not revert, and do not reimplement what is already done.
+
+**Already done at 212bb54.** Verify each item; do not redo it.
+- B1: `visual/mount.ts` no longer calls background listeners per frame. The `apis.ts` doc
+  comment is updated.
+- B2: `code/mount.ts` `placeBackground` inserts the visual canvas before the code canvas
+  with `vact-code-backdrop` and `aria-hidden`, removes it on null and on dispose, and
+  `backgroundStop` subscribes lazily. `code.css` sets `.vact-code` to
+  `position: relative`, `.vact-code-backdrop` to absolute with z-index 0, and
+  `.vact-code-canvas` to relative with z-index 1.
+- B3: `renderer.ts` has no `setBackground`, `uploadBackground`, backdrop fields, backdrop
+  quad or `backgroundUploads`. `maxTextureSize` is read in `initialize()`, and `resize()`
+  uses the cached value.
+- B4: `palette.ts` exists (`Rgba`, `Palette`, `FALLBACK_PALETTE`, `readPalette`,
+  `rgbaCss`). The renderer has `setPalette`. The mount reads the palette once and on a
+  `prefers-color-scheme` change.
+- Accepted OPT-TEXT hunk: the `onPresentation` callback in `code/mount.ts` (Text-identity
+  change detection, `presentation.changesBase === previousDoc`). It must stay byte-identical
+  to 212bb54. Check with `git diff 212bb54 -- editor/src/code/mount.ts`: no line inside that
+  callback may change.
+
+**Red baseline** (logs `tmp/canvas-cutover/opt-text/reconcile-s289b-combined-{check,vitest}.log`):
+- `npm run check`: 20 errors. They are `renderer.ts(220,202)` and `(233,71)` (an `Rgba`
+  passed where `drawRun` takes a string) and 18 errors in `gpu.test.ts` that use the
+  removed `setBackground`/`backgroundUploads`.
+- Vitest: 7 of 778 rows fail. Six are in `gpu.test.ts` (`:296`, `:402`, `:439`, `:448`,
+  `:458`, `:498`) and one is in `visual/panes.test.ts` (`:210`).
+
+**R1. Color format (fixes the TS errors).**
+- Decision: `rgbaCss(c: Rgba): string` returns lowercase `#rrggbb` (each channel
+  `Math.round(v * 255)`, two hex digits) when alpha is exactly 1, and
+  `rgba(R, G, B, A)` otherwise.
+- Wrap the two call sites with it: `drawRun(..., rgbaCss(this.palette.gutter), true)` at
+  line 220, and `drawRun(..., rgbaCss(this.palette.labelText))` at line 233.
+- Why: `FALLBACK_PALETTE` then produces exactly the legacy strings (`'#d8dee9'`,
+  `'#7a7f87'`, `'#ebcb8b'` and the token hexes). Atlas tile identities and the
+  `gpu.test.ts:310` assertion `t.color === '#ebcb8b'` stay byte-identical.
+- Do not change the color parameter type of `drawRun`, `RunStyle.color` or
+  `TileRequest.color` to `Rgba`, and do not edit `atlas.ts`: its color contract belongs to
+  CANVAS-OPT-RENDER.
+
+**R2. Port the six `gpu.test.ts` rows.** Keep the intent of each row, keep every assertion
+that does not mention the background byte-identical, and record each port with its old and
+new assertion in the progress log. Do not invent exact counts: run the row and pin the
+observed value only where the old row pinned one.
+- `:296` "draws all required feedback in order...":
+  - Remove the source canvas and `setBackground`.
+  - The leading backdrop quad `[1, 1, 1, 1]` disappears, so `colors.slice(0, 5)` becomes
+    `colors.slice(0, 4)`, starting with the scrim `[0.04, 0.05, 0.07, 0.85]`.
+  - `expect(diagnostic).toBeGreaterThan(4)` becomes `toBeGreaterThan(3)`, the same
+    one-index shift.
+  - Everything else is unchanged, including `'#ebcb8b'`, the scissor check and the
+    dispose checks.
+- `:402` "copies changed background once per frame..." becomes "animation frames never copy
+  or upload a backdrop":
+  - 1 text frame, then 100 animation-only frames
+    (`render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })`).
+  - Expect: 0 new `texImage2D`/`texSubImage2D` calls, 0 new `raster.createCanvas`
+    calls, 0 `drawImage` calls on any fake 2D context, a stable live-texture count,
+    `b.counters.byKind.backdrop === 0`, and `dispose` -> `usedBytes === 0`.
+- `:439` "large backgrounds downsample..." becomes "a large viewport stays within the
+  staging and pixel caps with no backdrop reservation":
+  - Keep the geometry and pixel cap assertions and the `copied` undefined assertion.
+  - Replace `backgroundUploads === 1` with `byKind.backdrop === 0`.
+- `:448` "reuses a near-staging-cap backdrop...":
+  - Two renders of the 40-line document.
+  - Keep the geometry cap, dispose `usedBytes === 0` and `live.size === 0`.
+  - Replace the `backgroundUploads` check with `byKind.backdrop === 0`.
+- `:458` "retains every unchanged text tile with animated near-cap backgrounds":
+  - Keep the 4-iteration loop as 4 animation frames (an animated playing range, with no
+    `setBackground`).
+  - Keep `firstUploads === 80`, the 40 rasterized `line ` texts, identical textures,
+    stable `usedBytes`, 0 evictions and the ledger-cap checks in the `allocate` wrapper.
+  - Replace `backgroundUploads === revision` with `byKind.backdrop === 0`.
+  - The `texSubImage2D` count becomes 0, and the `texImage2D` count drops by the one
+    backdrop upload: white plus 80 glyph tiles. Confirm by running.
+  - `peakGeometry > 4 MiB - 20,000` measured backdrop staging, so it is removed. Record
+    that as the only dropped assertion, because its subject no longer exists.
+- `:498` "shrinks animated backdrop staging under new geometry pressure..." becomes
+  "geometry pressure during animation frames never evicts text":
+  - Keep the pressure allocation, the unchanged atlas uploads, 0 evictions and the
+    dispose checks.
+  - Replace the backdrop byte comparisons with `byKind.backdrop === 0`.
+
+**R3. `visual/panes.test.ts`.** Line 210 `[canvas, canvas]` becomes `[canvas]`, and line 223
+`[canvas, canvas, null]` becomes `[canvas, null]`. The `stopped` assertions are unchanged.
+
+**R4. New rows** (from "Test Cases"; none of them exist at 212bb54):
+- the `getParameter` row (amended above);
+- the palette rows:
+  - a `diagnostic: [1, 0, 0, 1]` palette is used for the underline draw;
+  - `FALLBACK_PALETTE.token` equals `GPU_TOKEN_COLORS` parsed;
+  - `rgbaCss` of every fallback field equals the legacy string;
+  - `readPalette` on a root whose computed style gives `--vt-danger: #ff0000` returns
+    `diagnostic [1, 0, 0, 1]`, and an unparsable value falls back;
+- the `mount.test.ts` layering rows:
+  - first child with class `vact-code-backdrop`, followed by the code canvas;
+  - `cb(null)` removes it;
+  - 60 frames with playing highlights give 0 `drawImage` and 0 background uploads;
+  - `dispose` removes it.
+
+**R5. Other sharedPaths.** The grep `grep -rln "backgroundUploads\|setBackground\|onBackgroundCanvas" editor/src editor/test`
+at 212bb54 matches only `apis.ts`, `code/mount.ts`, `visual/mount.ts`, `panes.test.ts` and
+`gpu.test.ts`. The other session-290 sharedPaths are expected to stay unedited.
+`theme.css` already defines every section-7 token the palette reads.
+
+**Reporting rule** (progress gate `scripts/implementation-progress-check.py`):
+- Repaired findings go only into `addressedFeedback`/`resolvedFindings` with status
+  `repaired` and their evidence.
+- `risks`, `findings`, `authorSelfCheck.findings` and `authorSelfCheck.residualRisks` carry
+  no critical, high, mid or medium item. They may hold a low or unrated note, or a genuinely
+  unfixed defect.
+- Pending independent review is not a risk.
+- Run no mutation or negative-control command.
+- Every verification record is `{command, exitStatus: 0, testsRun > 0, testsPassed,
+  failureCount: 0, outcome: "passed", log}` for tests, or `{command, exitStatus: 0,
+  outcome: "passed", log}` otherwise. Details go in `notes`.
+- `priorVerification` is empty or uses the same format.
+
+**Session 290 gates** (all exit 0; heavy suites one at a time):
+- Inside the sandbox:
+  - `cd editor && npm run check`;
+  - `cd editor && ./node_modules/.bin/vitest run test/canvas/gpu.test.ts test/canvas/mount.test.ts test/canvas/frame.test.ts test/visual`;
+  - `cd editor && ./node_modules/.bin/vitest run` (at least 778 tests, all passing);
+  - the host-wasm wasm32 build;
+  - the src-tauri cargo check.
+- Outside the sandbox: `npm run test:style`, the behavior e2e, `npm run test:perf`
+  (alone), strict clippy and full nextest (timeout 2400, alone).
+- Line-count check: `wc -l` of every touched TS file is below 1000.
 
 ## Contracts and Key Points
 
@@ -232,8 +390,14 @@ Each task's completion criterion is its contract plus its test rows, passing.
   - `dispose()` -> `usedBytes === 0`.
 
   Every assertion that does not mention the background is kept verbatim.
-- New: `setViewport` called on 100 frames -> `getParameter` called exactly once since
-  init. Control: `restore` (a `webglcontextrestored` event) -> one more call.
+- New (session-290 amendment INT-S289-BD-PLAN-GETPARAM, design 15.3.8.14 section 4 "GL
+  hygiene"): after init, spy on `gl.getParameter` (`vi.spyOn(f.r.gl, 'getParameter')`) and
+  clear it. 100 iterations of `setViewport` plus an animation-only `render` (same and
+  alternating sizes at DPR 1) -> 0 `getParameter` calls. Control branch in the same test: a
+  context loss and restore (`webglcontextlost` then `webglcontextrestored`) -> at least 1
+  call with `MAX_TEXTURE_SIZE`. The init-time reads (`CanvasRenderer.initialize`,
+  `renderer.ts:126`; the atlas constructor, `atlas.ts:36`) are allowed. The test records
+  their count in a comment and does not assert "exactly once".
 - New: a palette with `diagnostic: [1, 0, 0, 1]` -> the diagnostic underline draw uses that
   color. `FALLBACK_PALETTE` -> today's colors (the token map equals `GPU_TOKEN_COLORS`
   parsed).
@@ -308,7 +472,9 @@ report. Edit only this plan's progress log.
 
 - [ ] The visual mount calls back once with the canvas and once with null; no per-frame calls
 - [ ] The code mount stacks the visual canvas under the code canvas; no copy, no upload and no per-frame wake-up
-- [ ] `uploadBackground` and `setBackground` removed; 0 backdrop ledger bytes; `getParameter` read once per init or restore
+- [ ] `uploadBackground` and `setBackground` removed; 0 backdrop ledger bytes; 0 `getParameter` calls over 100 `setViewport`/animation frames, at least 1 fresh `MAX_TEXTURE_SIZE` read on context restore, and the init-time reads (`renderer.ts:126`, `atlas.ts:36`) recorded and allowed
+- [ ] Counter rows: 100 animation frames give 0 backdrop copies (0 `drawImage`, 0 canvas-source texture uploads, 0 `createCanvas`) and 0 `getParameter`
+- [ ] Session 290: `npm run check` exit 0 (the Rgba/string errors at `renderer.ts` 220 and 233 are fixed); the accepted OPT-TEXT `onPresentation` hunk in `mount.ts` is byte-identical to 212bb54
 - [ ] `palette.ts` maps the section-7 tokens; the diagnostic underline uses `--vt-danger`; the fallback equals today's colors
 - [ ] Ported backdrop rows keep every non-background assertion; `panes.test.ts` updated to the once/null contract
 - [ ] Behavior e2e, `test:style`, default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
@@ -332,3 +498,18 @@ sharedPaths").
 - Resolved the `backgroundUploads` reader pitfall: no harness reader exists (step3 review
   finding, low).
 - Scope, contracts, tasks and criteria are otherwise unchanged.
+
+### Session: 2026-10-06 (session 290 plan amendment)
+**Tasks Completed**: Operator decisions INT-S289-BD-PLAN-GETPARAM and ownership decision 2;
+design 15.3.8.14 sections 4 and 8 (session-290 amendment).
+**Notes**:
+- The getParameter criterion is now: 0 over 100 `setViewport`/animation frames, at least 1
+  fresh `MAX_TEXTURE_SIZE` read on restore, and the init reads at `renderer.ts:126` and
+  `atlas.ts:36` allowed. This plan's Test Cases and Completion Criteria and the manifest
+  `acceptanceCriteria[2]` are updated.
+- Added 12 concrete sharedPaths (the 15-file design list minus the three existing
+  writePaths).
+- Added the "Session 290 resume" brief INT-S289-BD-IMPL-INCOMPLETE, which pins the
+  `rgbaCss` hex format, the six `gpu.test.ts` ports, the `panes.test.ts` port and the new
+  rows.
+- Status is In Progress from the partial implementation at 212bb54.

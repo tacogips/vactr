@@ -8295,7 +8295,13 @@ and a new `editor/src/code/advances.ts`.
   The rebuild key no longer contains `cursor` or `annotationsRevision`.
 - **GL hygiene.**
   - *Parameters.* `getParameter` (`MAX_TEXTURE_SIZE` and the other limits)
-    runs once at init and once on restore, and the values are cached.
+    runs only at init and on restore, and the values are cached. The rule is
+    no GPU queries on the hot path, not a total count (session-290 amendment,
+    INT-S289-BD-PLAN-GETPARAM):
+    - over 100 `setViewport` and animation frames the count is 0;
+    - a context restore makes at least 1 fresh `MAX_TEXTURE_SIZE` read;
+    - the init-time reads in `CanvasRenderer.initialize` (`renderer.ts`)
+      and in the atlas constructor (`atlas.ts`) are recorded and allowed.
   - *Errors.* `getError` runs only at init, on restore, when the canvas
     backing store, atlas texture or instance buffer is (re)allocated, and in
     an explicit diagnostic method. It never runs per frame or per upload.
@@ -8336,8 +8342,9 @@ and a new `editor/src/code/advances.ts`.
     draw calls.
   - *Caret move.* `textBuilds` 0.
   - *Animation-only frame.* 0 atlas uploads, 0 layout builds, 0 staging
-    canvases created, 0 backdrop copies, 0 `mapWireSpan` calls with the
-    revision unchanged, and at most 4 draw calls.
+    canvases created, 0 backdrop copies, 0 `getParameter` calls over 100
+    frames, 0 `mapWireSpan` calls with the revision unchanged, and at most
+    4 draw calls.
   - *Behavior.* The behavior checks of 15.3.8.8 (canvas-only text, the
     readback probe, IME, context loss, DPR, resize) keep passing in both
     browsers.
@@ -8377,7 +8384,7 @@ default vitest suite, with no wall clock:
 |------|--------|
 | Single-char ASCII edit, keystroke task plus next frame | `shape()` <= 1 + newly exposed lines; `measureText` 0; `Text.toString` 0; `Utf8Index` builds 0; synchronous parses 0 (exactly 1 deferred); `getError`/`getParameter` 0; atlas uploads <= new cells; geometry bytes <= changed line segments; draw calls <= 4 |
 | Caret move | `textBuilds` 0; syntax `captures` 0 |
-| Animation-only frame | 0 atlas uploads, 0 layout builds, 0 staging canvases, 0 backdrop copies, 0 `mapWireSpan` (revision unchanged), draw calls <= 4 |
+| Animation-only frame | 0 atlas uploads, 0 layout builds, 0 staging canvases, 0 backdrop copies, 0 `getParameter` over 100 frames, 0 `mapWireSpan` (revision unchanged), draw calls <= 4 |
 | Bind panel | mounted rows <= viewport rows (section 1 definition); 0 nodes moved when order is unchanged; 0 rows with `opacity` |
 | Store | notify visits only subscribers of the changed keys |
 | History | after 300 edits, `mapWireSpan(evalSpan, evalRev)` is non-null |
@@ -8472,6 +8479,32 @@ Chromium.
     or silent-sink rule is weakened. Every such edit is recorded in the
     owning plan's progress log. This changes ownership only; the plans'
     scope, order and criteria stay as they are.
+  - *Backdrop and render sharedPaths (session-290 amendment).* The partial
+    BACKDROP at 212bb54 needs to edit files outside its writePaths: the
+    removed `setBackground` callers and tests, and the atlas
+    `getParameter` read. `canvas-cutover-opt-backdrop` and
+    `canvas-cutover-opt-render` therefore both list these fifteen files as
+    concrete sharedPaths, in the plan and in the manifest:
+    - `editor/src/code/atlas.ts`
+    - `editor/src/visual/panes.ts`
+    - `editor/src/visual/render-host.ts`
+    - `editor/src/visual/frame.ts`
+    - `editor/src/app/theme.css`
+    - `editor/test/canvas/gpu.test.ts`
+    - `editor/test/canvas/mount.test.ts`
+    - `editor/test/canvas/frame.test.ts`
+    - `editor/test/visual/frame.test.ts`
+    - `editor/test/visual/meters.test.ts`
+    - `editor/test/visual/panes.test.ts`
+    - `editor/test/visual/render-host.test.ts`
+    - `editor/test/visual/scopes.test.ts`
+    - `editor/test/visual/text-asset.test.ts`
+    - `editor/test/visual/video.test.ts`
+
+    This is the same kind of ownership change as above. The only criterion
+    change is the `getParameter` wording in section 4 (GL hygiene). Ported
+    tests keep their intent: no per-frame backdrop upload, correct layering
+    and scrim, and context loss and restore.
   - *Overlap.* Files may appear in several plans, because only one plan is
     active at a time. `code/mount.ts` is written by HISTORY, TEXT and RENDER
     in turn.

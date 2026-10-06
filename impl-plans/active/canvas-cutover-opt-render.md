@@ -90,6 +90,23 @@ sharedPaths:
   - `editor/test/e2e/ios-sim.mjs`
   - `editor/test/e2e/README.md`
   - `editor/test/style/ui-style.mjs`
+- Backdrop and render sharedPaths (session-290 ownership amendment; design 15.3.8.14
+  section 8). These are the 15-file list minus the three already in writePaths here
+  (`atlas.ts`, `gpu.test.ts`, `mount.test.ts`). They are edited only if the atlas, geometry
+  or layer change breaks them. Keep the intent of every row, keep every other assertion
+  byte-identical, and record each edit with sha256 values:
+  - `editor/src/visual/panes.ts`
+  - `editor/src/visual/render-host.ts`
+  - `editor/src/visual/frame.ts`
+  - `editor/src/app/theme.css` (existing token values never change)
+  - `editor/test/canvas/frame.test.ts`
+  - `editor/test/visual/frame.test.ts`
+  - `editor/test/visual/meters.test.ts`
+  - `editor/test/visual/panes.test.ts`
+  - `editor/test/visual/render-host.test.ts`
+  - `editor/test/visual/scopes.test.ts`
+  - `editor/test/visual/text-asset.test.ts`
+  - `editor/test/visual/video.test.ts`
 
 ### Harness sharedPaths (session 288)
 
@@ -248,7 +265,12 @@ serial plan-author amendment.
   `cursor`, `handles`, `annotationsRevision` and `cursorVisible` affect only the overlay
   layers. A caret move gives `textBuilds` 0.
 - *GL calls.* No `getError` or `getParameter` per frame: they run in `initialize`, restore
-  and allocations only. No `isTexture`.
+  and allocations only. No `isTexture`. Session-290 wording (design 15.3.8.14 section 4,
+  "GL hygiene"): 0 `getParameter` over 100 `setViewport`/animation frames and on edits,
+  at least 1 fresh `MAX_TEXTURE_SIZE` read on restore, and the init reads (renderer
+  `initialize` and the atlas constructor) allowed. The BACKDROP `getParameter` row stays
+  green. If the new atlas takes its limit from the renderer instead of its own read, that is
+  allowed, provided restore still makes a fresh read.
 - *Restore.* Rebuild the atlas, buffers and slot table from CPU state (layout cache and
   spans) and mark every segment dirty. Context loss releases reservations as today.
 - *DPR change.* Reset the atlas and every segment; the existing `resize()` path calls
@@ -440,3 +462,13 @@ sharedPaths").
   `behavior.mjs` was already a sharedPath.
 - Removed-stat probes are handled by keeping the stat, not by editing the probe.
 - Scope, contracts, tasks and criteria are otherwise unchanged.
+
+### Session: 2026-10-06 (session 290 plan amendment)
+**Tasks Completed**: Ownership decision 2 and INT-S289-BD-PLAN-GETPARAM (design 15.3.8.14
+sections 4 and 8, session-290 amendment).
+**Notes**:
+- Added 12 concrete sharedPaths, here and in the manifest (the 15-file list minus
+  `atlas.ts`, `gpu.test.ts` and `mount.test.ts`, which are already writePaths).
+- Aligned the "GL calls" wording with the amended getParameter rule.
+- Scope, contracts, tasks and criteria are otherwise unchanged. This plan starts only after
+  CANVAS-OPT-BACKDROP is accepted.

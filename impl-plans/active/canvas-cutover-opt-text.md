@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-TEXT: Advance Tables, Change-Set Layout, Deferred Syntax and Off-Keystroke Completion Implementation Plan
 
-**Status**: In Progress (Step 6 implementation complete; downstream reviews pending)
+**Status**: Completed (accepted by the session-289 integration review; final source checkpointed in 212bb54)
 **Plan ID**: CANVAS-OPT-TEXT (session 286, wave 11; runs alone after CANVAS-OPT-DOM is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 3 (text layout, syntax and request scheduling), section 6 (budgets), engine rules; 15.3.3 (as amended: measured advances, caret validated against the same shaping); 15.3.8.7 (allowed whole-text transfers, as amended); 15.3.8.10 (bounded edit path)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-TEXT`)
@@ -644,3 +644,11 @@ strict Clippy, nextest, wasm32 and Tauri checks remain applicable and passed.
 fixture had no `onPresentation` subscriber, leaving its presentation cache uninitialized. The
 fixture was corrected to capture presentations; the final focused and full suites pass. ADV-01
 and ADV-02 are reported as repaired, with independent adversarial re-review pending.
+
+### Session: 2026-10-06 (session 290 plan checkpoint)
+**Tasks Completed**: Recorded acceptance. The session-289 integration review accepted
+CANVAS-OPT-TEXT. The operator checkpoint 212bb54 holds its final source, including the
+adversarial repair in `input.ts`, `layout.ts`, `input.test.ts`, `mount.test.ts` and the
+`onPresentation` hunk of `code/mount.ts`.
+**Notes**: The manifest moves CANVAS-OPT-TEXT to acceptedDependencies (commit 212bb54). It
+is not redispatched. CANVAS-OPT-BACKDROP keeps the `onPresentation` hunk byte-identical.

@@ -1646,6 +1646,20 @@ WebKit-first performance wave).
 The design's single OPT-RENDER plan is refined into BACKDROP and RENDER, as 15.3.8.14
 section 8 allows.
 
+**Session 291 amendment (design 15.3.8.14 section 8, "OPT-RENDER split").**
+
+- *Superseded plan.* CANVAS-OPT-RENDER now has status `Split` and is replaced by three
+  serial plans:
+  - CANVAS-OPT-RENDER-A (`canvas-cutover-opt-render-a.md`, wave 13);
+  - CANVAS-OPT-RENDER-B (`canvas-cutover-opt-render-b.md`, wave 14);
+  - CANVAS-OPT-RENDER-C (`canvas-cutover-opt-render-c.md`, wave 15).
+- *Order.* This plan runs at wave 16, after C is accepted. CANVAS-OPT-BACKDROP was accepted
+  in session 290 (commit 4262255).
+- *Closeout.* TASK-605 also archives `canvas-cutover-opt-render-a.md`, `-b.md` and `-c.md`
+  file by file, next to the parent `canvas-cutover-opt-render.md`. These paths are concrete
+  writePaths in the manifest.
+- *Unchanged.* No other task, threshold or gate changes.
+
 **Baseline.** The session-285 WIP at `cea81cd` (TASK-508 attribution, TASK-509 edit-path
 invariants) is the baseline. It is not redone. Its rows must still pass.
 

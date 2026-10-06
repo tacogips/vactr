@@ -1,7 +1,7 @@
 # Canvas Cutover OPT-RENDER: Append-Only Cell Atlas, Instanced Per-Line Geometry and Four Draw Calls Implementation Plan
 
-**Status**: In Progress
-**Plan ID**: CANVAS-OPT-RENDER (session 286, wave 13; runs alone after CANVAS-OPT-BACKDROP is accepted)
+**Status**: Split (session 291; never dispatched again. Work continues in impl-plans/active/canvas-cutover-opt-render-a.md, -b.md and -c.md, per design 15.3.8.14 section 8 "OPT-RENDER split (session-291 amendment)")
+**Plan ID**: CANVAS-OPT-RENDER (session 286, wave 13; superseded in the manifest by CANVAS-OPT-RENDER-A, -B and -C at waves 13, 14 and 15)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 4 ("Glyph atlas", "Per-line geometry cache", "Layers and draw calls", "GL hygiene", "Context loss, DPR and disposal", "Ported tests", "Proof") and section 6; 15.3.3 (as amended: cluster rasterization, run cells for complex lines); 15.3.5 caps; 15.3.8.7 "GPU per frame" (as amended)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-RENDER`)
 **Created**: 2026-10-06
@@ -489,3 +489,21 @@ packing helper.
   rollback and cumulative counters) and renderer assumptions that still require migration.
 - No completion criteria are checked. The implementation and required behavior/e2e/gate
   verification remain incomplete.
+
+### Session: 2026-10-06 (session 291 plan split)
+**Tasks Completed**: Split into three serial sub-plans, per design 15.3.8.14 section 8 "OPT-RENDER
+split (session-291 amendment)". This plan is not dispatched again. It stays as the reference
+contract and is archived at closeout.
+**Notes**:
+- **canvas-cutover-opt-render-a.md** (wave 13):
+  - criteria 1, 3 (draw count, gutter flag) and 6;
+  - the 16 red `gpu.test.ts` rows at 4262255;
+  - the 60-line draw, growth/reset, emoji/Hebrew and animation rows.
+- **canvas-cutover-opt-render-b.md** (wave 14):
+  - criterion 2 (blocks, slot table, `bufferSubData`, compaction) and criterion 4;
+  - the one-line edit, Enter and the 20,000-line single-ASCII-edit counters.
+- **canvas-cutover-opt-render-c.md** (wave 15):
+  - criterion 3 (overlays: caret `textBuilds` 0) and criterion 5, end to end through
+    `mount.ts`;
+  - the `code.css` gpu-status badge `z-index`.
+- Criteria 7-9 (gates, harness rule, progress log) apply to each sub-plan.

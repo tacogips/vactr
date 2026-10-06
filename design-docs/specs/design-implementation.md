@@ -8447,10 +8447,205 @@ Chromium.
      first and takes the zero-copy backdrop, the GL-limit caching and the
      palette. `canvas-cutover-opt-render` then takes the atlas, the geometry,
      the layers, the remaining GL hygiene, and context loss, DPR and
-     disposal.
+     disposal. The session-291 amendment, described below, then split
+     `canvas-cutover-opt-render` into the serial sub-plans A, B and C.
   6. `canvas-cutover-evidence`: the pending plan, amended for the release
      re-measure and closeout. It is not an accepted plan, so continuing it is
      not a redispatch.
+- **OPT-RENDER split (session-291 amendment).** CANVAS-OPT-RENDER used up its
+  bounded continuation attempts. HEAD 4262255 is an operator WIP checkpoint
+  with part of the plan done: the single-texture cell allocator in
+  `atlas.ts`, atlas UV sampling in `renderer.ts`, and the 32-byte
+  `packInstances` helper in the new `geometry.ts`. The renderer still issues
+  one `drawArrays` per quad and still toggles `scissor`. At that checkpoint
+  `npm run check` exits 0, and `gpu.test.ts` passes 33 of 49 rows (log:
+  `tmp/canvas-cutover/opt-render/focused-atlas-2.log`). Only the plan split
+  changes here. The section 4 and section 6 criteria and every threshold are
+  unchanged. Rendering is split into three serial sub-plans, each sized for
+  one bounded implementation pass:
+  - *Order.* CANVAS-OPT-RENDER-A, then -B, then -C, then CANVAS-EVIDENCE.
+    Only one runs at a time, because they share files.
+  - *Plan files.* The plans are
+    `impl-plans/active/canvas-cutover-opt-render-a.md`, `-b.md` and `-c.md`.
+    `canvas-cutover-opt-render.md` stays as the parent record with status
+    `Split` and is never dispatched again. Its contracts (cell atlas,
+    `geometry.ts`, renderer orchestration, layout accessor, `mount.ts`) stay
+    the reference, and each sub-plan cites the parts it implements.
+  - *Manifest.* In `canvas-cutover-dispatch.json`, three entries,
+    `CANVAS-OPT-RENDER-A`, `-B` and `-C`, replace `CANVAS-OPT-RENDER` in
+    `plans`, with waves 13, 14 and 15. A depends on CANVAS-OPT-BACKDROP, B on
+    A, and C on B. CANVAS-EVIDENCE moves to wave 16 and depends on C. The
+    manifest is checkpoint-committed and pushed before A is dispatched.
+  - *What A builds that B and C keep.* A delivers the final structure, and B
+    and C only fill it in. Neither may change the instance format, the
+    program or the layer set:
+    - the 32-byte instance format, including `a_meta` (slot, flags) and the
+      fixed flag bits;
+    - the single program, including the slot-table `texelFetch` path;
+    - the four layer buffers and VAOs.
+  - *Integration review.* Each sub-plan's integration review checks that the
+    instance format, program and layer set are unchanged since A. A change
+    there is a finding against the sub-plan.
+  - *Slot table placement.* The slot table belongs to B. The issue text
+    groups it with C, but B's Enter criterion cannot be met without it.
+  - *Ownership.* All three sub-plans own the same concrete files:
+    - writePaths: the writePaths of `canvas-cutover-opt-render.md`, plus
+      `editor/src/code/code.css` and their own plan file;
+    - sharedPaths: unchanged, meaning the 8 harness files and the 12
+      session-290 files;
+    - artifact roots: `tmp/canvas-cutover/opt-render-a`, `-b` or `-c`,
+      plus the existing build roots.
+
+    One new path is reserved: `editor/src/code/segments.ts`. A sub-plan
+    creates it only when `renderer.ts` or `geometry.ts` would otherwise
+    reach 1,000 lines. Each sub-plan records `BASE=4262255` and its own
+    `START` in `intent.json`.
+  - *Green after every sub-plan.* The "Green after every plan" list below,
+    and the behavior e2e, apply after each of A, B and C. No sub-plan may
+    leave a red row for a later one.
+  - *Test rows.* No assertion is deleted or weakened. When a sub-plan's
+    change breaks a passing row, the sub-plan ports that row with its intent
+    kept. Two known examples:
+    - the `scissor` arguments in "updates DPR when CSS viewport changes but
+      backing dimensions stay equal" become the gutter uniform at that DPR;
+    - the `bufferUploads` count becomes text-layer buffer writes.
+
+  **CANVAS-OPT-RENDER-A (cell atlas and instanced text draw).**
+  - *Atlas.* A finishes the cell atlas as specified in section 4:
+    - mask, color and run cells;
+    - shelf packing;
+    - growth to 2048 x 1024, then 2048 x 2048, within the cached
+      `MAX_TEXTURE_SIZE` and the 16 MiB cap, then a reset at maximum. Every
+      growth or reset bumps the generation;
+    - persistent staging;
+    - at most one upload per new cell, without `getError`;
+    - plain string keys;
+    - the 1 MiB per-frame budget with `text-pending`.
+
+    The `tile`, `tilePixels` and `supportsRunRaster` adapters are removed.
+  - *Instanced draws.* A moves every layer to `drawArraysInstanced` with the
+    final instance format, with one draw per non-empty layer and at most 4 in
+    total. The `CLIP_GUTTER` flag replaces `scissor`.
+  - *Text rebuild key.* The text layer is rebuilt only when one of these
+    changes: the text revision, the syntax style rows, the visible window,
+    the font generation, the DPR or the atlas generation.
+  - *What A may still rebuild.* A may rebuild every visible line's text
+    instances and the whole slot table on each text-dirty frame, with at most
+    one buffer write per frame.
+  - *Overlays.* Caret, handles and selection are drawn only in the overlay
+    and background layers. Cursor-only frames therefore do not rewrite the
+    text layer, which is what the ported "idle frames reuse" row requires.
+  - *Context loss, DPR and dispose.* Context loss, restore, a DPR change and
+    dispose cover the atlas, the program and the layer buffers. The ledger
+    `usedBytes` returns to 0.
+  - *Ported rows.* A ports the 16 rows that are red at 4262255, with their
+    intent kept, as the cell and instance terms in the parent plan's "Ported
+    rows" table describe:
+    - `GPU shaped-run atlas`:
+      - "reuses one ledger-accounted raster canvas until disposal";
+      - "crops the whole run and masks syntax without reshaping substrings";
+      - "rasterizes a styled multi-tile run once and releases its bounded
+        raster";
+      - "caches by text/font/fallback/DPR/style and deletes evicted tiles";
+      - "rolls back reservations and textures on upload failure";
+      - "bounds atlas misses per frame while allowing resident hits".
+    - `GPU code compositor`:
+      - "draws all required feedback in order on GPU and clips source
+        against gutter";
+      - "idle frames reuse text uploads, layout and static geometry; edits
+        rebuild only dirty tiles";
+      - "animation-only frames replay cached text without shaping or
+        uploads";
+      - "does no liveness, error or segmentation probes on animation-only
+        frames";
+      - "keeps textPending until a bounded per-frame atlas upload
+        completes";
+      - "retains text and save access after allocation/upload failure
+        without DOM fallback";
+      - "retains every unchanged text tile across animation frames without
+        backdrop uploads";
+      - "geometry pressure during animation does not evict text or allocate
+        backdrop storage";
+      - "dense offscreen syntax on a 1MiB line cannot overflow visible-tile
+        metadata";
+      - "keeps rendering all visible lines when atlas working set exceeds
+        available budget".
+  - *New rows* (counting fake GL, additive stub font):
+    - a 60-line viewport gives exactly 1 text draw and at most 4 draws in
+      total. The in-test control asserts that more than 60 decoded instances
+      are drawn;
+    - an atlas filled to capacity grows (`growths` 1, generation bumped),
+      then resets at maximum (`resets` 1). Text keeps rendering within the
+      per-frame budget, with `text-pending` until it completes;
+    - an emoji cluster gives a color cell with `UNTINTED`, and a Hebrew line
+      gives run cells.
+  - *Accepted when* `gpu.test.ts` passes every row (at least 49 plus A's new
+    rows) and the full gate list is green.
+
+  **CANVAS-OPT-RENDER-B (per-line geometry cache).**
+  - *Segments and blocks.* B replaces A's whole-window text rebuild with
+    cached segments. A segment is one (line, 256-cluster chunk, horizontal
+    window), keyed by line text identity or hash, font generation, DPR,
+    style hash and atlas generation. Each segment is stored in 64-instance
+    blocks of one persistent text buffer, written with `bufferSubData`. B
+    also adds:
+    - a free list with zero-writes for freed blocks;
+    - compaction, at most once per frame;
+    - `bufferData` only for capacity growth, an atlas reset or a restore.
+  - *Slot table.* B adds the incremental RG32F slot table, writing only
+    shifted slots, which are counted in `slotTableBytes`.
+  - *Gutter segments* are rewritten only when the line number changes.
+  - *Restore and DPR.* A restore marks every segment dirty, and a DPR change
+    resets the segments.
+  - *New rows:*
+    - a one-line edit: `geometryBytes` grows by at most that line's segment
+      block bytes, and `textBuilds` by 1;
+    - Enter on line 30: at most 2 text segments are rebuilt, plus slot-table
+      bytes and only the renumbered gutter segments;
+    - an unchanged line that shifts rebuilds 0 cells and writes only the
+      slot table;
+    - in `edit-cost.test.ts` (or `mount.test.ts`), a single ASCII edit on the
+      20,000-line fixture, run through the keystroke task and the next frame:
+      - atlas uploads at most the new cells;
+      - geometry bytes at most the changed line's segment bytes;
+      - `getError` 0, `getParameter` 0 and `measureText` 0;
+      - at most 4 draws.
+
+      Each row also asserts an in-test control branch, for example a
+      non-ASCII edit that must measure.
+
+  **CANVAS-OPT-RENDER-C (overlays and render closeout).**
+  - *Overlay-only frames.* C makes caret, selection, handle and blink
+    changes rewrite only the overlay and background layers, end to end
+    through `mount.ts`:
+    - the `staticRevision++` on each text frame is dropped;
+    - `annotationsRevision` changes only with surface, selection or
+      presentation annotations;
+    - a frame dirty only for `selection` calls `spans()` 0 times and makes 0
+      text builds.
+  - *Badge stacking.* The gpu-status badge must paint above the code canvas.
+    The canvas is `z-index: 1` (`code.css:50`) and draws the scrim, while
+    `.vact-code-gpu-status` (`code.css:69`) has no `z-index`, so today it
+    paints under the canvas. C gives it `z-index: 2`, the same as the
+    diagnostic tooltip.
+  - *New rows:*
+    - a renderer-level and a mount-level caret move each give `textBuilds` 0
+      and syntax `captures` 0, with the overlay rewritten;
+    - 100 mounted animation-only frames give:
+      - 0 atlas uploads, 0 layout builds, 0 staging canvases and 0 backdrop
+        copies;
+      - 0 `getParameter`, 0 `getError` and 0 `measureText`;
+      - 0 `mapWireSpan` with the revision unchanged;
+      - at most 4 draws per frame;
+    - a `mount.test.ts` row reads `code.css` and asserts that
+      `.vact-code-gpu-status` declares a `z-index` greater than
+      `.vact-code-canvas`'s.
+  - *Ports.* C ports any remaining row its overlay change breaks, with
+    intent kept.
+  - *Parent plan.* C checks the remaining completion criteria of the parent
+    plan.
+  - *Accepted when* `gpu.test.ts` passes every row (at least 49) and the full
+    gate list is green.
 - **Ownership.** Each plan lists concrete files only, with no directories,
   far below the 512-entry snapshot cap.
   - *Pre-authorization.* Each plan pre-authorizes generously from

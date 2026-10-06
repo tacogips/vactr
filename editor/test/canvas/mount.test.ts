@@ -45,17 +45,17 @@ function rendererGL(): WebGL2RenderingContext {
   let next = 1;
   const gl: Record<string, unknown> = {};
   const constants = ['MAX_TEXTURE_SIZE', 'TEXTURE_2D', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'LINEAR', 'NEAREST',
-    'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'UNPACK_PREMULTIPLY_ALPHA_WEBGL', 'RGBA', 'UNSIGNED_BYTE',
-    'VERTEX_SHADER', 'FRAGMENT_SHADER', 'COMPILE_STATUS', 'LINK_STATUS', 'ARRAY_BUFFER', 'STATIC_DRAW', 'FLOAT',
-    'FRAMEBUFFER', 'SCISSOR_TEST', 'BLEND', 'ONE', 'ONE_MINUS_SRC_ALPHA', 'COLOR_BUFFER_BIT', 'TEXTURE0', 'TRIANGLES'];
+    'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'UNPACK_PREMULTIPLY_ALPHA_WEBGL', 'UNPACK_SKIP_PIXELS', 'UNPACK_SKIP_ROWS', 'UNPACK_ROW_LENGTH', 'RGBA', 'RG', 'RG32F', 'UNSIGNED_SHORT', 'UNSIGNED_BYTE',
+    'VERTEX_SHADER', 'FRAGMENT_SHADER', 'COMPILE_STATUS', 'LINK_STATUS', 'ARRAY_BUFFER', 'STATIC_DRAW', 'DYNAMIC_DRAW', 'FLOAT',
+    'FRAMEBUFFER', 'BLEND', 'ONE', 'ONE_MINUS_SRC_ALPHA', 'COLOR_BUFFER_BIT', 'TEXTURE0', 'TEXTURE1', 'TRIANGLES'];
   constants.forEach((name, index) => { gl[name] = index + 1; }); gl.NO_ERROR = 0;
   for (const kind of ['Texture', 'Shader', 'Program', 'Buffer', 'VertexArray']) {
     gl[`create${kind}`] = () => ({ id: next++ }); gl[`delete${kind}`] = () => {};
   }
   for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram',
-    'bindVertexArray', 'bindBuffer', 'bufferData', 'enableVertexAttribArray', 'vertexAttribPointer', 'bindFramebuffer',
+    'bindVertexArray', 'bindBuffer', 'bufferData', 'bufferSubData', 'enableVertexAttribArray', 'vertexAttribPointer', 'vertexAttribIPointer', 'vertexAttribDivisor', 'bindFramebuffer',
     'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1i',
-    'activeTexture', 'scissor', 'drawArrays', 'bindTexture', 'texImage2D', 'texSubImage2D', 'uniform4f']) gl[name] = () => {};
+    'activeTexture', 'drawArraysInstanced', 'bindTexture', 'texImage2D', 'texSubImage2D', 'uniform4f', 'uniform1f']) gl[name] = () => {};
   gl.getParameter = () => 4096; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
   gl.getShaderInfoLog = () => ''; gl.getProgramInfoLog = () => ''; gl.getAttribLocation = () => 0;
   gl.getUniformLocation = (_program: unknown, name: string) => ({ name }); gl.getError = () => gl.NO_ERROR;

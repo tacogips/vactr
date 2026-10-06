@@ -1,10 +1,11 @@
 import { Text } from '@codemirror/state';
 import type { CodeAnnotation, CodeRect } from '../app/apis';
-import { GlyphAtlas, type CanvasFactory, type RunStyle } from './atlas';
+import { GlyphAtlas, type CanvasFactory } from './atlas';
 import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from './layout';
 import { ResourceLedger, effectiveSize, RESOURCE_LIMITS, type Reservation } from './resources';
 import type { PhaseTimer } from './frame';
 import { FALLBACK_PALETTE, rgbaCss, type Palette } from './palette';
+import { CLIP_GUTTER, UNTINTED, InstanceWriter, LayerBuffer, VERTEX_SOURCE, FRAGMENT_SOURCE, type GeometryLayer } from './geometry';
 
 export interface GpuStatus {
   kind: 'ready' | 'degraded' | 'unavailable' | 'context-lost'; message: string;
@@ -18,30 +19,13 @@ export interface RenderFeedback {
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
 }
-interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; uv?: [number, number, number, number]; generation?: number; cursor?: boolean; clipped: boolean }
+interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; uv?: [number, number, number, number]; generation?: number; cursor?: boolean; flags?: number; layer: GeometryLayer; slot: number }
 export interface RendererOptions {
   ledger?: ResourceLedger; gl?: WebGL2RenderingContext; createCanvas?: CanvasFactory;
   palette?: Palette;
   onStatus?: (status: GpuStatus) => void;
 }
-const VERTEX = `#version 300 es
-in vec2 a_pos;
-uniform vec4 u_rect;
-uniform vec2 u_view;
-out vec2 v_uv;
-uniform vec4 u_uv;
-void main() {
-  v_uv = mix(u_uv.xy, u_uv.zw, a_pos);
-  vec2 p = u_rect.xy + a_pos * u_rect.zw;
-  gl_Position = vec4(p.x / u_view.x * 2.0 - 1.0, 1.0 - p.y / u_view.y * 2.0, 0., 1.);
-}`;
-const FRAGMENT = `#version 300 es
-precision mediump float;
-in vec2 v_uv;
-uniform sampler2D u_texture;
-uniform vec4 u_color;
-out vec4 out_color;
-void main() { out_color = texture(u_texture, v_uv) * u_color; }`;
+const LAYERS: readonly GeometryLayer[] = ['background', 'text', 'overlay', 'overlayText'];
 export const GPU_TOKEN_COLORS: Readonly<Record<string, string>> = Object.freeze({
   'vact-tok-comment': '#7a7f87', 'vact-tok-directive': '#b07bd8', 'vact-tok-keyword': '#d08770',
   'vact-tok-number': '#88c0d0', 'vact-tok-string': '#a3be8c', 'vact-tok-path': '#a3be8c',
@@ -51,7 +35,7 @@ export const GPU_TOKEN_COLORS: Readonly<Record<string, string>> = Object.freeze(
 /** GPU presentation only. Mount/input owns editing, callbacks, scrolling and frame scheduling. */
 export class CanvasRenderer {
   readonly ledger: ResourceLedger;
-  readonly stats = { frames: 0, textBuilds: 0, bufferUploads: 0, drawCalls: 0 };
+  readonly stats = { frames: 0, textBuilds: 0, bufferUploads: 0, drawCalls: 0, lastFrameDraws: 0, decodedTextInstances: 0 };
   private gl: WebGL2RenderingContext | null;
   private atlas: GlyphAtlas | null = null;
   private program: WebGLProgram | null = null;
@@ -66,16 +50,19 @@ export class CanvasRenderer {
   private view: LayoutViewport = { width: 1, height: 1, scrollLeft: 0, scrollTop: 0 };
   private requestedDpr = 1;
   private labels = new Map<string, ShapedRun>();
-  private beforeAnimation: DrawCommand[] | null = null;
-  private afterAnimation: DrawCommand[] | null = null;
+  private textCommands: DrawCommand[] | null = null;
   private cacheKey = '';
   private textureGeneration = 0;
   private seenEvictions = 0;
   private collecting: DrawCommand[] | null = null;
-  private drawWhileCollecting = false;
-  private cursorVisibleWhileCollecting = true;
-  private scissorOn = false;
+  private currentLayer: GeometryLayer = 'background';
+  private currentSlot = 0;
+  private writers = new Map<GeometryLayer, InstanceWriter>(LAYERS.map(layer => [layer, new InstanceWriter()]));
+  private layerBuffers = new Map<GeometryLayer, LayerBuffer>();
+  private cornerBuffer: WebGLBuffer | null = null;
+  private slotTexture: WebGLTexture | null = null;
   private pendingText = false;
+  private textRevisionCounter = 0;
   private visibleLines: ShapedLine[] = [];
   private pendingStartLine = 0;
   private currentLineIndex = 0;
@@ -113,8 +100,8 @@ export class CanvasRenderer {
   get textPending(): boolean { return this.pendingText; }
   get atlasStats(): Readonly<{ uploads: number; hits: number; evictions: number }> { return this.atlas?.stats ?? { uploads: 0, hits: 0, evictions: 0 }; }
   setPhases(phases: PhaseTimer | null): void { this.layout.phases = phases; }
-  setDocument(text: string): void { this.layout.setDocument(text); this.clearDrawCache(); }
-  setText(doc: Text): void { this.layout.setText(doc); this.clearDrawCache(); }
+  setDocument(text: string): void { this.layout.setDocument(text); this.textRevisionCounter++; this.clearDrawCache(); }
+  setText(doc: Text): void { this.layout.setText(doc); this.textRevisionCounter++; this.clearDrawCache(); }
   setPalette(palette: Palette): void { this.palette = palette; this.clearDrawCache(); }
   setViewport(view: LayoutViewport, dpr = 1): void {
     if (![view.width, view.height, view.scrollLeft, view.scrollTop, view.left ?? 0, view.top ?? 0, view.gutter ?? 48].every(Number.isFinite) || view.width <= 0 || view.height <= 0 || view.scrollLeft < 0 || view.scrollTop < 0 || dpr <= 0 || !Number.isFinite(dpr)) throw new RangeError('Invalid viewport');
@@ -126,12 +113,13 @@ export class CanvasRenderer {
     const gl = this.gl; if (!gl) throw new Error('WebGL2 unavailable');
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
     const geometry = this.ledger.allocate('geometry', 12 * 4);
+    const slotBudget = this.ledger.allocate('geometry', this.maxTextureSize * 8);
     const white = this.ledger.allocate('atlas', 4);
-    if (!geometry || !white) { geometry?.release(); white?.release(); throw new Error('GPU initialization budget exhausted'); }
-    this.allocations.push(geometry, white);
+    if (!geometry || !slotBudget || !white) { geometry?.release(); slotBudget?.release(); white?.release(); throw new Error('GPU initialization budget exhausted'); }
+    this.allocations.push(geometry, slotBudget, white);
     const shaders: WebGLShader[] = [];
     try {
-      for (const [type, source] of [[gl.VERTEX_SHADER, VERTEX], [gl.FRAGMENT_SHADER, FRAGMENT]] as const) {
+      for (const [type, source] of [[gl.VERTEX_SHADER, VERTEX_SOURCE], [gl.FRAGMENT_SHADER, FRAGMENT_SOURCE]] as const) {
         const shader = gl.createShader(type); if (!shader) throw new Error('Shader allocation failed');
         shaders.push(shader); gl.shaderSource(shader, source); gl.compileShader(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) ?? 'Shader compile failed');
@@ -139,15 +127,30 @@ export class CanvasRenderer {
       this.program = gl.createProgram(); if (!this.program) throw new Error('Program allocation failed');
       for (const shader of shaders) gl.attachShader(this.program, shader);
       gl.linkProgram(this.program); if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(this.program) ?? 'Program link failed');
-      this.buffer = gl.createBuffer(); this.vao = gl.createVertexArray(); this.white = gl.createTexture();
-      if (!this.buffer || !this.vao || !this.white) throw new Error('GPU object allocation failed');
-      gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]), gl.STATIC_DRAW); this.stats.bufferUploads++;
-      const attribute = gl.getAttribLocation(this.program, 'a_pos'); gl.enableVertexAttribArray(attribute); gl.vertexAttribPointer(attribute, 2, gl.FLOAT, false, 0, 0);
+      this.vao = gl.createVertexArray(); this.white = gl.createTexture(); this.cornerBuffer = gl.createBuffer(); this.slotTexture = gl.createTexture();
+      if (!this.vao || !this.white || !this.cornerBuffer || !this.slotTexture) throw new Error('GPU object allocation failed');
+      gl.bindVertexArray(this.vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]), gl.STATIC_DRAW);
+      const corner = gl.getAttribLocation(this.program, 'a_corner'); gl.enableVertexAttribArray(corner); gl.vertexAttribPointer(corner, 2, gl.FLOAT, false, 0, 0);
+      for (const layer of LAYERS) {
+        const buffer = gl.createBuffer(); if (!buffer) throw new Error('Layer buffer allocation failed');
+        this.layerBuffers.set(layer, new LayerBuffer(gl, this.ledger, buffer));
+      }
+      const stride = 32;
+      const attrs: Array<[string, number, number, number]> = [['a_rect', 4, gl.FLOAT, 0], ['a_uv', 4, gl.UNSIGNED_SHORT, 16], ['a_color', 4, gl.UNSIGNED_BYTE, 24]];
+      for (const [name, size, type, offset] of attrs) {
+        const loc = gl.getAttribLocation(this.program, name); gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, size, type, name !== 'a_rect', stride, offset); gl.vertexAttribDivisor(loc, 1);
+      }
+      const meta = gl.getAttribLocation(this.program, 'a_meta'); gl.enableVertexAttribArray(meta); gl.vertexAttribIPointer(meta, 2, gl.UNSIGNED_SHORT, stride, 28); gl.vertexAttribDivisor(meta, 1);
+      gl.bindTexture(gl.TEXTURE_2D, this.slotTexture); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, this.maxTextureSize, 1, 0, gl.RG, gl.FLOAT, new Float32Array(this.maxTextureSize * 2));
+      this.locations.u_slots = gl.getUniformLocation(this.program, 'u_slots'); this.locations.u_gutter = gl.getUniformLocation(this.program, 'u_gutter');
       gl.bindTexture(gl.TEXTURE_2D, this.white);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-      for (const name of ['u_rect', 'u_view', 'u_color', 'u_texture', 'u_uv']) this.locations[name] = gl.getUniformLocation(this.program, name);
+      for (const name of ['u_view', 'u_texture']) this.locations[name] = gl.getUniformLocation(this.program, name);
       if (gl.getError() !== gl.NO_ERROR) throw new Error('GPU initialization failed');
       this.atlas = new GlyphAtlas(gl, this.ledger, this.createCanvas);
     } finally { for (const shader of shaders) gl.deleteShader(shader); }
@@ -179,75 +182,68 @@ export class CanvasRenderer {
       if (this.atlas.stats.evictions !== this.seenEvictions) { this.textureGeneration++; this.seenEvictions = this.atlas.stats.evictions; }
       if (!this.target) this.resize(this.requestedDpr);
       const gl = this.gl; this.atlas.beginFrame(); this.pendingText = false;
+      for (const writer of this.writers.values()) writer.clear();
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindVertexArray(this.vao); gl.useProgram(this.program);
-      gl.viewport(0, 0, this.canvas.width, this.canvas.height); this.unclip();
+      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.uniform2f(this.locations.u_view, this.view.width, this.view.height); gl.uniform1i(this.locations.u_texture, 0); gl.activeTexture(gl.TEXTURE0);
-      this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
+      gl.uniform2f(this.locations.u_view, this.view.width, this.view.height); gl.uniform1i(this.locations.u_texture, 0); gl.uniform1i(this.locations.u_slots, 1); gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.atlas.texture);
       const annotations = feedback.annotations ?? [];
       const staticAnnotations = annotations.filter(a => a.kind !== 'playing' && a.kind !== 'eval');
-      const annotationKey = feedback.annotationsRevision === undefined ? staticAnnotations : feedback.annotationsRevision;
-      const key = JSON.stringify([feedback.textRevision, this.view, this.scale, this.layout.font.generation, this.atlas.stats.evictions, annotationKey, feedback.cursor, feedback.handles]);
-      const rebuild = feedback.textRevision === undefined || this.beforeAnimation === null || this.afterAnimation === null || this.cacheKey !== key;
-      let unsupported = false;
-      let before = this.beforeAnimation ?? [];
-      let after = this.afterAnimation ?? [];
-      if (rebuild) {
-        before = []; after = [];
-        this.collecting = before; this.clip(this.view.gutter ?? 48);
-        for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.12, 0.22, 0.32, 0.55]);
-        this.collecting = null;
-        for (const command of before) this.replay(command);
+      const syntaxKey = staticAnnotations.filter(a => a.kind === 'syntax').map(a => `${a.from}:${a.to}:${a.className ?? ''}`).join(';');
+      const key = `${feedback.textRevision ?? this.textRevisionCounter}|${this.view.width},${this.view.height},${this.view.scrollLeft},${this.view.scrollTop},${this.view.left ?? 0},${this.view.top ?? 0},${this.view.gutter ?? 48}|${this.scale}|${this.layout.font.generation ?? 0}|${this.atlas.stats.generation}|${syntaxKey}`;
+      const rebuildText = this.textCommands === null || this.cacheKey !== key;
+      this.currentLayer = 'background';
+      this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
+      if (rebuildText) {
         this.visibleLines = this.layout.visible(this.view);
-      } else {
-        for (const command of before) this.replay(command);
+        this.writeSlots(this.visibleLines);
+        this.textCommands = []; this.collecting = this.textCommands; this.currentLayer = 'text';
+        for (let offset = 0; offset < this.visibleLines.length; offset++) {
+          const index = (this.pendingStartLine + offset) % Math.max(1, this.visibleLines.length);
+          const line = this.visibleLines[index]!; this.currentLineIndex = index; this.currentSlot = index + 1;
+          for (const run of line.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, 0, staticAnnotations);
+        }
+        this.currentSlot = 0;
+        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], rgbaCss(this.palette.gutter), true);
+        this.collecting = null; this.stats.textBuilds++;
+        if (!this.pendingText) { this.cacheKey = key; this.pendingStartLine = 0; }
+        else this.cacheKey = '';
+        this.stats.bufferUploads++;
       }
-      this.clip(this.view.gutter ?? 48);
+      for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.12, 0.22, 0.32, 0.55]);
       for (const a of [...annotations, ...(feedback.animated ?? [])]) if (a.kind === 'playing' || a.kind === 'eval') {
         const color = a.kind === 'playing' ? [0.35, 0.29, 0.13, 0.5] : a.className?.includes('error') ? [0.4, 0.12, 0.16, 0.5] : [0.2, 0.32, 0.36, 0.5];
         for (const r of this.animatedRects(a)) this.quad(this.local(r), color);
       }
-      if (rebuild) {
-        this.collecting = after; this.drawWhileCollecting = true; this.cursorVisibleWhileCollecting = feedback.cursorVisible !== false;
-        this.clip(this.view.gutter ?? 48);
-        for (let offset = 0; offset < this.visibleLines.length; offset++) {
-          const index = (this.pendingStartLine + offset) % this.visibleLines.length;
-          const line = this.visibleLines[index]!; this.currentLineIndex = index;
-          unsupported ||= line.rtlUnsupported; const y = line.number * this.layout.font.lineHeight - this.view.scrollTop;
-          for (const run of line.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, y, staticAnnotations);
-        }
-        this.unclip();
-        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], rgbaCss(this.palette.gutter), true);
-        this.clip(this.view.gutter ?? 48);
-        for (const a of staticAnnotations) {
-          if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? this.palette.diagnostic : this.palette.composition);
-          if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), this.palette.callHead);
-        }
-        if (feedback.cursor != null) { const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.addCommand({ rect: this.local(r), color: this.palette.cursor, cursor: true }); }
-        for (const a of staticAnnotations) {
-          if (a.kind === 'binding' && a.label) {
-            const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
-            const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
-            const width = Math.min(256, Math.max(16, a.label.length * 8 + 8));
-            this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
-            this.drawRun(this.labelRun(a.label, width), x + 4, y, [], rgbaCss(this.palette.labelText));
-          }
-        }
-        for (const handle of feedback.handles ?? []) {
-          const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
-          const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
-          this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, this.palette.handle);
-        }
-      this.collecting = null; this.drawWhileCollecting = false; this.stats.textBuilds++;
-        if (!this.pendingText) { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = key; this.pendingStartLine = 0; }
-        else { this.beforeAnimation = before; this.afterAnimation = after; this.cacheKey = ''; }
-      } else {
-        for (const command of after) if (!command.cursor || feedback.cursorVisible !== false) this.replay(command);
+      for (const command of this.textCommands ?? []) this.replay(command);
+      this.currentLayer = 'overlay';
+      for (const a of staticAnnotations) {
+        if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? this.palette.diagnostic : this.palette.composition);
+        if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), this.palette.callHead);
       }
-      this.unclip();
+      if (feedback.cursorVisible !== false && feedback.cursor != null) {
+        const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.quad(this.local(r), this.palette.cursor);
+      }
+      for (const a of staticAnnotations) {
+        if (a.kind === 'binding' && a.label) {
+          const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
+          const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
+          const width = Math.min(256, Math.max(16, a.label.length * 8 + 8));
+          this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
+          this.currentLayer = 'overlayText'; this.drawRun(this.labelRun(a.label, width), x + 4, y, [], rgbaCss(this.palette.labelText)); this.currentLayer = 'overlay';
+        }
+      }
+      this.currentLayer = 'overlay';
+      for (const handle of feedback.handles ?? []) {
+        const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
+        const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
+        this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, this.palette.handle);
+      }
+      this.collecting = null; this.flushLayers();
       this.stats.frames++;
-      if (unsupported) this.report('degraded', 'Mixed RTL hit testing is unsupported'); else this.reportReady();
+      if (this.visibleLines.some(line => line.rtlUnsupported)) this.report('degraded', 'Mixed RTL hit testing is unsupported'); else this.reportReady();
       this.atlas.endFrame();
       return true;
     } catch (e) { this.atlas.endFrame(); this.fail(e); return false; }
@@ -263,26 +259,46 @@ export class CanvasRenderer {
   private replay(command: DrawCommand): void {
     this.drawCommand(command);
   }
-  private addCommand(command: Omit<DrawCommand, 'clipped'>): void {
-    const recorded = { ...command, ...(command.texture ? { generation: this.textureGeneration } : {}), clipped: this.scissorOn };
+  private addCommand(command: Omit<DrawCommand, 'layer' | 'slot'> & { flags?: number }): void {
+    const recorded: DrawCommand = { ...command, flags: command.flags ?? 0, layer: this.currentLayer, slot: this.currentSlot, ...(command.texture ? { generation: this.textureGeneration } : {}) };
     if (this.collecting) {
       this.collecting.push(recorded);
-      if (this.drawWhileCollecting && (!recorded.cursor || this.cursorVisibleWhileCollecting)) this.drawCommand(recorded);
       return;
     }
     this.drawCommand(recorded);
   }
   private drawCommand(command: DrawCommand): void {
     if (command.texture && command.generation !== this.textureGeneration) return;
+    const uv = command.uv ?? [0, 0, 2 / this.atlas!.dimensions[0], 2 / this.atlas!.dimensions[1]];
+    this.writers.get(command.layer)!.push(command.rect, uv, command.color as [number, number, number, number], command.slot, command.flags);
+  }
+  private writeSlots(lines: readonly ShapedLine[]): void {
+    if (lines.length + 1 > this.maxTextureSize) throw new Error('Visible line slot table exceeds texture limit');
+    const gl = this.gl!; const values = new Float32Array((lines.length + 1) * 2);
+    for (let i = 0; i < lines.length; i++) values[(i + 1) * 2 + 1] = lines[i]!.number * this.layout.font.lineHeight - this.view.scrollTop;
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.slotTexture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, lines.length + 1, 1, gl.RG, gl.FLOAT, values);
+  }
+  private flushLayers(): void {
     const gl = this.gl!;
-    if (command.clipped && !this.scissorOn) this.clip(this.view.gutter ?? 48);
-    else if (!command.clipped && this.scissorOn) this.unclip();
-    gl.bindTexture(gl.TEXTURE_2D, command.texture ?? this.white);
-    gl.uniform4f(this.locations.u_rect, command.rect.left, command.rect.top, command.rect.right - command.rect.left, command.rect.bottom - command.rect.top);
-    gl.uniform4f(this.locations.u_color, command.color[0]!, command.color[1]!, command.color[2]!, command.color[3]!);
-    const uv = command.uv ?? [0, 0, 1, 1];
-    gl.uniform4f(this.locations.u_uv, uv[0]!, uv[1]!, uv[2]!, uv[3]!);
-    gl.drawArrays(gl.TRIANGLES, 0, 6); this.stats.drawCalls++;
+    const drawStart = this.stats.drawCalls;
+    gl.uniform1f(this.locations.u_gutter, (this.view.gutter ?? 48));
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.slotTexture);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.atlas!.texture);
+    for (const layer of LAYERS) {
+      const writer = this.writers.get(layer)!; if (!writer.count) continue;
+      const buffer = this.layerBuffers.get(layer)!.buffer;
+      this.layerBuffers.get(layer)!.upload(writer.bytes());
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      const stride = 32;
+      for (const [name, size, type, normalized, offset] of [['a_rect', 4, gl.FLOAT, false, 0], ['a_uv', 4, gl.UNSIGNED_SHORT, true, 16], ['a_color', 4, gl.UNSIGNED_BYTE, true, 24]] as const) {
+        const loc = gl.getAttribLocation(this.program!, name); gl.vertexAttribPointer(loc, size, type, normalized, stride, offset);
+      }
+      const meta = gl.getAttribLocation(this.program!, 'a_meta'); gl.vertexAttribIPointer(meta, 2, gl.UNSIGNED_SHORT, stride, 28);
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, writer.count); this.stats.drawCalls++;
+      if (layer === 'text') this.stats.decodedTextInstances = writer.count;
+    }
+    this.stats.lastFrameDraws = this.stats.drawCalls - drawStart;
   }
   private animatedRects(range: CodeAnnotation): CodeRect[] {
     if (this.visibleLines.length === 0) return [];
@@ -302,46 +318,60 @@ export class CanvasRenderer {
     return out;
   }
   private drawRun(run: ShapedRun, x: number, y: number, styles: readonly CodeAnnotation[], color?: string, gutter = false): void {
-    const atlas = this.atlas!; const step = atlas.tilePixels / this.scale;
+    const atlas = this.atlas!; const pad = Math.ceil(2 * this.scale); const step = (atlas.maxCellWidth - 2 * pad) / this.scale;
     const left = gutter ? 0 : this.view.gutter ?? 48; const right = gutter ? this.view.gutter ?? 48 : this.view.width;
-    const first = Math.max(0, Math.floor((left - x) / step));
-    const last = Math.min(Math.ceil(run.width / step), Math.ceil((right - x) / step));
-    const fullRunRaster = atlas.supportsRunRaster(run, this.layout.font, this.scale);
-    const runStyles: RunStyle[] = fullRunRaster
-      ? styles.filter(a => a.kind === 'syntax' && a.to > run.from && a.from < run.to)
-        .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: rgbaCss(this.palette.token[a.className ?? ''] ?? this.palette.text) }))
-      : [];
-    // Draw during rebuild before a later miss can evict this tile from the atlas.
-    for (let i = first; i < last; i++) {
-      const offset = i * step; const width = Math.min(step, run.width - offset);
-      if (width <= 0) continue;
-      let tileStyles = runStyles;
-      if (!fullRunRaster && styles.length) {
-        const from = this.layout.offsetInRun(run, offset, -1);
-        const to = this.layout.offsetInRun(run, offset + width, 1);
-        tileStyles = styles.filter(a => a.kind === 'syntax' && a.to > from && a.from < to)
-          .map(a => ({ from: Math.max(a.from, run.from), to: Math.min(a.to, run.to), color: rgbaCss(this.palette.token[a.className ?? ''] ?? this.palette.text) }));
+    if (!this.layout.isRunLine(run)) {
+      for (const cluster of this.layout.textCells(run, Math.max(0, left - x - 8), right - x + 8)) {
+        const glyphX = x + cluster.x;
+        if (glyphX + cluster.width < left || glyphX > right) continue;
+        const from = run.from + cluster.from, to = run.from + cluster.to;
+        const style = styles.find(a => a.kind === 'syntax' && a.from < to && a.to > from);
+        const tint = color ?? (style ? rgbaCss(this.palette.token[style.className ?? ''] ?? this.palette.text) : rgbaCss(this.palette.text));
+        const emoji = /\p{Extended_Pictographic}/u.test(cluster.text);
+        const cell = atlas.cell({ kind: emoji ? 'color' : 'mask', text: cluster.text, font: this.layout.font, dpr: this.scale, width: cluster.width });
+        if (!cell) {
+          if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length);
+          this.pendingText = true; continue;
+        }
+        const flags = (gutter ? 0 : CLIP_GUTTER) | (emoji ? UNTINTED : 0);
+        const cssPad = cell.pad / this.scale;
+        this.quad({ left: glyphX - cssPad, right: glyphX + cluster.width + cssPad, top: y, bottom: y + this.layout.font.lineHeight }, parseCssColor(tint), atlas.texture,
+          [cell.u0, cell.v0, cell.u1, cell.v1], flags);
       }
-      const tile = atlas.tile({ run, font: this.layout.font, dpr: this.scale, x: offset, width, styles: tileStyles, color: color ?? rgbaCss(this.palette.text) });
-      if (!tile) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; continue; }
-      this.quad({ left: x + offset, right: x + offset + width, top: y, bottom: y + this.layout.font.lineHeight }, [1, 1, 1, 1], tile.texture,
-        [tile.cell.u0, tile.cell.v0, tile.cell.u1, tile.cell.v1]);
+      return;
+    }
+    const runStyles = color ? [] : styles.filter(a => a.kind === 'syntax' && a.from < run.to && a.to > run.from);
+    const boundaries = [0, run.width];
+    for (const style of runStyles) {
+      boundaries.push(this.layout.runOffset(run, Math.max(0, style.from - run.from)));
+      boundaries.push(this.layout.runOffset(run, Math.min(run.text.length, style.to - run.from)));
+    }
+    boundaries.sort((a, b) => a - b);
+    const edges = boundaries.filter((value, index) => index === 0 || value > boundaries[index - 1]!);
+    for (let segment = 0; segment < edges.length - 1; segment++) {
+      const segmentFrom = edges[segment]!, segmentTo = edges[segment + 1]!;
+      if (segmentTo <= segmentFrom) continue;
+      const middle = (segmentFrom + segmentTo) / 2;
+      const at = this.layout.offsetInRun(run, middle, 1);
+      const style = runStyles.find(a => a.from <= at && a.to > at);
+      const tint = color ?? (style ? rgbaCss(this.palette.token[style.className ?? ''] ?? this.palette.text) : rgbaCss(this.palette.text));
+      let offset = Math.max(segmentFrom, left - x); const visibleTo = Math.min(segmentTo, right - x);
+      while (offset < visibleTo) {
+        const width = Math.min(step, segmentTo - offset, visibleTo - offset);
+        if (width <= 0) break;
+        const cell = atlas.cell({ kind: 'run', text: run.text, run, piece: { from: offset, to: offset + width }, chunkX: offset, font: this.layout.font, dpr: this.scale, width });
+        if (!cell) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; offset += width; continue; }
+        const cssPad = cell.pad / this.scale, flags = gutter ? 0 : CLIP_GUTTER;
+        this.quad({ left: x + offset - cssPad, right: x + offset + width + cssPad, top: y, bottom: y + this.layout.font.lineHeight }, parseCssColor(tint), atlas.texture,
+          [cell.u0, cell.v0, cell.u1, cell.v1], flags);
+        offset += width;
+      }
     }
   }
   private local(r: CodeRect): CodeRect { return { left: r.left - (this.view.left ?? 0), right: r.right - (this.view.left ?? 0), top: r.top - (this.view.top ?? 0), bottom: r.bottom - (this.view.top ?? 0) }; }
-  private clip(gutter: number): void {
-    const gl = this.gl!; gl.enable(gl.SCISSOR_TEST);
-    this.scissorOn = true;
-    const left = Math.min(this.canvas.width, Math.max(0, Math.floor(gutter * this.scale)));
-    gl.scissor(left, 0, this.canvas.width - left, this.canvas.height);
-  }
-  private unclip(): void {
-    this.gl!.disable(this.gl!.SCISSOR_TEST);
-    this.scissorOn = false;
-  }
-  private quad(r: CodeRect, color: number[], texture = this.white, uv?: [number, number, number, number]): void {
+  private quad(r: CodeRect, color: number[], texture = this.white, uv?: [number, number, number, number], flags = 0): void {
     if (r.right <= 0 || r.left >= this.view.width || r.bottom <= 0 || r.top >= this.view.height) return;
-    this.addCommand({ rect: r, color, texture: texture ?? undefined, ...(uv ? { uv } : {}) });
+    this.addCommand({ rect: r, color, texture: texture ?? undefined, ...(uv ? { uv } : {}), flags });
   }
   private reportReady(): void { this.report(this.scale < this.requestedDpr ? 'degraded' : 'ready', this.scale < this.requestedDpr ? 'Effective DPR reduced to respect GPU budget' : 'GPU ready'); }
   private report(kind: GpuStatus['kind'], message: string): void {
@@ -350,20 +380,26 @@ export class CanvasRenderer {
     if (changed) this.options.onStatus?.(this.statusValue);
   }
   private fail(error: unknown): void { this.clearDrawCache(); this.releaseGpu(false); this.report('unavailable', error instanceof Error ? error.message : String(error)); }
-  private clearDrawCache(): void { this.beforeAnimation = null; this.afterAnimation = null; this.cacheKey = ''; this.collecting = null; this.drawWhileCollecting = false; this.visibleLines = []; }
+  private clearDrawCache(): void { this.textCommands = null; this.cacheKey = ''; this.collecting = null; this.visibleLines = []; }
   private releaseGpu(lost: boolean): void {
     this.clearDrawCache();
     const gl = this.gl;
     if (lost) this.atlas?.contextLost(); else this.atlas?.dispose(); this.atlas = null;
+    for (const layer of this.layerBuffers.values()) {
+      layer.dispose();
+      if (gl && !lost) gl.deleteBuffer(layer.buffer);
+    }
+    this.layerBuffers.clear();
     if (gl && !lost) {
       if (this.white) gl.deleteTexture(this.white);
-      if (this.buffer) gl.deleteBuffer(this.buffer);
+      if (this.cornerBuffer) gl.deleteBuffer(this.cornerBuffer);
+      if (this.slotTexture) gl.deleteTexture(this.slotTexture);
       if (this.vao) gl.deleteVertexArray(this.vao);
       if (this.program) gl.deleteProgram(this.program);
     }
     this.target?.release(); this.target = null;
     for (const allocation of this.allocations) allocation.release(); this.allocations = [];
-    this.program = null; this.buffer = null; this.white = null; this.vao = null;
+    this.program = null; this.buffer = null; this.white = null; this.vao = null; this.cornerBuffer = null; this.slotTexture = null;
     this.canvas.width = 0; this.canvas.height = 0;
   }
   dispose(): void {
@@ -373,4 +409,15 @@ export class CanvasRenderer {
     document.fonts?.removeEventListener('loadingdone', this.fontsChanged);
     this.releaseGpu(this.lost); this.labels.clear(); this.layout.invalidate();
   }
+}
+
+function parseCssColor(value: string): number[] {
+  const hex = /^#([\da-f]{6})$/i.exec(value);
+  if (hex) return [0, 2, 4].map((index) => Number.parseInt(hex[1]!.slice(index, index + 2), 16) / 255).concat(1);
+  const rgba = /^rgba?\(([^)]+)\)$/.exec(value);
+  if (rgba) {
+    const parts = rgba[1]!.split(',').map((part) => Number(part.trim()));
+    if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) return [parts[0]! / 255, parts[1]! / 255, parts[2]! / 255, parts[3] ?? 1];
+  }
+  return [1, 1, 1, 1];
 }

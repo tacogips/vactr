@@ -57,6 +57,31 @@ export class TextLayout {
   get lineCount(): number { return this.text?.lines ?? this.lines.length; }
   get cacheBytes(): number { return this.bytes; }
   get widestShaped(): number { return this.widest; }
+  isRunLine(run: ShapedRun): boolean { return complexScript.test(run.text); }
+  textCells(run: ShapedRun, visibleFrom = 0, visibleTo = run.width): Array<{ text: string; from: number; to: number; x: number; width: number }> {
+    const index = this.runWidthIndex(run);
+    const pieces: Array<{ text: string; start: number; end: number }> = [];
+    let ascii = true; for (const char of run.text) if (char.codePointAt(0)! > 0x7f) { ascii = false; break; }
+    if (ascii) {
+      let start = Math.max(0, this.offsetInRun(run, visibleFrom, -1));
+      while (start < run.text.length) {
+        const left = this.widthAt(run, index, start);
+        if (left > visibleTo) break;
+        pieces.push({ text: run.text[start]!, start, end: start + 1 }); start++;
+      }
+    } else {
+      for (const part of segmenter.segment(run.text)) {
+        const end = part.index + part.segment.length;
+        const left = this.widthAt(run, index, part.index), right = this.widthAt(run, index, end);
+        if (right >= visibleFrom && left <= visibleTo) pieces.push({ text: part.segment, start: part.index, end });
+        if (left > visibleTo) break;
+      }
+    }
+    return pieces.map(piece => {
+      const left = this.widthAt(run, index, piece.start), right = this.widthAt(run, index, piece.end);
+      return { text: piece.text, from: piece.start, to: piece.end, x: left, width: Math.max(1, right - left) };
+    });
+  }
   resetWidestShaped(): void { this.widest = 0; }
   setDocument(text: string): void {
     if (!this.text && text === this.source) return;
@@ -391,6 +416,9 @@ export class TextLayout {
       if (this.widthAt(run, index, boundaries[mid]!) < x) lo = mid + 1; else hi = mid;
     }
     return run.from + boundaries[Math.min(bias < 0 ? Math.max(0, lo - 1) : lo, boundaries.length - 1)]!;
+  }
+  runOffset(run: ShapedRun, offset: number): number {
+    return this.widthAt(run, this.runWidthIndex(run), Math.max(0, Math.min(run.text.length, offset)));
   }
   coordsAtPos(pos: number, view: LayoutViewport): CodeRect | null {
     if (!Number.isInteger(pos) || pos < 0 || pos > this.length) return null;

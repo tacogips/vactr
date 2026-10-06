@@ -1,7 +1,7 @@
 import { Text } from '@codemirror/state';
 import { describe, expect, it, vi } from 'vitest';
 import { TextLayout, type LayoutFont } from '../../src/code/layout';
-import { GlyphAtlas, type CanvasFactory } from '../../src/code/atlas';
+import { GlyphAtlas, type AtlasCell, type CanvasFactory } from '../../src/code/atlas';
 import { CanvasRenderer, GPU_TOKEN_COLORS } from '../../src/code/renderer';
 import { MiB, ResourceLedger, RESOURCE_LIMITS, effectiveSize } from '../../src/code/resources';
 import type { CodeAnnotation } from '../../src/app/apis';
@@ -34,9 +34,9 @@ function oldBoundary(text: string, pos: number, bias: -1 | 1): number {
   return pos;
 }
 const view = { width: 320, height: 100, scrollLeft: 0, scrollTop: 0, left: 10, top: 20, gutter: 48 };
-function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: number; y: number; font: string; color: string }[]; crops: number[][]; drawImages: number; canvases: number } {
+function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: number; y: number; font: string; color: string }[]; crops: number[][]; drawImages: number; canvases: number; measures: number } {
   const text: { text: string; x: number; y: number; font: string; color: string }[] = []; const crops: number[][] = [];
-  let drawImages = 0; let canvases = 0;
+  let drawImages = 0; let canvases = 0; let measures = 0;
   return { text, crops,
     createCanvas: () => {
       canvases++;
@@ -44,38 +44,58 @@ function rasterizer(): { createCanvas: CanvasFactory; text: { text: string; x: n
       const ctx = { font: '', fillStyle: '', textBaseline: '', setTransform() {}, clearRect() {}, save() {}, restore() {}, beginPath() {}, clip() {}, drawImage() { drawImages++; },
         rect(...args: number[]) { crops.push(args); },
         getImageData(_x: number, _y: number, w: number, h: number) { return { data: new Uint8ClampedArray(w * h * 4) }; },
-        measureText(t: string) { return { width: width(t) }; },
+        measureText(t: string) { measures++; return { width: width(t) }; },
         fillText(t: string, x: number, y: number) { text.push({ text: t, x, y, font: this.font, color: this.fillStyle }); },
       };
       Object.defineProperty(canvas, 'getContext', { value: () => ctx }); return canvas;
     },
-    get drawImages() { return drawImages; }, get canvases() { return canvases; },
+    get drawImages() { return drawImages; }, get canvases() { return canvases; }, get measures() { return measures; },
   };
+}
+function atlasCell(a: GlyphAtlas, request: { run: { text: string; from: number; to: number; x: number; width: number }; font: LayoutFont; dpr: number; x: number; width: number; color?: string; styles?: readonly { from: number; to: number; color: string }[] }): { texture: WebGLTexture; width: number; height: number; x: number; cssWidth: number; cell: AtlasCell } | null {
+  const cell = a.cell({ kind: 'run', text: request.run.text, run: request.run, piece: { from: request.x, to: request.x + request.width }, chunkX: request.x, font: request.font, dpr: request.dpr, width: request.width });
+  return cell ? { texture: a.texture, width: cell.width, height: cell.height, x: request.x, cssWidth: request.width, cell } : null;
 }
 function recordingGL(maxTexture = 1024) {
   let next = 1; let error = 0; let failUpload = false;
   const live = new Map<object, string>(); const deleted: string[] = []; const calls: { name: string; args: unknown[] }[] = [];
-  let rect: number[] = []; let color: number[] = []; let bound: object | null = null; let scissor = false;
-  const draws: { rect: number[]; color: number[]; texture: object | null; textureLiveAtDraw: boolean; scissor: boolean }[] = [];
+  let rect: number[] = []; let color: number[] = []; let bound: object | null = null; let instances = new Uint8Array(); let arrayBuffer: object | null = null; let slots = new Float32Array(2);
+  const draws: { rect: number[]; color: number[]; texture: object | null; textureLiveAtDraw: boolean; scissor: boolean; layer: string; flags: number; uv: number[] }[] = [];
   const gl: Record<string, unknown> = {};
-  ['MAX_TEXTURE_SIZE', 'TEXTURE_2D', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'LINEAR', 'NEAREST', 'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'UNPACK_PREMULTIPLY_ALPHA_WEBGL', 'RGBA', 'UNSIGNED_BYTE', 'VERTEX_SHADER', 'FRAGMENT_SHADER', 'COMPILE_STATUS', 'LINK_STATUS', 'ARRAY_BUFFER', 'STATIC_DRAW', 'FLOAT', 'FRAMEBUFFER', 'SCISSOR_TEST', 'BLEND', 'ONE', 'ONE_MINUS_SRC_ALPHA', 'COLOR_BUFFER_BIT', 'TEXTURE0', 'TRIANGLES'].forEach((name, i) => gl[name] = i + 1);
+  ['MAX_TEXTURE_SIZE', 'TEXTURE_2D', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'LINEAR', 'NEAREST', 'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'UNPACK_PREMULTIPLY_ALPHA_WEBGL', 'UNPACK_SKIP_PIXELS', 'UNPACK_SKIP_ROWS', 'UNPACK_ROW_LENGTH', 'RGBA', 'RG', 'RG32F', 'FLOAT', 'UNSIGNED_SHORT', 'UNSIGNED_BYTE', 'VERTEX_SHADER', 'FRAGMENT_SHADER', 'COMPILE_STATUS', 'LINK_STATUS', 'ARRAY_BUFFER', 'STATIC_DRAW', 'DYNAMIC_DRAW', 'FRAMEBUFFER', 'BLEND', 'ONE', 'ONE_MINUS_SRC_ALPHA', 'COLOR_BUFFER_BIT', 'TEXTURE0', 'TEXTURE1', 'TRIANGLES'].forEach((name, i) => gl[name] = i + 1);
   gl.NO_ERROR = 0;
   for (const kind of ['Texture', 'Shader', 'Program', 'Buffer', 'VertexArray']) {
     gl[`create${kind}`] = () => { const object = { id: next++ }; live.set(object, kind); return object; };
     gl[`delete${kind}`] = (obj: object) => { expect(live.get(obj)).toBe(kind); live.delete(obj); deleted.push(kind); };
   }
-  for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram', 'bindVertexArray', 'bindBuffer', 'bufferData', 'enableVertexAttribArray', 'vertexAttribPointer', 'bindFramebuffer', 'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1i', 'activeTexture', 'scissor']) gl[name] = (...args: unknown[]) => {
-    if (args[0] === gl.SCISSOR_TEST) scissor = name === 'enable';
+  for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram', 'bindVertexArray', 'bufferData', 'enableVertexAttribArray', 'vertexAttribPointer', 'vertexAttribIPointer', 'vertexAttribDivisor', 'bindFramebuffer', 'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1f', 'uniform1i', 'activeTexture']) gl[name] = (...args: unknown[]) => {
     calls.push({ name, args });
   };
+  gl.bindBuffer = (_target: number, buffer: object | null) => { arrayBuffer = buffer; calls.push({ name: 'bindBuffer', args: [_target, buffer] }); };
   gl.getParameter = (...args: unknown[]) => { calls.push({ name: 'getParameter', args }); return maxTexture; }; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
   gl.isTexture = (obj: object) => live.get(obj) === 'Texture';
   gl.getShaderInfoLog = () => ''; gl.getProgramInfoLog = () => ''; gl.getAttribLocation = () => 0; gl.getUniformLocation = (_p: object, name: string) => ({ name });
   gl.isContextLost = () => false;
   gl.bindTexture = (_target: number, texture: object | null) => { bound = texture; };
   gl.uniform4f = (loc: { name: string }, ...args: number[]) => { if (loc.name === 'u_rect') rect = args; if (loc.name === 'u_color') color = args; };
-  gl.drawArrays = () => draws.push({ rect: [...rect], color: [...color], texture: bound, textureLiveAtDraw: bound !== null && live.get(bound) === 'Texture', scissor });
-  for (const name of ['texImage2D', 'texSubImage2D']) gl[name] = (...args: unknown[]) => { calls.push({ name, args }); if (failUpload) { error = 1285; failUpload = false; } };
+  gl.bufferSubData = (_target: number, _offset: number, data: Uint8Array) => { instances = new Uint8Array(data); calls.push({ name: 'bufferSubData', args: [_target, _offset, data] }); };
+  gl.drawArraysInstanced = (_mode: number, _first: number, _vertices: number, count: number) => {
+    const buffers = [...live.entries()].filter(([, kind]) => kind === 'Buffer').map(([obj]) => obj);
+    const layer = ['background', 'text', 'overlay', 'overlayText'][buffers.indexOf(arrayBuffer!) - 1] ?? 'overlayText';
+    calls.push({ name: 'drawArraysInstanced', args: [_mode, _first, _vertices, count, layer] });
+    const data = new DataView(instances.buffer, instances.byteOffset, instances.byteLength);
+    for (let i = 0; i < count; i++) {
+      const offset = i * 32;
+      const slot = data.getUint16(offset + 28, true);
+      const instanceRect = [0, 4, 8, 12].map(n => data.getFloat32(offset + n, true));
+      instanceRect[1] += slots[slot * 2 + 1] ?? 0;
+      const instanceColor = [24, 25, 26, 27].map(n => data.getUint8(offset + n) / 255);
+      const uv = [16, 18, 20, 22].map(n => data.getUint16(offset + n, true) / 65535);
+      draws.push({ rect: instanceRect, color: instanceColor, texture: bound, textureLiveAtDraw: bound !== null && live.get(bound) === 'Texture', scissor: false, layer,
+        flags: data.getUint16(offset + 30, true), uv });
+    }
+  };
+  for (const name of ['texImage2D', 'texSubImage2D']) gl[name] = (...args: unknown[]) => { calls.push({ name, args }); if (name === 'texSubImage2D' && args[8] instanceof Float32Array) slots = new Float32Array(args[8]); if (failUpload) { failUpload = false; throw new Error('refused upload'); } };
   gl.getError = () => { const result = error; error = 0; return result; };
   return { gl: gl as unknown as WebGL2RenderingContext, live, deleted, calls, draws, failNextUpload: () => { failUpload = true; }, lose: () => live.clear() };
 }
@@ -219,68 +239,68 @@ describe('GPU shaped-run atlas', () => {
     const r = recordingGL(); const raster = rasterizer(); const createCanvas = vi.fn(raster.createCanvas);
     const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, createCanvas);
     const run = { text: 'abc', from: 0, to: 3, x: 0, width: 24 };
-    a.tile({ run, font, dpr: 1, x: 0, width: 24 });
-    a.tile({ run: { ...run, from: 3, to: 6 }, font, dpr: 1, x: 0, width: 24 });
+    atlasCell(a, { run, font, dpr: 1, x: 0, width: 24 });
+    atlasCell(a, { run: { ...run, from: 3, to: 6 }, font, dpr: 1, x: 0, width: 24 });
     expect(createCanvas).toHaveBeenCalledTimes(1);
-    expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(2);
+    expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(1);
     const geometryWithStaging = b.counters.byKind.geometry;
     expect(geometryWithStaging).toBeGreaterThanOrEqual(24 * 20 * 4);
-    a.endFrame(); expect(b.counters.byKind.geometry).toBeLessThan(geometryWithStaging);
-    a.beginFrame(); a.tile({ run: { ...run, from: 6, to: 9 }, font, dpr: 1, x: 0, width: 24 });
+    a.endFrame(); expect(b.counters.byKind.geometry).toBe(geometryWithStaging);
+    a.beginFrame(); atlasCell(a, { run: { ...run, from: 6, to: 9 }, font, dpr: 1, x: 0, width: 24 });
     expect(createCanvas).toHaveBeenCalledTimes(1);
     a.dispose(); expect(b.usedBytes).toBe(0);
   });
   it('crops the whole run and masks syntax without reshaping substrings', () => {
     const r = recordingGL(64); const raster = rasterizer(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, raster.createCanvas);
     const run = { text: 'ffi日本', from: 0, to: 5, x: 0, width: 50 };
-    const tile = a.tile({ run, font, dpr: 1, x: 32, width: 18, styles: [{ from: 3, to: 5, color: '#ff0000' }] })!;
-    expect(tile.width).toBe(18); expect(raster.text.map(t => t.text)).toEqual(['ffi日本', 'ffi日本']); expect(raster.text[0]!.x).toBe(-32);
-    expect(raster.crops).toContainEqual([-14, 0, 32, 20]);
+    const tile = atlasCell(a, { run, font, dpr: 1, x: 32, width: 18, styles: [{ from: 3, to: 5, color: '#ff0000' }] })!;
+    expect(tile.width).toBe(22); expect(raster.text.map(t => t.text)).toEqual(['ffi日本']); expect(raster.text[0]!.x).toBe(-30);
+    expect(raster.crops).toContainEqual([2, 0, 18, 20]);
     a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
   it('rasterizes a styled multi-tile run once and releases its bounded raster', () => {
-    const r = recordingGL(64); const raster = rasterizer(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, raster.createCanvas);
+    const r = recordingGL(128); const raster = rasterizer(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, raster.createCanvas);
     const run = { text: 'a'.repeat(32), from: 0, to: 32, x: 0, width: 256 };
     const styles = [{ from: 8, to: 12, color: '#ff0000' }];
-    for (const x of [0, 64, 128, 192]) expect(a.tile({ run, font, dpr: 1, x, width: 64, styles })).not.toBeNull();
-    expect(raster.text.map(t => t.text)).toEqual([run.text, run.text]);
-    expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(4);
+    for (const x of [0, 48, 96, 144]) expect(atlasCell(a, { run, font, dpr: 1, x, width: 40, styles })).not.toBeNull();
+    expect(raster.text.map(t => t.text)).toEqual([run.text, run.text, run.text, run.text]);
+    expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(1);
     const cachedRasterBytes = b.counters.byKind.geometry;
     expect(cachedRasterBytes).toBeGreaterThan(0);
-    a.endFrame(); expect(b.counters.byKind.geometry).toBeLessThan(cachedRasterBytes);
+    a.endFrame(); expect(b.counters.byKind.geometry).toBe(cachedRasterBytes);
     a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
-  it('caches by text/font/fallback/DPR/style and deletes evicted tiles', () => {
-    const r = recordingGL(); const b = new ResourceLedger(17000); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
+  it('caches mask cells by text/font/fallback/DPR while tint stays per instance', () => {
+    const r = recordingGL(); const b = new ResourceLedger(5 * MiB); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
     const run = { text: 'abc', from: 0, to: 3, x: 0, width: 24 };
     const req = { run, font, dpr: 1, x: 0, width: 24 };
-    const first = a.tile(req)!; expect(a.tile(req)!.texture).toBe(first.texture); expect(a.stats.uploads).toBe(1);
-    a.tile({ ...req, font: { ...font, fallback: 'other' } });
-    a.tile({ ...req, color: '#ff0000' }); a.tile({ ...req, dpr: 2 });
-    expect(a.stats.evictions).toBeGreaterThan(0); expect(b.usedBytes).toBeLessThanOrEqual(17000);
+    const first = atlasCell(a, req)!; expect(atlasCell(a, req)!.texture).toBe(first.texture); expect(a.stats.uploads).toBe(1);
+    atlasCell(a, { ...req, font: { ...font, fallback: 'other' } });
+    atlasCell(a, { ...req, color: '#ff0000' }); atlasCell(a, { ...req, dpr: 2 });
+    expect(a.stats.evictions).toBe(0); expect(a.stats.uploads).toBe(3); expect(b.usedBytes).toBeLessThanOrEqual(5 * MiB);
     a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
   it('reuses syntax tiles when an unchanged run shifts in document offsets', () => {
     const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
     const run = { text: 'abc', from: 10, to: 13, x: 0, width: 24 };
-    const first = a.tile({ run, font, dpr: 1, x: 0, width: 24, styles: [{ from: 11, to: 12, color: '#ff0000' }] })!;
+    const first = atlasCell(a, { run, font, dpr: 1, x: 0, width: 24, styles: [{ from: 11, to: 12, color: '#ff0000' }] })!;
     run.from += 10; run.to += 10;
-    const shifted = a.tile({ run, font, dpr: 1, x: 0, width: 24, styles: [{ from: 21, to: 22, color: '#ff0000' }] })!;
+    const shifted = atlasCell(a, { run, font, dpr: 1, x: 0, width: 24, styles: [{ from: 21, to: 22, color: '#ff0000' }] })!;
     expect(shifted.texture).toBe(first.texture);
     expect(a.stats).toMatchObject({ uploads: 1, hits: 1 });
     a.dispose(); expect(b.usedBytes).toBe(0);
   });
   it('rolls back reservations and textures on upload failure', () => {
     const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas); r.failNextUpload();
-    expect(() => a.tile({ run: { text: 'a', from: 0, to: 1, x: 0, width: 8 }, font, dpr: 1, x: 0, width: 8 })).toThrow('refused');
-    expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); expect(a.size).toBe(0);
+    expect(() => atlasCell(a, { run: { text: 'a', from: 0, to: 1, x: 0, width: 8 }, font, dpr: 1, x: 0, width: 8 })).toThrow('refused');
+    a.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); expect(a.size).toBe(0);
   });
   it('bounds atlas misses per frame while allowing resident hits', () => {
     const r = recordingGL(); const b = new ResourceLedger(); const a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
     const req = { run: { text: 'a', from: 0, to: 1, x: 0, width: 8 }, font, dpr: 1, x: 0, width: 8 };
-    a.beginFrame(640); expect(a.tile(req)).not.toBeNull();
-    a.beginFrame(0); expect(a.tile(req)).not.toBeNull();
-    expect(a.tile({ ...req, x: 8 })).toBeNull(); expect(a.stats.uploads).toBe(1);
+    a.beginFrame(1200); expect(atlasCell(a, req)).not.toBeNull();
+    a.beginFrame(0); expect(atlasCell(a, req)).not.toBeNull();
+    expect(atlasCell(a, { ...req, x: 8 })).toBeNull(); expect(a.stats.uploads).toBe(1);
     a.dispose(); expect(b.usedBytes).toBe(0);
   });
 });
@@ -308,20 +328,22 @@ describe('GPU code compositor', () => {
       { kind: 'composition', from: 6, to: 9 }, { kind: 'binding', from: 4, to: 5, label: 'CC 1' },
     ];
     expect(f.renderer.render({ annotations, cursor: 5, handles: [{ pos: 0 }, { pos: 9, end: true }] })).toBe(true);
-    const colors = f.r.draws.map(d => d.color);
-    expect(colors.slice(0, 4)).toEqual([[0.04, 0.05, 0.07, 0.85], [0.12, 0.22, 0.32, 0.55], [0.35, 0.29, 0.13, 0.5], [0.2, 0.32, 0.36, 0.5]]);
-    const diagnostic = colors.findIndex(c => c[0] === 0.75); const cursor = colors.findIndex(c => c[0] === 0.9); const badge = colors.findIndex(c => c[0] === 0.15);
+    const colors = f.r.draws.map(d => d.color); const q = (rgba: number[]) => rgba.map(channel => Math.round(channel * 255) / 255);
+    expect(colors.slice(0, 4)).toEqual([[0.04, 0.05, 0.07, 0.85], [0.12, 0.22, 0.32, 0.55], [0.35, 0.29, 0.13, 0.5], [0.2, 0.32, 0.36, 0.5]].map(q));
+    const diagnostic = colors.findIndex(c => Math.abs(c[0]! - 0.75) < 0.01); const cursor = colors.findIndex(c => Math.abs(c[0]! - 0.9) < 0.01); const badge = colors.findIndex(c => Math.abs(c[0]! - 0.15) < 0.01);
     expect(diagnostic).toBeGreaterThan(3); expect(cursor).toBeGreaterThan(diagnostic); expect(badge).toBeGreaterThan(cursor);
-    expect(colors.slice(-2)).toEqual([[0.53, 0.75, 0.82, 1], [0.53, 0.75, 0.82, 1]]);
-    expect(f.r.calls.some(c => c.name === 'scissor' && c.args[0] === 48)).toBe(true);
-    expect(f.raster.text.some(t => t.text === 'let x = 1' && t.color === '#ebcb8b')).toBe(true); expect(f.raster.text.some(t => t.text === '1')).toBe(true);
+    expect(colors.filter(c => Math.abs(c[0]! - 0.53) < 0.01 && Math.abs(c[1]! - 0.75) < 0.01).length).toBeGreaterThanOrEqual(2);
+    expect(f.r.calls.some(c => c.name === 'drawArraysInstanced' && Number(c.args[3]) > 1)).toBe(true);
+    expect(f.raster.text.some(t => t.text === 'l' && t.color === '#ffffff')).toBe(true);
+    expect(f.r.draws.some(d => d.layer === 'text' && Math.abs(d.color[0]! - Math.round(0.92 * 255) / 255) < 0.001)).toBe(true);
+    expect(f.raster.text.some(t => t.text === '1')).toBe(true);
     f.renderer.dispose(); expect(f.b.usedBytes).toBe(0); expect(f.r.live.size).toBe(0);
   });
   it('idle frames reuse text uploads, layout and static geometry; edits rebuild only dirty tiles', () => {
     const f = fixture(); expect(f.renderer.render()).toBe(true); const uploads = f.renderer.atlasStats.uploads; const builds = f.l.stats.builds;
     for (let i = 0; i < 4; i++) expect(f.renderer.render({ cursor: i })).toBe(true);
     expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.l.stats.builds).toBe(builds); expect(f.renderer.stats.bufferUploads).toBe(1);
-    f.renderer.setDocument('let x = 2\n日本'); f.renderer.render(); expect(f.renderer.atlasStats.uploads).toBe(uploads + 1);
+    f.renderer.setDocument('let x = Ω\n日本'); f.renderer.render(); expect(f.renderer.atlasStats.uploads).toBe(uploads + 1);
     f.renderer.dispose();
   });
   it('animation-only frames replay cached text without shaping or uploads', () => {
@@ -369,9 +391,9 @@ describe('GPU code compositor', () => {
   });
   it('replays gutter numbers unscissored and source text clipped on cached frames', () => {
     const f = fixture();
-    const frameDraws = (start: number) => f.r.draws.slice(start).filter(draw => draw.color.every(channel => channel === 1) && draw.rect[3] === font.lineHeight);
-    const gutterDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => draw.rect[0] + draw.rect[2] <= 48);
-    const sourceDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => draw.rect[0] >= 48);
+    const frameDraws = (start: number) => f.r.draws.slice(start).filter(draw => draw.layer === 'text' && draw.rect[3] === font.lineHeight);
+    const gutterDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => draw.flags === 0);
+    const sourceDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => (draw.flags & 1) !== 0);
     const firstStart = f.r.draws.length;
     expect(f.renderer.render({ textRevision: 1 })).toBe(true);
     const rebuildDraws = frameDraws(firstStart);
@@ -385,25 +407,25 @@ describe('GPU code compositor', () => {
     expect(rebuildGutter.length).toBeGreaterThan(0); expect(cachedGutter.length).toBe(rebuildGutter.length);
     expect(rebuildSource.length).toBeGreaterThan(0); expect(cachedSource.length).toBeGreaterThan(0);
     expect(rebuildGutter.every(draw => !draw.scissor)).toBe(true); expect(cachedGutter.every(draw => !draw.scissor)).toBe(true);
-    expect(rebuildSource.every(draw => draw.scissor)).toBe(true); expect(cachedSource.every(draw => draw.scissor)).toBe(true);
+    expect(rebuildSource.every(draw => (draw.flags & 1) !== 0)).toBe(true); expect(cachedSource.every(draw => (draw.flags & 1) !== 0)).toBe(true);
     f.renderer.dispose();
   });
   it('rebuilds static draw lists on revision and draws call-head underline without a label', () => {
     const f = fixture('call()'); f.renderer.render({ textRevision: 1 }); const builds = f.renderer.stats.textBuilds;
     expect(f.renderer.render({ textRevision: 2, annotations: [{ kind: 'call-head', from: 0, to: 4, label: 'must-not-render' }] })).toBe(true);
     expect(f.renderer.stats.textBuilds).toBe(builds + 1);
-    expect(f.r.draws.some(draw => draw.color[0] === 0.55 && draw.color[1] === 0.6)).toBe(true);
+    expect(f.r.draws.some(draw => Math.abs(draw.color[0]! - 0.55) < 0.01 && Math.abs(draw.color[1]! - 0.6) < 0.01)).toBe(true);
     expect(f.raster.text.some(entry => entry.text === 'must-not-render')).toBe(false); f.renderer.dispose();
   });
   it('keeps textPending until a bounded per-frame atlas upload completes', () => {
     const r = recordingGL(1024); const raster = rasterizer(); const b = new ResourceLedger();
-    const text = Array.from({ length: 35 }, () => 'x'.repeat(800)).join('\n');
+    const text = Array.from({ length: 35 }, (_, line) => Array.from({ length: 40 }, (_, i) => String.fromCharCode(0xe000 + line * 40 + i)).join('')).join('\n');
     const renderer = new CanvasRenderer(document.createElement('canvas'), layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas });
     renderer.setViewport({ width: 640, height: 1000, scrollLeft: 0, scrollTop: 0, gutter: 0 });
     expect(renderer.render({ textRevision: 1 })).toBe(true); expect(renderer.textPending).toBe(true);
-    expect(renderer.atlasStats.uploads).toBeLessThan(35);
+    expect(renderer.atlasStats.uploads).toBeLessThan(1400);
     for (let i = 0; i < 3 && renderer.textPending; i++) expect(renderer.render({ textRevision: 1 })).toBe(true);
-    expect(renderer.textPending).toBe(false); expect(renderer.atlasStats.uploads).toBe(35);
+    expect(renderer.textPending).toBe(false); expect(renderer.atlasStats.uploads).toBe(1400);
     renderer.dispose(); expect(b.usedBytes).toBe(0);
   });
   it('animation frames never copy or upload a backdrop', () => {
@@ -442,7 +464,7 @@ describe('GPU code compositor', () => {
     expect(f.c.width).toBe(200);
     f.renderer.setViewport({ ...view, width: 200, height: 200 }, 1); expect(f.c.width).toBe(200);
     expect(f.renderer.status.effectiveDpr).toBe(1); expect(f.renderer.render()).toBe(true);
-    expect(f.r.calls.filter(c => c.name === 'scissor').at(-1)?.args[0]).toBe(48); f.renderer.dispose();
+    expect(f.r.calls.filter(c => c.name === 'uniform1f' && (c.args[0] as { name: string }).name === 'u_gutter').at(-1)?.args[1]).toBe(48); f.renderer.dispose();
   });
   it('large viewports stay within geometry and aggregate pixel caps without a backdrop reservation', () => {
     const f = fixture(); expect(f.renderer.render()).toBe(true);
@@ -485,8 +507,8 @@ describe('GPU code compositor', () => {
         const textures = r.draws.slice(start).map(draw => draw.texture);
         if (revision === 1) {
           firstUploads = renderer.atlasStats.uploads; firstTextures = textures; firstBytes = b.usedBytes;
-          expect(firstUploads).toBe(80); // 40 visible source runs and 40 line numbers.
-          expect(raster.text.filter(entry => entry.text.startsWith('line '))).toHaveLength(40);
+          expect(firstUploads).toBe(new Set([...Array.from({ length: 40 }, (_, i) => `line ${i}`)].join('') + Array.from({ length: 40 }, (_, i) => String(i + 1)).join('')).size);
+          expect(raster.text.some(entry => entry.text === 'l')).toBe(true);
         } else {
           expect(renderer.atlasStats.uploads).toBe(firstUploads);
           expect(textures).toEqual(firstTextures); // No skipped or replaced visible tiles.
@@ -495,8 +517,8 @@ describe('GPU code compositor', () => {
         expect(renderer.atlasStats.evictions).toBe(0);
         expect(b.counters.byKind.backdrop).toBe(0);
       }
-    expect(r.calls.filter(call => call.name === 'texSubImage2D')).toHaveLength(0);
-      expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(81); // White and 80 glyph tiles; no backdrop texture.
+    expect(r.calls.filter(call => call.name === 'texSubImage2D')).toHaveLength(firstUploads + 2); // White texels, slot table and distinct glyph cells.
+      expect(r.calls.filter(call => call.name === 'texImage2D')).toHaveLength(3); // Atlas, slots and white fallback; no backdrop texture.
     } finally { renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); }
   });
   it('geometry pressure during animation does not evict text or allocate backdrop storage', () => {
@@ -547,7 +569,9 @@ describe('GPU code compositor', () => {
     const f = fixture('x'.repeat(1024 * 1024));
     const annotations: CodeAnnotation[] = Array.from({ length: 150_000 }, (_, i) => ({ kind: 'syntax', from: i * 6, to: i * 6 + 3, className: 'vact-tok-head' }));
     expect(f.renderer.render({ annotations })).toBe(true);
-    expect(f.b.counters.byKind.geometry).toBeLessThan(10_000);
+    const plain = fixture('x'.repeat(1024 * 1024)); expect(plain.renderer.render()).toBe(true);
+    const baselineGeometry = plain.b.counters.byKind.geometry; plain.renderer.dispose();
+    expect(f.b.counters.byKind.geometry - baselineGeometry).toBeLessThan(10_000);
     expect(f.raster.crops.length).toBeLessThan(32); f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
   });
   it('atlas does not retain historical full source strings outside the layout cache', () => {
@@ -556,35 +580,78 @@ describe('GPU code compositor', () => {
     expect(f.l.cacheBytes).toBeLessThan(201_000); expect(f.b.counters.byKind.geometry).toBeLessThanOrEqual(RESOURCE_LIMITS.geometry);
     f.renderer.dispose(); expect(f.b.usedBytes).toBe(0);
   });
-  it('keeps rendering all visible lines when atlas working set exceeds available budget', () => {
-    const r = recordingGL(); const b = new ResourceLedger(2_100_000); const c = document.createElement('canvas'); const raster = rasterizer();
-    const text = Array.from({ length: 50 }, (_, i) => `${i}:` + 'x'.repeat(58)).join('\n');
-    const renderer = new CanvasRenderer(c, layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas }); renderer.setViewport({ width: 500, height: 1000, scrollLeft: 0, scrollTop: 0, gutter: 0 });
-    const renderedPrefixes = new Set<number>();
-    const assertNewlyRasterizedLinesWereDrawn = (rasterStart: number, drawStart: number): void => {
-      const rasterized = raster.text.slice(rasterStart).map(entry => /^(\d+):/.exec(entry.text)?.[1]).filter((line): line is string => line !== undefined).map(Number);
-      const frameDraws = r.draws.slice(drawStart);
-      expect(frameDraws.every(draw => draw.textureLiveAtDraw)).toBe(true);
-      const drawnLines = new Set(frameDraws.filter(draw => draw.rect[3] === 20 && draw.color.every(channel => channel === 1)).map(draw => draw.rect[1] / 20));
-      for (const line of rasterized) {
-        renderedPrefixes.add(line);
-        expect(drawnLines.has(line), `rasterized line ${line} has no same-frame text draw; drawn lines: ${JSON.stringify([...drawnLines])}`).toBe(true);
-      }
-    };
-    let rasterStart = raster.text.length; let drawStart = r.draws.length;
-    expect(renderer.render()).toBe(true); expect(renderer.atlasStats.evictions).toBeGreaterThan(0);
-    assertNewlyRasterizedLinesWereDrawn(rasterStart, drawStart);
-    for (let i = 0; i < 10 && renderer.textPending; i++) {
-      rasterStart = raster.text.length; drawStart = r.draws.length;
-      expect(renderer.render()).toBe(true); assertNewlyRasterizedLinesWereDrawn(rasterStart, drawStart);
+  it('keeps rendering every visible line while a small atlas working set stays pending', () => {
+    const r = recordingGL(1024); const b = new ResourceLedger(); const c = document.createElement('canvas'); const raster = rasterizer();
+    const text = Array.from({ length: 40 }, (_, line) => Array.from({ length: 122 }, (_, i) => String.fromCharCode(0xe000 + line * 122 + i)).join('')).join('\n');
+    const renderer = new CanvasRenderer(c, layout(text), { gl: r.gl, ledger: b, createCanvas: raster.createCanvas }); renderer.setViewport({ width: 1024, height: 800, scrollLeft: 0, scrollTop: 0, gutter: 0 });
+    const drawnLines = new Set<number>();
+    for (let frame = 0; frame < 8; frame++) {
+      const start = r.draws.length; expect(renderer.render()).toBe(true);
+      for (const draw of r.draws.slice(start)) if (draw.layer === 'text' && draw.textureLiveAtDraw) drawnLines.add(draw.rect[1] / font.lineHeight);
+      expect(renderer.textPending).toBe(true);
     }
-    expect(renderer.textPending).toBe(true);
-    expect([...renderedPrefixes].sort((a, b) => a - b)).toEqual(Array.from({ length: 50 }, (_, i) => i));
-    expect(b.usedBytes).toBeLessThanOrEqual(2_100_000); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
+    expect(renderer.atlasStats.evictions).toBeGreaterThan(0);
+    expect([...drawnLines].sort((a, b) => a - b)).toEqual(Array.from({ length: 40 }, (_, i) => i));
+    expect(b.usedBytes).toBeLessThanOrEqual(RESOURCE_LIMITS.total); renderer.dispose(); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0);
   });
   it('releases initialization resources when shader or object setup fails', () => {
     const r = recordingGL(); Object.assign(r.gl, { getShaderParameter: () => false }); const b = new ResourceLedger();
     const renderer = new CanvasRenderer(document.createElement('canvas'), layout('safe'), { gl: r.gl, ledger: b });
     expect(renderer.status.kind).toBe('unavailable'); expect(renderer.status.saveText()).toBe('safe'); expect(b.usedBytes).toBe(0); expect(r.live.size).toBe(0); renderer.dispose();
+  });
+  it('batches a 60-line viewport into one text instanced draw and at most four layer draws', () => {
+    const f = fixture(Array.from({ length: 60 }, (_, i) => `line ${i}`).join('\n'));
+    f.renderer.setViewport({ ...view, height: 1200 });
+    expect(f.renderer.render({ textRevision: 1 })).toBe(true);
+    const frame = f.r.calls.filter(call => call.name === 'drawArraysInstanced');
+    expect(frame.filter(call => call.args[4] === 'text')).toHaveLength(1);
+    expect(f.renderer.stats.lastFrameDraws).toBeLessThanOrEqual(4);
+    expect(f.renderer.stats.decodedTextInstances).toBeGreaterThan(60);
+    f.renderer.dispose();
+  });
+  it('defers atlas growth and reset to frame boundaries and bumps its generation', () => {
+    const fill = (maxTexture: number) => {
+      const r = recordingGL(maxTexture), b = new ResourceLedger(), a = new GlyphAtlas(r.gl, b, rasterizer().createCanvas);
+      let index = 0, capacityMiss = false;
+      for (let frame = 0; frame < 10 && !capacityMiss; frame++) {
+        a.beginFrame();
+        for (let n = 0; n < 2000; n++) {
+          const text = String.fromCodePoint(0xf0000 + index);
+          if (!a.cell({ kind: 'mask', text, font, dpr: 1, width: 8 })) { capacityMiss = a.stats.uploads > 4000; break; }
+          index++;
+        }
+        a.endFrame();
+      }
+      const oldGeneration = a.stats.generation;
+      a.beginFrame();
+      const stats = { generation: a.stats.generation, growths: a.stats.growths, resets: a.stats.resets, oldGeneration };
+      a.dispose(); expect(b.usedBytes).toBe(0); return stats;
+    };
+    const grown = fill(2048); expect(grown.growths).toBe(1); expect(grown.generation).toBeGreaterThan(grown.oldGeneration);
+    const reset = fill(1024); expect(reset.resets).toBeGreaterThanOrEqual(1); expect(reset.generation).toBeGreaterThan(reset.oldGeneration);
+  });
+  it('rasterizes emoji as untinted color cells and Hebrew as a shaped run', () => {
+    const f = fixture('😀\nאבג');
+    expect(f.l.textCells(f.l.shape(0).runs[0]!).map(cell => cell.text)).toContain('😀');
+    expect(f.renderer.render({ textRevision: 1 })).toBe(true);
+    expect(f.raster.text.some(item => item.text === '😀')).toBe(true);
+    expect(f.r.draws.some(draw => draw.layer === 'text' && (draw.flags & 2) !== 0)).toBe(true);
+    expect(f.raster.text.some(item => item.text === 'אבג')).toBe(true);
+    expect(f.l.shape(1).rtlUnsupported).toBe(true);
+    f.renderer.dispose();
+  });
+  it('keeps 100 animation frames free of GPU queries, rasterization and cell uploads', () => {
+    const f = fixture(); expect(f.renderer.render({ textRevision: 1 })).toBe(true); const createCanvasCount = f.raster.canvases;
+    const error = vi.spyOn(f.r.gl, 'getError'), parameter = vi.spyOn(f.r.gl, 'getParameter'), texture = vi.spyOn(f.r.gl, 'isTexture');
+    error.mockClear(); parameter.mockClear(); texture.mockClear();
+    const uploads = f.renderer.atlasStats.uploads, measures = f.raster.measures;
+    for (let frame = 0; frame < 100; frame++) {
+      expect(f.renderer.render({ textRevision: 1, animated: [{ kind: 'playing', from: 0, to: 3 }] })).toBe(true);
+      expect(f.renderer.stats.lastFrameDraws).toBeLessThanOrEqual(4);
+    }
+    expect(error).not.toHaveBeenCalled(); expect(parameter).not.toHaveBeenCalled(); expect(texture).not.toHaveBeenCalled();
+    expect(f.renderer.atlasStats.uploads).toBe(uploads); expect(f.raster.canvases).toBe(createCanvasCount); expect(f.raster.measures).toBe(measures);
+    f.renderer.setDocument('let Ω = 1'); expect(f.renderer.render({ textRevision: 2 })).toBe(true); expect(f.renderer.atlasStats.uploads).toBeGreaterThan(uploads);
+    f.renderer.dispose();
   });
 });

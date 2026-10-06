@@ -3,17 +3,23 @@
 
 .bind-panel,
 .bind-controls {
-  font: 12px ui-sans-serif, system-ui, sans-serif;
-  padding: 0.25rem 0.5rem;
+  font: var(--vt-text-sm) var(--vt-font-sans);
+  padding: var(--vt-space-2) var(--vt-space-3);
+  border-top: var(--vt-border-w) solid var(--vt-border);
+}
+
+.bind-panel {
+  overflow-x: auto;
 }
 
 .bind-panel h3,
 .bind-controls h3 {
-  font-size: 11px;
+  font-size: var(--vt-text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0.5rem 0 0.25rem;
-  color: #8a8f98;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin: var(--vt-space-2) 0 var(--vt-space-1);
+  color: var(--vt-text-muted);
 }
 
 .bind-group:not(:has(.bind-row)) {
@@ -23,16 +29,17 @@
 .bind-row {
   display: grid;
   grid-template-columns: minmax(6rem, 1fr) 7rem 3.5rem auto auto auto auto auto auto auto;
-  gap: 0.25rem;
+  column-gap: var(--vt-space-2);
+  row-gap: var(--vt-space-1);
   align-items: center;
-  padding: 1px 0;
+  padding: var(--vt-space-1) 0;
 }
 
 .bind-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--vt-font-mono);
 }
 
 .bind-select {
@@ -55,13 +62,13 @@
 }
 
 .bind-tier {
-  font-size: 10px;
-  color: #d0a770;
+  font-size: var(--vt-text-xs);
+  color: var(--vt-warn);
 }
 
 .bind-row[data-state='stale'] .bind-state,
 .bind-row[data-state='unbound'] .bind-state {
-  color: #e06c75;
+  color: var(--vt-danger);
   font-weight: 600;
 }
 
@@ -72,34 +79,42 @@
 
 .bind-form,
 .bind-name-badge {
-  font-size: 10px;
-  color: #e06c75;
+  font-size: var(--vt-text-xs);
+  color: var(--vt-danger);
 }
 
 .bind-midi {
-  font-size: 10px;
-  color: #88c0d0;
+  font-size: var(--vt-text-xs);
+  color: var(--vt-data-1);
 }
 
 .bind-row .vact-icon-button,
 .bind-controls .vact-icon-button {
-  padding: 0.2rem;
+  padding: 0;
+  width: var(--vt-control-h-compact);
+  height: var(--vt-control-h-compact);
 }
 
 .bind-name {
   display: flex;
-  gap: 0.5rem;
-  padding: 1px 0;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-1) 0;
 }
 
 .bind-name-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--vt-font-mono);
 }
 
 .bind-controls-header {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: var(--vt-space-2);
   align-items: center;
+  min-height: var(--vt-control-h);
+}
+
+.bind-controls-header h3 {
+  margin: 0;
 }
 
 .bind-notice:empty {
@@ -107,42 +122,43 @@
 }
 
 .bind-notice {
-  color: #d0a770;
-  font-size: 11px;
+  color: var(--vt-warn);
+  font-size: var(--vt-text-xs);
 }
 
 .bind-ctl-group h4 {
-  margin: 0.25rem 0 0;
-  font-size: 11px;
+  margin: var(--vt-space-1) 0 0;
+  font-size: var(--vt-text-xs);
+  color: var(--vt-text-muted);
 }
 
 .bind-ctl-entry {
-  padding-left: 0.5rem;
-  border-left: 2px solid #3b4252;
-  margin: 2px 0;
+  padding-left: var(--vt-space-1);
+  border-left: 2px solid var(--vt-border-strong);
+  margin: var(--vt-space-1) 0;
 }
 
 .bind-ctl-entry[data-diagnostic] {
-  border-left-color: #e06c75;
+  border-left-color: var(--vt-danger);
 }
 
 .bind-ctl-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: #b07bd8;
+  font-family: var(--vt-font-mono);
+  color: var(--vt-syn-directive);
 }
 
 .bind-ctl-marker {
-  color: #e06c75;
-  font-size: 10px;
+  color: var(--vt-danger);
+  font-size: var(--vt-text-xs);
 }
 
 .bind-ctl-binding {
-  padding-left: 0.5rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding-left: var(--vt-space-1);
+  font-family: var(--vt-font-mono);
 }
 
 .bind-overlay {
-  color: #88c0d0;
+  color: var(--vt-data-1);
   font-style: italic;
   opacity: 0.85;
 }

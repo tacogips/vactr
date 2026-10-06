@@ -30,6 +30,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, file = 'main.vact'): 
   panel.setAttribute('aria-label', 'Song');
   const apply = doc.createElement('button');
   apply.type = 'button';
+  apply.className = 'song-apply vact-primary';
   apply.textContent = 'Apply song';
   const status = doc.createElement('span');
   status.setAttribute('role', 'status');

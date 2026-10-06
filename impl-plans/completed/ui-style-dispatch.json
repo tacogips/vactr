@@ -1,0 +1,201 @@
+{
+  "taskId": "ui-style",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/ui-style",
+  "baseBranch": "wf/ui-style",
+  "remote": "origin",
+  "originalHead": "20798dcb38c6413d30f6b280531c4f1e837d733c",
+  "designDocPaths": [
+    "design-docs/specs/design-ui-style.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/pending-ui-style-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "evidenceRoot": "tmp/ui-style",
+  "evidenceLayout": "tmp/ui-style/<planId>/attempt-<n>/ for per-plan logs. tmp/ui-style/after/ holds the wave-2 style-test report and screenshots, and tmp/ui-style/before/ plus tmp/ui-style/shot.mjs are intake inputs that must not be deleted. tmp/ is gitignored, so nothing here is committed.",
+  "issueReference": "workflowInput issue 'App-wide UI redesign: solid, flat, square (no rounded corners), consistent spacing, no native widget look' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-275; intake comm-004225; design accepted comm-004227; plans comm-004228; plan review comm-004229 needs_revision; revision comm-004230; plans accepted comm-004231; no GitHub issue number)",
+  "reviewContext": {
+    "issueReference": "workflowInput issue 'App-wide UI redesign: solid, flat, square (no rounded corners), consistent spacing, no native widget look' (session 275; intake comm-004225; design accepted comm-004227; plans accepted comm-004231; no GitHub issue number)",
+    "userProblem": "The user says the controls pane buttons are 'rounded white buttons packed with no margin and look terrible' and asked for the whole application, not only the controls pane, to look solid and stylish with no rounded corners. The before screenshot is tmp/ui-style/before/ui-full-1440x900@2x.png. These native widgets are unstyled: Apply song, Enable MIDI, the editors/grid/roll tabs, the persistence and Visuals selects, the Choose File input and the Packages Proxy input. Leftover radii are .vact-icon-button 6px, .vact-light 50%, and 2px/3px in code.css. Spacing and headers are inconsistent (design section 1).",
+    "requiredOutcomes": [
+      "One token file, editor/src/app/theme.css, defines --vt-* custom properties on :root (colors, spacing 4/8/12/16/24, type 11/12/13/14, UI and mono families, control heights, focus ring) with a pointer: coarse override block. index.html links it before app.css.",
+      "Every button, icon button, slot button, tab, select, input, file input (::file-selector-button), checkbox and range, popup, badge and meter computes border-radius 0 with appearance none and flat token styling, including hover, active, pressed, focus-visible and disabled states.",
+      "There is a primary (accent) variant for Apply song and Enable MIDI, and a danger variant for stop or hush per the design.",
+      "Separate adjacent controls are at least 8px apart and declared tight groups are 4px apart. Toolbar groups have separators, status text is separated from buttons, and panel padding and section headers are uniform.",
+      "Under pointer: coarse, interactive targets are at least 36px tall.",
+      "All component sheets (app, bind, params, code, midi, pkg, visual) are token-only.",
+      "A static vitest token check (6 tests) and a silent Playwright style test (Chromium plus WebKit, --mute-audio on Chromium only, no audio interaction) check radius, appearance, gaps, coarse sizes and the focus ring. The style test writes after screenshots at 1440x900 and 1180x820 coarse to tmp/ui-style/after/.",
+      "Behavior is unchanged: npm run check exits 0, the full vitest suite passes, and npm run build passes."
+    ],
+    "nonGoals": [
+      "No behavior, DOM-order, accessibility-label or focus-order changes, and no class used by JS or tests is removed or renamed.",
+      "No edits to the canvas renderer or other protected wf/canvas files. The canvas palette mapping is recorded as a design follow-up (design section 7).",
+      "No theme switching, no JS reading of tokens, no CSS framework and no new dependency.",
+      "No hover or visual-diff baselines, and no Firefox run."
+    ],
+    "constraints": [
+      "Work only on branch wf/ui-style in /Users/taco/gits/tacogips/vactr-worktrees/wf-ui-style. Commit and non-force push to origin wf/ui-style only. No push to main and no PR.",
+      "Protected (never modified): editor/src/code/{pointer,perf-hook,renderer,mount,layout,input,keyboard,accessibility,sync,syntax,syntax-core,history,frame,highlight,transport,eval}.ts, editor/src/app/clock.ts, editor/src/bind/{mount,write}.ts, editor/src/visual/{frame,scopes,video,render-host}.ts, editor/test/e2e/* (serve.mjs is import-only), design-docs/specs/design-implementation.md, design-docs/specs/design-canvas-editor-evidence.md, impl-plans/active/canvas-cutover-*, .agents/settings.local.json.",
+      "Automated runs never produce audible sound and never change the macOS volume. The style test never clicks transport, run, song or audio controls.",
+      "The Codex sandbox cannot bind localhost, so npm run test:style and the shot.mjs harness run outside the sandbox in the Opus verification step.",
+      "Existing tests keep their assertions. The vitest count must not drop below the baseline, and wave 2 adds exactly 6 tests.",
+      "Each wave-1 plan proves ownership with pre and post git hash-object checks. A worker never restores, checks out or reformats a sibling's file.",
+      "Run fanout with max concurrency 1 in the shared native worktree, because concurrent npm run build calls race on editor/dist (residual risk from the plan review)."
+    ],
+    "designDecisionsAndRationale": [
+      "theme.css is linked from index.html instead of being imported by the mount modules. Custom properties resolve at computed-value time, so sheets injected later by the protected mount.ts files can still use the tokens, and no protected file changes (design 3.1).",
+      "Base element rules have zero specificity (:where), so the native look is removed globally while component sheets can still override (design 4).",
+      "The --vt-syn-* tokens equal renderer.ts GPU_TOKEN_COLORS, so DOM and canvas token colors match without editing the renderer (design 3.2 and 7).",
+      "The token names are fixed in design 3.2 and 3.3, so the four wave-1 plans can edit disjoint sheets in parallel (design 9).",
+      "The style test opens details.vact-samples by setting the property, never by clicking, so sample controls are covered without any interaction (plan review UIS-PR-1)."
+    ],
+    "intentionalTradeoffs": [
+      "The open <select> option list stays OS-drawn, because CSS cannot reach it in WebKit (design 2).",
+      "The SVG data-URI tokens --vt-icon-chevron and --vt-icon-check contain literal hex values. Custom properties cannot be interpolated into data URIs, so the static check exempts theme.css from the hex rule.",
+      "The open user questions UQ1 (accent hue), UQ2 (hush danger treatment) and UQ3 (global [hidden] rule) follow the documented defaults unless the user overrides them (design-docs/user-qa/pending-ui-style-questions.md).",
+      "The coarse folded rail is 38px against a 40px button (accepted residual)."
+    ],
+    "supportedEdgeCases": [
+      "Disabled Apply song (no code) uses the disabled tokens, not the accent.",
+      "Coarse pointer at 1180x820: every visible interactive target is at least 36px tall.",
+      "WebKit may return an empty getComputedStyle appearance, so the test falls back to webkitAppearance. WebKit also rejects --mute-audio, so that flag is passed to Chromium only.",
+      "The .vact-sample-map row is a flex row, while li.vact-bank stays block so that ul.vact-entries remains below the row.",
+      "The danger hover does not depend on source order (.vact-icon-button:hover:not(:disabled) is removed)."
+    ],
+    "outOfScopeEdgeCases": [
+      ".vact-sample-map appears only when a sample library is present. If it is absent from the served build, the recorded absence plus the CSS spec is the coverage.",
+      "Real .midi-devices labels appear only after MIDI is enabled. Coarse sizing for them is covered by a probe checkbox label.",
+      "Merge conflicts with wf/canvas in code.css and impl-plans/README.md are resolved at merge time, not in this run."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ui-style.md",
+      "impl-plans/active/ui-style-shell.md",
+      "impl-plans/active/ui-style-bind-params.md",
+      "impl-plans/active/ui-style-code.md",
+      "impl-plans/active/ui-style-panels.md",
+      "impl-plans/active/ui-style-verify.md",
+      "tmp/ui-style/before/ui-full-1440x900@2x.png",
+      "tmp/ui-style/shot.mjs"
+    ]
+  },
+  "setupCommands": [
+    "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm"
+  ],
+  "setupNotes": "Run setupCommands from the repository root, and only if target/wasm32-unknown-unknown/debug/vactr.wasm is missing. They are not gating.",
+  "session276Amendment": {
+    "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-276",
+    "baseCommit": "364889b09f20868f1e996f4363e2c0ebca3762fb",
+    "acceptedPlanIds": ["UI-STYLE-BIND-PARAMS", "UI-STYLE-CODE", "UI-STYLE-PANELS"],
+    "acceptedPlansNote": "Accepted by the session-275 integration review (tmp/ui-style/s275-integration-review.json). They are listed under acceptedDependencies, not in plans, and are not redispatched. Their plan-file gate text changed only for BSD-grep portability; their source and acceptance stand.",
+    "dispatchOrder": ["UI-STYLE-SHELL", "UI-STYLE-VERIFY"],
+    "changes": [
+      "IR-SHELL-DIST-LINK: UI-STYLE-SHELL acceptanceCriteria[1] and verification now check the editor/index.html source order and the built-asset order (--vt-bg before the first .vact-icon-button) with read-only node one-liners. The two-link dist/index.html expectation is removed (design 3.1, 8.3).",
+      "IR-MANIFEST-RADIUS-GREP: every radius gate uses 'border-radius:[[:space:]]*[^[:space:]0v;]' (SHELL, CODE).",
+      "White/black boundary: the BIND-PARAMS named-color gate uses '(^|[^-[:alnum:]])(white|black)([^-[:alnum:]]|$)' so white-space no longer matches (design 8.1, 8.3).",
+      "The PANELS font gate uses 'font-weight:[[:space:]]*bold' instead of '\\s' (BSD grep has no \\s).",
+      "All grep gates call /usr/bin/grep explicitly, because plain grep may resolve to ugrep in this environment.",
+      "UI-STYLE-VERIFY gains the design 8.2 Proxy and native-tier hidden checks (assertion 7 and probe child 11) and the whole-word named-color rule in vitest check 2."
+    ]
+  },
+  "executionModel": {
+    "maxConcurrency": 1,
+    "waves": [
+      {"wave": 1, "planIds": ["UI-STYLE-SHELL"]},
+      {"wave": 2, "planIds": ["UI-STYLE-VERIFY"]}
+    ],
+    "serialFinalization": "After wave 2 and review, update the impl-plans/README.md status, move completed plans to impl-plans/completed/, then commit and non-force push to origin wf/ui-style. No push to main and no PR."
+  },
+  "acceptedDependencies": [
+    {
+      "planId": "UI-STYLE-BIND-PARAMS",
+      "planPath": "impl-plans/active/ui-style-bind-params.md",
+      "commit": "364889b09f20868f1e996f4363e2c0ebca3762fb",
+      "provides": "Token-only editor/src/bind/bind.css and editor/src/params/params.css with the flat editors/grid/roll tab bar. Accepted by the session-275 integration review; not redispatched."
+    },
+    {
+      "planId": "UI-STYLE-CODE",
+      "planPath": "impl-plans/active/ui-style-code.md",
+      "commit": "364889b09f20868f1e996f4363e2c0ebca3762fb",
+      "provides": "Token-only, radius-0 editor/src/code/code.css including the completion popup, diagnostics tooltip and .vact-sample-map row. Accepted by the session-275 integration review; not redispatched."
+    },
+    {
+      "planId": "UI-STYLE-PANELS",
+      "planPath": "impl-plans/active/ui-style-panels.md",
+      "commit": "364889b09f20868f1e996f4363e2c0ebca3762fb",
+      "provides": "Token-only editor/src/midi/midi.css, editor/src/pkg/pkg.css and editor/src/visual/visual.css with the styled file input and Proxy input. Accepted by the session-275 integration review; not redispatched (its plan file gets only session-276 gate-text edits in this checkpoint)."
+    }
+  ],
+  "plans": [
+    {
+      "planId": "UI-STYLE-SHELL",
+      "planPath": "impl-plans/active/ui-style-shell.md",
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/app/theme.css",
+        "editor/index.html",
+        "editor/src/app/app.css",
+        "editor/src/app/song.ts",
+        "editor/src/midi/mount.ts",
+        "impl-plans/active/ui-style-shell.md",
+        "target",
+        "editor/dist",
+        "tmp/ui-style",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "editor/dist", "tmp/ui-style", "tree-sitter-vact/tree-sitter-vact.wasm"],
+      "acceptanceCriteria": [
+        "theme.css is created with every listed --vt-* token and the pointer: coarse block, and it contains only :root blocks.",
+        "Source editor/index.html links ./src/app/theme.css before ./src/app/app.css, and the built CSS asset in editor/dist/assets that contains --vt-bg declares --vt-bg before the first .vact-icon-button rule. Vite bundles both sheets into one asset, so dist/index.html has a single stylesheet link; no check expects two (design 3.1, amendment IR-SHELL-DIST-LINK).",
+        "app.css holds the zero-specificity base rules, the primary and danger variants, square icon and slot buttons, transport groups, section headers and the status bar, and it is token-only (no hex, rgb or hsl, no nonzero radius, no literal font families).",
+        "song.ts gives Apply song the primary class and midi/mount.ts sets className 'midi-enable vact-primary'. No class is removed and DOM order is unchanged.",
+        "npm run check, the full vitest run (count not below baseline) and npm run build exit 0.",
+        "The ownership check passes, with the pre and post git hash-object table in the plan progress log."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run build",
+        "cd editor && node -e \"const s=require('fs').readFileSync('index.html','utf8');const t=s.indexOf('./src/app/theme.css');const a=s.indexOf('./src/app/app.css');console.log('source-order',t,a);process.exit(t>=0&&a>t?0:1)\"",
+        "cd editor && node -e \"const fs=require('fs');const d='dist/assets/';const hits=fs.readdirSync(d).filter(n=>n.endsWith('.css')&&fs.readFileSync(d+n,'utf8').includes('--vt-bg'));const s=hits.length===1?fs.readFileSync(d+hits[0],'utf8'):'';const a=s.indexOf('--vt-bg');const b=s.indexOf('.vact-icon-button');console.log('built-order',hits.join(','),a,b);process.exit(hits.length===1&&a>=0&&b>a?0:1)\"",
+        "cd editor && ! /usr/bin/grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsl' src/app/app.css",
+        "cd editor && ! /usr/bin/grep -nE 'border-radius:[[:space:]]*[^[:space:]0v;]' src/app/theme.css src/app/app.css",
+        "cd editor && ! /usr/bin/grep -nE 'system-ui|sans-serif|monospace' src/app/app.css"
+      ]
+    },
+    {
+      "planId": "UI-STYLE-VERIFY",
+      "planPath": "impl-plans/active/ui-style-verify.md",
+      "dependsOn": ["UI-STYLE-SHELL", "UI-STYLE-BIND-PARAMS", "UI-STYLE-CODE", "UI-STYLE-PANELS"],
+      "writePaths": [
+        "editor/test/ui/style-tokens.test.ts",
+        "editor/test/style/ui-style.mjs",
+        "editor/package.json",
+        "impl-plans/active/ui-style-verify.md",
+        "target",
+        "editor/dist",
+        "tmp/ui-style",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "editor/dist", "tmp/ui-style", "tree-sitter-vact/tree-sitter-vact.wasm"],
+      "acceptanceCriteria": [
+        "editor/test/ui/style-tokens.test.ts adds exactly 6 passing tests in the gating vitest run (total equals baseline plus 6), and no existing test changes. Check 2 matches named colors only as whole words inside color-bearing property values; a letter, digit, '_' or '-' neighbour breaks the match, so white-space and --vt-* names never fail it (design 8.1).",
+        "editor/test/style/ui-style.mjs passes node --check. It renders the built app in Chromium (with --mute-audio) and WebKit and checks radius 0, non-native appearance, minimum gaps (8px separate, 4px tight), coarse targets of at least 36px, the focus ring, and assertion 7 'Packages Proxy': the real browser-tier .pkg-proxy input has four 0px radii, the probe text input's background-color, a 1px top border and (viewport B) height >= 36; the probe label.pkg-proxy[hidden] computes display none and is excluded from visibility-based checks (design 8.2). It opens details.vact-samples by property only and never clicks audio, run, transport or song controls.",
+        "editor/package.json gains exactly one script, test:style, with no dependency change and no npm install.",
+        "Outside the sandbox, the Opus verification step runs npm run test:style (exit 0) and confirms report.json and the Chromium and WebKit screenshots at 1440x900@2x and 1180x820-coarse@2x in tmp/ui-style/after/. node ../tmp/ui-style/shot.mjs ../tmp/ui-style/after exits 0 and writes ui-full.png.",
+        "Negative controls (for example a temporary border-radius 4px in pkg.css) are run, reverted and reported separately, not as gating."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run build",
+        "cd editor && node --check test/style/ui-style.mjs"
+      ],
+      "outsideSandboxVerification": [
+        "cd editor && npm run build && npm run test:style",
+        "cd editor && node ../tmp/ui-style/shot.mjs ../tmp/ui-style/after"
+      ]
+    }
+  ]
+}

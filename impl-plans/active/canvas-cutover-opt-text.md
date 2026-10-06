@@ -120,6 +120,56 @@ completion request (150 ms). A harness check that reads syntax or completion sta
 edit may need to wait for that state. Do this by frame-aligned or bounded polling only,
 never by weakening the check.
 
+### Session 289 resume (CANVAS-OPT-TEXT only)
+
+**Why.** Session 288 blocked this plan only because the receipt listed the already
+repaired OPTTEXT-TI-02 with severity `mid` under unresolved findings. The progress gate
+(`scripts/implementation-progress-check.py`, material_findings) blocks any item whose
+severity, or any string, starts with critical, high, mid or medium in `payload.risks`,
+`payload.findings`, `authorSelfCheck.findings` or `authorSelfCheck.residualRisks`.
+
+**Source state.** The source is final at HEAD 827b851. TASK-T1 to TASK-T6 and the
+OPTTEXT-TI-01 and OPTTEXT-TI-02 repairs are all in that commit. Do not reimplement.
+Change source only if a gate or a new review finding exposes a defect, and then fix it
+inside this plan's writePaths.
+
+**Base.** `BASE=1d17ced` (session-286 plan checkpoint) for the diff criteria. Record
+`START` (the session-289 plan checkpoint commit) in `tmp/canvas-cutover/opt-text/intent.json`.
+The harness `git diff <START>` check uses that START. OPT-TEXT edited no harness
+sharedPath: `git diff --stat 842cf6e 827b851 -- editor/test/e2e editor/test/style` is
+empty. The only change since ff49fd1 is the operator frame wait in `behavior.mjs`
+(842cf6e), which the OPT-DOM review covers.
+
+**Gates.** Rerun every row of the Verification section on the current HEAD, one heavy
+suite at a time:
+- focused canvas;
+- `test/code`;
+- default vitest;
+- `npm run check`;
+- `test:perf` (alone, `--maxWorkers=1`);
+- strict clippy;
+- full nextest (alone, `timeout 2400`);
+- the host-wasm wasm32 build;
+- the `editor/src-tauri` cargo check.
+
+Rust sources are unchanged since the accepted Rust gates. Rerun the Rust rows on HEAD
+anyway, because that gives the new fingerprint. Report only final passing runs, in the
+mandatory record format. Expected counts: focused canvas 151, `test/code` 154, default
+vitest 776 or more, nextest 2816 passed with 3 configured skips.
+
+**Receipt rules.**
+- OPTTEXT-TI-01 and OPTTEXT-TI-02 go only into `addressedFeedback`/`resolvedFindings` with
+  status `repaired` and their evidence. OPTTEXT-TI-02 evidence: `changedRanges` calls
+  `getChangedRanges` on the edited previous tree with the new tree as its argument.
+  `editor/test/code/syntax.test.ts` asserts at most 4 recaptured lines for an inline edit,
+  with an in-test no-`changedRanges` control that recaptures exactly 64 lines.
+- The test path is `editor/test/code/syntax.test.ts`. The session-288 receipt wrongly
+  cited `editor/src/code/syntax.test.ts`; that file does not exist.
+- Never list a repaired finding, or the pending independent review, in risks, findings
+  or residualRisks. A genuine residual note uses severity `low` or no severity.
+- No mutation or negative-control command. Cite historical logs (for example
+  `syntax-ti02-focused-01.log`) only in `notes`.
+
 ## Contracts and Key Points
 
 ### 1. `advances.ts` (new) and `TextLayout` measurement
@@ -541,3 +591,9 @@ canvas 151/151 (`focused-ti02-final.log`), full Vitest 776/776
 **Notes**: The historical OPTTEXT-TI-01 counter-calibration logs remain under the plan evidence
 directory but are not gating records. Rust sources remain unchanged. Independent test-integrity,
 adversarial and integration review are pending.
+
+### Session: 2026-10-06 (session 289 plan checkpoint)
+**Tasks Completed**: Added the "Session 289 resume" section: re-gate on HEAD, receipt rules
+for repaired findings, and the corrected test path `editor/test/code/syntax.test.ts`.
+**Notes**: No scope, contract, writePaths or criteria change. Next: the final-source re-gate,
+then test-integrity, adversarial and integration review.

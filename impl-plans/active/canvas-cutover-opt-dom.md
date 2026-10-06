@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-DOM: Bind Panel Virtualization, Indexed Store, Incremental Roll and Lazy Accessibility Bridge Implementation Plan
 
-**Status**: In Progress
+**Status**: Completed (accepted by the session-288 integration review, commit 827b851; manifest acceptedDependencies since session 289; archived at CANVAS-EVIDENCE closeout)
 **Plan ID**: CANVAS-OPT-DOM (session 286, wave 10; runs alone after CANVAS-OPT-HISTORY is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 1 (bind panel, store and DOM) and section 6 (budgets); design-docs/specs/design-ui-style.md (tokens, square controls); 15.1.6 (binding UI, one-repaint rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-DOM`)
@@ -547,3 +547,9 @@ browser gates against the final OPT-DOM source.
   `style-int-01-final.log`, and `e2e-behavior-int-01-final.log`. An initial shell
   wrapper had a zsh reserved-variable error after the build; that attempt is not
   counted as verification and its log is retained without overwriting.
+
+### Session: 2026-10-06 (session 289 plan checkpoint)
+**Tasks Completed**: Status bookkeeping only.
+**Notes**: The session-288 integration review accepted CANVAS-OPT-DOM (commit 827b851).
+Its manifest entry moved from `plans` to `acceptedDependencies`, so it is not
+redispatched. No source, scope or criteria change.

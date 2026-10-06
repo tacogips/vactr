@@ -2185,6 +2185,326 @@ The TASK-703 `run-001` is the e2e record. If any source changes after it, repeat
 - `git diff c10ab72 -- src/session/tests/publish.rs` contains the in-test control branch
   (pair inconsistency above 1 ms when re-paired with `host_now`).
 
+## Session 294 Amendment (operator decision 2026-10-07; design 15.3.8.15 part D)
+
+**Issue reference.** This is the workflowInput issue "RESUME session 293: audio-domain
+early-flash rule, final canonical evidence, gates and closeout" (workflow execution
+`opus-luna-design-and-implement-review-loop-session-294`, resuming session 293 at HEAD
+`618a84f`, checkpoint `adfbf5d`). Design 15.3.8.15 part D was accepted by step 3 at
+comm-004687.
+
+**Operator decision.** The operator decided this on 2026-10-07, and it is recorded in design
+15.3.8.15 part D and in the manifest `operatorRules`.
+
+- The authoritative early-flash test is in the audio domain. A frame-range pair is early when
+  no onset of that range in the frame's epoch has `time <= audibleTime + Q`, where
+  `Q = 128 / sampleRate`, one render quantum.
+- The page-time proxy (sample value below -2 ms) is reported only, never gated.
+- This is a definition correction, not a relaxation. `THRESHOLDS`, `TARGETS`, the 250 ms
+  stall, the workload and every other gate stay unchanged.
+
+### Intent and context
+
+The session-293 canonical run-001 (`tmp/canvas-cutover/evidence/s302-run-001-e2e-replay-final.log`)
+failed only on `webkit:stall-window early flashes=1 (-15.33 ms)`. The raw row is in
+`design-docs/specs/evidence/canvas-cutover/run-001/webkit-measure.jsonl` (`phase:
+'sync-sample'`, `time: 243`, range `93-95`). The highlight was not early: its first showing
+frame has `audibleTime` 243.01222667 s, which is after the 243 s onset. Only the page-time
+proxy put it at -15.33 ms. That proxy was the gated test at `editor/test/e2e/stats.mjs:347`
+(per-window `early`) and in the `measure.mjs:98` `stallWindowSync.earlyCount` expression.
+
+The audio-domain test already exists for the global count. `attributeSync`
+(`stats.mjs:145-245`) counts an early pair when `candidateFor` finds no onset within
+`audibleTime + earlyToleranceS`, but it uses a fixed 2 ms tolerance. TASK-707 does four
+things:
+
+- makes the tolerance one render quantum;
+- uses the same audio-domain early pairs for the stall-window gate;
+- reports the page proxy as informational;
+- records the sample rate.
+
+Then TASK-703 to TASK-706 continue unchanged except for the amendments below. The session-293
+disposition note ("a serial plan-author amendment must resolve this conflict") is resolved by
+this section. No product file and no frontend clock formula changes.
+
+### Non-goals
+
+- No change to `THRESHOLDS` or `TARGETS`. `earlyFlashMs: 2` stays, and the `stats.test.ts`
+  row that pins `THRESHOLDS` stays as it is.
+- No workload, stall, sync-window, coverage or stall-classification (conditions (a) and (b))
+  change.
+- No `syncAbsMs`, replay, active-set or beat-drift gate change.
+- No product, Rust, `perf-hook.ts`, `editor/src/**`, dependency, `editor/package.json` or
+  fixture change.
+- `run.mjs` is not edited unless summary wiring drops a new metric. In that case, record the
+  reason.
+- No silent-sink behavior change. `silent-sink.mjs` gains only one read-only field in
+  `now()`.
+- No new file. `stats.mjs` (555 lines) and `stats.test.ts` (388 lines) stay under 1,000
+  lines.
+- No mutation or negative-control command. Sensitivity is shown only by in-test branches.
+
+### Ownership changes (manifest entry `CANVAS-EVIDENCE`)
+
+- `editor/test/e2e/silent-sink.mjs` moves from sharedPaths to writePaths. The only allowed
+  edit is the `sampleRate` field in `now()`.
+- Every other path TASK-707 touches is already a writePath:
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/README.md`
+  - `design-docs/specs/design-canvas-editor-evidence.md`
+  - the `run-001` files
+- artifactRoots are unchanged. Logs use the prefix `tmp/canvas-cutover/evidence/s294-`.
+
+### TASK-707: Audio-domain early-flash rule (part D; sandbox; before TASK-703)
+
+**Files.** These are the only files TASK-707 edits:
+
+- `editor/test/e2e/stats.mjs`;
+- `editor/test/e2e/stats.test.ts`;
+- `editor/test/e2e/measure.mjs`;
+- `editor/test/e2e/silent-sink.mjs`;
+- `editor/test/e2e/README.md`.
+
+Record fresh-read and post-edit sha256 values in `tmp/canvas-cutover/evidence/intent.json`
+and `receipt.json`.
+
+**`silent-sink.mjs`.**
+
+- `now()` at `:99` returns `{ ctxTime, pageMs, sampleRate: ctx.sampleRate }`. It still
+  returns `null` when there is no context.
+- Nothing else in the file changes: no meter, gain, wrapping or report change.
+
+**`stats.mjs`:**
+
+- **Render-quantum constant.** Add the export `RENDER_QUANTUM_FRAMES = 128` next to
+  `THRESHOLDS`. Do not put it inside `THRESHOLDS` and do not edit `THRESHOLDS` or `TARGETS`.
+- **`attributeSync` signature.** It becomes
+  `attributeSync(onsets, presented, { earlyToleranceS = 0.002, sampleRate, nominalMs } = {})`.
+  - The tolerance is `RENDER_QUANTUM_FRAMES / sampleRate` when `sampleRate` is a finite
+    number above 0. Otherwise it is `earlyToleranceS`.
+  - Use that one tolerance value in all three places that use `earlyToleranceS` today: the
+    `candidateFor` limit (`:167`), the sample admission check (`:211`) and, through
+    `candidateFor`, the early count (`:187`). Never keep 2 ms in one place and `Q` in another.
+- **`attributeSync` new return fields** (existing fields unchanged):
+  - `earlyToleranceS`: the tolerance used.
+  - `earlyFlashes`: one entry per counted early pair,
+    `{ frameIndex, frameMs, audibleTime, epoch, range }`. `frameIndex` is the index into the
+    same `presented` array (carry it from `evaluated`). `earlyFlashCount` must equal
+    `earlyFlashes.length`.
+  - `earlyFlash`: `{ withinToleranceCount, maxLeadMs }`. A pair counts when `candidateFor`
+    returned an onset with `candidate.time > row.audibleTime`, which means it was admitted
+    only through the tolerance. Its lead is `(candidate.time - row.audibleTime) * 1000`.
+    `maxLeadMs` is `null` when the count is 0. Both fields are informational.
+- **`classifyStallSamples` signature.** It gains an optional fifth parameter:
+  `classifyStallSamples(samples, presented, windows, onsets = ..., earlyFlashes = [])`.
+- **Stall-window frame set.** For each window, the set is:
+  - F (`firstFrameIndex`);
+  - `F - 1`, when F > 0;
+  - the `frameIndex` of every sample matched to that window.
+- **Per-window fields.**
+  - `early` becomes the number of `earlyFlashes` entries whose `frameIndex` is in the
+    window's frame set. This replaces `sample.value < -2` at `:347`.
+  - Add `pageProxyEarly`: the window's samples with `value < -THRESHOLDS.earlyFlashMs`.
+- **Classification return fields.**
+  - Add `earlyCount`: the number of distinct `earlyFlashes` entries that fall in any
+    window's frame set. Count each entry once, even when it falls in two windows.
+  - Add `pageProxyEarlyCount`: the stall-class samples with `value < -THRESHOLDS.earlyFlashMs`.
+- **`evaluate`** (inside the existing `syncProvenance === 'measured'` block).
+  - Add one failure, `audio sample rate unavailable`, when `metrics.audioRunning === true`
+    and `metrics.audioSampleRate` is not a finite number above 0.
+  - The `early flashes=N` and `stall-window early flashes=N` failures keep their exact message
+    text and still read `metrics.earlyFlashCount` and `metrics.stallWindowSync.earlyCount`.
+    Only the producers of those numbers change.
+  - Never add a failure for `syncPageProxyEarlyCount` or `pageProxyEarlyCount`.
+- **`renderEvidence` rows.**
+  - Change the threshold text of `Stall-window early flashes` to
+    `0 (audio domain, 1 render quantum)`.
+  - Change the threshold text of `Early flashes` to
+    `0 (audio domain, tolerance 128 frames)`.
+  - Add `Audio sample rate / early tolerance (Hz / ms)` from `m.audioSampleRate` and
+    `m.earlyToleranceMs`, threshold text `reported`.
+  - Add `Page-time proxy early samples (all / stall-window)` from `m.syncPageProxyEarlyCount`
+    and `m.stallWindowSync?.pageProxyEarlyCount`, threshold text
+    `informational; < -2 ms page-time proxy, not gated`.
+  - Add `Early tolerance band pairs / max lead (ms)` from `m.earlyFlash`, threshold text
+    `informational`.
+  - The output stays ASCII-only, through the existing `ascii` wrapper.
+
+**`measure.mjs`:**
+
+- **Read the sample rate.** Read
+  `audioSampleRate = await page.evaluate(() => window.__vactrSink?.now()?.sampleRate ?? null)`
+  once, in the same place the final `transport` is read (`:81`). Pass it as
+  `attributeSync(onsets, presented, { sampleRate: audioSampleRate })` at `:83`.
+- **Classification.** Pass `syncAttribution.earlyFlashes` as the fifth argument to
+  `classifyStallSamples` at `:93`.
+- **`metrics` fields:**
+  - `stallWindowSync.earlyCount = stallClassification.earlyCount`. This replaces the
+    `value < -THRESHOLDS.earlyFlashMs` filter.
+  - `stallWindowSync.pageProxyEarlyCount = stallClassification.pageProxyEarlyCount`.
+  - `syncPageProxyEarlyCount`: all samples (`syncAttribution.samples`) with
+    `value < -THRESHOLDS.earlyFlashMs`.
+  - `audioSampleRate`.
+  - `earlyToleranceMs = syncAttribution.earlyToleranceS * 1000`.
+  - `earlyFlash = syncAttribution.earlyFlash`.
+- **Raw rows.** Add one raw sample row,
+  `{ phase: 'early-flash', ...entry }`, for each `earlyFlashes` entry.
+- **Keep everything else unchanged:** stall windows, `beatResidual`, `frameIntervalExcluded`,
+  `lateFrameAudits`.
+
+**`README.md`.** Extend the stall paragraph at `:17` with one sentence: early flashes are
+judged in the audio domain (frame `audibleTime` against onset time, tolerance 128 frames at
+the context sample rate), and the page-time value is informational (design 15.3.8.15 part D).
+
+**`stats.test.ts` rows.** Each row below is a situation and its expected outcome.
+
+- Update the interface at `:17` and `:9` for the new options, return fields and fifth
+  parameter.
+- Add `audioSampleRate: 48000` to `passingMetrics` at `:28`. This adds a field only; it
+  changes no existing assertion.
+- Use exactly one onset of the tested range in the epoch, with no earlier occurrence.
+  Otherwise `candidateFor` attributes the pair to the earlier onset as a replay (step 3
+  finding).
+- **Shared fixture** (recorded, early and quantum-boundary rows; epoch `'e'` on every onset
+  and frame).
+  - **Onsets.** Two onsets:
+    - the tested onset `{ time: 243, end: 244, from: 93, to: 95, epoch: 'e' }`;
+    - one earlier onset of a different range, `{ time: 241, end: 241.5, from: 1, to: 2,
+      epoch: 'e' }`.
+
+    With only the 243 onset, `syncWindow` would be empty, because `windowStart =
+    firstOnset + maxRetainedDuration = 244`. The 241 onset brings that term down to 242,
+    and coverage spans [241, 244].
+  - **Frame 0, leading non-showing frame.** `{ frameMs: 243050, targetMs: 243080,
+    audibleTime: 242.95, epoch: 'e', activeKey: '' }`.
+    - It is required. `syncWindow` sets
+      `windowStart = max(presented[0].audibleTime, firstOnset + maxRetainedDuration)`
+      (`stats.mjs:140`).
+    - Without frame 0, `windowStart` would be the showing frame's 243.0122, which is after
+      the 243 onset. The onset would then be dropped from `windowOnsets` (`:178`), and the
+      sample would be rejected at `:211`.
+    - With frame 0, `windowStart` is 242.95, so the 243 onset is a window onset.
+    - The empty `activeKey` keeps the 241 onset from counting as a replay.
+  - **Frame 1, first showing frame.** `{ frameMs: 243112, targetMs: 243142.56,
+    audibleTime: 243.0122, epoch: 'e', activeKey: '93-95' }`.
+  - **Frame 2, F.** `{ frameMs: 243115, targetMs: 243145, audibleTime: 243.0152, epoch: 'e',
+    activeKey: '93-95' }`.
+  - **Window.** `{ index: 0, startMs: 243113, endMs: 243363 }`. F is the first frame with
+    `frameMs >= 243113`, which is index 2. So frame 1 is F-1, and condition (b) holds.
+  - **Pre-checks**, asserted first in every row that uses this fixture: `framePairs > 0`
+    and `windowOnsets >= 1`. The recorded case also asserts `samples.length === 1` and
+    `samples[0].frameIndex === 1`.
+- **Recorded case.** The shared fixture with `sampleRate` 48000.
+  - `earlyFlashCount` is 0, and the classification's `earlyCount` is 0.
+  - The single sample is `stall` and its value is below -2, about -15.3:
+    `243115 - (243142.56 - 12.2)`.
+  - `pageProxyEarlyCount` is 1.
+  - `evaluate` with the produced counts passes and has no early failure.
+- **Early case.** The shared fixture with frame 1's `audibleTime` set to 242.98, which is
+  still above frame 0's 242.95.
+  - `earlyFlashCount` is 1, and `earlyFlashes[0].frameIndex` is 1, which is F-1.
+    `earlyCount` is 1.
+  - No sample is admitted at frame 1, because 242.98 < 243 - Q. Do not assert a sample
+    count in this row.
+  - `evaluate` failures contain both `early flashes=1` and `stall-window early flashes=1`.
+- **Quantum boundary** (one test, both branches). Reuse the shared fixture and change only
+  frame 1's `audibleTime` to `243 - lead`.
+  - at `sampleRate` 48000, a lead of 2.6 ms is not early, and `earlyFlash.withinToleranceCount`
+    is 1 with `maxLeadMs` about 2.6;
+  - at 48000, a lead of 2.7 ms is early;
+  - at `sampleRate` 44100, a lead of 2.85 ms is not early;
+  - with no `sampleRate`, a lead of 2.6 ms is early (the 2 ms default is stricter).
+- **Port of the old -3 ms row at `:198`.** Keep its fixture. The frame `audibleTime` 0.2 is
+  equal to the onset, so it is not audio-early.
+  - Assert the classification gives `pageProxyEarlyCount` 1 and `earlyCount` 0.
+  - Assert `evaluate` with those counts has no `stall-window early flashes` failure.
+  - Rename the row to say "reports a -3 ms page-proxy sample without gating it". The
+    audio-domain early rows above carry the failing assertion. Record this port in the
+    progress log.
+- **Sample-rate guard.** In one test, both branches:
+  - a measured summary with `audioRunning: true` and no `audioSampleRate` fails with
+    `audio sample rate unavailable`;
+  - the same summary with 48000 passes.
+- **Unchanged rows.** Every other existing row stays byte-identical in its assertions and
+  passes, including the latency-independence control at `:176`, the `THRESHOLDS` pin at
+  `:245` and the early and replay rows at `:247` and `:268`, which use the 2 ms default.
+
+**Pitfalls.**
+
+- Do not make the stall-window early count per sample (`sample.frame.audibleTime <
+  sample.time - Q`). `attributeSync` only admits samples within the tolerance, so that test
+  could never fail. The count must come from `earlyFlashes`.
+- Do not change the meaning of `frameIndex`. `earlyFlashes`, samples and F all index the
+  same merged `presented` array.
+- If a fixture yields no sample, fix the fixture. Never change `syncWindow`, the
+  `windowOnsets` filter (`stats.mjs:178`) or the admission check (`stats.mjs:211`) to make a
+  fixture pass. Those rules are unchanged by design 15.3.8.15 part D.
+- Do not read the sample rate from Node or hard-code 48000 in `measure.mjs`.
+- Do not touch `THRESHOLDS`. A new key there would break the pin row and the invariant.
+- Keep the failure message strings exactly as they are. Existing rows match them.
+
+**Done when:**
+
+- `cd editor && ./node_modules/.bin/vitest run test/e2e` exits 0, with testsRun above the
+  session-293 54 plus the new rows, and failureCount 0;
+- `cd editor && npm run check` exits 0;
+- `node --check` exits 0 on the eight harness files in the Verification table;
+- `git diff 618a84f -- editor/test/e2e/stats.mjs` shows no line inside `THRESHOLDS` or
+  `TARGETS`;
+- `git diff --name-only 618a84f` lists only the five TASK-707 files, plus the plan, manifest
+  and design files of this checkpoint;
+- `wc -l editor/test/e2e/stats.mjs editor/test/e2e/stats.test.ts` shows both under 1,000.
+
+### Amendments to TASK-703 to TASK-706
+
+- **TASK-703** runs after TASK-707, and its criteria are unchanged. The required early
+  result is now:
+  - audio-domain `earlyFlashCount` 0;
+  - audio-domain `stallWindowSync.earlyCount` 0;
+  - `audioSampleRate` finite;
+  - `earlyToleranceMs` equal to `128000 / audioSampleRate`.
+
+  Record `syncPageProxyEarlyCount`, `stallWindowSync.pageProxyEarlyCount`, and
+  `earlyFlash.withinToleranceCount` and `maxLeadMs` per browser in the progress log. A
+  nonzero audio-domain early count is a product finding. Repair it under the seam protocol;
+  never relabel it.
+- **TASK-704** adds three things to the section "Stall-window sync classification (session
+  293, design 15.3.8.15)":
+  - the session-293 trigger row (onset 243, first showing frame `audibleTime` 243.0122,
+    proxy -15.33 ms) with its audio-domain verdict;
+  - the rule and `Q` per browser;
+  - the page-proxy and tolerance-band figures of the new run.
+
+  Update the triage table so the WebKit stall-window early-flash failure is resolved by the
+  definition correction, citing design 15.3.8.15 part D and the new run.
+- **TASK-705** is unchanged: eleven gates, strictly serial, full nextest alone under
+  `timeout 2400`.
+- **TASK-706** is unchanged: 23 canvas-cutover plans, 15 canvas-editor-224 plans and
+  `canvas-editor-224-dispatch.json`. The erratum and the deferred typo fixes are as listed.
+  The commit message records the part D definition correction.
+
+### Invariant amendments
+
+- The `c10ab72` invariant on `editor/test/e2e/silent-sink.mjs` is replaced by this one:
+  `git diff 618a84f -- editor/test/e2e/silent-sink.mjs` shows only the `sampleRate` field
+  added to `now()`.
+- Every other invariant of the Session 302 Amendment still holds. That includes
+  `THRESHOLDS`/`TARGETS` byte identity, Rust limited to the two publish files, and protocol,
+  clock and `perf-hook.ts` unchanged.
+
+### Session 294 checklist (mechanical)
+
+- `grep -n "RENDER_QUANTUM_FRAMES" editor/test/e2e/stats.mjs` finds the export and its use in
+  `attributeSync`.
+- `grep -n "value < -2" editor/test/e2e/stats.mjs` finds no gating use. The only remaining
+  page-proxy comparisons use `THRESHOLDS.earlyFlashMs` in the informational counters.
+- `grep -n "sampleRate" editor/test/e2e/silent-sink.mjs editor/test/e2e/measure.mjs` finds the
+  `now()` field and the single read.
+- The recorded-case, early-case, quantum-boundary and sample-rate-guard rows exist in
+  `stats.test.ts` and pass.
+
 ## Verification
 
 Inside the sandbox:
@@ -2245,6 +2565,16 @@ marked:
 | `cd editor && ./node_modules/.bin/vitest run test/e2e` | exit 0; the TASK-702 rows pass, including the latency-independence control |
 | `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` (outside the sandbox, alone) | exit 0, as specified in TASK-703 |
 
+Session 294 rows (added; the rows above still apply):
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cd editor && ./node_modules/.bin/vitest run test/e2e > ../tmp/canvas-cutover/evidence/s294-vitest-e2e.log 2>&1` | exit 0, failureCount 0; the recorded-case, early-case, quantum-boundary, ported -3 ms and sample-rate-guard rows pass, and every existing row passes |
+| `cd editor && npm run check > ../tmp/canvas-cutover/evidence/s294-npm-check.log 2>&1` | exit 0 |
+| `node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/silent-sink.mjs editor/test/e2e/fixtures/large-doc.mjs > tmp/canvas-cutover/evidence/s294-node-check.log 2>&1` | exit 0 |
+| `git diff --check > tmp/canvas-cutover/evidence/s294-diff-check.log 2>&1` | exit 0 |
+| `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001 > ../tmp/canvas-cutover/evidence/s294-run-001-e2e.log 2>&1` (outside the sandbox, alone, after `mise run build-wasm-release` and `VACTR_REQUIRE_SESSION_ABI=1 npm run build`) | exit 0; in both browsers audio-domain early flashes 0 (global and stall-window), `audioSampleRate` finite, and every TASK-703 criterion holds |
+
 ## Overwrite and Drift Protocol
 
 Record fresh-read sha256 values before each edit or move (`tmp/canvas-cutover/evidence/intent.json`)
@@ -2300,6 +2630,8 @@ only this plan's progress log and the plan files being archived.
 - [x] Session 302 plan amendment: design 15.3.8.15 records the 2026-10-07 Option A user approval; this plan has TASK-701 to TASK-706; the manifest `operatorRules` records the approval; the design, plan and manifest are checkpoint-committed before CANVAS-EVIDENCE is redispatched
 - [x] Session 302 TASK-701: `publish.rs` pairs a running sample's `sample_time` with `Clock::to_host(cycle)` under the one-grid-period guard; the ported and new `session::tests::publish` rows pass, including the in-test control branch; `canvas-clock.test.ts` is ported with no assertion deleted and passes on the rebuilt host-wasm artifact; strict clippy and rustfmt on the two Rust files exit 0
 - [x] Session 302 TASK-702: `measure.mjs` records `{index,startMs,endMs}` stall windows and no longer infers stalls from frame gaps; `classifyStallSamples` and `beatResidualMs` are exported; `evaluate` gates non-stall `syncAbsMs`, stall-window early flashes, window integrity, audited F residuals and a missing `beatDriftMs`; the `stats.test.ts` rows, including the latency-independence control, pass; `THRESHOLDS` and `TARGETS` are unchanged
+- [x] Session 294 plan amendment: design 15.3.8.15 part D (accepted by step 3, comm-004687) records the operator's audio-domain early-flash decision; this plan has TASK-707 and the TASK-703 to TASK-706 amendments; the manifest `operatorRules`, `sessions.session294` and the CANVAS-EVIDENCE entry (with `silent-sink.mjs` moved to writePaths) record it; design, plan and manifest are checkpoint-committed before CANVAS-EVIDENCE is redispatched
+- [ ] Session 294 TASK-707: `attributeSync` uses `Q = 128 / sampleRate` for candidate matching, sample admission and the early count, and returns `earlyFlashes`, `earlyFlash` and `earlyToleranceS`; `classifyStallSamples` counts stall-window early from `earlyFlashes` at F, F-1 and the sample frames, and reports `pageProxyEarly`/`pageProxyEarlyCount`; `evaluate` adds `audio sample rate unavailable`; `measure.mjs` records `audioSampleRate`, `earlyToleranceMs`, `earlyFlash` and `syncPageProxyEarlyCount`; `silent-sink.mjs` `now()` returns `sampleRate`; the new and ported `stats.test.ts` rows pass; `THRESHOLDS` and `TARGETS` are unchanged
 - [ ] Session 302 TASK-703: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exits 0 on the release wasm; in both browsers non-stall sync p95 <= 33.4 ms and p99 <= 50 ms, stall-recovery criteria hold, beat drift <= 1 ms, the session-286 gates hold, behavior is 18/18, post-sink peak is 0 and direct destination connections are 0
 - [ ] Session 302 TASK-704: the evidence document has the "Stall-window sync classification (session 293, design 15.3.8.15)" section with the per-window table, the side-by-side sync figures and the beat-drift diagnosis, and its triage table cites the new run
 - [ ] Session 302 TASK-705: all eleven final gates pass serially, with full nextest run alone under `timeout 2400`
@@ -2735,3 +3067,28 @@ serial plan-author amendment must resolve this conflict and name any changed own
 deterministic proof before further implementation. TASK-704 evidence prose, final gates,
 closeout, formal review, commit and push remain pending downstream or blocked by TASK-703.
 No source file reached 1,000 lines. No thresholds or workload changed.
+
+### Session: 2026-10-07 (session 294 plan amendment, Session 294 Amendment)
+
+**Tasks Completed**: Plan amendment only. Added the section "Session 294 Amendment" with
+TASK-707 and amendments to TASK-703 to TASK-706. This resolves the session-293 disposition
+note.
+
+**Notes**:
+
+- **Design.** Design 15.3.8.15 part D was accepted by step 3 at comm-004687 with two
+  low-severity notes, both folded into this plan:
+  - in the trigger narrative, F is most likely frame 243112 itself, and 243115 is its proxy
+    frame (wording only);
+  - early-case fixtures must have a single onset of the tested range.
+- **Rule.** The early-flash test is now in the audio domain, with `Q = 128 / sampleRate`.
+  The page proxy is informational. `THRESHOLDS` and `TARGETS` are unchanged.
+- **Ownership.** `editor/test/e2e/silent-sink.mjs` moves to writePaths, for the `sampleRate`
+  field in `now()` only. No product, Rust or dependency change.
+- **Rules.** Never run two heavy suites at once. No mutation or negative-control commands.
+  Repaired findings go only into addressedFeedback with status repaired.
+- **Step 5 fix (S294-PR-01, comm-004689).** The TASK-707 shared fixture now has a leading
+  non-showing frame (`audibleTime` 242.95, empty `activeKey`), so the 243 onset is a window
+  onset. Frame indices are now showing frame 1 and F 2. The recorded case pre-checks
+  `windowOnsets >= 1` and `samples.length === 1`. A pitfall forbids changing `syncWindow`
+  or the admission check to fit a fixture.

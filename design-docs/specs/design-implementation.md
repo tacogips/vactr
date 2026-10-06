@@ -6399,6 +6399,10 @@ and changes no product contract.
 Session 293 (resume of 292) adds 15.3.8.15: the user-approved (2026-10-07,
 Option A) stall-window sync classification and the exact `TransportSample`
 time/cycle pairing that removes the WebKit beat drift. No threshold changes.
+Session 294 (resume of 293) adds 15.3.8.15 part D, the operator-decided
+audio-domain early-flash rule. It is a definition correction: the tolerance
+is one render quantum, the page-time proxy becomes informational, and
+`THRESHOLDS` is unchanged.
 
 ##### 15.3.8.1 Baseline check (repository state at c9e5a05)
 
@@ -7125,7 +7129,7 @@ injected every 10 s).
 | Input latency | From keydown `event.timeStamp` to the rAF timestamp of the frame after the frame whose text phase presented that revision (a presentation proxy). IME is reported separately. | p95 <= 50 ms, p99 <= 100 ms |
 | Frame work | Duration of the code-pane frame callback, reported for animation-only and text-dirty frames | Animation-only: p50 <= 4 ms, p95 <= 8 ms, p99 <= 16.7 ms (a 1 ms p50 target is recorded, not gated). Text-dirty: p95 <= 8 ms, tightened from 16.7 ms by 15.3.8.14 (a 4 ms target is recorded, not gated) |
 | Frame interval | rAF timestamp deltas, excluding injected stalls | p95 <= 20 ms, p99 <= 50 ms |
-| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation. One sample per distinct (onset time, epoch, first presented frame); dropped frames are reported separately (15.3.8.14 section 5). Samples are classified by recorded stall windows (15.3.8.15) | Gated only when provenance is `measured`: non-stall samples p95 of the absolute value <= 33.4 ms, p99 <= 50 ms; every sample: no highlight earlier than 2 ms before the onset; stall-window samples: the stall-recovery criteria of 15.3.8.15. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
+| A/V sync, model | For each onset: presentation-proxy time of the first frame showing the range, minus the onset mapped to page time through the active correlation. One sample per distinct (onset time, epoch, first presented frame); dropped frames are reported separately (15.3.8.14 section 5). Samples are classified by recorded stall windows (15.3.8.15) | Gated only when provenance is `measured`: non-stall samples p95 of the absolute value <= 33.4 ms, p99 <= 50 ms; every frame: no highlight shown at a sampled audible time earlier than its onset by more than one render quantum (128 / sample rate; amended by 15.3.8.15 part D; the 2 ms page-time proxy is informational); stall-window samples: the stall-recovery criteria of 15.3.8.15. `estimate` is reported but not gated. `unavailable` is recorded as a limitation. |
 | Late frames | The first frame after each recorded stall window (15.3.8.15) | Active set equals the analytic set, 0 replayed flashes, beat residual at that frame <= 1 ms, absolute beat-phase drift at the end of the run <= 1 ms |
 | Memory | `ResourceLedger` maximum per cap and total. JS heap on Chromium after CDP `HeapProfiler.collectGarbage` (WebKit has no heap API: ledger only, a limitation). | No cap exceeded. Ledger total <= 96 MiB. Heap growth from end of warmup to end of the cycle run <= 8 MiB. Ledger returns to 0 on dispose. |
 | Audio | Worklet underrun and drop counters during stalls, hidden periods and context loss | Recorded. Any underrun attributable to a UI stall is a failure. |
@@ -7473,8 +7477,10 @@ precisely; the thresholds stay as they are):
 - **Sync attribution.** An onset occurrence is identified by its range, its
   epoch and its audible window `[time, end)`. A presented frame's active
   range is attributed to the one occurrence with the same range and epoch and
-  the largest `time <= audibleTime + 2 ms`. An early flash or a replayed flash
-  is counted at most once per frame-range pair. Sync samples, early flashes,
+  the largest `time <= audibleTime + 2 ms`. (Amended by 15.3.8.15 part D: the
+  tolerance is one render quantum, `Q = 128 / sampleRate`, not 2 ms.) An
+  early flash or a replayed flash is counted at most once per frame-range
+  pair. Sync samples, early flashes,
   replays and the late-frame active-set comparison use only onsets inside the
   window that the presented-frame buffer covers. Disjoint windows give no
   samples, and that alone is not a failure. The attribution is a pure function
@@ -8806,11 +8812,17 @@ the cycle run (15.3.8.8 profile H).
   sample. It covers only non-stall samples (part A).
 - 15.3.8.4 "Position": a `TransportSample` pairs `cycle` with the host time of
   that exact cycle (part B).
+- 15.3.8.8 early rule and 15.3.8.12 "Sync attribution" tolerance: the early
+  flash is an audio-domain test with a one-render-quantum tolerance, and the
+  page-time proxy is informational (part D, session 294).
 
 **What it does not change.**
 
 - No threshold changes. `syncAbsMs` stays at p95 <= 33.4 ms and p99 <= 50 ms,
   the early-flash tolerance stays at 2 ms, and the 1 ms beat-drift gate stays.
+  (Part D, session 294, moves the authoritative early-flash test to the audio
+  domain with a one-render-quantum tolerance. The 2 ms page-time test stays
+  as an informational column. `THRESHOLDS` is unchanged.)
 - The 250 ms stall, its 10 s period, the workload and every other profile H
   rule are unchanged.
 - The silent-sink rule and the production master output stage are unchanged.
@@ -8867,9 +8879,10 @@ escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
   is reported in exactly one class. A second or later late frame after a
   stall is not classified as a stall-window sample.
 - **Gates for non-stall samples.** `syncAbsMs` p95 <= 33.4 ms and p99 <= 50
-  ms, computed over the non-stall samples only. The early rule (no highlight
-  earlier than 2 ms before the onset) also applies, with provenance gating as
-  in 15.3.8.8.
+  ms, computed over the non-stall samples only. The early rule also applies,
+  with provenance gating as in 15.3.8.8. The rule is the audio-domain test
+  of part D, which replaces "no highlight earlier than 2 ms before the
+  onset".
 - **Gates for stall-window samples** (stall-recovery criteria, replacing
   `syncAbsMs` for this class):
   1. *Active set.* For each window whose F lies in the sync window and the
@@ -8879,7 +8892,10 @@ escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
   2. *No replay.* No range expired before F's audible time is shown at F or
      later. Replayed flashes must be 0, counted over all frames and reported
      separately for F frames.
-  3. *No early flash.* No stall-window sample has a value below -2 ms.
+  3. *No early flash.* No stall-window frame shows an audio-domain early
+     flash (part D). Before part D this read "no stall-window sample has a
+     value below -2 ms". That page-time value is now reported only, never
+     gated.
   4. *No accumulated drift.* At each audited F, the beat residual (defined in
      part B) is at most 1 ms. The audited window count is reported. If the
      sync gate is active and no window is audited, the run fails.
@@ -8909,7 +8925,8 @@ escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
     non-stall and fails the p99 gate. The same sample inside a recorded
     window is classified stall-window. Both branches are asserted in one
     passing test.
-  - a stall-window sample at -3 ms fails the early rule;
+  - a stall-window sample at -3 ms fails the early rule (superseded by part
+    D: the row is ported to the audio-domain rows listed there);
   - an active-set mismatch at F fails;
   - a beat residual of 1.01 ms at F fails, and 1.0 ms passes;
   - a window count that differs from the injected count fails.
@@ -9024,6 +9041,126 @@ escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
   test:style`, rustfmt `--check` on the two touched Rust files, and the
   silent iOS simulator pass. Full nextest runs alone, with a timeout of at
   least 2400 s.
+
+**D. Audio-domain early-flash rule (session 294 operator decision).**
+
+- **Trigger.** After parts A and B, the canonical release-wasm `run-001`
+  failed only on `webkit:stall-window early flashes=1 (-15.33 ms)`. The raw
+  row (`design-docs/specs/evidence/canvas-cutover/run-001/webkit-measure.jsonl`,
+  `phase: 'sync-sample'`, onset `time` 243, range `93-95`) has:
+  - first showing frame: `frameMs` 243112, `targetMs` 243142.56,
+    `audibleTime` 243.01222667 s, which is after the 243 s onset;
+  - presentation-proxy frame: `nextFrameMs` 243115, 3 ms later. The row has
+    `droppedFrames` 14, and condition (b) holds. So the first showing frame
+    243112 is most likely F itself, and 243115 follows it;
+  - onset page time: 243130.33 ms, so the value is 243115 - 243130.33 =
+    -15.33 ms.
+
+  The highlight was correct in the audio domain. The page-time proxy maps the
+  onset through a frame whose target lies 30 ms ahead, then compares it with
+  the next frame, presented 3 ms later right after the stall. So the -2 ms
+  test on the proxy value measured the stall, not an early highlight.
+- **Decision (operator, 2026-10-07).** This is a definition correction, not a
+  relaxation. It matches the activation rule of 15.3.8.x: a highlight is
+  active when `start <= sample.time`. The authoritative early-flash test is in
+  the audio domain:
+  - Let `Q = 128 / sampleRate` seconds: one render quantum at the
+    AudioContext sample rate (2.667 ms at 48 kHz, 2.902 ms at 44.1 kHz).
+  - A frame-range pair (a presented frame that shows range K) is an
+    **early flash** when the frame's recorded `audibleTime` is earlier than
+    the onset it shows by more than `Q`.
+  - In attribution terms (15.3.8.12, "Sync attribution"), the pair is early
+    when no onset of K in the frame's epoch has `time <= audibleTime + Q`.
+  - `Q` is the resolution of the audio clock that `audibleTime` comes from:
+    `currentTime` and the output timestamp's `contextTime` move in
+    128-frame steps.
+- **One rule, both gates.**
+  - The tolerance `Q` replaces the fixed 2 ms in the attribution. It is used
+    for candidate matching, the sample admission check, and the frame-pair
+    early count. So every frame-range pair is either attributable to an
+    onset or counted early, with no gap between two tolerances.
+  - `earlyFlashCount`, the global count gated as `early flashes=N`, is the
+    number of audio-domain early frame-pairs over all evaluated frames. Its
+    frame set is the existing sync window and onset coverage, unchanged.
+  - `stallWindowSync.earlyCount` (gated as `stall-window early flashes=N`;
+    stall-recovery criterion 3) counts the subset of those early pairs whose
+    frame is a stall-window frame. For each recorded window, that means F,
+    the frame just before F (presented at F, condition (b)), or the
+    first-showing frame of any stall-window sample. It is a classified
+    subset, so a frame-pair can never escape the global gate.
+  - The per-window `early` column in `stallWindows[]` uses the same rule.
+- **Page-time proxy (informational only).** The old test, a sample value
+  below `-THRESHOLDS.earlyFlashMs` (-2 ms), is still computed and reported:
+  - `syncPageProxyEarlyCount` over all samples;
+  - `stallWindowSync.pageProxyEarlyCount` over stall-window samples;
+  - `pageProxyEarly` per window.
+
+  It never appears in `failures`. `THRESHOLDS` and `TARGETS` stay
+  byte-identical, including `earlyFlashMs: 2`, and the existing
+  `stats.test.ts` row that pins `THRESHOLDS` still holds. The constant 128 is
+  a separate named export (render-quantum frames), not a `THRESHOLDS` key.
+- **Disclosure of the tolerance band** (informational, never gated):
+  - `earlyFlash.withinToleranceCount`: frame-range pairs whose attributed
+    onset is later than the frame's `audibleTime` but within `Q`;
+  - `earlyFlash.maxLeadMs`: the largest such lead.
+
+  The evidence document reports both, so any pair that the 2 ms page
+  tolerance would have counted and `Q` admits stays visible.
+- **Sample rate.**
+  - `editor/test/e2e/silent-sink.mjs` `now()` also returns the sink-wrapped
+    application AudioContext's `sampleRate`.
+  - `measure.mjs` reads it once after the workload starts and passes it to
+    the attribution.
+  - It records `metrics.audioSampleRate` and `metrics.earlyToleranceMs`
+    (`Q` in ms).
+  - In a gating run with provenance `measured`, a missing or non-positive
+    sample rate is a failure (`audio sample rate unavailable`). The run
+    never falls back silently.
+  - Called without a sample rate, the pure attribution keeps its 2 ms
+    default. That is stricter, and only plain unit fixtures use it.
+- **What does not change.** The thresholds, the 250 ms stall, its period, the
+  workload, the sync window and coverage, the stall classification
+  conditions (a) and (b), the non-stall `syncAbsMs` gate, the replay and
+  active-set criteria, beat drift, the silent sink, and every product file.
+  This part touches only harness files and documents.
+- **Deterministic proof** (`editor/test/e2e/stats.test.ts`, plain data,
+  `sampleRate` 48000 unless stated):
+  - *Recorded case, not early:* a frame with `audibleTime` 243.0122 showing
+    `93-95`, onset 243, a straddling F 3 ms later with a value of -15.33 ms
+    inside a recorded window. Expected: `earlyFlashCount` 0, stall-window
+    early 0, `pageProxyEarlyCount` 1. `evaluate` passes.
+  - *Early:* the same rows with `audibleTime` 242.98. Expected:
+    `earlyFlashCount` 1 and stall-window early 1. `evaluate` reports both
+    `early flashes=1` and `stall-window early flashes=1`.
+  - *Quantum boundary* (both branches in one test): a lead of 2.6 ms is not
+    early and counts in `withinToleranceCount`; a lead of 2.7 ms is early. At
+    `sampleRate` 44100, a lead of 2.85 ms is not early.
+  - *Port of the old -3 ms row:* a stall-window sample at -3 ms whose frame
+    `audibleTime` is at or after the onset is now reported in
+    `pageProxyEarlyCount` and does not fail. The audio-domain early rows
+    above replace its failing assertion.
+  - *Guard:* a measured-provenance summary without `audioSampleRate` fails
+    with `audio sample rate unavailable`.
+  - Every existing TASK-702 row stays and passes, including the
+    latency-independence control.
+- **Owner files** (CANVAS-EVIDENCE):
+  - `editor/test/e2e/stats.mjs`
+  - `editor/test/e2e/stats.test.ts`
+  - `editor/test/e2e/measure.mjs`
+  - `editor/test/e2e/silent-sink.mjs` (adds the `sampleRate` field only)
+  - `editor/test/e2e/README.md`
+  - `design-docs/specs/design-canvas-editor-evidence.md`
+  - the concrete `run-001` files that the rerun rewrites
+
+  The plan and the manifest `operatorRules` record the decision as a
+  definition correction.
+- **Evidence.**
+  - `renderEvidence` labels both early rows as audio domain, with the
+    sample rate and `Q`.
+  - It adds the page-proxy and tolerance-band rows, marked informational.
+  - The evidence section "Stall-window sync classification (session 293,
+    design 15.3.8.15)" adds three things: the trigger row above, its
+    audio-domain verdict, and the rerun figures.
 
 **Residual risks.**
 

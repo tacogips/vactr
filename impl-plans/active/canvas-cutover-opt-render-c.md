@@ -276,6 +276,16 @@ the plan author handle them.
 - [ ] Harness and session-290 sharedPaths are unedited, or their edits are recorded.
 - [ ] Progress log updated.
 
+## Session 292 Dispatch Notes
+
+- `START` is HEAD when C is dispatched, after B is accepted. The structure A froze and B's
+  segment cache are read from `START`.
+- Row floor: `gpu.test.ts` keeps at least as many passing rows as at `START` (53 after A,
+  plus B's rows). The design's "at least 49" is the minimum; no row present at `START` is
+  removed.
+- Rust carry-forward and the deadline rule: the same as plan B, section "Session 292
+  Dispatch Notes".
+
 ## Progress Log
 
 ### Session: 2026-10-06 (session 291 plan authoring)

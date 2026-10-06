@@ -281,6 +281,21 @@ progress log.
 - [ ] Harness and session-290 sharedPaths are unedited, or their edits are recorded.
 - [ ] Progress log updated.
 
+## Session 292 Dispatch Notes
+
+- `START` is HEAD when B is dispatched, after A is accepted on `35140bd`. The structure
+  A froze (instance format, program, four layers) is read from `START`.
+- Row floor: `gpu.test.ts` keeps all 53 rows passing at `START`, plus B's new rows. No row
+  present at `START` is removed.
+- Rust carry-forward: B edits no Rust. If
+  `git diff --name-only 5e58d04 HEAD -- src Cargo.toml Cargo.lock build.rs editor/src-tauri`
+  still prints nothing, full nextest may be carried forward exactly as in plan A, section
+  "Session 292 Resume". Clippy, the wasm32 build and the src-tauri check run fresh where the
+  sandbox allows. The closeout reruns every Rust gate fresh.
+- Deadline: if the step deadline cuts the pass short, keep the partial work in the tree.
+  Record what is done and what remains in this progress log, and report it as a
+  severity-low note for an operator Luna completion pass. Do not revert it.
+
 ## Progress Log
 
 ### Session: 2026-10-06 (session 291 plan authoring)

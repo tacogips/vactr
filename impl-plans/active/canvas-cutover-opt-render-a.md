@@ -480,6 +480,65 @@ residual notes.
   `test:perf` pass. Rust gates were not run per the task instruction that Rust is untouched.
 - [x] Harness and session-290 sharedPaths are unedited.
 - [x] Progress log updated.
+- [ ] Session 292: final-source gates rerun on `START=35140bd` with logs (section below).
+- [ ] Session 292: Rust carry-forward records added with the empty-diff proof.
+- [ ] Session 292: test-integrity, adversarial and integration review accepted.
+
+## Session 292 Resume (re-gate on 35140bd; no reimplementation)
+
+**State.** A is implemented at `35140bd` by an operator-directed Codex gpt-6-luna pass
+(progress log entry "CANVAS-OPT-RENDER-A completion"). `git diff --name-only 4262255 35140bd`
+lists only `atlas.ts`, `geometry.ts`, `layout.ts`, `renderer.ts`, `first-viewport.test.ts`,
+`gpu.test.ts`, `mount.test.ts`, `editor/test/support/gl.ts` and plan/design files, all
+inside this plan's writePaths. Record `BASE=4262255` and `START=35140bd` in
+`tmp/canvas-cutover/opt-render-a/intent.json`.
+
+**What the step-6 implementer does.** Rerun the gates below once on `START`, serially, each
+heavy suite alone. Do not rewrite source. Change source only when a gate fails or a review
+finding requires it; then fix it inside this plan's writePaths, rerun the affected gates and
+report only the final passing runs.
+
+**Gates on START** (logs under `tmp/canvas-cutover/opt-render-a/`, prefix `s292-`):
+
+- inside the sandbox: `vitest run test/canvas/gpu.test.ts` (>= 53 tests), `vitest run
+  test/canvas`, full `vitest run` (>= 785), `npm run check`, the host-wasm wasm32 build,
+  strict clippy and the src-tauri cargo check;
+- outside the sandbox (verification step): the behavior e2e with
+  `--run-id s292-opt-render-a --out ../tmp/canvas-cutover/opt-render-a/s292-behavior`,
+  `npm run test:style` and `npm run test:perf` (alone).
+
+**Rust carry-forward.** Rust has not changed since `5e58d04`. Proof (notes, not a gate):
+`git diff --name-only 5e58d04 HEAD -- src Cargo.toml Cargo.lock build.rs editor/src-tauri`
+prints nothing. The only `mise.toml` change since then is the `build-wasm-release` task
+(2e3361d), which does not affect the debug or test builds. Full nextest is therefore carried
+forward from the last green full-suite run,
+`tmp/canvas-cutover/opt-backdrop/nextest-final-source.log` (2816 run, 2816 passed,
+3 skipped, exit 0), as one record:
+`{command, exitStatus: 0, testsRun: 2816, testsPassed: 2816, failureCount: 0,
+outcome: "passed", log, notes: "carry-forward: Rust unchanged since 5e58d04"}`.
+If a fresh clippy, wasm32 or src-tauri run cannot run in the sandbox, carry it forward the
+same way from `clippy-final-source.log`, `wasm-final.log` or `tauri-check-final.log` in the
+same directory. The closeout in CANVAS-EVIDENCE reruns every Rust gate fresh.
+
+**Test-integrity review brief** (review step; read-only).
+`git diff 4262255 35140bd -- editor/test/canvas/gpu.test.ts` removes 37 `expect` lines and
+adds 57. `mount.test.ts` and `first-viewport.test.ts` remove none. Two row titles changed:
+
+- "caches by text/font/fallback/DPR/style and deletes evicted tiles" became "caches mask
+  cells by text/font/fallback/DPR while tint stays per instance";
+- "keeps rendering all visible lines when atlas working set exceeds available budget" became
+  "keeps rendering every visible line while a small atlas working set stays pending".
+
+For every removed `expect`, the reviewer names the HEAD assertion that keeps its intent,
+using the term map of the parent plan's "Ported rows" table: tile -> cell, per-quad
+`drawArrays` -> decoded instances, `scissor` -> `CLIP_GUTTER` and the gutter uniform,
+`bufferUploads` -> text-layer buffer writes, evicted tile deletion -> reset or generation
+bump releasing cells, style in the tile key -> per-instance tint with the syntax color still
+asserted. A removed intent with no counterpart is a finding. The A implementer repairs it by
+restoring the assertion in cell or instance terms. It is never accepted as an exemption.
+
+**Deadline.** If the step deadline cuts a repair short, keep the partial work in the tree
+and report it as a severity-low note.
 
 ## Progress Log
 

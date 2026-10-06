@@ -5,7 +5,7 @@
     {
       "id": "canvas-only-text",
       "pass": true,
-      "detail": "source chars=25; bridge opacity=0; canvas=767x858; line1=47,0,197,18; colors=364"
+      "detail": "source chars=25; bridge opacity=0; canvas=767x842; line1=47,0,197,18; colors=343"
     },
     {
       "id": "editing-undo-redo-navigation",
@@ -42,13 +42,13 @@
       "pass": true,
       "detail": {
         "status": "pass",
-        "detail": "bridge bottom=73; inset height=360"
+        "detail": "bridge bottom=85; inset height=360"
       }
     },
     {
       "id": "background-no-replay",
       "pass": true,
-      "detail": "frames hidden=76, resumed=86"
+      "detail": "frames hidden=91, resumed=101"
     },
     {
       "id": "dispose-ledger",

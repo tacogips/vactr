@@ -93,6 +93,46 @@ const rangeKey = (row) => `${row.from}-${row.to}`;
 const activeRanges = (key) => new Set(String(key ?? '').split(',').filter(Boolean));
 const sameEpoch = (a, b) => (a.epoch ?? null) === (b.epoch ?? null);
 
+function onsetCoverage(onsets) {
+  const byEpoch = new Map();
+  for (const onset of onsets ?? []) {
+    const epoch = onset.epoch ?? null;
+    if (!byEpoch.has(epoch)) byEpoch.set(epoch, new Map());
+    const atTime = byEpoch.get(epoch);
+    const current = atTime.get(onset.time);
+    atTime.set(onset.time, Math.max(current ?? -Infinity, onset.end));
+  }
+  const windows = [];
+  for (const [epoch, atTime] of byEpoch) {
+    const points = [...atTime].map(([time, end]) => ({ time:Number(time), end:Number(end) }))
+      .sort((a, b) => a.time - b.time);
+    const deltas = points.slice(1).map((point, index) => point.time - points[index].time)
+      .filter((delta) => Number.isFinite(delta) && delta > 0).sort((a, b) => a - b);
+    const middle = Math.floor(deltas.length / 2);
+    const cadence = deltas.length === 0 ? Infinity : deltas.length % 2
+      ? deltas[middle] : (deltas[middle - 1] + deltas[middle]) / 2;
+    const maxGap = cadence * 3;
+    let start = null;
+    let end = null;
+    for (let index = 0; index < points.length; index += 1) {
+      const point = points[index];
+      if (start === null) { start = point.time; end = point.end; continue; }
+      if (point.time - points[index - 1].time > maxGap) {
+        windows.push({ epoch, start, end });
+        start = point.time;
+      }
+      end = Math.max(end, point.end);
+    }
+    if (start !== null) windows.push({ epoch, start, end });
+  }
+  return {
+    windows,
+    contains(time, epoch) {
+      return windows.some((window) => window.epoch === (epoch ?? null) && time >= window.start && time <= window.end);
+    },
+  };
+}
+
 export function syncWindow(onsets, presented) {
   if (!onsets?.length || !presented?.length) return { windowStart:null, windowEnd:null, empty:true };
   const firstOnset = Math.min(...onsets.map((row) => row.time));
@@ -104,17 +144,44 @@ export function syncWindow(onsets, presented) {
 
 export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nominalMs: nominalOverride } = {}) {
   const window = syncWindow(onsets ?? [], presented ?? []);
+  const coverage = onsetCoverage(onsets ?? []);
   const { windowStart, windowEnd, empty } = window;
   const inWindow = (time) => !empty && time >= windowStart && time <= windowEnd;
+  const onsetIndex = new Map();
+  for (const onset of onsets ?? []) {
+    const epoch = onset.epoch ?? null;
+    if (!onsetIndex.has(epoch)) onsetIndex.set(epoch, new Map());
+    const byKey = onsetIndex.get(epoch);
+    const key = rangeKey(onset);
+    if (!byKey.has(key)) byKey.set(key, new Map());
+    const byTime = byKey.get(key);
+    if (!byTime.has(onset.time)) byTime.set(onset.time, onset);
+  }
+  const sortedOnsets = new Map();
+  for (const [epoch, byKey] of onsetIndex) {
+    sortedOnsets.set(epoch, new Map([...byKey].map(([key, byTime]) =>
+      [key, [...byTime.values()].sort((a, b) => a.time - b.time)])));
+  }
+  const candidateFor = (row, key) => {
+    const candidates = sortedOnsets.get(row.epoch ?? null)?.get(key) ?? [];
+    const limit = row.audibleTime + earlyToleranceS;
+    let low = 0;
+    let high = candidates.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (candidates[middle].time <= limit) low = middle + 1;
+      else high = middle;
+    }
+    return low > 0 ? candidates[low - 1] : null;
+  };
+  const frameRanges = new Map((presented ?? []).map((row) => [row, activeRanges(row.activeKey)]));
   const windowOnsets = (onsets ?? []).filter((row) => inWindow(row.time));
+  const windowOnsetSet = new Set(windowOnsets);
   const evaluated = (presented ?? []).map((row, index) => ({ row, index }))
-    .filter(({ row }) => inWindow(row.audibleTime));
+    .filter(({ row }) => inWindow(row.audibleTime) && coverage.contains(row.audibleTime, row.epoch));
   let earlyFlashCount = 0, replayedFlashCount = 0, framePairs = 0;
-  const candidateFor = (row, key) => (onsets ?? [])
-    .filter((onset) => rangeKey(onset) === key && sameEpoch(onset, row) && onset.time <= row.audibleTime + earlyToleranceS)
-    .sort((a, b) => b.time - a.time)[0] ?? null;
   for (const { row } of evaluated) {
-    for (const key of activeRanges(row.activeKey)) {
+    for (const key of frameRanges.get(row)) {
       framePairs += 1;
       const candidate = candidateFor(row, key);
       if (!candidate) earlyFlashCount += 1;
@@ -132,51 +199,121 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nomi
     : nominalCandidates.length % 2 === 1 ? nominalCandidates[middle]
       : (nominalCandidates[middle - 1] + nominalCandidates[middle]) / 2;
   const nominal = Number.isFinite(nominalOverride) && nominalOverride > 0 ? nominalOverride : medianNominal;
-  const sync = [];
-  const samples = [];
+  const sampled = new Map();
   const sampleKeys = new Set();
   let duplicateSamples = 0;
   let droppedFrameSamples = 0;
   let droppedFrames = 0;
-  for (const onset of windowOnsets) {
-    const key = rangeKey(onset);
-    for (let index = 0; index < (presented ?? []).length - 1; index += 1) {
-      const row = presented[index];
-      if (!activeRanges(row.activeKey).has(key) || !sameEpoch(onset, row) || row.audibleTime < onset.time - earlyToleranceS) continue;
-      if (candidateFor(row, key) !== onset) continue;
-      const next = presented[index + 1];
+  for (let index = 0; index < (presented ?? []).length - 1; index += 1) {
+    const row = presented[index];
+    for (const key of frameRanges.get(row)) {
+      const onset = candidateFor(row, key);
+      if (!onset || !windowOnsetSet.has(onset) || sampled.has(onset) || row.audibleTime < onset.time - earlyToleranceS) continue;
       const sampleKey = `${onset.time}|${onset.epoch ?? ''}|${index}`;
+      sampled.set(onset, null);
       if (sampleKeys.has(sampleKey)) {
         duplicateSamples += 1;
-        break;
+        continue;
       }
       sampleKeys.add(sampleKey);
+      const next = presented[index + 1];
       const value = next.frameMs - (row.targetMs + (onset.time - row.audibleTime) * 1000);
-      const sampleDroppedFrames = Math.max(0, Math.round((next.frameMs - row.frameMs) / nominal) - 1);
-      sync.push(value);
-      samples.push({ time: onset.time, epoch: onset.epoch ?? null, frameIndex: index, value, droppedFrames: sampleDroppedFrames });
+      const previous = presented[index - 1];
+      const droppedBefore = previous ? Math.max(0, Math.round((row.frameMs - previous.frameMs) / nominal) - 1) : 0;
+      const droppedAfter = Math.max(0, Math.round((next.frameMs - row.frameMs) / nominal) - 1);
+      const sampleDroppedFrames = droppedBefore + droppedAfter;
+      sampled.set(onset, {
+        time: onset.time,
+        epoch: onset.epoch ?? null,
+        frameIndex: index,
+        value,
+        droppedFrames: sampleDroppedFrames,
+        onset: { time:onset.time, end:onset.end, from:onset.from, to:onset.to, epoch:onset.epoch ?? null, receivedMs:onset.receivedMs },
+        frame: { frameMs:row.frameMs, targetMs:row.targetMs, audibleTime:row.audibleTime, epoch:row.epoch ?? null, activeKey:row.activeKey },
+        previousFrameMs: previous?.frameMs ?? null,
+        nextFrameMs: next.frameMs,
+      });
       if (sampleDroppedFrames >= 1) droppedFrameSamples += 1;
       droppedFrames += sampleDroppedFrames;
-      break;
     }
   }
+  const samples = windowOnsets.map((onset) => sampled.get(onset)).filter(Boolean);
+  const sync = samples.map((sample) => sample.value);
   return { sync, earlyFlashCount, replayedFlashCount, framePairs, windowOnsets:windowOnsets.length,
-    excludedFrames:(presented ?? []).length - evaluated.length, windowStart, windowEnd,
+    excludedFrames:(presented ?? []).length - evaluated.length, coverageWindows:coverage.windows.length, windowStart, windowEnd,
     samples, duplicateSamples, droppedFrameSamples, droppedFrames };
 }
 
-export function lateActiveMismatches(onsets, presented, stalls) {
+export function lateActiveMismatchDetails(onsets, presented, stalls) {
   const window = syncWindow(onsets ?? [], presented ?? []);
-  if (window.empty) return 0;
-  let mismatches = 0;
+  const coverage = onsetCoverage(onsets ?? []);
+  if (window.empty) return [];
+  const audits = [];
   for (const stall of stalls ?? []) {
     const row = (presented ?? []).find((item) => item.frameMs >= stall);
     if (!row || row.audibleTime < window.windowStart || row.audibleTime > window.windowEnd) continue;
-    const expected = new Set((onsets ?? []).filter((onset) => sameEpoch(onset, row) && onset.time <= row.audibleTime && row.audibleTime < onset.end).map(rangeKey));
+    if (!coverage.contains(row.audibleTime, row.epoch)) continue;
+    const overlappingOnsets = (onsets ?? []).filter((onset) => sameEpoch(onset, row) &&
+      onset.time <= row.audibleTime && row.audibleTime < onset.end);
+    const receiptCutoffMs = Number.isFinite(row.executionMs) ? row.executionMs : row.frameMs;
+    const eligibleOnsets = overlappingOnsets.filter((onset) =>
+      !Number.isFinite(onset.receivedMs) || onset.receivedMs <= receiptCutoffMs);
+    const expected = new Set(eligibleOnsets.map(rangeKey));
     const actual = activeRanges(row.activeKey);
-    if (expected.size !== actual.size || [...expected].some((key) => !actual.has(key))) mismatches += 1;
+    const expectedRanges = [...expected].sort();
+    const actualRanges = [...actual].sort();
+    const missingRanges = expectedRanges.filter((key) => !actual.has(key));
+    const extraRanges = actualRanges.filter((key) => !expected.has(key));
+    audits.push({
+      stallFrameMs:stall,
+      frameMs:row.frameMs,
+      executionMs:receiptCutoffMs,
+      audibleTime:row.audibleTime,
+      epoch:row.epoch ?? null,
+      activeKey:row.activeKey,
+      expectedRanges,
+      actualRanges,
+      missingRanges,
+      extraRanges,
+      eligibleOnsets:eligibleOnsets.map(({ time, end, from, to, epoch, receivedMs }) => ({ time, end, from, to, epoch:epoch ?? null, receivedMs })),
+      overlappingOnsets:overlappingOnsets.map(({ time, end, from, to, epoch, receivedMs }) => ({
+        time, end, from, to, epoch:epoch ?? null, receivedMs,
+        eligible:!Number.isFinite(receivedMs) || receivedMs <= receiptCutoffMs,
+      })),
+      mismatch:expected.size !== actual.size || missingRanges.length > 0,
+    });
   }
-  return mismatches;
+  return audits;
+}
+
+export function lateActiveMismatches(onsets, presented, stalls) {
+  return lateActiveMismatchDetails(onsets, presented, stalls).filter((audit) => audit.mismatch).length;
+}
+
+export function tickStarvationEvidence(phaseRows, { lookaheadMs = 120, longSpanMs = 50 } = {}) {
+  const ticks = (phaseRows ?? []).filter((row) => row[0] === 6)
+    .map((row) => Number(row[1])).filter(Number.isFinite).sort((a, b) => a - b);
+  const gaps = [];
+  for (let index = 1; index < ticks.length; index += 1) {
+    const durationMs = ticks[index] - ticks[index - 1];
+    if (durationMs > lookaheadMs) gaps.push({ startMs:ticks[index - 1], endMs:ticks[index], durationMs });
+  }
+  const longSpans = (phaseRows ?? []).flatMap((row) => {
+    const startMs = Number(row[1]);
+    const durationMs = row.slice(2).reduce((total, value) => total + Number(value || 0), 0);
+    return Number.isFinite(startMs) && durationMs > longSpanMs ? [{ phase:row[0], startMs, durationMs }] : [];
+  });
+  const overlaps = gaps.flatMap((gap) => longSpans
+    .filter((span) => span.startMs <= gap.endMs && span.startMs + span.durationMs >= gap.startMs)
+    .map((span) => ({ ...gap, span })));
+  return {
+    tickStartCount:ticks.length,
+    tickStartGapsOverLookahead:gaps.length,
+    maxTickStartGapMs:gaps.reduce((max, gap) => Math.max(max, gap.durationMs), 0),
+    mainThreadSpansOverThreshold:longSpans.length,
+    starvationOverlaps:overlaps.length,
+    overlaps,
+  };
 }
 
 export function rankSelfTime(cpuProfile, top = 10) {

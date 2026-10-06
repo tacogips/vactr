@@ -5,7 +5,7 @@
     {
       "id": "canvas-only-text",
       "pass": true,
-      "detail": "source chars=25; bridge opacity=0; canvas=767x858; line1=47,0,202,18; colors=353"
+      "detail": "source chars=25; bridge opacity=0; canvas=767x842; line1=47,0,202,18; colors=349"
     },
     {
       "id": "editing-undo-redo-navigation",
@@ -27,7 +27,7 @@
     {
       "id": "touch-selection",
       "pass": true,
-      "detail": "WebKit pointer event diagnostic=/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/tmp/canvas-cutover/evidence/s274-webkit-touch-events.json; {\"geometry\":{\"doc\":\"# canvas-visible-evidence\\n#e2e\",\"canvas\":{\"x\":0,\"y\":37,\"width\":767.40625,\"height\":858,\"top\":37,\"right\":767.40625,\"bottom\":895,\"left\":0},\"pane\":{\"x\":0,\"y\":37,\"width\":767.40625,\"height\":858,\"top\":37,\"right\":767.40625,\"bottom\":895,\"left\":0},\"touchX\":88,\"touchY\":47,\"word\":\"canvas\",\"wordStart\":2},\"tapSelection\":{\"anchor\":5,\"head\":5},\"atLongPress\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":490},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":492},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":548}]},\"atEnd\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":490},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":492},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":548},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":1073}]},\"handleWaitError\":null}"
+      "detail": "WebKit pointer event diagnostic=/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/tmp/canvas-cutover/evidence/s274-webkit-touch-events.json; {\"geometry\":{\"doc\":\"# canvas-visible-evidence\\n#e2e\",\"canvas\":{\"x\":0,\"y\":49,\"width\":767.40625,\"height\":842,\"top\":49,\"right\":767.40625,\"bottom\":891,\"left\":0},\"pane\":{\"x\":0,\"y\":49,\"width\":767.40625,\"height\":842,\"top\":49,\"right\":767.40625,\"bottom\":891,\"left\":0},\"touchX\":88,\"touchY\":59,\"word\":\"canvas\",\"wordStart\":2},\"tapSelection\":{\"anchor\":5,\"head\":5},\"atLongPress\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":600},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":601},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":654}]},\"atEnd\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":600},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":601},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":654},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":1179}]},\"handleWaitError\":null}"
     },
     {
       "id": "context-loss-restore",
@@ -44,13 +44,13 @@
       "pass": true,
       "detail": {
         "status": "pass",
-        "detail": "bridge bottom=55; inset height=360"
+        "detail": "bridge bottom=67; inset height=360"
       }
     },
     {
       "id": "background-no-replay",
       "pass": true,
-      "detail": "frames hidden=90, resumed=99"
+      "detail": "frames hidden=78, resumed=88"
     },
     {
       "id": "dispose-ledger",

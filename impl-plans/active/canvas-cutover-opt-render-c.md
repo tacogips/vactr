@@ -1,12 +1,12 @@
 # Canvas Cutover OPT-RENDER-C: Overlay-Only Frames, Animation Budgets and GPU Status Badge Implementation Plan
 
-**Status**: Ready (dispatch only after CANVAS-OPT-RENDER-B is accepted)
+**Status**: In Progress (implementation and gates complete; independent review pending)
 **Plan ID**: CANVAS-OPT-RENDER-C (session 291, wave 15; depends on CANVAS-OPT-RENDER-B)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 3 ("Dirty reasons"), section 4 ("Layers and draw calls", "Proof"), section 6 (caret and animation-only rows) and section 8 ("OPT-RENDER split (session-291 amendment)", block "CANVAS-OPT-RENDER-C")
 **Parent plan**: impl-plans/active/canvas-cutover-opt-render.md (status `Split`; contract section 5 "mount.ts" and the remaining completion criteria)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-RENDER-C`)
 **Created**: 2026-10-06
-**Last Updated**: 2026-10-06
+**Last Updated**: 2026-10-07
 
 ---
 
@@ -254,27 +254,27 @@ the plan author handle them.
 
 ## Completion Criteria
 
-- [ ] `mount.ts`:
-  - [ ] no per-frame `staticRevision++`;
-  - [ ] `annotationsRevision` bumped only on annotation, selection or presentation changes;
-  - [ ] selection-only frames skip `spans()` and the text rebuild.
-- [ ] Renderer-level and mount-level caret-move rows pass: `textBuilds` 0, `captures` 0,
+- [x] `mount.ts`:
+  - [x] no per-frame `staticRevision++`;
+  - [x] `annotationsRevision` bumped only on annotation, selection or presentation changes;
+  - [x] selection-only frames skip `spans()` and the text rebuild.
+- [x] Renderer-level and mount-level caret-move rows pass: `textBuilds` 0, `captures` 0,
   `spans()` 0, layout builds 0, with in-test controls.
-- [ ] Mounted 100 animation-only frames pass, counted after the inject, warm-up and reset
+- [x] Mounted 100 animation-only frames pass, counted after the inject, warm-up and reset
   order:
-  - [ ] 0 uploads, 0 layout builds, 0 staging canvases and 0 backdrop copies;
-  - [ ] 0 `getParameter` and 0 `getError`;
-  - [ ] 0 `measureText` on every 2D context;
-  - [ ] 0 `mapWireSpan`, through `vi.spyOn(DocumentSync.prototype, 'mapWireSpan')`;
-  - [ ] at most 4 draws per frame;
-  - [ ] in-test control: an edit plus a frame gives at least 1 `mapWireSpan` call.
-- [ ] `.vact-code-gpu-status` has `z-index: 2`, and the `mount.test.ts` badge-stacking row
+  - [x] 0 uploads, 0 layout builds, 0 staging canvases and 0 backdrop copies;
+  - [x] 0 `getParameter` and 0 `getError`;
+  - [x] 0 `measureText` on every 2D context;
+  - [x] 0 `mapWireSpan`, through `vi.spyOn(DocumentSync.prototype, 'mapWireSpan')`;
+  - [x] at most 4 draws per frame;
+  - [x] in-test control: an edit plus a frame gives at least 1 `mapWireSpan` call.
+- [x] `.vact-code-gpu-status` has `z-index: 2`, and the `mount.test.ts` badge-stacking row
   passes.
-- [ ] `gpu.test.ts` passes every row (at least 49) with no assertion deleted.
-- [ ] Full default vitest and `npm run check` pass. Outside the sandbox, the behavior e2e,
+- [x] `gpu.test.ts` passes every row (at least 49) with no assertion deleted.
+- [x] Full default vitest and `npm run check` pass. Outside the sandbox, the behavior e2e,
   `test:style`, `test:perf`, clippy, nextest, the wasm32 build and the src-tauri check pass.
-- [ ] Harness and session-290 sharedPaths are unedited, or their edits are recorded.
-- [ ] Progress log updated.
+- [x] Harness and session-290 sharedPaths are unedited, or their edits are recorded.
+- [x] Progress log updated.
 
 ## Session 292 Dispatch Notes
 
@@ -297,3 +297,16 @@ the plan author handle them.
   - the mounted animation row now lists 0 `getError` and 0 `measureText`;
   - it names the `DocumentSync.prototype.mapWireSpan` seam;
   - it fixes the inject, warm-up, reset and count order, with an edit control.
+
+
+### Session: 2026-10-07 (CANVAS-OPT-RENDER-C implementation)
+**Tasks Completed**: C mount revision semantics, overlay-only caret behavior, static/dynamic GPU layer caching, status badge stacking, regression coverage and all assigned verification gates.
+**Notes**:
+- `mount.ts` now advances `annotationsRevision` only when selection positions or static annotation contents change. Selection-only frames keep cached syntax rows, make zero syntax-span calls, and do not rebuild text geometry.
+- `renderer.ts` caches static background and overlay inputs. Unchanged animation frames append/upload only the dynamic playing/eval background tail; overlay buffers remain unchanged. Renderer caret movement invalidates only the overlay and preserves text geometry.
+- Added mounted 100-frame counters for atlas/slot uploads, layout builds, staging canvases, backdrop copies/ledger bytes, GL probes, measureText, mapWireSpan and per-frame draws, plus a document-edit map control. Added the code.css z-index assertion.
+- The first focused run exposed the CSS test's `import.meta.url` not being a file URL under Vitest. The test now follows repo convention for dynamic `node:fs` loading and reads from the editor cwd. `npm run check` then passed.
+- Read-only review found animation frames still rewriting static layer data. Added the background-prefix and overlay caches; focused, canvas and full suites were rerun after this correction.
+- Final counts: focused canvas 95/95; canvas 215/215; full Vitest 795/795 across 93 files; behavior e2e 18/18 (Chromium 10/10, WebKit 8/8); style 4/4; perf 1/1; nextest 2816 passed, 3 configured skips, exit 0. `npm run check`, strict clippy, wasm32 build and src-tauri check exited 0.
+- Final logs and receipt are under `tmp/canvas-cutover/opt-render-c/`. Final source fingerprints are in `final-sha256.txt`. The source paths overlap accepted A/B work; no A/B hunk was removed.
+- Downstream test-integrity, adversarial and serial integration reviews remain owned by later workflow steps.

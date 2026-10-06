@@ -101,10 +101,13 @@ export class GlyphAtlas {
     // the GPU/storage reservations; per-glyph JS keys do not consume GPU budget.
     const reservation = this.ledger.allocate('geometry', 0);
     if (!reservation) return null;
+    const previousCanvasHeight = this.canvas.height;
+    let stagingReservation: Reservation | null = null;
     if (this.canvas.height < height) {
-      const next = this.ledger.allocate('geometry', this.width * height * 4);
-      if (!next) { reservation.release(); return null; }
-      this.canvasReservation.release(); this.canvasReservation = next; this.canvas.height = height;
+      stagingReservation = this.ledger.allocate('geometry', this.width * height * 4);
+      if (!stagingReservation) { reservation.release(); return null; }
+      this.canvas.height = height;
+      this.rasterFontKey = '';
     }
     const ctx = this.context;
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, width, height);
@@ -123,7 +126,16 @@ export class GlyphAtlas {
     this.gl.pixelStorei(this.gl.UNPACK_ROW_LENGTH, 0);
     try {
       this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, x, y, width, height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.canvas);
-    } catch (error) { reservation.release(); throw error; }
+    } catch (error) {
+      reservation.release();
+      if (stagingReservation) {
+        this.canvas.height = previousCanvasHeight;
+        stagingReservation.release();
+        this.rasterFontKey = '';
+      }
+      throw error;
+    }
+    if (stagingReservation) { this.canvasReservation.release(); this.canvasReservation = stagingReservation; }
     const cell: AtlasCell = { u0: x / this.width, v0: y / this.height, u1: (x + width) / this.width, v1: (y + height) / this.height, width, height, pad, generation: this.stats.generation };
     this.cells.set(key, { cell, reservation }); this.x = x + width; this.y = y; this.shelfHeight = Math.max(shelfHeight, height);
     this.frameBytes += bytes; this.stats.uploads++; this.stats.newCells++;
@@ -181,7 +193,7 @@ export class GlyphAtlas {
     this.clearCells(); this.x = 2; this.y = 0; this.shelfHeight = 2;
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureValue);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.width, this.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
-    this.gl.getError();
+    if (this.gl.getError() !== this.gl.NO_ERROR) throw new Error('Text atlas allocation failed');
     this.writeWhiteTexels(); this.stats.generation++; this.stats.resets++; this.stats.evictions++;
   }
 

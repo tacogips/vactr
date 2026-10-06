@@ -68,6 +68,7 @@
 .vact-code-input-bridge::selection { background: transparent; color: transparent; }
 .vact-code-gpu-status {
   position: absolute;
+  z-index: 2;
   bottom: 0;
   left: 0;
   padding: var(--vt-space-1) var(--vt-space-2);

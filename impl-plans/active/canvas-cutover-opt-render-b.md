@@ -1,12 +1,12 @@
 # Canvas Cutover OPT-RENDER-B: Per-Line Geometry Cache and Incremental Slot Table Implementation Plan
 
-**Status**: Ready (dispatch only after CANVAS-OPT-RENDER-A is accepted)
+**Status**: Step 6 implementation complete (independent review pending)
 **Plan ID**: CANVAS-OPT-RENDER-B (session 291, wave 14; depends on CANVAS-OPT-RENDER-A)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 4 ("Per-line geometry cache", "Context loss, DPR and disposal", "Proof"), section 6 (single-char edit budget row) and section 8 ("OPT-RENDER split (session-291 amendment)", block "CANVAS-OPT-RENDER-B")
 **Parent plan**: impl-plans/active/canvas-cutover-opt-render.md (status `Split`; contract section 2 "Text buffer", "Segment key", "Gutter segments" and "Slot table")
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-RENDER-B`)
 **Created**: 2026-10-06
-**Last Updated**: 2026-10-06
+**Last Updated**: 2026-10-07
 
 ---
 
@@ -117,9 +117,12 @@ the 12 session-290 files), with the same edit rules.
     `runs` array from the layout.
 - **Storage.** A segment owns a list of 64-instance blocks in the text `LayerBuffer`.
   Instance y is 0, line-local, and its slot index is in `a_meta`.
-- **Window membership.** Lines in `[visibleFirst - overscan, visibleLast + overscan]` keep
-  their segments, with overscan equal to one viewport of lines. Segments outside are freed:
-  their blocks go to the free list and are zero-written with `bufferSubData`.
+- **Window membership.** Shape rows in `[visibleFirst - overscan, visibleLast + overscan]`,
+  with overscan equal to one viewport of lines. Keep already-built segments while their line
+  remains in that window; materialize unseen offscreen geometry only when its line enters the
+  viewport, so an edit does not synchronously rasterize unrelated offscreen text. Segments
+  outside the window are freed: their blocks go to the free list and are zero-written with
+  `bufferSubData`.
 
 ### 2. Text buffer blocks
 
@@ -192,8 +195,9 @@ lines only.
   are unchanged).
 - *Unchanged shifted line.* A line shifted by an insert above gives 0 new cells, 0 segment
   builds for that line and a slot-table write only.
-- *Scroll by one line.* Builds only the newly entering line's segments, and frees the leaving
-  segments' blocks (free-list reuse is visible on the next build).
+- *Scroll by one line.* Builds only the newly visible line's segments; the leaving line's
+  existing segments remain cached while inside the one-viewport overscan window, then free
+  after scrolling beyond that window (free-list reuse is visible on a later build).
 - *Compaction.* After freeing more than half the blocks, compaction runs once (`compactions`
   1) and the decoded text instances are unchanged.
 - *Restore.* A context loss and restore rebuilds every visible segment once and drops no
@@ -262,24 +266,24 @@ progress log.
 
 ## Completion Criteria
 
-- [ ] Segments are keyed by `runs` identity, chunk, font generation, DPR, line-relative style
+- [x] Segments are keyed by `runs` identity, chunk, font generation, DPR, line-relative style
   hash and atlas generation, and only window lines get segments.
-- [ ] Text buffer blocks:
-  - [ ] free list;
-  - [ ] bounded compaction;
-  - [ ] `bufferSubData` for changed blocks only;
-  - [ ] `bufferData` only on growth, reset, restore or compaction, at most once per frame.
-- [ ] Slot table with incremental writes counted in `slotTableBytes`, and gutter segments
+- [x] Text buffer blocks:
+  - [x] free list;
+  - [x] bounded compaction;
+  - [x] `bufferSubData` for changed blocks only;
+  - [x] `bufferData` only on growth, reset, restore or compaction, at most once per frame.
+- [x] Slot table with incremental writes counted in `slotTableBytes`, and gutter segments
   rewritten only on renumbering.
-- [ ] One-line edit, Enter, shifted line, scroll, compaction, restore and DPR rows pass.
-- [ ] The 20,000-line single ASCII edit row passes: `getError`/`getParameter`/`measureText`
+- [x] One-line edit, Enter, shifted line, scroll, compaction, restore and DPR rows pass.
+- [x] The 20,000-line single ASCII edit row passes: `getError`/`getParameter`/`measureText`
   0, uploads at most the new cells, geometry at most the changed segment, at most 4 draws,
   with an in-test non-ASCII control.
-- [ ] A's instance format, program and layers are unchanged.
-- [ ] Full default vitest and `npm run check` pass. Outside the sandbox, the behavior e2e,
+- [x] A's instance format, program and layers are unchanged.
+- [x] Full default vitest and `npm run check` pass. Outside the sandbox, the behavior e2e,
   `test:style`, `test:perf`, clippy, nextest, the wasm32 build and the src-tauri check pass.
-- [ ] Harness and session-290 sharedPaths are unedited, or their edits are recorded.
-- [ ] Progress log updated.
+- [x] Harness and session-290 sharedPaths are unedited, or their edits are recorded.
+- [x] Progress log updated.
 
 ## Session 292 Dispatch Notes
 
@@ -304,3 +308,84 @@ progress log.
 **Notes**:
 - B owns the slot table (design decision): its Enter criterion needs it.
 - Dispatch only after A is accepted.
+
+### Session: 2026-10-07 (Step 6 implementation)
+**Tasks Completed**: Implemented retained 256-grapheme text segments, free-list GPU block allocation,
+incremental slot writes, line-number gutter reuse, bounded compaction, and 20,000-line hot-path controls.
+**Evidence**:
+- Focused canvas/edit-cost/mount tests: 92/92; canvas suite: 212/212; full vitest: 792/792.
+- `npm run check`, behavior E2E Chromium/WebKit 18/18, style 4/4, serial perf 1/1 passed.
+- Strict clippy, full nextest 2816/2816 (3 skipped), wasm32 build and Tauri check passed.
+- `tmp/canvas-cutover/opt-render-b/source-invariants.log` confirms A's instance constants, offsets,
+  flags and shader sources remain unchanged; source files remain below 1000 lines.
+- Final command logs and `receipt.json` are recorded under `tmp/canvas-cutover/opt-render-b/`.
+**Notes**: Shared harness paths were not edited. Test-integrity, adversarial and serial integration
+reviews are downstream workflow steps and remain pending.
+- Intermediate chunk-overbuild and geometry-budget failures were resolved by horizontal overscan,
+  chunk-local syntax filtering and packing gutter commands with the first visible text segment;
+  diagnostic logs are `gpu-chunk-rerun.log`, `gpu-gutter.log` and `focused-final.log` under the
+  plan evidence directory. Final-source reruns are the passing logs listed above.
+- The initial eager vertical overscan experiment uploaded 10,240 bytes (five blocks) during the
+  mounted edit frame and was reverted; this finding led to lazy geometry materialization below.
+  Diagnostic evidence remains in `mount-overscan-diagnostic.log` and `mount-warmup.log`.
+
+### Session: 2026-10-07 (Step 6 continuation: vertical overscan)
+**Tasks Completed**: Added a one-viewport vertical shaping and retention window with lazy geometry
+materialization on viewport entry. Existing offscreen segments remain cached within overscan and
+are freed after leaving it; unseen offscreen geometry is deferred so unrelated long lines do not
+inflate the mounted edit upload budget.
+**Evidence**: GPU/mount focused run passed 79/79 at
+`tmp/canvas-cutover/opt-render-b/vertical-overscan-focused-4.log`; mounted 20,000-line ASCII edit
+kept geometry uploads within one changed-line block. Earlier eager-build failures remain diagnostic
+evidence in `mount-overscan-diagnostic.log` and `mount-warmup.log`.
+
+**Final-source verification**: focused 92/92, canvas 212/212, full vitest 792/792, check,
+behavior E2E 18/18, style 4/4, serial perf 1/1 (ratio 2.84), strict clippy, full nextest
+2816 passed / 3 skipped, wasm32 build, Tauri check and source invariants all passed. Complete logs
+are listed in `tmp/canvas-cutover/opt-render-b/receipt.json`; full nextest took 891.631 seconds.
+Test-integrity, adversarial and serial integration reviews remain downstream workflow steps.
+
+### Session: 2026-10-07 (Step 6 continuation: compaction reference repair)
+**Tasks Completed**: Replaced the compaction frame's same-renderer self-comparison with an
+independent cold `CanvasRenderer` reference at the final viewport. The fake decodes instance
+slots and resolves viewport-relative absolute positions through its slot table. The row compares
+sorted visible non-padding text tuples (excluding UVs), asserts ten visible lines and compaction
+count +1, and verifies a scrollTop 40 reference differs.
+**Evidence**: `gpu.test.ts` 60/60 (`repair-s297-gpu.log`); focused 92/92
+(`repair-s297-focused.log`); canvas 212/212 (`repair-s297-canvas.log`); full Vitest 792/792
+(`repair-s297-vitest-full.log`); `npm run check` and `git diff --check` exit 0. The source-token
+scan is clean. Logs are under `tmp/canvas-cutover/opt-render-b/`.
+**Source identity**: GPU test SHA-256 `b2413b3fad7e5ddc1e2da0152f4cb842ce3c7066b67d2ba3187710f7948b5060`.
+Production renderer, segments, layout and geometry hashes remain `7c0de895...`, `62e4beea...`,
+`c033fba9...` and `0495442b...`; therefore prior behavior E2E, style and serial perf evidence
+continues to match production sources. Receipt records the full hashes and gate logs.
+
+### Session: 2026-10-07 (Step 6 continuation: adversarial slot and gutter repairs)
+**Tasks Completed**: Added explicit slot ownership and release on eviction/invalidation so a returning
+line cannot reuse a slot that has already returned to the free list. Added a scroll regression row
+covering 400 -> 420 -> 400 -> 340 -> 160 with unique visible slots, expected row positions, and a
+retained-slot/entering-segment control. Gutter segments now build at the fixed x=4 origin; replay
+compensates for the current horizontal scroll only for appended gutter commands, preserving the
+cache key and text geometry. Added a horizontal scroll and new-row gutter regression row with a
+text-shift control.
+**Evidence**: GPU 62/62, focused 94/94, canvas 214/214, full Vitest 794/794, `npm run check`,
+behavior E2E 18/18 (Chromium 10/10, WebKit 8/8), style 4/4, serial perf 1/1 (ratio 2.86),
+forbidden-token scan and `git diff --check` all pass. Logs are recorded in the receipt under
+`tmp/canvas-cutover/opt-render-b/repair-s298-*`; Rust diff against HEAD is empty.
+**Source identity**: Renderer SHA-256 `e502280d788203b849393f1ac2d20345dac491f4f11e6fb2e9015e88e5cf4656`;
+GPU test SHA-256 `4ec441d5b5cd8236da3b4e7c56e08e108deb8d6c9165a7348d760b9031c28517`.
+Independent test-integrity, adversarial and serial integration reviews remain downstream workflow steps.
+
+### Session: 2026-10-07 (Step 6 continuation: far horizontal gutter fallback)
+**Tasks Completed**: When a row has a cached gutter segment but no visible text chunk carries its
+gutter commands, the renderer writes those commands into blocks owned by the gutter segment. The
+horizontal chunk filter and segment keys remain unchanged. The gutter row now includes an empty
+line, far-scroll frames at `scrollLeft: 1000` for `scrollTop: 0` and `400`, a control confirming
+short-line text is filtered while its gutter remains, and duplicate-instance checks across
+standalone/packed placement transitions.
+**Evidence**: GPU 62/62, focused 94/94, canvas 214/214, full Vitest 794/794, `npm run check`,
+behavior E2E 18/18 (Chromium 10/10, WebKit 8/8), style 4/4, serial perf 1/1 (ratio 2.72),
+forbidden-token scan and `git diff --check` all pass. Logs are recorded under
+`tmp/canvas-cutover/opt-render-b/repair-s299-*`; Rust diff against HEAD is empty.
+**Source identity**: Renderer SHA-256 `175918ee588a0f1a7f4d254c717f840b22d983396007911e83234cfaa2f521bb`;
+GPU test SHA-256 `35a45e71f727e06a017ce0dc207b3931330f2ccccb05850cd80a9b2a65478605`.

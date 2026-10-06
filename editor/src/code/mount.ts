@@ -32,6 +32,14 @@ import { installPerfHook, recordOnset, recordPresented, removePerfHook, type Vac
 
 export const DOC_FILE = 'main.vact';
 
+function sameAnnotations(left: readonly CodeAnnotation[], right: readonly CodeAnnotation[]): boolean {
+  return left.length === right.length && left.every((row, index) => {
+    const other = right[index];
+    return other !== undefined && row.from === other.from && row.to === other.to && row.kind === other.kind &&
+      row.className === other.className && row.label === other.label;
+  });
+}
+
 export interface MountOptions {
   gl?: WebGL2RenderingContext;
   frameHost?: FrameHost;
@@ -107,7 +115,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let staticAnnotations: CodeAnnotation[] = [];
   let syntaxSpans: CodeAnnotation[] = [];
   let syntaxWindow: { from: number; to: number } | null = null;
-  let staticRevision = 0;
+  let annotationsRevision = 0;
+  let renderedSelection: { anchor: number; head: number } | null = null;
   const hideDiagnosticTip = (): void => { diagTip.hidden = true; };
   const anchor = new TimeAnchor(clock, tier === 'browser' ? 'audio' : 'receipt');
   const highlight = new HighlightScheduler({ clock, file: DOC_FILE, map: (span, rev) => sync.mapWireSpan(span, rev),
@@ -217,11 +226,14 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
           ...input.presentation.annotations];
         const animatedRows: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
         const annotations = { staticRows, animatedRows, cursor: input.presentation.cursor };
+        const selectionChanged = !renderedSelection || renderedSelection.anchor !== surface.state.selection.main.anchor ||
+          renderedSelection.head !== surface.state.selection.main.head;
+        if (selectionChanged || !sameAnnotations(staticAnnotations, staticRows)) annotationsRevision++;
+        renderedSelection = { anchor: surface.state.selection.main.anchor, head: surface.state.selection.main.head };
         staticAnnotations = annotations.staticRows;
-        staticRevision++;
         timed('upload', () => {
           renderer.setViewport(range.view, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated: annotations.animatedRows, textRevision: displayRevision, cursor: annotations.cursor, cursorVisible: true, handles });
+          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, cursor: annotations.cursor, cursorVisible: true, handles });
         });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
@@ -229,7 +241,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
         timed('upload', () => {
           renderer.setViewport(viewHost.viewport, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision: staticRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
+          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
         });
       }
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);

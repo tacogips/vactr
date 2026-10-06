@@ -9,6 +9,7 @@ export interface LayoutFont { font: string; fallback?: string; generation?: numb
 export interface LayoutViewport { width: number; height: number; scrollLeft: number; scrollTop: number; left?: number; top?: number; gutter?: number }
 export interface ShapedRun { text: string; from: number; to: number; x: number; width: number }
 export interface ShapedLine { number: number; from: number; to: number; runs: readonly ShapedRun[]; width: number; rtlUnsupported: boolean }
+export interface GeometrySegment { chunk: number; runs: ShapedRun[] }
 interface LineIndex { from: number; to: number; next: number }
 interface RunWidthChunk {
   start: number; end: number; width: number; cumulative: number;
@@ -35,6 +36,7 @@ export class TextLayout {
   private cache = new Map<number, { line: ShapedLine; bytes: number; clusters: number[] | null }>();
   private runWidths = new WeakMap<ShapedRun, RunWidthIndex>();
   private runClusters = new WeakMap<ShapedRun, { lineFrom: number; clusters: number[] | null }>();
+  private geometryPartitions = new WeakMap<readonly ShapedRun[], Array<Array<{ run: number; from: number; to: number }>>>();
   private bytes = 0;
   private widest = 0;
   private metricsFont = '';
@@ -353,6 +355,45 @@ export class TextLayout {
     const out: ShapedLine[] = [];
     for (let i = first; i < last; i++) out.push(this.shape(i));
     return out;
+  }
+  /** Split stable line runs into bounded grapheme chunks for retained GPU geometry. */
+  geometrySegments(line: ShapedLine, maxClusters = 256): GeometrySegment[] {
+    if (!Number.isSafeInteger(maxClusters) || maxClusters < 1) throw new RangeError('Invalid geometry segment size');
+    let partitions = this.geometryPartitions.get(line.runs);
+    if (!partitions) {
+      partitions = [];
+      let current: Array<{ run: number; from: number; to: number }> = [];
+      let count = 0;
+      const flush = (): void => { if (current.length) { partitions!.push(current); current = []; count = 0; } };
+      const append = (run: number, from: number, to: number, clusters: number): void => {
+        if (count >= maxClusters) flush();
+        const last = current[current.length - 1];
+        if (last && last.run === run && last.to === from) last.to = to;
+        else current.push({ run, from, to });
+        count += clusters;
+      };
+      line.runs.forEach((run, runIndex) => {
+        let ascii = true; for (const char of run.text) if (char.codePointAt(0)! > 0x7f) { ascii = false; break; }
+        if (ascii) {
+          for (let from = 0; from < run.text.length;) {
+            if (count >= maxClusters) flush();
+            const clusters = Math.min(maxClusters - count, run.text.length - from);
+            append(runIndex, from, from + clusters, clusters); from += clusters;
+          }
+        } else {
+          for (const part of segmenter.segment(run.text)) append(runIndex, part.index, part.index + part.segment.length, 1);
+        }
+      });
+      flush();
+      if (partitions.length === 0) partitions.push([]);
+      this.geometryPartitions.set(line.runs, partitions);
+    }
+    return partitions.map((parts, chunk) => ({ chunk, runs: parts.map(part => {
+      const run = line.runs[part.run]!;
+      const from = run.from + part.from, to = run.from + part.to;
+      const left = this.runOffset(run, part.from), right = this.runOffset(run, part.to);
+      return { text: run.text.slice(part.from, part.to), from, to, x: run.x + left, width: right - left };
+    }) }));
   }
   private lineAt(pos: number): number {
     let lo = 0, hi = this.lineCount - 1;

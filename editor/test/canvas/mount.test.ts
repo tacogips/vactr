@@ -17,6 +17,7 @@ import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 import { CanvasRenderer } from '../../src/code/renderer';
 import { CodeViewHost } from '../../src/code/view-host';
 import { TextLayout } from '../../src/code/layout';
+import { DocumentSync } from '../../src/code/sync';
 import { FallbackSpans } from '../../src/code/syntax';
 import { startFrameLoop } from '../../src/visual/frame';
 import { WasmCore } from '../../src/protocol/wasm';
@@ -41,7 +42,8 @@ function rafHost(): RafHost {
   };
 }
 
-function rendererGL(): WebGL2RenderingContext {
+type RenderCalls = { getError: number; getParameter: number; texSubImage2D: number; bufferData: number; bufferSubData: number; drawArraysInstanced: number };
+function rendererGL(calls?: RenderCalls): WebGL2RenderingContext {
   let next = 1;
   const gl: Record<string, unknown> = {};
   const constants = ['MAX_TEXTURE_SIZE', 'TEXTURE_2D', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'LINEAR', 'NEAREST',
@@ -55,22 +57,24 @@ function rendererGL(): WebGL2RenderingContext {
   for (const name of ['texParameteri', 'pixelStorei', 'shaderSource', 'compileShader', 'attachShader', 'linkProgram',
     'bindVertexArray', 'bindBuffer', 'bufferData', 'bufferSubData', 'enableVertexAttribArray', 'vertexAttribPointer', 'vertexAttribIPointer', 'vertexAttribDivisor', 'bindFramebuffer',
     'useProgram', 'viewport', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear', 'uniform2f', 'uniform1i',
-    'activeTexture', 'drawArraysInstanced', 'bindTexture', 'texImage2D', 'texSubImage2D', 'uniform4f', 'uniform1f']) gl[name] = () => {};
-  gl.getParameter = () => 4096; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
+    'activeTexture', 'drawArraysInstanced', 'bindTexture', 'texImage2D', 'texSubImage2D', 'uniform4f', 'uniform1f']) gl[name] = () => {
+    if (calls && name in calls) calls[name as keyof RenderCalls]++;
+  };
+  gl.getParameter = () => { if (calls) calls.getParameter++; return 4096; }; gl.getShaderParameter = () => true; gl.getProgramParameter = () => true;
   gl.getShaderInfoLog = () => ''; gl.getProgramInfoLog = () => ''; gl.getAttribLocation = () => 0;
-  gl.getUniformLocation = (_program: unknown, name: string) => ({ name }); gl.getError = () => gl.NO_ERROR;
+  gl.getUniformLocation = (_program: unknown, name: string) => ({ name }); gl.getError = () => { if (calls) calls.getError++; return gl.NO_ERROR; };
   gl.isContextLost = () => false; gl.isTexture = () => true;
   return gl as unknown as WebGL2RenderingContext;
 }
 
-interface Rig { root: HTMLElement; code: HTMLElement; deps: EditorDeps; mounted: ReturnType<typeof mount>; transport: RecordingTransport; fakes: CanvasFakes; host: RafHost; gl?: WebGL2RenderingContext }
+interface Rig { root: HTMLElement; code: HTMLElement; deps: EditorDeps; mounted: ReturnType<typeof mount>; transport: RecordingTransport; fakes: CanvasFakes; host: RafHost; gl?: WebGL2RenderingContext; calls?: RenderCalls; measureTextCalls: { value: number } }
 const rigs: Rig[] = [];
-function setup(perf = false, withGl = false, audible?: AudibleClock, core?: WasmCore): Rig {
-  const gl = withGl ? rendererGL() : undefined;
+function setup(perf = false, withGl = false, audible?: AudibleClock, core?: WasmCore, measureTextCalls = { value: 0 }, calls: RenderCalls = { getError: 0, getParameter: 0, texSubImage2D: 0, bufferData: 0, bufferSubData: 0, drawArraysInstanced: 0 }): Rig {
+  const gl = withGl ? rendererGL(calls) : undefined;
   const fakes = installCanvasFakes(withGl ? { webgl2: () => gl! } : {});
   const context = fakes.ctx(document.createElement('canvas')) as unknown as Record<string, unknown>;
   Object.assign(Object.getPrototypeOf(context) as object, {
-    measureText: (text: string) => ({ width: text.length * 8 }),
+    measureText: (text: string) => { measureTextCalls.value++; return { width: text.length * 8 }; },
     setTransform() {}, save() {}, restore() {}, rect() {}, clip() {},
   });
   const root = document.createElement('div'); document.body.append(root);
@@ -79,7 +83,7 @@ function setup(perf = false, withGl = false, audible?: AudibleClock, core?: Wasm
   const host = rafHost();
   if (perf) window.history.replaceState({}, '', '?perf=1');
   const mounted = mount(root, deps, { frameHost: host, ...(gl ? { gl } : {}) });
-  const rig = { root, code: layout.code, deps, mounted, transport, fakes, host, ...(withGl ? { gl } : {}) };
+  const rig = { root, code: layout.code, deps, mounted, transport, fakes, host, measureTextCalls, ...(withGl ? { gl, calls } : {}) };
   rigs.push(rig); return rig;
 }
 
@@ -212,7 +216,9 @@ describe('headless canvas mount', () => {
   });
 
   it('does no whole-document work on an edit frame or active animation-only frames', () => {
-    const rig = setup(true, true); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    const calls: RenderCalls = { getError: 0, getParameter: 0, texSubImage2D: 0, bufferData: 0, bufferSubData: 0, drawArraysInstanced: 0 };
+    const measureTextCalls = { value: 0 };
+    const rig = setup(true, true, undefined, undefined, measureTextCalls, calls); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
     const surface = rig.deps.code!.surface;
     const longLine = `const ${'x'.repeat(1_530)} 日本 👨‍👩‍👧‍👦`;
     const documentLines = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`);
@@ -235,10 +241,25 @@ describe('headless canvas mount', () => {
     expect(layoutStats.segmentations).toBe(animationSegments);
     expect(segment).not.toHaveBeenCalled();
     const measuredBeforeEdit = layoutStats.measuredTextChars;
+    const rendererBeforeEdit = { ...perf.counters().renderer };
+    const uploadBeforeEdit = calls.texSubImage2D, measureCallsBeforeEdit = measureTextCalls.value;
+    const glQueriesBeforeEdit = { getError: calls.getError, getParameter: calls.getParameter };
     const toString = vi.spyOn(Text.prototype, 'toString');
     const sliceString = vi.spyOn(Object.getPrototypeOf(surface.state.doc) as Text & { sliceString: Text['sliceString'] }, 'sliceString');
     textarea.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true }));
     rig.host.step(72);
+    const rendererAfterEdit = perf.counters().renderer;
+    expect(rendererAfterEdit.textBuilds - rendererBeforeEdit.textBuilds,
+      JSON.stringify({ before: rendererBeforeEdit, after: rendererAfterEdit, revision: surface.state.doc.length, view: rig.deps.code!.surface.state.selection.main.head })).toBe(1);
+    expect(rendererAfterEdit.geometryBytes - rendererBeforeEdit.geometryBytes,
+      JSON.stringify({ delta: rendererAfterEdit.geometryBytes - rendererBeforeEdit.geometryBytes,
+        lineLength: surface.state.doc.line(2).length, clusters: Array.from(surface.state.doc.line(2).text).length,
+        builds: rendererAfterEdit.textBuilds - rendererBeforeEdit.textBuilds })).toBeLessThanOrEqual(2048);
+    expect(rendererAfterEdit.lastFrameDraws).toBeLessThanOrEqual(4);
+    expect(calls.getError - glQueriesBeforeEdit.getError).toBe(0);
+    expect(calls.getParameter - glQueriesBeforeEdit.getParameter).toBe(0);
+    expect(calls.texSubImage2D - uploadBeforeEdit).toBeLessThanOrEqual(1);
+    expect(measureTextCalls.value - measureCallsBeforeEdit).toBe(0);
     expect(layoutStats.measuredTextChars - measuredBeforeEdit).toBeLessThanOrEqual(4 * documentLines[1]!.length + 4_096);
     const editHadLargeSlice = sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024);
     const builds = perf.counters().renderer.textBuilds;
@@ -248,6 +269,10 @@ describe('headless canvas mount', () => {
     expect(sliceString.mock.calls.some(([from, to]) => (to ?? Infinity) - from > 64 * 1024)).toBe(false);
     expect(perf.counters().renderer.textBuilds).toBe(builds);
     expect(editHadLargeSlice).toBe(false);
+    const japaneseMeasureCount = measureTextCalls.value, japaneseUploads = calls.texSubImage2D;
+    textarea.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: '漢', bubbles: true, cancelable: true }));
+    rig.host.step(224);
+    expect(measureTextCalls.value > japaneseMeasureCount || calls.texSubImage2D > japaneseUploads).toBe(true);
     rig.mounted.dispose();
     const controlRig = setup(true, true); const controlPerf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
     controlRig.deps.code!.surface.dispatch({ changes: { from: 0, insert: 'const fresh = 1' } }); controlRig.host.step(16);
@@ -289,6 +314,40 @@ describe('headless canvas mount', () => {
     expect(fake.calls.every(call => call.args.every(arg => typeof arg !== 'number' || arg <= 64 * 1024))).toBe(true);
     expect(isTexture).not.toHaveBeenCalled(); expect(getError).not.toHaveBeenCalled(); expect(segment).not.toHaveBeenCalled();
     expect(renderer.textBuilds).toBe(builds);
+
+    const map = vi.spyOn(DocumentSync.prototype, 'mapWireSpan');
+    const now = rig.deps.clock.now();
+    rig.transport.emit({ kind: 'playing', body: { events: [{ slot: 'overlay-budget', beat: [0, 1], time: now,
+      end_time: now + 100, dur: [1, 1], src: { file: 'main.vact', span: { start: 0, end: 5 },
+        doc_revision: rig.deps.code!.currentRevision('main.vact'), form_gen: 1 } }] } });
+    rig.host.step(240);
+    expect(map).toHaveBeenCalled();
+    map.mockClear();
+    const calls = rig.calls!;
+    calls.getError = 0; calls.getParameter = 0; calls.texSubImage2D = 0;
+    const measureStart = rig.measureTextCalls.value;
+    const canvasesStart = rig.fakes.canvases2d.length;
+    const drawImages = () => rig.fakes.canvases2d.reduce((sum, canvas) => sum + rig.fakes.ctx(canvas).named('drawImage').length, 0);
+    const copiesStart = drawImages();
+    const textBuilds = renderer.textBuilds, layoutBuilds = perf.counters().layout.builds;
+    const frameDraws: number[] = [];
+    for (let frame = 0; frame < 100; frame++) {
+      rig.host.step(256 + frame * 16);
+      frameDraws.push(renderer.lastFrameDraws);
+    }
+    expect(renderer.textBuilds).toBe(textBuilds);
+    expect(perf.counters().layout.builds).toBe(layoutBuilds);
+    expect(calls.texSubImage2D).toBe(0);
+    expect(rig.fakes.canvases2d.length - canvasesStart).toBe(0);
+    expect(drawImages() - copiesStart).toBe(0);
+    expect(perf.counters().ledger.byKind.backdrop).toBe(0);
+    expect(calls.getParameter).toBe(0); expect(calls.getError).toBe(0);
+    expect(rig.measureTextCalls.value - measureStart).toBe(0);
+    expect(map).not.toHaveBeenCalled();
+    expect(frameDraws).toHaveLength(100); expect(frameDraws.every(count => count <= 4)).toBe(true);
+    surface.dispatch({ changes: { from: 0, insert: 'x' } }); rig.host.step(1900);
+    expect(map).toHaveBeenCalled();
+    map.mockRestore();
   });
 
   it('keeps syntax annotations stable across playing frames and recomputes them after wheel scrolling', () => {
@@ -323,7 +382,8 @@ describe('headless canvas mount', () => {
 
   it('does not request syntax spans for a caret-only frame and captures after scrolling', () => {
     const spans = vi.spyOn(FallbackSpans.prototype, 'spans');
-    const rig = setup();
+    const rig = setup(true, true);
+    const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
     const host = rig.code.firstElementChild as HTMLElement;
     host.getBoundingClientRect = () => ({ left: 0, right: 600, top: 0, bottom: 800, x: 0, y: 0, width: 600, height: 800, toJSON: () => ({}) });
     const surface = rig.deps.code!.surface;
@@ -332,13 +392,37 @@ describe('headless canvas mount', () => {
     for (let frame = 0; frame < 5 && rig.host.callbacks.size; frame += 1) rig.host.step(24 + frame * 8);
     expect(spans).toHaveBeenCalled();
     spans.mockClear();
+    const before = perf.counters();
+    const render = vi.spyOn(CanvasRenderer.prototype, 'render');
     const head = surface.state.selection.main.head, line = surface.state.doc.lineAt(head);
     surface.dispatch({ selection: { anchor: head < line.to ? head + 1 : Math.max(line.from, head - 1) } });
     rig.host.step(32);
     expect(spans).not.toHaveBeenCalled();
+    expect(perf.counters().renderer.textBuilds).toBe(before.renderer.textBuilds);
+    expect(perf.counters().layout.builds).toBe(before.layout.builds);
+    expect(render.mock.calls.at(-1)?.[0]?.cursor).not.toBe(head);
+    const buildsBeforeTypedControl = perf.counters().renderer.textBuilds;
+    surface.dispatch({ changes: { from: 0, insert: 'x' } }); rig.host.step(40);
+    expect(perf.counters().renderer.textBuilds).toBeGreaterThan(buildsBeforeTypedControl);
+    spans.mockClear();
     rig.code.querySelector('canvas.vact-code-canvas')!.dispatchEvent(new WheelEvent('wheel', { deltaY: 180, bubbles: true, cancelable: true }));
-    rig.host.step(48);
+    rig.host.step(56);
     expect(spans).toHaveBeenCalled();
+  });
+
+  it('keeps the GPU status badge above both canvas layers', async () => {
+    const fsName: string = 'node:fs';
+    const fs = await import(/* @vite-ignore */ fsName) as { readFileSync(path: string, encoding: 'utf8'): string };
+    const runtime = globalThis as unknown as { process: { cwd(): string } };
+    const css = fs.readFileSync(`${runtime.process.cwd()}/src/code/code.css`, 'utf8');
+    const rule = (selector: string): string => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    };
+    const zIndex = (selector: string): number => Number(rule(selector).match(/z-index:\s*(\d+)/)?.[1]);
+    expect(zIndex('.vact-code-gpu-status')).toBe(2);
+    expect(zIndex('.vact-code-canvas')).toBe(1);
+    expect(zIndex('.vact-code-backdrop')).toBe(0);
   });
 
   it('renders the state document after cancelling IME preedit and continues editing', () => {

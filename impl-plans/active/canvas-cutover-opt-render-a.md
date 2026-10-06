@@ -477,11 +477,20 @@ residual notes.
   every row (at least 53).
 - [x] New rows: 60-line draws, growth and reset, emoji and Hebrew, 100 animation frames.
 - [x] Full default vitest and `npm run check` pass. The behavior e2e, `test:style` and
-  `test:perf` pass. Rust gates were not run per the task instruction that Rust is untouched.
+  `test:perf` pass. Strict clippy, the wasm32 build and src-tauri check pass; full nextest
+  is carried forward from the source-matched Rust run recorded below.
 - [x] Harness and session-290 sharedPaths are unedited.
 - [x] Progress log updated.
-- [ ] Session 292: final-source gates rerun on `START=35140bd` with logs (section below).
-- [ ] Session 292: Rust carry-forward records added with the empty-diff proof.
+- [x] Session 292: final-source gates rerun on current HEAD `ffdb546` with logs (Session 293
+  progress entry below; this HEAD supersedes `START=35140bd`).
+- [x] Session 292: Rust carry-forward record added with the empty-diff proof (Session 293
+  progress entry below).
+- [x] Session 294 integrity repair: cached text bytes/count are retained on non-rebuild
+  frames; real text-layer buffer writes are counted and tested through per-buffer records.
+- [x] Session 294 integrity repair: constrained-ledger working-set and refused-growth tests
+  assert live cells, UVs, same-frame raster coverage, reset generation and disposal bounds.
+- [x] Session 294 integrity repair: allocation GL errors are detected on layer growth and
+  atlas reset; rollback and unavailable/save-text behavior are asserted before disposal.
 - [ ] Session 292: test-integrity, adversarial and integration review accepted.
 
 ## Session 292 Resume (re-gate on 35140bd; no reimplementation)
@@ -593,3 +602,125 @@ No new source files were needed.
 **Not Run**: Cargo clippy, nextest and src-tauri Cargo checks, as the task states Rust is
 untouched and those gates are not required. E2E did run its required release wasm/editor
 build prerequisites. No harness or session-290 sharedPath was edited.
+
+### Session: 2026-10-06 (session 293 final-source re-gate)
+**Source**: `ffdb54623031998295246a7127582b9949fad1a3`; later than the plan's Session 292
+`START=35140bd`, so all fresh frontend and build gates below are on actual current HEAD.
+**Tasks Completed**: Re-ran the assigned plan's final-source gates serially. No source code
+changes were needed. Verified that Rust inputs are unchanged since `5e58d04`:
+`git diff --name-only 5e58d04 HEAD -- src Cargo.toml Cargo.lock build.rs editor/src-tauri`
+was empty. `mise.toml` has only the previously recorded `build-wasm-release` addition.
+**Verification** (every fresh command exited 0):
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/gpu.test.ts`: 53/53;
+  `tmp/canvas-cutover/opt-render-a/s293-gpu.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas`: 205/205 across 11 files;
+  `tmp/canvas-cutover/opt-render-a/s293-canvas.log`.
+- `cd editor && ./node_modules/.bin/vitest run`: 785/785 across 93 files;
+  `tmp/canvas-cutover/opt-render-a/s293-vitest-full.log`.
+- `cd editor && npm run check`: exit 0;
+  `tmp/canvas-cutover/opt-render-a/s293-check.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`: exit 0;
+  `tmp/canvas-cutover/opt-render-a/s293-wasm.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0;
+  `tmp/canvas-cutover/opt-render-a/s293-clippy.log`.
+- `CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml`: exit 0;
+  `tmp/canvas-cutover/opt-render-a/s293-tauri-check.log`.
+- `cd editor && npm run e2e -- --browser all --profile behavior --run-id s293-opt-render-a --out ../tmp/canvas-cutover/opt-render-a/s293-behavior`: exit 0, 18/18 across Chromium and WebKit;
+  `tmp/canvas-cutover/opt-render-a/s293-behavior.log`. WebKit synthetic clipboard and IME
+  remain labeled limitations in the runner output.
+- `cd editor && npm run test:style`: exit 0, 4/4 engine/viewport combinations;
+  `tmp/canvas-cutover/opt-render-a/s293-style.log`.
+- `cd editor && npm run test:perf`: exit 0, 1/1 in the isolated serial perf gate;
+  `tmp/canvas-cutover/opt-render-a/s293-perf.log`.
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`: carry-forward, 2816/2816 passed and 3 skipped, exit 0; source unchanged since `5e58d04`;
+  `tmp/canvas-cutover/opt-backdrop/nextest-final-source.log`.
+- Source scan: `wc -l` reported renderer 423, geometry 111, atlas 197 and layout 458 lines;
+  the forbidden-token scan found no `getImageData`, `JSON.stringify`, `drawArrays(` or
+  `scissor` in atlas.ts, renderer.ts or geometry.ts.
+**Downstream**: test-integrity, adversarial and integration review remain for the assigned
+review steps; no review acceptance is claimed here.
+
+### Session: 2026-10-06 (session 294 test-integrity repairs)
+**Finding mapping and changes**:
+- TI-S293-RA-1: the prior idle and animation rows counted rebuilds while replaying and
+  uploading text each frame. `renderer.ts` now retains the text writer bytes/count unless the
+  rebuild key changes, uploads only while dirty, and increments `stats.bufferUploads` after
+  each successful text-layer write. The fake stores and decodes instances per bound buffer.
+  Cursor-only, animation-only, and 100-frame rows assert no text buffer writes; edit controls
+  assert exactly one new write. Changed `renderer.ts` and `gpu.test.ts`.
+- TI-S293-RA-2: the working-set row previously filtered dead-text draws and lacked its
+  bounded per-frame intent. It now uses a 2,100,000-byte ledger with `recordingGL(64)` (the
+  smallest power-of-two slot table for 40 visible lines plus slot zero), asserts every text
+  draw is live with in-range UVs, verifies same-frame draws for newly rasterized lines, and
+  bounds every frame plus disposal. The cache row now asserts invalidate/reset generation
+  and re-upload. A separate `recordingGL(2048)` / 5 MiB ledger case fills the 1024 atlas,
+  refuses 2048 growth, and proves a frame-boundary reset without growth. Changed `gpu.test.ts`.
+- TI-S293-RA-3: the fake now injects non-throwing GL_OUT_OF_MEMORY (1285) on allocation while
+  preserving throw-based `failNextUpload`. `LayerBuffer.upload` checks `getError` once after
+  growth `bufferData`; failed staging uploads retain the previous ledger reservation; atlas
+  reset checks and propagates allocation errors before generation/counter increments. Tests
+  prove rollback before dispose, constructor rollback, unavailable status and retained save
+  text on layer allocation/reset failure, and zero frame-loop `getError`. Changed
+  `geometry.ts`, `atlas.ts`, and `gpu.test.ts`.
+**Verification** (final source; commands run serially, all exit 0):
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/gpu.test.ts`: 54/54;
+  `tmp/canvas-cutover/opt-render-a/s294-gpu-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas`: 206/206 across 11 files;
+  `tmp/canvas-cutover/opt-render-a/s294-canvas-final.log`.
+- `cd editor && npm run check`: exit 0;
+  `tmp/canvas-cutover/opt-render-a/s294-check-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run`: 786/786 across 93 files;
+  `tmp/canvas-cutover/opt-render-a/s294-vitest-full-final.log`.
+- `cd editor && npm run e2e -- --browser all --profile behavior --run-id s294-opt-render-a --out ../tmp/canvas-cutover/opt-render-a/s294-behavior`: exit 0, 18/18 across Chromium and WebKit;
+  `tmp/canvas-cutover/opt-render-a/s294-behavior-final.log`. WebKit synthetic clipboard,
+  composition and touch limitations remain identified by the runner.
+- `cd editor && npm run test:perf`: exit 0, 1/1 in the serial perf gate;
+  `tmp/canvas-cutover/opt-render-a/s294-perf-final.log`.
+- `cd editor && npm run test:style`: exit 0, all four engine/viewport combinations;
+  `tmp/canvas-cutover/opt-render-a/s294-style-final.log`.
+- Forbidden-token scan for `getImageData`, `JSON.stringify`, `drawArrays(` and `scissor`:
+  no matches; source sizes are 209/435/114 lines;
+  `tmp/canvas-cutover/opt-render-a/s294-source-scan-final.log`.
+- The first GPU attempt exposed a frame-budget setup error in the new refused-growth test
+  (53 passed, 1 failed); the captured output and diagnosis are retained at
+  `tmp/canvas-cutover/opt-render-a/s294-gpu-budget-attempt.log`. The final test-only budget
+  correction and source-matched rerun above pass.
+**Downstream**: independent test-integrity, adversarial and integration reviews remain
+pending. No review acceptance is claimed.
+
+### Session: 2026-10-06 (session 296 retained-highlight repair)
+**Finding**: `INT-S292-RA-STALE-HL` is repaired. `render()` now switches to the
+`background` layer immediately after a text rebuild and before emitting selection, playing
+or eval quads. Text command replay still targets the recorded `text` layer. Added
+`gpu.test.ts` coverage for a rebuild frame with selection and playing annotations, a following
+annotation-free animation frame, and a third-frame playing control. It verifies highlights
+appear in the background layer, never enter or persist in the retained text layer, the text
+instance count matches an annotation-free renderer control, and animation frames make no
+text-buffer write. No previous assertion was removed or weakened.
+
+**Verification** (final source; all commands exited 0):
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/gpu.test.ts`: 55/55;
+  `tmp/canvas-cutover/opt-render-a/s296-gpu.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas`: 207/207 across 11 files;
+  `tmp/canvas-cutover/opt-render-a/s296-canvas.log`.
+- `cd editor && ./node_modules/.bin/vitest run`: 787/787 across 93 files;
+  `tmp/canvas-cutover/opt-render-a/s296-vitest-full.log`.
+- `cd editor && npm run check`: exit 0;
+  `tmp/canvas-cutover/opt-render-a/s296-check.log`.
+- `cd editor && npm run e2e -- --browser all --profile behavior --run-id s296-opt-render-a --out ../tmp/canvas-cutover/opt-render-a/s296-behavior`: 18/18 across Chromium and WebKit;
+  `tmp/canvas-cutover/opt-render-a/s296-behavior.log`.
+- `cd editor && npm run test:style`: 4/4 engine/viewport combinations;
+  `tmp/canvas-cutover/opt-render-a/s296-style.log`.
+- `cd editor && npm run test:perf`: 1/1 in the standalone serial performance gate;
+  `tmp/canvas-cutover/opt-render-a/s296-perf.log`.
+- Forbidden-token scan for `getImageData`, `JSON.stringify`, `drawArrays(` and `scissor`:
+  no matches; source sizes are 209/436/114 lines;
+  `tmp/canvas-cutover/opt-render-a/s296-source-scan.log`.
+- `git diff --check`: exit 0. One initial source-scan wrapper invocation used zsh's
+  read-only `status` variable and stopped before scanning; the corrected scan above passed.
+
+**Rust carry-forward**: no Rust, Cargo manifest, lockfile, build script or Tauri source was
+changed. Strict clippy, full nextest, wasm32 build and Tauri cargo check remain carried
+forward from the recorded session 293/294 green runs.
+**Downstream**: independent test-integrity, adversarial and integration review must re-review
+this correction. No review acceptance is claimed.

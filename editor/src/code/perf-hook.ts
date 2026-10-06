@@ -10,7 +10,8 @@ import type { TransportSample } from '../protocol/types';
 
 export interface PresentedRecord {
   frameMs: number; targetMs: number; audibleTime: number; provenance: Provenance; valid: boolean;
-  activeKey: string; beatCycle: number | null; beatFlash: boolean; revision: number; handles: number; epoch?: string | null;
+  activeKey: string; beatCycle: number | null; beatFlash: boolean; revision: number; handles: number;
+  executionMs?: number; epoch?: string | null;
 }
 export interface OnsetRecord { time: number; end: number; from: number; to: number; epoch: string | null; receivedMs: number }
 export interface VactrPerf {
@@ -71,7 +72,10 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
 }
 
 export function recordPresented(api: VactrPerf | null, record: PresentedRecord): void {
-  (api as (VactrPerf & { recordPresented?: (value: PresentedRecord) => void }) | null)?.recordPresented?.(record);
+  (api as (VactrPerf & { recordPresented?: (value: PresentedRecord) => void }) | null)?.recordPresented?.({
+    ...record,
+    executionMs: performance.now(),
+  });
 }
 export function recordOnset(api: VactrPerf | null, record: OnsetRecord): void {
   (api as (VactrPerf & { recordOnset?: (value: OnsetRecord) => void }) | null)?.recordOnset?.(record);

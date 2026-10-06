@@ -55,19 +55,32 @@ export class LayerBuffer {
   private reservation: import('./resources').Reservation | null = null;
   private capacity = 0;
   constructor(private gl: WebGL2RenderingContext, private ledger: import('./resources').ResourceLedger,
-    readonly buffer: WebGLBuffer) {}
+    readonly buffer: WebGLBuffer, private maximumBytes = Number.MAX_SAFE_INTEGER) {}
+  get capacityBytes(): number { return this.capacity; }
   upload(bytes: Uint8Array): void {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffer);
-    if (bytes.byteLength > this.capacity) {
-      let next = Math.max(INSTANCE_BYTES * INSTANCES_PER_BLOCK, this.capacity || 1);
-      while (next < bytes.byteLength) next *= 2;
-      const reservation = this.ledger.allocate('geometry', next);
-      if (!reservation) throw new Error('Layer geometry budget exhausted');
-      try { this.gl.bufferData(this.gl.ARRAY_BUFFER, next, this.gl.DYNAMIC_DRAW); }
-      catch (error) { reservation.release(); throw error; }
-      this.reservation?.release(); this.reservation = reservation; this.capacity = next;
-    }
+    this.ensureCapacity(bytes.byteLength);
     if (bytes.byteLength) this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, bytes);
+  }
+  uploadRange(offset: number, bytes: Uint8Array): void {
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset % INSTANCE_BYTES !== 0) throw new RangeError('Invalid geometry range');
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffer);
+    this.ensureCapacity(offset + bytes.byteLength);
+    if (bytes.byteLength) this.gl.bufferSubData(this.gl.ARRAY_BUFFER, offset, bytes);
+  }
+  private ensureCapacity(required: number): void {
+    if (required <= this.capacity) return;
+    if (required > this.maximumBytes) throw new Error('Layer geometry block cap reached');
+    let next = Math.max(INSTANCE_BYTES * INSTANCES_PER_BLOCK, this.capacity || 1);
+    while (next < required) next = Math.min(this.maximumBytes, next * 2);
+    const reservation = this.ledger.allocate('geometry', next);
+    if (!reservation) throw new Error('Layer geometry budget exhausted');
+    try {
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, next, this.gl.DYNAMIC_DRAW);
+      if (this.gl.getError() !== this.gl.NO_ERROR) throw new Error('Layer allocation failed');
+    }
+    catch (error) { reservation.release(); throw error; }
+    this.reservation?.release(); this.reservation = reservation; this.capacity = next;
   }
   dispose(): void { this.reservation?.release(); this.reservation = null; this.capacity = 0; }
 }
@@ -77,11 +90,15 @@ export class InstanceWriter {
   private storage: ArrayBuffer = new ArrayBuffer(INSTANCE_BYTES * INSTANCES_PER_BLOCK);
   private view = new DataView(this.storage);
   private length = 0;
-  clear(): void { this.length = 0; }
+  clear(): void { new Uint8Array(this.storage, 0, this.length * INSTANCE_BYTES).fill(0); this.length = 0; }
   get count(): number { return this.length; }
   bytes(): Uint8Array { return new Uint8Array(this.storage, 0, this.length * INSTANCE_BYTES); }
   push(rect: InstanceRect, uv: InstanceUv, color: InstanceColor, slot = 0, flags = 0): void {
-    const offset = this.length * INSTANCE_BYTES;
+    this.pushAt(this.length, rect, uv, color, slot, flags);
+  }
+  pushAt(index: number, rect: InstanceRect, uv: InstanceUv, color: InstanceColor, slot = 0, flags = 0): void {
+    if (!Number.isSafeInteger(index) || index < 0) throw new RangeError('Invalid instance index');
+    const offset = index * INSTANCE_BYTES;
     this.ensure(offset + INSTANCE_BYTES);
     if ('left' in rect) {
       this.view.setFloat32(offset, rect.left, true); this.view.setFloat32(offset + 4, rect.top, true);
@@ -93,7 +110,18 @@ export class InstanceWriter {
     for (let index = 0; index < 4; index++) this.view.setUint8(offset + 24 + index, quantize(color[index]!, 255));
     this.view.setUint16(offset + 28, slot, true);
     this.view.setUint16(offset + 30, flags, true);
-    this.length++;
+    this.length = Math.max(this.length, index + 1);
+  }
+  setCount(count: number): void {
+    if (!Number.isSafeInteger(count) || count < 0) throw new RangeError('Invalid instance count');
+    this.ensure(count * INSTANCE_BYTES); this.length = count;
+  }
+  padToBlock(): void {
+    const aligned = Math.ceil(this.length / INSTANCES_PER_BLOCK) * INSTANCES_PER_BLOCK;
+    if (aligned === this.length) return;
+    this.ensure(aligned * INSTANCE_BYTES);
+    new Uint8Array(this.storage, this.length * INSTANCE_BYTES, (aligned - this.length) * INSTANCE_BYTES).fill(0);
+    this.length = aligned;
   }
   private ensure(required: number): void {
     if (required <= this.storage.byteLength) return;

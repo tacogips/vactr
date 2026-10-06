@@ -1,11 +1,11 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: In Progress (session 285: edit-path phase attribution and repair, silent release-wasm re-measure, closeout; see "Session 285 Amendment")
+**Status**: In Progress (session 291: canonical release-wasm re-measure; TASK-601 remains incomplete due to unresolved A/V and playback measurements; see Session 291 progress)
 **Plan ID**: CANVAS-EVIDENCE (dispatch wave 8 since session 277; depends on the ten accepted canvas-cutover plans and on CANVAS-EVIDENCE-SCOPE, -SCHED and -FRAMECOST)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope; "Session 285 scope record" for the edit-path repair)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
 **Created**: 2026-10-05
-**Last Updated**: 2026-10-05
+**Last Updated**: 2026-10-07
 
 ---
 
@@ -1854,6 +1854,10 @@ only this plan's progress log and the plan files being archived.
 - [ ] Session 286 TASK-602: S and F evaluated and recorded (S implemented only on its trigger, with the scope record appended first)
 - [ ] Session 286 TASK-603: evidence document "Performance wave (session 286)" baseline/final table with raw paths
 - [ ] Session 286 TASK-604/605: final gates and the silent simulator pass; the six OPT plans archived along with the TASK-507 set; README updated; pushed non-force
+- [x] Session 291 TASK-602: S not triggered. F evaluated and not triggered: 11 tick-start gaps exceeded 120 ms in each browser, but none overlapped a main-thread phase span over 50 ms. No Worker file or design amendment was created.
+- [x] Session 291 TASK-603: evidence document has the session-286 baseline/final table, current failure triage, raw paths, silent-sink results, and pending physical-iPad procedures.
+- [ ] Session 291 TASK-601: latest auditable canonical release `run-001` is incomplete (runner exit 1): sync p99 is 140.93 ms Chromium / 200.67 ms WebKit; Chromium has three post-stall active-set/receipt-timing discrepancies; behavior checks are 18/18 and silent-sink assertions pass. Beat drift passes in both browsers. The F condition is false, so continue product/harness attribution without a tick Worker.
+- [ ] Session 291 TASK-604/605 and final integration: downstream final gates on the accepted source, review-dependent archive/index updates, commit and non-force push remain pending.
 - [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
 ## Progress Log
@@ -2126,3 +2130,92 @@ TASK-601 to TASK-605.
 - The F references are renumbered to the next free 15.3.8.x number.
 - The textWork gate is now 8 ms (HARNESS). No other threshold or workload change.
 
+### Session: 2026-10-07 (session 291 implementation)
+
+**Tasks Completed**: Accepted CANVAS-OPT-RENDER-C dependency readiness from the runtime-owned
+`acceptedPlanIds`; preserved the shared A/B/C implementation changes. Fixed evidence sampling
+to snapshot the bounded frame/key/presented/onset rings every 15 seconds during the 120-second
+cycle. Indexed sync onset lookup to avoid repeated whole-ring scans. Added exact sync sample
+inputs and post-stall audits (selected frame, expected/actual active ranges, overlapping and
+receipt-eligible onsets) so the reported metrics are reproducible from the captured evidence.
+The independent review found that downsampled raw rows had not supported reproduction; the
+latest JSONL now carries `sync-sample` and `stall-audit` rows while phase metrics remain based
+on the complete in-memory trace. Added the session-286 evidence comparison and current triage
+to `design-canvas-editor-evidence.md`.
+
+**Final-source verification**:
+
+- `cd editor && npm run check`: exit 0 (`tmp/canvas-cutover/evidence/s291-receipt-audit-check.log`).
+- `cd editor && ./node_modules/.bin/vitest run`: 798/798, exit 0 (`tmp/canvas-cutover/evidence/s291-receipt-audit-vitest-full.log`).
+- `cd editor && ./node_modules/.bin/vitest run test/e2e/stats.test.ts`: 35/35, exit 0 (`s291-receipt-audit-focused.log`).
+- `cd editor && npm run test:style`: 4/4, exit 0 (`tmp/canvas-cutover/evidence/s291-receipt-audit-style.log`).
+- `cd editor && npm run test:perf` (alone): 1/1, exit 0 (`tmp/canvas-cutover/evidence/s291-receipt-audit-perf.log`; 5k/20k median ratio 2.83).
+- `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`: runner exit 1, not blocked (`s291-run-001-auditable-final2.log`). Both behavior suites pass 18/18; release wasm is verified (`nameSection: true`, `dwarf: false`). Both silent sinks were installed before first connect with zero direct destination connections, zero post-sink peak and numeric -13.00 dBFS workload peaks. Input/frame/text p95 and beat drift pass. Sync p99 is 140.93 ms Chromium / 200.67 ms WebKit; no-dropped-frame p99 is 22.17 / 200.67 ms, but all samples remain in the gate. Chromium has three post-stall discrepancies; detailed audit rows show 64 active ranges against zero receipt-eligible onsets in each selected frame. These remain unresolved, not acceptable limitations.
+- The canonical raw files are under `design-docs/specs/evidence/canvas-cutover/run-001/`; the measure JSONL files are each below the 8 MB source snapshot cap. Full phase distributions and exact TASK-511 overlap counts are calculated before serialization; the JSONL retains phase spans >=50 ms and omits only shorter supplemental phase rows.
+- The indexed sync aggregation keeps canonical analysis bounded. The periodic-capture attempt `s291-run-001-periodic.log` was stopped after 24 minutes in quadratic aggregation; earlier source-matched failed runs remain in this evidence directory.
+
+The implementation records pre-edit intent and fresh file hashes in `s291-intent-*.json`
+under `tmp/canvas-cutover/evidence/`. Earlier checks exposed and then resolved the missing
+test-module type and raw evidence retention issues; their prior logs remain in the same
+evidence directory. Measure JSONL files are under the 8 MB source snapshot cap. No source file
+reached 1,000 lines. No Rust source changed.
+
+**TASK-602 disposition**: S is not triggered: text-work, input and frame p95 pass, and syntax is not attributed as the dominant late-frame cause. F is not triggered: although each browser has 11 tick gaps over the 120 ms lookahead, exact phase attribution found zero overlaps with spans over 50 ms (`run-001/summary.json`). No Worker file or design amendment was created.
+
+**Remaining work**: TASK-601 acceptance remains incomplete until sync p99 and Chromium's post-stall active-set/receipt-timing discrepancy are resolved and a canonical run passes. Beat drift passes both browsers. Current phase attribution does not authorize a tick Worker; investigate the measured failures within this plan's write paths and use selective redispatch or a serial plan amendment if ownership requires it. Formal review, closeout archival/index updates, closeout gates, commit and push remain downstream workflow work.
+
+### Session: 2026-10-07 (session 291 source-matched instrumentation re-measure)
+
+**Tasks Completed**: Added callback execution timestamps to perf-hook presented rows and used
+them only for post-stall receipt eligibility; kept RAF timestamps for synchronization math.
+Dropped-frame sample counts now include the gap before the first active presented frame as well
+as the following interval. Added regressions for both cases. Rebuilt the release editor bundle
+before the canonical run; the earlier same-node run that used the pre-existing `editor/dist`
+bundle is retained as diagnostic history and is not final-source evidence.
+
+**Final-source verification**:
+
+- `cd editor && ./node_modules/.bin/vitest run test/e2e/stats.test.ts`: 37/37, exit 0
+  (`tmp/canvas-cutover/evidence/s291-final-instrumentation-focused.log`).
+- `cd editor && npm run check`: exit 0
+  (`tmp/canvas-cutover/evidence/s291-final-instrumentation-check.log`).
+- `cd editor && ./node_modules/.bin/vitest run`: 800/800, exit 0
+  (`tmp/canvas-cutover/evidence/s291-final-instrumentation-vitest.log`).
+- `cd editor && npm run test:style`: 4/4, exit 0
+  (`tmp/canvas-cutover/evidence/s291-final-instrumentation-style.log`).
+- `cd editor && npm run test:perf` (alone): 1/1, exit 0, ratio 2.66
+  (`tmp/canvas-cutover/evidence/s291-final-instrumentation-perf.log`).
+- `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`: exit 0
+  (`tmp/canvas-cutover/evidence/s291-final-instrumentation-build.log`); emitted JS contains
+  the callback timestamp instrumentation.
+- `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`:
+  runner exit 1, not blocked (`tmp/canvas-cutover/evidence/s291-final-bundle-e2e.log`). Both
+  browser behavior suites pass 18/18. Release wasm is verified with name section and no DWARF;
+  each silent sink was installed before first connect, direct destination connections are 0,
+  post-sink peak is 0 and workload peak is -13.00 dBFS. Input, frame and text p95 pass in both.
+  Sync p99 is 157.422 ms Chromium / 155.667 ms WebKit against the 50 ms gate; WebKit beat drift
+  is 1.50 ms against the 1 ms gate. Post-stall active-set mismatches are 0 in both browsers.
+  These measurement failures remain unresolved; no threshold or workload changed.
+- `git diff --check`: exit 0 (`tmp/canvas-cutover/evidence/s291-final-diff-check.log`).
+
+The source-matched raw records are in `design-docs/specs/evidence/canvas-cutover/run-001/`;
+the evidence document's comparison table and failure triage use this run. Each browser recorded
+11 tick-start gaps above 120 ms, but zero overlaps with main-thread spans over 50 ms. TASK-602
+therefore records F as not triggered. TASK-601 remains unchecked. No Rust source changed and no
+source file reached 1,000 lines.
+
+**Remaining work**: Resolve the sync p99 and WebKit beat-drift gates without relabeling failures
+as limitations, then produce a passing canonical run. Formal review, closeout archival/index
+updates, final closeout gates, commit and non-force push remain downstream workflow work.
+
+**Current sync attribution**: the WebKit `syncAbsMsNoDrop.p99` remains 125.333 ms. The two
+no-drop samples above 50 ms are at audio times 190 s and 243 s (`webkit-measure.jsonl:25087`
+and `:25140`); both onset receipts and first active frames occur immediately after the explicit
+250 ms main-thread stalls (`measure.mjs:56`). These are real late visual updates, not a formula
+artifact. Their adjacent presented-frame intervals are only 6–11 ms, so the local dropped-frame
+counter labels them as no-drop even though the preceding stall audit is present (`:25166` and
+`:25171`). Sync remains gated across every sample by design section 15.3.8.14; do not filter
+these samples or change thresholds/workload. The synthetic stall is not represented among the
+named input/frame/upload phase spans, so the strict F overlap criterion remains unmet in the
+current evidence. Keep TASK-601 incomplete and route any changed escalation/design disposition
+through the serial plan-author step before implementing a Worker.

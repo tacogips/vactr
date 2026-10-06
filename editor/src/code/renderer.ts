@@ -6,6 +6,7 @@ import { ResourceLedger, effectiveSize, RESOURCE_LIMITS, type Reservation } from
 import type { PhaseTimer } from './frame';
 import { FALLBACK_PALETTE, rgbaCss, type Palette } from './palette';
 import { CLIP_GUTTER, UNTINTED, InstanceWriter, LayerBuffer, VERTEX_SOURCE, FRAGMENT_SOURCE, type GeometryLayer } from './geometry';
+import { SegmentCache, MAX_TEXT_BLOCKS, type SegmentKey } from './segments';
 
 export interface GpuStatus {
   kind: 'ready' | 'degraded' | 'unavailable' | 'context-lost'; message: string;
@@ -35,7 +36,7 @@ export const GPU_TOKEN_COLORS: Readonly<Record<string, string>> = Object.freeze(
 /** GPU presentation only. Mount/input owns editing, callbacks, scrolling and frame scheduling. */
 export class CanvasRenderer {
   readonly ledger: ResourceLedger;
-  readonly stats = { frames: 0, textBuilds: 0, bufferUploads: 0, drawCalls: 0, lastFrameDraws: 0, decodedTextInstances: 0 };
+  readonly stats = { frames: 0, textBuilds: 0, gutterBuilds: 0, bufferUploads: 0, geometryBytes: 0, slotTableBytes: 0, compactions: 0, drawCalls: 0, lastFrameDraws: 0, decodedTextInstances: 0 };
   private gl: WebGL2RenderingContext | null;
   private atlas: GlyphAtlas | null = null;
   private program: WebGLProgram | null = null;
@@ -51,6 +52,7 @@ export class CanvasRenderer {
   private requestedDpr = 1;
   private labels = new Map<string, ShapedRun>();
   private textCommands: DrawCommand[] | null = null;
+  private textLayerDirty = true;
   private cacheKey = '';
   private textureGeneration = 0;
   private seenEvictions = 0;
@@ -59,9 +61,26 @@ export class CanvasRenderer {
   private currentSlot = 0;
   private writers = new Map<GeometryLayer, InstanceWriter>(LAYERS.map(layer => [layer, new InstanceWriter()]));
   private layerBuffers = new Map<GeometryLayer, LayerBuffer>();
+  private backgroundKey = '';
+  private backgroundStaticCount = 0;
+  private overlayKey = '';
+  private readonly segments = new SegmentCache<DrawCommand[]>();
+  private readonly pendingSegments = new Set<string>();
+  private readonly gutterIdentities = new Map<number, readonly ShapedRun[]>();
+  private readonly lineNumbersByRuns = new WeakMap<object, number>();
+  private readonly shiftedGutterIdentities = new WeakMap<object, readonly ShapedRun[]>();
+  private readonly lineSlots = new WeakMap<object, number>();
+  private readonly slotOwners = new Map<number, object>();
+  private readonly liveSlots = new Map<number, string>();
+  private readonly freeSlots: number[] = [];
+  private nextSlot = 1;
+  private uploadedText = new Uint8Array();
+  private textHighWaterBlocks = 0;
+  private atlasGenerationSeen = -1;
   private cornerBuffer: WebGLBuffer | null = null;
   private slotTexture: WebGLTexture | null = null;
   private pendingText = false;
+  private currentSegmentPending = false;
   private textRevisionCounter = 0;
   private visibleLines: ShapedLine[] = [];
   private pendingStartLine = 0;
@@ -100,8 +119,8 @@ export class CanvasRenderer {
   get textPending(): boolean { return this.pendingText; }
   get atlasStats(): Readonly<{ uploads: number; hits: number; evictions: number }> { return this.atlas?.stats ?? { uploads: 0, hits: 0, evictions: 0 }; }
   setPhases(phases: PhaseTimer | null): void { this.layout.phases = phases; }
-  setDocument(text: string): void { this.layout.setDocument(text); this.textRevisionCounter++; this.clearDrawCache(); }
-  setText(doc: Text): void { this.layout.setText(doc); this.textRevisionCounter++; this.clearDrawCache(); }
+  setDocument(text: string): void { this.layout.setDocument(text); this.textRevisionCounter++; this.clearFrameCache(); }
+  setText(doc: Text): void { this.layout.setText(doc); this.textRevisionCounter++; this.clearFrameCache(); }
   setPalette(palette: Palette): void { this.palette = palette; this.clearDrawCache(); }
   setViewport(view: LayoutViewport, dpr = 1): void {
     if (![view.width, view.height, view.scrollLeft, view.scrollTop, view.left ?? 0, view.top ?? 0, view.gutter ?? 48].every(Number.isFinite) || view.width <= 0 || view.height <= 0 || view.scrollLeft < 0 || view.scrollTop < 0 || dpr <= 0 || !Number.isFinite(dpr)) throw new RangeError('Invalid viewport');
@@ -135,7 +154,7 @@ export class CanvasRenderer {
       const corner = gl.getAttribLocation(this.program, 'a_corner'); gl.enableVertexAttribArray(corner); gl.vertexAttribPointer(corner, 2, gl.FLOAT, false, 0, 0);
       for (const layer of LAYERS) {
         const buffer = gl.createBuffer(); if (!buffer) throw new Error('Layer buffer allocation failed');
-        this.layerBuffers.set(layer, new LayerBuffer(gl, this.ledger, buffer));
+        this.layerBuffers.set(layer, new LayerBuffer(gl, this.ledger, buffer, layer === 'text' ? MAX_TEXT_BLOCKS * 2048 : Number.MAX_SAFE_INTEGER));
       }
       const stride = 32;
       const attrs: Array<[string, number, number, number]> = [['a_rect', 4, gl.FLOAT, 0], ['a_uv', 4, gl.UNSIGNED_SHORT, 16], ['a_color', 4, gl.UNSIGNED_BYTE, 24]];
@@ -179,10 +198,13 @@ export class CanvasRenderer {
   render(feedback: RenderFeedback = {}): boolean {
     if (this.disposed || this.lost || !this.gl || !this.program || !this.atlas) return false;
     try {
-      if (this.atlas.stats.evictions !== this.seenEvictions) { this.textureGeneration++; this.seenEvictions = this.atlas.stats.evictions; }
       if (!this.target) this.resize(this.requestedDpr);
       const gl = this.gl; this.atlas.beginFrame(); this.pendingText = false;
-      for (const writer of this.writers.values()) writer.clear();
+      if (this.atlas.stats.evictions !== this.seenEvictions) { this.textureGeneration++; this.seenEvictions = this.atlas.stats.evictions; }
+      if (this.atlasGenerationSeen !== this.atlas.stats.generation) {
+        this.atlasGenerationSeen = this.atlas.stats.generation;
+        this.segments.clear(); this.pendingSegments.clear(); this.textHighWaterBlocks = 0; this.uploadedText = new Uint8Array(); this.textLayerDirty = true;
+      }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindVertexArray(this.vao); gl.useProgram(this.program);
       gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -193,40 +215,51 @@ export class CanvasRenderer {
       const staticAnnotations = annotations.filter(a => a.kind !== 'playing' && a.kind !== 'eval');
       const syntaxKey = staticAnnotations.filter(a => a.kind === 'syntax').map(a => `${a.from}:${a.to}:${a.className ?? ''}`).join(';');
       const key = `${feedback.textRevision ?? this.textRevisionCounter}|${this.view.width},${this.view.height},${this.view.scrollLeft},${this.view.scrollTop},${this.view.left ?? 0},${this.view.top ?? 0},${this.view.gutter ?? 48}|${this.scale}|${this.layout.font.generation ?? 0}|${this.atlas.stats.generation}|${syntaxKey}`;
+      const viewportKey = `${this.view.width},${this.view.height},${this.view.scrollLeft},${this.view.scrollTop},${this.view.left ?? 0},${this.view.top ?? 0},${this.view.gutter ?? 48}|${this.scale}|${this.layout.font.generation ?? 0}|${this.atlas.stats.generation}`;
+      const selectionKey = staticAnnotations.filter(a => a.kind === 'selection').map(a => `${a.from}:${a.to}`).join(';');
+      const backgroundKey = `${viewportKey}|${feedback.textRevision ?? this.textRevisionCounter}|${feedback.annotationsRevision ?? 0}|${selectionKey}`;
+      const handlesKey = (feedback.handles ?? []).map(handle => `${handle.pos}:${handle.end ? 1 : 0}`).join(',');
+      const overlayKey = `${backgroundKey}|${feedback.annotationsRevision ?? 0}|${feedback.cursor ?? ''}|${feedback.cursorVisible !== false}|${handlesKey}`;
+      const backgroundStaticDirty = this.backgroundKey !== backgroundKey;
+      const overlayDirty = this.overlayKey !== overlayKey;
+      for (const [layer, writer] of this.writers) {
+        if (layer === 'text') continue;
+        if (layer === 'background') {
+          if (backgroundStaticDirty) writer.clear(); else writer.setCount(this.backgroundStaticCount);
+        } else if (overlayDirty) writer.clear();
+      }
       const rebuildText = this.textCommands === null || this.cacheKey !== key;
       this.currentLayer = 'background';
-      this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
+      if (backgroundStaticDirty) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
       if (rebuildText) {
-        this.visibleLines = this.layout.visible(this.view);
-        this.writeSlots(this.visibleLines);
-        this.textCommands = []; this.collecting = this.textCommands; this.currentLayer = 'text';
-        for (let offset = 0; offset < this.visibleLines.length; offset++) {
-          const index = (this.pendingStartLine + offset) % Math.max(1, this.visibleLines.length);
-          const line = this.visibleLines[index]!; this.currentLineIndex = index; this.currentSlot = index + 1;
-          for (const run of line.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x - this.view.scrollLeft, 0, staticAnnotations);
-        }
-        this.currentSlot = 0;
-        for (const line of this.visibleLines) this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, line.number * this.layout.font.lineHeight - this.view.scrollTop, [], rgbaCss(this.palette.gutter), true);
-        this.collecting = null; this.stats.textBuilds++;
+        const lineHeight = this.layout.font.lineHeight;
+        const overscan = Math.ceil(this.view.height / lineHeight) * lineHeight;
+        const overscanTop = Math.max(0, this.view.scrollTop - overscan);
+        const overscanBottom = this.view.scrollTop + this.view.height + overscan;
+        this.visibleLines = this.layout.visible({ ...this.view, scrollTop: overscanTop, height: overscanBottom - overscanTop });
+        this.rebuildTextSegments(staticAnnotations);
         if (!this.pendingText) { this.cacheKey = key; this.pendingStartLine = 0; }
         else this.cacheKey = '';
-        this.stats.bufferUploads++;
       }
-      for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.12, 0.22, 0.32, 0.55]);
+      this.currentLayer = 'background';
+      if (backgroundStaticDirty) {
+        for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.12, 0.22, 0.32, 0.55]);
+        this.backgroundStaticCount = this.writers.get('background')!.count;
+        this.backgroundKey = backgroundKey;
+      }
       for (const a of [...annotations, ...(feedback.animated ?? [])]) if (a.kind === 'playing' || a.kind === 'eval') {
         const color = a.kind === 'playing' ? [0.35, 0.29, 0.13, 0.5] : a.className?.includes('error') ? [0.4, 0.12, 0.16, 0.5] : [0.2, 0.32, 0.36, 0.5];
         for (const r of this.animatedRects(a)) this.quad(this.local(r), color);
       }
-      for (const command of this.textCommands ?? []) this.replay(command);
       this.currentLayer = 'overlay';
-      for (const a of staticAnnotations) {
+      if (overlayDirty) for (const a of staticAnnotations) {
         if (a.kind === 'diagnostic' || a.kind === 'composition') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 2 }), a.kind === 'diagnostic' ? this.palette.diagnostic : this.palette.composition);
         if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), this.palette.callHead);
       }
-      if (feedback.cursorVisible !== false && feedback.cursor != null) {
+      if (overlayDirty && feedback.cursorVisible !== false && feedback.cursor != null) {
         const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.quad(this.local(r), this.palette.cursor);
       }
-      for (const a of staticAnnotations) {
+      if (overlayDirty) for (const a of staticAnnotations) {
         if (a.kind === 'binding' && a.label) {
           const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
           const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
@@ -236,12 +269,13 @@ export class CanvasRenderer {
         }
       }
       this.currentLayer = 'overlay';
-      for (const handle of feedback.handles ?? []) {
+      if (overlayDirty) for (const handle of feedback.handles ?? []) {
         const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
         const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
         this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, this.palette.handle);
       }
-      this.collecting = null; this.flushLayers();
+      if (overlayDirty) this.overlayKey = overlayKey;
+      this.collecting = null; this.flushLayers(backgroundStaticDirty, overlayDirty);
       this.stats.frames++;
       if (this.visibleLines.some(line => line.rtlUnsupported)) this.report('degraded', 'Mixed RTL hit testing is unsupported'); else this.reportReady();
       this.atlas.endFrame();
@@ -274,21 +308,228 @@ export class CanvasRenderer {
   }
   private writeSlots(lines: readonly ShapedLine[]): void {
     if (lines.length + 1 > this.maxTextureSize) throw new Error('Visible line slot table exceeds texture limit');
-    const gl = this.gl!; const values = new Float32Array((lines.length + 1) * 2);
-    for (let i = 0; i < lines.length; i++) values[(i + 1) * 2 + 1] = lines[i]!.number * this.layout.font.lineHeight - this.view.scrollTop;
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.slotTexture);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, lines.length + 1, 1, gl.RG, gl.FLOAT, values);
+    const active = new Set<number>(), changed = new Map<number, [number, number]>();
+    for (const line of lines) {
+      const identity = line.runs as object;
+      let slot = this.lineSlots.get(identity);
+      if (slot !== undefined && this.slotOwners.get(slot) !== identity) {
+        this.lineSlots.delete(identity); slot = undefined;
+      }
+      if (slot === undefined) {
+        while (slot === undefined) {
+          const available = this.freeSlots.pop();
+          if (available === undefined) slot = this.nextSlot++;
+          else if (!this.slotOwners.has(available)) slot = available;
+        }
+        this.lineSlots.set(identity, slot); this.slotOwners.set(slot, identity);
+      }
+      active.add(slot);
+      if (slot >= Math.min(1024, this.maxTextureSize)) { this.pendingText = true; continue; }
+      const x = -this.view.scrollLeft, y = line.number * this.layout.font.lineHeight - this.view.scrollTop;
+      const position = `${x}:${y}`;
+      if (this.liveSlots.get(slot) !== position) {
+        changed.set(slot, [x, y]);
+        this.liveSlots.set(slot, position);
+      }
+    }
+    for (const slot of this.slotOwners.keys()) if (!active.has(slot)) {
+      if (this.liveSlots.has(slot)) changed.set(slot, [0, 0]);
+      this.liveSlots.delete(slot);
+      const owner = this.slotOwners.get(slot);
+      if (owner) this.lineSlots.delete(owner);
+      this.slotOwners.delete(slot); this.freeSlots.push(slot);
+    }
+    const slots = [...changed.keys()].sort((a, b) => a - b);
+    const gl = this.gl!; gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.slotTexture);
+    for (let at = 0; at < slots.length;) {
+      const start = slots[at]!; let end = at + 1;
+      while (end < slots.length && slots[end] === slots[end - 1]! + 1) end++;
+      const values = new Float32Array((end - at) * 2);
+      for (let index = at; index < end; index++) values.set(changed.get(slots[index]!)!, (index - at) * 2);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, start, 0, end - at, 1, gl.RG, gl.FLOAT, values);
+      this.stats.slotTableBytes += values.byteLength; at = end;
+    }
   }
-  private flushLayers(): void {
+  private styleHash(line: ShapedLine, styles: readonly CodeAnnotation[], from = line.from, to = line.to): string {
+    return styles.filter(a => a.kind === 'syntax' && a.from < to && a.to > from)
+      .map(a => `${Math.max(0, a.from - line.from)}:${Math.min(line.to, a.to) - line.from}:${a.className ?? ''}`).join(';');
+  }
+  private gutterIdentity(lineNumber: number): readonly ShapedRun[] {
+    let identity = this.gutterIdentities.get(lineNumber);
+    if (!identity) { identity = []; this.gutterIdentities.set(lineNumber, identity); }
+    return identity;
+  }
+  private rebuildTextSegments(styles: readonly CodeAnnotation[]): void {
+    const lineHeight = this.layout.font.lineHeight;
+    const visibleFirst = Math.floor(this.view.scrollTop / lineHeight);
+    const visibleLast = Math.ceil((this.view.scrollTop + this.view.height) / lineHeight);
+    const rows = this.visibleLines.map(line => {
+      const runs = line.runs, identity = runs as object;
+      const previousNumber = this.lineNumbersByRuns.get(identity);
+      this.lineNumbersByRuns.set(identity, line.number);
+      const chunks = this.layout.geometrySegments(line).filter(chunk => {
+        const first = chunk.runs[0], last = chunk.runs[chunk.runs.length - 1];
+        const from = first?.x ?? 0, to = last ? last.x + last.width : 0;
+        return to >= Math.max(0, this.view.scrollLeft - this.view.width) && from <= this.view.scrollLeft + this.view.width * 2;
+      });
+      const textKeys = chunks.map(chunk => {
+        const from = chunk.runs[0]?.from ?? line.from, last = chunk.runs[chunk.runs.length - 1];
+        const to = last?.to ?? line.to;
+        return { chunk, key: { runs, chunk: chunk.chunk, fontGeneration: this.layout.font.generation ?? 0,
+          dpr: this.scale, styleHash: this.styleHash(line, styles, from, to), atlasGeneration: this.textureGeneration } as SegmentKey };
+      });
+      let shiftedGutter = this.shiftedGutterIdentities.get(identity);
+      if (!shiftedGutter && previousNumber !== undefined && previousNumber !== line.number) {
+        shiftedGutter = runs; this.shiftedGutterIdentities.set(identity, shiftedGutter);
+      }
+      const gutterRuns = shiftedGutter ?? this.gutterIdentity(line.number);
+      const gutterKey: SegmentKey = { runs: gutterRuns, chunk: -1, fontGeneration: this.layout.font.generation ?? 0,
+        dpr: this.scale, styleHash: `gutter:${line.number + 1}`, atlasGeneration: this.textureGeneration };
+      return { line, identity, textKeys, gutterKey, canBuild: line.number >= visibleFirst && line.number < visibleLast };
+    });
+    const visibleNumbers = new Set(rows.map(row => row.line.number));
+    for (const number of this.gutterIdentities.keys()) if (!visibleNumbers.has(number)) this.gutterIdentities.delete(number);
+    const keep = new Set<string>();
+    for (const row of rows) { for (const { key } of row.textKeys) keep.add(this.segments.key(key)); keep.add(this.segments.key(row.gutterKey)); }
+    this.writeSlots(this.visibleLines);
+    const removed = this.segments.deleteOutside(keep);
+    if (removed.length) this.textLayerDirty = true;
+    const used = this.segments.usedBlocks;
+    if (used > 0 && this.segments.highWaterBlocks > 2 * used) {
+      this.segments.compact(); this.stats.compactions++; this.uploadedText = new Uint8Array();
+    }
+    const writer = this.writers.get('text')!; writer.clear();
+    for (let offset = 0; offset < rows.length; offset++) {
+      const index = (this.pendingStartLine + offset) % Math.max(1, rows.length), { line, identity, textKeys, gutterKey, canBuild } = rows[index]!;
+      const gutterId = this.segments.key(gutterKey);
+      if (this.pendingSegments.delete(gutterId)) this.segments.delete(gutterKey);
+      let gutter = this.segments.get(gutterKey);
+      if (!gutter && canBuild) {
+        this.currentSlot = this.lineSlots.get(identity)!; this.currentLayer = 'text'; this.collecting = []; this.currentSegmentPending = false;
+        this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, 0, [], rgbaCss(this.palette.gutter), true);
+        gutter = this.segments.set(gutterKey, this.collecting, 0) ?? undefined;
+        if (!gutter) this.pendingText = true;
+        else { this.stats.gutterBuilds++; if (this.currentSegmentPending) this.pendingSegments.add(gutterId); }
+      }
+      let gutterPacked = false;
+      for (let chunkIndex = 0; chunkIndex < textKeys.length; chunkIndex++) {
+        const { chunk, key: textKey } = textKeys[chunkIndex]!;
+        const textId = this.segments.key(textKey);
+        if (this.pendingSegments.delete(textId)) this.segments.delete(textKey);
+        let segment = this.segments.get(textKey);
+        if (!segment && canBuild) {
+          this.currentLineIndex = index; this.currentSlot = this.lineSlots.get(identity)!;
+          this.currentLayer = 'text'; this.collecting = []; this.currentSegmentPending = false;
+          const oldWidth = this.view.width;
+          this.view.width = Math.max(oldWidth, (this.view.gutter ?? 48) + line.width + 8);
+          const from = chunk.runs[0]?.from ?? line.from, last = chunk.runs[chunk.runs.length - 1];
+          const to = last?.to ?? line.to;
+          const chunkStyles = styles.filter(style => style.kind !== 'syntax' || (style.from < to && style.to > from));
+          for (const run of chunk.runs) this.drawRun(run, (this.view.gutter ?? 48) + run.x, 0, chunkStyles);
+          this.view.width = oldWidth;
+          const built = this.segments.set(textKey, this.collecting, 0);
+          this.collecting = null;
+          if (!built) this.pendingText = true;
+          segment = built ?? undefined;
+          if (built) {
+            this.stats.textBuilds++;
+            if (this.currentSegmentPending) this.pendingSegments.add(textId);
+          }
+        }
+        if (!segment) continue;
+        const commands = chunkIndex === 0 ? [...segment.value, ...(gutter?.value ?? [])] : segment.value;
+        if (!this.segments.ensureBlocks(textKey, Math.max(1, Math.ceil(commands.length / 64)))) { this.pendingText = true; continue; }
+        let wroteAllCommands = true;
+        for (let commandIndex = 0; commandIndex < commands.length; commandIndex++) {
+          const command = commands[commandIndex]!;
+          const block = segment.blocks[Math.floor(commandIndex / 64)];
+          if (block === undefined) { this.pendingText = true; wroteAllCommands = false; break; }
+          const gutterCommand = chunkIndex === 0 && commandIndex >= segment.value.length;
+          const rect = gutterCommand
+            ? { ...command.rect, left: command.rect.left + this.view.scrollLeft, right: command.rect.right + this.view.scrollLeft }
+            : command.rect;
+          writer.pushAt(block * 64 + commandIndex % 64, rect,
+            command.uv ?? [0, 0, 2 / this.atlas!.dimensions[0], 2 / this.atlas!.dimensions[1]],
+            command.color as [number, number, number, number], this.lineSlots.get(identity)!, command.flags);
+        }
+        if (chunkIndex === 0 && gutter && wroteAllCommands) gutterPacked = true;
+      }
+      if (gutter && gutter.value.length > 0 && !gutterPacked) {
+        if (!this.segments.ensureBlocks(gutterKey, Math.max(1, Math.ceil(gutter.value.length / 64)))) this.pendingText = true;
+        else for (let commandIndex = 0; commandIndex < gutter.value.length; commandIndex++) {
+          const command = gutter.value[commandIndex]!;
+          const block = gutter.blocks[Math.floor(commandIndex / 64)];
+          if (block === undefined) { this.pendingText = true; break; }
+          const rect = { ...command.rect, left: command.rect.left + this.view.scrollLeft, right: command.rect.right + this.view.scrollLeft };
+          writer.pushAt(block * 64 + commandIndex % 64, rect,
+            command.uv ?? [0, 0, 2 / this.atlas!.dimensions[0], 2 / this.atlas!.dimensions[1]],
+            command.color as [number, number, number, number], this.lineSlots.get(identity)!, command.flags);
+        }
+      }
+      this.collecting = null;
+    }
+    const blocks = Math.min(MAX_TEXT_BLOCKS, this.segments.highWaterBlocks);
+    writer.setCount(blocks * 64); this.textHighWaterBlocks = blocks;
+    const next = writer.bytes();
+    const previous = this.uploadedText;
+    const layer = this.layerBuffers.get('text')!;
+    const totalBlocks = Math.max(Math.ceil(previous.length / 2048), Math.ceil(next.length / 2048));
+    let block = 0;
+    while (block < totalBlocks) {
+      const offset = block * 2048;
+      const a = previous.subarray(offset, offset + 2048), b = next.subarray(offset, offset + 2048);
+      if (a.length === b.length && a.every((value, i) => value === b[i])) { block++; continue; }
+      const start = block++;
+      while (block < totalBlocks) {
+        const nextOffset = block * 2048, before = previous.subarray(nextOffset, nextOffset + 2048), after = next.subarray(nextOffset, nextOffset + 2048);
+        if (before.length === after.length && before.every((value, i) => value === after[i])) break;
+        block++;
+      }
+      const end = block * 2048, data = new Uint8Array(end - start * 2048);
+      data.set(next.subarray(start * 2048, end));
+      layer.uploadRange(start * 2048, data); this.stats.bufferUploads++; this.stats.geometryBytes += data.byteLength; this.textLayerDirty = true;
+    }
+    this.uploadedText = next.slice();
+    this.textCommands = [];
+    this.stats.decodedTextInstances = writer.count;
+    if (!this.pendingText) this.textLayerDirty = false;
+  }
+  private invalidateSegments(): void {
+    this.segments.clear(); this.pendingSegments.clear(); this.liveSlots.clear();
+    for (const [slot, owner] of this.slotOwners) {
+      this.lineSlots.delete(owner); this.freeSlots.push(slot);
+    }
+    this.slotOwners.clear();
+    this.uploadedText = new Uint8Array(); this.textHighWaterBlocks = 0;
+  }
+  private flushLayers(backgroundStaticDirty: boolean, overlayDirty: boolean): void {
     const gl = this.gl!;
     const drawStart = this.stats.drawCalls;
     gl.uniform1f(this.locations.u_gutter, (this.view.gutter ?? 48));
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.slotTexture);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.atlas!.texture);
     for (const layer of LAYERS) {
-      const writer = this.writers.get(layer)!; if (!writer.count) continue;
+      const writer = this.writers.get(layer)!;
+      if (!writer.count) {
+        if (layer === 'text' && this.textLayerDirty) this.textLayerDirty = false;
+        continue;
+      }
       const buffer = this.layerBuffers.get(layer)!.buffer;
-      this.layerBuffers.get(layer)!.upload(writer.bytes());
+      if (layer === 'background') {
+        if (backgroundStaticDirty) this.layerBuffers.get(layer)!.upload(writer.bytes());
+        else if (writer.count > this.backgroundStaticCount) this.layerBuffers.get(layer)!.uploadRange(
+          this.backgroundStaticCount * 32, writer.bytes().subarray(this.backgroundStaticCount * 32));
+      } else if (layer === 'overlay' || layer === 'overlayText') {
+        if (overlayDirty) this.layerBuffers.get(layer)!.upload(writer.bytes());
+      } else if (this.textLayerDirty) {
+        this.layerBuffers.get(layer)!.upload(writer.bytes());
+      }
+      if (layer === 'text' && this.textLayerDirty) {
+        if (layer === 'text') {
+          this.stats.bufferUploads++;
+          this.textLayerDirty = false;
+        }
+      }
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       const stride = 32;
       for (const [name, size, type, normalized, offset] of [['a_rect', 4, gl.FLOAT, false, 0], ['a_uv', 4, gl.UNSIGNED_SHORT, true, 16], ['a_color', 4, gl.UNSIGNED_BYTE, true, 24]] as const) {
@@ -331,7 +572,7 @@ export class CanvasRenderer {
         const cell = atlas.cell({ kind: emoji ? 'color' : 'mask', text: cluster.text, font: this.layout.font, dpr: this.scale, width: cluster.width });
         if (!cell) {
           if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length);
-          this.pendingText = true; continue;
+          this.pendingText = true; this.currentSegmentPending = true; continue;
         }
         const flags = (gutter ? 0 : CLIP_GUTTER) | (emoji ? UNTINTED : 0);
         const cssPad = cell.pad / this.scale;
@@ -360,7 +601,7 @@ export class CanvasRenderer {
         const width = Math.min(step, segmentTo - offset, visibleTo - offset);
         if (width <= 0) break;
         const cell = atlas.cell({ kind: 'run', text: run.text, run, piece: { from: offset, to: offset + width }, chunkX: offset, font: this.layout.font, dpr: this.scale, width });
-        if (!cell) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; offset += width; continue; }
+        if (!cell) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; this.currentSegmentPending = true; offset += width; continue; }
         const cssPad = cell.pad / this.scale, flags = gutter ? 0 : CLIP_GUTTER;
         this.quad({ left: x + offset - cssPad, right: x + offset + width + cssPad, top: y, bottom: y + this.layout.font.lineHeight }, parseCssColor(tint), atlas.texture,
           [cell.u0, cell.v0, cell.u1, cell.v1], flags);
@@ -380,7 +621,11 @@ export class CanvasRenderer {
     if (changed) this.options.onStatus?.(this.statusValue);
   }
   private fail(error: unknown): void { this.clearDrawCache(); this.releaseGpu(false); this.report('unavailable', error instanceof Error ? error.message : String(error)); }
-  private clearDrawCache(): void { this.textCommands = null; this.cacheKey = ''; this.collecting = null; this.visibleLines = []; }
+  private clearFrameCache(): void { this.textCommands = null; this.cacheKey = ''; this.collecting = null; this.visibleLines = []; }
+  private clearDrawCache(): void {
+    this.clearFrameCache(); this.invalidateSegments(); this.textLayerDirty = true;
+    this.backgroundKey = ''; this.backgroundStaticCount = 0; this.overlayKey = '';
+  }
   private releaseGpu(lost: boolean): void {
     this.clearDrawCache();
     const gl = this.gl;

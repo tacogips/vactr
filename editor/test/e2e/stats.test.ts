@@ -12,11 +12,13 @@ interface StatsModule {
   attributeWorkloadOnsets(rows: Array<{ receivedMs:number; [key:string]:unknown }>, baselineKeys: Set<string>, clickMs:number): { workload:Array<unknown>; count:number; excludedBaseline:number; excludedPreClick:number };
   splitSinkOnsets(times:number[], ctxTime:number): { control:number; workload:number };
   syncWindow(onsets:Array<{time:number;end:number}>,presented:Array<{audibleTime:number}>): {windowStart:number|null;windowEnd:number|null;empty:boolean};
-  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number;nominalMs?:number}): {sync:number[];samples:Array<{time:number;epoch:string|null;frameIndex:number;value:number;droppedFrames:number}>;duplicateSamples:number;droppedFrameSamples:number;droppedFrames:number;earlyFlashCount:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
+  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number;nominalMs?:number}): {sync:number[];samples:Array<{time:number;epoch:string|null;frameIndex:number;value:number;droppedFrames:number;onset:{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number};frame:{frameMs:number;targetMs:number;audibleTime:number;epoch:string|null;activeKey:string};previousFrameMs:number|null;nextFrameMs:number}>;duplicateSamples:number;droppedFrameSamples:number;droppedFrames:number;earlyFlashCount:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
   lateActiveMismatches(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number}>,stalls:number[]): number;
+  lateActiveMismatchDetails(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;executionMs?:number}>,stalls:number[]):Array<{stallFrameMs:number;frameMs:number;executionMs:number;audibleTime:number;epoch:string|null;activeKey:string;expectedRanges:string[];actualRanges:string[];missingRanges:string[];extraRanges:string[];eligibleOnsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>;overlappingOnsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number;eligible:boolean}>;mismatch:boolean}>;
   rankSelfTime(profile:Record<string,unknown>,top?:number):Array<{functionName:string;url:string;line:number;selfMs:number;share:number}>;
   classifyWithControl(metricKey:string,path:string,productValue:number,controlValue:number,threshold:number):'pass'|'fail'|'limitation';
   phaseSummary(rows:number[][]):Record<string,{spans:number;p50:number|null;p95:number|null;p99:number|null;totalMs:number}>;
+  tickStarvationEvidence(rows:number[][], options?:{lookaheadMs?:number;longSpanMs?:number}):{tickStartCount:number;tickStartGapsOverLookahead:number;maxTickStartGapMs:number;mainThreadSpansOverThreshold:number;starvationOverlaps:number;overlaps:Array<{startMs:number;endMs:number;durationMs:number;span:{phase:number;startMs:number;durationMs:number}}>};
 }
 const spec: string = '../../test/e2e/stats.mjs';
 const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
@@ -94,7 +96,9 @@ describe('canvas evidence statistics', () => {
     expect(result.sync).toHaveLength(1);
     expect(result.samples).toHaveLength(1);
     expect(result.duplicateSamples).toBe(63);
-    expect(result.samples[0]).toMatchObject({time:0.2,epoch:'e',frameIndex:0,droppedFrames:0});
+    expect(result.samples[0]).toMatchObject({time:0.2,epoch:'e',frameIndex:0,droppedFrames:0,
+      onset:{time:0.2,end:0.3,from:0,to:1,epoch:'e'},
+      frame:{frameMs:200,targetMs:200,audibleTime:0.2,activeKey:active},nextFrameMs:216.7});
   });
   it('keeps distinct first presented frames and distinct onset times as separate samples', () => {
     const voices=Array.from({length:64},(_,i)=>({time:0.2,end:0.3,from:i*2,to:i*2+1,epoch:'e'}));
@@ -141,6 +145,17 @@ describe('canvas evidence statistics', () => {
     expect(stats.attributeSync(onset,medianRows).samples[0].droppedFrames).toBe(2);
     expect(stats.attributeSync(onset,[]).samples).toEqual([]);
   });
+  it('attributes a stall gap before the first active frame to that sync sample', () => {
+    const onsets=[{time:0,end:0.1,from:100,to:101,epoch:'e'},{time:0.2,end:0.3,from:1,to:2,epoch:'e'}];
+    const rows=[
+      {audibleTime:0.1,activeKey:'',epoch:'e',frameMs:100,targetMs:100},
+      {audibleTime:0.2,activeKey:'1-2',epoch:'e',frameMs:200,targetMs:200},
+      {audibleTime:0.2167,activeKey:'1-2',epoch:'e',frameMs:216.7,targetMs:216.7},
+    ];
+    const result=stats.attributeSync(onsets,rows,{nominalMs:16.7});
+    expect(result.samples[0]).toMatchObject({previousFrameMs:100,droppedFrames:5});
+    expect(result).toMatchObject({droppedFrames:5,droppedFrameSamples:1});
+  });
   it('tightens textWork to 8 ms while recording non-gating targets', () => {
     const over=stats.evaluate({metrics:{...passingMetrics,textWorkMs:{p95:8.1}}});
     const equal=stats.evaluate({metrics:{...passingMetrics,textWorkMs:{p95:8.0}}});
@@ -156,7 +171,7 @@ describe('canvas evidence statistics', () => {
   it('keeps every non-text-work threshold unchanged', () => {
     expect(stats.THRESHOLDS).toEqual({inputP95Ms:50,inputP99Ms:100,animationWorkP50Ms:4,animationWorkP95Ms:8,animationWorkP99Ms:16.7,textWorkP95Ms:8,frameIntervalP95Ms:20,frameIntervalP99Ms:50,syncAbsP95Ms:33.4,syncAbsP99Ms:50,earlyFlashMs:2,ledgerMiB:96,heapGrowthMiB:8,lateBeatDriftMs:1});
   });
-  it('counts an early frame, an expired frame, and an epoch mismatch once each', () => {
+  it('counts covered early and expired frames while excluding unknown epochs', () => {
     const onsets=Array.from({length:9},(_,i)=>({time:i*0.25,end:i*0.25+0.2,from:1,to:2,epoch:'e'}));onsets.push({time:1,end:1.4,from:5,to:7,epoch:'e'});
     const rows=[
       {audibleTime:0.99,activeKey:'5-7',epoch:'e',frameMs:990,targetMs:990},
@@ -165,8 +180,8 @@ describe('canvas evidence statistics', () => {
       {audibleTime:1.42,activeKey:'5-7',epoch:'e',frameMs:1420,targetMs:1420},
     ];
     const result=stats.attributeSync(onsets,rows);
-    expect(result.earlyFlashCount).toBe(4);expect(result.replayedFlashCount).toBe(1);
-    expect(result.framePairs).toBe(5);
+    expect(result.earlyFlashCount).toBe(3);expect(result.replayedFlashCount).toBe(1);
+    expect(result.framePairs).toBe(4);
   });
   it('reports disjoint and evicted windows without false flash counts', () => {
     const onsets=[{time:0,end:1,from:5,to:7,epoch:'e'}];
@@ -187,6 +202,60 @@ describe('canvas evidence statistics', () => {
     const rows=[{audibleTime:3.4,activeKey:'1-2',epoch:'e',frameMs:3400},{audibleTime:3.5,activeKey:'1-2,8-9',epoch:'e',frameMs:3500}];
     expect(stats.lateActiveMismatches(onsets,rows,[3300])).toBe(0);
     expect(stats.lateActiveMismatches(onsets,rows,[3500])).toBe(1);
+    expect(stats.lateActiveMismatchDetails(onsets,rows,[3500])[0]).toMatchObject({
+      stallFrameMs:3500,frameMs:3500,audibleTime:3.5,expectedRanges:['1-2'],
+      actualRanges:['1-2','8-9'],missingRanges:[],extraRanges:['8-9'],mismatch:true,
+    });
+  });
+  it('does not expect an onset before its receipt but checks it on later frames', () => {
+    const onsets=[0,0.5,1,1.5,2].map((time)=>({time,end:time+1,from:5,to:7,epoch:'e',receivedMs:time===2?3000:time*1000}));
+    const beforeReceipt={audibleTime:2.5,activeKey:'',epoch:'e',frameMs:2500};
+    const afterReceipt={audibleTime:2.6,activeKey:'',epoch:'e',frameMs:3100};
+    expect(stats.lateActiveMismatches(onsets,[beforeReceipt],[2500])).toBe(0);
+    expect(stats.lateActiveMismatches(onsets,[afterReceipt],[3100])).toBe(1);
+    expect(stats.lateActiveMismatchDetails(onsets,[afterReceipt],[3100])[0]).toMatchObject({
+      expectedRanges:['5-7'],actualRanges:[],eligibleOnsets:[expect.objectContaining({time:2,receivedMs:3000})],
+      overlappingOnsets:[expect.objectContaining({time:2,receivedMs:3000,eligible:true})],
+    });
+    const beforeAudit=stats.lateActiveMismatchDetails(onsets,[beforeReceipt,afterReceipt],[2500])[0];
+    expect(beforeAudit).toMatchObject({expectedRanges:[],overlappingOnsets:[expect.objectContaining({time:2,receivedMs:3000,eligible:false})]});
+  });
+  it('uses callback execution time when a playing receipt follows the RAF timestamp', () => {
+    const onsets=[0,0.5,1,1.5,2].map((time)=>({time,end:time+1,from:5,to:7,epoch:'e',receivedMs:time===2?2510:time*1000}));
+    const row={audibleTime:2.5,activeKey:'5-7',epoch:'e',frameMs:2500,executionMs:2520};
+    const audit=stats.lateActiveMismatchDetails(onsets,[row],[2500])[0];
+    expect(audit).toMatchObject({frameMs:2500,executionMs:2520,expectedRanges:['5-7'],actualRanges:['5-7'],mismatch:false,
+      overlappingOnsets:[expect.objectContaining({time:2,receivedMs:2510,eligible:true})]});
+  });
+  it('identifies only tick gaps overlapping a recorded long main-thread span', () => {
+    const rows=[
+      [6,0,0,0,0,0,0,0,1],
+      [5,50,0,0,0,0,0,80,0],
+      [6,200,0,0,0,0,0,0,1],
+      [4,500,0,0,0,0,0,60,0],
+      [6,310,0,0,0,0,0,0,1],
+    ];
+    expect(stats.tickStarvationEvidence(rows)).toMatchObject({
+      tickStartCount:3,tickStartGapsOverLookahead:1,maxTickStartGapMs:200,
+      mainThreadSpansOverThreshold:2,starvationOverlaps:1,
+      overlaps:[{startMs:0,endMs:200,durationMs:200,span:{phase:5,startMs:50,durationMs:80}}],
+    });
+    expect(stats.tickStarvationEvidence([[6,0,0,0,0,0,0,0,1],[6,10,0,0,0,0,0,0,1]])
+      .starvationOverlaps).toBe(0);
+  });
+  it('excludes telemetry retention holes while still checking covered frames and stalls', () => {
+    const onsets=[0,1,2,3,4,10,11,12,13,14].map((time)=>({time,end:time+0.8,from:5,to:7,epoch:'e'}));
+    const rows=[
+      {audibleTime:2.2,activeKey:'5-7',epoch:'e',frameMs:2200,targetMs:2200},
+      {audibleTime:7,activeKey:'5-7',epoch:'e',frameMs:7000,targetMs:7000},
+      {audibleTime:10.2,activeKey:'5-7',epoch:'e',frameMs:10200,targetMs:10200},
+    ];
+    const result=stats.attributeSync(onsets,rows);
+    expect(result).toMatchObject({framePairs:2,replayedFlashCount:0,coverageWindows:2,excludedFrames:1});
+    expect(stats.lateActiveMismatches(onsets,rows,[7000,10200])).toBe(0);
+    expect(stats.lateActiveMismatches(onsets,rows,[2200])).toBe(0);
+    const coveredMismatch=[...rows.slice(0,1),{...rows[0],audibleTime:2.9,frameMs:2900}];
+    expect(stats.lateActiveMismatches(onsets,coveredMismatch,[2900])).toBe(1);
   });
   it('ranks CPU self time and classifies WebKit headless limits conservatively', () => {
     const profile={nodes:[{id:1,callFrame:{functionName:'slow',url:'app.js',lineNumber:4}},{id:2,callFrame:{functionName:'fast',url:'app.js',lineNumber:8}}],samples:[1,2,1],timeDeltas:[6000,2000,2000]};

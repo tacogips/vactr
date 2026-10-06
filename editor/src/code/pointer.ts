@@ -1,7 +1,6 @@
 import type { CodeRect } from '../app/apis';
 import { CodeSurface } from './surface';
-import { boundary } from './accessibility';
-import { wordRange } from './keyboard';
+import { boundaryAt, wordRangeAt } from './keyboard';
 
 export interface SelectionHandle { pos: number; end: boolean }
 export interface NumericGesture { move(event: PointerEvent): void; end(cancelled: boolean): void }
@@ -81,7 +80,7 @@ export class PointerController {
       this.timer = setTimeout(() => {
         this.timer = null;
         if (this.gesture !== g || g.scrolling) return;
-        const range = wordRange(this.surface.state.doc.toString(), g.position);
+        const range = wordRangeAt(this.surface.state.doc, g.position);
         g.anchor = range.from; g.selecting = true;
         this.surface.dispatch({ selection: { anchor: range.from, head: range.to } }); this.capture(g.id); this.options.focus?.();
       }, 500);
@@ -92,7 +91,7 @@ export class PointerController {
       const line = this.surface.state.doc.lineAt(position);
       this.surface.dispatch({ selection: { anchor: line.from, head: Math.min(this.surface.state.doc.length, line.to + 1) } }); g.anchor = line.from;
     } else if (clicks === 2) {
-      const range = wordRange(this.surface.state.doc.toString(), position);
+      const range = wordRangeAt(this.surface.state.doc, position);
       this.surface.dispatch({ selection: { anchor: range.from, head: range.to } }); g.anchor = range.from;
     } else this.surface.dispatch({ selection: { anchor: g.anchor, head: position } });
   }
@@ -108,7 +107,7 @@ export class PointerController {
   }
   private select(g: Gesture): void {
     const pos = this.surface.posAtCoords({ x: g.x, y: g.y }); if (pos == null) return;
-    const head = boundary(this.surface.state.doc.toString(), pos);
+    const head = boundaryAt(this.surface.state.doc, pos);
     const s = this.surface.state.selection.main;
     this.surface.dispatch({ selection: g.handle === 'anchor' ? { anchor: head, head: s.head }
       : { anchor: g.handle === 'head' ? s.anchor : g.anchor, head } });

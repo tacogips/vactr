@@ -202,13 +202,13 @@ stop editing it and report. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] `attributeSync` emits one sample per (onset time, epoch, first presented frame); 64 voices on one frame -> 1 sample
-- [ ] `droppedFrames`, `droppedFrameSamples`, `duplicateSamples` and `samples` returned; `measure.mjs` reports `syncDroppedFrameSamples`, `syncDroppedFrames`, `syncDuplicateSamples`, `syncAbsMsNoDrop` and `targets`
-- [ ] `THRESHOLDS.textWorkP95Ms === 8`; every other threshold unchanged (guard row passes)
-- [ ] `TARGETS` exported and recorded without gating; `renderEvidence` rows updated
-- [ ] `git diff $BASE -- editor/test/e2e/stats.mjs` shows only `textWorkP95Ms` changed inside `THRESHOLDS`
-- [ ] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
-- [ ] Progress log updated
+- [x] `attributeSync` emits one sample per (onset time, epoch, first presented frame); 64 voices on one frame -> 1 sample
+- [x] `droppedFrames`, `droppedFrameSamples`, `duplicateSamples` and `samples` returned; `measure.mjs` reports `syncDroppedFrameSamples`, `syncDroppedFrames`, `syncDuplicateSamples`, `syncAbsMsNoDrop` and `targets`
+- [x] `THRESHOLDS.textWorkP95Ms === 8`; every other threshold unchanged (guard row passes)
+- [x] `TARGETS` exported and recorded without gating; `renderEvidence` rows updated
+- [x] `git diff $BASE -- editor/test/e2e/stats.mjs` shows only `textWorkP95Ms` changed inside `THRESHOLDS`
+- [x] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -228,3 +228,8 @@ stop editing it and report. Edit only this plan's progress log.
 - **Starting state.** Treat the 28ed027 edits as a draft. Check them line by line against
   contracts 1-3 and every Test Cases bullet. Complete or fix anything missing, then run the
   full verification table. Do not revert the draft wholesale.
+
+### Session: 2026-10-06 (session 287 implementation and verification)
+**Tasks Completed**: TASK-H1 through TASK-H3; resumed and verified the committed draft against the accepted plan.
+**Notes**: The implementation de-duplicates by onset time/epoch/first frame, reports dropped frames independently while retaining all samples in the sync gate, tightens only the textWork gate to 8 ms, and records non-gating targets. The updated fixture uses textWork p95 6 to follow the tightened gate, not to weaken it. Verification logs in `tmp/canvas-cutover/opt-harness/*-session287.log`: focused stats 32/32; e2e 41/41; default Vitest 749/749; `npm run check`; serial `test:perf` 1/1 (ratio 3.52); strict clippy; full nextest 2816 passed / 3 skipped (exit 0); wasm32 build; src-tauri check. `node --check` also passed.
+**Diff note**: The required plan-base comparison (`1d17ced`) includes `impl-plans/active/canvas-cutover-dispatch.json`, introduced by the session-287 restart checkpoint before this implementation turn. It is outside this plan's writePaths and is preserved; `git diff --name-only 09703a6706763321212c5a48e484547afc0da5fd` is clean after this plan-local update. The focused `stats.mjs` diff from the plan base changes only `textWorkP95Ms` within `THRESHOLDS`.

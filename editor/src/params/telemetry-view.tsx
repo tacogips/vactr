@@ -26,16 +26,16 @@ export function GridView(props: { rows: Accessor<GridRow[]> }): JSX.Element {
 
 export interface RollDisplayNote extends RollNote {
   lane: string | undefined;
-  top: number;
 }
 
-export function RollView(props: { notes: Accessor<RollDisplayNote[]> }): JSX.Element {
+export function RollView(props: { notes: Accessor<RollDisplayNote[]>; range: Accessor<{ hi: number; lanes: number }> }): JSX.Element {
   return (
     <div class="params-roll">
       <For each={props.notes()}>{(note) =>
         <span class="params-roll-note" data-slot={note.slot} data-lane={note.lane}
           data-pitch={note.pitch === null ? undefined : String(note.pitch)}
-          style={{ left: `${note.pos * 100}%`, width: `${Math.max(0.5, note.len * 100)}%`, top: `${note.top}%` }}
+          style={{ left: `${note.pos * 100}%`, width: `${Math.max(0.5, note.len * 100)}%`,
+            top: `${((note.pitch === null ? props.range().lanes - 1 : props.range().hi - note.pitch) / props.range().lanes) * 100}%` }}
           title={note.text} />
       }</For>
     </div>

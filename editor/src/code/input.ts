@@ -30,39 +30,45 @@ export class InputController {
     this.accessibility = new AccessibilityBridge(surface, container, options.label);
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
-    this.listen(el, 'compositionstart', () => this.withInput(() => { this.surface.notifyCompositionStart(); this.beginComposition(); }));
+    this.listen(el, 'compositionstart', () => this.withInput(() => { this.flushBeforeHandler(); this.surface.notifyCompositionStart(); this.beginComposition(); }));
     this.listen(el, 'compositionupdate', (event) => this.withInput(() => this.updateComposition((event as CompositionEvent).data)));
     this.listen(el, 'compositionend', (event) => this.withInput(() => this.endComposition((event as CompositionEvent).data)));
-    this.listen(el, 'beforeinput', (event) => this.withInput(() => this.beforeInput(event as InputEvent)));
+    this.listen(el, 'beforeinput', (event) => this.withInput(() => { this.flushBeforeHandler(); this.beforeInput(event as InputEvent); }));
     this.listen(el, 'input', (event) => this.withInput(() => this.input(event as InputEvent)));
-    this.listen(el, 'select', () => {
-      if (this.composing || el.value !== this.accessibility.window.value) return;
-      const selection = this.accessibility.readSelection();
-      if (selection) this.surface.dispatch({ selection });
+    this.listen(el, 'select', () => this.withInput(() => { this.syncSelection(); this.flushBeforeHandler(); }));
+    this.listen(document, 'selectionchange', () => {
+      if (document.activeElement !== el) return;
+      this.withInput(() => { this.syncSelection(); this.flushBeforeHandler(); });
     });
     this.listen(el, 'keydown', (event) => this.withInput(() => {
+      this.flushBeforeHandler();
       const key = event as KeyboardEvent;
       if (this.composing && key.key === 'Escape') { key.preventDefault(); this.cancelComposition(); return; }
       if (!this.composing) this.trailingComposition = false;
       if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);
     }));
-    this.listen(el, 'copy', (event) => this.withInput(() => this.clipboard(event as ClipboardEvent, 'copy')));
-    this.listen(el, 'cut', (event) => this.withInput(() => this.clipboard(event as ClipboardEvent, 'cut')));
-    this.listen(el, 'paste', (event) => this.withInput(() => this.clipboard(event as ClipboardEvent, 'paste')));
+    this.listen(el, 'copy', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'copy'); }));
+    this.listen(el, 'cut', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'cut'); }));
+    this.listen(el, 'paste', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'paste'); }));
+    this.listen(el, 'focus', () => this.withInput(() => this.flushBeforeHandler()));
     this.listen(el, 'blur', () => { this.surface.notifyBlur(); this.cancelComposition(); });
-    const position = () => this.accessibility.position();
+    const position = () => this.accessibility.markPositionDirty();
     this.listen(window, 'resize', position);
     this.listen(window, 'orientationchange', position);
     this.listen(window, 'scroll', position);
     if (window.visualViewport) { this.listen(window.visualViewport, 'resize', position); this.listen(window.visualViewport, 'scroll', position); }
     this.stop = surface.subscribe(() => {
-      if (!this.composing) this.accessibility.refresh();
+      if (!this.composing) this.accessibility.markDirty();
       this.publish();
     });
     this.publish();
   }
   setPhases(phases: PhaseTimer | null): void { this.options.phases = phases; this.keyboard.setPhases(phases); }
   get isComposing(): boolean { return this.composing; }
+  flushBridge(): void {
+    const position = this.accessibility.isDirty || this.accessibility.isPositionDirty;
+    if (position) this.accessibility.flush({ position: true });
+  }
   get presentation(): InputPresentation {
     const stateDoc = this.surface.state.doc, range = this.surface.compositionRange;
     const cursor = this.composing && range ? range.from + this.preedit.length : this.surface.state.selection.main.head;
@@ -80,6 +86,15 @@ export class InputController {
   }
   private listen(target: EventTarget, name: string, fn: EventListener): void {
     target.addEventListener(name, fn); this.listeners.push(() => target.removeEventListener(name, fn));
+  }
+  private flushBeforeHandler(): void {
+    if (this.accessibility.isDirty) this.accessibility.flush({ position: false });
+  }
+  private syncSelection(): void {
+    const el = this.accessibility.textarea;
+    if (this.composing || el.value !== this.accessibility.window.value) return;
+    const selection = this.accessibility.readSelection();
+    if (selection) this.surface.dispatch({ selection });
   }
   private withInput<T>(run: () => T): T {
     const phases = this.options.phases;

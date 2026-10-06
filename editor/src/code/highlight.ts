@@ -73,6 +73,7 @@ interface Entry {
   span: Span;
   rev: number;
   epoch: string | null;
+  mapped?: { at: number; range: Range16 | null };
 }
 
 export interface HighlightOptions {
@@ -85,6 +86,9 @@ export interface HighlightOptions {
   anchor?: TimeAnchor;
   audible?: AudibleClock;
   epoch?: () => string | null;
+  pin?: (owner: string, rev: number) => boolean;
+  unpin?: (owner: string) => void;
+  revision?: () => number;
   /** Receives the active ranges whenever they change. */
   apply?: (ranges: Range16[]) => void;
 }
@@ -94,6 +98,7 @@ export class HighlightScheduler {
   private readonly opts: HighlightOptions;
   private readonly anchor: TimeAnchor;
   private entries: Entry[] = [];
+  private readonly lastAccepted = new Map<number, number>();
   private activeRanges: Range16[] = [];
   private activeKey = '';
   private readonly acceptListeners = new Set<(e: { time: number; end: number; from: number; to: number; epoch: string | null }) => void>();
@@ -123,7 +128,10 @@ export class HighlightScheduler {
         ? this.opts.map(src.span, src.doc_revision)
         : null;
       if (this.opts.audible && !mapped) { this.stats.unmapped += 1; continue; }
-      this.entries.push({ start, end, span: src.span, rev: src.doc_revision, epoch });
+      this.opts.pin?.(`playing:${src.doc_revision}`, src.doc_revision);
+      this.lastAccepted.set(src.doc_revision, this.opts.audible?.now() ?? this.opts.clock.now());
+      this.entries.push({ start, end, span: src.span, rev: src.doc_revision, epoch,
+        ...(mapped ? { mapped: { at: this.opts.revision?.() ?? -1, range: mapped } } : {}) });
       this.stats.accepted += 1;
       if (mapped) for (const cb of this.acceptListeners) cb({ time: start, end, from: mapped.from, to: mapped.to, epoch });
     }
@@ -157,12 +165,23 @@ export class HighlightScheduler {
         keep.push(e);
         continue;
       }
-      const r = this.opts.map(e.span, e.rev);
+      const revision = this.opts.revision?.();
+      let r = e.mapped && revision !== undefined && e.mapped.at === revision ? e.mapped.range : undefined;
+      if (r === undefined) {
+        r = this.opts.map(e.span, e.rev);
+        if (this.opts.revision) e.mapped = { at: this.opts.revision(), range: r };
+      }
       if (!r) { this.stats.unmapped += 1; continue; }
       keep.push(e);
       ranges.push(r);
     }
     this.entries = keep;
+    for (const [rev, at] of this.lastAccepted) {
+      if (!keep.some((entry) => entry.rev === rev) && now - at > 2) {
+        this.opts.unpin?.(`playing:${rev}`);
+        this.lastAccepted.delete(rev);
+      }
+    }
     ranges.sort((a, b) => a.from - b.from || a.to - b.to);
     const unique = ranges.filter((r, i) => i === 0 || r.from !== ranges[i - 1]?.from || r.to !== ranges[i - 1]?.to);
     const key = unique.map((r) => `${r.from}:${r.to}`).join(',');
@@ -192,5 +211,7 @@ export class HighlightScheduler {
   /** Forgets every entry (hush); the next `tick` clears the decorations. */
   clear(): void {
     this.entries = [];
+    for (const rev of this.lastAccepted.keys()) this.opts.unpin?.(`playing:${rev}`);
+    this.lastAccepted.clear();
   }
 }

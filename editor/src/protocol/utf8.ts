@@ -36,11 +36,13 @@ function isLow(c: number): boolean {
 }
 
 export class Utf8Index {
+  static builds = 0;
   readonly text: string;
   /** `bytes[i]`: the byte offset of UTF-16 offset `i` (length + 1 entries). */
   private readonly bytes: Uint32Array;
 
   constructor(text: string) {
+    Utf8Index.builds += 1;
     this.text = text;
     const n = text.length;
     const bytes = new Uint32Array(n + 1);

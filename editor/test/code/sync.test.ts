@@ -1,8 +1,9 @@
-import { EditorState, Text } from '@codemirror/state';
+import { ChangeSet, EditorState, Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentSync } from '../../src/code/sync';
 import { CodeSurface } from '../../src/code/surface';
 import { Utf8Index } from '../../src/protocol/utf8';
+import { LineBytes, LineTable } from '../../src/code/line-bytes';
 import { Client } from '../../src/protocol/client';
 import { DOC_DEBOUNCE_MS } from '../../src/protocol/document';
 import { Store } from '../../src/protocol/store';
@@ -48,6 +49,36 @@ describe('DocumentSync', () => {
       edit_epoch: 1,
     });
     expect(sync.revision).toBe(2);
+  });
+
+  it('pins the current revision from line starts without a text read or table build', () => {
+    const { sync, state } = setup(Array.from({ length: 200 }, (_, i) => `line ${i}`).join('\n'));
+    const builds = LineTable.builds, indexBuilds = Utf8Index.builds;
+    const tableBytes = sync.history.indexBytes;
+    const toString = vi.spyOn(Text.prototype, 'toString');
+    expect(sync.pin('eval', sync.revision)).toBe(true);
+    expect(LineTable.builds).toBe(builds);
+    expect(Utf8Index.builds).toBe(indexBuilds);
+    expect(sync.history.indexBytes).toBe(tableBytes);
+    expect(toString).not.toHaveBeenCalled();
+    sync.unpin('eval');
+    expect(state().doc.lines).toBe(200);
+  });
+
+  it('keeps LineBytes line starts equal to LineTable after 50 edits', () => {
+    let text = Text.of(['a', '日本', '😀', '', 'tail']);
+    const bytes = new LineBytes(text);
+    for (let i = 0; i < 50; i += 1) {
+      const line = text.line((i % text.lines) + 1);
+      const at = line.from + Math.min(line.length, i % 3);
+      const changes = ChangeSet.of({ from: at, insert: i % 2 ? 'x' : '\n' }, text.length);
+      const next = changes.apply(text);
+      bytes.update(changes, text, next); text = next;
+      const starts = bytes.starts(), table = LineTable.build(text);
+      expect(starts.length).toBe(text.lines + 1);
+      for (let n = 1; n <= text.lines; n += 1) expect(starts[n - 1]).toBe(table.toByte(text.line(n).from));
+      expect(starts[starts.length - 1]).toBe(table.byteLength);
+    }
   });
 
   it('gives a zero-length dirty span at a pure deletion of multi-byte text', () => {

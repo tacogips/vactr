@@ -24,7 +24,6 @@ import type { CodeSurface } from '../app/apis';
 import type { BindApi, SiteMode } from '../app/apis';
 import type { Client } from '../protocol/client';
 import type { EditorDecl, ParamMeta, SiteTier, Span, StaleBindingBody, WireSite } from '../protocol/types';
-import { Utf8Index } from '../protocol/utf8';
 import type { Range16, SiteEntry, SiteTable } from './sites';
 
 // ------------------------------------------------------------ value math
@@ -88,6 +87,7 @@ export interface WriterHost {
   table: SiteTable;
   surface: CodeSurface;
   currentRevision(): number;
+  toWireSpan(from: number, to: number): Span;
   /** A wire span of revision `rev` mapped to now, or null when touched. */
   map(span: Span, rev: number): Range16 | null;
   /** The current range of the form owning `range` (from `eval-result.forms`). */
@@ -333,13 +333,12 @@ export class SiteWriter implements BindApi {
     );
     surface.dispatch({ changes: cs });
     const rev = this.host.currentRevision();
-    const idx = new Utf8Index(surface.state.doc.toString());
     for (const s of specs) {
       const from = cs.mapPos(s.from, -1);
-      table.setAnchor(s.e, idx.spanToBytes(from, from + s.insert.length), rev, s.insert);
+      table.setAnchor(s.e, this.host.toWireSpan(from, from + s.insert.length), rev, s.insert);
     }
     this.host.changed(specs.map((s) => s.e.bindingId));
-    const span = idx.spanToBytes(cs.mapPos(form.from, -1), cs.mapPos(form.to, 1));
+    const span = this.host.toWireSpan(cs.mapPos(form.from, -1), cs.mapPos(form.to, 1));
     this.evalForm(key, span, rev);
     return true;
   }

@@ -214,8 +214,8 @@ describe('headless canvas state authority', () => {
   });
 });
 
-describe('revision and index ceilings', () => {
-  it('enforces 256 revisions and four cached indexes including stale rejection', () => {
+describe('revision and line-table ceilings', () => {
+  it('enforces 256 revisions and four cached line tables including stale rejection', () => {
     let state = EditorState.create({ doc: 'abc' });
     const h = new RevisionHistory(state.doc, 1, 999);
     for (let rev = 2; rev <= 300; rev++) {
@@ -224,36 +224,36 @@ describe('revision and index ceilings', () => {
     }
     expect(h.current - h.oldest + 1).toBe(HISTORY_LIMIT);
     expect(h.mapWireSpan({ start: 0, end: 1 }, 1)).toBeNull();
-    for (let rev = 295; rev <= 300; rev++) h.index(rev);
+    for (let rev = 295; rev <= 300; rev++) h.lineTable(rev);
     expect(h.indexCount).toBe(4);
     expect(h.retainedBytes).toBeLessThanOrEqual(HISTORY_UNDO_BYTES);
     expect(h.indexBytes).toBeLessThanOrEqual(INDEX_BYTES);
   });
 
-  it('evicts byte-heavy old revisions and refuses to cache oversized indexes', () => {
+  it('evicts byte-heavy old revisions and refuses to cache oversized line tables', () => {
     let state = EditorState.create({ doc: '日本😀'.repeat(20) });
-    const h = new RevisionHistory(state.doc, 1, 256, 800, 400);
+    const h = new RevisionHistory(state.doc, 1, 256, 800, 128);
     for (let rev = 2; rev <= 5; rev++) {
       const tr = state.update({ changes: { from: state.doc.length, insert: '語' } }); state = tr.state;
-      h.record(rev, tr.changes, state.doc); h.index(rev);
+      h.record(rev, tr.changes, state.doc); h.lineTable(rev);
     }
     expect(h.retainedBytes).toBeLessThanOrEqual(800);
     expect(h.indexBytes).toBeLessThanOrEqual(400);
     expect(h.indexCount).toBe(0);
     expect(h.text(5)?.toString()).toBe(state.doc.toString());
-    expect(h.index(5)?.toByte(4)).toBe(10);
+    expect(h.lineTable(5)?.toByte(4)).toBe(10);
     expect(h.mapWireSpan({ start: 0, end: 3 }, 1)).toBeNull();
   });
 
   it('enforces the real 8MiB index byte cap before the four-entry count cap', () => {
-    let state = EditorState.create({ doc: 'a'.repeat(1024 * 1024) });
+    let state = EditorState.create({ doc: Text.of(Array(1_048_576).fill('')) });
     const h = new RevisionHistory(state.doc);
     for (let rev = 2; rev <= 4; rev++) {
-      h.index(rev - 1);
+      h.lineTable(rev - 1);
       const tr = state.update({ changes: { from: state.doc.length, insert: 'x' } }); state = tr.state;
       h.record(rev, tr.changes, state.doc);
     }
-    h.index(4);
+    h.lineTable(4);
     expect(h.indexCount).toBe(1);
     expect(h.indexBytes).toBeLessThanOrEqual(INDEX_BYTES);
     expect(h.mapWireSpan({ start: 0, end: 1 }, 1)).toEqual({ from: 0, to: 1 });

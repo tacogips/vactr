@@ -39,6 +39,8 @@ export class AccessibilityBridge {
   readonly status: HTMLElement;
   window: InputWindow;
   private projected = { start: 0, end: 0, direction: 'none' as string };
+  private dirty = false;
+  private positionDirty = true;
   constructor(private surface: CodeSurface, container: HTMLElement, label = 'Code editor') {
     this.textarea = document.createElement('textarea');
     this.textarea.setAttribute('aria-label', label);
@@ -52,16 +54,44 @@ export class AccessibilityBridge {
     this.status.setAttribute('aria-live', 'polite');
     Object.assign(this.status.style, { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clipPath: 'inset(50%)' });
     container.append(this.textarea, this.status);
-    this.window = surroundingWindow(surface); this.refresh();
+    this.window = { start: -1, end: -1, value: '', anchor: 0, head: 0, outside: false };
+    this.markDirty(); this.flush({ position: true });
   }
-  refresh(): void {
-    this.window = surroundingWindow(this.surface);
-    this.textarea.value = this.window.value;
+  markDirty(): void { this.dirty = true; }
+  markPositionDirty(): void { this.positionDirty = true; }
+  get isDirty(): boolean { return this.dirty; }
+  get isPositionDirty(): boolean { return this.positionDirty; }
+  flush(opts: { position?: boolean } = {}): void {
+    if (this.dirty) {
+      const previous = this.window;
+      const next = surroundingWindow(this.surface);
+      const actual = this.textarea.value;
+      if (next.value !== actual || next.start !== previous.start || next.end !== previous.end) {
+        if (next.start === previous.start) {
+          let prefix = 0;
+          while (prefix < actual.length && prefix < next.value.length && actual[prefix] === next.value[prefix]) prefix++;
+          let suffix = 0;
+          while (suffix < actual.length - prefix && suffix < next.value.length - prefix &&
+            actual[actual.length - 1 - suffix] === next.value[next.value.length - 1 - suffix]) suffix++;
+          this.textarea.setRangeText(next.value.slice(prefix, next.value.length - suffix), prefix, actual.length - suffix, 'preserve');
+        } else {
+          this.textarea.value = next.value;
+        }
+      }
+      this.window = next;
+      this.dirty = false;
+    }
     const { start, end, anchor, head } = this.window;
     const a = Math.max(start, Math.min(end, anchor)) - start, h = Math.max(start, Math.min(end, head)) - start;
-    this.textarea.setSelectionRange(Math.min(a, h), Math.max(a, h), anchor > head ? 'backward' : 'forward');
+    const from = Math.min(a, h), to = Math.max(a, h), direction = anchor > head ? 'backward' : 'forward';
+    if (this.textarea.selectionStart !== from || this.textarea.selectionEnd !== to || this.textarea.selectionDirection !== direction) {
+      this.textarea.setSelectionRange(from, to, direction);
+    }
     this.projected = { start: this.textarea.selectionStart, end: this.textarea.selectionEnd, direction: this.textarea.selectionDirection };
-    this.position();
+    if (opts.position) { this.position(); this.positionDirty = false; }
+  }
+  refresh(): void {
+    this.markDirty(); this.flush({ position: true });
   }
   position(): void {
     const rect = this.surface.coordsAtPos(this.surface.state.selection.main.head);

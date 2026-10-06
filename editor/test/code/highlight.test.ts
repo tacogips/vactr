@@ -1,6 +1,6 @@
 import { Text } from '@codemirror/state';
 import { AudibleClock } from '../../src/app/clock';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   HighlightScheduler,
   TimeAnchor,
@@ -228,6 +228,28 @@ describe('HighlightScheduler (criterion 1, mock clock)', () => {
     sched.clear();
     sched.tick();
     expect(playingRanges(view)).toEqual([]);
+  });
+
+  it('pins accepted revisions, reuses mapped spans until the current revision changes, and unpins on clear or expiry', () => {
+    const text = 'd1 "bd"', clock = new MockClock(0.1);
+    let revision = 2;
+    const map = vi.fn(() => ({ from: 4, to: 6 }));
+    const pin = vi.fn(() => true), unpin = vi.fn();
+    const sched = new HighlightScheduler({ clock, file: 'main.vact', map, pin, unpin, revision: () => revision, tempo: () => TEMPO });
+    sched.onPlaying([event(text, 'bd', 0, [1, 1])]);
+    expect(pin).toHaveBeenCalledWith('playing:1', 1);
+    sched.tick(); sched.tick();
+    expect(map).toHaveBeenCalledTimes(1);
+    revision = 3; sched.tick();
+    expect(map).toHaveBeenCalledTimes(2);
+    sched.clear();
+    expect(unpin).toHaveBeenCalledWith('playing:1');
+
+    unpin.mockClear();
+    const expiring = new HighlightScheduler({ clock, file: 'main.vact', map, pin, unpin, tempo: () => TEMPO });
+    expiring.onPlaying([event(text, 'bd', 0, [1, 1])]);
+    clock.set(2.2); expiring.tick();
+    expect(unpin).toHaveBeenCalledWith('playing:1');
   });
 
   it('anchors native-tier host times at the first batch receipt', () => {

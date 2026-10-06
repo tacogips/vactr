@@ -72,6 +72,8 @@ export interface CodeApi {
   surface: CodeSurface;
   /** A wire span of revision `rev` mapped to the current UTF-16 range, or null when gone. */
   mapWireSpan(span: Span, rev: number): { from: number; to: number } | null;
+  /** current revision; UTF-16 range to UTF-8 byte span; O(changed lines) */
+  toWireSpan(from: number, to: number): Span;
   currentRevision(file: string): number;
   selectedSiteId(): number | null;
   samples: SampleLibraryApi;

@@ -182,6 +182,7 @@ export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[]
   const code: CodeApi = {
     surface: view,
     mapWireSpan: (span, rev) => sync.mapWireSpan(span, rev),
+    toWireSpan: (from, to) => sync.toWireSpan(from, to),
     currentRevision: () => sync.revision,
     selectedSiteId: () => null,
     samples: { frames: () => null, openBrowser: () => {} },
@@ -197,6 +198,7 @@ export function setup(text: string, opts: BindOptions & { editors?: EditorDecl[]
   const renders: [string, string][] = [];
   const area = new BindArea(root, deps, code, {
     ...opts,
+    panelViewport: opts.panelViewport ?? (() => ({ top: 0, height: 1e9 })),
     onRender: (key, el) => {
       const v = el.querySelector('.bind-value, .bind-name-value');
       renders.push([key, v?.textContent ?? '']);

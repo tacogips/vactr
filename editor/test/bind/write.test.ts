@@ -3,6 +3,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { formatLiteral } from '../../src/bind/write';
+import { Utf8Index } from '../../src/protocol/utf8';
 import { cleanup, FILE, q, settle, setup, site, spanOf } from './fixtures';
 
 afterEach(cleanup);
@@ -66,6 +67,17 @@ describe('overlay mode (criterion 2)', () => {
 });
 
 describe('source-edit mode (criterion 2)', () => {
+  it('writes a multi-line slider edit without building a whole-document UTF-8 index', () => {
+    const text = 's [:bd] > gain 0.5\nd1';
+    const h = setup(text);
+    h.evalResult([site(text, '0.5', 1)]);
+    h.area.writer.setMode(h.area.table.byId(1)?.bindingId ?? '', 'source-edit');
+    const builds = Utf8Index.builds;
+    h.deps.bind?.writeSite(1, 0.6);
+    expect(Utf8Index.builds).toBe(builds);
+    expect(h.text()).toBe('s [:bd] > gain 0.6\nd1');
+  });
+
   it('edits the text and evals the form, one eval in flight, the latest value applied after the reply', async () => {
     const h = setup(TEXT);
     h.evalResult([site(TEXT, '0.5', 1)]);

@@ -22,7 +22,7 @@
   color: var(--vt-text-muted);
 }
 
-.bind-group:not(:has(.bind-row)) {
+.bind-group[data-empty] {
   display: none;
 }
 
@@ -32,6 +32,10 @@
   column-gap: var(--vt-space-2);
   row-gap: var(--vt-space-1);
   align-items: center;
+  height: calc(var(--vt-control-h-compact) + 2 * var(--vt-space-1));
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
   padding: var(--vt-space-1) 0;
 }
 
@@ -74,13 +78,16 @@
 
 .bind-row[data-state='stale'],
 .bind-row[data-state='unbound'] {
-  opacity: 0.7;
+  color: var(--vt-text-muted);
 }
 
 .bind-form,
 .bind-name-badge {
   font-size: var(--vt-text-xs);
   color: var(--vt-danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bind-midi {
@@ -98,11 +105,24 @@
 .bind-name {
   display: flex;
   gap: var(--vt-space-2);
+  height: calc(var(--vt-control-h-compact) + 2 * var(--vt-space-1));
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
   padding: var(--vt-space-1) 0;
 }
 
 .bind-name-label {
   font-family: var(--vt-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bind-spacer {
+  padding: 0;
+  border: 0;
+  pointer-events: none;
 }
 
 .bind-controls-header {
@@ -160,5 +180,4 @@
 .bind-overlay {
   color: var(--vt-data-1);
   font-style: italic;
-  opacity: 0.85;
 }

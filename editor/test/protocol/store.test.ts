@@ -76,6 +76,44 @@ describe('Store', () => {
     expect(tempo).toBe(1);
   });
 
+  it('indexes 10,000 subscriptions and visits only affected subscribers once', () => {
+    const store = new Store();
+    const seen: string[] = [];
+    for (let i = 0; i < 10_000; i += 1) store.subscribe([nameKey(`k${i}`)], () => seen.push(`k${i}`));
+    store.subscribe([nameKey('k7'), nameKey('also-k7')], () => seen.push('multi'));
+    const before = store.stats.notifyVisits;
+    store.apply({ kind: 'bindings', body: bindings({ changed: [{ name: 'k7', value: '7', form_gen: 1 }] }) });
+    expect(store.stats.notifyVisits - before).toBe(2);
+    expect(seen).toEqual(['k7', 'multi']);
+    const control = new Store();
+    let controlCalls = 0;
+    control.subscribe([nameKey('a')], () => controlCalls++);
+    control.subscribe([nameKey('b')], () => controlCalls++);
+    control.subscribe([nameKey('c')], () => controlCalls++);
+    control.apply({ kind: 'bindings', body: bindings({ changed: [
+      { name: 'a', value: '1', form_gen: 1 }, { name: 'b', value: '2', form_gen: 1 }, { name: 'c', value: '3', form_gen: 1 },
+    ] }) });
+    expect(control.stats.notifyVisits).toBe(3);
+    expect(controlCalls).toBe(3);
+  });
+
+  it('notifies indexed keys in registration order and snapshots subscriptions during callbacks', () => {
+    const store = new Store();
+    const seen: string[] = [];
+    let unsubscribeLater = () => {};
+    store.subscribe([nameKey('x')], () => {
+      seen.push('first');
+      store.subscribe([nameKey('x')], () => seen.push('new'));
+      unsubscribeLater();
+    });
+    unsubscribeLater = store.subscribe([nameKey('y')], () => seen.push('second'));
+    store.subscribe([nameKey('x')], () => seen.push('third'));
+    store.apply({ kind: 'bindings', body: bindings({ changed: [
+      { name: 'y', value: '2', form_gen: 1 }, { name: 'x', value: '1', form_gen: 1 },
+    ] }) });
+    expect(seen).toEqual(['first', 'third']);
+  });
+
   it('applies a bindings batch atomically', () => {
     const store = new Store();
     store.apply({ kind: 'eval-result', body: evalResult('a.vact', [site(1, 0.1, { key: 'lead.lpf' })]) });

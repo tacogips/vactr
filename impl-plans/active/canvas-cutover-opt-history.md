@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-HISTORY: Delta-Charged History, Pinned Revisions and Line-Table Wire Mapping Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (implementation complete; pending independent review and workflow closeout)
 **Plan ID**: CANVAS-OPT-HISTORY (session 286, wave 9; runs alone after CANVAS-OPT-HARNESS is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 2 (history, pinned revisions and wire mapping) and section 6 (budgets); 15.3.5 (history ceilings, as amended); 15.3.8.10 (bounded edit path, line-based sync)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-HISTORY`)
@@ -442,17 +442,17 @@ report. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] `line-bytes.ts` with `LineBytes`, `LineTable` and `starts()`; byte-identical to `Utf8Index` on the test corpus
-- [ ] Delta charging with an O(1) total; the 300-edit growth bound passes
-- [ ] Pins: owners, composed sets, the 32-owner LRU, refusal and restart rules; the eval-survives-churn row passes
-- [ ] After 300 edits, `mapWireSpan(evalSpan, evalRev)` is non-null and equals the sequential reference
-- [ ] A single-character edit makes 0 `Utf8Index` builds and 0 `LineTable` builds; no whole-document `toString` in history, sync, bind or pointer paths
-- [ ] `CodeApi.toWireSpan` added; the bind consumers use it; the test fakes compile
-- [ ] Highlight per-revision cache: 0 `map` calls on ticks with an unchanged revision
-- [ ] `state.test.ts` ceiling rows ported to `lineTable()` with identical `expect()` lines (`indexByteLimit` 400 -> 128 at :235; 1,048,576-empty-line fixture at :249), each port recorded; every other existing assertion unchanged
-- [ ] The pin-refusal row (a@A, b@A shared, c@B refused, c@B succeeds after unpin) and the on-demand-evicted-before-refusal row pass; fixtures derived from `128 + 4 * (lines + 1)`
-- [ ] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
-- [ ] Progress log updated
+- [x] `line-bytes.ts` with `LineBytes`, `LineTable` and `starts()`; byte-identical to `Utf8Index` on the test corpus
+- [x] Delta charging with an O(1) total; the 300-edit growth bound passes
+- [x] Pins: owners, composed sets, the 32-owner LRU, refusal and restart rules; the eval-survives-churn row passes
+- [x] After 300 edits, `mapWireSpan(evalSpan, evalRev)` is non-null and equals the sequential reference
+- [x] A single-character edit makes 0 `Utf8Index` builds and 0 `LineTable` builds; no whole-document `toString` in history, sync, bind or pointer paths
+- [x] `CodeApi.toWireSpan` added; the bind consumers use it; the test fakes compile
+- [x] Highlight per-revision cache: 0 `map` calls on ticks with an unchanged revision
+- [x] `state.test.ts` ceiling rows ported to `lineTable()` with identical `expect()` lines (`indexByteLimit` 400 -> 128 at :235; 1,048,576-empty-line fixture at :249), each port recorded; every other existing assertion unchanged
+- [x] The pin-refusal row (a@A, b@A shared, c@B refused, c@B succeeds after unpin) and the on-demand-evicted-before-refusal row pass; fixtures derived from `128 + 4 * (lines + 1)`
+- [x] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -470,3 +470,38 @@ report. Edit only this plan's progress log.
 
 **Notes**: Wave 9, after HARNESS. It fixes the highlight-death product bug that also causes
 the mass stale flip of the bind panel.
+
+### Session: 2026-10-06 (session 287 implementation)
+**Tasks Completed**: Implemented the delta-charged history, revision pins and line-table wire
+mapping; migrated bind and pointer wire-span paths; added counter and regression coverage.
+
+**Evidence**: `tmp/canvas-cutover/opt-history/receipt.json` records source hashes and final
+verification. Final focused suite: 122/122; bind/params/app/code/canvas suite: 494/494;
+full Vitest: 760/760; serial `test:perf`: 1/1 (ratio 2.80); full nextest: 2816 passed,
+3 repository-configured skips, exit 0. `npm run check`, strict clippy, wasm32 build and
+src-tauri check all exited 0. `git diff --check` and plan scope/line-count checks passed.
+
+**Port record**: `editor/test/canvas/state.test.ts` keeps each existing `expect()` unchanged;
+the byte-cap row changes `indexByteLimit` 400 to 128, and the byte-heavy fixture is
+1,048,576 empty lines. The corresponding regression rows pass in the focused suite.
+
+**Resolved attempts**: Two initial focused runs exposed a missing `vi` import and an exact
+2-second expiry assertion; both tests were corrected to assert the required greater-than-2s
+behavior. The initial type check exposed a type-only `ChangeSet` import used at runtime;
+the import was corrected. Final-source focused tests and `npm run check` pass (see receipt).
+
+**Handoff**: Implementation criteria are complete. Independent test-integrity, adversarial
+and integration reviews, shared documentation/index work, commit and push remain owned by
+later workflow steps.
+
+### Session: 2026-10-06 (test-integrity repair HIST-TI-01)
+**Tasks Completed**: Strengthened the owner-33 LRU test so `eval` pins revision 1 while
+playing, diagnostic and churn owners pin revision 2. The test asserts `[1, 2]` after the
+first 25 owners, `[2]` after owner 33 evicts the unrefreshed eval owner, and `[1, 2]` when
+the control case refreshes eval before owner 33. `pinsEvicted === 1` and shared revision
+record behavior remain asserted; no production source or other plan file changed.
+
+**Verification**: `history.test.ts` 9/9; assigned focused suite 122/122; full Vitest
+760/760; `npm run check` exit 0. Logs: `history-test-integrity-final.log`,
+`focused-test-integrity-final.log`, `vitest-test-integrity-final.log`, and
+`check-test-integrity-final.log` under `tmp/canvas-cutover/opt-history/`.

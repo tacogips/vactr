@@ -5,6 +5,8 @@ import { PhaseTimer } from '../../src/code/frame';
 import { InputController } from '../../src/code/input';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
+import { LineTable } from '../../src/code/line-bytes';
+import { Utf8Index } from '../../src/protocol/utf8';
 import { wordMove } from '../../src/code/keyboard';
 import { boundary, INPUT_WINDOW_LIMIT, surroundingWindow } from '../../src/code/accessibility';
 import { Client } from '../../src/protocol/client';
@@ -36,15 +38,52 @@ function oldWindow(text: string, head: number, anchor: number): { start: number;
 afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); vi.restoreAllMocks(); document.body.replaceChildren(); });
 
 describe('bounded document edit costs', () => {
+  it('defers textarea edits, then patches only the changed window without a layout read', () => {
+    const { surface, input } = setup();
+    const textarea = input.accessibility.textarea;
+    const valueSetter = vi.spyOn(HTMLTextAreaElement.prototype, 'value', 'set');
+    const setRangeText = vi.spyOn(textarea, 'setRangeText');
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    input.replaceSelection('x', 'input.type');
+    expect(valueSetter).not.toHaveBeenCalled();
+    expect(rect).not.toHaveBeenCalled();
+    input.flushBridge();
+    expect(valueSetter).not.toHaveBeenCalled();
+    expect(setRangeText).toHaveBeenCalledTimes(1);
+    expect(rect).not.toHaveBeenCalled();
+  });
+
+  it('flushes a pending edit before beforeinput reads the textarea and avoids caret-only value writes', () => {
+    const { surface, input } = setup(lines.slice(0, 40));
+    const textarea = input.accessibility.textarea;
+    const valueSetter = vi.spyOn(HTMLTextAreaElement.prototype, 'value', 'set');
+    const setRangeText = vi.spyOn(textarea, 'setRangeText');
+    input.replaceSelection('x', 'input.type');
+    const pendingValue = surroundingWindow(surface).value;
+    expect(textarea.value).not.toBe(pendingValue);
+    let observed = '';
+    textarea.addEventListener('beforeinput', () => { observed = textarea.value; });
+    textarea.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertFromPaste', cancelable: true }));
+    expect(observed).toBe(pendingValue);
+    valueSetter.mockClear(); setRangeText.mockClear();
+    surface.dispatch({ selection: { anchor: 2 } });
+    input.flushBridge();
+    expect(valueSetter).not.toHaveBeenCalled();
+    expect(setRangeText).not.toHaveBeenCalled();
+  });
+
   it('caches presentation identity and keeps a one-character edit free of whole-document strings', () => {
     const { surface, input } = setup();
     expect(input.presentation.doc).toBe(surface.state.doc);
     const before = input.presentation; expect(input.presentation).toBe(before);
     const toString = vi.spyOn(Text.prototype, 'toString');
+    const indexBuilds = Utf8Index.builds, tableBuilds = LineTable.builds;
     const sliceString = spySlices(surface.state.doc);
     surface.dispatch({ selection: { anchor: surface.state.doc.line(10_001).from + 12 } });
     input.replaceSelection('x', 'input.type');
     expect(toString.mock.contexts.every(context => (context as Text).length < 64 * 1024)).toBe(true);
+    expect(Utf8Index.builds).toBe(indexBuilds);
+    expect(LineTable.builds).toBe(tableBuilds);
     expect(sliceString.flatMap(spy => spy.mock.calls).some(([from, to]) => (to ?? Infinity) - from > 64 * 1024)).toBe(false);
   });
 
@@ -66,6 +105,7 @@ describe('bounded document edit costs', () => {
   it('maps forward and backward textarea selections like the former whole-string boundary algorithm', () => {
     const { surface, input } = setup(); const head = surface.state.doc.line(10_001).from + 20;
     surface.dispatch({ selection: { anchor: head } });
+    input.flushBridge();
     const text = surface.state.doc.toString(), window = input.accessibility.window, textarea = input.accessibility.textarea;
     const expected = (start: number, end: number, backward: boolean) => ({
       anchor: boundary(text, window.start + (backward ? end : start), backward ? 1 : -1),

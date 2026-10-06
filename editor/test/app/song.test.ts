@@ -28,7 +28,7 @@ function fixture() {
   const sync = new DocumentSync(client.document(file), Text.of(['song-code']));
   const surface = new CodeSurface({ sync });
   const deps: EditorDeps = { client, store, files: new MemoryFiles(), clock: new MockClock(), tier: 'browser',
-    code: { surface, currentRevision: () => sync.revision, mapWireSpan: () => null,
+    code: { surface, currentRevision: () => sync.revision, mapWireSpan: () => null, toWireSpan: (from, to) => sync.toWireSpan(from, to),
       selectedSiteId: () => null, samples: { frames: () => null, openBrowser: () => {} } } };
   const controls = mount(root, deps, file);
   cleanups.push(() => { controls.dispose(); surface.dispose(); client.close(); store.dispose(); root.remove(); });
@@ -150,7 +150,7 @@ describe('mounted song controls with the actual backend', () => {
     const sync = new DocumentSync(client.document(file), Text.of(code.split('\n')));
     const surface = new CodeSurface({ sync });
     const deps: EditorDeps = { client, store, files: new MemoryFiles(), clock: new MockClock(), tier: 'browser',
-      code: { surface, currentRevision: () => sync.revision, mapWireSpan: () => null,
+      code: { surface, currentRevision: () => sync.revision, mapWireSpan: () => null, toWireSpan: (from, to) => sync.toWireSpan(from, to),
         selectedSiteId: () => null, samples: { frames: () => null, openBrowser: () => {} } } };
     const controls = mount(root, deps, file);
     const pending: WasmRecord[] = [];

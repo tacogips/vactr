@@ -1,6 +1,6 @@
 # Canvas Cutover OPT-DOM: Bind Panel Virtualization, Indexed Store, Incremental Roll and Lazy Accessibility Bridge Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-OPT-DOM (session 286, wave 10; runs alone after CANVAS-OPT-HISTORY is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.14 section 1 (bind panel, store and DOM) and section 6 (budgets); design-docs/specs/design-ui-style.md (tokens, square controls); 15.1.6 (binding UI, one-repaint rule)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-OPT-DOM`)
@@ -345,12 +345,12 @@ report. Edit only this plan's progress log.
 
 ## Completion Criteria
 
-- [ ] `bind.css` has no `opacity` and no `:has(`; stale and unbound rows are dimmed by `--vt-text-muted`; fixed token-derived row height
-- [ ] Mounted rows `<=` viewport rows plus 2x8 overscan, including after the mass stale transition; 0 node moves when order is unchanged
-- [ ] The fixture seam keeps every existing bind assertion unchanged
-- [ ] Store notify visits only the subs of changed keys, in registration order
-- [ ] The roll reuses elements across batches in a cycle and updates lanes in place
-- [ ] Accessibility bridge: 0 full value writes and 0 rect reads in the keystroke task; flush before input-reading handlers; one frame flush
+- [x] `bind.css` has no `opacity` and no `:has(`; stale and unbound rows are dimmed by `--vt-text-muted`; fixed token-derived row height
+- [x] Mounted rows `<=` viewport rows plus 2x8 overscan, including after the mass stale transition; 0 node moves when order is unchanged
+- [x] The fixture seam keeps every existing bind assertion unchanged
+- [x] Store notify visits only the subs of changed keys, in registration order
+- [x] The roll reuses elements across batches in a cycle and updates lanes in place
+- [x] Accessibility bridge: 0 full value writes and 0 rect reads in the keystroke task; flush before input-reading handlers; one frame flush
 - [ ] `ui-style.mjs`, the style-token test and the behavior e2e pass in both browsers
 - [ ] Default vitest, `npm run check`, `test:perf`, clippy, nextest, wasm32 build and src-tauri check pass
 - [ ] Progress log updated
@@ -361,3 +361,8 @@ report. Edit only this plan's progress log.
 **Tasks Completed**: Plan authored from design 15.3.8.14 section 1.
 **Notes**: Wave 10, after HISTORY. The `.bind-overlay` opacity was named explicitly
 (step3 review finding, low).
+
+
+### Session: 2026-10-06 (session 286 implementation handoff)
+**Tasks Completed**: TASK-D1 through TASK-D5 and focused regressions in TASK-D6.
+**Notes**: Focused bind/store/roll/input/mount tests passed 161/161 (`tmp/canvas-cutover/opt-dom/focused-final.log`); UI tests passed 18/18 (`ui-final.log`); npm check passed (`check-final-rerun.log`); full vitest passed 766/766 before the final bridge input reconciliation (`vitest-full-final.log`); the post-change focused bridge suite passed 74/74 (`focused-repair5.log`). Style passed in Chromium and WebKit (`style-final.log`); release wasm and ABI frontend build passed (`wasm-release-final.log`, `frontend-build-repair2.log`). The behavior e2e still fails only `canvas-only-text` in both touch-enabled browsers (16/18 checks passed; see `e2e-behavior-retry2.log`): the bridge rectangle is sampled before the next canvas frame positions it, yielding a 1 px glyph sample. Fixing the test's frame synchronization requires editing `editor/test/e2e/behavior.mjs`, outside this plan's writePaths. Resume after a plan/manifest checkpoint authorizes that path or assigns the test update to its owner. Full aggregate/perf/native cargo gates remain pending because implementation is blocked at this required browser verification.

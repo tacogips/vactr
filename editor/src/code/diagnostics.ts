@@ -75,17 +75,19 @@ export class DiagnosticsController {
       opts.client.on('eval-result', (env) => {
         if (env.kind !== 'eval-result' || env.body.file !== file) return;
         this.evalRev = env.body.doc_revision;
+        opts.sync.pin('diag:static', this.evalRev);
         this.staticBatch = { rev: env.body.doc_revision, diags: env.body.diagnostics.filter((d) => d.file === file) };
         this.refresh();
       }),
       opts.client.on('diag', (env) => {
         if (env.kind !== 'diag') return;
-        for (const c of env.body.clear) this.runtime.delete(c.slot);
+        for (const c of env.body.clear) { this.runtime.delete(c.slot); opts.sync.unpin(`diag:runtime:${c.slot}`); }
         const rev = this.evalRev;
         if (rev !== null) {
           for (const d of env.body.add) {
             if (d.file !== file) continue;
             const slot = d.slot ?? '';
+            opts.sync.pin(`diag:runtime:${slot}`, rev);
             this.runtime.set(slot, [...(this.runtime.get(slot) ?? []), { rev, diags: [d] }]);
           }
         }
@@ -129,6 +131,7 @@ export class DiagnosticsController {
     this.checkedRevision = rev;
     // `session_check` checks exactly the text it was given.
     this.checkBatch = { rev, diags };
+    this.opts.sync.pin('diag:check', rev);
     this.refresh();
   }
 
@@ -165,6 +168,10 @@ export class DiagnosticsController {
     this.disarm();
     for (const off of this.offs) off();
     this.offs.length = 0;
+    this.opts.sync.unpin('diag:static');
+    this.opts.sync.unpin('diag:check');
+    for (const slot of this.runtime.keys()) this.opts.sync.unpin(`diag:runtime:${slot}`);
+    this.runtime.clear();
     this.surface?.annotate('diagnostics', []);
     this.surface = null;
   }

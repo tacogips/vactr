@@ -100,6 +100,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const hideDiagnosticTip = (): void => { diagTip.hidden = true; };
   const anchor = new TimeAnchor(clock, tier === 'browser' ? 'audio' : 'receipt');
   const highlight = new HighlightScheduler({ clock, file: DOC_FILE, map: (span, rev) => sync.mapWireSpan(span, rev),
+    pin: (owner, rev) => sync.pin(owner, rev), unpin: (owner) => sync.unpin(owner), revision: () => sync.revision,
     tempo: () => store.tempo, anchor, ...(deps.audible ? { audible: deps.audible, epoch: () => store.transportSample?.epoch ?? null } : {}) });
   const evalCtl = new EvalController({ client, sync, onHush: () => highlight.clear(), onEval: (reply) => onEval?.(reply) });
   const diagnostics = new DiagnosticsController({ client, sync, tier, ...(deps.core ? { core: deps.core } : {}),
@@ -122,6 +123,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let evalRev: number | null = null;
   const api: CodeApi = {
     surface, mapWireSpan: (span, rev) => sync.mapWireSpan(span, rev),
+    toWireSpan: (from, to) => sync.toWireSpan(from, to),
     currentRevision: (file) => file === DOC_FILE ? sync.revision : 0,
     selectedSiteId: () => {
       if (evalRev === null) return null;
@@ -164,6 +166,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     onFrame(ctx) {
       if (disposed) return;
       if (ctx.textDirty) { viewHost.invalidateRect(); viewHost.refreshRect(); }
+      input.flushBridge();
       const audible = deps.audible?.sample(ctx.frameMs) ?? { time: clock.now(), targetMs: ctx.frameMs, provenance: 'unavailable' as const, valid: false };
       playingRanges = highlight.tick(ctx.frameMs);
       scheduler?.setActive('playing', highlight.size > 0);
@@ -270,7 +273,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     }),
     client.on('eval-result', (env) => {
       if (env.kind !== 'eval-result') return;
-      if (env.body.file === DOC_FILE) evalRev = env.body.doc_revision;
+      if (env.body.file === DOC_FILE) { evalRev = env.body.doc_revision; sync.pin('eval', evalRev); }
       transport.onDiagnostics(env.body.diagnostics);
     }),
     client.on('diag', (env) => { if (env.kind === 'diag') transport.onDiagnostics(env.body.add); }),

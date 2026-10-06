@@ -9,6 +9,13 @@ export function wordRange(text: string, position: number): { from: number; to: n
   for (const s of words.segment(text)) if (s.index <= position && position < s.index + s.segment.length) return { from: s.index, to: s.index + s.segment.length };
   return { from: position, to: position };
 }
+export function wordRangeAt(doc: Text, position: number): { from: number; to: number } {
+  const line = doc.lineAt(Math.max(0, Math.min(doc.length, Math.floor(position))));
+  const local = Math.max(0, Math.min(line.length, position - line.from));
+  const from = Math.max(0, local - 32_768), to = Math.min(line.length, local + 32_768);
+  const range = wordRange(line.text.slice(from, to), local - from);
+  return { from: line.from + from + range.from, to: line.from + from + range.to };
+}
 export function wordMove(text: string, position: number, direction: -1 | 1): number {
   if (direction < 0) {
     let previous = 0;
@@ -21,7 +28,7 @@ export function wordMove(text: string, position: number, direction: -1 | 1): num
   for (const s of words.segment(text)) if (s.isWordLike && s.index + s.segment.length > position) return s.index + s.segment.length;
   return text.length;
 }
-function lineBoundary(doc: Text, position: number, bias: -1 | 1): number {
+export function lineBoundary(doc: Text, position: number, bias: -1 | 1): number {
   const line = doc.lineAt(Math.max(0, Math.min(doc.length, position)));
   const first = Math.max(1, Math.min(doc.lines, line.number));
   const last = position > line.to ? Math.min(doc.lines, first + 1) : first;
@@ -29,24 +36,35 @@ function lineBoundary(doc: Text, position: number, bias: -1 | 1): number {
   const local = doc.sliceString(from, to);
   return from + boundary(local, position - from, bias);
 }
+export function boundaryAt(doc: Text, position: number, bias: -1 | 1 = -1): number {
+  const line = doc.lineAt(Math.max(0, Math.min(doc.length, Math.floor(position))));
+  return line.from + boundary(line.text, Math.max(0, Math.min(line.length, position - line.from)), bias);
+}
 function wordMoveAt(doc: Text, position: number, direction: -1 | 1): number {
-  const line = doc.lineAt(position), local = position - line.from;
+  const line = doc.lineAt(Math.max(0, Math.min(doc.length, position))), local = position - line.from;
+  let remaining = 65_536;
   if (direction < 0) {
-    let previous = -1;
-    for (const part of words.segment(line.text)) if (part.isWordLike && part.index < local) previous = part.index;
-    if (previous >= 0) return line.from + previous;
-    for (let number = line.number - 1; number >= 1; number--) {
-      const previous = doc.line(number);
-      const matches = [...words.segment(previous.text)].filter(part => part.isWordLike);
-      if (matches.length) return previous.from + matches[matches.length - 1]!.index;
+    for (let number = line.number; number >= 1 && remaining > 0; number -= 1) {
+      const current = doc.line(number);
+      const end = number === line.number ? Math.max(0, Math.min(current.length, local)) : current.length;
+      const start = Math.max(0, end - remaining);
+      const text = current.text.slice(start, end);
+      let previous = -1;
+      for (const part of words.segment(text)) if (part.isWordLike && part.index < text.length) previous = part.index;
+      if (previous >= 0) return current.from + start + previous;
+      remaining -= text.length + (number > 1 ? 1 : 0);
+      if (start > 0 || remaining <= 0) return current.from + start;
     }
     return 0;
   }
-  for (const part of words.segment(line.text)) if (part.isWordLike && part.index + part.segment.length > local)
-    return line.from + part.index + part.segment.length;
-  for (let number = line.number + 1; number <= doc.lines; number++) {
-    const next = doc.line(number);
-    for (const part of words.segment(next.text)) if (part.isWordLike) return next.from + part.index + part.segment.length;
+  for (let number = line.number; number <= doc.lines && remaining > 0; number += 1) {
+    const current = doc.line(number);
+    const start = number === line.number ? Math.max(0, Math.min(current.length, local)) : 0;
+    const end = Math.min(current.length, start + remaining);
+    const text = current.text.slice(start, end);
+    for (const part of words.segment(text)) if (part.isWordLike) return current.from + start + part.index + part.segment.length;
+    remaining -= text.length + (number < doc.lines ? 1 : 0);
+    if (end < current.length || remaining <= 0) return current.from + current.length;
   }
   return doc.length;
 }

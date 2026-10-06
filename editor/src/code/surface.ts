@@ -37,6 +37,7 @@ export class CodeSurface implements SurfaceContract {
   private readonly byteLimit: number;
   private undoBytes = 0;
   private reduced = false;
+  private readonly historyMemo = new WeakMap<object, number>();
 
   constructor(options: CodeSurfaceOptions) {
     this.sync = options.sync;
@@ -75,9 +76,9 @@ export class CodeSurface implements SurfaceContract {
   }
   private boundHistory(): void {
     const value = this.current.field(historyField);
-    const initial = trimUndoHistory(value, this.byteLimit);
+    const initial = trimUndoHistory(value, this.byteLimit, this.historyMemo);
     this.sync.history.trimToBytes(Math.max(0, this.byteLimit - initial.bytes));
-    const bounded = trimUndoHistory(initial.value, this.byteLimit - this.sync.history.retainedBytes);
+    const bounded = trimUndoHistory(initial.value, this.byteLimit - this.sync.history.retainedBytes, this.historyMemo);
     this.undoBytes = bounded.bytes;
     if (!initial.reduced && !bounded.reduced) return;
     this.reduced = true;

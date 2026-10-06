@@ -15,10 +15,10 @@ import type { EditorDeps, Mounted } from '../app/deps';
 import { buildLayout } from '../app/layout';
 import { DOC_FILE } from '../code/mount';
 import type { EditorDecl, EvalResultBody, WireForm } from '../protocol/types';
-import { Utf8Index } from '../protocol/utf8';
 import { ControlPanel } from './directives';
 import { DragController } from './drag';
 import { formatValue, SliderPanel } from './panel';
+import type { PanelViewport } from './panel';
 import { Persistence, type PersistenceMode } from './persistence';
 import { CcRouter } from './routing';
 import { save, type Saved } from './save';
@@ -47,6 +47,8 @@ export interface BindOptions {
   docName?: string;
   /** Test seam: called after every panel row render. */
   onRender?: (key: string, el: HTMLElement) => void;
+  /** Test seam for deterministic bind-panel virtualization. */
+  panelViewport?: () => PanelViewport;
 }
 
 export class BindArea {
@@ -66,7 +68,6 @@ export class BindArea {
   private evalRev = 0;
   private forms: WireForm[] = [];
   private owners = new Map<string, string>();
-  private indexCache: { rev: number; idx: Utf8Index } | null = null;
   private readonly offs: (() => void)[] = [];
   private readonly stylesheet: HTMLLinkElement | null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -92,6 +93,7 @@ export class BindArea {
       table: this.table,
       surface: this.surface,
       currentRevision: () => code.currentRevision(this.file),
+      toWireSpan: (from, to) => code.toWireSpan(from, to),
       map: (span, rev) => code.mapWireSpan(span, rev),
       formOf: (range) => this.formOf(range),
       editors: () => this.editors(),
@@ -156,6 +158,7 @@ export class BindArea {
       learn: (e) => void this.writer.learn(e.site.id),
       commit: (e) => this.writer.commit(e.site.id),
       ...(opts.onRender ? { onRender: opts.onRender } : {}),
+      ...(opts.panelViewport ? { viewport: opts.panelViewport } : {}),
     });
     this.control = new ControlPanel(right, {
       store,
@@ -294,11 +297,7 @@ export class BindArea {
   }
 
   private bytes(r: Range16): { start: number; end: number } {
-    const rev = this.code.currentRevision(this.file);
-    if (!this.indexCache || this.indexCache.rev !== rev) {
-      this.indexCache = { rev, idx: new Utf8Index(this.surface.state.doc.toString()) };
-    }
-    return this.indexCache.idx.spanToBytes(r.from, r.to);
+    return this.code.toWireSpan(r.from, r.to);
   }
 
   private hasSetEntry(e: SiteEntry): boolean {

@@ -85,15 +85,21 @@ describe('DiagnosticsController', () => {
   });
 
   it('removes a slot runtime markers on clear', () => {
-    const { transport, view, evalResult, shown } = setup('native');
+    const { transport, sync, ctl, view, evalResult, shown } = setup('native');
+    const pin = vi.spyOn(sync, 'pin'), unpin = vi.spyOn(sync, 'unpin');
     evalResult([]);
     transport.emit({
       kind: 'diag',
       body: { add: [diag('d1', 'd1 late', { slot: 'd1' }), diag('d2', 'd2 late', { slot: 'd2' })], clear: [] },
     });
     expect(shown(view).map((d) => d.text)).toEqual(['d1', 'd2']);
+    expect(pin).toHaveBeenCalledWith('diag:static', 1);
+    expect(pin).toHaveBeenCalledWith('diag:runtime:d1', 1);
     transport.emit({ kind: 'diag', body: { add: [], clear: [{ slot: 'd1' }] } });
     expect(shown(view).map((d) => d.text)).toEqual(['d2']);
+    expect(unpin).toHaveBeenCalledWith('diag:runtime:d1');
+    ctl.dispose();
+    expect(unpin).toHaveBeenCalledWith('diag:static');
   });
 
   it('drops a diagnostic whose span no longer maps', () => {
@@ -145,10 +151,12 @@ describe('DiagnosticsController', () => {
   });
 
   it('checks an unchanged revision once and checks again after an edit', () => {
-    const { view, core, ctl } = setup('browser', () => []);
+    const { view, sync, core, ctl } = setup('browser', () => []);
+    const pin = vi.spyOn(sync, 'pin');
     ctl.runCheck();
     ctl.runCheck();
     expect(core?.check).toHaveBeenCalledTimes(1);
+    expect(pin).toHaveBeenCalledWith('diag:check', 1);
 
     view.dispatch({ changes: { from: 0, insert: 'x' } });
     ctl.runCheck();

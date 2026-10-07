@@ -1,10 +1,10 @@
 # DOM-RENDERER-CORE: Renderer Interface, DOM Renderer, Overlays and Unit Tests Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (accepted in session 296 after the DOM-CORE-TI-HIGHLIGHT-VACUOUS and DOM-CORE-ADV-OVERLAY-STALE-GEOMETRY repairs; archived 2026-10-07)
 **Plan ID**: DOM-RENDERER-CORE (wave 1 of 4, serial chain)
 **Design Reference**: `design-docs/specs/design-dom-renderer.md`. Cite the document's own numbering: DR-1 (interface), DR-3 (tree, coordinates, CSS rules), DR-4 (window, keys, bounds), DR-5 (frame discipline), DR-6 (highlights), DR-7 (stats) and DR-8 (unit tests).
 **Depends On**: none
-**Next**: `impl-plans/active/dom-renderer-mount.md`
+**Next**: `impl-plans/completed/dom-renderer-mount.md`
 **Created**: 2026-10-07
 **Last Updated**: 2026-10-07
 
@@ -296,13 +296,15 @@ action.
   whose target is inside `.vact-dom-lines` or `.vact-dom-gutter`. `lineBuilds` and `lineMoves`
   deltas are 0. At least one record targets `.vact-dom-caret`.
 - **Animation-only frame** (same text, annotations and viewport; new `animated` with 3 playing
-  ranges):
-  - first time -> every record's target is inside `.vact-dom-hl`;
-  - then off, then the same 3 on again -> every record is `attributes` with
-    `attributeName === 'class'` inside `.vact-dom-hl`, and `highlightBuilds` delta is 0.
-  - Both branches go in one test.
-- **Highlight cap:** 600 distinct ranges on -> `highlightDropped > 0` and highlight keys
-  <= 512.
+  ranges): first frame has records, builds highlights, and shows 3 `.vact-dom-hlr.on` elements;
+  off and on frames each produce exactly 3 class records and toggle deltas of 3, with active
+  counts 0 and 3. Repeating the same on frame produces no records and a toggle delta of 0.
+- **Overlay geometry revision:** after rendering playing, selection and diagnostic ranges at
+  offsets 14-18 in a 300-line document, replacing the newline at offset 13 with a space refreshes
+  their positions to the current `TextLayout.rangeRects`; a repeated unchanged frame produces no
+  mutation records. Diagnostic bars remain aligned to the range's left edge and bottom offset.
+- **Highlight cap:** 600 distinct ranges on -> `highlightDropped > 0`, at most 512 highlight
+  rects, and exactly 512 `.vact-dom-hlr.on` elements.
 - **IME:** a doc whose line 0 contains preedit `にほんご`, plus a `composition` annotation over
   it and `cursor` at its end -> the line text includes the preedit, one `.vact-dom-comp` bar
   whose left/top equal `layout.coordsAtPos` in content coordinates, and the caret at the
@@ -334,23 +336,23 @@ action.
 
 ### TASK-C1: Interface and selector
 **Deliverables**: `renderer-types.ts`, plus the selector and type-check tests.
-- [ ] `RendererKind`, `CodeRenderer` and `selectRendererKind` exported exactly as pinned
-- [ ] Compile-time `CanvasRenderer extends CodeRenderer` assertion passes `npm run check`
+- [x] `RendererKind`, `CodeRenderer` and `selectRendererKind` exported exactly as pinned
+- [x] Compile-time `CanvasRenderer extends CodeRenderer` assertion passes `npm run check`
 
 ### TASK-C2: Lines, gutter, window and transforms
 **Deliverables**: `dom-renderer.ts` (root tree, window, keyed lines, run pieces, tokens, gutter,
 font, status, stats, dispose), `dom-renderer.css`.
-- [ ] Virtualization, scroll, edit, newline, long-line, token, literal-text, DPR and dispose
+- [x] Virtualization, scroll, edit, newline, long-line, token, literal-text, DPR and dispose
       tests pass
-- [ ] `setPhases` sets `layout.phases` (same semantics as `renderer.ts:121`), and the setPhases
+- [x] `setPhases` sets `layout.phases` (same semantics as `renderer.ts:121`), and the setPhases
       test passes
 
 ### TASK-C3: Overlays and highlights
 **Deliverables**: `dom-overlay.ts` (selection, caret, handles, bars, labels, highlight pool).
-- [ ] Caret-move, animation-only, highlight-cap, IME, selection and no-layout-read tests pass
+- [x] Caret-move, animation-only, highlight-cap, IME, selection and no-layout-read tests pass
 
 ### TASK-C4: Verification and progress log
-- [ ] All verification commands below exit 0. Logs are under `tmp/dom-renderer/core/`. The
+- [x] All verification commands below exit 0. Logs are under `tmp/dom-renderer/core/`. The
       sha256 of each written file is recorded in the progress log.
 
 ## Verification (implementer, in the sandbox; no browser and no lock needed)
@@ -371,14 +373,57 @@ mutation or negative-control commands.
 
 ## Completion Criteria
 
-- [ ] The five new files exist. Each `.ts` file is under 600 lines.
-- [ ] Every pinned export and class name exists with the exact spelling.
-- [ ] Verification 1-4 pass.
-- [ ] No file outside writePaths changed (`git status --short` shows only the writePaths).
+- [x] The five new files exist. Each `.ts` file is under 600 lines.
+- [x] Every pinned export and class name exists with the exact spelling.
+- [x] Verification 1-4 pass.
+- [x] No file outside writePaths changed (`git status --short` shows only the writePaths).
 
 ## Progress Log
 
-### Session: (implementer fills in)
-**Tasks Completed**:
+### Session: 2026-10-07 DOM-RENDERER-CORE
+**Tasks Completed**: TASK-C1 through TASK-C4 implementation, tests, and final-source verification.
 **Verification**:
-**Notes**:
+- `cd editor && npm run check > ../tmp/dom-renderer/core/check.log 2>&1` — exit 0.
+- `cd editor && ./node_modules/.bin/vitest run test/code/dom-renderer.test.ts > ../tmp/dom-renderer/core/vitest-dom.log 2>&1` — exit 0, 8/8 tests passed.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas > ../tmp/dom-renderer/core/vitest-canvas.log 2>&1` — exit 0, 215/215 tests passed.
+- `git diff --stat -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/mount.ts editor/src/code/code.css editor/src/app/theme.css` — exit 0, empty output (`tmp/dom-renderer/core/protected-paths.log`).
+**Notes**: The renderer files are under 600 lines. Status, node accounting, highlight and overlay caps, stable transform-only scrolling, middle/end virtualization, non-default gutter width, selection/composition/caret coordinates, literal text, and no-layout-read behavior are covered. Interim assertion and type-check failures were corrected; captured outputs are in `tmp/dom-renderer/core/attempt-*.log` and the node-counter diagnostic log. Independent formal review and downstream mount/harness/evidence plans remain with later workflow steps.
+
+SHA-256:
+- `editor/src/code/renderer-types.ts`: `b18a4a7ad2abf5c6002cb84fc4dab0a74906045d01ccf8d88461ddb50406e7d0`
+- `editor/src/code/dom-renderer.ts`: `8b519e66ddfc66a23e96c0488686c0e383c0bed0ae5e7377d276fd9996febc2d`
+- `editor/src/code/dom-overlay.ts`: `bb676db3cad08d92afaca0dcab26afe3832e4479bda0e2c5129815d5ccfa987b`
+- `editor/src/code/dom-renderer.css`: `c6f70216603ce2db7a72d8fc96b4af06ad69348ac54212290b5b5b958188cc85`
+- `editor/test/code/dom-renderer.test.ts`: `a678eb9c09e6908e19babe9312d7bb30baa59042d801eb8217e4473011d1e818`
+
+### Session: 2026-10-07 DOM-CORE-TI-HIGHLIGHT-VACUOUS repair
+**Finding**: `DOM-CORE-TI-HIGHLIGHT-VACUOUS` (test-integrity review, comm-004765) repaired in
+`editor/test/code/dom-renderer.test.ts`. The test now requires nonempty first-frame records,
+visible highlight counts of 3 / 0 / 3, exact toggle deltas of 3 / 3 / 0 across on/off/on/repeat,
+no repeat-frame mutations, a positive first-frame build count, and a 512-element active cap.
+**Verification**:
+- `cd editor && npm run check > ../tmp/dom-renderer/core/check.log 2>&1` — exit 0.
+- `cd editor && ./node_modules/.bin/vitest run test/code/dom-renderer.test.ts > ../tmp/dom-renderer/core/vitest-dom.log 2>&1` — exit 0, 8/8 passed.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas > ../tmp/dom-renderer/core/vitest-canvas.log 2>&1` — exit 0, 215/215 passed.
+- `git diff --stat -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/mount.ts editor/src/code/code.css editor/src/app/theme.css > tmp/dom-renderer/core/protected-paths-ti-final.log` — exit 0, empty output.
+**Test SHA-256**: `17de067a9b86e8cf66308b256dff63259e50578ac977ef1f080f3ede85a3a2bc`.
+**Review decision**: repair is ready for independent re-review; no acceptance decision is claimed here.
+
+### Session: 2026-10-07 DOM-CORE-ADV-OVERLAY-STALE-GEOMETRY repair
+**Finding**: `DOM-CORE-ADV-OVERLAY-STALE-GEOMETRY` (adversarial review, comm-004769) repaired.
+`DomRenderer.render` now passes `lastTextRevision` to static and animated overlays. Static,
+selection and highlight geometry keys include that revision. Geometry refresh preserves the
+active `on` class, so a visible highlight remains visible while its rect moves after an edit.
+The regression test joins two lines while preserving annotation offsets, checks current
+TextLayout positions for highlight, selection and diagnostic geometry, then asserts that the next
+unchanged frame has no mutations.
+**Verification**:
+- `cd editor && npm run check > ../tmp/dom-renderer/core/check.log 2>&1` — exit 0.
+- `cd editor && ./node_modules/.bin/vitest run test/code/dom-renderer.test.ts > ../tmp/dom-renderer/core/vitest-dom.log 2>&1` — exit 0, 9/9 passed.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas > ../tmp/dom-renderer/core/vitest-canvas.log 2>&1` — exit 0, 215/215 passed.
+- `git diff --stat -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/mount.ts editor/src/code/code.css editor/src/app/theme.css > tmp/dom-renderer/core/protected-paths-adv-final.log` — exit 0, empty output.
+**SHA-256**:
+- `editor/src/code/dom-overlay.ts`: `8f0ae29581f1ec024ab446f17129367f829c362688ccfc39f93cc6c8625c1a9f`
+- `editor/src/code/dom-renderer.ts`: `a21211c89ee760bd1ff56db31b1525b1676488509655bd0ba83b9d8cab4633fc`
+- `editor/test/code/dom-renderer.test.ts`: `9538c2142d30472e5d88501c695d038977324347a0cfc8faeb5c2266ca5ebc40`
+**Review decision**: repair submitted for independent re-review; no acceptance decision is claimed here.

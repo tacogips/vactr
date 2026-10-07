@@ -1,9 +1,9 @@
 # DOM-RENDERER-HARNESS: Comparison Driver, DOM Behavior Checks and measure.mjs Hooks Implementation Plan
 
-**Status**: Ready (starts after DOM-RENDERER-MOUNT is accepted)
+**Status**: Completed (accepted in session 296 after the ADV-HARNESS-S296-01 repair; archived 2026-10-07). The `dom-visible-text` token check was later corrected by DOM-RENDERER-EVIDENCE to the string token; see that plan's progress log.
 **Plan ID**: DOM-RENDERER-HARNESS (wave 3 of 4, serial chain)
 **Design Reference**: `design-docs/specs/design-dom-renderer.md` DR-9 (DOM behavior e2e) and DR-10 (comparison protocol: matrix, conditions, order, lock, `measure.mjs` hooks, first-viewport probe, metric table, raw data, honesty and winner rules, report)
-**Depends On**: DOM-RENDERER-MOUNT (`impl-plans/active/dom-renderer-mount.md`)
+**Depends On**: DOM-RENDERER-MOUNT (`impl-plans/completed/dom-renderer-mount.md`)
 **Next**: `impl-plans/active/dom-renderer-evidence.md`
 **Created**: 2026-10-07
 **Last Updated**: 2026-10-07
@@ -374,23 +374,23 @@ Import `compare-stats.mjs` and `fixtures/large-doc.mjs` through the dynamic-impo
 ## Tasks
 
 ### TASK-H1: `compare-stats.mjs` and its tests
-- [ ] All exports exist as pinned. Every test bullet passes.
+- [x] All exports exist as pinned. Every test bullet passes.
 
 ### TASK-H2: `measure.mjs` hooks
-- [ ] Only the four additive hooks. `git diff editor/test/e2e/measure.mjs` shows no other change.
+- [x] Only the four additive hooks. `git diff editor/test/e2e/measure.mjs` shows no other change.
 
 ### TASK-H3: `behavior-dom.mjs`
-- [ ] Every DR-9 check id is implemented. `node --check` passes.
+- [x] Every DR-9 check id is implemented. `node --check` passes.
 
 ### TASK-H4: `compare.mjs`
-- [ ] Flags, lock guard, preflight, behavior and measurement modes, raw files, attempts,
+- [x] Flags, lock guard, preflight, behavior and measurement modes, raw files, attempts,
       `--resume`, `--write-report` and exit codes, all as pinned.
 
 ### TASK-H5: README and verification
-- [ ] `editor/test/e2e/README.md` gets a "Renderer comparison" section. It covers the lock
+- [x] `editor/test/e2e/README.md` gets a "Renderer comparison" section. It covers the lock
       wrapper command, the per-cell invocations, `--resume`, `--write-report` and the output
       layout.
-- [ ] The commands below pass. Logs are under `tmp/dom-renderer/harness/`.
+- [x] The commands below pass. Logs are under `tmp/dom-renderer/harness/`.
 
 ## Verification (implementer, in the sandbox; serial)
 
@@ -413,13 +413,14 @@ the EVIDENCE plan runs them outside the sandbox.
 
 ## Completion Criteria
 
-- [ ] All pinned exports, flags and check ids exist.
-- [ ] Verification 1-5 pass.
-- [ ] Only writePaths and the two sharedPaths changed.
+- [x] All pinned exports, flags and check ids exist.
+- [x] Verification 1-5 pass.
+- [x] Only writePaths and the two sharedPaths changed.
 
 ## Progress Log
 
-### Session: (implementer fills in)
-**Tasks Completed**:
-**Verification**:
-**Notes**:
+### Session: 2026-10-07 13:45 JST
+**Tasks Completed**: TASK-H1 through TASK-H5. Added pure comparison statistics helpers/tests, serial comparison and report driver, DOM behavior checks, the four `measure.mjs` hooks, and README instructions.
+**Verification**: `node --check test/e2e/compare.mjs && node --check test/e2e/compare-stats.mjs && node --check test/e2e/behavior-dom.mjs && node --check test/e2e/measure.mjs` (exit 0); `npm run check` (exit 0); Vitest focused e2e statistics suite (56/56); report-only dry run (exit 0; generated markers and unavailable metrics); protected-path diff stat empty.
+**Notes**: Browser behavior and full comparison measurements are assigned to DOM-RENDERER-EVIDENCE. No changes to `run.mjs`, `behavior.mjs`, `stats.mjs`, `silent-sink.mjs` or `fixtures/large-doc.mjs`. Prior accepted mount files remained intact.
+**Review repair (ADV-HARNESS-S296-01)**: `firstViewport` now selects the latest presented row at the loaded revision during the first rAF poll with `textPending === false`; fresh repair checks passed in `tmp/dom-renderer/harness/node-check-repair.log`, `check-repair.log`, `vitest-e2e-repair.log` (56/56), `write-report-repair.log`, and empty `protected-paths-repair.log`. The 60 s timeout-to-null and `mountToFirstFrameMs` definition are unchanged.

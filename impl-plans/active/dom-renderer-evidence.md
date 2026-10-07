@@ -1,11 +1,11 @@
 # DOM-RENDERER-EVIDENCE: DOM Behavior Run, Canvas-vs-DOM Measurement Matrix, Report and Gates Implementation Plan
 
-**Status**: Ready (starts after DOM-RENDERER-HARNESS is accepted)
+**Status**: In Progress (TASK-E1 through E6 complete; TASK-E7 belongs to final integration)
 **Plan ID**: DOM-RENDERER-EVIDENCE (wave 4 of 4, serial chain; final)
 **Design Reference**: `design-docs/specs/design-dom-renderer.md` DR-9 (DOM behavior), DR-10 (comparison protocol and report) and DR-12 (gates)
-**Depends On**: DOM-RENDERER-HARNESS (`impl-plans/active/dom-renderer-harness.md`), and transitively CORE and MOUNT
+**Depends On**: DOM-RENDERER-HARNESS (`impl-plans/completed/dom-renderer-harness.md`), and transitively CORE and MOUNT (`impl-plans/completed/`)
 **Created**: 2026-10-07
-**Last Updated**: 2026-10-07
+**Last Updated**: 2026-10-07 (implementation evidence complete)
 
 ---
 
@@ -97,7 +97,7 @@ suite while a locked measurement runs.
   `REPORT_SKELETON`, with `unavailable` tables.
 - Add an `impl-plans/README.md` entry: "DOM renderer comparison backend (design
   `design-dom-renderer.md`), serial plans core -> mount -> harness -> evidence", with links.
-- [ ] The report exists with both markers. The README entry is added.
+- [x] The report exists with both markers. The README entry is added.
 
 ### TASK-E2 (outside the sandbox): Builds
 Run these serially, from the repository root unless noted:
@@ -137,7 +137,7 @@ attempts remain in `attempts.json`.
 Expected wall clock is about 25-30 min per cell. Post-sink silence (peak 0) is enforced inside
 `runMeasurement` for every run.
 
-- [ ] `rc-001/runs/` has 24 complete `.json` files plus `.jsonl` files, and `environment.json`,
+- [x] `rc-001/runs/` has 24 complete `.json` files plus `.jsonl` files, and `environment.json`,
       `attempts.json`, `comparison.json` and `behavior/` exist.
 
 ### TASK-E5 (iteration 2, sandbox): Report
@@ -174,7 +174,7 @@ Expected wall clock is about 25-30 min per cell. Post-sink silence (peak 0) is e
      example, transform-only scroll, keyed line reuse, class-toggle highlights) beat canvas in
      which metric, and by how much. Write no recommendations.
 3. Do not edit the generated region by hand.
-- [ ] The report has measured tables, the three written sections, and no `Pending measured
+- [x] The report has measured tables, the three written sections, and no `Pending measured
       data.` line.
 
 ### TASK-E6 (final gates; sandbox items by the implementer, locked items outside)
@@ -236,16 +236,35 @@ Do not run mutation or negative-control commands.
 
 ## Completion Criteria
 
-- [ ] DOM behavior passes in Chromium and WebKit (TASK-E3.1).
-- [ ] 24 complete runs exist with raw data under `rc-001` (TASK-E4).
-- [ ] The report is complete, with tables and analysis (TASK-E5).
-- [ ] Gates 1-9 pass (TASK-E6).
+- [x] DOM behavior passes in Chromium and WebKit (TASK-E3.1).
+- [x] 24 complete runs exist with raw data under `rc-001` (TASK-E4).
+- [x] The report is complete, with tables and analysis (TASK-E5).
+- [x] Gates 1-9 pass (TASK-E6).
 - [ ] The commit is pushed non-force to `origin wf/dom-editor` (TASK-E7, final integration
       step).
 
 ## Progress Log
 
-### Session: (implementer fills in)
-**Tasks Completed**:
+### Session: 2026-10-07 (Step 6 implementation)
+**Tasks Completed**: TASK-E1 through TASK-E6. Generated the report skeleton and index entry; built release WASM and frontend; DOM behavior passed in Chromium and WebKit (11/11 Chromium checks; 9/9 WebKit checks passed plus the two clipboard/IME limitations; touch uses synthetic pointer events); canvas reference behavior passed. Completed all 24 serial measurement keys and generated raw JSON/JSONL, environment, attempts and comparison files. Authored Analysis, Limitations and Observations from `rc-001` values. Gates 1-9 passed. TASK-E7 commit and non-force push remain for final integration.
+
 **Verification**:
-**Notes**:
+- `CARGO_TERM_QUIET=true mise run build-wasm-release` — exit 0, `tmp/dom-renderer/evidence/wasm-release.log`.
+- `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` — exit 0, `tmp/dom-renderer/evidence/dist-build.log`.
+- Locked DOM behavior — exit 0, 2 browser suites passed, `tmp/dom-renderer/evidence/behavior-dom-retry1.log`.
+- Locked canvas behavior reference — exit 0, 2 browser suites passed, `tmp/dom-renderer/evidence/behavior-canvas.log`.
+- Locked matrix cells (each attempted and completed 6 keys, exit 0): `tmp/dom-renderer/evidence/cell-1000-chromium.log`, `cell-1000-webkit.log`, `cell-20000-chromium.log`, `cell-20000-webkit.log`. Matrix gate failures remain reported in per-run data; there were no incomplete keys or retries.
+- `cd editor && node test/e2e/compare.mjs --run-id rc-001 --write-report` — exit 0, `tmp/dom-renderer/evidence/write-report-2.log`; the measured tables are generated and written analysis is outside the marker region.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` — exit 0, `tmp/dom-renderer/evidence/wasm-debug-host.log`.
+- `cd editor && npm run check` — exit 0, `tmp/dom-renderer/evidence/check.log`.
+- `cd editor && ./node_modules/.bin/vitest run` — exit 0, 836/836 tests, `tmp/dom-renderer/evidence/vitest-full-final.log`.
+- `cd editor && npm run test:perf` — exit 0, 1/1 test, `tmp/dom-renderer/evidence/test-perf.log`.
+- Locked `cd editor && npm run test:style` — exit 0, 4/4 engine/viewport assertions, `tmp/dom-renderer/evidence/test-style.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` — exit 0, `tmp/dom-renderer/evidence/clippy.log`.
+- Locked, alone, `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run` — exit 0, 2817/2817 tests passed, `tmp/dom-renderer/evidence/nextest.log`.
+- `CARGO_TERM_QUIET=true mise run build-wasm-release` — exit 0, `tmp/dom-renderer/evidence/wasm-release-final.log`.
+- `git diff --stat ec34f66 -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/frame.ts editor/test/e2e/run.mjs editor/test/e2e/behavior.mjs editor/test/e2e/stats.mjs editor/test/e2e/fixtures/large-doc.mjs` — exit 0, empty output, `tmp/dom-renderer/evidence/protected-paths-final.log`.
+- `rg -n 'DOM renderer comparison' impl-plans/README.md` — exit 0, `tmp/dom-renderer/evidence/readme-index.log`.
+- `python3 tmp/dom-renderer/evidence/report-evidence-integrity.py` — exit 0; 24 unique complete run JSON files and 24 JSONL files, all required evidence and report sections present, no pending-data line, and 12,621,357 raw bytes (<20 MiB), `tmp/dom-renderer/evidence/report-evidence-integrity-final.log`.
+
+**Notes**: The first locked DOM behavior attempt exposed an incorrect harness expectation (`let` is not the keyword capture; syntax maps `string.special.symbol` to the keyword class). The check was corrected to verify the string token and its `--vt-syn-string` color; attempt-1 browser artifacts were preserved under `tmp/dom-renderer/evidence/*-attempt1.json`, and the final check passed in both engines. The initial plain debug wasm build exited 0 but produced a binary without `session_init`; the first full Vitest run therefore failed 48 wasm-dependent tests. Rebuilt the debug cdylib with the `host-wasm` feature and reran the full suite successfully (836/836); superseded output is retained in `tmp/dom-renderer/evidence/vitest-full.log`. The final-source passing runs are the only verification records above. `rc-001` has no measurement retries; gate-failing runs are faithfully shown per cell in the report. Measurement lock is released. No canvas renderer, layout, frame, or protected shared harness file changed since `ec34f66`.

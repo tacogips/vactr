@@ -25,6 +25,8 @@ import { PointerController, type SelectionHandle } from './pointer';
 import { TextLayout } from './layout';
 import { createMeasureContext } from './advances';
 import { CanvasRenderer } from './renderer';
+import { DomRenderer } from './dom-renderer';
+import { selectRendererKind, type CodeRenderer, type RendererKind } from './renderer-types';
 import { readPalette } from './palette';
 import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
@@ -44,6 +46,7 @@ export interface MountOptions {
   gl?: WebGL2RenderingContext;
   frameHost?: FrameHost;
   createCanvas?: () => HTMLCanvasElement;
+  renderer?: RendererKind;
 }
 
 function localStore(win: Window | null): Pick<Storage, 'getItem' | 'setItem'> | null {
@@ -63,17 +66,21 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const { client, store, clock, tier } = deps;
   const doc = root.ownerDocument; const win = doc.defaultView;
   if (!win) throw new Error('Canvas editor requires a window');
+  const rendererKind = selectRendererKind(win.location.search, opts.renderer);
   addStylesheet(doc);
   const codePane = pane(root, 'code'); const transportPane = pane(root, 'transport');
   codePane.dataset.syntax = 'fallback';
+  codePane.dataset.renderer = rendererKind;
   const holder = doc.createElement('div');
   const disposeCanvasHost = render(() => createComponent(CodeSurface, {}), holder);
   const hostEl = holder.firstElementChild as HTMLElement; codePane.appendChild(hostEl);
-  const canvas = doc.createElement('canvas'); canvas.className = 'vact-code-canvas'; canvas.setAttribute('aria-hidden', 'true');
+  const surfaceEl: HTMLElement = rendererKind === 'canvas' ? doc.createElement('canvas') : doc.createElement('div');
+  if (rendererKind === 'canvas') { surfaceEl.className = 'vact-code-canvas'; surfaceEl.setAttribute('aria-hidden', 'true'); }
+  else { surfaceEl.className = 'vact-code-dom'; surfaceEl.setAttribute('aria-hidden', 'true'); }
   const inputContainer = doc.createElement('div'); inputContainer.className = 'vact-code-input-bridge';
   const gpuStatus = doc.createElement('div'); gpuStatus.className = 'vact-code-gpu-status'; gpuStatus.setAttribute('role', 'status');
   const diagTip = doc.createElement('div'); diagTip.className = 'vact-code-diag-tooltip'; diagTip.setAttribute('role', 'tooltip'); diagTip.hidden = true;
-  hostEl.append(canvas, inputContainer, gpuStatus, diagTip);
+  hostEl.append(surfaceEl, inputContainer, gpuStatus, diagTip);
 
   const sync = new DocumentSync(client.document(DOC_FILE), Text.of(['']));
   const surface = new HeadlessSurface({ sync });
@@ -81,11 +88,14 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const textMetrics = metrics ?? { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
   const layout = new TextLayout(textMetrics, { font: '13px ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 18, baseline: 14 });
   const ledger = new ResourceLedger();
-  const renderer = new CanvasRenderer(canvas, layout, { ledger, palette: readPalette(doc.documentElement), ...(opts.gl ? { gl: opts.gl } : {}),
-    ...(opts.createCanvas ? { createCanvas: opts.createCanvas } : {}), onStatus: (status) => {
-      gpuStatus.textContent = status.kind === 'unavailable' ? 'GPU unavailable; editing and save remain available' : status.message;
-      gpuStatus.dataset.gpu = status.kind;
-    } });
+  const onStatus = (status: import('./renderer').GpuStatus): void => {
+    gpuStatus.textContent = status.kind === 'unavailable' ? 'GPU unavailable; editing and save remain available' : status.message;
+    gpuStatus.dataset.gpu = status.kind;
+  };
+  const renderer: CodeRenderer = rendererKind === 'canvas'
+    ? new CanvasRenderer(surfaceEl as HTMLCanvasElement, layout, { ledger, palette: readPalette(doc.documentElement), ...(opts.gl ? { gl: opts.gl } : {}),
+      ...(opts.createCanvas ? { createCanvas: opts.createCanvas } : {}), onStatus })
+    : new DomRenderer(surfaceEl, layout, { onStatus });
   const schedulerHost = frameHost(win, opts.frameHost);
   let scheduler: FrameScheduler | undefined;
   let input: InputController | undefined;
@@ -110,7 +120,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     if (!next) return;
     next.classList.add('vact-code-backdrop');
     next.setAttribute('aria-hidden', 'true');
-    hostEl.insertBefore(next, canvas);
+    hostEl.insertBefore(next, surfaceEl);
   };
   let staticAnnotations: CodeAnnotation[] = [];
   let syntaxSpans: CodeAnnotation[] = [];
@@ -174,13 +184,13 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       }
     } });
   viewHost.setFocus(() => input.focus());
-  pointer = new PointerController(surface, canvas, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
+  pointer = new PointerController(surface, surfaceEl, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
     onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText('selection'); },
     composing: () => input.isComposing });
   const forwardPointer = (event: Event): void => surface.notifyPointer(event as PointerEvent);
   const pointerNames = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
-  for (const name of pointerNames) canvas.addEventListener(name, forwardPointer);
-  const removePointerForwarding = (): void => { for (const name of pointerNames) canvas.removeEventListener(name, forwardPointer); };
+  for (const name of pointerNames) surfaceEl.addEventListener(name, forwardPointer);
+  const removePointerForwarding = (): void => { for (const name of pointerNames) surfaceEl.removeEventListener(name, forwardPointer); };
 
   const perfEnabled = new URLSearchParams(win.location.search).get('perf') === '1';
   scheduler = new FrameScheduler(schedulerHost, doc, hostEl, { perf: perfEnabled, revision: () => sync.revision,
@@ -296,8 +306,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     diagTip.style.top = `${coords.bottom - hostRect.top}px`;
     diagTip.hidden = false;
   };
-  canvas.addEventListener('pointermove', showDiagnosticTip);
-  canvas.addEventListener('pointerleave', hideDiagnosticTip);
+  surfaceEl.addEventListener('pointermove', showDiagnosticTip);
+  surfaceEl.addEventListener('pointerleave', hideDiagnosticTip);
 
   const offs: (() => void)[] = [
     client.on('playing', (env) => {
@@ -324,7 +334,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     syntaxProvider = new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax')); codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText('syntax');
   }, () => undefined);
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
-    ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
+    ledger, highlight, renderer, rendererKind, client, store, syntaxTruncated: () => syntaxTruncated,
     disposeCode: () => mounted.dispose() });
 
   const colorScheme = win.matchMedia?.('(prefers-color-scheme: dark)');
@@ -336,7 +346,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       if (disposed) return; disposed = true;
       scheduler.dispose(); pointer.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
       removePointerForwarding(); input.accessibility.textarea.removeEventListener('keydown', keyRecord);
-      canvas.removeEventListener('pointermove', showDiagnosticTip); canvas.removeEventListener('pointerleave', hideDiagnosticTip);
+      surfaceEl.removeEventListener('pointermove', showDiagnosticTip); surfaceEl.removeEventListener('pointerleave', hideDiagnosticTip);
       for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
       disposeFormat(); completion?.dispose(); syntaxProvider.dispose?.(); backgroundStop?.();
       colorScheme?.removeEventListener('change', updatePalette);

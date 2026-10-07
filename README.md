@@ -213,6 +213,17 @@ Without it, the binary target can overwrite that path with a stub that
 has no `session_init` export. With `VACTR_REQUIRE_SESSION_ABI=1`,
 `npm run build` refuses that stub.
 
+The code pane renders on canvas by default. Open the page with
+`?renderer=dom` (or pass `renderer: 'dom'` to the code `mount` options)
+to render it with the DOM renderer (`editor/src/code/dom-renderer.ts`,
+design `design-docs/specs/design-dom-renderer.md`). It is a comparison
+backend: document, input/IME, pointer, audible clock, highlights, syntax,
+diagnostics, frame scheduler and `TextLayout` geometry are shared with
+canvas mode, and only presentation differs. `editor/test/e2e/compare.mjs`
+measures both renderers in Chromium and WebKit under the shared
+measurement lock (see `editor/test/e2e/README.md`, "Renderer comparison").
+The measured results are in `design-docs/specs/design-renderer-comparison.md`.
+
 The Tauri shell (`editor/src-tauri/`) is a standalone crate that wraps
 the same `editor/dist`. Its file access is limited to dialog-picked text
 files. `cargo check --manifest-path editor/src-tauri/Cargo.toml` is part

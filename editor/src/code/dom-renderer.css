@@ -1,0 +1,45 @@
+.vact-code-dom {
+  --vt-dom-code-bg: rgb(10 13 18 / 0.85);
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  contain: strict;
+  background: var(--vt-dom-code-bg);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  cursor: text;
+}
+.vact-dom-gutter, .vact-dom-text { position: absolute; top: 0; bottom: 0; overflow: hidden; }
+.vact-dom-gutter { left: 0; width: 48px; color: var(--vt-syn-comment); }
+.vact-dom-text { left: 48px; right: 0; }
+.vact-dom-content, .vact-dom-gutter-rows { position: absolute; left: 0; top: 0; will-change: transform; }
+.vact-dom-content { min-width: max-content; }
+.vact-dom-lines, .vact-dom-sel, .vact-dom-hl, .vact-dom-under, .vact-dom-labels, .vact-dom-caret { position: absolute; inset: 0 auto auto 0; }
+.vact-dom-line, .vact-dom-num { position: absolute; left: 0; top: 0; white-space: pre; contain: layout style; }
+.vact-dom-num { padding-left: 4px; }
+.vact-dom-run { position: absolute; top: 0; white-space: pre; }
+.vact-dom-tok-comment { color: var(--vt-syn-comment); }
+.vact-dom-tok-directive { color: var(--vt-syn-directive); }
+.vact-dom-tok-keyword { color: var(--vt-syn-keyword); }
+.vact-dom-tok-number { color: var(--vt-syn-number); }
+.vact-dom-tok-string, .vact-dom-tok-path { color: var(--vt-syn-string); }
+.vact-dom-tok-head { color: var(--vt-syn-head); }
+.vact-dom-tok-bracket { color: var(--vt-syn-bracket); }
+.vact-dom-selr { position: absolute; background: var(--vt-selection); }
+.vact-dom-hlr { position: absolute; visibility: hidden; }
+.vact-dom-hlr.on { visibility: visible; }
+.vact-dom-playing { background: var(--vt-playing-bg); }
+.vact-dom-flash { background: var(--vt-flash); }
+.vact-dom-flash-error { background: var(--vt-flash-error); }
+.vact-dom-bar { position: absolute; }
+.vact-dom-diag { background: var(--vt-danger); }
+.vact-dom-comp { background: var(--vt-data-1); }
+.vact-dom-call { background: color-mix(in srgb, var(--vt-text-muted) 60%, transparent); }
+.vact-dom-caret { position: absolute; background: var(--vt-text); }
+.vact-dom-handle { position: absolute; background: var(--vt-data-1); }
+.vact-dom-label { position: absolute; overflow: hidden; white-space: nowrap; background: var(--vt-raised); color: var(--vt-syn-head); }

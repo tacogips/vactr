@@ -415,7 +415,7 @@ result format (`pass`, or `limitation`, which is excluded from counts).
 
 | Check | Assertion |
 |-------|-----------|
-| `dom-visible-text` | The pane has `.vact-code-dom` and no `.vact-code-canvas`. Each rendered visible row's text equals the document line (or its rendered chunk slices). A `vact-dom-tok-keyword` span's computed color equals the resolved `--vt-syn-keyword`. The bridge textarea is transparent. |
+| `dom-visible-text` | The pane has `.vact-code-dom` and no `.vact-code-canvas`. Each rendered visible row's text equals the document line (or its rendered chunk slices). A `vact-dom-tok-string` span's computed color equals the resolved `--vt-syn-string` (the fixture has no `(keyword)` node, and a statement-leading `let` maps to `vact-tok-head` in `syntax-core.ts`, so the string token is the check; corrected during DOM-RENDERER-EVIDENCE). The bridge textarea is transparent. |
 | `dom-caret-alignment` | For an ASCII line, a Japanese line and an emoji line of the fixture, the caret element's left edge is within 1 CSS px (ASCII) or 2 CSS px (non-ASCII) of a DOM `Range` rect at the same offset. This validates `TextLayout` against browser text layout. A failure is a recorded defect, not a limitation. A fix inside the DOM renderer files is in scope. A fix that needs `layout.ts` (not owned by any DOM plan) requires a scope amendment: stop and report with evidence. |
 | `editing-undo-redo-navigation` | Same assertions as the canvas check. |
 | `clipboard-round-trip` / `clipboard-synthetic-event` | Same as canvas (the WebKit check is a limitation). |
@@ -634,12 +634,12 @@ TS or JS file stays under 1,000 lines.
 
 ### DR-12 Plan decomposition (serial)
 
-1. `impl-plans/active/dom-renderer-core.md`: `renderer-types.ts`,
+1. `impl-plans/completed/dom-renderer-core.md`: `renderer-types.ts`,
    `dom-renderer.ts`, `dom-overlay.ts`, `dom-renderer.css` and
    `dom-renderer.test.ts`.
-2. `impl-plans/active/dom-renderer-mount.md`: the `mount.ts` seam,
+2. `impl-plans/completed/dom-renderer-mount.md`: the `mount.ts` seam,
    `perf-hook.ts` and `dom-mount.test.ts`.
-3. `impl-plans/active/dom-renderer-harness.md`: `compare.mjs`,
+3. `impl-plans/completed/dom-renderer-harness.md`: `compare.mjs`,
    `compare-stats.mjs` and its test, `behavior-dom.mjs`, the `measure.mjs`
    hooks and the README.
 4. `impl-plans/active/dom-renderer-evidence.md`: DOM and canvas behavior

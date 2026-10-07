@@ -1,0 +1,32 @@
+{
+  "runId": "rc-001",
+  "hostname": "tacogipsnoMacBook-Air.local",
+  "platform": "darwin",
+  "release": "25.5.0",
+  "arch": "arm64",
+  "node": "v26.10.0",
+  "cpus": 10,
+  "lockOwner": "dom-renderer-evidence-s296",
+  "wasm": {
+    "path": "/Users/taco/gits/tacogips/vactr-worktrees/wf-dom-editor/editor/dist/vactr.wasm",
+    "bytes": 6451822,
+    "sha256": "fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f",
+    "nameSection": true,
+    "dwarf": false,
+    "profile": "release",
+    "releasePath": "/Users/taco/gits/tacogips/vactr-worktrees/wf-dom-editor/target/wasm32-unknown-unknown/release/vactr.wasm",
+    "releaseSha256": "fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f",
+    "debugSha256": "8c554118eeb1b23e405507c2814aaa2e6e4977c4888cfa77ae8fe5b4dd3c6a8d",
+    "gating": true
+  },
+  "distBuild": "VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+  "command": "cd editor && node test/e2e/compare.mjs --run-id rc-001",
+  "startedAt": "2026-10-07T07:10:16.146Z",
+  "browserModes": {
+    "webkit": {
+      "headless": true,
+      "probe": "headless WebGL2"
+    }
+  },
+  "endedAt": "2026-10-07T07:10:25.121Z"
+}

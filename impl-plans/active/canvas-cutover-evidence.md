@@ -2631,10 +2631,10 @@ only this plan's progress log and the plan files being archived.
 - [x] Session 302 TASK-701: `publish.rs` pairs a running sample's `sample_time` with `Clock::to_host(cycle)` under the one-grid-period guard; the ported and new `session::tests::publish` rows pass, including the in-test control branch; `canvas-clock.test.ts` is ported with no assertion deleted and passes on the rebuilt host-wasm artifact; strict clippy and rustfmt on the two Rust files exit 0
 - [x] Session 302 TASK-702: `measure.mjs` records `{index,startMs,endMs}` stall windows and no longer infers stalls from frame gaps; `classifyStallSamples` and `beatResidualMs` are exported; `evaluate` gates non-stall `syncAbsMs`, stall-window early flashes, window integrity, audited F residuals and a missing `beatDriftMs`; the `stats.test.ts` rows, including the latency-independence control, pass; `THRESHOLDS` and `TARGETS` are unchanged
 - [x] Session 294 plan amendment: design 15.3.8.15 part D (accepted by step 3, comm-004687) records the operator's audio-domain early-flash decision; this plan has TASK-707 and the TASK-703 to TASK-706 amendments; the manifest `operatorRules`, `sessions.session294` and the CANVAS-EVIDENCE entry (with `silent-sink.mjs` moved to writePaths) record it; design, plan and manifest are checkpoint-committed before CANVAS-EVIDENCE is redispatched
-- [ ] Session 294 TASK-707: `attributeSync` uses `Q = 128 / sampleRate` for candidate matching, sample admission and the early count, and returns `earlyFlashes`, `earlyFlash` and `earlyToleranceS`; `classifyStallSamples` counts stall-window early from `earlyFlashes` at F, F-1 and the sample frames, and reports `pageProxyEarly`/`pageProxyEarlyCount`; `evaluate` adds `audio sample rate unavailable`; `measure.mjs` records `audioSampleRate`, `earlyToleranceMs`, `earlyFlash` and `syncPageProxyEarlyCount`; `silent-sink.mjs` `now()` returns `sampleRate`; the new and ported `stats.test.ts` rows pass; `THRESHOLDS` and `TARGETS` are unchanged
-- [ ] Session 302 TASK-703: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001` exits 0 on the release wasm; in both browsers non-stall sync p95 <= 33.4 ms and p99 <= 50 ms, stall-recovery criteria hold, beat drift <= 1 ms, the session-286 gates hold, behavior is 18/18, post-sink peak is 0 and direct destination connections are 0
-- [ ] Session 302 TASK-704: the evidence document has the "Stall-window sync classification (session 293, design 15.3.8.15)" section with the per-window table, the side-by-side sync figures and the beat-drift diagnosis, and its triage table cites the new run
-- [ ] Session 302 TASK-705: all eleven final gates pass serially, with full nextest run alone under `timeout 2400`
+- [x] Session 294 TASK-707: `attributeSync` uses `Q = 128 / sampleRate` for candidate matching, sample admission and the early count, and returns `earlyFlashes`, `earlyFlash` and `earlyToleranceS`; each early-flash row has `frameIndex`, `frameMs`, `audibleTime`, `epoch` and `range`; empty tolerance-band output has `maxLeadMs: null`; `classifyStallSamples` counts stall-window early from `earlyFlashes` at F, F-1 and the sample frames, and reports `pageProxyEarly`/`pageProxyEarlyCount`; `evaluate` adds `audio sample rate unavailable`; `measure.mjs` records `audioSampleRate`, `earlyToleranceMs`, `earlyFlash` and `syncPageProxyEarlyCount`; `silent-sink.mjs` `now()` returns `sampleRate`; the new and ported `stats.test.ts` rows pass; `THRESHOLDS` and `TARGETS` are unchanged (`s294-stats-shape-final.log`: 47/47, exit 0; `s294-npm-check-shape-final.log`: exit 0; `s294-node-check-shape-final.log`: exit 0)
+- [ ] Session 302 TASK-703: the exact final-source canonical `run-001` remains incomplete: repeated release-wasm runs pass behavior and silent-audio checks, but the latest WebKit input p95 is 51 ms and sync p99 is 58 ms against unchanged limits of 50 ms (`s294-e2e-shape-retry4.log`; earlier exact-source retries are retained separately)
+- [x] Session 302 TASK-704: the evidence document has the "Stall-window sync classification (session 293, design 15.3.8.15)" section with the per-window table, the side-by-side sync figures and the beat-drift diagnosis, and its triage table cites the new run (`design-canvas-editor-evidence.md`; generated from `run-001`)
+- [ ] Session 302 TASK-705: final gates pass serially except the required canonical e2e, which currently fails WebKit input p95 and sync p99 on the exact final source; full nextest ran alone under `timeout 2400` (logs recorded in the session 294 progress entry below)
 - [ ] Session 302 TASK-706: 23 canvas-cutover plans, 15 canvas-editor-224 plans and `canvas-editor-224-dispatch.json` are archived file by file; `impl-plans/README.md` is updated; the erratum and typo fixes are applied; the commit is pushed non-force to `origin wf/canvas`
 - [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
@@ -3092,3 +3092,73 @@ note.
   onset. Frame indices are now showing frame 1 and F 2. The recorded case pre-checks
   `windowOnsets >= 1` and `samples.length === 1`. A pitfall forbids changing `syncWindow`
   or the admission check to fit a fixture.
+
+### Session: 2026-10-07 (session 294 Step 6 implementation)
+
+**Tasks Completed**: TASK-707 audio-domain early-flash classification and TASK-704 evidence
+and triage update. TASK-703 remains incomplete on the exact final source; TASK-705's non-e2e
+gates pass, but it remains incomplete because its required canonical e2e gate failed. `Q` is
+128 frames at each browser's measured 48 kHz sample rate (2.6667 ms). Chromium and WebKit
+both report zero audio-domain early flashes, zero stall-window early flashes, and 0 ms beat
+drift; the page-time proxy reports 2 and 1 early samples respectively and remains informational.
+Both behavior suites pass 18/18, the sink was installed before the first connection, direct
+destination connections are 0, post-sink peak is 0, and the release wasm has a name section
+with no DWARF. Thresholds and workload are unchanged. The latest exact-source run fails WebKit
+input p95 at 51 ms and sync p99 at 58 ms; these remain unresolved gates.
+
+**Final-source verification** (complete logs under `tmp/canvas-cutover/evidence/`):
+
+- `cd editor && ./node_modules/.bin/vitest run test/e2e/stats.test.ts`: 47/47, exit 0
+  (`s294-stats-shape-final.log`).
+- `cd editor && npm run check`: exit 0 (`s294-npm-check-shape-final.log`).
+- `cd editor && ./node_modules/.bin/vitest run`: 810/810, exit 0
+  (`s294-gate-vitest-shape-final.log`).
+- `node --check editor/test/e2e/run.mjs editor/test/e2e/serve.mjs editor/test/e2e/behavior.mjs editor/test/e2e/measure.mjs editor/test/e2e/stats.mjs editor/test/e2e/ios-sim.mjs editor/test/e2e/silent-sink.mjs editor/test/e2e/fixtures/large-doc.mjs`:
+  exit 0 (`s294-node-check-shape-final.log`).
+- `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001`:
+  latest exact-source run exits 1 (`s294-e2e-shape-retry4.log`). Browser behavior is 18/18;
+  measurements fail WebKit input p95 51 ms and sync p99 58 ms. Earlier exact-source retries
+  are retained in `s294-e2e-shape-final.log`, `s294-e2e-shape-retry.log`,
+  `s294-e2e-shape-retry2.log` and `s294-e2e-shape-retry3.log`. The latest harness-generated
+  `run-001` evidence records both sample rates as 48000, Q as 2.6667 ms, zero audio-domain
+  early flashes, zero stall-window early flashes and zero beat drift. The page-time proxy is
+  informational. Raw evidence is under `design-docs/specs/evidence/canvas-cutover/run-001/`.
+- `CARGO_TERM_QUIET=true cargo build`: exit 0 (`s294-gate-cargo-build.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0
+  (`s294-gate-clippy.log`).
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`:
+  2,817 passed, 3 configured skipped, 0 failed, exit 0 (`s294-gate-nextest.log`).
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`:
+  exit 0 (`s294-gate-wasm-host.log`).
+- `cd editor && ./node_modules/.bin/vitest run`: 810/810, exit 0
+  (`s294-gate-vitest-full.log`).
+- `cd editor && npm run test:perf` (alone): 1/1, exit 0; focused 5k/20k median ratio 3.04
+  (`s294-gate-test-perf-shape-final.log`). The earlier exact-source pass is retained at
+  `s294-gate-test-perf-rerun.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/no-editor-view.test.ts`: 1/1,
+  exit 0 (`s294-gate-no-editor-view.log`).
+- `cd editor && npm run test:style`: four engine/viewport combinations, exit 0
+  (`s294-gate-test-style.log`).
+- `CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml`: exit 0
+  (`s294-gate-tauri-check.log`).
+- `rustfmt --edition 2021 --check src/session/publish.rs src/session/tests/publish.rs`: exit 0
+  (`s294-gate-rustfmt.log`).
+- `node editor/test/e2e/ios-sim.mjs --app editor/src-tauri/gen/apple/build/arm64-sim/Vactr.app --device "iPad Pro 11-inch (M5)" --out design-docs/specs/evidence/canvas-cutover/run-001/ios-sim.json`:
+  exit 0 (`s294-gate-ios-sim.log`); the Vactr-process self-check reports `playingEvents: 0`,
+  `silent: true`, `pass: true`, WebGL2, and a binary mtime after commit `6f6b807`.
+- `git diff --check`: exit 0.
+
+`npm run test:perf` had one source-matched run exceed its wall-clock budget during host load;
+the isolated serial rerun passed as required. Its first log is retained at
+`s294-gate-test-perf.log`. The exact-source canonical e2e retries remain non-passing under
+variable WebKit input and sync measurements; no threshold, workload, Rust code or dependency
+changed. The current evidence document triage describes the latest failure without treating it
+as acceptable. No source file reached 1,000 lines.
+Fresh-read and post-edit seam hashes are retained in `s294-implementation/`; no source file
+reached 1,000 lines.
+
+**Outstanding implementation work**: Reproduce and resolve or obtain a passing exact-source
+canonical WebKit run for the 50 ms input p95 and sync p99 gates. Do not relabel these results or
+change thresholds/workload. TASK-703 and TASK-705 remain unchecked until the canonical e2e gate
+passes. Formal integration review, archival, README/erratum updates, commit and push remain
+downstream and are not the cause of this incomplete implementation result.

@@ -96,7 +96,7 @@ export function silentSinkInit() {
     return originalPlay.apply(this, args);
   };
   w.__vactrSink = {
-    now() { const ctx = state.contexts.keys().next().value; return ctx ? { ctxTime:ctx.currentTime, pageMs:performance.now() } : null; },
+    now() { const ctx = state.contexts.keys().next().value; return ctx ? { ctxTime:ctx.currentTime, pageMs:performance.now(), sampleRate:ctx.sampleRate } : null; },
     report() {
       const sinks = [...state.contexts].map(([ctx, sink]) => ({ ctx, sink }));
       const prePeak = Math.max(0, ...sinks.map(({ sink }) => sink.prePeak));

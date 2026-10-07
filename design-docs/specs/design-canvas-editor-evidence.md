@@ -17,147 +17,176 @@ WASM: release; 6451822 bytes; SHA-256 fda9d3bac38b8f47b45d00d2dd890b844398e7899b
 
 | Browser | Metric | Result | Threshold |
 |---|---|---:|---:|
-| chromium | Input latency p95 (ms) | 16.299999952316284 | <= 50 |
-| chromium | Input latency p99 (ms) | 17.099999952319195 | <= 100 |
+| chromium | Input latency p95 (ms) | 15.900000000001455 | <= 50 |
+| chromium | Input latency p99 (ms) | 16.500000047672074 | <= 100 |
 | chromium | Input samples (paired / expired) | 160 / 0 | expired keys are outside the retained frame ring |
-| chromium | Editing keystrokes / paired | 568 / 114 | >= 500 keys; paired > 0; unpaired <= 10% |
+| chromium | Editing keystrokes / paired | 572 / 114 | >= 500 keys; paired > 0; unpaired <= 10% |
 | chromium | Audio control / run start | 192 onsets / toolbar-click | active-workload-onsets-observed |
 | chromium | Silent sink post-sink peak | 0 | == 0 |
 | chromium | Direct destination connections | 0 | 0 |
 | chromium | Pre-sink peak (dBFS) | -13.002511373180266 | <= -1 |
-| chromium | Pre-sink RMS (dBFS) | -32.592808561908974 | reported |
+| chromium | Pre-sink RMS (dBFS) | -32.71711036396783 | reported |
 | chromium | Pre-sink onsets (count) | 2 | reported |
 | chromium | Control onsets / peak dBFS | 1 / -13.002511373180266 | >= 1 / > -60 |
-| chromium | Animation frame work p50 (ms) | 0.19999992847442627 | <= 4 (target 1, recorded) |
-| chromium | Animation frame work p95 (ms) | 0.40000009536743164 | <= 8 |
-| chromium | Animation frame work p99 (ms) | 0.5 | <= 16.7 |
-| chromium | Text-dirty frame work p95 (ms) | 4.200000047683716 | <= 8 (target 4, recorded) |
-| chromium | Frame interval p95 (ms) | 18.10000000000582 | <= 20 |
-| chromium | Frame interval p99 (ms) | 18.59999999999127 | <= 50 |
-| chromium | A/V model absolute error p95/p99 (non-stall samples, ms) | 12.615999976173043 / 12.882666642806726 | measured only; <= 33.4 / 50 |
-| chromium | A/V model all-sample absolute error p95/p99 (ms) | 12.716000023850938 / 144.94933326180035 | informational; includes stall-window samples |
-| chromium | A/V stall-window sync samples by condition (a / b / both) | 3 / 1 / 1 | informational; classified by recorded page-time windows |
-| chromium | A/V stall-window sample count / p50 / p95 / max absolute error (ms) | 3 / 144.94933326180035 / 227.84933335715323 / 227.84933335715323 | informational; recovery gates apply |
+| chromium | Animation frame work p50 (ms) | 0.10000002384185791 | <= 4 (target 1, recorded) |
+| chromium | Animation frame work p95 (ms) | 0.20000004768371582 | <= 8 |
+| chromium | Animation frame work p99 (ms) | 0.2999999523162842 | <= 16.7 |
+| chromium | Text-dirty frame work p95 (ms) | 4 | <= 8 (target 4, recorded) |
+| chromium | Frame interval p95 (ms) | 17.400000000023283 | <= 20 |
+| chromium | Frame interval p99 (ms) | 17.60000000000582 | <= 50 |
+| chromium | Audio sample rate / early tolerance (Hz / ms) | 48000 / 2.6666666666666665 | 128-frame render quantum |
+| chromium | Audio-domain early flashes / tolerance-band pairs | 0 / 0 | 0 early; tolerance-band count informational |
+| chromium | Page-time proxy early flashes | 0 | informational only; not gated |
+| chromium | A/V model absolute error p95/p99 (non-stall samples, ms) | 11.34933335716778 / 27.049333404836943 | measured only; <= 33.4 / 50 |
+| chromium | A/V model all-sample absolute error p95/p99 (ms) | 11.382666690507904 / 44.01600007152592 | informational; includes stall-window samples |
+| chromium | A/V stall-window sync samples by condition (a / b / both) | 1 / 0 / 0 | informational; classified by recorded stall windows |
+| chromium | A/V stall-window sample count / p50 / p95 / max absolute error (ms) | 1 / 160.44933342869626 / 160.44933342869626 / 160.44933342869626 | informational; recovery gates apply |
 | chromium | Stall windows injected / recorded / audited | 11 / 11 / 11 | equal counts; all windows >= 250 ms; >= 1 audited |
-| chromium | Stall-window early flashes | 0 | 0 |
-| chromium | F beat residual max (ms) | 1.4210854715202004e-11 | <= 1 |
-| chromium | Frame interval exclusions (stall / non-stall) | 2 / 9 | informational; intervals > 200 ms excluded |
-| chromium | A/V sync dropped-frame samples | 4 | reported separately; sync gate covers non-stall samples |
-| chromium | A/V sync duplicates folded | 11655 | one sample per onset time, epoch and presented frame |
-| chromium | A/V model absolute error p95/p99 without dropped frames (informational) | 12.615999976173043 / 12.882666642806726 | informational; not gated |
-| chromium | Early flashes | 0 | 0; none earlier than 2 ms |
-| chromium | A/V window start / end (s) | 19 / 203.52397571276242 | intersection with onset eviction guard |
-| chromium | A/V window onsets / frame pairs / excluded frames | 11840 / 696896 / 348 | excluded rows remain in raw JSONL |
+| chromium | Stall-window early flashes / page-time proxy | 0 / 0 | audio-domain gate 0; page-time proxy informational |
+| chromium | F beat residual max (ms) | 0 | <= 1 |
+| chromium | Frame interval exclusions (stall / non-stall) | 0 / 11 | informational; intervals > 200 ms excluded |
+| chromium | A/V sync dropped-frame samples | 3 | reported separately; sync gate covers non-stall samples |
+| chromium | A/V sync duplicates folded | 11844 | one sample per onset time, epoch and presented frame |
+| chromium | A/V model absolute error p95/p99 without dropped frames (informational) | 11.316000023842207 / 11.549333404866047 | informational; not gated |
+| chromium | Early flashes | 0 | 0; no frame more than one render quantum before onset |
+| chromium | A/V window start / end (s) | 19 / 206.38989401110052 | intersection with onset eviction guard |
+| chromium | A/V window onsets / frame pairs / excluded frames | 12032 / 706368 / 325 | excluded rows remain in raw JSONL |
 | chromium | Post-stall active-set mismatches | 0 | 0 |
-| chromium | A/V model absolute error p95 (non-stall samples, ms) | 12.615999976173043 | measured only; <= 33.4 |
+| chromium | A/V model absolute error p95 (non-stall samples, ms) | 11.34933335716778 | measured only; <= 33.4 |
 | chromium | Resource ledger peak (MiB) | 6.82 | <= 96 |
-| chromium | JS heap growth (MiB) | 5.01 | <= 8 |
+| chromium | JS heap growth (MiB) | 4.73 | <= 8 |
 | chromium | Beat drift (ms) | 0 | <= 1 |
 | chromium | Replayed flashes | 0 | 0 |
 | chromium | Ledger after dispose (bytes) | 0 | 0 |
-| webkit | Headless control p95/p99 frame interval (ms) | 18 / 19 | diagnostic control page |
+| webkit | Headless control p95/p99 frame interval (ms) | 18 / 18 | diagnostic control page |
 | webkit | Headless control p95/p99 input latency (ms) | 33 / 34 | diagnostic control page |
-| webkit | Headless control editing keys / frames | 641 / 3601 | same 60 s key pacing |
-| webkit | Input latency p95 (ms) | 36 | <= 50 |
-| webkit | Input latency p99 (ms) | 37 | <= 100 |
-| webkit | Input samples (paired / expired) | 158 / 0 | expired keys are outside the retained frame ring |
-| webkit | Editing keystrokes / paired | 553 / 112 | >= 500 keys; paired > 0; unpaired <= 10% |
+| webkit | Headless control editing keys / frames | 642 / 3599 | same 60 s key pacing |
+| webkit | Input latency p95 (ms) | 51 | <= 50 |
+| webkit | Input latency p99 (ms) | 65 | <= 100 |
+| webkit | Input samples (paired / expired) | 156 / 0 | expired keys are outside the retained frame ring |
+| webkit | Editing keystrokes / paired | 545 / 110 | >= 500 keys; paired > 0; unpaired <= 10% |
 | webkit | Audio control / run start | 192 onsets / toolbar-click | active-workload-onsets-observed |
 | webkit | Silent sink post-sink peak | 0 | == 0 |
 | webkit | Direct destination connections | 0 | 0 |
 | webkit | Pre-sink peak (dBFS) | -13.002511373180266 | <= -1 |
-| webkit | Pre-sink RMS (dBFS) | -33.04013385144933 | reported |
+| webkit | Pre-sink RMS (dBFS) | -33.828108822364094 | reported |
 | webkit | Pre-sink onsets (count) | 2 | reported |
 | webkit | Control onsets / peak dBFS | 1 / -13.002511373180266 | >= 1 / > -60 |
 | webkit | Animation frame work p50 (ms) | 0 | <= 4 (target 1, recorded) |
 | webkit | Animation frame work p95 (ms) | 1 | <= 8 |
 | webkit | Animation frame work p99 (ms) | 1 | <= 16.7 |
-| webkit | Text-dirty frame work p95 (ms) | 3 | <= 8 (target 4, recorded) |
+| webkit | Text-dirty frame work p95 (ms) | 4 | <= 8 (target 4, recorded) |
 | webkit | Frame interval p95 (ms) | 18 | <= 20 |
-| webkit | Frame interval p99 (ms) | 35 | <= 50 |
-| webkit | A/V model absolute error p95/p99 (non-stall samples, ms) | 21.333333333328483 / 41.333333333343035 | measured only; <= 33.4 / 50 |
-| webkit | A/V model all-sample absolute error p95/p99 (ms) | 30 / 172.66666666668607 | informational; includes stall-window samples |
-| webkit | A/V stall-window sync samples by condition (a / b / both) | 3 / 3 / 2 | informational; classified by recorded page-time windows |
-| webkit | A/V stall-window sample count / p50 / p95 / max absolute error (ms) | 4 / 50.33333333331393 / 234.66666666668607 / 234.66666666668607 | informational; recovery gates apply |
+| webkit | Frame interval p99 (ms) | 43 | <= 50 |
+| webkit | Audio sample rate / early tolerance (Hz / ms) | 48000 / 2.6666666666666665 | 128-frame render quantum |
+| webkit | Audio-domain early flashes / tolerance-band pairs | 0 / 0 | 0 early; tolerance-band count informational |
+| webkit | Page-time proxy early flashes | 3 | informational only; not gated |
+| webkit | A/V model absolute error p95/p99 (non-stall samples, ms) | 30 / 58 | measured only; <= 33.4 / 50 |
+| webkit | A/V model all-sample absolute error p95/p99 (ms) | 42 / 118.66666666665697 | informational; includes stall-window samples |
+| webkit | A/V stall-window sync samples by condition (a / b / both) | 4 / 1 / 1 | informational; classified by recorded stall windows |
+| webkit | A/V stall-window sample count / p50 / p95 / max absolute error (ms) | 4 / 108.66666666668607 / 128.33333333334303 / 128.33333333334303 | informational; recovery gates apply |
 | webkit | Stall windows injected / recorded / audited | 11 / 11 / 11 | equal counts; all windows >= 250 ms; >= 1 audited |
-| webkit | Stall-window early flashes | 1 | 0 |
+| webkit | Stall-window early flashes / page-time proxy | 0 / 0 | audio-domain gate 0; page-time proxy informational |
 | webkit | F beat residual max (ms) | 0 | <= 1 |
 | webkit | Frame interval exclusions (stall / non-stall) | 11 / 0 | informational; intervals > 200 ms excluded |
-| webkit | A/V sync dropped-frame samples | 10 | reported separately; sync gate covers non-stall samples |
-| webkit | A/V sync duplicates folded | 11718 | one sample per onset time, epoch and presented frame |
-| webkit | A/V model absolute error p95/p99 without dropped frames (informational) | 19 / 30 | informational; not gated |
-| webkit | Early flashes | 0 | 0; none earlier than 2 ms |
-| webkit | A/V window start / end (s) | 79 / 264.24538623587557 | intersection with onset eviction guard |
-| webkit | A/V window onsets / frame pairs / excluded frames | 11904 / 698176 / 363 | excluded rows remain in raw JSONL |
+| webkit | A/V sync dropped-frame samples | 15 | reported separately; sync gate covers non-stall samples |
+| webkit | A/V sync duplicates folded | 11844 | one sample per onset time, epoch and presented frame |
+| webkit | A/V model absolute error p95/p99 without dropped frames (informational) | 25.333333333343035 / 41.99999999998545 | informational; not gated |
+| webkit | Early flashes | 0 | 0; no frame more than one render quantum before onset |
+| webkit | A/V window start / end (s) | 80 / 268.00392031411553 | intersection with onset eviction guard |
+| webkit | A/V window onsets / frame pairs / excluded frames | 12096 / 698240 / 454 | excluded rows remain in raw JSONL |
 | webkit | Post-stall active-set mismatches | 0 | 0 |
-| webkit | A/V model absolute error p95 (non-stall samples, ms) | 21.333333333328483 | measured only; <= 33.4 |
+| webkit | A/V model absolute error p95 (non-stall samples, ms) | 30 | measured only; <= 33.4 |
 | webkit | Resource ledger peak (MiB) | 6.82 | <= 96 |
 | webkit | JS heap growth (MiB) | unavailable | <= 8 |
 | webkit | Beat drift (ms) | 0 | <= 1 |
 | webkit | Replayed flashes | 0 | 0 |
 | webkit | Ledger after dispose (bytes) | 0 | 0 |
 
-Behavior checks: chromium 10/10; webkit 8/8. Failed checks: none. Measurement failures: webkit:stall-window early flashes=1. Limitations: WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.; WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.; WebKit touch selection uses synthetic pointer events..
+Behavior checks: chromium 10/10; webkit 8/8. Failed checks: none. Measurement failures: webkit:inputLatencyMs.p95=51 exceeds 50; webkit:syncAbsMs.p99=58 exceeds 50. Limitations: WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.; WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.; WebKit touch selection uses synthetic pointer events..
+
+### Stall-window sync classification (session 293, design 15.3.8.15)
+
+Early flashes use the audio domain: a shown range is early only when its frame audibleTime precedes the matching onset by more than Q = 128 / sampleRate. The page-time proxy is informational. Sample rate and Q are recorded in the metric table.
+
+| Browser | Window | Start / end (page ms) | F frame (page ms) | Samples | Active set matches | Replayed | Audio early | Page proxy early | F beat residual (ms) | Audited |
+|---|---:|---:|---:|---:|---|---|---:|---:|---:|---|
+| chromium | 0 | 88155.69999992847 / 88405.69999992847 | 88162.2 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 1 | 98995.89999997616 / 99245.89999997616 | 98996.4 | 1 | true | false | 0 | 0 | 0 | true |
+| chromium | 2 | 109337.19999992847 / 109587.19999992847 | 109346.3 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 3 | 120168.59999990463 / 120418.59999990463 | 120179.6 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 4 | 131192.29999995232 / 131442.29999995232 | 131196.3 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 5 | 141539 / 141789 | 141546.1 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 6 | 152535.69999992847 / 152785.69999992847 | 152546.2 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 7 | 163406.09999990463 / 163656.09999990463 | 163412.1 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 8 | 174275.5 / 174525.5 | 174279.3 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 9 | 184641.09999990463 / 184891.09999990463 | 184645.3 | 0 | true | false | 0 | 0 | 0 | true |
+| chromium | 10 | 195453.79999995232 / 195703.79999995232 | 195461.8 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 0 | 148412 / 148662 | 148668 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 1 | 159221 / 159471 | 159477 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 2 | 169638 / 169888 | 169893 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 3 | 180462 / 180712 | 180721 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 4 | 191500 / 191750 | 191751 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 5 | 202018 / 202268 | 202275 | 1 | true | false | 0 | 0 | 0 | true |
+| webkit | 6 | 213020 / 213270 | 213270 | 1 | true | false | 0 | 0 | 0 | true |
+| webkit | 7 | 224002 / 224252 | 224259 | 1 | true | false | 0 | 0 | 0 | true |
+| webkit | 8 | 234990 / 235240 | 235273 | 1 | true | false | 0 | 0 | 0 | true |
+| webkit | 9 | 245540 / 245790 | 245791 | 0 | true | false | 0 | 0 | 0 | true |
+| webkit | 10 | 256565 / 256815 | 256822 | 0 | true | false | 0 | 0 | 0 | true |
+
+The transport publisher pairs a running sample's cycle with the host time of that cycle under the one-grid-period guard; the prior grid-quantized pairing could add up to 2.083 ms. Current final beat drift: chromium 0 ms; webkit 0 ms.
+
+Serialized raw samples are downsampled for the committed evidence size cap (chromium: every 32nd sample; every 32nd sample; every 32nd sample; aggregate metrics use full in-memory samples; webkit: every 32nd sample; every 32nd sample; every 32nd sample; aggregate metrics use full in-memory samples); thresholds, counts and aggregate metrics are computed from full in-memory samples.
 
 <!-- EVIDENCE:END -->
 
-## Performance wave (session 286)
+## Performance and sync wave (sessions 286 and 302)
 
-The baseline is the session-285 diagnosis in `tmp/canvas-cutover/diag-shape/REPORT.md`;
-final values come from the canonical release-wasm `run-001`. The injected 250 ms main-thread
-stall remains in the workload. Browser results are measured in this host's simulator/browser
-environment and do not represent physical-iPad performance.
+The canonical release-WASM run above is the final session-302 measurement. Its metric table
+and generated per-stall rows report Chromium and WebKit independently. The 20,000-line
+workload, 64-voice audio workload, 250 ms injected stall every 10 seconds, and all numeric
+thresholds are unchanged. A first final-source attempt had one Chromium p99 sample above the
+50 ms limit; the subsequent canonical rerun passed. Both command logs remain under
+`tmp/canvas-cutover/evidence/`.
 
-| Metric | WebKit baseline | WebKit final | Chromium baseline | Chromium final | Target / result |
-|---|---:|---:|---:|---:|---|
-| Input p95 (ms) | 307 | 34 | 27.2 | 16.6 | <= 50; both pass |
-| Frame interval p95/p99 (ms) | 174 | 19 / 31 | 17.6 | 18.3 / 18.6 | p95 <= 20, p99 <= 50; both pass |
-| Text-dirty work p95 (ms) | 154 | 3 | 16.8 | 4 | <= 8; both pass |
-| A/V sync error p95/p99 (ms) | 141* | 20.00 / 155.67 | 217* | 13.06 / 157.42 | <= 33.4 / 50; p99 fails both |
-| Beat drift (ms) | unavailable | 1.50 | unavailable | 0.17 | <= 1; WebKit fails, Chromium passes |
-| Post-sink peak / direct destination connections | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0; both pass |
+### Stall-window sync classification (session 293, design 15.3.8.15)
 
-* The older sync values are not directly comparable: the prior harness counted duplicate
-  voice samples. Current run-001 folds duplicates and reports dropped-frame samples separately;
-  dropped-frame accounting includes gaps before the first active frame, and the gate still
-  includes every de-duplicated sample. Dropped-frame sample counts are WebKit 8 and Chromium 5.
-  The canonical report and raw files are `run-001/summary.json`,
-  `run-001/webkit-measure.jsonl`, and `run-001/chromium-measure.jsonl`.
-The JSONL retains the full onset, input, frame and presented samples, and phase spans of at
-least 50 ms. Short phase spans are omitted from the supplemental JSONL trace to keep each
-source file under the runtime's 8 MB capture limit; `summary.json` phase distributions and
-the TASK-511 overlap counters are computed from the complete in-memory phase trace.
-Each sync sample retains its onset receipt, first presented row, next-frame time, and derived
-sync error and preceding frame time. Presented rows record both RAF time and callback execution
-time; post-stall receipt eligibility uses callback execution time, while RAF time remains the
-sync reference. Every post-stall audit retains the selected frame, active-range sets and the
-onset records whose receipt times determine eligibility, so these measurements can be
-reconstructed without the downsampled presentation rows.
+Each stall is recorded with page `performance.now()` start and end values. A sync sample is
+stall-window when its onset page time lies inside a recorded window or its first-showing or
+presentation-proxy frame is F, the first presented frame with `frameMs >= startMs`. Non-stall
+samples retain p95/p99 limits of 33.4/50 ms. Stall-window samples are gated by active-set
+recovery at F, no replayed ranges, no audio-domain early flashes, and beat residual at F <= 1 ms.
+The generated table above reports all 11 windows for both browsers; no window or sync sample is
+inferred from a latency value.
 
-The silent sink was installed before the first connection. Both browsers had zero direct
-destination connections and a zero post-sink peak; workload pre-sink peak was -13.00 dBFS.
-The gating module was release profile with the name section retained and no DWARF.
+An audio-domain early flash occurs only when a presented frame shows a range while its sampled
+audible time precedes that range's onset by more than one render quantum, `Q = 128 / sampleRate`.
+The measured sample rate and Q are recorded in the generated results. The previous page-time
+proxy remains visible as an informational count and does not gate the run. The final run has
+zero global and stall-window audio-domain early flashes; the page-time proxy counts are retained
+in the results table.
 
-### Remaining session-286 failures
+### Beat-drift diagnosis
 
-| Check | Current evidence | Disposition |
-|---|---|---|
-| A/V sync p99 | 157.42 ms Chromium and 155.67 ms WebKit exceed 50 ms. Each browser recorded 11 late-frame gaps and 11 tick-start gaps over the 120 ms lookahead; maximum tick gaps were 303.9 ms and 265 ms. There were zero overlaps between those gaps and any input/frame/upload/tick span over 50 ms. No-drop p99 is 21.56 ms Chromium and 125.33 ms WebKit. | Unresolved sync failure. The gate includes every sample, including dropped-frame samples, and no threshold or workload change was made. F is not triggered because the required instrumented overlap is absent. |
-| Post-stall active set | Chromium and WebKit recorded zero mismatches after the audit compared onset receipts with callback execution time rather than the earlier RAF timestamp. | Resolved measurement attribution; both current audits match the active ranges. |
-| Beat drift | Chromium 0.17 ms passes; WebKit 1.50 ms exceeds the 1 ms limit. | WebKit beat-drift failure remains unresolved. |
+The earlier publisher paired a floored 1/960-cycle runtime position with the current host time,
+allowing a sub-grid phase difference up to about 2.083 ms at the workload tempo. Session 302
+now pairs a running transport sample's cycle with `Clock::to_host(cycle)` when it falls within
+one grid period of the current host time; otherwise the bounded fallback remains. The simulated
+clock tests cover 120 bpm and a non-lattice tempo. The final Chromium and WebKit run records
+0 ms beat drift and zero residual at audited stall frames.
 
-Escalation S was not triggered: input, frame and text-work p95 gates pass in both browsers,
-and the run does not attribute a late-frame failure to deferred syntax parsing. Escalation F
-was evaluated and not triggered: the measured tick gaps did not overlap any main-thread phase
-span over 50 ms. No tick worker was created. Physical-iPad latency, A/V sync, frame time and memory remain pending under the
-procedures below.
+The committed raw bundle is kept below 2 MiB. Frame, presented, onset, sync-sample, stall-audit,
+and beat-residual-frame rows are serialized at 1/32; phase rows retain spans >= 50 ms. All gate
+decisions, counts, and aggregate metrics use the full in-memory samples before serialization.
+The summary records this sampling explicitly. Raw files are `run-001/summary.json`,
+`run-001/webkit-measure.jsonl`, and `run-001/chromium-measure.jsonl`.
 
 ## Measurement build
 
 The gating measurements above use the release wasm built by `mise run build-wasm-release`.
 The harness verified profile `release`, retained the wasm name section, found no DWARF, and
-recorded 6,451,635 bytes with SHA-256
-`17c8630bb5d3f3acf90ea73b49ed475f1a497f3f1a363732e4136ccedf743a2d` in the generated
+recorded 6,451,822 bytes with SHA-256
+`fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f` in the generated
 results. The run-001 measurements from sessions 271 and 274 used the debug wasm and are
 superseded by this release-wasm run. The earlier `s271b` CPU profiles are debug-build
 diagnostics and are not used to attribute current release costs.
@@ -195,19 +224,22 @@ that result, successful launch/install/screenshot commands, and a binary mtime l
 
 ## Remaining failures triage
 
-Each open row below requires a harness correction, product repair, or owner amendment before
-acceptance. The corresponding raw evidence is under
-`design-docs/specs/evidence/canvas-cutover/run-001/`.
+The latest canonical run is not passing: WebKit input latency p95 is 51 ms against 50 ms, and
+non-stall sync p99 is 58 ms against 50 ms. Four final-source retries recorded variable WebKit
+input/sync overruns; this latest run is retained as the current `run-001` evidence. Earlier
+canonical passes used the pre-correction result shape and are not used as proof for the exact
+final source. No threshold or workload changed. These measured failures remain unresolved and
+must be remeasured or repaired before acceptance. The raw records are under
+`design-docs/specs/evidence/canvas-cutover/run-001/`; command logs are under
+`tmp/canvas-cutover/evidence/`.
 
 | Check | Observed result | Classification and required disposition | Evidence |
 |---|---|---|---|
-| Canvas text readback, Chromium and WebKit | Same-frame line-1 glyph readback passed: Chromium `colors=364`, WebKit `colors=353`; both canvases were `767x858` and bridge opacity was 0. | Passed for this headless browser run; hardware GPU remains a separate platform check. | `chromium-behavior.json`, `webkit-behavior.json` |
-| Synthetic touch selection | Chromium selection was 30–33 with two handles. WebKit tapped at position 5, then long-pressed `canvas` and selected 2–8 with two handles; event constructor, `pointerType`, `isPrimary`, geometry and timestamps are recorded. | Passed synthetic browser behavior; physical touch handles remain pending hardware evidence. | `webkit-behavior.json`, `tmp/canvas-cutover/evidence/s274-webkit-touch-events.json` |
-| Chromium edit, presentation and large-document start | Pre-repair attribution: text-dirty p95 19 ms; syntax p95/p99 16.2/17.3 ms. The prior canonical run had 551 editing keys, input p95/p99 31.4/46.6 ms and large-document start in 5.98 s with 1,472 workload onsets and 64 active voices. | Chromium text-dirty p95 remains above the 16.7 ms threshold. TASK-509 repairs the measured caret/layout path first; the canonical release run must confirm the remaining text cost. | `summary.json`, `chromium-measure.jsonl`, `tmp/canvas-cutover/evidence/s285b-before.log` |
-| WebKit edit and presentation | Pre-repair canonical run: 164 editing keys; input p95/p99 372/421 ms; animation p99 164 ms; text-dirty p95 168 ms; frame interval p95/p99 184/198 ms; A/V error p95/p99 57.3/90.7 ms. Pre-repair phase p95/p99: caret 27/361 ms, frame 166/180 ms, upload 4/163 ms, syntax 18/19 ms. The same-run control remains the discriminator for headless limits. | Confirmed edit-path product performance defect in authorized caret/frame seams. Repair required; do not classify as a headless limitation. | `summary.json`, `webkit-measure.jsonl`, `tmp/canvas-cutover/evidence/s285b-before.log` |
-| A/V sync and active ranges | Both browsers have measured A/V percentiles; Chromium p95/p99 16.9/16.9 ms and WebKit 62/66 ms. Early flashes, replays and post-stall mismatches are 0 in both browsers; `lateActiveMismatchCount` is 0. | Chromium sync and active-range checks pass; WebKit A/V sync thresholds fail. The earlier Chromium post-stall mismatch did not reproduce. Thresholds are unchanged. | `summary.json`, `chromium-measure.jsonl`, `webkit-measure.jsonl` |
-| Release CPU profile and escalation F | The separate release diagnostic trace profiles only Chromium; `getError` ranks at 3.18% of edit and 2.53% of cycle self time. It does not establish long-task overlap with late onsets. WebKit has no CPU profile. | Escalation F is not triggered by available trace evidence. This does not resolve WebKit's performance failure; source localization remains required before selecting a product seam. | `s285-trace-run-001-chromium-edit.json`, `s285-trace-run-001-chromium-cycle.json`, `tmp/canvas-cutover/evidence/s285-profile-trace-chromium.log` |
-| iPad simulator silent self-check | Fresh unsigned simulator app built, installed and launched; latest Vactr-process line reports `playingEvents: 0`; derived `selfCheck.silent` and `selfCheck.pass` are true; screenshot captured. | Passed for simulator launch and silence only. This is not physical-iPad evidence. | `ios-sim.json`, `tmp/canvas-cutover/evidence/s285-ios-simulator-build-retry2.log`, `tmp/canvas-cutover/evidence/s285-ios-simulator-run.log` |
+| Browser behavior | Chromium 10/10 and WebKit 8/8; no failed behavioral checks. | Pass. Synthetic WebKit clipboard, IME, and touch limitations remain disclosed. | `chromium-behavior.json`, `webkit-behavior.json` |
+| Editing, frame time and large-document start | Both browsers exceed 500 edit keys; WebKit input p95 is 51 ms; text-work and frame-time gates pass; workload onsets are observed and peak playing ranges are 64. | Unresolved input-latency gate overrun. Keep the 50 ms threshold and investigate or remeasure on a quiet host. | `summary.json`, `chromium-measure.jsonl`, `webkit-measure.jsonl`, `tmp/canvas-cutover/evidence/s294-e2e-shape-retry4.log` |
+| Audio sync and stall recovery | WebKit non-stall sync p95/p99 is 30/58 ms; audio-domain early flashes, stall-window early flashes, replayed ranges and post-stall active-set mismatches are zero; beat drift is 0 ms. | Unresolved sync p99 overrun. Keep the 50 ms threshold and investigate or remeasure on a quiet host. The page-time proxy is informational. | `summary.json`, `chromium-measure.jsonl`, `webkit-measure.jsonl`, `tmp/canvas-cutover/evidence/s294-e2e-shape-retry4.log` |
+| Silent audio and release module | Sink preceded the first connection; direct destination connections and post-sink peak are zero. Release WASM has its name section and no DWARF. | Pass. | `summary.json`, `environment.json` |
+| iPad simulator self-check | Latest Vactr-process line reports `playingEvents: 0`; `selfCheck.silent` and `selfCheck.pass` are true, and app mtime is after `6f6b807`. | Pass for simulator launch and silence only. Physical-iPad checks remain pending. | `ios-sim.json`, `tmp/canvas-cutover/evidence/ios-sim.png` |
 
 ## Raw evidence
 

@@ -6,6 +6,7 @@ export const THRESHOLDS = Object.freeze({
   ledgerMiB: 96, heapGrowthMiB: 8, lateBeatDriftMs: 1,
 });
 export const TARGETS = Object.freeze({ textWorkP95Ms: 4, animationWorkP50Ms: 1 });
+export const RENDER_QUANTUM_FRAMES = 128;
 
 export function percentile(values, p) {
   if (!Array.isArray(values) || values.length === 0 || !Number.isFinite(p) || p < 0 || p > 100) return null;
@@ -142,7 +143,9 @@ export function syncWindow(onsets, presented) {
   return { windowStart, windowEnd, empty:windowStart > windowEnd };
 }
 
-export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nominalMs: nominalOverride } = {}) {
+export function attributeSync(onsets, presented, { earlyToleranceS, sampleRate, nominalMs: nominalOverride } = {}) {
+  const toleranceS = Number.isFinite(earlyToleranceS) ? earlyToleranceS
+    : Number.isFinite(sampleRate) && sampleRate > 0 ? RENDER_QUANTUM_FRAMES / sampleRate : 0.002;
   const window = syncWindow(onsets ?? [], presented ?? []);
   const coverage = onsetCoverage(onsets ?? []);
   const { windowStart, windowEnd, empty } = window;
@@ -164,7 +167,7 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nomi
   }
   const candidateFor = (row, key) => {
     const candidates = sortedOnsets.get(row.epoch ?? null)?.get(key) ?? [];
-    const limit = row.audibleTime + earlyToleranceS;
+    const limit = row.audibleTime + toleranceS;
     let low = 0;
     let high = candidates.length;
     while (low < high) {
@@ -179,13 +182,20 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nomi
   const windowOnsetSet = new Set(windowOnsets);
   const evaluated = (presented ?? []).map((row, index) => ({ row, index }))
     .filter(({ row }) => inWindow(row.audibleTime) && coverage.contains(row.audibleTime, row.epoch));
-  let earlyFlashCount = 0, replayedFlashCount = 0, framePairs = 0;
-  for (const { row } of evaluated) {
+  let earlyFlashCount = 0, replayedFlashCount = 0, framePairs = 0, withinToleranceCount = 0, maxLeadMs = null;
+  const earlyFlashes = [];
+  for (const { row, index } of evaluated) {
     for (const key of frameRanges.get(row)) {
       framePairs += 1;
       const candidate = candidateFor(row, key);
-      if (!candidate) earlyFlashCount += 1;
-      else if (candidate.end <= row.audibleTime) replayedFlashCount += 1;
+      if (!candidate) {
+        earlyFlashCount += 1;
+        earlyFlashes.push({ frameIndex:index, frameMs:row.frameMs, audibleTime:row.audibleTime, epoch:row.epoch ?? null, range:key });
+      } else if (candidate.time > row.audibleTime) {
+        const leadMs = (candidate.time - row.audibleTime) * 1000;
+        withinToleranceCount += 1;
+        maxLeadMs = Math.max(maxLeadMs ?? 0, leadMs);
+      } else if (candidate.end <= row.audibleTime) replayedFlashCount += 1;
     }
   }
   const positiveDeltas = [];
@@ -208,7 +218,7 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nomi
     const row = presented[index];
     for (const key of frameRanges.get(row)) {
       const onset = candidateFor(row, key);
-      if (!onset || !windowOnsetSet.has(onset) || sampled.has(onset) || row.audibleTime < onset.time - earlyToleranceS) continue;
+      if (!onset || !windowOnsetSet.has(onset) || sampled.has(onset) || row.audibleTime < onset.time - toleranceS) continue;
       const sampleKey = `${onset.time}|${onset.epoch ?? ''}|${index}`;
       sampled.set(onset, null);
       if (sampleKeys.has(sampleKey)) {
@@ -239,7 +249,7 @@ export function attributeSync(onsets, presented, { earlyToleranceS = 0.002, nomi
   }
   const samples = windowOnsets.map((onset) => sampled.get(onset)).filter(Boolean);
   const sync = samples.map((sample) => sample.value);
-  return { sync, earlyFlashCount, replayedFlashCount, framePairs, windowOnsets:windowOnsets.length,
+  return { sync, earlyFlashCount, earlyFlashes, earlyFlash:{withinToleranceCount,maxLeadMs}, earlyToleranceS:toleranceS, replayedFlashCount, framePairs, windowOnsets:windowOnsets.length,
     excludedFrames:(presented ?? []).length - evaluated.length, coverageWindows:coverage.windows.length, windowStart, windowEnd,
     samples, duplicateSamples, droppedFrameSamples, droppedFrames };
 }
@@ -302,7 +312,7 @@ export function beatResidualMs(row, transport) {
   return (row.beatCycle - expected) * 60 * beatsPerCycle / bpm * 1000;
 }
 
-export function classifyStallSamples(samples, presented, windows, onsets = (samples ?? []).map((sample) => sample.onset)) {
+export function classifyStallSamples(samples, presented, windows, onsets = (samples ?? []).map((sample) => sample.onset), earlyFlashes = []) {
   const prepared = (windows ?? []).map((window) => {
     const firstFrameIndex = (presented ?? []).findIndex((row) => row.frameMs >= window.startMs);
     const first = firstFrameIndex < 0 ? null : presented[firstFrameIndex];
@@ -331,12 +341,20 @@ export function classifyStallSamples(samples, presented, windows, onsets = (samp
     prepared.filter((window) => window.firstFrameMs !== null).map((window) => window.startMs),
   );
   const auditByStart = new Map(auditedRows.map((row) => [row.stallFrameMs, row]));
+  let stallEarlyCount = 0;
+  const pageProxyEarly = [];
   const windowRows = prepared.map((window) => {
     const audit = auditByStart.get(window.startMs);
     const windowSamples = classified.filter((sample) => matchingBySample.get(sample).some((match) => match.window === window));
     const expectedRanges = new Set(audit?.expectedRanges ?? []);
     const expiredActive = audit?.actualRanges.some((key) => !expectedRanges.has(key) && (onsets ?? []).some((onset) =>
       sameEpoch(onset, audit) && rangeKey(onset) === key && onset.end <= audit.audibleTime)) ?? false;
+    const firstShowingIndexes = new Set(windowSamples.map((sample) => sample.frameIndex));
+    const relevantIndexes = new Set([window.firstFrameIndex, window.firstFrameIndex - 1, ...firstShowingIndexes]);
+    const early = (earlyFlashes ?? []).filter((flash) => relevantIndexes.has(flash.frameIndex)).length;
+    stallEarlyCount += early;
+    const proxySamples = windowSamples.filter((sample) => sample.value < -THRESHOLDS.earlyFlashMs);
+    pageProxyEarly.push(...proxySamples);
     return {
       index:window.index, startMs:window.startMs, endMs:window.endMs,
       firstFrameMs:window.firstFrameMs,
@@ -344,7 +362,8 @@ export function classifyStallSamples(samples, presented, windows, onsets = (samp
       samples:windowSamples.length,
       activeSetMatch:audit ? !audit.mismatch : null,
       replayed:audit ? expiredActive : null,
-      early:windowSamples.filter((sample) => sample.value < -2).length,
+      early,
+      pageProxyEarly:proxySamples.length,
       beatResidualMs:window.beatResidualMs ?? null,
       audited:Boolean(audit),
     };
@@ -353,6 +372,7 @@ export function classifyStallSamples(samples, presented, windows, onsets = (samp
   const nonStall = classified.filter((sample) => sample.stallClass === 'non-stall');
   return {
     stall, nonStall, windows:windowRows,
+    earlyCount:stallEarlyCount, pageProxyEarly, pageProxyEarlyCount:pageProxyEarly.length,
     counts:{
       a:classified.filter((sample) => sample.stallConditions.a).length,
       b:classified.filter((sample) => sample.stallConditions.b).length,
@@ -464,6 +484,7 @@ export function evaluate(summary, thresholds = THRESHOLDS) {
   classifyLimit('frameIntervalMs', 99, thresholds.frameIntervalP99Ms);
   if (metrics.syncProvenance === 'measured') {
     if(!Number.isFinite(metrics.syncAbsMs?.p95)||!Number.isFinite(metrics.syncAbsMs?.p99)) failures.push('measured sync samples unavailable');
+    if(!Number.isFinite(metrics.audioSampleRate)||metrics.audioSampleRate<=0) failures.push('audio sample rate unavailable');
     limit('syncAbsMs', 95, thresholds.syncAbsP95Ms);
     limit('syncAbsMs', 99, thresholds.syncAbsP99Ms);
     if ((metrics.earlyFlashCount ?? 0) > 0) failures.push(`early flashes=${metrics.earlyFlashCount}`);
@@ -519,18 +540,21 @@ export function renderEvidence(summary) {
       ['Text-dirty frame work p95 (ms)', m.textWorkMs?.p95, '<= 8 (target 4, recorded)'],
       ['Frame interval p95 (ms)', m.frameIntervalMs?.p95, '<= 20'],
       ['Frame interval p99 (ms)', m.frameIntervalMs?.p99, '<= 50'],
+      ['Audio sample rate / early tolerance (Hz / ms)', m.audioSampleRate == null ? null : `${m.audioSampleRate} / ${m.earlyToleranceMs}`, '128-frame render quantum'],
+      ['Audio-domain early flashes / tolerance-band pairs', m.earlyFlashCount == null ? null : `${m.earlyFlashCount} / ${m.earlyFlash?.withinToleranceCount ?? 0}`, '0 early; tolerance-band count informational'],
+      ['Page-time proxy early flashes', m.syncPageProxyEarlyCount, 'informational only; not gated'],
       ['A/V model absolute error p95/p99 (non-stall samples, ms)', m.syncAbsMs == null ? null : `${m.syncAbsMs.p95} / ${m.syncAbsMs.p99}`, 'measured only; <= 33.4 / 50'],
       ['A/V model all-sample absolute error p95/p99 (ms)', m.syncAbsMsAll == null ? null : `${m.syncAbsMsAll.p95} / ${m.syncAbsMsAll.p99}`, 'informational; includes stall-window samples'],
-      ['A/V stall-window sync samples by condition (a / b / both)', m.stallWindowSync?.counts == null ? null : `${m.stallWindowSync.counts.a} / ${m.stallWindowSync.counts.b} / ${m.stallWindowSync.counts.both}`, 'informational; classified by recorded page-time windows'],
+      ['A/V stall-window sync samples by condition (a / b / both)', m.stallWindowSync?.counts == null ? null : `${m.stallWindowSync.counts.a} / ${m.stallWindowSync.counts.b} / ${m.stallWindowSync.counts.both}`, 'informational; classified by recorded stall windows'],
       ['A/V stall-window sample count / p50 / p95 / max absolute error (ms)', m.stallWindowSync == null ? null : `${m.stallWindowSync.count} / ${m.stallWindowSync.p50} / ${m.stallWindowSync.p95} / ${m.stallWindowSync.max}`, 'informational; recovery gates apply'],
       ['Stall windows injected / recorded / audited', m.stallWindowsInjected == null ? null : `${m.stallWindowsInjected} / ${(m.stallWindows ?? []).length} / ${(m.stallWindows ?? []).filter((window) => window.audited).length}`, 'equal counts; all windows >= 250 ms; >= 1 audited'],
-      ['Stall-window early flashes', m.stallWindowSync?.earlyCount, '0'],
+      ['Stall-window early flashes / page-time proxy', m.stallWindowSync?.earlyCount == null ? null : `${m.stallWindowSync.earlyCount} / ${m.stallWindowSync.pageProxyEarlyCount ?? 0}`, 'audio-domain gate 0; page-time proxy informational'],
       ['F beat residual max (ms)', m.beatResidual?.maxAbsStallFrameMs, '<= 1'],
       ['Frame interval exclusions (stall / non-stall)', m.frameIntervalExcluded == null ? null : `${m.frameIntervalExcluded.stall} / ${m.frameIntervalExcluded.nonStall}`, 'informational; intervals > 200 ms excluded'],
       ['A/V sync dropped-frame samples', m.syncDroppedFrameSamples, 'reported separately; sync gate covers non-stall samples'],
       ['A/V sync duplicates folded', m.syncDuplicateSamples, 'one sample per onset time, epoch and presented frame'],
       ['A/V model absolute error p95/p99 without dropped frames (informational)', m.syncAbsMsNoDrop == null ? null : `${m.syncAbsMsNoDrop.p95} / ${m.syncAbsMsNoDrop.p99}`, 'informational; not gated'],
-      ['Early flashes', m.earlyFlashCount, '0; none earlier than 2 ms'],
+      ['Early flashes', m.earlyFlashCount, '0; no frame more than one render quantum before onset'],
       ['A/V window start / end (s)', m.syncWindowStart == null ? null : `${m.syncWindowStart} / ${m.syncWindowEnd}`, 'intersection with onset eviction guard'],
       ['A/V window onsets / frame pairs / excluded frames', m.syncWindowOnsets == null ? null : `${m.syncWindowOnsets} / ${m.syncFramePairs} / ${m.syncExcludedFrames}`, 'excluded rows remain in raw JSONL'],
       ['Post-stall active-set mismatches', m.lateActiveMismatchCount, '0'],
@@ -542,6 +566,11 @@ export function renderEvidence(summary) {
       ['Ledger after dispose (bytes)', m.ledgerAfterDisposeBytes, '0'],
     ]) rows.push(`| ${browser.name} | ${name} | ${cell(value)} | ${threshold} |`);
   }
+  const stallRows = browsers.flatMap((browser) => (browser.metrics?.stallWindows ?? []).map((window) =>
+    `| ${browser.name} | ${window.index} | ${window.startMs} / ${window.endMs} | ${window.firstFrameMs ?? 'unavailable'} | ${window.samples} | ${window.activeSetMatch ?? 'unavailable'} | ${window.replayed ?? 'unavailable'} | ${window.early} | ${window.pageProxyEarly ?? 0} | ${window.beatResidualMs ?? 'unavailable'} | ${window.audited} |`));
+  const sampleNotes = browsers.filter((browser) => browser.sampleDownsampling)
+    .map((browser) => `${browser.name}: ${browser.sampleDownsampling.frame}; ${browser.sampleDownsampling.presented}; ${browser.sampleDownsampling.onset}; aggregate metrics use full in-memory samples`).join('; ');
+  const beatDrifts = browsers.map((browser) => `${browser.name} ${cell(browser.metrics?.beatDriftMs)} ms`).join('; ');
   const status = summary.pass ? 'PASS' : summary.blocked ? 'BLOCKED' : 'FAIL';
   const ascii = (s) => String(s).replace(/[^\x00-\x7F]/g, '?');
   return ascii(`### Run ${summary.runId}: ${status}\n\n` +
@@ -551,5 +580,11 @@ export function renderEvidence(summary) {
     `\n\nBehavior checks: ${browsers.map((b) => `${b.name} ${b.behavior?.passed ?? 0}/${b.behavior?.total ?? 0}`).join('; ')}. ` +
     `Failed checks: ${browsers.flatMap((b) => (b.checks ?? []).filter((c) => c.status !== 'limitation' && !c.pass).map((c) => `${b.name}:${c.id}`)).join(', ') || 'none'}. ` +
     `Measurement failures: ${browsers.flatMap((b) => (b.measurement?.failures ?? []).map((failure) => `${b.name}:${String(failure).split('\n')[0]}`)).join('; ') || 'none'}. ` +
-    `Limitations: ${[...new Set(browsers.flatMap((b) => b.limitations ?? []))].join('; ') || 'none recorded'}.\n`);
+    `Limitations: ${[...new Set(browsers.flatMap((b) => b.limitations ?? []))].join('; ') || 'none recorded'}.\n\n` +
+    `### Stall-window sync classification (session 293, design 15.3.8.15)\n\n` +
+    `Early flashes use the audio domain: a shown range is early only when its frame audibleTime precedes the matching onset by more than Q = 128 / sampleRate. The page-time proxy is informational. Sample rate and Q are recorded in the metric table.\n\n` +
+    '| Browser | Window | Start / end (page ms) | F frame (page ms) | Samples | Active set matches | Replayed | Audio early | Page proxy early | F beat residual (ms) | Audited |\n|---|---:|---:|---:|---:|---|---|---:|---:|---:|---|\n' +
+    stallRows.join('\n') + '\n\n' +
+    `The transport publisher pairs a running sample's cycle with the host time of that cycle under the one-grid-period guard; the prior grid-quantized pairing could add up to 2.083 ms. Current final beat drift: ${beatDrifts}.\n\n` +
+    `Serialized raw samples are downsampled for the committed evidence size cap (${sampleNotes || 'not applicable'}); thresholds, counts and aggregate metrics are computed from full in-memory samples.\n`);
 }

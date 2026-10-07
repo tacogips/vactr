@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 interface StatsModule {
   THRESHOLDS: Readonly<Record<string, number>>;
+  RENDER_QUANTUM_FRAMES: number;
   TARGETS: Readonly<{ textWorkP95Ms: number; animationWorkP50Ms: number }>;
   percentile(values: number[], p: number): number | null;
   beatResidualMs(row:{epoch:string|null;beatCycle:number;audibleTime:number},transport:{running:boolean;epoch:string|null;cycle:[number,number];sample_time:number;bpm:number;beats_per_cycle:number}):number|null;
-  classifyStallSamples(samples:Array<{time:number;frameIndex:number;value:number;onset:{time:number;end:number;from:number;to:number;epoch:string|null};frame:{frameMs:number;targetMs:number;audibleTime:number;epoch:string|null;activeKey:string}}>,presented:Array<{frameMs:number;audibleTime:number;epoch:string|null;activeKey:string;targetMs:number;beatCycle?:number}>,windows:Array<{index:number;startMs:number;endMs:number;beatResidualMs?:number|null}>,onsets?:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>):{stall:Array<{frameIndex:number;stallClass:string;stallConditions:{a:boolean;b:boolean};value:number}>;nonStall:Array<{frameIndex:number;stallClass:string;stallConditions:{a:boolean;b:boolean};value:number}>;windows:Array<{index:number;startMs:number;endMs:number;firstFrameMs:number|null;firstFrameLagMs:number|null;samples:number;activeSetMatch:boolean|null;replayed:boolean|null;early:number;beatResidualMs:number|null;audited:boolean}>;counts:{a:number;b:number;both:number}};
+  classifyStallSamples(samples:Array<{time:number;frameIndex:number;value:number;onset:{time:number;end:number;from:number;to:number;epoch:string|null};frame:{frameMs:number;targetMs:number;audibleTime:number;epoch:string|null;activeKey:string}}>,presented:Array<{frameMs:number;audibleTime:number;epoch:string|null;activeKey:string;targetMs:number;beatCycle?:number}>,windows:Array<{index:number;startMs:number;endMs:number;beatResidualMs?:number|null}>,onsets?:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,earlyFlashes?:Array<{frameIndex:number;frameMs:number;audibleTime:number;epoch:string|null;range:string}>):{stall:Array<{frameIndex:number;stallClass:string;stallConditions:{a:boolean;b:boolean};value:number}>;nonStall:Array<{frameIndex:number;stallClass:string;stallConditions:{a:boolean;b:boolean};value:number}>;windows:Array<{index:number;startMs:number;endMs:number;firstFrameMs:number|null;firstFrameLagMs:number|null;samples:number;activeSetMatch:boolean|null;replayed:boolean|null;early:number;pageProxyEarly:number;beatResidualMs:number|null;audited:boolean}>;earlyCount:number;pageProxyEarly:Array<unknown>;pageProxyEarlyCount:number;counts:{a:number;b:number;both:number}};
   pairInputLatency(frames: number[][], keys: number[][]): { paired: Array<{ keyTime: number; frameTime: number; latencyMs: number }>; pairedKeys: number; nonEditingKeys: number; expiredKeys: number; unpairedKeys: number };
   countChecks(checks: Array<{ status?: string; pass?: boolean }>): { total: number; passed: number; failed: number };
   evaluate(summary: Record<string, unknown>, thresholds?: Record<string, number>): { pass: boolean; failures: string[]; limitations: string[]; targets: { textWorkP95Met: boolean | null; animationWorkP50Met: boolean | null } };
@@ -14,7 +15,7 @@ interface StatsModule {
   attributeWorkloadOnsets(rows: Array<{ receivedMs:number; [key:string]:unknown }>, baselineKeys: Set<string>, clickMs:number): { workload:Array<unknown>; count:number; excludedBaseline:number; excludedPreClick:number };
   splitSinkOnsets(times:number[], ctxTime:number): { control:number; workload:number };
   syncWindow(onsets:Array<{time:number;end:number}>,presented:Array<{audibleTime:number}>): {windowStart:number|null;windowEnd:number|null;empty:boolean};
-  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number;nominalMs?:number}): {sync:number[];samples:Array<{time:number;epoch:string|null;frameIndex:number;value:number;droppedFrames:number;onset:{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number};frame:{frameMs:number;targetMs:number;audibleTime:number;epoch:string|null;activeKey:string};previousFrameMs:number|null;nextFrameMs:number}>;duplicateSamples:number;droppedFrameSamples:number;droppedFrames:number;earlyFlashCount:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
+  attributeSync(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;targetMs:number}>,options?:{earlyToleranceS?:number;sampleRate?:number;nominalMs?:number}): {sync:number[];samples:Array<{time:number;epoch:string|null;frameIndex:number;value:number;droppedFrames:number;onset:{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number};frame:{frameMs:number;targetMs:number;audibleTime:number;epoch:string|null;activeKey:string};previousFrameMs:number|null;nextFrameMs:number}>;duplicateSamples:number;droppedFrameSamples:number;droppedFrames:number;earlyFlashCount:number;earlyFlashes:Array<{frameIndex:number;frameMs:number;audibleTime:number;epoch:string|null;range:string}>;earlyFlash:{withinToleranceCount:number;maxLeadMs:number|null};earlyToleranceS:number;replayedFlashCount:number;framePairs:number;windowOnsets:number;excludedFrames:number;windowStart:number|null;windowEnd:number|null};
   lateActiveMismatches(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number}>,stalls:number[]): number;
   lateActiveMismatchDetails(onsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>,presented:Array<{audibleTime:number;activeKey:string;epoch:string|null;frameMs:number;executionMs?:number}>,stalls:number[]):Array<{stallFrameMs:number;frameMs:number;executionMs:number;audibleTime:number;epoch:string|null;activeKey:string;expectedRanges:string[];actualRanges:string[];missingRanges:string[];extraRanges:string[];eligibleOnsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number}>;overlappingOnsets:Array<{time:number;end:number;from:number;to:number;epoch:string|null;receivedMs?:number;eligible:boolean}>;mismatch:boolean}>;
   rankSelfTime(profile:Record<string,unknown>,top?:number):Array<{functionName:string;url:string;line:number;selfMs:number;share:number}>;
@@ -25,7 +26,7 @@ interface StatsModule {
 const spec: string = '../../test/e2e/stats.mjs';
 const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
 
-const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:6}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, beatDriftMs:0, onsetCount:1 };
+const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:6}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, audioSampleRate:48000, earlyToleranceMs:128000/48000, beatDriftMs:0, onsetCount:1 };
 describe('canvas evidence statistics', () => {
   it('uses nearest rank percentiles', () => expect(stats.percentile(Array.from({ length: 100 }, (_, i) => i + 1), 95)).toBe(95));
   it('summarizes exclusive phase rows and leaves empty phases unmeasured', () => {
@@ -195,12 +196,43 @@ describe('canvas evidence statistics', () => {
     expect(stats.evaluate({metrics:{...base,stallWindowSync:{earlyCount:0},stallWindows:[{startMs:0,endMs:250,audited:true,beatResidualMs:1}]}}).pass).toBe(true);
     expect(stats.evaluate({metrics:{...base,beatDriftMs:null}}).failures).toContain('beat drift unavailable');
   });
-  it('rejects a -3 ms stall-window sync sample as early', () => {
-    const onset={time:0.2,end:0.4,from:1,to:2,epoch:'e'};
-    const sample={time:0.2,frameIndex:0,value:-3,onset,frame:{frameMs:1000,targetMs:1000,audibleTime:0.2,epoch:'e',activeKey:'1-2'}};
-    const classified=stats.classifyStallSamples([sample],[sample.frame],[{index:0,startMs:1000,endMs:1250}]);
-    const result=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},stallWindowSync:{earlyCount:classified.stall.filter((row)=>row.value < -2).length},stallWindowsInjected:0,stallWindows:[]}});
-    expect(result.failures).toContain('stall-window early flashes=1');
+  it('keeps the recorded post-onset audio time while reporting the -15.33 ms page proxy', () => {
+    const onsets=[{time:0,end:1,from:1,to:2,epoch:'e'},{time:243,end:244,from:93,to:95,epoch:'e'}];
+    const presented=[
+      {frameMs:242900,targetMs:242900,audibleTime:242.9,epoch:'e',activeKey:''},
+      {frameMs:243112,targetMs:243142.56,audibleTime:243.0122,epoch:'e',activeKey:'93-95'},
+      {frameMs:243115,targetMs:243145,audibleTime:243.02,epoch:'e',activeKey:'93-95'},
+    ];
+    const attributed=stats.attributeSync(onsets,presented,{sampleRate:48000});
+    const classified=stats.classifyStallSamples(attributed.samples,presented,[{index:0,startMs:243111,endMs:243361}],onsets,attributed.earlyFlashes);
+    expect(attributed.earlyFlashCount).toBe(0);expect(classified.earlyCount).toBe(0);
+    expect(attributed.earlyFlashes).toEqual([]);expect(attributed.earlyFlash).toEqual({withinToleranceCount:0,maxLeadMs:null});
+    expect(attributed.samples[0].value).toBeCloseTo(-15.36,2);
+    expect(classified.pageProxyEarlyCount).toBe(1);
+    expect(stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},earlyFlashCount:0,stallWindowSync:{earlyCount:0},stallWindowsInjected:1,stallWindows:classified.windows}}).pass).toBe(true);
+    const earlyRows=[presented[0],{...presented[1],audibleTime:242.98},{...presented[2],audibleTime:243.01}];
+    const early=stats.attributeSync(onsets,earlyRows,{sampleRate:48000});
+    const earlyClass=stats.classifyStallSamples(early.samples,earlyRows,[{index:0,startMs:243111,endMs:243361}],onsets,early.earlyFlashes);
+    expect(early.earlyFlashCount).toBe(1);expect(early.earlyFlashes[0]).toMatchObject({frameIndex:1,range:'93-95'});expect(earlyClass.earlyCount).toBe(1);
+    const failed=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},earlyFlashCount:early.earlyFlashCount,stallWindowSync:{earlyCount:earlyClass.earlyCount},stallWindowsInjected:1,stallWindows:earlyClass.windows}});
+    expect(failed.failures).toContain('early flashes=1');expect(failed.failures).toContain('stall-window early flashes=1');
+  });
+  it('gates audio-domain early flashes at the sample-rate render-quantum boundary', () => {
+    const measure=(leadMs:number,sampleRate:number)=>stats.attributeSync(
+      [{time:0,end:0.1,from:1,to:2,epoch:'e'},{time:1+leadMs/1000,end:1.2,from:5,to:7,epoch:'e'}],
+      [{audibleTime:0.5,activeKey:'',epoch:'e',frameMs:500,targetMs:500},{audibleTime:1,activeKey:'5-7',epoch:'e',frameMs:1000,targetMs:1000},{audibleTime:1.02,activeKey:'5-7',epoch:'e',frameMs:1020,targetMs:1020}],
+      {sampleRate},
+    );
+    expect(measure(2.6,48000)).toMatchObject({earlyFlashCount:0,earlyFlash:{withinToleranceCount:1}});
+    expect(measure(2.7,48000).earlyFlashCount).toBe(1);
+    expect(measure(2.85,44100).earlyFlashCount).toBe(0);
+    expect(stats.RENDER_QUANTUM_FRAMES).toBe(128);
+  });
+  it('requires the measured audio sample rate and reports page-proxy early values only as informational', () => {
+    const missing=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',audioSampleRate:undefined}});
+    expect(missing.failures).toContain('audio sample rate unavailable');
+    const proxy=stats.evaluate({metrics:{...passingMetrics,syncProvenance:'measured',syncAbsMs:{p95:0,p99:0},syncPageProxyEarlyCount:1,earlyFlashCount:0,stallWindowSync:{earlyCount:0},stallWindowsInjected:0,stallWindows:[]}});
+    expect(proxy.pass).toBe(true);
   });
   it('audits full workload onsets and gates an expired highlight still active on F', () => {
     const onset={time:1,end:1.8,from:1,to:2,epoch:'e'};
@@ -366,11 +398,16 @@ describe('canvas evidence statistics', () => {
   it('reports estimated sync without gating it', () => expect(stats.evaluate({ metrics: { ...passingMetrics, syncProvenance: 'estimate', syncAbsMs: { p95: 999 } } }).pass).toBe(true));
   it('does not gate unavailable sync', () => expect(stats.evaluate({ metrics: { ...passingMetrics, syncProvenance: 'unavailable' } }).pass).toBe(true));
   it('renders all metric rows and an ASCII run id', () => {
-    const text = stats.renderEvidence({ runId: 'run-001', browsers: [{ name: 'Chromium', metrics: { editKeyCount:499, editPairedKeyCount:100, controlOnsetCount:3, controlStartMethod:'toolbar-click', onsetAttribution:'control sounded' }, checks:[{ id:'real-failure', pass:false }, { id:'synthetic-ime', status:'limitation', pass:null }], measurement:{ failures:['no playing onset telemetry', 'Run shortcut timeout\nstack trace'] }, behavior: { passed: 4, total: 4 } }] });
+    const text = stats.renderEvidence({ runId: 'run-001', browsers: [{ name: 'Chromium', sampleDownsampling:{frame:'every 32nd sample',presented:'every 32nd sample',onset:'every 32nd sample'}, metrics: { editKeyCount:499, editPairedKeyCount:100, controlOnsetCount:3, controlStartMethod:'toolbar-click', onsetAttribution:'control sounded', beatDriftMs:0, stallWindows:[{index:0,startMs:1,endMs:251,firstFrameMs:256,samples:2,activeSetMatch:true,replayed:false,early:0,pageProxyEarly:1,beatResidualMs:0,audited:true}] }, checks:[{ id:'real-failure', pass:false }, { id:'synthetic-ime', status:'limitation', pass:null }], measurement:{ failures:['no playing onset telemetry', 'Run shortcut timeout\nstack trace'] }, behavior: { passed: 4, total: 4 } }] });
     expect(text).toContain('run-001');
     for (const row of ['Input latency p95', 'Editing keystrokes / paired', 'Audio control / run start', 'Silent sink post-sink peak', 'Direct destination connections', 'Pre-sink peak (dBFS)', 'Pre-sink RMS (dBFS)', 'Animation frame work p95', 'Frame interval p95', 'A/V model absolute error', 'A/V sync dropped-frame samples', 'A/V sync duplicates folded', 'Resource ledger peak', 'JS heap growth', 'Beat drift', 'Replayed flashes']) expect(text).toContain(row);
     expect(text).toContain('<= 8 (target 4, recorded)');
     expect(text).toContain('<= 4 (target 1, recorded)');
+    expect(text).toContain('Stall-window sync classification (session 293, design 15.3.8.15)');
+    expect(text).toContain('| Chromium | 0 | 1 / 251 | 256 | 2 | true | false | 0 | 1 | 0 | true |');
+    expect(text).toContain('page-time proxy is informational');
+    expect(text).toContain('prior grid-quantized pairing could add up to 2.083 ms');
+    expect(text).toContain('Serialized raw samples are downsampled');
     expect(text).toContain('Chromium:real-failure');
     expect(text).not.toContain('Chromium:synthetic-ime');
     expect(text).toContain('Measurement failures: Chromium:no playing onset telemetry; Chromium:Run shortcut timeout.');

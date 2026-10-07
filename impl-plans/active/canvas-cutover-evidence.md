@@ -1,8 +1,8 @@
 # Canvas Cutover: Real-Browser Evidence, Measurements and Closeout Implementation Plan
 
-**Status**: In Progress (session 293: redispatched under the "Session 302 Amendment", TASK-701 to TASK-706, design 15.3.8.15; TASK-601 is superseded by TASK-703)
-**Plan ID**: CANVAS-EVIDENCE (dispatch wave 16 since session 291; every dependency is accepted)
-**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope; "Session 285 scope record" for the edit-path repair), 15.3.8.14 (session-286 performance wave), 15.3.8.15 (session-293 stall-window sync classification and transport-sample pairing)
+**Status**: In Progress (session 303: the "Session 303 Amendment" adds TASK-708 before TASK-703 to TASK-706; it runs after CANVAS-SYNTAX-WORKER, CANVAS-DIAG-OFFPATH and CANVAS-TELEMETRY-LEAD; design 15.3.8.16)
+**Plan ID**: CANVAS-EVIDENCE (dispatch wave 20 since session 303; it depends on the three session-303 plans)
+**Design Reference**: design-docs/specs/design-implementation.md#15.3.8.8 (measurement protocol and thresholds, including the session-267 silent automated audio rule), 15.3.8.9 (gates and closeout), 15.3.8.11 (serial perf gate), 15.3.8.12 (session-274 evidence repair wave), 15.3.8.13 (session-277 release-wasm measurement build and repair scope; "Session 285 scope record" for the edit-path repair), 15.3.8.14 (session-286 performance wave), 15.3.8.15 (session-293 stall-window sync classification and transport-sample pairing), 15.3.8.16 (session-303 main-thread long tasks and quiet-host evidence)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json
 **Created**: 2026-10-05
 **Last Updated**: 2026-10-07
@@ -2505,6 +2505,171 @@ the context sample rate), and the page-time value is informational (design 15.3.
 - The recorded-case, early-case, quantum-boundary and sample-rate-guard rows exist in
   `stats.test.ts` and pass.
 
+## Session 303 Amendment (design 15.3.8.16 parts D, E and F)
+
+**Issue reference.** This is the workflowInput issue "RESUME session 294: syntax Worker,
+diagnostics off keystroke path, earlier playing telemetry; quiet-host canonical evidence;
+closeout" (workflow execution `opus-luna-design-and-implement-review-loop-session-303`, resuming
+session 294 at HEAD `ec34f66`, plan checkpoint `3f972e7`). Design 15.3.8.16 was accepted by
+step 3 at comm-004816.
+
+### Intent and context
+
+At `ec34f66`, `run-001` failed only WebKit input p95 (51-59 ms) and WebKit non-stall sync p99
+(58 ms). The operator diagnosis (`tmp/canvas-cutover/diag-webkit-input/REPORT.md`) attributes
+them to three causes:
+
+- the main-thread reparse;
+- the diagnostics check;
+- the 30 ms telemetry lead;
+
+all made visible by host load. Three serial plans fix the product first:
+
+1. CANVAS-SYNTAX-WORKER;
+2. CANVAS-DIAG-OFFPATH;
+3. CANVAS-TELEMETRY-LEAD.
+
+This plan then does the following, in this order:
+
+1. TASK-708: the quiet-host precondition and load recording (part D), the README, and the
+   optional sink buffer reuse (part E);
+2. TASK-703: the canonical run;
+3. TASK-704: the evidence document;
+4. TASK-705: the final gates;
+5. TASK-706: closeout.
+
+### Non-goals
+
+- No product source edits in this amendment. A canonical-run product finding is repaired under
+  the existing seam protocol, but the three new plans' files are edited only for such a finding,
+  with phase evidence.
+- No change to `THRESHOLDS`, `TARGETS`, the 250 ms stall, its period, the workload, the sync
+  window, the stall classification or the audio-domain early rule.
+- The quiet-host gate is a run precondition only. It never relabels a measured failure.
+
+### Ownership changes (manifest entry `CANVAS-EVIDENCE`)
+
+- `editor/test/e2e/run.mjs` moves from sharedPaths to writePaths.
+- New writePaths:
+  - `impl-plans/active/canvas-cutover-syntax-worker.md`
+  - `impl-plans/active/canvas-cutover-diag-offpath.md`
+  - `impl-plans/active/canvas-cutover-telemetry-lead.md`
+  - `impl-plans/completed/canvas-cutover-syntax-worker.md`
+  - `impl-plans/completed/canvas-cutover-diag-offpath.md`
+  - `impl-plans/completed/canvas-cutover-telemetry-lead.md`
+- `dependsOn` gains CANVAS-SYNTAX-WORKER, CANVAS-DIAG-OFFPATH and CANVAS-TELEMETRY-LEAD.
+- The wave becomes 20.
+
+### TASK-708: Quiet-host gate, load recording, README and sink buffers (sandbox; before TASK-703)
+
+- **`stats.mjs`** gains two pure exports. Keep the file under 1,000 lines; it is 590 today.
+  - `parseBusyProcesses(psText, excludePids)`. Input is the output of
+    `ps -Ao pid,ppid,pcpu,comm`. It returns `[{ pid, pcpu, comm }]` for rows with
+    `pcpu >= 50` whose command basename matches `cargo`, `rustc`, `clippy-driver`,
+    `cargo-nextest`, `rustfmt`, `vitest`, `tsc`, `vite`, `esbuild`, `node`, `xcodebuild` or
+    `swift-frontend`, excluding `excludePids`.
+  - `quietHostGate({ load1, busy })`. It returns `{ quiet: load1 < 9 && busy.length <= 2, reason }`.
+- **`run.mjs`.**
+  - At start, read `os.loadavg()` and run `ps -Ao pid,ppid,pcpu,comm` (`execFileSync`). The
+    exclude set is the run's own pid and its ancestors and descendants.
+  - For `--write-evidence` runs, a failing gate exits 2 as blocked, with
+    `fatal: 'host not quiet: <reason>'`. This follows the existing `gatingPreflight` refusal
+    pattern at `run.mjs:22-24` and runs before any server or browser starts.
+  - During the run, sample `os.loadavg()` every 10 s (an `unref`'d interval), and once at the
+    end.
+  - Write `summary.hostLoad = { start: { load, busy }, samples: [[ms, l1, l5, l15]], end, mean1m, max1m }`.
+  - Non-gating runs record `hostLoad` without the refusal.
+- **`stats.test.ts` rows:**
+  - a `ps` fixture with 3 busy `rustc` rows → `quietHostGate` is `quiet: false`;
+  - the same with the run's own pid excluded and 2 busy → `quiet: true`;
+  - `load1` 9.0 → `quiet: false`, and 8.99 → `quiet: true`.
+
+  These rows are the in-test control.
+- **`README.md`** documents the 15.3.8.16 part D procedure with the exact commands: load wait,
+  then lock, then re-check, then run, then release through a trap.
+- **`silent-sink.mjs` (part E, optional).** Allocate `preData`/`postData` once per sink, next to
+  the analysers (`silent-sink.mjs:53`), and reuse them per poll. Meter semantics stay unchanged,
+  and the existing `stats.test.ts` sink rows and behavior checks must pass. If this is skipped,
+  record "part E not applied" in the progress log.
+
+### Amendments to TASK-703 to TASK-706
+
+- **TASK-703** runs after TASK-708 on the source accepted after CANVAS-TELEMETRY-LEAD. Before
+  each canonical or diagnostic browser run:
+  1. Wait without the lock until load average is below 9 with at most 2 busy build or test
+     processes.
+  2. Take the lock with
+     `until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done`
+     and write `CANVAS-EVIDENCE` to `owner`.
+  3. Re-check the gate. If it fails, release and retry.
+  4. Run, then release with `rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`
+     from a trap.
+
+  The criteria are unchanged. Additional criteria:
+  - `hostLoad` is present per browser;
+  - `data-syntax` is `tree-sitter-worker` in both behavior suites;
+  - `highlight.aheadAccepted > 0` in both browsers' counters.
+
+  Record `highlight.retracted` and `confirmedSkipped`. A run that exits 2 for "host not quiet"
+  is retried later and is never reported as a pass or a failure.
+- **TASK-704** adds the section "Main-thread long tasks (session 303, design 15.3.8.16)"
+  containing:
+  - the diagnosis table from `REPORT.md` (interleaved runs, load, input and sync per run);
+  - the three causes with their fixes: the syntax Worker, the post-frame check, and
+    announced telemetry with retraction;
+  - the before figures (`ec34f66`: WebKit input p95 51-59 ms, sync p99 58 ms) and the after
+    figures from the new `run-001`;
+  - `hostLoad` per browser;
+  - the noise analysis (session 292 compared with session 294 under different load);
+  - the raw data paths.
+
+  It also adds to the pending physical-iPad list "Worker syntax on iPad WKWebView" with its
+  procedure: launch, type 50 keys, and read `data-syntax` through Web Inspector. It keeps the
+  silent virtual-sink method, the platform limitations and every pending check, and updates the
+  triage table.
+- **TASK-705**: eleven gates, strictly serial, with full nextest alone under the lock and
+  `timeout 2400`.
+  - Gate 10 becomes rustfmt `--check` on every Rust file touched since `ec34f66`: the
+    CANVAS-TELEMETRY-LEAD list plus `src/session/publish.rs` and
+    `src/session/tests/publish.rs`.
+  - The `no-editor-view` row stays.
+- **TASK-706** archives 26 canvas-cutover plans: the 23 listed before, plus `syntax-worker`,
+  `diag-offpath` and `telemetry-lead`. It also archives the 15 canvas-editor-224 plans and
+  `canvas-editor-224-dispatch.json`.
+  - `impl-plans/README.md` is updated.
+  - The 15.3.8.4 erratum and the deferred typo fixes are applied as listed.
+  - Commit and push non-force to `origin wf/canvas`.
+
+### Invariant amendments (replace the Session 302 and 294 invariants that conflict)
+
+- `THRESHOLDS` and `TARGETS` in `stats.mjs` stay byte-identical to HEAD `c10ab72`.
+- `git diff ec34f66 -- editor/test/e2e/fixtures/large-doc.mjs editor/package.json editor/package-lock.json Cargo.toml Cargo.lock mise.toml`
+  is empty.
+- `git diff ec34f66 -- editor/test/e2e/silent-sink.mjs` is empty or contains only the part E
+  buffer reuse.
+- Rust changes since `ec34f66` are limited to the CANVAS-TELEMETRY-LEAD writePaths.
+- `src/session/codec.rs` is unchanged.
+- `editor/src/code/transport.ts` and `editor/src/app/clock.ts` are unchanged since `ec34f66`.
+- No touched source file reaches 1,000 lines.
+- Every automated audio run stays silent.
+
+### Session 303 checklist (mechanical)
+
+- `grep -n "quietHostGate\|parseBusyProcesses" editor/test/e2e/stats.mjs editor/test/e2e/run.mjs`
+  finds both exports and the `run.mjs` use.
+- `jq '.browsers[].hostLoad // .hostLoad' design-docs/specs/evidence/canvas-cutover/run-001/summary.json`
+  is non-null.
+- `grep -n "Main-thread long tasks (session 303" design-docs/specs/design-canvas-editor-evidence.md`
+  finds the section.
+
+Session 303 verification rows:
+
+| Command | Required evidence |
+|---------|-------------------|
+| `cd editor && ./node_modules/.bin/vitest run test/e2e > ../tmp/canvas-cutover/evidence/s303-vitest-e2e.log 2>&1` | exit 0; the TASK-708 rows pass with every existing row |
+| `node --check editor/test/e2e/run.mjs`, `node --check editor/test/e2e/stats.mjs`, `node --check editor/test/e2e/silent-sink.mjs` (one file per invocation; S303-PR-L3) | each exits 0 |
+| Under the quiet-host lock: `cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-id run-001 > ../tmp/canvas-cutover/evidence/s303-run-001-e2e.log 2>&1` (after `mise run build-wasm-release` and `VACTR_REQUIRE_SESSION_ABI=1 npm run build`) | exit 0; every TASK-703 criterion including WebKit and Chromium input p95 <= 50 ms, frame p95 <= 20 ms, non-stall sync p99 <= 50 ms, textWork p95 <= 8 ms, `hostLoad` recorded |
+
 ## Verification
 
 Inside the sandbox:
@@ -2636,6 +2801,10 @@ only this plan's progress log and the plan files being archived.
 - [x] Session 302 TASK-704: the evidence document has the "Stall-window sync classification (session 293, design 15.3.8.15)" section with the per-window table, the side-by-side sync figures and the beat-drift diagnosis, and its triage table cites the new run (`design-canvas-editor-evidence.md`; generated from `run-001`)
 - [ ] Session 302 TASK-705: final gates pass serially except the required canonical e2e, which currently fails WebKit input p95 and sync p99 on the exact final source; full nextest ran alone under `timeout 2400` (logs recorded in the session 294 progress entry below)
 - [ ] Session 302 TASK-706: 23 canvas-cutover plans, 15 canvas-editor-224 plans and `canvas-editor-224-dispatch.json` are archived file by file; `impl-plans/README.md` is updated; the erratum and typo fixes are applied; the commit is pushed non-force to `origin wf/canvas`
+- [ ] Session 303 plan amendment: design 15.3.8.16 (accepted by step 3, comm-004816), the three new plans, this amendment and the manifest are checkpoint-committed and pushed before CANVAS-SYNTAX-WORKER is dispatched
+- [ ] Session 303 TASK-708: `parseBusyProcesses` and `quietHostGate` are exported and tested (with the 9.0/8.99 and 3/2-busy controls); `run.mjs` refuses a non-quiet `--write-evidence` start with exit 2 and records `hostLoad`; the README documents the procedure; part E is applied or recorded as not applied
+- [ ] Session 303 TASK-703: under the quiet-host lock, `run-001` exits 0 in Chromium and WebKit (input p95 <= 50 ms, frame p95 <= 20 ms, non-stall sync p99 <= 50 ms, textWork p95 <= 8 ms, audio-domain early 0, post-sink peak 0), with `hostLoad`, `data-syntax` `tree-sitter-worker` and `aheadAccepted > 0` recorded
+- [ ] Session 303 TASK-704/705/706: the "Main-thread long tasks (session 303, design 15.3.8.16)" evidence section; eleven serial gates; 26 canvas-cutover, 15 canvas-editor-224 and 1 dispatch file archived; README; erratum and typos; non-force push to `origin wf/canvas`
 - [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
 ## Progress Log
@@ -3162,3 +3331,14 @@ canonical WebKit run for the 50 ms input p95 and sync p99 gates. Do not relabel 
 change thresholds/workload. TASK-703 and TASK-705 remain unchecked until the canonical e2e gate
 passes. Formal integration review, archival, README/erratum updates, commit and push remain
 downstream and are not the cause of this incomplete implementation result.
+
+### Session: 2026-10-07 (session 303 plan amendment, Session 303 Amendment)
+
+**Tasks Completed**: Plan amendment authored from design 15.3.8.16 (accepted by step 3,
+comm-004816). The amendment adds TASK-708 (quiet-host gate, `hostLoad`, README, optional sink
+buffers) and amends TASK-703 to TASK-706. It also replaces the conflicting Session 302/294
+invariants, because Rust, the protocol and `perf-hook.ts` now change under
+CANVAS-TELEMETRY-LEAD. Three serial product plans precede this one:
+`canvas-cutover-syntax-worker.md`, `canvas-cutover-diag-offpath.md` and
+`canvas-cutover-telemetry-lead.md`. In the manifest, `run.mjs` moves to writePaths, the wave
+becomes 20, and `dependsOn` gains the three plans. No threshold, workload or stall change.

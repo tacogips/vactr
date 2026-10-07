@@ -6794,6 +6794,10 @@ preserves the current behavior.
   - Entries whose epoch does not match are dropped, and so are entries more
     than 2 s in the future.
   - There are at most 4,096 entries, and hush clears them.
+  - (Amended by 15.3.8.16 part C: announced `ahead` entries are accepted
+    under the same rules, confirmations are de-duplicated by `id`, and
+    `retract` removes entries. Activation is unchanged, so no entry shows
+    before its audible time.)
 - **Eval flash.** The eval flash is UI feedback timed on page time (200 ms),
   not on the audio clock. It is not replayed after a stall.
 
@@ -7001,9 +7005,9 @@ These bounds are enforced and tested:
 | Path | Bound |
 |------|-------|
 | Document deltas | `doc-changed` carries only changed byte ranges and inserted bytes, composed per 200 ms debounce or forced flush. A test asserts that a one-character edit in a 1 MiB document yields a `doc-changed` payload under 256 bytes, with no whole-text transfer. |
-| Allowed whole-text transfers | Only these: open/reset, song apply, format, completion request, debounced local check. Completion and check allow at most one request in flight (latest wins), are skipped while composing, and never run per frame. Check is also skipped when the revision is unchanged. Neither runs inside a keystroke task: a typing-triggered completion request runs at least 150 ms after the last trigger, Ctrl-Space runs in the next task, and the check keeps its 300 ms debounce (15.3.8.14 section 3). |
+| Allowed whole-text transfers | Only these: open/reset, song apply, format, completion request, debounced local check. Completion and check allow at most one request in flight (latest wins), are skipped while composing, and never run per frame. Check is also skipped when the revision is unchanged. Neither runs inside a keystroke task: a typing-triggered completion request runs at least 150 ms after the last trigger, Ctrl-Space runs in the next task, and the check keeps its 300 ms debounce (15.3.8.14 section 3). Amended by 15.3.8.16: the syntax Worker `reset` (mount, reset or gap, recovery, an edit over 1,024 changes or 65,536 inserted code units) is also allowed, and the check runs only in an input-free `afterPresent` task. |
 | JS to Wasm per animation frame | Exactly one `session_frame` from the visual loop. No document text. |
-| Wasm to JS | The outbox is drained synchronously per ABI call. Per drained batch: playing events at most 4,096 and telemetry envelopes at most 1 MiB (both already validated in `envelope.ts`). The telemetry backlog stays at 64 (the existing `MAX_TELEMETRY_QUEUE`: coalesce tempo and levels, drop expired playing first). Control replies are never dropped. In-flight requests stay capped at 64 (the existing `MAX_PENDING_REQUESTS` busy rejection). Tests assert these existing caps under the 4,096-event load. |
+| Wasm to JS | The outbox is drained synchronously per ABI call. Per drained batch: playing events at most 4,096 and telemetry envelopes at most 1 MiB (both already validated in `envelope.ts`). The telemetry backlog stays at 64 (the existing `MAX_TELEMETRY_QUEUE`: coalesce tempo and levels, drop expired playing first). Control replies are never dropped. In-flight requests stay capped at 64 (the existing `MAX_PENDING_REQUESTS` busy rejection). Tests assert these existing caps under the 4,096-event load. Amended by 15.3.8.16 part C: the 4,096 playing cap covers `events` plus `ahead`, and `retract` is at most 4,096 ids. |
 | Native IPC | One channel message per routed envelope. Per 5 ms tick, at most one tempo, one levels, and playing events up to 4,096. Probe replies and other control replies are never coalesced. |
 | Frontend queues | Highlight entries at most 4,096, future horizon 2 s, scope frames 8, probe samples 8. Overflow and drop counters are exposed in status and in `__vactrPerf`. |
 | GPU per frame | Atlas cell uploads at most 1 MiB (the remainder draws on later frames under a `text-pending` status, and is never omitted); geometry uploads only changed line segments within the 8 MiB staging cap; no background canvas upload (the visual canvas is a DOM layer, 15.3.8.14); at most 4 draw calls on the code canvas; video upload at most 1 per new video frame, at most 30 Hz. |
@@ -7122,7 +7126,8 @@ keystrokes at about 10/s, with scrolling and selection; the floor counts all
 editing-run keystrokes, while the count of keys paired with a presented
 document revision is reported separately and must be above 0), and a 120 s cycle
 run (edit, font, DPR and resize every 5 s, with a 250 ms main-thread stall
-injected every 10 s).
+injected every 10 s). Gating and diagnostic runs start only on a quiet host,
+under the measurement lock, with host load recorded (15.3.8.16 part D).
 
 | Metric | Definition | Pass threshold (profile H) |
 |--------|------------|----------------------------|
@@ -8154,6 +8159,9 @@ and a new `editor/src/code/advances.ts`.
      and schedules one `setTimeout(0)` task, with at most one pending.
      First parses (mount, reset, recovery) also run in a scheduled task.
      Until the first tree exists, the fallback tokenizer provides spans.
+     (Amended by 15.3.8.16 part A: production parses in a Worker. The
+     main-thread fallback queues its task only from the next presented
+     frame, through `afterPresent`.)
   2. *Span cache.* Spans are cached per line, relative to the line start,
      for the capture window (visible range plus one viewport above and
      below).
@@ -8192,7 +8200,9 @@ and a new `editor/src/code/advances.ts`.
     Their assertions stay unchanged.
 - **Check.** It keeps its 300 ms debounce, its latest-wins rule and its
   skip of unchanged revisions (15.3.8.13 C). It never runs in a keystroke
-  task or a frame callback.
+  task or a frame callback. (Amended by 15.3.8.16 part B: input events also
+  re-arm the debounce, and the check runs only in an `afterPresent` task
+  with no input since that frame.)
 - **Dirty reasons.** `FrameScheduler.invalidateText(reason)` takes one of
   `doc`, `selection`, `view`, `syntax`, `annotations` or `gpu`. The `gpu`
   reason covers font, DPR, atlas and context changes. The mount calls the
@@ -8412,7 +8422,8 @@ Chromium.
   p50 target of 1 ms.
 - **Serial perf gate:** `npm run test:perf` (15.3.8.11) is unchanged.
 
-**7. Escalation S: syntax in a Worker (pre-authorized, not yet triggered).**
+**7. Escalation S: syntax in a Worker (pre-authorized; triggered in session
+303, and 15.3.8.16 part A is its scope record and full contract).**
 
 - **Trigger.** S triggers only when both of these hold after the TEXT and
   RENDER plans:
@@ -8833,7 +8844,8 @@ the cycle run (15.3.8.8 profile H).
 
 This amendment allows exactly two Rust files, which 15.3.8.14 excluded:
 `src/session/publish.rs` and `src/session/tests/publish.rs` (part B). If
-escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
+escalation F of 15.3.8.13 ever triggers, it takes the next free number
+(15.3.8.16 was used in session 303 for the main-thread long-task wave).
 
 **A. Stall-window classification (the approved Option A).**
 
@@ -9171,6 +9183,592 @@ escalation F of 15.3.8.13 ever triggers, it takes 15.3.8.16.
   fall outside one grid period, the sample falls back to `host_now` and keeps
   the old sub-grid error for that sample. The constant workload tempo never
   takes this path.
+
+##### 15.3.8.16 Main-thread long tasks: syntax Worker, off-path check, playing telemetry lead and quiet-host evidence (session 303)
+
+**Issue reference:** `workflowInput:RESUME-session-294` (resumed as session
+303, run `opus-luna-design-and-implement-review-loop-session-303`). It
+records operator decisions 1 to 5 of that issue. This subsection takes the
+number 15.3.8.16, which 15.3.8.15 had reserved for escalation F of
+15.3.8.13. F is still not triggered. If it ever triggers, it takes the next
+free number.
+
+**Baseline.** At `wf/canvas` HEAD ec34f66 every final gate passes except the
+canonical `run-001`. That run fails two gates:
+
+| Gate | WebKit | Limit |
+|------|--------|-------|
+| Input latency p95 | 51-59 ms | 50 ms |
+| Non-stall `syncAbsMs` p99 | 58 ms | 50 ms |
+
+Chromium passes both. The design through 15.3.8.15 part D and the plans and
+manifest at checkpoint 3f972e7 stay the baseline. No accepted plan is
+redispatched.
+
+**Trigger evidence.** The operator diagnosis is
+`tmp/canvas-cutover/diag-webkit-input/REPORT.md` (gitignored; scripts
+`analyze.mjs`, `recv.mjs`, `syncattr.mjs`, `reclassify.mjs` and
+`diag-init.js` sit beside it). It found no regression: c10ab72 and ec34f66
+measure the same under equal host load. It found three long main-thread
+tasks:
+
+1. **Deferred reparse.** `SyntaxSpans.schedule` (`setTimeout(0)`) runs
+   between a keystroke and its frame in 102 of 105 slow keys (at least
+   45 ms) and in 0 of 34 fast keys. Incremental `parseDoc` takes 26 ms at
+   p50 and 45 ms at p95; `changedRanges` takes 5 ms and the line-cache loop
+   7 ms.
+2. **Check.** `runCheck` (`session_check`) takes about 32 ms and runs about
+   71 times per run.
+3. **Late telemetry.** `playing` events are published at commit, only
+   `commit_lead` = 30 ms ahead (`src/sched/runtime.rs`). In WebKit they reach
+   the page around the audible time: the median is -7 to +11 ms, and p95 is
+   26-52 ms late. So any main-thread task of 30 ms or more pushes a highlight
+   past 50 ms.
+
+Item 1 meets the Escalation S trigger of 15.3.8.14 section 7: the release run
+fails WebKit input p95, and the deferred reparse is the dominant long task
+overlapping the late frames.
+
+**What this subsection changes.** Each change below has a pointer back here
+at the rule it amends:
+
+- 15.3.8.14 section 3, deferred syntax rule 1: the reparse runs in a Worker
+  (part A). The main-thread fallback reparse waits for a presented frame.
+- 15.3.8.14 section 3, "Check": the check waits for a presented frame and
+  for an input-free typing pause (part B).
+- 15.3.8.14 section 7: Escalation S is triggered, and this subsection is its
+  scope record.
+- 15.3.8.4, "Playing highlights": `playing` batches gain announced events
+  and retractions (part C).
+- 15.3.8.7: the allowed whole-text transfers gain the syntax Worker reset,
+  and the `playing` bound covers announced events (parts A and C).
+- 15.3.8.8 and 15.3.8.14 section 9: quiet-host preconditions and load
+  recording for gating runs (part D).
+
+**What it does not change.**
+
+- No threshold changes. Input p95 <= 50 ms and p99 <= 100 ms, frame interval
+  p95 <= 20 ms, textWork p95 <= 8 ms, non-stall `syncAbsMs` p95 <= 33.4 ms and
+  p99 <= 50 ms, and the audio-domain early-flash rule of 15.3.8.15 part D
+  all stay.
+- The 250 ms stall, its period, the workload, the sync window, the
+  stall-window classification and the silent-sink rule stay.
+- `commit_lead` (0.030 s), `lookahead` (0.120 s), the widening rule, the
+  `reduced_lead` rule and everything sent to the audio host stay. Audio
+  timing is unchanged.
+- The production master output stage, the `CodeSurface` and `CodeApi`
+  members, the Cargo profiles and the dependency set stay. There is still no
+  `SharedArrayBuffer`, and no `requestIdleCallback`.
+
+**A. Syntax in a Worker (Escalation S, decision 1).**
+
+- **Modes.** `codePane.dataset.syntax` reports one of three values:
+  - `tree-sitter-worker`: the Worker mode, which is the production default in
+    both engines;
+  - `tree-sitter`: the main-thread fallback mode;
+  - `fallback`: the tokenizer, used until a tree exists or when tree-sitter
+    cannot load.
+- **Worker creation.** `app/main.ts` sets a new optional
+  `EditorDeps.syntaxWorker?: () => Worker`, which calls
+  `new Worker(new URL('../code/syntax-worker.ts', import.meta.url), { type: 'module' })`.
+  - `editor/vite.config.ts` sets `worker: { format: 'es' }`, because the
+    worker imports `web-tree-sitter` dynamically, and that cannot be
+    bundled as IIFE.
+  - The worker chunk is a same-origin asset. The Tauri CSP already allows
+    `worker-src 'self' blob:`, and module workers exist in Safari and
+    WKWebView 15+.
+  - When `deps.syntaxWorker` is absent (jsdom tests, or a host without
+    `Worker`), the mount uses the main-thread fallback mode, so existing
+    tests keep their provider.
+- **Worker side** (`editor/src/code/syntax-worker.ts` is the entry;
+  `editor/src/code/syntax-worker-core.ts` holds a side-effect-free core
+  class that tests drive in process).
+  - The worker owns the tree-sitter parser, language, query, tree and its own
+    copy of the document as a `@codemirror/state` `Text`, which is the existing
+    headless dependency. It loads `web-tree-sitter.wasm`,
+    `tree-sitter-vact.wasm` and `highlights.scm` from the `base` URL in
+    `init`, which is `document.baseURI`, the same files as
+    `loadVactSyntax`.
+  - The entry binds `self.onmessage` only in a dedicated worker scope.
+    Importing the core has no side effects.
+- **Messages from the main thread.** Every document-bearing message carries
+  `seq`, the provider's syntax revision. It increases by 1 per non-empty
+  transaction and per reset.
+  - `init { base }`, sent once. The worker replies `ready` or
+    `failed { reason }`.
+  - `reset { seq, text, window }`, sent on mount, on document reset or a
+    revision gap, on recovery, and for an oversized edit. This is an allowed
+    whole-text transfer (15.3.8.7).
+  - `edit { seq, changes, window }`. `changes` is a list of
+    `[fromA, toA, insert]` in ascending `fromA` order, in the coordinates of
+    document `seq - 1`, as `ChangeSet.iterChanges` reports them. An edit with
+    more than 1,024 changes, or more than 65,536 inserted UTF-16 code units
+    in total, is sent as `reset` instead.
+  - `lines { seq, first, last }`, a request for capture-window lines that
+    the main thread has no cached spans for. At most one is sent per
+    `spans()` call.
+  - `window` is the capture window `[firstLine, lastLine]`, with lines
+    0-based: the visible range plus one viewport above and below, as in
+    15.3.8.14 section 3.
+  - `dispose`. The main thread then calls `terminate()`.
+- **Worker behavior.**
+  - On `edit`, it applies the tree edits (`treeEditFromDocs`) and the text
+    replacement at once. It then schedules one parse in its own
+    `setTimeout(0)` task, so consecutive edits coalesce into one incremental
+    parse.
+  - After the parse it captures the touched lines, plus the lines of
+    `tree.getChangedRanges(old)` inside the last window. It deletes the old
+    tree and replies.
+  - On `reset`, it parses in full and captures the whole window.
+  - On `lines`, it captures at once if no parse is pending. Otherwise the
+    lines join the pending parse's reply.
+- **Reply.** The reply is
+  `spans { seq, lines: Uint32Array, spans: Uint32Array, truncated }`, and
+  both arrays are transferred, not copied.
+  - `seq` is the latest `seq` the worker has applied.
+  - `lines` holds triples `[line, firstSpan, spanCount]`, with lines
+    0-based in document `seq`.
+  - `spans` holds triples `[fromInLine, toInLine, classIndex]`, where the
+    index refers to `CAPTURE_CLASSES` in key order.
+  - A reply covers at most the window lines plus any requested lines, and at
+    most 16,384 spans. Beyond that, `truncated` is set, which feeds the
+    existing `syntax-truncated` status.
+- **Main side** (`WorkerSyntaxSpans` in `editor/src/code/syntax.ts`, which
+  implements `SpanProvider`).
+  - `noteChanges` remaps the cached lines through the change set as today
+    (rule 2 of 15.3.8.14 section 3). Touched lines keep their mapped spans,
+    and nothing flickers. It then increments `seq` and posts one `edit`.
+    That is the whole keystroke-task cost: no parse, no capture and no
+    `toString`.
+  - `spans()` returns the cached lines. A line in the window with no cached
+    entry shows unstyled text until its reply arrives, and its number joins
+    the next `lines` request. Until the first reply for the current reset
+    arrives, the tokenizer provides spans, as before a tree exists today.
+  - **Stale results.** A reply whose `seq` differs from the current `seq` is
+    dropped, the cache is unchanged, and `stats.staleReplies` increases. A
+    reply with the current `seq` replaces the cache entries of exactly its
+    lines, then calls `onSyntax`, which invalidates text for reason
+    `syntax`.
+  - `stats` exposes `posts`, `resets`, `replies`, `staleReplies`,
+    `workerFailures` and the existing `captures` and `capturedLines`, which
+    count main-thread captures and are 0 in Worker mode.
+- **Failure and fallback.** Any of the following ends Worker mode:
+  - a construction exception;
+  - an `error` or `messageerror` event;
+  - a `failed` reply;
+  - no `ready` within 10 s of `init`.
+
+  The worker is then terminated, `workerFailures` increases, and the mount
+  switches to the main-thread mode through the existing `deps.syntax` loader.
+  That mode starts with a full parse, scheduled as below.
+- **Main-thread fallback mode** (`SyntaxSpans`, which amends 15.3.8.14
+  section 3 rule 1).
+  - A pending reparse no longer runs in an immediate `setTimeout(0)`. It
+    runs in a `setTimeout(0)` task queued from the next presented frame's
+    rAF callback (`afterPresent`, below). So it never runs between a
+    keystroke and the frame that presents that keystroke's revision.
+  - While the page is hidden, the reparse waits until frames resume.
+  - `flush()` stays synchronous.
+- **`afterPresent(cb)`.** `FrameScheduler` (`editor/src/code/frame.ts`)
+  gains `afterPresent(cb): () => void`.
+  - It queues `cb` in a `setTimeout(0)` task. That task is posted from the
+    end of the next rAF callback in which the code pane ran.
+  - The returned function cancels it.
+  - Parts A and B use it. Standalone providers in tests get an injectable
+    equivalent built from rAF and timers.
+- **Self-check.** The Tauri self-check report (`reportSelfCheck` in
+  `app/main.ts`) adds the informational field
+  `syntax: codePane.dataset.syntax`. `ios-sim.mjs` records it and does not
+  gate on it, because the self-check can report before the worker is ready.
+  Worker mode on a physical iPad is a pending check (part D).
+- **Proof** (deterministic, default suite,
+  `editor/test/code/syntax-worker.test.ts` (reserved by 15.3.8.14),
+  `editor/test/code/syntax.test.ts` and `editor/test/canvas/edit-cost.test.ts`,
+  with a fake worker transport, fake timers and fake rAF). Each row also
+  asserts an in-test control branch.
+  - *No parse in the keystroke task.* In Worker mode, a single-character
+    edit on the 20,000-line fixture performs 0 main-thread parses, 0
+    main-thread captures and 0 `Text.toString` calls, and exactly 1
+    `postMessage`. The control branch: the same edit in fallback mode
+    reaches its parse only through `afterPresent`.
+  - *Spans equal a fresh parse.* The real core runs in process with the real
+    tree-sitter wasm, as the existing syntax tests use it. Over 200 seeded
+    random edits (ASCII, Japanese, emoji, newline insert and delete), with
+    replies delivered at random points, including several edits before one
+    reply, the provider's window spans, once the reply for the latest `seq`
+    is applied, equal `styleSpans` of a fresh full parse of the current
+    document.
+  - *Stale replies are ignored.* A reply for `seq` n delivered after edit
+    n+1 was posted leaves the cache unchanged, and `staleReplies` is 1. The
+    reply for n+1 is then applied.
+  - *Fallback waits for a presented frame.* With no worker, or after a
+    worker `error`, `noteChanges` followed by timers advanced by 0 leaves
+    `deferredParses` at 0, and `spans()` returns the mapped spans of the
+    touched line. After one fake presented frame plus its task,
+    `deferredParses` is 1 and one `syntax` invalidation was requested.
+  - *Bounds.* An edit with 65,537 inserted code units posts `reset`. A reply
+    over 16,384 spans sets `truncated`.
+  - *Ported row.* The `edit-cost.test.ts` row "`syncParses` 0, then exactly
+    1 deferred parse after the task flush" becomes two rows: in Worker mode,
+    0 main-thread parses and 1 post; in fallback mode, 0 parses after the
+    task flush and 1 after the next presented frame plus its task.
+- **Real browsers.** The behavior profile asserts `data-syntax` equal to
+  `tree-sitter-worker` in Chromium and WebKit after load. It also asserts
+  that the existing syntax-colored glyph check still passes.
+
+**B. Diagnostics check off the keystroke path (decision 2).**
+
+- **Decision.** The check stays on the main-thread wasm instance #1. A
+  worker-hosted wasm instance is rejected as disproportionate.
+  `Session::check` (`src/session/frontend.rs`) reads the session's package
+  lock, package cache, manifest and file table. A second instance would need
+  a mirrored package pipeline (`pkg_resolve`/`pkg_supply`) and a second
+  release wasm in memory.
+- **Schedule** (amends 15.3.8.14 section 3, "Check").
+  1. A document change, or an input event, arms or re-arms the 300 ms
+     debounce (`CHECK_DEBOUNCE_MS`, unchanged). Input events are `keydown`,
+     `beforeinput`, `compositionstart`, `compositionupdate` and
+     `compositionend` on the input bridge. The mount forwards them through a
+     new `DiagnosticsController.noteInput()`, which costs O(1).
+  2. When the debounce expires, the controller calls `afterPresent`.
+  3. The task then runs the check only if all of these hold:
+     - no input event and no document change happened after the rAF
+       callback that queued the task;
+     - the surface is not composing;
+     - the revision differs from the last checked one;
+     - checks are enabled.
+
+     If an input event or a change did happen, it re-arms the debounce and
+     counts `checkDeferrals`.
+- **Result.** The check never runs in a keystroke task, in a microtask queued
+  from one, or in a frame callback. It never runs in the first frame
+  interval after a keystroke. Other rules are unchanged: latest wins, an
+  unchanged revision is skipped, and the batch is pinned.
+- **Bounds.**
+  - One whole-text string per check, which is an allowed transfer
+    (15.3.8.7). At most one check runs at a time, because the call is
+    synchronous.
+  - A check batch keeps at most `MAX_CHECK_DIAGNOSTICS = 1,024`
+    diagnostics, the first ones in returned order. `stats.checkDropped`
+    counts the surplus.
+  - `stats` exposes `checks`, `checkDeferrals` and `checkDropped`.
+- **Proof** (`editor/test/code/diagnostics.test.ts` and
+  `editor/test/canvas/edit-cost.test.ts`, fake timers, fake frames and a
+  counting checker that records the phase it ran in):
+  - a keystroke, then 299 ms: 0 checks;
+  - 300 ms with no frame: 0 checks; then one presented frame plus its
+    task: exactly 1;
+  - a keystroke after that frame but before the task: 0 checks,
+    `checkDeferrals` 1, and 1 check after the next quiet debounce and frame;
+  - over 20 edits 50 ms apart, the checker never runs in a keystroke task,
+    in a frame callback, or in the first frame after a keystroke, and runs
+    exactly once after the last edit;
+  - 1,500 returned diagnostics keep 1,024, and `checkDropped` is 476;
+  - the existing edit-cost row "checks 0 before 300 ms" still holds.
+
+**C. Playing telemetry lead (decision 3).**
+
+- **Principle.** Commits are unchanged. Commit decides what reaches the
+  audio host, and with which lead. Announcement adds only a preview: for
+  every staged event within the lookahead, a `playing` copy is published
+  ahead of commit. A retraction is published if that event will not be
+  committed as announced.
+- **Configuration.** `RuntimeConfig.telemetry_lead` defaults to `lookahead`
+  (0.120 s). The announce horizon is
+  `now + max(commit_lead, telemetry_lead)`, limited to what is staged, which
+  never goes past the query target. When `commit_lead` widens to
+  `telemetry_lead` or beyond, nothing is announced and the behavior is
+  exactly today's.
+- **Announce pass** (a new `src/sched/announce.rs`, called from
+  `Runtime::tick` after `commit_all`). This keeps `runtime.rs` and
+  `commit.rs` below 1,000 lines.
+  - The pass reads the staged, emittable, uncommitted records of non-muted
+    pattern lanes, with onset between the commit horizon and the announce
+    horizon.
+  - It announces each one once, as a `PlayingEvent` with the same `time`,
+    `dur`, `beat` and `src` the commit would produce, plus a session-unique
+    id. Ids are monotonic and below 2^53.
+  - It mutates no staging, ledger, cell, sample or host state, and it never
+    calls `send`.
+  - The `hits`/`ctrl` windows in `Telemetry` are still filled only at
+    commit.
+  - Only records that `commit_all` would publish are candidates. Live MIDI
+    notes (`midi_in.rs`, the only other `PlayingEvent` producer) are not
+    announced.
+- **Announce map.** The runtime keeps announced, unresolved records keyed by
+  (slot, lane generation, staging key), with the announced id, `time` and
+  `src`. It holds at most `ANNOUNCE_CAP = 4,096` entries. A record beyond
+  the cap is not announced and is published at commit as today, and
+  `announceSkipped` counts it.
+- **Confirmation at commit.** `commit_all` checks the map for each committed
+  and published event.
+  - If the event was announced with `|time - announced| <= 1e-9` s and the
+    same `src`, it is published in the committed queue as today, carrying the
+    announced id. That is a confirmation.
+  - Otherwise any announcement for it is retracted, and the event is
+    published without an id.
+- **Retraction.** At the end of each tick, an announced entry is retracted
+  and removed when any of these holds:
+  - its staging key is gone (lane invalidation, rebind or `until` moved,
+    stop, hush, reset, slot removed);
+  - it was marked committed without publication (muted, `Committed::Dropped`,
+    commit failure);
+  - its onset or `src` changed (for example a tempo re-anchor).
+
+  So every announced id ends in exactly one confirmation or one retraction,
+  never both and never twice. A frozen (MIDI-clock) tick does not run the
+  pass. Its entries resolve at the next normal tick, and the frontend
+  already drops the old epoch.
+- **Wire** (additive and optional, protocol v1, the same pattern as the
+  15.3.8.4 fields; `src/session/protocol.rs` and
+  `editor/src/protocol/types.ts`):
+  - `WirePlaying.id?: u64`, present only on announced events and on their
+    confirmations;
+  - `PlayingBody.ahead?: WirePlaying[]` holds the announced events, carrying
+    the same `epoch` and `end_time` stamping as committed events;
+  - `PlayingBody.retract?: u64[]`;
+  - each field is omitted when it is empty or absent. A tick that announces
+    and retracts nothing therefore emits byte-identical legacy JSON.
+- **Publisher** (`src/session/publish.rs`). It drains the committed queue and
+  the announce queue each tick into one `playing` envelope, and only when a
+  telemetry subscriber exists, as today.
+  - `events.len() + ahead.len() <= 4,096` (`MAX_PLAYING_EVENTS`), with
+    committed events first. `ahead` keeps the order (time, slot, id).
+  - `retract.len() <= 4,096`. The 1 MiB envelope validation is unchanged.
+  - An announcement cut by the cap is simply never seen by the frontend.
+    Its confirmation then arrives as a new event, and a retraction of an
+    unknown id is ignored.
+- **Consumers.**
+  - Only `HighlightScheduler` (`editor/src/code/highlight.ts`) reads `ahead`
+    and `retract`.
+  - Every other `playing` consumer reads `body.events` only, unchanged: the
+    transport bar, the params roll and grid, and the self-check counter.
+  - `HighlightScheduler` applies a batch in this order:
+    1. `retract`: it removes the entries with those ids, active or pending,
+       and counts `retracted`; unknown ids are ignored.
+    2. `events`: an event whose `id` matches a held or already-resolved
+       entry is skipped. It adds no entry, makes no `onAccept` call and
+       bumps no `accepted`. A bounded set of the last 4,096 resolved ids
+       makes this check. Any other event is accepted as today.
+    3. `ahead`: each event is accepted under today's rules (file, epoch,
+       2 s horizon, mapping, pin) and keyed by its id.
+- **Early-flash rule.** Activation is unchanged: `time <= audible <
+  end_time` on the audible clock (15.3.8.4). So an announced entry is never
+  shown before its audible time. The audio-domain early-flash gate of
+  15.3.8.15 part D applies unchanged.
+- **Perf hook.** `editor/src/code/perf-hook.ts` removes a retracted id's
+  onset from `__vactrPerf.onsets()`. It exposes `highlight.retracted` and
+  `highlight.aheadAccepted`, and the evidence reports both.
+- **15.3.8.4 amendment.** Playing highlights accept announced entries,
+  de-duplicate confirmations by id, and drop retracted entries.
+- **15.3.8.7 amendment.** The per-batch cap of 4,096 playing events covers
+  `events` plus `ahead`, and `retract` is capped at 4,096. Native IPC keeps
+  one `playing` per tick within the same caps.
+- **Proof, Rust.** The tests are in a new `src/sched/tests/sched/announce.rs`,
+  registered in `src/sched/tests/sched.rs`, and in
+  `src/session/tests/publish.rs`. They use the deterministic rig clock with
+  5 ms ticks at 48 kHz quantum-aligned times.
+  - *Lead.* At 120 bpm, every committed, non-muted pattern event with `src`
+    is announced with `onset - host_now >= 0.100` s, before its commit tick.
+    The control branch: with `telemetry_lead = commit_lead`, 0 events are
+    announced.
+  - *Audio unchanged.* The rig runs 20 simulated seconds with
+    `telemetry_lead` 0.030 and again with 0.120. Three things are identical
+    in both runs:
+    - the sequence of events sent to the audio host (time and payload);
+    - `rt.telemetry()`, apart from the `id` on confirmations;
+    - the `hits` window contents.
+  - *Ordering and ids.* Each tick's `ahead` list is ordered by (time, slot,
+    id), and ids increase strictly in announce order. Every id resolves
+    exactly once.
+  - *Retraction.* Four cases:
+    - a rebind whose boundary lies inside the announce window but beyond the
+      commit lead retracts the old events past the boundary before their
+      onset, and they are never confirmed;
+    - a mute after the announcement retracts it;
+    - a tempo re-anchor retracts the announcement and publishes the
+      committed event without an id;
+    - a lane invalidation that re-stages an event with the same staging
+      key, onset and `src` keeps its announcement, which is confirmed once.
+      If the key changes, the old id is retracted and the new record is
+      announced, and the frontend still holds exactly one entry for it.
+  - *Bounds.* With more than 4,096 staged events in the window, the map
+    holds at most 4,096 entries and the rest are published at commit. A
+    published batch has `events + ahead <= 4,096`, committed first, and
+    `retract <= 4,096`.
+  - *Wire.* The literal JSON round trip covers `ahead`, `retract` and `id`.
+    A tick with nothing announced emits byte-identical legacy JSON. With no
+    telemetry subscriber, no `playing` envelope is emitted.
+  - The existing `rebind.rs`, `faults.rs` and `midi` telemetry rows pass
+    unchanged.
+- **Proof, frontend** (`editor/test/code/highlight.test.ts`,
+  `editor/test/canvas/clock.test.ts` and the new
+  `editor/test/protocol/envelope.test.ts`). The
+  clock is simulated, with 60 Hz frames, random drops and an injected
+  250 ms stall.
+  - An `ahead` event that arrives 120 ms before its onset is shown by no
+    frame whose `sample.time` is before its `time`. It is shown by the
+    first frame at or after it.
+  - Its confirmation adds no entry, no `onAccept` call and no `accepted`
+    count.
+  - A retraction before the onset means the event is never shown. A
+    retraction of an active entry removes it at the next tick. An unknown id
+    is ignored.
+  - An `ahead` event with a stale epoch is dropped.
+  - Batches with only legacy fields behave exactly as today, and every
+    existing row passes unchanged.
+  - `envelope.ts` rejects these: a non-array `ahead` or `retract`; ids that
+    are not non-negative safe integers; invalid `ahead` events; and
+    `events + ahead > 4,096` or `retract > 4,096`.
+
+**D. Quiet-host evidence protocol (decision 5).**
+
+- **Order before each canonical or diagnostic browser run, and before the
+  full nextest run.**
+  1. Wait without the lock until the 1-minute load average is below 9 and
+     at most 2 build or test processes are busy.
+  2. Acquire the lock with
+     `until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done`,
+     and write the session or plan id to `.measure-lock/owner`.
+  3. Re-check the load gate. If it fails, release the lock, sleep 30 s and
+     go back to step 1. The lock is never held while idle.
+  4. Run, then release with
+     `rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` from a
+     `trap`, so the lock is released on every exit path.
+- **Busy process.** A process is busy when a `ps -Ao pid,ppid,pcpu,comm`
+  snapshot shows at least 50% CPU and its command matches `cargo`, `rustc`,
+  `clippy-driver`, `cargo-nextest`, `rustfmt`, `vitest`, `tsc`, `vite`,
+  `esbuild`, `node`, `xcodebuild` or `swift-frontend`. The run's own process
+  tree is excluded.
+- **Recording** (`editor/test/e2e/run.mjs`).
+  - A `--write-evidence` run records `hostLoad`:
+    - `os.loadavg()` at start, every 10 s and at the end;
+    - the busy-process count and names at start;
+    - mean and max of the 1-minute load per browser run.
+  - A gating run whose start-time gate fails exits 2 as blocked, the same
+    way a debug wasm is refused (15.3.8.13 D). That is a precondition, not a
+    product failure and not a threshold.
+  - The evidence document records `hostLoad` for every run it cites.
+- **Unchanged.** Thresholds, the workload and the 250 ms stall do not
+  change. The gate decides when the run happens, not what passes.
+- **README.** `editor/test/e2e/README.md` documents the procedure with the
+  exact commands.
+- **Pending checks.** The evidence lists Worker syntax on a physical iPad
+  WKWebView with the procedure: launch, type 50 keys, and read
+  `data-syntax` through Web Inspector.
+
+**E. Silent-sink buffers (decision 4, optional).** `editor/test/e2e/silent-sink.mjs`
+may allocate its two 32768-sample `Float32Array` meter buffers once per sink
+and reuse them for each poll. Meter semantics, the window, the onset rule
+and every assertion stay unchanged. If this is done, CANVAS-EVIDENCE does it
+in its harness task.
+
+**F. Plans, order and ownership.**
+
+- **Order.** Serial, one at a time, before the closeout tasks of
+  CANVAS-EVIDENCE. The suite stays green after each plan (the "Green after
+  every plan" list of 15.3.8.14 section 8).
+  1. **CANVAS-SYNTAX-WORKER**
+     (`impl-plans/active/canvas-cutover-syntax-worker.md`), part A.
+     - writePaths:
+       - `editor/src/code/syntax.ts`
+       - `editor/src/code/syntax-core.ts`
+       - `editor/src/code/syntax-worker.ts` (new)
+       - `editor/src/code/syntax-worker-core.ts` (new)
+       - `editor/src/code/frame.ts`
+       - `editor/src/code/mount.ts`
+       - `editor/src/app/deps.ts`
+       - `editor/src/app/main.ts`
+       - `editor/vite.config.ts`
+       - `editor/test/code/syntax.test.ts`
+       - `editor/test/code/syntax-worker.test.ts` (new)
+       - `editor/test/canvas/edit-cost.test.ts`
+       - `editor/test/canvas/mount.test.ts`
+       - `editor/test/canvas/frame.test.ts`
+       - `editor/test/e2e/behavior.mjs`
+       - `editor/test/e2e/ios-sim.mjs`
+     - Verification outside the sandbox adds the behavior profile, run under
+       the lock.
+  2. **CANVAS-DIAG-OFFPATH**
+     (`impl-plans/active/canvas-cutover-diag-offpath.md`), part B.
+     - writePaths:
+       - `editor/src/code/diagnostics.ts`
+       - `editor/src/code/mount.ts`
+       - `editor/src/code/input.ts`
+       - `editor/test/code/diagnostics.test.ts`
+       - `editor/test/canvas/edit-cost.test.ts`
+       - `editor/test/canvas/input.test.ts`
+  3. **CANVAS-TELEMETRY-LEAD**
+     (`impl-plans/active/canvas-cutover-telemetry-lead.md`), part C.
+     - writePaths:
+       - `src/sched/announce.rs` (new)
+       - `src/sched/mod.rs`
+       - `src/sched/runtime.rs`
+       - `src/sched/commit.rs`
+       - `src/sched/telemetry.rs`
+       - `src/session/protocol.rs`
+       - `src/session/publish.rs`
+       - `src/sched/tests/sched.rs`
+       - `src/sched/tests/sched/announce.rs` (new)
+       - `src/session/tests/publish.rs`
+       - `editor/src/protocol/types.ts`
+       - `editor/src/protocol/envelope.ts`
+       - `editor/src/code/highlight.ts`
+       - `editor/src/code/perf-hook.ts`
+       - `editor/test/code/highlight.test.ts`
+       - `editor/test/canvas/clock.test.ts`
+       - `editor/test/protocol/envelope.test.ts` (new: the `playing`
+         validation rows; no existing test file holds them)
+     - The plan also runs rustfmt `--check` on its touched Rust files.
+  4. **CANVAS-EVIDENCE**, "Session 303 Amendment". A new TASK-708 covers
+     part D recording, the README and part E. It is followed by TASK-703
+     (canonical `run-001` under part D until it exits 0), TASK-704 (the
+     evidence document adds the syntax-worker, off-path check and
+     telemetry-lead changes, the noise analysis from `REPORT.md` with the
+     interleaved run table, `hostLoad`, the raw data paths, the silent-sink
+     method, the platform limitations and the pending iPad checks), TASK-705
+     (the eleven final gates, serially) and TASK-706 (closeout as in
+     15.3.8.14 section 9, now also archiving the three new plans).
+     - Added writePaths: `editor/test/e2e/run.mjs`,
+       `editor/test/e2e/silent-sink.mjs` and `editor/test/e2e/README.md`.
+- **Ownership rules.**
+  - Each plan lists concrete files only, and the manifest
+    (`impl-plans/active/canvas-cutover-dispatch.json`) gains the three
+    entries. It is checkpoint-committed before dispatch.
+  - A small necessary addition is recorded in the plan and the manifest.
+  - Files may recur across plans, because only one runs at a time.
+  - Any touched source file that reaches 1,000 lines is split.
+- **Verification records** use the session-286 format: numeric `exitStatus`
+  0, outcome `"passed"`, a positive test count, failure count 0 and a log
+  path. No mutation or negative-control commands are run. Sensitivity is
+  shown only by in-test control branches.
+
+**Rejected alternatives.**
+
+| Alternative | Why not |
+|-------------|---------|
+| Only move the main-thread reparse after a presented frame | The reparse still blocks the proxy frame that the input metric reads, and it still delays ticks and telemetry. It is kept only as the fallback mode. |
+| A worker-hosted wasm instance for `session_check` | `Session::check` needs the session lock, package cache, manifest and file table. Mirroring them needs a second package pipeline and a second wasm in memory. |
+| Raise `commit_lead` to 120 ms | It changes edit-to-sound latency, the `reduced_lead` behavior and the widening behavior, which is a musical behavior change. Announcement leaves audio untouched. |
+| Announce without retraction | A rebind, mute or invalidation inside the window would flash code that never sounds. |
+| A new envelope kind for announcements | It needs new routing in the client, store and codec. Optional fields on `playing` keep every other consumer unchanged. |
+
+**Residual risks.**
+
+- **Worker on iPad.** Module-worker loading of `web-tree-sitter` in iPad
+  WKWebView is verified only through WebKit Playwright and the simulator
+  self-check field. A physical iPad stays pending. A failure falls back to
+  the main-thread mode, which is functional but slower.
+- **Check overlapping a key.** A key that arrives while the 32 ms check
+  runs still waits for it. Part B makes this happen only when a key follows
+  an input-free pause of at least 300 ms plus one frame. The input p99
+  gate stays 100 ms.
+- **Retraction after display.** A retraction can arrive after its entry was
+  shown only when the tick that resolves it runs late, which is the stall
+  case. The entry is then removed at the next tick. The replayed-flash and
+  active-set criteria of 15.3.8.15 still gate stall windows.
+- **Quiet host.** The quiet-host gate may take a long time to open on a
+  shared machine. That delays evidence. It never changes a threshold.
 
 ## 16. Wasm and AudioWorklet Layout
 

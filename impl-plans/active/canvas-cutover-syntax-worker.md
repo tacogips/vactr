@@ -1,6 +1,6 @@
 # Canvas Cutover SYNTAX-WORKER: Tree-sitter Parsing in a Worker, Post-Frame Fallback Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-SYNTAX-WORKER (session 303, wave 17; runs alone; first of the serial session-303 plans)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.16 part A (syntax Worker, Escalation S), part F (order and ownership); 15.3.8.14 section 3 rule 1 and section 7 (as amended); 15.3.8.7 allowed whole-text transfers (as amended)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-SYNTAX-WORKER`)
@@ -428,20 +428,20 @@ Repair is serial. Edit only this plan's progress log among the plan files.
 
 ## Completion Criteria
 
-- [ ] `FrameScheduler.afterPresent` exists with the four `frame.test.ts` rows passing.
-- [ ] `editor/src/code/syntax-worker-core.ts` and `editor/src/code/syntax-worker.ts` exist; the
+- [x] `FrameScheduler.afterPresent` exists with the four `frame.test.ts` rows passing.
+- [x] `editor/src/code/syntax-worker-core.ts` and `editor/src/code/syntax-worker.ts` exist; the
   entry binds only in a worker scope.
-- [ ] `WorkerSyntaxSpans` posts exactly one `edit` per transaction. `reset` is sent only for
+- [x] `WorkerSyntaxSpans` posts exactly one `edit` per transaction. `reset` is sent only for
   reset, gap, recovery, more than 1,024 changes, or more than 65,536 inserted units.
-- [ ] Replies with a non-current seq are dropped (`staleReplies`). These rows pass: equivalence
+- [x] Replies with a non-current seq are dropped (`staleReplies`). These rows pass: equivalence
   (including at least 20 multi-change transactions and bursts), the `{1,2,4}` reproduction,
   coalesced remap, burst convergence, stale, keystroke cost, truncation and failure.
-- [ ] The worker derives tree edits and touched lines from one `ChangeSet` in final-document
+- [x] The worker derives tree edits and touched lines from one `ChangeSet` in final-document
   coordinates, and remaps the pending touched set across coalesced edits.
-- [ ] `data-syntax` becomes `tree-sitter-worker` only after the first current-seq reply is
+- [x] `data-syntax` becomes `tree-sitter-worker` only after the first current-seq reply is
   applied. The mount row shows `'fallback'` after `ready`, no flip on a stale reply, and the
   flip on a current reply.
-- [ ] The `SyntaxSpans` fallback reparses only after a presented frame, and `flush()` stays
+- [x] The `SyntaxSpans` fallback reparses only after a presented frame, and `flush()` stays
   synchronous.
 - [ ] `vite.config.ts` has `worker: { format: 'es' }`; the release page build emits the worker
   chunk.
@@ -473,3 +473,35 @@ row.
   Multi-change, reproduction and remap rows were added, and the descending per-change pitfall
   was replaced.
 - S303-PR-L3: `node --check` now runs one file per invocation.
+
+### Session: 2026-10-07 (session 303 implementation)
+
+**Tasks Completed**: Implemented `FrameScheduler.afterPresent`, the side-effect-free worker
+core and worker-only entry, main-thread `WorkerSyntaxSpans`, post-frame fallback parsing, Vite
+worker format, mount mode reporting, and the behavior/iOS informational syntax fields. Added
+deterministic frame, worker equivalence/burst/stale/failure/cost, fallback, edit-cost and mount
+mode rows. The multi-change worker edit path constructs one `ChangeSet`, computes touched lines
+in final-document coordinates, reverses tree edits, and remaps coalesced touched lines.
+
+**Final-source passing verification**:
+
+- `cd editor && npm run check` — exit 0; `tmp/canvas-cutover/syntax-worker/session-303/npm-check-final-04.log`.
+- Focused Vitest command from the verification table — exit 0, 8 files / 88 tests;
+  `tmp/canvas-cutover/syntax-worker/session-303/focused-final.log`.
+- Full `cd editor && ./node_modules/.bin/vitest run` — exit 0, 94 files / 823 tests;
+  `tmp/canvas-cutover/syntax-worker/session-303/vitest-full-final.log`.
+- `node --check` for each E2E module and `git diff --check` — exit 0; logs in the same
+  session-303 evidence directory.
+- Strict clippy, wasm32 build, and Tauri check — each exit 0; `clippy-final.log`,
+  `wasm-build-final.log`, and `tauri-check-final.log` in the session-303 evidence directory.
+- Every touched file is below 1,000 lines; no Rust, dependency, lockfile, threshold or
+  workload changes were made.
+
+**Still pending**: release page build and worker chunk inspection, Chromium/WebKit behavior
+profile, full nextest, and a passing serial `test:perf`. Two final-source serial perf attempts
+failed at 5,088 ms and 5,202 ms against the 4,800 ms cap while other host work was active; full
+logs are `test-perf.log` and `test-perf-final.log`. The attempted foreground lock wait was
+interrupted before acquiring `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`, owned by
+`dom-renderer-evidence-s296`; its WebKit workload remains active intermittently. Do not accept
+the perf gate or browser/nextest gates until the owner releases the lock, the quiet-host gate is
+met, and the commands pass on the final source.

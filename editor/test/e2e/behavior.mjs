@@ -22,6 +22,10 @@ export async function runBehavior(browser, origin, name) {
     await page.waitForFunction(() => Boolean(window.__vactrPerf), { timeout: 30000 });
     await page.waitForSelector('.vact-code-canvas', { timeout: 30000 });
     api = await page.evaluate(() => Boolean(window.__vactrPerf));
+    await check('syntax-worker', async () => {
+      await page.waitForFunction(() => document.querySelector('[data-pane="code"]')?.dataset.syntax === 'tree-sitter-worker', { timeout: 10000 });
+      return 'current tree-sitter Worker spans applied';
+    });
     await check('canvas-only-text', async () => {
       const ta=page.locator('.vact-code-input-bridge textarea');await ta.focus();await ta.fill('# canvas-visible-evidence');await ta.type('x');await ta.press('Backspace');
       return page.evaluate(async () => {

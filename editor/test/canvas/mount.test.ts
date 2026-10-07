@@ -18,7 +18,8 @@ import { CanvasRenderer } from '../../src/code/renderer';
 import { CodeViewHost } from '../../src/code/view-host';
 import { TextLayout } from '../../src/code/layout';
 import { DocumentSync } from '../../src/code/sync';
-import { FallbackSpans } from '../../src/code/syntax';
+import { FallbackSpans, type SyntaxWorkerPort } from '../../src/code/syntax';
+import type { SyntaxWorkerReply, SyntaxWorkerRequest } from '../../src/code/syntax-worker-core';
 import { startFrameLoop } from '../../src/visual/frame';
 import { WasmCore } from '../../src/protocol/wasm';
 import { VactrHost } from '../../worklet/host.js';
@@ -69,7 +70,7 @@ function rendererGL(calls?: RenderCalls): WebGL2RenderingContext {
 
 interface Rig { root: HTMLElement; code: HTMLElement; deps: EditorDeps; mounted: ReturnType<typeof mount>; transport: RecordingTransport; fakes: CanvasFakes; host: RafHost; gl?: WebGL2RenderingContext; calls?: RenderCalls; measureTextCalls: { value: number } }
 const rigs: Rig[] = [];
-function setup(perf = false, withGl = false, audible?: AudibleClock, core?: WasmCore, measureTextCalls = { value: 0 }, calls: RenderCalls = { getError: 0, getParameter: 0, texSubImage2D: 0, bufferData: 0, bufferSubData: 0, drawArraysInstanced: 0 }): Rig {
+function setup(perf = false, withGl = false, audible?: AudibleClock, core?: WasmCore, measureTextCalls = { value: 0 }, calls: RenderCalls = { getError: 0, getParameter: 0, texSubImage2D: 0, bufferData: 0, bufferSubData: 0, drawArraysInstanced: 0 }, syntaxWorker?: () => SyntaxWorkerPort): Rig {
   const gl = withGl ? rendererGL(calls) : undefined;
   const fakes = installCanvasFakes(withGl ? { webgl2: () => gl! } : {});
   const context = fakes.ctx(document.createElement('canvas')) as unknown as Record<string, unknown>;
@@ -79,7 +80,7 @@ function setup(perf = false, withGl = false, audible?: AudibleClock, core?: Wasm
   });
   const root = document.createElement('div'); document.body.append(root);
   const layout = buildLayout(root); const store = new Store(); const transport = new RecordingTransport();
-  const deps: EditorDeps = { client: new Client(transport, { store }), store, clock: new MockClock(), tier: 'browser', files: new MemoryFiles(), ...(audible ? { audible } : {}), ...(core ? { core } : {}) };
+  const deps: EditorDeps = { client: new Client(transport, { store }), store, clock: new MockClock(), tier: 'browser', files: new MemoryFiles(), ...(audible ? { audible } : {}), ...(core ? { core } : {}), ...(syntaxWorker ? { syntaxWorker } : {}) };
   const host = rafHost();
   if (perf) window.history.replaceState({}, '', '?perf=1');
   const mounted = mount(root, deps, { frameHost: host, ...(gl ? { gl } : {}) });
@@ -93,6 +94,35 @@ afterEach(() => {
 });
 
 describe('headless canvas mount', () => {
+  it('keeps Worker syntax pending until current spans apply and falls back on Worker error', async () => {
+    class Port implements SyntaxWorkerPort {
+      messages: SyntaxWorkerRequest[] = []; listeners = new Map<string, EventListener[]>(); terminate = vi.fn();
+      postMessage(message: SyntaxWorkerRequest): void { this.messages.push(message); }
+      addEventListener(type: 'message' | 'error' | 'messageerror', listener: EventListener): void { this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]); }
+      emit(reply: SyntaxWorkerReply): void { for (const listener of this.listeners.get('message') ?? []) listener(new MessageEvent('message', { data: reply })); }
+      fail(): void { for (const listener of this.listeners.get('error') ?? []) listener(new Event('error')); }
+    }
+    const port = new Port(); const rig = setup(false, false, undefined, undefined, undefined, undefined, () => port);
+    rig.host.step(16);
+    const reset = port.messages.find((message) => message.type === 'reset');
+    expect(rig.code.dataset.syntax).toBe('fallback');
+    port.emit({ type: 'ready' }); expect(rig.code.dataset.syntax).toBe('fallback');
+    rig.deps.code!.surface.dispatch({ changes: { from: 0, insert: 'x' } });
+    rig.host.step(24); expect(rig.host.callbacks.size).toBe(0);
+    const staleSeq = reset?.type === 'reset' ? reset.seq : 0;
+    port.emit({ type: 'spans', seq: staleSeq, lines: new Uint32Array(), spans: new Uint32Array(), truncated: false });
+    expect(rig.code.dataset.syntax).toBe('fallback'); expect(rig.host.callbacks.size).toBe(0);
+    const edit = port.messages.filter((message) => message.type === 'edit').at(-1);
+    const seq = edit?.type === 'edit' ? edit.seq : staleSeq + 1;
+    port.emit({ type: 'spans', seq, lines: new Uint32Array([0, 0, 0]), spans: new Uint32Array(), truncated: false });
+    expect(rig.code.dataset.syntax).toBe('tree-sitter-worker'); expect(rig.host.callbacks.size).toBe(1);
+    expect(rig.deps.code).toBeDefined();
+
+    const fallbackPort = new Port(); const fallback = setup(false, false, undefined, undefined, undefined, undefined, () => fallbackPort);
+    fallback.deps.syntax = async () => ({ parse: () => ({ captures: () => [], delete() {} }), parseDoc: () => ({ captures: () => [], delete() {} }), edit() {} });
+    fallbackPort.fail(); await Promise.resolve();
+    expect(fallback.code.dataset.syntax).toBe('tree-sitter');
+  });
   it('invalidates the cached rect on text frames and resets width for one full-document replacement', () => {
     const rig = setup();
     const invalidate = vi.spyOn(CodeViewHost.prototype, 'invalidateRect');

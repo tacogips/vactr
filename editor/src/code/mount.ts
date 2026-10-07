@@ -12,7 +12,7 @@ import { FrameScheduler, type FrameHost } from './frame';
 import { DiagnosticsController } from './diagnostics';
 import { EvalController } from './eval';
 import { HighlightScheduler, TimeAnchor } from './highlight';
-import { FallbackSpans, SyntaxSpans, type SpanProvider } from './syntax';
+import { FallbackSpans, SyntaxSpans, WorkerSyntaxSpans, type SpanProvider } from './syntax';
 import { formatKeymap } from './format';
 import { SampleBrowser, SampleLibrary, type DecodedAudio } from './samples';
 import { DocumentSync } from './sync';
@@ -319,10 +319,24 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   if (store.levels) transport.onLevels(store.levels);
   browser.setSounds(store.manifest?.sounds ?? []);
 
-  if (deps.syntax) void deps.syntax().then((syntax) => {
-    if (disposed) return;
-    syntaxProvider = new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax')); codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText('syntax');
-  }, () => undefined);
+  const loadMainThreadSyntax = (): void => {
+    if (!deps.syntax) { syntaxProvider = new FallbackSpans(); codePane.dataset.syntax = 'fallback'; return; }
+    void deps.syntax().then((syntax) => {
+      if (disposed) return;
+      syntaxProvider.dispose?.();
+      syntaxProvider = new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax'), (cb) => scheduler.afterPresent(cb));
+      codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText('syntax');
+    }, () => { if (!disposed) { syntaxProvider = new FallbackSpans(); codePane.dataset.syntax = 'fallback'; scheduler.invalidateText('syntax'); } });
+  };
+  if (deps.syntaxWorker) {
+    try {
+      let workerProvider: WorkerSyntaxSpans | null = null;
+      workerProvider = new WorkerSyntaxSpans(deps.syntaxWorker(), doc.baseURI,
+        () => scheduler.invalidateText('syntax'), loadMainThreadSyntax,
+        () => { if (syntaxProvider === workerProvider) codePane.dataset.syntax = 'tree-sitter-worker'; });
+      syntaxProvider = workerProvider;
+    } catch { loadMainThreadSyntax(); }
+  } else loadMainThreadSyntax();
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
     ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
     disposeCode: () => mounted.dispose() });

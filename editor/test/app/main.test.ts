@@ -207,7 +207,9 @@ describe('native self-check', () => {
     return args.report;
   }
   it('reports zero playing envelopes when the simulator self-check starts silent',async()=>{
-    expect(await runSelfCheck(0)).toContain('"playingEvents":0');
+    const report = await runSelfCheck(0);
+    expect(report).toContain('"playingEvents":0');
+    expect(report).toContain('"syntax":"absent"');
   });
   it('reports playing envelopes observed before the self-check report',async()=>{
     expect(await runSelfCheck(1)).toContain('"playingEvents":1');

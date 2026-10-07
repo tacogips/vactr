@@ -125,6 +125,9 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   deps.formatter = new WasmFormatter(tool);
   deps.completion = new WasmCompletionEngine(tool);
   deps.syntax = () => loadVactSyntax(win.document.baseURI);
+  if (typeof Worker === 'function') {
+    deps.syntaxWorker = () => new Worker(new URL('../code/syntax-worker.ts', import.meta.url), { type: 'module' });
+  }
   const editor = createEditor(root, deps);
   if (tauriFallback) {
     const notice = root.ownerDocument.createElement('div');
@@ -162,6 +165,7 @@ export async function reportSelfCheck(root: HTMLElement, win: Window, deps: Edit
       gpuStatus,
       effectiveDpr: win.devicePixelRatio,
       latencyKind,
+      syntax: root.querySelector<HTMLElement>('[data-pane="code"]')?.dataset.syntax ?? 'absent',
       playingEvents,
     }) });
   } catch {

@@ -127,6 +127,39 @@ describe('FrameScheduler', () => {
     const callbackCount = f.onFrame.mock.calls.length; f.doc.dispatchEvent(new Event('resume')); f.host.flush(); expect(f.onFrame).toHaveBeenCalledTimes(callbackCount);
     expect(host.resizeInstance?.disconnect).toHaveBeenCalledOnce();
   });
+  it('runs afterPresent callbacks in a task after the next frame, with cancellation and hidden handling', () => {
+    vi.useFakeTimers();
+    try {
+      const f = setup(); f.host.flush();
+      const calls: string[] = [];
+      f.scheduler.afterPresent(() => calls.push('presented'));
+      vi.advanceTimersByTime(0); expect(calls).toEqual([]);
+      f.host.flush(); expect(calls).toEqual([]);
+      vi.advanceTimersByTime(0); expect(calls).toEqual(['presented']);
+
+      const before = f.scheduler.afterPresent(() => calls.push('cancelled-before'));
+      before(); f.host.flush(); vi.advanceTimersByTime(0);
+      expect(calls).not.toContain('cancelled-before');
+
+      const after = f.scheduler.afterPresent(() => calls.push('cancelled-after'));
+      f.host.flush(); after(); vi.advanceTimersByTime(0);
+      expect(calls).not.toContain('cancelled-after');
+
+      Object.defineProperty(f.doc, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      f.doc.dispatchEvent(new Event('visibilitychange'));
+      f.scheduler.afterPresent(() => calls.push('hidden'));
+      vi.advanceTimersByTime(0); expect(calls).not.toContain('hidden');
+      Object.defineProperty(f.doc, 'visibilityState', { configurable: true, get: () => 'visible' });
+      f.doc.dispatchEvent(new Event('visibilitychange')); f.host.flush();
+      expect(calls).not.toContain('hidden'); vi.advanceTimersByTime(0);
+      expect(calls).toContain('hidden');
+      f.scheduler.dispose();
+    } finally { vi.useRealTimers(); }
+  });
+  it('requests an idle frame for afterPresent', () => {
+    const f = setup(); f.host.flush(); expect(f.host.callbacks.size).toBe(0);
+    f.scheduler.afterPresent(() => {}); expect(f.host.callbacks.size).toBe(1); f.scheduler.dispose();
+  });
 });
 
 describe('PerfRecorder', () => {

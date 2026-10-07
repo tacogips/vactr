@@ -1,4 +1,4 @@
-import { ChangeSet, Text } from '@codemirror/state';
+import { ChangeSet, EditorState, Text } from '@codemirror/state';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TextLayout } from '../../src/code/layout';
 import { PhaseTimer } from '../../src/code/frame';
@@ -12,7 +12,8 @@ import { boundary, INPUT_WINDOW_LIMIT, surroundingWindow } from '../../src/code/
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import { RecordingTransport } from '../support/recording';
-import { SyntaxSpans, type ParsedVact, type VactSyntax } from '../../src/code/syntax';
+import { SyntaxSpans, WorkerSyntaxSpans, type ParsedVact, type SyntaxWorkerPort, type VactSyntax } from '../../src/code/syntax';
+import type { SyntaxWorkerReply, SyntaxWorkerRequest } from '../../src/code/syntax-worker-core';
 
 const cleanups: (() => void)[] = [];
 const lines = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma${' '.repeat(22)}`);
@@ -49,7 +50,9 @@ describe('bounded document edit costs', () => {
       if (documentChanged) layout.setText(presentation.doc, presentation.changes);
     });
     const parsed = (): ParsedVact => ({ captures: () => [], changedRanges: () => [], delete: () => {} });
-    const syntax = new SyntaxSpans({ parse: () => parsed(), parseDoc: () => parsed(), edit: () => {} } satisfies VactSyntax);
+    const afterFrameCallbacks: (() => void)[] = [];
+    const syntax = new SyntaxSpans({ parse: () => parsed(), parseDoc: () => parsed(), edit: () => {} } satisfies VactSyntax,
+      () => {}, (callback) => { afterFrameCallbacks.push(callback); return () => { const index = afterFrameCallbacks.indexOf(callback); if (index >= 0) afterFrameCallbacks.splice(index, 1); }; });
     syntax.spans(surface.state, 0, 64, 32); syntax.flush(); syntax.stats.deferredParses = 0;
     const stop = surface.subscribe((update) => { if (update.docChanged) syntax.noteChanges(update.changes, update.state); });
     cleanups.push(stop, () => syntax.dispose());
@@ -67,8 +70,28 @@ describe('bounded document edit costs', () => {
     expect(toString.mock.contexts.filter((context) => (context as Text).length >= 64 * 1024)).toHaveLength(0);
     expect(syntax.stats.syncParses).toBe(0);
     expect(syntax.stats.deferredParses).toBe(0);
-    syntax.flush();
+    afterFrameCallbacks.shift()?.();
     expect(syntax.stats.deferredParses).toBe(1);
+  });
+
+  it('posts one bounded Worker edit without main-thread captures or large stringification', () => {
+    const messages: SyntaxWorkerRequest[] = [], listeners = new Map<string, EventListener[]>();
+    const port: SyntaxWorkerPort = {
+      postMessage(message) { messages.push(message); }, terminate() {},
+      addEventListener(type, listener) { listeners.set(type, [...(listeners.get(type) ?? []), listener]); },
+    };
+    const provider = new WorkerSyntaxSpans(port, 'http://test/');
+    const state = EditorState.create({ doc: lines.join('\n') });
+    provider.spans(state, 0, 64, 32);
+    const reset = messages.find((message) => message.type === 'reset');
+    for (const listener of listeners.get('message') ?? []) listener(new MessageEvent('message', { data: { type: 'ready' } satisfies SyntaxWorkerReply }));
+    for (const listener of listeners.get('message') ?? []) listener(new MessageEvent('message', { data: { type: 'spans', seq: reset?.type === 'reset' ? reset.seq : 0, lines: new Uint32Array(), spans: new Uint32Array(), truncated: false } satisfies SyntaxWorkerReply }));
+    const before = messages.length, next = state.update({ changes: { from: 0, insert: 'x' } });
+    const stringify = vi.spyOn(Text.prototype, 'toString'); provider.noteChanges(next.changes, next.state);
+    expect(messages).toHaveLength(before + 1); expect(messages.at(-1)?.type).toBe('edit');
+    expect(provider.stats.captures).toBe(0);
+    expect(stringify.mock.contexts.filter((doc) => (doc as Text).length >= 64 * 1024)).toHaveLength(0);
+    stringify.mockRestore(); provider.dispose();
   });
 
   it('defers textarea edits, then patches only the changed window without a layout read', () => {

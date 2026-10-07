@@ -164,6 +164,7 @@ export function vactrAssets(): Plugin {
 export default defineConfig({
   // Relative asset URLs: the same dist serves the browser and the Tauri shell.
   base: './',
+  worker: { format: 'es' },
   plugins: [solid(), vactrAssets()],
   build: {
     target: 'es2022',

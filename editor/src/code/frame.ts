@@ -86,6 +86,9 @@ export class FrameScheduler {
   private cleanups: (() => void)[] = [];
   private observer: ResizeObserver | null = null;
   private media: MediaQueryList | null = null;
+  private afterPresentNext = 0;
+  private afterPresentCallbacks = new Map<number, () => void>();
+  private afterPresentTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly tick = (timestamp: number): void => {
     this.pending = null;
     if (this.disposed || this.hiddenValue) return;
@@ -108,6 +111,7 @@ export class FrameScheduler {
       const work = this.perf ? performance.now() - start : 0;
       this.perf?.recordFrame(timestamp, work, textDirty, this.opts.revision?.() ?? 0);
       this.inFrame = false;
+      this.postAfterPresent();
     }
     if (this.requestedDuringFrame || this.owners.size > 0) this.schedule();
   };
@@ -138,6 +142,26 @@ export class FrameScheduler {
     if (this.disposed || this.hiddenValue) return;
     if (this.inFrame) { this.requestedDuringFrame = true; return; }
     this.schedule();
+  }
+  afterPresent(cb: () => void): () => void {
+    if (this.disposed) return () => {};
+    const id = this.afterPresentNext++;
+    this.afterPresentCallbacks.set(id, cb);
+    this.request();
+    return () => { this.afterPresentCallbacks.delete(id); };
+  }
+  private postAfterPresent(): void {
+    if (!this.afterPresentCallbacks.size || this.afterPresentTimer !== null) return;
+    const callbackIds = [...this.afterPresentCallbacks.keys()];
+    this.afterPresentTimer = setTimeout(() => {
+      this.afterPresentTimer = null;
+      for (const id of callbackIds) {
+        const cb = this.afterPresentCallbacks.get(id);
+        this.afterPresentCallbacks.delete(id);
+        if (!this.disposed) cb?.();
+      }
+      if (this.afterPresentCallbacks.size) this.request();
+    }, 0);
   }
   private schedule(): void {
     if (this.pending === null && !this.disposed && !this.hiddenValue) this.pending = this.host.requestAnimationFrame(this.tick);
@@ -173,6 +197,8 @@ export class FrameScheduler {
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
     if (this.pending !== null) this.host.cancelAnimationFrame(this.pending); this.pending = null;
+    if (this.afterPresentTimer !== null) clearTimeout(this.afterPresentTimer); this.afterPresentTimer = null;
+    this.afterPresentCallbacks.clear();
     for (const cleanup of this.cleanups.splice(0)) cleanup(); this.observer?.disconnect(); this.observer = null; this.owners.clear();
   }
 }

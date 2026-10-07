@@ -1,6 +1,7 @@
 import { Text, type ChangeSet, type EditorState } from '@codemirror/state';
 import type { CodeAnnotation } from '../app/apis';
-import { styleSpans, treeEditFromDocs, type ParsedVact, type VactSyntax } from './syntax-core';
+import { CAPTURE_CLASSES, styleSpans, treeEditFromDocs, type ParsedVact, type VactSyntax } from './syntax-core';
+import { SYNTAX_CAPTURE_CLASSES, type SyntaxWorkerReply, type SyntaxWorkerRequest, type SyntaxWindow } from './syntax-worker-core';
 import { LineStream, vactParser } from './language';
 
 export { CAPTURE_CLASSES, createVactSyntax, loadVactSyntax } from './syntax-core';
@@ -11,6 +12,28 @@ export interface SpanProvider {
   spans(state: EditorState, from: number, to: number, limit: number): SpanResult;
   noteChanges?(changes: ChangeSet, state: EditorState): void;
   dispose?(): void;
+}
+
+export interface SyntaxWorkerPort {
+  postMessage(message: SyntaxWorkerRequest, transfer?: Transferable[]): void;
+  terminate(): void;
+  addEventListener(type: 'message' | 'error' | 'messageerror', listener: EventListener): void;
+}
+
+type CachedLine = { from: number; spans: { from: number; to: number; className: string }[] };
+
+function remapSpanLines(lineCache: Map<number, CachedLine>, changes: ChangeSet, base: Text, next: Text): void {
+  const moved = new Map<number, CachedLine>();
+  for (const [number, cached] of lineCache) {
+    const newFrom = changes.mapPos(cached.from, 1), line = next.lineAt(newFrom);
+    const spans: CachedLine['spans'] = [];
+    for (const span of cached.spans) {
+      const from = changes.mapPos(cached.from + span.from, 1), to = changes.mapPos(cached.from + span.to, -1);
+      if (to > from) spans.push({ from: from - line.from, to: to - line.from, className: span.className });
+    }
+    lineCache.delete(number); moved.set(line.number - 1, { from: line.from, spans });
+  }
+  for (const [number, cached] of moved) lineCache.set(number, cached);
 }
 
 function bounded(spans: readonly { from: number; to: number; className: string }[], from: number, to: number, limit: number): SpanResult {
@@ -99,14 +122,22 @@ export class SyntaxSpans implements SpanProvider {
   private parsed: ParsedVact | null = null;
   private lastDoc: Text | null = null;
   private fullParse = true;
-  private pending: ReturnType<typeof setTimeout> | null = null;
+  private pending: (() => void) | null = null;
   private currentState: EditorState | null = null;
   private captureWindow: { from: number; to: number } | null = null;
   private readonly lineCache = new Map<number, { from: number; spans: { from: number; to: number; className: string }[] }>();
   private readonly touched = new Set<number>();
   private disposed = false;
   readonly stats = { syncParses: 0, deferredParses: 0, captures: 0, capturedLines: 0 };
-  constructor(private readonly syntax: VactSyntax, private readonly onSyntax: () => void = () => {}) {}
+  constructor(private readonly syntax: VactSyntax, private readonly onSyntax: () => void = () => {},
+    private readonly afterPresent: (cb: () => void) => () => void = (cb) => {
+      if (typeof globalThis.requestAnimationFrame === 'function') {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let frame = globalThis.requestAnimationFrame(() => { timer = setTimeout(cb, 0); });
+        return () => { globalThis.cancelAnimationFrame(frame); if (timer !== null) clearTimeout(timer); frame = 0; };
+      }
+      const timer = setTimeout(cb, 0); return () => clearTimeout(timer);
+    }) {}
 
   noteChanges(changes: ChangeSet, state: EditorState): void {
     const next = state.doc;
@@ -152,11 +183,11 @@ export class SyntaxSpans implements SpanProvider {
     return bounded(spans, from, to, limit);
   }
 
-  flush(): void { if (this.pending) { clearTimeout(this.pending); this.pending = null; this.reparse(); } }
+  flush(): void { if (this.pending) { this.pending(); this.pending = null; this.reparse(); } }
 
   private schedule(): void {
     if (this.pending || this.disposed) return;
-    this.pending = setTimeout(() => { this.pending = null; this.reparse(); }, 0);
+    this.pending = this.afterPresent(() => { this.pending = null; this.reparse(); });
   }
 
   private reparse(): void {
@@ -227,18 +258,120 @@ export class SyntaxSpans implements SpanProvider {
   }
 
   private remapLines(changes: ChangeSet, base: Text, next: Text): void {
-    const moved = new Map<number, { from: number; spans: { from: number; to: number; className: string }[] }>();
-    for (const [number, cached] of this.lineCache) {
-      const newFrom = changes.mapPos(cached.from, 1);
-      const line = next.lineAt(newFrom), mapped: { from: number; to: number; className: string }[] = [];
-      for (const span of cached.spans) {
-        const from = changes.mapPos(cached.from + span.from, 1), to = changes.mapPos(cached.from + span.to, -1);
-        if (to > from) mapped.push({ from: from - line.from, to: to - line.from, className: span.className });
-      }
-      this.lineCache.delete(number); moved.set(line.number - 1, { from: line.from, spans: mapped });
-    }
-    for (const [number, cached] of moved) this.lineCache.set(number, cached);
+    remapSpanLines(this.lineCache, changes, base, next);
   }
 
-  dispose(): void { if (this.pending) clearTimeout(this.pending); this.pending = null; this.disposed = true; this.parsed?.delete(); this.parsed = null; this.lineCache.clear(); }
+  dispose(): void { if (this.pending) this.pending(); this.pending = null; this.disposed = true; this.parsed?.delete(); this.parsed = null; this.lineCache.clear(); }
+}
+
+/** Main-thread cache and bounded message producer for the dedicated syntax worker. */
+export class WorkerSyntaxSpans implements SpanProvider {
+  private seq = 0;
+  private lastDoc: Text | null = null;
+  private window: SyntaxWindow = [0, 0];
+  private workerCacheReady = false;
+  private everApplied = false;
+  private failed = false;
+  private disposed = false;
+  private readyTimer: ReturnType<typeof setTimeout> | null;
+  private readonly fallback = new FallbackSpans();
+  private readonly lineCache = new Map<number, CachedLine>();
+  private readonly inFlight = new Set<string>();
+  private truncated = false;
+  readonly stats = { posts: 0, resets: 0, replies: 0, staleReplies: 0, workerFailures: 0, captures: 0, capturedLines: 0 };
+
+  constructor(private readonly worker: SyntaxWorkerPort, base: string, private readonly onSyntax: () => void = () => {},
+    private readonly onFail: () => void = () => {}, private readonly onFirstApply: () => void = () => {}) {
+    worker.addEventListener('message', this.message);
+    worker.addEventListener('error', this.error);
+    worker.addEventListener('messageerror', this.error);
+    this.readyTimer = setTimeout(() => this.fail(), 10_000);
+    this.post({ type: 'init', base });
+  }
+
+  noteChanges(changes: ChangeSet, state: EditorState): void {
+    const next = state.doc, base = this.lastDoc;
+    this.fallback.noteChanges(changes, state);
+    if (changes.empty) { this.lastDoc = next; return; }
+    let applied: Text;
+    try { if (!base) throw new Error('Missing syntax base document'); applied = changes.apply(base); }
+    catch { this.sendReset(next); return; }
+    if (!base || applied.length !== next.length) { this.sendReset(next); return; }
+    remapSpanLines(this.lineCache, changes, base, next);
+    this.lastDoc = next; this.seq += 1; this.inFlight.clear();
+    let count = 0, insertedUnits = 0;
+    const entries: [number, number, string][] = [];
+    changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      count += 1; insertedUnits += inserted.length;
+      if (count <= 1024 && insertedUnits <= 65_536) entries.push([fromA, toA, inserted.toString()]);
+    });
+    if (count > 1024 || insertedUnits > 65_536) this.postReset(next);
+    else this.post({ type: 'edit', seq: this.seq, changes: entries, window: this.window });
+  }
+
+  spans(state: EditorState, from: number, to: number, limit: number): SpanResult {
+    const first = state.doc.lineAt(Math.max(0, Math.min(state.doc.length, from))).number - 1;
+    const last = state.doc.lineAt(Math.max(from, Math.min(state.doc.length, to > from ? to - 1 : to))).number - 1;
+    this.window = [Math.max(0, first - 1), Math.min(state.doc.lines - 1, last + 1)];
+    if (this.lastDoc !== state.doc) this.sendReset(state.doc);
+    if (!this.workerCacheReady || this.failed) return this.fallback.spans(state, from, to, limit);
+    const missing: number[] = [];
+    for (let line = first; line <= last; line += 1) if (!this.lineCache.has(line)) missing.push(line);
+    if (missing.length) {
+      const low = missing[0]!, high = missing[missing.length - 1]!, key = `${this.seq}:${low}:${high}`;
+      if (!this.inFlight.has(key)) { this.inFlight.add(key); this.post({ type: 'lines', seq: this.seq, first: low, last: high }); }
+    }
+    const result: { from: number; to: number; className: string }[] = [];
+    for (let lineNo = first; lineNo <= last; lineNo += 1) {
+      const line = state.doc.line(lineNo + 1), cached = this.lineCache.get(lineNo);
+      if (cached) for (const span of cached.spans) result.push({ from: line.from + span.from, to: line.from + span.to, className: span.className });
+    }
+    return { ...bounded(result, from, to, limit), truncated: this.truncated };
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    if (!this.failed) { this.post({ type: 'dispose' }); this.worker.terminate(); }
+    this.clearReadyTimer(); this.failed = true; this.disposed = true;
+    this.lineCache.clear(); this.inFlight.clear();
+  }
+
+  private post(message: SyntaxWorkerRequest): void { if (this.failed || this.disposed) return; this.stats.posts += 1; this.worker.postMessage(message); }
+  private postReset(doc: Text): void {
+    this.stats.resets += 1; this.lineCache.clear(); this.workerCacheReady = false;
+    this.post({ type: 'reset', seq: this.seq, text: doc.toString(), window: this.window });
+  }
+  private sendReset(doc: Text): void {
+    this.lastDoc = doc; this.seq += 1; this.inFlight.clear(); this.postReset(doc);
+  }
+  private clearReadyTimer(): void { if (this.readyTimer !== null) clearTimeout(this.readyTimer); this.readyTimer = null; }
+  private readonly message: EventListener = (event) => {
+    const reply = (event as MessageEvent<SyntaxWorkerReply>).data;
+    if (!reply || this.failed) return;
+    if (reply.type === 'ready') { this.clearReadyTimer(); return; }
+    if (reply.type === 'failed') { this.fail(); return; }
+    this.stats.replies += 1;
+    if (reply.seq !== this.seq) { this.stats.staleReplies += 1; return; }
+    for (let row = 0; row + 2 < reply.lines.length; row += 3) {
+      const number = reply.lines[row]!, first = reply.lines[row + 1]!, count = reply.lines[row + 2]!;
+      const line = this.lastDoc?.line(number + 1); if (!line) continue;
+      const spans: CachedLine['spans'] = [];
+      for (let index = first; index < first + count; index += 1) {
+        const offset = index * 3, key = SYNTAX_CAPTURE_CLASSES[reply.spans[offset + 2]!];
+        const className = key ? CAPTURE_CLASSES[key] : undefined;
+        if (className) spans.push({ from: reply.spans[offset]!, to: reply.spans[offset + 1]!, className });
+      }
+      this.lineCache.set(number, { from: line.from, spans });
+    }
+    this.truncated = reply.truncated; this.inFlight.clear();
+    const firstApply = !this.everApplied; this.workerCacheReady = true; this.everApplied = true;
+    if (firstApply) this.onFirstApply();
+    this.onSyntax();
+  };
+  private readonly error: EventListener = () => this.fail();
+  private fail(): void {
+    if (this.failed || this.disposed) return;
+    this.failed = true; this.clearReadyTimer(); this.stats.workerFailures += 1;
+    this.worker.terminate(); this.onFail();
+  }
 }

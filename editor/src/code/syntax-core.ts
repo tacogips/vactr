@@ -55,13 +55,19 @@ function pointAtDoc(doc: Text, pos: number): TreePoint {
 
 /** Convert one UTF-16 transaction change using CodeMirror line coordinates. */
 export function treeEditFromDocs(base: Text, next: Text, fromA: number, toA: number, fromB: number, toB: number): SyntaxTreeEdit {
+  const startPosition = pointAtDoc(base, fromA);
+  const inserted = next.sliceString(fromB, toB);
+  const insertedLines = inserted.split('\n');
+  const newEndPosition = insertedLines.length === 1
+    ? { row: startPosition.row, column: startPosition.column + inserted.length }
+    : { row: startPosition.row + insertedLines.length - 1, column: insertedLines[insertedLines.length - 1]!.length };
   return {
     startIndex: fromA,
     oldEndIndex: toA,
-    newEndIndex: toB,
-    startPosition: pointAtDoc(base, fromA),
+    newEndIndex: fromA + inserted.length,
+    startPosition,
     oldEndPosition: pointAtDoc(base, toA),
-    newEndPosition: pointAtDoc(next, toB),
+    newEndPosition,
   };
 }
 

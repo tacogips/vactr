@@ -155,6 +155,26 @@ describe('tree-sitter syntax WASM', () => {
     finally { provider.dispose(); }
   });
 
+  it('waits for a presented frame before running a fallback reparse', () => {
+    const callbacks: (() => void)[] = [], cancelled = new Set<() => void>(), onSyntax = vi.fn();
+    const provider = new SyntaxSpans(createVactSyntax(parser, query), onSyntax, (callback) => {
+      callbacks.push(callback); return () => { cancelled.add(callback); };
+    });
+    let state = EditorState.create({ doc: 'let value 1' });
+    provider.spans(state, 0, state.doc.length, 32); provider.flush(); onSyntax.mockClear();
+    const transaction = state.update({ changes: { from: 10, insert: '2' } });
+    provider.noteChanges(transaction.changes, transaction.state); state = transaction.state;
+    vi.useFakeTimers();
+    try {
+      vi.advanceTimersByTime(0);
+      expect(provider.stats.deferredParses).toBe(1);
+      expect(provider.spans(state, 0, state.doc.length, 32).spans.length).toBeGreaterThan(0);
+      expect(onSyntax).not.toHaveBeenCalled();
+      callbacks.filter((callback) => !cancelled.has(callback)).at(-1)?.();
+      expect(provider.stats.deferredParses).toBe(2); expect(onSyntax).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); provider.dispose(); }
+  });
+
   it('bounds changed-range captures and refreshes a second cached window after an inline edit', () => {
     const syntax = createVactSyntax(parser, query);
     const provider = new SyntaxSpans(syntax);

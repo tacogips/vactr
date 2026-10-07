@@ -261,13 +261,21 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
         return fail('bad-shape', 'invalid song failure identity');
       break;
     case 'playing':
-      if (env.body.events.length > MAX_PLAYING_EVENTS || !env.body.events.every(validPlaying))
+      if (env.body.events.length > MAX_PLAYING_EVENTS || !env.body.events.every(validPlaying) ||
+        (env.body.ahead !== undefined && (!Array.isArray(env.body.ahead) || !env.body.ahead.every(validPlaying) ||
+          env.body.ahead.some((event) => event.id !== undefined && !integer(event.id)))) ||
+        (env.body.retract !== undefined && (!Array.isArray(env.body.retract) ||
+          !env.body.retract.every(integer) || env.body.retract.length > MAX_PLAYING_EVENTS)) ||
+        env.body.events.length + (env.body.ahead?.length ?? 0) > MAX_PLAYING_EVENTS ||
+        env.body.events.some((event) => event.id !== undefined && !integer(event.id)))
         return fail('bad-shape', 'invalid or oversized playing batch');
       break;
     case 'levels':
       if (!env.body.levels.every((v) => isObject(v) && typeof v.source === 'string' &&
         nonnegative(v.rms) && (v.bands === undefined ||
         (Array.isArray(v.bands) && v.bands.every(nonnegative)))) ||
+        (env.body.time !== undefined && !nonnegative(env.body.time)) ||
+        (env.body.epoch !== undefined && !epoch(env.body.epoch)) ||
         (env.body.analyzers !== undefined && (!Array.isArray(env.body.analyzers) ||
         !env.body.analyzers.every((v) => isObject(v) && typeof v.bus === 'string' &&
           typeof v.kind === 'string' && integer(v.id) && Array.isArray(v.cells) && v.cells.every(finite)))))

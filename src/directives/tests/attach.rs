@@ -1,7 +1,62 @@
 //! The Decided attachment rule over the spec's own examples
 //! (architecture.md Editor Requirements; design 13.5).
 
-use super::{codes, shown, table, SPEC};
+use super::{codes, shown, table, FILE, SPEC};
+
+#[test]
+fn top_of_matches_reference_for_nested_targets() {
+    let src = "fn f a:\n\tlet x a\n\t+x\ninst pluck freq: float = 440:\n\tsaw freq\nbus :verb:\n\tdelay 0.3\nlet plain 1\n";
+    let read = crate::reader::read(src, FILE, &crate::reader::AliasEnv::new());
+    assert!(read.diags.is_empty(), "{:?}", read.diags);
+    let doc = crate::directives::attach::Doc::new(
+        src,
+        FILE,
+        &read.nodes,
+        &crate::types::HostManifest::spec_default(),
+    );
+    assert!(doc.targets.iter().any(|target| target.top
+        != doc
+            .targets
+            .iter()
+            .position(|candidate| candidate.top == target.top)
+            .unwrap_or(usize::MAX)));
+    for (index, target) in doc.targets.iter().enumerate() {
+        let expected = doc
+            .targets
+            .iter()
+            .position(|candidate| candidate.top == target.top)
+            .unwrap_or(index);
+        assert_eq!(doc.top_of(index), expected, "target {index}");
+    }
+}
+
+#[test]
+fn top_of_hand_built_doc_uses_compatible_fallback() {
+    use crate::directives::attach::{Doc, Target};
+    use crate::reader::span::Span;
+
+    let mut doc = Doc::default();
+    doc.targets = [3, 1, 3, 9]
+        .into_iter()
+        .map(|top| Target {
+            extent: Span::new(FILE, 0, 0),
+            indent: 0,
+            first_line: 0,
+            last_line: 0,
+            top,
+            def: None,
+            implicit: None,
+        })
+        .collect();
+    for (index, target) in doc.targets.iter().enumerate() {
+        let expected = doc
+            .targets
+            .iter()
+            .position(|candidate| candidate.top == target.top)
+            .unwrap_or(index);
+        assert_eq!(doc.top_of(index), expected, "target {index}");
+    }
+}
 
 /// Each directive's text and the first line of its attach target.
 fn attachments(src: &str) -> Vec<(String, Option<String>)> {

@@ -1,8 +1,9 @@
-import { Text } from '@codemirror/state';
+import { ChangeSet, Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
-import { InputController } from '../../src/code/input';
+import { InputController, type InputPresentation } from '../../src/code/input';
+import { TextLayout } from '../../src/code/layout';
 import { boundary, INPUT_WINDOW_LIMIT } from '../../src/code/accessibility';
 import { PointerController } from '../../src/code/pointer';
 import { Client } from '../../src/protocol/client';
@@ -10,14 +11,14 @@ import { Store } from '../../src/protocol/store';
 import { RecordingTransport } from '../support/recording';
 
 const cleanup: (() => void)[] = [];
-function setup(text = '日本😀 abc') {
+function setup(text = '日本😀 abc', onPresentation?: (presentation: InputPresentation) => void) {
   const transport = new RecordingTransport();
   const client = new Client(transport, { store: new Store(), now: () => Date.now() });
   const sync = new DocumentSync(client.document('main.vact'), Text.of(text.split('\n')));
   const surface = new CodeSurface({ sync });
   const container = document.createElement('div'); document.body.append(container);
   const evalSelection = vi.fn(), evalAll = vi.fn(), hush = vi.fn(), scrollCaret = vi.fn(), onError = vi.fn();
-  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret, onError });
+  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret, onError, onPresentation });
   cleanup.push(() => { input.dispose(); surface.dispose(); container.remove(); });
   return { surface, sync, input, container, el: input.accessibility.textarea, transport, evalSelection, evalAll, hush, scrollCaret, onError };
 }
@@ -55,11 +56,46 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { for (const fn of cleanup.splice(0).reverse()) fn(); vi.useRealTimers(); });
 
 describe('canvas input bridge', () => {
+  it('clears a pending document delta before composition and full-invalidates a mismatched layout delta', () => {
+    const { el, surface, input } = setup('a\nb\n', () => {});
+    surface.dispatch({ selection: { anchor: 3 } });
+    input.replaceSelection('x', 'input.type');
+    const typed = input.presentation;
+    const staleChanges = typed.changes;
+    expect(staleChanges).toBeDefined();
+    expect(staleChanges).toBeInstanceOf(ChangeSet);
+
+    composition(el, 'compositionstart');
+    const preedit = input.presentation;
+    expect(preedit.doc.toString()).toBe('a\nbx\n');
+    expect(preedit.changes).toBeUndefined();
+    expect(preedit.changesBase).toBeUndefined();
+
+    const layout = new TextLayout({ font: '', measureText: text => ({ width: text.length * 8 }) },
+      { font: '12px monospace', lineHeight: 20, baseline: 15 });
+    layout.setText(typed.doc);
+    layout.shape(2);
+    expect(layout.cacheBytes).toBeGreaterThan(0);
+    expect(() => layout.setText(preedit.doc, staleChanges)).not.toThrow();
+    expect(layout.cacheBytes).toBe(0);
+    expect(layout.shape(2).number).toBe(2);
+  });
+
   it('keeps preedit on presentation only and commits Japanese exactly once with one undo group', () => {
     const { surface, sync, el, input } = setup('abc'); surface.dispatch({ selection: { anchor: 1, head: 2 } });
-    composition(el, 'compositionstart'); composition(el, 'compositionupdate', 'に'); before(el, 'insertCompositionText', '日本', true);
+    composition(el, 'compositionstart');
+    const beforePreedit = input.presentation;
+    composition(el, 'compositionupdate', 'に');
+    const firstPreedit = input.presentation;
+    expect(firstPreedit.changes?.apply(beforePreedit.doc).eq(firstPreedit.doc)).toBe(true);
+    before(el, 'insertCompositionText', '日本', true);
+    const secondPreedit = input.presentation;
+    expect(secondPreedit.changes?.apply(firstPreedit.doc).eq(secondPreedit.doc)).toBe(true);
     expect(surface.state.doc.toString()).toBe('abc'); expect(sync.revision).toBe(1);
-    expect(input.presentation).toEqual({ text: 'a日本c', cursor: 3, annotations: [{ from: 1, to: 3, kind: 'composition' }] });
+    expect(input.presentation.text).toBe('a日本c');
+    expect(input.presentation.doc.toString()).toBe('a日本c');
+    expect(input.presentation.cursor).toBe(3);
+    expect(input.presentation.annotations).toEqual([{ from: 1, to: 3, kind: 'composition' }]);
     composition(el, 'compositionend', '日本'); before(el, 'insertFromComposition', '日本', true);
     el.dispatchEvent(new InputEvent('input', { inputType: 'insertFromComposition', data: '日本' }));
     expect(surface.state.doc.toString()).toBe('a日本c'); expect(sync.revision).toBe(2);
@@ -112,11 +148,13 @@ describe('canvas input bridge', () => {
     expect(surface.state.doc.toString()).toBe('😀'); expect(sync.revision).toBe(2);
   });
   it('reconciles native fallback replacement containing surrogate and combining clusters', () => {
-    const { el, surface } = setup('A😀e\u0301Z'); el.value = 'A😁e\u0301Z'; el.dispatchEvent(new InputEvent('input', { inputType: 'insertReplacementText' }));
+    const { el, surface, input } = setup('A😀e\u0301Z'); el.value = 'A😁e\u0301Z'; el.dispatchEvent(new InputEvent('input', { inputType: 'insertReplacementText' }));
+    input.flushBridge(); expect(el.value).toBe('A😁e\u0301Z');
     expect(surface.state.doc.toString()).toBe('A😁e\u0301Z'); surface.undo(); expect(surface.state.doc.toString()).toBe('A😀e\u0301Z');
   });
   it('bounds accessibility windows and navigates across a window boundary', () => {
     const { surface, input, el } = setup('日本😀e\u0301'.repeat(5000)); surface.dispatch({ selection: { anchor: 10000 } });
+    input.flushBridge();
     const oldStart = input.accessibility.window.start; expect(el.value.length).toBeLessThanOrEqual(INPUT_WINDOW_LIMIT);
     expect(boundary(surface.state.doc.toString(), oldStart)).toBe(oldStart);
     el.setSelectionRange(0, 0); el.dispatchEvent(new Event('select')); expect(surface.state.selection.main.head).toBe(oldStart);
@@ -153,7 +191,7 @@ describe('canvas input bridge', () => {
     expect(boundary(text, input.accessibility.window.end)).toBe(input.accessibility.window.end);
   });
   it('uses document selection for fallback input when selection extends beyond the bridge window', () => {
-    const { surface, el } = setup('x'.repeat(20000)); key(el, 'a', { ctrlKey: true }); el.value = 'paste';
+    const { surface, input, el } = setup('x'.repeat(20000)); key(el, 'a', { ctrlKey: true }); input.flushBridge(); el.value = 'paste';
     el.dispatchEvent(new InputEvent('input', { inputType: 'insertText' })); expect(surface.state.doc.toString()).toBe('paste');
   });
   it.each([
@@ -161,7 +199,7 @@ describe('canvas input bridge', () => {
     ['shared suffix', 'c', 'abc'],
     ['shared prefix and suffix', 'a', 'aba'],
   ])('preserves full native replacement with %s outside the window', (_name, original, replacement) => {
-    const { surface, el, sync } = setup(original.repeat(20000)); key(el, 'a', { ctrlKey: true });
+    const { surface, input, el, sync } = setup(original.repeat(20000)); key(el, 'a', { ctrlKey: true }); input.flushBridge();
     el.value = replacement; el.dispatchEvent(new InputEvent('input', { inputType: 'insertReplacementText' }));
     expect(surface.state.doc.toString()).toBe(replacement); expect(surface.state.selection.main.head).toBe(replacement.length);
     expect(sync.revision).toBe(2); surface.undo(); expect(surface.state.doc.toString()).toBe(original.repeat(20000));
@@ -170,6 +208,7 @@ describe('canvas input bridge', () => {
     const { surface, el, input } = setup('a'.repeat(24000));
     const from = backward ? 10000 : 2000, to = backward ? 22000 : 14000;
     surface.dispatch({ selection: { anchor: backward ? to : from, head: backward ? from : to } });
+    input.flushBridge();
     const old = input.accessibility.window;
     expect(old.outside).toBe(true);
     const a = Math.max(0, Math.min(old.value.length, from - old.start));
@@ -180,13 +219,13 @@ describe('canvas input bridge', () => {
     expect(surface.state.selection.main.head).toBe(from + 3); surface.undo(); expect(surface.state.doc.length).toBe(24000);
   });
   it('reconciles replacement even when its text equals the entire projected selection', () => {
-    const { surface, el } = setup('a'.repeat(20000)); key(el, 'a', { ctrlKey: true });
+    const { surface, input, el } = setup('a'.repeat(20000)); key(el, 'a', { ctrlKey: true }); input.flushBridge();
     const replacement = el.value;
     el.dispatchEvent(new InputEvent('input', { inputType: 'insertReplacementText' }));
     expect(surface.state.doc.toString()).toBe(replacement); expect(surface.state.doc.length).toBe(INPUT_WINDOW_LIMIT);
   });
   it('deletes a partially clipped selection without removing its unselected context', () => {
-    const { surface, el, input } = setup('a'.repeat(24000)); surface.dispatch({ selection: { anchor: 2000, head: 14000 } });
+    const { surface, el, input } = setup('a'.repeat(24000)); surface.dispatch({ selection: { anchor: 2000, head: 14000 } }); input.flushBridge();
     const old = input.accessibility.window;
     const end = Math.max(0, Math.min(old.value.length, 14000 - old.start));
     el.value = old.value.slice(end); el.dispatchEvent(new InputEvent('input', { inputType: 'deleteContentBackward' }));
@@ -211,6 +250,15 @@ describe('headless keyboard', () => {
     key(el, 'ArrowDown'); expect(surface.state.selection.main.head).toBe(11);
     key(el, 'End', { ctrlKey: true, shiftKey: true }); expect(surface.state.selection.main.to).toBe(16); expect(scrollCaret).toHaveBeenCalled();
   });
+  it('bounds punctuation-only word movement to 65,536 UTF-16 units and returns a line start', () => {
+    const { surface, el } = setup(Array.from({ length: 70_000 }, () => '!').join('\n'));
+    const end = surface.state.doc.length;
+    surface.dispatch({ selection: { anchor: end } });
+    key(el, 'ArrowLeft', { ctrlKey: true });
+    const head = surface.state.selection.main.head;
+    expect(head).toBe(surface.state.doc.lineAt(head).from);
+    expect(end - head).toBeLessThanOrEqual(65_536);
+  });
   it('dispatches eval/hush and keyboard history only outside composition', () => {
     const { surface, el, evalSelection, evalAll, hush } = setup('');
     key(el, 'Enter', { ctrlKey: true }); key(el, 'Enter', { metaKey: true, shiftKey: true }); key(el, '.', { metaKey: true });
@@ -226,6 +274,17 @@ describe('canvas pointer contracts', () => {
     fire('pointermove', { clientX: 80 }); expect(surface.state.selection.main.to).toBe(8); window.dispatchEvent(new Event('blur')); expect(capture.size).toBe(0);
     fire('pointerdown', { detail: 2 }); expect(surface.state.selection.main.from).toBe(0); expect(surface.state.selection.main.to).toBe(5); fire('pointerup');
     fire('pointerdown', { detail: 3 }); expect(surface.state.selection.main.to).toBe(11); fire('pointerup');
+  });
+  it('selects and drags on a distant line without serializing the whole document', () => {
+    const text = Array.from({ length: 20_000 }, (_, n) => `const value${n} = alpha beta gamma`).join('\n');
+    const { surface, fire } = pointerSetup(text);
+    const line = surface.state.doc.line(10_000);
+    surface.attachBridge({ focus() {}, posAtCoords: ({ x }) => line.from + Math.min(line.length, Math.round(x / 10)),
+      coordsAtPos: (pos) => ({ left: pos * 10, right: pos * 10 + 1, top: 0, bottom: 20 }) });
+    const toString = vi.spyOn(Text.prototype, 'toString');
+    fire('pointerdown', { detail: 2 }); fire('pointerup');
+    fire('pointerdown'); fire('pointermove', { clientX: 80 });
+    expect(toString).not.toHaveBeenCalled();
   });
   it('counts real pointerdown detail zero for repeated word/line selection and numeric refusal', () => {
     const { surface, fire, numericDrag } = pointerSetup();

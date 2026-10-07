@@ -1,5 +1,6 @@
 import {
   COMPLETION_USER_EVENT,
+  COMPLETION_DEBOUNCE_MS,
   isTriggerChar,
   type CompletionKey,
   type CompletionResult,
@@ -23,6 +24,7 @@ export class CompletionPopup {
   private requestSequence = 0;
   private inFlight = false;
   private dirty = false;
+  private timer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
   constructor(surface: CompletionSurface, source: CompletionSource) {
@@ -62,7 +64,7 @@ export class CompletionPopup {
     const selection = this.surface.selection();
     if (this.panel) {
       if (this.isTypingOrDeleting(change.userEvent)) {
-        if (selection.head >= (this.result?.from ?? 0)) this.request();
+        if (selection.head >= (this.result?.from ?? 0)) this.request('typing');
         else this.close();
       }
       return;
@@ -74,7 +76,7 @@ export class CompletionPopup {
       selection.anchor === selection.head &&
       !this.surface.isComposing()
     ) {
-      this.request();
+      this.request('typing');
     }
   }
 
@@ -86,7 +88,7 @@ export class CompletionPopup {
     if (this.disposed) return false;
     if (key === 'Ctrl-Space') {
       if (!this.source.available) return false;
-      this.request();
+      this.request('explicit');
       return true;
     }
     if (!this.panel || !this.result) return false;
@@ -114,21 +116,24 @@ export class CompletionPopup {
     }
   }
 
-  private request(): void {
+  private request(kind: 'typing' | 'explicit'): void {
     if (this.disposed) return;
-    const sequence = ++this.requestSequence;
-    if (this.inFlight) {
-      this.dirty = true;
-      return;
-    }
     if (!this.source.available || this.surface.isComposing()) {
       this.close();
       return;
     }
-    void this.runRequest(sequence);
+    const sequence = ++this.requestSequence;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      if (this.disposed || !this.source.available || this.surface.isComposing()) { this.close(); return; }
+      if (this.inFlight) { this.dirty = true; return; }
+      void this.runRequest(sequence);
+    }, kind === 'typing' ? COMPLETION_DEBOUNCE_MS : 0);
   }
 
   private async runRequest(sequence: number): Promise<void> {
+    const version = this.surface.version();
     const text = this.surface.text();
     const cursor = this.surface.selection().head;
     this.inFlight = true;
@@ -138,7 +143,7 @@ export class CompletionPopup {
       if (
         result === null ||
         result.items.length === 0 ||
-        this.surface.text() !== text ||
+        this.surface.version() !== version ||
         this.surface.isComposing()
       ) {
         this.close();
@@ -152,8 +157,10 @@ export class CompletionPopup {
       if (this.dirty && !this.disposed) {
         this.dirty = false;
         const nextSequence = this.requestSequence;
-        if (this.source.available && !this.surface.isComposing()) void this.runRequest(nextSequence);
-        else this.close();
+        if (this.timer === null) {
+          if (this.source.available && !this.surface.isComposing()) void this.runRequest(nextSequence);
+          else this.close();
+        }
       }
     }
   }
@@ -233,6 +240,8 @@ export class CompletionPopup {
   }
 
   private close(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
     this.requestSequence += 1;
     this.dirty = false;
     this.panel?.remove();

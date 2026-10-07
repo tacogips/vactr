@@ -1,5 +1,4 @@
 import { Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '../../src/app/song';
 import { buildLayout } from '../../src/app/layout';
@@ -28,12 +27,11 @@ function fixture() {
   const client = new Client(transport, { store });
   const sync = new DocumentSync(client.document(file), Text.of(['song-code']));
   const surface = new CodeSurface({ sync });
-  const view = new EditorView({ state: surface.state });
   const deps: EditorDeps = { client, store, files: new MemoryFiles(), clock: new MockClock(), tier: 'browser',
-    code: { surface, view, currentRevision: () => sync.revision, mapWireSpan: () => null,
+    code: { surface, currentRevision: () => sync.revision, mapWireSpan: () => null, toWireSpan: (from, to) => sync.toWireSpan(from, to),
       selectedSiteId: () => null, samples: { frames: () => null, openBrowser: () => {} } } };
   const controls = mount(root, deps, file);
-  cleanups.push(() => { controls.dispose(); view.destroy(); surface.dispose(); client.close(); store.dispose(); root.remove(); });
+  cleanups.push(() => { controls.dispose(); surface.dispose(); client.close(); store.dispose(); root.remove(); });
   const applied = async () => {
     transport.respond((env) => env.kind === 'apply-song' ? [{ kind: 'song-candidate-ready', re: env.seq,
       body: { epoch: '9', doc_revision: env.body.doc_revision } }] : []);
@@ -151,9 +149,8 @@ describe('mounted song controls with the actual backend', () => {
     const code = 'inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone > gain 0.1}] duration: 8} tail-seconds: 0 > play-song';
     const sync = new DocumentSync(client.document(file), Text.of(code.split('\n')));
     const surface = new CodeSurface({ sync });
-    const view = new EditorView({ state: surface.state });
     const deps: EditorDeps = { client, store, files: new MemoryFiles(), clock: new MockClock(), tier: 'browser',
-      code: { surface, view, currentRevision: () => sync.revision, mapWireSpan: () => null,
+      code: { surface, currentRevision: () => sync.revision, mapWireSpan: () => null, toWireSpan: (from, to) => sync.toWireSpan(from, to),
         selectedSiteId: () => null, samples: { frames: () => null, openBrowser: () => {} } } };
     const controls = mount(root, deps, file);
     const pending: WasmRecord[] = [];
@@ -262,7 +259,7 @@ describe('mounted song controls with the actual backend', () => {
       expect(muteButton().disabled).toBe(true);
       expect((await step()).pcm.every((v) => Math.abs(v) < 1e-7)).toBe(true);
     } finally {
-      controls.dispose(); view.destroy(); surface.dispose(); client.close(); store.dispose(); root.remove();
+      controls.dispose(); surface.dispose(); client.close(); store.dispose(); root.remove();
     }
   }, 30000);
 });

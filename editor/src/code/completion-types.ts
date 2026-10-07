@@ -70,6 +70,7 @@ export interface CaretRect {
 
 export interface CompletionSurface {
   text(): string;
+  version(): unknown;
   selection(): { anchor: number; head: number };
   replace(from: number, to: number, insert: string): void;
   caretRect(pos: number): CaretRect | null;
@@ -93,6 +94,7 @@ export const COMPLETION_KEYS: readonly CompletionKey[] = [
 ];
 
 export const COMPLETION_USER_EVENT = 'input.complete';
+export const COMPLETION_DEBOUNCE_MS = 150;
 
 export function isTriggerChar(ch: string): boolean {
   return ch.length === 1 && /[A-Za-z0-9\-:.]/.test(ch);

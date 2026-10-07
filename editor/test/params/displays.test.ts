@@ -24,7 +24,7 @@ async function source(name: string): Promise<string> {
 
 const imports = (src: string): string[] => [...src.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => m[1] as string);
 
-const TEXT = 'd1 n [:a4 60 :bd] > s :superpiano';
+const TEXT = 'd1 n [:a4 60 :c6 :bd] > s :superpiano';
 
 let areas: ParamsArea[] = [];
 
@@ -118,5 +118,18 @@ describe('step grid and piano roll are displays', () => {
     expect(parsePitch(':eb2')).toBe(39);
     expect(parsePitch('x')).toBeNull();
     expect(h.transport.sent).toEqual([]);
+  });
+
+  it('appends notes in place within a cycle and updates lane styles without recreating elements', () => {
+    const { h, params } = rig();
+    params.roll.update([ev('d1', 0, ':a4'), ev('d1', 1, '60')], 4);
+    const first = [...params.roll.el.querySelectorAll('.params-roll-note')];
+    const beforeTop = (first[0] as HTMLElement).style.top;
+    params.roll.update([ev('d1', 2, ':c6'), ev('d2', 3, ':a4'), ev('d3', 3.5, ':a4')], 4);
+    const after = [...params.roll.el.querySelectorAll('.params-roll-note')];
+    expect(after).toHaveLength(first.length + 3);
+    expect(after[0]).toBe(first[0]);
+    expect(after[1]).toBe(first[1]);
+    expect((after[0] as HTMLElement).style.top).not.toBe(beforeTop);
   });
 });

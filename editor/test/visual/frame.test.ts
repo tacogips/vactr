@@ -4,13 +4,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { startFrameLoop, type FrameScheduler } from '../../src/visual/frame';
+import type { AudibleClock } from '../../src/app/clock';
 import { MockClock } from '../support/clock';
 
 class FakeRaf implements FrameScheduler {
   private next = 1;
-  readonly pending = new Map<number, () => void>();
+  readonly pending = new Map<number, (frameMs: number) => void>();
 
-  request(cb: () => void): number {
+  request(cb: (frameMs: number) => void): number {
     const id = this.next++;
     this.pending.set(id, cb);
     return id;
@@ -21,10 +22,10 @@ class FakeRaf implements FrameScheduler {
   }
 
   /** Runs the callbacks pending now (one animation frame). */
-  step(): void {
+  step(frameMs = 1000): void {
     const due = [...this.pending.values()];
     this.pending.clear();
-    for (const cb of due) cb();
+    for (const cb of due) cb(frameMs);
   }
 }
 
@@ -44,7 +45,7 @@ describe('startFrameLoop', () => {
     expect(loop.running).toBe(true);
     raf.step();
     clock.advance(0.5);
-    raf.step();
+    raf.step(1016);
     expect(log).toEqual(['frame:1', 'draw:1', 'present', 'frame:1.5', 'draw:1.5', 'present']);
     expect(raf.pending.size).toBe(1);
   });
@@ -92,5 +93,27 @@ describe('startFrameLoop', () => {
     expect(draws).toBe(0);
     expect(errors).toHaveLength(1);
     expect(raf.pending.size).toBe(0);
+  });
+
+  it('uses one audible sample for the core and draw, and falls back when invalid', () => {
+    const raf = new FakeRaf();
+    const clock = new MockClock(4);
+    const seen: number[] = [];
+    const audible = { sample: (frameMs: number) => {
+      expect(frameMs).toBe(1000);
+      return { time: 12.5, targetMs: frameMs, epoch: 'e', provenance: 'measured', uncertainty: 0, valid: true };
+    } } as unknown as AudibleClock;
+    startFrameLoop({ core: { frame: (t) => seen.push(t) }, host: { draw: (t) => seen.push(t) },
+      clock, audible, scheduler: raf });
+    raf.step();
+    expect(seen).toEqual([12.5, 12.5]);
+
+    const fallbackRaf = new FakeRaf();
+    const fallback: number[] = [];
+    startFrameLoop({ core: { frame: (t) => fallback.push(t) }, host: { draw: (t) => fallback.push(t) },
+      clock, audible: { sample: () => ({ time: 0, targetMs: 0, epoch: null, provenance: 'unavailable', uncertainty: 0, valid: false }) } as unknown as AudibleClock,
+      scheduler: fallbackRaf });
+    fallbackRaf.step();
+    expect(fallback).toEqual([4, 4]);
   });
 });

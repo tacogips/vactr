@@ -4,13 +4,12 @@
 // the code view. Editors write only through `deps.bind` (ED-BIND's
 // `BindApi`); the grid and roll only display `playing` telemetry.
 
-import { StateEffect, StateField, type Range } from '@codemirror/state';
-import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import { createComponent, createSignal, type Setter } from 'solid-js';
 import { render } from 'solid-js/web';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { buildLayout } from '../app/layout';
 import { DOC_FILE } from '../code/mount';
+import type { CodeSurface as HeadlessCodeSurface } from '../code/surface';
 import type { EditorKind, WireSite } from '../protocol/types';
 import { render as delay } from './delay';
 import { render as dynamics } from './dynamics';
@@ -69,32 +68,6 @@ function addStylesheet(doc: Document): HTMLLinkElement | null {
 
 // ---------------------------------------------------- call-head marks
 
-interface HeadMark {
-  from: number;
-  to: number;
-  group: string;
-}
-
-const setHeads = StateEffect.define<HeadMark[]>();
-
-const headField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(set, tr) {
-    let next = set.map(tr.changes);
-    for (const e of tr.effects) {
-      if (!e.is(setHeads)) continue;
-      const ranges: Range<Decoration>[] = e.value
-        .filter((m) => m.to > m.from)
-        .map((m) =>
-          Decoration.mark({ class: 'params-call-head', attributes: { 'data-group': m.group } }).range(m.from, m.to),
-        );
-      next = Decoration.set(ranges, true);
-    }
-    return next;
-  },
-  provide: (f) => EditorView.decorations.from(f),
-});
-
 // ------------------------------------------------------------ the area
 
 export interface ParamsOptions {
@@ -125,7 +98,7 @@ export class ParamsArea {
   private readonly setTab: Setter<ParamsTab>;
   private readonly setGroups: Setter<GroupView[]>;
   private readonly disposeView: () => void;
-  private disposeEditorView: (() => void) | null = null;
+  private disposeHostView: (() => void) | null = null;
   private readonly offs: (() => void)[] = [];
   private readonly stylesheet: HTMLLinkElement | null;
   private evalRev = 0;
@@ -183,23 +156,26 @@ export class ParamsArea {
       }),
     );
 
-    const view = deps.code?.view;
-    if (view) {
-      view.dispatch({
-        effects: StateEffect.appendConfig.of([
-          headField,
-          EditorView.domEventHandlers({
-            click: (ev) => {
-              const t = ev.target instanceof Element ? ev.target.closest('.params-call-head') : null;
-              const id = t?.getAttribute('data-group');
-              if (!id || this.disposed) return false;
-              this.showTab('editors');
-              this.open(id);
-              return false;
-            },
-          }),
-        ]),
-      });
+    const surface = deps.code?.surface;
+    if (surface) {
+      let down: { x: number; y: number; pointerId: number; primary: boolean; numeric: boolean } | null = null;
+      this.offs.push(surface.onPointer((event) => {
+        if (event.type === 'pointerdown') {
+          down = { x: event.clientX, y: event.clientY, pointerId: event.pointerId,
+            primary: event.button === 0 && event.isPrimary !== false,
+            numeric: (event as PointerEvent & { vactrNumericGesture?: boolean }).vactrNumericGesture === true };
+          return;
+        }
+        if (event.type !== 'pointerup' || !down || down.pointerId !== event.pointerId) return;
+        const start = down; down = null;
+        if (!start.primary || start.numeric || this.disposed || surface.compositionRange || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) return;
+        const pos = surface.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos === null) return;
+        const head = (surface as HeadlessCodeSurface).annotationRanges().find((range) => range.kind === 'call-head' && range.from <= pos && pos <= range.to);
+        if (!head?.label) return;
+        this.showTab('editors');
+        this.open(head.label);
+      }));
     }
     this.refresh(true);
   }
@@ -219,7 +195,7 @@ export class ParamsArea {
     const decl = found.decl && (kind === undefined || kind === found.kind) ? found.decl : undefined;
     const handles = makeHandles(group, decl, this.host);
     const doc = this.el.ownerDocument;
-    this.disposeEditorView = render(() => createComponent(EditorHostView, {
+    this.disposeHostView = render(() => createComponent(EditorHostView, {
       title: `${group.name} ${group.ordinal} - ${k}`, kind: k,
     }), this.editorEl);
     const body = this.editorEl.querySelector('.params-kind') as HTMLElement;
@@ -242,8 +218,8 @@ export class ParamsArea {
   close(): void {
     this.current?.view.dispose();
     this.current = null;
-    this.disposeEditorView?.();
-    this.disposeEditorView = null;
+    this.disposeHostView?.();
+    this.disposeHostView = null;
   }
 
   showTab(tab: ParamsTab): void {
@@ -256,7 +232,7 @@ export class ParamsArea {
     this.close();
     this.grid.dispose();
     this.roll.dispose();
-    this.deps.code?.view.dispatch({ effects: setHeads.of([]) });
+    this.deps.code?.surface.annotate('params-heads', []);
     this.disposeView();
     this.el.remove();
     this.stylesheet?.remove();
@@ -297,12 +273,12 @@ export class ParamsArea {
   private markHeads(): void {
     const code = this.deps.code;
     if (!code) return;
-    const marks: HeadMark[] = [];
+    const marks: { from: number; to: number; kind: 'call-head'; className: string; label: string }[] = [];
     for (const g of this.all) {
       const r = code.mapWireSpan(g.head, this.evalRev);
-      if (r) marks.push({ ...r, group: g.id });
+      if (r && r.to > r.from) marks.push({ ...r, kind: 'call-head', className: 'params-call-head', label: g.id });
     }
-    code.view.dispatch({ effects: setHeads.of(marks.sort((a, b) => a.from - b.from)) });
+    code.surface.annotate('params-heads', marks.sort((a, b) => a.from - b.from || a.to - b.to));
   }
 
   /** The current text of the group's top-level form (read only; the sampler's bank). */
@@ -311,7 +287,7 @@ export class ParamsArea {
     const form = this.deps.store.forms(this.file)[group.form];
     if (!code || !form) return null;
     const r = code.mapWireSpan(form.span, this.evalRev);
-    return r ? code.view.state.sliceDoc(r.from, r.to) : null;
+    return r ? code.surface.state.sliceDoc(r.from, r.to) : null;
   }
 }
 

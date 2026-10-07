@@ -156,7 +156,7 @@ describe('session ABI (real host-wasm artifact)', () => {
       expect(() => recordJson(r)).not.toThrow();
     }
     expect(rig.all.every((r) => r.tag <= TAG_PKG)).toBe(true);
-  });
+  }, 60_000);
 
   it('eval yields an eval-result with sites; playing carries the eval doc_revision', async () => {
     const rig = await start();

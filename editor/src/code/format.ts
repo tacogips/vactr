@@ -1,5 +1,5 @@
-import type { Extension } from '@codemirror/state';
-import { keymap, type EditorView } from '@codemirror/view';
+import { Transaction } from '@codemirror/state';
+import type { CodeSurface } from '../app/apis';
 import { minimalChange, type Formatter } from './format-core';
 
 export { WasmFormatter, minimalChange } from './format-core';
@@ -7,16 +7,17 @@ export type { Formatter, FormatResult } from './format-core';
 
 export const FORMAT_KEY = 'Shift-Alt-f';
 
-export async function formatDocument(view: EditorView, formatter: Formatter): Promise<boolean> {
-  const before = view.state.doc.toString();
+export async function formatDocument(surface: CodeSurface, formatter: Formatter): Promise<boolean> {
+  if (surface.compositionRange) return false;
+  const before = surface.state.doc.toString();
   try {
     const result = await formatter.format(before);
-    if (result.status !== 0 || result.text === before || view.state.doc.toString() !== before) return false;
+    if (result.status !== 0 || result.text === before || surface.compositionRange || surface.state.doc.toString() !== before) return false;
     const change = minimalChange(before, result.text);
     if (!change) return false;
-    view.dispatch({
+    surface.dispatch({
       changes: change,
-      userEvent: 'format',
+      annotations: Transaction.userEvent.of('format'),
     });
     return true;
   } catch {
@@ -24,16 +25,14 @@ export async function formatDocument(view: EditorView, formatter: Formatter): Pr
   }
 }
 
-export function formatKeymap(formatter: () => Formatter | undefined): Extension {
-  return keymap.of([
-    {
-      key: FORMAT_KEY,
-      run: (view) => {
-        const current = formatter();
-        if (!current) return false;
-        void formatDocument(view, current);
-        return true;
-      },
+export function formatKeymap(surface: CodeSurface, formatter: () => Formatter | undefined): () => void {
+  return surface.addKeymap([{
+    key: FORMAT_KEY,
+    run: () => {
+      const current = formatter();
+      if (!current || surface.compositionRange) return false;
+      void formatDocument(surface, current);
+      return true;
     },
-  ]);
+  }], 'default');
 }

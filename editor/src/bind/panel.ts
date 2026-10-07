@@ -30,6 +30,10 @@ export const GROUPS: readonly [SiteOrigin, string][] = [
   ['inst-default', 'Inst defaults'],
 ];
 
+export const PANEL_ROW_HEIGHT = 32;
+export const PANEL_OVERSCAN_ROWS = 8;
+export interface PanelViewport { top: number; height: number; headerHeight?: number }
+
 export interface PanelHost {
   store: Store;
   table: SiteTable;
@@ -44,6 +48,8 @@ export interface PanelHost {
   commit(e: SiteEntry): void;
   /** Test seam: called after every row render. */
   onRender?(key: string, el: HTMLElement): void;
+  /** Test seam for deterministic viewport virtualization. */
+  viewport?(): PanelViewport;
 }
 
 interface Row {
@@ -70,10 +76,24 @@ export class SliderPanel {
   readonly el: HTMLElement;
   private readonly host: PanelHost;
   private readonly groups = new Map<SiteOrigin, HTMLElement>();
+  private readonly groupHeaders = new Map<SiteOrigin, HTMLElement>();
+  private readonly groupTop = new Map<SiteOrigin, HTMLElement>();
+  private readonly groupBottom = new Map<SiteOrigin, HTMLElement>();
+  private readonly model = new Map<SiteOrigin, string[]>();
+  private readonly mountedOrder = new Map<SiteOrigin, string[]>();
   private readonly namesEl: HTMLElement;
+  private readonly namesTop: HTMLElement;
+  private readonly namesBottom: HTMLElement;
+  private modelNames: string[] = [];
   private readonly rows = new Map<string, Row>();
   private readonly nameRows = new Map<string, ValueRow>();
   private readonly renders = new Map<string, number>();
+  private readonly scrollContainer: HTMLElement | null;
+  private observer: ResizeObserver | null = null;
+  private frame: number | null = null;
+  private rowHeight = PANEL_ROW_HEIGHT;
+  private disposed = false;
+  private readonly removeViewportListeners: (() => void)[] = [];
 
   constructor(parent: HTMLElement, host: PanelHost) {
     this.host = host;
@@ -87,17 +107,43 @@ export class SliderPanel {
       g.dataset.origin = origin;
       const h = doc.createElement('h3');
       h.textContent = title;
+      const top = doc.createElement('div'); top.className = 'bind-spacer'; top.dataset.edge = 'top';
+      const bottom = doc.createElement('div'); bottom.className = 'bind-spacer'; bottom.dataset.edge = 'bottom';
       g.appendChild(h);
+      g.append(top, bottom);
       this.groups.set(origin, g);
+      this.groupHeaders.set(origin, h);
+      this.groupTop.set(origin, top);
+      this.groupBottom.set(origin, bottom);
+      this.model.set(origin, []);
+      this.mountedOrder.set(origin, []);
       this.el.appendChild(g);
     }
     this.namesEl = doc.createElement('div');
     this.namesEl.className = 'bind-names';
     const h = doc.createElement('h3');
     h.textContent = 'Values';
-    this.namesEl.appendChild(h);
+    this.namesTop = doc.createElement('div'); this.namesTop.className = 'bind-spacer'; this.namesTop.dataset.edge = 'top';
+    this.namesBottom = doc.createElement('div'); this.namesBottom.className = 'bind-spacer'; this.namesBottom.dataset.edge = 'bottom';
+    this.namesEl.append(h, this.namesTop, this.namesBottom);
     this.el.appendChild(this.namesEl);
     parent.appendChild(this.el);
+    this.scrollContainer = this.findScrollContainer();
+    if (!host.viewport && this.scrollContainer) {
+      const dirty = (): void => this.requestWindow();
+      this.scrollContainer.addEventListener('scroll', dirty, { passive: true });
+      this.removeViewportListeners.push(() => this.scrollContainer?.removeEventListener('scroll', dirty));
+      const view = doc.defaultView;
+      if (view?.ResizeObserver) {
+        this.observer = new view.ResizeObserver(dirty);
+        this.observer.observe(this.scrollContainer);
+      }
+      doc.fonts?.addEventListener('loadingdone', dirty);
+      this.removeViewportListeners.push(() => doc.fonts?.removeEventListener('loadingdone', dirty));
+      const coarse = typeof view?.matchMedia === 'function' ? view.matchMedia('(pointer: coarse)') : null;
+      coarse?.addEventListener?.('change', dirty);
+      this.removeViewportListeners.push(() => coarse?.removeEventListener?.('change', dirty));
+    }
   }
 
   /** Render counts per `binding:<id>` / `name:<n>` (tests). */
@@ -144,11 +190,8 @@ export class SliderPanel {
 
   /** Adds a value display for every stored name not shown yet. */
   addNames(): void {
-    for (const name of this.host.store.names().keys()) {
-      if (this.nameRows.has(name)) continue;
-      const nr = this.createNameRow(name);
-      this.renderName(nr);
-    }
+    this.modelNames = [...this.host.store.names().keys()];
+    this.updateWindow();
   }
 
   dispose(): void {
@@ -156,6 +199,12 @@ export class SliderPanel {
     for (const n of this.nameRows.values()) { n.off(); n.dispose(); }
     this.rows.clear();
     this.nameRows.clear();
+    this.disposed = true;
+    if (this.frame !== null) this.el.ownerDocument.defaultView?.cancelAnimationFrame(this.frame);
+    this.frame = null;
+    this.observer?.disconnect(); this.observer = null;
+    for (const remove of this.removeViewportListeners) remove();
+    this.removeViewportListeners.length = 0;
     this.el.remove();
   }
 
@@ -170,6 +219,11 @@ export class SliderPanel {
 
   private syncRows(render: Set<string>): void {
     const { table } = this.host;
+    const next = new Map<SiteOrigin, string[]>();
+    for (const [origin] of GROUPS) next.set(origin, []);
+    const entries = table.all().map((e) => ({ e, at: table.currentRange(e)?.from ?? Number.MAX_SAFE_INTEGER }));
+    entries.sort((a, b) => a.at - b.at);
+    for (const { e } of entries) next.get(e.site.origin)?.push(e.bindingId);
     for (const [id, row] of this.rows) {
       if (table.get(id)) continue;
       row.off();
@@ -177,26 +231,136 @@ export class SliderPanel {
       row.el.remove();
       this.rows.delete(id);
     }
-    const entries = table.all().map((e) => ({ e, at: table.currentRange(e)?.from ?? Number.MAX_SAFE_INTEGER }));
-    entries.sort((a, b) => a.at - b.at);
-    for (const { e } of entries) {
-      let row = this.rows.get(e.bindingId);
-      if (!row) {
-        row = this.createRow(e.bindingId);
-        render.delete(e.bindingId); // the Solid root rendered its initial state
-      }
-      const keys = this.keysOf(e.bindingId);
-      if (row.keys !== keys) {
-        this.subscribe(row, keys);
-        if (this.renderCount(`binding:${e.bindingId}`) > 1) render.add(e.bindingId);
-      }
-      // Re-appending moves the element into order; it is not a render.
-      this.groups.get(e.site.origin)?.appendChild(row.el);
+    for (const [origin, ids] of next) this.model.set(origin, ids);
+    for (const id of render) this.pendingRender.add(id);
+    if (this.host.viewport) this.updateWindow();
+    else this.requestWindow();
+  }
+
+  private pendingRender = new Set<string>();
+
+  private findScrollContainer(): HTMLElement | null {
+    const pane = this.el.closest<HTMLElement>('.pane-right');
+    if (pane) return pane;
+    for (let node = this.el.parentElement; node; node = node.parentElement) {
+      const overflow = this.el.ownerDocument.defaultView?.getComputedStyle(node).overflowY;
+      if (overflow === 'auto' || overflow === 'scroll') return node;
     }
-    for (const id of render) {
+    return this.el.parentElement;
+  }
+
+  private requestWindow(): void {
+    if (this.disposed || this.frame !== null) return;
+    const view = this.el.ownerDocument.defaultView;
+    if (!view) return;
+    this.frame = view.requestAnimationFrame(() => { this.frame = null; this.updateWindow(); });
+  }
+
+  private viewport(): PanelViewport {
+    const seam = this.host.viewport?.();
+    if (seam) return seam;
+    const container = this.scrollContainer;
+    if (!container) return { top: 0, height: 0 };
+    const panelRect = this.el.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return {
+      top: containerRect.top + container.clientTop - panelRect.top,
+      height: container.clientHeight,
+    };
+  }
+
+  private updateWindow(): void {
+    if (this.disposed) return;
+    const viewport = this.viewport();
+    const measuredRow = this.rows.values().next().value as Row | undefined;
+    if (!this.host.viewport && measuredRow) {
+      const measured = measuredRow.el.offsetHeight;
+      this.rowHeight = measured > 0 ? measured : PANEL_ROW_HEIGHT;
+    }
+    const rowHeight = this.rowHeight > 0 ? this.rowHeight : PANEL_ROW_HEIGHT;
+    const headerHeight = viewport.headerHeight ?? 0;
+    const measuredHeaders = new Map<SiteOrigin, number>();
+    if (!this.host.viewport) for (const [origin] of GROUPS) measuredHeaders.set(origin, this.groupHeaders.get(origin)?.offsetHeight ?? 0);
+    let groupOrigin = 0;
+    for (const [origin] of GROUPS) {
+      const ids = this.model.get(origin) ?? [];
+      const groupHeader = this.host.viewport ? headerHeight : measuredHeaders.get(origin) ?? 0;
+      const contentOrigin = groupOrigin + groupHeader;
+      const start = Math.max(0, Math.floor((viewport.top - contentOrigin) / rowHeight) - PANEL_OVERSCAN_ROWS);
+      const end = Math.min(ids.length, Math.ceil((viewport.top + viewport.height - contentOrigin) / rowHeight) + PANEL_OVERSCAN_ROWS);
+      this.mountGroup(origin, ids, start, Math.max(start, end), rowHeight);
+      groupOrigin = contentOrigin + ids.length * rowHeight;
+    }
+    const nameOrigin = groupOrigin;
+    const nameStart = Math.max(0, Math.floor((viewport.top - nameOrigin - headerHeight) / rowHeight) - PANEL_OVERSCAN_ROWS);
+    const nameEnd = Math.min(this.modelNames.length, Math.ceil((viewport.top + viewport.height - nameOrigin - headerHeight) / rowHeight) + PANEL_OVERSCAN_ROWS);
+    this.mountNames(nameStart, Math.max(nameStart, nameEnd), rowHeight);
+    this.pendingRender.clear();
+  }
+
+  private mountGroup(origin: SiteOrigin, ids: string[], start: number, end: number, rowHeight: number): void {
+    const group = this.groups.get(origin)!;
+    const selected = ids.slice(start, end);
+    const selectedSet = new Set(selected);
+    for (const id of this.mountedOrder.get(origin) ?? []) {
+      if (selectedSet.has(id)) continue;
       const row = this.rows.get(id);
-      if (row) this.renderRow(row);
+      if (row) { row.off(); row.dispose(); row.el.remove(); this.rows.delete(id); }
     }
+    const renderIds = this.pendingRender;
+    for (const id of selected) {
+      let row = this.rows.get(id);
+      if (!row) {
+        row = this.createRow(id);
+        const keys = this.keysOf(id);
+        this.subscribe(row, keys);
+        renderIds.delete(id);
+      } else {
+        const keys = this.keysOf(id);
+        if (row.keys !== keys) { this.subscribe(row, keys); renderIds.add(id); }
+      }
+    }
+    const prior = this.mountedOrder.get(origin) ?? [];
+    const unchanged = prior.length === selected.length && prior.every((id, i) => id === selected[i]);
+    const top = this.groupTop.get(origin)!; const bottom = this.groupBottom.get(origin)!;
+    top.style.height = `${start * rowHeight}px`;
+    bottom.style.height = `${(ids.length - end) * rowHeight}px`;
+    const groupEl = group as HTMLElement & { dataset: DOMStringMap };
+    if (ids.length === 0) groupEl.dataset.empty = ''; else delete groupEl.dataset.empty;
+    if (!unchanged) {
+      let anchor: Node = bottom;
+      for (let i = selected.length - 1; i >= 0; i -= 1) {
+        const row = this.rows.get(selected[i] as string)!;
+        if (row.el.parentNode !== group || row.el.nextSibling !== anchor) group.insertBefore(row.el, anchor);
+        anchor = row.el;
+      }
+    }
+    if (bottom.parentNode !== group) group.appendChild(bottom);
+    this.mountedOrder.set(origin, selected);
+    for (const id of [...renderIds]) {
+      if (!selectedSet.has(id)) continue;
+      const row = this.rows.get(id); if (row) this.renderRow(row);
+      renderIds.delete(id);
+    }
+  }
+
+  private mountNames(start: number, end: number, rowHeight: number): void {
+    const selected = this.modelNames.slice(start, end);
+    const selectedSet = new Set(selected);
+    for (const [name, row] of this.nameRows) {
+      if (selectedSet.has(name)) continue;
+      row.off(); row.dispose(); row.el.remove(); this.nameRows.delete(name);
+    }
+    for (const name of selected) if (!this.nameRows.has(name)) this.createNameRow(name);
+    this.namesTop.style.height = `${start * rowHeight}px`;
+    this.namesBottom.style.height = `${(this.modelNames.length - end) * rowHeight}px`;
+    let anchor: Node = this.namesBottom;
+    for (let i = selected.length - 1; i >= 0; i -= 1) {
+      const row = this.nameRows.get(selected[i] as string)!;
+      if (row.el.parentNode !== this.namesEl || row.el.nextSibling !== anchor) this.namesEl.insertBefore(row.el, anchor);
+      anchor = row.el;
+    }
+    if (this.modelNames.length === 0) this.namesEl.dataset.empty = ''; else delete this.namesEl.dataset.empty;
   }
 
   private subscribe(row: Row, keys: string): void {
@@ -281,10 +445,10 @@ export class SliderPanel {
     const [state, setState] = createSignal(this.nameState(name));
     const dispose = render(() => createComponent(NameRow, { name, state }), holder);
     const el = holder.firstElementChild as HTMLElement;
-    this.namesEl.appendChild(el);
     const row: ValueRow = { name, el, setState, dispose, off: () => {} };
     row.off = this.host.store.subscribe([nameKey(name)], () => this.renderName(row));
     this.nameRows.set(name, row);
+    this.count(`name:${name}`, row.el);
     return row;
   }
 

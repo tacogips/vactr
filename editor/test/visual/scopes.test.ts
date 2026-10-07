@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Store } from '../../src/protocol/store';
 import type { LevelsBody } from '../../src/protocol/types';
 import { AnalyzerArea } from '../../src/visual/meters';
-import { decodeRing, scopeSamples, SPECTROGRAM_RING } from '../../src/visual/scopes';
+import { decodeRing, pickFrame, scopeSamples, SPECTROGRAM_RING, type TimedLevels } from '../../src/visual/scopes';
 import { mountSpectrum } from '../../src/visual/spectrum';
 import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 
@@ -84,6 +84,17 @@ describe('ring decoding', () => {
     expect(new Set(colors).size).toBe(1);
     expect(colors[0]).not.toBe(brightest[0]);
     area.dispose();
+  });
+});
+
+describe('timestamped scope frame selection', () => {
+  const frame = (time: number): TimedLevels => ({ body: { time, levels: [], analyzers: [] }, receivedAt: time + 10 });
+
+  it('picks newest time not later than audible t and hides samples older than two seconds', () => {
+    const frames = [frame(1), frame(1.1), frame(1.2)];
+    expect(pickFrame(frames, 1.15)?.time).toBe(1.1);
+    expect(pickFrame(frames, 3.5)).toBeNull();
+    expect(pickFrame(frames, 1)).toBe(frames[0]?.body);
   });
 });
 

@@ -1,6 +1,9 @@
-import { EditorState, Text } from '@codemirror/state';
+import { ChangeSet, EditorState, Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentSync } from '../../src/code/sync';
+import { CodeSurface } from '../../src/code/surface';
+import { Utf8Index } from '../../src/protocol/utf8';
+import { LineBytes, LineTable } from '../../src/code/line-bytes';
 import { Client } from '../../src/protocol/client';
 import { DOC_DEBOUNCE_MS } from '../../src/protocol/document';
 import { Store } from '../../src/protocol/store';
@@ -46,6 +49,36 @@ describe('DocumentSync', () => {
       edit_epoch: 1,
     });
     expect(sync.revision).toBe(2);
+  });
+
+  it('pins the current revision from line starts without a text read or table build', () => {
+    const { sync, state } = setup(Array.from({ length: 200 }, (_, i) => `line ${i}`).join('\n'));
+    const builds = LineTable.builds, indexBuilds = Utf8Index.builds;
+    const tableBytes = sync.history.indexBytes;
+    const toString = vi.spyOn(Text.prototype, 'toString');
+    expect(sync.pin('eval', sync.revision)).toBe(true);
+    expect(LineTable.builds).toBe(builds);
+    expect(Utf8Index.builds).toBe(indexBuilds);
+    expect(sync.history.indexBytes).toBe(tableBytes);
+    expect(toString).not.toHaveBeenCalled();
+    sync.unpin('eval');
+    expect(state().doc.lines).toBe(200);
+  });
+
+  it('keeps LineBytes line starts equal to LineTable after 50 edits', () => {
+    let text = Text.of(['a', '日本', '😀', '', 'tail']);
+    const bytes = new LineBytes(text);
+    for (let i = 0; i < 50; i += 1) {
+      const line = text.line((i % text.lines) + 1);
+      const at = line.from + Math.min(line.length, i % 3);
+      const changes = ChangeSet.of({ from: at, insert: i % 2 ? 'x' : '\n' }, text.length);
+      const next = changes.apply(text);
+      bytes.update(changes, text, next); text = next;
+      const starts = bytes.starts(), table = LineTable.build(text);
+      expect(starts.length).toBe(text.lines + 1);
+      for (let n = 1; n <= text.lines; n += 1) expect(starts[n - 1]).toBe(table.toByte(text.line(n).from));
+      expect(starts[starts.length - 1]).toBe(table.byteLength);
+    }
   });
 
   it('gives a zero-length dirty span at a pure deletion of multi-byte text', () => {
@@ -107,5 +140,85 @@ describe('DocumentSync', () => {
     vi.advanceTimersByTime(DOC_DEBOUNCE_MS);
     expect(transport.sent).toHaveLength(0);
     expect(sync.revision).toBe(1);
+  });
+
+  it('matches Utf8Index for seeded Unicode edits, multi-change transactions, undo and redo', () => {
+    const initialText = Text.of(['ASCII 日本 🎹', '', 'z'.repeat(100_000), 'tail']);
+    const transport = new RecordingTransport();
+    const client = new Client(transport, { store: new Store(), now: () => Date.now() });
+    const sync = new DocumentSync(client.document('random.vact'), initialText);
+    const surface = new CodeSurface({ sync });
+    let latest: { changes: import('@codemirror/state').ChangeSet; doc: Text } | null = null;
+    surface.subscribe((update) => { if (update.docChanged) latest = { changes: update.changes, doc: update.state.doc }; });
+    let seed = 0x51a7;
+    const random = (max: number): number => { seed = (1664525 * seed + 1013904223) >>> 0; return seed % max; };
+    const inserts = ['', 'x', '日本', '🎹', '\n', 'é\n尾'];
+    const assertLastChange = (base: Text, changes: import('@codemirror/state').ChangeSet) => {
+      const edits: { from: number; to: number; insert: string }[] = [];
+      changes.iterChanges((from, to, _fromB, _toB, inserted) => edits.push({ from, to, insert: inserted.toString() }));
+      const expected = new Utf8Index(base.toString()).changes(edits);
+      vi.advanceTimersByTime(DOC_DEBOUNCE_MS);
+      const event = transport.of('doc-changed').at(-1);
+      expect(event?.body.changes).toEqual(expected.changes);
+      expect(event?.body.dirty).toEqual(expected.dirty);
+    };
+
+    for (let i = 0; i < 200; i += 1) {
+      const base = surface.state.doc;
+      const first = random(base.length + 1);
+      const specs: { from: number; to: number; insert: string }[] = [{
+        from: first,
+        to: i % 4 === 0 ? Math.min(base.length, first + 1 + random(4)) : first,
+        insert: inserts[random(inserts.length)]!,
+      }];
+      if (i % 9 === 0 && base.length > 4) {
+        const second = Math.max(0, Math.min(base.length - 1, first > base.length / 2 ? first - 3 : first + 3));
+        if (Math.abs(second - first) > 1) specs.push({ from: second, to: second, insert: inserts[random(inserts.length)]! });
+      }
+      specs.sort((left, right) => left.from - right.from);
+      const tr = surface.state.update({ changes: specs });
+      if (!tr.docChanged) continue;
+      surface.dispatch(tr);
+      assertLastChange(base, tr.changes);
+    }
+
+    for (const operation of ['undo', 'redo'] as const) {
+      const base = surface.state.doc;
+      latest = null;
+      expect(surface[operation]()).toBe(true);
+      expect(latest).not.toBeNull();
+      assertLastChange(base, latest!.changes);
+    }
+    surface.dispose();
+  }, 30_000);
+
+  it('rebuilds a stale Text identity without whole-document string or oversized slice work', () => {
+    const initial = Text.of(['a'.repeat(100_000)]);
+    const replacement = Text.of(['b'.repeat(100_000)]);
+    const transport = new RecordingTransport();
+    const client = new Client(transport, { store: new Store(), now: () => Date.now() });
+    const sync = new DocumentSync(client.document('reset.vact'), initial);
+    const state = EditorState.create({ doc: replacement });
+    const tr = state.update({ changes: { from: 50_000, to: 50_001, insert: '日本🎹' } });
+    const sourceProto = Object.getPrototypeOf(replacement) as { toString: () => string; sliceString: (from: number, to?: number) => string };
+    const stringify = vi.spyOn(sourceProto, 'toString');
+    const slices = vi.spyOn(sourceProto, 'sliceString');
+    sync.apply(tr);
+    expect(stringify.mock.contexts.some((doc) => (doc as Text).length > 65_536)).toBe(false);
+    expect(slices.mock.calls.every(([from, to]) => (to ?? Infinity) - from <= 65_536)).toBe(true);
+    vi.advanceTimersByTime(DOC_DEBOUNCE_MS);
+    expect(transport.of('doc-changed')[0]?.body.changes).toEqual([{ from: 50_000, to: 50_001, insert_len: 10 }]);
+    stringify.mockRestore();
+    slices.mockRestore();
+  });
+
+  it('maps an edit endpoint inside a surrogate pair to the pair start byte', () => {
+    const base = 'a🎹b';
+    const { transport, sync, change } = setup(base);
+    expect(new Utf8Index(base).toByte(2)).toBe(1);
+    change({ from: 2, insert: 'x' });
+    vi.advanceTimersByTime(DOC_DEBOUNCE_MS);
+    expect(transport.of('doc-changed')[0]?.body.changes).toEqual([{ from: 1, to: 1, insert_len: 1 }]);
+    expect(sync.revision).toBe(2);
   });
 });

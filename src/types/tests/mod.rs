@@ -20,6 +20,7 @@ mod masks;
 mod natives;
 mod no_abort;
 mod scope;
+mod scope_cost;
 mod sound;
 mod ty;
 

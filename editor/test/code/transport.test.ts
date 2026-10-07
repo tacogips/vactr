@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { EditorDeps, Mounted } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
+import { AudibleClock } from '../../src/app/clock';
 import { DOC_FILE, mount } from '../../src/code/mount';
 import { TransportBar, clockStatus, formatLevel } from '../../src/code/transport';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
-import type { TempoBody, WirePlaying } from '../../src/protocol/types';
+import type { TempoBody, TransportSample, WirePlaying } from '../../src/protocol/types';
 import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
@@ -27,6 +28,88 @@ const tempo = (extra: Partial<TempoBody> = {}): TempoBody => ({ bpm: 120, beats_
 const play = (slot: string, time: number): WirePlaying => ({ slot, beat: [0, 1], time, dur: [1, 4] });
 
 describe('TransportBar', () => {
+  it('projects the current transport sample at audible time and hides stale positions', () => {
+    const clock = new MockClock(10);
+    let audibleTime = 10.04;
+    let correlationValid = true;
+    let sample: TransportSample = {
+      epoch: 'run-1', sample_time: 10, cycle: [2, 1], bpm: 120, beats_per_cycle: 4,
+      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+    };
+    const client = new Client(new RecordingTransport());
+    const parent = document.createElement('div'); document.body.appendChild(parent);
+    const bar = new TransportBar(parent, { client, clock,
+      audible: new AudibleClock({ at: () => correlationValid
+        ? { time: audibleTime, uncertainty: 0, provenance: 'measured' } : null }),
+      sample: () => sample });
+    const position = parent.querySelector<HTMLElement>('.vact-position');
+    bar.tick(0);
+    expect(bar.state.cycle).toBeCloseTo(2.02);
+    expect(bar.state.beatFlash).toBe(true);
+    expect(position?.dataset.sync).toBe('visible');
+    expect(position?.dataset.beatFlash).toBe('on');
+    audibleTime = 12.01;
+    bar.tick(16.7);
+    expect(bar.state).toEqual({ cycle: null, beatFlash: false, hidden: true });
+    expect(position?.dataset.sync).toBe('hidden');
+    sample = { ...sample, sample_time: 12.01, running: false };
+    audibleTime = 12.01;
+    bar.tick(33.4);
+    expect(bar.state.hidden).toBe(false);
+    correlationValid = false;
+    bar.tick(50.1);
+    expect(bar.state).toEqual({ cycle: null, beatFlash: false, hidden: true });
+    expect(position?.dataset.beatFlash).toBe('off');
+    correlationValid = true;
+    audibleTime = 12.02;
+    bar.tick(66.8);
+    expect(bar.state.hidden).toBe(false);
+    bar.dispose();
+  });
+
+  it('tracks analytic cycle and beat windows through five minutes of frame drops and stalls', () => {
+    const clock = new MockClock();
+    const client = new Client(new RecordingTransport());
+    const parent = document.createElement('div'); document.body.appendChild(parent);
+    const audible = new AudibleClock({ at: (pageMs) => ({
+      time: pageMs / 1000, uncertainty: 0, provenance: 'measured',
+    }) });
+    let sample: TransportSample = {
+      epoch: 'run-1', sample_time: 0, cycle: [0, 1], bpm: 120, beats_per_cycle: 4,
+      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+    };
+    const bar = new TransportBar(parent, { client, clock, audible, sample: () => sample });
+    const beatDuration = 0.5;
+    let frameMs = 0;
+    let nextStallMs = 10000;
+    let random = 0x13579bdf;
+    let expectedFlashes = 0;
+    let actualFlashes = 0;
+    while (frameMs < 300000) {
+      random = (random * 1664525 + 1013904223) >>> 0;
+      frameMs += (1000 / 60) * (2 + (random % 3));
+      if (frameMs >= nextStallMs) {
+        frameMs += 250;
+        nextStallMs += 10000;
+      }
+      const targetTime = audible.sample(frameMs).time;
+      sample = {
+        ...sample,
+        sample_time: targetTime - 0.05,
+        cycle: [(targetTime - 0.05) / 2, 1],
+      };
+      bar.tick(frameMs);
+      expect(bar.state.cycle).toBeCloseTo(targetTime / 2, 9);
+      const beatStart = Math.floor(targetTime / beatDuration) * beatDuration;
+      const expectedFlash = targetTime >= beatStart && targetTime < beatStart + 0.08;
+      expect(bar.state.beatFlash).toBe(expectedFlash);
+      if (expectedFlash) expectedFlashes += 1;
+      if (bar.state.beatFlash) actualFlashes += 1;
+    }
+    expect(actualFlashes).toBe(expectedFlashes);
+    bar.dispose();
+  });
+
   it('renders tempo and extrapolates cycle/beat on the clock between messages', () => {
     const { clock, bar, text, label } = setup();
     bar.onTempo(tempo());
@@ -126,7 +209,7 @@ describe('code area mount', () => {
     const code = deps.code;
     expect(code).toBeDefined();
     expect(transport.sent).toEqual([]);
-    expect(layout.code.querySelector('.cm-editor')).not.toBeNull();
+    expect(layout.code.querySelector('canvas.vact-code-canvas')).not.toBeNull();
     expect(layout.code.querySelector('.vact-samples')).not.toBeNull();
     transport.emit({ kind: 'tempo', body: tempo({ bpm: 140 }) });
     expect(layout.transport.querySelector('.vact-tempo')?.getAttribute('aria-label')).toBe('tempo 140.0 bpm');
@@ -135,7 +218,7 @@ describe('code area mount', () => {
     m.dispose();
     mounted.length = 0;
     expect(deps.code).toBeUndefined();
-    expect(layout.code.querySelector('.cm-editor')).toBeNull();
+    expect(layout.code.querySelector('canvas.vact-code-canvas')).toBeNull();
   });
 
   it('implements CodeApi: revisions, span mapping and the selected site', () => {
@@ -143,7 +226,7 @@ describe('code area mount', () => {
     const code = deps.code;
     if (!code) throw new Error('no code api');
     const text = 'lpf 800 # ö\ngain 0.5';
-    code.view.dispatch({ changes: { from: 0, insert: text } });
+    code.surface.dispatch({ changes: { from: 0, insert: text } });
     expect(code.currentRevision(DOC_FILE)).toBe(2);
     expect(code.currentRevision('other.vact')).toBe(0);
     const enc = new TextEncoder();
@@ -165,16 +248,16 @@ describe('code area mount', () => {
         directives: { file_level: {}, entries: [] },
       },
     });
-    code.view.dispatch({ selection: { anchor: text.indexOf('0.5') + 1 } });
+    code.surface.dispatch({ selection: { anchor: text.indexOf('0.5') + 1 } });
     expect(code.selectedSiteId()).toBe(9);
-    code.view.dispatch({ selection: { anchor: text.indexOf('800') } });
+    code.surface.dispatch({ selection: { anchor: text.indexOf('800') } });
     expect(code.selectedSiteId()).toBe(7);
-    code.view.dispatch({ selection: { anchor: text.indexOf('#') } });
+    code.surface.dispatch({ selection: { anchor: text.indexOf('#') } });
     expect(code.selectedSiteId()).toBeNull();
     // An insertion above keeps the mapping; the revision moves on.
-    code.view.dispatch({ changes: { from: 0, insert: '# 日本\n' } });
+    code.surface.dispatch({ changes: { from: 0, insert: '# 日本\n' } });
     const r = code.mapWireSpan(at('0.5'), 2);
-    expect(code.view.state.doc.sliceString(r?.from ?? 0, r?.to ?? 0)).toBe('0.5');
+    expect(code.surface.state.doc.sliceString(r?.from ?? 0, r?.to ?? 0)).toBe('0.5');
     expect(code.currentRevision(DOC_FILE)).toBe(3);
     expect(code.samples.frames('bd', 0)).toBeNull();
     code.samples.openBrowser('bd');

@@ -4,10 +4,10 @@
 // resolve against the event's own (earlier) doc_revision.
 
 import { moveLineDown } from '@codemirror/commands';
-import { EditorState, Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { Text } from '@codemirror/state';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HighlightScheduler, highlightExtension, playingRanges, setPlaying } from '../../src/code/highlight';
+import { HighlightScheduler } from '../../src/code/highlight';
+import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
 import { Client } from '../../src/protocol/client';
 import type { WirePlaying } from '../../src/protocol/types';
@@ -15,27 +15,25 @@ import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
 const enc = new TextEncoder();
-const views: EditorView[] = [];
+const views: CodeSurface[] = [];
 afterEach(() => {
-  for (const v of views.splice(0)) v.destroy();
+  for (const v of views.splice(0)) v.dispose();
 });
+const playingRanges = (surface: CodeSurface) => surface.annotationRanges().filter((range) => range.kind === 'playing');
 
 function setup(text: string) {
   const clock = new MockClock(0);
   const client = new Client(new RecordingTransport());
   const initial = Text.of(text.split('\n'));
   const sync = new DocumentSync(client.document('main.vact'), initial);
-  const view = new EditorView({
-    parent: document.body,
-    state: EditorState.create({ doc: initial, extensions: [sync.extension(), highlightExtension()] }),
-  });
+  const view = new CodeSurface({ sync });
   views.push(view);
   const sched = new HighlightScheduler({
     clock,
     file: 'main.vact',
     map: (span, rev) => sync.mapWireSpan(span, rev),
     tempo: () => ({ bpm: 120, beats_per_cycle: 4, cycle: [0, 1] }),
-    apply: (ranges) => view.dispatch({ effects: setPlaying.of(ranges) }),
+    apply: (ranges) => view.annotate('playing', ranges.map((range) => ({ ...range, kind: 'playing' }))),
   });
   const shown = (): string[] => {
     sched.tick();
@@ -100,7 +98,8 @@ describe('highlight reconciliation (criterion 10)', () => {
     expect(shown()).toEqual(['bd', 'hh']);
     // The editor's own reorder: the cursor form moves below the next one.
     view.dispatch({ selection: { anchor: 1 } });
-    expect(moveLineDown(view)).toBe(true);
+    const commandView = { get state() { return view.state; }, dispatch: (tr: Parameters<typeof view.dispatch>[0]) => view.dispatch(tr) };
+    expect(moveLineDown(commandView as Parameters<typeof moveLineDown>[0])).toBe(true);
     expect(view.state.doc.toString()).toBe(`${b}\n${a}`);
     // The moved form keeps its highlight at its new position. The line it
     // jumped over is re-typed by the command (a change over its text), so

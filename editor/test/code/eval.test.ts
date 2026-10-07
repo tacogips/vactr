@@ -1,7 +1,7 @@
-import { EditorState, Text } from '@codemirror/state';
-import { EditorView, runScopeHandlers } from '@codemirror/view';
+import { Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EvalController, FLASH_CLASS, FLASH_ERROR_CLASS, FLASH_MS, flashes, formSpanAt } from '../../src/code/eval';
+import { EvalController, FLASH_CLASS, FLASH_ERROR_CLASS, FLASH_MS, formSpanAt } from '../../src/code/eval';
+import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
@@ -39,7 +39,7 @@ describe('formSpanAt', () => {
   });
 });
 
-const views: EditorView[] = [];
+const views: CodeSurface[] = [];
 
 function setup(text: string, respond?: (env: ClientEnvelope) => Scripted[]) {
   const transport = new RecordingTransport();
@@ -49,24 +49,28 @@ function setup(text: string, respond?: (env: ClientEnvelope) => Scripted[]) {
   const sync = new DocumentSync(client.document('main.vact'), initial);
   const onHush = vi.fn();
   const ctl = new EvalController({ client, sync, onHush });
-  const view = new EditorView({
-    parent: document.body,
-    state: EditorState.create({ doc: initial, extensions: [sync.extension(), ctl.extension()] }),
-  });
+  const view = new CodeSurface({ sync });
   views.push(view);
   ctl.attach(view);
+  const currentFlashes = new Map<string, { from: number; to: number; kind: 'eval'; className?: string }>();
+  ctl.onFlash((range, kind) => {
+    const key = `${range.from}:${range.to}`;
+    if (kind) currentFlashes.set(key, { ...range, kind: 'eval', className: kind }); else currentFlashes.delete(key);
+    view.annotate('eval-test', [...currentFlashes.values()]);
+  });
   return { transport, client, sync, ctl, view, onHush };
 }
 
-function key(view: EditorView, k: string, mods: { shift?: boolean } = {}): boolean {
+function key(view: CodeSurface, k: string, mods: { shift?: boolean } = {}): boolean {
   const ev = new KeyboardEvent('keydown', { key: k, ctrlKey: true, shiftKey: mods.shift === true, bubbles: true });
-  return runScopeHandlers(view, ev, 'editor');
+  return view.runKeymaps(ev);
 }
+const flashes = (surface: CodeSurface) => surface.annotationRanges().filter((range) => range.kind === 'eval').map((range) => ({ from: range.from, to: range.to, cls: range.className }));
 
 describe('EvalController', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
-    for (const v of views.splice(0)) v.destroy();
+    for (const v of views.splice(0)) v.dispose();
     vi.useRealTimers();
   });
 
@@ -118,7 +122,8 @@ describe('EvalController', () => {
     view.dispatch({ selection: { anchor: 9 } });
     key(view, 'Enter');
     expect(flashes(view)).toEqual([{ from: 8, to: 15, cls: FLASH_CLASS }]);
-    expect(view.dom.querySelector(`.${FLASH_CLASS}`)?.textContent).toBe('d1 "bd"');
+    const flash = view.annotationRanges().find((range) => range.kind === 'eval');
+    expect(view.state.doc.sliceString(flash?.from ?? 0, flash?.to ?? 0)).toBe('d1 "bd"');
     vi.advanceTimersByTime(FLASH_MS - 1);
     expect(flashes(view)).toHaveLength(1);
     vi.advanceTimersByTime(1);

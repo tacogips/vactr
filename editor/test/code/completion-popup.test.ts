@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { COMPLETION_USER_EVENT, type CompletionKey, type CompletionResult, type CompletionSource, type CompletionSurface, type SurfaceChange } from '../../src/code/completion-types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { COMPLETION_DEBOUNCE_MS, COMPLETION_USER_EVENT, type CompletionKey, type CompletionResult, type CompletionSource, type CompletionSurface, type SurfaceChange } from '../../src/code/completion-types';
 import { CompletionPopup } from '../../src/code/completion-popup';
 
 interface NodeFs {
@@ -41,6 +41,7 @@ class FakeSurface implements CompletionSurface {
   rect: { left: number; top: number; bottom: number } | null = { left: 12, top: 20, bottom: 40 };
   readonly host = document.createElement('div');
   readonly replaced: Array<[number, number, string]> = [];
+  textCalls = 0;
   readonly changeListeners = new Set<(change: SurfaceChange) => void>();
   readonly keyListeners = new Set<(key: CompletionKey) => boolean>();
   readonly blurListeners = new Set<() => void>();
@@ -51,8 +52,11 @@ class FakeSurface implements CompletionSurface {
   }
 
   text(): string {
+    this.textCalls += 1;
     return this.doc;
   }
+
+  version(): unknown { return this.doc; }
 
   selection(): { anchor: number; head: number } {
     return { anchor: this.anchor, head: this.head };
@@ -151,6 +155,8 @@ async function flush(): Promise<void> {
 
 const surfaces: FakeSurface[] = [];
 const popups: CompletionPopup[] = [];
+const advanceTyping = (): void => { vi.advanceTimersByTime(COMPLETION_DEBOUNCE_MS); };
+const advanceExplicit = (): void => { vi.advanceTimersByTime(0); };
 
 function setup(): { surface: FakeSurface; source: FakeSource; popup: CompletionPopup } {
   const surface = new FakeSurface();
@@ -161,16 +167,23 @@ function setup(): { surface: FakeSurface; source: FakeSource; popup: CompletionP
   return { surface, source, popup };
 }
 
+beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   for (const popup of popups.splice(0)) popup.dispose();
   for (const surface of surfaces.splice(0)) surface.host.remove();
+  vi.useRealTimers();
 });
 
 describe('CompletionPopup', () => {
   it('auto-requests only single identifier, colon and dot input and renders the listbox contract', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    expect(source.calls).toHaveLength(0);
+    vi.advanceTimersByTime(COMPLETION_DEBOUNCE_MS - 1);
+    expect(source.calls).toHaveLength(0);
+    vi.advanceTimersByTime(1);
     expect(source.calls).toHaveLength(1);
+    expect(surface.textCalls).toBe(1);
     expect(source.calls[0]).toMatchObject({ text: 'a', cursor: 1 });
     source.resolve(0, items());
     await flush();
@@ -197,6 +210,7 @@ describe('CompletionPopup', () => {
     surfaces.push(colonSurface);
     popups.push(colonPopup);
     colonSurface.type(':');
+    advanceTyping();
     expect(colonSource.calls).toHaveLength(1);
     colonPopup.dispose();
 
@@ -206,6 +220,7 @@ describe('CompletionPopup', () => {
     surfaces.push(dotSurface);
     popups.push(dotPopup);
     dotSurface.type('.');
+    advanceTyping();
     expect(dotSource.calls).toHaveLength(1);
     dotPopup.dispose();
   });
@@ -219,6 +234,26 @@ describe('CompletionPopup', () => {
     expect(source.calls).toHaveLength(0);
   });
 
+  it('coalesces five typing triggers and schedules Ctrl-Space in the next task', () => {
+    const { surface, source } = setup();
+    for (const [index, char] of [...'abcde'].entries()) {
+      surface.type(char);
+      if (index < 4) vi.advanceTimersByTime(30);
+    }
+    expect(source.calls).toHaveLength(0);
+    vi.advanceTimersByTime(COMPLETION_DEBOUNCE_MS - 1);
+    expect(source.calls).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(source.calls).toHaveLength(1);
+    expect(source.calls[0]?.text).toBe('abcde');
+
+    const explicit = setup();
+    expect(explicit.surface.emitKey('Ctrl-Space')).toBe(true);
+    expect(explicit.source.calls).toHaveLength(0);
+    advanceExplicit();
+    expect(explicit.source.calls).toHaveLength(1);
+  });
+
   it('does not consume keys while closed and Ctrl-Space requests only when available', () => {
     const { surface, source } = setup();
     for (const key of ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Enter', 'Tab', 'Escape'] as const) {
@@ -230,12 +265,14 @@ describe('CompletionPopup', () => {
     source.available = true;
     surface.type(' ');
     expect(surface.emitKey('Ctrl-Space')).toBe(true);
+    advanceExplicit();
     expect(source.calls).toHaveLength(1);
   });
 
   it('navigates with wrapping arrows and clamped pages, then accepts with Enter or Tab', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    advanceTyping();
     source.resolve(0, items(20));
     await flush();
     expect(surface.emitKey('ArrowDown')).toBe(true);
@@ -262,6 +299,7 @@ describe('CompletionPopup', () => {
 
     const second = setup();
     second.surface.type('x');
+    advanceTyping();
     second.source.resolve(0, items());
     await flush();
     expect(second.surface.emitKey('Tab')).toBe(true);
@@ -271,6 +309,7 @@ describe('CompletionPopup', () => {
   it('Escape closes and mousedown prevents focus loss and accepts the clicked item', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    advanceTyping();
     source.resolve(0, items());
     await flush();
     expect(surface.emitKey('Escape')).toBe(true);
@@ -278,6 +317,7 @@ describe('CompletionPopup', () => {
     expect(surface.emitKey('Escape')).toBe(false);
 
     surface.type('a');
+    advanceTyping();
     source.resolve(1, items());
     await flush();
     const row = surface.host.querySelectorAll('[role="option"]')[1];
@@ -290,11 +330,13 @@ describe('CompletionPopup', () => {
   it('re-requests for prefixed typing events while open and closes before the replace range', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    advanceTyping();
     source.resolve(0, { ...items(), from: 1 });
     await flush();
     expect(popup.isOpen()).toBe(true);
 
     surface.type('b', 'input.type.text');
+    advanceTyping();
     expect(source.calls).toHaveLength(2);
     source.resolve(1, { ...items(), from: 1 });
     await flush();
@@ -315,6 +357,7 @@ describe('CompletionPopup', () => {
 
     const during = setup();
     during.surface.type('a');
+    advanceTyping();
     during.surface.compose(true);
     during.source.resolve(0, items());
     await flush();
@@ -322,6 +365,7 @@ describe('CompletionPopup', () => {
 
     const openDuringComposition = setup();
     openDuringComposition.surface.type('a');
+    advanceTyping();
     openDuringComposition.source.resolve(0, items());
     await flush();
     expect(openDuringComposition.popup.isOpen()).toBe(true);
@@ -335,6 +379,7 @@ describe('CompletionPopup', () => {
     ]) {
       const fixture = setup();
       fixture.surface.type('a');
+      advanceTyping();
       close(fixture);
       fixture.source.resolve(0, items());
       await flush();
@@ -345,8 +390,11 @@ describe('CompletionPopup', () => {
   it('coalesces changes during a request into one latest request and rejects stale text', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    advanceTyping();
     surface.type('b');
+    vi.advanceTimersByTime(30);
     surface.type('c');
+    advanceTyping();
     expect(source.calls).toHaveLength(1);
     source.resolve(0, items());
     await flush();
@@ -359,6 +407,7 @@ describe('CompletionPopup', () => {
 
     const stale = setup();
     stale.surface.type('a');
+    advanceTyping();
     stale.surface.doc = 'different';
     stale.source.resolve(0, items());
     await flush();
@@ -368,28 +417,33 @@ describe('CompletionPopup', () => {
   it('closes for cursor-before-range, empty/null results, blur and selection changes', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    advanceTyping();
     source.resolve(0, { ...items(), items: [] });
     await flush();
     expect(popup.isOpen()).toBe(false);
 
     surface.emitKey('Ctrl-Space');
+    advanceExplicit();
     source.resolve(1, null);
     await flush();
     expect(popup.isOpen()).toBe(false);
 
     surface.emitKey('Ctrl-Space');
+    advanceExplicit();
     source.resolve(2, items());
     await flush();
     surface.select(0);
     expect(popup.isOpen()).toBe(false);
 
     surface.emitKey('Ctrl-Space');
+    advanceExplicit();
     source.resolve(3, items());
     await flush();
     surface.blur();
     expect(popup.isOpen()).toBe(false);
 
     surface.emitKey('Ctrl-Space');
+    advanceExplicit();
     source.resolve(4, { ...items(), from: 2 });
     await flush();
     surface.select(1);
@@ -397,6 +451,7 @@ describe('CompletionPopup', () => {
 
     surface.rect = null;
     surface.emitKey('Ctrl-Space');
+    advanceExplicit();
     source.resolve(5, items());
     await flush();
     expect(popup.isOpen()).toBe(false);
@@ -405,6 +460,7 @@ describe('CompletionPopup', () => {
   it('disposes the panel and all surface subscriptions, and has no CodeMirror dependency', async () => {
     const { surface, source, popup } = setup();
     surface.type('a');
+    advanceTyping();
     source.resolve(0, items());
     await flush();
     expect(surface.listenerCount()).toBe(4);

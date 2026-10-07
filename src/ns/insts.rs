@@ -18,7 +18,7 @@
 //! bindings: `additive`, `wavetable` and `granular` stay the ugens.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -234,6 +234,7 @@ pub struct InstRegistry {
     inst_resources: BTreeMap<InstId, InstResourceDeclaration>,
     bus_resources: BTreeMap<BusId, BusResourceDeclaration>,
     insts: BTreeMap<InstId, InstEntry>,
+    declared_names: Rc<BTreeSet<Rc<str>>>,
     names: BTreeMap<KwId, InstId>,
     buses: BTreeMap<KwId, BusEntry>,
     master: Option<BusEntry>,
@@ -262,6 +263,7 @@ impl InstRegistry {
             inst_resources: BTreeMap::new(),
             bus_resources: BTreeMap::new(),
             insts: BTreeMap::new(),
+            declared_names: Rc::new(BTreeSet::new()),
             names: BTreeMap::new(),
             buses: BTreeMap::new(),
             master: None,
@@ -309,10 +311,13 @@ impl InstRegistry {
     /// Parameter names of installed instruments, for checking and compiling
     /// pattern steps in subsequent forms.
     pub fn declared_names(&self) -> impl Iterator<Item = Rc<str>> + '_ {
-        self.insts
-            .values()
-            .flat_map(|entry| entry.params.iter())
-            .map(|param| name_of_kw(param.name))
+        self.declared_names.iter().cloned()
+    }
+
+    /// The shared parameter-name set for checker and compiler consumers.
+    #[must_use]
+    pub fn declared_names_rc(&self) -> Rc<BTreeSet<Rc<str>>> {
+        Rc::clone(&self.declared_names)
     }
 
     /// The bus declared as `name`.
@@ -402,6 +407,13 @@ impl InstRegistry {
             self.next_inst += 1;
         }
         self.insts.insert(id, entry);
+        self.declared_names = Rc::new(
+            self.insts
+                .values()
+                .flat_map(|entry| entry.params.iter())
+                .map(|param| name_of_kw(param.name))
+                .collect(),
+        );
     }
 
     /// Registers a bus definition (`None` for `master`); returns the graph

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { Store } from '../../src/protocol/store';
 import type { LevelsBody } from '../../src/protocol/types';
-import { AnalyzerArea, analyzerKey, pitchReadout, stereoReadout } from '../../src/visual/meters';
+import { AnalyzerArea, analyzerKey, LevelsTimeline, pitchReadout, stereoReadout } from '../../src/visual/meters';
 import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 
 let fakes: CanvasFakes | null = null;
@@ -104,5 +104,25 @@ describe('AnalyzerArea', () => {
     expect(pitchReadout([0, 0])).toBe('- (conf 0.00)');
     expect(pitchReadout([261.63, 1])).toBe('261.6 Hz C4 (conf 1.00)');
     expect(stereoReadout([])).toBe('corr 0.00 width 0.00 bal 0.00');
+  });
+
+  it('bounds timestamp history and marks stale and untimestamped presentations', () => {
+    fakes = installCanvasFakes();
+    const timeline = new LevelsTimeline();
+    for (let i = 0; i < 10; i++) timeline.push({ time: i, levels: [], analyzers: [] }, i);
+    expect(timeline.size).toBe(8);
+    expect(timeline.at(9)?.time).toBe(9);
+    expect(timeline.at(12)).toBeNull();
+
+    const store = new Store();
+    const area = new AnalyzerArea(document.createElement('div'), store, () => 4);
+    area.receive({ time: 1, levels: [{ source: ':master', rms: 0.1 }] });
+    area.present(4);
+    expect(area.el.dataset.sync).toBe('hidden');
+    expect(area.el.hidden).toBe(true);
+    area.receive({ levels: [{ source: ':master', rms: 0.2 }] });
+    expect(area.el.dataset.sync).toBe('unsynced');
+    expect(area.el.hidden).toBe(false);
+    area.dispose();
   });
 });

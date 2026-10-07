@@ -29,6 +29,7 @@ pub mod song;
 
 pub use eval::{alias_env_for, analyze, Analysis, EvalOutcome, FormResult, PackageView};
 pub use protocol::{ClientMsg, Envelope, ServerMsg};
+pub use publish::{ClockReading, LatencyKind};
 pub use repl::run_repl;
 pub use session::{Dest, Outgoing, PersistenceMode, Session, SessionConfig};
 

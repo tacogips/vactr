@@ -10,6 +10,7 @@ import { render } from 'solid-js/web';
 import { AnalyzerView, CanvasDisplayView, ReadoutDisplayView } from './meter-view';
 import type { Store } from '../protocol/store';
 import type { LevelsBody, WireAnalyzer } from '../protocol/types';
+import { pickFrame, type TimedLevels } from './scopes';
 import {
   decodeRing,
   drawScope,
@@ -23,6 +24,27 @@ import { dbFraction, drawBars, masterLevel, METER_FLOOR_DB, num, sameCells } fro
 export const DISPLAY_WIDTH = 160;
 export const METER_HEIGHT = 14;
 export const PLOT_HEIGHT = 48;
+
+/** Bounded presentation history; rendering reads the audible-time-selected frame. */
+export class LevelsTimeline {
+  private readonly frames: TimedLevels[] = [];
+  private latest: LevelsBody | null = null;
+
+  get size(): number { return this.frames.length; }
+
+  push(body: LevelsBody, receivedAt: number): void {
+    this.latest = body;
+    this.frames.push({ body, receivedAt });
+    if (this.frames.length > 8) this.frames.shift();
+  }
+
+  at(t: number): LevelsBody | null {
+    const latest = this.frames[this.frames.length - 1]?.body;
+    return latest?.time == null ? latest ?? null : pickFrame(this.frames, t);
+  }
+
+  latestBody(): LevelsBody | null { return this.latest; }
+}
 
 type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number, cells: readonly number[]) => void;
 
@@ -161,8 +183,13 @@ export class AnalyzerArea {
   private lastBands: readonly number[] | undefined;
   private readonly off: () => void;
   private readonly disposeView: () => void;
+  private readonly timeline = new LevelsTimeline();
+  private presented: LevelsBody | null = null;
+  private readonly latestOnReceipt: boolean;
 
-  constructor(parent: HTMLElement, store: Store) {
+  constructor(parent: HTMLElement, store: Store, private readonly now: () => number = () => performance.now() / 1000,
+    latestOnReceipt = false) {
+    this.latestOnReceipt = latestOnReceipt;
     const doc = parent.ownerDocument;
     const holder = doc.createElement('div');
     this.disposeView = render(() => createComponent(AnalyzerView, {}), holder);
@@ -177,16 +204,32 @@ export class AnalyzerArea {
     master.append(this.master.meter.el, this.master.bands.el);
     this.list = this.el.querySelector('.visual-analyzer-list') as HTMLElement;
     parent.appendChild(this.el);
-    this.off = store.subscribe(['levels'], () => this.update(store.levels));
-    this.update(store.levels);
+    this.off = store.subscribe(['levels'], () => this.receive(store.levels));
+    this.receive(store.levels);
   }
 
   displays(): ReadonlyMap<string, AnalyzerDisplay> {
     return new Map([...this.entries].map(([k, v]) => [k, v.display]));
   }
 
-  update(body: LevelsBody | null): void {
+  receive(body: LevelsBody | null): void {
     if (!body) return;
+    this.timeline.push(body, this.now());
+    if (this.latestOnReceipt) this.presentLatest();
+    else this.present(body.time == null ? Infinity : this.now());
+  }
+
+  presentLatest(): void { this.presentBody(this.timeline.latestBody()); }
+
+  present(t: number): void {
+    this.presentBody(this.timeline.at(t));
+  }
+
+  private presentBody(body: LevelsBody | null): void {
+    this.el.dataset.sync = !body ? 'hidden' : body.time == null ? 'unsynced' : 'synced';
+    this.el.hidden = body === null;
+    if (!body || body === this.presented) return;
+    this.presented = body;
     const m = masterLevel(body);
     if (m) {
       const rms = [num(m.rms)];

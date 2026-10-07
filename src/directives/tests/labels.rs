@@ -2,6 +2,7 @@
 //! explicit/explicit and explicit/implicit collisions, with rejected
 //! references and positional fallback.
 
+use crate::directives::attach::{reset_top_of_steps, top_of_steps};
 use crate::directives::labels::{LabelKind, LabelLookup};
 
 use super::{codes, shown, table};
@@ -113,4 +114,23 @@ s [:hh] > hpf 2000 > d2   #@ hats: hpf cc: 30
 fn unknown_label() {
     let (_, diags) = table("s [:hh] > hpf 1 > d1\n#@ nosuch.hpf cc: 1\n");
     assert_eq!(codes(&diags), ["unknown-label"]);
+}
+
+#[test]
+fn building_labels_for_twenty_thousand_targets_uses_bounded_top_of_steps() {
+    let src = (0..20_000)
+        .map(|index| format!("let a{index} {index}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    reset_top_of_steps();
+    let (table, diags) = table(&src);
+    let steps = top_of_steps();
+    assert!(diags.is_empty(), "{} diagnostics", diags.len());
+    let targets = table.doc.targets.len();
+    println!("label top_of steps: steps={steps}, targets={targets}");
+    assert!(targets >= 20_000, "targets={targets}");
+    assert!(
+        steps <= 2 * targets as u64,
+        "steps={steps}, targets={targets}"
+    );
 }

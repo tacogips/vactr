@@ -8,6 +8,7 @@
 //! delivery delay, so each test states the cycle duration and transport
 //! delay it relies on.
 
+mod announce;
 mod cells;
 mod control;
 mod dryrun;

@@ -2,48 +2,52 @@
    transport bar and sample browser. */
 
 .vact-code {
+  position: relative;
   height: 100%;
   min-height: 12rem;
 }
 
-.vact-code .cm-editor {
-  height: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-}
-
 /* Tokens (language.ts). */
-.vact-tok-comment { color: #7a7f87; font-style: italic; }
-.vact-tok-directive { color: #b07bd8; font-style: normal; }
-.vact-tok-keyword { color: #d08770; }
-.vact-tok-number { color: #88c0d0; }
-.vact-tok-string { color: #a3be8c; }
-.vact-tok-path { color: #a3be8c; text-decoration: underline dotted; }
-.vact-tok-head { color: #ebcb8b; font-weight: 600; }
-.vact-tok-bracket { color: #8a8f98; }
+.vact-tok-comment { color: var(--vt-syn-comment); font-style: italic; }
+.vact-tok-directive { color: var(--vt-syn-directive); font-style: normal; }
+.vact-tok-keyword { color: var(--vt-syn-keyword); }
+.vact-tok-number { color: var(--vt-syn-number); }
+.vact-tok-string { color: var(--vt-syn-string); }
+.vact-tok-path { color: var(--vt-syn-string); text-decoration: underline dotted; }
+.vact-tok-head { color: var(--vt-syn-head); font-weight: 600; }
+.vact-tok-bracket { color: var(--vt-syn-bracket); }
 
 /* Eval flash (eval.ts) and playing highlight (highlight.ts). */
-.vact-flash { background: rgba(136, 192, 208, 0.35); }
-.vact-flash-error { background: rgba(191, 97, 106, 0.45); }
+.vact-flash { background: var(--vt-flash); }
+.vact-flash-error { background: var(--vt-flash-error); }
 .vact-playing {
-  background: rgba(235, 203, 139, 0.45);
-  outline: 1px solid rgba(235, 203, 139, 0.8);
-  border-radius: 2px;
+  background: var(--vt-playing-bg);
+  outline: var(--vt-border-w) solid var(--vt-playing-outline);
+  border-radius: 0;
 }
 
 /* Transport bar: styled in app/app.css with the other design 15.2 controls. */
 
 /* Sample browser (samples.ts). */
-.vact-samples { font-size: 12px; padding: 0.25rem 0.5rem; }
-.vact-sounds, .vact-banks, .vact-entries { margin: 0; padding-left: 1rem; }
-.vact-entry { display: flex; align-items: center; gap: 0.5rem; }
-.vact-entry[data-missing='true'] { color: #7a7f87; }
+.vact-samples { font-size: var(--vt-text-sm); padding: var(--vt-space-1) var(--vt-space-2); }
+.vact-sounds, .vact-banks, .vact-entries { margin: 0; padding-left: var(--vt-space-4); }
+.vact-entry { display: flex; align-items: center; gap: var(--vt-space-2); }
+.vact-entry[data-missing='true'] { color: var(--vt-text-muted); }
+.vact-sample-map {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  margin: var(--vt-space-1) 0;
+}
+.vact-sample-map input { flex: 1 1 auto; min-width: 0; }
+.vact-bank > span { margin-right: var(--vt-space-2); }
 .vact-preview { width: 96px; height: 24px; }
-.vact-samples-status { color: #7a7f87; }
+.vact-samples-status { color: var(--vt-text-muted); }
 
-/* GPU surface; legacy CM styles stay until the serial CE-JOIN cutover. */
+/* GPU surface. */
 .vact-code-surface { position: relative; overflow: hidden; height: 100%; }
-.vact-code-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.vact-code-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.vact-code-canvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; touch-action: none; }
 .vact-code-input-bridge {
   position: absolute;
   width: 1px;
@@ -62,4 +66,56 @@
   font: inherit;
 }
 .vact-code-input-bridge::selection { background: transparent; color: transparent; }
-.vact-code-gpu-status { position: absolute; bottom: 0; left: 0; padding: 0.25rem; }
+.vact-code-gpu-status {
+  position: absolute;
+  z-index: 2;
+  bottom: 0;
+  left: 0;
+  padding: var(--vt-space-1) var(--vt-space-2);
+  color: var(--vt-text-muted);
+  background: var(--vt-surface);
+  font-size: var(--vt-text-xs);
+}
+.vact-code-diag-tooltip {
+  position: absolute;
+  z-index: 2;
+  max-width: min(32rem, calc(100% - 1rem));
+  padding: var(--vt-space-1) var(--vt-space-2);
+  color: var(--vt-text);
+  background: var(--vt-surface);
+  border: var(--vt-border-w) solid var(--vt-syn-keyword);
+  border-radius: 0;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+/* Completion popup (completion-popup.ts). */
+.vact-completion {
+  min-width: 16rem;
+  z-index: 10;
+  color: var(--vt-text);
+  background: var(--vt-surface);
+  border: var(--vt-border-w) solid var(--vt-border-strong);
+  border-radius: 0;
+  font-family: var(--vt-font-mono);
+  font-size: var(--vt-text-sm);
+}
+.vact-completion-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--vt-space-2);
+  padding: 0 var(--vt-space-2);
+  cursor: pointer;
+}
+.vact-completion-item[aria-selected='true'] {
+  color: var(--vt-text);
+  background: var(--vt-selection);
+}
+.vact-completion-kind { color: var(--vt-syn-keyword); font-size: var(--vt-text-xs); }
+.vact-completion-detail {
+  overflow: hidden;
+  color: var(--vt-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

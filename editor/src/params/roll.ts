@@ -45,15 +45,19 @@ export class PianoRoll {
   private readonly code: () => CodeApi | undefined;
   private cycle = -1;
   private list: RollNote[] = [];
+  private readonly display = new Map<string, RollDisplayNote>();
   private readonly setNotes: Setter<RollDisplayNote[]>;
+  private readonly setRange: Setter<{ hi: number; lanes: number }>;
   private readonly disposeView: () => void;
 
   constructor(parent: HTMLElement, code: () => CodeApi | undefined) {
     this.code = code;
     const holder = parent.ownerDocument.createElement('div');
     const [notes, setNotes] = createSignal<RollDisplayNote[]>([]);
+    const [range, setRange] = createSignal({ hi: 0, lanes: 2 });
     this.setNotes = setNotes;
-    this.disposeView = render(() => createComponent(RollView, { notes }), holder);
+    this.setRange = setRange;
+    this.disposeView = render(() => createComponent(RollView, { notes, range }), holder);
     this.el = holder.firstElementChild as HTMLElement;
     parent.appendChild(this.el);
   }
@@ -67,6 +71,7 @@ export class PianoRoll {
       if (cycle > this.cycle) {
         this.cycle = cycle;
         this.list = [];
+        this.display.clear();
       } else if (cycle < this.cycle) {
         continue;
       }
@@ -90,7 +95,7 @@ export class PianoRoll {
     const code = this.code();
     if (!e.src || !code) return '';
     const r = code.mapWireSpan(e.src.span, e.src.doc_revision);
-    return r ? code.view.state.sliceDoc(r.from, r.to) : '';
+    return r ? code.surface.state.sliceDoc(r.from, r.to) : '';
   }
 
   private draw(): void {
@@ -98,9 +103,22 @@ export class PianoRoll {
     const hi = pitches.length > 0 ? Math.max(...pitches) : 0;
     const lo = pitches.length > 0 ? Math.min(...pitches) : 0;
     const lanes = hi - lo + 2;
-    this.setNotes(this.list.map((n) => {
-      const lane = n.pitch === null ? lanes - 1 : hi - n.pitch;
-      return { ...n, lane: n.pitch === null ? 'unpitched' : undefined, top: (lane / lanes) * 100 };
-    }));
+    this.setRange({ hi, lanes });
+    const occurrences = new Map<string, number>();
+    const next = this.list.map((n) => {
+      const base = `${n.slot}|${n.pos}|${n.len}|${n.text}`;
+      const occurrence = occurrences.get(base) ?? 0;
+      occurrences.set(base, occurrence + 1);
+      const key = `${base}|${occurrence}`;
+      let display = this.display.get(key);
+      if (!display) {
+        display = { ...n, lane: n.pitch === null ? 'unpitched' : undefined };
+        this.display.set(key, display);
+      }
+      return display;
+    });
+    const retained = new Set(next);
+    for (const [key, note] of this.display) if (!retained.has(note)) this.display.delete(key);
+    this.setNotes(next);
   }
 }

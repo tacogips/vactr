@@ -20,6 +20,7 @@ use crate::ns::evaluator::{Evaluator, PassReport};
 use crate::ns::tweak::{SiteOrigin, SiteTier, TweakSite};
 use crate::pattern::eval::AnalyzerId;
 use crate::reader::span::{FileId, Span, SrcRef};
+use crate::sched::announce::{AnnounceDrain, ANNOUNCE_CAP};
 use crate::sched::runtime::Runtime;
 use crate::sched::telemetry::PlayingEvent;
 use crate::session::protocol::{
@@ -38,6 +39,34 @@ use crate::vm::fail::Failure;
 const LEVELS_PERIOD: f64 = 0.1;
 /// Maximum transport snapshot cadence: twenty per second.
 const TRANSPORT_PERIOD: f64 = 0.05;
+
+/// Provenance of native output-latency telemetry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LatencyKind {
+    Measured,
+    Estimate,
+    Unavailable,
+}
+
+impl LatencyKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Measured => "measured",
+            Self::Estimate => "estimate",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+/// A host's current processing-time and output-latency observation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClockReading {
+    pub processing_time: f64,
+    pub latency_seconds: Option<f64>,
+    pub latency_kind: LatencyKind,
+    pub uncertainty_seconds: Option<f64>,
+}
 
 /// The display name of `id` in `files`.
 #[must_use]
@@ -316,6 +345,7 @@ pub fn playing_wire(
     WirePlaying {
         epoch: None,
         end_time: Some(e.time + e.dur),
+        id: e.id,
         slot: name_of_kw(e.slot).to_string(),
         beat: ratio_pair(e.beat),
         time: e.time,
@@ -327,6 +357,51 @@ pub fn playing_wire(
             form_gen: s.form_gen.get(),
         }),
     }
+}
+
+/// Builds the bounded playing envelope, keeping committed events ahead of previews.
+pub(crate) fn playing_body(
+    events: &[PlayingEvent],
+    announced: AnnounceDrain,
+    files: &[Rc<str>],
+    bpm: f64,
+    epoch: &str,
+    rev_of: &dyn Fn(&SrcRef) -> u64,
+) -> Option<PlayingBody> {
+    if events.is_empty() && announced.ahead.is_empty() && announced.retract.is_empty() {
+        return None;
+    }
+    let events: Vec<_> = events
+        .iter()
+        .take(ANNOUNCE_CAP)
+        .map(|event| {
+            let mut wire = playing_wire(event, files, bpm, rev_of);
+            wire.epoch = Some(epoch.to_owned());
+            wire
+        })
+        .collect();
+    let ahead_limit = ANNOUNCE_CAP.saturating_sub(events.len());
+    let mut ahead: Vec<_> = announced
+        .ahead
+        .iter()
+        .take(ahead_limit)
+        .map(|event| {
+            let mut wire = playing_wire(event, files, bpm, rev_of);
+            wire.epoch = Some(epoch.to_owned());
+            wire
+        })
+        .collect();
+    ahead.sort_by(|a, b| {
+        a.time
+            .total_cmp(&b.time)
+            .then_with(|| a.slot.cmp(&b.slot))
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    Some(PlayingBody {
+        events,
+        ahead,
+        retract: announced.retract.into_iter().take(ANNOUNCE_CAP).collect(),
+    })
 }
 
 /// The constant `id` parameter of an analyzer's `EffectSpec`, when it has
@@ -395,6 +470,7 @@ impl Session {
         if !host_now.is_finite() || host_now < 0.0 {
             return Vec::new();
         }
+        self.last_host_now = host_now;
         let mut out = std::mem::take(&mut self.outbox);
         for (conn, msg) in self.apply_pending() {
             let routed = self.route(conn.unwrap_or(0), None, vec![msg]);
@@ -464,19 +540,15 @@ impl Session {
         self.transport_state = Some(state);
         let epoch = format!("session-{}-{}", self.transport_id, self.transport_epoch);
         let events = self.rt.telemetry();
-        if !events.is_empty() && self.subs.values().any(|s| s.telemetry) {
+        let announced = self.rt.announced();
+        let has_telemetry_subscriber = self.subs.values().any(|s| s.telemetry);
+        if has_telemetry_subscriber {
             let bpm = tempo.bpm.to_f64();
             let rev_of = |s: &SrcRef| self.revision_of(s);
-            let events = events
-                .iter()
-                .take(4096)
-                .map(|e| {
-                    let mut wire = playing_wire(e, &self.files, bpm, &rev_of);
-                    wire.epoch = Some(epoch.clone());
-                    wire
-                })
-                .collect();
-            msgs.push(ServerMsg::Playing(PlayingBody { events }));
+            if let Some(body) = playing_body(&events, announced, &self.files, bpm, &epoch, &rev_of)
+            {
+                msgs.push(ServerMsg::Playing(body));
+            }
         }
         let due = self
             .last_levels
@@ -502,6 +574,8 @@ impl Session {
                     bands: Some(sigs.fft),
                 }],
                 analyzers: analyzers.filter(|v| !v.is_empty()),
+                time: Some(host_now),
+                epoch: Some(epoch.clone()),
             }));
         }
         let clock = if source == ClockSource::MidiClock {
@@ -521,16 +595,37 @@ impl Session {
             .is_none_or(|t| host_now - t >= TRANSPORT_PERIOD || host_now < t);
         let transport = if due && self.subs.values().any(|s| s.telemetry) {
             self.last_transport = Some(host_now);
+            // `sched::runtime::GRID` is private; keep its current value here for the guard.
+            let cps = tempo.bpm.to_f64() / 60.0 / tempo.beats_per_cycle.to_f64();
+            let grid_period = 1.0 / (960.0 * cps);
+            let candidate = self.rt.clock().to_host(self.transport_cycle);
+            let sample_time = if !frozen
+                && !lost
+                && candidate.is_finite()
+                && candidate >= 0.0
+                && (candidate - host_now).abs() <= grid_period + 1e-9
+            {
+                candidate
+            } else {
+                host_now
+            };
             Some(TransportSample {
                 epoch,
-                sample_time: host_now,
+                sample_time,
                 cycle: ratio_pair(self.transport_cycle),
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.to_f64(),
                 running: !frozen && !lost,
-                latency_seconds: None,
-                latency_kind: "unavailable".to_string(),
-                uncertainty_seconds: None,
+                latency_seconds: self
+                    .observed_clock
+                    .and_then(|reading| reading.latency_seconds),
+                latency_kind: self
+                    .observed_clock
+                    .map_or("unavailable", |reading| reading.latency_kind.as_str())
+                    .to_string(),
+                uncertainty_seconds: self
+                    .observed_clock
+                    .and_then(|reading| reading.uncertainty_seconds),
             })
         } else {
             None

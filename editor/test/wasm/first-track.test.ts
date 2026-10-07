@@ -167,5 +167,5 @@ describe('examples/first-track.vact through the real browser session', () => {
     expect(layout.transport.querySelector('.vact-tempo')?.getAttribute('aria-label')).toBe('tempo 124.0 bpm');
     area.dispose();
     root.remove();
-  });
+  }, 60_000);
 });

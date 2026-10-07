@@ -20,14 +20,15 @@
 
 mod song;
 mod song_capacity;
+mod stream;
 use song_capacity::SongCapacityCache;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{SampleFormat, SupportedStreamConfig};
+use cpal::traits::StreamTrait;
 
 use crate::dsp::arena::StoreKind;
 use crate::dsp::bus::BusTemplate;
@@ -44,6 +45,7 @@ use crate::host::caps::{
     TapSrc,
 };
 use crate::host::native::capture::{self, CaptureCounters, CaptureStats, InputConsumer};
+use crate::host::native::clock::OutputClock;
 use crate::host::native::tap::{self, NativeTapReader, TapShared};
 use crate::host::native::{unavailable, NativeConfig};
 use crate::host::wire::{AudioEvent, CtlMsg, HostMsg, SlotControl};
@@ -368,13 +370,47 @@ pub struct NativeAudioHost {
     reported: u32,
     diags: Vec<Diagnostic>,
     stream_errors: Arc<AtomicU32>,
-    stream: Option<cpal::Stream>,
+    stream: Rc<RefCell<Option<cpal::Stream>>>,
+    output_clock: OutputClock,
     input_stream: Option<cpal::Stream>,
     capture_counters: Option<Arc<CaptureCounters>>,
     capture_reported: CaptureStats,
     taps: Arc<TapShared>,
     /// Resolves bus keywords for bus taps and captures (`set_bus_names`).
     bus_names: Option<Rc<dyn InstResolver>>,
+}
+
+/// Owner-thread control for the native output stream.
+#[derive(Clone)]
+pub struct StreamControl {
+    stream: Rc<RefCell<Option<cpal::Stream>>>,
+    clock: OutputClock,
+}
+
+impl StreamControl {
+    /// Pauses output and marks its clock correlation unavailable.
+    pub fn suspend(&self) {
+        if let Some(stream) = self.stream.borrow().as_ref() {
+            let _ = stream.pause();
+        }
+        self.clock.set_running(false);
+    }
+
+    /// Resumes output.
+    ///
+    /// # Errors
+    /// Returns an unavailable diagnostic when CPAL cannot resume the stream.
+    pub fn resume(&self) -> Result<(), Diagnostic> {
+        let stream = self.stream.borrow();
+        let Some(stream) = stream.as_ref() else {
+            return Err(unavailable("audio output stream is not open"));
+        };
+        stream
+            .play()
+            .map_err(|e| unavailable(format!("audio output could not resume ({e})")))?;
+        self.clock.set_running(true);
+        Ok(())
+    }
 }
 
 impl NativeAudioHost {
@@ -396,95 +432,22 @@ impl NativeAudioHost {
     }
 
     fn open_with_outputs(cfg: &NativeConfig, output_channels: u8) -> Result<Self, Diagnostic> {
-        let host = cpal::default_host();
-        let device = host.default_output_device().ok_or_else(|| {
-            unavailable("audio output is not available on this host (no output device)")
-        })?;
-        let supported = f32_config(&device)?;
-        let channels = usize::from(supported.channels());
-        if output_channels == 4 && channels != 4 {
-            return Err(unavailable(
-                "quad output needs a four-channel default device configuration",
-            ));
+        stream::open_with_outputs(cfg, output_channels)
+    }
+
+    /// Output-clock telemetry shared with the session owner.
+    #[must_use]
+    pub fn output_clock(&self) -> OutputClock {
+        self.output_clock.clone()
+    }
+
+    /// Owner-thread control for suspending and resuming the CPAL stream.
+    #[must_use]
+    pub fn stream_control(&self) -> StreamControl {
+        StreamControl {
+            stream: Rc::clone(&self.stream),
+            clock: self.output_clock.clone(),
         }
-        let rate = supported.sample_rate().0;
-        let config = supported.config();
-        #[allow(clippy::cast_precision_loss)]
-        let engine = crate::host::song_profile::song_engine_config(
-            rate as f32,
-            MAX_BLOCK,
-            CapabilitySet::native(),
-            StoreKind::NativeArc,
-            output_channels,
-        )
-        .map_err(|_| unavailable("unsupported song audio device configuration"))?;
-        let (mut this, mut side) = Self::pair(engine, AtomicCells::new(cfg.cells));
-        let capture = if cfg.audio_in {
-            let input_device = host.default_input_device().ok_or_else(|| {
-                unavailable("audio input was requested but no default input device is available")
-            })?;
-            let input_config = input_f32_config(&input_device, rate)?;
-            let input_channels = usize::from(input_config.channels());
-            let (mut producer, consumer, counters) = capture::pair();
-            let input_errors = Arc::clone(&this.stream_errors);
-            let input_stream = input_device
-                .build_input_stream(
-                    &input_config.config(),
-                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                        producer.push_interleaved(data, input_channels);
-                    },
-                    move |_| {
-                        input_errors.fetch_add(1, Ordering::Relaxed);
-                    },
-                    None,
-                )
-                .map_err(|e| {
-                    unavailable(format!(
-                        "audio input was requested but its stream cannot open ({e})"
-                    ))
-                })?;
-            Some((input_stream, consumer, counters))
-        } else {
-            None
-        };
-        let errors = Arc::clone(&this.stream_errors);
-        let (input_stream, mut input_consumer, counters) = match capture {
-            Some((stream, consumer, counters)) => (Some(stream), Some(consumer), Some(counters)),
-            None => (None, None, None),
-        };
-        let mut input_scratch = [0.0; 2 * MAX_BLOCK];
-        let stream = device
-            .build_output_stream(
-                &config,
-                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    if let Some(consumer) = &mut input_consumer {
-                        render_captured(&mut side, consumer, &mut input_scratch, data, channels);
-                    } else {
-                        side.render(data, channels);
-                    }
-                },
-                move |_| {
-                    errors.fetch_add(1, Ordering::Relaxed);
-                },
-                None,
-            )
-            .map_err(|e| {
-                unavailable(format!("audio output is not available on this host ({e})"))
-            })?;
-        if let Some(input) = &input_stream {
-            input.play().map_err(|e| {
-                unavailable(format!(
-                    "audio input was requested but its stream cannot start ({e})"
-                ))
-            })?;
-        }
-        stream.play().map_err(|e| {
-            unavailable(format!("audio output is not available on this host ({e})"))
-        })?;
-        this.stream = Some(stream);
-        this.input_stream = input_stream;
-        this.capture_counters = counters;
-        Ok(this)
     }
 
     /// A host with no device: the caller drives `AudioSide::render` (tests,
@@ -588,7 +551,8 @@ impl NativeAudioHost {
             reported: 0,
             diags: Vec::new(),
             stream_errors: Arc::new(AtomicU32::new(0)),
-            stream: None,
+            stream: Rc::new(RefCell::new(None)),
+            output_clock: OutputClock::new(cfg.sample_rate as u32),
             input_stream: None,
             capture_counters: None,
             capture_reported: CaptureStats::default(),
@@ -920,55 +884,6 @@ impl AudioHost for NativeAudioHost {
     fn poll_capture(&mut self, id: CaptureId, out: &mut Vec<f32>) -> CapturePoll {
         tap::poll_capture(&self.taps, id, out)
     }
-}
-
-/// The device's default configuration when it is f32, else an f32 range
-/// at the default rate (or the range's highest rate).
-fn f32_config(device: &cpal::Device) -> Result<SupportedStreamConfig, Diagnostic> {
-    let default = device
-        .default_output_config()
-        .map_err(|e| unavailable(format!("audio output is not available on this host ({e})")))?;
-    if default.sample_format() == SampleFormat::F32 {
-        return Ok(default);
-    }
-    let rate = default.sample_rate();
-    let ranges = device
-        .supported_output_configs()
-        .map_err(|e| unavailable(format!("audio output is not available on this host ({e})")))?;
-    let mut fallback = None;
-    for r in ranges.filter(|r| r.sample_format() == SampleFormat::F32) {
-        if r.min_sample_rate() <= rate && rate <= r.max_sample_rate() {
-            return Ok(r.with_sample_rate(rate));
-        }
-        fallback.get_or_insert(r.with_max_sample_rate());
-    }
-    fallback.ok_or_else(|| {
-        unavailable("audio output is not available on this host (no f32 output format)")
-    })
-}
-
-/// A f32 input configuration at the already chosen output rate. Prefer
-/// stereo, then mono; wider devices use their first two channels.
-fn input_f32_config(device: &cpal::Device, rate: u32) -> Result<SupportedStreamConfig, Diagnostic> {
-    let ranges = device.supported_input_configs().map_err(|e| {
-        unavailable(format!(
-            "audio input was requested but its formats are unavailable ({e})"
-        ))
-    })?;
-    ranges
-        .filter(|r| {
-            r.sample_format() == SampleFormat::F32
-                && capture_channel_rank(r.channels()).is_some()
-                && r.min_sample_rate().0 <= rate
-                && rate <= r.max_sample_rate().0
-        })
-        .min_by_key(|r| capture_channel_rank(r.channels()))
-        .map(|r| r.with_sample_rate(cpal::SampleRate(rate)))
-        .ok_or_else(|| {
-            unavailable(format!(
-                "audio input was requested but no f32 input supports the output rate {rate} Hz"
-            ))
-        })
 }
 
 pub(crate) const fn capture_channel_rank(channels: u16) -> Option<u8> {

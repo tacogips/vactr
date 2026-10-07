@@ -5,4 +5,6 @@
 mod args;
 mod fmt;
 #[cfg(feature = "host-native")]
+mod owner;
+#[cfg(feature = "host-native")]
 mod ws;

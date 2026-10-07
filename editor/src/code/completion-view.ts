@@ -8,11 +8,11 @@ import {
   type CompletionSurface,
   type SurfaceChange,
 } from './completion-types';
-import { Prec, StateEffect, Transaction } from '@codemirror/state';
-import { EditorView, keymap } from '@codemirror/view';
+import { Transaction } from '@codemirror/state';
+import type { CodeSurface } from '../app/apis';
 
-/** Connects completion to the current EditorView through the canvas-ready surface contract. */
-export function attachCompletion(view: EditorView, engine: CompletionEngine): { dispose(): void } {
+/** Connects the UI-agnostic completion core to the headless code surface. */
+export function attachCompletion(code: CodeSurface, engine: CompletionEngine): { dispose(): void } {
   const changes = new Set<(change: SurfaceChange) => void>();
   const keyHandlers = new Set<(key: CompletionKey) => boolean>();
   const blurHandlers = new Set<() => void>();
@@ -24,27 +24,27 @@ export function attachCompletion(view: EditorView, engine: CompletionEngine): { 
     return () => listeners.delete(listener);
   };
   const surface: CompletionSurface = {
-    text: () => view.state.doc.toString(),
-    selection: () => view.state.selection.main,
+    text: () => code.state.doc.toString(),
+    version: () => code.state.doc,
+    selection: () => code.state.selection.main,
     replace(from, to, insert) {
       if (from > to) return;
-      view.dispatch({
+      code.dispatch({
         changes: { from, to, insert },
         selection: { anchor: from + insert.length },
         annotations: Transaction.userEvent.of(COMPLETION_USER_EVENT),
-        scrollIntoView: true,
       });
     },
     caretRect(pos) {
-      const rect = view.coordsAtPos(pos);
+      const rect = code.coordsAtPos(pos);
       return rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null;
     },
-    isComposing: () => view.composing,
+    isComposing: () => code.compositionRange !== null,
     onChange: (listener) => subscribe(changes, listener),
     onKey: (handler) => subscribe(keyHandlers, handler),
     onBlur: (listener) => subscribe(blurHandlers, listener),
     onCompositionStart: (listener) => subscribe(compositionHandlers, listener),
-    popupHost: () => view.dom.ownerDocument.body,
+    popupHost: () => document.body,
   };
 
   const keyBindings = COMPLETION_KEYS.map((key) => ({
@@ -54,42 +54,18 @@ export function attachCompletion(view: EditorView, engine: CompletionEngine): { 
       return false;
     },
   }));
-  view.dispatch({
-    effects: StateEffect.appendConfig.of([
-      Prec.highest(keymap.of(keyBindings)),
-      EditorView.updateListener.of((update) => {
-        if (disposed) return;
-        const userEvent = [...update.transactions]
-          .reverse()
-          .map((transaction) => transaction.annotation(Transaction.userEvent))
-          .find((event) => event !== undefined) ?? null;
-        let inserted = '';
-        if (update.docChanged) {
-          for (const transaction of update.transactions) {
-            transaction.changes.iterChanges((_fromA, _toA, _fromB, _toB, text) => {
-              inserted += text.toString();
-            });
-          }
-        }
-        const change: SurfaceChange = {
-          docChanged: update.docChanged,
-          selectionChanged: update.selectionSet,
-          userEvent,
-          inserted,
-        };
-        for (const listener of changes) listener(change);
-      }),
-      EditorView.domEventHandlers({
-        blur: () => {
-          for (const listener of blurHandlers) listener();
-          return false;
-        },
-        compositionstart: () => {
-          for (const listener of compositionHandlers) listener();
-          return false;
-        },
-      }),
-    ]),
+  const disposeKeymap = code.addKeymap(keyBindings, 'highest');
+  const disposeBlur = code.onBlur(() => { for (const listener of blurHandlers) listener(); });
+  const disposeComposition = code.onCompositionStart(() => { for (const listener of compositionHandlers) listener(); });
+  const disposeUpdate = code.subscribe((update) => {
+    if (disposed) return;
+    let inserted = '';
+    if (update.docChanged) update.changes.iterChanges((_fromA, _toA, fromB, toB) => {
+      inserted += update.state.doc.sliceString(fromB, toB);
+    });
+    const change: SurfaceChange = { docChanged: update.docChanged, selectionChanged: update.selectionSet,
+      userEvent: update.userEvent, inserted };
+    for (const listener of changes) listener(change);
   });
 
   const popup = new CompletionPopup(surface, new CompletionService(engine));
@@ -97,6 +73,7 @@ export function attachCompletion(view: EditorView, engine: CompletionEngine): { 
     dispose() {
       if (disposed) return;
       disposed = true;
+      disposeKeymap(); disposeBlur(); disposeComposition(); disposeUpdate();
       popup.dispose();
       changes.clear();
       keyHandlers.clear();

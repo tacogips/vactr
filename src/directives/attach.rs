@@ -123,7 +123,36 @@ pub struct Doc {
     pub lines: Lines,
     pub targets: Vec<Target>,
     pub sites: Vec<CallSite>,
+    top_first: Vec<usize>,
 }
+
+#[cfg(test)]
+use std::cell::Cell;
+
+#[cfg(test)]
+thread_local! {
+    static TOP_OF_STEPS: Cell<u64> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn top_of_steps() -> u64 {
+    TOP_OF_STEPS.with(Cell::get)
+}
+
+#[cfg(test)]
+pub(crate) fn reset_top_of_steps() {
+    TOP_OF_STEPS.with(|steps| steps.set(0));
+}
+
+#[cfg(test)]
+#[inline]
+fn note_top_of_step() {
+    TOP_OF_STEPS.with(|steps| steps.set(steps.get() + 1));
+}
+
+#[cfg(not(test))]
+#[inline(always)]
+fn note_top_of_step() {}
 
 /// Heads that are syntax, never call sites.
 const NOT_SITES: [&str; 13] = [
@@ -285,6 +314,14 @@ impl Doc {
         }
         doc.sites.sort_by_key(|s| s.head.start);
         doc.targets.sort_by_key(|t| (t.extent.start, t.first_line));
+        let top_count = nodes.len();
+        doc.top_first = vec![usize::MAX; top_count];
+        for (target_index, target) in doc.targets.iter().enumerate() {
+            let first = &mut doc.top_first[target.top];
+            if *first == usize::MAX {
+                *first = target_index;
+            }
+        }
         doc
     }
 
@@ -362,7 +399,21 @@ impl Doc {
     #[must_use]
     pub fn top_of(&self, t: usize) -> usize {
         let top = self.targets[t].top;
-        self.targets.iter().position(|x| x.top == top).unwrap_or(t)
+        if let Some(first) = self.top_first.get(top).copied() {
+            if first != usize::MAX {
+                note_top_of_step();
+                return first;
+            }
+        }
+        let mut steps = 0;
+        let first = self.targets.iter().position(|target| {
+            steps += 1;
+            target.top == top
+        });
+        for _ in 0..steps {
+            note_top_of_step();
+        }
+        first.unwrap_or(t)
     }
 }
 

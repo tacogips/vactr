@@ -10,8 +10,20 @@ function host(fake: FakeCore, opts: Record<string, unknown> = {}) {
   return { h, node };
 }
 
+function timedHost(fake: FakeCore, currentTime: number) {
+  const ctx = { currentTime };
+  const node = fakeNode();
+  const h = new VactrHost(ctx as unknown as AudioContext, node, fake.exports, {
+    wasmUrl: '',
+    processorUrl: '',
+    init: 'session',
+  });
+  return { h, ctx, ticks: () => fake.callsOf('session_tick').map((call) => call.args[0] as number) };
+}
+
 describe('worklet/host.js', () => {
   afterEach(() => {
+    delete (globalThis as typeof globalThis & { __vactrPhaseTimer?: unknown }).__vactrPhaseTimer;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -39,6 +51,74 @@ describe('worklet/host.js', () => {
 
     h.putSample('bd:0', new Float32Array([0.25]), 48000, 1);
     expect(fake.callsOf('sample_put')).toHaveLength(1);
+  });
+
+  it('coalesces a stale-message backlog at fresh engine time', () => {
+    const fake = new FakeCore();
+    const { h, ctx, ticks } = timedHost(fake, 10);
+    h.onWorklet({ t: 9.5, js: [0, 0, 0, 0, 0] });
+    expect(ticks()).toEqual([9.5]);
+
+    ctx.currentTime = 11;
+    for (let i = 0; i < 200; i += 1) {
+      h.onWorklet({ t: 9.5 + (0.4 * i) / 199, js: [0, 0, 0, 0, 0] });
+    }
+
+    const afterBacklog = ticks();
+    expect(afterBacklog).toHaveLength(2);
+    expect(afterBacklog.every((time, index) => index === 0 || time >= afterBacklog[index - 1]!)).toBe(true);
+    expect(afterBacklog[1]).toBeGreaterThanOrEqual(10.5 - h.tickEvery);
+    expect(afterBacklog[1]).toBeLessThanOrEqual(10.5);
+    expect(afterBacklog[1]).toBeGreaterThan(9.9);
+  });
+
+  it('resets the estimated offset when a gap or error counter increases', () => {
+    for (const counterIndex of [3, 2]) {
+      const fake = new FakeCore();
+      const { h, ctx, ticks } = timedHost(fake, 11);
+      h.onWorklet({ t: 10.5, js: [0, 0, 0, 0, 0] });
+      ctx.currentTime = 11.8;
+      const counters = [0, 0, 0, 0, 0];
+      counters[counterIndex] = 1;
+      h.onWorklet({ t: 10.6, js: counters });
+      expect(ticks()).toEqual([10.5, 10.6]);
+      expect(ticks()[1]).not.toBe(11.8 - 0.5);
+    }
+  });
+
+  it('keeps the minimum offset and applies tickEvery to engine time', () => {
+    const fake = new FakeCore();
+    const { h, ctx, ticks } = timedHost(fake, 1.8);
+    h.onWorklet({ t: 1, js: [0, 0, 0, 0, 0] });
+    ctx.currentTime = 1.51;
+    h.onWorklet({ t: 1.01, js: [0, 0, 0, 0, 0] });
+    expect(ticks()).toEqual([1, 1.01]);
+
+    for (let i = 1; i <= 20; i += 1) {
+      const time = 1.01 + (128 * i) / 48000;
+      ctx.currentTime = time + 0.5;
+      h.onWorklet({ t: time, js: [0, 0, 0, 0, 0] });
+    }
+    const cadence = ticks();
+    expect(cadence.every((time, index) => index === 0 || time - cadence[index - 1]! >= h.tickEvery)).toBe(true);
+  });
+
+  it('lowers a queue-inflated first offset to the minimum sample', () => {
+    const fake = new FakeCore();
+    const { h, ctx, ticks } = timedHost(fake, 1.8);
+    h.onWorklet({ t: 1.0, js: [0, 0, 0, 0, 0] });
+    expect(ticks()).toEqual([1.0]);
+
+    ctx.currentTime = 1.9;
+    h.onWorklet({ t: 1.4, js: [0, 0, 0, 0, 0] });
+    expect(ticks().at(-1)).toBeCloseTo(1.4, 9);
+
+    ctx.currentTime = 2.3;
+    h.onWorklet({ t: 1.41, js: [0, 0, 0, 0, 0] });
+    const observedTick = ticks().at(-1)!;
+    expect(observedTick).toBeCloseTo(1.8, 9);
+    expect(Math.abs(observedTick - 1.5)).toBeGreaterThan(h.tickEvery);
+    expect(Math.abs(observedTick - 1.41)).toBeGreaterThan(h.tickEvery);
   });
 
   it('connects an external Web Audio source to the input-enabled node', () => {
@@ -76,6 +156,22 @@ describe('worklet/host.js', () => {
     h.putSample('bd:0', new Float32Array([0.25]), 48000, 1);
     expect(fake.callsOf('session_sample_put')).toHaveLength(1);
     expect(fake.callsOf('sample_put')).toHaveLength(0);
+  });
+
+  it('times session_tick only when the optional phase timer is present', () => {
+    const fake = new FakeCore(); const absent = timedHost(fake, 1.25);
+    const now = vi.spyOn(performance, 'now');
+    absent.h.onWorklet({ t: 1.25 });
+    expect(fake.callsOf('session_tick')).toHaveLength(1);
+    expect(now).not.toHaveBeenCalled();
+    const begin = vi.fn(), end = vi.fn();
+    vi.stubGlobal('__vactrPhaseTimer', { begin, end });
+    const timed = timedHost(fake, 2);
+    timed.h.onWorklet({ t: 2 });
+    expect(begin).toHaveBeenCalledExactlyOnceWith('tick');
+    expect(end).toHaveBeenCalledExactlyOnceWith('tick');
+    timed.h.onWorklet({});
+    expect(begin).toHaveBeenCalledTimes(1); expect(end).toHaveBeenCalledTimes(1);
   });
 
   it('delivers each editor record once when onRecord re-enters wasm', () => {

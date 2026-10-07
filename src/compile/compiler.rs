@@ -50,7 +50,7 @@ pub struct CompileCx<'a> {
     /// namespace's tweak table).
     pub sites: Vec<TweakSite>,
     /// Installed instrument header names accepted as pattern steps.
-    pub custom_controls: BTreeSet<Rc<str>>,
+    pub custom_controls: Rc<BTreeSet<Rc<str>>>,
     env: Option<CheckEnv>,
 }
 
@@ -66,7 +66,7 @@ impl<'a> CompileCx<'a> {
             stack_budget: DEFAULT_STACK_BUDGET,
             diags: Vec::new(),
             sites: Vec::new(),
-            custom_controls: BTreeSet::new(),
+            custom_controls: Rc::new(BTreeSet::new()),
             env: None,
         }
     }

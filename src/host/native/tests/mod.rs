@@ -4,6 +4,7 @@
 
 mod audio;
 mod capture;
+mod clock;
 mod midi;
 mod tap;
 mod tick;

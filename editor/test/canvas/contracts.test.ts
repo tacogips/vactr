@@ -24,7 +24,7 @@ describe('canvas predecessor contracts', () => {
     const annotation: CodeAnnotation = { from: 0, to: 3, kind: 'playing' };
     expect(state.doc.sliceString(annotation.from, annotation.to)).toBe('日本語');
     expectTypeOf<CodeSurface['state']>().toEqualTypeOf<EditorState>();
-    expectTypeOf<CodeApi['surface']>().toEqualTypeOf<CodeSurface | undefined>();
+    expectTypeOf<CodeApi['surface']>().toEqualTypeOf<CodeSurface>();
     expectTypeOf<ResourceBudget['reserve']>().toEqualTypeOf<(bytes: number) => boolean>();
   });
 
@@ -65,6 +65,9 @@ describe('canvas predecessor contracts', () => {
   it('rejects nonfinite JSON numbers and invalid levels', () => {
     expect(decodeServer('{"v":1,"seq":1,"kind":"tempo","body":{"bpm":1e309,"beats_per_cycle":4,"cycle":[0,1]}}').ok).toBe(false);
     expect(decodeServer(frame('levels', { levels: [{ source: 'master', rms: -1 }] })).ok).toBe(false);
+    expect(decodeServer(frame('levels', { levels: [], time: 1.5, epoch: 'run-1' })).ok).toBe(true);
+    expect(decodeServer(frame('levels', { levels: [], time: -1 })).ok).toBe(false);
+    expect(decodeServer(frame('levels', { levels: [], epoch: '' })).ok).toBe(false);
     expect(decodeServer(frame('tempo', tempo().body, { v: { toString: 1, valueOf: 1 } })).ok).toBe(false);
   });
 

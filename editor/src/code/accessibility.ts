@@ -19,13 +19,17 @@ export function boundary(text: string, pos: number, bias: -1 | 1 = -1): number {
 }
 export interface InputWindow { start: number; end: number; value: string; anchor: number; head: number; outside: boolean }
 export function surroundingWindow(surface: CodeSurface): InputWindow {
-  const text = surface.state.doc.toString(), selection = surface.state.selection.main;
-  let start = boundary(text, Math.max(0, selection.head - INPUT_WINDOW_LIMIT / 2), 1);
-  let end = boundary(text, Math.min(text.length, start + INPUT_WINDOW_LIMIT), -1);
-  if (end === text.length) start = boundary(text, Math.max(0, end - INPUT_WINDOW_LIMIT), 1);
+  const doc = surface.state.doc, selection = surface.state.selection.main;
+  const from = Math.max(0, selection.head - INPUT_WINDOW_LIMIT - 4);
+  const to = Math.min(doc.length, selection.head + INPUT_WINDOW_LIMIT + 4);
+  const local = doc.sliceString(from, to);
+  const snap = (position: number, bias: -1 | 1): number => from + boundary(local, position - from, bias);
+  let start = snap(Math.max(0, selection.head - INPUT_WINDOW_LIMIT / 2), 1);
+  let end = snap(Math.min(doc.length, start + INPUT_WINDOW_LIMIT), -1);
+  if (end === doc.length) start = snap(Math.max(0, end - INPUT_WINDOW_LIMIT), 1);
   // A single oversized grapheme cannot fit: retain an empty caret window.
-  if (end < start || selection.head < start || selection.head > end) start = end = boundary(text, selection.head, -1);
-  return { start, end, value: text.slice(start, end), anchor: selection.anchor, head: selection.head,
+  if (end < start || selection.head < start || selection.head > end) start = end = snap(selection.head, -1);
+  return { start, end, value: doc.sliceString(start, end), anchor: selection.anchor, head: selection.head,
     outside: selection.from < start || selection.to > end };
 }
 
@@ -35,6 +39,8 @@ export class AccessibilityBridge {
   readonly status: HTMLElement;
   window: InputWindow;
   private projected = { start: 0, end: 0, direction: 'none' as string };
+  private dirty = false;
+  private positionDirty = true;
   constructor(private surface: CodeSurface, container: HTMLElement, label = 'Code editor') {
     this.textarea = document.createElement('textarea');
     this.textarea.setAttribute('aria-label', label);
@@ -48,16 +54,44 @@ export class AccessibilityBridge {
     this.status.setAttribute('aria-live', 'polite');
     Object.assign(this.status.style, { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clipPath: 'inset(50%)' });
     container.append(this.textarea, this.status);
-    this.window = surroundingWindow(surface); this.refresh();
+    this.window = { start: -1, end: -1, value: '', anchor: 0, head: 0, outside: false };
+    this.markDirty(); this.flush({ position: true });
   }
-  refresh(): void {
-    this.window = surroundingWindow(this.surface);
-    this.textarea.value = this.window.value;
+  markDirty(): void { this.dirty = true; }
+  markPositionDirty(): void { this.positionDirty = true; }
+  get isDirty(): boolean { return this.dirty; }
+  get isPositionDirty(): boolean { return this.positionDirty; }
+  flush(opts: { position?: boolean } = {}): void {
+    if (this.dirty) {
+      const previous = this.window;
+      const next = surroundingWindow(this.surface);
+      const actual = this.textarea.value;
+      if (next.value !== actual || next.start !== previous.start || next.end !== previous.end) {
+        if (next.start === previous.start) {
+          let prefix = 0;
+          while (prefix < actual.length && prefix < next.value.length && actual[prefix] === next.value[prefix]) prefix++;
+          let suffix = 0;
+          while (suffix < actual.length - prefix && suffix < next.value.length - prefix &&
+            actual[actual.length - 1 - suffix] === next.value[next.value.length - 1 - suffix]) suffix++;
+          this.textarea.setRangeText(next.value.slice(prefix, next.value.length - suffix), prefix, actual.length - suffix, 'preserve');
+        } else {
+          this.textarea.value = next.value;
+        }
+      }
+      this.window = next;
+      this.dirty = false;
+    }
     const { start, end, anchor, head } = this.window;
     const a = Math.max(start, Math.min(end, anchor)) - start, h = Math.max(start, Math.min(end, head)) - start;
-    this.textarea.setSelectionRange(Math.min(a, h), Math.max(a, h), anchor > head ? 'backward' : 'forward');
+    const from = Math.min(a, h), to = Math.max(a, h), direction = anchor > head ? 'backward' : 'forward';
+    if (this.textarea.selectionStart !== from || this.textarea.selectionEnd !== to || this.textarea.selectionDirection !== direction) {
+      this.textarea.setSelectionRange(from, to, direction);
+    }
     this.projected = { start: this.textarea.selectionStart, end: this.textarea.selectionEnd, direction: this.textarea.selectionDirection };
-    this.position();
+    if (opts.position) { this.position(); this.positionDirty = false; }
+  }
+  refresh(): void {
+    this.markDirty(); this.flush({ position: true });
   }
   position(): void {
     const rect = this.surface.coordsAtPos(this.surface.state.selection.main.head);
@@ -73,9 +107,13 @@ export class AccessibilityBridge {
     const el = this.textarea;
     if (el.selectionStart === this.projected.start && el.selectionEnd === this.projected.end && el.selectionDirection === this.projected.direction) return null;
     const backward = el.selectionDirection === 'backward';
-    const text = this.surface.state.doc.toString();
-    return { anchor: boundary(text, this.window.start + (backward ? el.selectionEnd : el.selectionStart), backward ? 1 : -1),
-      head: boundary(text, this.window.start + (backward ? el.selectionStart : el.selectionEnd), backward ? -1 : 1) };
+    const doc = this.surface.state.doc;
+    const anchor = this.window.start + (backward ? el.selectionEnd : el.selectionStart);
+    const head = this.window.start + (backward ? el.selectionStart : el.selectionEnd);
+    const from = Math.max(0, Math.min(anchor, head) - 4), to = Math.min(doc.length, Math.max(anchor, head) + 4);
+    const local = doc.sliceString(from, to);
+    return { anchor: from + boundary(local, anchor - from, backward ? 1 : -1),
+      head: from + boundary(local, head - from, backward ? -1 : 1) };
   }
   announce(message: string, visible = false): void {
     this.status.textContent = message.slice(0, 256);

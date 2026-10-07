@@ -13,6 +13,8 @@
 pub mod args;
 mod fmt;
 mod get;
+#[cfg(feature = "host-native")]
+pub mod owner;
 mod render;
 mod repl;
 mod run;
@@ -53,7 +55,7 @@ pub(crate) const TICK_PERIOD: std::time::Duration = std::time::Duration::from_mi
 pub(crate) enum HostClock {
     /// The real audio clock (`--host native`).
     #[cfg(feature = "host-native")]
-    Native(crate::host::native::FrameClock),
+    Native(crate::host::native::FrameClock, NativeLink),
     /// A virtual clock advanced by [`HostClock::advance`] only.
     Virtual(Cell<f64>),
 }
@@ -63,7 +65,7 @@ impl HostClock {
     pub(crate) fn now(&self) -> f64 {
         match self {
             #[cfg(feature = "host-native")]
-            HostClock::Native(c) => c.now(),
+            HostClock::Native(c, _) => c.now(),
             HostClock::Virtual(v) => v.get(),
         }
     }
@@ -73,10 +75,16 @@ impl HostClock {
     pub(crate) fn advance(&self, dt: f64) {
         match self {
             #[cfg(feature = "host-native")]
-            HostClock::Native(_) => {}
+            HostClock::Native(_, _) => {}
             HostClock::Virtual(v) => v.set(v.get() + dt),
         }
     }
+}
+
+#[cfg(feature = "host-native")]
+pub(crate) struct NativeLink {
+    pub(crate) output: crate::host::native::OutputClock,
+    pub(crate) stream: crate::host::native::StreamControl,
 }
 
 /// Runs `main` over the process arguments and exits with its code (the
@@ -256,7 +264,12 @@ fn build_session_native(
                         sample_rate: native.clock.sample_rate(),
                         ..RuntimeConfig::default()
                     };
-                    (native.hosts, runtime, HostClock::Native(native.clock))
+                    let native_clock = native.clock.clone();
+                    let link = NativeLink {
+                        output: native.output.clone(),
+                        stream: native.stream.clone(),
+                    };
+                    (native.hosts, runtime, HostClock::Native(native_clock, link))
                 }
                 Err(d) => {
                     if host == HostChoice::NativeInput {

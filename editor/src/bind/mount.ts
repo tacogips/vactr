@@ -10,17 +10,15 @@
 // re-keys the table first and each affected row then repaints once. A whole
 // `eval-result` is applied from the client listener as one rebuild.
 
-import { StateEffect } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
 import type { CodeApi } from '../app/apis';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { buildLayout } from '../app/layout';
 import { DOC_FILE } from '../code/mount';
 import type { EditorDecl, EvalResultBody, WireForm } from '../protocol/types';
-import { Utf8Index } from '../protocol/utf8';
 import { ControlPanel } from './directives';
-import { DragController, overlayField, setOverlays, type OverlayMark } from './drag';
+import { DragController } from './drag';
 import { formatValue, SliderPanel } from './panel';
+import type { PanelViewport } from './panel';
 import { Persistence, type PersistenceMode } from './persistence';
 import { CcRouter } from './routing';
 import { save, type Saved } from './save';
@@ -49,6 +47,8 @@ export interface BindOptions {
   docName?: string;
   /** Test seam: called after every panel row render. */
   onRender?: (key: string, el: HTMLElement) => void;
+  /** Test seam for deterministic bind-panel virtualization. */
+  panelViewport?: () => PanelViewport;
 }
 
 export class BindArea {
@@ -64,11 +64,10 @@ export class BindArea {
   readonly notices: string[] = [];
   private readonly deps: EditorDeps;
   private readonly code: CodeApi;
-  private readonly view: EditorView;
+  private readonly surface: CodeApi['surface'];
   private evalRev = 0;
   private forms: WireForm[] = [];
   private owners = new Map<string, string>();
-  private indexCache: { rev: number; idx: Utf8Index } | null = null;
   private readonly offs: (() => void)[] = [];
   private readonly stylesheet: HTMLLinkElement | null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -76,7 +75,7 @@ export class BindArea {
   constructor(root: HTMLElement, deps: EditorDeps, code: CodeApi, opts: BindOptions = {}) {
     this.deps = deps;
     this.code = code;
-    this.view = code.view;
+    this.surface = code.surface;
     this.file = opts.file ?? DOC_FILE;
     this.docName = opts.docName ?? this.file;
     const { client, store } = deps;
@@ -84,7 +83,7 @@ export class BindArea {
 
     this.table = new SiteTable({
       map: (span, rev) => code.mapWireSpan(span, rev),
-      text: (from, to) => this.view.state.sliceDoc(from, to),
+      text: (from, to) => this.surface.state.sliceDoc(from, to),
       retain: (e) => this.writer.overlay(e.bindingId) !== undefined || this.hasSetEntry(e),
       formOf: (range) => this.formOf(range),
     });
@@ -92,8 +91,9 @@ export class BindArea {
       client,
       file: this.file,
       table: this.table,
-      view: this.view,
+      surface: this.surface,
       currentRevision: () => code.currentRevision(this.file),
+      toWireSpan: (from, to) => code.toWireSpan(from, to),
       map: (span, rev) => code.mapWireSpan(span, rev),
       formOf: (range) => this.formOf(range),
       editors: () => this.editors(),
@@ -106,7 +106,7 @@ export class BindArea {
       table: this.table,
       writer: this.writer,
       persistence: this.persistence,
-      view: this.view,
+      surface: this.surface,
       midi: () => deps.midi,
       directives: () => store.directives(this.file),
       evalRevision: () => this.evalRev,
@@ -158,6 +158,7 @@ export class BindArea {
       learn: (e) => void this.writer.learn(e.site.id),
       commit: (e) => this.writer.commit(e.site.id),
       ...(opts.onRender ? { onRender: opts.onRender } : {}),
+      ...(opts.panelViewport ? { viewport: opts.panelViewport } : {}),
     });
     this.control = new ControlPanel(right, {
       store,
@@ -165,8 +166,8 @@ export class BindArea {
       persistence: this.persistence,
       evalRevision: () => this.evalRev,
       map: (span, rev) => code.mapWireSpan(span, rev),
-      slice: (from, to) => this.view.state.sliceDoc(from, to),
-      lineOf: (pos) => this.view.state.doc.lineAt(pos).number,
+      slice: (from, to) => this.surface.state.sliceDoc(from, to),
+      lineOf: (pos) => this.surface.state.doc.lineAt(pos).number,
       setMode: (mode) => this.setMode(mode),
       save: () => void this.save().catch((e: unknown) => this.notice(`save failed: ${String(e)}`)),
     });
@@ -189,15 +190,9 @@ export class BindArea {
       }),
     );
 
-    this.view.dispatch({
-      effects: StateEffect.appendConfig.of([
-        overlayField,
-        this.drag.extension(),
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) this.panel.renderIds(this.table.refreshMapping());
-        }),
-      ]),
-    });
+    this.offs.push(this.surface.subscribe((update) => {
+      if (update.docChanged) this.panel.renderIds(this.table.refreshMapping());
+    }), this.drag.attach(this.surface));
 
     this.router.sync();
     const win = root.ownerDocument.defaultView;
@@ -226,7 +221,7 @@ export class BindArea {
     return save({
       files: this.deps.files,
       name,
-      text: this.view.state.doc.toString(),
+      text: this.surface.state.doc.toString(),
       mode: this.persistence.mode,
       set,
     });
@@ -302,11 +297,7 @@ export class BindArea {
   }
 
   private bytes(r: Range16): { start: number; end: number } {
-    const rev = this.code.currentRevision(this.file);
-    if (!this.indexCache || this.indexCache.rev !== rev) {
-      this.indexCache = { rev, idx: new Utf8Index(this.view.state.doc.toString()) };
-    }
-    return this.indexCache.idx.spanToBytes(r.from, r.to);
+    return this.code.toWireSpan(r.from, r.to);
   }
 
   private hasSetEntry(e: SiteEntry): boolean {
@@ -316,7 +307,7 @@ export class BindArea {
   private lineExcerpt(e: SiteEntry): string {
     const r = this.table.currentRange(e);
     if (!r) return e.literalText;
-    const line = this.view.state.doc.lineAt(r.from).text.trim();
+    const line = this.surface.state.doc.lineAt(r.from).text.trim();
     return line.length > 40 ? `${line.slice(0, 39)}…` : line;
   }
 
@@ -328,13 +319,13 @@ export class BindArea {
   }
 
   private updateOverlays(): void {
-    const marks: OverlayMark[] = [];
+    const marks: { from: number; to: number; kind: 'binding'; label: string }[] = [];
     for (const [id, v] of this.writer.overlays()) {
       const e = this.table.get(id);
       const r = e ? this.table.currentRange(e) : null;
-      if (r) marks.push({ pos: r.to, text: ` = ${formatValue(v)}` });
+      if (r) marks.push({ from: r.to, to: r.to, kind: 'binding', label: ` = ${formatValue(v)}` });
     }
-    this.view.dispatch({ effects: setOverlays.of(marks) });
+    this.surface.annotate('bind-overlays', marks);
   }
 }
 

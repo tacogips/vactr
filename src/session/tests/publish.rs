@@ -9,7 +9,15 @@ use super::support::{batches, Rig};
 use crate::host::testing::AudioCall;
 use crate::ns::depgraph::FormState;
 use crate::ns::stage::SlotKey;
-use crate::session::protocol::{BindingsBody, ServerMsg, WireFormState, WireState, WireValue};
+use crate::sched::announce::{AnnounceDrain, ANNOUNCE_CAP};
+use crate::sched::slots::SlotKind;
+use crate::sched::telemetry::PlayingEvent;
+use crate::session::protocol::{
+    BindingsBody, PlayingBody, ServerMsg, WireFormState, WirePlaying, WireState, WireValue,
+};
+use crate::session::{ClockReading, LatencyKind};
+use crate::value::intern::intern_kw;
+use crate::value::ratio::Ratio64;
 
 /// The current defining generation of `name`.
 fn gen(rig: &Rig, name: &str) -> u64 {
@@ -371,14 +379,17 @@ fn transport_samples(msgs: &[ServerMsg]) -> Vec<crate::session::protocol::Transp
 }
 
 #[test]
-fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceiling() {
+fn periodic_transport_pairs_cycle_with_host_time_and_keeps_rate_ceiling() {
     let mut rig = Rig::new();
     let mut samples = Vec::new();
     for n in 0..=1000 {
         let time = f64::from(n) / 1000.0;
         rig.clock.set(time);
         for sample in transport_samples(&rig.tick()) {
-            assert_eq!(sample.sample_time, time);
+            let cps = sample.bpm / 60.0 / sample.beats_per_cycle;
+            let grid_period = 1.0 / (960.0 * cps);
+            assert!(time - sample.sample_time >= 0.0);
+            assert!(time - sample.sample_time < grid_period + 1e-9);
             assert_eq!(
                 sample.cycle,
                 crate::session::publish::ratio_pair(rig.s.runtime().clock().pos())
@@ -386,7 +397,7 @@ fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceilin
             assert!(sample.running);
             assert_eq!(sample.latency_kind, "unavailable");
             assert_eq!(sample.latency_seconds, None);
-            samples.push(sample);
+            samples.push((time, sample));
         }
     }
     assert!(
@@ -395,14 +406,87 @@ fn periodic_transport_uses_matching_host_time_and_runtime_cycle_with_rate_ceilin
         samples.len()
     );
     for pair in samples.windows(2) {
-        assert!(pair[1].sample_time - pair[0].sample_time >= 0.05);
-        assert_eq!(pair[0].epoch, pair[1].epoch);
+        assert!(pair[1].0 - pair[0].0 >= 0.05);
+        assert_eq!(pair[0].1.epoch, pair[1].1.epoch);
     }
-    let before = samples.last().unwrap().epoch.clone();
+    let before = samples.last().unwrap().1.epoch.clone();
     rig.clock.set(0.0);
     let restarted = transport_samples(&rig.tick());
     assert_ne!(restarted[0].epoch, before);
     assert_eq!(restarted[0].sample_time, 0.0);
+}
+
+#[test]
+fn transport_sample_time_matches_cycle_at_quantum_ticks() {
+    fn cycle(sample: &crate::session::protocol::TransportSample) -> f64 {
+        crate::value::ratio::Ratio64::new(sample.cycle[0], sample.cycle[1])
+            .unwrap_or(crate::value::ratio::Ratio64::ZERO)
+            .to_f64()
+    }
+
+    let mut rig = Rig::new();
+    let mut samples = Vec::new();
+    for n in 0..=7500 {
+        let host_now = f64::from(n * 128) / 48_000.0;
+        rig.clock.set(host_now);
+        if n == 3750 {
+            rig.ok("use-bpm 137", 1);
+        }
+        for sample in transport_samples(&rig.tick()) {
+            samples.push((host_now, sample));
+        }
+    }
+
+    for bpm in [120.0, 137.0] {
+        let phase: Vec<_> = samples
+            .iter()
+            .filter(|(_, sample)| sample.bpm == bpm)
+            .collect();
+        assert!(phase.len() > 10, "not enough samples at {bpm} bpm");
+        let cps = bpm / 60.0 / 4.0;
+        let grid_period = 1.0 / (960.0 * cps);
+        for (host_now, sample) in &phase {
+            assert!(host_now - sample.sample_time >= 0.0);
+            assert!(host_now - sample.sample_time < grid_period + 1e-9);
+        }
+        for (index, left) in phase.iter().enumerate() {
+            let (_, sample_i) = *left;
+            for right in phase.iter().skip(index + 1) {
+                let (_, sample_j) = *right;
+                if sample_i.epoch != sample_j.epoch {
+                    continue;
+                }
+                assert!(sample_j.sample_time >= sample_i.sample_time);
+                let cycle_i = cycle(sample_i);
+                let cycle_j = cycle(sample_j);
+                let paired_error = ((cycle_j - cycle_i) / cps
+                    - (sample_j.sample_time - sample_i.sample_time))
+                    .abs();
+                assert!(
+                    paired_error <= 1e-9,
+                    "{bpm} bpm paired error {paired_error}"
+                );
+            }
+        }
+    }
+
+    let default_phase: Vec<_> = samples
+        .iter()
+        .filter(|(_, sample)| sample.bpm == 120.0)
+        .collect();
+    let mut max_host_error = 0.0_f64;
+    for (index, left) in default_phase.iter().enumerate() {
+        let (host_i, sample_i) = *left;
+        for right in default_phase.iter().skip(index + 1) {
+            let (host_j, sample_j) = *right;
+            if sample_i.epoch != sample_j.epoch {
+                continue;
+            }
+            let host_error = ((cycle(sample_j) - cycle(sample_i)) / 0.5 - (host_j - host_i)).abs();
+            max_host_error = max_host_error.max(host_error);
+        }
+    }
+    assert!(max_host_error > 0.001, "control error {max_host_error}");
 }
 
 #[test]
@@ -454,6 +538,7 @@ fn scheduled_end_time_uses_original_seconds_and_preserves_source_revision() {
         }),
         kind: SlotKind::Pattern,
         reduced_lead: false,
+        id: None,
     };
     let files = vec![std::rc::Rc::from("main.vact")];
     let first = crate::session::publish::playing_wire(&event, &files, 120.0, &|_| 42);
@@ -507,6 +592,111 @@ fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
     let next = transport_samples(&rig.tick());
     assert_eq!(next.len(), 1);
     assert_eq!(Some(next[0].epoch.as_str()), epoch.as_deref());
+}
+
+#[test]
+fn playing_wire_round_trip_and_legacy_json_omit_empty_additions() {
+    let event = WirePlaying {
+        epoch: Some("session-1-2".to_string()),
+        end_time: Some(1.25),
+        id: Some(7),
+        slot: "d1".to_string(),
+        beat: [1, 1],
+        time: 0.75,
+        dur: [1, 2],
+        src: None,
+    };
+    let body = PlayingBody {
+        events: vec![event.clone()],
+        ahead: vec![WirePlaying {
+            id: Some(8),
+            time: 1.0,
+            ..event
+        }],
+        retract: vec![9],
+    };
+    let encoded = serde_json::to_string(&body).expect("serialize playing body");
+    let decoded: PlayingBody = serde_json::from_str(&encoded).expect("deserialize playing body");
+    assert_eq!(decoded, body);
+
+    let legacy = PlayingBody {
+        events: vec![WirePlaying {
+            epoch: None,
+            end_time: None,
+            id: None,
+            slot: "d1".to_string(),
+            beat: [0, 1],
+            time: 0.5,
+            dur: [1, 2],
+            src: None,
+        }],
+        ahead: Vec::new(),
+        retract: Vec::new(),
+    };
+    assert_eq!(
+        serde_json::to_string(&legacy).expect("serialize legacy playing"),
+        r#"{"events":[{"slot":"d1","beat":[0,1],"time":0.5,"dur":[1,2]}]}"#
+    );
+}
+
+#[test]
+fn publisher_keeps_committed_events_first_and_bounds_ahead_to_remaining_capacity() {
+    let event = PlayingEvent {
+        slot: intern_kw("d1"),
+        beat: Ratio64::ZERO,
+        time: 1.0,
+        src: None,
+        dur: 0.0,
+        kind: SlotKind::Pattern,
+        reduced_lead: false,
+        id: None,
+    };
+    let committed = vec![event.clone(); 4_000];
+    let ahead = (0..500)
+        .map(|id| PlayingEvent {
+            id: Some(id + 1),
+            time: 2.0 - (id as f64) / 1_000.0,
+            ..event.clone()
+        })
+        .collect();
+    let body = crate::session::publish::playing_body(
+        &committed,
+        AnnounceDrain {
+            ahead,
+            retract: vec![1; ANNOUNCE_CAP + 1],
+        },
+        &[],
+        120.0,
+        "epoch",
+        &|_| 0,
+    )
+    .expect("non-empty playing body");
+    assert_eq!(body.events.len(), 4_000);
+    assert_eq!(body.ahead.len(), 96);
+    assert!(body.events.len() + body.ahead.len() <= ANNOUNCE_CAP);
+    assert!(body.events.iter().all(|event| event.id.is_none()));
+    assert!(body.ahead.iter().all(|event| event.id.is_some()));
+    assert!(body.retract.len() <= ANNOUNCE_CAP);
+    assert!(body.ahead.windows(2).all(|pair| {
+        (pair[0].time, &pair[0].slot, pair[0].id) <= (pair[1].time, &pair[1].slot, pair[1].id)
+    }));
+}
+
+#[test]
+fn playing_announcement_is_not_sent_without_a_telemetry_subscriber() {
+    let mut rig = Rig::new();
+    rig.send(crate::session::protocol::ClientMsg::Subscribe(
+        crate::session::protocol::SubscribeBody {
+            telemetry: false,
+            levels: false,
+            diagnostics: false,
+        },
+    ));
+    rig.ok("s [:bd :sd :hh :cp] > d1", 1);
+    let messages = rig.run_to(0.5);
+    assert!(messages
+        .iter()
+        .all(|message| !matches!(message, ServerMsg::Playing(_))));
 }
 
 #[test]
@@ -585,4 +775,88 @@ fn invalid_host_samples_do_not_advance_or_publish_and_unsubscribed_samples_are_a
         },
     ));
     assert!(transport_samples(&rig.tick()).is_empty());
+}
+
+#[test]
+fn observed_latency_and_levels_share_the_transport_clock_sample() {
+    let mut rig = Rig::new();
+    rig.send(crate::session::protocol::ClientMsg::Subscribe(
+        crate::session::protocol::SubscribeBody {
+            telemetry: true,
+            levels: true,
+            diagnostics: true,
+        },
+    ));
+    rig.s.observe_clock(Some(ClockReading {
+        processing_time: 0.012,
+        latency_seconds: Some(0.012),
+        latency_kind: LatencyKind::Measured,
+        uncertainty_seconds: Some(0.001),
+    }));
+    let messages = rig.tick();
+    let sample = transport_samples(&messages)
+        .into_iter()
+        .next()
+        .expect("transport sample");
+    assert_eq!(sample.latency_kind, "measured");
+    assert_eq!(sample.latency_seconds, Some(0.012));
+    assert_eq!(sample.uncertainty_seconds, Some(0.001));
+    let levels = messages
+        .iter()
+        .find_map(|message| match message {
+            ServerMsg::Levels(levels) => Some(levels),
+            _ => None,
+        })
+        .expect("levels sample");
+    assert_eq!(levels.time, Some(0.0));
+    assert_eq!(levels.epoch.as_deref(), Some(sample.epoch.as_str()));
+}
+
+#[test]
+fn discontinuity_changes_epoch_clears_telemetry_and_keeps_control_replies() {
+    let mut rig = Rig::new();
+    let initial = transport_samples(&rig.tick())[0].epoch.clone();
+    let pending = rig
+        .s
+        .apply_text(7, r#"{"v":1,"seq":2,"kind":"manifest?","body":{}}"#);
+    rig.s.outbox.extend(pending);
+    let queued = rig.s.route(
+        7,
+        None,
+        vec![
+            ServerMsg::Playing(Default::default()),
+            ServerMsg::Diag(Default::default()),
+        ],
+    );
+    rig.s.outbox.extend(queued);
+    rig.s.clock_discontinuity();
+    assert_eq!(rig.s.outbox.len(), 2, "only pending telemetry was dropped");
+    assert!(rig
+        .s
+        .outbox
+        .iter()
+        .any(|out| matches!(&out.env.body, ServerMsg::Manifest(_))));
+    assert!(rig
+        .s
+        .outbox
+        .iter()
+        .any(|out| matches!(&out.env.body, ServerMsg::Diag(_))));
+    assert!(!rig
+        .s
+        .outbox
+        .iter()
+        .any(|out| matches!(&out.env.body, ServerMsg::Playing(_))));
+    rig.clock.set(0.05);
+    let messages = rig.tick();
+    assert!(messages
+        .iter()
+        .any(|message| matches!(message, ServerMsg::Manifest(_))));
+    assert!(messages
+        .iter()
+        .any(|message| matches!(message, ServerMsg::Diag(_))));
+    let next = transport_samples(&messages)
+        .into_iter()
+        .next()
+        .expect("transport sample");
+    assert_ne!(next.epoch, initial);
 }

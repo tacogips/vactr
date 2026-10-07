@@ -52,6 +52,7 @@ fn clients() -> Vec<ClientMsg> {
             .unwrap(),
             muted: true,
         }),
+        ClientMsg::ClockProbe(ClockProbeBody { page_send: 12.5 }),
         ClientMsg::Eval(EvalBody {
             file: "main.vact".to_string(),
             code: "s [:bd :sd] > d1\n# ünïcode \"quoted\"".to_string(),
@@ -179,6 +180,16 @@ fn servers() -> Vec<ServerMsg> {
             code: "failed".into(),
             message: "candidate rejected".into(),
         }),
+        ServerMsg::ClockProbe(ClockProbeReply {
+            page_send: 12.5,
+            engine_receive: 1.25,
+            engine_send: 1.25,
+            epoch: "session-1-0".into(),
+            correlation: None,
+            latency_seconds: None,
+            latency_kind: "unavailable".into(),
+            uncertainty_seconds: None,
+        }),
         ServerMsg::EvalResult(EvalResultBody {
             file: "main.vact".to_string(),
             doc_revision: 3,
@@ -297,6 +308,7 @@ fn servers() -> Vec<ServerMsg> {
             events: vec![WirePlaying {
                 epoch: None,
                 end_time: None,
+                id: Some(7),
                 slot: "d1".to_string(),
                 beat: [4, 1],
                 time: 2.0,
@@ -308,6 +320,8 @@ fn servers() -> Vec<ServerMsg> {
                     form_gen: 1,
                 }),
             }],
+            ahead: Vec::new(),
+            retract: Vec::new(),
         }),
         ServerMsg::Levels(LevelsBody {
             levels: vec![WireLevel {
@@ -316,6 +330,8 @@ fn servers() -> Vec<ServerMsg> {
                 bands: None,
             }],
             analyzers: None,
+            time: None,
+            epoch: None,
         }),
         ServerMsg::Tempo(TempoBody {
             transport: None,
@@ -379,6 +395,45 @@ fn the_wire_shape_matches_command_md() {
             ..
         }))
     ));
+}
+
+#[test]
+fn clock_probe_validates_page_time_and_omits_absent_correlation() {
+    let request = r#"{"v":1,"seq":3,"kind":"clock-probe","body":{"page_send":12.5}}"#;
+    assert!(matches!(
+        decode(request),
+        Ok(Envelope {
+            body: ClientMsg::ClockProbe(_),
+            ..
+        })
+    ));
+    assert_eq!(
+        code_of(r#"{"v":1,"seq":3,"kind":"clock-probe","body":{"page_send":-1}}"#),
+        ErrorCode::BadBody
+    );
+    let reply = Envelope::new(
+        4,
+        Some(3),
+        ServerMsg::ClockProbe(ClockProbeReply {
+            page_send: 12.5,
+            engine_receive: 1.25,
+            engine_send: 1.25,
+            epoch: "session-1-0".into(),
+            correlation: None,
+            latency_seconds: None,
+            latency_kind: "unavailable".into(),
+            uncertainty_seconds: None,
+        }),
+    );
+    let value: serde_json::Value = serde_json::from_str(&encode(&reply)).expect("reply JSON");
+    assert_eq!(
+        value,
+        serde_json::json!({"v":1,"seq":4,"re":3,"kind":"clock-probe","body":{
+            "page_send":12.5,"engine_receive":1.25,"engine_send":1.25,
+            "epoch":"session-1-0","latency_seconds":null,"latency_kind":"unavailable",
+            "uncertainty_seconds":null
+        }})
+    );
 }
 
 fn code_of(text: &str) -> ErrorCode {

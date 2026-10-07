@@ -1,10 +1,12 @@
 import { isolateHistory } from '@codemirror/commands';
+import { ChangeSet, Text, type ChangeSet as ChangeSetType } from '@codemirror/state';
 import type { CodeAnnotation } from '../app/apis';
 import { CodeSurface } from './surface';
 import { AccessibilityBridge, boundary } from './accessibility';
 import { KeyboardController, type KeyboardOptions } from './keyboard';
+import type { PhaseTimer } from './frame';
 
-export interface InputPresentation { text: string; cursor: number; annotations: readonly CodeAnnotation[] }
+export interface InputPresentation { doc: Text; changes?: ChangeSetType; changesBase?: Text; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
 export interface InputOptions extends KeyboardOptions {
   label?: string;
   onPresentation?: (presentation: InputPresentation) => void;
@@ -19,55 +21,100 @@ export class InputController {
   private preedit = '';
   private original = '';
   private trailingComposition = false;
+  private cachedPresentation: InputPresentation | null = null;
+  private pendingChanges: ChangeSetType | undefined;
+  private pendingChangesBase: Text | undefined;
+  private lastStateDoc: Text;
+  private presentationKey: { stateDoc: Text; range: { from: number; to: number } | null; preedit: string; composing: boolean; cursor: number } | null = null;
   private stop: () => void;
   private listeners: (() => void)[] = [];
   private disposed = false;
   constructor(readonly surface: CodeSurface, container: HTMLElement, private options: InputOptions = {}) {
+    this.lastStateDoc = surface.state.doc;
     this.accessibility = new AccessibilityBridge(surface, container, options.label);
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
-    this.listen(el, 'compositionstart', () => this.beginComposition());
-    this.listen(el, 'compositionupdate', (event) => this.updateComposition((event as CompositionEvent).data));
-    this.listen(el, 'compositionend', (event) => this.endComposition((event as CompositionEvent).data));
-    this.listen(el, 'beforeinput', (event) => this.beforeInput(event as InputEvent));
-    this.listen(el, 'input', (event) => this.input(event as InputEvent));
-    this.listen(el, 'select', () => {
-      if (this.composing || el.value !== this.accessibility.window.value) return;
-      const selection = this.accessibility.readSelection();
-      if (selection) this.surface.dispatch({ selection });
+    this.listen(el, 'compositionstart', () => this.withInput(() => { this.flushBeforeHandler(); this.surface.notifyCompositionStart(); this.beginComposition(); }));
+    this.listen(el, 'compositionupdate', (event) => this.withInput(() => this.updateComposition((event as CompositionEvent).data)));
+    this.listen(el, 'compositionend', (event) => this.withInput(() => this.endComposition((event as CompositionEvent).data)));
+    this.listen(el, 'beforeinput', (event) => this.withInput(() => { this.flushBeforeHandler(); this.beforeInput(event as InputEvent); }));
+    this.listen(el, 'input', (event) => this.withInput(() => this.input(event as InputEvent)));
+    this.listen(el, 'select', () => this.withInput(() => { this.syncSelection(); this.flushBeforeHandler(); }));
+    this.listen(document, 'selectionchange', () => {
+      if (document.activeElement !== el) return;
+      this.withInput(() => { this.syncSelection(); this.flushBeforeHandler(); });
     });
-    this.listen(el, 'keydown', (event) => {
+    this.listen(el, 'keydown', (event) => this.withInput(() => {
+      this.flushBeforeHandler();
       const key = event as KeyboardEvent;
       if (this.composing && key.key === 'Escape') { key.preventDefault(); this.cancelComposition(); return; }
       if (!this.composing) this.trailingComposition = false;
-      this.keyboard.handle(key);
-    });
-    this.listen(el, 'copy', (event) => this.clipboard(event as ClipboardEvent, 'copy'));
-    this.listen(el, 'cut', (event) => this.clipboard(event as ClipboardEvent, 'cut'));
-    this.listen(el, 'paste', (event) => this.clipboard(event as ClipboardEvent, 'paste'));
-    this.listen(el, 'blur', () => this.cancelComposition());
-    const position = () => this.accessibility.position();
+      if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);
+    }));
+    this.listen(el, 'copy', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'copy'); }));
+    this.listen(el, 'cut', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'cut'); }));
+    this.listen(el, 'paste', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'paste'); }));
+    this.listen(el, 'focus', () => this.withInput(() => this.flushBeforeHandler()));
+    this.listen(el, 'blur', () => { this.surface.notifyBlur(); this.cancelComposition(); });
+    const position = () => this.accessibility.markPositionDirty();
     this.listen(window, 'resize', position);
     this.listen(window, 'orientationchange', position);
     this.listen(window, 'scroll', position);
     if (window.visualViewport) { this.listen(window.visualViewport, 'resize', position); this.listen(window.visualViewport, 'scroll', position); }
-    this.stop = surface.subscribe(() => {
-      if (!this.composing) this.accessibility.refresh();
-      this.publish();
+    this.stop = surface.subscribe((update) => {
+      const previous = this.cachedPresentation;
+      const changes = update.docChanged && !this.composing && previous?.doc === this.lastStateDoc ? update.changes : undefined;
+      this.lastStateDoc = update.state.doc;
+      if (!this.composing) this.accessibility.markDirty();
+      this.publish(changes, changes ? previous?.doc : undefined);
     });
     this.publish();
   }
+  setPhases(phases: PhaseTimer | null): void { this.options.phases = phases; this.keyboard.setPhases(phases); }
   get isComposing(): boolean { return this.composing; }
+  flushBridge(): void {
+    const position = this.accessibility.isDirty || this.accessibility.isPositionDirty;
+    if (position) this.accessibility.flush({ position: true });
+  }
   get presentation(): InputPresentation {
-    const text = this.surface.state.doc.toString(), range = this.surface.compositionRange;
-    if (!this.composing || !range) return { text, cursor: this.surface.state.selection.main.head, annotations: [] };
-    return { text: text.slice(0, range.from) + this.preedit + text.slice(range.to), cursor: range.from + this.preedit.length,
-      annotations: [{ from: range.from, to: range.from + this.preedit.length, kind: 'composition' }] };
+    const stateDoc = this.surface.state.doc, range = this.surface.compositionRange;
+    const cursor = this.composing && range ? range.from + this.preedit.length : this.surface.state.selection.main.head;
+    const key = this.presentationKey;
+    if (key && key.stateDoc === stateDoc && key.composing === this.composing && key.preedit === this.preedit && key.cursor === cursor &&
+      key.range?.from === range?.from && key.range?.to === range?.to) return this.cachedPresentation!;
+    const doc = this.composing && range ? stateDoc.replace(range.from, range.to, Text.of(this.preedit.split('\n'))) : stateDoc;
+    const annotations: readonly CodeAnnotation[] = this.composing && range
+      ? [{ from: range.from, to: range.from + this.preedit.length, kind: 'composition' }] : [];
+    const presentation = { doc, changes: this.pendingChanges, changesBase: this.pendingChangesBase, cursor, annotations } as InputPresentation;
+    Object.defineProperty(presentation, 'text', { enumerable: true, get: () => doc.toString() });
+    this.presentationKey = { stateDoc, range: range ? { ...range } : null, preedit: this.preedit, composing: this.composing, cursor };
+    this.cachedPresentation = presentation;
+    return presentation;
   }
   private listen(target: EventTarget, name: string, fn: EventListener): void {
     target.addEventListener(name, fn); this.listeners.push(() => target.removeEventListener(name, fn));
   }
-  private publish(): void { if (!this.disposed) this.options.onPresentation?.(this.presentation); }
+  private flushBeforeHandler(): void {
+    if (this.accessibility.isDirty) this.accessibility.flush({ position: false });
+  }
+  private syncSelection(): void {
+    const el = this.accessibility.textarea;
+    if (this.composing || el.value !== this.accessibility.window.value) return;
+    const selection = this.accessibility.readSelection();
+    if (selection) this.surface.dispatch({ selection });
+  }
+  private withInput<T>(run: () => T): T {
+    const phases = this.options.phases;
+    phases?.begin('input');
+    try { return run(); } finally { phases?.end('input'); }
+  }
+  private publish(changes?: ChangeSetType, changesBase?: Text): void {
+    if (this.disposed) return;
+    this.pendingChanges = changes;
+    this.pendingChangesBase = changes ? changesBase : undefined;
+    this.presentationKey = null;
+    this.options.onPresentation?.(this.presentation);
+  }
   beginComposition(): void {
     if (this.composing || this.disposed) return;
     this.trailingComposition = false;
@@ -78,7 +125,9 @@ export class InputController {
   }
   updateComposition(text: string): void {
     if (!this.composing) this.beginComposition();
-    this.preedit = text; this.publish();
+    const previous = this.presentation, range = this.surface.compositionRange;
+    const changes = range ? ChangeSet.of({ from: range.from, to: range.from + this.preedit.length, insert: text }, previous.doc.length) : undefined;
+    this.preedit = text; this.publish(changes, changes ? previous.doc : undefined);
   }
   endComposition(text: string): void {
     if (!this.composing) return;

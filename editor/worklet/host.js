@@ -4,8 +4,9 @@
 // Plain JS module, no build step. `startHost` fetches the module bytes,
 // instantiates wasm #1, creates the AudioContext and the AudioWorkletNode,
 // and posts a COPY of the bytes to the worklet (wasm #2). On every worklet
-// message it hands the worklet's records to `inbox`, calls `tick` with the
-// posted frame time (at most every `tickEvery` seconds of audio time), and
+// message it hands the worklet's records to `inbox`, calls `tick` with a
+// fresh engine time estimated from the context clock (at most every
+// `tickEvery` seconds of audio time), and
 // posts each outbox record to the worklet as a transferred ArrayBuffer.
 // Console records (tag 0x70) go to `onConsole` instead. JS never parses a
 // record beyond the frame length and that routing tag. Samples are decoded
@@ -48,6 +49,9 @@ export class VactrHost {
     this.opts = opts;
     this.now = 0;
     this.lastTick = -1;
+    this.engineOffset = null;
+    this.lastGaps = -1;
+    this.lastErrors = -1;
     this.tickEvery = opts.tickEvery ?? 0.005;
     this.fn = opts.init === 'session' ? EXPORTS.session : EXPORTS.main;
     this.report = null;
@@ -85,10 +89,35 @@ export class VactrHost {
       this.js = m.js;
     }
     if (typeof m.t === 'number') {
-      this.now = m.t;
+      const ct = this.ctx?.currentTime;
+      let fresh = m.t;
+      if (typeof ct === 'number' && Number.isFinite(ct)) {
+        const sample = ct - m.t;
+        const counters = Array.isArray(m.js) ? m.js : null;
+        const gaps = counters?.[3];
+        const errors = counters?.[2];
+        const counterIncreased =
+          (typeof gaps === 'number' && this.lastGaps >= 0 && gaps > this.lastGaps) ||
+          (typeof errors === 'number' && this.lastErrors >= 0 && errors > this.lastErrors);
+        if (this.engineOffset === null || counterIncreased) {
+          this.engineOffset = sample;
+        } else {
+          this.engineOffset = Math.min(this.engineOffset, sample);
+        }
+        if (typeof gaps === 'number') this.lastGaps = gaps;
+        if (typeof errors === 'number') this.lastErrors = errors;
+        fresh = Math.max(m.t, ct - this.engineOffset);
+      }
+      this.now = Math.max(this.lastTick, fresh);
       if (this.lastTick < 0 || this.now - this.lastTick >= this.tickEvery) {
         this.lastTick = this.now;
-        this.x[this.fn.tick](this.now);
+        const phases = globalThis.__vactrPhaseTimer;
+        if (phases) phases.begin('tick');
+        try {
+          this.x[this.fn.tick](this.now);
+        } finally {
+          if (phases) phases.end('tick');
+        }
       }
     }
     this.flush();

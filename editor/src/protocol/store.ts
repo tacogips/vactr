@@ -76,6 +76,7 @@ interface Sub {
   keys: ReadonlySet<string>;
   cb: StoreCallback;
   active: boolean;
+  seq: number;
 }
 
 export const nameKey = (n: string): string => `name:${n}`;
@@ -105,13 +106,16 @@ export class Store {
   private levelsBody: LevelsBody | null = null;
   private manifestBody: ManifestBody | null = null;
   private lastPass = 0;
-  private subs: Sub[] = [];
+  private subs = new Set<Sub>();
+  private readonly index = new Map<string, Set<Sub>>();
+  private nextSubSeq = 0;
   private queue: QueuedChange[] = [];
   private notifying = false;
   private disposed = false;
   private timedSample: TransportSample | null = null;
   private dropped = 0;
   private coalesced = 0;
+  readonly stats = { notifyVisits: 0 };
   get transportSample(): TransportSample | null { return this.timedSample; }
   get synchronized(): boolean { return this.timedSample !== null; }
   get queueStats(): { telemetryQueued: number; dropped: number; coalesced: number } {
@@ -121,7 +125,8 @@ export class Store {
     this.disposed = true;
     this.queue.length = 0;
     for (const sub of this.subs) sub.active = false;
-    this.subs.length = 0;
+    this.subs.clear();
+    this.index.clear();
     this.siteMap.clear(); this.siteFile.clear(); this.nameMap.clear();
     this.fileDiags.clear(); this.slotDiags.clear(); this.directiveMap.clear(); this.formMap.clear();
     this.songMap.clear(); this.songRequests.clear();
@@ -252,11 +257,22 @@ export class Store {
 
   subscribe(keys: Iterable<string>, cb: StoreCallback): () => void {
     if (this.disposed) return () => {};
-    const sub: Sub = { keys: new Set(keys), cb, active: true };
-    this.subs.push(sub);
+    const sub: Sub = { keys: new Set(keys), cb, active: true, seq: this.nextSubSeq++ };
+    this.subs.add(sub);
+    for (const key of sub.keys) {
+      let bucket = this.index.get(key);
+      if (!bucket) { bucket = new Set(); this.index.set(key, bucket); }
+      bucket.add(sub);
+    }
     return () => {
+      if (!sub.active) return;
       sub.active = false;
-      this.subs = this.subs.filter((s) => s !== sub);
+      this.subs.delete(sub);
+      for (const key of sub.keys) {
+        const bucket = this.index.get(key);
+        bucket?.delete(sub);
+        if (bucket?.size === 0) this.index.delete(key);
+      }
     };
   }
 
@@ -294,16 +310,12 @@ export class Store {
   private notify(changed: ReadonlySet<string>): void {
     this.notifying = true;
     try {
-      for (const sub of [...this.subs]) {
+      const candidates = new Set<Sub>();
+      for (const key of changed) for (const sub of this.index.get(key) ?? []) candidates.add(sub);
+      const snapshot = [...candidates].sort((a, b) => a.seq - b.seq);
+      for (const sub of snapshot) {
         if (!sub.active) continue;
-        let hit = false;
-        for (const k of sub.keys) {
-          if (changed.has(k)) {
-            hit = true;
-            break;
-          }
-        }
-        if (!hit) continue;
+        this.stats.notifyVisits += 1;
         try {
           sub.cb(changed, this);
         } catch (e) {

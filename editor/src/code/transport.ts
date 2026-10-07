@@ -21,10 +21,10 @@
 
 import { createComponent, createRoot, createSignal, type Accessor, type Setter } from 'solid-js';
 import { render } from 'solid-js/web';
-import type { Clock } from '../app/clock';
+import type { AudibleClock, Clock } from '../app/clock';
 import type { Client } from '../protocol/client';
 import { defaultTimers, type Timers } from '../protocol/document';
-import type { Diagnostic, LevelsBody, ServerEnvelope, TempoBody, WirePlaying } from '../protocol/types';
+import type { Diagnostic, LevelsBody, ServerEnvelope, TempoBody, TransportSample, WirePlaying } from '../protocol/types';
 import { audioModel, type AudioContextLike, type AudioModel } from '../ui/audio';
 import { TransportView, type ClockStatus, type EvalStatus, type Position, type SlotView } from '../ui/transport-view';
 import { DEFAULT_BEATS_PER_CYCLE, DEFAULT_BPM, TimeAnchor } from './highlight';
@@ -69,6 +69,8 @@ export interface TransportOptions {
   client: Client;
   clock: Clock;
   anchor?: TimeAnchor;
+  audible?: AudibleClock;
+  sample?: () => TransportSample | null;
   /** Called after `hush` is sent. */
   onHush?: () => void;
   /** The browser tier's AudioContext; omitted on the native tier. */
@@ -88,6 +90,7 @@ interface SlotRow {
 export class TransportBar {
   readonly el: HTMLElement;
   readonly audio: AudioModel;
+  readonly state = { cycle: null as number | null, beatFlash: false, hidden: true };
   private readonly opts: TransportOptions;
   private readonly anchor: TimeAnchor;
   private readonly timers: Timers;
@@ -264,8 +267,8 @@ export class TransportBar {
   }
 
   /** Per frame: the position and the activity lights. */
-  tick(): void {
-    this.renderPosition();
+  tick(frameMs?: number): void {
+    this.renderPosition(frameMs);
     const now = this.opts.clock.now();
     for (const row of this.slots.values()) {
       row.times = row.times.filter((t) => t + ACTIVITY_S > now);
@@ -282,7 +285,41 @@ export class TransportBar {
     this.el.remove();
   }
 
-  private renderPosition(): void {
+  private renderPosition(frameMs?: number): void {
+    if (this.opts.audible && this.opts.sample) {
+      const audible = this.opts.audible.sample(frameMs ?? performance.now());
+      const s = this.opts.sample();
+      let cycle: number | null = null;
+      let beatFlash = false;
+      if (audible.valid && s && (!audible.epoch || s.epoch === audible.epoch)) {
+        const age = audible.time - s.sample_time;
+        if (age >= 0 ? age <= 2 : age >= -1) {
+          const bpc = s.beats_per_cycle > 0 ? s.beats_per_cycle : DEFAULT_BEATS_PER_CYCLE;
+          const sampleCycle = s.cycle[1] === 0 ? 0 : s.cycle[0] / s.cycle[1];
+          const bpm = s.bpm > 0 ? s.bpm : DEFAULT_BPM;
+          const beatDuration = 60 / bpm;
+          cycle = sampleCycle;
+          if (s.running) cycle += age * bpm / 60 / bpc;
+          const sampleBeatPhase = (sampleCycle - Math.floor(sampleCycle)) * bpc;
+          const beatElapsed = ((sampleBeatPhase % 1) * beatDuration) + (s.running ? age : 0);
+          const beatAge = ((beatElapsed % beatDuration) + beatDuration) % beatDuration;
+          beatFlash = s.running && beatAge < 0.08;
+          const whole = Math.floor(cycle);
+          const beat = Math.floor((cycle - whole) * bpc + 1e-9) + 1;
+          this.setPosition({ cycle: whole, beat, beatsPerCycle: bpc });
+        }
+      }
+      this.state.cycle = cycle;
+      this.state.beatFlash = beatFlash && cycle !== null;
+      this.state.hidden = cycle === null;
+      const position = this.el.querySelector<HTMLElement>('.vact-position');
+      if (position) {
+        position.dataset.sync = this.state.hidden ? 'hidden' : 'visible';
+        position.dataset.beatFlash = this.state.beatFlash ? 'on' : 'off';
+      }
+      if (cycle === null) this.setPosition(null);
+      return;
+    }
     const c = this.cycles();
     if (c === null) return;
     const bpc = this.tempo && this.tempo.beats_per_cycle > 0 ? this.tempo.beats_per_cycle : DEFAULT_BEATS_PER_CYCLE;

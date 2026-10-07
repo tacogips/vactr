@@ -9,6 +9,8 @@
 //! session state from before the checked document. This module classifies
 //! each new binding into the 5.6 diagnostics; the checker reports them.
 
+#[cfg(test)]
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -76,7 +78,42 @@ pub(crate) enum ScopeKind {
 #[derive(Debug)]
 struct Scope {
     names: Vec<(Rc<str>, Binding)>,
+    index: HashMap<Rc<str>, usize>,
 }
+
+impl Scope {
+    fn empty() -> Self {
+        Self {
+            names: Vec::new(),
+            index: HashMap::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static NAME_PROBES: Cell<u64> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn name_probes() -> u64 {
+    NAME_PROBES.with(Cell::get)
+}
+
+#[cfg(test)]
+pub(crate) fn reset_name_probes() {
+    NAME_PROBES.with(|probes| probes.set(0));
+}
+
+#[cfg(test)]
+#[inline]
+fn note_probe() {
+    NAME_PROBES.with(|probes| probes.set(probes.get() + 1));
+}
+
+#[cfg(not(test))]
+#[inline(always)]
+fn note_probe() {}
 
 /// The user scopes, session first. Never empty.
 #[derive(Debug)]
@@ -127,7 +164,7 @@ impl Scopes {
     /// Only the session scope.
     pub(crate) fn new() -> Scopes {
         Scopes {
-            stack: vec![Scope { names: Vec::new() }],
+            stack: vec![Scope::empty()],
             query_effects: HashMap::new(),
         }
     }
@@ -142,7 +179,7 @@ impl Scopes {
     /// Opens a child scope. Every kind classifies bindings the same way;
     /// the kind documents which 5.6 boundary the caller opened.
     pub(crate) fn push(&mut self, _kind: ScopeKind) {
-        self.stack.push(Scope { names: Vec::new() });
+        self.stack.push(Scope::empty());
     }
 
     /// The number of open scopes (the session counts).
@@ -167,14 +204,15 @@ impl Scopes {
         let Some((inner, outer)) = self.stack.split_last() else {
             return DeclNote::None;
         };
-        if let Some((_, b)) = inner.names.iter().find(|(n, _)| &**n == name) {
-            return DeclNote::Rebinding(b.span);
+        note_probe();
+        if let Some(slot) = inner.index.get(name) {
+            return DeclNote::Rebinding(inner.names[*slot].1.span);
         }
-        if outer
-            .iter()
-            .any(|s| s.names.iter().any(|(n, _)| &**n == name))
-        {
-            return DeclNote::Shadowing;
+        for scope in outer {
+            note_probe();
+            if scope.index.contains_key(name) {
+                return DeclNote::Shadowing;
+            }
         }
         if env.global(name).is_some() {
             return if self.at_session() {
@@ -193,32 +231,31 @@ impl Scopes {
     /// earlier binding, so later uses see the latest type.
     pub(crate) fn bind(&mut self, name: Rc<str>, b: Binding) {
         if let Some(scope) = self.stack.last_mut() {
-            match scope.names.iter_mut().find(|(n, _)| *n == name) {
-                Some(slot) => slot.1 = b,
-                None => scope.names.push((name, b)),
+            note_probe();
+            match scope.index.get(&*name).copied() {
+                Some(slot) => scope.names[slot].1 = b,
+                None => {
+                    let slot = scope.names.len();
+                    scope.names.push((Rc::clone(&name), b));
+                    note_probe();
+                    scope.index.insert(name, slot);
+                }
             }
         }
     }
 
     /// The session-scope binding of `name` (a local binding does not count).
     pub(crate) fn session_lookup(&self, name: &str) -> Option<&Binding> {
-        self.stack
-            .first()?
-            .names
-            .iter()
-            .rev()
-            .find(|(n, _)| &**n == name)
-            .map(|(_, b)| b)
+        let scope = self.stack.first()?;
+        note_probe();
+        scope.index.get(name).map(|slot| &scope.names[*slot].1)
     }
 
     /// The innermost user binding of `name`.
     pub(crate) fn lookup(&self, name: &str) -> Option<&Binding> {
-        self.stack.iter().rev().find_map(|s| {
-            s.names
-                .iter()
-                .rev()
-                .find(|(n, _)| &**n == name)
-                .map(|(_, b)| b)
+        self.stack.iter().rev().find_map(|scope| {
+            note_probe();
+            scope.index.get(name).map(|slot| &scope.names[*slot].1)
         })
     }
 
@@ -231,8 +268,10 @@ impl Scopes {
         extra: BindExtra,
         query_effect: bool,
     ) {
-        for s in self.stack.iter_mut().rev() {
-            if let Some((_, b)) = s.names.iter_mut().rev().find(|(n, _)| &**n == name) {
+        for scope in self.stack.iter_mut().rev() {
+            note_probe();
+            if let Some(slot) = scope.index.get(name).copied() {
+                let b = &mut scope.names[slot].1;
                 b.scheme = scheme;
                 b.extra = extra;
                 b.query_effect = query_effect;

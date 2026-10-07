@@ -1,27 +1,30 @@
 /* The parameter-editor pane (design 15.1.7). */
-.params { display: flex; flex-direction: column; gap: 4px; font: 12px/1.3 system-ui, sans-serif; }
-.params-tabs { display: flex; gap: 2px; }
+.params { display: flex; flex-direction: column; gap: var(--vt-space-2); font: var(--vt-text-sm)/1.3 var(--vt-font-sans); padding: var(--vt-space-2) var(--vt-space-3); border-top: var(--vt-border-w) solid var(--vt-border); }
+.params-tabs { display: flex; gap: var(--vt-space-1); border-bottom: var(--vt-border-w) solid var(--vt-border); }
+.params-tab { background: transparent; border: 0; border-bottom: 2px solid transparent; min-height: var(--vt-control-h); padding: 0 var(--vt-space-3); color: var(--vt-text-muted); font-size: var(--vt-text-xs); text-transform: uppercase; letter-spacing: 0.06em; }
+.params-tab:hover { background: transparent; color: var(--vt-text); }
+.params-tab:active { background: transparent; }
 .params[data-tab="editors"] .params-tab[data-tab="editors"],
 .params[data-tab="grid"] .params-tab[data-tab="grid"],
-.params[data-tab="roll"] .params-tab[data-tab="roll"] { font-weight: bold; }
-.params-list { display: flex; flex-direction: column; gap: 2px; max-height: 10em; overflow-y: auto; }
-.params-group { display: flex; gap: 4px; align-items: center; }
-.params-group-label { flex: 1; font-family: monospace; }
-.params-title { font-weight: bold; margin-top: 4px; }
+.params[data-tab="roll"] .params-tab[data-tab="roll"] { color: var(--vt-text); border-bottom-color: var(--vt-accent); font-weight: 600; background: transparent; }
+.params-list { display: flex; flex-direction: column; gap: var(--vt-space-1); max-height: 10em; overflow-y: auto; }
+.params-group { display: flex; gap: var(--vt-space-2); align-items: center; }
+.params-group-label { flex: 1; font-family: var(--vt-font-mono); }
+.params-title { color: var(--vt-text-muted); font-size: var(--vt-text-xs); font-weight: 600; margin-top: var(--vt-space-1); }
 .params-kind { position: relative; }
 .params-spectrum { position: absolute; left: 0; top: 0; opacity: 0.4; pointer-events: none; }
-.params-canvas { display: block; background: #111; position: relative; cursor: crosshair; }
-.params-handles { display: flex; flex-direction: column; gap: 2px; }
-.params-handle { display: grid; grid-template-columns: 6em 1fr 6em auto; gap: 4px; align-items: center; }
-.params-handle-label { font-family: monospace; overflow: hidden; text-overflow: ellipsis; }
+.params-canvas { display: block; background: var(--vt-bg-sunken); position: relative; cursor: crosshair; }
+.params-handles { display: flex; flex-direction: column; gap: var(--vt-space-1); }
+.params-handle { display: grid; grid-template-columns: 6em 1fr 6em auto; gap: var(--vt-space-2); align-items: center; }
+.params-handle-label { font-family: var(--vt-font-mono); overflow: hidden; text-overflow: ellipsis; }
 .params-handle.params-disabled { opacity: 0.45; }
-.params-hint { color: #fc6; min-height: 1em; }
-.params-no-preview { color: #888; }
-.params-xy-pick { display: flex; gap: 4px; }
-.params-grid, .params-roll { position: relative; min-height: 6em; background: #111; }
-.params-grid-row { position: relative; height: 1.4em; border-bottom: 1px solid #222; }
-.params-grid-slot { position: absolute; left: 0; color: #888; font-family: monospace; }
-.params-grid-step { position: absolute; top: 2px; bottom: 2px; background: #8fd; }
-.params-roll-note { position: absolute; height: 4px; background: #fc6; }
-.params-roll-note[data-lane="unpitched"] { background: #888; }
+.params-hint { color: var(--vt-warn); min-height: 1em; }
+.params-no-preview { color: var(--vt-text-muted); }
+.params-xy-pick { display: flex; gap: var(--vt-space-1); }
+.params-grid, .params-roll { position: relative; min-height: 6em; background: var(--vt-bg-sunken); }
+.params-grid-row { position: relative; height: 1.4em; border-bottom: 1px solid var(--vt-border); }
+.params-grid-slot { position: absolute; left: 0; color: var(--vt-text-muted); font-family: var(--vt-font-mono); }
+.params-grid-step { position: absolute; top: 2px; bottom: 2px; background: var(--vt-data-1); }
+.params-roll-note { position: absolute; height: 4px; background: var(--vt-data-2); }
+.params-roll-note[data-lane="unpitched"] { background: var(--vt-text-muted); }
 .params-call-head { text-decoration: underline dotted; cursor: pointer; }

@@ -20,11 +20,10 @@
 // `superseded-definition` drops the pending write.
 
 import { ChangeSet } from '@codemirror/state';
-import type { EditorView } from '@codemirror/view';
+import type { CodeSurface } from '../app/apis';
 import type { BindApi, SiteMode } from '../app/apis';
 import type { Client } from '../protocol/client';
 import type { EditorDecl, ParamMeta, SiteTier, Span, StaleBindingBody, WireSite } from '../protocol/types';
-import { Utf8Index } from '../protocol/utf8';
 import type { Range16, SiteEntry, SiteTable } from './sites';
 
 // ------------------------------------------------------------ value math
@@ -86,8 +85,9 @@ export interface WriterHost {
   client: Client;
   file: string;
   table: SiteTable;
-  view: EditorView;
+  surface: CodeSurface;
   currentRevision(): number;
+  toWireSpan(from: number, to: number): Span;
   /** A wire span of revision `rev` mapped to now, or null when touched. */
   map(span: Span, rev: number): Range16 | null;
   /** The current range of the form owning `range` (from `eval-result.forms`). */
@@ -291,7 +291,13 @@ export class SiteWriter implements BindApi {
       if (busy) {
         for (const [e, v] of g.items) busy.pending.set(e.bindingId, v);
         any = true;
-      } else if (this.applyEdits(key, g.form, g.items)) any = true;
+      } else {
+        const composition = this.host.surface.compositionRange;
+        const queued = composition !== null && g.form.from <= composition.to && g.form.to >= composition.from;
+        let applied = false;
+        this.host.surface.deferSourceWrite(g.form, () => { applied = this.applyEdits(key, g.form, g.items); });
+        if (queued || applied) any = true;
+      }
     }
     return any;
   }
@@ -306,8 +312,8 @@ export class SiteWriter implements BindApi {
   }
 
   private applyEdits(key: string, form: Range16, items: [SiteEntry, number][]): boolean {
-    const { view, table } = this.host;
-    const doc = view.state.doc;
+    const { surface, table } = this.host;
+    const doc = surface.state.doc;
     const specs: { e: SiteEntry; from: number; to: number; insert: string }[] = [];
     for (const [e, v] of items) {
       const r = table.currentRange(e);
@@ -325,15 +331,14 @@ export class SiteWriter implements BindApi {
       specs.map((s) => ({ from: s.from, to: s.to, insert: s.insert })),
       doc.length,
     );
-    view.dispatch({ changes: cs });
+    surface.dispatch({ changes: cs });
     const rev = this.host.currentRevision();
-    const idx = new Utf8Index(view.state.doc.toString());
     for (const s of specs) {
       const from = cs.mapPos(s.from, -1);
-      table.setAnchor(s.e, idx.spanToBytes(from, from + s.insert.length), rev, s.insert);
+      table.setAnchor(s.e, this.host.toWireSpan(from, from + s.insert.length), rev, s.insert);
     }
     this.host.changed(specs.map((s) => s.e.bindingId));
-    const span = idx.spanToBytes(cs.mapPos(form.from, -1), cs.mapPos(form.to, 1));
+    const span = this.host.toWireSpan(cs.mapPos(form.from, -1), cs.mapPos(form.to, 1));
     this.evalForm(key, span, rev);
     return true;
   }
@@ -351,7 +356,7 @@ export class SiteWriter implements BindApi {
       }
       this.sourceWrites(next);
     };
-    const { client, file, view } = this.host;
-    client.eval(file, view.state.doc.toString(), span).then(done, done);
+    const { client, file, surface } = this.host;
+    client.eval(file, surface.state.doc.toString(), span).then(done, done);
   }
 }

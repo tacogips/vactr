@@ -10,12 +10,11 @@
 // 3. the change set is recorded in the `RevisionHistory` under the new
 //    revision, so any span of a kept revision maps to the current text.
 
-import type { ChangeSet, Extension, Text } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import type { ChangeSet, Text } from '@codemirror/state';
 import type { CodeSurface } from './surface';
 import type { DocSync } from '../protocol/document';
-import type { Span } from '../protocol/types';
-import { Utf8Index, type Utf16Change } from '../protocol/utf8';
+import type { ByteChange, Span } from '../protocol/types';
+import { LineBytes } from './line-bytes';
 import { RevisionHistory, type Range16 } from './history';
 
 /** The part of a CodeMirror `Transaction` the sync reads. */
@@ -30,10 +29,13 @@ export class DocumentSync {
   readonly doc: DocSync;
   readonly history: RevisionHistory;
   private readonly listeners: ((rev: number) => void)[] = [];
+  private bytes: LineBytes;
 
   constructor(doc: DocSync, initial: Text, historyLimit?: number, byteLimit?: number, indexByteLimit?: number) {
     this.doc = doc;
     this.history = new RevisionHistory(initial, doc.revision, historyLimit, byteLimit, indexByteLimit);
+    this.bytes = new LineBytes(initial);
+    this.history.setCurrentStarts(this.bytes.starts());
   }
 
   get file(): string {
@@ -48,19 +50,27 @@ export class DocumentSync {
   /** Applies one transaction; a transaction that changes nothing is ignored. */
   apply(tr: DocTransaction): void {
     if (!tr.docChanged) return;
-    const recorded = this.history.text(this.history.current);
-    // The history's current text is the base unless the view was reset.
-    const base =
-      recorded === tr.startState.doc
-        ? (this.history.index(this.history.current) as Utf8Index)
-        : new Utf8Index(tr.startState.doc.toString());
-    const list: Utf16Change[] = [];
+    const base = tr.startState.doc;
+    if (!this.bytes.matches(base)) this.bytes = new LineBytes(base);
+    const list: ByteChange[] = [];
     tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-      list.push({ from: fromA, to: toA, insert: inserted.toString() });
+      const from = this.bytes.toByte(base, fromA);
+      const to = this.bytes.toByte(base, toA);
+      const insertLen = this.bytes.insertLength(inserted);
+      list.push({ from, to, insert_len: insertLen });
     });
-    const { changes, dirty } = base.changes(list);
+    const changes: ByteChange[] = list;
+    const dirty: Span[] = [];
+    let delta = 0;
+    for (const change of changes) {
+      const start = change.from + delta;
+      dirty.push({ start, end: start + change.insert_len });
+      delta += change.insert_len - (change.to - change.from);
+    }
     this.doc.edit(changes, dirty);
     this.history.record(this.doc.revision, tr.changes, tr.newDoc);
+    this.bytes.update(tr.changes, base, tr.newDoc);
+    this.history.setCurrentStarts(this.bytes.starts());
     for (const cb of [...this.listeners]) cb(this.doc.revision);
   }
 
@@ -80,9 +90,13 @@ export class DocumentSync {
 
   /** A current UTF-16 range -> a byte span of the current revision. */
   toWireSpan(from: number, to: number): Span {
-    const idx = this.history.index(this.history.current) as Utf8Index;
-    return idx.spanToBytes(from, to);
+    const text = this.history.text(this.history.current);
+    if (!text) return { start: 0, end: 0 };
+    return { start: this.bytes.toByte(text, from), end: this.bytes.toByte(text, to) };
   }
+
+  pin(owner: string, rev: number): boolean { return this.history.pin(owner, rev, rev === this.revision ? this.bytes.starts() : undefined); }
+  unpin(owner: string): void { this.history.unpin(owner); }
 
   /** Headless observer binding: the surface has already applied and recorded the transaction. */
   bind(surface: CodeSurface, cb: (rev: number) => void): () => void {
@@ -90,10 +104,4 @@ export class DocumentSync {
     return surface.subscribe((update) => { if (update.docChanged) cb(this.revision); });
   }
 
-  /** Legacy compatibility until CE-JOIN; never install on a headless surface. */
-  extension(): Extension {
-    return EditorView.updateListener.of((update) => {
-      for (const tr of update.transactions) this.apply(tr);
-    });
-  }
 }

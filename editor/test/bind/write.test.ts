@@ -2,8 +2,8 @@
 // the in-flight eval rule, and declines on text drift.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { overlayMarks } from '../../src/bind/drag';
 import { formatLiteral } from '../../src/bind/write';
+import { Utf8Index } from '../../src/protocol/utf8';
 import { cleanup, FILE, q, settle, setup, site, spanOf } from './fixtures';
 
 afterEach(cleanup);
@@ -27,7 +27,7 @@ describe('overlay mode (criterion 2)', () => {
     expect(h.transport.kinds()).toEqual(['doc-changed', 'set-tweak']);
     expect(h.transport.of('set-tweak')[0]?.body).toEqual({ file: FILE, id: 1, form_gen: 3, value: 0.75, edit_epoch: 1 });
     expect(h.text()).toBe(before);
-    expect(overlayMarks(h.view)).toEqual([{ pos: TEXT.indexOf('0.5') + 3, text: ' = 0.75' }]);
+    expect(h.view.annotationRanges().filter((r) => r.kind === 'binding').map((r) => ({ pos: r.from, text: r.label }))).toEqual([{ pos: TEXT.indexOf('0.5') + 3, text: ' = 0.75' }]);
     expect(q(h.row(1), '.bind-value')).toBe('0.75');
   });
 
@@ -43,7 +43,7 @@ describe('overlay mode (criterion 2)', () => {
     const ev = h.transport.of('eval')[0]?.body;
     expect(ev?.span).toEqual(spanOf(next, next));
     expect(ev?.code).toBe(next);
-    expect(overlayMarks(h.view)).toEqual([]);
+    expect(h.view.annotationRanges().filter((r) => r.kind === 'binding')).toEqual([]);
   });
 
   it('a reeval site shows "next cycle"; a bindings batch re-keys it and the next move targets the new id', () => {
@@ -67,6 +67,17 @@ describe('overlay mode (criterion 2)', () => {
 });
 
 describe('source-edit mode (criterion 2)', () => {
+  it('writes a multi-line slider edit without building a whole-document UTF-8 index', () => {
+    const text = 's [:bd] > gain 0.5\nd1';
+    const h = setup(text);
+    h.evalResult([site(text, '0.5', 1)]);
+    h.area.writer.setMode(h.area.table.byId(1)?.bindingId ?? '', 'source-edit');
+    const builds = Utf8Index.builds;
+    h.deps.bind?.writeSite(1, 0.6);
+    expect(Utf8Index.builds).toBe(builds);
+    expect(h.text()).toBe('s [:bd] > gain 0.6\nd1');
+  });
+
   it('edits the text and evals the form, one eval in flight, the latest value applied after the reply', async () => {
     const h = setup(TEXT);
     h.evalResult([site(TEXT, '0.5', 1)]);

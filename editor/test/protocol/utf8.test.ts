@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Utf8Index, utf8Length } from '../../src/protocol/utf8';
+import { Text } from '@codemirror/state';
+import { LineTable } from '../../src/code/line-bytes';
 
 const enc = new TextEncoder();
 const bytesOf = (s: string): number => enc.encode(s).length;
@@ -72,5 +74,17 @@ describe('Utf8Index', () => {
     ]);
     const next = 'ありXとうéé ( 0)';
     expect(bytesOf(next)).toBe(bytesOf(base) - 2 + 0 - 1);
+  });
+});
+
+describe('LineTable', () => {
+  it('matches Utf8Index across ASCII, Japanese, emoji, CRLF and empty lines', () => {
+    for (const text of [Text.of(['plain ASCII', '']), Text.of(['日本語', '']), Text.of(['😀🎵a', 'b']), Text.of(['A\r', 'B', '', ''])]) {
+      const table = LineTable.build(text);
+      const index = new Utf8Index(text.toString());
+      expect(table.byteLength).toBe(index.byteLength);
+      for (let byte = 0; byte <= index.byteLength; byte += 1) expect(table.toUtf16(byte)).toBe(index.toUtf16(byte));
+      for (let offset = 0; offset <= text.length; offset += 1) expect(table.toByte(offset)).toBe(index.toByte(offset));
+    }
   });
 });

@@ -50,6 +50,17 @@ export class RecordingGL {
   readonly TEXTURE0 = 0x84c0;
   readonly RGBA = 0x1908;
   readonly UNSIGNED_BYTE = 0x1401;
+  readonly UNSIGNED_SHORT = 0x1403;
+  readonly FLOAT = 0x1406;
+  readonly RG = 0x8227;
+  readonly RG32F = 0x8230;
+  readonly DYNAMIC_DRAW = 0x88e8;
+  readonly ARRAY_BUFFER = 0x8892;
+  readonly MAX_TEXTURE_SIZE = 0x0d33;
+  readonly UNPACK_SKIP_PIXELS = 0x0cf4;
+  readonly UNPACK_SKIP_ROWS = 0x0cf3;
+  readonly UNPACK_ROW_LENGTH = 0x0cf2;
+  readonly TEXTURE1 = 0x84c1;
   readonly TEXTURE_MIN_FILTER = 0x2801;
   readonly TEXTURE_MAG_FILTER = 0x2800;
   readonly TEXTURE_WRAP_S = 0x2802;
@@ -279,4 +290,15 @@ export class RecordingGL {
   drawArrays(mode: number, first: number, count: number): void {
     this.rec('drawArrays', [mode, first, count, this.boundFramebuffer, this.current]);
   }
+
+  drawArraysInstanced(mode: number, first: number, count: number, instances: number): void {
+    this.rec('drawArraysInstanced', [mode, first, count, instances, this.boundFramebuffer, this.current]);
+  }
+
+  bufferData(...args: unknown[]): void { this.rec('bufferData', args); }
+  bufferSubData(...args: unknown[]): void { this.rec('bufferSubData', args); }
+  vertexAttribPointer(...args: unknown[]): void { this.rec('vertexAttribPointer', args); }
+  vertexAttribIPointer(...args: unknown[]): void { this.rec('vertexAttribIPointer', args); }
+  vertexAttribDivisor(...args: unknown[]): void { this.rec('vertexAttribDivisor', args); }
+  enableVertexAttribArray(...args: unknown[]): void { this.rec('enableVertexAttribArray', args); }
 }

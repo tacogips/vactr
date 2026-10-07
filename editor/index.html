@@ -2,8 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <style>
+      #vactr-app {
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+    </style>
     <title>Vactr</title>
+    <link rel="stylesheet" href="./src/app/theme.css" />
     <link rel="stylesheet" href="./src/app/app.css" />
   </head>
   <body>

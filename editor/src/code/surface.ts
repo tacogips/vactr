@@ -1,8 +1,9 @@
-import { Compartment, EditorState, type Extension, type Transaction, type TransactionSpec } from '@codemirror/state';
+import { Compartment, EditorState, Transaction, type Extension, type TransactionSpec } from '@codemirror/state';
 import { history, historyField, undo, redo, undoDepth, redoDepth } from '@codemirror/commands';
 import type { CodeAnnotation, CodeRange, CodeRect, CodeSurface as SurfaceContract, CodeSurfaceUpdate } from '../app/apis';
 import { HISTORY_UNDO_BYTES, trimUndoHistory, touches } from './history';
 import { DocumentSync } from './sync';
+import type { NumericGesture } from './pointer';
 
 export interface SurfaceBridge {
   focus(): void;
@@ -22,6 +23,11 @@ export class CodeSurface implements SurfaceContract {
   private readonly undoSlot = new Compartment();
   private readonly listeners = new Set<(update: CodeSurfaceUpdate) => void>();
   private readonly pointers = new Set<(event: PointerEvent) => void>();
+  private readonly blurListeners = new Set<() => void>();
+  private readonly compositionListeners = new Set<() => void>();
+  private readonly numericDragProviders = new Set<(event: PointerEvent, pos: number) => NumericGesture | null>();
+  private readonly highestKeymaps: { key: string; run(): boolean }[][] = [];
+  private readonly defaultKeymaps: { key: string; run(): boolean }[][] = [];
   private readonly annotations = new Map<string, readonly CodeAnnotation[]>();
   private bridge: SurfaceBridge | null = null;
   private composing: CodeRange | null = null;
@@ -31,6 +37,7 @@ export class CodeSurface implements SurfaceContract {
   private readonly byteLimit: number;
   private undoBytes = 0;
   private reduced = false;
+  private readonly historyMemo = new WeakMap<object, number>();
 
   constructor(options: CodeSurfaceOptions) {
     this.sync = options.sync;
@@ -63,14 +70,15 @@ export class CodeSurface implements SurfaceContract {
         if (this.composing) this.composing = Object.freeze({ from: tr.changes.mapPos(this.composing.from, -1), to: tr.changes.mapPos(this.composing.to, 1) });
       }
       this.boundHistory();
-      this.publish({ state: this.current, changes: tr.changes, docChanged: tr.docChanged, selectionSet: tr.selection !== undefined });
+      this.publish({ state: this.current, changes: tr.changes, docChanged: tr.docChanged, selectionSet: tr.selection !== undefined,
+        userEvent: tr.annotation(Transaction.userEvent) ?? null });
     } finally { this.dispatching = false; }
   }
   private boundHistory(): void {
     const value = this.current.field(historyField);
-    const initial = trimUndoHistory(value, this.byteLimit);
+    const initial = trimUndoHistory(value, this.byteLimit, this.historyMemo);
     this.sync.history.trimToBytes(Math.max(0, this.byteLimit - initial.bytes));
-    const bounded = trimUndoHistory(initial.value, this.byteLimit - this.sync.history.retainedBytes);
+    const bounded = trimUndoHistory(initial.value, this.byteLimit - this.sync.history.retainedBytes, this.historyMemo);
     this.undoBytes = bounded.bytes;
     if (!initial.reduced && !bounded.reduced) return;
     this.reduced = true;
@@ -98,11 +106,33 @@ export class CodeSurface implements SurfaceContract {
     for (const r of ranges) if (!Number.isInteger(r.from) || !Number.isInteger(r.to) || r.from < 0 || r.to < r.from || r.to > this.state.doc.length) throw new RangeError('Invalid annotation');
     if (ranges.length) this.annotations.set(owner, Object.freeze(ranges.map((r) => Object.freeze({ ...r }))));
     else this.annotations.delete(owner);
-    this.publish({ state: this.state, changes: this.state.changes(), docChanged: false, selectionSet: false });
+    this.publish({ state: this.state, changes: this.state.changes(), docChanged: false, selectionSet: false, userEvent: null });
   }
   annotationRanges(): readonly CodeAnnotation[] { return Object.freeze([...this.annotations.values()].flat()); }
   onPointer(cb: (event: PointerEvent) => void): () => void { this.pointers.add(cb); return () => this.pointers.delete(cb); }
   notifyPointer(event: PointerEvent): void { if (!this.disposed) for (const cb of [...this.pointers]) cb(event); }
+  notifyBlur(): void { if (!this.disposed) for (const cb of [...this.blurListeners]) cb(); }
+  notifyCompositionStart(): void { if (!this.disposed) for (const cb of [...this.compositionListeners]) cb(); }
+  onBlur(cb: () => void): () => void { this.blurListeners.add(cb); return () => this.blurListeners.delete(cb); }
+  onCompositionStart(cb: () => void): () => void { this.compositionListeners.add(cb); return () => this.compositionListeners.delete(cb); }
+  addKeymap(bindings: readonly { key: string; run(): boolean }[], precedence: 'highest' | 'default' = 'default'): () => void {
+    const registry = precedence === 'highest' ? this.highestKeymaps : this.defaultKeymaps;
+    const group = [...bindings]; registry.push(group);
+    return () => { const index = registry.indexOf(group); if (index >= 0) registry.splice(index, 1); };
+  }
+  runKeymaps(event: KeyboardEvent): boolean {
+    for (const group of [...this.highestKeymaps, ...this.defaultKeymaps]) for (const binding of group) {
+      if (matchesKey(event, binding.key) && binding.run()) { event.preventDefault(); return true; }
+    }
+    return false;
+  }
+  registerNumericDrag(provider: (event: PointerEvent, pos: number) => NumericGesture | null): () => void {
+    this.numericDragProviders.add(provider); return () => this.numericDragProviders.delete(provider);
+  }
+  numericDrag(event: PointerEvent, pos: number): NumericGesture | null {
+    for (const provider of this.numericDragProviders) { const gesture = provider(event, pos); if (gesture) return gesture; }
+    return null;
+  }
   setCompositionRange(range: CodeRange | null): void {
     this.composing = range ? Object.freeze({ ...range }) : null;
     if (!range) { const pending = this.deferred; this.deferred = []; for (const write of pending) write(); }
@@ -115,8 +145,29 @@ export class CodeSurface implements SurfaceContract {
   }
   dispose(): void {
     this.disposed = true;
-    this.listeners.clear(); this.pointers.clear(); this.annotations.clear(); this.deferred = [];
+    this.listeners.clear(); this.pointers.clear(); this.blurListeners.clear(); this.compositionListeners.clear();
+    this.numericDragProviders.clear(); this.highestKeymaps.length = 0; this.defaultKeymaps.length = 0;
+    this.annotations.clear(); this.deferred = [];
     this.composing = null; this.bridge = null;
     this.sync.doc.dispose();
   }
+}
+
+function matchesKey(event: KeyboardEvent, binding: string): boolean {
+  const parts = binding.split('-'); const key = parts.pop()?.toLowerCase();
+  if (!key) return false;
+  const modifiers = new Set(parts);
+  const apple = /Mac|iP/.test(typeof navigator === 'undefined' ? '' : navigator.platform);
+  const wantsCtrl = modifiers.has('Ctrl') || (modifiers.has('Mod') && !apple);
+  const wantsMeta = modifiers.has('Meta') || (modifiers.has('Mod') && apple);
+  if (event.ctrlKey !== wantsCtrl || event.metaKey !== wantsMeta) return false;
+  if (!!event.shiftKey !== modifiers.has('Shift') || !!event.altKey !== modifiers.has('Alt')) return false;
+  const produced = event.key.toLowerCase();
+  if (produced === key) return true;
+  if ((event.shiftKey || event.altKey) && event.code) {
+    const code = event.code.toLowerCase();
+    const unshifted = code.startsWith('key') ? code.slice(3) : code.startsWith('digit') ? code.slice(5) : code;
+    return unshifted === key;
+  }
+  return false;
 }

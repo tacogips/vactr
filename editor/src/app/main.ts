@@ -9,8 +9,10 @@
 // use time. main makes no other decision.
 
 import { BrowserFiles, TauriFiles, type FileAccess } from '../platform/files';
+import { invoke } from '@tauri-apps/api/core';
 import { Client } from '../protocol/client';
 import { SocketTransport } from '../protocol/socket';
+import { TauriTransport } from '../protocol/tauri';
 import { Store } from '../protocol/store';
 import { WasmCore, WasmTransport } from '../protocol/wasm';
 import { mount as mountBind } from '../bind/mount';
@@ -23,7 +25,7 @@ import { mount as mountMidi } from '../midi/mount';
 import { mount as mountParams } from '../params/mount';
 import { mount as mountPkg } from '../pkg/mount';
 import { mount as mountVisual } from '../visual/mount';
-import { AudioClock, PageClock } from './clock';
+import { AudioClock, PageClock, audibleFor } from './clock';
 import type { EditorDeps, Mounted, MountFn } from './deps';
 import { buildLayout, pane, type Layout } from './layout';
 import { mount as mountSong } from './song';
@@ -86,29 +88,122 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   const store = new Store();
   const files: FileAccess = isTauri(win) ? new TauriFiles() : new BrowserFiles(win);
   let deps: EditorDeps;
+  let audibleLifecycle: ReturnType<typeof audibleFor>;
+  let tauriFallback: string | null = null;
   if (choice.tier === 'native') {
     const client = new Client(new SocketTransport(choice.url), { store });
-    deps = { client, store, clock: new PageClock(), tier: 'native', files };
+    audibleLifecycle = audibleFor('native', { client, epoch: () => store.transportSample?.epoch ?? null });
+    deps = { client, store, clock: new PageClock(), audible: audibleLifecycle.audible, tier: 'native', files };
   } else {
-    const base = win.document.baseURI;
-    const core = await WasmCore.start({
-      wasmUrl: new URL('vactr.wasm', base).href,
-      processorUrl: new URL('worklet/processor.js', base).href,
-    });
-    const client = new Client(new WasmTransport(core), { store });
-    const ctx = core.host.ctx;
-    // Audio may start only after a user gesture.
-    root.addEventListener('pointerdown', () => void ctx.resume(), { once: true });
-    deps = { client, store, clock: new AudioClock(ctx), tier: 'browser', files, core };
+    let tauriClient: Client | null = null;
+    if (isTauri(win)) {
+      try {
+        tauriClient = new Client(await TauriTransport.connect(), { store });
+      } catch (error) {
+        tauriFallback = error instanceof Error ? error.message : String(error);
+      }
+    }
+    if (tauriClient) {
+      audibleLifecycle = audibleFor('native', { client: tauriClient, epoch: () => store.transportSample?.epoch ?? null });
+      deps = { client: tauriClient, store, clock: new PageClock(), audible: audibleLifecycle.audible, tier: 'native', files };
+    } else {
+      const base = win.document.baseURI;
+      const core = await WasmCore.start({
+        wasmUrl: new URL('vactr.wasm', base).href,
+        processorUrl: new URL('worklet/processor.js', base).href,
+      });
+      const client = new Client(new WasmTransport(core), { store });
+      const ctx = core.host.ctx;
+      audibleLifecycle = audibleFor('browser', { ctx, epoch: () => store.transportSample?.epoch ?? null });
+      // Audio may start only after a user gesture.
+      root.addEventListener('pointerdown', () => void ctx.resume(), { once: true });
+      deps = { client, store, clock: new AudioClock(ctx), audible: audibleLifecycle.audible, tier: 'browser', files, core };
+    }
   }
   const formatterUrl = new URL('vactr.wasm', win.document.baseURI).href;
   const tool = new ToolWasm(formatterUrl);
   deps.formatter = new WasmFormatter(tool);
   deps.completion = new WasmCompletionEngine(tool);
   deps.syntax = () => loadVactSyntax(win.document.baseURI);
+  if (typeof Worker === 'function') {
+    deps.syntaxWorker = () => new Worker(new URL('../code/syntax-worker.ts', import.meta.url), { type: 'module' });
+  }
   const editor = createEditor(root, deps);
+  if (tauriFallback) {
+    const notice = root.ownerDocument.createElement('div');
+    notice.setAttribute('role', 'status');
+    notice.dataset.tauriFallback = 'true';
+    notice.textContent = `Native connection failed; using browser mode: ${tauriFallback}`;
+    editor.layout.status.appendChild(notice);
+  }
+  audibleLifecycle.start();
   deps.client.subscribe({ telemetry: true, levels: true, diagnostics: true });
-  return editor;
+  if (isTauri(win)) void reportSelfCheck(root, win, deps);
+  return { ...editor, dispose() { audibleLifecycle.dispose(); editor.dispose(); } };
+}
+
+export async function reportSelfCheck(root: HTMLElement, win: Window, deps: EditorDeps): Promise<void> {
+  let playingEvents = 0;
+  const offPlaying = deps.client.on('playing', () => { playingEvents += 1; });
+  try {
+    if (!await invoke<boolean>('self_check_enabled')) return;
+    const waitStartedAt = Date.now();
+    const deadline = waitStartedAt + 10_000;
+    let off = () => {};
+    let telemetryTimeout: ReturnType<typeof setTimeout> | undefined;
+    const telemetry = new Promise<void>((resolve) => {
+      off = deps.client.on('tempo', () => resolve());
+    });
+    await Promise.race([telemetry, new Promise<void>((resolve) => {
+      telemetryTimeout = setTimeout(resolve, Math.min(3000, Math.max(0, deadline - Date.now())));
+    })]);
+    off();
+    if (telemetryTimeout !== undefined) clearTimeout(telemetryTimeout);
+    const codePane = root.querySelector<HTMLElement>('[data-pane="code"]');
+    let syntaxTimedOut = false;
+    if (codePane?.dataset.syntax === 'fallback') {
+      const remainingMs = Math.max(0, deadline - Date.now());
+      if (remainingMs === 0) {
+        syntaxTimedOut = true;
+      } else {
+        syntaxTimedOut = await new Promise<boolean>((resolve) => {
+          const observer = new MutationObserver(() => {
+            if (codePane.dataset.syntax !== 'fallback') finish(false);
+          });
+          const timeout = setTimeout(() => finish(true), remainingMs);
+          const finish = (timedOut: boolean) => {
+            observer.disconnect();
+            clearTimeout(timeout);
+            resolve(timedOut);
+          };
+          observer.observe(codePane, { attributes: true, attributeFilter: ['data-syntax'] });
+          if (codePane.dataset.syntax !== 'fallback') finish(false);
+        });
+      }
+    }
+    const syntaxWaitMs = Date.now() - waitStartedAt;
+    const status = root.querySelector<HTMLElement>('[data-pane="code"] [role="status"]');
+    const canvas = root.querySelector<HTMLCanvasElement>('[data-pane="code"] canvas');
+    const webgl2 = Boolean(canvas?.getContext('webgl2'));
+    const gpuStatus = status?.textContent ?? '';
+    const latencyKind = deps.store.transportSample?.latency_kind ?? 'unavailable';
+    await invoke('self_check', { report: JSON.stringify({
+      tier: deps.tier,
+      webgl2,
+      renderer: deps.code ? 'mounted' : 'absent',
+      gpuStatus,
+      effectiveDpr: win.devicePixelRatio,
+      latencyKind,
+      syntax: codePane?.dataset.syntax ?? 'absent',
+      syntaxWaitMs,
+      syntaxTimedOut,
+      playingEvents,
+    }) });
+  } catch {
+    // Self-check is diagnostic only and must not take the editor down.
+  } finally {
+    offPlaying();
+  }
 }
 
 // Page entry: only the editor page carries #vactr-app.

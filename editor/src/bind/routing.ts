@@ -17,7 +17,7 @@
 // `doc-changed`); a mismatch is declined. ExternalFile mode records the
 // mapping in the set and sends no `learn`.
 
-import type { EditorView } from '@codemirror/view';
+import type { CodeSurface } from '../app/apis';
 import type { MidiApi, MidiCcEvent } from '../app/apis';
 import type { Client } from '../protocol/client';
 import type { DirectiveEditBody, EditorDecl, Span, WireBinding, WireDirectives } from '../protocol/types';
@@ -31,7 +31,7 @@ export interface RouterHost {
   table: SiteTable;
   writer: SiteWriter;
   persistence: Persistence;
-  view: EditorView;
+  surface: CodeSurface;
   /** `deps.midi`, read at use time. */
   midi(): MidiApi | undefined;
   directives(): WireDirectives | undefined;
@@ -242,12 +242,15 @@ export class CcRouter {
       return false;
     }
     const r = this.host.map(body.span, body.doc_revision);
-    const { view } = this.host;
-    if (!r || view.state.sliceDoc(r.from, r.to) !== body.expected) {
+    const { surface } = this.host;
+    if (!r || surface.state.sliceDoc(r.from, r.to) !== body.expected) {
       this.host.notice('directive edit declined: the text changed');
       return false;
     }
-    view.dispatch({ changes: { from: r.from, to: r.to, insert: body.text } });
+    surface.deferSourceWrite(r, () => {
+      if (surface.state.sliceDoc(r.from, r.to) !== body.expected) return;
+      surface.dispatch({ changes: { from: r.from, to: r.to, insert: body.text } });
+    });
     this.host.edited?.();
     return true;
   }

@@ -34,8 +34,8 @@ use crate::session::authority::PendingWrites;
 use crate::session::changes::ChangeSet;
 use crate::session::eval::{package_sources, pkg_diag};
 use crate::session::protocol::{
-    ClientMsg, Empty, Envelope, ErrorCode, ManifestBody, ProtocolError, Route, ServerMsg,
-    Subscription, Topic,
+    ClientMsg, ClockProbeCorrelation, ClockProbeReply, Empty, Envelope, ErrorCode, ManifestBody,
+    ProtocolError, Route, ServerMsg, Subscription, Topic,
 };
 use crate::session::{codec, publish};
 use crate::types::diag::{DiagCode, Diagnostic};
@@ -192,6 +192,8 @@ pub struct Session {
     pub(super) transport_epoch: u64,
     pub(super) transport_restart_generation: u64,
     pub(super) last_transport: Option<f64>,
+    pub(super) last_host_now: f64,
+    pub(super) observed_clock: Option<publish::ClockReading>,
     pub(super) transport_cycle: Ratio64,
     pub(super) transport_state: Option<(f64, Ratio64, ClockSource, bool, bool)>,
     pub(super) ev: Evaluator,
@@ -251,6 +253,35 @@ impl std::fmt::Debug for Session {
 pub const CONSOLE_FILE: &str = "<console>";
 
 impl Session {
+    /// Publish the most recent native output-clock observation.
+    pub fn observe_clock(&mut self, reading: Option<publish::ClockReading>) {
+        self.observed_clock =
+            reading.filter(|r| r.processing_time.is_finite() && r.processing_time >= 0.0);
+    }
+
+    /// Invalidate timing samples after an audio interruption or route change.
+    pub fn clock_discontinuity(&mut self) {
+        self.transport_epoch = self.transport_epoch.saturating_add(1);
+        self.observed_clock = None;
+        self.outbox.retain(|out| {
+            !matches!(
+                out.env.body.routing(),
+                Route::Broadcast(Topic::Telemetry | Topic::Levels | Topic::Tempo)
+            )
+        });
+    }
+
+    /// Queue an asynchronous host diagnostic for subscribed clients.
+    #[cfg(all(feature = "host-native", not(target_arch = "wasm32")))]
+    pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
+        let body = crate::session::protocol::DiagBody {
+            add: vec![publish::diag_wire(&self.files, &diagnostic)],
+            clear: Vec::new(),
+        };
+        let outgoing = self.route(0, None, vec![ServerMsg::Diag(body)]);
+        self.outbox.extend(outgoing);
+    }
+
     /// Begin isolated preparation or fail explicitly; never use the active loader.
     pub fn begin_song_assets(
         &self,
@@ -313,6 +344,8 @@ impl Session {
             transport_epoch: 0,
             transport_restart_generation: rt.midi_clock().restart_generation(),
             last_transport: None,
+            last_host_now: 0.0,
+            observed_clock: None,
             transport_cycle: Ratio64::ZERO,
             transport_state: None,
             ev,
@@ -486,6 +519,31 @@ impl Session {
     pub fn apply_from(&mut self, conn: u32, env: Envelope<ClientMsg>) -> Vec<Outgoing> {
         let re = Some(env.seq);
         let msgs = match env.body {
+            ClientMsg::ClockProbe(body) => {
+                let epoch = format!("session-{}-{}", self.transport_id, self.transport_epoch);
+                let available = self
+                    .observed_clock
+                    .filter(|r| r.latency_kind != publish::LatencyKind::Unavailable);
+                let engine_time = available.map_or(self.last_host_now, |r| r.processing_time);
+                let correlation = available.and_then(|r| {
+                    r.latency_seconds.map(|latency| ClockProbeCorrelation {
+                        engine_time: r.processing_time,
+                        output_time: r.processing_time + latency,
+                    })
+                });
+                vec![ServerMsg::ClockProbe(ClockProbeReply {
+                    page_send: body.page_send,
+                    engine_receive: engine_time,
+                    engine_send: engine_time,
+                    epoch,
+                    correlation,
+                    latency_seconds: available.and_then(|r| r.latency_seconds),
+                    latency_kind: available
+                        .map_or("unavailable", |r| r.latency_kind.as_str())
+                        .to_string(),
+                    uncertainty_seconds: available.and_then(|r| r.uncertainty_seconds),
+                })]
+            }
             ClientMsg::ApplySong(b) => {
                 // Validation here is read-only: no file registration, active
                 // eval, runtime drain or false Ready response before SONG-07.

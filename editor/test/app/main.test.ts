@@ -214,4 +214,75 @@ describe('native self-check', () => {
   it('reports playing envelopes observed before the self-check report',async()=>{
     expect(await runSelfCheck(1)).toContain('"playingEvents":1');
   });
+
+  it('waits for tree-sitter-worker syntax and reports that it resolved', async () => {
+    vi.useFakeTimers();
+    invokeMock.mockReset();invokeMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const listeners = new Map<string, Array<(event: unknown) => void>>();
+    const client = { on: (kind: string, callback: (event: unknown) => void) => {
+      const entries = listeners.get(kind) ?? [];
+      entries.push(callback);
+      listeners.set(kind, entries);
+      return () => listeners.set(kind, (listeners.get(kind) ?? []).filter((entry) => entry !== callback));
+    } };
+    const root = document.createElement('div');
+    const codePane = document.createElement('section');
+    codePane.dataset.pane = 'code';
+    codePane.dataset.syntax = 'fallback';
+    root.append(codePane);
+    const pending = reportSelfCheck(root, { devicePixelRatio: 2 } as unknown as Window,
+      { client, store: { transportSample: null }, tier: 'native' } as never);
+    try {
+      await Promise.resolve();
+      await Promise.resolve();
+      for (const callback of listeners.get('tempo') ?? []) callback({});
+      setTimeout(() => { codePane.dataset.syntax = 'tree-sitter-worker'; }, 500);
+      await vi.advanceTimersByTimeAsync(500);
+      await pending;
+      const args = invokeMock.mock.calls.find((call) => call[0] === 'self_check')?.[1] as { report: string };
+      expect(JSON.parse(args.report)).toMatchObject({
+        syntax: 'tree-sitter-worker',
+        syntaxWaitMs: 500,
+        syntaxTimedOut: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports fallback syntax when the syntax readiness bound expires', async () => {
+    vi.useFakeTimers();
+    invokeMock.mockReset();invokeMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const listeners = new Map<string, Array<(event: unknown) => void>>();
+    const client = { on: (kind: string, callback: (event: unknown) => void) => {
+      const entries = listeners.get(kind) ?? [];
+      entries.push(callback);
+      listeners.set(kind, entries);
+      return () => listeners.set(kind, (listeners.get(kind) ?? []).filter((entry) => entry !== callback));
+    } };
+    const root = document.createElement('div');
+    const codePane = document.createElement('section');
+    codePane.dataset.pane = 'code';
+    codePane.dataset.syntax = 'fallback';
+    root.append(codePane);
+    const pending = reportSelfCheck(root, { devicePixelRatio: 2 } as unknown as Window,
+      { client, store: { transportSample: null }, tier: 'native' } as never);
+    try {
+      await Promise.resolve();
+      await Promise.resolve();
+      for (const callback of listeners.get('tempo') ?? []) callback({});
+      await vi.advanceTimersByTimeAsync(9999);
+      expect(invokeMock).not.toHaveBeenCalledWith('self_check', expect.anything());
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      const args = invokeMock.mock.calls.find((call) => call[0] === 'self_check')?.[1] as { report: string };
+      expect(JSON.parse(args.report)).toMatchObject({
+        syntax: 'fallback',
+        syntaxWaitMs: 10_000,
+        syntaxTimedOut: true,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

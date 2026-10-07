@@ -2,11 +2,7 @@
 
 This directory contains implementation plans that translate design documents into actionable implementation specifications.
 
-The [GPU canvas editor cutover](active/canvas-cutover-dispatch.json) is Ready (design 15.3.8, 2026-10-05). It supersedes the historical canvas-editor-224 chain. It runs in three waves:
-
-- Wave 1: [clock](active/canvas-cutover-clock.md), [native](active/canvas-cutover-native.md) and [render](active/canvas-cutover-render.md).
-- Wave 2: [mount](active/canvas-cutover-mount.md), [visual](active/canvas-cutover-visual.md) and [shell](active/canvas-cutover-shell.md).
-- Wave 3: [evidence and closeout](active/canvas-cutover-evidence.md).
+The [GPU canvas editor cutover](active/canvas-cutover-dispatch.json) is Completed (2026-10-07; design 15.3.8): all plans accepted; canonical silent release-wasm `run-001` passes in Chromium and WebKit; WebKit input p95 is 16 ms and sync p95 is 12.7 ms. The historical canvas-editor-224 chain is superseded.
 
 The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (design-ui-style.md, 2026-10-05): [shell](completed/ui-style-shell.md), [bind and params](completed/ui-style-bind-params.md), [code](completed/ui-style-code.md), [panels](completed/ui-style-panels.md) and [verify](completed/ui-style-verify.md). Follow-up F1 (canvas palette mapping) remains open.
 
@@ -170,6 +166,48 @@ Large features are split into multiple related plans with cross-references.
 
 | Plan | Completed | Design Reference |
 |------|-----------|------------------|
+| [canvas-cutover-clock.md](completed/canvas-cutover-clock.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-diag-offpath.md](completed/canvas-cutover-diag-offpath.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-editcost.md](completed/canvas-cutover-evidence-editcost.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-framecost.md](completed/canvas-cutover-evidence-framecost.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-runstart.md](completed/canvas-cutover-evidence-runstart.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-sched.md](completed/canvas-cutover-evidence-sched.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-scope.md](completed/canvas-cutover-evidence-scope.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-silent.md](completed/canvas-cutover-evidence-silent.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence-viewport.md](completed/canvas-cutover-evidence-viewport.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-evidence.md](completed/canvas-cutover-evidence.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-mount.md](completed/canvas-cutover-mount.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-native.md](completed/canvas-cutover-native.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-backdrop.md](completed/canvas-cutover-opt-backdrop.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-dom.md](completed/canvas-cutover-opt-dom.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-harness.md](completed/canvas-cutover-opt-harness.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-history.md](completed/canvas-cutover-opt-history.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-render-a.md](completed/canvas-cutover-opt-render-a.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-render-b.md](completed/canvas-cutover-opt-render-b.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-render-c.md](completed/canvas-cutover-opt-render-c.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-render.md](completed/canvas-cutover-opt-render.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-opt-text.md](completed/canvas-cutover-opt-text.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-render.md](completed/canvas-cutover-render.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-shell.md](completed/canvas-cutover-shell.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-syntax-worker.md](completed/canvas-cutover-syntax-worker.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-telemetry-lead.md](completed/canvas-cutover-telemetry-lead.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-cutover-visual.md](completed/canvas-cutover-visual.md) | Completed (2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-dispatch.json](completed/canvas-editor-224-dispatch.json) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-clock.md](completed/canvas-editor-224-clock.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-consumers.md](completed/canvas-editor-224-consumers.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-contracts.md](completed/canvas-editor-224-contracts.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-dependency-evidence.md](completed/canvas-editor-224-dependency-evidence.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-editor-join.md](completed/canvas-editor-224-editor-join.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-execution.md](completed/canvas-editor-224-execution.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-gpu.md](completed/canvas-editor-224-gpu.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-input.md](completed/canvas-editor-224-input.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-native-clock.md](completed/canvas-editor-224-native-clock.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-native-shell.md](completed/canvas-editor-224-native-shell.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-package-preparation.md](completed/canvas-editor-224-package-preparation.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-state.md](completed/canvas-editor-224-state.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-telemetry.md](completed/canvas-editor-224-telemetry.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-verification.md](completed/canvas-editor-224-verification.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
+| [canvas-editor-224-visual.md](completed/canvas-editor-224-visual.md) | Superseded by the canvas-cutover plans (completed 2026-10-07) | design-implementation.md 15.3.8 |
 | [song-mode-slice-matcher-budget.md](completed/song-mode-slice-matcher-budget.md) | 2026-10-02; focused accounting acceptance ROOT0494, actual20 tests | design-song-mode.md bounds and identity |
 | [sample-timestamps.md](completed/sample-timestamps.md) | 2026-09-30 | design-sample-timestamps.md |
 | [sampled-breakcore.md](completed/sampled-breakcore.md) | 2026-09-30 | design-genre-tracks.md sampled breakcore |

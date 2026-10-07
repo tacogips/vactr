@@ -6828,6 +6828,8 @@ frames with random drops, and injected 250 ms stalls. They assert:
 - Probe sampling selects the minimum RTT, rejects RTT over 100 ms, and hides
   indicators once data is stale.
 
+**Erratum:** The implemented `clock-probe` wire retains the pre-existing field names. The request body is `{ page_send }` in milliseconds; the reply is `clock-probe { page_send, engine_receive, engine_send, epoch, correlation?, latency_seconds, latency_kind, uncertainty_seconds }`, with `processing_time = (engine_receive + engine_send) / 2`. This is equivalent to the draft amendment's `page_time_ms` / `processing_time` / `clock-probe-reply` naming.
+
 ##### 15.3.8.5 Native clock, Tauri desktop IPC and iOS shell
 
 **`src/host/native/clock.rs` (new).** `OutputClock` is a seqlock of
@@ -7231,7 +7233,7 @@ sandbox. Verification outside the sandbox runs the 15.3.7 command set plus:
 
 **Closeout** (evidence plan):
 
-- Move the 15 `impl-plans/active/canvas-editor-224-*.md` files, plus
+- Move the 15 `impl-plans/completed/canvas-editor-224-*.md` files, plus
   `canvas-editor-224-dispatch.json`, to `impl-plans/completed/`, each listed
   as a concrete path with a one-line superseded note. Do the same for the
   completed `canvas-cutover-*` plans.
@@ -8453,7 +8455,7 @@ Chromium.
 
 **8. Plans, order and ownership (decision 8).**
 
-- **Plans.** New serial plans live in `impl-plans/active/canvas-cutover-opt-*.md`.
+- **Plans.** New serial plans live in `impl-plans/completed/canvas-cutover-opt-*.md`.
   The suggested split and order follow. The plan author may refine the split
   but must keep the order rules: correctness first, then the plans whose
   output the later ones consume.
@@ -8489,7 +8491,7 @@ Chromium.
   - *Order.* CANVAS-OPT-RENDER-A, then -B, then -C, then CANVAS-EVIDENCE.
     Only one runs at a time, because they share files.
   - *Plan files.* The plans are
-    `impl-plans/active/canvas-cutover-opt-render-a.md`, `-b.md` and `-c.md`.
+    `impl-plans/completed/canvas-cutover-opt-render-a.md`, `-b.md` and `-c.md`.
     `canvas-cutover-opt-render.md` stays as the parent record with status
     `Split` and is never dispatched again. Its contracts (cell atlas,
     `geometry.ts`, renderer orchestration, layout accessor, `mount.ts`) stay
@@ -9669,7 +9671,7 @@ in its harness task.
   CANVAS-EVIDENCE. The suite stays green after each plan (the "Green after
   every plan" list of 15.3.8.14 section 8).
   1. **CANVAS-SYNTAX-WORKER**
-     (`impl-plans/active/canvas-cutover-syntax-worker.md`), part A.
+     (`impl-plans/completed/canvas-cutover-syntax-worker.md`), part A.
      - writePaths:
        - `editor/src/code/syntax.ts`
        - `editor/src/code/syntax-core.ts`
@@ -9690,7 +9692,7 @@ in its harness task.
      - Verification outside the sandbox adds the behavior profile, run under
        the lock.
   2. **CANVAS-DIAG-OFFPATH**
-     (`impl-plans/active/canvas-cutover-diag-offpath.md`), part B.
+     (`impl-plans/completed/canvas-cutover-diag-offpath.md`), part B.
      - writePaths:
        - `editor/src/code/diagnostics.ts`
        - `editor/src/code/mount.ts`
@@ -9699,7 +9701,7 @@ in its harness task.
        - `editor/test/canvas/edit-cost.test.ts`
        - `editor/test/canvas/input.test.ts`
   3. **CANVAS-TELEMETRY-LEAD**
-     (`impl-plans/active/canvas-cutover-telemetry-lead.md`), part C.
+     (`impl-plans/completed/canvas-cutover-telemetry-lead.md`), part C.
      - writePaths:
        - `src/sched/announce.rs` (new)
        - `src/sched/mod.rs`

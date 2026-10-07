@@ -3,6 +3,7 @@
 This is a plain Node.js Playwright-library harness. It does not use `@playwright/test`.
 
 ```sh
+# Required gating artifact: release wasm with the name section and no DWARF.
 mise run build-wasm-release
 cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build
 cd editor && npm run e2e -- --browser all --profile all --write-evidence

@@ -147,12 +147,41 @@ export async function reportSelfCheck(root: HTMLElement, win: Window, deps: Edit
   const offPlaying = deps.client.on('playing', () => { playingEvents += 1; });
   try {
     if (!await invoke<boolean>('self_check_enabled')) return;
+    const waitStartedAt = Date.now();
+    const deadline = waitStartedAt + 10_000;
     let off = () => {};
+    let telemetryTimeout: ReturnType<typeof setTimeout> | undefined;
     const telemetry = new Promise<void>((resolve) => {
       off = deps.client.on('tempo', () => resolve());
     });
-    await Promise.race([telemetry, new Promise<void>((resolve) => setTimeout(resolve, 3000))]);
+    await Promise.race([telemetry, new Promise<void>((resolve) => {
+      telemetryTimeout = setTimeout(resolve, Math.min(3000, Math.max(0, deadline - Date.now())));
+    })]);
     off();
+    if (telemetryTimeout !== undefined) clearTimeout(telemetryTimeout);
+    const codePane = root.querySelector<HTMLElement>('[data-pane="code"]');
+    let syntaxTimedOut = false;
+    if (codePane?.dataset.syntax === 'fallback') {
+      const remainingMs = Math.max(0, deadline - Date.now());
+      if (remainingMs === 0) {
+        syntaxTimedOut = true;
+      } else {
+        syntaxTimedOut = await new Promise<boolean>((resolve) => {
+          const observer = new MutationObserver(() => {
+            if (codePane.dataset.syntax !== 'fallback') finish(false);
+          });
+          const timeout = setTimeout(() => finish(true), remainingMs);
+          const finish = (timedOut: boolean) => {
+            observer.disconnect();
+            clearTimeout(timeout);
+            resolve(timedOut);
+          };
+          observer.observe(codePane, { attributes: true, attributeFilter: ['data-syntax'] });
+          if (codePane.dataset.syntax !== 'fallback') finish(false);
+        });
+      }
+    }
+    const syntaxWaitMs = Date.now() - waitStartedAt;
     const status = root.querySelector<HTMLElement>('[data-pane="code"] [role="status"]');
     const canvas = root.querySelector<HTMLCanvasElement>('[data-pane="code"] canvas');
     const webgl2 = Boolean(canvas?.getContext('webgl2'));
@@ -165,7 +194,9 @@ export async function reportSelfCheck(root: HTMLElement, win: Window, deps: Edit
       gpuStatus,
       effectiveDpr: win.devicePixelRatio,
       latencyKind,
-      syntax: root.querySelector<HTMLElement>('[data-pane="code"]')?.dataset.syntax ?? 'absent',
+      syntax: codePane?.dataset.syntax ?? 'absent',
+      syntaxWaitMs,
+      syntaxTimedOut,
       playingEvents,
     }) });
   } catch {

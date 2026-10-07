@@ -325,3 +325,31 @@ These checks require a physical iPad, the named accessories and a fresh build. R
 | 120 Hz ProMotion frame time | On a ProMotion iPad, run the product workload with audio, Hydra, scopes and video for five minutes; capture frame timestamps and GPU timing when supported. | Report p50/p95/p99; update/submission p95 <=8 ms and presentation interval p95 <=16.7 ms, p99 <=33.4 ms. |
 | Sustained thermal animation | On a physical iPad, run repeated edit/font/DPR/resize cycles with audio and all available visuals for ten minutes. Record temperature/throttling, heap and resource ledger before/after. | No cap is exceeded, retained heap growth is <=8 MiB after warmup/GC, and audio has no UI-stall-attributable underruns. |
 | Physical A/V sync | Capture the app display and line/headphone output together with a camera and microphone at the same timebase over five minutes. Repeat per audio route and record correlation uncertainty. | For measured uncertainty <=10 ms, acoustic reference to visible onset p95 <=33.4 ms; no growing offset, and estimated/unavailable routes are reported separately. |
+
+## Final gates (operator, 2026-10-07)
+
+Run serially on the final source (`wf/canvas` after 6f26587 plus the closeout and self-check change), with the shared measurement lock held for every browser and simulator run. Logs are in `tmp/canvas-cutover/final-gates/` (gitignored).
+
+| Gate | Result |
+|---|---|
+| `cargo build --locked` | exit 0 |
+| `cargo clippy --locked --all-targets -- -D warnings` | exit 0 |
+| `cargo build --locked --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 |
+| `cargo check --locked --manifest-path editor/src-tauri/Cargo.toml` | exit 0 |
+| `mise run build-wasm-release` | exit 0 |
+| `cd editor && npm run check` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run` | exit 0, 839/839 |
+| `cd editor && ./node_modules/.bin/vitest run test/e2e` (after the self-check change) | exit 0, 58/58 |
+| `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | exit 0 |
+| `cd editor && npm run test:perf` | exit 0 |
+| `cd editor && npm run test:style` | exit 0, 4/4 engine-viewport combinations |
+| Behavior e2e, Chromium and WebKit | pass, 20/20 (Chromium 11, WebKit 9; WebKit synthetic clipboard and IME are recorded limitations); syntax-worker check passes in both |
+| `timeout 2400 cargo nextest run --locked` | exit 0, 2,828 passed, 3 skipped |
+| iOS simulator build (`cargo-tauri ios build --target aarch64-sim --debug`, after a fresh frontend build) | exit 0 |
+| iPad Pro 11-inch (M5) simulator self-check | pass: `tier native`, `webgl2 true`, `latencyKind measured`, `syntax tree-sitter-worker` (ready 51 ms after the first telemetry), `playingEvents 0`, silent |
+
+Notes:
+
+- The self-check now waits (bounded, 10 s) for the syntax engine to leave `fallback` and reports `syntax`, `syntaxWaitMs` and `syntaxTimedOut`. The earlier simulator report of `fallback` was the pre-load state, not a failure.
+- `editor/src-tauri/tauri.conf.json` has an empty `beforeBuildCommand`, so iOS and desktop bundles embed whatever `editor/dist` contains. Run `VACTR_REQUIRE_SESSION_ABI=1 npm run build` before every Tauri build. Tauri's copy step also fails if `gen/apple/build/arm64-sim/Vactr.app` already exists; remove or rename that build output first.
+- The tree-sitter Worker is verified in the iOS simulator's WKWebView. The physical-iPad row for Worker syntax in "Pending physical-iPad procedures" remains pending: input latency, ProMotion frame pacing, real IME, VoiceOver, audio output latency and thermal behavior need a physical device.

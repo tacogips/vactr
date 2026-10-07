@@ -18,6 +18,7 @@ const launchLogStart=[launchStartedAt.getFullYear(),String(launchStartedAt.getMo
 result.selfCheckLine=(logs.stdout+'\n'+launch.stdout).split(/\r?\n/).filter(isSelfCheck).at(-1)??null;result.selfCheckSource=result.selfCheckLine?'Vactr-process':null;
 try{const match=result.selfCheckLine?.match(/VACTR_SELF_CHECK\s+(\{.*\})/);result.selfCheck=match?JSON.parse(match[1]):null;}catch{result.selfCheck=null;}
 result.syntax=result.selfCheck?.syntax??null;
+result.syntaxReady=typeof result.syntax==='string'&&result.syntax.startsWith('tree-sitter');
 result.silent=result.selfCheck?.playingEvents===0;if(result.selfCheck)result.selfCheck.silent=result.silent;
 const binary=path.join(app,'Vactr');const commit=run('git',['show','-s','--format=%cI','6f6b807']);const sourceCommitTime=commit.status===0?Date.parse(commit.stdout.trim()):null;result.appBinary={path:binary,mtimeIso:fs.existsSync(binary)?fs.statSync(binary).mtime.toISOString():null,afterCommit:sourceCommitTime!==null&&fs.existsSync(binary)?fs.statSync(binary).mtimeMs>sourceCommitTime:false,referenceCommit:'6f6b807'};
 const screenshot=path.resolve('tmp/canvas-cutover/evidence/ios-sim.png');const shot=run('xcrun',['simctl','io',udid,'screenshot',screenshot]);result.commands.push({command:`xcrun simctl io ${udid} screenshot ${screenshot}`,exitStatus:shot.status,output:shot.stdout,stderr:shot.stderr});result.screenshot=screenshot;

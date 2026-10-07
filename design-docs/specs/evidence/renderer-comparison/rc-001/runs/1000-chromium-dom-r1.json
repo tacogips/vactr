@@ -1,0 +1,568 @@
+{
+  "key": "1000-chromium-dom-r1",
+  "lines": 1000,
+  "browser": "chromium",
+  "renderer": "dom",
+  "run": 1,
+  "position": 1,
+  "complete": true,
+  "headless": true,
+  "browserVersion": "151.0.7922.34",
+  "startedAt": "2026-10-07T05:36:05.221Z",
+  "endedAt": "2026-10-07T05:39:45.600Z",
+  "loadavgStart": [
+    9.57373046875,
+    10.14501953125,
+    12.42138671875
+  ],
+  "loadavgEnd": [
+    26.81396484375,
+    19.5927734375,
+    16.01708984375
+  ],
+  "contended": true,
+  "metrics": {
+    "inputP50": 6.999999952327926,
+    "inputP95": 15.899999952322105,
+    "inputP99": 16.699999928474426,
+    "frameP95": 18.10000000000582,
+    "frameP99": 18.599999999976717,
+    "textP95": 6.5,
+    "animP50": 0.2999999523162842,
+    "animP95": 0.3999999761581421,
+    "syncP95": 17.718999976161285,
+    "syncP99": 99.15233330946648,
+    "stallSyncCount": 1,
+    "stallSyncP50": 233.05233328565373,
+    "stallSyncP95": 233.05233328565373,
+    "stallSyncMax": 233.05233328565373,
+    "lateActiveMismatchCount": 0,
+    "replayedFlashCount": 0,
+    "heapGrowthBytes": 3829108,
+    "domNodesPeak": 1256,
+    "domNodesFinal": 1191,
+    "ledgerMaxBytes": 0,
+    "mountToFirstFrameMs": 437.2,
+    "loadToViewportMs": 72.69999992847443,
+    "gatePass": false,
+    "failures": [
+      "syncAbsMs.p99=99.15233330946648 exceeds 50"
+    ]
+  },
+  "rawMetrics": {
+    "inputLatencyMs": {
+      "p95": 15.899999952322105,
+      "p99": 16.699999928474426
+    },
+    "animationWorkMs": {
+      "p50": 0.2999999523162842,
+      "p95": 0.3999999761581421,
+      "p99": 0.5
+    },
+    "textWorkMs": {
+      "p95": 6.5
+    },
+    "frameIntervalMs": {
+      "p95": 18.10000000000582,
+      "p99": 18.599999999976717
+    },
+    "frameIntervalExcluded": {
+      "stall": 1,
+      "nonStall": 9
+    },
+    "phaseMs": {
+      "input": {
+        "spans": 309,
+        "p50": 0.20000004768371582,
+        "p95": 2.899999976158142,
+        "p99": 3.3000000715255737,
+        "totalMs": 159.09999978542328
+      },
+      "caret": {
+        "spans": 6,
+        "p50": 0.10000002384185791,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "totalMs": 0.6000000238418579
+      },
+      "shaping": {
+        "spans": 20,
+        "p50": 0.10000002384185791,
+        "p95": 0.10000002384185791,
+        "p99": 0.10000002384185791,
+        "totalMs": 2.0000003576278687
+      },
+      "syntax": {
+        "spans": 69,
+        "p50": 0.10000002384185791,
+        "p95": 0.20000004768371582,
+        "p99": 0.2999999523162842,
+        "totalMs": 8.099999904632568
+      },
+      "upload": {
+        "spans": 8038,
+        "p50": 0.19999992847442627,
+        "p95": 0.2999999523162842,
+        "p99": 2,
+        "totalMs": 1595.9000004529953
+      },
+      "frame": {
+        "spans": 7429,
+        "p50": 0.10000002384185791,
+        "p95": 0.2999999523162842,
+        "p99": 0.5,
+        "totalMs": 1225.099993944168
+      },
+      "tick": {
+        "spans": 25149,
+        "p50": 0.30000007152557373,
+        "p95": 0.40000009536743164,
+        "p99": 0.6000000238418579,
+        "totalMs": 8647.599996685982
+      }
+    },
+    "tickStarvation": {
+      "tickStartCount": 25149,
+      "tickStartGapsOverLookahead": 19,
+      "maxTickStartGapMs": 1535.6999999284744,
+      "mainThreadSpansOverThreshold": 0,
+      "starvationOverlaps": 0,
+      "overlaps": []
+    },
+    "layoutStats": {
+      "builds": 220,
+      "evictions": 0,
+      "segmentations": 1,
+      "measuredTextCalls": 225,
+      "measuredTextChars": 247,
+      "maxMeasuredTextLength": 3
+    },
+    "syncProvenance": "measured",
+    "syncAbsMs": {
+      "p95": 17.718999976161285,
+      "p99": 99.15233330946648
+    },
+    "syncAbsMsAll": {
+      "p95": 17.78566661896184,
+      "p99": 184.25233323794964
+    },
+    "stallWindowSync": {
+      "count": 1,
+      "p50": 233.05233328565373,
+      "p95": 233.05233328565373,
+      "max": 233.05233328565373,
+      "earlyCount": 0,
+      "pageProxyEarly": [],
+      "pageProxyEarlyCount": 0,
+      "counts": {
+        "a": 1,
+        "b": 0,
+        "both": 0
+      }
+    },
+    "stallWindows": [
+      {
+        "index": 0,
+        "startMs": 87872.5,
+        "endMs": 88122.5,
+        "firstFrameMs": 87878.3,
+        "firstFrameLagMs": -244.1999999999971,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 1,
+        "startMs": 101141.5,
+        "endMs": 101391.5,
+        "firstFrameMs": 101144.9,
+        "firstFrameLagMs": -246.60000000000582,
+        "samples": 1,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 2,
+        "startMs": 111443,
+        "endMs": 111693,
+        "firstFrameMs": 111443.2,
+        "firstFrameLagMs": -249.8000000000029,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 3,
+        "startMs": 123906.90000009537,
+        "endMs": 124156.90000009537,
+        "firstFrameMs": 123909.7,
+        "firstFrameLagMs": -247.20000009537034,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": -1.4210854715202004e-11,
+        "audited": true
+      },
+      {
+        "index": 4,
+        "startMs": 136604.60000002384,
+        "endMs": 136854.70000004768,
+        "firstFrameMs": 136609.5,
+        "firstFrameLagMs": -245.20000004768372,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 5,
+        "startMs": 149810.70000004768,
+        "endMs": 150060.70000004768,
+        "firstFrameMs": 150061,
+        "firstFrameLagMs": 0.2999999523162842,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 6,
+        "startMs": 161917.80000007153,
+        "endMs": 162167.80000007153,
+        "firstFrameMs": 161927.6,
+        "firstFrameLagMs": -240.20000007151975,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 7,
+        "startMs": 172205.40000009537,
+        "endMs": 172455.40000009537,
+        "firstFrameMs": 172209.5,
+        "firstFrameLagMs": -245.90000009536743,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 8,
+        "startMs": 184522.20000004768,
+        "endMs": 184772.20000004768,
+        "firstFrameMs": 184527.7,
+        "firstFrameLagMs": -244.50000004767207,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 9,
+        "startMs": 197409.10000002384,
+        "endMs": 197659.10000002384,
+        "firstFrameMs": 197410.2,
+        "firstFrameLagMs": -248.90000002383022,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      }
+    ],
+    "stallWindowsInjected": 10,
+    "beatResidual": {
+      "maxAbsNonStallMs": 4.263256414560601e-11,
+      "maxAbsStallFrameMs": 1.4210854715202004e-11
+    },
+    "syncAbsMsNoDrop": {
+      "p95": 17.685666595149087,
+      "p99": 18.085666619008407
+    },
+    "syncDroppedFrameSamples": 5,
+    "syncDroppedFrames": 46,
+    "syncDuplicateSamples": 12096,
+    "targets": {
+      "textWorkP95Ms": 4,
+      "animationWorkP50Ms": 1
+    },
+    "earlyFlashCount": 0,
+    "earlyFlash": {
+      "withinToleranceCount": 0,
+      "maxLeadMs": null
+    },
+    "earlyFlashes": [],
+    "earlyToleranceS": 0.0026666666666666666,
+    "earlyToleranceMs": 2.6666666666666665,
+    "audioSampleRate": 48000,
+    "syncPageProxyEarlyCount": 0,
+    "replayedFlashCount": 0,
+    "syncWindowStart": 19,
+    "syncWindowEnd": 210.19623624919146,
+    "syncWindowOnsets": 12288,
+    "syncFramePairs": 720384,
+    "syncExcludedFrames": 355,
+    "telemetryCaptureCount": 8,
+    "telemetryCaptureIntervalMs": 15000,
+    "ledgerMaxBytes": 0,
+    "ledgerCounters": {
+      "usedBytes": 0,
+      "byKind": {
+        "atlas": 0,
+        "geometry": 0,
+        "canvas": 0,
+        "backdrop": 0,
+        "visualText": 0,
+        "visualTarget": 0,
+        "video": 0,
+        "other": 0
+      },
+      "pixels": 0,
+      "visualTargets": 0,
+      "refusals": 0
+    },
+    "heapGrowthBytes": 3829108,
+    "beatDriftMs": 0,
+    "peakPlayingRanges": 64,
+    "audioRunning": true,
+    "onsetCount": 12352,
+    "controlOnsetCount": 192,
+    "controlStartMethod": "toolbar-click",
+    "runStartMethod": "toolbar-click",
+    "largeDocumentStartStatus": "toolbar-click-returned",
+    "onsetAttribution": "active-workload-onsets-observed",
+    "workletCounters": "not exposed",
+    "probe": null,
+    "highlight": {
+      "received": 13440,
+      "accepted": 13440,
+      "overflow": 0,
+      "horizonDrops": 0,
+      "epochDrops": 0,
+      "unmapped": 0
+    },
+    "client": {
+      "telemetryQueued": 0,
+      "dropped": 0,
+      "coalesced": 0,
+      "pendingRequests": 0
+    },
+    "frameCount": 11571,
+    "keyCount": 696,
+    "editKeyCount": 575,
+    "editPairedKeyCount": 116,
+    "inputSamplesUsed": 158,
+    "inputKeysNonEditing": 538,
+    "inputKeysExpired": 0,
+    "inputKeysUnpaired": 0,
+    "editPairedSamples": 116,
+    "editNonEditingKeys": 517,
+    "editExpiredKeys": 0,
+    "editUnpairedKeys": 0,
+    "workSamples": 11571,
+    "startedAt": "2026-10-07T05:36:14.593Z",
+    "controlSink": {
+      "installed": true,
+      "installedBeforeFirstConnect": true,
+      "contexts": 1,
+      "wrappedDestinationConnections": 1,
+      "directDestinationConnections": 0,
+      "mediaElementsForcedMuted": 0,
+      "violations": [],
+      "suspendedOnViolation": false,
+      "pre": {
+        "peak": 0.22380739450454712,
+        "peakDbfs": -13.002511373180266,
+        "rms": 0.019221693293185245,
+        "rmsDbfs": -34.324167135124235,
+        "onsetCount": 1,
+        "onsetTimes": [
+          4.020333333333333
+        ]
+      },
+      "post": {
+        "peak": 0
+      }
+    },
+    "workloadSink": {
+      "installed": true,
+      "installedBeforeFirstConnect": true,
+      "contexts": 1,
+      "wrappedDestinationConnections": 1,
+      "directDestinationConnections": 0,
+      "mediaElementsForcedMuted": 0,
+      "violations": [],
+      "suspendedOnViolation": false,
+      "pre": {
+        "peak": 0.22380739450454712,
+        "peakDbfs": -13.002511373180266,
+        "rms": 0.017002563023070388,
+        "rmsDbfs": -35.38971213375743,
+        "onsetCount": 1,
+        "onsetTimes": [
+          4.020333333333333
+        ]
+      },
+      "post": {
+        "peak": 0
+      }
+    },
+    "hushQuiet": true,
+    "hushQuietMs": 1026,
+    "largeRunClickMs": 5882,
+    "largeRunCtxTime": 5.728,
+    "workloadOnsetCount": 12352,
+    "workloadOnsetsExcludedBaseline": 0,
+    "workloadOnsetsExcludedPreClick": 0,
+    "sinkOnsetsTotal": 1,
+    "sinkOnsetSplit": {
+      "control": 1,
+      "workload": 0
+    },
+    "sink": {
+      "control": {
+        "installed": true,
+        "installedBeforeFirstConnect": true,
+        "contexts": 1,
+        "wrappedDestinationConnections": 1,
+        "directDestinationConnections": 0,
+        "mediaElementsForcedMuted": 0,
+        "violations": [],
+        "suspendedOnViolation": false,
+        "pre": {
+          "peak": 0.22380739450454712,
+          "peakDbfs": -13.002511373180266,
+          "rms": 0.019221693293185245,
+          "rmsDbfs": -34.324167135124235,
+          "onsetCount": 1,
+          "onsetTimes": [
+            4.020333333333333
+          ]
+        },
+        "post": {
+          "peak": 0
+        }
+      },
+      "workload": {
+        "installed": true,
+        "installedBeforeFirstConnect": true,
+        "contexts": 1,
+        "wrappedDestinationConnections": 1,
+        "directDestinationConnections": 0,
+        "mediaElementsForcedMuted": 0,
+        "violations": [],
+        "suspendedOnViolation": false,
+        "pre": {
+          "peak": 0.22380739450454712,
+          "peakDbfs": -13.002511373180266,
+          "rms": 0.017002563023070388,
+          "rmsDbfs": -35.38971213375743,
+          "onsetCount": 1,
+          "onsetTimes": [
+            4.020333333333333
+          ]
+        },
+        "post": {
+          "peak": 0
+        }
+      }
+    },
+    "domNodes": {
+      "peak": 1256,
+      "final": 1191
+    },
+    "rendererStats": {
+      "frames": 12501,
+      "lineBuilds": 219,
+      "lineMoves": 78,
+      "lineReuses": 10082,
+      "lineReleases": 147,
+      "gutterWrites": 299,
+      "overlayWrites": 1057,
+      "caretWrites": 835,
+      "highlightToggles": 536,
+      "highlightBuilds": 204,
+      "highlightDropped": 0,
+      "transformWrites": 4,
+      "windowShifts": 3,
+      "windowFrom": 928,
+      "windowTo": 1000,
+      "liveLines": 72,
+      "liveNodes": 628,
+      "peakNodes": 964,
+      "spansMerged": 0,
+      "overlayDropped": 0
+    },
+    "rendererKind": "dom",
+    "lateFrameCount": 10,
+    "lateActiveMismatchCount": 0,
+    "imeLatencyMs": {
+      "p95": null,
+      "p99": null
+    },
+    "imeLatencyNote": "separate from key latency; CDP IME is covered by behavior checks but the pinned perf hook does not tag composition keys",
+    "ledgerAfterDisposeBytes": 0
+  },
+  "rendererStats": {
+    "frames": 12501,
+    "lineBuilds": 219,
+    "lineMoves": 78,
+    "lineReuses": 10082,
+    "lineReleases": 147,
+    "gutterWrites": 299,
+    "overlayWrites": 1057,
+    "caretWrites": 835,
+    "highlightToggles": 536,
+    "highlightBuilds": 204,
+    "highlightDropped": 0,
+    "transformWrites": 4,
+    "windowShifts": 3,
+    "windowFrom": 928,
+    "windowTo": 1000,
+    "liveLines": 72,
+    "liveNodes": 628,
+    "peakNodes": 964,
+    "spansMerged": 0,
+    "overlayDropped": 0
+  },
+  "gate": {
+    "pass": false,
+    "failures": [
+      "syncAbsMs.p99=99.15233330946648 exceeds 50"
+    ],
+    "limitations": []
+  },
+  "sampleStride": 32
+}

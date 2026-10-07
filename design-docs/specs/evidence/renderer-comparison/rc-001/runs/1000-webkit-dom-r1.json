@@ -1,0 +1,586 @@
+{
+  "key": "1000-webkit-dom-r1",
+  "lines": 1000,
+  "browser": "webkit",
+  "renderer": "dom",
+  "run": 1,
+  "position": 1,
+  "complete": true,
+  "headless": true,
+  "browserVersion": "26.5",
+  "startedAt": "2026-10-07T05:58:15.118Z",
+  "endedAt": "2026-10-07T06:02:44.362Z",
+  "loadavgStart": [
+    8.04052734375,
+    6.79248046875,
+    8.72119140625
+  ],
+  "loadavgEnd": [
+    9.185546875,
+    7.9794921875,
+    8.67626953125
+  ],
+  "contended": false,
+  "metrics": {
+    "inputP50": 9,
+    "inputP95": 258,
+    "inputP99": 262,
+    "frameP95": 19,
+    "frameP99": 24,
+    "textP95": 4,
+    "animP50": 0,
+    "animP95": 1,
+    "syncP95": 26.333333333328483,
+    "syncP99": 70,
+    "stallSyncCount": 0,
+    "stallSyncP50": null,
+    "stallSyncP95": null,
+    "stallSyncMax": null,
+    "lateActiveMismatchCount": 0,
+    "replayedFlashCount": 0,
+    "heapGrowthBytes": null,
+    "domNodesPeak": 1275,
+    "domNodesFinal": 1275,
+    "ledgerMaxBytes": 0,
+    "mountToFirstFrameMs": 221,
+    "loadToViewportMs": 92,
+    "gatePass": false,
+    "failures": [
+      "inputLatencyMs.p95=258 exceeds 50",
+      "inputLatencyMs.p99=262 exceeds 100",
+      "syncAbsMs.p99=70 exceeds 50"
+    ]
+  },
+  "rawMetrics": {
+    "inputLatencyMs": {
+      "p95": 258,
+      "p99": 262
+    },
+    "animationWorkMs": {
+      "p50": 0,
+      "p95": 1,
+      "p99": 1
+    },
+    "textWorkMs": {
+      "p95": 4
+    },
+    "frameIntervalMs": {
+      "p95": 19,
+      "p99": 24
+    },
+    "frameIntervalExcluded": {
+      "stall": 11,
+      "nonStall": 0
+    },
+    "phaseMs": {
+      "input": {
+        "spans": 111,
+        "p50": 1,
+        "p95": 2,
+        "p99": 3,
+        "totalMs": 135
+      },
+      "caret": {
+        "spans": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "totalMs": 0
+      },
+      "shaping": {
+        "spans": 3,
+        "p50": 1,
+        "p95": 2,
+        "p99": 2,
+        "totalMs": 4
+      },
+      "syntax": {
+        "spans": 4,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "totalMs": 4
+      },
+      "upload": {
+        "spans": 1360,
+        "p50": 1,
+        "p95": 1,
+        "p99": 2,
+        "totalMs": 1421
+      },
+      "frame": {
+        "spans": 1100,
+        "p50": 1,
+        "p95": 1,
+        "p99": 2,
+        "totalMs": 1134
+      },
+      "tick": {
+        "spans": 6014,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "totalMs": 6040
+      }
+    },
+    "tickStarvation": {
+      "tickStartCount": 23648,
+      "tickStartGapsOverLookahead": 13,
+      "maxTickStartGapMs": 266,
+      "mainThreadSpansOverThreshold": 0,
+      "starvationOverlaps": 0,
+      "overlaps": []
+    },
+    "layoutStats": {
+      "builds": 220,
+      "evictions": 0,
+      "segmentations": 1,
+      "measuredTextCalls": 225,
+      "measuredTextChars": 247,
+      "maxMeasuredTextLength": 3
+    },
+    "syncProvenance": "measured",
+    "syncAbsMs": {
+      "p95": 26.333333333328483,
+      "p99": 70
+    },
+    "syncAbsMsAll": {
+      "p95": 26.333333333328483,
+      "p99": 70
+    },
+    "stallWindowSync": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "max": null,
+      "earlyCount": 0,
+      "pageProxyEarly": [],
+      "pageProxyEarlyCount": 0,
+      "counts": {
+        "a": 0,
+        "b": 0,
+        "both": 0
+      }
+    },
+    "stallWindows": [
+      {
+        "index": 0,
+        "startMs": 147705,
+        "endMs": 147955,
+        "firstFrameMs": 147958,
+        "firstFrameLagMs": 3,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 1,
+        "startMs": 160619,
+        "endMs": 160869,
+        "firstFrameMs": 160871,
+        "firstFrameLagMs": 2,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 2,
+        "startMs": 170938,
+        "endMs": 171188,
+        "firstFrameMs": 171189,
+        "firstFrameLagMs": 1,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 3,
+        "startMs": 181914,
+        "endMs": 182164,
+        "firstFrameMs": 182166,
+        "firstFrameLagMs": 2,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 4,
+        "startMs": 192938,
+        "endMs": 193188,
+        "firstFrameMs": 193189,
+        "firstFrameLagMs": 1,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 5,
+        "startMs": 203873,
+        "endMs": 204123,
+        "firstFrameMs": 204123,
+        "firstFrameLagMs": 0,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 6,
+        "startMs": 214307,
+        "endMs": 214557,
+        "firstFrameMs": 214557,
+        "firstFrameLagMs": 0,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 7,
+        "startMs": 225316,
+        "endMs": 225566,
+        "firstFrameMs": 225568,
+        "firstFrameLagMs": 2,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 8,
+        "startMs": 237316,
+        "endMs": 237566,
+        "firstFrameMs": 237568,
+        "firstFrameLagMs": 2,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 9,
+        "startMs": 248367,
+        "endMs": 248617,
+        "firstFrameMs": 248619,
+        "firstFrameLagMs": 2,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      },
+      {
+        "index": 10,
+        "startMs": 258667,
+        "endMs": 258917,
+        "firstFrameMs": 258918,
+        "firstFrameLagMs": 1,
+        "samples": 0,
+        "activeSetMatch": true,
+        "replayed": false,
+        "early": 0,
+        "pageProxyEarly": 0,
+        "beatResidualMs": 0,
+        "audited": true
+      }
+    ],
+    "stallWindowsInjected": 11,
+    "beatResidual": {
+      "maxAbsNonStallMs": 4.263256414560601e-11,
+      "maxAbsStallFrameMs": 0
+    },
+    "syncAbsMsNoDrop": {
+      "p95": 26,
+      "p99": 27
+    },
+    "syncDroppedFrameSamples": 7,
+    "syncDroppedFrames": 17,
+    "syncDuplicateSamples": 11718,
+    "targets": {
+      "textWorkP95Ms": 4,
+      "animationWorkP50Ms": 1
+    },
+    "earlyFlashCount": 0,
+    "earlyFlash": {
+      "withinToleranceCount": 0,
+      "maxLeadMs": null
+    },
+    "earlyFlashes": [],
+    "earlyToleranceS": 0.0026666666666666666,
+    "earlyToleranceMs": 2.6666666666666665,
+    "audioSampleRate": 48000,
+    "syncPageProxyEarlyCount": 2,
+    "replayedFlashCount": 0,
+    "syncWindowStart": 79,
+    "syncWindowEnd": 264.6171026563408,
+    "syncWindowOnsets": 11904,
+    "syncFramePairs": 691904,
+    "syncExcludedFrames": 351,
+    "telemetryCaptureCount": 8,
+    "telemetryCaptureIntervalMs": 15000,
+    "ledgerMaxBytes": 0,
+    "ledgerCounters": {
+      "usedBytes": 0,
+      "byKind": {
+        "atlas": 0,
+        "geometry": 0,
+        "canvas": 0,
+        "backdrop": 0,
+        "visualText": 0,
+        "visualTarget": 0,
+        "video": 0,
+        "other": 0
+      },
+      "pixels": 0,
+      "visualTargets": 0,
+      "refusals": 0
+    },
+    "heapGrowthBytes": null,
+    "beatDriftMs": 0,
+    "peakPlayingRanges": 64,
+    "audioRunning": true,
+    "onsetCount": 11968,
+    "controlOnsetCount": 192,
+    "controlStartMethod": "toolbar-click",
+    "runStartMethod": "toolbar-click",
+    "largeDocumentStartStatus": "toolbar-click-returned",
+    "onsetAttribution": "active-workload-onsets-observed",
+    "workletCounters": "not exposed",
+    "probe": null,
+    "highlight": {
+      "received": 16832,
+      "accepted": 16832,
+      "overflow": 0,
+      "horizonDrops": 0,
+      "epochDrops": 0,
+      "unmapped": 0
+    },
+    "client": {
+      "telemetryQueued": 0,
+      "dropped": 0,
+      "coalesced": 0,
+      "pendingRequests": 0
+    },
+    "frameCount": 11217,
+    "keyCount": 667,
+    "editKeyCount": 570,
+    "editPairedKeyCount": 114,
+    "inputSamplesUsed": 158,
+    "inputKeysNonEditing": 509,
+    "inputKeysExpired": 0,
+    "inputKeysUnpaired": 0,
+    "editPairedSamples": 114,
+    "editNonEditingKeys": 513,
+    "editExpiredKeys": 0,
+    "editUnpairedKeys": 0,
+    "workSamples": 11217,
+    "startedAt": "2026-10-07T05:58:24.581Z",
+    "controlSink": {
+      "installed": true,
+      "installedBeforeFirstConnect": true,
+      "contexts": 1,
+      "wrappedDestinationConnections": 1,
+      "directDestinationConnections": 0,
+      "mediaElementsForcedMuted": 0,
+      "violations": [],
+      "suspendedOnViolation": false,
+      "pre": {
+        "peak": 0.22380739450454712,
+        "peakDbfs": -13.002511373180266,
+        "rms": 0.020741196788884985,
+        "rmsDbfs": -33.663323759505474,
+        "onsetCount": 1,
+        "onsetTimes": [
+          4.047666666666666
+        ]
+      },
+      "post": {
+        "peak": 0
+      }
+    },
+    "workloadSink": {
+      "installed": true,
+      "installedBeforeFirstConnect": true,
+      "contexts": 1,
+      "wrappedDestinationConnections": 1,
+      "directDestinationConnections": 0,
+      "mediaElementsForcedMuted": 0,
+      "violations": [],
+      "suspendedOnViolation": false,
+      "pre": {
+        "peak": 0.22380739450454712,
+        "peakDbfs": -13.002511373180266,
+        "rms": 0.017378856779263735,
+        "rmsDbfs": -35.199575916535615,
+        "onsetCount": 1,
+        "onsetTimes": [
+          4.047666666666666
+        ]
+      },
+      "post": {
+        "peak": 0
+      }
+    },
+    "hushQuiet": true,
+    "hushQuietMs": 1031,
+    "largeRunClickMs": 6001,
+    "largeRunCtxTime": 5.770666666666667,
+    "workloadOnsetCount": 11968,
+    "workloadOnsetsExcludedBaseline": 0,
+    "workloadOnsetsExcludedPreClick": 0,
+    "sinkOnsetsTotal": 1,
+    "sinkOnsetSplit": {
+      "control": 1,
+      "workload": 0
+    },
+    "sink": {
+      "control": {
+        "installed": true,
+        "installedBeforeFirstConnect": true,
+        "contexts": 1,
+        "wrappedDestinationConnections": 1,
+        "directDestinationConnections": 0,
+        "mediaElementsForcedMuted": 0,
+        "violations": [],
+        "suspendedOnViolation": false,
+        "pre": {
+          "peak": 0.22380739450454712,
+          "peakDbfs": -13.002511373180266,
+          "rms": 0.020741196788884985,
+          "rmsDbfs": -33.663323759505474,
+          "onsetCount": 1,
+          "onsetTimes": [
+            4.047666666666666
+          ]
+        },
+        "post": {
+          "peak": 0
+        }
+      },
+      "workload": {
+        "installed": true,
+        "installedBeforeFirstConnect": true,
+        "contexts": 1,
+        "wrappedDestinationConnections": 1,
+        "directDestinationConnections": 0,
+        "mediaElementsForcedMuted": 0,
+        "violations": [],
+        "suspendedOnViolation": false,
+        "pre": {
+          "peak": 0.22380739450454712,
+          "peakDbfs": -13.002511373180266,
+          "rms": 0.017378856779263735,
+          "rmsDbfs": -35.199575916535615,
+          "onsetCount": 1,
+          "onsetTimes": [
+            4.047666666666666
+          ]
+        },
+        "post": {
+          "peak": 0
+        }
+      }
+    },
+    "domNodes": {
+      "peak": 1275,
+      "final": 1275
+    },
+    "rendererStats": {
+      "frames": 15635,
+      "lineBuilds": 219,
+      "lineMoves": 78,
+      "lineReuses": 10082,
+      "lineReleases": 147,
+      "gutterWrites": 299,
+      "overlayWrites": 1049,
+      "caretWrites": 827,
+      "highlightToggles": 536,
+      "highlightBuilds": 204,
+      "highlightDropped": 0,
+      "transformWrites": 4,
+      "windowShifts": 3,
+      "windowFrom": 928,
+      "windowTo": 1000,
+      "liveLines": 72,
+      "liveNodes": 628,
+      "peakNodes": 964,
+      "spansMerged": 0,
+      "overlayDropped": 0
+    },
+    "rendererKind": "dom",
+    "lateFrameCount": 11,
+    "lateActiveMismatchCount": 0,
+    "imeLatencyMs": {
+      "p95": null,
+      "p99": null
+    },
+    "imeLatencyNote": "separate from key latency; CDP IME is covered by behavior checks but the pinned perf hook does not tag composition keys",
+    "ledgerAfterDisposeBytes": 0
+  },
+  "rendererStats": {
+    "frames": 15635,
+    "lineBuilds": 219,
+    "lineMoves": 78,
+    "lineReuses": 10082,
+    "lineReleases": 147,
+    "gutterWrites": 299,
+    "overlayWrites": 1049,
+    "caretWrites": 827,
+    "highlightToggles": 536,
+    "highlightBuilds": 204,
+    "highlightDropped": 0,
+    "transformWrites": 4,
+    "windowShifts": 3,
+    "windowFrom": 928,
+    "windowTo": 1000,
+    "liveLines": 72,
+    "liveNodes": 628,
+    "peakNodes": 964,
+    "spansMerged": 0,
+    "overlayDropped": 0
+  },
+  "gate": {
+    "pass": false,
+    "failures": [
+      "inputLatencyMs.p95=258 exceeds 50",
+      "inputLatencyMs.p99=262 exceeds 100",
+      "syncAbsMs.p99=70 exceeds 50"
+    ],
+    "limitations": []
+  },
+  "sampleStride": 32
+}

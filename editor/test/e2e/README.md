@@ -31,3 +31,18 @@ cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-i
 ```
 
 The `EXIT` trap releases the lock after the run. If the in-lock re-check fails, the procedure releases and reacquires the lock after the host quiets; do not wait while holding the lock.
+
+## Renderer comparison
+
+The renderer comparison uses `compare.mjs` to run the same release build, workload, silent sink, browser options and thresholds for canvas and DOM. Acquire the shared measurement lock for each browser and document-size cell; do not run another browser measurement or the full nextest suite while holding it:
+
+```sh
+until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done
+printf '%s\n' 'DOM-RENDERER-EVIDENCE' > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner
+trap 'rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock' EXIT
+cd editor && node test/e2e/compare.mjs --run-id rc-001 --browsers chromium --lines 1000
+```
+
+Repeat the invocation for `--browsers chromium --lines 20000`, `--browsers webkit --lines 1000` and `--browsers webkit --lines 20000`, releasing the lock after each invocation. Each cell runs three serial, alternating renderer pairs. Use `--resume` to continue completed raw runs after interruption. Use `--behavior` for DOM and canvas behavior checks. `--write-report` rebuilds `comparison.json` and the marked report section from existing raw JSON without a browser or lock; pass `--out` and `--report` to select destinations.
+
+Raw attempts, run JSON/JSONL and per-cell aggregates live under `design-docs/specs/evidence/renderer-comparison/<run-id>/`. The report is `design-docs/specs/design-renderer-comparison.md`. Full verification logs belong under `tmp/dom-renderer/harness/`.

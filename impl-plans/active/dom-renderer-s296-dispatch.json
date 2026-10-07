@@ -1,0 +1,290 @@
+{
+  "taskId": "dom-renderer-s296",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/dom-editor",
+  "baseBranch": "wf/dom-editor",
+  "remote": "origin",
+  "originalHead": "ec34f667032df07eaeb21638ad62df562b814bc2",
+  "designDocPaths": [
+    "design-docs/specs/design-dom-renderer.md",
+    "design-docs/specs/architecture.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/dom-renderer-s296",
+  "evidenceLayout": "tmp/dom-renderer-s296/<planId>/attempt-<n>/ holds dispatcher-level receipts. Each plan writes its own command logs under its declared artifact root tmp/dom-renderer/<core|mount|harness|evidence>/ as named in the plan Verification section. tmp/ is untracked. A missing or truncated log is not a pass.",
+  "executionModel": {
+    "waves": [
+      ["DOM-RENDERER-CORE"],
+      ["DOM-RENDERER-MOUNT"],
+      ["DOM-RENDERER-HARNESS"],
+      ["DOM-RENDERER-EVIDENCE"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The final integration step commits the accepted implementation, the report, rc-001 raw data and impl-plans/README.md with an AGENTS.md structured message and no tool attribution, then pushes non-force to origin wf/dom-editor. Never main, never a PR.",
+    "measurementLock": "Every browser run (compare.mjs behavior and measurement, test:style, Playwright) and the full nextest run is wrapped in: until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap release; owner file written; released immediately after. Never hold it while idle; never run two heavy suites at once.",
+    "serialReconciliation": "DOM-RENDERER-EVIDENCE is the serial reconciliation wave: it owns the report, rc-001 raw data, the impl-plans/README.md index entry and the final gates."
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput issue 'DOM (HTML) rendering backend for the editor and measured canvas-vs-DOM performance comparison' (no GitHub number); workflowExecutionId opus-luna-design-and-implement-review-loop-session-296; plans accepted in comm-004759 (step5-impl-plan-review)",
+    "userProblem": "The user asked for an HTML (DOM) editor version in addition to the canvas editor and a measured performance comparison between them, in the same app behind a flag, measured serially, to inform a later GPUI-inspired canvas tuning proposal.",
+    "requiredOutcomes": [
+      "Design for the DOM renderer backend and comparison protocol (design-dom-renderer.md DR-1..DR-12) plus one architecture.md decision-log row.",
+      "?renderer=dom (or mount option renderer: 'dom') renders through DomRenderer sharing document, input/IME, pointer, clock, highlights, syntax, diagnostics, frame scheduler and TextLayout; canvas default unchanged.",
+      "jsdom unit tests: virtualization bounds, keyed reuse, caret moves without line rebuilds, animation-only frames touching only highlight classes, IME, selection, setPhases, no layout reads.",
+      "DOM behavior e2e passes in Chromium and WebKit with the silent sink.",
+      "design-docs/specs/design-renderer-comparison.md with raw data under design-docs/specs/evidence/renderer-comparison/rc-001: canvas vs DOM x Chromium/WebKit x 1,000/20,000 lines x 3 runs, all issue metrics, with analysis.",
+      "Gates: npm run check, default vitest, test:perf, test:style (locked), strict clippy, full nextest (alone, locked), release wasm build, frontend build; commit and non-force push to origin wf/dom-editor."
+    ],
+    "nonGoals": [
+      "No canvas tuning and no tuning proposal text (observations only).",
+      "No edits to renderer.ts, layout.ts, frame.ts, view-host.ts, input.ts, pointer.ts, palette.ts, code.css, theme.css, run.mjs, behavior.mjs, stats.mjs or the large-doc fixture.",
+      "No CSS Custom Highlight API, contenteditable, Worker or native scrolling in the DOM renderer.",
+      "No product toggle UI, no threshold or workload change, no mutation or negative-control commands."
+    ],
+    "constraints": [
+      "English only, no emojis; AGENTS.md, design-doc, impl-plan skills.",
+      "Work only on wf/dom-editor in /Users/taco/gits/tacogips/vactr-worktrees/wf-dom-editor; non-force push to origin wf/dom-editor only at the final integration step.",
+      "Shared-file edits minimal and additive (mount.ts seam, perf-hook.ts widening, measure.mjs four hooks, README section) for merge with wf/canvas.",
+      "Measurement lock for every browser measurement and the full nextest run.",
+      "Automated runs are silent (silent sink, Chromium --mute-audio); never change macOS volume.",
+      "UI flat, square, token-based: no opacity, filter, :has(, box-shadow or non-zero border-radius in dom-renderer.css.",
+      "Mandatory verification record format; only final passing runs listed."
+    ],
+    "designDecisionsAndRationale": [
+      "A small CodeRenderer interface (renderer-types.ts) that CanvasRenderer satisfies structurally, so canvas code stays untouched (DR-1).",
+      "TextLayout remains the sole geometry authority; the DOM renderer never measures text or reads layout, so both backends share caret/selection geometry (DR-3).",
+      "Virtualized window with keyed line elements (WeakMap keyed by ShapedRun[] identity) and transform-only scroll (DR-4, DR-5).",
+      "Playing highlights as tracked class toggles with an LRU-bounded key map (DR-6).",
+      "compare.mjs reuses runMeasurement, the silent sink and unchanged thresholds; pure helpers in compare-stats.mjs are unit-tested because the sandbox cannot bind localhost (DR-10).",
+      "setPhases sets layout.phases so shaping time is attributed identically in both modes (core Key Point 17)."
+    ],
+    "intentionalTradeoffs": [
+      "The 1,000-line document is a slice of the 20,000-line fixture (sliceWorkload) because the fixture asserts 1 MiB.",
+      "Raw sample files are downsampled (stride 32, auto-doubled to fit 870,000 bytes per run).",
+      "Gate failures of either renderer are reported results, not blockers; no rerun-until-pass.",
+      "Canvas behavior failures unrelated to the seam are recorded for the wf/canvas owner, not fixed here."
+    ],
+    "supportedEdgeCases": [
+      "Japanese IME preedit and composition bars; emoji and non-ASCII caret alignment within 2 px.",
+      "Long lines rendered by horizontally culled 256-cluster chunks.",
+      "DPR change and resize without line rebuilds.",
+      "Markup-like document text rendered literally (textContent only).",
+      "Highlight and overlay caps with dropped counters; dispose leaves no nodes."
+    ],
+    "outOfScopeEdgeCases": [
+      "Physical iPad measurements.",
+      "WebKit JS heap growth (reported as unavailable).",
+      "Real (non-synthetic) WebKit touch, IME and clipboard."
+    ],
+    "residualRisks": [
+      "low: rc-001 may slightly exceed the DR-10 20 MiB budget; EVIDENCE records du -sh.",
+      "low: a fully resumed cell can report testsRun 0; the serial cell order in TASK-E4 avoids this.",
+      "low: behavior-dom dom-bounded-nodes must place the pointer over the code pane before mouse.wheel; covered by EVIDENCE repair rights on behavior-dom.mjs."
+    ],
+    "sourcePaths": [
+      "editor/src/code/mount.ts",
+      "editor/src/code/perf-hook.ts",
+      "editor/src/code/renderer.ts",
+      "editor/src/code/layout.ts",
+      "editor/src/code/palette.ts",
+      "editor/src/app/apis.ts",
+      "editor/test/e2e/run.mjs",
+      "editor/test/e2e/measure.mjs",
+      "editor/test/e2e/behavior.mjs",
+      "editor/test/e2e/stats.mjs",
+      "editor/test/canvas/mount.test.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "DOM-RENDERER-CORE",
+      "planPath": "impl-plans/active/dom-renderer-core.md",
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/code/renderer-types.ts",
+        "editor/src/code/dom-renderer.ts",
+        "editor/src/code/dom-overlay.ts",
+        "editor/src/code/dom-renderer.css",
+        "editor/test/code/dom-renderer.test.ts",
+        "impl-plans/active/dom-renderer-core.md",
+        "tmp/dom-renderer/core",
+        "editor/node_modules/.vite"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "tmp/dom-renderer/core",
+        "editor/node_modules/.vite"
+      ],
+      "acceptanceCriteria": [
+        "renderer-types.ts exports RendererKind, CodeRenderer and selectRendererKind exactly as pinned; compile-time CanvasRenderer extends CodeRenderer assertion passes npm run check.",
+        "dom-renderer.ts, dom-overlay.ts and dom-renderer.css implement the pinned element tree, window rule, keyed lines, transforms, overlays, highlights, stats, setPhases and dispose; each .ts file under 600 lines.",
+        "dom-renderer.test.ts covers virtualization, scroll, edit, newline, caret move, animation-only frame, highlight cap, IME, selection, no layout reads, long line, tokens, literal text, DPR, setPhases, dispose and CSS lint, all passing.",
+        "No edits to renderer.ts, layout.ts, mount.ts, code.css or theme.css; only writePaths changed."
+      ],
+      "verification": [
+        "cd editor && npm run check > ../tmp/dom-renderer/core/check.log 2>&1",
+        "cd editor && ./node_modules/.bin/vitest run test/code/dom-renderer.test.ts > ../tmp/dom-renderer/core/vitest-dom.log 2>&1",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas > ../tmp/dom-renderer/core/vitest-canvas.log 2>&1",
+        "git diff --stat -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/mount.ts editor/src/code/code.css editor/src/app/theme.css"
+      ]
+    },
+    {
+      "planId": "DOM-RENDERER-MOUNT",
+      "planPath": "impl-plans/active/dom-renderer-mount.md",
+      "dependsOn": ["DOM-RENDERER-CORE"],
+      "writePaths": [
+        "editor/test/code/dom-mount.test.ts",
+        "impl-plans/active/dom-renderer-mount.md",
+        "tmp/dom-renderer/mount",
+        "editor/node_modules/.vite",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "sharedPaths": [
+        "editor/src/code/mount.ts",
+        "editor/src/code/perf-hook.ts"
+      ],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Renderer selection seam only (Contract items 1-7): imports, MountOptions.renderer, selectRendererKind, surfaceEl, DomRenderer construction, identifier swap canvas->surfaceEl, rendererKind to perf hook."},
+        {"path": "editor/src/code/perf-hook.ts", "intendedEdit": "Widen renderer type to CodeRenderer; add rendererKind and domNodes to counters()."}
+      ],
+      "artifactRoots": [
+        "tmp/dom-renderer/mount",
+        "editor/node_modules/.vite",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "acceptanceCriteria": [
+        "mount.ts edits limited to the seam; canvas mode DOM tree, class names, append order, listener targets and renderer arguments unchanged.",
+        "perf-hook.ts widened with rendererKind and domNodes; existing counter fields unchanged.",
+        "dom-mount.test.ts covers default/bogus/dom URL and option precedence, DOM text, pointer selection, perf counters in both modes, at most one getBoundingClientRect per frame, backdrop placement and dispose.",
+        "Focused and full default vitest pass; renderer.ts, layout.ts, frame.ts, view-host.ts and app/main.ts unchanged."
+      ],
+      "verification": [
+        "cargo build --lib --target wasm32-unknown-unknown > tmp/dom-renderer/mount/wasm-debug.log 2>&1",
+        "cd editor && npm run check > ../tmp/dom-renderer/mount/check.log 2>&1",
+        "cd editor && ./node_modules/.bin/vitest run test/code/dom-mount.test.ts test/code/dom-renderer.test.ts test/canvas > ../tmp/dom-renderer/mount/vitest-focused.log 2>&1",
+        "cd editor && ./node_modules/.bin/vitest run > ../tmp/dom-renderer/mount/vitest-full.log 2>&1",
+        "git diff --stat -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/frame.ts editor/src/code/view-host.ts editor/src/app/main.ts"
+      ]
+    },
+    {
+      "planId": "DOM-RENDERER-HARNESS",
+      "planPath": "impl-plans/active/dom-renderer-harness.md",
+      "dependsOn": ["DOM-RENDERER-MOUNT"],
+      "writePaths": [
+        "editor/test/e2e/compare.mjs",
+        "editor/test/e2e/compare-stats.mjs",
+        "editor/test/e2e/compare-stats.test.ts",
+        "editor/test/e2e/behavior-dom.mjs",
+        "impl-plans/active/dom-renderer-harness.md",
+        "tmp/dom-renderer/harness",
+        "editor/node_modules/.vite"
+      ],
+      "sharedPaths": [
+        "editor/test/e2e/measure.mjs",
+        "editor/test/e2e/README.md"
+      ],
+      "sharedPathNotes": [
+        {"path": "editor/test/e2e/measure.mjs", "intendedEdit": "Four additive hooks only: workload override, widened font-size selector, domNodes peak/final, rendererStats and rendererKind in metrics."},
+        {"path": "editor/test/e2e/README.md", "intendedEdit": "Append a Renderer comparison section (lock wrapper, per-cell invocations, --resume, --write-report, output layout)."}
+      ],
+      "artifactRoots": [
+        "tmp/dom-renderer/harness",
+        "editor/node_modules/.vite"
+      ],
+      "acceptanceCriteria": [
+        "compare-stats.mjs exports every pinned helper and constant; compare-stats.test.ts covers every test bullet and passes.",
+        "compare.mjs implements the pinned flags, lock guard, preflight, behavior and measurement modes, raw files, attempts, --resume, --write-report and exit codes.",
+        "behavior-dom.mjs implements every DR-9 check id; node --check passes.",
+        "measure.mjs changed only by the four additive hooks; run.mjs, behavior.mjs, stats.mjs, silent-sink.mjs and the fixture unchanged.",
+        "--write-report works without a browser or lock into tmp/dom-renderer/harness/dry."
+      ],
+      "verification": [
+        "cd editor && node --check test/e2e/compare.mjs && node --check test/e2e/compare-stats.mjs && node --check test/e2e/behavior-dom.mjs && node --check test/e2e/measure.mjs > ../tmp/dom-renderer/harness/node-check.log 2>&1",
+        "cd editor && npm run check > ../tmp/dom-renderer/harness/check.log 2>&1",
+        "cd editor && ./node_modules/.bin/vitest run test/e2e/compare-stats.test.ts test/e2e/stats.test.ts > ../tmp/dom-renderer/harness/vitest-e2e.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id harness-dry --write-report --out ../tmp/dom-renderer/harness/dry --report ../tmp/dom-renderer/harness/dry/report.md > ../tmp/dom-renderer/harness/write-report.log 2>&1",
+        "git diff --stat -- editor/test/e2e/run.mjs editor/test/e2e/behavior.mjs editor/test/e2e/stats.mjs editor/test/e2e/fixtures/large-doc.mjs editor/test/e2e/silent-sink.mjs"
+      ]
+    },
+    {
+      "planId": "DOM-RENDERER-EVIDENCE",
+      "planPath": "impl-plans/active/dom-renderer-evidence.md",
+      "dependsOn": ["DOM-RENDERER-HARNESS"],
+      "writePaths": [
+        "design-docs/specs/design-renderer-comparison.md",
+        "impl-plans/active/dom-renderer-evidence.md",
+        "design-docs/specs/evidence/renderer-comparison/rc-001",
+        "tmp/dom-renderer/evidence",
+        "target",
+        "editor/dist",
+        "editor/node_modules/.vite",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "sharedPaths": [
+        "editor/src/code/dom-renderer.ts",
+        "editor/src/code/dom-overlay.ts",
+        "editor/src/code/dom-renderer.css",
+        "editor/test/code/dom-renderer.test.ts",
+        "editor/src/code/mount.ts",
+        "editor/src/code/perf-hook.ts",
+        "editor/test/e2e/behavior-dom.mjs",
+        "editor/test/e2e/compare.mjs",
+        "editor/test/e2e/compare-stats.mjs",
+        "editor/test/e2e/compare-stats.test.ts",
+        "impl-plans/README.md"
+      ],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/dom-renderer.ts", "intendedEdit": "Repair only when an e2e or gate failure proves a defect; record reason and failing evidence."},
+        {"path": "editor/src/code/dom-overlay.ts", "intendedEdit": "Repair only when an e2e or gate failure proves a defect."},
+        {"path": "editor/src/code/dom-renderer.css", "intendedEdit": "Repair only when an e2e or gate failure proves a defect."},
+        {"path": "editor/test/code/dom-renderer.test.ts", "intendedEdit": "Add a deterministic reproduction test for any product defect fixed."},
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Seam lines only, repair only on proven defect."},
+        {"path": "editor/src/code/perf-hook.ts", "intendedEdit": "Repair only on proven defect."},
+        {"path": "editor/test/e2e/behavior-dom.mjs", "intendedEdit": "Repair only on proven defect (e.g. pointer over code pane before mouse.wheel in dom-bounded-nodes)."},
+        {"path": "editor/test/e2e/compare.mjs", "intendedEdit": "Repair only on proven defect."},
+        {"path": "editor/test/e2e/compare-stats.mjs", "intendedEdit": "Repair only on proven defect."},
+        {"path": "editor/test/e2e/compare-stats.test.ts", "intendedEdit": "Repair only on proven defect."},
+        {"path": "impl-plans/README.md", "intendedEdit": "Add one index entry for the four dom-renderer plans."}
+      ],
+      "artifactRoots": [
+        "design-docs/specs/evidence/renderer-comparison/rc-001",
+        "tmp/dom-renderer/evidence",
+        "target",
+        "editor/dist",
+        "editor/node_modules/.vite",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "acceptanceCriteria": [
+        "DOM behavior passes in Chromium and WebKit (TASK-E3.1) under the measurement lock with the silent sink.",
+        "24 complete runs with raw data under design-docs/specs/evidence/renderer-comparison/rc-001 (TASK-E4); environment.json, attempts.json, comparison.json and behavior/ exist.",
+        "design-renderer-comparison.md has measured tables plus Analysis, Limitations and Observations sections citing rc-001 numbers, and no 'Pending measured data.' line (TASK-E5).",
+        "Gates 1-9 of TASK-E6 pass; renderer.ts, layout.ts, frame.ts, run.mjs, behavior.mjs, stats.mjs and the fixture unchanged since ec34f66.",
+        "Commit and non-force push to origin wf/dom-editor by the final integration step (TASK-E7)."
+      ],
+      "verification": [
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --write-report > ../tmp/dom-renderer/evidence/write-report-1.log 2>&1",
+        "mise run build-wasm-release > tmp/dom-renderer/evidence/wasm-release.log 2>&1",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build > ../tmp/dom-renderer/evidence/dist-build.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --behavior --renderers dom > ../tmp/dom-renderer/evidence/behavior-dom.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --resume --lines 1000 --browsers chromium > ../tmp/dom-renderer/evidence/cell-1000-chromium.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --resume --lines 1000 --browsers webkit > ../tmp/dom-renderer/evidence/cell-1000-webkit.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --resume --lines 20000 --browsers chromium > ../tmp/dom-renderer/evidence/cell-20000-chromium.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --resume --lines 20000 --browsers webkit > ../tmp/dom-renderer/evidence/cell-20000-webkit.log 2>&1",
+        "cd editor && node test/e2e/compare.mjs --run-id rc-001 --write-report > ../tmp/dom-renderer/evidence/write-report-2.log 2>&1",
+        "cargo build --lib --target wasm32-unknown-unknown > tmp/dom-renderer/evidence/wasm-debug.log 2>&1",
+        "cd editor && npm run check > ../tmp/dom-renderer/evidence/check.log 2>&1",
+        "cd editor && ./node_modules/.bin/vitest run > ../tmp/dom-renderer/evidence/vitest-full.log 2>&1",
+        "cd editor && npm run test:perf > ../tmp/dom-renderer/evidence/test-perf.log 2>&1",
+        "cd editor && npm run test:style > ../tmp/dom-renderer/evidence/test-style.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/dom-renderer/evidence/clippy.log 2>&1",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run > tmp/dom-renderer/evidence/nextest.log 2>&1",
+        "mise run build-wasm-release > tmp/dom-renderer/evidence/wasm-release-final.log 2>&1",
+        "git diff --stat ec34f66 -- editor/src/code/renderer.ts editor/src/code/layout.ts editor/src/code/frame.ts editor/test/e2e/run.mjs editor/test/e2e/behavior.mjs editor/test/e2e/stats.mjs editor/test/e2e/fixtures/large-doc.mjs"
+      ]
+    }
+  ]
+}

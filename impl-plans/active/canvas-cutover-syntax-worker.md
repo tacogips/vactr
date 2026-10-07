@@ -433,9 +433,11 @@ Repair is serial. Edit only this plan's progress log among the plan files.
   entry binds only in a worker scope.
 - [x] `WorkerSyntaxSpans` posts exactly one `edit` per transaction. `reset` is sent only for
   reset, gap, recovery, more than 1,024 changes, or more than 65,536 inserted units.
-- [x] Replies with a non-current seq are dropped (`staleReplies`). These rows pass: equivalence
-  (including at least 20 multi-change transactions and bursts), the `{1,2,4}` reproduction,
-  coalesced remap, burst convergence, stale, keystroke cost, truncation and failure.
+- [x] Replies with a non-current seq are dropped (`staleReplies`); after a stale drop, the next
+  current-seq reply triggers a current-window refresh while in-window mapped spans stay visible.
+  These rows pass: equivalence (including at least 20 multi-change transactions and bursts), the
+  `{1,2,4}` reproduction, coalesced remap, burst convergence, stale interleave, keystroke cost,
+  truncation and failure.
 - [x] The worker derives tree edits and touched lines from one `ChangeSet` in final-document
   coordinates, and remaps the pending touched set across coalesced edits.
 - [x] `data-syntax` becomes `tree-sitter-worker` only after the first current-seq reply is
@@ -443,15 +445,15 @@ Repair is serial. Edit only this plan's progress log among the plan files.
   flip on a current reply.
 - [x] The `SyntaxSpans` fallback reparses only after a presented frame, and `flush()` stays
   synchronous.
-- [ ] `vite.config.ts` has `worker: { format: 'es' }`; the release page build emits the worker
+- [x] `vite.config.ts` has `worker: { format: 'es' }`; the release page build emits the worker
   chunk.
-- [ ] `data-syntax` is `tree-sitter-worker` in Chromium and WebKit in the behavior profile; the
+- [x] `data-syntax` is `tree-sitter-worker` in Chromium and WebKit in the behavior profile; the
   self-check and `ios-sim.json` record `syntax` (informational).
-- [ ] The full default vitest run, `npm run check`, `test:perf`, strict clippy, full nextest, the
+- [x] The full default vitest run, `npm run check`, `test:perf`, strict clippy, full nextest, the
   wasm32 build and the Tauri check all exit 0.
-- [ ] No touched file reaches 1,000 lines. No dependency, Rust or threshold change
+- [x] No touched file reaches 1,000 lines. No dependency, Rust or threshold change
   (`git diff --name-only` stays within the writePaths).
-- [ ] The progress log records the hashes, logs and results.
+- [x] The progress log records the hashes, logs and results.
 
 ## Progress Log
 
@@ -497,11 +499,45 @@ in final-document coordinates, reverses tree edits, and remaps coalesced touched
 - Every touched file is below 1,000 lines; no Rust, dependency, lockfile, threshold or
   workload changes were made.
 
-**Still pending**: release page build and worker chunk inspection, Chromium/WebKit behavior
-profile, full nextest, and a passing serial `test:perf`. Two final-source serial perf attempts
-failed at 5,088 ms and 5,202 ms against the 4,800 ms cap while other host work was active; full
-logs are `test-perf.log` and `test-perf-final.log`. The attempted foreground lock wait was
-interrupted before acquiring `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`, owned by
-`dom-renderer-evidence-s296`; its WebKit workload remains active intermittently. Do not accept
-the perf gate or browser/nextest gates until the owner releases the lock, the quiet-host gate is
-met, and the commands pass on the final source.
+**State at the session-303 checkpoint**: release page build and worker chunk inspection,
+Chromium/WebKit behavior profile, full nextest, and a passing serial `test:perf` were pending.
+Session 304 resolved these gates on the final source; see its progress record and logs under
+`tmp/canvas-cutover/syntax-worker/session-304/`.
+
+
+### Session: 2026-10-07 (session 304 final-source verification)
+
+**Tasks Completed**: Re-ran the assigned implementation gates on checkpoint `a8b209b` after the measurement lock became available. Confirmed the release page emits `syntax-worker-BVsDP44l.js`; Chromium (11/11 checks) and WebKit (9/9 checks plus two separately labeled synthetic-event limitations) both applied current tree-sitter Worker spans. Full default Vitest passed 823/823, the focused suite passed 88/88, and the dedicated serial perf gate passed. Full nextest passed 2,817 tests with 3 existing skips. Strict clippy, wasm32 build, Tauri check, npm check, both E2E syntax checks, and diff check exited 0. No source changes were needed in this continuation.
+
+**Final-source passing verification** (logs under `tmp/canvas-cutover/syntax-worker/session-304/`):
+
+- `cd editor && npm run check`: exit 0.
+- Focused Vitest command from the Verification table: exit 0; 8 files / 88 tests passed.
+- `cd editor && ./node_modules/.bin/vitest run`: exit 0; 94 files / 823 tests passed.
+- `cd editor && npm run test:perf`: exit 0; 1 test passed; ratio 2.65.
+- `mise run build-wasm-release` and `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`: both exit 0; worker chunk present.
+- Behavior E2E command: exit 0; Chromium 11/11 and WebKit 7/7 automated checks passed, including `syntax-worker` in each browser.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`: exit 0.
+- Locked `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true timeout 2400 cargo nextest run`: exit 0; 2,817 passed, 3 existing skips.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`, `CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml`, both `node --check` commands, and `git diff --check`: exit 0.
+- Every touched source file remains below 1,000 lines. No dependency, Rust source, workload, or threshold change.
+- Quiet-host load observations: `behavior-host-load.txt` and `nextest-host-load.txt`.
+- Plan fresh-read SHA-256: `16b2d8059cb5abe4b5df1ec0a90073c314fe328994ea919f07392142b5d69c9d`; post-edit SHA-256 is recorded in `receipt-session-304.sha256`.
+
+
+### Session: 2026-10-07 (session 305 adversarial repair)
+
+**Finding addressed: ADV-S304-SW-STALE-REFRESH.** `WorkerSyntaxSpans` now remembers dropped stale spans replies. After the next current-sequence reply it clamps and refreshes the current capture window, evicts only out-of-window cache entries, preserves in-window mapped spans during the refresh, and tracks the in-flight window so later `spans()` calls do not duplicate covered line requests. Added the production-path stale-interleave row; it performs no manual full-document `lines` recapture and requires eventual whole-document equality with a fresh parse. Existing equivalence and stale-drop assertions remain unchanged.
+
+**Final-source verification** (logs under `tmp/canvas-cutover/syntax-worker/session-305/`):
+
+- `cd editor && ./node_modules/.bin/vitest run test/code/syntax-worker.test.ts test/code/syntax.test.ts test/canvas/edit-cost.test.ts test/canvas/mount.test.ts test/canvas/frame.test.ts`: exit 0; 5 files / 70 tests passed.
+- `cd editor && npm run check`: exit 0.
+- `cd editor && ./node_modules/.bin/vitest run`: exit 0; 94 files / 824 tests passed.
+- `mise run build-wasm-release` and `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`: both exit 0; worker chunk emitted.
+- Locked `cd editor && npm run e2e -- --browser all --profile behavior --run-id s305-syntax-worker --out ../tmp/canvas-cutover/syntax-worker/session-305/behavior`: exit 0; aggregate 20/20, `syntax-worker` passes in Chromium and WebKit. WebKit: 9/9 automated checks, plus two separately labeled limitations.
+- Locked `cd editor && npm run test:perf`: exit 0; 1/1, ratio 3.10.
+- `git diff --check`: exit 0.
+- Final source SHA-256: `editor/src/code/syntax.ts` eae60c71462978bdebe0daf8eb34c169f588c3be2f06846e2684c0eddce2928c; `editor/test/code/syntax-worker.test.ts` 8a532cf9b5e7bf848aed1eccf390ff5c07170bb10d2f1f535db1710f22f9686c.
+
+Regression authoring produced two corrected intermediate test attempts: the initial stale-line expectation was too strict about the parser's changed-range capture, and the next row called `spans()` on the fake port. Their complete logs are `focused-review-fix.log` and `stale-worker-regression.log`; the corrected dedicated row passes in `stale-worker-regression-02.log` and the final focused/full suites above.

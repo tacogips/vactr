@@ -1,6 +1,7 @@
 import { ChangeSet, EditorState, Text } from '@codemirror/state';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TextLayout } from '../../src/code/layout';
+import { CHECK_DEBOUNCE_MS, DiagnosticsController } from '../../src/code/diagnostics';
 import { PhaseTimer } from '../../src/code/frame';
 import { InputController, type InputPresentation } from '../../src/code/input';
 import { CodeSurface } from '../../src/code/surface';
@@ -28,7 +29,7 @@ function setup(inputLines = lines, onPresentation?: (presentation: InputPresenta
   const surface = new CodeSurface({ sync }), container = document.createElement('div'); document.body.append(container);
   const input = new InputController(surface, container, { onPresentation });
   cleanups.push(() => { input.dispose(); surface.dispose(); client.close(); store.dispose(); container.remove(); });
-  return { surface, input, container };
+  return { surface, input, container, sync, client, store };
 }
 function oldWindow(text: string, head: number, anchor: number): { start: number; end: number; value: string; anchor: number; head: number; outside: boolean } {
   let start = boundary(text, Math.max(0, head - INPUT_WINDOW_LIMIT / 2), 1);
@@ -40,6 +41,34 @@ function oldWindow(text: string, head: number, anchor: number): { start: number;
 afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); vi.restoreAllMocks(); document.body.replaceChildren(); });
 
 describe('bounded document edit costs', () => {
+  it('keeps a 20,000-line edit check out of the keystroke and frame phases', () => {
+    vi.useFakeTimers();
+    const { surface, input, sync, client } = setup();
+    const frameCallbacks: (() => void)[] = [], tasks: (() => void)[] = [];
+    let phase = 'idle';
+    const check = vi.fn(() => { expect(phase).toBe('task'); return []; });
+    const diagnostics = new DiagnosticsController({ client, sync, tier: 'browser', core: { check }, text: () => surface.state.doc.toString(),
+      afterPresent(callback) {
+        let cancelled = false;
+        const frame = (): void => { if (!cancelled) tasks.push(() => { phase = 'task'; if (!cancelled) callback(); }); };
+        frameCallbacks.push(frame);
+        return () => { cancelled = true; };
+      } });
+    const stop = surface.subscribe((update) => { if (update.docChanged) diagnostics.noteInput(); });
+    cleanups.push(stop, () => diagnostics.dispose());
+    const checksDuringKeystroke = check.mock.calls.length;
+    phase = 'keystroke'; input.replaceSelection('x', 'input.type');
+    expect(check.mock.calls.length - checksDuringKeystroke).toBe(0);
+    expect(diagnostics.stats.checks).toBe(0);
+    vi.advanceTimersByTime(CHECK_DEBOUNCE_MS);
+    phase = 'frame'; for (const frame of frameCallbacks.splice(0)) frame();
+    expect(check.mock.calls.length).toBe(0);
+    expect(diagnostics.stats.checks).toBe(0);
+    tasks.shift()?.();
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(diagnostics.stats.checks).toBe(1);
+  });
+
   it('keeps a 20,000-line ASCII edit bounded across layout and deferred syntax', () => {
     const metrics = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
     const layout = new TextLayout(metrics, { font: '16px mono', lineHeight: 20, baseline: 16 });

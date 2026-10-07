@@ -793,7 +793,7 @@ impl Runtime {
                             if onset < now {
                                 late += 1;
                             }
-                            let pe = PlayingEvent {
+                            let mut pe = PlayingEvent {
                                 slot: name,
                                 beat: tempo.beats_at(whole.begin).unwrap_or(Ratio64::ZERO),
                                 time: onset,
@@ -801,7 +801,11 @@ impl Runtime {
                                 dur: (self.clock.to_host(whole.end) - onset).max(0.0),
                                 kind: SlotKind::Pattern,
                                 reduced_lead: prev.is_some_and(|p| onset <= p + lead),
+                                id: None,
                             };
+                            pe.id =
+                                self.announcer
+                                    .confirm(&(id, lane.gen, key.clone()), onset, ev.src);
                             let ctls: Vec<(KwId, Value)> =
                                 ev.controls.iter().map(|(k, v)| (*k, v.clone())).collect();
                             self.telemetry.publish(pe, &ctls);

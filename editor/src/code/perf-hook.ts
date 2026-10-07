@@ -13,7 +13,7 @@ export interface PresentedRecord {
   activeKey: string; beatCycle: number | null; beatFlash: boolean; revision: number; handles: number;
   executionMs?: number; epoch?: string | null;
 }
-export interface OnsetRecord { time: number; end: number; from: number; to: number; epoch: string | null; receivedMs: number }
+export interface OnsetRecord { time: number; end: number; from: number; to: number; epoch: string | null; receivedMs: number; id?: number }
 export interface VactrPerf {
   perf: PerfRecorder;
   phases(): { names: PerfPhase[]; rows: number[][] };
@@ -67,6 +67,15 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
     onsetRows[onsetNext] = record; onsetNext = (onsetNext + 1) % onsetRows.length;
     onsetCount = Math.min(onsetRows.length, onsetCount + 1);
   } });
+  Object.defineProperty(api, 'retractOnset', { value: (id: number) => {
+    const keep = ordered(onsetRows, onsetNext, onsetCount).filter((record) => record.id !== id);
+    onsetNext = 0; onsetCount = 0;
+    for (const record of keep) {
+      onsetRows[onsetNext] = record;
+      onsetNext = (onsetNext + 1) % onsetRows.length;
+      onsetCount += 1;
+    }
+  } });
   (input.win as Window & { __vactrPerf?: VactrPerf }).__vactrPerf = api;
   return api;
 }
@@ -79,5 +88,9 @@ export function recordPresented(api: VactrPerf | null, record: PresentedRecord):
 }
 export function recordOnset(api: VactrPerf | null, record: OnsetRecord): void {
   (api as (VactrPerf & { recordOnset?: (value: OnsetRecord) => void }) | null)?.recordOnset?.(record);
+}
+export function retractOnset(api: VactrPerf | null, id: number): void {
+  const onsetApi = api as (VactrPerf & { retractOnset?: (value: number) => void }) | null;
+  onsetApi?.retractOnset?.(id);
 }
 export function removePerfHook(win: Window): void { delete (win as Window & { __vactrPerf?: VactrPerf }).__vactrPerf; }

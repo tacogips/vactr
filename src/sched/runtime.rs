@@ -27,6 +27,7 @@ use crate::ns::stage::{EffectSink, SlotKey, StagedEffect};
 use crate::pattern::eval::{HostSig, InputCells, QueryCtx};
 use crate::pattern::query::{Event, TimeSpan};
 use crate::reader::span::{FileId, Span};
+use crate::sched::announce::{AnnounceDrain, Announcer};
 use crate::sched::cells::{ControlCells, Tier};
 use crate::sched::commit::{note_fault, SampleTable};
 use crate::sched::control::ControlChannel;
@@ -54,6 +55,8 @@ pub struct RuntimeConfig {
     pub lookahead: f64,
     /// Commit horizon, seconds.
     pub commit_lead: f64,
+    /// Preview telemetry horizon, seconds.
+    pub telemetry_lead: f64,
     pub resend_ticks: u32,
     pub transport_diag_ticks: u32,
     /// Late events within one second that widen the commit lead.
@@ -77,6 +80,7 @@ impl Default for RuntimeConfig {
         Self {
             lookahead: 0.120,
             commit_lead: 0.030,
+            telemetry_lead: 0.120,
             resend_ticks: 3,
             transport_diag_ticks: 20,
             late_threshold: 4,
@@ -155,6 +159,7 @@ pub struct Runtime {
     pub(crate) control: ControlChannel,
     pub(crate) samples: SampleTable,
     pub(crate) telemetry: Telemetry,
+    pub(crate) announcer: Announcer,
     pub(crate) at: AtQueue,
     pub(crate) pos: Ratio64,
     pub(crate) last_now: Option<f64>,
@@ -254,6 +259,7 @@ impl Runtime {
             input: InputCells::new(),
             samples: SampleTable::default(),
             telemetry: Telemetry::default(),
+            announcer: Announcer::default(),
             at: AtQueue::default(),
             pos: Ratio64::ZERO,
             last_now: None,
@@ -321,6 +327,11 @@ impl Runtime {
     /// Drains the telemetry queue.
     pub fn telemetry(&mut self) -> Vec<PlayingEvent> {
         self.telemetry.drain()
+    }
+
+    /// Drains early announcements and retractions.
+    pub(crate) fn announced(&mut self) -> AnnounceDrain {
+        self.announcer.drain()
     }
 
     /// Re-synchronizes the browser cell mirror after a reconnect.
@@ -551,6 +562,7 @@ impl Runtime {
         self.query_all(ev, target, &mut rep);
         // (4) commit what enters the commit horizon.
         self.commit_all(host_now, &mut rep);
+        self.announce_all(host_now);
         self.emit_midi_clock(host_now);
         // (5) telemetry, signal inputs, control and cell transport.
         self.telemetry.refresh(host_now, &mut self.input);

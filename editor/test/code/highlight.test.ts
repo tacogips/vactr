@@ -109,6 +109,53 @@ describe('HighlightScheduler (criterion 1, mock clock)', () => {
     expect(sched.size).toBe(0);
   });
 
+  it('holds ahead events until audible time, deduplicates confirmation, and retracts pending or active ids', () => {
+    const text = 'd1 "bd sd"';
+    let now = 1;
+    const accepted: { id?: number }[] = [];
+    const retracted: number[] = [];
+    const sched = new HighlightScheduler({
+      clock: new MockClock(), audible: new AudibleClock({ at: () => ({ time: now, uncertainty: 0, provenance: 'measured' }) }),
+      epoch: () => 'e1', file: 'main.vact', map: (span) => ({ from: span.start, to: span.end }), tempo: () => TEMPO,
+    });
+    sched.onAccept((item) => accepted.push(item));
+    sched.onRetract((id) => retracted.push(id));
+    const ahead = { ...event(text, 'bd', 1.12, [1, 8]), id: 10, epoch: 'e1', end_time: 1.3 };
+    sched.onPlaying([], { ahead: [ahead] });
+    expect(sched.tick(0)).toEqual([]);
+    expect(sched.stats.aheadAccepted).toBe(1);
+    now = 1.12;
+    expect(sched.tick(16.7)).toEqual([{ from: 4, to: 6 }]);
+    sched.onPlaying([{ ...ahead }]);
+    expect(sched.size).toBe(1);
+    expect(sched.stats.confirmedSkipped).toBe(1);
+    expect(accepted).toHaveLength(1);
+    sched.onPlaying([], { retract: [10, 999] });
+    expect(sched.tick(33.4)).toEqual([]);
+    expect(retracted).toEqual([10]);
+    expect(sched.stats.retracted).toBe(1);
+
+    const pending = { ...event(text, 'sd', 1.5, [1, 8]), id: 11, epoch: 'e1', end_time: 1.7 };
+    sched.onPlaying([], { ahead: [pending] });
+    sched.onPlaying([], { retract: [11] });
+    now = 1.5;
+    expect(sched.tick(50)).toEqual([]);
+    expect(retracted).toEqual([10, 11]);
+  });
+
+  it('drops ahead events with stale audible epochs', () => {
+    const text = 'd1 "bd"';
+    const stale = { ...event(text, 'bd', 0, [1, 8]), id: 4, epoch: 'old', end_time: 0.1 };
+    // Use audible mode so epoch validation is enforced.
+    const audible = new HighlightScheduler({
+      clock: new MockClock(), audible: new AudibleClock({ at: () => ({ time: 0, uncertainty: 0, provenance: 'measured' }) }),
+      epoch: () => 'new', file: 'main.vact', map: () => ({ from: 0, to: 1 }), tempo: () => TEMPO,
+    });
+    audible.onPlaying([], { ahead: [stale] });
+    expect(audible.size).toBe(0);
+    expect(audible.stats.epochDrops).toBe(1);
+  });
+
   it('re-derives active ranges after invalid correlation and a late frame without replaying expired events', () => {
     const text = 'd1 "bd sd"';
     let now = 1.1;

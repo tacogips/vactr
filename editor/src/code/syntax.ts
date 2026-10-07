@@ -278,6 +278,7 @@ export class WorkerSyntaxSpans implements SpanProvider {
   private readonly lineCache = new Map<number, CachedLine>();
   private readonly inFlight = new Set<string>();
   private truncated = false;
+  private resyncAfterStale = false;
   readonly stats = { posts: 0, resets: 0, replies: 0, staleReplies: 0, workerFailures: 0, captures: 0, capturedLines: 0 };
 
   constructor(private readonly worker: SyntaxWorkerPort, base: string, private readonly onSyntax: () => void = () => {},
@@ -318,8 +319,12 @@ export class WorkerSyntaxSpans implements SpanProvider {
     const missing: number[] = [];
     for (let line = first; line <= last; line += 1) if (!this.lineCache.has(line)) missing.push(line);
     if (missing.length) {
-      const low = missing[0]!, high = missing[missing.length - 1]!, key = `${this.seq}:${low}:${high}`;
-      if (!this.inFlight.has(key)) { this.inFlight.add(key); this.post({ type: 'lines', seq: this.seq, first: low, last: high }); }
+      const low = missing[0]!, high = missing[missing.length - 1]!;
+      const covered = [...this.inFlight].some((request) => {
+        const [seq, first, last] = request.split(':').map(Number);
+        return seq === this.seq && first <= low && last >= high;
+      });
+      if (!covered) { this.inFlight.add(`${this.seq}:${low}:${high}`); this.post({ type: 'lines', seq: this.seq, first: low, last: high }); }
     }
     const result: { from: number; to: number; className: string }[] = [];
     for (let lineNo = first; lineNo <= last; lineNo += 1) {
@@ -351,7 +356,7 @@ export class WorkerSyntaxSpans implements SpanProvider {
     if (reply.type === 'ready') { this.clearReadyTimer(); return; }
     if (reply.type === 'failed') { this.fail(); return; }
     this.stats.replies += 1;
-    if (reply.seq !== this.seq) { this.stats.staleReplies += 1; return; }
+    if (reply.seq !== this.seq) { this.stats.staleReplies += 1; this.resyncAfterStale = true; return; }
     for (let row = 0; row + 2 < reply.lines.length; row += 3) {
       const number = reply.lines[row]!, first = reply.lines[row + 1]!, count = reply.lines[row + 2]!;
       const line = this.lastDoc?.line(number + 1); if (!line) continue;
@@ -364,6 +369,16 @@ export class WorkerSyntaxSpans implements SpanProvider {
       this.lineCache.set(number, { from: line.from, spans });
     }
     this.truncated = reply.truncated; this.inFlight.clear();
+    if (this.resyncAfterStale) {
+      this.resyncAfterStale = false;
+      const lastLine = Math.max(0, (this.lastDoc?.lines ?? 1) - 1);
+      const first = Math.max(0, Math.min(this.window[0], lastLine));
+      const last = Math.max(first, Math.min(this.window[1], lastLine));
+      this.window = [first, last];
+      for (const line of this.lineCache.keys()) if (line < first || line > last) this.lineCache.delete(line);
+      this.inFlight.add(`${this.seq}:${first}:${last}`);
+      this.post({ type: 'lines', seq: this.seq, first, last });
+    }
     const firstApply = !this.everApplied; this.workerCacheReady = true; this.everApplied = true;
     if (firstApply) this.onFirstApply();
     this.onSyntax();

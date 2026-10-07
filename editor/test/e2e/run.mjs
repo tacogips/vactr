@@ -2,12 +2,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
 import { startServer, editorRoot, repoRoot } from './serve.mjs';
 import { runBehavior } from './behavior.mjs';
 import { runMeasurement } from './measure.mjs';
-import { countChecks, renderEvidence } from './stats.mjs';
+import { countChecks, parseBusyProcesses, quietHostGate, renderEvidence } from './stats.mjs';
 import { installSilentSink } from './silent-sink.mjs';
 import { gatingPreflight } from './wasm-profile.mjs';
 const args=process.argv.slice(2); const value=(key,def)=>{const i=args.indexOf(key);return i>=0?args[i+1]:def;};
@@ -17,6 +18,27 @@ const writeEvidence=args.includes('--write-evidence'); const headedWebkit=args.i
 const command=`cd editor && npm run e2e -- --browser ${value('--browser','all')} --profile ${profile} --run-id ${runId}${writeEvidence?' --write-evidence':''}${headedWebkit?' --headed-webkit':''}${profileTrace?' --profile-trace':''}`;
 const evidencePath=(name)=>path.join(out,name); const browsers=[]; let blocked=false; let fatal=null;
 const host={hostname:os.hostname(),platform:os.platform(),release:os.release(),arch:os.arch(),node:process.version,runId,commands:[command,'mise run build-wasm-release','cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build']};
+const processRows=(text)=>String(text??'').split(/\r?\n/).slice(1).flatMap((line)=>{const match=line.trim().match(/^(\d+)\s+(\d+)\s+([\d.]+)\s+(.+)$/);return match?[{pid:Number(match[1]),ppid:Number(match[2]),pcpu:Number(match[3]),comm:match[4].trim()}]:[];});
+function excludedProcessTree(rows, rootPid) {
+  const parents=new Map(rows.map((row)=>[row.pid,row.ppid])); const excluded=new Set([rootPid]);
+  let parent=parents.get(rootPid); while(parent&&!excluded.has(parent)){excluded.add(parent);parent=parents.get(parent);}
+  const children=new Map(); for(const row of rows){if(!children.has(row.ppid))children.set(row.ppid,[]);children.get(row.ppid).push(row.pid);}
+  const queue=[rootPid]; while(queue.length){for(const child of children.get(queue.shift())??[]){if(!excluded.has(child)){excluded.add(child);queue.push(child);}}}
+  return excluded;
+}
+function takeHostSample() {
+  const load=os.loadavg(); const psText=execFileSync('ps',['-Ao','pid,ppid,pcpu,comm'],{encoding:'utf8'});
+  const rows=processRows(psText); const excluded=excludedProcessTree(rows,process.pid);
+  return {at:Date.now(),load,busy:parseBusyProcesses(psText,excluded)};
+}
+const startedAt=Date.now(); let hostLoadStart;
+try { hostLoadStart=takeHostSample(); }
+catch(error) { hostLoadStart={at:startedAt,load:os.loadavg(),busy:[],error:String(error)}; }
+const hostSamples=[];
+function recordHostLoad() { try { const sample=takeHostSample(); hostSamples.push([sample.at-startedAt,...sample.load]); return sample; } catch(error) { const sample={at:Date.now(),load:os.loadavg(),busy:[],error:String(error)};hostSamples.push([sample.at-startedAt,...sample.load]);return sample; } }
+const hostLoadTimer=setInterval(recordHostLoad,10_000); hostLoadTimer.unref();
+const startGate=quietHostGate({load1:hostLoadStart.error?Number.NaN:hostLoadStart.load?.[0],busy:hostLoadStart.busy});
+if(writeEvidence&&!startGate.quiet){clearInterval(hostLoadTimer);const fatal=`host not quiet: ${startGate.reason}`;const result={runId,pass:false,blocked:true,testsRun:0,testsPassed:0,failureCount:0,fatal,hostLoad:{start:{load:hostLoadStart.load,busy:hostLoadStart.busy},samples:hostSamples}};console.log(JSON.stringify(result));process.exit(2);}
 try {
   if(!fs.existsSync(path.join(editorRoot,'dist','index.html'))) throw Object.assign(new Error(`built editor dist missing at ${path.join(editorRoot,'dist')}`),{blocked:true});
   const preflight=await gatingPreflight({distWasm:path.join(editorRoot,'dist','vactr.wasm'),releasePath:path.join(repoRoot,'target/wasm32-unknown-unknown/release/vactr.wasm'),debugPath:path.join(repoRoot,'target/wasm32-unknown-unknown/debug/vactr.wasm'),writeEvidence});
@@ -48,9 +70,14 @@ try {
 const webgl=Object.fromEntries(browsers.map((browser)=>[browser.name,browser.renderer??null]));
 for(const browser of browsers)if(String(browser.renderer??'').includes('SwiftShader'))browser.limitations.push('Chromium rendered with software GL (SwiftShader); frame metrics are recorded failures, never relabeled as passes');
 const environment={...host,osVersion:os.version(),webgl,simulator:{xcode:process.env.DEVELOPER_DIR??'xcode-select default; see ios-sim.json'}};
+clearInterval(hostLoadTimer);
+const hostLoadEnd=takeHostSample();
+const hostLoad={start:{load:hostLoadStart.load,busy:hostLoadStart.busy},samples:hostSamples,end:{load:hostLoadEnd.load,busy:hostLoadEnd.busy},mean1m:hostSamples.length?hostSamples.reduce((sum,row)=>sum+row[1],0)/hostSamples.length:hostLoadStart.load[0],max1m:Math.max(hostLoadStart.load[0],hostLoadEnd.load[0],...hostSamples.map((row)=>row[1]))};
+for(const browser of browsers)browser.hostLoad=hostLoad;
+environment.hostLoad=hostLoad;
 for(const b of browsers)if(b.samples){b.sampleDownsampling={frame:'every 32nd sample',presented:'every 32nd sample',onset:'every 32nd sample',syncSample:'every 32nd sample',stallAudit:'every 32nd sample',beatResidualFrame:'every 32nd sample',phase:'serialized phase trace retains spans >= 50 ms; phase metrics use the complete in-memory trace',other:'all',analysis:'all pass/fail decisions and scalar metrics use the complete in-memory samples'};const metrics=b.metrics;if(metrics?.beatResidual?.frames)metrics.beatResidual={...metrics.beatResidual,frames:metrics.beatResidual.frames.filter((_,index)=>index%32===0)};for(const key of ['syncSamples','lateFrameAudits'])if(Array.isArray(metrics?.[key]))metrics[key]=metrics[key].filter((_,index)=>index%32===0);}
 const anyFailed=browsers.some((b)=>countChecks(b.checks??[]).failed>0||(b.measurement&&(!b.measurement.pass||(b.measurement.failures??[]).length>0)));
-const summary={runId,commands:host.commands,browsers:browsers.map(({samples,...b})=>b),environment,wasm:host.wasm,pass:!fatal&&!blocked&&!anyFailed,blocked,failures:browsers.flatMap((b)=>[...(b.checks??[]).filter((c)=>c.status!=='limitation'&&!c.pass).map((c)=>`${b.name}:${c.id}`),...(b.measurement?.failures??[]).map((x)=>`${b.name}:${x}`)]),fatal};
+const summary={runId,commands:host.commands,browsers:browsers.map(({samples,...b})=>b),environment,hostLoad,wasm:host.wasm,pass:!fatal&&!blocked&&!anyFailed,blocked,failures:browsers.flatMap((b)=>[...(b.checks??[]).filter((c)=>c.status!=='limitation'&&!c.pass).map((c)=>`${b.name}:${c.id}`),...(b.measurement?.failures??[]).map((x)=>`${b.name}:${x}`)]),fatal};
 const checkTotals=countChecks(browsers.flatMap((b)=>b.checks??[]));const result={runId,pass:summary.pass,blocked,testsRun:checkTotals.total,testsPassed:checkTotals.passed,failureCount:checkTotals.failed,summary};
 if(writeEvidence){
  fs.mkdirSync(out,{recursive:true}); fs.writeFileSync(evidencePath('environment.json'),JSON.stringify(environment,null,2)+'\n');

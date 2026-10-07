@@ -365,6 +365,7 @@ export interface DiagBody {
 }
 
 export interface WirePlaying {
+  id?: number;
   epoch?: string;
   end_time?: number;
   slot: string;
@@ -376,6 +377,8 @@ export interface WirePlaying {
 
 export interface PlayingBody {
   events: WirePlaying[];
+  ahead?: WirePlaying[];
+  retract?: number[];
 }
 
 export interface WireLevel {

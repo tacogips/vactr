@@ -3,6 +3,11 @@
   "version": "151.0.7922.34",
   "checks": [
     {
+      "id": "syntax-worker",
+      "pass": true,
+      "detail": "current tree-sitter Worker spans applied"
+    },
+    {
       "id": "canvas-only-text",
       "pass": true,
       "detail": "source chars=25; bridge opacity=0; canvas=767x842; line1=47,0,197,18; colors=343"
@@ -48,7 +53,7 @@
     {
       "id": "background-no-replay",
       "pass": true,
-      "detail": "frames hidden=76, resumed=85"
+      "detail": "frames hidden=74, resumed=84"
     },
     {
       "id": "dispose-ledger",

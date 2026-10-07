@@ -9,8 +9,15 @@ use super::support::{batches, Rig};
 use crate::host::testing::AudioCall;
 use crate::ns::depgraph::FormState;
 use crate::ns::stage::SlotKey;
-use crate::session::protocol::{BindingsBody, ServerMsg, WireFormState, WireState, WireValue};
+use crate::sched::announce::{AnnounceDrain, ANNOUNCE_CAP};
+use crate::sched::slots::SlotKind;
+use crate::sched::telemetry::PlayingEvent;
+use crate::session::protocol::{
+    BindingsBody, PlayingBody, ServerMsg, WireFormState, WirePlaying, WireState, WireValue,
+};
 use crate::session::{ClockReading, LatencyKind};
+use crate::value::intern::intern_kw;
+use crate::value::ratio::Ratio64;
 
 /// The current defining generation of `name`.
 fn gen(rig: &Rig, name: &str) -> u64 {
@@ -531,6 +538,7 @@ fn scheduled_end_time_uses_original_seconds_and_preserves_source_revision() {
         }),
         kind: SlotKind::Pattern,
         reduced_lead: false,
+        id: None,
     };
     let files = vec![std::rc::Rc::from("main.vact")];
     let first = crate::session::publish::playing_wire(&event, &files, 120.0, &|_| 42);
@@ -584,6 +592,111 @@ fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
     let next = transport_samples(&rig.tick());
     assert_eq!(next.len(), 1);
     assert_eq!(Some(next[0].epoch.as_str()), epoch.as_deref());
+}
+
+#[test]
+fn playing_wire_round_trip_and_legacy_json_omit_empty_additions() {
+    let event = WirePlaying {
+        epoch: Some("session-1-2".to_string()),
+        end_time: Some(1.25),
+        id: Some(7),
+        slot: "d1".to_string(),
+        beat: [1, 1],
+        time: 0.75,
+        dur: [1, 2],
+        src: None,
+    };
+    let body = PlayingBody {
+        events: vec![event.clone()],
+        ahead: vec![WirePlaying {
+            id: Some(8),
+            time: 1.0,
+            ..event
+        }],
+        retract: vec![9],
+    };
+    let encoded = serde_json::to_string(&body).expect("serialize playing body");
+    let decoded: PlayingBody = serde_json::from_str(&encoded).expect("deserialize playing body");
+    assert_eq!(decoded, body);
+
+    let legacy = PlayingBody {
+        events: vec![WirePlaying {
+            epoch: None,
+            end_time: None,
+            id: None,
+            slot: "d1".to_string(),
+            beat: [0, 1],
+            time: 0.5,
+            dur: [1, 2],
+            src: None,
+        }],
+        ahead: Vec::new(),
+        retract: Vec::new(),
+    };
+    assert_eq!(
+        serde_json::to_string(&legacy).expect("serialize legacy playing"),
+        r#"{"events":[{"slot":"d1","beat":[0,1],"time":0.5,"dur":[1,2]}]}"#
+    );
+}
+
+#[test]
+fn publisher_keeps_committed_events_first_and_bounds_ahead_to_remaining_capacity() {
+    let event = PlayingEvent {
+        slot: intern_kw("d1"),
+        beat: Ratio64::ZERO,
+        time: 1.0,
+        src: None,
+        dur: 0.0,
+        kind: SlotKind::Pattern,
+        reduced_lead: false,
+        id: None,
+    };
+    let committed = vec![event.clone(); 4_000];
+    let ahead = (0..500)
+        .map(|id| PlayingEvent {
+            id: Some(id + 1),
+            time: 2.0 - (id as f64) / 1_000.0,
+            ..event.clone()
+        })
+        .collect();
+    let body = crate::session::publish::playing_body(
+        &committed,
+        AnnounceDrain {
+            ahead,
+            retract: vec![1; ANNOUNCE_CAP + 1],
+        },
+        &[],
+        120.0,
+        "epoch",
+        &|_| 0,
+    )
+    .expect("non-empty playing body");
+    assert_eq!(body.events.len(), 4_000);
+    assert_eq!(body.ahead.len(), 96);
+    assert!(body.events.len() + body.ahead.len() <= ANNOUNCE_CAP);
+    assert!(body.events.iter().all(|event| event.id.is_none()));
+    assert!(body.ahead.iter().all(|event| event.id.is_some()));
+    assert!(body.retract.len() <= ANNOUNCE_CAP);
+    assert!(body.ahead.windows(2).all(|pair| {
+        (pair[0].time, &pair[0].slot, pair[0].id) <= (pair[1].time, &pair[1].slot, pair[1].id)
+    }));
+}
+
+#[test]
+fn playing_announcement_is_not_sent_without_a_telemetry_subscriber() {
+    let mut rig = Rig::new();
+    rig.send(crate::session::protocol::ClientMsg::Subscribe(
+        crate::session::protocol::SubscribeBody {
+            telemetry: false,
+            levels: false,
+            diagnostics: false,
+        },
+    ));
+    rig.ok("s [:bd :sd :hh :cp] > d1", 1);
+    let messages = rig.run_to(0.5);
+    assert!(messages
+        .iter()
+        .all(|message| !matches!(message, ServerMsg::Playing(_))));
 }
 
 #[test]

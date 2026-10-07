@@ -46,11 +46,11 @@ export function silentSinkInit() {
     const gain = new GainNode(ctx, { gain:0 });
     const post = ctx.createAnalyser(); post.fftSize = 32768;
     originalConnect.call(pre, gain); originalConnect.call(gain, post); originalConnect.call(post, ctx.destination);
-    sink = { pre, gain, post, lastTime: ctx.currentTime, prePeak: 0, preSquares: 0, preSamples: 0, postPeak: 0, onsetTimes: [], quietBlocks: 5 };
+    sink = { pre, gain, post, preData:new Float32Array(pre.fftSize), postData:new Float32Array(post.fftSize), lastTime: ctx.currentTime, prePeak: 0, preSquares: 0, preSamples: 0, postPeak: 0, onsetTimes: [], quietBlocks: 5 };
     state.contexts.set(ctx, sink);
     const timer = setInterval(() => {
       if (ctx.state === 'closed') { clearInterval(timer); return; }
-      const preData = new Float32Array(pre.fftSize); const postData = new Float32Array(post.fftSize);
+      const { preData, postData } = sink;
       pre.getFloatTimeDomainData(preData); post.getFloatTimeDomainData(postData);
       const elapsed = Math.max(0, Math.round((ctx.currentTime - sink.lastTime) * ctx.sampleRate));
       const count = Math.min(elapsed, preData.length); const start = preData.length - count;

@@ -1,6 +1,6 @@
 # Canvas Cutover DIAG-OFFPATH: Diagnostics Check After a Presented Frame on an Input-Free Pause Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-DIAG-OFFPATH (session 303, wave 18; runs alone after CANVAS-SYNTAX-WORKER is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.16 part B (and part A for `afterPresent`); 15.3.8.14 section 3 "Check" (as amended); 15.3.8.7 allowed whole-text transfers (as amended); 15.3.8.13 C (unchanged revision skip)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-DIAG-OFFPATH`)
@@ -175,8 +175,8 @@ Inside the sandbox:
 
 | Command | Required evidence |
 |---------|-------------------|
-| `cd editor && npm run check > ../tmp/canvas-cutover/diag-offpath/npm-check.log 2>&1` | exit 0 |
-| `cd editor && ./node_modules/.bin/vitest run test/code/diagnostics.test.ts test/canvas/edit-cost.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts > ../tmp/canvas-cutover/diag-offpath/focused.log 2>&1` | exit 0; the rows above pass |
+| `cd editor && npm run check > ../tmp/canvas-cutover/diag-offpath/npm-check-final.log 2>&1` | exit 0 |
+| `cd editor && ./node_modules/.bin/vitest run test/code/diagnostics.test.ts test/canvas/edit-cost.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts > ../tmp/canvas-cutover/diag-offpath/focused-final.log 2>&1` | exit 0; the rows above pass |
 | `cd editor && ./node_modules/.bin/vitest run > ../tmp/canvas-cutover/diag-offpath/vitest-full.log 2>&1` | exit 0, failureCount 0 |
 | `git diff --check` | exit 0 |
 
@@ -197,23 +197,25 @@ Records use the mandatory format (numeric `exitStatus: 0`, `outcome: "passed"`, 
 
 ## Overwrite and Drift Protocol
 
-Record fresh-read and post-edit sha256 values in `tmp/canvas-cutover/diag-offpath/intent.json`
-and `receipt.json`. `mount.ts` was last written by CANVAS-SYNTAX-WORKER, so read it fresh before
-editing. Drift in a not-yet-edited file stops edits to that file, and repair is serial.
+Record per-edit fresh-read intentions in `intent-*.json` and final post-edit sha256 values in
+`tmp/canvas-cutover/diag-offpath/receipt.json`. `mount.ts` was last written by
+CANVAS-SYNTAX-WORKER, so read it fresh before editing. Drift in a not-yet-edited file stops
+edits to that file, and repair is serial.
 
 ## Completion Criteria
 
-- [ ] `DiagnosticsController` has `noteInput`, `afterPresent`/`isComposing` options,
+- [x] `DiagnosticsController` has `noteInput`, `afterPresent`/`isComposing` options,
   `MAX_CHECK_DIAGNOSTICS = 1024` and `stats { checks, checkDeferrals, checkDropped }`.
-- [ ] A check runs only in an `afterPresent` task with no input and no document change since the
+- [x] A check runs only in an `afterPresent` task with no input and no document change since the
   frame. The keystroke-phase and frame-phase counters are 0 in the 20-edit row.
-- [ ] Input listeners are attached in `mount.ts` and removed on dispose.
-- [ ] The cap row (both branches), the deferral, composing, unchanged-revision and dispose rows
+- [x] Input listeners are attached in `mount.ts` and removed on dispose.
+- [x] The cap row (both branches), the deferral, composing, unchanged-revision and dispose rows
   pass. Existing rows pass with no weakened assertion.
-- [ ] `npm run check`, full vitest, `test:perf`, strict clippy, full nextest, the wasm32 build and
+- [x] `npm run check`, full vitest, `test:perf`, strict clippy, full nextest, the wasm32 build and
   the Tauri check all exit 0.
-- [ ] No touched file reaches 1,000 lines. `git diff --name-only` stays within the writePaths.
-- [ ] The progress log records the hashes and logs.
+- [x] No touched file reaches 1,000 lines. This plan's edits stay within its declared writePaths;
+  inherited CANVAS-SYNTAX-WORKER changes remain in the shared working tree and were not edited.
+- [x] The progress log records the hashes and logs.
 
 ## Progress Log
 
@@ -221,3 +223,27 @@ editing. Drift in a not-yet-edited file stops edits to that file, and repair is 
 
 **Tasks Completed**: Plan authored from design 15.3.8.16 part B (accepted by step 3,
 comm-004816).
+
+### Session: 2026-10-07 (CANVAS-DIAG-OFFPATH Step 6)
+
+**Tasks Completed**: TASK-DO1, TASK-DO2 and TASK-DO3. The check now snapshots input sequence
+and document revision at debounce expiry, waits for `afterPresent`, defers on new input/revision
+or composition, caps check diagnostics at 1,024, and exposes the three required counters. Mount
+wires the five bridge input/composition events and removes them on disposal. Existing merge,
+debounce and unchanged-revision assertions remain; new rows cover post-frame task timing, 20-edit
+phase attribution, cancellation/composition deferrals, both cap boundaries, disposal, the
+20,000-line input cost and mount listener lifecycle.
+
+**Verification**: `npm run check` passed; focused Vitest passed 88/88; full Vitest passed 830/830;
+serial `test:perf` passed 1/1 (ratio 2.69); strict clippy, full nextest (2,817 passed, 3 skipped),
+the wasm32 build and the Tauri check exited 0; `git diff --check` exited 0. Logs are under
+`tmp/canvas-cutover/diag-offpath/`. The first focused attempt used generic DOM events for keyboard
+and composition handlers and produced two unhandled test-harness errors; intent-005 corrected the
+test to dispatch a valid `KeyboardEvent`, and the final focused run passed. No Rust, dependency,
+threshold or frame-scheduler changes were made.
+
+**Source Hashes**: `intent-001.json` records the pre-edit hashes. Final hashes are recorded in
+`receipt.json`; per-edit intentions are `intent-002.json` through `intent-006.json`.
+
+**Downstream**: Independent test-integrity, adversarial and integration review remain owned by
+later workflow steps; no review approval is claimed here.

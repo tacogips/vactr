@@ -8,6 +8,34 @@ export const THRESHOLDS = Object.freeze({
 export const TARGETS = Object.freeze({ textWorkP95Ms: 4, animationWorkP50Ms: 1 });
 export const RENDER_QUANTUM_FRAMES = 128;
 
+const BUSY_PROCESS_NAMES = new Set([
+  'cargo', 'rustc', 'clippy-driver', 'cargo-nextest', 'rustfmt', 'vitest',
+  'tsc', 'vite', 'esbuild', 'node', 'xcodebuild', 'swift-frontend',
+]);
+
+export function parseBusyProcesses(psText, excludePids = []) {
+  const excluded = new Set([...excludePids].map(Number));
+  return String(psText ?? '').split(/\r?\n/).slice(1).flatMap((line) => {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+([\d.]+)\s+(.+)$/);
+    if (!match) return [];
+    const [, pidText, , cpuText, command] = match;
+    const pid = Number(pidText);
+    const pcpu = Number(cpuText);
+    const comm = command.trim();
+    const basename = comm.split(/[\\/]/).at(-1);
+    if (!Number.isSafeInteger(pid) || excluded.has(pid) || !Number.isFinite(pcpu)
+      || pcpu < 50 || !BUSY_PROCESS_NAMES.has(basename)) return [];
+    return [{ pid, pcpu, comm }];
+  });
+}
+
+export function quietHostGate({ load1, busy } = {}) {
+  const quiet = Number.isFinite(load1) && load1 < 9 && Array.isArray(busy) && busy.length <= 2;
+  const reason = quiet ? 'host load and busy-process count are within limits'
+    : `load1=${Number.isFinite(load1) ? load1 : 'unavailable'} (limit < 9), busy=${Array.isArray(busy) ? busy.length : 'unavailable'} (limit <= 2)`;
+  return { quiet, reason };
+}
+
 export function percentile(values, p) {
   if (!Array.isArray(values) || values.length === 0 || !Number.isFinite(p) || p < 0 || p > 100) return null;
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);

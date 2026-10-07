@@ -448,6 +448,7 @@ impl Runtime {
                 dur: 0.0,
                 kind: SlotKind::Pattern,
                 reduced_lead: false,
+                id: None,
             },
             &ctls,
         );

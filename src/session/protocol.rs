@@ -712,6 +712,8 @@ pub struct WirePlaying {
     pub epoch: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end_time: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<u64>,
     pub slot: String,
     pub beat: [i64; 2],
     pub time: f64,
@@ -723,6 +725,10 @@ pub struct WirePlaying {
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct PlayingBody {
     pub events: Vec<WirePlaying>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ahead: Vec<WirePlaying>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub retract: Vec<u64>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]

@@ -3,6 +3,7 @@
 //! The module map is fixed by design 12.8.2: BE-SCHED owns the scheduler
 //! files, BE-MIDI owns `midi_in` and `midi_clock`.
 
+pub(crate) mod announce;
 pub mod cells;
 pub mod commit;
 pub mod control;

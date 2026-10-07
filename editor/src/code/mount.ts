@@ -28,7 +28,7 @@ import { CanvasRenderer } from './renderer';
 import { readPalette } from './palette';
 import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
-import { installPerfHook, recordOnset, recordPresented, removePerfHook, type VactrPerf } from './perf-hook';
+import { installPerfHook, recordOnset, recordPresented, retractOnset, removePerfHook, type VactrPerf } from './perf-hook';
 
 export const DOC_FILE = 'main.vact';
 
@@ -124,7 +124,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     tempo: () => store.tempo, anchor, ...(deps.audible ? { audible: deps.audible, epoch: () => store.transportSample?.epoch ?? null } : {}) });
   const evalCtl = new EvalController({ client, sync, onHush: () => highlight.clear(), onEval: (reply) => onEval?.(reply) });
   const diagnostics = new DiagnosticsController({ client, sync, tier, ...(deps.core ? { core: deps.core } : {}),
-    text: () => surface.state.doc.toString(), announce: (message) => input?.accessibility.announce(message) });
+    text: () => surface.state.doc.toString(), afterPresent: (callback) => scheduler?.afterPresent(callback) ?? (() => {}),
+    isComposing: () => input?.isComposing ?? false, announce: (message) => input?.accessibility.announce(message) });
   evalCtl.attach(surface);
   const disposeFormat = formatKeymap(surface, () => deps.formatter);
   const completion = deps.completion ? attachCompletion(surface, deps.completion) : null;
@@ -262,7 +263,10 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   scheduler.invalidateText('doc');
 
   const keyRecord = (event: Event): void => scheduler?.perf?.recordKey((event as KeyboardEvent).timeStamp, sync.revision);
+  const noteDiagInput = (): void => diagnostics.noteInput();
+  const diagInputEvents = ['keydown', 'beforeinput', 'compositionstart', 'compositionupdate', 'compositionend'] as const;
   input.accessibility.textarea.addEventListener('keydown', keyRecord);
+  for (const name of diagInputEvents) input.accessibility.textarea.addEventListener(name, noteDiagInput);
   const stopFlash = evalCtl.onFlash((range, kind) => {
     if (kind) evalRanges = [...evalRanges.filter((r) => !(r.from === range.from && r.to === range.to)), { ...range, kind: 'eval', className: kind }];
     else evalRanges = evalRanges.filter((r) => !(r.from === range.from && r.to === range.to));
@@ -302,7 +306,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const offs: (() => void)[] = [
     client.on('playing', (env) => {
       if (env.kind !== 'playing') return;
-      highlight.onPlaying(env.body.events); transport.onPlaying(env.body.events); scheduler.setActive('playing', true);
+      highlight.onPlaying(env.body.events, { ahead: env.body.ahead, retract: env.body.retract });
+      transport.onPlaying(env.body.events); scheduler.setActive('playing', true);
     }),
     client.on('eval-result', (env) => {
       if (env.kind !== 'eval-result') return;
@@ -314,6 +319,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     store.subscribe(['levels'], (_c, s) => { if (s.levels) transport.onLevels(s.levels); }),
     store.subscribe(['manifest'], (_c, s) => browser.setSounds(s.manifest?.sounds ?? [])),
     highlight.onAccept((onset) => recordOnset(perfApi, { ...onset, receivedMs: win.performance.now() })),
+    highlight.onRetract((id) => retractOnset(perfApi, id)),
   ];
   if (store.tempo) transport.onTempo(store.tempo);
   if (store.levels) transport.onLevels(store.levels);
@@ -350,6 +356,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       if (disposed) return; disposed = true;
       scheduler.dispose(); pointer.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
       removePointerForwarding(); input.accessibility.textarea.removeEventListener('keydown', keyRecord);
+      for (const name of diagInputEvents) input.accessibility.textarea.removeEventListener(name, noteDiagInput);
       canvas.removeEventListener('pointermove', showDiagnosticTip); canvas.removeEventListener('pointerleave', hideDiagnosticTip);
       for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
       disposeFormat(); completion?.dispose(); syntaxProvider.dispose?.(); backgroundStop?.();

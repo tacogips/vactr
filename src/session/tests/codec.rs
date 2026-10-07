@@ -308,6 +308,7 @@ fn servers() -> Vec<ServerMsg> {
             events: vec![WirePlaying {
                 epoch: None,
                 end_time: None,
+                id: Some(7),
                 slot: "d1".to_string(),
                 beat: [4, 1],
                 time: 2.0,
@@ -319,6 +320,8 @@ fn servers() -> Vec<ServerMsg> {
                     form_gen: 1,
                 }),
             }],
+            ahead: Vec::new(),
+            retract: Vec::new(),
         }),
         ServerMsg::Levels(LevelsBody {
             levels: vec![WireLevel {

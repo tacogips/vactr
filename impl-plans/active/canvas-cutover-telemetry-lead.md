@@ -1,6 +1,6 @@
 # Canvas Cutover TELEMETRY-LEAD: Announced Playing Telemetry Within the Lookahead, With Retraction Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CANVAS-TELEMETRY-LEAD (session 303, wave 19; runs alone after CANVAS-DIAG-OFFPATH is accepted)
 **Design Reference**: design-docs/specs/design-implementation.md#15.3.8.16 part C; 15.3.8.4 "Playing highlights" (as amended); 15.3.8.7 Wasm-to-JS and Native IPC rows (as amended); 15.3.8.15 part D (audio-domain early-flash rule, unchanged)
 **Manifest**: impl-plans/active/canvas-cutover-dispatch.json (entry `CANVAS-TELEMETRY-LEAD`)
@@ -382,24 +382,24 @@ in a not-yet-edited file stops edits to that file, and repair is serial.
 
 ## Completion Criteria
 
-- [ ] `src/sched/announce.rs` holds the map, ids, queues, reconcile, announce and `confirm`.
+- [x] `src/sched/announce.rs` holds the map, ids, queues, reconcile, announce and `confirm`.
   `commit.rs` gains only the confirmation hook.
-- [ ] The reconcile uses the O(1) record predicate, with no `emittable()` per entry. The
+- [x] The reconcile uses the O(1) record predicate, with no `emittable()` per entry. The
   announce walk makes at most one `emittable()` call per lane per tick, with an early break.
   The pass-cost row proves both with its control branch.
-- [ ] `RuntimeConfig.telemetry_lead` defaults to 0.120. `telemetry_lead <= commit_lead` announces
+- [x] `RuntimeConfig.telemetry_lead` defaults to 0.120. `telemetry_lead <= commit_lead` announces
   nothing.
-- [ ] `PlayingBody.ahead`, `PlayingBody.retract` and `WirePlaying.id` are optional and omitted
+- [x] `PlayingBody.ahead`, `PlayingBody.retract` and `WirePlaying.id` are optional and omitted
   when empty; legacy JSON is byte-identical.
-- [ ] The lead (with control), audio-unchanged, ordering/ids, rebind, mute, tempo, invalidation,
+- [x] The lead (with control), audio-unchanged, ordering/ids, rebind, mute, tempo, invalidation,
   cap, wire round-trip, legacy-bytes, batch-bound and no-subscriber rows pass.
-- [ ] Envelope validation and the highlight and clock rows pass. Early-arriving events never show
+- [x] Envelope validation and the highlight and clock rows pass. Early-arriving events never show
   before `time`. `transport.ts`, `params/*` and `main.ts` are unchanged.
-- [ ] Strict clippy, focused and full nextest, rustfmt on the touched files, the wasm32 build,
+- [x] Strict clippy, focused and full nextest, rustfmt on the touched files, the wasm32 build,
   `npm run check`, full vitest, `test:perf` and the Tauri check all exit 0.
-- [ ] No touched file reaches 1,000 lines. No dependency change. `git diff --name-only` stays
+- [x] No touched file reaches 1,000 lines. No dependency change. `git diff --name-only` stays
   within writePaths plus the noted sharedPaths.
-- [ ] The progress log records the hashes, logs and results.
+- [x] The progress log records the hashes, logs and results.
 
 ## Progress Log
 
@@ -425,3 +425,31 @@ comm-004816). Plan decisions within the design:
 - S303-PR-L1: the Lead row asserts the literal bound of 0.100 s.
 - S303-PR-L2: retractions are never dropped, and an undrained `ahead` stops announcing, so
   those records are published at commit.
+
+### Session: 2026-10-07 (session 304 Step 6 implementation)
+
+**Tasks Completed**: TASK-TL1 through TASK-TL5 implemented and verified on the final combined
+source. The `CANVAS-DIAG-OFFPATH` predecessor is accepted in the dispatch and its existing edits
+in `editor/src/code/mount.ts` and `editor/test/canvas/mount.test.ts` were preserved.
+
+- Added `src/sched/announce.rs` with bounded announcement ids, grouped reconciliation, one
+  `emittable()` pass per lane, confirmations, retractions, and bounded suppression for overflow
+  and changed same-key records. `commit.rs` only adds the confirmation hook; committed audio,
+  telemetry, and hit windows remain unchanged.
+- Added optional wire `id`, `ahead`, and `retract` fields with omission for empty legacy batches;
+  publisher keeps committed events first and enforces the combined batch bounds.
+- Added frontend validation and highlight routing. `transport.onPlaying`, `transport.ts`, params,
+  and `editor/src/app/main.ts` remain on committed events only. Added audible-time, confirmation,
+  retraction, stale-epoch, legacy, envelope, and mounted perf-onset rows.
+- Final verification logs under `tmp/canvas-cutover/telemetry-lead/`: build, strict clippy,
+  focused nextest (107/107), full nextest (2,828/2,828; 3 existing configured exclusions),
+  rustfmt, wasm32 build, npm check, focused frontend tests, full vitest (837/837), test:perf
+  (1/1, ratio 2.08), Tauri check, line counts, and `git diff --check` all pass. The full nextest
+  run recorded the quiet-host precondition and held the measurement lock.
+- Final source hashes are recorded in `receipt.json`; per-edit intentions are in
+  `intent-frontend-001.json` and `intents.jsonl`.
+- Author self-check grouped the suppressed-key cleanup by `(slot, generation)`, resolving each
+  lane once and checking each key through `staging.get`; focused announce tests (8/8), check,
+  strict clippy, and rustfmt pass after that correction.
+- Formal review, shared documentation/index updates, archive, commit, and push remain assigned to
+  downstream workflow steps.

@@ -20,6 +20,7 @@ use crate::ns::evaluator::{Evaluator, PassReport};
 use crate::ns::tweak::{SiteOrigin, SiteTier, TweakSite};
 use crate::pattern::eval::AnalyzerId;
 use crate::reader::span::{FileId, Span, SrcRef};
+use crate::sched::announce::{AnnounceDrain, ANNOUNCE_CAP};
 use crate::sched::runtime::Runtime;
 use crate::sched::telemetry::PlayingEvent;
 use crate::session::protocol::{
@@ -344,6 +345,7 @@ pub fn playing_wire(
     WirePlaying {
         epoch: None,
         end_time: Some(e.time + e.dur),
+        id: e.id,
         slot: name_of_kw(e.slot).to_string(),
         beat: ratio_pair(e.beat),
         time: e.time,
@@ -355,6 +357,51 @@ pub fn playing_wire(
             form_gen: s.form_gen.get(),
         }),
     }
+}
+
+/// Builds the bounded playing envelope, keeping committed events ahead of previews.
+pub(crate) fn playing_body(
+    events: &[PlayingEvent],
+    announced: AnnounceDrain,
+    files: &[Rc<str>],
+    bpm: f64,
+    epoch: &str,
+    rev_of: &dyn Fn(&SrcRef) -> u64,
+) -> Option<PlayingBody> {
+    if events.is_empty() && announced.ahead.is_empty() && announced.retract.is_empty() {
+        return None;
+    }
+    let events: Vec<_> = events
+        .iter()
+        .take(ANNOUNCE_CAP)
+        .map(|event| {
+            let mut wire = playing_wire(event, files, bpm, rev_of);
+            wire.epoch = Some(epoch.to_owned());
+            wire
+        })
+        .collect();
+    let ahead_limit = ANNOUNCE_CAP.saturating_sub(events.len());
+    let mut ahead: Vec<_> = announced
+        .ahead
+        .iter()
+        .take(ahead_limit)
+        .map(|event| {
+            let mut wire = playing_wire(event, files, bpm, rev_of);
+            wire.epoch = Some(epoch.to_owned());
+            wire
+        })
+        .collect();
+    ahead.sort_by(|a, b| {
+        a.time
+            .total_cmp(&b.time)
+            .then_with(|| a.slot.cmp(&b.slot))
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    Some(PlayingBody {
+        events,
+        ahead,
+        retract: announced.retract.into_iter().take(ANNOUNCE_CAP).collect(),
+    })
 }
 
 /// The constant `id` parameter of an analyzer's `EffectSpec`, when it has
@@ -493,19 +540,15 @@ impl Session {
         self.transport_state = Some(state);
         let epoch = format!("session-{}-{}", self.transport_id, self.transport_epoch);
         let events = self.rt.telemetry();
-        if !events.is_empty() && self.subs.values().any(|s| s.telemetry) {
+        let announced = self.rt.announced();
+        let has_telemetry_subscriber = self.subs.values().any(|s| s.telemetry);
+        if has_telemetry_subscriber {
             let bpm = tempo.bpm.to_f64();
             let rev_of = |s: &SrcRef| self.revision_of(s);
-            let events = events
-                .iter()
-                .take(4096)
-                .map(|e| {
-                    let mut wire = playing_wire(e, &self.files, bpm, &rev_of);
-                    wire.epoch = Some(epoch.clone());
-                    wire
-                })
-                .collect();
-            msgs.push(ServerMsg::Playing(PlayingBody { events }));
+            if let Some(body) = playing_body(&events, announced, &self.files, bpm, &epoch, &rev_of)
+            {
+                msgs.push(ServerMsg::Playing(body));
+            }
         }
         let due = self
             .last_levels

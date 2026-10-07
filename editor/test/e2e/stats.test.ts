@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 
 interface StatsModule {
+  parseBusyProcesses(psText:string,excludePids?:number[]):Array<{pid:number;pcpu:number;comm:string}>;
+  quietHostGate(input:{load1:number;busy:Array<unknown>}):{quiet:boolean;reason:string};
   THRESHOLDS: Readonly<Record<string, number>>;
   RENDER_QUANTUM_FRAMES: number;
   TARGETS: Readonly<{ textWorkP95Ms: number; animationWorkP50Ms: number }>;
@@ -28,6 +30,19 @@ const stats = (await import(/* @vite-ignore */ spec)) as StatsModule;
 
 const passingMetrics = { inputLatencyMs:{p95:40,p99:80}, animationWorkMs:{p50:2,p95:6,p99:12}, textWorkMs:{p95:6}, frameIntervalMs:{p95:18,p99:40}, editKeyCount:500, editPairedKeyCount:100, editUnpairedKeys:0, audioRunning:true, audioSampleRate:48000, earlyToleranceMs:128000/48000, beatDriftMs:0, onsetCount:1 };
 describe('canvas evidence statistics', () => {
+  it('gates three busy build processes and excludes the runner when only two remain', () => {
+    const ps='  PID  PPID %CPU COMM\n  101     1  61.0 rustc\n  102     1  55.0 /tool/cargo\n  103     1  50.0 node';
+    const busy=stats.parseBusyProcesses(ps);
+    expect(busy).toHaveLength(3);
+    expect(stats.quietHostGate({load1:8.99,busy}).quiet).toBe(false);
+    const excludingRunner=stats.parseBusyProcesses(ps,[103]);
+    expect(excludingRunner).toHaveLength(2);
+    expect(stats.quietHostGate({load1:8.99,busy:excludingRunner})).toMatchObject({quiet:true});
+  });
+  it('uses a strict load threshold at 9.0 and accepts 8.99', () => {
+    expect(stats.quietHostGate({load1:9.0,busy:[]}).quiet).toBe(false);
+    expect(stats.quietHostGate({load1:8.99,busy:[]}).quiet).toBe(true);
+  });
   it('uses nearest rank percentiles', () => expect(stats.percentile(Array.from({ length: 100 }, (_, i) => i + 1), 95)).toBe(95));
   it('summarizes exclusive phase rows and leaves empty phases unmeasured', () => {
     const rows=[[0,0,1,2,0,0,0,0,0],[5,10,3,0,0,0,4,0,0],[5,20,5,0,0,0,0,0,0]];

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AudibleClock, OutputTimestampCorrelation, ProbeCorrelation } from '../../src/app/clock';
+import { HighlightScheduler } from '../../src/code/highlight';
 import type { ServerEnvelope } from '../../src/protocol/types';
 import { SimulatedTime } from '../support/clock';
 
@@ -12,6 +13,19 @@ const reply = (pageSend: number, engine: number, latency: number | null = 0.02):
 });
 
 describe('audible clock', () => {
+  it('keeps early playing telemetry hidden until its audible timestamp', () => {
+    let audibleTime = 3;
+    const scheduler = new HighlightScheduler({
+      clock: { now: () => audibleTime },
+      audible: new AudibleClock({ at: () => ({ time: audibleTime, uncertainty: 0, provenance: 'measured' }) }),
+      epoch: () => 'e1', file: 'main.vact', map: () => ({ from: 1, to: 3 }), tempo: () => null,
+    });
+    scheduler.onPlaying([], { ahead: [{ id: 1, epoch: 'e1', slot: 'd1', beat: [0, 1], time: 3.12,
+      end_time: 3.2, dur: [1, 8], src: { file: 'main.vact', span: { start: 1, end: 3 }, doc_revision: 1, form_gen: 1 } }] });
+    expect(scheduler.tick(0)).toEqual([]);
+    audibleTime = 3.12;
+    expect(scheduler.tick(16.7)).toEqual([{ from: 1, to: 3 }]);
+  });
   it('uses output timestamps without subtracting output latency twice', () => {
     const time = new SimulatedTime(); time.pageMs = 5016; time.contextSeconds = 10.016;
     const correlation = new OutputTimestampCorrelation({ currentTime: 10.02, sampleRate: 48000,

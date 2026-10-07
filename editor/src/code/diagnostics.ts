@@ -20,6 +20,24 @@ import type { Diagnostic, Severity } from '../protocol/types';
 import type { DocumentSync } from './sync';
 
 export const CHECK_DEBOUNCE_MS = 300;
+export const MAX_CHECK_DIAGNOSTICS = 1024;
+
+function defaultAfterPresent(callback: () => void): () => void {
+  let frame: number | null = null;
+  let task: ReturnType<typeof setTimeout> | null = null;
+  let cancelled = false;
+  const run = (): void => {
+    if (cancelled) return;
+    task = setTimeout(() => { task = null; if (!cancelled) callback(); }, 0);
+  };
+  if (typeof globalThis.requestAnimationFrame === 'function') frame = globalThis.requestAnimationFrame(run);
+  else task = setTimeout(() => { task = null; if (!cancelled) callback(); }, 0);
+  return () => {
+    cancelled = true;
+    if (frame !== null && typeof globalThis.cancelAnimationFrame === 'function') globalThis.cancelAnimationFrame(frame);
+    if (task !== null) clearTimeout(task);
+  };
+}
 
 export type DiagSource = 'static' | 'check' | 'runtime';
 
@@ -41,6 +59,8 @@ export interface DiagnosticsOptions {
   timers?: Timers;
   /** The current document text (for the check). */
   text: () => string;
+  afterPresent?: (callback: () => void) => () => void;
+  isComposing?: () => boolean;
   announce?: (message: string) => void;
 }
 
@@ -63,9 +83,12 @@ export class DiagnosticsController {
   private readonly runtime = new Map<string, Batch[]>();
   private evalRev: number | null = null;
   private timer: unknown = null;
+  private pendingPresent: (() => void) | null = null;
+  private inputSeq = 0;
   private merged: PresentedDiagnostic[] = [];
   private announcedCount = -1;
   private readonly offs: (() => void)[] = [];
+  readonly stats = { checks: 0, checkDeferrals: 0, checkDropped: 0 };
 
   constructor(opts: DiagnosticsOptions) {
     this.opts = opts;
@@ -124,13 +147,15 @@ export class DiagnosticsController {
     if (rev === this.checkedRevision) return;
     let diags: Diagnostic[];
     try {
+      this.stats.checks += 1;
       diags = core.check(this.opts.text());
     } catch {
       return;
     }
     this.checkedRevision = rev;
     // `session_check` checks exactly the text it was given.
-    this.checkBatch = { rev, diags };
+    this.checkBatch = { rev, diags: diags.slice(0, MAX_CHECK_DIAGNOSTICS) };
+    this.stats.checkDropped += Math.max(0, diags.length - MAX_CHECK_DIAGNOSTICS);
     this.opts.sync.pin('diag:check', rev);
     this.refresh();
   }
@@ -166,6 +191,7 @@ export class DiagnosticsController {
 
   dispose(): void {
     this.disarm();
+    this.cancelPendingPresent();
     for (const off of this.offs) off();
     this.offs.length = 0;
     this.opts.sync.unpin('diag:static');
@@ -179,10 +205,34 @@ export class DiagnosticsController {
   private scheduleCheck(): void {
     if (!this.checksEnabled) return;
     this.disarm();
+    this.cancelPendingPresent(true);
     this.timer = this.timers.set(() => {
       this.timer = null;
-      this.runCheck();
+      const snapshot = { inputSeq: this.inputSeq, revision: this.opts.sync.revision };
+      this.pendingPresent = (this.opts.afterPresent ?? defaultAfterPresent)(() => {
+        this.pendingPresent = null;
+        if (!this.checksEnabled) return;
+        if (snapshot.inputSeq !== this.inputSeq || snapshot.revision !== this.opts.sync.revision || (this.opts.isComposing?.() ?? false)) {
+          this.stats.checkDeferrals += 1;
+          this.scheduleCheck();
+          return;
+        }
+        this.runCheck();
+      });
     }, CHECK_DEBOUNCE_MS);
+  }
+
+  noteInput(): void {
+    if (!this.checksEnabled) return;
+    this.inputSeq += 1;
+    this.scheduleCheck();
+  }
+
+  private cancelPendingPresent(countDeferral = false): void {
+    if (!this.pendingPresent) return;
+    this.pendingPresent();
+    this.pendingPresent = null;
+    if (countDeferral) this.stats.checkDeferrals += 1;
   }
 
   private disarm(): void {

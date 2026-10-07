@@ -33,6 +33,8 @@ pub struct PlayingEvent {
     /// Committed with less than the configured commit lead (a rebind too
     /// close to its boundary, 11.3 "Insufficient lead").
     pub reduced_lead: bool,
+    /// Announcement id, present on an early preview and its confirmation.
+    pub id: Option<u64>,
 }
 
 /// Recent event starts of one slot: `(time, numeric controls)`.

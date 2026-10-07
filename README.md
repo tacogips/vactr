@@ -151,8 +151,13 @@ automated proxy is a recording-host test.
 ## Editor
 
 The editor (TASK-010/011, design `design-docs/specs/design-implementation.md`
-15.1, 15.2) is a Vite + TypeScript app in `editor/` with CodeMirror 6 and
-Solid.js views. One frontend speaks Session Protocol v1 over two transports:
+15.1, 15.2, 15.3) is a Vite + TypeScript app in `editor/` with Solid.js
+views and a WebGL2 canvas code surface. Code text, cursor, selection,
+syntax, diagnostics and playing highlights are drawn on the canvas; the
+DOM only bridges input, IME, clipboard and accessibility. A headless
+`@codemirror/state` EditorState is the single document authority (with
+revisions and undo/redo); production code imports no `@codemirror/view`.
+One frontend speaks Session Protocol v1 over two transports:
 
 - Browser tier (default): the wasm core runs a `Session` on the main
   thread (`src/host/wasm/session_half.rs`) and audio runs in the
@@ -164,8 +169,8 @@ Solid.js views. One frontend speaks Session Protocol v1 over two transports:
 The transport, code mount point, slider and directive rows, parameter pane
 and handles, read-only grid and roll, analyzer displays, visual panes,
 sample browser, and package pane are Solid views. Protocol, binding
-write-back, CodeMirror, canvas drawing, and the WebGL2 render host remain
-in TypeScript hosts.
+write-back, the document state, canvas drawing, and the WebGL2 render host
+remain in TypeScript hosts.
 
 It provides:
 
@@ -177,12 +182,15 @@ It provides:
 - a side column that folds to a rail (button or `Mod-\\`) with sections
   that fold individually, remembered per browser;
 - the `.vact` mode (tree-sitter highlighting once `tree-sitter-vact.wasm`
-  loads, the StreamLanguage mode otherwise), eval keybindings and flash,
-  a format command on `Shift-Alt-f` (the wasm formatter), and inline
-  diagnostics; a completion popup appears while typing, `Ctrl-Space` opens
-  it manually, Arrow/PageUp/PageDown move, `Enter`/`Tab` accept, and
-  `Escape` closes it;
-- playing-step highlighting on the audio clock, and the transport bar;
+  loads, parsed in a Worker off the keystroke path; a line-local fallback
+  tokenizer otherwise), eval keybindings and flash, a format command on
+  `Shift-Alt-f` (the wasm formatter), and inline diagnostics (the browser
+  check runs on a typing pause, after the next presented frame); a
+  completion popup appears while typing, `Ctrl-Space` opens it manually,
+  Arrow/PageUp/PageDown move, `Enter`/`Tab` accept, and `Escape` closes it;
+- playing-step highlighting on the audible clock (playing events are
+  announced ahead within the scheduling lookahead and shown at their
+  audible time, never early), and the transport bar;
 - the right-pane slider panel (source-edit and overlay modes), the
   `#@` directive control panel, drag on literals and WebMIDI learn;
 - parameter editors from `EditorDecl`/`ParamMeta`, and the display-only
@@ -198,20 +206,33 @@ by the editor.
 ```sh
 # the wasm artifact the editor loads (the --lib build keeps the cdylib at the default path)
 CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm
+mise run build-wasm-release   # release wasm with the name section (page build default)
 cd editor
 npm ci
 npm run dev        # http://localhost:5173
 npm run check      # tsc
 mise run ts-build-wasm   # tree-sitter-vact.wasm for the syntax tests and dist
 npm run test       # vitest (real-wasm suites read $VACTR_WASM)
+npm run test:perf  # wall-clock budgets, serial; run it alone on the host
 VACTR_REQUIRE_SESSION_ABI=1 npm run build   # editor/dist
 ```
 
-`VACTR_WASM` overrides the artifact path (the default is
-`target/wasm32-unknown-unknown/debug/vactr.wasm`). Build with `--lib`.
-Without it, the binary target can overwrite that path with a stub that
-has no `session_init` export. With `VACTR_REQUIRE_SESSION_ABI=1`,
-`npm run build` refuses that stub.
+`VACTR_WASM` overrides the artifact path. The defaults differ by consumer:
+
+- the vite page build (`npm run dev` and `npm run build`) defaults to
+  `target/wasm32-unknown-unknown/release/vactr.wasm`, built by
+  `mise run build-wasm-release`;
+- the vitest real-wasm suites default to
+  `target/wasm32-unknown-unknown/debug/vactr.wasm`.
+
+Build with `--lib`. Without it, the binary target can overwrite that path
+with a stub that has no `session_init` export. With
+`VACTR_REQUIRE_SESSION_ABI=1`, `npm run build` refuses that stub.
+
+`npm run e2e` runs the Playwright browser evidence harness (Chromium and
+WebKit) with a silent virtual audio sink; see `editor/test/e2e/README.md`
+for the release-wasm, quiet-host and measurement-lock procedure. The
+recorded results are in `design-docs/specs/design-canvas-editor-evidence.md`.
 
 The Tauri shell (`editor/src-tauri/`) is a standalone crate that wraps
 the same `editor/dist`. Its file access is limited to dialog-picked text
@@ -241,10 +262,13 @@ See [design-formatter-and-syntax.md, section 2](design-docs/specs/design-formatt
 for the toolchain details. Use `mise run ts-generate` to verify generated
 files, `mise run ts-test` to run the corpus and parse check, and
 `mise run ts-build-wasm` to build `tree-sitter-vact.wasm`. The editor
-uses tree-sitter highlighting when its WASM assets load and falls back
-to the existing StreamLanguage mode if they are unavailable. The code
-pane's `data-syntax` attribute shows which one is active (`tree-sitter`
-or `fallback`). `tree-sitter-vact.wasm` is git-ignored, so run
+parses with tree-sitter in a dedicated Worker (edit deltas in, changed-line
+spans out, stale replies dropped). If the Worker is unavailable it parses
+on the main thread after the next presented frame, and if the tree-sitter
+assets are unavailable it falls back to a line-local tokenizer. The code
+pane's `data-syntax` attribute shows which one is active
+(`tree-sitter-worker`, `tree-sitter` or `fallback`).
+`tree-sitter-vact.wasm` is git-ignored, so run
 `mise run ts-build-wasm` before `npm run test` or `npm run build` on a
 fresh checkout. Tree-sitter spans come from the CodeMirror-free
 `editor/src/code/syntax-core.ts` as `{from, to, class}` with the `vact-tok-*`

@@ -187,6 +187,44 @@ describe('syntax Worker protocol', () => {
     port.drain(); port.deliverAll(); provider.dispose();
   });
 
+  it('resynchronizes the current capture window after a stale line reply is dropped', async () => {
+    const port = new FakePort(); const provider = new WorkerSyntaxSpans(port, 'x');
+    await Promise.resolve(); port.deliverAll();
+    let state = EditorState.create({ doc: 'let a 1\nlet b 2' });
+    provider.spans(state, 0, state.doc.length, 100);
+    port.drain(); port.deliverAll();
+
+    const line0 = ChangeSet.of([{ from: 0, insert: '#' }], state.doc.length);
+    state = state.update({ changes: line0 }).state; provider.noteChanges(line0, state); port.drain();
+    const stale = port.replies.splice(0).find((reply) => reply.type === 'spans');
+    expect(stale?.type).toBe('spans');
+    if (stale?.type !== 'spans') throw new Error('stale line-0 reply missing');
+    expect(Array.from(stale.lines).filter((_value, index) => index % 3 === 0)).toContain(0);
+
+    const line1 = ChangeSet.of([{ from: state.doc.line(2).to, insert: 'x' }], state.doc.length);
+    state = state.update({ changes: line1 }).state; provider.noteChanges(line1, state);
+    port.emit(stale);
+    expect(provider.stats.staleReplies).toBe(1);
+    port.drain();
+    const current = port.replies.splice(0).find((reply) => reply.type === 'spans');
+    expect(current?.type).toBe('spans');
+    if (current?.type !== 'spans') throw new Error('current line-1 reply missing');
+    expect(current.seq).not.toBe(stale.seq);
+    expect(Array.from(current.lines).filter((_value, index) => index % 3 === 0)).toEqual([1]);
+
+    port.emit(current);
+    const refreshRequests = port.requests.filter((request) => request.type === 'lines');
+    expect(refreshRequests).toEqual([{ type: 'lines', seq: current.seq, first: 0, last: 1 }]);
+    provider.spans(state, 0, state.doc.length, 100);
+    expect(port.requests.filter((request) => request.type === 'lines')).toHaveLength(1);
+    port.deliverAll();
+
+    const actual = provider.spans(state, 0, state.doc.length, 100).spans.map(({ from, to, className }) => ({ from, to, className }));
+    const fresh = syntax.parseDoc(state.doc, null);
+    expect(actual).toEqual(styleSpans(fresh, 0, state.doc.length).map((span) => ({ from: span.from, to: span.to, className: span.cls })));
+    fresh.delete(); provider.dispose();
+  });
+
   it('keeps mapped Worker spans visible while an incremental reply is pending', async () => {
     const port = new FakePort(); const provider = new WorkerSyntaxSpans(port, 'x');
     await Promise.resolve(); port.deliverAll();

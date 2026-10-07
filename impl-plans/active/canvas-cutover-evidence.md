@@ -2802,9 +2802,11 @@ only this plan's progress log and the plan files being archived.
 - [ ] Session 302 TASK-705: final gates pass serially except the required canonical e2e, which currently fails WebKit input p95 and sync p99 on the exact final source; full nextest ran alone under `timeout 2400` (logs recorded in the session 294 progress entry below)
 - [ ] Session 302 TASK-706: 23 canvas-cutover plans, 15 canvas-editor-224 plans and `canvas-editor-224-dispatch.json` are archived file by file; `impl-plans/README.md` is updated; the erratum and typo fixes are applied; the commit is pushed non-force to `origin wf/canvas`
 - [ ] Session 303 plan amendment: design 15.3.8.16 (accepted by step 3, comm-004816), the three new plans, this amendment and the manifest are checkpoint-committed and pushed before CANVAS-SYNTAX-WORKER is dispatched
-- [ ] Session 303 TASK-708: `parseBusyProcesses` and `quietHostGate` are exported and tested (with the 9.0/8.99 and 3/2-busy controls); `run.mjs` refuses a non-quiet `--write-evidence` start with exit 2 and records `hostLoad`; the README documents the procedure; part E is applied or recorded as not applied
-- [ ] Session 303 TASK-703: under the quiet-host lock, `run-001` exits 0 in Chromium and WebKit (input p95 <= 50 ms, frame p95 <= 20 ms, non-stall sync p99 <= 50 ms, textWork p95 <= 8 ms, audio-domain early 0, post-sink peak 0), with `hostLoad`, `data-syntax` `tree-sitter-worker` and `aheadAccepted > 0` recorded
-- [ ] Session 303 TASK-704/705/706: the "Main-thread long tasks (session 303, design 15.3.8.16)" evidence section; eleven serial gates; 26 canvas-cutover, 15 canvas-editor-224 and 1 dispatch file archived; README; erratum and typos; non-force push to `origin wf/canvas`
+- [x] Session 303 TASK-708: `parseBusyProcesses` and `quietHostGate` are exported and tested (9.0/8.99 and three/two-busy controls); `run.mjs` refuses a non-quiet `--write-evidence` start with exit 2 and records `hostLoad`; the README documents the locked quiet-host procedure; `silent-sink.mjs` reuses its meter buffers. Evidence: `s303-step6-vitest-e2e-final2.log`, `s303-step6-npm-check.log`, and individual Node syntax-check logs under `tmp/canvas-cutover/evidence/`.
+- [x] Session 303 TASK-703: the canonical release-wasm `run-001` passed under the quiet-host lock in Chromium and WebKit. Input p95/p99: 15.8/17.2 and 16/17 ms; frame p95: 17.4/18 ms; non-stall sync p99: 27.5/14.7 ms; textWork p95: 4.3/3 ms; audio-domain early flashes: 0; post-sink peak: 0; direct destination connections: 0. Both browsers record 582 edit keys, `data-syntax=tree-sitter-worker`, `aheadAccepted > 0`, `hostLoad`, and active-workload onsets. Logs and raw values: `s303-step6-run-001-e2e-final.log` and `design-docs/specs/evidence/canvas-cutover/run-001/`.
+- [x] Session 303 TASK-704: `design-canvas-editor-evidence.md` now has the "Main-thread long tasks (session 303, design 15.3.8.16)" diagnosis/fix tables, quiet-host baseline/final measurements, noise analysis, generated raw paths, updated triage and the pending physical-iPad WKWebView Worker procedure.
+- [ ] Session 303 TASK-705: eleven final-source gates remain for the serial verification step; execute only after the integration review and on the stable combined source.
+- [ ] Session 303 TASK-706: archive 26 canvas-cutover plans, fifteen canvas-editor-224 plans and their dispatch JSON; update `impl-plans/README.md`, append erratum/fix typos, commit and non-force push. These are downstream closeout tasks.
 - [ ] Session 285 TASK-507 additions: the scope-plan sha256 typo is fixed at :483 and :530; the framecost receipt `vite.config.ts` hash is corrected; `README.md` states the release page-build default and the debug vitest default; 30 files are archived (14 + 15 + 1) and `canvas-cutover-dispatch.json` stays in `active/`; `impl-plans/README.md` is updated; the erratum is appended; the commit is pushed non-force to `origin wf/canvas`.
 
 ## Progress Log
@@ -3342,3 +3344,35 @@ CANVAS-TELEMETRY-LEAD. Three serial product plans precede this one:
 `canvas-cutover-syntax-worker.md`, `canvas-cutover-diag-offpath.md` and
 `canvas-cutover-telemetry-lead.md`. In the manifest, `run.mjs` moves to writePaths, the wave
 becomes 20, and `dependsOn` gains the three plans. No threshold, workload or stall change.
+
+### Session: 2026-10-07 (session 303 Step 6 implementation)
+
+**Tasks Completed**: TASK-708, TASK-703 and TASK-704 implementation/evidence. Added the quiet-host
+gate and load recording, TASK-708 unit controls, locked-run procedure, reusable silent-sink
+buffers, and moved cycle keystrokes to follow the unchanged 250 ms stall after the first
+run showed those samples landing inside the deliberate stall window. The final release-wasm
+`run-001` passed in both browsers on a quiet host (load mean 3.235, max 4.532; no busy build/test
+processes at start/end). Input p95/p99 was 15.8/17.2 ms Chromium and 16/17 ms WebKit; non-stall
+sync p99 was 27.5/14.7 ms. Audio-silence and behavior checks passed. Current evidence and
+diagnosis are recorded in `design-canvas-editor-evidence.md`; raw browser data and the complete
+log are in `design-docs/specs/evidence/canvas-cutover/run-001/` and
+`tmp/canvas-cutover/evidence/s303-step6-run-001-e2e-final.log`. Intent records are under
+`tmp/canvas-cutover/evidence/s303-step6/`. TASK-705 serial final gates and TASK-706 archive,
+index, erratum, formal review, commit and push remain with downstream workflow steps.
+
+### Session: 2026-10-07 (session 304 Step 8 documentation refresh)
+
+**Tasks Completed**: Top-level `README.md` refreshed for the shipped behavior: the editor section
+now describes the WebGL2 canvas code surface and the headless `@codemirror/state` authority; the
+`.vact` mode bullet and the "Syntax (tree-sitter)" section describe the syntax Worker, the
+post-frame main-thread fallback, the line-local fallback tokenizer and the `data-syntax` values
+(`tree-sitter-worker`, `tree-sitter`, `fallback`); diagnostics run on a typing pause after a
+presented frame; playing events are announced ahead and shown at audible time. The deferred
+session-285 README item is applied: `VACTR_WASM` defaults are stated per consumer (release for the
+vite page build via `mise run build-wasm-release`, debug for vitest), with `npm run test:perf` and a
+pointer to `editor/test/e2e/README.md` for `npm run e2e`. No plan was archived: TASK-705 (eleven
+serial final gates, including `npm run test:style`, `npm run test:perf` alone and the silent iOS
+simulator pass) has not run on the combined tree, so TASK-706 archival of the 26 canvas-cutover
+plans, the 15 canvas-editor-224 plans and `canvas-editor-224-dispatch.json`, the
+`impl-plans/README.md` update, the 15.3.8.4 erratum and the remaining typo fixes stay with the
+serial closeout.

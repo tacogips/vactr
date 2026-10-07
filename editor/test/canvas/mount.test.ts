@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Text } from '@codemirror/state';
 import type { EditorDeps } from '../../src/app/deps';
 import { mount } from '../../src/code/mount';
+import { DiagnosticsController } from '../../src/code/diagnostics';
 import { AudibleClock } from '../../src/app/clock';
 import * as PerfHook from '../../src/code/perf-hook';
 import type { VactrPerf } from '../../src/code/perf-hook';
@@ -94,6 +95,18 @@ afterEach(() => {
 });
 
 describe('headless canvas mount', () => {
+  it('forwards bridge keydown to diagnostics and removes the listener on dispose', () => {
+    const noteInput = vi.spyOn(DiagnosticsController.prototype, 'noteInput');
+    const rig = setup();
+    const textarea = rig.root.querySelector('textarea');
+    expect(textarea).not.toBeNull();
+    textarea!.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(noteInput).toHaveBeenCalledTimes(1);
+    rig.mounted.dispose();
+    textarea!.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(noteInput).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps Worker syntax pending until current spans apply and falls back on Worker error', async () => {
     class Port implements SyntaxWorkerPort {
       messages: SyntaxWorkerRequest[] = []; listeners = new Map<string, EventListener[]>(); terminate = vi.fn();
@@ -243,6 +256,22 @@ describe('headless canvas mount', () => {
     expect(perf?.transportSample()).toMatchObject({ epoch: 'e1', cycle: [2, 1], sample_time: 1 });
     expect(perf?.onsets()).toHaveLength(1);
     expect(perf?.onsets()[0]).toMatchObject({ from: 0, to: 3, time: 1, end: 2, receivedMs: expect.any(Number) });
+  });
+
+  it('routes announced playing telemetry to highlights and removes retracted perf onsets', () => {
+    const audible = new AudibleClock({ at: () => ({ time: 1, uncertainty: 0, provenance: 'measured' }) });
+    const rig = setup(true, true, audible); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    rig.deps.code!.surface.dispatch({ changes: { from: 0, insert: 'let x 1' } });
+    const revision = rig.deps.code!.currentRevision('main.vact');
+    const ahead = { id: 77, slot: 'd1', beat: [0, 1] as [number, number], time: 1.1,
+      end_time: 1.5, dur: [1, 8] as [number, number],
+      src: { file: 'main.vact', span: { start: 0, end: 3 }, doc_revision: revision, form_gen: 1 } };
+    rig.transport.emit({ kind: 'playing', body: { events: [], ahead: [ahead] } });
+    expect(perf.onsets()).toHaveLength(1);
+    expect(perf.onsets()[0]).toMatchObject({ id: 77, time: 1.1 });
+    rig.transport.emit({ kind: 'playing', body: { events: [], retract: [77] } });
+    expect(perf.onsets()).toEqual([]);
+    expect(perf.counters().highlight.retracted).toBe(1);
   });
 
   it('does no whole-document work on an edit frame or active animation-only frames', () => {

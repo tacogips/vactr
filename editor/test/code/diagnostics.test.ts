@@ -1,6 +1,6 @@
 import { Text } from '@codemirror/state';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHECK_DEBOUNCE_MS, DiagnosticsController } from '../../src/code/diagnostics';
+import { CHECK_DEBOUNCE_MS, DiagnosticsController, MAX_CHECK_DIAGNOSTICS } from '../../src/code/diagnostics';
 import { DocumentSync } from '../../src/code/sync';
 import { CodeSurface } from '../../src/code/surface';
 import { Client } from '../../src/protocol/client';
@@ -30,6 +30,15 @@ function setup(tier: 'browser' | 'native', check?: (text: string) => Diagnostic[
   const initial = Text.of(TEXT.split('\n'));
   const sync = new DocumentSync(client.document('main.vact'), initial);
   let view: CodeSurface | null = null;
+  let composing = false;
+  const frameCallbacks: (() => void)[] = [];
+  const tasks: (() => void)[] = [];
+  const afterPresent = (callback: () => void): (() => void) => {
+    let cancelled = false;
+    const frame = (): void => { if (!cancelled) tasks.push(() => { if (!cancelled) callback(); }); };
+    frameCallbacks.push(frame);
+    return () => { cancelled = true; };
+  };
   const core = check ? { check: vi.fn(check) } : undefined;
   const ctl = new DiagnosticsController({
     client,
@@ -37,6 +46,8 @@ function setup(tier: 'browser' | 'native', check?: (text: string) => Diagnostic[
     tier,
     ...(core ? { core } : {}),
     text: () => view?.state.doc.toString() ?? '',
+    afterPresent,
+    isComposing: () => composing,
   });
   view = new CodeSurface({ sync });
   views.push(view);
@@ -50,7 +61,11 @@ function setup(tier: 'browser' | 'native', check?: (text: string) => Diagnostic[
   const annotated = () => view!.annotationRanges().filter((range) => range.kind === 'diagnostic').map((range) => ({
     text: view!.state.doc.sliceString(range.from, range.to), label: range.label, className: range.className,
   }));
-  return { transport, client, sync, ctl, view, core, evalResult, shown, annotated };
+  const presentFrame = (): void => { for (const callback of frameCallbacks.splice(0)) callback(); };
+  const runTask = (): void => { tasks.shift()?.(); };
+  const flushAfterPresent = (): void => { presentFrame(); runTask(); };
+  return { transport, client, sync, ctl, view, core, evalResult, shown, annotated, presentFrame, runTask, flushAfterPresent,
+    setComposing(value: boolean) { composing = value; } };
 }
 
 describe('DiagnosticsController', () => {
@@ -61,7 +76,7 @@ describe('DiagnosticsController', () => {
   });
 
   it('merges static, check and runtime diagnostics', () => {
-    const { transport, view, ctl, evalResult, shown, annotated } = setup('browser', (t) =>
+    const { transport, view, ctl, evalResult, shown, annotated, presentFrame, runTask } = setup('browser', (t) =>
       t.includes('# ok') ? [diag('hh', 'check: unknown sound', {}, t)] : [],
     );
     evalResult([diag('bd sd', 'static: bad pattern', { severity: 'warning' })]);
@@ -71,6 +86,8 @@ describe('DiagnosticsController', () => {
     vi.advanceTimersByTime(CHECK_DEBOUNCE_MS - 1);
     expect(shown(view).map((d) => d.source?.split(':')[0])).toEqual(['static', 'runtime']);
     vi.advanceTimersByTime(1);
+    expect(shown(view)).toHaveLength(2);
+    presentFrame(); runTask();
     expect(shown(view)).toEqual([
       { text: 'bd sd', message: 'static: bad pattern', source: 'static:x' },
       { text: 'd2', message: 'late event (slot d2, beat 3/4)', source: 'runtime:x' },
@@ -125,29 +142,95 @@ describe('DiagnosticsController', () => {
   });
 
   it('debounces the check to 300 ms after the LAST edit', () => {
-    const { view, core } = setup('browser', () => []);
+    const { view, core, presentFrame, runTask } = setup('browser', () => []);
     view.dispatch({ changes: { from: 0, insert: 'a' } });
     vi.advanceTimersByTime(200);
     view.dispatch({ changes: { from: 0, insert: 'b' } });
     vi.advanceTimersByTime(200);
     expect(core?.check).not.toHaveBeenCalled();
     vi.advanceTimersByTime(100);
+    expect(core?.check).not.toHaveBeenCalled();
+    presentFrame();
+    expect(core?.check).not.toHaveBeenCalled();
+    runTask();
     expect(core?.check).toHaveBeenCalledTimes(1);
     expect(core?.check).toHaveBeenCalledWith(`ba${TEXT}`);
   });
 
   it('runs one check after 20 edits spaced 50 ms apart', () => {
-    const { view, core } = setup('browser', () => []);
+    const { view, core, ctl, presentFrame, runTask } = setup('browser', () => []);
+    const phases: string[] = [];
+    let phase = 'idle';
+    core!.check.mockImplementation(() => { phases.push(phase); return []; });
     for (let i = 0; i < 20; i += 1) {
+      phase = 'keystroke'; ctl.noteInput();
       view.dispatch({ changes: { from: 0, insert: String(i % 10) } });
       vi.advanceTimersByTime(50);
+      phase = 'frame'; presentFrame();
     }
     vi.advanceTimersByTime(CHECK_DEBOUNCE_MS);
+    expect(core?.check).not.toHaveBeenCalled();
+    phase = 'frame'; presentFrame();
+    expect(core?.check).not.toHaveBeenCalled();
+    phase = 'task'; runTask();
     expect(core?.check).toHaveBeenCalledTimes(1);
+    expect(phases).toEqual(['task']);
+    expect(ctl.stats).toMatchObject({ checks: 1, checkDeferrals: 0, checkDropped: 0 });
 
+    ctl.noteInput();
     view.dispatch({ changes: { from: 0, insert: 'x' } });
     vi.advanceTimersByTime(CHECK_DEBOUNCE_MS);
+    presentFrame(); runTask();
     expect(core?.check).toHaveBeenCalledTimes(2);
+  });
+
+  it('defers a presented check after new input and retries after the quiet pause', () => {
+    const { ctl, core, presentFrame, runTask } = setup('browser', () => []);
+    ctl.noteInput(); vi.advanceTimersByTime(CHECK_DEBOUNCE_MS); presentFrame();
+    ctl.noteInput(); runTask();
+    expect(core?.check).not.toHaveBeenCalled();
+    expect(ctl.stats.checkDeferrals).toBe(1);
+    vi.advanceTimersByTime(CHECK_DEBOUNCE_MS); presentFrame(); runTask();
+    expect(core?.check).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers while composing and runs after composition ends and another quiet pause', () => {
+    const { ctl, core, setComposing, presentFrame, runTask } = setup('browser', () => []);
+    ctl.noteInput(); vi.advanceTimersByTime(CHECK_DEBOUNCE_MS); presentFrame();
+    setComposing(true); runTask();
+    expect(core?.check).not.toHaveBeenCalled();
+    expect(ctl.stats.checkDeferrals).toBe(1);
+    setComposing(false); ctl.noteInput(); vi.advanceTimersByTime(CHECK_DEBOUNCE_MS); presentFrame(); runTask();
+    expect(core?.check).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps check diagnostics at 1024 and reports only the dropped surplus', () => {
+    const oversized = setup('browser', () => Array.from({ length: 1500 }, (_, i) => diag('let', `error ${i}`)));
+    oversized.ctl.runCheck();
+    expect(oversized.ctl.current().filter((item) => item.source.startsWith('check:'))).toHaveLength(MAX_CHECK_DIAGNOSTICS);
+    expect(oversized.ctl.stats).toMatchObject({ checks: 1, checkDropped: 476 });
+    oversized.ctl.dispose();
+
+    const exact = setup('browser', () => Array.from({ length: 1024 }, (_, i) => diag('let', `error ${i}`)));
+    exact.ctl.runCheck();
+    expect(exact.ctl.current().filter((item) => item.source.startsWith('check:'))).toHaveLength(1024);
+    expect(exact.ctl.stats.checkDropped).toBe(0);
+    exact.ctl.dispose();
+  });
+
+  it('skips the scheduled check when the revision is unchanged and cancels it on dispose', () => {
+    const unchanged = setup('browser', () => []);
+    unchanged.ctl.runCheck();
+    unchanged.ctl.noteInput(); vi.advanceTimersByTime(CHECK_DEBOUNCE_MS);
+    unchanged.presentFrame(); unchanged.runTask();
+    expect(unchanged.core?.check).toHaveBeenCalledTimes(1);
+    expect(unchanged.ctl.stats.checks).toBe(1);
+    unchanged.ctl.dispose();
+
+    const disposed = setup('browser', () => []);
+    disposed.ctl.noteInput(); vi.advanceTimersByTime(CHECK_DEBOUNCE_MS); disposed.presentFrame();
+    disposed.ctl.dispose(); disposed.runTask();
+    expect(disposed.core?.check).not.toHaveBeenCalled();
   });
 
   it('checks an unchanged revision once and checks again after an edit', () => {

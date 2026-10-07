@@ -49,11 +49,12 @@ export async function runMeasurement(page, context, browserName, { profile='all'
     try {
       await startTrace();traceStopped=false;
       while(Date.now()-cycleStart<120_000) {
-        const at=Date.now(); await page.keyboard.press('End'); await page.keyboard.press('z'); await page.keyboard.press('Backspace');
+        const at=Date.now();
         if(cdp)await cdp.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:cycle%2?2:1,mobile:false});
         const observedDpr=await page.evaluate(()=>devicePixelRatio);observedDprs.push(observedDpr);
         await page.evaluate(()=>{ const c=document.querySelector('.vact-code-canvas'); c.style.fontSize=`${12+(Math.floor(performance.now()/5000)%3)}px`; window.dispatchEvent(new Event('resize')); });
         if(cycle%2===1) { const interval=await page.evaluate(()=>{const startMs=performance.now();const deadline=startMs+250;while(performance.now()<deadline){}return{startMs,endMs:performance.now()};});const window={index:injectedStallCount,...interval};stallWindows.push(window);samples.push({phase:'stall-window',...window});injectedStallCount++; }
+        await page.keyboard.press('End'); await page.keyboard.press('z'); await page.keyboard.press('Backspace');
         if(profileTrace&&!traceStopped&&Date.now()-profilerStartedAt>=10_000){await stopTrace('cycle');traceStopped=true;}
         const counters=await page.evaluate(()=>window.__vactrPerf.counters());ledgerPeakBytes=Math.max(ledgerPeakBytes,counters.usedBytes);samples.push({phase:'cycle',at,stall:cycle%2===1,devicePixelRatio:observedDpr,highlightUnmapped:counters.highlight.unmapped}); cycle++; await sleep(5000);
         if(Date.now()>=nextTelemetryCapture){

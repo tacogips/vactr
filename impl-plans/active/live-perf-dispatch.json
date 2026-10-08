@@ -1,12 +1,24 @@
 {
   "taskId": "live-perf",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-307",
-  "issueReference": "workflowInput (no GitHub issue URL or number supplied): opus-luna-design-and-implement-review-loop-session-307, live-perf, 'Live performance controls: right-drag momentary value tweak with glide/snap return, and gentle stop (effect tails) vs instant cut with shortcuts'",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-332",
+  "issueReference": "workflowInput (no GitHub issue URL or number supplied): 'RESTART session 307: finish live performance controls (integration review, LP-EVIDENCE, gates, push)', opus-luna-design-and-implement-review-loop-session-332 restarting session-307 (stopped by the host low-memory reaper), live-perf, 'Live performance controls: right-drag momentary value tweak with glide/snap return, and gentle stop (effect tails) vs instant cut with shortcuts'",
   "implementationBranch": "wf/live-perf",
   "baseBranch": "wf/live-perf",
   "remote": "origin",
-  "originalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+  "originalHead": "d4e258ed2276825743d8b51320c5a4d676c8f86b",
+  "restart": {
+    "restartOf": "opus-luna-design-and-implement-review-loop-session-307",
+    "session307OriginalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+    "planCheckpoint": "04dc4f25bad457718b39a71a30e07818bd8c514e",
+    "wipCommit": "d4e258ed2276825743d8b51320c5a4d676c8f86b",
+    "planReviewAcceptance": "comm-005385 (step5-impl-plan-review, session 332): accepted, plans reused unchanged from 04dc4f2",
+    "state": "LP-CONTRACT accepted by integration review (moved to acceptedDependencies). LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-STOP and LP-EDITOR-MOMENTARY are implemented in d4e258e; the LP-SESSION-MOMENTARY repair passed test-integrity and adversarial review (focused 135/135) before the stop.",
+    "nextActions": [
+      "Rerun each wave-2 plan's final-source verification on d4e258e strictly serially (expected green; mandatory verification record format) and complete the second-wave integration review.",
+      "Then LP-EVIDENCE: perf-hook accessors, four behavior checks, serial gates 1-13, design section 12 record titled for session 332 (not 307), file-by-file archive, README; commit and non-force push to origin wf/live-perf."
+    ]
+  },
   "designDocPaths": [
     "design-docs/specs/design-live-performance.md",
     "design-docs/specs/design-implementation.md",
@@ -14,7 +26,15 @@
     "design-docs/specs/architecture.md"
   ],
   "evidenceRoot": "tmp/live-perf",
-  "executionModel": "Three waves. Wave 1: LP-CONTRACT. Wave 2: LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-STOP and LP-EDITOR-MOMENTARY, which have disjoint writePaths and are logically parallel. Wave 3: LP-EVIDENCE. All plans share one worktree and one cargo target/ and editor/node_modules/.vite, so run fanout with --max-concurrency 1 to avoid compile and test races (operator lesson). The design and plans are committed before fanout. Workers edit only their own Progress Log. Every edit starts with a fresh read and pre/post sha256 values recorded in the Progress Log. A drift in a file outside the plan's writePaths is reported, never repaired by the worker. Serial repair happens after the join.",
+  "executionModel": "Three waves. Wave 1: LP-CONTRACT. Wave 2: LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-STOP and LP-EDITOR-MOMENTARY, which have disjoint writePaths and are logically parallel. Wave 3: LP-EVIDENCE. All plans share one worktree and one cargo target/ and editor/node_modules/.vite, so run fanout with --max-concurrency 1 to avoid compile and test races (operator lesson). The design and plans are committed before fanout. Workers edit only their own Progress Log. Every edit starts with a fresh read and pre/post sha256 values recorded in the Progress Log. A drift in a file outside the plan's writePaths is reported, never repaired by the worker. Serial repair happens after the join. Session-332 restart: LP-CONTRACT is an accepted dependency (committed in d4e258e), so the remaining plans are wave 2 (five gate reruns plus integration review) and wave 3 (LP-EVIDENCE), still with --max-concurrency 1; host memory pressure requires every gate to run strictly serially and the full nextest run alone under the measurement lock.",
+  "acceptedDependencies": [
+    {
+      "planId": "LP-CONTRACT",
+      "planPath": "impl-plans/active/live-perf-contract.md",
+      "commit": "d4e258ed2276825743d8b51320c5a4d676c8f86b",
+      "provides": "Accepted by the session-307 integration review: C1-C8 contracts (CtlMsg 0x1C OutputStop and 0x1D CellRamp, HostMsg 0x4B OutputState and 0x4C CellRampAck with round-trip tests; ClientMsg StopAll/Momentary; StaleReason MomentaryIneligible/MomentaryCapacity; TransportSample.output; StagedEffect StopAll/Cut; runtime and session hooks; registered test modules) and the editor client stopAll()/momentary() with the 16 ms drag limit and envelope validation of transport.output."
+    }
+  ],
   "operatorRules": [
     "English only; no emojis; follow AGENTS.md and the rust-coding-standards skill; touched Rust files stay under 1000 lines (split otherwise).",
     "Run rustfmt on touched Rust files only; never run crate-wide cargo fmt; do not edit .agents/settings.local.json.",
@@ -26,7 +46,7 @@
     "The Codex sandbox cannot bind localhost and keeps .git read-only. Browser runs, the full nextest run and commit/push happen in verification or review steps outside the sandbox."
   ],
   "reviewContext": {
-    "issueReference": "workflowInput 'Live performance controls: right-drag momentary value tweak with glide/snap return, and gentle stop (effect tails) vs instant cut with shortcuts' (no GitHub issue number); workflowExecutionId opus-luna-design-and-implement-review-loop-session-307; plans accepted in comm-005068 (step5-impl-plan-review, finding LP-PLAN-R1-STALE-RELEASE verified repaired)",
+    "issueReference": "workflowInput 'RESTART session 307: finish live performance controls (integration review, LP-EVIDENCE, gates, push)' (no GitHub issue number); workflowExecutionId opus-luna-design-and-implement-review-loop-session-332, restarting session-307 whose plans were accepted in comm-005068 (finding LP-PLAN-R1-STALE-RELEASE verified repaired); reuse re-accepted in comm-005385 (step5-impl-plan-review, session 332)",
     "userProblem": "Performers need DJ-effect-style live control: right-drag (iPad: two-finger drag) on a bound number changes the live value without editing the document and returns to the base value on release (glide by default, Shift snaps). Stopping playback currently cuts everything abruptly (Mod-. sends hush); like ordinary synths, the default stop should let voices release and delay/reverb tails ring out, with an explicit instant cut also available by shortcut.",
     "requiredOutcomes": [
       "Right-drag on a bound Direct numeric site sends momentary targets with left-drag scaling; the document text never changes; release glides back over the glide time (default 1000 ms, controls-pane setting, localStorage vactr.momentary.glideMs); Shift release snaps back; the overlay shows the live value.",
@@ -101,74 +121,6 @@
     ]
   },
   "plans": [
-    {
-      "planId": "LP-CONTRACT",
-      "planPath": "impl-plans/active/live-perf-contract.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "src/host/wire.rs",
-        "src/host/tests/contracts.rs",
-        "src/session/protocol.rs",
-        "src/session/protocol_live.rs",
-        "src/session/codec.rs",
-        "src/session/tests/codec.rs",
-        "src/session/session.rs",
-        "src/session/publish.rs",
-        "src/session/mod.rs",
-        "src/session/momentary.rs",
-        "src/session/tests/mod.rs",
-        "src/session/tests/live_stop.rs",
-        "src/session/tests/momentary.rs",
-        "src/sched/mod.rs",
-        "src/sched/runtime.rs",
-        "src/sched/runtime/live.rs",
-        "src/sched/ramps.rs",
-        "src/sched/tests/sched.rs",
-        "src/sched/tests/sched/live.rs",
-        "src/sched/tests/sched/ramps.rs",
-        "src/ns/stage.rs",
-        "src/ns/evaluator.rs",
-        "src/ns/tests/stage.rs",
-        "src/vm/natives/effects.rs",
-        "src/dsp/engine.rs",
-        "src/host/wasm/worklet_half.rs",
-        "src/host/wasm/main_half.rs",
-        "src/host/testing.rs",
-        "editor/src/protocol/types.ts",
-        "editor/src/protocol/envelope.ts",
-        "editor/src/protocol/client.ts",
-        "editor/test/protocol/client.test.ts",
-        "editor/test/protocol/envelope.test.ts",
-        "impl-plans/active/live-perf-contract.md",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/live-perf/contract"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules/.vite",
-        "tmp/live-perf/contract"
-      ],
-      "acceptanceCriteria": [
-        "C1-C8 contracts exist exactly as pinned: new CtlMsg (0x1C OutputStop, 0x1D CellRamp) and HostMsg (0x4B OutputState, 0x4C CellRampAck) records with round-trip tests; ClientMsg StopAll/Momentary; StaleReason MomentaryIneligible/MomentaryCapacity; TransportSample.output; StagedEffect StopAll/Cut; runtime and session hooks with behavior-preserving stubs; registered empty test modules.",
-        "Behavior unchanged: hush still emits Panic SlotControl for every slot; existing tests pass with no assertion edited.",
-        "editor client stopAll() and momentary() with the 16 ms drag limit and an immediate release that cancels queued drags; envelope validation of transport.output."
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo build --all-targets",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/host::tests::contracts|session::tests::codec|ns::tests::stage|sched::tests::sched::control|host::tests::e2e::sched_gaps/)'",
-        "rustfmt --edition 2021 --check <each touched .rs file>",
-        "cd editor && npm run check",
-        "cd editor && ./node_modules/.bin/vitest run test/protocol"
-      ]
-    },
     {
       "planId": "LP-ENGINE",
       "planPath": "impl-plans/active/live-perf-engine.md",
@@ -419,7 +371,7 @@
       "verification": [
         "CARGO_TERM_QUIET=true cargo build --all-targets",
         "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "rustfmt --edition 2021 --check <every .rs file changed since the plan checkpoint>",
+        "rustfmt --edition 2021 --check $(git diff --name-only --diff-filter=d 04dc4f25bad457718b39a71a30e07818bd8c514e -- '*.rs')",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "mise run build-wasm-release",
         "cd editor/src-tauri && CARGO_TERM_QUIET=true cargo check",

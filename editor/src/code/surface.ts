@@ -1,6 +1,6 @@
 import { Compartment, EditorState, Transaction, type Extension, type TransactionSpec } from '@codemirror/state';
 import { history, historyField, undo, redo, undoDepth, redoDepth } from '@codemirror/commands';
-import type { CodeAnnotation, CodeRange, CodeRect, CodeSurface as SurfaceContract, CodeSurfaceUpdate } from '../app/apis';
+import type { CodeAnnotation, CodeRange, CodeRect, CodeSurface as SurfaceContract, CodeSurfaceUpdate, MomentaryGesture, MomentaryProvider, MomentaryStart } from '../app/apis';
 import { HISTORY_UNDO_BYTES, trimUndoHistory, touches } from './history';
 import { DocumentSync } from './sync';
 import type { NumericGesture } from './pointer';
@@ -26,6 +26,9 @@ export class CodeSurface implements SurfaceContract {
   private readonly blurListeners = new Set<() => void>();
   private readonly compositionListeners = new Set<() => void>();
   private readonly numericDragProviders = new Set<(event: PointerEvent, pos: number) => NumericGesture | null>();
+  private readonly momentaryProviders = new Set<MomentaryProvider>();
+  private readonly animatedSources = new Map<string, (frameMs: number) => readonly CodeAnnotation[]>();
+  private readonly animatedWakeListeners = new Set<() => void>();
   private readonly highestKeymaps: { key: string; run(): boolean }[][] = [];
   private readonly defaultKeymaps: { key: string; run(): boolean }[][] = [];
   private readonly annotations = new Map<string, readonly CodeAnnotation[]>();
@@ -133,6 +136,15 @@ export class CodeSurface implements SurfaceContract {
     for (const provider of this.numericDragProviders) { const gesture = provider(event, pos); if (gesture) return gesture; }
     return null;
   }
+  registerMomentaryDrag(provider: MomentaryProvider): () => void { this.momentaryProviders.add(provider); return () => this.momentaryProviders.delete(provider); }
+  momentaryHit(pos: number): boolean { for (const p of this.momentaryProviders) if (p.hit(pos)) return true; return false; }
+  momentaryDrag(start: MomentaryStart): MomentaryGesture | null { for (const p of this.momentaryProviders) { const g = p.begin(start); if (g) return g; } return null; }
+  registerAnimated(owner: string, rows: (frameMs: number) => readonly CodeAnnotation[]): { wake(): void; dispose(): void } {
+    this.animatedSources.set(owner, rows);
+    return { wake: () => { for (const cb of [...this.animatedWakeListeners]) cb(); }, dispose: () => { if (this.animatedSources.get(owner) === rows) this.animatedSources.delete(owner); } };
+  }
+  animatedRows(frameMs: number): CodeAnnotation[] { return [...this.animatedSources.values()].flatMap((rows) => [...rows(frameMs)]); }
+  onAnimatedWake(cb: () => void): () => void { this.animatedWakeListeners.add(cb); return () => this.animatedWakeListeners.delete(cb); }
   setCompositionRange(range: CodeRange | null): void {
     this.composing = range ? Object.freeze({ ...range }) : null;
     if (!range) { const pending = this.deferred; this.deferred = []; for (const write of pending) write(); }
@@ -146,7 +158,7 @@ export class CodeSurface implements SurfaceContract {
   dispose(): void {
     this.disposed = true;
     this.listeners.clear(); this.pointers.clear(); this.blurListeners.clear(); this.compositionListeners.clear();
-    this.numericDragProviders.clear(); this.highestKeymaps.length = 0; this.defaultKeymaps.length = 0;
+    this.numericDragProviders.clear(); this.momentaryProviders.clear(); this.animatedSources.clear(); this.animatedWakeListeners.clear(); this.highestKeymaps.length = 0; this.defaultKeymaps.length = 0;
     this.annotations.clear(); this.deferred = [];
     this.composing = null; this.bridge = null;
     this.sync.doc.dispose();

@@ -126,7 +126,7 @@ fn at(cx: &mut NativeCx<'_>, args: &[Value], _: Kw<'_>) -> R {
 }
 
 fn hush(cx: &mut NativeCx<'_>, _: &[Value], _: Kw<'_>) -> R {
-    cx.stage(StagedEffect::Revoke(SlotKey::All))?;
+    cx.stage(StagedEffect::Cut)?;
     Ok(Value::Nil)
 }
 

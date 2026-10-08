@@ -1,6 +1,6 @@
 # LP-SESSION-STOP: Scheduler stop modes, output-stop delivery, song stop, output telemetry
 
-**Status**: Ready (after LP-CONTRACT)
+**Status**: In Progress (review repair implemented; final verification blocked by LP-SESSION-MOMENTARY compilation)
 **Plan ID**: LP-SESSION-STOP (wave 2; parallel with LP-ENGINE, LP-SESSION-MOMENTARY, LP-EDITOR-STOP, LP-EDITOR-MOMENTARY)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.1, 4.4, 4.5, 4.6, 8.1(5), D1, D2, D5
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -252,16 +252,87 @@ Write logs to `tmp/live-perf/session-stop/*.log`.
 
 ## Completion Criteria
 
-- [ ] TASK-S1 to TASK-S4 are implemented.
+- [x] TASK-S1 to TASK-S4 source behavior is implemented.
 - [ ] Every listed test passes. Existing control, MIDI and sched_gaps
-  assertions are unchanged and pass.
-- [ ] `stop-all` gives Natural plus Gentle; hush gives Panic plus Cut; a
-  per-slot stop gives Natural only.
+  assertions are unchanged. OutputStop timeout diagnostics defer while slot
+  controls remain outstanding, allowing one slot diagnostic to own the
+  outage. New diagnostic and endpoint behavior tests are present but remain
+  unverified because the combined tree does not compile in the unowned
+  LP-SESSION-MOMENTARY files.
+- [x] Added scheduler/session tests for stop-all Natural plus Gentle, hush
+  Panic plus Cut, per-slot Natural only, output ordering, retry/ack behavior,
+  telemetry omission/mapping, no-song no-op, and OutputStop/slot diagnostic
+  de-duplication. Added pure Playing/Draining endpoint behavior table tests in
+  `src/sched/tests/sched/live.rs`; the Draining-to-Ended transition remains
+  covered by existing `SongTransport::cutoff` tests. Test execution is pending.
 - [ ] Verification 1-5 exit 0. Touched files are under 1000 lines. The
-  Progress Log is updated.
+  Progress Log is updated. Rustfmt passes and the touched song file is 950
+  lines; compile-dependent gates remain blocked by LP-SESSION-MOMENTARY.
 
 ## Progress Log
 
 ### Session: 2026-10-08 (plan authored)
 **Tasks Completed**: plan authored (step 4).
 **Notes**: Not started.
+
+### Session: 2026-10-08 (step 6 implementation)
+**Tasks Completed**: TASK-S1 to TASK-S4 source implementation; added explicit
+revoke, scheduler output-stop, session envelope, telemetry and no-song tests.
+**Notes**: `OutputTracker` retries three times and routes its one diagnostic
+through the existing `ControlChannel::tick()` collector. Rustfmt ran on the
+six touched Rust files. No tests/builds were run by this implementation pass;
+parent-designated verification remains pending. Song Playing/Draining endpoint
+tests are pending because the available `genuine_ready` fixture is private to
+`src/sched/runtime/song/clock_tests.rs`, not an authorized writePath.
+
+### Session: 2026-10-08 (step 6 verification)
+**Tasks Completed**: Required build and clippy gates passed; focused nextest
+was run and exposed one existing test assertion conflict.
+**Notes**: `CARGO_TERM_QUIET=true cargo build --all-targets` and
+`CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+both exited 0. The required focused nextest exited 1: 53/54 tests passed and
+`sched::tests::sched::control::repeated_loss_resends_and_raises_the_transport_diagnostic_once`
+still expects one HostTransport diagnostic, while the new OutputStop tracker
+correctly reports its unacknowledged Cut in addition to the slot timeout. No
+source-only change can preserve both diagnostic schedules and that old
+assertion. `src/sched/tests/sched/control.rs` is explicitly restricted to new
+rows with existing assertions unchanged, so reconciling the test requires an
+ownership clarification. The wasm build and final exact rustfmt gate were not
+run after the focused test failure. Song Playing/Draining endpoint behavioral
+tests also remain outside the authorized test paths because their genuine
+fixture is private to `src/sched/runtime/song/clock_tests.rs`.
+
+### Session: 2026-10-08 (step 6 review repair)
+**Tasks Completed**: Added the OutputStop/slot diagnostic de-duplication seam,
+two retry-exhaustion regression tests, pure song stop endpoint computation,
+`stop_song` delegation, and table-driven Playing/Draining endpoint cases.
+**Notes**: The original assertion in
+`repeated_loss_resends_and_raises_the_transport_diagnostic_once` was not
+edited. OutputStop retries remain enabled; retry exhaustion clears the
+request, then defers its diagnostic while slot controls remain outstanding.
+It is suppressed if a slot reports HostTransport, emitted if the controls
+clear without a report, and canceled if OutputState acknowledges the request.
+Endpoint tests assert the same epoch and bounds checked by
+`SongTransport::cutoff`. Verification is pending the parent-designated
+checker/gates; no pass is claimed here.
+
+### Session: 2026-10-08 (step 6 final-source verification)
+**Tasks Completed**: Exact plan rustfmt check passed. Re-ran the exact
+all-targets build on the formatted final source; compilation is blocked by
+unowned LP-SESSION-MOMENTARY code.
+**Notes**: `rustfmt --edition 2021 --check src/sched/runtime/live.rs
+src/sched/control.rs src/sched/runtime/song.rs src/sched/tests/sched/live.rs
+src/sched/tests/sched/control.rs src/session/tests/live_stop.rs` exited 0
+(`tmp/live-perf/session-stop/review-repair-final2-rustfmt.log`).
+The first check found formatter-only differences (`review-repair-rustfmt.log`);
+rustfmt was applied to the plan's exact touched-file set before this passing
+rerun.
+`CARGO_TERM_QUIET=true cargo build --all-targets` exited 101
+(`tmp/live-perf/session-stop/review-repair-final2-build.log`) with errors in
+`src/session/momentary.rs`: wrong `StaleBindingBody` import, private
+`Runtime::invalidate_uncommitted` calls, `Box<dyn AudioHost>` coercions and a
+mutable-borrow conflict. This file is outside LP-SESSION-STOP writePaths.
+Clippy, focused nextest and wasm build could not be meaningfully run until
+that compile blocker is repaired. The review findings' source and test
+changes are present, but behavioral verification and plan completion remain
+open.

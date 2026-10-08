@@ -65,6 +65,7 @@ const CLIENT_FIELDS: Record<ClientKind, Record<string, FieldType>> = {
   eval: { file: 'string', code: 'string', doc_revision: 'number', edit_epoch: 'number' },
   hush: {},
   stop: { slot: 'string' },
+  'stop-all': {},
   'set-var': { file: 'string', name: 'string', defining_form_gen: 'number', edit_epoch: 'number' },
   'set-tweak': {
     file: 'string',
@@ -72,6 +73,13 @@ const CLIENT_FIELDS: Record<ClientKind, Record<string, FieldType>> = {
     form_gen: 'number',
     value: 'number',
     edit_epoch: 'number',
+  },
+  momentary: {
+    file: 'string',
+    id: 'number',
+    form_gen: 'number',
+    edit_epoch: 'number',
+    ramp_ms: 'number',
   },
   'doc-changed': {
     file: 'string',
@@ -213,7 +221,9 @@ function latency(v: Record<string, unknown>): boolean {
 }
 function transport(v: unknown): boolean {
   return isObject(v) && epoch(v.epoch) && nonnegative(v.sample_time) && ratio(v.cycle) &&
-    positive(v.bpm) && positive(v.beats_per_cycle) && typeof v.running === 'boolean' && latency(v);
+    positive(v.bpm) && positive(v.beats_per_cycle) && typeof v.running === 'boolean' && latency(v) &&
+    (v.output === undefined || (typeof v.output === 'string' &&
+      ['running', 'draining', 'cutting', 'idle'].includes(v.output)));
 }
 function validPlaying(v: unknown): boolean {
   if (!isObject(v) || typeof v.slot !== 'string' || !nonnegative(v.time) ||
@@ -234,6 +244,11 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
   const decoded = decodeWith<ServerEnvelope>(text, SERVER_KINDS, SERVER_FIELDS);
   if (!decoded.ok) return decoded;
   const env = decoded.env;
+  if (env.kind === 'stale-binding' &&
+    !['stale-form-gen', 'edit-invalidated', 'unreconciled-edit', 'superseded-definition',
+      'momentary-ineligible', 'momentary-capacity'].includes(env.body.reason)) {
+    return fail('bad-shape', 'invalid stale-binding reason');
+  }
   if (['playing', 'levels', 'tempo'].includes(env.kind) &&
     new TextEncoder().encode(text).byteLength > MAX_TELEMETRY_BYTES) {
     return fail('bad-shape', 'telemetry exceeds 1 MiB');
@@ -302,6 +317,13 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
 /** Decodes one client frame (tests and the recording transport). */
 export function decodeClient(text: string): Decoded<ClientEnvelope> {
   const decoded = decodeWith<ClientEnvelope>(text, CLIENT_KINDS, CLIENT_FIELDS);
+  if (decoded.ok && decoded.env.kind === 'momentary') {
+    const b = decoded.env.body;
+    if (!b.file || b.file.includes('\0') || !integer(b.id) || !integer(b.form_gen) ||
+      !integer(b.edit_epoch) || !integer(b.ramp_ms) || b.ramp_ms > 10_000 ||
+      !(b.target === null || finite(b.target)))
+      return fail('bad-shape', 'invalid momentary request');
+  }
   if (decoded.ok && decoded.env.kind === 'apply-song') {
     const b = decoded.env.body;
     if (!integer(b.doc_revision) || !integer(b.edit_epoch) || !b.file || b.file.includes('\0'))

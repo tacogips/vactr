@@ -70,6 +70,7 @@ export class Client {
   private readonly listeners = new Map<ServerKind | '*', Listener[]>();
   private readonly errorListeners: ((e: DecodeError) => void)[] = [];
   private readonly tweaks = new Map<string, TweakSlot>();
+  private readonly momentaries = new Map<string, TweakSlot>();
   private readonly receiveQueue: ServerEnvelope[] = [];
   private receiving = false;
   private telemetryDropped = 0;
@@ -194,6 +195,10 @@ export class Client {
     this.send({ kind: 'stop', body: { slot } });
   }
 
+  stopAll(): void {
+    this.send({ kind: 'stop-all', body: {} });
+  }
+
   /** A controller write to a tweak site; rate-limited per `(file, id)`. */
   setTweak(file: string, id: number, formGen: number, value: number): void {
     const doc = this.document(file);
@@ -223,6 +228,55 @@ export class Client {
         if (q) {
           s.last = this.now();
           this.write(file, q);
+        }
+      }, Math.max(0, s.last + TWEAK_INTERVAL_MS - t));
+    }
+  }
+
+  /** Sends a momentary target, rate-limited per `(file, id)`; null releases immediately. */
+  momentary(file: string, id: number, formGen: number, target: number | null, rampMs: number): void {
+    const doc = this.document(file);
+    const msg: ClientMsg = {
+      kind: 'momentary',
+      body: {
+        file,
+        id,
+        form_gen: formGen,
+        edit_epoch: doc.epoch,
+        target,
+        ramp_ms: Math.min(10_000, Math.max(0, Math.trunc(rampMs || 0))),
+      },
+    };
+    const key = `${file}\u0000${id}`;
+    if (target === null) {
+      const slot = this.momentaries.get(key);
+      if (slot?.timer !== null && slot?.timer !== undefined) this.timers.clear(slot.timer);
+      this.momentaries.delete(key);
+      this.write(file, msg);
+      return;
+    }
+
+    let slot = this.momentaries.get(key);
+    if (!slot) {
+      slot = { last: -Infinity, timer: null, queued: null };
+      this.momentaries.set(key, slot);
+    }
+    const t = this.now();
+    if (slot.timer === null && t - slot.last >= TWEAK_INTERVAL_MS) {
+      slot.last = t;
+      this.write(file, msg);
+      return;
+    }
+    slot.queued = msg;
+    if (slot.timer === null) {
+      const s = slot;
+      s.timer = this.timers.set(() => {
+        s.timer = null;
+        const queued = s.queued;
+        s.queued = null;
+        if (queued) {
+          s.last = this.now();
+          this.write(file, queued);
         }
       }, Math.max(0, s.last + TWEAK_INTERVAL_MS - t));
     }
@@ -261,6 +315,10 @@ export class Client {
       if (s.timer !== null) this.timers.clear(s.timer);
     }
     this.tweaks.clear();
+    for (const s of this.momentaries.values()) {
+      if (s.timer !== null) this.timers.clear(s.timer);
+    }
+    this.momentaries.clear();
     for (const d of this.docs.values()) d.dispose();
     for (const p of this.pending.values()) p.reject(new Error('client closed'));
     this.pending.clear();

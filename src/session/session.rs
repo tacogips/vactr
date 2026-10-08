@@ -212,6 +212,9 @@ pub struct Session {
     pub(super) pending_song: Option<crate::song::PreparedSong>,
     pub(super) song_epoch: u64,
     pub(super) song_requests: super::song::SongRequests,
+    // Owned by LP-SESSION-MOMENTARY; kept here as a stable session seam.
+    #[allow(dead_code)]
+    pub(super) momentary: super::momentary::MomentaryTable,
     pub(super) persistence: PersistenceMode,
     /// File names by `FileId` (index 0 is the console).
     pub(super) files: Vec<Rc<str>>,
@@ -360,6 +363,7 @@ impl Session {
             song_asset_limits: None,
             pending_song: None,
             song_requests: super::song::SongRequests::default(),
+            momentary: super::momentary::MomentaryTable::default(),
             song_epoch: 0,
             persistence: cfg.persistence,
             files: vec![Rc::from(CONSOLE_FILE)],
@@ -600,7 +604,12 @@ impl Session {
                 msgs
             }
             ClientMsg::Hush(Empty {}) => {
-                self.revoke(SlotKey::All);
+                self.momentary_clear();
+                self.stage_now(StagedEffect::Cut);
+                Vec::new()
+            }
+            ClientMsg::StopAll(Empty {}) => {
+                self.stage_now(StagedEffect::StopAll);
                 Vec::new()
             }
             ClientMsg::Stop(b) => match slot_key(&b.slot) {
@@ -612,6 +621,7 @@ impl Session {
             },
             ClientMsg::SetVar(b) => self.on_set_var(conn, env.seq, b),
             ClientMsg::SetTweak(b) => self.on_set_tweak(conn, env.seq, b),
+            ClientMsg::Momentary(b) => self.on_momentary(conn, env.seq, b),
             ClientMsg::DocChanged(b) => {
                 if let Err(error) = self.invalidate_song_requests(&b) {
                     return self.route(conn, re, vec![bad_body(error.message.to_string())]);
@@ -656,7 +666,11 @@ impl Session {
 
     /// Stops `key` at once (`hush`, `stop`).
     pub(super) fn revoke(&mut self, key: SlotKey) {
-        self.sink.apply(StagedEffect::Revoke(key));
+        self.stage_now(StagedEffect::Revoke(key));
+    }
+
+    pub(super) fn stage_now(&mut self, effect: StagedEffect) {
+        self.sink.apply(effect);
         let rep = self.rt.drain(&mut self.ev);
         self.console
             .extend(rep.console.iter().map(ToString::to_string));

@@ -17,10 +17,10 @@ function setup(text = '日本😀 abc', onPresentation?: (presentation: InputPre
   const sync = new DocumentSync(client.document('main.vact'), Text.of(text.split('\n')));
   const surface = new CodeSurface({ sync });
   const container = document.createElement('div'); document.body.append(container);
-  const evalSelection = vi.fn(), evalAll = vi.fn(), hush = vi.fn(), scrollCaret = vi.fn(), onError = vi.fn();
-  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret, onError, onPresentation });
+  const evalSelection = vi.fn(), evalAll = vi.fn(), stopAll = vi.fn(), cut = vi.fn(), scrollCaret = vi.fn(), onError = vi.fn();
+  const input = new InputController(surface, container, { evalSelection, evalAll, stopAll, cut, scrollCaret, onError, onPresentation });
   cleanup.push(() => { input.dispose(); surface.dispose(); container.remove(); });
-  return { surface, sync, input, container, el: input.accessibility.textarea, transport, evalSelection, evalAll, hush, scrollCaret, onError };
+  return { surface, sync, input, container, el: input.accessibility.textarea, transport, evalSelection, evalAll, stopAll, cut, scrollCaret, onError };
 }
 function composition(el: HTMLElement, kind: string, data = '') { el.dispatchEvent(new CompositionEvent(kind, { data, bubbles: true })); }
 function before(el: HTMLElement, inputType: string, data: string | null = null, isComposing = false) {
@@ -53,7 +53,7 @@ function pointerSetup(text = 'alpha beta\ngamma') {
 }
 
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => { for (const fn of cleanup.splice(0).reverse()) fn(); vi.useRealTimers(); });
+afterEach(() => { for (const fn of cleanup.splice(0).reverse()) fn(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('canvas input bridge', () => {
   it('clears a pending document delta before composition and full-invalidates a mismatched layout delta', () => {
@@ -120,10 +120,10 @@ describe('canvas input bridge', () => {
     composition(el, 'compositionstart'); el.dispatchEvent(new Event('blur')); expect(surface.compositionRange).toBeNull();
   });
   it('freezes bridge and suppresses evaluation/history/navigation during composition', () => {
-    const { el, surface, evalAll, evalSelection, hush } = setup(); composition(el, 'compositionstart');
+    const { el, surface, evalAll, evalSelection, stopAll } = setup(); composition(el, 'compositionstart');
     el.value = 'native preedit'; surface.annotate('feedback', []);
     key(el, 'Enter', { ctrlKey: true }); key(el, 'Enter', { metaKey: true, shiftKey: true }); key(el, '.', { ctrlKey: true }); key(el, 'a', { ctrlKey: true });
-    expect(el.value).toBe('native preedit'); expect(evalAll).not.toHaveBeenCalled(); expect(evalSelection).not.toHaveBeenCalled(); expect(hush).not.toHaveBeenCalled();
+    expect(el.value).toBe('native preedit'); expect(evalAll).not.toHaveBeenCalled(); expect(evalSelection).not.toHaveBeenCalled(); expect(stopAll).not.toHaveBeenCalled();
     expect(surface.state.selection.main.empty).toBe(true);
   });
   it('drains overlapping source writes after commit so they revalidate expected text', () => {
@@ -259,10 +259,14 @@ describe('headless keyboard', () => {
     expect(head).toBe(surface.state.doc.lineAt(head).from);
     expect(end - head).toBeLessThanOrEqual(65_536);
   });
-  it('dispatches eval/hush and keyboard history only outside composition', () => {
-    const { surface, el, evalSelection, evalAll, hush } = setup('');
-    key(el, 'Enter', { ctrlKey: true }); key(el, 'Enter', { metaKey: true, shiftKey: true }); key(el, '.', { metaKey: true });
-    expect(evalSelection).toHaveBeenCalledOnce(); expect(evalAll).toHaveBeenCalledOnce(); expect(hush).toHaveBeenCalledOnce();
+  it('dispatches eval/stop shortcuts and keyboard history only outside composition', () => {
+    vi.stubGlobal('navigator', { platform: 'MacIntel' });
+    const { surface, el, evalSelection, evalAll, stopAll, cut } = setup('');
+    key(el, 'Enter', { ctrlKey: true }); key(el, 'Enter', { metaKey: true, shiftKey: true });
+    key(el, '.', { metaKey: true, code: 'Period' });
+    key(el, '>', { metaKey: true, shiftKey: true, code: 'Period' });
+    expect(evalSelection).toHaveBeenCalledOnce(); expect(evalAll).toHaveBeenCalledOnce();
+    expect(stopAll).toHaveBeenCalledOnce(); expect(cut).toHaveBeenCalledOnce();
     before(el, 'insertText', 'a'); key(el, 'z', { ctrlKey: true }); expect(surface.state.doc.toString()).toBe('');
     key(el, 'z', { metaKey: true, shiftKey: true }); expect(surface.state.doc.toString()).toBe('a');
   });

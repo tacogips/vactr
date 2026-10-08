@@ -22,6 +22,7 @@ import { attachCompletion } from './completion-view';
 import { CodeSurface as HeadlessSurface } from './surface';
 import { InputController } from './input';
 import { PointerController, type SelectionHandle } from './pointer';
+import { MomentaryPointer } from './momentary-pointer';
 import { TextLayout } from './layout';
 import { createMeasureContext } from './advances';
 import { CanvasRenderer } from './renderer';
@@ -93,6 +94,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let scheduler: FrameScheduler | undefined;
   let input: InputController | undefined;
   let pointer: PointerController;
+  let momentaryPointer: MomentaryPointer;
   let viewHost: CodeViewHost;
   let disposed = false;
   let evalRanges: CodeAnnotation[] = [];
@@ -181,6 +183,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   pointer = new PointerController(surface, surfaceEl, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
     onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText('selection'); },
     composing: () => input.isComposing });
+  momentaryPointer = new MomentaryPointer(surface, surfaceEl, { cancelSelection: () => pointer.cancel() });
   const forwardPointer = (event: Event): void => surface.notifyPointer(event as PointerEvent);
   const pointerNames = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
   for (const name of pointerNames) surfaceEl.addEventListener(name, forwardPointer);
@@ -228,7 +231,9 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const staticRows = [...result.spans, ...surface.annotationRanges(),
           ...(selection.empty ? [] : [{ from: selection.from, to: selection.to, kind: 'selection' as const }]),
           ...input.presentation.annotations];
-        const animatedRows: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
+        const momentaryRows = surface.animatedRows(ctx.frameMs);
+        scheduler?.setActive('momentary', momentaryRows.length > 0);
+        const animatedRows: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
         const annotations = { staticRows, animatedRows, cursor: input.presentation.cursor };
         const selectionChanged = !renderedSelection || renderedSelection.anchor !== surface.state.selection.main.anchor ||
           renderedSelection.head !== surface.state.selection.main.head;
@@ -242,7 +247,9 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
       } else {
-        const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
+        const momentaryRows = surface.animatedRows(ctx.frameMs);
+        scheduler?.setActive('momentary', momentaryRows.length > 0);
+        const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
         timed('upload', () => {
           renderer.setViewport(viewHost.viewport, viewport.dpr);
           renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
@@ -260,6 +267,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
           beatFlash: transport.state.beatFlash, revision: sync.revision, handles: handles.length, epoch: store.transportSample?.epoch ?? null });
       }
     } });
+  const removeAnimatedWake = surface.onAnimatedWake(() => { scheduler?.setActive('momentary', true); scheduler?.request(); });
   const phaseTimer = scheduler.perf?.phases ?? null;
   input.setPhases(phaseTimer); viewHost.setPhases(phaseTimer); renderer.setPhases(phaseTimer);
   if (phaseTimer) (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer = phaseTimer;
@@ -357,11 +365,11 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const mounted: Mounted = {
     dispose() {
       if (disposed) return; disposed = true;
-      scheduler.dispose(); pointer.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
+      scheduler.dispose(); momentaryPointer.dispose(); pointer.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
       removePointerForwarding(); input.accessibility.textarea.removeEventListener('keydown', keyRecord);
       for (const name of diagInputEvents) input.accessibility.textarea.removeEventListener(name, noteDiagInput);
       surfaceEl.removeEventListener('pointermove', showDiagnosticTip); surfaceEl.removeEventListener('pointerleave', hideDiagnosticTip);
-      for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
+      removeAnimatedWake(); for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
       disposeFormat(); completion?.dispose(); syntaxProvider.dispose?.(); backgroundStop?.();
       colorScheme?.removeEventListener('change', updatePalette);
       backgroundCanvas?.remove(); backgroundCanvas = null;

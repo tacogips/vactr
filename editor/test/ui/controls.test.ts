@@ -209,7 +209,7 @@ describe('icon-only transport (design 15.2)', () => {
     expect(q('.vact-tempo')?.textContent).toBe('120.0');
     expect(parent.textContent).not.toMatch(/bpm|internal|hush|mute|master/);
     q<HTMLButtonElement>('.vact-stop-all')?.click();
-    expect(transport.of('stop').map((m) => m.body)).toEqual([{ slot: 'd1' }]);
+    expect(transport.of('stop-all').map((m) => m.body)).toEqual([{}]);
   });
 });
 

@@ -5,8 +5,8 @@
 //   between messages (held while an external MIDI clock is lost).
 // - MIDI clock status from `tempo.clock`: `internal`, `midi locked`,
 //   `midi lost`, shown as a glyph with the word as its accessible name.
-// - Hush sends `hush` (the session's hush already releases with panic);
-//   stop-all sends `stop {slot}` for every known slot.
+// - Hush sends `hush` for an immediate cut; stop-all sends one session-level
+//   `stop-all` message for every slot, including slots not seen by the editor.
 // - The per-slot list is built from `playing` events and the slots named
 //   by `eval-result` and `diag` diagnostics (v1 carries no slot table):
 //   an activity light lit for 150 ms from each event's time, and a stop
@@ -26,6 +26,7 @@ import type { Client } from '../protocol/client';
 import { defaultTimers, type Timers } from '../protocol/document';
 import type { Diagnostic, LevelsBody, ServerEnvelope, TempoBody, TransportSample, WirePlaying } from '../protocol/types';
 import { audioModel, type AudioContextLike, type AudioModel } from '../ui/audio';
+import { isApplePlatform, stopShortcut } from '../ui/stop-keys';
 import { TransportView, type ClockStatus, type EvalStatus, type Position, type SlotView } from '../ui/transport-view';
 import { DEFAULT_BEATS_PER_CYCLE, DEFAULT_BPM, TimeAnchor } from './highlight';
 
@@ -71,7 +72,11 @@ export interface TransportOptions {
   anchor?: TimeAnchor;
   audible?: AudibleClock;
   sample?: () => TransportSample | null;
-  /** Called after `hush` is sent. */
+  /** Install the app-level stop shortcuts unless explicitly disabled. */
+  shortcuts?: boolean;
+  /** Platform override for shortcut tests. */
+  platform?: string;
+  /** Called after stop-all or hush to clear the highlight scheduler. */
   onHush?: () => void;
   /** The browser tier's AudioContext; omitted on the native tier. */
   audio?: AudioContextLike | null;
@@ -99,11 +104,16 @@ export class TransportBar {
   private readonly setPosition: Setter<Position | null>;
   private readonly setClock: Setter<ClockStatus>;
   private readonly setLevel: Setter<number | null>;
+  private readonly setOutput: Setter<'running' | 'draining' | 'cutting' | 'idle'>;
   private readonly setSlotViews: Setter<SlotView[]>;
+  private readonly output: Accessor<'running' | 'draining' | 'cutting' | 'idle'>;
   private readonly evalStatus: Accessor<EvalStatus>;
   private readonly setEvalStatus: Setter<EvalStatus>;
   private readonly disposeRoot: () => void;
   private readonly disposeRender: () => void;
+  private readonly stopKeyWindow: Window | null;
+  private readonly stopKeyHandler: ((event: KeyboardEvent) => void) | null;
+  private readonly outputStates: string[] = [];
   private evalSeq = 0;
   private evalTimer: unknown = null;
   private tempo: TempoBody | null = null;
@@ -123,6 +133,7 @@ export class TransportBar {
       position: Setter<Position | null>;
       clock: Setter<ClockStatus>;
       level: Setter<number | null>;
+      output: Setter<'running' | 'draining' | 'cutting' | 'idle'>;
       slots: Setter<SlotView[]>;
       evalStatus: Setter<EvalStatus>;
     };
@@ -133,6 +144,7 @@ export class TransportBar {
       position: Accessor<Position | null>;
       clock: Accessor<ClockStatus>;
       level: Accessor<number | null>;
+      output: Accessor<'running' | 'draining' | 'cutting' | 'idle'>;
       slots: Accessor<SlotView[]>;
     };
     this.disposeRoot = createRoot((dispose) => {
@@ -140,10 +152,11 @@ export class TransportBar {
       const [position, setPosition] = createSignal<Position | null>(null);
       const [clock, setClock] = createSignal<ClockStatus>('internal');
       const [level, setLevel] = createSignal<number | null>(null);
+      const [output, setOutput] = createSignal<'running' | 'draining' | 'cutting' | 'idle'>('running');
       const [slots, setSlots] = createSignal<SlotView[]>([]);
       const [status, setStatus] = createSignal<EvalStatus>({ kind: 'idle' });
-      setters = { bpm: setBpm, position: setPosition, clock: setClock, level: setLevel, slots: setSlots, evalStatus: setStatus };
-      accessors = { bpm, position, clock, level, slots };
+      setters = { bpm: setBpm, position: setPosition, clock: setClock, level: setLevel, output: setOutput, slots: setSlots, evalStatus: setStatus };
+      accessors = { bpm, position, clock, level, output, slots };
       evalStatus = status;
       audio = audioModel(opts.audio ?? null);
       return dispose;
@@ -152,7 +165,9 @@ export class TransportBar {
     this.setPosition = setters.position;
     this.setClock = setters.clock;
     this.setLevel = setters.level;
+    this.setOutput = setters.output;
     this.setSlotViews = setters.slots;
+    this.output = accessors.output;
     this.setEvalStatus = setters.evalStatus;
     this.evalStatus = evalStatus;
     this.audio = audio;
@@ -164,6 +179,7 @@ export class TransportBar {
           position: accessors.position,
           clock: accessors.clock,
           level: accessors.level,
+          output: accessors.output,
           slots: accessors.slots,
           audio: audio.state,
           audioReason: audio.reason,
@@ -176,6 +192,24 @@ export class TransportBar {
         }),
       this.el,
     );
+
+    const win = doc.defaultView;
+    if (opts.shortcuts !== false && win) {
+      this.stopKeyWindow = win;
+      this.stopKeyHandler = (event) => {
+        if (event.repeat) return;
+        const action = stopShortcut(event, isApplePlatform(opts.platform ?? win.navigator.platform));
+        if (!action) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (action === 'stop-all') this.stopAll();
+        else this.hush();
+      };
+      win.addEventListener('keydown', this.stopKeyHandler, true);
+    } else {
+      this.stopKeyWindow = null;
+      this.stopKeyHandler = null;
+    }
   }
 
   hush(): void {
@@ -183,9 +217,15 @@ export class TransportBar {
     this.opts.onHush?.();
   }
 
-  /** `stop {slot}` for every known slot. */
+  /** Stops every slot, including slots that have not appeared in the editor. */
   stopAll(): void {
-    for (const slot of this.slotNames()) this.opts.client.stop(slot);
+    this.opts.client.stopAll();
+    this.opts.onHush?.();
+  }
+
+  /** The distinct transport output states seen, retaining at most 16 transitions. */
+  outputHistory(): readonly string[] {
+    return [...this.outputStates];
   }
 
   /** Tracks one eval reply: pending, then its outcome or "not delivered". */
@@ -268,7 +308,14 @@ export class TransportBar {
 
   /** Per frame: the position and the activity lights. */
   tick(frameMs?: number): void {
-    this.renderPosition(frameMs);
+    const sample = this.opts.sample?.() ?? null;
+    const output = sample?.output ?? 'running';
+    if (this.output() !== output) this.setOutput(output);
+    if (this.outputStates[this.outputStates.length - 1] !== output) {
+      this.outputStates.push(output);
+      if (this.outputStates.length > 16) this.outputStates.shift();
+    }
+    this.renderPosition(frameMs, sample);
     const now = this.opts.clock.now();
     for (const row of this.slots.values()) {
       row.times = row.times.filter((t) => t + ACTIVITY_S > now);
@@ -279,16 +326,17 @@ export class TransportBar {
 
   dispose(): void {
     if (this.evalTimer !== null) this.timers.clear(this.evalTimer);
+    this.stopKeyWindow?.removeEventListener('keydown', this.stopKeyHandler as EventListener, true);
     this.disposeRender();
     this.audio.dispose();
     this.disposeRoot();
     this.el.remove();
   }
 
-  private renderPosition(frameMs?: number): void {
+  private renderPosition(frameMs?: number, transportSample?: TransportSample | null): void {
     if (this.opts.audible && this.opts.sample) {
       const audible = this.opts.audible.sample(frameMs ?? performance.now());
-      const s = this.opts.sample();
+      const s = transportSample === undefined ? this.opts.sample() : transportSample;
       let cycle: number | null = null;
       let beatFlash = false;
       if (audible.valid && s && (!audible.epoch || s.epoch === audible.epoch)) {

@@ -57,8 +57,12 @@ pub enum StagedEffect {
         slot: SlotKey,
         value: Value,
     },
-    /// Stop a slot (`stop :name`, `hush` is `Revoke(All)`).
+    /// Stop one slot with its existing release behavior.
     Revoke(SlotKey),
+    /// Stop every slot, the output and the song gently.
+    StopAll,
+    /// Cut every slot, the output and the song immediately.
+    Cut,
     /// A control-cell update for a late-bound slot (11.3).
     CellUpdate {
         slot: VarSlotRef,

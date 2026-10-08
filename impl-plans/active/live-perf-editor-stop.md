@@ -230,13 +230,18 @@ Write logs to `tmp/live-perf/editor-stop/*.log`.
 
 ## Completion Criteria
 
-- [ ] TASK-T1 to TASK-T4 are done, and all listed tests pass.
-- [ ] `grep -n "Mod-\\." editor/src/code/eval.ts` shows no keymap binding.
-- [ ] Toolbar labels match the design section 6 table exactly.
-- [ ] Verification 1-3 exit 0. The Progress Log is updated.
+- [x] TASK-T1 to TASK-T4 are done, and all listed tests pass.
+- [x] `grep -n "Mod-\\." editor/src/code/eval.ts` shows no keymap binding.
+- [x] Toolbar labels match the design section 6 table exactly.
+- [x] Verification 1-3 exit 0. The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-10-08 (plan authored)
 **Tasks Completed**: plan authored (step 4).
 **Notes**: Not started.
+
+### Session: 2026-10-08 (LP-EDITOR-STOP implementation)
+**Tasks Completed**: TASK-T1 through TASK-T4.
+**Verification**: `cd editor && npm run check` passed (exit 0); focused Vitest passed (81/81); code/UI/protocol Vitest passed (279/279). Final-source logs: `tmp/live-perf/editor-stop/editor-check-final2.log`, `tmp/live-perf/editor-stop/vitest-focused-final2.log`, `tmp/live-perf/editor-stop/vitest-code-ui-protocol-final2.log`, and `tmp/live-perf/editor-stop/eval-keymap-check.log`.
+**Notes**: The app-level capture listener owns both shortcuts, the code keymap binding is removed, stop-all sends one message and clears highlights, toolbar output labels reflect sampled state, and all assigned criteria are complete. Browser style verification remains with LP-EVIDENCE.

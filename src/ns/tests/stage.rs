@@ -57,6 +57,8 @@ fn slot_effects_stage_their_kinds() {
         .map(|e| match e {
             StagedEffect::SlotBind { slot, .. } => format!("bind {}", slot.name()),
             StagedEffect::Revoke(k) => format!("revoke {}", k.name()),
+            StagedEffect::StopAll => "stop-all".into(),
+            StagedEffect::Cut => "cut".into(),
             StagedEffect::OneShot { at, overrides, .. } => {
                 format!("once {:?} {}", at.map(|r| r.to_string()), overrides.len())
             }
@@ -71,7 +73,7 @@ fn slot_effects_stage_their_kinds() {
             "bind drums",
             "revoke d2",
             "revoke drums",
-            "revoke *",
+            "cut",
             "once Some(\"4\") 1",
             "tempo",
             "print 1 2"

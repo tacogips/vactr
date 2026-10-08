@@ -3,6 +3,7 @@ import type { Text } from '@codemirror/state';
 import { CodeSurface } from './surface';
 import { boundary } from './accessibility';
 import type { PhaseTimer } from './frame';
+import { isApplePlatform, stopShortcut } from '../ui/stop-keys';
 
 const words = new Intl.Segmenter(undefined, { granularity: 'word' });
 export function wordRange(text: string, position: number): { from: number; to: number } {
@@ -72,7 +73,8 @@ export interface KeyboardOptions {
   composing?: () => boolean;
   evalSelection?: () => void;
   evalAll?: () => void;
-  hush?: () => void;
+  stopAll?: () => void;
+  cut?: () => void;
   scrollCaret?: () => void;
   phases?: PhaseTimer | null;
 }
@@ -84,9 +86,11 @@ export class KeyboardController {
     this.options.phases?.begin('input');
     try {
     const mod = event.metaKey || event.ctrlKey, key = event.key.toLowerCase();
+    const stopAction = stopShortcut(event, isApplePlatform());
     let handled = true;
     if (mod && key === 'enter') { if (event.shiftKey) this.options.evalAll?.(); else this.options.evalSelection?.(); }
-    else if (mod && key === '.') this.options.hush?.();
+    else if (stopAction === 'stop-all') this.options.stopAll?.();
+    else if (stopAction === 'cut') this.options.cut?.();
     else if (mod && key === 'a') this.surface.dispatch({ selection: { anchor: 0, head: this.surface.state.doc.length } });
     else if (mod && key === 'z') { if (event.shiftKey) this.surface.redo(); else this.surface.undo(); }
     else if (event.ctrlKey && key === 'y') this.surface.redo();

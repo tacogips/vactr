@@ -23,6 +23,7 @@ use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::{CellId, CellRead};
 use crate::dsp::fft::{Fft, FFT_SIZE};
 use crate::dsp::graph::{BusId, InstId};
+use crate::dsp::ramp::{CellRamps, RampedCells};
 use crate::dsp::release::{TagMap, Tombstones};
 use crate::dsp::ring::{
     push_garbage, AckProducer, Budget, ControlSource, Garbage, NativeInstall, Producer, Record,
@@ -36,6 +37,7 @@ use crate::sched::slots::{CtlId, SlotId};
 pub use crate::dsp::ring::{CellStore, Counters, EngineConfig, EngineIo};
 
 mod occupancy;
+mod output;
 mod render;
 mod song;
 mod song_queue;
@@ -68,6 +70,8 @@ pub struct Engine {
     gens: SlotGens,
     buses: BusGraph,
     orbits: Box<[OrbitDelay]>,
+    output: output::OutputStage,
+    ramps: CellRamps,
     pending: Box<[AudioEvent]>,
     n_pending: usize,
     deferred: [(Option<AudioEvent>, Option<VoiceTag>); MAX_DEFERRED_STARTS],
@@ -173,6 +177,8 @@ impl Engine {
             orbits: (0..cfg.orbits.max(1))
                 .map(|_| OrbitDelay::new(secs(cfg.orbit_delay_seconds), mb))
                 .collect(),
+            output: output::OutputStage::new(),
+            ramps: CellRamps::new(cfg.analysis_cells),
             pending: vec![silent; cfg.event_capacity.max(1)].into_boxed_slice(),
             n_pending: 0,
             deferred: [(None, None); MAX_DEFERRED_STARTS],
@@ -263,6 +269,28 @@ impl Engine {
     #[must_use]
     pub fn buses(&self) -> &BusGraph {
         &self.buses
+    }
+
+    #[cfg(test)]
+    pub(crate) fn output_memory_is_clear(&self) -> bool {
+        let (orbits, buses) = self.output_memory_status();
+        orbits.into_iter().all(|clear| clear) && buses.into_iter().all(|clear| clear)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn output_memory_status(&self) -> (Vec<bool>, Vec<bool>) {
+        (
+            self.orbits
+                .iter()
+                .map(crate::dsp::bus::OrbitDelay::memory_is_clear)
+                .collect(),
+            self.buses
+                .slots
+                .iter()
+                .filter(|slot| slot.song_key.is_none())
+                .map(crate::dsp::bus::BusSlot::memory_is_clear)
+                .collect(),
+        )
     }
 
     /// The live template of an instrument.
@@ -394,6 +422,16 @@ impl Engine {
         self.retire_song_runtime(self.frame);
         self.reap_returned_song_epochs();
         self.retire(io);
+        if let Some((phase, frame)) = self.output.pending_report {
+            if io
+                .acks
+                .push_critical(HostMsg::OutputState { phase, frame })
+                .is_ok()
+            {
+                self.output.last_reported = phase;
+                self.output.pending_report = None;
+            }
+        }
         self.publish(io);
         self.blocks += 1;
     }
@@ -532,6 +570,7 @@ impl Engine {
             }
             Record::Msg(CtlMsg::CellRetire { cell, epoch }) => {
                 if cells.retire(cell, epoch) {
+                    self.ramps.drop_cell(cell);
                     if let Some(s) = self.retiring_cells.iter_mut().find(|s| s.is_none()) {
                         *s = Some((cell, epoch));
                     }
@@ -559,6 +598,30 @@ impl Engine {
             }
             Record::Msg(CtlMsg::SampleRetire { resource }) => {
                 self.store.retire(resource);
+            }
+            Record::Msg(CtlMsg::OutputStop { mode }) => {
+                self.output
+                    .stop(mode, self.frame, self.sr, self.cfg.cut_fade_seconds);
+            }
+            Record::Msg(CtlMsg::CellRamp {
+                cell,
+                epoch,
+                seq,
+                target,
+                frames,
+                release,
+            }) => {
+                if cells.live_epoch(cell).is_some_and(|live| live != epoch) {
+                    return;
+                }
+                let current = RampedCells::new(&self.ramps, cells, self.frame).get(cell);
+                if self.ramps.apply(
+                    cell, epoch, seq, target, frames, release, self.frame, current,
+                ) {
+                    ack(HostMsg::CellRampAck { cell, seq });
+                } else {
+                    self.counters.dropped = self.counters.dropped.saturating_add(1);
+                }
             }
             Record::Msg(
                 CtlMsg::CellBatch { .. } | CtlMsg::GraphInstall { .. } | CtlMsg::SampleSlice { .. },

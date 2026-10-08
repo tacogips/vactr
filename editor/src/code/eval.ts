@@ -6,7 +6,7 @@
 //   the next such line, minus trailing blank lines. The session selects
 //   the forms inside it (14.5.4).
 // - `Mod-Shift-Enter` evaluates the whole document (no span).
-// - `Mod-.` sends `hush`.
+// - Stop and cut shortcuts are handled once by the app-level transport bar.
 //
 // `eval` always carries the full text, the revision and the epoch (the
 // client flushes the pending `doc-changed` first). The span flashes for
@@ -87,7 +87,6 @@ export class EvalController {
     this.removeKeymap = surface.addKeymap([
       { key: 'Mod-Enter', run: () => this.evalAtCursor() !== null },
       { key: 'Mod-Shift-Enter', run: () => this.evalAll() !== null },
-      { key: 'Mod-.', run: () => (this.hush(), true) },
     ], 'default');
   }
 
@@ -115,7 +114,7 @@ export class EvalController {
     return this.watch(reply);
   }
 
-  /** `Mod-.`. */
+  /** Sends `hush` for callers that explicitly request an immediate cut. */
   hush(): void {
     this.opts.client.hush();
     this.opts.onHush?.();

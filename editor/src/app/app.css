@@ -286,6 +286,10 @@
   color: var(--vt-danger);
 }
 
+.vact-stop-all[data-output='draining'] {
+  color: var(--vt-accent);
+}
+
 .vact-hush {
   color: var(--vt-warn);
 }

@@ -4,6 +4,7 @@ use crate::dsp::cells::CellRead;
 use crate::dsp::effects::prim::{balance_gains, pan_gains};
 use crate::dsp::effects::FxCtx;
 use crate::dsp::fft::FFT_SIZE;
+use crate::dsp::ramp::RampedCells;
 use crate::dsp::ugen::Template;
 use crate::dsp::voice::{self, RenderCtx, Voice};
 
@@ -16,6 +17,7 @@ impl Engine {
         n: usize,
         channels: usize,
     ) {
+        let skip_effects = self.output.skips_effects();
         self.buses.clear(n);
         if let Some(input) = input {
             let master = self.buses.master();
@@ -149,12 +151,12 @@ impl Engine {
                 }
             }
         }
-        let m = buses.master();
-        for o in orbits.iter_mut() {
-            let slot = &mut buses.slots[m];
-            o.run(n, *sr, &mut slot.l, &mut slot.r);
-        }
-        {
+        if !skip_effects {
+            let m = buses.master();
+            for o in orbits.iter_mut() {
+                let slot = &mut buses.slots[m];
+                o.run(n, *sr, &mut slot.l, &mut slot.r);
+            }
             let scope = store.song_read_scope(None);
             let mut fx = FxCtx {
                 sr: *sr,
@@ -166,15 +168,33 @@ impl Engine {
                 stats: &mut stats,
             };
             buses.render(n, cells, dry, &mut fx, &mut mix_l[..n], &mut mix_r[..n]);
+        } else {
+            buses.clear(n);
+            mix_l[..n].fill(0.0);
+            mix_r[..n].fill(0.0);
         }
         self.counters.fx = stats;
-        if let Err(reason) = self.render_song_branches(cells, n) {
-            let _ = reason;
-            self.fault(FaultCode::BadResource, 0);
+        if !skip_effects {
+            if let Err(reason) = self.render_song_branches(cells, n) {
+                let _ = reason;
+                self.fault(FaultCode::BadResource, 0);
+            }
         }
         let mut energy = 0.0;
+        let mut peak = 0.0f32;
         for k in 0..n {
-            let (l, r) = (guard(self.mix_l[k]), guard(self.mix_r[k]));
+            let gain = self.output.gate_sample();
+            let mut l = guard(self.mix_l[k]);
+            let mut r = guard(self.mix_r[k]);
+            let mut stem_l = guard(self.mix_3[k]);
+            let mut stem_r = guard(self.mix_4[k]);
+            if gain != 1.0 {
+                l *= gain;
+                r *= gain;
+                stem_l *= gain;
+                stem_r *= gain;
+            }
+            peak = peak.max(l.abs()).max(r.abs());
             if let Some(o) = out.get_mut(channels * k) {
                 *o = l;
             }
@@ -182,17 +202,136 @@ impl Engine {
                 *o = r;
             }
             if channels == 4 {
-                out[4 * k + 2] = guard(self.mix_3[k]);
-                out[4 * k + 3] = guard(self.mix_4[k]);
+                out[4 * k + 2] = stem_l;
+                out[4 * k + 3] = stem_r;
             }
             let mono = 0.5 * (l + r);
             energy += mono * mono;
             self.master_ring[self.ring_pos] = mono;
             self.ring_pos = (self.ring_pos + 1) % FFT_SIZE;
         }
+        let clear_done = if matches!(
+            self.output.phase,
+            output::Phase::ClearingCut | output::Phase::ClearingIdle
+        ) {
+            self.clear_output_memory(n)
+        } else {
+            false
+        };
+        let end_frame = self.frame.saturating_add(n as u64);
+        self.output.after_block(
+            peak,
+            self.pool.active() > 0,
+            self.song_runtime
+                .as_ref()
+                .is_some_and(|r| r.has_live_branches()),
+            end_frame,
+            n,
+            self.sr,
+            &self.cfg,
+            clear_done,
+        );
+        self.buses.hold_retiring(matches!(
+            self.output.phase,
+            output::Phase::Draining | output::Phase::ClearingIdle
+        ));
         #[allow(clippy::cast_precision_loss)]
         let rms = (energy / n.max(1) as f32).sqrt();
         self.sigs.amp += 0.2 * (rms - self.sigs.amp);
+    }
+
+    fn clear_output_memory(&mut self, frames: usize) -> bool {
+        let budget = (frames.saturating_mul(self.cfg.clear_samples_per_quantum) / 128).max(1);
+        let mut left = budget;
+        let mut did_work = false;
+        while left > 0 {
+            if self.output.clear.orbit < self.orbits.len() {
+                let index = self.output.clear.orbit;
+                let len = self.orbits[index].memory_len();
+                let count = self.orbits[index].clear_memory(self.output.clear.offset, left);
+                left = left.saturating_sub(count);
+                did_work |= count > 0;
+                self.output.clear.offset = self.output.clear.offset.saturating_add(count);
+                if self.output.clear.offset >= len {
+                    self.output.clear.orbit += 1;
+                    self.output.clear.offset = 0;
+                } else if count == 0 {
+                    break;
+                }
+                continue;
+            }
+            while self.output.clear.bus < self.buses.slots.len() {
+                let slot = &self.buses.slots[self.output.clear.bus];
+                if slot.song_key.is_some()
+                    || !matches!(
+                        slot.state,
+                        crate::dsp::bus::SlotState::Live | crate::dsp::bus::SlotState::Retiring
+                    )
+                {
+                    self.output.clear.bus += 1;
+                    self.output.clear.offset = 0;
+                    self.output.clear.region = 0;
+                    self.output.clear.reinitializing = false;
+                } else {
+                    break;
+                }
+            }
+            if self.output.clear.bus >= self.buses.slots.len() {
+                return true;
+            }
+            let index = self.output.clear.bus;
+            if !self.output.clear.reinitializing {
+                let len = self.buses.clear_len(index);
+                let count = self
+                    .buses
+                    .clear_slot_memory(index, self.output.clear.offset, left);
+                left = left.saturating_sub(count);
+                self.output.clear.offset = self.output.clear.offset.saturating_add(count);
+                did_work |= count > 0;
+                if self.output.clear.offset >= len {
+                    self.output.clear.reinitializing = true;
+                    self.output.clear.region = 0;
+                } else if count == 0 {
+                    break;
+                }
+                continue;
+            }
+
+            let Some(region_len) = self.buses.clear_region_len(index, self.output.clear.region)
+            else {
+                self.output.clear.bus += 1;
+                self.output.clear.offset = 0;
+                self.output.clear.region = 0;
+                self.output.clear.reinitializing = false;
+                continue;
+            };
+            if region_len > left && did_work {
+                break;
+            }
+            let sr = self.sr;
+            let caps = &self.cfg.caps;
+            let initialized =
+                self.buses
+                    .reinitialize_clear_region(index, self.output.clear.region, sr, caps);
+            if initialized.is_none() {
+                break;
+            }
+            self.output.clear.region += 1;
+            if self
+                .buses
+                .clear_region_len(index, self.output.clear.region)
+                .is_none()
+            {
+                self.output.clear.bus += 1;
+                self.output.clear.offset = 0;
+                self.output.clear.region = 0;
+                self.output.clear.reinitializing = false;
+            }
+            // Re-initialization is limited to one carved region per block.
+            break;
+        }
+        self.output.clear.orbit >= self.orbits.len()
+            && self.output.clear.bus >= self.buses.slots.len()
     }
 }
 
@@ -289,6 +428,7 @@ impl Engine {
         if let Some(tag) = tag {
             let _ = self.tags.insert(tag, u32::try_from(vi).unwrap_or(u32::MAX));
         }
+        self.output.admit(self.frame.saturating_add(delay as u64));
         self.choke_cut_group(vi);
     }
 
@@ -338,13 +478,16 @@ impl Engine {
         channels: usize,
     ) {
         let _ = self.apply_song_runtime_frame(self.frame, io.acks);
+        let mut ramps = std::mem::take(&mut self.ramps);
+        ramps.reap(self.frame);
+        let cells = RampedCells::new(&ramps, io.cells, self.frame);
         for i in 0..MAX_DEFERRED_STARTS {
             if self.pool.free().is_none() {
                 break;
             }
             if let (Some(ev), tag) = self.deferred[i] {
                 self.deferred[i] = (None, None);
-                self.start(&ev, tag, 0, io.cells);
+                self.start(&ev, tag, 0, &cells);
             }
         }
         while self.n_pending < self.pending.len() {
@@ -378,9 +521,10 @@ impl Engine {
                 let f = ((ev.time - start) * f64::from(self.sr)).round() as usize;
                 f.min(n - 1)
             };
-            self.start(&ev, None, delay, io.cells);
+            self.start(&ev, None, delay, &cells);
         }
-        self.render(io.cells, input, out, n, channels);
+        self.render(&cells, input, out, n, channels);
+        self.ramps = ramps;
         self.frame += n as u64;
     }
 }

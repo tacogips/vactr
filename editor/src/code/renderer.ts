@@ -64,6 +64,8 @@ export class CanvasRenderer {
   private backgroundKey = '';
   private backgroundStaticCount = 0;
   private overlayKey = '';
+  private overlayStaticCount = 0;
+  private overlayTextStaticCount = 0;
   private readonly segments = new SegmentCache<DrawCommand[]>();
   private readonly pendingSegments = new Set<string>();
   private readonly gutterIdentities = new Map<number, readonly ShapedRun[]>();
@@ -227,6 +229,8 @@ export class CanvasRenderer {
         if (layer === 'background') {
           if (backgroundStaticDirty) writer.clear(); else writer.setCount(this.backgroundStaticCount);
         } else if (overlayDirty) writer.clear();
+        else if (layer === 'overlay') writer.setCount(this.overlayStaticCount);
+        else if (layer === 'overlayText') writer.setCount(this.overlayTextStaticCount);
       }
       const rebuildText = this.textCommands === null || this.cacheKey !== key;
       this.currentLayer = 'background';
@@ -273,6 +277,21 @@ export class CanvasRenderer {
         const r = this.layout.coordsAtPos(handle.pos, this.view); if (!r) continue;
         const x = r.left - (this.view.left ?? 0), y = (handle.end ? r.bottom : r.top) - (this.view.top ?? 0);
         this.quad({ left: x - 5, right: x + 5, top: y - 4, bottom: y + 6 }, this.palette.handle);
+      }
+      if (overlayDirty) {
+        this.overlayStaticCount = this.writers.get('overlay')!.count;
+        this.overlayTextStaticCount = this.writers.get('overlayText')!.count;
+      }
+      const momentary = (feedback.animated ?? []).filter(a => a.kind === 'momentary' && a.label);
+      if (momentary.length) {
+        this.currentLayer = 'overlay';
+        for (const a of momentary) {
+          const r = this.layout.coordsAtPos(a.to, this.view); if (!r) continue;
+          const x = r.left - (this.view.left ?? 0) + 3, y = r.top - (this.view.top ?? 0);
+          const width = Math.min(256, Math.max(16, a.label!.length * 8 + 8));
+          this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
+          this.currentLayer = 'overlayText'; this.drawRun(this.labelRun(a.label!, width), x + 4, y, [], rgbaCss(this.palette.labelText)); this.currentLayer = 'overlay';
+        }
       }
       if (overlayDirty) this.overlayKey = overlayKey;
       this.collecting = null; this.flushLayers(backgroundStaticDirty, overlayDirty);
@@ -521,6 +540,10 @@ export class CanvasRenderer {
           this.backgroundStaticCount * 32, writer.bytes().subarray(this.backgroundStaticCount * 32));
       } else if (layer === 'overlay' || layer === 'overlayText') {
         if (overlayDirty) this.layerBuffers.get(layer)!.upload(writer.bytes());
+        else if (writer.count > (layer === 'overlay' ? this.overlayStaticCount : this.overlayTextStaticCount)) {
+          const offset = (layer === 'overlay' ? this.overlayStaticCount : this.overlayTextStaticCount) * 32;
+          this.layerBuffers.get(layer)!.uploadRange(offset, writer.bytes().subarray(offset));
+        }
       } else if (this.textLayerDirty) {
         this.layerBuffers.get(layer)!.upload(writer.bytes());
       }

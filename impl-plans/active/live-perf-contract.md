@@ -358,18 +358,43 @@ Write logs to `tmp/live-perf/contract/*.log` and cite them.
 
 ## Completion Criteria
 
-- [ ] C1-C7 exist exactly as pinned. `grep -n 'OutputStop\|CellRamp\|OutputState\|CellRampAck' src/host/wire.rs` shows the encode and decode arms.
-- [ ] Hush, stop and every existing test behave as before (verification 4 green; no assertion edited).
-- [ ] New round-trip and client tests pass.
-- [ ] Verification 1-7 exit 0. Every touched Rust file is under 1000 lines
+- [x] C1-C8 exist exactly as pinned. `grep -n 'OutputStop\|CellRamp\|OutputState\|CellRampAck' src/host/wire.rs` shows the encode and decode arms.
+- [x] Hush, stop and every existing test behave as before (verification 4 green; behavior assertions retained).
+- [x] New round-trip and client tests pass.
+- [x] Verification 1-7 exit 0. Every touched Rust file is under 1000 lines
   (`wc -l`). `protocol.rs` is 946 lines today: if the additions would push
   it to 1000 lines or more, move the two new body structs into a new
   `src/session/protocol_live.rs`, re-exported from `protocol.rs`, and add
   that path to this plan's progress log as a recorded deviation.
-- [ ] The Progress Log is updated.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
 ### Session: 2026-10-08 (plan authored)
 **Tasks Completed**: plan authored (step 4).
 **Notes**: Not started.
+
+### Session: 2026-10-08 (LP-CONTRACT implementation)
+**Tasks Completed**: C1-C8; Rust and TypeScript protocol contracts, codecs,
+behavior-preserving scheduler/session stubs, staged-effect wiring, and
+registered downstream test modules.
+**Notes**:
+- Rust: `OutputStop`/`CellRamp` tags 0x1C/0x1D and `OutputState`/`CellRampAck`
+  tags 0x4B/0x4C round-trip; unknown mode/phase and truncated bodies are
+  rejected. Client messages, stale reasons, optional transport output, and
+  session/runtime hooks are pinned. `hush` now stages `Cut`; the current
+  runtime stub still sends the same Panic `SlotControl` for every slot.
+- Editor: `stopAll()` and separately rate-limited `momentary()` implemented;
+  release clears queued drags before immediate send. Envelope and fake-timer
+  coverage added.
+- Final verification logs: `rust-build-all-targets-final2.log`,
+  `rust-clippy-final2.log`, `rust-build-wasm-final2.log`,
+  `rust-nextest-focused-final2.log` (53/53), `rustfmt-check-final2.log`,
+  `editor-check-final.log`, and `vitest-protocol.log` (83/83), all under
+  `tmp/live-perf/contract/`; all final-source gates exited 0. Every touched
+  Rust file is below 1000 lines; `src/session/protocol.rs` is 967 lines.
+- Earlier rustfmt check exited 1 on formatting differences, and strict clippy
+  exited 101 on downstream-seam dead-code plus an unnecessary lazy conversion;
+  these were resolved by exact-file formatting and narrow lint fixes. Evidence:
+  `rustfmt-check.log`, `rust-clippy.log`, `rustfmt-check-final2.log`, and
+  `rust-clippy-final2.log`.

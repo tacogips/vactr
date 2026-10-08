@@ -4,6 +4,7 @@ use crate::host::caps::{
     AudioHost, SongHostPreparation, SongPreparationLimits, SongPreparationProgress,
     SongPreparationRefusal, SongReadyBundle, SongSubmitError,
 };
+use crate::host::wire::OutputMode;
 use crate::sched::song::{SongTransport, SongTransportRefusal, SongTransportState};
 use crate::song::routing::{SongClockRequest, SongCommand, SongHostAck, SongHostClock, SongMute};
 use crate::song::snapshot::FrozenSound;
@@ -453,6 +454,58 @@ impl Runtime {
             published_state: None,
         });
         Ok(())
+    }
+    pub(crate) fn stop_song(&mut self, mode: OutputMode, rep: &mut DrainReport) {
+        let Some((activation, state)) = self
+            .song
+            .owners
+            .last()
+            .map(|owner| (owner.activation, owner.transport.state()))
+        else {
+            return;
+        };
+        let observed_clock = self.hosts.audio.song_clock().ok().or(self.song.clock);
+        let sample_rate = observed_clock.map_or(self.cfg.sample_rate, |clock| clock.sample_rate);
+        let now_frame = observed_clock.map_or_else(
+            || {
+                let now = self.hosts.audio.now() * f64::from(sample_rate);
+                if now.is_finite() {
+                    now.round().clamp(0.0, u64::MAX as f64) as u64
+                } else {
+                    0
+                }
+            },
+            |clock| clock.frame,
+        );
+        let Some(owner) = self.song.owners.last() else {
+            return;
+        };
+        let old = owner.transport.endpoints();
+        let lead_frames = (self.cfg.commit_lead * f64::from(sample_rate))
+            .round()
+            .max(0.0) as u64;
+        let Some(endpoints) =
+            super::live::stop_endpoints(mode, state, now_frame, lead_frames, activation, old)
+        else {
+            return;
+        };
+        let Some(owner) = self.song.owners.last_mut() else {
+            return;
+        };
+        if let Err(refusal) = owner.transport.cutoff(self.hosts.audio.as_mut(), endpoints) {
+            let failure = match refusal.error {
+                SongSubmitError::Invalid(failure) => failure,
+                SongSubmitError::Backpressure => Failure::new(
+                    FailCode::BeyondCapability,
+                    "song stop command was refused by host backpressure",
+                ),
+                SongSubmitError::Unavailable => Failure::new(
+                    FailCode::HostUnavailable,
+                    "song stop command is unavailable on this host",
+                ),
+            };
+            rep.faults.push(failure);
+        }
     }
     pub fn song_state(&self) -> Option<SongTransportState> {
         self.song

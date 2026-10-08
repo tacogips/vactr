@@ -19,6 +19,7 @@ pub mod graph;
 pub mod meta;
 pub mod offline;
 pub mod ported;
+pub mod ramp;
 pub mod release;
 pub mod ring;
 pub(crate) mod song;

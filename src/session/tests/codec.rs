@@ -68,6 +68,7 @@ fn clients() -> Vec<ClientMsg> {
             edit_epoch: 0,
         }),
         ClientMsg::Hush(Empty {}),
+        ClientMsg::StopAll(Empty {}),
         ClientMsg::Stop(StopBody {
             slot: "d2".to_string(),
         }),
@@ -91,6 +92,22 @@ fn clients() -> Vec<ClientMsg> {
             form_gen: 7,
             value: WireNum::Float(0.5),
             edit_epoch: 2,
+        }),
+        ClientMsg::Momentary(MomentaryBody {
+            file: "main.vact".to_string(),
+            id: 4,
+            form_gen: 7,
+            edit_epoch: 2,
+            target: None,
+            ramp_ms: 1000,
+        }),
+        ClientMsg::Momentary(MomentaryBody {
+            file: "main.vact".to_string(),
+            id: 5,
+            form_gen: 7,
+            edit_epoch: 2,
+            target: Some(WireNum::Float(0.25)),
+            ramp_ms: 30,
         }),
         ClientMsg::DocChanged(DocChangedBody {
             file: "main.vact".to_string(),
@@ -252,6 +269,16 @@ fn servers() -> Vec<ServerMsg> {
             reason: StaleReason::UnreconciledEdit,
             current_form_gen: None,
         }),
+        ServerMsg::StaleBinding(StaleBindingBody {
+            target: StaleTarget::Id(1),
+            reason: StaleReason::MomentaryIneligible,
+            current_form_gen: None,
+        }),
+        ServerMsg::StaleBinding(StaleBindingBody {
+            target: StaleTarget::Id(1),
+            reason: StaleReason::MomentaryCapacity,
+            current_form_gen: None,
+        }),
         ServerMsg::DirectiveEdit(DirectiveEditBody {
             file: "main.vact".to_string(),
             doc_revision: 3,
@@ -395,6 +422,24 @@ fn the_wire_shape_matches_command_md() {
             ..
         }))
     ));
+}
+
+#[test]
+fn momentary_requires_ramp_and_transport_output_is_optional() {
+    assert_eq!(
+        code_of(
+            r#"{"v":1,"seq":1,"kind":"momentary","body":{"file":"a","id":1,"form_gen":1,"edit_epoch":0,"target":null}}"#
+        ),
+        ErrorCode::BadBody
+    );
+
+    let sample: TransportSample = serde_json::from_str(
+        r#"{"epoch":"e","sample_time":0.0,"cycle":[0,1],"bpm":120.0,"beats_per_cycle":4.0,"running":true,"latency_seconds":null,"latency_kind":"unavailable","uncertainty_seconds":null}"#,
+    )
+    .expect("legacy transport sample decodes");
+    assert_eq!(sample.output, None);
+    let encoded = serde_json::to_value(sample).expect("transport serializes");
+    assert!(encoded.get("output").is_none());
 }
 
 #[test]

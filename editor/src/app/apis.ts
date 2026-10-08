@@ -7,6 +7,10 @@ import type { EditorState, Transaction, TransactionSpec, ChangeSet } from '@code
 import type { InstrumentSelector, Span, WireSite } from '../protocol/types';
 import type { NumericGesture } from '../code/pointer';
 
+export interface MomentaryGesture { move(clientY: number): void; end(snap: boolean): void }
+export interface MomentaryStart { pos: number; clientY: number; kind: 'mouse' | 'touch' }
+export interface MomentaryProvider { hit(pos: number): boolean; begin(start: MomentaryStart): MomentaryGesture | null }
+
 export interface SongControls {
   applyWholeCode(): Promise<void>;
   muteInstrument(selector: InstrumentSelector, muted: boolean): Promise<void>;
@@ -36,7 +40,7 @@ export interface ResourceBudget {
 export interface CodeRange { from: number; to: number }
 export interface CodeRect { left: number; right: number; top: number; bottom: number }
 export interface CodeAnnotation extends CodeRange {
-  kind: 'syntax' | 'selection' | 'playing' | 'eval' | 'diagnostic' | 'binding' | 'composition' | 'call-head';
+  kind: 'syntax' | 'selection' | 'playing' | 'eval' | 'diagnostic' | 'binding' | 'composition' | 'call-head' | 'momentary';
   className?: string;
   label?: string;
 }
@@ -63,6 +67,12 @@ export interface CodeSurface {
   onBlur(cb: () => void): () => void;
   onCompositionStart(cb: () => void): () => void;
   registerNumericDrag(provider: (event: PointerEvent, pos: number) => NumericGesture | null): () => void;
+  registerMomentaryDrag(provider: MomentaryProvider): () => void;
+  momentaryHit(pos: number): boolean;
+  momentaryDrag(start: MomentaryStart): MomentaryGesture | null;
+  registerAnimated(owner: string, rows: (frameMs: number) => readonly CodeAnnotation[]): { wake(): void; dispose(): void };
+  onAnimatedWake(cb: () => void): () => void;
+  animatedRows(frameMs: number): CodeAnnotation[];
   readonly compositionRange: CodeRange | null;
   /** Defer overlapping writes until composition ends; callback revalidates site/text. */
   deferSourceWrite(range: CodeRange, write: () => void): void;

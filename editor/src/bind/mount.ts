@@ -17,6 +17,8 @@ import { DOC_FILE } from '../code/mount';
 import type { EditorDecl, EvalResultBody, WireForm } from '../protocol/types';
 import { ControlPanel } from './directives';
 import { DragController } from './drag';
+import { MomentaryController } from './momentary';
+import { mountGlideSetting, readGlide } from './glide-setting';
 import { formatValue, SliderPanel } from './panel';
 import type { PanelViewport } from './panel';
 import { Persistence, type PersistenceMode } from './persistence';
@@ -71,6 +73,11 @@ export class BindArea {
   private readonly offs: (() => void)[] = [];
   private readonly stylesheet: HTMLLinkElement | null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private glide = readGlide();
+  private momentary!: MomentaryController;
+  private glideSetting?: { dispose(): void };
+  private unregisterMomentary?: () => void;
+  private animatedMomentary?: { wake(): void; dispose(): void };
 
   constructor(root: HTMLElement, deps: EditorDeps, code: CodeApi, opts: BindOptions = {}) {
     this.deps = deps;
@@ -127,6 +134,16 @@ export class BindArea {
       editors: () => this.editors(),
       overlay: (id) => this.writer.overlay(id),
     });
+    this.momentary = new MomentaryController({ table: this.table, editors: () => this.editors(),
+      send: (id, fg, target, ms) => client.momentary(this.file, id, fg, target, ms),
+      glideMs: () => this.glide, now: () => performance.now(), notice: (m) => this.notice(m) });
+    this.unregisterMomentary = this.surface.registerMomentaryDrag({ hit: (pos) => this.momentary.hit(pos),
+      begin: (start) => {
+        const gesture = this.momentary.begin(start); if (!gesture) return null;
+        this.animatedMomentary?.wake();
+        return { move: (y) => gesture.move(y), end: (snap) => { gesture.end(snap); this.animatedMomentary?.wake(); } };
+      } });
+    this.animatedMomentary = this.surface.registerAnimated('momentary', (frameMs) => this.momentary.rows(frameMs));
 
     // The table's subscription first: a `bindings` batch re-keys before rows repaint.
     this.offs.push(
@@ -141,12 +158,14 @@ export class BindArea {
         }
         if (sites.length === 0) return;
         const r = this.table.applySites(sites, client.document(this.file).baseRevision);
+        this.momentary.refresh();
         this.panel.applyRefresh(r, changed);
         this.writer.afterRefresh(r.changed);
       }),
     );
 
     const right = buildLayout(root).right;
+    this.glideSetting = mountGlideSetting(right, (ms) => { this.glide = ms; });
     this.panel = new SliderPanel(right, {
       store,
       table: this.table,
@@ -178,7 +197,10 @@ export class BindArea {
       }),
       client.on('bindings', () => this.panel.addNames()),
       client.on('stale-binding', (env) => {
-        if (env.kind === 'stale-binding') this.writer.onStale(env.body);
+        if (env.kind === 'stale-binding') {
+          this.writer.onStale(env.body);
+          if (env.body.reason === 'momentary-ineligible' || env.body.reason === 'momentary-capacity') this.notice(`momentary tweak rejected: ${env.body.reason}`);
+        }
       }),
       client.on('directive-edit', (env) => {
         // A learn reply is applied by the learn itself; only unsolicited edits here.
@@ -236,6 +258,7 @@ export class BindArea {
     if (this.timer !== null) clearInterval(this.timer);
     for (const off of this.offs) off();
     this.router.dispose();
+    this.unregisterMomentary?.(); this.animatedMomentary?.dispose(); this.glideSetting?.dispose();
     this.panel.dispose();
     this.control.dispose();
     this.stylesheet?.remove();
@@ -253,6 +276,7 @@ export class BindArea {
     this.forms = body.forms;
     this.router.onEval();
     const r = this.table.applyEval(body.sites, body.doc_revision);
+    this.momentary.refresh();
     this.persistence.set.renameAll(r.migrated.map(([, from, to]) => [from, to]));
     for (const id of r.removed) this.writer.forget(id);
     this.owners = this.computeOwners(body);

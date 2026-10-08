@@ -156,7 +156,7 @@ pub fn site_wire(ev: &Evaluator, site: &TweakSite, key: Option<String>, doc: &Do
         span: wire_span(site.span),
         tier,
         origin,
-        value: num_f64(&site.slot.get()),
+        value: num_f64(&site.slot.base()),
         form_gen: site.form_gen.get(),
         key,
         call: call_of(doc, site.span),
@@ -476,6 +476,7 @@ impl Session {
             let routed = self.route(conn.unwrap_or(0), None, vec![msg]);
             out.extend(routed);
         }
+        self.momentary_tick(host_now);
         let drained = self.rt.drain(&mut self.ev);
         let rep = self.rt.tick(&mut self.ev, host_now);
         out.extend(self.publish_song_notices());
@@ -616,6 +617,7 @@ impl Session {
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.to_f64(),
                 running: !frozen && !lost,
+                output: self.rt.output.wire(),
                 latency_seconds: self
                     .observed_clock
                     .and_then(|reading| reading.latency_seconds),

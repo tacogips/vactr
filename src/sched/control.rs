@@ -70,6 +70,7 @@ pub struct ControlChannel {
     slots: BTreeMap<SlotId, SlotEntries>,
     resend_ticks: u32,
     diag_ticks: u32,
+    pending_transport_diagnostic: Option<Diagnostic>,
 }
 
 fn nowhere() -> Span {
@@ -89,7 +90,17 @@ impl ControlChannel {
             slots: BTreeMap::new(),
             resend_ticks: resend_ticks.max(1),
             diag_ticks: diag_ticks.max(1),
+            pending_transport_diagnostic: None,
         }
+    }
+
+    /// Queues one bounded output-transport diagnostic for the next tick.
+    pub(crate) fn report_transport(&mut self, message: String) {
+        self.pending_transport_diagnostic = Some(Diagnostic::error(
+            DiagCode::HostTransport,
+            nowhere(),
+            message,
+        ));
     }
 
     /// Queues an immediate control, merged into the outstanding one, and
@@ -155,7 +166,11 @@ impl ControlChannel {
     /// One tick: re-sends unacknowledged entries in effective-time order,
     /// reports persistent loss and missed deadlines.
     pub fn tick(&mut self, host_now: f64, hosts: &mut Hosts) -> Vec<Diagnostic> {
-        let mut diags = Vec::new();
+        let mut diags = self
+            .pending_transport_diagnostic
+            .take()
+            .into_iter()
+            .collect::<Vec<_>>();
         let (resend, diag) = (self.resend_ticks, self.diag_ticks);
         for s in self.slots.values_mut() {
             let name = s.key.map_or_else(|| "?".to_string(), SlotKey::name);
@@ -202,6 +217,20 @@ impl ControlChannel {
             }
         }
         diags
+    }
+
+    /// Whether an outstanding slot control has already reported transport loss.
+    pub(crate) fn transport_reported(&self) -> bool {
+        self.slots.values().any(|slot| {
+            slot.immediate.is_some_and(|entry| entry.reported)
+                || slot.future.is_some_and(|entry| entry.reported)
+        })
+    }
+
+    pub(crate) fn has_outstanding(&self) -> bool {
+        self.slots
+            .values()
+            .any(|slot| slot.immediate.is_some() || slot.future.is_some())
     }
 
     /// The outstanding entry of a class.
@@ -270,10 +299,19 @@ impl Runtime {
 
     /// `stop` (Natural) or `hush` (every slot, Panic) (11.3).
     pub(crate) fn revoke(&mut self, key: SlotKey) {
+        let release = match key {
+            SlotKey::All => Release::Panic,
+            _ => Release::Natural,
+        };
+        let _ = self.revoke_with(key, release);
+    }
+
+    /// Revokes a slot or every slot using the requested voice release mode.
+    pub(crate) fn revoke_with(&mut self, key: SlotKey, release: Release) -> f64 {
         let (now, _) = self.now_pos();
-        let (keys, release) = match key {
-            SlotKey::All => (self.slots.keys(), Release::Panic),
-            k => (vec![k], Release::Natural),
+        let keys = match key {
+            SlotKey::All => self.slots.keys(),
+            k => vec![k],
         };
         for k in keys {
             let Some(slot) = self.slots.get_mut(k) else {
@@ -309,6 +347,7 @@ impl Runtime {
                 self.slots.remove(k);
             }
         }
+        now
     }
 
     /// The MIDI side of the always-on late-start recovery: every committed

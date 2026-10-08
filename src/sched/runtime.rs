@@ -10,6 +10,7 @@
 //! then run due `at` thunks. Logical time is `Ratio64`; host seconds appear
 //! only at the host boundary and in commit.
 
+mod live;
 mod song;
 pub use song::SongNotice;
 use std::cell::RefCell;
@@ -157,6 +158,8 @@ pub struct Runtime {
     pub(crate) cells: ControlCells,
     pub(crate) input: InputCells,
     pub(crate) control: ControlChannel,
+    pub(crate) output: live::OutputTracker,
+    pub(crate) ramps: crate::sched::ramps::RampSender,
     pub(crate) samples: SampleTable,
     pub(crate) telemetry: Telemetry,
     pub(crate) announcer: Announcer,
@@ -243,6 +246,8 @@ impl Runtime {
             .expect("the default tempo has a finite cps");
         let rt = Runtime {
             control: ControlChannel::new(cfg.resend_ticks, cfg.transport_diag_ticks),
+            output: live::OutputTracker::default(),
+            ramps: crate::sched::ramps::RampSender::default(),
             commit_lead: cfg.commit_lead,
             cfg,
             hosts,
@@ -382,6 +387,8 @@ impl Runtime {
                 let now = self.hosts.audio.now();
                 self.close_live_notes(key, now);
             }
+            StagedEffect::StopAll => self.stop_all(ev, rep),
+            StagedEffect::Cut => self.cut(ev, rep),
             StagedEffect::CellUpdate { slot, .. } => {
                 self.cells.write_slot(&slot);
                 self.invalidate_uncommitted();
@@ -544,6 +551,7 @@ impl Runtime {
     pub fn tick(&mut self, ev: &mut Evaluator, host_now: f64) -> TickReport {
         let mut rep = TickReport::default();
         self.take_host_msgs(&mut rep);
+        self.output_tick();
         self.tick_song(&mut rep);
         self.poll_captures(&mut rep.faults);
         // MIDI input: cc cells, clock slave pulses and transport (11.7).
@@ -615,6 +623,8 @@ impl Runtime {
                         "unsolicited song acknowledgment in legacy-only runtime",
                     ));
                 }
+                HostMsg::OutputState { phase, frame } => self.output.observe(phase, frame),
+                HostMsg::CellRampAck { cell, seq } => self.ramps.on_ack(cell, seq),
                 HostMsg::SlotControlAck(a) => self.control.ack(a),
                 HostMsg::CellInitAck { .. }
                 | HostMsg::CellBatchAck { .. }

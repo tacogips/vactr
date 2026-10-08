@@ -20,6 +20,7 @@ pub mod console;
 pub mod editors;
 pub mod eval;
 mod frontend;
+mod momentary;
 pub mod protocol;
 pub mod publish;
 pub mod repl;

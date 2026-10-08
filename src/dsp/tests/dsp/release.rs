@@ -176,3 +176,82 @@ fn natural_releases_open_voices_and_panic_gates_them() {
     let _ = rig.run(2);
     assert!(voice_of(&rig, b).is_none(), "gone within 3 ms");
 }
+
+#[test]
+fn natural_releases_scheduled_voice_before_its_legato_gate_ends() {
+    let mut rig = pad();
+    let mut ev = AudioEvent::new(rig.engine.now(), SlotId::new(1), 1, InstId::new(1));
+    for (id, value) in [
+        (ctl::ATTACK, 0.001),
+        (ctl::DECAY, 0.01),
+        (ctl::SUSTAIN, 0.8),
+        (ctl::RELEASE, 0.05),
+        (ctl::LEGATO, 2.0),
+    ] {
+        ev.push_ctl(id, Ctl::Const(value)).expect("fits");
+    }
+    rig.send(ev);
+    let _ = rig.run(4);
+    assert!(rig
+        .engine
+        .voices()
+        .voices
+        .iter()
+        .any(|voice| voice.active && voice.gate_left > 0));
+    rig.post(CtlMsg::SlotControl(SlotControl {
+        slot: SlotId::new(1),
+        new_gen: 2,
+        effective_time: rig.engine.now(),
+        release: Release::Natural,
+    }));
+    let _ = rig.step();
+    let voice = rig
+        .engine
+        .voices()
+        .voices
+        .iter()
+        .find(|voice| voice.active)
+        .expect("scheduled voice active");
+    assert!(voice.released() && !voice.open);
+    let _ = rig.run(30);
+    assert_eq!(
+        rig.engine.active_voices(),
+        0,
+        "release ends before the two-second gate"
+    );
+}
+
+#[test]
+fn natural_does_not_restart_a_closed_gate_release() {
+    let mut controlled = pad();
+    let mut baseline = pad();
+    for rig in [&mut controlled, &mut baseline] {
+        let mut ev = AudioEvent::new(rig.engine.now(), SlotId::new(1), 1, InstId::new(1));
+        for (id, value) in [
+            (ctl::ATTACK, 0.001),
+            (ctl::DECAY, 0.01),
+            (ctl::SUSTAIN, 0.8),
+            (ctl::RELEASE, 1.0),
+            (ctl::LEGATO, 0.1),
+        ] {
+            ev.push_ctl(id, Ctl::Const(value)).expect("fits");
+        }
+        rig.send(ev);
+        let _ = rig.run(40);
+        assert!(rig
+            .engine
+            .voices()
+            .voices
+            .iter()
+            .any(|voice| voice.active && voice.released()));
+    }
+    controlled.post(CtlMsg::SlotControl(SlotControl {
+        slot: SlotId::new(1),
+        new_gen: 2,
+        effective_time: controlled.engine.now(),
+        release: Release::Natural,
+    }));
+    let with_control = controlled.step().to_vec();
+    let without_control = baseline.step().to_vec();
+    assert_eq!(with_control, without_control);
+}

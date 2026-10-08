@@ -1,6 +1,6 @@
 # LP-SESSION-MOMENTARY: Session momentary table, evaluator override, cell ramps
 
-**Status**: Ready (after LP-CONTRACT)
+**Status**: Completed
 **Plan ID**: LP-SESSION-MOMENTARY (wave 2; parallel with LP-ENGINE, LP-SESSION-STOP, LP-EDITOR-STOP, LP-EDITOR-MOMENTARY)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 5.1, 5.5, 5.6, 5.7, 5.8 (constants), 8.1(5), D7, D8, section 11
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -410,14 +410,14 @@ Write logs to `tmp/live-perf/session-momentary/*.log`.
 
 ## Completion Criteria
 
-- [ ] TASK-M1 to TASK-M4 are implemented, and every listed test passes.
-- [ ] The tweak slot is never written by the momentary path (test
+- [x] TASK-M1 to TASK-M4 are implemented, and every listed test passes.
+- [x] The tweak slot is never written by the momentary path (test
   asserted).
-- [ ] Releases resolve by current id or the one-step alias and bypass
+- [x] Releases resolve by current id or the one-step alias and bypass
   staleness checks. Stale drags are still dropped silently. The four
   release and stale-drag tests pass.
-- [ ] Existing authority, publish, eval, cells and ns tests pass unchanged.
-- [ ] Verification 1-5 exit 0. Touched files are under 1000 lines. The
+- [x] Existing authority, publish, eval, cells and ns tests pass unchanged.
+- [x] Verification 1-5 exit 0. Touched files are under 1000 lines. The
   Progress Log records the query-time and eager-dependent limitations.
 
 ## Progress Log
@@ -425,3 +425,39 @@ Write logs to `tmp/live-perf/session-momentary/*.log`.
 ### Session: 2026-10-08 (plan authored)
 **Tasks Completed**: plan authored (step 4).
 **Notes**: Not started.
+
+### Session: 2026-10-08 (implementation repair)
+**Tasks Completed**: TASK-M1..M4 source implementation; session and RampSender behavioral tests added; combined-tree compile repair.
+**Notes**:
+- Momentary values remain a `VarSlot` side field; every staged `CellUpdate` writes the slot base, and tests assert the slot base/version remain unchanged.
+- Releases resolve the current id or one re-key alias and bypass stale checks; stale drags and unknown-id releases are silent.
+- Evaluator query-time reads use the ramp at `tick(now)`, not each event's scheduled time; the maximum lookahead offset is 120 ms.
+- Eager dependents recomputed through the reactive pass do not follow momentary changes to a `var`; only direct readers of that slot do.
+- `CARGO_TERM_QUIET=true cargo build --all-targets` passed after compile repair (`tmp/live-perf/session-momentary/compile-repair-4.log`). Required strict clippy, focused nextest, wasm and final rustfmt gates remain to be run by the serial verifier.
+- Test coverage is in `src/session/tests/momentary.rs` and `src/sched/tests/sched/ramps.rs`; completion criteria remain unchecked until those final-source gates pass.
+- The plan's example expecting `slot.get() == 1200` after 20 ms of a 30 ms ramp conflicts with accepted D8/TASK-M4 query-time semantics. `direct_drag_ramps_cells_without_writing_the_tweak_slot` now expects the rounded interpolation at `tick(now)` (~1067) and still asserts `base() == 800`.
+
+### Session: 2026-10-08 (final implementation verification)
+**Tasks Completed**: TASK-M1..M4 and all assigned session/cell-ramp tests; final implementation gates 1-5.
+**Notes**:
+- Final-source verification passed: `CARGO_TERM_QUIET=true cargo build --all-targets` (exit 0; `tmp/live-perf/session-momentary/final13-build-all-targets.log`); `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` (exit 0; `tmp/live-perf/session-momentary/final13-clippy.log`); `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/session::tests::(momentary|authority|publish|eval)|sched::tests::sched::(ramps|cells)|ns::tests/)'` (exit 0, 133 run, 133 passed, 0 failures; `tmp/live-perf/session-momentary/final13-focused-nextest.log`); `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` (exit 0; `tmp/live-perf/session-momentary/final13-wasm.log`); `rustfmt --edition 2021 --check src/session/momentary.rs src/session/authority.rs src/session/publish.rs src/ns/namespace.rs src/ns/evaluator.rs src/sched/cells.rs src/sched/ramps.rs src/session/tests/momentary.rs src/sched/tests/sched/ramps.rs` (exit 0; `tmp/live-perf/session-momentary/final13-rustfmt.log`).
+- Findings from final6 through final12 were corrected in final source: ramp expectations follow query-time interpolation; site stepping follows the encoded control domain; explicit re-evaluation migrations are preserved across top-level forms until `take_migrations`; and the old-id alias test uses a fed binding-origin cell. Final13 is the passing source-matched gate set; earlier failing attempts are not passing evidence.
+- Limitation: evaluator reads sample the ramp at `tick(now)`, so event-level consumers use their existing read granularity; lookahead is bounded to 120 ms. Eager dependents recomputed through the reactive pass do not follow momentary changes to a `var`; direct readers do.
+- Implementation-phase completion is recorded. Serial combined-tree integration review, downstream plan coordination, closeout documentation, commit and push remain pending their owning workflow steps.
+
+### Session: 2026-10-08 (test-integrity repairs)
+**Tasks Completed**: Repaired LPSM-TI-1 and LPSM-TI-2 in `src/session/tests/momentary.rs`; reran verification gates 1-5 on the updated source.
+**Notes**:
+- Added `encoded()` via `ControlCells::encode_for` and assert encoded targets for drag (1200), direct and alias release (800), edit-invalidated release (800), and releasing rebase (600). Ramp checks slice records posted after each action; the rebase assertion uses current cell incarnations and the remaining 800 ms frames.
+- The normal release test verifies the entry is reaped and a subsequent tick posts no additional ramp. The hush test verifies a `release: true, frames: 0` drop ramp for each fed cell.
+- Final-source gates all passed: build `tmp/live-perf/session-momentary/final14-build-all-targets.log`; strict clippy `tmp/live-perf/session-momentary/final14-clippy.log`; focused nextest (133 run, 133 passed) `tmp/live-perf/session-momentary/final14-focused-nextest.log`; wasm build `tmp/live-perf/session-momentary/final14-wasm.log`; rustfmt check `tmp/live-perf/session-momentary/final14-rustfmt.log`.
+- Independent test-integrity and adversarial re-review remain downstream; no review acceptance is claimed here.
+
+### Session: 2026-10-08 (LPSM-ADV-1 repair)
+**Tasks Completed**: Preserved live momentary entries for forms untouched by a span evaluation; added held and releasing two-form regressions.
+**Notes**:
+- `momentary_rebase` now keeps an unmatched entry unchanged when the same ID and `form_gen` still resolve in the current `TweakTable`. It posts no ramp or refresh in that case. The existing drop path remains for absent or superseded sites.
+- `src/session/tests/momentary.rs` evaluates form A by `WireSpan` while form B is held or releasing. Both cases assert the entry remains and no `release: true, frames: 0` ramp is posted for B. The held case releases later by B's original ID to encoded base 900 with the full glide duration. The releasing case verifies it remains active at 1.02 s and reaps at its original 1.03 s end.
+- The first final15 focused nextest attempt exposed a fixture timing issue: release began before the 30 ms drag ramp had reached its target. The test now advances to 0.03 s before release; final16 is the passing source-matched verification set.
+- Final16 gates passed: `CARGO_TERM_QUIET=true cargo build --all-targets` (`tmp/live-perf/session-momentary/final16-build-all-targets.log`); `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` (`tmp/live-perf/session-momentary/final16-clippy.log`); focused nextest (135 run, 135 passed, 0 failures; `tmp/live-perf/session-momentary/final16-focused-nextest.log`); `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` (`tmp/live-perf/session-momentary/final16-wasm.log`); and exact plan rustfmt check (`tmp/live-perf/session-momentary/final16-rustfmt.log`).
+- Independent re-review and serial combined-tree integration review remain downstream; no review acceptance is claimed here.

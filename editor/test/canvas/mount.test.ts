@@ -95,6 +95,20 @@ afterEach(() => {
 });
 
 describe('headless canvas mount', () => {
+  it('renders animated surface rows without changing annotation revision or text builds', () => {
+    const rig = setup(true, true); const surface = rig.deps.code!.surface;
+    const render = vi.spyOn(CanvasRenderer.prototype, 'render');
+    const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    rig.host.step(16); render.mockClear();
+    const baselineBuilds = perf.counters().renderer.textBuilds;
+    const animation = surface.registerAnimated('test-momentary', () => [{ from: 0, to: 0, kind: 'momentary', label: ' ~ 1' }]);
+    animation.wake();
+    for (let i = 0; i < 5; i++) rig.host.step(100 + i * 16);
+    const revisions = render.mock.calls.map(([feedback]) => feedback?.annotationsRevision);
+    expect(new Set(revisions).size).toBe(1);
+    expect(perf.counters().renderer.textBuilds).toBe(baselineBuilds);
+    animation.dispose();
+  });
   it('forwards bridge keydown to diagnostics and removes the listener on dispose', () => {
     const noteInput = vi.spyOn(DiagnosticsController.prototype, 'noteInput');
     const rig = setup();

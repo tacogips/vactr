@@ -917,7 +917,7 @@ impl SlotGens {
                 match c.release {
                     Release::None => {}
                     Release::Natural => {
-                        if v.open {
+                        if v.open || v.gate_left > 0 {
                             v.release();
                         }
                     }

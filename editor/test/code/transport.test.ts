@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EditorDeps, Mounted } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
 import { AudibleClock } from '../../src/app/clock';
 import { DOC_FILE, mount } from '../../src/code/mount';
-import { TransportBar, clockStatus, formatLevel } from '../../src/code/transport';
+import { TransportBar, clockStatus, formatLevel, type TransportOptions } from '../../src/code/transport';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
@@ -11,17 +11,28 @@ import type { TempoBody, TransportSample, WirePlaying } from '../../src/protocol
 import { MockClock } from '../support/clock';
 import { RecordingTransport } from '../support/recording';
 
-function setup() {
+const cleanups: (() => void)[] = [];
+afterEach(() => { for (const dispose of cleanups.splice(0).reverse()) dispose(); document.body.innerHTML = ''; });
+
+function track(bar: TransportBar): () => void {
+  let active = true;
+  const dispose = () => { if (active) { active = false; bar.dispose(); } };
+  cleanups.push(dispose);
+  return dispose;
+}
+
+function setup(options: Pick<TransportOptions, 'platform' | 'shortcuts' | 'sample' | 'onHush'> = {}) {
   const clock = new MockClock(10);
   const transport = new RecordingTransport();
   const client = new Client(transport, { store: new Store() });
   const parent = document.createElement('div');
   document.body.appendChild(parent);
-  const bar = new TransportBar(parent, { client, clock });
+  const bar = new TransportBar(parent, { client, clock, ...options });
+  const dispose = track(bar);
   const text = (cls: string) => parent.querySelector(`.${cls}`)?.textContent;
   // Design 15.2: icons carry their words as the accessible name.
   const label = (cls: string) => parent.querySelector(`.${cls}`)?.getAttribute('aria-label');
-  return { clock, transport, client, parent, bar, text, label };
+  return { clock, transport, client, parent, bar, text, label, dispose };
 }
 
 const tempo = (extra: Partial<TempoBody> = {}): TempoBody => ({ bpm: 120, beats_per_cycle: 4, cycle: [3, 1], ...extra });
@@ -42,6 +53,7 @@ describe('TransportBar', () => {
       audible: new AudibleClock({ at: () => correlationValid
         ? { time: audibleTime, uncertainty: 0, provenance: 'measured' } : null }),
       sample: () => sample });
+    const dispose = track(bar);
     const position = parent.querySelector<HTMLElement>('.vact-position');
     bar.tick(0);
     expect(bar.state.cycle).toBeCloseTo(2.02);
@@ -64,7 +76,7 @@ describe('TransportBar', () => {
     audibleTime = 12.02;
     bar.tick(66.8);
     expect(bar.state.hidden).toBe(false);
-    bar.dispose();
+    dispose();
   });
 
   it('tracks analytic cycle and beat windows through five minutes of frame drops and stalls', () => {
@@ -79,6 +91,7 @@ describe('TransportBar', () => {
       running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
     };
     const bar = new TransportBar(parent, { client, clock, audible, sample: () => sample });
+    const dispose = track(bar);
     const beatDuration = 0.5;
     let frameMs = 0;
     let nextStallMs = 10000;
@@ -107,7 +120,7 @@ describe('TransportBar', () => {
       if (bar.state.beatFlash) actualFlashes += 1;
     }
     expect(actualFlashes).toBe(expectedFlashes);
-    bar.dispose();
+    dispose();
   });
 
   it('renders tempo and extrapolates cycle/beat on the clock between messages', () => {
@@ -145,13 +158,90 @@ describe('TransportBar', () => {
 
   it('sends hush from the hush/panic button and stop from a slot mute', () => {
     const { transport, bar, parent } = setup();
+    expect(parent.querySelector<HTMLButtonElement>('.vact-hush')?.getAttribute('aria-label')).toBe('cut: silence everything now and clear effects (Mod-Shift-.)');
     parent.querySelector<HTMLButtonElement>('.vact-hush')?.click();
     bar.onPlaying([play('d2', 11), play('d1', 11)]);
     expect(bar.slotNames()).toEqual(['d1', 'd2']);
     expect([...parent.querySelectorAll<HTMLElement>('.vact-slot')].map((li) => li.dataset.slot)).toEqual(['d1', 'd2']);
+    expect(parent.querySelector<HTMLButtonElement>('[data-slot="d2"] .vact-mute')?.getAttribute('aria-label')).toBe('stop d2: release its notes');
     parent.querySelector<HTMLButtonElement>('[data-slot="d2"] .vact-mute')?.click();
     expect(transport.kinds()).toEqual(['hush', 'stop']);
     expect(transport.of('stop')[0]?.body).toEqual({ slot: 'd2' });
+  });
+
+  it('captures stop shortcuts once from any focus, ignores repeats, and removes the listener on dispose', () => {
+    const onHush = vi.fn();
+    const { transport, parent, dispose } = setup({ platform: 'Linux', onHush });
+    const textarea = document.createElement('textarea');
+    const targetKeydown = vi.fn();
+    parent.appendChild(textarea);
+    textarea.addEventListener('keydown', targetKeydown);
+    textarea.focus();
+
+    const stop = new KeyboardEvent('keydown', { key: '.', code: 'Period', ctrlKey: true, bubbles: true, cancelable: true });
+    textarea.dispatchEvent(stop);
+    expect(stop.defaultPrevented).toBe(true);
+    expect(targetKeydown).not.toHaveBeenCalled();
+    expect(transport.kinds()).toEqual(['stop-all']);
+    expect(transport.of('stop-all')[0]?.body).toEqual({});
+    expect(onHush).toHaveBeenCalledOnce();
+
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: '.', code: 'Period', ctrlKey: true, repeat: true, bubbles: true, cancelable: true }));
+    expect(transport.kinds()).toEqual(['stop-all']);
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: '>', code: 'Period', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+    expect(transport.kinds()).toEqual(['stop-all', 'hush']);
+    expect(onHush).toHaveBeenCalledTimes(2);
+
+    dispose();
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: '.', code: 'Period', ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(transport.kinds()).toEqual(['stop-all', 'hush']);
+  });
+
+  it('uses Meta only on Mac and Ctrl does not trigger there', () => {
+    const { transport, parent } = setup({ platform: 'MacIntel' });
+    const input = document.createElement('input');
+    parent.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: '.', code: 'Period', ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(transport.kinds()).toEqual([]);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: '.', code: 'Period', metaKey: true, bubbles: true, cancelable: true }));
+    expect(transport.kinds()).toEqual(['stop-all']);
+  });
+
+  it('sends one stop-all for all slots and clears highlights', () => {
+    const onHush = vi.fn();
+    const { transport, parent, bar } = setup({ onHush });
+    bar.onPlaying([play('d1', 11), play('d2', 11)]);
+    parent.querySelector<HTMLButtonElement>('.vact-stop-all')?.click();
+    expect(transport.of('stop-all').map((env) => env.body)).toEqual([{}]);
+    expect(transport.of('stop')).toEqual([]);
+    expect(onHush).toHaveBeenCalledOnce();
+  });
+
+  it('projects output state only on transitions and bounds output history', () => {
+    let sample: TransportSample = {
+      epoch: 'run-1', sample_time: 10, cycle: [0, 1], bpm: 120, beats_per_cycle: 4,
+      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null, output: 'draining',
+    };
+    const { bar, parent } = setup({ sample: () => sample });
+    const stop = parent.querySelector<HTMLButtonElement>('.vact-stop-all');
+    bar.tick();
+    expect(stop?.dataset.output).toBe('draining');
+    expect(stop?.getAttribute('aria-label')).toBe('stop: stop every slot, let effects ring out (Mod-.) - tails ringing out');
+    expect(stop?.getAttribute('title')).toBe(stop?.getAttribute('aria-label'));
+    expect(bar.outputHistory()).toEqual(['draining']);
+    bar.tick();
+    expect(bar.outputHistory()).toEqual(['draining']);
+    sample = { ...sample, output: 'idle' };
+    bar.tick();
+    expect(stop?.dataset.output).toBe('idle');
+    expect(stop?.getAttribute('aria-label')).toBe('stop: stop every slot, let effects ring out (Mod-.)');
+    expect(bar.outputHistory()).toEqual(['draining', 'idle']);
+    const states: Array<NonNullable<TransportSample['output']>> = ['running', 'draining', 'cutting', 'idle'];
+    for (let index = 0; index < 20; index += 1) {
+      sample = { ...sample, output: states[index % states.length] };
+      bar.tick();
+    }
+    expect(bar.outputHistory()).toHaveLength(16);
   });
 
   it('lights a slot for 150 ms from its event time', () => {

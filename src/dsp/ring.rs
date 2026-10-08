@@ -523,7 +523,11 @@ impl ControlSource for ByteInbox {
         self.current = Some(i);
         let b = self.slot(i);
         let parsed = match b[0] {
-            song::GRAPH | song::BEGIN | song::SLICE => song::decode(b),
+            song::GRAPH | song::BEGIN | song::SLICE => CtlMsg::decode(b)
+                .ok()
+                .filter(|(_, n)| *n == b.len())
+                .map(|(msg, _)| Record::Msg(msg))
+                .or_else(|| song::decode(b)),
             crate::song::routing::SONG_COMMAND_TAG => CtlMsg::decode(b)
                 .ok()
                 .filter(|(_, n)| *n == b.len())
@@ -607,6 +611,10 @@ pub trait CellStore: CellRead {
     fn init(&mut self, cell: CellId, epoch: u32, value: f32) -> Option<HostMsg>;
     /// `CellBatch` with its entries; the ack to send, if any.
     fn batch(&mut self, seq: u32, view: &BatchView<'_>) -> Option<HostMsg>;
+    /// The live incarnation when the store can validate epochs.
+    fn live_epoch(&self, _cell: CellId) -> Option<u32> {
+        None
+    }
     /// `CellRetire`; true when the cell started retiring.
     fn retire(&mut self, cell: CellId, epoch: u32) -> bool;
     /// No use of a retiring cell is left; true when it was vacated.
@@ -619,6 +627,12 @@ impl CellStore for Mirror {
     }
     fn batch(&mut self, seq: u32, view: &BatchView<'_>) -> Option<HostMsg> {
         self.apply_batch(seq, view.iter())
+    }
+    fn live_epoch(&self, cell: CellId) -> Option<u32> {
+        match self.state(cell) {
+            Some(crate::dsp::cells::CellState::Live { epoch, .. }) => Some(epoch),
+            _ => None,
+        }
     }
     fn retire(&mut self, cell: CellId, epoch: u32) -> bool {
         Mirror::retire(self, cell, epoch)
@@ -771,6 +785,16 @@ pub struct EngineConfig {
     pub orbit_delay_seconds: f32,
     pub analysis_cells: usize,
     pub event_capacity: usize,
+    /// Master peak threshold for ending a gentle drain.
+    pub silence_peak: f32,
+    /// Consecutive below-threshold duration before the engine idles.
+    pub tail_hold_seconds: f32,
+    /// Maximum time spent draining before an automatic cut.
+    pub drain_cap_seconds: f32,
+    /// Anti-click output gate duration for cut and post-clear admission.
+    pub cut_fade_seconds: f32,
+    /// Effect samples cleared per 128-frame callback quantum.
+    pub clear_samples_per_quantum: usize,
 }
 
 /// A host configuration that cannot be represented by the preallocated DSP core.
@@ -818,6 +842,11 @@ impl EngineConfig {
             orbit_delay_seconds: 4.0,
             analysis_cells: 4096,
             event_capacity: EVENT_CAPACITY,
+            silence_peak: 1e-4,
+            tail_hold_seconds: 0.3,
+            drain_cap_seconds: 15.0,
+            cut_fade_seconds: 0.005,
+            clear_samples_per_quantum: 65_536,
         }
     }
 
@@ -843,9 +872,16 @@ impl EngineConfig {
                 && seconds >= 0.0
                 && seconds * self.sample_rate <= Self::MAX_STATE_SAMPLES
         };
+        let valid_duration = |seconds: f32| seconds.is_finite() && seconds > 0.0;
         if !valid_seconds(self.voice_seconds)
             || !valid_seconds(self.bus_seconds)
             || !valid_seconds(self.orbit_delay_seconds)
+            || !valid_duration(self.tail_hold_seconds)
+            || !valid_duration(self.drain_cap_seconds)
+            || !valid_duration(self.cut_fade_seconds)
+            || !self.silence_peak.is_finite()
+            || self.silence_peak <= 0.0
+            || self.clear_samples_per_quantum == 0
         {
             return Err(ConfigError::StateBudget);
         }

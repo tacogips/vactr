@@ -14,8 +14,10 @@ mod control;
 mod dryrun;
 mod faults;
 mod granular;
+mod live;
 mod merge;
 mod output;
+mod ramps;
 mod rebind;
 mod timestamps;
 

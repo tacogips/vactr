@@ -212,6 +212,7 @@ pub struct Evaluator {
     pub(super) dynamic_manifest_cache: RefCell<Vec<DynamicManifestCacheEntry>>,
     queued: Vec<(VarSlotRef, Value)>,
     last_pass: Option<PassReport>,
+    last_migrations: Vec<(TweakId, TweakId)>,
 }
 
 impl std::fmt::Debug for Evaluator {
@@ -229,6 +230,8 @@ pub(super) fn one_shot(e: &StagedEffect) -> bool {
         StagedEffect::OneShot { .. }
             | StagedEffect::Console(_)
             | StagedEffect::Revoke(_)
+            | StagedEffect::StopAll
+            | StagedEffect::Cut
             | StagedEffect::PlaySong(_)
     )
 }
@@ -288,6 +291,7 @@ impl Evaluator {
             dynamic_manifest_cache: RefCell::new(Vec::new()),
             queued: Vec::new(),
             last_pass: None,
+            last_migrations: Vec::new(),
         }
     }
 
@@ -341,6 +345,11 @@ impl Evaluator {
         self.last_pass.as_ref()
     }
 
+    /// Takes tweak-site migrations accumulated since the previous take.
+    pub fn take_migrations(&mut self) -> Vec<(TweakId, TweakId)> {
+        std::mem::take(&mut self.last_migrations)
+    }
+
     pub(super) fn next_gen(&mut self) -> FormGen {
         self.form_gen += 1;
         FormGen::new(self.form_gen)
@@ -379,7 +388,29 @@ impl Evaluator {
         } else {
             BTreeSet::new()
         };
-        let a = self.attempt(form, gen, None, &[], BTreeSet::new(), bad);
+        let migrate_from = self
+            .graph
+            .ids()
+            .find_map(|id| {
+                let previous = self.graph.get(id)?;
+                (self.graph.is_current(id) && previous.node.span == form.span)
+                    .then_some(previous.gen)
+            })
+            .or_else(|| {
+                self.ns
+                    .tweaks()
+                    .borrow()
+                    .iter()
+                    .filter(|site| {
+                        site.form_gen.get() < gen.get()
+                            && site.span.file == form.span.file
+                            && site.span.start >= form.span.start
+                            && site.span.end <= form.span.end
+                    })
+                    .max_by_key(|site| site.form_gen.get())
+                    .map(|site| site.form_gen)
+            });
+        let a = self.attempt(form, gen, migrate_from, &[], BTreeSet::new(), bad);
         let checked_callables = checked.callables;
         let mut diags = checked.diags;
         diags.extend(a.diags);
@@ -840,16 +871,24 @@ impl Evaluator {
     /// Override migration (section 13): a new site matched by index, type
     /// and origin to a site of the previous generation whose slot carries
     /// a controller override starts from the overridden value.
-    fn migrate(&self, old: FormGen, new: &[TweakSite]) {
+    fn migrate(&mut self, old: FormGen, new: &[TweakSite]) {
         let prev = self.ns.tweaks().borrow().sites_of(old);
-        for n in new.iter().filter(|s| s.origin != SiteOrigin::Binding) {
-            let hit = prev
-                .iter()
-                .find(|p| p.index == n.index && p.ty == n.ty && p.origin == n.origin);
+        for n in new {
+            let hit = prev.iter().find(|p| {
+                p.origin == n.origin
+                    && if n.origin == SiteOrigin::Binding {
+                        p.slot.same(&n.slot) || p.slot.name() == n.slot.name()
+                    } else {
+                        p.index == n.index && p.ty == n.ty
+                    }
+            });
             if let Some(p) = hit {
-                let cur = p.slot.get();
-                if changed(&p.initial, &cur) {
-                    n.slot.set(cur);
+                self.last_migrations.push((p.id, n.id));
+                if n.origin != SiteOrigin::Binding {
+                    let cur = p.slot.base();
+                    if changed(&p.initial, &cur) {
+                        n.slot.set(cur);
+                    }
                 }
             }
         }

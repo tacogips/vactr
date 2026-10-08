@@ -334,6 +334,36 @@ describe('GPU shaped-run atlas', () => {
 });
 
 describe('GPU code compositor', () => {
+  it('draws momentary labels without accumulating overlay instances', () => {
+    const f = fixture('let x = 1');
+    const first = { kind: 'momentary' as const, from: 9, to: 9, label: ' ~ 1.2' };
+    const countsSince = (start: number) => {
+      const counts = new Map<string, number>();
+      for (const call of f.r.calls.slice(start)) {
+        if (call.name !== 'drawArraysInstanced') continue;
+        const layer = String(call.args[4]);
+        counts.set(layer, (counts.get(layer) ?? 0) + Number(call.args[3]));
+      }
+      return counts;
+    };
+    let start = f.r.calls.length;
+    expect(f.renderer.render({ textRevision: 1, animated: [] })).toBe(true);
+    const baselineCounts = countsSince(start);
+    start = f.r.calls.length;
+    expect(f.renderer.render({ textRevision: 1, animated: [first] })).toBe(true);
+    const firstCounts = countsSince(start);
+    expect(firstCounts.get('overlay') ?? 0).toBeGreaterThan(baselineCounts.get('overlay') ?? 0);
+    expect(firstCounts.get('overlayText') ?? 0).toBeGreaterThan(baselineCounts.get('overlayText') ?? 0);
+    expect(f.raster.text.some(t => t.text.includes('~'))).toBe(true);
+    start = f.r.calls.length;
+    expect(f.renderer.render({ textRevision: 1, animated: [{ ...first, label: ' ~ 2.4' }] })).toBe(true);
+    const secondCounts = countsSince(start);
+    expect(secondCounts).toEqual(firstCounts);
+    start = f.r.calls.length;
+    expect(f.renderer.render({ textRevision: 1, animated: [] })).toBe(true);
+    expect(countsSince(start)).toEqual(baselineCounts);
+    f.renderer.dispose();
+  });
   it('keeps Text-backed and string-backed renderer commands identical', () => {
     const first = fixture(), second = fixture();
     const text = 'let x = 1\n日本';

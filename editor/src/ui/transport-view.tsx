@@ -47,6 +47,7 @@ export interface TransportViewProps {
   clock: Accessor<ClockStatus>;
   /** Master level in dBFS; null when unknown, -Infinity when silent. */
   level: Accessor<number | null>;
+  output: Accessor<'running' | 'draining' | 'cutting' | 'idle'>;
   slots: Accessor<SlotView[]>;
   audio: Accessor<AudioState>;
   audioReason: Accessor<string>;
@@ -60,18 +61,21 @@ export interface TransportViewProps {
 
 function IconButton(props: {
   class: string;
-  label: string;
+  label: string | Accessor<string>;
   onClick: () => void;
   disabled?: boolean;
+  dataOutput?: string;
   children: JSX.Element;
 }): JSX.Element {
+  const label = () => typeof props.label === 'function' ? props.label() : props.label;
   return (
     <button
       type="button"
       class={`vact-icon-button ${props.class}`}
-      aria-label={props.label}
-      title={props.label}
+      aria-label={label()}
+      title={label()}
       disabled={props.disabled}
+      data-output={props.dataOutput}
       onClick={() => props.onClick()}
     >
       {props.children}
@@ -196,10 +200,17 @@ export function TransportView(props: TransportViewProps): JSX.Element {
           </Match>
         </Switch>
       </span>
-      <IconButton class="vact-hush" label="hush: silence everything (Mod-.)" onClick={props.onHush}>
+      <IconButton class="vact-hush" label="cut: silence everything now and clear effects (Mod-Shift-.)" onClick={props.onHush}>
         <Hush />
       </IconButton>
-      <IconButton class="vact-stop-all" label="stop every slot" onClick={props.onStopAll}>
+      <IconButton
+        class="vact-stop-all"
+        label={() => props.output() === 'draining'
+          ? 'stop: stop every slot, let effects ring out (Mod-.) - tails ringing out'
+          : 'stop: stop every slot, let effects ring out (Mod-.)'}
+        dataOutput={props.output()}
+        onClick={props.onStopAll}
+      >
         <StopSquare />
       </IconButton>
       <span class="vact-level" aria-label={`master level ${levelText()} dB`} title={`master level ${levelText()} dB`}>
@@ -212,7 +223,7 @@ export function TransportView(props: TransportViewProps): JSX.Element {
             <li class="vact-slot" data-slot={slot.name}>
               <span class="vact-light" data-lit={slot.lit() ? 'true' : 'false'} aria-hidden="true" />
               <span class="vact-slot-name">{slot.name}</span>
-              <IconButton class="vact-mute" label={`stop ${slot.name}`} onClick={() => props.onStop(slot.name)}>
+              <IconButton class="vact-mute" label={`stop ${slot.name}: release its notes`} onClick={() => props.onStop(slot.name)}>
                 <StopSquare />
               </IconButton>
             </li>

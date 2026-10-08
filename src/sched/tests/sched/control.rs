@@ -8,6 +8,7 @@ use super::{played, started, Rig};
 use crate::host::caps::MidiEvent;
 use crate::host::testing::{RenderCall, SinkCall};
 use crate::host::wire::{HostMsg, Release, SlotControlAck};
+use crate::ns::stage::SlotKey;
 use crate::sched::control::ControlClass;
 use crate::sched::runtime::RuntimeConfig;
 use crate::sched::slots::SlotId;
@@ -407,4 +408,16 @@ fn repeated_loss_resends_and_raises_the_transport_diagnostic_once() {
     assert!(transport[0]
         .message
         .contains("not acknowledged after 20 ticks"));
+}
+
+#[test]
+fn revoke_with_can_panic_gate_a_single_slot() {
+    let mut rig = Rig::new();
+    rig.run("s :bd > d1");
+    rig.rt.revoke_with(SlotKey::D(1), Release::Panic);
+
+    let controls = rig.controls();
+    assert_eq!(controls.len(), 1);
+    assert_eq!(controls[0].1.slot, S1);
+    assert_eq!(controls[0].1.release, Release::Panic);
 }

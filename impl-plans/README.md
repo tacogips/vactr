@@ -20,6 +20,14 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 [Route preparation metering](active/song-mode-route-preparation-meter.md) has held0003 source accepted after eight focused tests, 425 broader Rust tests, and fresh frontend/build verification. Actual route-builder adoption is now released in the following phase. It preserves original nested depth and certification failure work before the immutable routing bridge.
 
+## Live performance controls (2026-10-08)
+
+The [live performance controls](../design-docs/specs/design-live-performance.md) plans are Ready. They cover the right-drag and two-finger momentary tweak with glide or snap return, gentle stop (effect tails) as the default, and the instant cut. The [dispatch manifest](active/live-perf-dispatch.json) runs three waves; wave 2 is logically parallel but runs with fanout concurrency 1 in the shared worktree.
+
+- Wave 1: [contract](active/live-perf-contract.md) (wire records, protocol messages, wiring stubs).
+- Wave 2: [engine](active/live-perf-engine.md), [session stop](active/live-perf-session-stop.md), [session momentary](active/live-perf-session-momentary.md), [editor stop](active/live-perf-editor-stop.md) and [editor momentary](active/live-perf-editor-momentary.md).
+- Wave 3: [evidence](active/live-perf-evidence.md) (silent behavior e2e, serial gates, verification record, closeout).
+
 ## DOM renderer comparison (2026-10-08)
 
 The [DOM renderer comparison](../design-docs/specs/design-dom-renderer.md) plans are Completed: [core](completed/dom-renderer-core.md), [mount](completed/dom-renderer-mount.md), [harness](completed/dom-renderer-harness.md), and [evidence](completed/dom-renderer-evidence.md); the [dispatch manifest](completed/dom-renderer-s296-dispatch.json) is archived. The measured report and raw data remain at [design-renderer-comparison.md](../design-docs/specs/design-renderer-comparison.md) and `design-docs/specs/evidence/renderer-comparison/rc-001/`. The DOM backend was removed afterwards because the comparison measured no performance benefit over canvas.

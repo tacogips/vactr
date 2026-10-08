@@ -3046,6 +3046,13 @@ control's effective time or release.
   input voice enters its release stage, 11.7); an OSC message
   already transmitted is irrevocable (above). Nothing waits for the
   lookahead window.
+  *Amendment (2026-10-08, design-live-performance.md D1-D5):*
+  - `Natural` now also releases scheduled voices whose gate is still
+    open; they enter their envelope release stage.
+  - A new `stop-all` revokes every slot with `Natural` and starts the
+    engine's gentle output stop (Draining, then Idle).
+  - `hush` keeps `Panic` and adds the output cut: a 5 ms fade, then a
+    bounded clear of the effect state.
 - **Tempo change** (`use-bpm`/`use-cycle`): re-anchor the clock
   (11.1), bump every slot `gen` with `effective_time: now`, clear
   staging, re-query and re-commit from the current position.
@@ -4262,6 +4269,11 @@ UNTOUCHED (the editor renders the overlay value beside the literal).
 Publishing the file in overlay mode publishes the original literals;
 "commit" folds an overlay into the source explicitly. Nothing about
 either mode appears in the language.
+*Amendment (2026-10-08):* a third front end, the right-drag MOMENTARY
+tweak, is specified in design-live-performance.md section 5.
+- It applies to Direct sites only.
+- It is a separate override layer that never writes the tweak slot.
+- It glides back on the audio clock.
 
 **Override migration across generations.** Re-evaluating a form
 (manual or automatic) creates fresh tweak slots. Each new site is
@@ -5668,7 +5680,11 @@ to end (15.1.12).
     before the next such line, minus trailing blank lines. The session
     then selects the forms inside it (14.5.4).
   - `Mod-Shift-Enter` evaluates the whole document (no span).
-  - `Mod-.` sends `hush`.
+  - `Mod-.` sends `hush`. *Superseded (2026-10-08,
+    design-live-performance.md section 6):*
+    - `Mod-.` sends `stop-all` (gentle stop).
+    - `Mod-Shift-.` sends `hush` (cut).
+    - Both are handled by one app-level handler.
   - `eval.code` is always the full text (14.5.6).
   - The eval span flashes for 200 ms, and forms with a `failure` flash
     the error color.
@@ -5689,7 +5705,11 @@ to end (15.1.12).
   - MIDI clock status comes from `tempo.clock` (`internal`,
     `midi locked`, `midi lost`).
   - hush/panic sends `hush`. The protocol has no separate panic, and
-    the session's hush already releases with panic.
+    the session's hush already releases with panic. *Amendment
+    (2026-10-08, design-live-performance.md sections 4 and 6):*
+    - The stop button sends `stop-all` (gentle, session-side, covering
+      every slot) and shows the output state.
+    - The hush button is the cut (`Mod-Shift-.`).
   - The per-slot list is built from `playing` and `eval-result`. It
     shows an activity light from telemetry, and mute (`stop`, the only
     per-slot message).
@@ -6547,7 +6567,11 @@ ported to the surface rather than deleted.
     (`fallback`/`tree-sitter`) is kept.
 - **Eval (`code/eval.ts`).**
   - Mod-Enter (form), Mod-Shift-Enter (whole) and Mod-. (hush) become
-    default-precedence keymap bindings.
+    default-precedence keymap bindings. *Amendment (2026-10-08,
+    design-live-performance.md section 6):*
+    - `Mod-.` leaves the code keymap and becomes the app-level gentle
+      stop (`stop-all`).
+    - `Mod-Shift-.` becomes the app-level cut (`hush`).
   - The 200 ms flash becomes an animation-layer range (15.3.8.3) and is no
     longer a StateField decoration.
   - Flush-before-eval and the stale-generation checks stay unchanged.

@@ -174,6 +174,20 @@ Mute overlays survive a successful Apply only for instrument-family selectors st
 
 Browser editor editing updates the document without changing playback. Its explicit whole-code Apply submits one revision; revision changes while a candidate is pending invalidate that candidate. Existing live incremental evaluation remains available outside this song application path.
 
+### Live stop and cut (amendment 2026-10-08)
+
+This is design-live-performance.md D5.
+
+- **Gentle stop.** The user-level gentle stop (`stop-all`, the stop
+  button, `Mod-.`) ends an active song early. It sends `Endpoints` with
+  the arrangement end at now plus the commit lead and the tail deadline
+  at that end plus the song's `tail_seconds`. The song then follows the
+  normal Draining -> Ended path.
+- **Cut.** The user-level cut (`hush`, `Mod-Shift-.`) applies `cutoff()`
+  at the next callback frame and resets the branch state.
+- **Unchanged.** `hush`/`stop` stay invalid inside song code. Static
+  export ignores live stop.
+
 ## Playback and export
 
 Introduce one song transport with Prepared, Playing, Draining, Ended and Failed states. Start only after required graph/sample acknowledgments. Query and commit only song onsets strictly before the declared end; schedule the end/release boundary ahead of the commit horizon.

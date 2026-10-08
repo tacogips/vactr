@@ -1,0 +1,438 @@
+{
+  "taskId": "live-perf",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-307",
+  "issueReference": "workflowInput (no GitHub issue URL or number supplied): opus-luna-design-and-implement-review-loop-session-307, live-perf, 'Live performance controls: right-drag momentary value tweak with glide/snap return, and gentle stop (effect tails) vs instant cut with shortcuts'",
+  "implementationBranch": "wf/live-perf",
+  "baseBranch": "wf/live-perf",
+  "remote": "origin",
+  "originalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+  "designDocPaths": [
+    "design-docs/specs/design-live-performance.md",
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/design-song-mode.md",
+    "design-docs/specs/architecture.md"
+  ],
+  "evidenceRoot": "tmp/live-perf",
+  "executionModel": "Three waves. Wave 1: LP-CONTRACT. Wave 2: LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-STOP and LP-EDITOR-MOMENTARY, which have disjoint writePaths and are logically parallel. Wave 3: LP-EVIDENCE. All plans share one worktree and one cargo target/ and editor/node_modules/.vite, so run fanout with --max-concurrency 1 to avoid compile and test races (operator lesson). The design and plans are committed before fanout. Workers edit only their own Progress Log. Every edit starts with a fresh read and pre/post sha256 values recorded in the Progress Log. A drift in a file outside the plan's writePaths is reported, never repaired by the worker. Serial repair happens after the join.",
+  "operatorRules": [
+    "English only; no emojis; follow AGENTS.md and the rust-coding-standards skill; touched Rust files stay under 1000 lines (split otherwise).",
+    "Run rustfmt on touched Rust files only; never run crate-wide cargo fmt; do not edit .agents/settings.local.json.",
+    "Automated tests are silent: silent sink, post-sink peak 0; native tests never open an audible device; never change the macOS volume.",
+    "Measurement lock (mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock, with the owner file and an rm -rf trap) for every browser run, test:style and the full nextest run. Never run two heavy suites at once.",
+    "No threshold or gate is loosened; existing assertions are kept (rows may only be strengthened, or changed where the design explicitly changes behavior: Mod-. mapping, stop-all body, per-slot stop label).",
+    "Verification records use {command, exitStatus: 0, testsRun > 0, testsPassed, failureCount: 0, outcome: 'passed', log}, with details in notes; no mutation or negative-control commands.",
+    "Repaired findings go only into addressedFeedback/resolvedFindings with status repaired; never list them as high or mid risks.",
+    "The Codex sandbox cannot bind localhost and keeps .git read-only. Browser runs, the full nextest run and commit/push happen in verification or review steps outside the sandbox."
+  ],
+  "reviewContext": {
+    "issueReference": "workflowInput 'Live performance controls: right-drag momentary value tweak with glide/snap return, and gentle stop (effect tails) vs instant cut with shortcuts' (no GitHub issue number); workflowExecutionId opus-luna-design-and-implement-review-loop-session-307; plans accepted in comm-005068 (step5-impl-plan-review, finding LP-PLAN-R1-STALE-RELEASE verified repaired)",
+    "userProblem": "Performers need DJ-effect-style live control: right-drag (iPad: two-finger drag) on a bound number changes the live value without editing the document and returns to the base value on release (glide by default, Shift snaps). Stopping playback currently cuts everything abruptly (Mod-. sends hush); like ordinary synths, the default stop should let voices release and delay/reverb tails ring out, with an explicit instant cut also available by shortcut.",
+    "requiredOutcomes": [
+      "Right-drag on a bound Direct numeric site sends momentary targets with left-drag scaling; the document text never changes; release glides back over the glide time (default 1000 ms, controls-pane setting, localStorage vactr.momentary.glideMs); Shift release snaps back; the overlay shows the live value.",
+      "Two-finger touch drag performs the same tweak; multiple simultaneous tweaks via independent pointer pairs; a re-evaluation during a tweak re-bases it.",
+      "Context menu suppressed only when a right press starts on a bound site.",
+      "Stop button and Mod-. send stop-all (gentle): every slot Natural release, effect tails ring out until master peak < -80 dBFS for 300 ms with 0 voices or a 15 s cap, then idle; restart during a tail works.",
+      "Hush button, Mod-Shift-. and the hush native cut: ~5 ms anti-click fade, effect state cleared in bounded chunks.",
+      "Glide and smoothing run as audio-clock cell ramps in dsp::Engine (browser worklet and native CPAL alike); no per-frame JS audio writes; no audio-thread allocation.",
+      "Deterministic Rust and vitest coverage plus silent Chromium/WebKit behavior e2e; all gates in LP-EVIDENCE exit 0; commit and non-force push to origin wf/live-perf."
+    ],
+    "nonGoals": [
+      "Changing left-drag permanent edit behavior (writeSite, overlay or source edit).",
+      "Persisting momentary values or glide time in the document or session.",
+      "Momentary tweaks on Reeval or Manual tier sites.",
+      "Changing the production master output stage, MIDI/OSC sink stop behavior, or any existing gate or threshold.",
+      "Physical iPad validation (recorded as pending)."
+    ],
+    "constraints": [
+      "English only, no emojis; Rust files under 1000 lines; rustfmt on touched files only.",
+      "Bounded messages and state: at most 16 momentary entries, 32 engine ramp slots, one OutputStop per user action, 16 ms per-entry drag rate.",
+      "UI uses flat square token-based styling (border-radius 0).",
+      "Automated tests are silent (silent sink, post-sink peak 0; headless native host); never change macOS volume.",
+      "Measurement lock for browser runs, test:style and the full nextest run; never two heavy suites at once.",
+      "Canvas editor performance gates must not regress.",
+      "Work only on wf/live-perf; non-force push to origin wf/live-perf; no main push, no PR."
+    ],
+    "designDecisionsAndRationale": [
+      "D1/D2: three stop scopes (slot, every slot via new session-side stop-all, whole output) and two modes; gentle is the default, cut is hush, so 'stop every slot' also covers slots the editor never saw.",
+      "D3: Release::Natural also releases scheduled voices with open gates, so gentle stop gives note-off envelopes instead of playing whole gates out.",
+      "D4: tail detection on the master output peak (-80 dBFS held 300 ms, 15 s cap) reported via TransportSample.output.",
+      "D5: song mode reuses Draining (arrangement end = now) for gentle and cutoff() for cut.",
+      "D6: glide time is an editor-local performer preference.",
+      "D7: the momentary tweak is a separate override layer that never writes the tweak slot, so migrate/persistence/commit never see it; Direct tier only.",
+      "D8: glide is an audio-clock ramp in the shared engine (CellRamps) with the session evaluating the same ramp for evaluator-side reads.",
+      "D9: effect state is zeroed in bounded chunks while the output gate is closed; nothing is reallocated.",
+      "D10: one app-level keydown handler matching event.code 'Period' owns both shortcuts; the code keymap Mod-. binding is removed.",
+      "D11: a chorded right press during a left drag starts no tweak."
+    ],
+    "intentionalTradeoffs": [
+      "Momentary values reach audio at each consumer's existing read granularity (voice start for event controls, block start for continuous ones).",
+      "Desktop tweaks are sequential (one mouse pointer); concurrent tweaks need touch.",
+      "Admission from ClearingIdle resumes Running over partially cleared effect memory whose tail is already below -80 dBFS (inaudible).",
+      "Plans run as three waves with --max-concurrency 1 because they share target/, editor/node_modules/.vite and the tree-sitter wasm artifact.",
+      "LP-EVIDENCE archives (moves without editing) this manifest and all plans in the final serial closeout after every other plan has finished."
+    ],
+    "supportedEdgeCases": [
+      "Release after a re-key resolves by current id or the one-step alias; release after edit invalidation; stale drags dropped silently; unknown-id release is a silent no-op.",
+      "Re-evaluation during a held or releasing tweak re-bases it; unmatched entries drop; hush clears all momentary entries with drop ramps.",
+      "Restart during a gentle-stop tail; cut during draining; Cut never downgraded by a later Gentle; OutputStop re-sent at most 3 times.",
+      "Shift turning '.' into '>' (event.code match); Meta on Mac/iPad and Ctrl elsewhere; key repeat ignored; shortcuts work with any focus.",
+      "Stepped or integer cells receive frames-0 steps only; frames-0 release drop; song gentle end and cut."
+    ],
+    "outOfScopeEdgeCases": [
+      "A note already sounding does not follow a change to an event-level control.",
+      "MIDI and OSC sinks get no extra note-offs from gentle stop.",
+      "A cut issued while a song install is pending waits for the existing control-drain gate.",
+      "Physical iPad two-finger gesture check (synthetic browser multi-touch only; recorded pending)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-live-performance.md",
+      "design-docs/specs/design-implementation.md",
+      "design-docs/specs/design-song-mode.md",
+      "design-docs/specs/architecture.md",
+      "impl-plans/active/live-perf-contract.md",
+      "impl-plans/active/live-perf-engine.md",
+      "impl-plans/active/live-perf-session-stop.md",
+      "impl-plans/active/live-perf-session-momentary.md",
+      "impl-plans/active/live-perf-editor-stop.md",
+      "impl-plans/active/live-perf-editor-momentary.md",
+      "impl-plans/active/live-perf-evidence.md",
+      "impl-plans/README.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "LP-CONTRACT",
+      "planPath": "impl-plans/active/live-perf-contract.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "src/host/wire.rs",
+        "src/host/tests/contracts.rs",
+        "src/session/protocol.rs",
+        "src/session/protocol_live.rs",
+        "src/session/codec.rs",
+        "src/session/tests/codec.rs",
+        "src/session/session.rs",
+        "src/session/publish.rs",
+        "src/session/mod.rs",
+        "src/session/momentary.rs",
+        "src/session/tests/mod.rs",
+        "src/session/tests/live_stop.rs",
+        "src/session/tests/momentary.rs",
+        "src/sched/mod.rs",
+        "src/sched/runtime.rs",
+        "src/sched/runtime/live.rs",
+        "src/sched/ramps.rs",
+        "src/sched/tests/sched.rs",
+        "src/sched/tests/sched/live.rs",
+        "src/sched/tests/sched/ramps.rs",
+        "src/ns/stage.rs",
+        "src/ns/evaluator.rs",
+        "src/ns/tests/stage.rs",
+        "src/vm/natives/effects.rs",
+        "src/dsp/engine.rs",
+        "src/host/wasm/worklet_half.rs",
+        "src/host/wasm/main_half.rs",
+        "src/host/testing.rs",
+        "editor/src/protocol/types.ts",
+        "editor/src/protocol/envelope.ts",
+        "editor/src/protocol/client.ts",
+        "editor/test/protocol/client.test.ts",
+        "editor/test/protocol/envelope.test.ts",
+        "impl-plans/active/live-perf-contract.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/live-perf/contract"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/live-perf/contract"
+      ],
+      "acceptanceCriteria": [
+        "C1-C8 contracts exist exactly as pinned: new CtlMsg (0x1C OutputStop, 0x1D CellRamp) and HostMsg (0x4B OutputState, 0x4C CellRampAck) records with round-trip tests; ClientMsg StopAll/Momentary; StaleReason MomentaryIneligible/MomentaryCapacity; TransportSample.output; StagedEffect StopAll/Cut; runtime and session hooks with behavior-preserving stubs; registered empty test modules.",
+        "Behavior unchanged: hush still emits Panic SlotControl for every slot; existing tests pass with no assertion edited.",
+        "editor client stopAll() and momentary() with the 16 ms drag limit and an immediate release that cancels queued drags; envelope validation of transport.output."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/host::tests::contracts|session::tests::codec|ns::tests::stage|sched::tests::sched::control|host::tests::e2e::sched_gaps/)'",
+        "rustfmt --edition 2021 --check <each touched .rs file>",
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/protocol"
+      ]
+    },
+    {
+      "planId": "LP-ENGINE",
+      "planPath": "impl-plans/active/live-perf-engine.md",
+      "wave": 2,
+      "dependsOn": ["LP-CONTRACT"],
+      "writePaths": [
+        "src/dsp/engine.rs",
+        "src/dsp/engine/output.rs",
+        "src/dsp/engine/render.rs",
+        "src/dsp/ramp.rs",
+        "src/dsp/mod.rs",
+        "src/dsp/voice.rs",
+        "src/dsp/bus.rs",
+        "src/dsp/effects/mod.rs",
+        "src/dsp/ring.rs",
+        "src/dsp/cells.rs",
+        "src/host/wasm/cells.rs",
+        "src/dsp/engine/song_runtime.rs",
+        "src/dsp/tests/dsp.rs",
+        "src/dsp/tests/dsp/output_stop.rs",
+        "src/dsp/tests/dsp/ramp.rs",
+        "src/dsp/tests/dsp/release.rs",
+        "impl-plans/active/live-perf-engine.md",
+        "target",
+        "tmp/live-perf/engine"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target", "tmp/live-perf/engine"],
+      "acceptanceCriteria": [
+        "OutputStage: Running/Draining/Cutting/ClearingCut/ClearingIdle/Idle, with a per-sample cut gate (5 ms), a master block peak below 1e-4 held 0.3 s with 0 voices leading to idle, a 15 s cap leading to cut, a chunked clear of orbit and legacy bus memory (65,536 samples per 128 frames), Retiring bus slots held while draining, and OutputState reports (also an acknowledgement for every OutputStop).",
+        "CellRamps: 32 fixed slots read through RampedCells at block start; monotone ramps with a per-block step <= B/N; retarget from the current value; release reaping; frames-0 release drop; epoch check where the store reports epochs; CellRampAck.",
+        "Release::Natural also releases scheduled voices whose gate is still open; Panic and None are unchanged.",
+        "Running output stays bit-identical (golden and DSP suites unchanged); zero callback allocation; native and browser rig parity."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/dsp::tests::dsp::(output_stop|ramp|release|bus|cut_group|effects|cells)/)'",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/dsp::tests|host::tests::e2e::templates|host::native::tests/)'",
+        "rustfmt --edition 2021 --check <each touched .rs file>"
+      ]
+    },
+    {
+      "planId": "LP-SESSION-STOP",
+      "planPath": "impl-plans/active/live-perf-session-stop.md",
+      "wave": 2,
+      "dependsOn": ["LP-CONTRACT"],
+      "writePaths": [
+        "src/sched/runtime/live.rs",
+        "src/sched/control.rs",
+        "src/sched/runtime/song.rs",
+        "src/sched/tests/sched/live.rs",
+        "src/sched/tests/sched/control.rs",
+        "src/session/tests/live_stop.rs",
+        "impl-plans/active/live-perf-session-stop.md",
+        "target",
+        "tmp/live-perf/session-stop"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target", "tmp/live-perf/session-stop"],
+      "acceptanceCriteria": [
+        "stop-all: every slot Natural, live notes closed, then exactly one OutputStop{Gentle}; hush: Panic plus OutputStop{Cut}; per-slot stop: Natural only.",
+        "OutputTracker: wire() strings, re-send after resend_ticks (at most 3, then a diagnostic), Cut never downgraded by Gentle.",
+        "Song: gentle stop gives an early Endpoints within the original bounds (Draining, then Ended); cut gives arrangement == tail_deadline == now; a refusal becomes a fault, never a panic.",
+        "TransportSample.output == 'draining' after an OutputState report; the key is absent before any report."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::tests::sched::(live|control)|session::tests::live_stop|sched::runtime::song|host::tests::e2e::sched_gaps|sched::tests::midi/)'",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs"
+      ]
+    },
+    {
+      "planId": "LP-SESSION-MOMENTARY",
+      "planPath": "impl-plans/active/live-perf-session-momentary.md",
+      "wave": 2,
+      "dependsOn": ["LP-CONTRACT"],
+      "writePaths": [
+        "src/session/momentary.rs",
+        "src/session/authority.rs",
+        "src/session/publish.rs",
+        "src/ns/namespace.rs",
+        "src/ns/evaluator.rs",
+        "src/sched/cells.rs",
+        "src/sched/ramps.rs",
+        "src/session/tests/momentary.rs",
+        "src/sched/tests/sched/ramps.rs",
+        "impl-plans/active/live-perf-session-momentary.md",
+        "target",
+        "tmp/live-perf/session-momentary"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target", "tmp/live-perf/session-momentary"],
+      "acceptanceCriteria": [
+        "MomentaryTable (max 16): Direct-only; stale messages dropped silently; MomentaryIneligible/MomentaryCapacity replies; the tweak slot is never written (VarSlot momentary field plus base(); migrate, write_slot, published site.value and authority reads use base()).",
+        "CellRamp per fed cell (site cells, var-fed cells and inst-default external cells) with encoded targets; stepped or integer cells get frames-0 steps only; acked browser incarnations only; Const-downgrade override; re-send with the remaining frames until acked; 32-cell bound.",
+        "Re-base after eval via the evaluator migration map: held entries re-key, releasing entries glide to the new base, unmatched entries drop; hush clears everything with drop ramps.",
+        "The query-time (tick now) and eager-dependent limitations are recorded in the Progress Log."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/session::tests::(momentary|authority|publish|eval)|sched::tests::sched::(ramps|cells)|ns::tests/)'",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "rustfmt --edition 2021 --check src/session/momentary.rs src/session/authority.rs src/session/publish.rs src/ns/namespace.rs src/ns/evaluator.rs src/sched/cells.rs src/sched/ramps.rs src/session/tests/momentary.rs src/sched/tests/sched/ramps.rs"
+      ]
+    },
+    {
+      "planId": "LP-EDITOR-STOP",
+      "planPath": "impl-plans/active/live-perf-editor-stop.md",
+      "wave": 2,
+      "dependsOn": ["LP-CONTRACT"],
+      "writePaths": [
+        "editor/src/ui/stop-keys.ts",
+        "editor/src/code/transport.ts",
+        "editor/src/ui/transport-view.tsx",
+        "editor/src/code/eval.ts",
+        "editor/src/code/keyboard.ts",
+        "editor/src/app/app.css",
+        "editor/test/ui/stop-keys.test.ts",
+        "editor/test/code/transport.test.ts",
+        "editor/test/code/eval.test.ts",
+        "editor/test/ui/controls.test.ts",
+        "editor/test/canvas/input.test.ts",
+        "impl-plans/active/live-perf-editor-stop.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/live-perf/editor-stop"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules/.vite", "tmp/live-perf/editor-stop"],
+      "acceptanceCriteria": [
+        "One app-level window keydown handler (capture): Mod-. sends stop-all and clears highlights, Mod-Shift-. sends hush; event.code 'Period'; Meta on Mac/iPad and Ctrl elsewhere; repeat ignored; exactly one message even with code focus.",
+        "The code keymap no longer binds Mod-.; the keyboard.ts fallback uses stopAll/cut options.",
+        "Toolbar labels per design section 6; the stop button sends one stop-all; data-output reflects TransportSample.output, set only on change; outputHistory() is bounded at 16."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/ui test/code/transport.test.ts test/code/eval.test.ts test/canvas/input.test.ts",
+        "cd editor && ./node_modules/.bin/vitest run test/code test/ui test/protocol"
+      ]
+    },
+    {
+      "planId": "LP-EDITOR-MOMENTARY",
+      "planPath": "impl-plans/active/live-perf-editor-momentary.md",
+      "wave": 2,
+      "dependsOn": ["LP-CONTRACT"],
+      "writePaths": [
+        "editor/src/bind/momentary.ts",
+        "editor/src/bind/glide-setting.ts",
+        "editor/src/bind/mount.ts",
+        "editor/src/bind/bind.css",
+        "editor/src/code/momentary-pointer.ts",
+        "editor/src/code/pointer.ts",
+        "editor/src/code/surface.ts",
+        "editor/src/app/apis.ts",
+        "editor/src/code/mount.ts",
+        "editor/src/code/renderer.ts",
+        "editor/test/bind/momentary.test.ts",
+        "editor/test/bind/glide-setting.test.ts",
+        "editor/test/canvas/momentary-pointer.test.ts",
+        "editor/test/canvas/gpu.test.ts",
+        "editor/test/canvas/mount.test.ts",
+        "impl-plans/active/live-perf-editor-momentary.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules/.vite",
+        "tmp/live-perf/editor-momentary"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules/.vite", "tmp/live-perf/editor-momentary"],
+      "acceptanceCriteria": [
+        "Right-drag (mouse button 2) on a bound Direct site sends momentary targets with left-drag scaling (DRAG_PX, DRAG_SLOP_PX, ParamMeta or relative, integer rounding) and a 30 ms smoothing; release sends (null, glideMs), a Shift release sends (null, 0); the document is never changed.",
+        "Context menu suppressed only on a bound-site hit or within 500 ms of a right-press gesture; a chorded right press during a left drag starts nothing.",
+        "Two-finger touch pairing within 250 ms and 8 px, with centroid drag; multiple independent pairs; single-finger tap, long-press and scroll unchanged.",
+        "The live value label is drawn through animated rows (kind 'momentary') with overlay static-count truncation; no annotationsRevision bump and no text rebuild.",
+        "Glide setting in the controls pane: localStorage vactr.momentary.glideMs, default 1000, range 0-10000, step 50, flat square tokens.",
+        "Re-base: a site-table refresh re-sends the held target from the new base and the new id."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/bind test/canvas/momentary-pointer.test.ts test/canvas/gpu.test.ts test/canvas/mount.test.ts",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas test/bind test/code"
+      ]
+    },
+    {
+      "planId": "LP-EVIDENCE",
+      "planPath": "impl-plans/active/live-perf-evidence.md",
+      "wave": 3,
+      "dependsOn": ["LP-ENGINE", "LP-SESSION-STOP", "LP-SESSION-MOMENTARY", "LP-EDITOR-STOP", "LP-EDITOR-MOMENTARY"],
+      "writePaths": [
+        "editor/src/code/perf-hook.ts",
+        "editor/src/code/mount.ts",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/canvas/mount.test.ts",
+        "design-docs/specs/design-live-performance.md",
+        "impl-plans/README.md",
+        "impl-plans/active/live-perf-contract.md",
+        "impl-plans/active/live-perf-engine.md",
+        "impl-plans/active/live-perf-session-stop.md",
+        "impl-plans/active/live-perf-session-momentary.md",
+        "impl-plans/active/live-perf-editor-stop.md",
+        "impl-plans/active/live-perf-editor-momentary.md",
+        "impl-plans/active/live-perf-evidence.md",
+        "impl-plans/active/live-perf-dispatch.json",
+        "impl-plans/completed/live-perf-contract.md",
+        "impl-plans/completed/live-perf-engine.md",
+        "impl-plans/completed/live-perf-session-stop.md",
+        "impl-plans/completed/live-perf-session-momentary.md",
+        "impl-plans/completed/live-perf-editor-stop.md",
+        "impl-plans/completed/live-perf-editor-momentary.md",
+        "impl-plans/completed/live-perf-evidence.md",
+        "impl-plans/completed/live-perf-dispatch.json",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/dist",
+        "editor/node_modules/.vite",
+        "editor/src-tauri/target",
+        "tmp/live-perf/e2e",
+        "tmp/live-perf/gates"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/dist",
+        "editor/node_modules/.vite",
+        "editor/src-tauri/target",
+        "tmp/live-perf/e2e",
+        "tmp/live-perf/gates"
+      ],
+      "acceptanceCriteria": [
+        "Perf-hook accessors (transportOutput, outputHistory, momentaryLabels, momentaryHit, coordsAtPos) are active only with ?perf=1.",
+        "Four new silent behavior checks pass in Chromium and WebKit: momentary-right-drag (live label, doc unchanged, context menu prevented on the site and not elsewhere, Shift snap, glide), momentary-two-finger (synthetic, limitation recorded), stop-gentle-shortcut (draining then idle), cut-shortcut (idle within 3 s, no draining after the keypress); post-sink peak 0.",
+        "Serial gates 1-13 exit 0: cargo build, strict clippy, rustfmt on touched files, debug wasm, release wasm, tauri check, npm check, full vitest, VACTR_REQUIRE_SESSION_ABI=1 npm run build, test:perf alone, test:style (lock), behavior e2e (lock), full nextest (lock, timeout >= 2400 s, alone).",
+        "Design section 12 verification record appended; plans and manifest archived file by file; README updated; commit and non-force push to origin wf/live-perf by the workflow integration step."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
+        "rustfmt --edition 2021 --check <every .rs file changed since the plan checkpoint>",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run build-wasm-release",
+        "cd editor/src-tauri && CARGO_TERM_QUIET=true cargo check",
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && npm run test:perf",
+        "LOCK: cd editor && npm run test:style",
+        "LOCK: cd editor && npm run e2e -- --browser all --profile behavior --run-id live-perf-001 --out ../tmp/live-perf/e2e/live-perf-001",
+        "LOCK: NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --no-fail-fast (timeout >= 2400 s, alone)",
+        "node --check editor/test/e2e/behavior.mjs",
+        "jq . impl-plans/completed/live-perf-dispatch.json"
+      ]
+    }
+  ]
+}

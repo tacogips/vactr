@@ -3,7 +3,7 @@ import type { Store } from '../protocol/store';
 import type { Provenance } from '../app/clock';
 import type { CodeSurface } from './surface';
 import type { HighlightScheduler } from './highlight';
-import type { CodeRenderer, RendererKind } from './renderer-types';
+import type { CodeRenderer } from './renderer-types';
 import type { ResourceLedger } from './resources';
 import { PERF_PHASES, type PerfPhase, type PerfRecorder } from './frame';
 import type { TransportSample } from '../protocol/types';
@@ -25,7 +25,7 @@ export interface VactrPerf {
   onsets(): OnsetRecord[];
   transportSample(): TransportSample | null;
   counters(): { highlight: HighlightScheduler['stats']; probe: null; client: Client['queueStats']; syntaxTruncated: number;
-    textPending: boolean; renderer: CodeRenderer['stats']; rendererKind: RendererKind; domNodes: number;
+    textPending: boolean; renderer: CodeRenderer['stats']; domNodes: number;
     gpuStatus: { kind: string; effectiveDpr: number }; layout: CodeRenderer['layout']['stats'];
     ledger: ResourceLedger['counters']; usedBytes: number };
   disposeCode(): void;
@@ -33,7 +33,7 @@ export interface VactrPerf {
 
 interface PerfInputs {
   win: Window; perf: PerfRecorder; surface: CodeSurface; revision(): number; ledger: ResourceLedger;
-  highlight: HighlightScheduler; renderer: CodeRenderer; rendererKind: RendererKind; client: Client; store: Store;
+  highlight: HighlightScheduler; renderer: CodeRenderer; client: Client; store: Store;
   syntaxTruncated(): number; disposeCode(): void;
 }
 
@@ -56,7 +56,7 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
     transportSample: () => input.store.transportSample ?? null,
     counters: () => ({ highlight: input.highlight.stats, probe: null, client: input.client.queueStats,
       syntaxTruncated: input.syntaxTruncated(), textPending: input.renderer.textPending, renderer: input.renderer.stats,
-      rendererKind: input.rendererKind, domNodes: input.win.document.getElementsByTagName('*').length,
+      domNodes: input.win.document.getElementsByTagName('*').length,
       gpuStatus: { kind: input.renderer.status.kind, effectiveDpr: input.renderer.status.effectiveDpr },
       layout: input.renderer.layout.stats, ledger: input.ledger.counters, usedBytes: input.ledger.usedBytes }),
     disposeCode: input.disposeCode,

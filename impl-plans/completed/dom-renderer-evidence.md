@@ -1,6 +1,6 @@
 # DOM-RENDERER-EVIDENCE: DOM Behavior Run, Canvas-vs-DOM Measurement Matrix, Report and Gates Implementation Plan
 
-**Status**: In Progress (TASK-E1 through E6 complete; TASK-E7 belongs to final integration)
+**Status**: Completed (2026-10-08; comparison evidence retained, DOM backend and harness removed after no measured performance benefit)
 **Plan ID**: DOM-RENDERER-EVIDENCE (wave 4 of 4, serial chain; final)
 **Design Reference**: `design-docs/specs/design-dom-renderer.md` DR-9 (DOM behavior), DR-10 (comparison protocol and report) and DR-12 (gates)
 **Depends On**: DOM-RENDERER-HARNESS (`impl-plans/completed/dom-renderer-harness.md`), and transitively CORE and MOUNT (`impl-plans/completed/`)
@@ -201,7 +201,7 @@ Run serially, one heavy suite at a time:
 If a gate fails, fix it within writePaths or sharedPaths and rerun. Report only the final
 passing run.
 
-### TASK-E7 (final integration step, outside the sandbox): Commit and push
+### TASK-E7 (superseded by the 2026-10-08 user decision): Commit and push
 - Stage only the files changed by the four dom-renderer plans, the design docs, the report,
   `rc-001` and the README.
 - Commit with a structured message per `AGENTS.md`, with no tool attribution.
@@ -240,13 +240,12 @@ Do not run mutation or negative-control commands.
 - [x] 24 complete runs exist with raw data under `rc-001` (TASK-E4).
 - [x] The report is complete, with tables and analysis (TASK-E5).
 - [x] Gates 1-9 pass (TASK-E6).
-- [ ] The commit is pushed non-force to `origin wf/dom-editor` (TASK-E7, final integration
-      step).
+- [x] The evidence plan is archived as Completed; the user explicitly requested no commit or push.
 
 ## Progress Log
 
 ### Session: 2026-10-07 (Step 6 implementation)
-**Tasks Completed**: TASK-E1 through TASK-E6. Generated the report skeleton and index entry; built release WASM and frontend; DOM behavior passed in Chromium and WebKit (11/11 Chromium checks; 9/9 WebKit checks passed plus the two clipboard/IME limitations; touch uses synthetic pointer events); canvas reference behavior passed. Completed all 24 serial measurement keys and generated raw JSON/JSONL, environment, attempts and comparison files. Authored Analysis, Limitations and Observations from `rc-001` values. Gates 1-9 passed. TASK-E7 commit and non-force push remain for final integration.
+**Tasks Completed**: TASK-E1 through TASK-E6; TASK-E7 was superseded by the 2026-10-08 user decision not to commit or push. The report skeleton and index entry were generated; built release WASM and frontend; DOM behavior passed in Chromium and WebKit (11/11 Chromium checks; 9/9 WebKit checks passed plus the two clipboard/IME limitations; touch uses synthetic pointer events); canvas reference behavior passed. Completed all 24 serial measurement keys and generated raw JSON/JSONL, environment, attempts and comparison files. Authored Analysis, Limitations and Observations from `rc-001` values. Gates 1-9 passed. TASK-E7 commit and push were excluded by the explicit user instruction for this closeout.
 
 **Verification**:
 - `CARGO_TERM_QUIET=true mise run build-wasm-release` — exit 0, `tmp/dom-renderer/evidence/wasm-release.log`.

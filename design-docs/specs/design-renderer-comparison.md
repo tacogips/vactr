@@ -1,5 +1,7 @@
 # Canvas vs DOM Renderer Comparison
 
+The DOM renderer backend and comparison harness were removed after this comparison (no measured performance benefit over canvas); recoverable from commit 56601c2.
+
 Status: Measured (rc-001; 24/24 runs complete, three runs per renderer/browser/size cell). Design: [DOM renderer design](design-dom-renderer.md).
 
 <!-- RENDERER-COMPARISON:BEGIN -->

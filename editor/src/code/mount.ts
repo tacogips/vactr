@@ -25,8 +25,7 @@ import { PointerController, type SelectionHandle } from './pointer';
 import { TextLayout } from './layout';
 import { createMeasureContext } from './advances';
 import { CanvasRenderer } from './renderer';
-import { DomRenderer } from './dom-renderer';
-import { selectRendererKind, type CodeRenderer, type RendererKind } from './renderer-types';
+import type { CodeRenderer } from './renderer-types';
 import { readPalette } from './palette';
 import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
@@ -46,7 +45,6 @@ export interface MountOptions {
   gl?: WebGL2RenderingContext;
   frameHost?: FrameHost;
   createCanvas?: () => HTMLCanvasElement;
-  renderer?: RendererKind;
 }
 
 function localStore(win: Window | null): Pick<Storage, 'getItem' | 'setItem'> | null {
@@ -66,17 +64,14 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const { client, store, clock, tier } = deps;
   const doc = root.ownerDocument; const win = doc.defaultView;
   if (!win) throw new Error('Canvas editor requires a window');
-  const rendererKind = selectRendererKind(win.location.search, opts.renderer);
   addStylesheet(doc);
   const codePane = pane(root, 'code'); const transportPane = pane(root, 'transport');
   codePane.dataset.syntax = 'fallback';
-  codePane.dataset.renderer = rendererKind;
   const holder = doc.createElement('div');
   const disposeCanvasHost = render(() => createComponent(CodeSurface, {}), holder);
   const hostEl = holder.firstElementChild as HTMLElement; codePane.appendChild(hostEl);
-  const surfaceEl: HTMLElement = rendererKind === 'canvas' ? doc.createElement('canvas') : doc.createElement('div');
-  if (rendererKind === 'canvas') { surfaceEl.className = 'vact-code-canvas'; surfaceEl.setAttribute('aria-hidden', 'true'); }
-  else { surfaceEl.className = 'vact-code-dom'; surfaceEl.setAttribute('aria-hidden', 'true'); }
+  const surfaceEl = doc.createElement('canvas');
+  surfaceEl.className = 'vact-code-canvas'; surfaceEl.setAttribute('aria-hidden', 'true');
   const inputContainer = doc.createElement('div'); inputContainer.className = 'vact-code-input-bridge';
   const gpuStatus = doc.createElement('div'); gpuStatus.className = 'vact-code-gpu-status'; gpuStatus.setAttribute('role', 'status');
   const diagTip = doc.createElement('div'); diagTip.className = 'vact-code-diag-tooltip'; diagTip.setAttribute('role', 'tooltip'); diagTip.hidden = true;
@@ -92,10 +87,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     gpuStatus.textContent = status.kind === 'unavailable' ? 'GPU unavailable; editing and save remain available' : status.message;
     gpuStatus.dataset.gpu = status.kind;
   };
-  const renderer: CodeRenderer = rendererKind === 'canvas'
-    ? new CanvasRenderer(surfaceEl as HTMLCanvasElement, layout, { ledger, palette: readPalette(doc.documentElement), ...(opts.gl ? { gl: opts.gl } : {}),
-      ...(opts.createCanvas ? { createCanvas: opts.createCanvas } : {}), onStatus })
-    : new DomRenderer(surfaceEl, layout, { onStatus });
+  const renderer: CodeRenderer = new CanvasRenderer(surfaceEl, layout, { ledger, palette: readPalette(doc.documentElement), ...(opts.gl ? { gl: opts.gl } : {}),
+    ...(opts.createCanvas ? { createCanvas: opts.createCanvas } : {}), onStatus });
   const schedulerHost = frameHost(win, opts.frameHost);
   let scheduler: FrameScheduler | undefined;
   let input: InputController | undefined;
@@ -354,7 +347,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     } catch { loadMainThreadSyntax(); }
   } else loadMainThreadSyntax();
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
-    ledger, highlight, renderer, rendererKind, client, store, syntaxTruncated: () => syntaxTruncated,
+    ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
     disposeCode: () => mounted.dispose() });
 
   const colorScheme = win.matchMedia?.('(prefers-color-scheme: dark)');

@@ -20,9 +20,9 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 [Route preparation metering](active/song-mode-route-preparation-meter.md) has held0003 source accepted after eight focused tests, 425 broader Rust tests, and fresh frontend/build verification. Actual route-builder adoption is now released in the following phase. It preserves original nested depth and certification failure work before the immutable routing bridge.
 
-## DOM renderer comparison (2026-10-07)
+## DOM renderer comparison (2026-10-08)
 
-The [DOM renderer comparison](../design-docs/specs/design-dom-renderer.md) is implemented in serial plans: [core](completed/dom-renderer-core.md) -> [mount](completed/dom-renderer-mount.md) -> [harness](completed/dom-renderer-harness.md) -> [evidence](active/dom-renderer-evidence.md). Core, mount and harness are Completed (accepted in session 296). Evidence is In Progress: TASK-E1 through E6 are done (report [design-renderer-comparison.md](../design-docs/specs/design-renderer-comparison.md), raw data under `design-docs/specs/evidence/renderer-comparison/rc-001/`); TASK-E7 (commit and non-force push to `origin wf/dom-editor`) remains with final integration. The [dispatch manifest](active/dom-renderer-s296-dispatch.json) stays active with the evidence plan.
+The [DOM renderer comparison](../design-docs/specs/design-dom-renderer.md) plans are Completed: [core](completed/dom-renderer-core.md), [mount](completed/dom-renderer-mount.md), [harness](completed/dom-renderer-harness.md), and [evidence](completed/dom-renderer-evidence.md); the [dispatch manifest](completed/dom-renderer-s296-dispatch.json) is archived. The measured report and raw data remain at [design-renderer-comparison.md](../design-docs/specs/design-renderer-comparison.md) and `design-docs/specs/evidence/renderer-comparison/rc-001/`. The DOM backend was removed afterwards because the comparison measured no performance benefit over canvas.
 
 ## Purpose
 

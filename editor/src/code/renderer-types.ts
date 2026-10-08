@@ -4,8 +4,6 @@ import type { PhaseTimer } from './frame';
 import type { Palette } from './palette';
 import type { GpuStatus, RenderFeedback } from './renderer';
 
-export type RendererKind = 'canvas' | 'dom';
-
 export interface CodeRenderer {
   readonly layout: TextLayout;
   readonly stats: Readonly<Record<string, number>>;
@@ -17,9 +15,4 @@ export interface CodeRenderer {
   setPalette(palette: Palette): void;
   setPhases(phases: PhaseTimer | null): void;
   dispose(): void;
-}
-
-export function selectRendererKind(search: string, requested?: RendererKind): RendererKind {
-  if (requested !== undefined) return requested;
-  return new URLSearchParams(search).get('renderer') === 'dom' ? 'dom' : 'canvas';
 }

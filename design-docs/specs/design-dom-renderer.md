@@ -1,5 +1,7 @@
 # DOM Renderer Backend and Canvas-vs-DOM Comparison
 
+Status: Removed (2026-10-08); see design-renderer-comparison.md; code recoverable from commit 56601c2.
+
 **Status:** Proposed (2026-10-07). **Issue reference:** workflowInput issue
 "DOM (HTML) rendering backend for the editor and measured canvas-vs-DOM
 performance comparison" (workflow execution

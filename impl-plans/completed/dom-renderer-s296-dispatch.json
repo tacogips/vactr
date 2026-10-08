@@ -1,5 +1,7 @@
 {
   "taskId": "dom-renderer-s296",
+  "status": "Completed (2026-10-08; comparison evidence retained, backend and harness removed after no measured performance benefit)",
+  "completionNote": "Archived by user decision in the main checkout; no commit or push requested.",
   "workflowMode": "issue-resolution",
   "implementationBranch": "wf/dom-editor",
   "baseBranch": "wf/dom-editor",

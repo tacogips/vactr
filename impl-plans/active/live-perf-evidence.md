@@ -5,7 +5,7 @@
 **Design Reference**: `design-docs/specs/design-live-performance.md` 8.3, 8.4, 9, 11
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09 (session 343: section 12 title; accepted wave-2 dependencies)
 
 ## Intent and Context
 
@@ -37,6 +37,10 @@ lock), records the results in the design document, and archives the plans.
 
 - **dependsOn**: LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY,
   LP-EDITOR-STOP, LP-EDITOR-MOMENTARY.
+- Session 343: integration review has already accepted LP-ENGINE,
+  LP-SESSION-MOMENTARY, LP-EDITOR-STOP and LP-EDITOR-MOMENTARY (manifest
+  `acceptedDependencies`, commit ab377d6). The only remaining dispatched
+  dependency is LP-SESSION-STOP (TASK-S5).
 - **Blocks**: none.
 
 ## writePaths
@@ -210,7 +214,7 @@ runs in the verification records.
 
 ### TASK-V4: Verification record (`design-docs/specs/design-live-performance.md`)
 
-Append the section **"12. Verification record (session 307)"**. It holds:
+Append the section **"12. Verification record (session 343)"**. It holds:
 
 - a table with each gate command, its exit status, tests run and passed,
   and its log path;
@@ -267,3 +271,14 @@ Change nothing else in the design.
 ### Session: 2026-10-08 (plan authored)
 **Tasks Completed**: plan authored (step 4).
 **Notes**: Not started.
+
+### Session: 2026-10-09 (session 343 plan step)
+**Tasks Completed**: none. Plan text updated only.
+**Notes**:
+- The section 12 title now reads "session 343".
+- The dependency note now records that the other wave-2 plans are
+  accepted.
+- This plan runs after LP-SESSION-STOP TASK-S5 passes test-integrity,
+  adversarial and integration review.
+- Gate 3's rustfmt diff set is taken from 04dc4f2, so it also covers
+  `src/sched/runtime/song/clock_tests.rs`.

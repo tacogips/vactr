@@ -1,11 +1,11 @@
 # LP-SESSION-STOP: Scheduler stop modes, output-stop delivery, song stop, output telemetry
 
-**Status**: Step 6 implementation complete; LP-SS-ADV-1 repaired and verified; independent re-review pending
-**Plan ID**: LP-SESSION-STOP (wave 2; parallel with LP-ENGINE, LP-SESSION-MOMENTARY, LP-EDITOR-STOP, LP-EDITOR-MOMENTARY)
+**Status**: In Progress. TASK-S1 to TASK-S4 are implemented. TASK-S5 (session-343 scope amendment: host-native `stop_song` tests) is Ready.
+**Plan ID**: LP-SESSION-STOP (wave 2; the only wave-2 plan redispatched in session 343)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.1, 4.4, 4.5, 4.6, 8.1(5), D1, D2, D5
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-09 (session-343 scope amendment)
 
 ## Intent and Context
 
@@ -57,13 +57,30 @@ All of these live as behavior-preserving stubs in
 
 - `src/sched/runtime/live.rs`
 - `src/sched/control.rs`
-- `src/sched/runtime/song.rs` (adds `stop_song` only)
+- `src/sched/runtime/song.rs` (adds `stop_song` only; already done. It is
+  973 lines and must not change in the TASK-S5 redispatch.)
+- `src/sched/runtime/song/clock_tests.rs` (session-343 scope amendment;
+  TASK-S5 only: new host-native `stop_song` tests plus one source-parameterized
+  fixture helper. Existing tests stay behaviorally unchanged.)
 - `src/sched/tests/sched/live.rs`
 - `src/sched/tests/sched/control.rs` (new rows only; existing assertions unchanged)
 - `src/session/tests/live_stop.rs`
 - `impl-plans/active/live-perf-session-stop.md` (Progress Log only)
 - Artifact roots (also in the manifest's `artifactRoots`): `target`,
   `tmp/live-perf/session-stop`
+
+## trackedPaths
+
+The source snapshot paths, meaning the writePaths minus the artifact roots:
+
+- `src/sched/runtime/live.rs`
+- `src/sched/control.rs`
+- `src/sched/runtime/song.rs`
+- `src/sched/runtime/song/clock_tests.rs`
+- `src/sched/tests/sched/live.rs`
+- `src/sched/tests/sched/control.rs`
+- `src/session/tests/live_stop.rs`
+- `impl-plans/active/live-perf-session-stop.md`
 
 ## sharedPaths
 
@@ -173,6 +190,139 @@ These rules satisfy `SongTransport::cutoff`'s validation at
 src/sched/song.rs:544-556. Never pass an arrangement beyond the old one, or
 a tail deadline beyond the old one.
 
+### TASK-S5: Host-native `Runtime::stop_song` tests (`src/sched/runtime/song/clock_tests.rs`, session-343 amendment)
+
+**Why.** The open finding LP-SESS-STOP-TI-2-STOP-SONG-UNTESTED (mid): no
+test runs `Runtime::stop_song` (src/sched/runtime/song.rs:458) with a
+genuinely installed song. The pure `stop_endpoints` table rows in
+`src/sched/tests/sched/live.rs` do not cover the call path through
+`SongTransport::cutoff`, the host submission, or the Draining/Ended
+transitions. This task adds only tests. It changes no product code.
+
+**Where and why it is reachable.**
+- `clock_tests` is declared at song.rs:18 (`#[cfg(test)] mod clock_tests;`)
+  and starts with `use super::*;`.
+- It is a descendant of `sched::runtime`, so it can read the private field
+  `Runtime.song` (runtime.rs:155), `Runtime.cfg` (runtime.rs:146), and the
+  private fields of `SongRuntime` (`owners`, `clock`) and of `Running`
+  (`transport`, `activation`).
+- The existing tests already do this: `runtime.song.owners[0].transport`
+  at clock_tests.rs:279 and :320.
+- Do not widen any visibility. Do not edit `song.rs`, `runtime.rs`,
+  `live.rs` or `src/sched/song.rs`.
+
+**Pattern to copy.** Use
+`clock_tests.rs:rejected_new_epoch_clock_preserves_other_genuine_ready_owner`
+(lines 288-369):
+
+- `EngineConfig::new(&caps, 8000., MAX_BLOCK, StoreKind::NativeArc)` with
+  `caps.max_voices = 2` and `bus_slots = 12`;
+- `NativeAudioHost::headless_with_config(config, 64)`;
+- `genuine_ready(...)`;
+- `activation = audio.song_clock().unwrap().frame + 960`;
+- `Runtime::new(hosts, Rc::new(NoopHost), caps, RuntimeConfig::default())`
+  and `start_song(ready, activation)`;
+- a bounded loop of `take_host_msgs` + `tick_song` + `side.render(&mut pcm, 2)`
+  until `transport.applied_activation().is_some()` and
+  `transport.state() == SongTransportState::Playing`.
+
+Every loop is bounded (for example `for _ in 0..N`) and fails with a
+message if its exit condition is never reached. Never write
+`loop {}` / `while` without a bound.
+
+**Fixture change (the only change to existing code).**
+- Split `genuine_ready` into `genuine_ready_with(audio, side, caps, epoch,
+  source: &str)`.
+- `genuine_ready(audio, side, caps, epoch)` delegates with today's exact
+  source string. The two existing callers and their assertions are
+  unchanged.
+- Gate the new helper with `#[cfg(feature = "host-native")]`, the same as
+  `genuine_ready`.
+
+**Test source.**
+- The new tests need a song tail longer than zero, so the gentle tail
+  window is observable.
+- Use the same source with `tail-seconds: 1` instead of `tail-seconds: 0`
+  (`SongSettings.tail_seconds`, src/song/song.rs:16; the default is 8).
+- If `duration: 4` ends the arrangement before the stop can be issued
+  after Playing, raise the duration in the test source only.
+
+**New tests.** All are `#[cfg(feature = "host-native")] #[test]`. Names
+are suggestions.
+
+1. `stop_song_gentle_drains_then_ends_within_the_song_tail`
+   - Reach Playing. Capture:
+     - `old = transport.endpoints()`;
+     - `now = runtime.hosts.audio.song_clock().unwrap().frame`;
+     - `lead = (runtime.cfg.commit_lead * 8000.).round() as u64`.
+   - Call `runtime.stop_song(OutputMode::Gentle, &mut DrainReport::default())`
+     with a named report and check it.
+   - Expected:
+     - `rep.faults` is empty;
+     - `new = transport.endpoints()` has `new.epoch == old.epoch`;
+     - `new.arrangement == (now + lead).max(activation).min(old.arrangement)`;
+     - `now <= new.arrangement <= old.arrangement`;
+     - `new.tail_deadline - new.arrangement == (old.tail_deadline - old.arrangement)`,
+       capped so that `new.tail_deadline <= old.tail_deadline`;
+     - `new.tail_deadline > new.arrangement`. The tail window exists:
+       tails continue after the arrangement end.
+   - Then run the bounded render/tick loop. Record the song clock frame and
+     state on each iteration. Expected:
+     - Draining is observed before Ended;
+     - the first Draining frame is `>= new.arrangement`;
+     - Ended is observed within the bound;
+     - Ended is first observed at a song clock frame `>= new.tail_deadline`.
+       This is design 4.4: private branch tails run to the song's tail
+       deadline.
+   - `runtime.song_state()` ends as `Some(Ended)`. Faults from every tick
+     report stay empty.
+2. `stop_song_cut_ends_at_now_and_silences_the_song_branch`
+   - Reach Playing, then render further until a rendered block has a peak
+     `> 0`. This is the in-test control that proves the song is audible
+     before the cut. If the fixture never sounds, fix the test source,
+     never the product.
+   - Capture `now` as above and call `stop_song(OutputMode::Cut, ..)`.
+   - Expected:
+     - `rep.faults` is empty;
+     - `new.arrangement == new.tail_deadline == now.clamp(activation, old.arrangement)`;
+     - `new.epoch == old.epoch`.
+   - Run the bounded loop. Expected:
+     - the state reaches Ended;
+     - every sample rendered after `now + 64` frames (the existing 64-frame
+       song tail fade) plus one 128-frame block of slack is exactly `0.0`.
+       This shows the song's branch and effect state are cleared: nothing
+       rings after a cut.
+3. `stop_song_refusal_becomes_a_fault_and_never_panics`
+   - Reach Playing. Swap in a refusing host with
+     `std::mem::replace(&mut runtime.hosts.audio, Box::new(CachedHost { clock: <current native song_clock()>, refused: true, commands: Vec::new() }))`.
+     Reuse the `CachedHost` already in this file (lines 8-41), whose
+     `try_song_command` returns `SongSubmitError::Backpressure`.
+   - Call `stop_song(OutputMode::Gentle, &mut rep)`. Expected:
+     - no panic;
+     - `rep.faults.len() == 1` with `FailCode::BeyondCapability`. Match the
+       mapping at song.rs:520-532 and check the code field, not the message
+       text;
+     - `transport.endpoints() == old`: the refusal leaves ownership intact;
+     - `transport.state() == Playing`.
+   - In-test control: restore the native host (swap back), call
+     `stop_song(OutputMode::Gentle, ..)` again, and expect `faults` empty and
+     `endpoints().arrangement < old.arrangement`.
+   - Refusal through the ready path: if `transport.ready` is still `Some`,
+     `cutoff` submits through `ready.submit_initial_command(host, ..)`. That
+     still calls the host, so the refusing host covers both paths. Do not
+     reach into the private `ready` field.
+
+**Silence and resources.** These tests use the headless native host
+(`NativeAudioHost::headless_with_config`). It never opens a device, so the
+tests stay silent. Do not use `NativeAudioHost::open` or any CPAL device
+path.
+
+**Size.** `clock_tests.rs` is 369 lines. Keep it under 700 lines after
+TASK-S5, and well under 1000. If the tests need shared setup, add one
+private helper `fn playing_runtime(source: &str) -> (Runtime, AudioSide, u64 /*activation*/)`
+in this file. Do not add new files or modules (that would require edits to
+song.rs).
+
 ## Key Points a Careless Implementation Gets Wrong
 
 - `stop_all` must use **Natural**, not Panic. `hush` keeps **Panic**.
@@ -189,9 +339,19 @@ a tail deadline beyond the old one.
   `effects.rs` (contract-owned). If a call site there is wrong, record it
   in the Progress Log as a contract defect for serial repair. Do not fix
   it here.
-- Keep every touched file under 1000 lines. `runtime/song.rs` is 890 lines
-  today: if `stop_song` would push it over, put it in `live.rs` and call
-  only the existing public transport accessors.
+- Keep every touched file under 1000 lines. `runtime/song.rs` is now 973
+  lines. TASK-S5 must not touch it; the tests go only in `clock_tests.rs`.
+- TASK-S5 is tests only. If a TASK-S5 assertion that follows design 4.4 or
+  8.1(5) fails, the product disagrees with the design. Examples: Ended
+  before `tail_deadline`, non-zero output after a cut, or a panic on
+  refusal. Do not weaken, skip or `#[ignore]` the assertion, and do not
+  edit product code outside writePaths. Stop and report it as an
+  unrepaired blocking finding with the log path, so the workflow can route
+  the repair.
+- Do not `#[ignore]` the new tests, and do not gate them on anything other
+  than `feature = "host-native"`. The default features include
+  `host-native` (Cargo.toml `default = ["host-native"]`), so the focused
+  nextest filter `sched::runtime::song` runs them.
 
 ## Tests to Add (input -> expected)
 
@@ -224,6 +384,20 @@ existing sched test helpers:
   `arrangement == tail_deadline == clamp(now_frame, ..)`.
 - **No song:** a no-op.
 
+**`src/sched/runtime/song/clock_tests.rs`** (TASK-S5, host-native, genuine
+installed song through `genuine_ready_with`). These are the behavioral
+counterparts of the Song gentle and Song cut rows above:
+
+- Playing song, then `stop_song(Gentle)`: bounded early `Endpoints`,
+  `tail_deadline > arrangement`, Draining seen before Ended, and Ended no
+  earlier than `tail_deadline`. No faults.
+- Audible Playing song, then `stop_song(Cut)`:
+  `arrangement == tail_deadline == clamp(now)`, Ended, and every sample
+  exactly 0 after `now + 64 + 128` frames. No faults.
+- Playing song with a refusing host, then `stop_song(Gentle)`: exactly one
+  `BeyondCapability` fault, no panic, endpoints and Playing state
+  unchanged. After the native host is restored, a second stop succeeds.
+
 **`src/sched/tests/sched/control.rs`:** one new row asserting that
 `revoke_with(slot, Release::Panic)` gates a single slot. All existing rows
 are unchanged.
@@ -246,9 +420,20 @@ path:
 3. `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::tests::sched::(live|control)|session::tests::live_stop|sched::runtime::song|host::tests::e2e::sched_gaps|sched::tests::midi/)'`
    passes with testsRun > 0.
 4. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
-5. `rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs`
+5. `rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/runtime/song/clock_tests.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs`
+6. (TASK-S5 evidence) `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::runtime::song::clock_tests::stop_song_/)'`
+   passes with testsRun >= 3. This proves the three new tests exist and run
+   under the default features.
+7. `git diff --exit-code HEAD -- src/sched/runtime/song.rs src/sched/runtime.rs src/sched/runtime/live.rs`
+   exits 0. HEAD is the session-343 checkpoint commit, and TASK-S5 changes
+   none of these files.
+   `wc -l src/sched/runtime/song/clock_tests.rs` reports fewer than 1000
+   lines (target: under 700).
 
-Write logs to `tmp/live-perf/session-stop/*.log`.
+Write logs to `tmp/live-perf/session-stop/*.log`. Run every command serially
+and never concurrently with another cargo or nextest run. The focused
+nextest run does not need the measurement lock; the full suite belongs to
+LP-EVIDENCE.
 
 ## Completion Criteria
 
@@ -265,9 +450,19 @@ Write logs to `tmp/live-perf/session-stop/*.log`.
   tests in `src/sched/tests/sched/live.rs`; the Draining-to-Ended transition
   remains covered by existing `SongTransport::cutoff` tests. All focused tests
   pass.
-- [x] Verification 1-5 exit 0. Touched files are under 1000 lines. The
-  Progress Log is updated. Rustfmt passes and `src/sched/runtime/song.rs` is
-  973 lines.
+- [x] Verification 1-5 exit 0 (pre-amendment file set). Touched files are
+  under 1000 lines. The Progress Log is updated. Rustfmt passes and
+  `src/sched/runtime/song.rs` is 973 lines.
+- [ ] TASK-S5: the three host-native `stop_song` tests (gentle, cut,
+  refusal) are in `src/sched/runtime/song/clock_tests.rs`, using
+  `genuine_ready_with`. The existing clock_tests are unchanged in behavior.
+  No product file changed.
+- [ ] TASK-S5: verification 1-7 exit 0 on the final source. Verification 5
+  includes `clock_tests.rs`, and verification 6 reports testsRun >= 3. Log
+  paths are recorded in the Progress Log.
+- [ ] Finding LP-SESS-STOP-TI-2-STOP-SONG-UNTESTED is reported as repaired
+  only in addressedFeedback/resolvedFindings, with the test names and the
+  nextest log as evidence.
 
 ## Progress Log
 
@@ -389,3 +584,32 @@ files were formatted and the final check passed. Final focused nextest passed
 
 Independent re-review of the repaired finding is pending; no review acceptance
 is claimed.
+
+### Session: 2026-10-09 (session 343, operator-authorized scope amendment; plan step)
+**Tasks Completed**: Plan and manifest scope amendment only. No source change.
+**Notes**:
+- Review finding LP-SESS-STOP-TI-2-STOP-SONG-UNTESTED (mid): no test runs
+  `Runtime::stop_song` (src/sched/runtime/song.rs:458) with an installed
+  song.
+- It could not be repaired inside the previous writePaths, for four
+  reasons:
+  - `Runtime.song` is private (src/sched/runtime.rs:155);
+  - `SongRuntime` is `pub(super)` (song.rs:110);
+  - `song.rs` is 973 lines;
+  - the `genuine_ready` fixture is private to
+    `src/sched/runtime/song/clock_tests.rs:165`, which is cfg host-native
+    and 369 lines.
+- The operator authorized adding `src/sched/runtime/song/clock_tests.rs`
+  to this plan, as recorded in the workflowInput of
+  opus-luna-design-and-implement-review-loop-session-343. It was added to:
+  - writePaths and the new trackedPaths section above;
+  - the LP-SESSION-STOP entry (`writePaths`, `trackedPaths`) in
+    `impl-plans/active/live-perf-dispatch.json`;
+  - the rustfmt gate (Verification 5).
+- TASK-S5 and Verification 6-7 were added.
+- The historical verification records in the earlier entries above are
+  left unchanged, because they describe what those sessions actually ran.
+- The design is reused unchanged (design-live-performance.md D5, 4.4,
+  8.1(5)).
+- The checkpoint commit follows this entry. Only LP-SESSION-STOP (TASK-S5)
+  is redispatched, then LP-EVIDENCE.

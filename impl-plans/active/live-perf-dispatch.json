@@ -1,7 +1,8 @@
 {
   "taskId": "live-perf",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-343",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-346",
+  "session346": "Resume of session 344 at 62a18b5: all six implementation plans are accepted (LP-SESSION-STOP moved to acceptedDependencies); plans[] holds only LP-EVIDENCE, dispatched alone with --max-concurrency 1; design section 12 is titled for session 346; no re-plan.",
   "session343": {
     "resumeOf": "opus-luna-design-and-implement-review-loop-session-332",
     "originalHead": "ab377d69b333e26166356a680151e91ad5b984d3",
@@ -68,6 +69,12 @@
       "planPath": "impl-plans/active/live-perf-editor-momentary.md",
       "commit": "ab377d69b333e26166356a680151e91ad5b984d3",
       "provides": "Accepted by the session-332 integration review: right-drag and two-finger momentary tweak, glide/Shift snap release, context-menu suppression on sites, live value label, glide setting."
+    },
+    {
+      "planId": "LP-SESSION-STOP",
+      "planPath": "impl-plans/active/live-perf-session-stop.md",
+      "commit": "62a18b50b2509414cd242f105772b8c85957c72c",
+      "provides": "Accepted by the session-344 integration review: stop-all (every slot Natural, then one OutputStop Gentle), hush (Panic plus OutputStop Cut), per-slot Natural stop, OutputTracker re-send and no Cut downgrade, song gentle end and cut, TransportSample.output, and the TASK-S5 Runtime::stop_song tests in src/sched/runtime/song/clock_tests.rs."
     }
   ],
   "operatorRules": [
@@ -157,71 +164,12 @@
   },
   "plans": [
     {
-      "planId": "LP-SESSION-STOP",
-      "planPath": "impl-plans/active/live-perf-session-stop.md",
-      "wave": 2,
-      "dependsOn": [],
-      "acceptedDependsOn": ["LP-CONTRACT"],
-      "redispatchScope": "Session 343: TASK-S5 only (host-native Runtime::stop_song tests in src/sched/runtime/song/clock_tests.rs). TASK-S1 to TASK-S4 are implemented; no product source change.",
-      "writePaths": [
-        "src/sched/runtime/live.rs",
-        "src/sched/control.rs",
-        "src/sched/runtime/song.rs",
-        "src/sched/runtime/song/clock_tests.rs",
-        "src/sched/tests/sched/live.rs",
-        "src/sched/tests/sched/control.rs",
-        "src/session/tests/live_stop.rs",
-        "impl-plans/active/live-perf-session-stop.md",
-        "target",
-        "tmp/live-perf/session-stop"
-      ],
-      "trackedPaths": [
-        "src/sched/runtime/live.rs",
-        "src/sched/control.rs",
-        "src/sched/runtime/song.rs",
-        "src/sched/runtime/song/clock_tests.rs",
-        "src/sched/tests/sched/live.rs",
-        "src/sched/tests/sched/control.rs",
-        "src/session/tests/live_stop.rs",
-        "impl-plans/active/live-perf-session-stop.md"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target", "tmp/live-perf/session-stop"],
-      "scopeAmendments": [
-        {
-          "session": "opus-luna-design-and-implement-review-loop-session-343",
-          "authorizedBy": "operator (workflowInput)",
-          "finding": "LP-SESS-STOP-TI-2-STOP-SONG-UNTESTED (mid)",
-          "added": ["src/sched/runtime/song/clock_tests.rs"],
-          "reason": "Runtime.song is private (src/sched/runtime.rs:155), SongRuntime is pub(super) (src/sched/runtime/song.rs:110), song.rs is 973 lines, and the genuine_ready fixture is private to src/sched/runtime/song/clock_tests.rs:165 (cfg host-native)."
-        }
-      ],
-      "acceptanceCriteria": [
-        "stop-all: every slot Natural, live notes closed, then exactly one OutputStop{Gentle}; hush: Panic plus OutputStop{Cut}; per-slot stop: Natural only.",
-        "OutputTracker: wire() strings, re-send after resend_ticks (at most 3, then a diagnostic), Cut never downgraded by Gentle.",
-        "Song: gentle stop gives an early Endpoints within the original bounds (Draining, then Ended); cut gives arrangement == tail_deadline == now; a refusal becomes a fault, never a panic.",
-        "TASK-S5: host-native tests in src/sched/runtime/song/clock_tests.rs drive Runtime::stop_song on a genuine installed song (genuine_ready_with): gentle -> bounded Endpoints, tail_deadline > arrangement, Draining before Ended, Ended no earlier than tail_deadline, no faults; cut -> arrangement == tail_deadline == clamp(now), Ended, exact zeros after now + 64 + 128 frames with a pre-cut audible control; refusal -> exactly one BeyondCapability fault, no panic, endpoints and Playing unchanged, a later stop on the restored host succeeds.",
-        "TASK-S5 changes no product file: git diff --exit-code HEAD -- src/sched/runtime/song.rs src/sched/runtime.rs src/sched/runtime/live.rs exits 0; clock_tests.rs stays under 1000 lines.",
-        "TransportSample.output == 'draining' after an OutputState report; the key is absent before any report."
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo build --all-targets",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::tests::sched::(live|control)|session::tests::live_stop|sched::runtime::song|host::tests::e2e::sched_gaps|sched::tests::midi/)'",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/runtime/song/clock_tests.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs",
-        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::runtime::song::clock_tests::stop_song_/)'",
-        "git diff --exit-code HEAD -- src/sched/runtime/song.rs src/sched/runtime.rs src/sched/runtime/live.rs",
-        "wc -l src/sched/runtime/song/clock_tests.rs"
-      ]
-    },
-    {
       "planId": "LP-EVIDENCE",
       "planPath": "impl-plans/active/live-perf-evidence.md",
       "wave": 3,
-      "dependsOn": ["LP-SESSION-STOP"],
-      "acceptedDependsOn": ["LP-CONTRACT", "LP-ENGINE", "LP-SESSION-MOMENTARY", "LP-EDITOR-STOP", "LP-EDITOR-MOMENTARY"],
+      "dependsOn": [],
+      "acceptedDependsOn": ["LP-CONTRACT", "LP-ENGINE", "LP-SESSION-MOMENTARY", "LP-EDITOR-STOP", "LP-EDITOR-MOMENTARY", "LP-SESSION-STOP"],
+      "redispatchScope": "Session 346: the whole plan (TASK-V1 to TASK-V5); nothing in it is implemented yet. Design section 12 is titled for session 346.",
       "writePaths": [
         "editor/src/code/perf-hook.ts",
         "editor/src/code/mount.ts",

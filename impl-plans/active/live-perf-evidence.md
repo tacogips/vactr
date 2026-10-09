@@ -5,7 +5,7 @@
 **Design Reference**: `design-docs/specs/design-live-performance.md` 8.3, 8.4, 9, 11
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09 (session 343: section 12 title; accepted wave-2 dependencies)
+**Last Updated**: 2026-10-10 (session 346: section 12 title; all six dependencies accepted)
 
 ## Intent and Context
 
@@ -37,10 +37,12 @@ lock), records the results in the design document, and archives the plans.
 
 - **dependsOn**: LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY,
   LP-EDITOR-STOP, LP-EDITOR-MOMENTARY.
-- Session 343: integration review has already accepted LP-ENGINE,
-  LP-SESSION-MOMENTARY, LP-EDITOR-STOP and LP-EDITOR-MOMENTARY (manifest
-  `acceptedDependencies`, commit ab377d6). The only remaining dispatched
-  dependency is LP-SESSION-STOP (TASK-S5).
+- Session 346: integration review has accepted all six implementation
+  plans: LP-CONTRACT, LP-ENGINE, LP-SESSION-MOMENTARY, LP-EDITOR-STOP and
+  LP-EDITOR-MOMENTARY (ab377d6 and earlier), and LP-SESSION-STOP (session
+  344, 62a18b5). All six are in the manifest's `acceptedDependencies`, so
+  this plan has no pending dependency and is the only dispatched plan. Do
+  not modify any accepted plan's product files.
 - **Blocks**: none.
 
 ## writePaths
@@ -214,7 +216,7 @@ runs in the verification records.
 
 ### TASK-V4: Verification record (`design-docs/specs/design-live-performance.md`)
 
-Append the section **"12. Verification record (session 343)"**. It holds:
+Append the section **"12. Verification record (session 346)"**. It holds:
 
 - a table with each gate command, its exit status, tests run and passed,
   and its log path;
@@ -282,3 +284,12 @@ Change nothing else in the design.
   adversarial and integration review.
 - Gate 3's rustfmt diff set is taken from 04dc4f2, so it also covers
   `src/sched/runtime/song/clock_tests.rs`.
+
+### Session: 2026-10-10 (session 346 plan step)
+**Tasks Completed**: none. Plan text and manifest updated only (no re-plan).
+**Notes**:
+- LP-SESSION-STOP was accepted in session 344 (62a18b5). The manifest moves
+  it to `acceptedDependencies`, so `plans[]` holds only LP-EVIDENCE with an
+  empty `dependsOn`.
+- The section 12 title now reads "session 346".
+- TASK-V1 to TASK-V5 are unchanged and still pending.

@@ -168,6 +168,23 @@ fn genuine_ready(
     caps: CapabilitySet,
     epoch: SnapshotEpoch,
 ) -> SongReadyBundle {
+    genuine_ready_with(
+        audio,
+        side,
+        caps,
+        epoch,
+        "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone}] duration: 4} tail-seconds: 0 > play-song",
+    )
+}
+
+#[cfg(feature = "host-native")]
+fn genuine_ready_with(
+    audio: &mut crate::host::native::audio::NativeAudioHost,
+    side: &mut crate::host::native::audio::AudioSide,
+    caps: CapabilitySet,
+    epoch: SnapshotEpoch,
+    source: &str,
+) -> SongReadyBundle {
     use crate::song::assets::{DecodedSongAssetFactory, SongAssetLimits};
     let factory =
         DecodedSongAssetFactory::new(Default::default(), Default::default(), Default::default());
@@ -185,10 +202,9 @@ fn genuine_ready(
         lock: None,
         cache: None,
     };
-    let candidate = crate::session::song::evaluate_song_candidate(
-        "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone}] duration: 4} tail-seconds: 0 > play-song",
-        "clock.vact", 1, epoch, &context,
-    ).unwrap();
+    let candidate =
+        crate::session::song::evaluate_song_candidate(source, "clock.vact", 1, epoch, &context)
+            .unwrap();
     let prepared = crate::song::prepare_song(candidate).unwrap();
     let mut owner = SongHostPreparation::begin(
         prepared,
@@ -219,6 +235,233 @@ fn genuine_ready(
         }
     }
     owner.take_ready().unwrap()
+}
+
+#[cfg(feature = "host-native")]
+fn genuine_playing_runtime(source: &str) -> (Runtime, crate::host::native::audio::AudioSide) {
+    use crate::dsp::{arena::StoreKind, engine::EngineConfig};
+    use crate::host::{caps::Hosts, native::audio::NativeAudioHost, noop::NoopHost};
+    let mut caps = CapabilitySet::native();
+    caps.max_voices = 2;
+    let mut config = EngineConfig::new(
+        &caps,
+        8000.,
+        crate::host::native::audio::MAX_BLOCK,
+        StoreKind::NativeArc,
+    );
+    config.bus_slots = 12;
+    let (mut audio, mut side) = NativeAudioHost::headless_with_config(config, 64).unwrap();
+    let ready = genuine_ready_with(&mut audio, &mut side, caps, SnapshotEpoch(44), source);
+    let activation = audio.song_clock().unwrap().frame + 960;
+    let mut hosts = Hosts::noop();
+    hosts.audio = Box::new(audio);
+    let (mut runtime, _) = Runtime::new(hosts, Rc::new(NoopHost), caps, RuntimeConfig::default());
+    runtime
+        .start_song(ready, activation)
+        .map_err(|refusal| refusal.failure)
+        .unwrap();
+
+    let mut pcm = [0.; 256];
+    let mut playing = false;
+    for _ in 0..64 {
+        let mut report = TickReport::default();
+        runtime.take_host_msgs(&mut report);
+        runtime.tick_song(&mut report);
+        assert!(report.faults.is_empty(), "{:?}", report.faults);
+        // Rendering advances the same native engine clock used by stop_song.
+        // The side belongs to the wrapped host and remains independently owned.
+        side.render(&mut pcm, 2);
+        let transport = &runtime.song.owners[0].transport;
+        if transport.applied_activation().is_some()
+            && transport.state() == SongTransportState::Playing
+        {
+            playing = true;
+            break;
+        }
+    }
+    assert!(
+        playing,
+        "genuine native song reached Playing within the bound"
+    );
+    (runtime, side)
+}
+
+#[cfg(feature = "host-native")]
+#[test]
+fn stop_song_gentle_drains_installed_song_until_tail_deadline() {
+    let source = "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone}] duration: 8} tail-seconds: 1 > play-song";
+    let (mut runtime, mut side) = genuine_playing_runtime(source);
+    let old = runtime.song.owners[0].transport.endpoints();
+    let activation = runtime.song.owners[0].activation;
+    let now = runtime.hosts.audio.song_clock().unwrap().frame;
+    let lead = (runtime.cfg.commit_lead * 8000.).round() as u64;
+    let mut report = DrainReport::default();
+    runtime.stop_song(OutputMode::Gentle, &mut report);
+
+    assert!(report.faults.is_empty(), "{:?}", report.faults);
+    let transport = &runtime.song.owners[0].transport;
+    let endpoints = transport.endpoints();
+    assert_eq!(endpoints.epoch, old.epoch);
+    assert_eq!(
+        endpoints.arrangement,
+        now.saturating_add(lead)
+            .max(activation)
+            .min(old.arrangement)
+    );
+    assert!(now <= endpoints.arrangement);
+    assert!(endpoints.arrangement <= old.arrangement);
+    assert_eq!(
+        endpoints.tail_deadline,
+        endpoints
+            .arrangement
+            .saturating_add(old.tail_deadline - old.arrangement)
+            .min(old.tail_deadline)
+    );
+    assert!(endpoints.tail_deadline > endpoints.arrangement);
+    assert!(endpoints.tail_deadline <= old.tail_deadline);
+    let mut pcm = [0.; 128];
+    let mut draining = false;
+    for _ in 0..64 {
+        side.render(&mut pcm, 2);
+        let clock = runtime.hosts.audio.song_clock().unwrap();
+        let mut first_tick = TickReport::default();
+        runtime.take_host_msgs(&mut first_tick);
+        runtime.tick_song(&mut first_tick);
+        assert!(first_tick.faults.is_empty(), "{:?}", first_tick.faults);
+        if clock.frame >= endpoints.arrangement {
+            draining = true;
+            break;
+        }
+    }
+    assert!(
+        draining,
+        "native clock reached the gentle arrangement endpoint"
+    );
+    assert_eq!(
+        runtime.song.owners[0].transport.state(),
+        SongTransportState::Draining
+    );
+
+    let mut ended = false;
+    for _ in 0..512 {
+        side.render(&mut pcm, 2);
+        let clock = runtime.hosts.audio.song_clock().unwrap();
+        let mut tick = TickReport::default();
+        runtime.take_host_msgs(&mut tick);
+        runtime.tick_song(&mut tick);
+        assert!(tick.faults.is_empty(), "{:?}", tick.faults);
+        if runtime.song_state() == Some(SongTransportState::Ended) {
+            assert!(clock.frame >= endpoints.tail_deadline);
+            ended = true;
+            break;
+        }
+    }
+    assert!(
+        ended,
+        "gentle native stop reached Ended within the bounded tail"
+    );
+    assert_eq!(runtime.song_state(), Some(SongTransportState::Ended));
+}
+
+#[cfg(feature = "host-native")]
+#[test]
+fn stop_song_cut_ends_now_and_clears_output_after_bounded_fade() {
+    let source = "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone}] duration: 8} tail-seconds: 1 > play-song";
+    let (mut runtime, mut side) = genuine_playing_runtime(source);
+    let mut before = [0.; 256];
+    side.render(&mut before, 2);
+    assert!(
+        before.iter().any(|sample| sample.abs() > 1e-6),
+        "song is audible before cut"
+    );
+    let old = runtime.song.owners[0].transport.endpoints();
+    let activation = runtime.song.owners[0].activation;
+    let now = runtime.hosts.audio.song_clock().unwrap().frame;
+    let mut report = DrainReport::default();
+    runtime.stop_song(OutputMode::Cut, &mut report);
+
+    assert!(report.faults.is_empty(), "{:?}", report.faults);
+    let endpoints = runtime.song.owners[0].transport.endpoints();
+    assert_eq!(endpoints.epoch, old.epoch);
+    assert_eq!(
+        endpoints.arrangement,
+        now.clamp(activation, old.arrangement)
+    );
+    assert_eq!(endpoints.tail_deadline, endpoints.arrangement);
+
+    let mut fade_and_clear = [0.; (64 + 128) * 2];
+    side.render(&mut fade_and_clear, 2);
+    let mut after_clear = [0.; 128];
+    side.render(&mut after_clear, 2);
+    assert!(after_clear.iter().all(|sample| *sample == 0.0));
+
+    let mut ended = false;
+    for _ in 0..8 {
+        let mut tick = TickReport::default();
+        runtime.take_host_msgs(&mut tick);
+        runtime.tick_song(&mut tick);
+        assert!(tick.faults.is_empty(), "{:?}", tick.faults);
+        if runtime.song_state() == Some(SongTransportState::Ended) {
+            ended = true;
+            break;
+        }
+        side.render(&mut after_clear, 2);
+    }
+    assert!(ended, "cut native stop reaches Ended within the bound");
+}
+
+#[cfg(feature = "host-native")]
+#[test]
+fn stop_song_refusal_is_fault_and_later_stop_succeeds() {
+    let source = "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone}] duration: 8} tail-seconds: 1 > play-song";
+    let (mut runtime, mut side) = genuine_playing_runtime(source);
+    let old = runtime.song.owners[0].transport.endpoints();
+    let clock = runtime.hosts.audio.song_clock().unwrap();
+    let native_host = std::mem::replace(
+        &mut runtime.hosts.audio,
+        Box::new(CachedHost {
+            clock,
+            refused: true,
+            commands: Vec::new(),
+        }),
+    );
+    let mut report = DrainReport::default();
+    runtime.stop_song(OutputMode::Gentle, &mut report);
+
+    assert_eq!(report.faults.len(), 1);
+    assert_eq!(report.faults[0].code, FailCode::BeyondCapability);
+    let transport = &runtime.song.owners[0].transport;
+    assert_eq!(transport.endpoints(), old);
+    assert_eq!(transport.state(), SongTransportState::Playing);
+
+    runtime.hosts.audio = native_host;
+    let mut restored = DrainReport::default();
+    runtime.stop_song(OutputMode::Gentle, &mut restored);
+    assert!(restored.faults.is_empty(), "{:?}", restored.faults);
+    let mut pcm = [0.; 128];
+    let endpoints = runtime.song.owners[0].transport.endpoints();
+    let mut draining = false;
+    for _ in 0..64 {
+        side.render(&mut pcm, 2);
+        let clock = runtime.hosts.audio.song_clock().unwrap();
+        let mut tick = TickReport::default();
+        runtime.take_host_msgs(&mut tick);
+        runtime.tick_song(&mut tick);
+        assert!(tick.faults.is_empty(), "{:?}", tick.faults);
+        if clock.frame >= endpoints.arrangement {
+            draining = true;
+            break;
+        }
+    }
+    assert!(
+        draining,
+        "native clock reached the recovered arrangement endpoint"
+    );
+    assert_eq!(
+        runtime.song.owners[0].transport.state(),
+        SongTransportState::Draining
+    );
+    assert!(runtime.song.owners[0].transport.endpoints().arrangement < old.arrangement);
 }
 
 #[cfg(feature = "host-native")]

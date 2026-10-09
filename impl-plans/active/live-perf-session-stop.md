@@ -453,14 +453,14 @@ LP-EVIDENCE.
 - [x] Verification 1-5 exit 0 (pre-amendment file set). Touched files are
   under 1000 lines. The Progress Log is updated. Rustfmt passes and
   `src/sched/runtime/song.rs` is 973 lines.
-- [ ] TASK-S5: the three host-native `stop_song` tests (gentle, cut,
+- [x] TASK-S5: the three host-native `stop_song` tests (gentle, cut,
   refusal) are in `src/sched/runtime/song/clock_tests.rs`, using
   `genuine_ready_with`. The existing clock_tests are unchanged in behavior.
   No product file changed.
-- [ ] TASK-S5: verification 1-7 exit 0 on the final source. Verification 5
+- [x] TASK-S5: verification 1-7 exit 0 on the final source. Verification 5
   includes `clock_tests.rs`, and verification 6 reports testsRun >= 3. Log
   paths are recorded in the Progress Log.
-- [ ] Finding LP-SESS-STOP-TI-2-STOP-SONG-UNTESTED is reported as repaired
+- [x] Finding LP-SESS-STOP-TI-2-STOP-SONG-UNTESTED is reported as repaired
   only in addressedFeedback/resolvedFindings, with the test names and the
   nextest log as evidence.
 
@@ -613,3 +613,48 @@ is claimed.
   8.1(5)).
 - The checkpoint commit follows this entry. Only LP-SESSION-STOP (TASK-S5)
   is redispatched, then LP-EVIDENCE.
+
+### Session: 2026-10-10 (step 6 TASK-S5 implementation)
+**Tasks Completed**: Added genuine installed-song host-native gentle, cut,
+and refusal tests; completed final-source verification 1-7.
+**Notes**:
+- `genuine_ready_with` accepts the test source; existing `genuine_ready`
+  delegates using its original source string. The bounded fixture helper
+  drives the real headless native host until the installed song is Playing.
+- `stop_song_gentle_drains_installed_song_until_tail_deadline` asserts the
+  exact bounded endpoint formula and epoch, observes Draining at/after the
+  arrangement endpoint, then Ended at/after the tail deadline with no faults.
+- `stop_song_cut_ends_now_and_clears_output_after_bounded_fade` proves the
+  song is audible before cut, asserts the clamped immediate endpoints and
+  epoch, then verifies exact output zeros after 64 + 128 frames and Ended.
+- `stop_song_refusal_is_fault_and_later_stop_succeeds` temporarily swaps in
+  the existing refusing `CachedHost`; it verifies exactly one
+  BeyondCapability fault, unchanged endpoints and Playing state, then restores
+  the exact native host and confirms a later gentle stop succeeds.
+- The first focused attempt exited 100 (0/3 passed) because it assumed the
+  transport state changed on command submission and indexed a retired owner;
+  `task-s5-focused-nextest.log` records the complete run. The second focused
+  attempt exited 100 (1/3 passed) because Draining is reached only after the
+  host clock advances to the arrangement endpoint;
+  `task-s5-repair-focused-nextest.log` records the complete run. Tests were
+  corrected to follow engine clock/acknowledgment transitions, and the final
+  source-matched reruns below pass.
+- `CARGO_TERM_QUIET=true cargo build --all-targets` passed
+  (`tmp/live-perf/session-stop/task-s5-final2-build-all-targets.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+  passed (`tmp/live-perf/session-stop/task-s5-final2-clippy.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::tests::sched::(live|control)|session::tests::live_stop|sched::runtime::song|host::tests::e2e::sched_gaps|sched::tests::midi/)'`
+  passed 66/66 (`tmp/live-perf/session-stop/task-s5-final2-combined-nextest.log`).
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+  passed (`tmp/live-perf/session-stop/task-s5-final2-wasm-build.log`).
+- `rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/runtime/song/clock_tests.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs`
+  passed (`tmp/live-perf/session-stop/task-s5-final2-rustfmt-check.log`).
+- `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib -E 'test(/sched::runtime::song::clock_tests::stop_song_/)'`
+  passed 3/3 (`tmp/live-perf/session-stop/task-s5-final2-focused-nextest.log`).
+- `git diff --exit-code HEAD -- src/sched/runtime/song.rs src/sched/runtime.rs src/sched/runtime/live.rs`
+  passed (`tmp/live-perf/session-stop/task-s5-final-product-scope.log`);
+  `wc -l src/sched/runtime/song/clock_tests.rs` reports 612 lines
+  (`tmp/live-perf/session-stop/task-s5-final2-line-count.log`).
+- No product file changed. The test file remains below the plan's 700-line
+  target. Formal reviews, LP-EVIDENCE, shared closeout, commit, and push remain
+  downstream workflow steps.

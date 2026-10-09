@@ -275,8 +275,26 @@ impl Session {
                     for cell in &cells {
                         if cell.stepped {
                             let rounded = cell.target.round();
-                            if rounded.to_bits() != cell.base.to_bits() && cell.acked {
-                                self.post_single_ramp(cell, rounded, 0, false, now);
+                            let previous = entry
+                                .cells
+                                .iter()
+                                .find(|previous| {
+                                    previous.id == cell.id && previous.epoch == cell.epoch
+                                })
+                                .map(|previous| previous.target.round())
+                                .unwrap_or_else(|| {
+                                    if entry.releasing {
+                                        entry.ramp.from.round() as f32
+                                    } else {
+                                        cell.base
+                                    }
+                                });
+                            if cell.acked && rounded.to_bits() != previous.to_bits() {
+                                if entry.releasing && rounded.to_bits() == cell.base.to_bits() {
+                                    self.post_single_ramp(cell, cell.base, 0, true, now);
+                                } else {
+                                    self.post_single_ramp(cell, rounded, 0, false, now);
+                                }
                             }
                         }
                     }
@@ -293,6 +311,9 @@ impl Session {
                 slot.set_momentary(None);
                 for cell in &entry.cells {
                     self.rt.cells.set_momentary(cell.id, cell.epoch, None);
+                    if cell.stepped && cell.acked {
+                        self.post_single_ramp(cell, cell.base, 0, true, now);
+                    }
                 }
                 if changed {
                     self.stage_slot_value(&slot, None);
@@ -559,8 +580,12 @@ impl Session {
     ) {
         let sr = self.rt.cfg.sample_rate;
         let frames = host_frame((end - now).max(0.0), sr).min(u64::from(u32::MAX)) as u32;
+        let stepped_glide = release && end - now > MIN_RAMP_S + 1e-9;
         for cell in cells {
             if !cell.acked {
+                continue;
+            }
+            if cell.stepped && stepped_glide {
                 continue;
             }
             let encoded = if release { cell.base } else { cell.target };

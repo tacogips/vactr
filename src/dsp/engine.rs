@@ -422,15 +422,16 @@ impl Engine {
         self.retire_song_runtime(self.frame);
         self.reap_returned_song_epochs();
         self.retire(io);
-        if let Some((phase, frame)) = self.output.pending_report {
+        while let Some((source, phase, frame)) = self.output.next_report() {
             if io
                 .acks
                 .push_critical(HostMsg::OutputState { phase, frame })
-                .is_ok()
+                .is_err()
             {
-                self.output.last_reported = phase;
-                self.output.pending_report = None;
+                break;
             }
+            self.output.last_reported = phase;
+            self.output.consume_report(source);
         }
         self.publish(io);
         self.blocks += 1;
@@ -469,10 +470,16 @@ impl Engine {
         let mut credit = INSTALL_BYTES_PER_QUANTUM;
         let mut batch = true;
         let mut copied = 0;
-        while let Some(rec) = io.controls.next(Budget {
-            install_bytes: credit,
-            batch,
-        }) {
+        loop {
+            if self.output.stop_acks_full() {
+                break;
+            }
+            let Some(rec) = io.controls.next(Budget {
+                install_bytes: credit,
+                batch,
+            }) else {
+                break;
+            };
             let cost = rec.install_bytes().min(credit);
             credit -= cost;
             copied += cost;

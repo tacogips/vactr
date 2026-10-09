@@ -1,3 +1,4 @@
+use crate::dsp::ring::CHANNEL_CAPACITY;
 use crate::host::wire::{OutputMode, OutputPhase};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -8,6 +9,12 @@ pub(super) enum Phase {
     ClearingCut,
     ClearingIdle,
     Idle,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ReportSource {
+    PhaseChange,
+    StopAck,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -29,6 +36,9 @@ pub(super) struct OutputStage {
     pub clear: ClearCursor,
     pub last_reported: OutputPhase,
     pub pending_report: Option<(OutputPhase, u64)>,
+    stop_acks: [Option<(OutputPhase, u64)>; CHANNEL_CAPACITY],
+    stop_ack_head: usize,
+    stop_ack_len: usize,
     admitted_during_cut_clear: bool,
     fade_in: bool,
 }
@@ -44,6 +54,9 @@ impl OutputStage {
             clear: ClearCursor::default(),
             last_reported: OutputPhase::Running,
             pending_report: None,
+            stop_acks: [None; CHANNEL_CAPACITY],
+            stop_ack_head: 0,
+            stop_ack_len: 0,
             admitted_during_cut_clear: false,
             fade_in: false,
         }
@@ -61,12 +74,74 @@ impl OutputStage {
     fn transition(&mut self, phase: Phase, frame: u64) {
         self.phase = phase;
         let wire = self.wire_phase();
-        if wire != self.last_reported {
+        if wire != self.latest_report_phase() {
             self.pending_report = Some((wire, frame));
         }
     }
 
+    fn latest_report_phase(&self) -> OutputPhase {
+        let queued = (self.stop_ack_len > 0)
+            .then(|| {
+                let tail = (self.stop_ack_head + self.stop_ack_len - 1) % CHANNEL_CAPACITY;
+                self.stop_acks[tail]
+            })
+            .flatten();
+        match (self.pending_report, queued) {
+            (Some(pending), Some(queued)) if pending.1 > queued.1 => pending.0,
+            (Some(_), Some(queued)) => queued.0,
+            (Some(pending), None) => pending.0,
+            (None, Some(queued)) => queued.0,
+            (None, None) => self.last_reported,
+        }
+    }
+
+    pub fn stop_acks_full(&self) -> bool {
+        self.stop_ack_len == CHANNEL_CAPACITY
+    }
+
+    pub fn next_report(&self) -> Option<(ReportSource, OutputPhase, u64)> {
+        let queued = if self.stop_ack_len > 0 {
+            self.stop_acks[self.stop_ack_head]
+        } else {
+            None
+        };
+        match (self.pending_report, queued) {
+            (Some(pending), Some(queued)) if pending.1 < queued.1 => {
+                Some((ReportSource::PhaseChange, pending.0, pending.1))
+            }
+            (Some(_), Some(queued)) => Some((ReportSource::StopAck, queued.0, queued.1)),
+            (Some(pending), None) => Some((ReportSource::PhaseChange, pending.0, pending.1)),
+            (None, Some(queued)) => Some((ReportSource::StopAck, queued.0, queued.1)),
+            (None, None) => None,
+        }
+    }
+
+    pub fn consume_report(&mut self, source: ReportSource) {
+        match source {
+            ReportSource::PhaseChange => self.pending_report = None,
+            ReportSource::StopAck => {
+                if self.stop_ack_len == 0 {
+                    return;
+                }
+                self.stop_acks[self.stop_ack_head] = None;
+                self.stop_ack_head = (self.stop_ack_head + 1) % CHANNEL_CAPACITY;
+                self.stop_ack_len -= 1;
+            }
+        }
+    }
+
+    fn push_stop_ack(&mut self, ack: (OutputPhase, u64)) {
+        debug_assert!(
+            !self.stop_acks_full(),
+            "stop ack FIFO must be backpressured"
+        );
+        let tail = (self.stop_ack_head + self.stop_ack_len) % CHANNEL_CAPACITY;
+        self.stop_acks[tail] = Some(ack);
+        self.stop_ack_len += 1;
+    }
+
     pub fn stop(&mut self, mode: OutputMode, frame: u64, sr: f32, fade_seconds: f32) {
+        let pending_before_stop = self.pending_report;
         match mode {
             OutputMode::Gentle => match self.phase {
                 Phase::Running | Phase::Draining => {
@@ -83,7 +158,9 @@ impl OutputStage {
             }
             OutputMode::Cut => {}
         }
-        self.pending_report = Some((self.wire_phase(), frame));
+        let phase = self.wire_phase();
+        self.pending_report = pending_before_stop;
+        self.push_stop_ack((phase, frame));
     }
 
     pub fn admit(&mut self, frame: u64) {

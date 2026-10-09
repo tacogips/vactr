@@ -1,11 +1,11 @@
 # LP-EDITOR-STOP: Stop and cut shortcuts, toolbar labels, output state display
 
-**Status**: Ready (after LP-CONTRACT)
+**Status**: In Progress (implementation complete; awaiting assigned review steps)
 **Plan ID**: LP-EDITOR-STOP (wave 2; parallel with LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-MOMENTARY)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.1, 4.5, 6, 8.2 (shortcuts, toolbar), D1, D2, D10
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Intent and Context
 
@@ -245,3 +245,8 @@ Write logs to `tmp/live-perf/editor-stop/*.log`.
 **Tasks Completed**: TASK-T1 through TASK-T4.
 **Verification**: `cd editor && npm run check` passed (exit 0); focused Vitest passed (81/81); code/UI/protocol Vitest passed (279/279). Final-source logs: `tmp/live-perf/editor-stop/editor-check-final2.log`, `tmp/live-perf/editor-stop/vitest-focused-final2.log`, `tmp/live-perf/editor-stop/vitest-code-ui-protocol-final2.log`, and `tmp/live-perf/editor-stop/eval-keymap-check.log`.
 **Notes**: The app-level capture listener owns both shortcuts, the code keymap binding is removed, stop-all sends one message and clears highlights, toolbar output labels reflect sampled state, and all assigned criteria are complete. Browser style verification remains with LP-EVIDENCE.
+
+### Session: 2026-10-09 (Step 6 current-source verification)
+**Tasks Completed**: Revalidated TASK-T1 through TASK-T4 on the current shared source; all assigned completion criteria remain satisfied.
+**Verification**: `cd editor && npm run check` exit 0 (`tmp/live-perf/editor-stop/editor-check-step6.log`); `cd editor && ./node_modules/.bin/vitest run test/ui test/code/transport.test.ts test/code/eval.test.ts test/canvas/input.test.ts` exit 0 (81/81; `tmp/live-perf/editor-stop/vitest-focused-step6.log`); `cd editor && ./node_modules/.bin/vitest run test/code test/ui test/protocol` exit 0 (279/279; `tmp/live-perf/editor-stop/vitest-code-ui-protocol-step6.log`). The explicit keymap absence check passed (`tmp/live-perf/editor-stop/eval-keymap-step6.log`).
+**Notes**: The assigned implementation was already present on the accepted shared branch, so no editor source or test files required changes in this node. Browser style verification, formal review and closeout remain with downstream workflow steps.

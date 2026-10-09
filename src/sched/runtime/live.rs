@@ -144,7 +144,12 @@ pub(crate) fn stop_endpoints(
     old: SongEndpoints,
 ) -> Option<SongEndpoints> {
     match mode {
-        OutputMode::Gentle if state == SongTransportState::Playing => {
+        OutputMode::Gentle
+            if matches!(
+                state,
+                SongTransportState::Playing | SongTransportState::Prepared
+            ) =>
+        {
             let arrangement = now_frame
                 .saturating_add(lead_frames)
                 .max(activation_frame)
@@ -160,7 +165,9 @@ pub(crate) fn stop_endpoints(
         OutputMode::Cut
             if matches!(
                 state,
-                SongTransportState::Playing | SongTransportState::Draining
+                SongTransportState::Prepared
+                    | SongTransportState::Playing
+                    | SongTransportState::Draining
             ) =>
         {
             let arrangement = now_frame.max(activation_frame).min(old.arrangement);

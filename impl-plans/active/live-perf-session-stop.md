@@ -1,11 +1,11 @@
 # LP-SESSION-STOP: Scheduler stop modes, output-stop delivery, song stop, output telemetry
 
-**Status**: In Progress (review repair implemented; final verification blocked by LP-SESSION-MOMENTARY compilation)
+**Status**: Step 6 implementation complete; LP-SS-ADV-1 repaired and verified; independent re-review pending
 **Plan ID**: LP-SESSION-STOP (wave 2; parallel with LP-ENGINE, LP-SESSION-MOMENTARY, LP-EDITOR-STOP, LP-EDITOR-MOMENTARY)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.1, 4.4, 4.5, 4.6, 8.1(5), D1, D2, D5
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Intent and Context
 
@@ -253,21 +253,21 @@ Write logs to `tmp/live-perf/session-stop/*.log`.
 ## Completion Criteria
 
 - [x] TASK-S1 to TASK-S4 source behavior is implemented.
-- [ ] Every listed test passes. Existing control, MIDI and sched_gaps
+- [x] Every listed test passes. Existing control, MIDI and sched_gaps
   assertions are unchanged. OutputStop timeout diagnostics defer while slot
   controls remain outstanding, allowing one slot diagnostic to own the
-  outage. New diagnostic and endpoint behavior tests are present but remain
-  unverified because the combined tree does not compile in the unowned
-  LP-SESSION-MOMENTARY files.
+  outage. The diagnostic test disables the rig's automatic acknowledgments
+  so this scenario actually retains outstanding slot controls.
 - [x] Added scheduler/session tests for stop-all Natural plus Gentle, hush
   Panic plus Cut, per-slot Natural only, output ordering, retry/ack behavior,
   telemetry omission/mapping, no-song no-op, and OutputStop/slot diagnostic
-  de-duplication. Added pure Playing/Draining endpoint behavior table tests in
-  `src/sched/tests/sched/live.rs`; the Draining-to-Ended transition remains
-  covered by existing `SongTransport::cutoff` tests. Test execution is pending.
-- [ ] Verification 1-5 exit 0. Touched files are under 1000 lines. The
-  Progress Log is updated. Rustfmt passes and the touched song file is 950
-  lines; compile-dependent gates remain blocked by LP-SESSION-MOMENTARY.
+  de-duplication. Added pure Prepared/Playing/Draining endpoint behavior table
+  tests in `src/sched/tests/sched/live.rs`; the Draining-to-Ended transition
+  remains covered by existing `SongTransport::cutoff` tests. All focused tests
+  pass.
+- [x] Verification 1-5 exit 0. Touched files are under 1000 lines. The
+  Progress Log is updated. Rustfmt passes and `src/sched/runtime/song.rs` is
+  973 lines.
 
 ## Progress Log
 
@@ -336,3 +336,56 @@ Clippy, focused nextest and wasm build could not be meaningfully run until
 that compile blocker is repaired. The review findings' source and test
 changes are present, but behavioral verification and plan completion remain
 open.
+
+### Session: 2026-10-09 (step 6 final-source completion)
+**Tasks Completed**: Corrected two regression-test setups, reran verification
+1-5 on final sources, and completed the assigned implementation criteria.
+**Notes**: `slot_and_output_stop_timeout_share_one_transport_diagnostic` now
+sets `ack_delay = None`, ensuring the outstanding-control diagnostic path is
+exercised. `output_telemetry_omits_unknown_state_and_publishes_draining`
+advances the mock clock to the next transport sample interval before checking
+the reported state. Focused nextest passed 63/63 with zero failures
+(`tmp/live-perf/session-stop/agent-focused-nextest.log`).
+The first focused run exited 100 (61/63 passed, 2 failed;
+`tmp/live-perf/session-stop/step6-focused-nextest.log`): it exposed those two
+test setup gaps, which were fixed before the passing rerun.
+
+- `CARGO_TERM_QUIET=true cargo build --all-targets` passed
+  (`tmp/live-perf/session-stop/final-build-all-targets.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+  passed (`tmp/live-perf/session-stop/final-clippy.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::tests::sched::(live|control)|session::tests::live_stop|sched::runtime::song|host::tests::e2e::sched_gaps|sched::tests::midi/)'`
+  passed, 63 tests (`tmp/live-perf/session-stop/agent-focused-nextest.log`).
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+  passed (`tmp/live-perf/session-stop/final-wasm-build.log`).
+- `rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs`
+  passed (`tmp/live-perf/session-stop/final-rustfmt-check.log`).
+
+Formal test-integrity/adversarial/integration reviews, LP-EVIDENCE, shared
+closeout, commit, and push remain downstream workflow steps.
+
+### Session: 2026-10-09 (step 6 adversarial repair)
+**Tasks Completed**: Repaired `LP-SS-ADV-1-SONG-STOP-OWNER-SELECTION`.
+**Notes**: `stop_song` now iterates all owners, skips Ended/Failed owners,
+applies bounded endpoints to Prepared owners, invalidates an unposted
+uncommitted replacement through `invalidate_replacement`, and records cutoff
+refusals and invalidation failures in `rep.faults`. Prepared gentle/cut rows
+assert the activation-clamped endpoints while retaining all existing rows.
+The first post-change rustfmt check found formatting-only differences
+(`tmp/live-perf/session-stop/repair-rustfmt-check.log`); the two owned source
+files were formatted and the final check passed. Final focused nextest passed
+63/63 (`tmp/live-perf/session-stop/repair-focused-nextest-quiet-complete.log`).
+
+- `CARGO_TERM_QUIET=true cargo build --all-targets` passed
+  (`tmp/live-perf/session-stop/repair-build-complete.log`).
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+  passed (`tmp/live-perf/session-stop/repair-clippy-complete.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/sched::tests::sched::(live|control)|session::tests::live_stop|sched::runtime::song|host::tests::e2e::sched_gaps|sched::tests::midi/)'`
+  passed, 63/63 (`tmp/live-perf/session-stop/repair-focused-nextest-quiet-complete.log`).
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+  passed (`tmp/live-perf/session-stop/repair-wasm-complete.log`).
+- `rustfmt --edition 2021 --check src/sched/runtime/live.rs src/sched/control.rs src/sched/runtime/song.rs src/sched/tests/sched/live.rs src/sched/tests/sched/control.rs src/session/tests/live_stop.rs`
+  passed (`tmp/live-perf/session-stop/repair-rustfmt-complete.log`).
+
+Independent re-review of the repaired finding is pending; no review acceptance
+is claimed.

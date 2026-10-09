@@ -561,3 +561,66 @@ selfcheck9 broad log is retained but is not verification evidence.
 **Notes**: Assigned LP-ENGINE implementation and behavioral verification are
 complete. Formal serial integration review and workflow closeout remain
 downstream.
+
+### Session: 2026-10-09 (LP-ENGINE per-stop acknowledgement repair)
+**Tasks Completed**: Replaced the single stop acknowledgement slot with a
+fixed-capacity FIFO, retained queued acknowledgements while the critical ack
+ring is full, and paused control consumption when the FIFO has no free slot.
+Added coverage for two acknowledgements from Cut then Gentle, unchanged
+de-duplicated phase transitions, and backpressure/retry with a full ack ring.
+**Resolved finding**: The prior single `pending_report` could overwrite
+acknowledgements when multiple `OutputStop` messages were handled in one
+callback. Every handled stop now has a retained report until delivery.
+**Verification**:
+- `CARGO_TERM_QUIET=true cargo build --all-targets` — exit 0;
+  `tmp/live-perf/engine/verify-build-all-targets.log`.
+- `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings`
+  — exit 0; `tmp/live-perf/engine/verify-clippy-all-targets.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
+  — exit 0; `tmp/live-perf/engine/verify-build-wasm.log`.
+- Focused LP-ENGINE nextest — 49/49 passed, exit 0;
+  `tmp/live-perf/engine/verify-nextest-focused.log`.
+- Broader DSP/native/template nextest — 796/796 passed, exit 0;
+  `tmp/live-perf/engine/verify-nextest-broad.log`.
+- `rustfmt --edition 2021 --check` on all 16 LP-ENGINE Rust files — exit 0;
+  `tmp/live-perf/engine/step6-final-rustfmt-check.log`.
+- Touched Rust line counts — exit 0, maximum 999 lines in `src/dsp/bus.rs`;
+  `tmp/live-perf/engine/step6-final-line-counts.log`.
+- `git diff --check` — exit 0;
+  `tmp/live-perf/engine/step6-final-diff-check.log`.
+**Resolved exploratory attempts**: The first regression run exposed a duplicate
+Draining transition (`nextest-ack-fifo-attempt-1.log`); the backpressure test
+then required corrections for a test-only ring-capacity lookup
+(`nextest-ack-fifo-compile-failure.log`) and for keeping the ack ring full
+(`nextest-ack-fifo-assertion-failure.log`). The final 49/49 focused run covers
+the corrections. The original current-source repair audit and final gates are
+documented separately from these resolved attempts.
+**Notes**: LP-ENGINE implementation and required behavioral verification are
+complete. Formal integration review and workflow closeout remain downstream.
+
+### Session: 2026-10-09 (LP-ENGINE-TI-ACK-ORDER repair)
+**Tasks Completed**: Merged pending phase reports and queued stop acknowledgements by
+frame. Stop acknowledgements win ties, matching the phase ordering model. Unified
+critical delivery consumes a report only after successful publication, preserving
+it across backpressure. Added `stop_ack_and_transition_reports_stay_frame_ordered_under_ack_backpressure`
+to cover a Cut acknowledgement queued while the output clear reaches Idle.
+**Resolved finding**: `LP-ENGINE-TI-ACK-ORDER` (`comm-005391`). The regression
+asserts non-decreasing report frames, delivery of the queued Cutting acknowledgement,
+and final Idle after the 4096-entry ack ring is drained. Existing exact phase
+sequence, native/browser parity, and backpressure assertions remain intact.
+**Verification**:
+```json
+[
+  {"command":"CARGO_TERM_QUIET=true cargo build --all-targets","exitStatus":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-build-all-final.log"},
+  {"command":"CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings","exitStatus":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-clippy-final.log"},
+  {"command":"CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm","exitStatus":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-wasm-final.log"},
+  {"command":"CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/dsp::tests::dsp::(output_stop|ramp|release|bus|cut_group|effects|cells)/)'","exitStatus":0,"testsRun":50,"testsPassed":50,"failureCount":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-focused.log"},
+  {"command":"CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib -E 'test(/dsp::tests|host::tests::e2e::templates|host::native::tests/)'","exitStatus":0,"testsRun":797,"testsPassed":797,"failureCount":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-broad.log"},
+  {"command":"rustfmt --edition 2021 --check src/dsp/engine.rs src/dsp/engine/output.rs src/dsp/tests/dsp/output_stop.rs","exitStatus":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-rustfmt.log"},
+  {"command":"wc -l src/dsp/engine.rs src/dsp/engine/output.rs src/dsp/tests/dsp/output_stop.rs","exitStatus":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-line-counts.log"},
+  {"command":"git diff --check","exitStatus":0,"outcome":"passed","log":"tmp/live-perf/engine/verify-frame-order-diff-check.log"}
+]
+```
+**Resolved exploratory attempt**: The first ordering regression run reached the memory-clear predicate before the deferred Idle transition and passed 49/50; two bounded callbacks were added before draining. Its log is `tmp/live-perf/engine/nextest-frame-order-attempt-1.log`. The final focused and broad runs above are post-edit evidence.
+**Notes**: Assigned LP-ENGINE implementation and behavioral verification are complete.
+Formal integration review and workflow closeout remain downstream.

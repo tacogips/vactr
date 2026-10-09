@@ -153,6 +153,7 @@ fn output_stop_only_timeout_reports_exactly_one_transport_diagnostic() {
 #[test]
 fn slot_and_output_stop_timeout_share_one_transport_diagnostic() {
     let mut rig = Rig::new();
+    rig.ack_delay = None;
     rig.run("s :bd > d1");
     rig.apply(StagedEffect::StopAll);
     rig.run_to(30.0 * DT);
@@ -195,13 +196,29 @@ fn stopping_without_a_song_is_a_no_op() {
 }
 
 #[test]
-fn song_stop_endpoints_are_bounded_for_playing_and_draining_states() {
+fn song_stop_endpoints_are_bounded_for_prepared_playing_and_draining_states() {
     let old = SongEndpoints {
         epoch: SnapshotEpoch(9),
         arrangement: 1_000,
         tail_deadline: 1_200,
     };
     let cases = [
+        (
+            OutputMode::Gentle,
+            SongTransportState::Prepared,
+            50,
+            10,
+            100,
+            Some((100, 300)),
+        ),
+        (
+            OutputMode::Cut,
+            SongTransportState::Prepared,
+            50,
+            0,
+            100,
+            Some((100, 100)),
+        ),
         (
             OutputMode::Gentle,
             SongTransportState::Playing,

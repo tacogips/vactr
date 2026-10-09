@@ -597,10 +597,135 @@ fn cut_is_not_downgraded_by_gentle_and_matches_browser_host() {
         rig
     });
     assert_eq!(native.0, browser.0);
-    assert_eq!(native.1, [OutputPhase::Cutting, OutputPhase::Idle]);
+    assert_eq!(
+        native.1,
+        [
+            OutputPhase::Cutting,
+            OutputPhase::Cutting,
+            OutputPhase::Idle
+        ]
+    );
     assert_eq!(native.1, browser.1);
+    let deduplicated = native
+        .1
+        .iter()
+        .copied()
+        .fold(Vec::new(), |mut phases, phase| {
+            if phases.last() != Some(&phase) {
+                phases.push(phase);
+            }
+            phases
+        });
+    assert_eq!(deduplicated, [OutputPhase::Cutting, OutputPhase::Idle]);
     assert!(native.0.iter().any(|sample| sample.abs() > 1.0e-5));
     assert!(native.0.iter().rev().take(256).all(|sample| *sample == 0.0));
+}
+
+#[test]
+fn stop_ack_and_transition_reports_stay_frame_ordered_under_ack_backpressure() {
+    let mut rig = NativeRig::native_with(stopped_config(StoreKind::NativeArc));
+    install_pad_native(&mut rig);
+    install_delay_native(&mut rig);
+    rig.send(routed_pad_event(rig.engine.now(), 1));
+    for _ in 0..8 {
+        let _ = rig.step();
+    }
+    let _ = rig.acks();
+    assert!(!rig.engine.output_memory_is_clear());
+
+    let stops_per_block = crate::dsp::ring::CHANNEL_CAPACITY;
+    let ack_capacity = 4096;
+    for _ in 0..ack_capacity / stops_per_block {
+        for _ in 0..stops_per_block {
+            rig.post(CtlMsg::SlotControl(SlotControl {
+                slot: SlotId::new(1),
+                new_gen: 2,
+                effective_time: rig.engine.now(),
+                release: Release::None,
+            }));
+        }
+        let _ = rig.step();
+    }
+    assert_eq!(rig.acks_rx.len(), ack_capacity);
+
+    rig.post(CtlMsg::OutputStop {
+        mode: OutputMode::Cut,
+    });
+    let mut clear_complete = false;
+    for _ in 0..200 {
+        let _ = rig.step();
+        assert_eq!(rig.acks_rx.len(), ack_capacity);
+        if rig.engine.output_memory_is_clear() {
+            clear_complete = true;
+            break;
+        }
+    }
+    assert!(
+        clear_complete,
+        "cut clear completes while reports are blocked"
+    );
+    for _ in 0..2 {
+        let _ = rig.step();
+        assert_eq!(rig.acks_rx.len(), ack_capacity);
+    }
+
+    let _ = rig.acks();
+    let _ = rig.step();
+    let reports = rig
+        .acks()
+        .into_iter()
+        .filter_map(|message| match message {
+            HostMsg::OutputState { phase, frame } => Some((phase, frame)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(reports.windows(2).all(|pair| pair[0].1 <= pair[1].1));
+    assert!(reports
+        .iter()
+        .any(|(phase, _)| *phase == OutputPhase::Cutting));
+    assert_eq!(
+        reports.last().map(|(phase, _)| *phase),
+        Some(OutputPhase::Idle)
+    );
+}
+
+#[test]
+fn stop_ack_fifo_backpressures_controls_and_retries_when_ack_ring_is_full() {
+    let mut rig = NativeRig::native_with(stopped_config(StoreKind::NativeArc));
+    let stop = || CtlMsg::OutputStop {
+        mode: OutputMode::Cut,
+    };
+    let stops_per_block = crate::dsp::ring::CHANNEL_CAPACITY;
+    let ack_capacity = 4096;
+
+    for _ in 0..ack_capacity / stops_per_block {
+        for _ in 0..stops_per_block {
+            rig.post(stop());
+        }
+        let _ = rig.step();
+    }
+    assert_eq!(rig.acks_rx.len(), ack_capacity);
+
+    for _ in 0..stops_per_block {
+        rig.post(stop());
+    }
+    let _ = rig.step();
+    assert_eq!(rig.acks_rx.len(), ack_capacity);
+
+    rig.post(stop());
+    let _ = rig.step();
+    assert_eq!(rig.acks_rx.len(), ack_capacity);
+
+    let full_reports = phases(rig.acks());
+    assert_eq!(full_reports.len(), ack_capacity);
+    assert!(full_reports
+        .iter()
+        .all(|phase| *phase == OutputPhase::Cutting));
+    let _ = rig.step();
+    assert_eq!(phases(rig.acks()).len(), stops_per_block);
+
+    let _ = rig.step();
+    assert_eq!(phases(rig.acks()), [OutputPhase::Cutting]);
 }
 
 #[test]

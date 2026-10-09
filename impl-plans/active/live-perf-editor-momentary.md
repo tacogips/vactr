@@ -446,3 +446,11 @@ Write logs to `tmp/live-perf/editor-momentary/*.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/bind test/canvas/momentary-pointer.test.ts test/canvas/gpu.test.ts test/canvas/mount.test.ts` — exit 0, 182/182; `tmp/live-perf/editor-momentary/focused-stale-release.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/canvas test/bind test/code` — exit 0, 494/494; `tmp/live-perf/editor-momentary/regression-stale-release.log`.
 **Review Finding**: LPEM-ADV-1 repaired for independent re-review; adversarial decision comm-005105 had declined acceptance pending this repair.
+
+### Session: 2026-10-09 (step6 final-source verification)
+**Tasks Completed**: Re-verified LP-EDITOR-MOMENTARY completion criteria on checkpoint `cb4a9f8f66e96de2f7204b56db21d46d3be0b414`; no source changes were needed.
+**Verification**:
+- `cd editor && npm run check` — exit 0; `tmp/live-perf/editor-momentary/npm-check-rerun-20261009.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/bind test/canvas/momentary-pointer.test.ts test/canvas/gpu.test.ts test/canvas/mount.test.ts` — exit 0, 182/182; `tmp/live-perf/editor-momentary/focused-rerun-20261009.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas test/bind test/code` — exit 0, 494/494; `tmp/live-perf/editor-momentary/regression-rerun-20261009.log`.
+**Notes**: `test:style`, `test:perf`, behavior e2e, and release evidence remain owned by downstream LP-EVIDENCE. Physical iPad validation remains pending as designed.

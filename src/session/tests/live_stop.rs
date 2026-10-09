@@ -71,6 +71,7 @@ fn output_telemetry_omits_unknown_state_and_publishes_draining() {
         phase: OutputPhase::Draining,
         frame: 1,
     });
+    rig.clock.set(0.1);
     let after = rig.tick();
     let after_sample = after.iter().find_map(|message| match message {
         ServerMsg::Tempo(body) => body.transport.as_ref(),

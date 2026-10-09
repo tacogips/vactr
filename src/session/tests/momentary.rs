@@ -492,6 +492,95 @@ fn integer_inst_control_cells_use_frames_zero_ramps() {
 }
 
 #[test]
+fn stepped_glide_release_ends_with_a_drop_at_base() {
+    let mut rig = Rig::new();
+    let src = "inst typed-cutoff cutoff: int = 100:\n\tsin-osc {* freq cutoff}\ns :typed-cutoff > cutoff 100 > once\n";
+    let (result, _) = rig.eval(src, 1, 1);
+    assert!(
+        result.forms.iter().all(|form| form.failure.is_none()),
+        "integer control fixture must evaluate: {:?}",
+        result.forms
+    );
+    rig.tick();
+    let site = site_at(&result, src, "100").clone();
+    assert_eq!(
+        site.origin,
+        crate::session::protocol::WireOrigin::InstDefault
+    );
+
+    assert!(send(&mut rig, &site, Some(WireNum::Int(1200)), 30).is_empty());
+    let held = cell_ramps(&rig);
+    let mut cells = Vec::new();
+    for (cell, epoch, _, frames, release) in held {
+        assert_eq!(frames, 0, "integer control ramps must be stepped");
+        assert!(!release, "the initial tweak is a held value");
+        if !cells.contains(&(cell, epoch)) {
+            cells.push((cell, epoch));
+        }
+    }
+    assert!(
+        !cells.is_empty(),
+        "integer default must feed external cells"
+    );
+
+    rig.clock.set(0.02);
+    rig.tick();
+    let release_start = cell_ramps(&rig).len();
+    assert!(send(&mut rig, &site, None, 1000).is_empty());
+    assert_eq!(
+        cell_ramps(&rig).len(),
+        release_start,
+        "a glide release must not drop stepped cells at its start"
+    );
+
+    for step in 1..=70 {
+        rig.clock.set(0.02 + f64::from(step) * 0.016);
+        rig.tick();
+    }
+    assert_eq!(rig.s.momentary.len(), 0, "release entry must be reaped");
+
+    let release_ramps = cell_ramps(&rig);
+    let release_ramps = &release_ramps[release_start..];
+    for (cell, epoch) in cells {
+        let base_target = rig
+            .s
+            .evaluator()
+            .insts()
+            .expect("instrument registry is installed")
+            .borrow()
+            .entries()
+            .find_map(|inst| inst.default_cell_value(crate::dsp::cells::CellId::new(cell)))
+            .expect("inst-default cell encodes its base value");
+        let posts: Vec<_> = release_ramps
+            .iter()
+            .filter(|(posted_cell, posted_epoch, _, _, _)| {
+                *posted_cell == cell && *posted_epoch == epoch
+            })
+            .collect();
+        assert!(!posts.is_empty(), "release must step cell {cell}:{epoch}");
+        assert!(
+            posts.iter().all(|(_, _, _, frames, _)| *frames == 0),
+            "stepped release posts must use frames=0: {posts:?}"
+        );
+        let last = posts.last().expect("release posts are nonempty");
+        assert_eq!(last.2, base_target, "cell {cell}:{epoch} must end at base");
+        assert!(last.4, "the final post for cell {cell}:{epoch} must drop");
+        let first_drop = posts
+            .iter()
+            .position(|(_, _, target, frames, release)| {
+                *target == base_target && *frames == 0 && *release
+            })
+            .expect("release must drop at the encoded base");
+        assert!(
+            posts[first_drop + 1..]
+                .iter()
+                .all(|(_, _, _, _, release)| *release),
+            "no held post may follow the base drop: {posts:?}"
+        );
+    }
+}
+
+#[test]
 fn releasing_entry_rebases_to_a_new_literal_base() {
     let mut rig = Rig::new();
     let src = "var cutoff 800\ns [:analog] > note [60] > lpf cutoff > gain 0.2 > d1\n";

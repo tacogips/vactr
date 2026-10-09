@@ -456,14 +456,9 @@ impl Runtime {
         Ok(())
     }
     pub(crate) fn stop_song(&mut self, mode: OutputMode, rep: &mut DrainReport) {
-        let Some((activation, state)) = self
-            .song
-            .owners
-            .last()
-            .map(|owner| (owner.activation, owner.transport.state()))
-        else {
+        if self.song.owners.is_empty() {
             return;
-        };
+        }
         let observed_clock = self.hosts.audio.song_clock().ok().or(self.song.clock);
         let sample_rate = observed_clock.map_or(self.cfg.sample_rate, |clock| clock.sample_rate);
         let now_frame = observed_clock.map_or_else(
@@ -477,34 +472,69 @@ impl Runtime {
             },
             |clock| clock.frame,
         );
-        let Some(owner) = self.song.owners.last() else {
-            return;
-        };
-        let old = owner.transport.endpoints();
         let lead_frames = (self.cfg.commit_lead * f64::from(sample_rate))
             .round()
             .max(0.0) as u64;
-        let Some(endpoints) =
-            super::live::stop_endpoints(mode, state, now_frame, lead_frames, activation, old)
-        else {
-            return;
-        };
-        let Some(owner) = self.song.owners.last_mut() else {
-            return;
-        };
-        if let Err(refusal) = owner.transport.cutoff(self.hosts.audio.as_mut(), endpoints) {
-            let failure = match refusal.error {
-                SongSubmitError::Invalid(failure) => failure,
-                SongSubmitError::Backpressure => Failure::new(
-                    FailCode::BeyondCapability,
-                    "song stop command was refused by host backpressure",
-                ),
-                SongSubmitError::Unavailable => Failure::new(
-                    FailCode::HostUnavailable,
-                    "song stop command is unavailable on this host",
-                ),
+
+        for owner in &mut self.song.owners {
+            let state = owner.transport.state();
+            if matches!(
+                state,
+                SongTransportState::Ended | SongTransportState::Failed
+            ) {
+                continue;
+            }
+
+            let uncommitted_replacement = owner
+                .replacement
+                .as_ref()
+                .is_some_and(|pending| !pending.committed);
+            if state == SongTransportState::Prepared
+                && !owner.activation_posted
+                && uncommitted_replacement
+            {
+                if let Some(pending) = &mut owner.replacement {
+                    pending.invalidated = true;
+                }
+                if let Err(failure) = owner.transport.invalidate_replacement() {
+                    rep.faults.push(failure);
+                }
+                continue;
+            }
+
+            let old = owner.transport.endpoints();
+            let Some(endpoints) = super::live::stop_endpoints(
+                mode,
+                state,
+                now_frame,
+                lead_frames,
+                owner.activation,
+                old,
+            ) else {
+                continue;
             };
-            rep.faults.push(failure);
+            if let Err(refusal) = owner.transport.cutoff(self.hosts.audio.as_mut(), endpoints) {
+                let failure = match refusal.error {
+                    SongSubmitError::Invalid(failure) => failure,
+                    SongSubmitError::Backpressure => Failure::new(
+                        FailCode::BeyondCapability,
+                        "song stop command was refused by host backpressure",
+                    ),
+                    SongSubmitError::Unavailable => Failure::new(
+                        FailCode::HostUnavailable,
+                        "song stop command is unavailable on this host",
+                    ),
+                };
+                rep.faults.push(failure);
+                if uncommitted_replacement {
+                    if let Some(pending) = &mut owner.replacement {
+                        pending.invalidated = true;
+                    }
+                    if let Err(failure) = owner.transport.invalidate_replacement() {
+                        rep.faults.push(failure);
+                    }
+                }
+            }
         }
     }
     pub fn song_state(&self) -> Option<SongTransportState> {

@@ -1,6 +1,6 @@
 # FM1V-17: `gendyn-core` Kernel (Dynamic Stochastic Synthesis)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FM1V-17 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "GENDYN")
 **Created**: 2026-10-10
@@ -124,9 +124,11 @@ Keep the ports test. Add:
 
 1. `rustfmt --edition 2021 --check src/dsp/ugen/gendyn.rs src/dsp/tests/dsp/gendyn.rs`
    must exit 0.
-2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gendyn/)' > tmp/fm1-voices/FM1V-17/nextest.log 2>&1; echo "exit=$?"`
+2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gendyn/)' > tmp/fm1-voices/FM1V-17/nextest-attempt-5.log 2>&1; echo "exit=$?"`
    must print `exit=0`, with at least 9 tests run and 0 failed.
-3. `git diff --stat` shows only writePaths.
+3. `git status --short -- src/dsp/ugen/gendyn.rs src/dsp/tests/dsp/gendyn.rs impl-plans/active/fm1-voices-17-gendyn.md`
+   shows only this plan's declared source/plan paths. The unscoped `git diff --stat`
+   may include concurrent fanout plans in this shared branch workspace.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
@@ -137,10 +139,24 @@ re-run.
 
 ## Done Criteria
 
-- [ ] The kernel is implemented.
-- [ ] Verification 1-3 pass and are recorded.
+- [x] The kernel is implemented.
+- [x] Verification 1-3 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-17 implementation)
+**Tasks Completed**: Implemented the 136-float GENDYN state, seeded breakpoint initialization, four bounded random distributions, mirrored second-order amplitude/duration walks, point-count latching, cyclic interpolation, spread-zero pitch lock and 10 Hz DC blocking. Added eight behavioral tests while preserving the FM1V-00 port-contract test.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/gendyn.rs src/dsp/tests/dsp/gendyn.rs` exited 0. Focused `cargo nextest run -E 'test(/gendyn/)'` exited 0 with 9 run, 9 passed, 0 failed; complete log: `tmp/fm1-voices/FM1V-17/nextest-attempt-5.log`. Scoped `git status --short` lists only this plan's two Rust files and plan file. The unscoped `git diff --stat` lists 13 tracked paths belonging to concurrent fanout plans; our new Rust files are untracked as expected and are visible in scoped status. Earlier test attempts are preserved separately; attempt 1 failed during concurrent-plan compilation, and attempts 2-4 recorded and resolved behavioral test issues.
+**Notes**: Positive-spread segment durations have a one-sample minimum to bound per-sample breakpoint traversal when the model's mirrored lower duration reaches zero. Spread-zero durations remain exactly `1/(freq*P)`. This is a documented high-frequency realtime tradeoff; no registry or downstream FM1V-30 work was pulled forward.
+
+### Session: 2026-10-10 (Step 6 current-tree verification)
+**Tasks Completed**: Rechecked the assigned GENDYN source and tests on the shared branch. No source changes were needed.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/gendyn.rs src/dsp/tests/dsp/gendyn.rs` exited 0; complete log: `tmp/fm1-voices/FM1V-17/rustfmt-step6-final.log`. Focused `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gendyn/)'` exited 0 with 9 run, 9 passed, 0 failed; complete log: `tmp/fm1-voices/FM1V-17/nextest-step6-final.log`. Scoped status shows only this plan's kernel, test and plan files (kernel and test are untracked as scaffold replacements). Line counts are 234 and 235, respectively.
+**Notes**: FM1V-30 owns the downstream registry/template integration. Formal review and integration checks remain with later workflow steps.
+
+### Session: 2026-10-10 (FM1V-17-TI-01 repair)
+**Tasks Completed**: Updated `gendyn_spread_zero_locks_period` to reject every lag in `1..=239` and lag `241`, proving that the 240-sample repeat is not a shorter-period multiple. Kept the 9600-sample settle window and both existing thresholds unchanged. The GENDYN kernel was not modified; its SHA-256 remains `e92cde03e953f7e0402123ef87f972c154ca6987b4d1a51290eb877f380f1add`.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/gendyn.rs src/dsp/tests/dsp/gendyn.rs` exited 0; complete log: `tmp/fm1-voices/FM1V-17/rustfmt-ti01.log`. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gendyn/)'` exited 0 with 9 run, 9 passed, 0 failed; complete log: `tmp/fm1-voices/FM1V-17/nextest-ti01.log`.

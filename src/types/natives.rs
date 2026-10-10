@@ -372,4 +372,5 @@ static CORE: &[NativeSig] = &[
         .effect(),
     // Source loading (7.1.3, 7.1.4): a fresh result variable per call site.
     f("load", 1, 1, &["fn path -> 'a"], &[V]).effect(),
+    f("fm6-sysex", 1, 1, &["fn path -> [[int]]"], &[V]).effect(),
 ];

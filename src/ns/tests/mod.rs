@@ -1,6 +1,7 @@
 //! Namespace, package and staging tests (ME-VM required tests).
 
 mod evaluator;
+mod fm6_sysex;
 mod inst;
 mod load;
 mod namespace;

@@ -51,8 +51,11 @@ pub mod fm_pair;
 pub mod frame_keyframe;
 pub mod frame_lfo;
 pub mod fusion_drum;
+pub mod gendyn;
 pub mod grain_pair;
 pub mod hat_pair;
+pub mod hurdy_gurdy;
+pub mod kalimba;
 pub mod mixer;
 pub mod modal_pair;
 pub mod musicdsp_synth;
@@ -64,6 +67,7 @@ pub mod peak_pulse;
 pub mod phase_pair;
 pub mod rings_part;
 pub mod sample;
+pub mod scanned;
 pub mod shape_pair;
 pub mod six_op_original;
 pub mod snare_pair;
@@ -80,9 +84,11 @@ pub mod table_terrain_pair;
 pub mod terrain_pair;
 pub mod tidal_function;
 pub mod tidal_poly;
+pub mod tonewheel;
 pub mod va_filter;
 pub mod vactrol_gate;
 pub mod voice_layer;
+pub mod vosim;
 pub mod wavetable;
 
 use crate::dsp::arena::SampleStore;
@@ -240,6 +246,18 @@ pub enum Node {
     },
     /// Self-enveloped bass voice kernel (six prelude models).
     BassCore,
+    /// kalimba voice kernel.
+    KalimbaCore,
+    /// tonewheel voice kernel.
+    TonewheelCore,
+    /// hurdy gurdy voice kernel.
+    HurdyGurdyCore,
+    /// vosim voice kernel.
+    VosimCore,
+    /// gendyn voice kernel.
+    GendynCore,
+    /// scanned voice kernel.
+    ScannedCore,
 }
 
 pub use mixer::run;
@@ -265,6 +283,9 @@ impl Node {
                 | Node::DigitalMetalCore
                 | Node::DigitalHatCore
                 | Node::BassCore
+                | Node::KalimbaCore
+                | Node::TonewheelCore
+                | Node::HurdyGurdyCore
                 | Node::AnalogPercussion
                 | Node::DualKick
                 | Node::SnarePair

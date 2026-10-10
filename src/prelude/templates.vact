@@ -443,3 +443,27 @@ inst sub-bass wave: keyword = :sine cutoff: float = 300 res: float = 0 drive: fl
 
 inst reese-bass wave: keyword = :saw detune: float = 0.18 sub-level: float = 0.3 cutoff: float = 650 res: float = 0.2 env-mod: float = 0.8 env-decay: float = 0.6 drive: float = 0.3 gate-length: float = 3.5 amp-attack: float = 0.01 release: float = 0.12 slide-from: float = 0 slide-time: float = 0.1:
 	bass-core freq wave: wave detune: detune sub-level: sub-level cutoff: cutoff res: res env-mod: env-mod env-decay: env-decay drive: drive gate-length: gate-length amp-attack: amp-attack release: release slide-from: slide-from slide-time: slide-time mode: 5 > * amp
+
+# A modal kalimba tine with a beating fundamental, beam modes and optional buzz.
+inst kalimba kalimba-beat: float = 1.5 kalimba-hardness: float = 0.5 kalimba-decay: float = 2.5 kalimba-damping: float = 0.5 kalimba-body: float = 0.3 kalimba-buzz: float = 0:
+	kalimba-core freq kalimba-beat: kalimba-beat kalimba-hardness: kalimba-hardness kalimba-decay: kalimba-decay kalimba-damping: kalimba-damping kalimba-body: kalimba-body kalimba-buzz: kalimba-buzz > * amp
+
+# Nine drawbars, percussion, key click and scanner vibrato for a tonewheel organ.
+inst tonewheel-organ drawbar1: float = 8 drawbar2: float = 8 drawbar3: float = 8 drawbar4: float = 0 drawbar5: float = 0 drawbar6: float = 0 drawbar7: float = 0 drawbar8: float = 0 drawbar9: float = 0 organ-click: float = 0.3 organ-perc: float = 0 organ-perc-slow: float = 0 organ-perc-soft: float = 0 organ-perc-trigger: float = 1 organ-vibrato: float = 0 gate-length: float = 4:
+	tonewheel-core freq drawbar1: drawbar1 drawbar2: drawbar2 drawbar3: drawbar3 drawbar4: drawbar4 drawbar5: drawbar5 drawbar6: drawbar6 drawbar7: drawbar7 drawbar8: drawbar8 drawbar9: drawbar9 organ-click: organ-click organ-perc: organ-perc organ-perc-slow: organ-perc-slow organ-perc-soft: organ-perc-soft organ-perc-trigger: organ-perc-trigger organ-vibrato: organ-vibrato gate-length: gate-length > * amp
+
+# A bowed chanterelle, bourdon and fifth with wheel-driven trompette buzz.
+inst hurdy-gurdy gurdy-wheel: float = 0.5 gurdy-pressure: float = 0.5 gurdy-melody: float = 1 gurdy-bourdon: float = 0.6 gurdy-fifth: float = 0.4 gurdy-trompette: float = 0.5 gurdy-drone-key: float = 43 gurdy-buzz: float = 0.6 gurdy-buzz-threshold: float = 0.5 gurdy-strokes: float = 0 gurdy-stroke-depth: float = 0.5 gate-length: float = 8:
+	hurdy-gurdy-core freq gurdy-wheel: gurdy-wheel gurdy-pressure: gurdy-pressure gurdy-melody: gurdy-melody gurdy-bourdon: gurdy-bourdon gurdy-fifth: gurdy-fifth gurdy-trompette: gurdy-trompette gurdy-drone-key: gurdy-drone-key gurdy-buzz: gurdy-buzz gurdy-buzz-threshold: gurdy-buzz-threshold gurdy-strokes: gurdy-strokes gurdy-stroke-depth: gurdy-stroke-depth gate-length: gate-length > * amp
+
+# Kaegi-Tempelaars VOSIM pulses shaped by an ADSR envelope.
+inst vosim vosim-formant: float = 900 vosim-pulses: float = 3 vosim-decay: float = 0.7:
+	vosim-core freq vosim-formant: vosim-formant vosim-pulses: vosim-pulses vosim-decay: vosim-decay > * {env-adsr attack decay sustain release} > * amp
+
+# Xenakis dynamic stochastic synthesis with seeded breakpoints.
+inst gendyn gendyn-points: float = 12 gendyn-amp-step: float = 0.2 gendyn-dur-step: float = 0.1 gendyn-dist: float = 1 gendyn-spread: float = 0.1:
+	gendyn-core freq gendyn-points: gendyn-points gendyn-amp-step: gendyn-amp-step gendyn-dur-step: gendyn-dur-step gendyn-dist: gendyn-dist gendyn-spread: gendyn-spread > * {env-adsr attack decay sustain release} > * amp
+
+# Verplank-Mathews-Shaw scanned synthesis of a fixed-mass string.
+inst scanned scan-stiffness: float = 0.5 scan-damping: float = 0.3 scan-centering: float = 0.1 scan-hammer: float = 0.3 scan-position: float = 0.5 scan-update: float = 400:
+	scanned-core freq scan-stiffness: scan-stiffness scan-damping: scan-damping scan-centering: scan-centering scan-hammer: scan-hammer scan-position: scan-position scan-update: scan-update > * {env-adsr attack decay sustain release} > * amp

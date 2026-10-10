@@ -480,6 +480,9 @@ impl Template {
             | Node::DigitalMetalCore
             | Node::DigitalHatCore
             | Node::BassCore
+            | Node::KalimbaCore
+            | Node::TonewheelCore
+            | Node::HurdyGurdyCore
             | Node::AnalogPercussion
             | Node::FeedbackDrum
             | Node::NoiseDrum

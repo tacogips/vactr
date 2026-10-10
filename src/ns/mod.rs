@@ -4,6 +4,7 @@
 pub mod depgraph;
 pub mod eval_doc;
 pub mod evaluator;
+pub mod fm6_sysex;
 pub mod insts;
 pub mod journal;
 pub mod load;

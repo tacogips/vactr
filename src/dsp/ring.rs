@@ -804,8 +804,9 @@ impl EngineConfig {
             max_block,
             output_channels: 2,
             store,
-            // The core prelude installs 73 definitions (67 plus the six bass
-            // templates). Leave bounded room for local song voices and opt-in
+            // The core prelude installs 79 definitions (67 plus six bass
+            // templates and six FM1 voices). Live input adds 2 and quad-stem
+            // definitions add 4. Leave bounded room for local song voices and opt-in
             // instruments.
             template_slots: 96,
             bus_slots: DEFAULT_BUS_SLOTS,

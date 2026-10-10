@@ -1,6 +1,6 @@
 # FM1V-21: `fm6-sysex` Native and `SourceLoader::read_bytes`
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: FM1V-21 (wave 2)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import" -> "Native", "Usage"; user question FV6)
 **Created**: 2026-10-10
@@ -191,10 +191,46 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 
 ## Done Criteria
 
-- [ ] `read_bytes`, the native and its registration are implemented.
+- [x] `read_bytes`, the native and its registration are implemented.
 - [ ] Verification 1-4 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-21 implementation)
+**Tasks Completed**: `SourceLoader::read_bytes`, native bounded byte reads,
+`SessionLoader` delegation, effectful `fm6-sysex` registration and signature,
+the exact loader-native table count test, and eight focused evaluator tests.
+The evaluator tests cover synthetic single/bulk patches, nested integer-list
+results, checksum errors, unsupported byte loading, query mode, path type,
+signature and the native loader's 64 KiB limit using a temporary directory.
+
+**Verification**:
+- Rust formatting passed for every Rust file in this plan's `writePaths`;
+  see `tmp/fm1-voices/FM1V-21/rustfmt-final.log`.
+- Scoped whitespace/status/line-count checks passed. All changed Rust files
+  are under 1000 lines; `session.rs` is the longest at 893 lines. SHA-256
+  before/after values for the four required shared files are recorded in
+  `tmp/fm1-voices/FM1V-21/source-hashes.log`.
+- The focused nextest command is not yet verified: attempts in
+  `nextest.log`, `nextest-postcheck-agent.log`, `nextest-retry-01.log`,
+  `nextest-retry-02.log`, `nextest-retry-03.log` and
+  `nextest-final-attempt.log` exited 101 before tests. Earlier compile
+  failures were in sibling-owned `src/dsp/ugen/fm/engine.rs` and
+  `src/dsp/tests/dsp/fm6_engine.rs`; the latest errors are in
+  `src/dsp/tests/dsp/fm1_voice_registry.rs` and
+  `src/host/tests/e2e/templates/fm1_voices.rs`. No FM1V-21 tests ran. The
+  full output is in the corresponding logs, and the errors changed as
+  sibling files were edited.
+- The first wasm attempt (`wasm.log`) exited 101 during concurrent sibling
+  compilation. The retry `wasm-retry-01.log` passed with exit 0; the build
+  emitted only dead-code warnings from sibling metadata constants.
+- Resume when sibling test compile errors are fixed and the shared tree
+  compiles, then rerun the exact focused nextest filter. The wasm criterion
+  is satisfied by `wasm-retry-01.log`.
+
+**Tasks Remaining**: focused behavioral tests after sibling compile errors
+are repaired. The wasm build, formatting, and scoped diff/file-limit checks
+are complete.

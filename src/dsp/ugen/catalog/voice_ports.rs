@@ -38,6 +38,91 @@ pub(super) const BASS_CORE: &[Port] = &[
     p("click-level", 0.0),
 ];
 
+/// Stable port order copied from the kalimba kernel contract.
+pub(super) const KALIMBACORE: &[Port] = &[
+    p("freq", 440.0),
+    p("kalimba-beat", 1.5),
+    p("kalimba-hardness", 0.5),
+    p("kalimba-decay", 2.5),
+    p("kalimba-damping", 0.5),
+    p("kalimba-body", 0.3),
+    p("kalimba-buzz", 0.0),
+    p("velocity", 1.0),
+];
+
+/// Stable port order copied from the tonewheel kernel contract.
+pub(super) const TONEWHEELCORE: &[Port] = &[
+    p("freq", 440.0),
+    p("cps", 0.5),
+    p("onset-time", 0.0),
+    p("drawbar1", 8.0),
+    p("drawbar2", 8.0),
+    p("drawbar3", 8.0),
+    p("drawbar4", 0.0),
+    p("drawbar5", 0.0),
+    p("drawbar6", 0.0),
+    p("drawbar7", 0.0),
+    p("drawbar8", 0.0),
+    p("drawbar9", 0.0),
+    p("organ-click", 0.3),
+    p("organ-perc", 0.0),
+    p("organ-perc-slow", 0.0),
+    p("organ-perc-soft", 0.0),
+    p("organ-perc-trigger", 1.0),
+    p("organ-vibrato", 0.0),
+    p("gate-length", 4.0),
+    p("velocity", 1.0),
+];
+
+/// Stable port order copied from the hurdy_gurdy kernel contract.
+pub(super) const HURDYGURDYCORE: &[Port] = &[
+    p("freq", 440.0),
+    p("cps", 0.5),
+    p("onset-time", 0.0),
+    p("gurdy-wheel", 0.5),
+    p("gurdy-pressure", 0.5),
+    p("gurdy-melody", 1.0),
+    p("gurdy-bourdon", 0.6),
+    p("gurdy-fifth", 0.4),
+    p("gurdy-trompette", 0.5),
+    p("gurdy-drone-key", 43.0),
+    p("gurdy-buzz", 0.6),
+    p("gurdy-buzz-threshold", 0.5),
+    p("gurdy-strokes", 0.0),
+    p("gurdy-stroke-depth", 0.5),
+    p("gate-length", 8.0),
+    p("velocity", 1.0),
+];
+
+/// Stable port order copied from the vosim kernel contract.
+pub(super) const VOSIMCORE: &[Port] = &[
+    p("freq", 440.0),
+    p("vosim-formant", 900.0),
+    p("vosim-pulses", 3.0),
+    p("vosim-decay", 0.7),
+];
+
+/// Stable port order copied from the gendyn kernel contract.
+pub(super) const GENDYNCORE: &[Port] = &[
+    p("freq", 440.0),
+    p("gendyn-points", 12.0),
+    p("gendyn-amp-step", 0.2),
+    p("gendyn-dur-step", 0.1),
+    p("gendyn-spread", 0.1),
+    p("gendyn-dist", 1.0),
+];
+
+/// Stable port order copied from the scanned kernel contract.
+pub(super) const SCANNEDCORE: &[Port] = &[
+    p("freq", 440.0),
+    p("scan-stiffness", 0.5),
+    p("scan-damping", 0.3),
+    p("scan-centering", 0.1),
+    p("scan-hammer", 0.3),
+    p("scan-position", 0.5),
+    p("scan-update", 400.0),
+];
+
 /// The Plaits voice-layer processor, in the stable kernel port order.
 pub(super) const VACTROL_GATE: &[Port] = &[
     IN,

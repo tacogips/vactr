@@ -1,6 +1,6 @@
 # FM1V-15: `hurdy-gurdy-core` Kernel (Bowed Waveguide, Drones, Buzz Bridge)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FM1V-15 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "Hurdy-gurdy")
 **Created**: 2026-10-10
@@ -201,10 +201,48 @@ re-run.
 
 ## Done Criteria
 
-- [ ] The kernel is implemented, with the fixed `STATE_FLOATS`.
-- [ ] Verification 1-4 pass and are recorded.
+- [x] The kernel is implemented, with the fixed `STATE_FLOATS`.
+- [x] Verification 1-4 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-15 implementation)
+**Tasks Completed**: Four-string bowed waveguide, tempo-locked wheel strokes,
+threshold-gated chien impact rattle, gate-length note lifetime, fixed state,
+and the plan's behavioral tests.
+
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/hurdy_gurdy.rs src/dsp/ugen/hurdy_gurdy/bowed.rs src/dsp/ugen/hurdy_gurdy/buzz.rs src/dsp/tests/dsp/hurdy_gurdy.rs` exited 0 (`tmp/fm1-voices/FM1V-15/rustfmt-final.log`).
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gurdy/)'` exited 0: 12 run, 12 passed, 0 failed (`tmp/fm1-voices/FM1V-15/nextest-attempt-8.log`). Independent rerun also exited 0: 12 run, 12 passed, 0 failed (`tmp/fm1-voices/FM1V-15/nextest-independent-20261010-rerun.log`).
+- Kernel line counts: 219, 114, 91; each kernel is under 400 lines. The test file is 468 lines, under the repository's 1000-line Rust source limit.
+- `git diff --stat -- src/dsp/ugen/hurdy_gurdy.rs src/dsp/ugen/hurdy_gurdy/bowed.rs src/dsp/ugen/hurdy_gurdy/buzz.rs src/dsp/tests/dsp/hurdy_gurdy.rs` is empty because these source files are new and untracked. Scoped `git status --short` lists only these four source files and this plan; no files were staged.
+
+Attempts 1-7 did not pass during tuning and their logs remain preserved under
+`tmp/fm1-voices/FM1V-15/`; attempt 8 and the independent rerun pass on the
+final source. Formal review and workflow finalization remain downstream.
+
+### Session: 2026-10-10 (test-integrity repairs)
+**Tasks Completed**: Repaired the three falsifiability findings from the
+independent test-integrity review.
+
+- F15-TI-1 (`gurdy_strokes_are_tempo_locked`): uses a continuous >3 kHz
+  high-pass followed by 5 ms RMS windows, mean-centered autocorrelation over
+  0.30..0.70 s, the unchanged +/-2% tolerance, and a `gurdy-strokes 0`
+  control requiring over 2x envelope variance.
+- F15-TI-2 (`gurdy_buzz_zero_is_exact_bypass`): drives trompette at 1.0 and
+  wheel at 0.9; asserts buzz 0 output is identical across thresholds 0 and 1,
+  and differs from buzz 0.8 output.
+- F15-TI-3 (`gurdy_drones_sound_at_key_and_fifth`): scans 85..115 Hz and
+  125..170 Hz at 0.1 Hz increments, retaining the 1% peak tolerances.
+  The widened drone test passes without kernel changes.
+
+**Verification**:
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gurdy/)' > tmp/fm1-voices/FM1V-15/nextest-ti-repair.log 2>&1; result=$?; cat tmp/fm1-voices/FM1V-15/nextest-ti-repair.log; printf 'exit=%s\\n' "$result"; exit "$result"` exited 0: 12 run, 12 passed, 0 failed.
+- Targeted repaired tests exited 0: 3 run, 3 passed (`tmp/fm1-voices/FM1V-15/ti-targeted.log`). The widened drone test also passed before other test edits (`tmp/fm1-voices/FM1V-15/drone-wideband-repro.log`).
+- `rustfmt --edition 2021 --check src/dsp/ugen/hurdy_gurdy.rs src/dsp/ugen/hurdy_gurdy/bowed.rs src/dsp/ugen/hurdy_gurdy/buzz.rs src/dsp/tests/dsp/hurdy_gurdy.rs` exited 0 after test edits.
+
+The independent reviewer must re-review F15-TI-1, F15-TI-2 and F15-TI-3;
+this progress record does not claim review acceptance.

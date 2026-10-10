@@ -1,6 +1,6 @@
 # FM1V-12: Six-Operator SysEx Parser (Single Voice and 32-Voice Bulk)
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: FM1V-12 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import": formats, validation order, unpacking)
 **Created**: 2026-10-10
@@ -227,10 +227,22 @@ Same as FM1V-10.
 
 ## Done Criteria
 
-- [ ] `parse` and the error type are implemented with the pinned contract.
-- [ ] Verification 1-4 pass and are recorded.
+- [x] `parse` and the error type are implemented with the pinned contract.
+- [x] Verification 1-4 pass and are recorded.
 
 ## Progress Log
 
-### Session: 2026-10-10 (plan created)
-**Tasks Completed**: none.
+### Session: 2026-10-10 (FM1V-12 implementation)
+**Tasks Completed**: Implemented `SysexError`, ordered single/bulk framing validation, truncated-header lengths, checksum and data-byte validation, single and bulk unpacking with range clamping, and test-only inverse encoders. Added eight synthetic tests covering round trips, validation errors, clamping and bulk layout offsets. Read the permitted MSFA `patch.cc` at the pinned FM1V-00 SHA; its bit layout agrees with the plan table.
+
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/fm/sysex.rs src/dsp/tests/dsp/fm6_sysex.rs` passed (final log `tmp/fm1-voices/FM1V-12/rustfmt-final.log`). Focused `cargo nextest run -E 'test(/fm6_sysex/)'` passed on the latest source (8 run, 8 passed, 0 failed; log `tmp/fm1-voices/FM1V-12/nextest-postcheck-20261010-latest.log`). `git ls-files '*.syx'` returned no tracked files (final log `tmp/fm1-voices/FM1V-12/tracked-sysex-final.log`). Scoped diff/status evidence is in `tmp/fm1-voices/FM1V-12/diff-scope.log`; global status also contains concurrent changes owned by other fanout plans. Two earlier nextest attempts failed before compiling this plan because the shared tree was moving; complete logs remain at `tmp/fm1-voices/FM1V-12/nextest.log` and `tmp/fm1-voices/FM1V-12/nextest-rerun.log`. Two postcheck attempts likewise captured transient compiler failures before a final source-matched passing run; their logs are retained at `tmp/fm1-voices/FM1V-12/nextest-postcheck-20261010.log` and `tmp/fm1-voices/FM1V-12/nextest-postcheck-20261010-rerun.log`.
+
+### Session: 2026-10-10 (bulk algorithm field correction and stable verification)
+**Tasks Completed**: Corrected bulk ALG unpacking to mask bits 0..4 (rather than saturating the full byte), and strengthened the layout spot-check with `0x73` to prove high bits are ignored. The edit intent is recorded at `tmp/fm1-voices/FM1V-12/edit-intent-algorithm-mask.md`.
+
+**Verification**: Final rustfmt check exited 0 (`rustfmt-final.log`). The exact focused nextest command exited 0 with 8 tests run, 8 passed, 0 failed (`nextest-postcheck-20261010-latest.log`). `git ls-files '*.syx'` exited 0 with no tracked `.syx` files (`tracked-sysex-final.log`). Scoped status identifies only this plan's three `writePaths`; other global changes belong to concurrent fanout plans. Independent formal review and integration gates remain downstream workflow steps.
+
+### Session: 2026-10-10 (Step 6 source-matched verification)
+**Tasks Completed**: Rechecked the FM1V-12 parser, synthetic fixtures, scoped working-tree state and accepted `FM1V-00` dependency. No parser or test code changes were needed. The assigned implementation criteria remain satisfied; formal review and combined-tree integration are downstream.
+
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/fm/sysex.rs src/dsp/tests/dsp/fm6_sysex.rs` exited 0 (`tmp/fm1-voices/FM1V-12/rustfmt-step6.log`). `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_sysex/)'` exited 0 (8 run, 8 passed, 0 failed; `tmp/fm1-voices/FM1V-12/nextest-step6.log`). `git ls-files '*.syx'` exited 0 and returned no tracked SysEx files (`tmp/fm1-voices/FM1V-12/tracked-sysex-step6.log`).

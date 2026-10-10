@@ -1,6 +1,6 @@
 # FM1V-18: `scanned-core` Kernel (Scanned Synthesis)
 
-**Status**: Ready
+**Status**: In Progress (implementation repair complete; independent re-review pending)
 **Plan ID**: FM1V-18 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "Scanned synthesis")
 **Created**: 2026-10-10
@@ -157,10 +157,29 @@ re-run.
 
 ## Done Criteria
 
-- [ ] The kernel is implemented.
-- [ ] Verification 1-3 pass and are recorded.
+- [x] The kernel is implemented.
+- [x] Verification 1-3 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-18 implementation)
+**Tasks Completed**: Implemented the 64-mass scanned-synthesis kernel and its eight behavior tests, preserving the FM1V-00 port contract.
+**Implementation**: `STATE_FLOATS = 3 * 64 + 8`; raised-cosine onset; Jacobi semi-implicit Euler updates at rounded, clamped scan-update intervals; Catmull-Rom circular scan with previous/current shape crossfade; persistent phase/countdown and normalized DC-blocked output. The coefficient corner test proves `4k + c < 4 - 2d - 0.1`. The timbre test uses hammer `0.02`, centering `0.0`, and default stiffness/damping, retaining the exact 0–100 ms vs 400–500 ms windows and >10% centroid criterion. An RMS guard requires the late window to remain at least `1e-3` of the early window.
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/scanned.rs src/dsp/tests/dsp/scanned.rs` — exit 0; log `tmp/fm1-voices/FM1V-18/rustfmt-final.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/scanned/)'` — exit 0, 9 run / 9 passed / 0 failed; log `tmp/fm1-voices/FM1V-18/nextest-verified.log`.
+- Scoped status showed only `src/dsp/ugen/scanned.rs`, `src/dsp/tests/dsp/scanned.rs`, and this plan file within FM1V-18 write paths; both Rust files are under 1000 lines.
+**Superseded attempts**: `nextest.log` (exit 101) and `nextest-retry.log` (exit 101) stopped at compile errors in concurrent FM1V-11/12/15/16/17 files; owning branches repaired them. `nextest-final.log` (exit 100, 7 passed / 2 failed) exposed test-window/excitation issues; corrected as described above. `spectral-rerun.log` (exit 100, 1 passed / 1 failed) confirmed default and high-stiffness/zero-damping settings did not meet the requested timbre threshold. `timbre-probe-2.log` then passed the corrected timbre scenario (1/1); the final FM1V-18 filter passed all nine tests.
+
+### Session: 2026-10-10 (test-integrity repairs F18-TI-1 and F18-TI-2)
+**Tasks Completed**: Repaired the two mid-severity findings without changing the scanned kernel or weakening plan thresholds/windows.
+**F18-TI-1**: Replaced the high damping/centering controls with hammer `0.02`, centering `0.0`, and default stiffness/damping. Added the late/early RMS guard (`late_rms >= 1e-3 * early_rms`) before the unchanged >10% centroid comparison. The integrity review's independent replica reported early/late centroids of approximately 652/38 bins and late/early RMS ratio approximately `1.2e-2`; the current-source test passes both guards.
+**F18-TI-2**: Widened the pitch helper's lag search to the prescribed +/-50% range and made it return the best normalized correlation with the estimate. The test retains the 1% frequency tolerance and now requires best correlation >= 0.8 and half-period correlation < best - 0.3. The integrity review's independent replica reported lag 218 (220.18 Hz), best correlation 0.953, and half-period correlation -0.044; the current-source test passes these assertions.
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/scanned.rs src/dsp/tests/dsp/scanned.rs` — exit 0; complete log `tmp/fm1-voices/FM1V-18/rustfmt-repair.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/scanned/)' > tmp/fm1-voices/FM1V-18/nextest-repair.log 2>&1; echo "exit=$?"` — exit 0, 9 run / 9 passed / 0 failed; complete log `tmp/fm1-voices/FM1V-18/nextest-repair.log`.
+- `git diff -- src/dsp/ugen/scanned.rs` — empty; kernel mtime remains `16:47:26`.
+**Review Decision**: F18-TI-1 and F18-TI-2 are implemented and locally verified; independent integrity re-review remains pending.

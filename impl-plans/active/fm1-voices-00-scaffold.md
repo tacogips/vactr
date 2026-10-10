@@ -1,6 +1,6 @@
 # FM1V-00: Module Scaffold, Port Contracts, Patch Type and msfa Checkout
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FM1V-00 (wave 0; blocks every other FM1V plan)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Architecture decision", "`fm6-core` UGen", Part 2 control tables, "Implementation partition")
 **Baseline**: wf/fm1-voices at `9ac8d1f` plus the accepted design commit
@@ -333,13 +333,25 @@ Record each result in the form `{command, exitStatus: 0, testsRun, testsPassed, 
 
 ## Done Criteria
 
-- [ ] All writePaths exist, and the shared paths changed only by the stated
+- [x] All writePaths exist, and the shared paths changed only by the stated
       lines.
-- [ ] The msfa SHA and file paths, or "msfa unavailable", are recorded here
+- [x] The msfa SHA and file paths, or "msfa unavailable", are recorded here
       and in the `patch.rs` doc.
-- [ ] Verification 1-5 pass and are recorded.
+- [x] Verification 1-5 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none. Awaiting implementation.
+
+### Session: 2026-10-10 (FM1V-00 implementation)
+**Tasks Completed**: Module tree, kernel and engine contracts, test placeholders, `Fm6Patch`, read-only msfa checkout, and required focused verification.
+
+- Created the six kernel scaffolds and their exact pinned port tables. All render stubs fill output with `0.0`; state size remains the one-float placeholder. Added the FM6/FM-mod port contracts and owner-only placeholders for downstream plans.
+- Implemented `Fm6Patch` in `src/dsp/ugen/fm/patch.rs` with all 155 offsets/ranges, exact flat-conversion errors, validation, and algorithm access. The doc records msfa revision `f67d41d313b7dc85f6fb99e79e515cc9d208cfff` and the consulted path names: `app/src/main/jni/dx7note.cc`, `dx7note.h`, `env.cc`, `env.h`, `exp2.cc`, `exp2.h`, `fm_core.cc`, `fm_core.h`, `fm_op_kernel.cc`, `fm_op_kernel.h`, `freqlut.cc`, `freqlut.h`, `patch.cc`, `patch.h`, `pitchenv.cc`, and `pitchenv.h`. Clone is read-only at `tmp/fm1-voices/msfa`.
+- Shared roots changed only as scoped: `src/dsp/ugen/fm.rs` has exactly six added `pub mod` lines; `src/dsp/ugen/mod.rs` has six new public module lines; `src/dsp/tests/dsp.rs` has thirteen test module lines; `src/host/tests/e2e/templates.rs` has three test module lines. Pre/post SHA-256 records are in `tmp/fm1-voices/FM1V-00/shared-before.sha256` and `shared-after.sha256`.
+- Final formatting check passed: `rustfmt --edition 2021 --check` on every Rust write/shared path; log `tmp/fm1-voices/FM1V-00/rustfmt-final2.log`.
+- Final focused behavioral verification passed: `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_patch|ports_are_unique|fm6_ports_contract/)'`; 13 run, 13 passed, 0 failed; log `tmp/fm1-voices/FM1V-00/nextest-final.log`.
+- Final strict lint passed: `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings`; exit 0; log `tmp/fm1-voices/FM1V-00/clippy-final.log`.
+- Resolved pre-final attempts retained: the first nextest compile found integer literals in `f32` port tables/tests (`nextest.log`); after correcting literal spelling, nextest passed 13/13 (`nextest-rerun.log`). First clippy found bare `#[must_use]` on a `Result` (`clippy.log`); after adding its diagnostic message, final clippy passed. Initial format-check attempts and formatting-only fixes are retained in `rustfmt.log`, `rustfmt-apply.log`, `rustfmt-final.log`, and `tonewheel-rustfmt.log`.
+- Scope checks: `fm.rs` diff is six additions; `git diff --stat` and `git status --short` contain only declared writePaths/sharedPaths. No registry edits were made. No remaining FM1V-00 implementation tasks.

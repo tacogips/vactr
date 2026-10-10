@@ -22,8 +22,11 @@ graph fm-pair-voice baseline 7a900d231ccdbd4b 0
 graph frame-keyframe-voice baseline 79cfbc5d992d58c2 0
 graph frame-lfo-voice baseline 9ee69ba0b33934db 0
 graph fusion-drum baseline 5b56c8279b0195ee 0
+graph gendyn baseline ad931fc001b9590c 0
 graph grain-pair-voice baseline 592a2625fdbc1f31 0
 graph granular baseline a4064d87700c892a 0
+graph hurdy-gurdy baseline 1e9b4a7b0bf2af54 0
+graph kalimba baseline ca079cba11203953 0
 graph low-drum baseline 2c2d40b50457b62e 0
 graph macro-cloud-voice baseline ce924d5a2a6b0c76 0
 graph macro-digital-voice baseline 804f6f9e3cfafb9d 0
@@ -51,6 +54,7 @@ graph phase-pair-voice baseline 1782d074f8958fd3 0
 graph reese-bass baseline 4046db5f2a90ec52 0
 graph resonator-voice baseline d91608b758688c1d 0
 graph sampler baseline f44518dce1cd043a 0
+graph scanned baseline f995b83721a1790f 0
 graph shape-voice baseline cb9c6230c184cf7b 0
 graph six-bank-a-voice baseline bdcd8bbd350b1909 0
 graph six-bank-b-voice baseline 9de843408028d14f 0
@@ -67,6 +71,8 @@ graph swarm-voice baseline f87a314f7836f7f1 0
 graph terrain-voice baseline 2375eb8a21f5947d 0
 graph tidal-poly-voice baseline 7445b51b801c6c07 0
 graph tidal-voice baseline 6934b01c5a3a622d 0
+graph tonewheel-organ baseline 41b9e5017fb3b403 0
+graph vosim baseline 01fb540341852929 0
 graph wave-grid-voice baseline ce5018b6f96f27ef 0
 graph wavetable baseline e112fcf7c7585bed 0
 graph wire-drum baseline 48a154773b0b20e9 0
@@ -107,9 +113,15 @@ render frame-keyframe-voice center e0d65f6401be9abd 24064
 render frame-lfo-voice center 33a8de7c0d0a2197 24064
 render fusion-drum center 5f4265ae8988f95d 24064
 render fusion-drum pan02 390954f36e71b2c9 24064
+render gendyn center b2687fbbf371f461 24064
+render gendyn pan02 ad0ede18cbc5e01c 24064
 render grain-pair-voice center 0d2108fc89d281be 24064
 render granular center 20c00ffeeec4e325 24064
 render granular pan02 20c00ffeeec4e325 24064
+render hurdy-gurdy center 2e86efd8cc3b89ed 24064
+render hurdy-gurdy pan02 f82e3a2b1b4a8588 24064
+render kalimba center 29f25c2df97c1089 24064
+render kalimba pan02 fb89073a8fb626d8 24064
 render low-drum center ca66a140220c9bc5 24064
 render low-drum pan02 f78f197d8fefe674 24064
 render macro-cloud-voice center 4fb4cc3ddcdb4e05 24064
@@ -159,6 +171,8 @@ render sampler center 20c00ffeeec4e325 24064
 render sampler pan02 20c00ffeeec4e325 24064
 render sampler sampler-mono-res e35ec34235992a65 24064
 render sampler sampler-stereo-res 51414a41ecf2ce65 24064
+render scanned center 52b73f2d92313f09 24064
+render scanned pan02 8499a025f5406d5b 24064
 render shape-voice center fc1ccced96d21c8f 24064
 render six-bank-a-voice center 18483ed693484585 24064
 render six-bank-b-voice center 1585a79e32e0fe81 24064
@@ -176,6 +190,10 @@ render swarm-voice center 3cc7d459697a6eb5 24064
 render terrain-voice center 7311dd0dbd45ece4 24064
 render tidal-poly-voice center 747b4d72c3d423ed 24064
 render tidal-voice center 04d755aa6648da4b 24064
+render tonewheel-organ center 4b174c26cfd5c5dd 24064
+render tonewheel-organ pan02 5ac00a76ae05bee9 24064
+render vosim center f8bb007140843d69 24064
+render vosim pan02 dae809bddd33e8a9 24064
 render wave-grid-voice center bde7dbbe31e437a3 24064
 render wavetable center 20c00ffeeec4e325 24064
 render wavetable pan02 20c00ffeeec4e325 24064

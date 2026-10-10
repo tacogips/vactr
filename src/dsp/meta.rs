@@ -282,6 +282,12 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
             "analog-bass" | "acid-bass" | "fm-bass" | "wobble-bass" | "sub-bass" | "reese-bass" => {
                 Node::BassCore
             }
+            "kalimba" => Node::KalimbaCore,
+            "tonewheel-organ" => Node::TonewheelCore,
+            "hurdy-gurdy" => Node::HurdyGurdyCore,
+            "vosim" => Node::VosimCore,
+            "gendyn" => Node::GendynCore,
+            "scanned" => Node::ScannedCore,
             _ => return None,
         };
         let ports = ucat::ports(&node);
@@ -325,6 +331,12 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     && template != "wobble-bass"
                     && template != "sub-bass"
                     && template != "reese-bass"
+                    && template != "kalimba"
+                    && template != "tonewheel-organ"
+                    && template != "hurdy-gurdy"
+                    && template != "vosim"
+                    && template != "gendyn"
+                    && template != "scanned"
                 {
                     return meta(name, ctl, (0.0, 1.0), "", false, default, &[]);
                 }
@@ -340,6 +352,41 @@ fn template_meta(template: &str, name: &'static str) -> Option<ParamMeta> {
                     "fold" => ((0.0, 1.0), false),
                     "bit-depth" => ((2.0, 16.0), false),
                     "click-level" => ((0.0, 1.0), false),
+                    "kalimba-beat" => ((0.0, 8.0), false),
+                    "kalimba-hardness" | "kalimba-damping" | "kalimba-body" | "kalimba-buzz" => {
+                        ((0.0, 1.0), false)
+                    }
+                    "kalimba-decay" => ((0.1, 10.0), false),
+                    "drawbar1" | "drawbar2" | "drawbar3" | "drawbar4" | "drawbar5" | "drawbar6"
+                    | "drawbar7" | "drawbar8" | "drawbar9" => ((0.0, 8.0), true),
+                    "organ-click" => ((0.0, 1.0), false),
+                    "organ-perc" => ((0.0, 2.0), true),
+                    "organ-perc-slow" | "organ-perc-soft" | "organ-perc-trigger" => {
+                        ((0.0, 1.0), true)
+                    }
+                    "organ-vibrato" => ((0.0, 6.0), true),
+                    "gurdy-wheel"
+                    | "gurdy-pressure"
+                    | "gurdy-melody"
+                    | "gurdy-bourdon"
+                    | "gurdy-fifth"
+                    | "gurdy-trompette"
+                    | "gurdy-buzz"
+                    | "gurdy-buzz-threshold"
+                    | "gurdy-stroke-depth" => ((0.0, 1.0), false),
+                    "gurdy-drone-key" => ((24.0, 72.0), true),
+                    "gurdy-strokes" => ((0.0, 16.0), true),
+                    "vosim-formant" => ((100.0, 8000.0), false),
+                    "vosim-pulses" => ((1.0, 8.0), true),
+                    "vosim-decay" => ((0.0, 1.0), false),
+                    "gendyn-points" => ((3.0, 32.0), true),
+                    "gendyn-amp-step" | "gendyn-dur-step" | "gendyn-spread" => ((0.0, 1.0), false),
+                    "gendyn-dist" => ((0.0, 3.0), true),
+                    "scan-stiffness" | "scan-damping" | "scan-centering" | "scan-position" => {
+                        ((0.0, 1.0), false)
+                    }
+                    "scan-hammer" => ((0.02, 1.0), false),
+                    "scan-update" => ((50.0, 2000.0), false),
                     "metal-ratio" => ((0.25, 12.0), false),
                     "metal-index" => ((0.0, 12.0), false),
                     "metal-feedback" => ((0.0, 0.95), false),
@@ -614,6 +661,12 @@ fn ugen_node(name: &str) -> Option<Node> {
         "peak-pulse-core" => Node::PeakPulse,
         "number-station-core" => Node::NumberStation,
         "bass-core" => Node::BassCore,
+        "kalimba-core" => Node::KalimbaCore,
+        "tonewheel-core" => Node::TonewheelCore,
+        "hurdy-gurdy-core" => Node::HurdyGurdyCore,
+        "vosim-core" => Node::VosimCore,
+        "gendyn-core" => Node::GendynCore,
+        "scanned-core" => Node::ScannedCore,
         "spectrum-pair" => Node::SpectrumPair,
         "clock-noise-pair" => Node::ClockNoisePair,
         "dual-kick-core" => Node::DualKick,

@@ -1,6 +1,6 @@
 # FM1V-10: The 32 Six-Operator Algorithm Topologies and msfa Cross-check
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FM1V-10 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Algorithm topologies", "msfa cross-check", "License boundary")
 **Created**: 2026-10-10
@@ -177,11 +177,32 @@ Record each result as `{command, exitStatus: 0, testsRun, testsPassed, failureCo
 
 ## Done Criteria
 
-- [ ] `ALGORITHMS` is implemented and equals the msfa derivation for all 32
+- [x] `ALGORITHMS` is implemented and equals the msfa derivation for all 32
       algorithms.
-- [ ] Verification 1-3 pass and are recorded, including the msfa SHA used.
+- [x] Verification 1-3 pass and are recorded, including the msfa SHA used.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-10 implementation)
+**Tasks Completed**: 32 topology entries, msfa fixture derivation, five focused tests, and assigned verification.
+
+- Implemented `Algorithm`, readable `ALGORITHMS[32]`, `RENDER_ORDER`, clamped `algorithm()` and `carrier_count()` in `src/dsp/ugen/fm/algorithms.rs`.
+- Added the Apache-2.0-attributed msfa bus-byte fixture and contributor-set derivation in `src/dsp/tests/dsp/fm_algorithms.rs`. Verified the msfa array order maps index 0 to operator 6 and index 5 to operator 1 using `fm_core.cc` processing order and `dx7note.cc` patch operator initialization.
+- Pinned reference: msfa revision `f67d41d313b7dc85f6fb99e79e515cc9d208cfff`, `tmp/fm1-voices/msfa/app/src/main/jni/fm_core.cc`.
+- Compared each derived modulation edge, carrier set and feedback edge against the accepted design table: 32/32 rows match (`tmp/fm1-voices/FM1V-10/design-comparison.json`). No design-document correction was needed.
+- `rustfmt --edition 2021 --check src/dsp/ugen/fm/algorithms.rs src/dsp/tests/dsp/fm_algorithms.rs`: exit 0; `tmp/fm1-voices/FM1V-10/rustfmt-final.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm_algo/)': exit 0, 5 run, 5 passed, 0 failed; `tmp/fm1-voices/FM1V-10/nextest-agent.log`.
+- Scoped `git status --short` and `git diff --stat` on the four FM1V-10 write paths: exit 0; only this plan file and the two new Rust files are changed, with the design file unchanged; `tmp/fm1-voices/FM1V-10/scoped-diff.log`.
+- Earlier focused attempts are retained as prior evidence: `nextest.log` caught this fixture's untyped bus literals and concurrent missing/incorrect files in FM1V-11/14/15; `nextest-final.log` then encountered concurrent FM1V-15 and FM1V-11 compile errors. The bus literals were annotated in this plan, and the owning plans corrected their files before the passing current-source rerun. No out-of-plan files were edited.
+- Formal integration review and workflow finalization (commit/push) remain downstream workflow steps.
+
+### Session: 2026-10-10 (Step 6 current-source verification)
+**Tasks Completed**: refreshed assigned formatting and focused behavioral gates on the current shared tree.
+
+- `rustfmt --edition 2021 --check src/dsp/ugen/fm/algorithms.rs src/dsp/tests/dsp/fm_algorithms.rs`: exit 0; `tmp/fm1-voices/FM1V-10/rustfmt-step6.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm_algo/)`: exit 0, 5 run, 5 passed, 0 failed; `tmp/fm1-voices/FM1V-10/nextest-step6.log`.
+- The pinned msfa revision remains available and the accepted design comparison remains 32/32 matching rows; no design table correction was needed.
+- Formal combined-tree integration review and workflow finalization remain downstream workflow steps.

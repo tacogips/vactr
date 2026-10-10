@@ -1,6 +1,6 @@
 # FM1V-13: `kalimba-core` Kernel (Modal Tine Voice)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FM1V-13 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "Kalimba (`kalimba-core`, template `kalimba`)")
 **Created**: 2026-10-10
@@ -177,11 +177,49 @@ re-run; never edit it. Fresh-read before each edit.
 
 ## Done Criteria
 
-- [ ] The kernel is implemented to the model above, with the real
+- [x] The kernel is implemented to the model above, with the real
       `STATE_FLOATS`.
-- [ ] Verification 1-4 pass and are recorded.
+- [x] Verification 1-4 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-13 implementation)
+**Tasks Completed**: Implemented the five-mode kalimba kernel and all assigned behavior tests.
+**Notes**: `STATE_FLOATS` is 24; modes use the specified beam ratios, beating twin, half-sine pluck, mode-dependent T60, two body band-pass resonators, seeded optional buzz, per-sample finite-state cleanup, and block-independent finish detection. Preserved the pinned ports test. No registry or template work was performed.
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/kalimba.rs src/dsp/tests/dsp/kalimba.rs` — exit 0; `tmp/fm1-voices/FM1V-13/rustfmt-final.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/kalimba/)'` — exit 0, 11 run / 11 passed / 0 failed; `tmp/fm1-voices/FM1V-13/nextest-final.log`.
+- Assigned-path scope and size audit — exit 0; only this plan's two Rust files are changed in its source paths; kernel 211 lines, tests 366 lines; `tmp/fm1-voices/FM1V-13/scope-and-lines-final.log`. The shared worktree also contains other plans' concurrent changes.
+- Earlier failed focused attempts are retained in `tmp/fm1-voices/FM1V-13/nextest.log` and `nextest-attempt-02.log` through `nextest-attempt-05.log`; the final current-tree run passes after the corrections.
+
+### Session: 2026-10-10 (FM1V-13 test-integrity repair)
+**Finding Repaired**: FM1V-13-TI-01 — `kalimba_default_c4_peak_is_normalized` now renders C4 at 261.6256 Hz; the default controls and 0.4..=0.9 assertion are unchanged. Lowered `NORMALIZATION` to 160.0; a standalone call to the production renderer measured C4 peak 0.752829.
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/kalimba.rs src/dsp/tests/dsp/kalimba.rs` — exit 0; `tmp/fm1-voices/FM1V-13/rustfmt-repair.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/kalimba/)'` — exit 0, 11 run / 11 passed / 0 failed; `tmp/fm1-voices/FM1V-13/nextest-repair.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib` — exit 0; `tmp/fm1-voices/FM1V-13/cargo-build-repair.log`.
+- `rustc --edition 2021 tmp/fm1-voices/FM1V-13/peak_probe.rs --extern vactr=target/debug/deps/libvactr.rlib -L dependency=target/debug/deps -o tmp/fm1-voices/FM1V-13/peak_probe` and the probe — both exit 0; `tmp/fm1-voices/FM1V-13/peak-probe-build.log` and `peak-probe.log`.
+- Line limits and preservation of the pinned `PORTS` table/ports test verified; `tmp/fm1-voices/FM1V-13/line-limits-repair.log`.
+- Byte-equivalence audit confirms the pinned `PORTS` table and port test are unchanged from their FM1V-00 scaffold; `tmp/fm1-voices/FM1V-13/port-preservation-repair-02.log`.
+**Review Status**: Repair evidence is complete; independent re-review remains pending.
+
+### Session: 2026-10-10 (FM1V-13 adversarial repair)
+**Finding Repaired**: FM1V-13-ADV-01 — finish detection now compares mode energy with `FINISH_ENERGY = 1.0e-8 / (NORMALIZATION * NORMALIZATION)`, keeping the pluck-window guard. Added `kalimba_finish_is_below_minus_80_db`; no existing tests, constants or ports were changed.
+**Measured Output**: Default C4, seed 33, 48 kHz: peak 0.752829; finish at frame 150272 (3.130667 s); maximum absolute output in the final 480 samples 0.000072633 (<1e-4).
+**Verification**:
+- `rustfmt --edition 2021 --check src/dsp/ugen/kalimba.rs src/dsp/tests/dsp/kalimba.rs` — exit 0; `tmp/fm1-voices/FM1V-13/rustfmt-adv01-verifier.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/kalimba/)'` — exit 0, 12 run / 12 passed / 0 failed; `tmp/fm1-voices/FM1V-13/nextest-adv01.log`.
+- Production renderer measurement — exit 0; `tmp/fm1-voices/FM1V-13/peak-probe-build-adv01.log` and `tmp/fm1-voices/FM1V-13/peak-probe-adv01.log`.
+- Kernel and test file sizes are 213 and 407 lines; pinned ports table and test remain byte-identical; `tmp/fm1-voices/FM1V-13/adv01-progress.md` and `tmp/fm1-voices/FM1V-13/port-preservation-repair-02.log`.
+**Review Status**: Implementation repair evidence is complete; independent adversarial re-review remains pending.
+**Post-format Verification**: Check-and-test-after-modify confirmed the probe formatting, rebuild and measurement, and reran the current-source kalimba suite. A first exact-file probe rustfmt check failed on formatting only; formatting the probe resolved it.
+- `rustfmt --edition 2021 --check tmp/fm1-voices/FM1V-13/peak_probe.rs` — exit 0; `tmp/fm1-voices/FM1V-13/rustfmt-adv01-probe-final.log`.
+- `rustc --edition=2021 tmp/fm1-voices/FM1V-13/peak_probe.rs --extern vactr=target/debug/deps/libvactr.rlib -L dependency=target/debug/deps -o target/debug/peak_probe` — exit 0; `tmp/fm1-voices/FM1V-13/peak-probe-build-adv01-final.log`.
+- `target/debug/peak_probe` — exit 0; `c4_peak=0.752829`, finish at frame 150272 (3.130667 s), final-480 peak 0.000072633; `tmp/fm1-voices/FM1V-13/peak-probe-adv01-final.log`.
+- Fresh source-linked rebuild and measurement — `CARGO_TERM_QUIET=true cargo build --lib`, probe recompilation against the rebuilt `target/debug/deps/libvactr.rlib`, and rerun all exit 0; measurements are unchanged; `tmp/fm1-voices/FM1V-13/cargo-build-adv01-final.log`, `peak-probe-build-adv01-final2.log`, and `peak-probe-adv01-final2.log`.
+- `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/kalimba/)'` — exit 0, 12 run / 12 passed / 0 failed; `tmp/fm1-voices/FM1V-13/nextest-adv01-final-verifier.log`.
+- Rechecked current line limits and byte-identical ports contract; `tmp/fm1-voices/FM1V-13/line-limits-adv01.log` and `tmp/fm1-voices/FM1V-13/port-preservation-adv01.log`.
+**Review Status**: Implementation repair evidence is complete; independent adversarial re-review remains pending.

@@ -1,6 +1,6 @@
 # FM1V-14: `tonewheel-core` Kernel (Drawbar Tonewheel Organ)
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: FM1V-14 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "Drawbar tonewheel organ")
 **Created**: 2026-10-10
@@ -169,7 +169,7 @@ Keep the ports test. Add:
 
 1. `rustfmt --edition 2021 --check src/dsp/ugen/tonewheel.rs src/dsp/tests/dsp/tonewheel.rs`
    must exit 0.
-2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/tonewheel/)' > tmp/fm1-voices/FM1V-14/nextest.log 2>&1; echo "exit=$?"`
+2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/tonewheel/)' > tmp/fm1-voices/FM1V-14/nextest-final-current.log 2>&1; echo "exit=$?"`
    must print `exit=0`, with at least 12 tests run and 0 failed.
 3. The kernel file is under 400 lines and the test file under 1000.
 4. `git diff --stat` shows only writePaths.
@@ -183,10 +183,37 @@ re-run.
 
 ## Done Criteria
 
-- [ ] The kernel is implemented, with the real `STATE_FLOATS`.
-- [ ] Verification 1-4 pass and are recorded.
+- [x] The kernel is implemented, with the real `STATE_FLOATS`.
+- [x] Plan-owned tests cover the pinned port contract and tonewheel behavior (13 tonewheel-named tests total).
+- [x] `tonewheel_foldback_caps_partials` holds the note and checks unfolded and folded partial frequencies (FM1V-14-TI-01).
+- [x] `tonewheel_gate_length_owns_note_off` asserts sound immediately before the expected note-off window (FM1V-14-TI-02).
+- [x] The gate release is armed once, persisted across blocks, ramps for 5 ms, and finishes after the release (FM1V-14-ADV-01).
+- [x] Verification 1-4 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-14 implementation)
+**Tasks Completed**: Implemented the nine-partial tonewheel renderer with foldback, drawbar gain steps, onset-latched percussion, seeded filtered click, scanner delay, gate-length release, finite output and fixed state sizing. Added 12 behavioral tests alongside the existing port-contract test. The fixed arena is 301 floats: nine phases plus `ceil(0.003 * 96 kHz) + 4` scanner samples.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/tonewheel.rs src/dsp/tests/dsp/tonewheel.rs` passed (exit 0). Final focused nextest passed 13/13, 0 failed, 2,912 skipped at `tmp/fm1-voices/FM1V-14/nextest-retry-2.log` (exit 0). The kernel/tests are 273/456 lines, and the plan's three authored paths are the only paths recorded for FM1V-14.
+**Prior attempts**: Initial nextest compilation was blocked by unrelated `src/dsp/tests/dsp/fm6_envelope.rs:74` (`E0689`); after waiting for the shared tree, retry 1 ran 13 tests but exposed a fixture gate-window error in the registration test. The test now holds the note through its one-second analysis window; the final source-matched retry passed. Logs are preserved as `nextest.log` and `nextest-retry-1.log`.
+**Next**: Formal combined-tree integration/adversarial review remains downstream.
+
+### Session: 2026-10-10 (FM1V-14 Step 6 final-source re-verification)
+**Tasks Completed**: Re-ran the focused tonewheel suite and formatting gate on the current shared-tree source. No Rust edits were required in this Step 6 execution.
+**Verification**: `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/tonewheel/)'` exited 0 with 13 tests passed, 0 failures, and 2,913 skipped; complete log: `tmp/fm1-voices/FM1V-14/nextest-final-current.log`. `rustfmt --edition 2021 --check src/dsp/ugen/tonewheel.rs src/dsp/tests/dsp/tonewheel.rs` exited 0; complete log: `tmp/fm1-voices/FM1V-14/rustfmt-final-current.log`. The kernel and tests are 273 and 456 lines, respectively.
+**Next**: Formal combined-tree integration/adversarial review remains downstream.
+
+### Session: 2026-10-10 (FM1V-14 test-integrity repairs)
+**Tasks Completed**: Repaired FM1V-14-TI-01 by holding the foldback-test note with CPS 0.03 and gate-length 64.0, checking all five unfolded partial frequencies below 1e-3, and adding folded-line positive controls above 0.05 while retaining the prior probes. Repaired FM1V-14-TI-02 by asserting signal above 1e-3 in samples 23,900-23,999 while retaining the existing note-off assertions.
+**Kernel Invariant**: `src/dsp/ugen/tonewheel.rs` remains unchanged; SHA-256 `a0870648e33cba6f563af6448b9ee0cc0c917a75965c6695577a05d5d6fbf40a`.
+**Verification**: `rustfmt --edition 2021 --check src/dsp/ugen/tonewheel.rs src/dsp/tests/dsp/tonewheel.rs` exited 0; complete log `tmp/fm1-voices/FM1V-14/rustfmt-ti-repair.log`. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/tonewheel/)'` exited 0 with 13 tests passed and 0 failures; complete log `tmp/fm1-voices/FM1V-14/nextest-ti-repair.log`. Line counts are 273/475; kernel SHA-256 remains `a0870648e33cba6f563af6448b9ee0cc0c917a75965c6695577a05d5d6fbf40a`.
+**Next**: Hand off both repaired findings for independent test-integrity re-review.
+
+### Session: 2026-10-10 (FM1V-14 adversarial repair FM1V-14-ADV-01)
+**Tasks Completed**: Fixed the gate/release state machine. The renderer now arms a 5 ms release once when the gate expires, stores the armed marker in `st.s[5]` and remaining samples in `st.s[1]`, linearly scales output throughout the release, and finishes after sample 24,239 (zero-fill begins at 24,240 for the default 48 kHz case). Extended `tonewheel_gate_length_owns_note_off` with release-window signal, late-tail decay, and exact-zero checks from sample 24,241 onward; all earlier assertions remain.
+**Negative Control**: The new release-window assertion failed against the old kernel as intended: 1 selected test, 0 passed, 1 failed, exit 100; `tmp/fm1-voices/FM1V-14/negative-control-adv01-old-kernel.log`.
+**Verification**: Focused nextest on the repaired source passed 13/13 with 0 failures, exit 0; `tmp/fm1-voices/FM1V-14/nextest-adv01.log`. Independent `check-and-test-after-modify` re-run also passed 13/13, exit 0; `tmp/fm1-voices/FM1V-14/postcheck-adv01-independent-nextest.log`. Rustfmt checks passed with exit 0 at `tmp/fm1-voices/FM1V-14/rustfmt-adv01.log` and `tmp/fm1-voices/FM1V-14/postcheck-adv01-independent-rustfmt.log`. Kernel/tests are 277/488 lines. Final kernel SHA-256: `65c16cfdc4592dab0a3ab455a7d20bf24cf1892f2a885e2daeb1e587d59fa065`.
+**Next**: Independent adversarial re-review and serial combined-tree integration review remain downstream.

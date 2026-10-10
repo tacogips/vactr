@@ -1,6 +1,6 @@
 # FM1V-20: Six-Operator FM Engine and `fm-mod` Algorithm Mode Kernel
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: FM1V-20 (wave 2)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility", "Macro patch", "Operator, EG and scaling behaviour" numeric rules, "`fm6-core` UGen")
 **Created**: 2026-10-10
@@ -249,11 +249,23 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 
 ## Done Criteria
 
-- [ ] The engine and `modulate_with_algorithm` are implemented, and the
+- [x] The engine and `modulate_with_algorithm` are implemented, and the
       legacy branch is bit-identical.
 - [ ] Verification 1-5 pass and are recorded.
+      Static checks 1, 3 and 4 passed. The canonical focused filter ran with
+      an isolated declared target directory and completed 50 tests (49
+      passed, 1 failed). The only failure is the FM1V-21
+      `fm6_sysex_native_returns_bulk_voices` test, whose fixture uses invalid
+      parenthesized Vactr syntax at `src/ns/tests/reactive_basic.rs:81:33`.
+      Complete log: `tmp/fm1-voices/FM1V-20/nextest-final-source-03.log`.
+      Supplemental plan-module filter passed 11/11 with exit status 0;
+      log: `tmp/fm1-voices/FM1V-20/nextest-engine-module-final.log`.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-20 implementation)
+**Tasks Completed**: Engine and algorithm-mode wrapper implemented; legacy branch, topology/render, patch EG and fixed-frequency, key-off chunk timing, determinism, stability, and allocation tests added.
+**Notes**: `src/dsp/ugen/fm/engine.rs` is 399 lines. `fm.rs` has no removed lines. Final rustfmt passed. `fm6_patch_key_off_waits_for_next_eg_chunk` compares identical output before the next 64-frame boundary and divergence in the boundary chunk. The isolated plan-module filter passed 11/11 with exit status 0. The canonical focused filter ran against `CARGO_TARGET_DIR=target/fm1-voices/FM1V-20/isolated-target` and completed with 50 tests run, 49 passed, and one unrelated FM1V-21 native SysEx test failed because `len (fm6-sysex ./bank.syx)` is invalid Vactr syntax. The failing source path is outside this plan's writePaths. Resume after FM1V-21 repairs its fixture, then rerun the canonical filter. Full logs: `tmp/fm1-voices/FM1V-20/nextest-final-source-03.log` and `tmp/fm1-voices/FM1V-20/nextest-engine-module-final.log`; final rustfmt log: `tmp/fm1-voices/FM1V-20/rustfmt-final-source-03.log`.

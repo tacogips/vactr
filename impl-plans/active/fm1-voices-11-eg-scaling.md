@@ -1,6 +1,6 @@
 # FM1V-11: Operator Envelope and Keyboard/Velocity/Frequency Scaling
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: FM1V-11 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Operator, EG and scaling behaviour", "License boundary")
 **Created**: 2026-10-10
@@ -199,12 +199,42 @@ plan's file, wait and re-run.
 
 ## Done Criteria
 
-- [ ] The envelope and scaling contracts are implemented with msfa
+- [x] The envelope and scaling contracts are implemented with msfa
       attribution doc comments.
-- [ ] Verification 1-3 pass and are recorded.
-- [ ] If msfa is recorded as unavailable, mark this plan blocked instead.
+- [x] Verification 1-3 pass and are recorded.
+- [x] msfa was available at pinned revision
+      `f67d41d313b7dc85f6fb99e79e515cc9d208cfff`.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-10 (FM1V-11 implementation)
+**Tasks Completed**: Implemented the 64-frame EG with msfa Q24 level progression, sample-rate-scaled increments, key-off release, exact f32 state serialization, `FULL_SCALE_LEVEL`, and `log_to_amp`; added all assigned keyboard, velocity, output-level, frequency, transpose, and feedback scaling functions; added 12 focused `fm6_*` tests.
+
+**Reference**: msfa Apache-2.0 revision `f67d41d313b7dc85f6fb99e79e515cc9d208cfff`; the implementation doc comments identify consulted source paths and adaptations. No other firmware sources or patch data were used.
+
+**Verification**:
+- `{command: "rustfmt --edition 2021 --check src/dsp/ugen/fm/envelope.rs src/dsp/ugen/fm/scaling.rs src/dsp/tests/dsp/fm6_envelope.rs", exitStatus: 0, outcome: "passed", log: "tmp/fm1-voices/FM1V-11/rustfmt-final.log"}`
+- `{command: "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_eg|fm6_scale|fm6_velocity|fm6_op_freq|fm6_feedback|fm6_log/)'", exitStatus: 0, testsRun: 12, testsPassed: 12, failureCount: 0, outcome: "passed", log: "tmp/fm1-voices/FM1V-11/nextest-final.log"}`
+- `git status --short -- src/dsp/ugen/fm/envelope.rs src/dsp/ugen/fm/scaling.rs src/dsp/tests/dsp/fm6_envelope.rs impl-plans/active/fm1-voices-11-eg-scaling.md` listed only the three new assigned Rust files as untracked. The scoped `git diff --stat` was empty because those files are untracked; no out-of-plan tracked diff was present for these paths.
+
+**Prior attempts retained**: initial nextest compilation failure (exit 101) at `tmp/fm1-voices/FM1V-11/nextest.log`; after fixing the test type, a too-strict adjacent-Q24-unit monotonicity assertion failed (12 run, 11 passed, 1 failed, exit 100) at `tmp/fm1-voices/FM1V-11/nextest-rerun-1.log`; initial rustfmt check reported formatting differences at `tmp/fm1-voices/FM1V-11/rustfmt-attempt-1.log`. All are resolved by current-source checks above.
+
+**Contract self-check**: expanded `feedback_gain` documentation to state msfa's `fb_shift = 8 - feedback` and the resulting doubling per feedback step. Executable behavior did not change.
+
+**Final verification after the contract documentation edit**:
+- `{command: "rustfmt --edition 2021 --check src/dsp/ugen/fm/envelope.rs src/dsp/ugen/fm/scaling.rs src/dsp/tests/dsp/fm6_envelope.rs", exitStatus: 0, outcome: "passed", log: "tmp/fm1-voices/FM1V-11/rustfmt-final-2.log"}`
+- `{command: "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_eg|fm6_scale|fm6_velocity|fm6_op_freq|fm6_feedback|fm6_log/)'", exitStatus: 0, testsRun: 12, testsPassed: 12, failureCount: 0, outcome: "passed", log: "tmp/fm1-voices/FM1V-11/nextest-final-2.log"}`
+
+**FM1V-20 handoff**: `op_outlevel` and `op_rate_scaling` take published operator numbers 1 through 6; a zero-based operator loop must pass `index + 1`.
+
+### Session: 2026-10-10 (Step 6 redispatch verification)
+**Tasks Completed**: Rechecked the assigned EG/scaling implementation against the accepted design and pinned msfa sources; no code correction was required. The msfa checkout resolves to the pinned revision.
+
+**Verification**:
+- `{command: "rustfmt --edition 2021 --check src/dsp/ugen/fm/envelope.rs src/dsp/ugen/fm/scaling.rs src/dsp/tests/dsp/fm6_envelope.rs", exitStatus: 0, outcome: "passed", log: "tmp/fm1-voices/FM1V-11/rustfmt-readonly-verify-01.log"}`
+- `{command: "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_eg|fm6_scale|fm6_velocity|fm6_op_freq|fm6_feedback|fm6_log/)', exitStatus: 0, testsRun: 12, testsPassed: 12, failureCount: 0, outcome: "passed", log: "tmp/fm1-voices/FM1V-11/nextest-readonly-verify-01.log"}`
+
+**Workflow boundary**: formal review and serial combined-tree integration remain downstream workflow steps.

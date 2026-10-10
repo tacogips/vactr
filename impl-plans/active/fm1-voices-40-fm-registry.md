@@ -4,7 +4,18 @@
 **Plan ID**: FM1V-40 (run 3, serial wave 4 of 6; registry plan, after FM1V-30)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility (chosen mechanism)", "`fm6-core` UGen", "SysEx import" usage, "Registration and digest stability", "Implementation partition", "Verification" -> `fm` template and Native)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 353)
+**Last Updated**: 2026-10-11 (session 355)
+
+## Session 355 Note (run 4)
+
+- Base is `b6e9858`, not `48d651c`. Every other point below still holds.
+  `tests/song_host_profile.rs` now expects `(50, 134)` / `(5, 102)`. It is
+  read-only here and must pass unchanged in the full run.
+- The design (session 355) puts the patched `fm6-core`
+  native-versus-codec parity test in `src/dsp/tests/dsp/fm6_registry.rs`
+  (`fm6_registry_codec_parity_with_and_without_patch`, owned by this plan).
+  The native `fm6-sysex` tests stay in FM1V-21's `src/ns/tests/fm6_sysex.rs`.
+  Do not create `src/host/tests/e2e/fm6_sysex.rs`.
 
 ## Session 353 Note (run 3)
 

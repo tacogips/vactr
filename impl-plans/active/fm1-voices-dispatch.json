@@ -4,7 +4,7 @@
   "implementationBranch": "wf/fm1-voices",
   "baseBranch": "wf/fm1-voices",
   "remote": "origin",
-  "originalHead": "48d651c4161cab40d99963732ee4483cae5ba570",
+  "originalHead": "b6e9858baf1a3a229499485e00aa06d5ce00b963",
   "designDocPaths": [
     "design-docs/specs/design-fm1-voices.md",
     "design-docs/specs/design-music.md",
@@ -103,6 +103,20 @@
     ],
     "notes": "48d651c raised template_slots 96->102 (src/dsp/ring.rs:811) and SONG_TEMPLATE_SLOTS 128->134 (src/host/song_profile.rs:12); tests/song_bus_memory_layout.rs passes 4/4 and is read-only for every plan. FM1V-21 needs only Verification 1-8 rerun under tmp/fm1-voices/FM1V-21/attempt-02/. Clippy ownership: FM1V-20 fixes its warnings in src/dsp/ugen/fm/engine.rs and src/dsp/tests/dsp/fm6_engine.rs; FM1V-30 fixes src/host/tests/e2e/templates/fm1_voices.rs. FM1V-21 and FM1V-20 gate on a scoped clippy scan (cargo clippy --all-targets without -D warnings, 0 diagnostics located in the plan's own files); strict cargo clippy --all-targets -- -D warnings exit 0 is gating from FM1V-30 on. Algorithms 4 and 6 keep the delayed-history cross-operator feedback edge (design 'Algorithms 4 and 6', accepted in step 3 of session 353)."
   },
+  "run4": {
+    "session": "opus-luna-design-and-implement-review-loop-session-355",
+    "baseCommit": "b6e9858baf1a3a229499485e00aa06d5ce00b963",
+    "preRunBaseForDiffChecks": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+    "remainingOrder": [
+      "FM1V-21",
+      "FM1V-20",
+      "FM1V-30",
+      "FM1V-40",
+      "FM1V-50",
+      "FM1V-51"
+    ],
+    "notes": "b6e9858 updated tests/song_host_profile.rs:907 expectations to (50, 134) / (5, 102); owner reports full nextest 2951 tests green at this base. FM1V-21 reruns Verification 1-8 under tmp/fm1-voices/FM1V-21/attempt-03/ (attempt-04 only after a harness kill). FM1V-20 (attempt-03) and FM1V-30 (attempt-02) evidence directories are unused so far and keep their run-3 names. Session 355 design edit: native fm6-sysex tests live in src/ns/tests/fm6_sysex.rs (FM1V-21), patched fm6-core codec parity in src/dsp/tests/dsp/fm6_registry.rs (FM1V-40); src/host/tests/e2e/fm6_sysex.rs is never created. Measured at session 355: golden_digests.txt numstat vs 9ac8d1f is 18 added / 0 removed; codec tags 106..111 assigned, 105 unused. Algorithms 4 and 6 keep the delayed-history cross-operator feedback edge (decided; FM1V-20 review verifies, does not reopen). tests/song_host_profile.rs and tests/song_bus_memory_layout.rs are read-only for every plan."
+  },
   "executionModel": {
     "finalIntegration": {
       "owner": "workflow (serial, after FM1V-51 is accepted; not a fanout plan)",
@@ -175,7 +189,7 @@
     "longRunningCommands": "Full nextest takes about 800-1700 s and complete::tests::robust::every_prefix_and_mutant_is_panic_free alone about 500 s; the previous FM1V-30 attempt was SIGTERMed at about 1200 s (tmp/fm1-voices/FM1V-30/focused-final-blessed.log, exitStatus 100). Run lock-wrapped full nextest in the foreground with an executor command timeout of at least 3600 s (or the maximum) and poll to exit; never background it. A SIGTERM/harness kill is neither pass nor code failure: rerun once with the long timeout and record both attempt logs under tmp/fm1-voices/<planId>/attempt-<n>/. Focused filters for FM1V-30 and FM1V-40 exclude the robust test via '- test(/complete::tests::robust/)'; full nextest still runs it. No test is skipped, ignored or loosened."
   },
   "reviewContext": {
-    "issueReference": "workflowInput issue: Extend existing FM with the 32 DX7 algorithms and add kalimba, drawbar tonewheel organ, hurdy-gurdy, and VOSIM/GENDYN/scanned-synthesis voices (no GitHub issue or PR number); workflow opus-luna-design-and-implement-review-loop-session-353 (continuation run 3 of sessions 347/349/352, base 48d651c); plan review accepted in comm-005984 (session 352 review comm-005971)",
+    "issueReference": "workflowInput issue: Extend existing FM with the 32 DX7 algorithms and add kalimba, drawbar tonewheel organ, hurdy-gurdy, and VOSIM/GENDYN/scanned-synthesis voices (no GitHub issue or PR number); workflow opus-luna-design-and-implement-review-loop-session-355 (continuation run 4 of sessions 347/349/352/353, base b6e9858); design accepted in comm-006008, plans in comm-006009, plan review accepted in comm-006010",
     "userProblem": "The fm template declares an algorithm parameter (default 5) that its fixed two-operator body ignores; vactr has no six-operator algorithm routing, operator feedback, operator EGs or SysEx patch import, and no kalimba, tonewheel organ, hurdy-gurdy, VOSIM, GENDYN or scanned-synthesis voice (design-fm1-voices.md Overview).",
     "requiredOutcomes": [
       "Design document for the six-operator extension of the existing FM engine (fm template backward compatibility, SysEx import) and each new voice (design-docs/specs/design-fm1-voices.md).",
@@ -346,19 +360,20 @@
         "At least 7 fm6_sysex tests from this plan run with 0 failed; wasm --lib build passes; each file under 1000 lines; no test files written inside the repository.",
         "Committed 25d3e80 source audited against the plan; fixture src/ns/tests/fm6_sysex.rs:92-93 rewritten as `len {fm6-sysex ./bank.syx}` (32) and `fm6-sysex ./bank.syx > first > len` (155) with no ( ) grouping left.",
         "FM1V-20's canonical filter test(/fm6|fm_mod|fm_algo/) and full nextest under the lock exit 0 with 0 failed.",
-        "Session 353: Verification 1-8 rerun on base 48d651c under tmp/fm1-voices/FM1V-21/attempt-02/; scoped clippy scan shows 0 diagnostics located in this plan's files; no source edit unless a gate fails inside writePaths."
+        "Session 355: Verification 1-8 rerun on base b6e9858 under tmp/fm1-voices/FM1V-21/attempt-03/ (full nextest exit 0, 0 failed, no cancelled tests); scoped clippy scan shows 0 diagnostics located in this plan's files; source hashes before/after unchanged unless a gate failed inside writePaths."
       ],
       "verification": [
-        "rustfmt --edition 2021 --check src/ns/fm6_sysex.rs src/ns/load.rs src/ns/mod.rs src/ns/tests/mod.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_sysex|native_table|natives|load|infer|no_abort|session/)' > tmp/fm1-voices/FM1V-21/nextest.log 2>&1; echo \"exit=$?\"",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/fm1-voices/FM1V-21/wasm.log 2>&1; echo \"exit=$?\"",
+        "rustfmt --edition 2021 --check src/ns/fm6_sysex.rs src/ns/load.rs src/ns/mod.rs src/ns/tests/mod.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs > tmp/fm1-voices/FM1V-21/attempt-03/rustfmt.log 2>&1; echo \"exit=$?\"",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_sysex|native_table|natives|load|infer|no_abort|session/)' > tmp/fm1-voices/FM1V-21/attempt-03/nextest.log 2>&1; echo \"exit=$?\"",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/fm1-voices/FM1V-21/attempt-03/wasm.log 2>&1; echo \"exit=$?\"",
         "wc -l src/ns/fm6_sysex.rs src/ns/load.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
         "test \"$(grep -c -F -e '((' -e 'len (' src/ns/tests/fm6_sysex.rs)\" = 0",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo/)' > tmp/fm1-voices/FM1V-21/nextest-fm-filter.log 2>&1; echo \"exit=$?\"",
-        "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-21 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-21/attempt-02/full.log 2>&1; echo \"exit=$?\"'",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets > tmp/fm1-voices/FM1V-21/attempt-02/clippy-scan.log 2>&1; echo \"exit=$?\"",
-        "test \"$(grep -c -E -- '--> src/(ns/fm6_sysex|ns/load|ns/mod|ns/tests/mod|ns/tests/fm6_sysex|types/natives|host/native/loader|session/session|vm/tests/native_table)\\.rs:' tmp/fm1-voices/FM1V-21/attempt-02/clippy-scan.log)\" = 0",
-        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-21/status-before.txt: new or changed paths are within writePaths"
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo/)' > tmp/fm1-voices/FM1V-21/attempt-03/nextest-fm-filter.log 2>&1; echo \"exit=$?\"",
+        "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-21 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-21/attempt-03/full.log 2>&1; echo \"exit=$?\"'",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets > tmp/fm1-voices/FM1V-21/attempt-03/clippy-scan.log 2>&1; echo \"exit=$?\"",
+        "test \"$(grep -c -E -- '--> src/(ns/fm6_sysex|ns/load|ns/mod|ns/tests/mod|ns/tests/fm6_sysex|types/natives|host/native/loader|session/session|vm/tests/native_table)\\.rs:' tmp/fm1-voices/FM1V-21/attempt-03/clippy-scan.log)\" = 0",
+        "shasum -a 256 src/ns/fm6_sysex.rs src/ns/load.rs src/ns/mod.rs src/ns/tests/mod.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs > tmp/fm1-voices/FM1V-21/attempt-03/source-hashes-after.log && cmp tmp/fm1-voices/FM1V-21/attempt-03/source-hashes-before.log tmp/fm1-voices/FM1V-21/attempt-03/source-hashes-after.log",
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-21/attempt-03/status-before.txt: new or changed paths are within writePaths"
       ]
     },
     {

@@ -4,7 +4,12 @@
 **Plan ID**: FM1V-50 (run 3, serial wave 5 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Presets and examples", "SysEx import" -> Usage syntax)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 353)
+**Last Updated**: 2026-10-11 (session 355)
+
+## Session 355 Note (run 4)
+
+Base is `b6e9858`, not `48d651c`. No other change. Everything below still
+applies.
 
 ## Session 353 Note (run 3)
 

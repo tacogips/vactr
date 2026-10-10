@@ -4,7 +4,15 @@
 **Plan ID**: FM1V-51 (run 3, serial wave 6 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("License boundary", "Algorithm topologies" -> "Algorithms 4 and 6", "SysEx import" -> Usage, "Presets and examples" -> Documentation, "References")
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 353)
+**Last Updated**: 2026-10-11 (session 355)
+
+## Session 355 Note (run 4)
+
+Base is `b6e9858`, not `48d651c`. Session 355 has already corrected
+`design-docs/specs/design-fm1-voices.md` (Verification -> Native,
+Implementation partition), so the test-file locations there are current.
+Edit that file here only for the kalimba-citation outcome described below.
+Everything below still applies.
 
 ## Session 353 Note (run 3)
 

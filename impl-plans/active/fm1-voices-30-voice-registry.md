@@ -1,12 +1,33 @@
 # FM1V-30: Register the Six Voice Kernels and Templates
 
-**Status**: In Progress (session 353 redispatch: audit and finish the partial edits, fix clippy)
-**Plan ID**: FM1V-30 (run 3, serial wave 3 of 6; registry plan, before FM1V-40)
+**Status**: In Progress (session 355 redispatch: audit and finish the partial edits, fix clippy)
+**Plan ID**: FM1V-30 (run 4, serial wave 3 of 6; registry plan, before FM1V-40)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Templates", "Registration and digest stability", "Implementation partition", "Verification" -> Voice kernels/E2e)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 353)
+**Last Updated**: 2026-10-11 (session 355)
 
-## Session 353 Redispatch (run 3, read first)
+## Session 355 Note (run 4, read first)
+
+- Base is `b6e9858`. The session 353 redispatch below never ran and
+  applies unchanged. Logs go to `tmp/fm1-voices/FM1V-30/attempt-02/`, which
+  does not exist yet.
+- `b6e9858` changed only the expectations in `tests/song_host_profile.rs`
+  to `(50, 134)` / `(5, 102)`. The file stays read-only for this plan.
+  Verification 4a must pass with it unchanged.
+- Measured state of the partial edits at session 355 design review. Use it
+  as a starting point for the audit; it is not a substitute for the audit:
+  - `git diff --numstat 9ac8d1f HEAD -- src/host/tests/e2e/templates/golden_digests.txt`
+    gives `18 0` (18 lines added, 0 removed).
+  - `graph fm baseline 29a87235be1d7b30 0`, `render fm center f84c6215540e7cb1 24064`
+    and `render fm pan02 013b4c5a6d6773d5 24064` are present.
+  - `src/dsp/ugen/catalog/codec.rs` maps tags 106..111 to the six voices,
+    after `BassCore` 104. Tag 105 is unused.
+
+  Re-bless only if the audit changes a kernel or template, and only with
+  `VACTR_BLESS_GOLDEN=1`. Even then, the removed-line count against
+  `9ac8d1f` must stay 0 and the added count must stay 18.
+
+## Session 353 Redispatch (run 3; still applies)
 
 Base is `48d651c`. FM1V-21 and FM1V-20 are accepted before this plan
 starts. The session 352 jobs below still apply in full, with these run 3

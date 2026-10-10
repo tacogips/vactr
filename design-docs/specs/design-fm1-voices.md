@@ -11,7 +11,7 @@ It is linked from
 [`design-music.md` section 4.4](design-music.md#44-six-operator-fm-algorithms-and-new-voices-author-2026-10-10).
 
 Status: accepted design for the wf/fm1-voices workflow (2026-10-10, session
-347; reconciled in session 352). The user decisions in
+347; reconciled in sessions 352 and 355). The user decisions in
 [`../user-qa/pending-fm1-voices-questions.md`](../user-qa/pending-fm1-voices-questions.md)
 are all decided: the owner accepted FV1 (a), FV2 (a), FV3, FV4 (a), FV5 (a),
 FV6 and FV7 on 2026-10-10.
@@ -295,6 +295,11 @@ these two algorithms. vactr keeps the chart's edge instead:
   is affected. The legacy `fm` path never runs the engine.
 - Test: for algorithms 4 and 6, feedback 0 and feedback 7 render different
   output, so the edge is live.
+- FM1V-20 does not reopen this decision. Its review checks that
+  `src/dsp/ugen/fm/engine.rs` implements exactly this rule (delayed source
+  history, never the current sample) and that the source comment states the
+  msfa divergence. Switching to msfa's no-feedback behaviour would need a new
+  owner decision.
 
 **msfa cross-check.** The cross-check lives in the test file
 `src/dsp/tests/dsp/fm_algorithms.rs` and works as follows:
@@ -981,16 +986,18 @@ and its count must be positive.
 - A user `inst` using `fm-mod` with no `algorithm` header is bit-identical to
   the legacy path.
 
-**Native** (`src/host/tests/e2e/fm6_sysex.rs`, using a test loader that
-implements `read_bytes`):
+**Native** (`src/ns/tests/fm6_sysex.rs`, plan FM1V-21, using a test loader
+that implements `read_bytes`):
 
 - `fm6-sysex` returns 32 lists of 155 ints for the bulk fixture and 1 for
   the single-voice fixture.
 - A bad-checksum file fails with a `fm6-sysex:` message that names the
   checksum.
 - The default loader fails with `host-unavailable`.
-- A patched `fm6-core` renders, and the native render equals the codec
-  (browser) render.
+
+**Patched `fm6-core`** (`src/dsp/tests/dsp/fm6_registry.rs`, plan FM1V-40):
+a patched `fm6-core` renders, and the native render equals the codec
+(browser) render, with and without a patch.
 
 **Voice kernels** (`src/dsp/tests/dsp/{kalimba,tonewheel,hurdy_gurdy,vosim,gendyn,scanned}.rs`):
 
@@ -1090,13 +1097,15 @@ tags 106..111 and leaves tag 105 unused until FM1V-40 assigns it to
 |------|------|------------|----------|
 | FM1V-01 engine core | `src/dsp/ugen/fm.rs` (only its `pub mod` lines), `src/dsp/ugen/fm/{algorithms,envelope,scaling,patch,engine}.rs`, `src/dsp/tests/dsp/fm_algorithms.rs`, `src/dsp/tests/dsp/fm6_engine.rs`, plus their module lines in `src/dsp/tests/dsp.rs` | none | No registry work. Runs first. |
 | FM1V-02 SysEx parser | `src/dsp/ugen/fm/sysex.rs`, `src/dsp/tests/dsp/fm6_sysex.rs` | FM1V-01 (`patch.rs`) | Yes, parallel with FM1V-04. Its `pub mod` and test-module lines are reserved by FM1V-01. |
-| FM1V-03 fm registry | `FM_MOD` ports, row 21, the `fm` header default, `fm6-core` registration (tag 105), payload lowering and slots, `fm6-sysex` native and `read_bytes`, `fm_mod_algorithm.rs`, `fm6_sysex.rs` e2e, `design-music.md` epiano line | FM1V-01, FM1V-02 | No (registry, serial) |
+| FM1V-03 fm registry | `FM_MOD` ports, row 21, the `fm` header default, `fm6-core` registration (tag 105), payload lowering and slots, `fm6-sysex` native and `read_bytes`, `fm_mod_algorithm.rs`, `src/ns/tests/fm6_sysex.rs`, `fm6_registry.rs`, `design-music.md` epiano line | FM1V-01, FM1V-02 | No (registry, serial) |
 | FM1V-04 voice kernels | the six kernel files and their unit tests. A scaffold step first adds the six `pub mod` lines and test-module lines, so kernels can be implemented in parallel without touching shared files | FM1V-01 (shares `tests/dsp.rs`) | Kernels in parallel after the scaffold |
 | FM1V-05 voice registry | all six voices' registration files, templates, `commit.rs`, `bass.rs` ordering test, golden blessing, `fm1_voices.rs` | FM1V-03, FM1V-04 | No (registry, serial) |
 | FM1V-06 examples and docs | the five examples, the example render test (`src/host/tests/e2e/templates/fm1_examples.rs` and its module line), `README.md`, the template list and sound-vocabulary row in `design-music.md` (section 4.4 itself already exists from the design step), `lang-reference.md`, the `THIRD_PARTY_NOTICES.md` msfa section, `design-docs/references/README.md` | FM1V-05 | No |
 
-The FM1V-03 e2e file `src/host/tests/e2e/fm6_sysex.rs` also needs its
-module line in the e2e test root. FM1V-03 owns that line.
+The accepted plans place the native tests in `src/ns/tests/fm6_sysex.rs`
+(FM1V-21, module line in `src/ns/tests/mod.rs`) and the patched-render
+parity test in `src/dsp/tests/dsp/fm6_registry.rs` (FM1V-40). No
+`src/host/tests/e2e/fm6_sysex.rs` file is created.
 
 Plans list only concrete tracked files in `writePaths`/`sharedPaths`. They
 declare `target/`, `tmp/<evidence-root>`, the tree-sitter grammar wasm and

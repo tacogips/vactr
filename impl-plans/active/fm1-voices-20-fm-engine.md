@@ -1,12 +1,27 @@
 # FM1V-20: Six-Operator FM Engine and `fm-mod` Algorithm Mode Kernel
 
-**Status**: In Progress (session 353 redispatch: canonical filter, clippy, reviews)
-**Plan ID**: FM1V-20 (run 3, serial wave 2 of 6)
+**Status**: In Progress (session 355 redispatch: canonical filter, clippy, reviews)
+**Plan ID**: FM1V-20 (run 4, serial wave 2 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility", "Macro patch", "Algorithm topologies" including "Algorithms 4 and 6", "Operator, EG and scaling behaviour" numeric rules, "`fm6-core` UGen")
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 353)
+**Last Updated**: 2026-10-11 (session 355)
 
-## Session 353 Redispatch (run 3, read first)
+## Session 355 Note (run 4, read first)
+
+- Base is `b6e9858`. The session 353 redispatch below never ran, because
+  FM1V-21 was still blocked. It applies unchanged: jobs 1-4 from session
+  352 plus job 5 (clippy). Logs still go to
+  `tmp/fm1-voices/FM1V-20/attempt-03/`, which does not exist yet.
+- FM1V-21 is accepted at attempt 03 before this plan starts. The full suite
+  was green at `b6e9858` (owner run, 2951 tests). Any new failure in the
+  full run is therefore caused by this plan's edits or is a real defect.
+  Record it with its log path.
+- Algorithms 4 and 6 are decided. The design says (section "Algorithms 4 and
+  6") that FM1V-20 review checks the rule and does not reopen it.
+  Switching to msfa's no-feedback behaviour needs a new owner decision.
+  Do not make that switch here.
+
+## Session 353 Redispatch (run 3; still applies)
 
 Base is `48d651c`. FM1V-21 is accepted before this plan starts, so the
 `fm6_sysex` fixture that turned the canonical filter red is fixed (it

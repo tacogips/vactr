@@ -1,12 +1,52 @@
 # FM1V-21: `fm6-sysex` Native and `SourceLoader::read_bytes`
 
-**Status**: In Progress (session 353 redispatch: full-gate rerun and reviews only)
-**Plan ID**: FM1V-21 (run 3, serial wave 1 of 6)
-**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import" -> "Native", "Usage"; user question FV6)
+**Status**: In Progress (session 355 redispatch: full-gate rerun and reviews only)
+**Plan ID**: FM1V-21 (run 4, serial wave 1 of 6)
+**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import" -> "Native", "Usage"; "Verification" -> Native, tests in `src/ns/tests/fm6_sysex.rs`; user question FV6)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 353)
+**Last Updated**: 2026-10-11 (session 355)
 
-## Session 353 Redispatch (run 3, read first)
+## Session 355 Redispatch (run 4, read first)
+
+Base is now `b6e9858`. Attempt 02 passed Verification 1-6 and 8. It failed
+only Verification 7, on
+`song_host_profile::configured_native_profile_is_actual_and_headless_compatibility_is_unchanged`
+(`tests/song_host_profile.rs:907`), which still expected the slot totals
+from before `48d651c`. The owner fixed that expectation in `b6e9858` to
+`(50, 134)` / `(5, 102)`. The owner then reported the full suite green on
+that tree: 2951 tests, with `song_host_profile` and `song_bus_memory_layout`
+at 9/9. No FM1V-21 source changed.
+
+Jobs, in order. Logs go under `tmp/fm1-voices/FM1V-21/attempt-03/`.
+
+1. Save `git status --porcelain=v1` to `attempt-03/status-before.txt`. Save
+   `shasum -a 256` of the nine Rust writePaths to
+   `attempt-03/source-hashes-before.log`.
+2. Make no source edit unless a gate below fails inside writePaths. These
+   files are read-only for this plan:
+   - `tests/song_host_profile.rs`
+   - `tests/song_bus_memory_layout.rs`
+   - `src/dsp/ring.rs`
+   - `src/host/song_profile.rs`
+   - every FM1V-20 and FM1V-30 file
+3. Rerun Verification 1-8 with every log path redirected into `attempt-03/`.
+   For example, Verification 2 writes `attempt-03/nextest.log` and
+   Verification 7 writes `attempt-03/full.log`. Run Verification 7 under the
+   measurement lock with an executor timeout of at least 3600 s, and poll it
+   until it exits. A SIGTERM or harness kill is neither a pass nor a code
+   failure. In that case, rerun once into `attempt-04/` and keep both logs.
+4. Save the hashes again to `attempt-03/source-hashes-after.log`. They must
+   equal the before-hashes unless step 2's exception applied.
+5. Add a Progress Log entry "session 355, attempt 03". Record every gate as
+   `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
+   Cancelled tests are never counted as passed.
+
+The clippy ownership rule from session 353 is unchanged. Strict
+`-D warnings` stays red on FM1V-20 and FM1V-30 WIP files until those plans
+run. Verification 8 (scoped scan, 0 diagnostics in this plan's files) is
+this plan's clippy gate.
+
+## Session 353 Redispatch (run 3, historical)
 
 Base is now `48d651c`. The session 352 attempt already audited the source,
 repaired the fixture and passed Verification 1-6 (logs under
@@ -316,8 +356,12 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
       deviations are fixed.
 - [x] The fixture at `src/ns/tests/fm6_sysex.rs:92-93` is rewritten with
       `{}` and `>` forms (Verification 5 prints 0).
-- [ ] Verification 1-8 pass on base `48d651c` and are recorded under
-      `tmp/fm1-voices/FM1V-21/attempt-02/` (session 353).
+- [ ] Verification 1-8 pass on base `b6e9858` and are recorded under
+      `tmp/fm1-voices/FM1V-21/attempt-03/` (session 355). Verification 7
+      (full nextest under the lock) shows exit 0 and 0 failed, with no
+      cancelled tests.
+- [ ] Source hashes in `attempt-03/` are unchanged, or every change is
+      inside writePaths and explained in the Progress Log.
 
 ## Progress Log
 

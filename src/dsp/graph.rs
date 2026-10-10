@@ -224,6 +224,10 @@ pub enum UGenSpec {
     GendynCore,
     /// scanned voice kernel.
     ScannedCore,
+    /// Six-operator FM core with an optional constant voice patch.
+    Fm6Core {
+        patch: Option<Box<crate::dsp::ugen::fm::patch::Fm6Patch>>,
+    },
 }
 
 /// A connection: node `from`'s output feeds input `port` of node `to`.

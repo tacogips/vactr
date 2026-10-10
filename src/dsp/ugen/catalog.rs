@@ -110,7 +110,15 @@ const VCO: &[Port] = &[
     p("width", 0.5),
 ];
 const FM_OP: &[Port] = &[FREQ, p("ratio", 1.0), p("index", 1.0), p("mod", 0.0)];
-const FM_MOD: &[Port] = &[IN, p("mod", 0.0), p("index", 1.0)];
+const FM_MOD: &[Port] = &[
+    IN,
+    p("mod", 0.0),
+    p("index", 1.0),
+    p("algorithm", 0.0),
+    FREQ,
+    p("ratio", 1.0),
+    p("velocity", 1.0),
+];
 const FM_DRUM: &[Port] = &[
     p("freq", 110.0),
     p("fm-amount", 1.5),
@@ -220,6 +228,7 @@ pub fn ports(node: &Node) -> &'static [Port] {
         Node::Vco { .. } => VCO,
         Node::FmOp => FM_OP,
         Node::FmMod => FM_MOD,
+        Node::Fm6Core { .. } => FM6_CORE,
         Node::FmDrum => FM_DRUM,
         Node::FeedbackMetal => FEEDBACK_METAL,
         Node::DigitalDrumCore => DIGITAL_DRUM,
@@ -395,6 +404,7 @@ pub fn ugen_name(spec: &UGenSpec) -> &'static str {
         UGenSpec::VosimCore => "vosim-core",
         UGenSpec::GendynCore => "gendyn-core",
         UGenSpec::ScannedCore => "scanned-core",
+        UGenSpec::Fm6Core { .. } => "fm6-core",
         UGenSpec::AnalogPercussion => "analog-percussion",
         UGenSpec::VaSource => "va-source",
         UGenSpec::VaFilter => "va-filter",
@@ -568,6 +578,7 @@ pub const UGEN_NAMES: &[&str] = &[
     "vosim-core",
     "gendyn-core",
     "scanned-core",
+    "fm6-core",
 ];
 
 /// The prelude synthesis templates (design 12.4).
@@ -704,6 +715,9 @@ pub fn node_of(spec: &UGenSpec) -> Node {
         UGenSpec::VosimCore => Node::VosimCore,
         UGenSpec::GendynCore => Node::GendynCore,
         UGenSpec::ScannedCore => Node::ScannedCore,
+        UGenSpec::Fm6Core { .. } => Node::Fm6Core {
+            slot: super::NO_FM6_PATCH,
+        },
         UGenSpec::AnalogPercussion => Node::AnalogPercussion,
         UGenSpec::VaSource => Node::VaSource,
         UGenSpec::VaFilter => Node::VaFilter,

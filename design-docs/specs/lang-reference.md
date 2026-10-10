@@ -860,6 +860,7 @@ less common one was renamed (Hydra `repeat` -> `tile`).
 | values | `is-nil`, `is-list`, `int`, `int64`, `float`, `round`, `neg`, `mod`, `sin`, `cos`, `min`, `max`, `abs` |
 | console | `print` |
 | time and slots | `use-bpm`, `use-cycle`, `use-clock`, `midi-clock-out`, `once`, `at`, `stop`, `hush`, `d1`..`d9`, `slot`, `bus`, `master` |
+| sound voices (fm1) | `fm` `algorithm` 0..32; `fm6-core` `patch:` (155 values); native-only `fm6-sysex path` (list of voices, each 155 integers); templates `kalimba`, `tonewheel-organ`, `hurdy-gurdy`, `vosim`, `gendyn`, `scanned` ([design](design-fm1-voices.md)) |
 
 Domain vocabulary lives with its specification: `design-music.md`
 (patterns, signals, sound) and `design-visual.md` (Hydra names).

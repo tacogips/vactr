@@ -97,6 +97,7 @@ descriptions only. See
 | Name | URL | Description |
 |------|-----|-------------|
 | music-synthesizer-for-android (msfa), Apache-2.0 | https://github.com/google/music-synthesizer-for-android | Algorithm bus table (test fixture), EG, scaling, frequency and feedback formulas, bulk-dump unpack layout |
+| Chapman, "The tones of the kalimba (African thumb piano)" (JASA 131(1), 945-950, 2012) | https://doi.org/10.1121/1.3651090 | Measured tine modes, inharmonic overtones and bridge-supported beam model; verified against the PubMed record |
 | Kaegi and Tempelaars, VOSIM (JAES 26(6), 1978) | https://www.aes.org/e-lib/ | VOSIM pulse-train model |
 | Xenakis, Formalized Music (rev. ed., 1992) | https://www.pendragonpress.com/ | Dynamic stochastic synthesis (GENDYN) |
 | Serra, GENDY3 (Perspectives of New Music 31(1), 1993) | https://www.jstor.org/ (Perspectives of New Music 31(1)) | Analysis of GENDY3 random walks and barriers |

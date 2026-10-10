@@ -1175,9 +1175,10 @@ See also
   data is used.
 - N. H. Fletcher and T. D. Rossing, *The Physics of Musical Instruments*,
   2nd ed., Springer, 1998: clamped-free bar modes and lamellophones.
-- D. Chapman, "The tones of the kalimba (African thumb piano)", JASA 131(4),
-  2012: measured tine partials, beating and buzzers. The plan verifies the
-  citation before adding it to the references index.
+- D. Chapman, "The tones of the kalimba (African thumb piano)", JASA 131(1),
+  945-950, 2012, https://doi.org/10.1121/1.3651090: measured tine modes,
+  inharmonic overtones and bridge-supported beam model. Bibliographic details
+  verified against the PubMed record (PMID 22280717).
 - J. O. Smith III, *Physical Audio Signal Processing*, W3K, 2010: digital
   waveguides and the bowed-string friction model.
 - M. E. McIntyre, R. T. Schumacher and J. Woodhouse, "On the oscillations of

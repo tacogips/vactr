@@ -16,12 +16,21 @@ const BASS: [&str; 6] = [
     "sub-bass",
     "reese-bass",
 ];
-const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
-    (
-        "kalimba",
-        UGenSpec::KalimbaCore,
-        Node::KalimbaCore,
-        &[
+struct VoiceCase {
+    name: &'static str,
+    spec: UGenSpec,
+    node: Node,
+    defaults: &'static [(&'static str, f32)],
+    expected_names: &'static [&'static str],
+    stepped: &'static [&'static str],
+}
+
+const VOICES: [VoiceCase; 6] = [
+    VoiceCase {
+        name: "kalimba",
+        spec: UGenSpec::KalimbaCore,
+        node: Node::KalimbaCore,
+        defaults: &[
             ("kalimba-beat", 1.5),
             ("kalimba-hardness", 0.5),
             ("kalimba-decay", 2.5),
@@ -29,7 +38,7 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             ("kalimba-body", 0.3),
             ("kalimba-buzz", 0.0),
         ],
-        &[
+        expected_names: &[
             "freq",
             "kalimba-beat",
             "kalimba-hardness",
@@ -39,13 +48,13 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "kalimba-buzz",
             "amp",
         ],
-        &[],
-    ),
-    (
-        "tonewheel-organ",
-        UGenSpec::TonewheelCore,
-        Node::TonewheelCore,
-        &[
+        stepped: &[],
+    },
+    VoiceCase {
+        name: "tonewheel-organ",
+        spec: UGenSpec::TonewheelCore,
+        node: Node::TonewheelCore,
+        defaults: &[
             ("drawbar1", 8.0),
             ("drawbar2", 8.0),
             ("drawbar3", 8.0),
@@ -63,7 +72,7 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             ("organ-vibrato", 0.0),
             ("gate-length", 4.0),
         ],
-        &[
+        expected_names: &[
             "freq",
             "drawbar1",
             "drawbar2",
@@ -83,7 +92,7 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "gate-length",
             "amp",
         ],
-        &[
+        stepped: &[
             "drawbar1",
             "drawbar2",
             "drawbar3",
@@ -99,12 +108,12 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "organ-perc-trigger",
             "organ-vibrato",
         ],
-    ),
-    (
-        "hurdy-gurdy",
-        UGenSpec::HurdyGurdyCore,
-        Node::HurdyGurdyCore,
-        &[
+    },
+    VoiceCase {
+        name: "hurdy-gurdy",
+        spec: UGenSpec::HurdyGurdyCore,
+        node: Node::HurdyGurdyCore,
+        defaults: &[
             ("gurdy-wheel", 0.5),
             ("gurdy-pressure", 0.5),
             ("gurdy-melody", 1.0),
@@ -118,7 +127,7 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             ("gurdy-stroke-depth", 0.5),
             ("gate-length", 8.0),
         ],
-        &[
+        expected_names: &[
             "freq",
             "gurdy-wheel",
             "gurdy-pressure",
@@ -134,18 +143,18 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "gate-length",
             "amp",
         ],
-        &["gurdy-drone-key", "gurdy-strokes"],
-    ),
-    (
-        "vosim",
-        UGenSpec::VosimCore,
-        Node::VosimCore,
-        &[
+        stepped: &["gurdy-drone-key", "gurdy-strokes"],
+    },
+    VoiceCase {
+        name: "vosim",
+        spec: UGenSpec::VosimCore,
+        node: Node::VosimCore,
+        defaults: &[
             ("vosim-formant", 900.0),
             ("vosim-pulses", 3.0),
             ("vosim-decay", 0.7),
         ],
-        &[
+        expected_names: &[
             "freq",
             "vosim-formant",
             "vosim-pulses",
@@ -156,20 +165,20 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "release",
             "amp",
         ],
-        &["vosim-pulses"],
-    ),
-    (
-        "gendyn",
-        UGenSpec::GendynCore,
-        Node::GendynCore,
-        &[
+        stepped: &["vosim-pulses"],
+    },
+    VoiceCase {
+        name: "gendyn",
+        spec: UGenSpec::GendynCore,
+        node: Node::GendynCore,
+        defaults: &[
             ("gendyn-points", 12.0),
             ("gendyn-amp-step", 0.2),
             ("gendyn-dur-step", 0.1),
             ("gendyn-dist", 1.0),
             ("gendyn-spread", 0.1),
         ],
-        &[
+        expected_names: &[
             "freq",
             "gendyn-points",
             "gendyn-amp-step",
@@ -182,13 +191,13 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "release",
             "amp",
         ],
-        &["gendyn-points", "gendyn-dist"],
-    ),
-    (
-        "scanned",
-        UGenSpec::ScannedCore,
-        Node::ScannedCore,
-        &[
+        stepped: &["gendyn-points", "gendyn-dist"],
+    },
+    VoiceCase {
+        name: "scanned",
+        spec: UGenSpec::ScannedCore,
+        node: Node::ScannedCore,
+        defaults: &[
             ("scan-stiffness", 0.5),
             ("scan-damping", 0.3),
             ("scan-centering", 0.1),
@@ -196,7 +205,7 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             ("scan-position", 0.5),
             ("scan-update", 400.0),
         ],
-        &[
+        expected_names: &[
             "freq",
             "scan-stiffness",
             "scan-damping",
@@ -210,8 +219,8 @@ const VOICES: [(&str, UGenSpec, Node, &[(&str, f32)], &[&str], &[&str]); 6] = [
             "release",
             "amp",
         ],
-        &[],
-    ),
+        stepped: &[],
+    },
 ];
 
 #[test]
@@ -232,10 +241,15 @@ fn fm1_voices_registered_after_bass() {
 
 #[test]
 fn fm1_voices_catalog_ports_match_kernels() {
-    for (name, spec, node, _, _, _) in VOICES {
-        assert_eq!(Node::from_spec(&spec), node, "{name} node");
-        let ports = catalog::ports(&node);
-        let kernel_ports: &[(&str, f32)] = match name {
+    for voice in VOICES {
+        assert_eq!(
+            Node::from_spec(&voice.spec),
+            voice.node,
+            "{} node",
+            voice.name
+        );
+        let ports = catalog::ports(&voice.node);
+        let kernel_ports: &[(&str, f32)] = match voice.name {
             "kalimba" => &crate::dsp::ugen::kalimba::PORTS,
             "tonewheel-organ" => &crate::dsp::ugen::tonewheel::PORTS,
             "hurdy-gurdy" => &crate::dsp::ugen::hurdy_gurdy::PORTS,
@@ -243,35 +257,36 @@ fn fm1_voices_catalog_ports_match_kernels() {
             "gendyn" => &crate::dsp::ugen::gendyn::PORTS,
             _ => &crate::dsp::ugen::scanned::PORTS,
         };
-        assert_eq!(ports.len(), kernel_ports.len(), "{name} port count");
+        assert_eq!(ports.len(), kernel_ports.len(), "{} port count", voice.name);
         for (port, &(port_name, default)) in ports.iter().zip(kernel_ports) {
             assert_eq!(
                 (port.name, port.default),
                 (port_name, default),
-                "{name} port"
+                "{} port",
+                voice.name
             );
         }
-        let build_ports = crate::dsp::build::ports(&spec);
+        let build_ports = crate::dsp::build::ports(&voice.spec);
         assert_eq!(build_ports.len(), kernel_ports.len());
         for (actual, (expected, _)) in build_ports.iter().zip(kernel_ports) {
-            assert_eq!(*actual, *expected, "{name} lowering port");
+            assert_eq!(*actual, *expected, "{} lowering port", voice.name);
         }
     }
 }
 
 #[test]
 fn fm1_voices_templates_render_audible_and_bounded() {
-    for (name, ..) in VOICES {
+    for voice in VOICES {
         let mut e = E2e::new();
-        e.eval(&format!("s :{name} > note [:c4 :e4 :g4 :c5] > d1"));
+        e.eval(&format!("s :{} > note [:c4 :e4 :g4 :c5] > d1", voice.name));
         let output = e.run_for(2.0);
-        assert!(e.faults.is_empty(), "{name}: {:?}", e.faults);
-        assert!(e.committed > 0, "{name}: event committed");
-        assert!(all_finite(&output), "{name}: finite");
+        assert!(e.faults.is_empty(), "{}: {:?}", voice.name, e.faults);
+        assert!(e.committed > 0, "{}: event committed", voice.name);
+        assert!(all_finite(&output), "{}: finite", voice.name);
         let rms = (output.iter().map(|x| x * x).sum::<f32>() / output.len() as f32).sqrt();
         let peak = output.iter().fold(0.0f32, |m, x| m.max(x.abs()));
-        assert!(rms > 1.0e-3, "{name}: RMS {rms}");
-        assert!(peak <= 1.0, "{name}: peak {peak}");
+        assert!(rms > 1.0e-3, "{}: RMS {rms}", voice.name);
+        assert!(peak <= 1.0, "{}: peak {peak}", voice.name);
     }
 }
 
@@ -320,10 +335,10 @@ fn fm1_voices_organ_and_gurdy_follow_tempo() {
 fn fm1_voices_mem_exceeded_one_float_less() {
     let e = E2e::new();
     let reg = e.reg.borrow();
-    for (name, ..) in VOICES {
+    for voice in VOICES {
         let entry = reg
             .entries()
-            .find(|entry| name_of_kw(entry.name).as_ref() == name)
+            .find(|entry| name_of_kw(entry.name).as_ref() == voice.name)
             .expect("template entry");
         let env = BuildEnv {
             sr: 48_000.0,
@@ -333,7 +348,8 @@ fn fm1_voices_mem_exceeded_one_float_less() {
         let template = Template::from_inst(&entry.def, &env).expect("fits 24000 floats");
         assert!(
             template.mem_total <= 24_000,
-            "{name}: {}",
+            "{}: {}",
+            voice.name,
             template.mem_total
         );
         let low = BuildEnv {
@@ -343,7 +359,8 @@ fn fm1_voices_mem_exceeded_one_float_less() {
         assert_eq!(
             Template::from_inst(&entry.def, &low).unwrap_err(),
             BuildError::MemExceeded,
-            "{name}"
+            "{}",
+            voice.name
         );
     }
 }
@@ -352,18 +369,19 @@ fn fm1_voices_mem_exceeded_one_float_less() {
 fn fm1_voices_editor_metadata() {
     let e = E2e::new();
     let reg = e.reg.borrow();
-    for (name, _, _, defaults, expected_names, stepped) in VOICES {
-        let decl = meta::decl_for(name).expect("metadata declaration");
+    for voice in VOICES {
+        let decl = meta::decl_for(voice.name).expect("metadata declaration");
         assert_eq!(
             decl.params.iter().map(|p| p.name).collect::<Vec<_>>(),
-            expected_names,
-            "{name} parameter order"
+            voice.expected_names,
+            "{} parameter order",
+            voice.name
         );
         let entry = reg
             .entries()
-            .find(|entry| name_of_kw(entry.name).as_ref() == name)
+            .find(|entry| name_of_kw(entry.name).as_ref() == voice.name)
             .expect("template entry");
-        for &(param_name, default) in defaults {
+        for &(param_name, default) in voice.defaults {
             let row = entry
                 .params
                 .iter()
@@ -378,11 +396,14 @@ fn fm1_voices_editor_metadata() {
                 .expect("header value");
             let actual = match actual {
                 crate::host::wire::Ctl::Const(v) => v,
-                crate::host::wire::Ctl::Cell(_) => panic!("{name}.{param_name} unexpected cell"),
+                crate::host::wire::Ctl::Cell(_) => {
+                    panic!("{}.{param_name} unexpected cell", voice.name)
+                }
             };
             assert!(
                 (actual - default).abs() < 1.0e-6,
-                "{name}.{param_name} header default {actual} != {default}"
+                "{}.{param_name} header default {actual} != {default}",
+                voice.name
             );
             let meta = decl
                 .params
@@ -391,13 +412,24 @@ fn fm1_voices_editor_metadata() {
                 .expect("parameter metadata");
             assert!(
                 (meta.default - default).abs() < 1.0e-6,
-                "{name}.{param_name} default {} != {default}",
+                "{}.{param_name} default {} != {default}",
+                voice.name,
                 meta.default
             );
-            if stepped.contains(&param_name) {
-                assert_eq!(meta.curve, Curve::Stepped, "{name}.{param_name} curve");
+            if voice.stepped.contains(&param_name) {
+                assert_eq!(
+                    meta.curve,
+                    Curve::Stepped,
+                    "{}.{param_name} curve",
+                    voice.name
+                );
             } else {
-                assert_ne!(meta.curve, Curve::Stepped, "{name}.{param_name} curve");
+                assert_ne!(
+                    meta.curve,
+                    Curve::Stepped,
+                    "{}.{param_name} curve",
+                    voice.name
+                );
             }
         }
     }
@@ -406,20 +438,21 @@ fn fm1_voices_editor_metadata() {
 #[test]
 fn fm1_voices_completion_offers_templates_and_ugens() {
     let snapshot = Snapshot::builtin();
-    for (name, _, _, _, _, _) in VOICES {
-        let prefix = &name[..name.chars().take(3).map(char::len_utf8).sum()];
+    for voice in VOICES {
+        let prefix = &voice.name[..voice.name.chars().take(3).map(char::len_utf8).sum()];
         let text = format!("s :{prefix}");
         let result = complete(&text, text.len(), &snapshot, 100);
         assert!(
             result
                 .items
                 .iter()
-                .any(|item| item.label == format!(":{name}")),
-            "template completion {name}"
+                .any(|item| item.label == format!(":{}", voice.name)),
+            "template completion {}",
+            voice.name
         );
     }
-    for (_, spec, _, _, _, _) in VOICES {
-        let ugen = catalog::ugen_name(&spec);
+    for voice in VOICES {
+        let ugen = catalog::ugen_name(&voice.spec);
         let prefix = &ugen[..ugen.len().min(8)];
         let result = complete(prefix, prefix.len(), &snapshot, 100);
         assert!(

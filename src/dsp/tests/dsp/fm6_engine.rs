@@ -47,7 +47,7 @@ fn fm6_ports_contract() {
         [0, 1, 2, 3, 4, 5, 6]
     );
     assert_eq!(engine::MACRO_FEEDBACK, 4);
-    assert!(engine::STATE_FLOATS <= 160);
+    const _: () = assert!(engine::STATE_FLOATS <= 160);
 }
 
 fn full_inputs(algorithm: f32, feedback: f32) -> [Inp<'static>; MAX_PORTS] {
@@ -100,6 +100,29 @@ fn render_macro(algorithm: u8, feedback: u8, frames: usize, block_size: usize) -
             seed: 41,
         };
         engine::fm6_render(&inputs, None, &mut state, &mut memory, block, &kx);
+    }
+    audio
+}
+
+fn render_patch(patch: &Fm6Patch, frames: usize, block_size: usize) -> Vec<f32> {
+    let store = SampleStore::new(StoreKind::NativeArc);
+    let caps = CapabilitySet::browser();
+    let mut stats = FxStats::default();
+    let inputs = full_inputs(1.0, 0.0);
+    let mut state = NodeState::default();
+    let mut memory = vec![0.0; engine::STATE_FLOATS];
+    let mut audio = vec![0.0; frames];
+    for block in audio.chunks_mut(block_size) {
+        let kx = Kx {
+            sr: 48_000.0,
+            gate: block.len(),
+            bank: None,
+            store: &store,
+            caps: &caps,
+            stats: &mut stats,
+            seed: 42,
+        };
+        engine::fm6_render(&inputs, Some(patch), &mut state, &mut memory, block, &kx);
     }
     audio
 }
@@ -491,6 +514,11 @@ fn fm6_patch_fixed_frequency_operator_ignores_note_pitch() {
     let mut stats = FxStats::default();
     let mut patch = Fm6Patch::EMPTY;
     patch.params[patch::global::ALGORITHM] = 31;
+    patch.params[patch::global::FEEDBACK] = 0;
+    for operator in 1..=6 {
+        let base = patch::op_base(operator);
+        patch.params[base + patch::op::OUTPUT_LEVEL] = 0;
+    }
     let base = patch::op_base(1);
     for (field, value) in [
         (patch::op::OSC_MODE, 1),
@@ -560,6 +588,15 @@ fn fm6_block_size_independent_and_deterministic() {
             "algorithm {alg}, repeat"
         );
     }
+
+    let patch = audible_patch();
+    let patch_64 = render_patch(&patch, 12_288, 64);
+    let patch_128 = render_patch(&patch, 12_288, 128);
+    let patch_256 = render_patch(&patch, 12_288, 256);
+    assert!(patch_64.iter().any(|sample| *sample != 0.0));
+    assert_eq!(patch_64, patch_128, "patch mode, 64 vs 128");
+    assert_eq!(patch_64, patch_256, "patch mode, 64 vs 256");
+    assert_eq!(patch_64, render_patch(&patch, 12_288, 128), "patch repeat");
 }
 
 #[test]

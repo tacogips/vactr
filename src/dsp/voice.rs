@@ -543,6 +543,24 @@ pub fn render<C: CellRead + ?Sized>(
             }
             continue;
         }
+        if let Node::Fm6Core { slot } = spec.node {
+            let patch = if slot == ugen::NO_FM6_PATCH {
+                None
+            } else {
+                t.fm6_payloads.get(usize::from(slot))
+            };
+            let kx = Kx {
+                sr: rc.sr,
+                gate,
+                bank: v.bank,
+                store: rc.store,
+                caps: rc.fx.caps,
+                stats: rc.fx.stats,
+                seed: v.seed.wrapping_add(u32::from(t.seed_ordinal(i))),
+            };
+            ugen::fm::engine::fm6_render(&ins, patch, &mut v.nodes[i], mem, out, &kx);
+            continue;
+        }
         if let Node::StageLinked { slot } = spec.node {
             if let Some(data) = t.stage_payloads.get(usize::from(slot)) {
                 let kx = Kx {

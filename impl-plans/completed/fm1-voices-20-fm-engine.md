@@ -1,6 +1,6 @@
 # FM1V-20: Six-Operator FM Engine and `fm-mod` Algorithm Mode Kernel
 
-**Status**: In Progress (session 355 redispatch: canonical filter, clippy, reviews)
+**Status**: Completed (test-integrity, adversarial and integration reviews accepted in session 355; archived 2026-10-11)
 **Plan ID**: FM1V-20 (run 4, serial wave 2 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility", "Macro patch", "Algorithm topologies" including "Algorithms 4 and 6", "Operator, EG and scaling behaviour" numeric rules, "`fm6-core` UGen")
 **Created**: 2026-10-10
@@ -8,14 +8,11 @@
 
 ## Session 355 Note (run 4, read first)
 
-- Base is `b6e9858`. The session 353 redispatch below never ran, because
-  FM1V-21 was still blocked. It applies unchanged: jobs 1-4 from session
-  352 plus job 5 (clippy). Logs still go to
-  `tmp/fm1-voices/FM1V-20/attempt-03/`, which does not exist yet.
-- FM1V-21 is accepted at attempt 03 before this plan starts. The full suite
-  was green at `b6e9858` (owner run, 2951 tests). Any new failure in the
-  full run is therefore caused by this plan's edits or is a real defect.
-  Record it with its log path.
+- Implementation ran on the shared `wf/fm1-voices` tree at checkpoint
+  `d0e4263`; FM1V-21 is accepted. Attempt-03 evidence is in
+  `tmp/fm1-voices/FM1V-20/attempt-03/`.
+- The full locked nextest run passed 2951/2951 with 3 skipped. The earlier
+  historical base notes below are not current-source evidence.
 - Algorithms 4 and 6 are decided. The design says (section "Algorithms 4 and
   6") that FM1V-20 review checks the rule and does not reopen it.
   Switching to msfa's no-feedback behaviour needs a new owner decision.
@@ -386,15 +383,15 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 
 - [x] The engine and `modulate_with_algorithm` are implemented, and the
       legacy branch is bit-identical.
-- [ ] The algorithm 4/6 divergence is commented in `engine.rs`, and the
+- [x] The algorithm 4/6 divergence is commented in `engine.rs`, and the
       feedback test asserts that algorithms 4 and 6 differ between feedback
       0 and 7.
-- [ ] The test-integrity audit is recorded per test. Mutation evidence is
+- [x] The test-integrity audit is recorded per test. Mutation evidence is
       recorded separately, with the files restored (hash match).
-- [ ] This plan's clippy warnings are fixed (Verification 8 scan shows 0
+- [x] This plan's clippy warnings are fixed (Verification 8 scan shows 0
       diagnostics in this plan's files) without changing rendered output.
-- [ ] Verification 1-8 pass on base `48d651c` and are recorded under
-      `tmp/fm1-voices/FM1V-20/attempt-03/` (session 353).
+- [x] Verification 1-8 pass on the shared source and are recorded under
+      `tmp/fm1-voices/FM1V-20/attempt-03/` (session 355).
       Session 352 note: static checks 1, 3 and 4 passed. The canonical focused filter ran with
       an isolated declared target directory and completed 50 tests (49
       passed, 1 failed). The only failure is the FM1V-21
@@ -412,3 +409,21 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 ### Session: 2026-10-10 (FM1V-20 implementation)
 **Tasks Completed**: Engine and algorithm-mode wrapper implemented; legacy branch, topology/render, patch EG and fixed-frequency, key-off chunk timing, determinism, stability, and allocation tests added.
 **Notes**: `src/dsp/ugen/fm/engine.rs` is 399 lines. `fm.rs` has no removed lines. Final rustfmt passed. `fm6_patch_key_off_waits_for_next_eg_chunk` compares identical output before the next 64-frame boundary and divergence in the boundary chunk. The isolated plan-module filter passed 11/11 with exit status 0. The canonical focused filter ran against `CARGO_TARGET_DIR=target/fm1-voices/FM1V-20/isolated-target` and completed with 50 tests run, 49 passed, and one unrelated FM1V-21 native SysEx test failed because `len (fm6-sysex ./bank.syx)` is invalid Vactr syntax. The failing source path is outside this plan's writePaths. Resume after FM1V-21 repairs its fixture, then rerun the canonical filter. Full logs: `tmp/fm1-voices/FM1V-20/nextest-final-source-03.log` and `tmp/fm1-voices/FM1V-20/nextest-engine-module-final.log`; final rustfmt log: `tmp/fm1-voices/FM1V-20/rustfmt-final-source-03.log`.
+
+### Session: 2026-10-11 (session 355, attempt-03 implementation closeout)
+**Tasks Completed**: Added patch-mode block-size independence and determinism coverage; fixed owned clippy warnings; documented the accepted algorithms 4/6 divergence; completed per-test integrity and mutation audits.
+**Test integrity**:
+- `fm6_ports_contract` -> ports and state-size invariant -> ok (compile-time assertion `STATE_FLOATS <= 160`).
+- `fm_mod_legacy_branch_is_bit_identical` -> algorithms 0/-1/NaN preserve exact output, state and memory -> ok.
+- `fm_mod_algorithms_are_pairwise_distinct` -> all 32 macro algorithms render distinct output -> ok.
+- `fm6_routing_is_observable` -> muting each operator changes output iff it reaches a carrier -> ok.
+- `fm6_feedback_uses_source_history_only_and_covers_cross_operator_edges` -> feedback 0 vs 7 changes output for algorithms 32, 4 and 6; algorithm 32 isolates source operator 6 -> ok.
+- `fm6_patch_mode_eg_shapes_output_and_releases` -> audible patch EG decay and release completion -> ok.
+- `fm6_patch_key_off_waits_for_next_eg_chunk` -> output stays equal before the next 64-frame boundary and diverges at that boundary -> ok.
+- `fm6_patch_fixed_frequency_operator_ignores_note_pitch` -> fixed 10 Hz output at note pitches 220 and 440 Hz -> ok; feedback and all operator output levels are explicitly initialized.
+- `fm6_block_size_independent_and_deterministic` -> macro and audible patch output match at 64/128/256 frames and repeat deterministically -> ok.
+- `fm6_stability_grid_is_finite_and_bounded` -> all algorithms at 20/8000 Hz with feedback 7 remain finite and within [-1, 1] -> ok.
+- `fm6_render_does_not_allocate` -> `fm6_render` and `modulate_with_algorithm` allocate zero times -> ok.
+**Verification**: rustfmt exit 0 (`rustfmt.log`); canonical filter exit 0, 50/50 (`nextest.log`); full locked suite exit 0, 2951/2951, 3 skipped (`full.log`); all-target clippy exit 0 and no diagnostics in this plan's files (`clippy-scan.log`, `clippy-owned-diagnostics.log`). Static checks for no pre-run `fm.rs` removals, engine line count (399), no golden digest removals and mutation restoration all exit 0 (`fm-no-deletions.log`, `engine-line-limit.log`, `golden-no-deletions.log`, `mutation-restore-hash-check.log`).
+**Mutation evidence (non-gating)**: Routing the legacy branch through the engine made `fm_mod_legacy_branch_is_bit_identical` fail (0 passed, 1 failed; `mutation-legacy.log`, mutation exit 100). Dropping the feedback contribution made `fm6_feedback_uses_source_history_only_and_covers_cross_operator_edges` fail (0 passed, 1 failed; `mutation-feedback.log`, mutation exit 100). `fm.rs` and `engine.rs` were restored byte-for-byte against their saved snapshots. The remaining clippy diagnostic is FM1V-30-owned `type_complexity` at `src/host/tests/e2e/templates/fm1_voices.rs:19`.
+**Downstream**: Independent test-integrity/adversarial reviews, serial integration review, accepted completion record, commit and push remain assigned to later workflow steps.

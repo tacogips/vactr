@@ -26,35 +26,35 @@ The [DOM renderer comparison](../design-docs/specs/design-dom-renderer.md) plans
 
 ## Six-operator FM algorithms and new voices (2026-10-10)
 
-These plans implement [design-fm1-voices.md](../design-docs/specs/design-fm1-voices.md). All are Ready.
+These plans implement [design-fm1-voices.md](../design-docs/specs/design-fm1-voices.md). All 16 are Completed and archived (2026-10-11, session 355). FM1V-00 and FM1V-10..18 were accepted at 25d3e80. FM1V-21, 20, 30, 40, 50 and 51 passed test-integrity, adversarial and integration review in session 355. The full nextest run under the measurement lock passed 2967/2967 with 3 skipped (`tmp/fm1-voices/FM1V-51/full.log`). The [dispatch manifest](active/fm1-voices-dispatch.json) stays active until its serial `finalIntegration` gates finish. Those gates are `mise run build-wasm-release`, the editor `npm run check` / `npm run test` / `VACTR_REQUIRE_SESSION_ABI=1 npm run build` / `npm run test:style` checks, `mise run fmt-vact-check`, and the commit and push to origin `wf/fm1-voices`. The manifest's `planPath` fields still record the pre-archive `active/` locations.
 
 **Wave 0**
 
-- [FM1V-00 scaffold](active/fm1-voices-00-scaffold.md): module tree, port contracts, `Fm6Patch`, msfa checkout.
+- [FM1V-00 scaffold](completed/fm1-voices-00-scaffold.md): module tree, port contracts, `Fm6Patch`, msfa checkout.
 
 **Wave 1** (parallel)
 
-- [FM1V-10 algorithms](active/fm1-voices-10-algorithms.md)
-- [FM1V-11 EG and scaling](active/fm1-voices-11-eg-scaling.md)
-- [FM1V-12 SysEx parser](active/fm1-voices-12-sysex.md)
-- Voice kernels: [FM1V-13 kalimba](active/fm1-voices-13-kalimba.md), [FM1V-14 tonewheel](active/fm1-voices-14-tonewheel.md), [FM1V-15 hurdy-gurdy](active/fm1-voices-15-hurdy-gurdy.md), [FM1V-16 VOSIM](active/fm1-voices-16-vosim.md), [FM1V-17 GENDYN](active/fm1-voices-17-gendyn.md), [FM1V-18 scanned](active/fm1-voices-18-scanned.md)
+- [FM1V-10 algorithms](completed/fm1-voices-10-algorithms.md)
+- [FM1V-11 EG and scaling](completed/fm1-voices-11-eg-scaling.md)
+- [FM1V-12 SysEx parser](completed/fm1-voices-12-sysex.md)
+- Voice kernels: [FM1V-13 kalimba](completed/fm1-voices-13-kalimba.md), [FM1V-14 tonewheel](completed/fm1-voices-14-tonewheel.md), [FM1V-15 hurdy-gurdy](completed/fm1-voices-15-hurdy-gurdy.md), [FM1V-16 VOSIM](completed/fm1-voices-16-vosim.md), [FM1V-17 GENDYN](completed/fm1-voices-17-gendyn.md), [FM1V-18 scanned](completed/fm1-voices-18-scanned.md)
 
 **Wave 2**
 
-- [FM1V-20 FM engine](active/fm1-voices-20-fm-engine.md)
-- [FM1V-21 `fm6-sysex` native](active/fm1-voices-21-sysex-native.md)
-- [FM1V-30 voice registry](active/fm1-voices-30-voice-registry.md)
+- [FM1V-20 FM engine](completed/fm1-voices-20-fm-engine.md)
+- [FM1V-21 `fm6-sysex` native](completed/fm1-voices-21-sysex-native.md)
+- [FM1V-30 voice registry](completed/fm1-voices-30-voice-registry.md)
 
 **Wave 3**
 
-- [FM1V-40 FM registry](active/fm1-voices-40-fm-registry.md)
+- [FM1V-40 FM registry](completed/fm1-voices-40-fm-registry.md)
 
 **Wave 4**
 
-- [FM1V-50 examples](active/fm1-voices-50-examples.md)
-- [FM1V-51 docs and notices](active/fm1-voices-51-docs-notices.md)
+- [FM1V-50 examples](completed/fm1-voices-50-examples.md)
+- [FM1V-51 docs and notices](completed/fm1-voices-51-docs-notices.md)
 
-Registry plans FM1V-30 and FM1V-40 run serially.
+Registry plans FM1V-30 and FM1V-40 ran serially.
 
 ## Purpose
 

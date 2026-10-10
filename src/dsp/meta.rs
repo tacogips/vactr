@@ -237,7 +237,7 @@ fn meta(
 
 fn row_meta(name: &'static str) -> Option<ParamMeta> {
     let row = controls::row(name)?;
-    let stepped = !matches!(row.domain, controls::CtlDomain::Float);
+    let stepped = name == "algorithm" || !matches!(row.domain, controls::CtlDomain::Float);
     let choices = match row.domain {
         controls::CtlDomain::Enum(names) => names,
         _ => &[],
@@ -634,6 +634,9 @@ fn ugen_node(name: &str) -> Option<Node> {
         "svf" => Node::Svf,
         "fm-op" => Node::FmOp,
         "fm-mod" => Node::FmMod,
+        "fm6-core" => Node::Fm6Core {
+            slot: crate::dsp::ugen::NO_FM6_PATCH,
+        },
         "fm-drum" => Node::FmDrum,
         "feedback-metal-core" => Node::FeedbackMetal,
         "digital-drum-core" => Node::DigitalDrumCore,
@@ -754,6 +757,9 @@ fn ugen_meta(node: &Node) -> Box<[ParamMeta]> {
                 return None;
             }
             let ctl = ucat::port_ctl(node, i)?;
+            if matches!(node, Node::Fm6Core { .. }) && p.name == "fm6-feedback" {
+                return Some(meta(p.name, ctl, (0.0, 7.0), "", true, p.default, &[]));
+            }
             if matches!(
                 node,
                 Node::DsfOsc

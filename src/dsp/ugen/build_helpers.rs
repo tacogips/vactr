@@ -14,6 +14,7 @@ pub(super) fn mem_need(node: &Node, env: &BuildEnv) -> (usize, usize) {
         Node::DigitalDrumCore | Node::DigitalSnareCore => (digital_drum::STATE_FLOATS, 0),
         Node::DigitalMetalCore | Node::DigitalHatCore => (digital_drum::metal::STATE_FLOATS, 0),
         Node::BassCore => (bass_voice::STATE_FLOATS, 0),
+        Node::FmMod | Node::Fm6Core { .. } => (fm::engine::STATE_FLOATS, 0),
         Node::KalimbaCore => (super::kalimba::STATE_FLOATS, 0),
         Node::TonewheelCore => (super::tonewheel::STATE_FLOATS, 0),
         Node::HurdyGurdyCore => (super::hurdy_gurdy::STATE_FLOATS, 0),

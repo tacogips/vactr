@@ -20,7 +20,7 @@ inst analog wave: keyword = :saw cutoff: float = 1200 res: float = 0.3 unison: i
 		> * amp
 
 # FM: two operators with ratio and index
-inst fm algorithm: int = 5 ratio: float = 14 index: float = 2:
+inst fm algorithm: int = 0 ratio: float = 14 index: float = 2:
 	fm-op freq ratio: 1 index: {* index {env-perc 0.01 0.8}}
 		> fm-mod {fm-op freq ratio: ratio}
 		> * {env-adsr attack decay sustain release}

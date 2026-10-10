@@ -135,7 +135,7 @@ fn render(
         let absolute = frame_start.saturating_add(frame);
         let chunk_frame = absolute % EG_BLOCK;
         if mode == MODE_PATCH && chunk_frame == 0 {
-            for operator in 0..6 {
+            for (operator, released_operator) in released.iter_mut().enumerate() {
                 let base = operator * OP_STRIDE;
                 let mut eg = Eg::load(&mem[base + EG..base + EG + EG_FLOATS]);
                 // A key-off takes effect at the next 64-frame chunk boundary.
@@ -146,7 +146,7 @@ fn render(
                 mem[base + AMP_FROM] = mem[base + AMP_TO];
                 mem[base + AMP_TO] = log_to_amp(level);
                 eg.store(&mut mem[base + EG..base + EG + EG_FLOATS]);
-                released[operator] = eg.released_and_silent();
+                *released_operator = eg.released_and_silent();
             }
         }
 
@@ -174,7 +174,7 @@ fn render(
             }
             if alg.feedback.1 == operator {
                 let source = usize::from(alg.feedback.0 - 1);
-                // Every edge uses delayed source history; alg 4/6 intentionally differ from msfa.
+                // Design section "Algorithms 4 and 6": delayed-history edges intentionally differ from msfa.
                 // msfa skips those multi-operator feedback edges, so no parity tolerance applies.
                 phase_mod += feedback
                     * (mem[source * OP_STRIDE + HISTORY_1] + mem[source * OP_STRIDE + HISTORY_2])
@@ -206,18 +206,18 @@ fn render(
             }
         }
 
-        for operator in 0..6 {
+        for (operator, output) in outputs.iter().enumerate() {
             let base = operator * OP_STRIDE;
             mem[base + HISTORY_2] = mem[base + HISTORY_1];
-            mem[base + HISTORY_1] = outputs[operator];
+            mem[base + HISTORY_1] = *output;
         }
-        *sample = (carrier_sum / carrier_count(&alg) as f32).clamp(-1.0, 1.0);
+        *sample = (carrier_sum / carrier_count(alg) as f32).clamp(-1.0, 1.0);
 
         if mode == MODE_PATCH && absolute >= keyoff_frame && chunk_frame == EG_BLOCK - 1 {
-            for operator in 0..6 {
+            for (operator, released_operator) in released.iter_mut().enumerate() {
                 let base = operator * OP_STRIDE;
                 let eg = Eg::load(&mem[base + EG..base + EG + EG_FLOATS]);
-                released[operator] = eg.released_and_silent();
+                *released_operator = eg.released_and_silent();
             }
         }
         st.u[1] = absolute.saturating_add(1).min(u32::MAX as usize) as u32;
@@ -324,7 +324,7 @@ fn setup(
         let transposed = transpose_hz(freq, patch.params[global::TRANSPOSE]);
         for operator in 1_usize..=6 {
             let base = (operator - 1) * OP_STRIDE;
-            let param_base = op_base(usize::from(operator));
+            let param_base = op_base(operator);
             let params = &patch.params[param_base..param_base + OP_PARAMS];
             mem[base + FREQUENCY] = op_freq_hz(
                 transposed,
@@ -338,8 +338,8 @@ fn setup(
             let eg = Eg::new(
                 rates,
                 levels,
-                op_outlevel(patch, usize::from(operator), key, vel),
-                op_rate_scaling(patch, usize::from(operator), key),
+                op_outlevel(patch, operator, key, vel),
+                op_rate_scaling(patch, operator, key),
                 kx.sr,
             );
             eg.store(&mut mem[base + EG..base + EG + EG_FLOATS]);

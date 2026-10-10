@@ -1,10 +1,10 @@
 # FM1V-40: Wire `fm-mod` Algorithm Mode and Register `fm6-core` With Patch Payload
 
-**Status**: Ready
+**Status**: Completed (test-integrity, adversarial and integration reviews accepted in session 355; archived 2026-10-11)
 **Plan ID**: FM1V-40 (run 3, serial wave 4 of 6; registry plan, after FM1V-30)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility (chosen mechanism)", "`fm6-core` UGen", "SysEx import" usage, "Registration and digest stability", "Implementation partition", "Verification" -> `fm` template and Native)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-11 (session 355)
+**Last Updated**: 2026-10-11 (FM1V-40 implementation and verification)
 
 ## Session 355 Note (run 4)
 
@@ -358,14 +358,23 @@ checkout, reset or push.
 
 ## Done Criteria
 
-- [ ] `fm` algorithm 1..=32 is functional, and 0 or unset is bit-identical
+- [x] `fm` algorithm 1..=32 is functional, and 0 or unset is bit-identical
       to before.
-- [ ] `fm6-core` is registered with patch payloads, and native and browser
+- [x] `fm6-core` is registered with patch payloads, and native and browser
       parity holds.
-- [ ] The golden file is unchanged.
-- [ ] Verification 1-9 pass and are recorded.
+- [x] The golden file is unchanged.
+- [x] Verification 1-9 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+
+### Session: 2026-10-11 (FM1V-40 implementation)
+**Tasks Completed**: Source and test edits for the assigned FM1V-40 contract.
+**Notes**: Implemented append-only `fm-mod` ports, algorithm dispatch and default row/header 0; registered `fm6-core` with constant patch lowering, bounded payload storage, versioned codec tag 105 and voice dispatch; added metadata/native/name registration and FM algorithm/FM6 registry tests. The e2e test confirms unset and explicit zero match; algorithm -3 is tested directly at the kernel boundary because the accepted control row range (0, 32) rejects negative event values. The direct kernel regression confirms bit-identical legacy output with state and memory untouched. Verification is complete on the final source: exact-file Rust formatting and Vact formatting passed; `focused-final-source-02.log` reports 631/631; the locked `full-final-source.log` reports 2,964/2,964 with 3 skipped; strict Clippy and wasm `--lib` build exit 0; baseline golden digests compare byte-identically; `templates.vact` differs by only the `fm` header default 5 -> 0; listed files are under 1,000 lines; the status delta is confined to writePaths. Evidence is under `tmp/fm1-voices/FM1V-40/`. Earlier compile, focused-test, and Clippy failures were corrected and retained in the attempt logs. Start/end hashes for the plan-required `templates.vact`, `controls.rs`, `voice.rs` and `codec.rs` are recorded in `pre-post-hashes-final.txt`, sourced from the immutable pre-node snapshot. Formal independent review, integration documentation, commit and push remain downstream workflow steps.
+
+### Session: 2026-10-11 (FM1V-40 final verification)
+**Tasks Completed**: Verification 1-9 on the final implementation source.
+**Notes**: `rustfmt-final-source.log` exit 0; `vact-fmt-final.log` exit 0; `golden-cmp-final.log` and golden removal-line check exit 0; template header delta check exit 0; `focused-final-source-02.log` 631 passed; `full-final-source.log` 2,964 passed and 3 skipped under the measurement lock; `clippy-final.log` exit 0; `wasm-lib-final.log` exit 0; `line-counts-final.log` maximum 964 lines; write-path audit exit 0. No golden line was added or removed. The two initial source/fixture issues, strict-Clippy warning and invalid one-line test declarations were corrected; their failed logs remain preserved for traceability. Final source hashes are in `source-hashes-final.txt`.

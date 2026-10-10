@@ -352,7 +352,7 @@ s :analog > note [:e2 :g2] > cutoff {range sine 400 2000} > d1
 # ---- digital: FM, phase distortion, additive ----------------------------
 # operators with ratio and index, wired by an algorithm number or an
 # explicit graph; phase distortion and additive partials as ugens
-inst epiano algorithm: int = 5 ratio: float = 14 index: float = 2:
+inst epiano algorithm: int = 0 ratio: float = 14 index: float = 2:  # 1..32 select six-operator topologies
 	fm-op freq ratio: 1 index: {* index {env-perc 0.01 0.8}}
 		> fm-mod {fm-op freq ratio: ratio}
 		> * {env-adsr 0.01 0.6 0.3 1.2}
@@ -568,7 +568,7 @@ All are pattern controls.
 |------|-----------|
 | patterns (Tidal/Strudel names) | `s`/`sound`, `n`, `note`, `gain`, `pan`, `speed`, `lpf`, `hpf`, `room`, `size`, `delay`, `fast`, `slow`, `rev`, `every`, `whenmod`, `sometimes`, `rarely`, `often`, `alt`, `maybe`, `euclid`, `hold`, `repeat`, `choose`, `stack`, `cat`, `fastcat`, `superimpose`, `off`, `jux`, `iter`, `chop`, `striate`, `slice`, `splice`, `begin`, `end`, `loop-at`, `fit`, `cut`, `ply`, `chunk`, `hurry`, `segment`, `range`, `scale`, `chord`, `voicing`, `arp`, `grid` (Tidal's `struct`, renamed because `struct` declares a struct; Decided 2026-09-25) |
 | signals | `sine`, `saw`, `tri`, `square`, `rand`, `irand`, `perlin`, `time`, `beat`, `phase`, `cycle`, `fft`, `amp`, `cc` (MIDI controller, 0..1), `midi-notes` (note input as a pattern), `lag`, `map-range` |
-| sound (SuperCollider names) | `inst`, `look` (a visual keyed to a sound), `sin-osc`, `saw`, `pulse`, `tri`, `white-noise`, `lpf`, `hpf`, `bpf`, `delay`, `comb`, `env-perc`, `env-adsr`, `line`, `midi`, `osc` ; synthesis: `sampler`, `analog`, `fm`, `pd`, `additive`, `wavetable`, `granular`, ugens `vco`, `sub-osc`, `ladder`, `svf`, `fm-op`, `fm-mod`, `phase-distortion`, `sample-play`, `env-perc`, `env-adsr`; buses `bus`, `master`; effects: see section 5 |
+| sound (SuperCollider names) | `inst`, `look` (a visual keyed to a sound), `sin-osc`, `saw`, `pulse`, `tri`, `white-noise`, `lpf`, `hpf`, `bpf`, `delay`, `comb`, `env-perc`, `env-adsr`, `line`, `midi`, `osc` ; synthesis: `sampler`, `analog`, `fm`, `pd`, `additive`, `wavetable`, `granular`, `kalimba`, `tonewheel-organ`, `hurdy-gurdy`, `vosim`, `gendyn`, `scanned`, ugens `vco`, `sub-osc`, `ladder`, `svf`, `fm-op`, `fm-mod`, `fm6-core`, `fm6-sysex`, `kalimba-core`, `tonewheel-core`, `hurdy-gurdy-core`, `vosim-core`, `gendyn-core`, `scanned-core`, `phase-distortion`, `sample-play`, `env-perc`, `env-adsr`; buses `bus`, `master`; effects: see section 5 |
 
 ## Kick-keyed rumble compression (RUM-001)
 

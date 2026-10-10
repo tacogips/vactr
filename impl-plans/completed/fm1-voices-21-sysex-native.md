@@ -1,6 +1,6 @@
 # FM1V-21: `fm6-sysex` Native and `SourceLoader::read_bytes`
 
-**Status**: In Progress (session 355 redispatch: full-gate rerun and reviews only)
+**Status**: Completed (test-integrity, adversarial and integration reviews accepted in session 355; archived 2026-10-11)
 **Plan ID**: FM1V-21 (run 4, serial wave 1 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import" -> "Native", "Usage"; "Verification" -> Native, tests in `src/ns/tests/fm6_sysex.rs`; user question FV6)
 **Created**: 2026-10-10
@@ -356,14 +356,61 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
       deviations are fixed.
 - [x] The fixture at `src/ns/tests/fm6_sysex.rs:92-93` is rewritten with
       `{}` and `>` forms (Verification 5 prints 0).
-- [ ] Verification 1-8 pass on base `b6e9858` and are recorded under
+- [x] Verification 1-8 pass on base `b6e9858` and are recorded under
       `tmp/fm1-voices/FM1V-21/attempt-03/` (session 355). Verification 7
       (full nextest under the lock) shows exit 0 and 0 failed, with no
       cancelled tests.
-- [ ] Source hashes in `attempt-03/` are unchanged, or every change is
+- [x] Source hashes in `attempt-03/` are unchanged, or every change is
       inside writePaths and explained in the Progress Log.
 
 ## Progress Log
+
+### Session: 2026-10-11 (session 355, attempt 03)
+**Tasks Completed**: Audited the current implementation against this plan;
+all assigned native, loader, registration, type-signature, table-count and
+fixture requirements match. No source edits were required. The eight
+`fm6_sysex` tests are present, and the native result is a list of per-voice
+155-integer lists. All eight gates passed on the stable base `b6e9858`.
+
+**Verification**:
+- Verification 1 passed (exit 0): `rustfmt --edition 2021 --check
+  src/ns/fm6_sysex.rs src/ns/load.rs src/ns/mod.rs src/ns/tests/mod.rs
+  src/ns/tests/fm6_sysex.rs src/types/natives.rs
+  src/host/native/loader.rs src/session/session.rs
+  src/vm/tests/native_table.rs`; log
+  `tmp/fm1-voices/FM1V-21/attempt-03/rustfmt.log`.
+- Verification 2 passed (exit 0): the focused nextest filter ran 291 tests,
+  all 291 passed, 0 failed; log
+  `tmp/fm1-voices/FM1V-21/attempt-03/nextest.log`.
+- Verification 3 passed (exit 0):
+  `CARGO_TERM_QUIET=true cargo build --lib --target
+  wasm32-unknown-unknown --no-default-features --features host-wasm`; log
+  `tmp/fm1-voices/FM1V-21/attempt-03/wasm.log`.
+- Verifications 4 and 5 passed (exit 0): all listed Rust files are below
+  1000 lines and the SysEx test fixture contains no forbidden parenthesis
+  grouping. Logs: `line-count.log` and `fixture-syntax.log` under
+  `tmp/fm1-voices/FM1V-21/attempt-03/`.
+- Verification 6 passed (exit 0): canonical FM filter ran 50 tests, all
+  50 passed, 0 failed; log
+  `tmp/fm1-voices/FM1V-21/attempt-03/nextest-fm-filter.log`.
+- Verification 7 passed (exit 0) under the shared measurement lock: full
+  nextest ran 2,951 tests, all 2,951 passed, 0 failed, 3 skipped and no
+  cancellations; log
+  `tmp/fm1-voices/FM1V-21/attempt-03/full.log`.
+- Verification 8 passed (exit 0): `CARGO_TERM_QUIET=true cargo clippy
+  --all-targets` completed, and the scoped scan found 0 diagnostics in
+  FM1V-21 files. Logs:
+  `tmp/fm1-voices/FM1V-21/attempt-03/clippy-scan.log` and
+  `clippy-owned-diagnostics.log`.
+- The nine Rust source hashes before and after verification match exactly;
+  `cmp` exited 0. The start and final status snapshots show no unowned
+  tracked source changes. Evidence is in `source-hashes-before.log`,
+  `source-hashes-after.log` and `status-before.txt` under
+  `tmp/fm1-voices/FM1V-21/attempt-03/`.
+
+**Tasks Remaining**: Independent integrity/adversarial review and workflow
+finalization are downstream steps; no FM1V-21 implementation or behavioral
+verification work remains.
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.

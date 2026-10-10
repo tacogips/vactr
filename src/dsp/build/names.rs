@@ -312,6 +312,7 @@ pub const UGENS: &[(&str, UGenSpec)] = &[
     ("vosim-core", UGenSpec::VosimCore),
     ("gendyn-core", UGenSpec::GendynCore),
     ("scanned-core", UGenSpec::ScannedCore),
+    ("fm6-core", UGenSpec::Fm6Core { patch: None }),
     ("aux-out", UGenSpec::AuxOut),
     ("out-3", UGenSpec::Out3),
     ("out-4", UGenSpec::Out4),

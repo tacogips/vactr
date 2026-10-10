@@ -1,6 +1,6 @@
 # FM1V-51: Documentation, Language Reference and msfa Third-Party Notice
 
-**Status**: Ready
+**Status**: Completed (test-integrity, adversarial and integration reviews accepted in session 355; archived 2026-10-11)
 **Plan ID**: FM1V-51 (run 3, serial wave 6 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("License boundary", "Algorithm topologies" -> "Algorithms 4 and 6", "SysEx import" -> Usage, "Presets and examples" -> Documentation, "References")
 **Created**: 2026-10-10
@@ -218,12 +218,19 @@ before editing it. Never commit, stash, checkout, reset or push.
 
 ## Done Criteria
 
-- [ ] The notice, README, design-music, lang-reference and references edits
+- [x] The notice, README, design-music, lang-reference and references edits
       are made.
-- [ ] The kalimba citation is resolved.
-- [ ] Verification 1-6 pass and are recorded.
+- [x] The kalimba citation is resolved.
+- [x] Verification 1-6 pass and are recorded.
 
 ## Progress Log
 
 ### Session: 2026-10-10 (plan created)
 **Tasks Completed**: none.
+
+### Session: 2026-10-11 (FM1V-51 implementation)
+**Tasks Completed**: Added the README status group, updated the epiano default and sound vocabulary, added the section 5 language-reference row, documented msfa with the pinned revision and verbatim Apache License 2.0 text, and verified and indexed the Chapman kalimba citation. Corrected its journal issue from 131(4) to 131(1); PubMed confirms volume 131, issue 1, pages 945-950 (PMID 22280717). The msfa notice records algorithms 4 and 6's cross-operator feedback divergence and states that no factory patches are bundled.
+
+**Verification**: focused reader/no-abort/native-types nextest: 53/53 passed, exit 0 (`tmp/fm1-voices/FM1V-51/nextest.log`). Full nextest under the measurement lock: 2967/2967 passed, 3 skipped, exit 0 (`tmp/fm1-voices/FM1V-51/full.log`). Apache text matches pinned checkout `COPYING` byte-for-byte; notice SHA matches `src/dsp/ugen/fm/patch.rs`; documentation grep and `git diff --check` passed; status delta is within this plan's writePaths. Evidence and per-edit intent are in `tmp/fm1-voices/FM1V-51/`.
+
+**Handoff**: Implementation is complete. Independent review and workflow finalization, including any review-dependent updates, commit and push, remain downstream.

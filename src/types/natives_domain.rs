@@ -452,6 +452,7 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
     dsp("vosim-core"),
     dsp("gendyn-core"),
     dsp("scanned-core"),
+    dsp("fm6-core"),
     dsp("svf-filter"),
     dsp("butterworth-filter"),
     dsp("chebyshev-filter"),

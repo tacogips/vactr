@@ -1,5 +1,6 @@
 //! Port declarations for instrument voice kernels.
 
+use super::super::fm::engine::FM6_PORTS;
 use super::{p, Port, FREQ, IN};
 
 /// The six-model bass voice kernel with hidden tempo anchors included.
@@ -36,6 +37,16 @@ pub(super) const BASS_CORE: &[Port] = &[
     p("fold", 0.0),
     p("bit-depth", 16.0),
     p("click-level", 0.0),
+];
+
+pub(super) const FM6_CORE: &[Port] = &[
+    p("freq", FM6_PORTS[0].1),
+    p("velocity", FM6_PORTS[1].1),
+    p("algorithm", FM6_PORTS[2].1),
+    p("ratio", FM6_PORTS[3].1),
+    p("index", FM6_PORTS[4].1),
+    p("fm6-feedback", FM6_PORTS[5].1),
+    p("patch", 0.0),
 ];
 
 /// Stable port order copied from the kalimba kernel contract.

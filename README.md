@@ -96,6 +96,16 @@ Back end (TASK-007..008):
   `examples/offbeat-bass-techno.vact`, `examples/wobble-techno.vact`.
   Render one with `vactr run examples/acid-techno.vact --cycles N`
   (see Development).
+- Six-operator FM extends `fm` with algorithm 0 as the legacy sound and
+  algorithms 1..32 as six-operator topologies. `fm6-core` accepts a `patch:`
+  list, and native hosts can read user-supplied files with `fm6-sysex`.
+  New voices are `kalimba`, `tonewheel-organ`, `hurdy-gurdy`, `vosim`,
+  `gendyn` and `scanned`. See
+  [the design](design-docs/specs/design-fm1-voices.md) and the
+  [FM6 algorithm](examples/fm6-algorithms.vact), [kalimba](examples/kalimba.vact),
+  [tonewheel organ](examples/tonewheel-organ.vact),
+  [hurdy-gurdy](examples/hurdy-gurdy.vact) and
+  [experimental oscillator](examples/experimental-oscillators.vact) examples.
 - `src/host/`: capability traits and `NoopHost`; `native/` (cpal, timer
   tick, midir, WAV loader) behind the `host-native` feature; `wasm/` (raw
   ABI, control-cell mirror protocol, resource lifecycle) behind `host-wasm`

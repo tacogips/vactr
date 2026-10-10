@@ -126,6 +126,9 @@ pub const PAN: CtlId = CtlId::new(4);
 /// The bank control: the installed resource id a sample event plays.
 pub const BANK: CtlId = CtlId::new(24);
 
+/// Sentinel slot for an `fm6-core` instance that uses macro mode.
+pub const NO_FM6_PATCH: u8 = u8::MAX;
+
 /// A node kind: the POD mirror of `UGenSpec` (effect parameters move to
 /// the graph's node parameters).
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -258,6 +261,10 @@ pub enum Node {
     GendynCore,
     /// scanned voice kernel.
     ScannedCore,
+    /// Six-operator FM core; slot indexes the optional constant patch table.
+    Fm6Core {
+        slot: u8,
+    },
 }
 
 pub use mixer::run;
@@ -286,6 +293,7 @@ impl Node {
                 | Node::KalimbaCore
                 | Node::TonewheelCore
                 | Node::HurdyGurdyCore
+                | Node::Fm6Core { .. }
                 | Node::AnalogPercussion
                 | Node::DualKick
                 | Node::SnarePair
@@ -441,6 +449,7 @@ pub enum BuildError {
     Empty,
     BadFrameData,
     BadStageData,
+    BadFm6Patch,
     /// The per-voice memory cannot hold the template's fixed state.
     MemExceeded,
 }
@@ -462,6 +471,7 @@ impl BuildError {
             BuildError::Empty => "the graph has no nodes",
             BuildError::BadFrameData => "invalid keyframe data",
             BuildError::BadStageData => "invalid Stages segment data",
+            BuildError::BadFm6Patch => "invalid six-operator patch",
             BuildError::MemExceeded => "the instrument state exceeds the voice memory",
         }
     }

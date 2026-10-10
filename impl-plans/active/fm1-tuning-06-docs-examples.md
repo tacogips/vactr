@@ -20,7 +20,8 @@ and pass the LSP formatting test (`src/lsp/tests/analysis.rs`).
 
 ## Non-goals
 
-- No Rust source changes, no `design-music.md` changes (the pointer already
+- No Rust source changes except the pinned block count in
+  `src/reader/tests/no_panic.rs` (run-3 amendment), no `design-music.md` changes (the pointer already
   exists), no `THIRD_PARTY_NOTICES.md` change (design D8: no upstream used).
 - No `load-scala` in examples or fences. Examples run on hosts without a
   source loader; show inline `scala` instead.
@@ -39,7 +40,18 @@ the sibling run: append at the end only.
 | `design-docs/specs/lang-reference.md` | append one new top-level section at the END (after the current last section) |
 | `examples/microtonal-tuning.vact` | new |
 | `examples/strum-harp.vact` | new |
-| `design-docs/specs/design-tuning-and-strum.md` | notation fix only: rewrite the five call-notation spans that use `( )` into brace syntax. The spans are in D3 (`tune (alt [..])`), 4.5 (`tune (alt [(edo 19) (edo 31)])`) and 10.4, 10.5 and 10.11 (`tune (edo 19)`). Example: `tune {alt [{edo 19} {edo 31}]}`. Change no other text |
+| `design-docs/specs/design-tuning-and-strum.md` | notation fix only: rewrite the five call-notation spans that use `( )` into brace syntax. The spans are in D3 (`tune (alt [..])`), 4.5 (`tune (alt [(edo 19) (edo 31)])`) and 10.4, 10.5 and 10.11 (`tune (edo 19)`). Example: `tune {alt [{edo 19} {edo 31}]}`. Change no other text (done in 82bbee2; run-3 design updates are the design step's, not this plan's) |
+| `src/reader/tests/no_panic.rs` | run-3 amendment: the pinned spec-block count `assert_eq!(blocks.len(), 11)` becomes 13 for this plan's two new fences (W4-READER-BLOCK-COUNT, owner-applied in 82bbee2). No other change |
+
+Run-3 lang-reference lag fix (edit only inside the section 6 that this
+plan appended, so the file stays additions-only versus dbad8c3): the
+`strum` bullet lists all curves `:flat`, `:fade`, `:swell` and states that
+an unknown direction or curve keyword is a type fault; the `tune`/`scala`
+text states that a `.kbm` unmapped (`x`) key yields no tone; the `perform`
+bullet lists its keywords `mode:` `inversion:` `bass:` `time:` `dir:`
+`curve:` `arp:` `pos:` `strips:` `base:` (design section 6). Prose
+only: add no new ```vactr fence (the pinned block count stays 13) and do
+not touch sections 1-5.
 
 ## lang-reference section content
 
@@ -99,8 +111,9 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 | `CARGO_TERM_QUIET=true cargo run -- run examples/microtonal-tuning.vact --host noop --cycles 2 > tmp/fm1-tuning/p06/run-microtonal.log 2>&1` | exit 0, no error diagnostics in the log (silent noop host) |
 | `CARGO_TERM_QUIET=true cargo run -- run examples/strum-harp.vact --host noop --cycles 2 > tmp/fm1-tuning/p06/run-strum.log 2>&1` | exit 0, no error diagnostics |
 | `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib fmt::tests lsp::tests reader::tests types::tests > tmp/fm1-tuning/p06/nextest-docs.log 2>&1` | exit 0, failureCount 0 (corpus fixed point, LSP formatting, spec fences) |
-| `git diff --stat design-docs/specs/lang-reference.md` | additions only |
-| `grep -nE '\((edo\|alt) ' design-docs/specs/design-tuning-and-strum.md > tmp/fm1-tuning/p06/design-notation.log 2>&1; test $? -eq 1` | exit 0: no `(edo ` or `(alt ` call notation remains. Also `git diff --numstat design-docs/specs/design-tuning-and-strum.md` must show at most 5 added and 5 deleted lines |
+| `test "$(git diff dbad8c3 -- design-docs/specs/lang-reference.md \| grep -c '^-[^-]')" = 0` | exit 0: additions only versus dbad8c3 |
+| `grep -nE '\((edo\|alt) ' design-docs/specs/design-tuning-and-strum.md > tmp/fm1-tuning/p06/design-notation.log 2>&1; test $? -eq 1` | exit 0: no `(edo ` or `(alt ` call notation remains. Also `git diff --numstat 086b94f 82bbee2 -- design-docs/specs/design-tuning-and-strum.md` must show exactly `5 5` (this plan's committed change; later design-step edits are excluded) |
+| `grep -c ':swell' design-docs/specs/lang-reference.md` | at least 1 (run-3 lag fix) |
 | `grep -c "tune\|strum\|harp\|inversion\|perform\|edo\|ratios\|scala" design-docs/specs/lang-reference.md` | every new name present |
 
 ## Completion Criteria
@@ -110,6 +123,8 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 - [ ] The docs-related test filters are green (fmt/LSP/reader/types aggregate has one reader block-count failure; see blocker below)
 - [x] The design doc call notation uses braces (five spans, no other change)
 - [x] Progress log updated
+- [ ] Run-3 lang-reference lag fix applied (strum curves and faults, unmapped `.kbm` key, `perform` keywords)
+- [ ] Test-integrity and adversarial reviews completed
 
 ## Progress Log
 
@@ -124,3 +139,7 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 ### Session: 2026-10-10 (Step 6 implementation)
 **Tasks Completed**: Appended lang-reference section 6, added both runnable examples, and verified the five-span design notation change. The non-reader fmt/LSP/types filter passed (162/162); the required examples each completed two noop cycles; formatter check passed. The complete docs filter ran 201 tests: 200 passed and `reader::tests::no_panic::every_line_prefix_of_every_block_reads` failed because its fixed `assert_eq!(blocks.len(), 11)` now observes 13 blocks.
 **Notes**: The failing assertion is in `src/reader/tests/no_panic.rs`, outside this plan's declared `writePaths`; do not edit it until the serial integration owner amends ownership. Resume by adding that exact file to the approved write surface, updating the block-count expectation to 13, and rerunning the complete docs filter. No other test failure was observed. The noop runs emit `latency-widened` warnings but no error diagnostics or audio output.
+
+### Session: 2026-10-10 (run 3 design step, session-354)
+**Tasks Completed**: writePaths amended with `src/reader/tests/no_panic.rs` (already 13 in 82bbee2; owner reported the docs filter 201/201). Added the section 6 lag fix (strum curves and faults, unmapped `.kbm` key, `perform` keywords). Rebased the diff checks onto fixed commits (lang-reference versus dbad8c3; notation versus 086b94f..82bbee2), because the run-3 design step edits design-tuning-and-strum.md.
+**Notes**: Remaining: apply the lang-reference lag fix, rerun the docs filter and the p06 verification, then the test-integrity and adversarial reviews.

@@ -315,7 +315,9 @@ numbers stay keys as written. Without a recognized tuning, all three keep
 - Song freezing (`src/song/source.rs`): the keyword mapping happens HERE,
   so the frozen `ResolvedNote` is already the tuned key (encode only sees
   the frozen number, so it cannot remap a keyword). Live and song output
-  therefore agree.
+  therefore agree. A tone whose key is unmapped under the event tuning
+  (a `.kbm` `x` key, `freq` returns none) is skipped: no frozen row, as
+  on the audio commit and MIDI paths; the other tones of a chord stay.
 - Song encode (`src/sched/song/encode.rs`): the same recognition on the
   frozen `tuning` list; skip it in the control loop; `row.note` (already a
   key) goes through `t.freq`.
@@ -353,6 +355,11 @@ the result is ordinary note events for any template or MIDI.
   `:swell` (`m_i = 0.5 + 0.5 * i / (N - 1)`), i the play-order index,
   N the tone count (N = 1: m = 1). Applied to `velocity` if present, else
   to `gain` if present, else sets `gain = m_i`. `:flat` writes nothing.
+  Patterned and sampled at the event anchor, like `dir`.
+- Validation: `dir` and `curve` are each sampled per chord event. A
+  keyword outside its list above (or a non-keyword) is a `type` fault for
+  that query; an unknown curve never falls back to `:fade` or `:swell`.
+  Events that pass through (scalar or no note) do not sample them.
 - Timing: `dt = min(time, len / N)`; tone i gets
   `whole = [begin + i * dt, end)` (all tones end together),
   `part = intersection(whole, parent.part)`, dropped when empty. Each child carries one
@@ -474,7 +481,7 @@ the presets, the ordering rule (section 3) and the MIDI limitation; its
 
 ## 9. File layout and shared-file policy
 
-New files (proposed; each under 1000 lines):
+New files (as built at 82bbee2; each under 1000 lines):
 
 - `src/pattern/tuning/mod.rs`: `Tuning`, spec parsing and validation,
   canonical control encode/decode, `freq`, `nearest`, `keys_per_period`.
@@ -482,9 +489,14 @@ New files (proposed; each under 1000 lines):
 - `src/pattern/tuning/presets.rs`: tuning presets and microtonal scale presets.
 - `src/pattern/combinators/tune.rs`: `tune` constructor and query.
 - `src/pattern/combinators/strum.rs`: `strum`, `harp`, `inversion`.
+- `src/sched/commit/tuned.rs`: tuned commit helper.
 - `src/vm/natives/tuning.rs`: the nine natives.
-- Tests: `src/pattern/tests/tuning.rs`, `src/pattern/tests/strum.rs`,
-  `src/sched/tests/tuning.rs` (commit audio/MIDI and song encode).
+- Tests: `src/pattern/tuning/tests.rs`, `src/pattern/combinators/tune/tests.rs`,
+  `src/pattern/combinators/strum/tests.rs`,
+  `src/pattern/combinators/music/tuning_tests.rs`,
+  `src/sched/tests/sched/tuning.rs` (commit audio/MIDI and song encode),
+  `src/sched/tests/sched/tuning_natives.rs` (natives end to end) and
+  `tests/song_tuning.rs` (song freeze and playback).
 - `examples/microtonal-tuning.vact`, `examples/strum-harp.vact` (inline
   `scala` only, so they run on every host).
 - `tests/fixtures/tuning/slendro.scl`, `tests/fixtures/tuning/slendro.kbm`
@@ -498,8 +510,12 @@ Modified (existing files): `src/pattern/mod.rs`,
 join existing or-patterns and must keep it under 1000),
 `src/song/source_uses.rs`, `src/session/song/source_uses.rs`,
 `src/session/song/shape_preparation.rs`, `src/sched/commit.rs` (873 lines),
-`src/sched/song/encode.rs`, `src/song/source.rs` (972 lines: the keyword
-mapping is a single helper call, keeping it under 1000),
+`src/sched/song/encode.rs`, `src/song/source.rs` (985 lines at 82bbee2;
+new song tests go to `tests/song_tuning.rs`, not this file),
+`src/session/song/freeze.rs`,
+`src/session/song/source_uses/timing/capture.rs`,
+`src/reader/tests/no_panic.rs` (pinned spec-block count, 11 -> 13, for
+the two `lang-reference.md` fences),
 `src/vm/natives/mod.rs` or
 `src/vm/natives/music.rs` (registration), `src/types/natives_domain.rs`,
 `src/types/infer_call.rs` (`perform` chord-literal check),
@@ -540,11 +556,16 @@ Behavioral tests (all silent; no audio device):
    sends the nearest MIDI note of that frequency on the MIDI path, and
    freezes `ResolvedNote` 63 and encodes the same frequency on the song
    path; untuned `note :d` stays key 62 on all three.
-6. Song encode: a frozen tuned row encodes the tuned freq.
+6. Song encode: a frozen tuned row encodes the tuned freq. Song freeze
+   under an inline `.kbm` with an `x` key: a chord containing the unmapped
+   key freezes and plays only the mapped tones (one row fewer), and the
+   mapped rows keep their tuned keys and frequencies (4.9).
 7. MIDI: tuned nearest note; untuned unchanged.
 8. `strum`: onsets, shared end, `dt` clamp, each direction including
    `:alternate` parity and `:random` determinism and permutation, curves
-   on `velocity`/`gain`/absent, `no-whole` fault, pass-through.
+   on `velocity`/`gain`/absent, `no-whole` fault, pass-through, and a
+   `type` fault (not a silent `:swell`) for an unknown curve keyword, as
+   for an unknown direction keyword (5.1).
 9. `harp`: plate contents, pos 0 / 0.5 / 1, clamping, tuned plate in 19-EDO.
 10. `inversion`: positive, negative, multi-period, bass flag.
 11. `perform`: each mode yields the expected notes and onsets, and drives
@@ -571,6 +592,12 @@ environment from `AGENTS.md`.
 4. `strum`, `harp`, `inversion` (independent of 3), then `perform`.
 5. Natives, type table, `lang-reference.md` and examples last for each
    name, with the full behavioral suite green before each acceptance.
+6. Closeout (run 3, after plans 01-05 were accepted at 82bbee2): the
+   `lang-reference.md` section 6 states the full `strum` curve list
+   (`:flat` `:fade` `:swell`), the unknown `dir`/`curve` fault, the
+   unmapped-tone skip and the `perform` keywords of section 6 here (plan
+   06). The strum curve validation of 5.1 and the 10.6/10.8 tests land in
+   plan 07 with no other feature change; both precede the full gates.
 
 ## 12. Open questions
 

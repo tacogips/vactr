@@ -252,7 +252,7 @@ pub static ROWS: &[ControlRow] = &[
     param("drift", 18, 0.002, (0.0, 0.1)),
     param("ratio", 19, 1.0, (0.0, 32.0)),
     param("index", 20, 1.0, (0.0, 32.0)),
-    param("algorithm", 21, 1.0, (1.0, 32.0)),
+    param("algorithm", 21, 0.0, (0.0, 32.0)),
     param("position", 22, 0.0, (0.0, 1.0)),
     mk(
         "table",

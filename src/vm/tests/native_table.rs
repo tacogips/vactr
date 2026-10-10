@@ -87,12 +87,13 @@ fn every_registration_has_a_table_entry() {
 }
 
 #[test]
-fn the_full_prelude_is_the_table_minus_load() {
+fn the_full_prelude_is_the_table_minus_loader_natives() {
     let p = full_prelude();
     assert!(p.errors().is_empty(), "{:?}", p.errors());
     let table = NativeTable::global();
-    assert_eq!(p.names().count(), table.len() - 1);
+    assert_eq!(p.names().count(), table.len() - 2);
     assert!(p.slot(intern_sym("load")).is_none());
+    assert!(p.slot(intern_sym("fm6-sysex")).is_none());
     // Registering the domain again is a no-op, not a duplicate.
     let mut again = full_prelude();
     crate::vm::natives::register_domain(&mut again);

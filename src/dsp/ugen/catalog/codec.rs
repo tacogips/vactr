@@ -90,7 +90,25 @@ pub(crate) fn put_spec(o: &mut Out<'_>, spec: &UGenSpec) -> Result<(), BuildErro
         UGenSpec::DigitalSnareCore => (93, 0),
         UGenSpec::DigitalMetalCore => (94, 0),
         UGenSpec::DigitalHatCore => (95, 0),
+        UGenSpec::Fm6Core { patch } => {
+            o.u8(105);
+            o.u8(super::super::fm::patch::WIRE_VERSION);
+            if let Some(patch) = patch {
+                patch.validate().map_err(|_| BuildError::BadFm6Patch)?;
+                o.u8(1);
+                o.0.extend_from_slice(&patch.params);
+            } else {
+                o.u8(0);
+            }
+            return Ok(());
+        }
         UGenSpec::BassCore => (104, 0),
+        UGenSpec::KalimbaCore => (106, 0),
+        UGenSpec::TonewheelCore => (107, 0),
+        UGenSpec::HurdyGurdyCore => (108, 0),
+        UGenSpec::VosimCore => (109, 0),
+        UGenSpec::GendynCore => (110, 0),
+        UGenSpec::ScannedCore => (111, 0),
         UGenSpec::AnalogPercussion => (35, 0),
         UGenSpec::VaSource => (37, 0),
         UGenSpec::VaFilter => (38, 0),
@@ -249,6 +267,28 @@ pub(crate) fn get_node(i: &mut In<'_>, raw: &mut RawGraph) -> Result<(), FaultCo
         }
         return Ok(());
     }
+    if tag == 105 {
+        if i.u8()? != super::super::fm::patch::WIRE_VERSION {
+            return Err(FaultCode::BadRecord);
+        }
+        let present = i.u8()?;
+        let slot = match present {
+            0 => crate::dsp::ugen::NO_FM6_PATCH,
+            1 => {
+                let mut patch = super::super::fm::patch::Fm6Patch::EMPTY;
+                for value in &mut patch.params {
+                    *value = i.u8()?;
+                }
+                patch.validate().map_err(|_| FaultCode::BadRecord)?;
+                raw.push_fm6_payload(patch)
+                    .map_err(|_| FaultCode::GraphTooLarge)?
+            }
+            _ => return Err(FaultCode::BadRecord),
+        };
+        raw.push_node(Node::Fm6Core { slot })
+            .map_err(|_| FaultCode::GraphTooLarge)?;
+        return Ok(());
+    }
     if tag == 85 {
         if i.u8()? != frame_keyframe::WIRE_VERSION {
             return Err(FaultCode::BadRecord);
@@ -339,6 +379,12 @@ pub(crate) fn get_node(i: &mut In<'_>, raw: &mut RawGraph) -> Result<(), FaultCo
         94 => Node::DigitalMetalCore,
         95 => Node::DigitalHatCore,
         104 => Node::BassCore,
+        106 => Node::KalimbaCore,
+        107 => Node::TonewheelCore,
+        108 => Node::HurdyGurdyCore,
+        109 => Node::VosimCore,
+        110 => Node::GendynCore,
+        111 => Node::ScannedCore,
         35 => Node::AnalogPercussion,
         37 => Node::VaSource,
         38 => Node::VaFilter,

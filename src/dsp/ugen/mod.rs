@@ -51,8 +51,11 @@ pub mod fm_pair;
 pub mod frame_keyframe;
 pub mod frame_lfo;
 pub mod fusion_drum;
+pub mod gendyn;
 pub mod grain_pair;
 pub mod hat_pair;
+pub mod hurdy_gurdy;
+pub mod kalimba;
 pub mod mixer;
 pub mod modal_pair;
 pub mod musicdsp_synth;
@@ -64,6 +67,7 @@ pub mod peak_pulse;
 pub mod phase_pair;
 pub mod rings_part;
 pub mod sample;
+pub mod scanned;
 pub mod shape_pair;
 pub mod six_op_original;
 pub mod snare_pair;
@@ -80,9 +84,11 @@ pub mod table_terrain_pair;
 pub mod terrain_pair;
 pub mod tidal_function;
 pub mod tidal_poly;
+pub mod tonewheel;
 pub mod va_filter;
 pub mod vactrol_gate;
 pub mod voice_layer;
+pub mod vosim;
 pub mod wavetable;
 
 use crate::dsp::arena::SampleStore;
@@ -119,6 +125,9 @@ pub const AMP: CtlId = CtlId::new(1);
 pub const PAN: CtlId = CtlId::new(4);
 /// The bank control: the installed resource id a sample event plays.
 pub const BANK: CtlId = CtlId::new(24);
+
+/// Sentinel slot for an `fm6-core` instance that uses macro mode.
+pub const NO_FM6_PATCH: u8 = u8::MAX;
 
 /// A node kind: the POD mirror of `UGenSpec` (effect parameters move to
 /// the graph's node parameters).
@@ -240,6 +249,22 @@ pub enum Node {
     },
     /// Self-enveloped bass voice kernel (six prelude models).
     BassCore,
+    /// kalimba voice kernel.
+    KalimbaCore,
+    /// tonewheel voice kernel.
+    TonewheelCore,
+    /// hurdy gurdy voice kernel.
+    HurdyGurdyCore,
+    /// vosim voice kernel.
+    VosimCore,
+    /// gendyn voice kernel.
+    GendynCore,
+    /// scanned voice kernel.
+    ScannedCore,
+    /// Six-operator FM core; slot indexes the optional constant patch table.
+    Fm6Core {
+        slot: u8,
+    },
 }
 
 pub use mixer::run;
@@ -265,6 +290,10 @@ impl Node {
                 | Node::DigitalMetalCore
                 | Node::DigitalHatCore
                 | Node::BassCore
+                | Node::KalimbaCore
+                | Node::TonewheelCore
+                | Node::HurdyGurdyCore
+                | Node::Fm6Core { .. }
                 | Node::AnalogPercussion
                 | Node::DualKick
                 | Node::SnarePair
@@ -420,6 +449,7 @@ pub enum BuildError {
     Empty,
     BadFrameData,
     BadStageData,
+    BadFm6Patch,
     /// The per-voice memory cannot hold the template's fixed state.
     MemExceeded,
 }
@@ -441,6 +471,7 @@ impl BuildError {
             BuildError::Empty => "the graph has no nodes",
             BuildError::BadFrameData => "invalid keyframe data",
             BuildError::BadStageData => "invalid Stages segment data",
+            BuildError::BadFm6Patch => "invalid six-operator patch",
             BuildError::MemExceeded => "the instrument state exceeds the voice memory",
         }
     }

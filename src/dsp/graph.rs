@@ -212,6 +212,22 @@ pub enum UGenSpec {
     Effect(EffectSpec),
     /// Self-enveloped bass voice kernel (six prelude models).
     BassCore,
+    /// kalimba voice kernel.
+    KalimbaCore,
+    /// tonewheel voice kernel.
+    TonewheelCore,
+    /// hurdy gurdy voice kernel.
+    HurdyGurdyCore,
+    /// vosim voice kernel.
+    VosimCore,
+    /// gendyn voice kernel.
+    GendynCore,
+    /// scanned voice kernel.
+    ScannedCore,
+    /// Six-operator FM core with an optional constant voice patch.
+    Fm6Core {
+        patch: Option<Box<crate::dsp::ugen::fm::patch::Fm6Patch>>,
+    },
 }
 
 /// A connection: node `from`'s output feeds input `port` of node `to`.

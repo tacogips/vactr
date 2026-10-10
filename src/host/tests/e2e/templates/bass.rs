@@ -16,13 +16,14 @@ const BASS_TEMPLATES: [&str; 6] = [
 ];
 
 #[test]
-fn bass_templates_are_registered_last() {
+fn bass_templates_precede_fm1_voices() {
     assert_eq!(
-        &catalog::TEMPLATE_NAMES[catalog::TEMPLATE_NAMES.len() - BASS_TEMPLATES.len()..],
+        &catalog::TEMPLATE_NAMES
+            [catalog::TEMPLATE_NAMES.len() - 12..catalog::TEMPLATE_NAMES.len() - 6],
         BASS_TEMPLATES.as_slice()
     );
     assert_eq!(
-        &insts::TEMPLATE_NAMES[insts::TEMPLATE_NAMES.len() - BASS_TEMPLATES.len()..],
+        &insts::TEMPLATE_NAMES[insts::TEMPLATE_NAMES.len() - 12..insts::TEMPLATE_NAMES.len() - 6],
         BASS_TEMPLATES.as_slice()
     );
 }

@@ -24,6 +24,8 @@ pub struct RawGraph {
     pub frame_payloads: [frame_keyframe::FrameData; frame_keyframe::MAX_PAYLOADS],
     pub n_stage_payloads: usize,
     pub stage_payloads: [stage_linked::StageData; stage_linked::MAX_PAYLOADS],
+    pub n_fm6_payloads: usize,
+    pub fm6_payloads: [fm::patch::Fm6Patch; fm::patch::MAX_FM6_PAYLOADS],
 }
 
 impl RawGraph {
@@ -50,6 +52,8 @@ impl RawGraph {
             frame_payloads: [frame_keyframe::FrameData::EMPTY; frame_keyframe::MAX_PAYLOADS],
             n_stage_payloads: 0,
             stage_payloads: [stage_linked::StageData::EMPTY; stage_linked::MAX_PAYLOADS],
+            n_fm6_payloads: 0,
+            fm6_payloads: [fm::patch::Fm6Patch::EMPTY; fm::patch::MAX_FM6_PAYLOADS],
         })
     }
 
@@ -61,6 +65,7 @@ impl RawGraph {
         self.n_params = 0;
         self.n_frame_payloads = 0;
         self.n_stage_payloads = 0;
+        self.n_fm6_payloads = 0;
     }
 
     /// Appends a node.
@@ -140,6 +145,12 @@ impl RawGraph {
                 Node::StageLinked { slot }
             } else if matches!(spec, UGenSpec::StageLinked { data: None }) {
                 return Err(BuildError::BadStageData);
+            } else if let UGenSpec::Fm6Core { patch: Some(patch) } = spec {
+                patch.validate().map_err(|_| BuildError::BadFm6Patch)?;
+                let slot = self.push_fm6_payload(**patch)?;
+                Node::Fm6Core { slot }
+            } else if matches!(spec, UGenSpec::Fm6Core { patch: None }) {
+                Node::Fm6Core { slot: NO_FM6_PATCH }
             } else {
                 Node::from_spec(spec)
             };
@@ -172,6 +183,16 @@ impl RawGraph {
             .get_mut(slot)
             .ok_or(BuildError::TooManyParams)? = data;
         self.n_frame_payloads += 1;
+        u8::try_from(slot).map_err(|_| BuildError::TooManyParams)
+    }
+
+    pub fn push_fm6_payload(&mut self, patch: fm::patch::Fm6Patch) -> Result<u8, BuildError> {
+        let slot = self.n_fm6_payloads;
+        *self
+            .fm6_payloads
+            .get_mut(slot)
+            .ok_or(BuildError::TooManyParams)? = patch;
+        self.n_fm6_payloads += 1;
         u8::try_from(slot).map_err(|_| BuildError::TooManyParams)
     }
 
@@ -211,6 +232,8 @@ pub struct Template {
     pub frame_payloads: [frame_keyframe::FrameData; frame_keyframe::MAX_PAYLOADS],
     pub n_stage_payloads: usize,
     pub stage_payloads: [stage_linked::StageData; stage_linked::MAX_PAYLOADS],
+    pub n_fm6_payloads: usize,
+    pub fm6_payloads: [fm::patch::Fm6Patch; fm::patch::MAX_FM6_PAYLOADS],
     pub n_sinks: usize,
     pub sinks: [u16; MAX_SINKS],
     /// An `aux-out` node is present; the voice writes independent L/R.
@@ -254,6 +277,8 @@ impl Template {
             frame_payloads: [frame_keyframe::FrameData::EMPTY; frame_keyframe::MAX_PAYLOADS],
             n_stage_payloads: 0,
             stage_payloads: [stage_linked::StageData::EMPTY; stage_linked::MAX_PAYLOADS],
+            n_fm6_payloads: 0,
+            fm6_payloads: [fm::patch::Fm6Patch::EMPTY; fm::patch::MAX_FM6_PAYLOADS],
             n_sinks: 0,
             sinks: [0; MAX_SINKS],
             has_aux: false,
@@ -402,6 +427,8 @@ impl Template {
         self.frame_payloads = raw.frame_payloads;
         self.n_stage_payloads = raw.n_stage_payloads;
         self.stage_payloads = raw.stage_payloads;
+        self.n_fm6_payloads = raw.n_fm6_payloads;
+        self.fm6_payloads = raw.fm6_payloads;
         self.n_fx = 0;
         self.n_refs = 0;
         self.n_sinks = 0;
@@ -480,6 +507,10 @@ impl Template {
             | Node::DigitalMetalCore
             | Node::DigitalHatCore
             | Node::BassCore
+            | Node::KalimbaCore
+            | Node::TonewheelCore
+            | Node::HurdyGurdyCore
+            | Node::Fm6Core { .. }
             | Node::AnalogPercussion
             | Node::FeedbackDrum
             | Node::NoiseDrum

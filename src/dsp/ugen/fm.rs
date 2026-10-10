@@ -5,6 +5,13 @@ use std::f32::consts::TAU;
 
 use super::{Inp, Kx, NodeState, MAX_PORTS};
 
+pub mod algorithms;
+pub mod engine;
+pub mod envelope;
+pub mod patch;
+pub mod scaling;
+pub mod sysex;
+
 /// `fm-op freq ratio index mod`: a sine operator at `freq * ratio`, output
 /// amplitude `index`, phase-modulated by `mod` (radians).
 pub fn op(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &Kx<'_>) {
@@ -39,6 +46,25 @@ pub fn modulate(ins: &[Inp<'_>; MAX_PORTS], out: &mut [f32]) {
         };
         *y = (x.asin() + ins[2].at(i) * ins[1].at(i)).sin();
     }
+}
+
+/// `fm-mod` with an optional six-operator algorithm mode.
+///
+/// Non-positive and non-finite algorithm values preserve the legacy stateless
+/// modulation path exactly and leave the voice state and memory untouched.
+pub fn modulate_with_algorithm(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    mem: &mut [f32],
+    out: &mut [f32],
+    kx: &Kx<'_>,
+) {
+    let algorithm = ins[engine::fm_mod_port::ALGORITHM].first();
+    if !algorithm.is_finite() || algorithm.round() <= 0.0 {
+        modulate(ins, out);
+        return;
+    }
+    engine::fm_mod_algorithm(ins, st, mem, out, kx);
 }
 
 /// `phase-distortion freq shape`: a cosine read through a two-segment

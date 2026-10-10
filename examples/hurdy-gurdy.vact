@@ -1,0 +1,8 @@
+# Drones are per voice, so the drone pattern owns its sustained note independently.
+use-bpm 96
+
+# Drone pattern: keep the chanterelle silent while the bourdon and fifth sound.
+s :hurdy-gurdy > note [:g2] > gurdy-melody 0 > gurdy-bourdon 0.65 > gurdy-fifth 0.42 > gurdy-wheel 0.55 > gate-length 32 > gain 0.2 > d1
+
+# Melody pattern: mute drones, then drive the trompette bridge with wheel strokes.
+s :hurdy-gurdy > note [:g3 :a3 :b3 :d4 :b3 :a3] > gurdy-bourdon 0 > gurdy-fifth 0 > gurdy-melody 1 > gurdy-wheel 0.78 > cut 1 > gurdy-strokes 4 > gurdy-buzz 0.7 > gate-length 3 > gain 0.2 > d2

@@ -262,6 +262,11 @@ impl SourceLoader for NativeSampleLoader {
         st.files.push((id, file));
         Ok((id, Rc::from(text)))
     }
+
+    fn read_bytes(&mut self, path: &PathVal, limit: u64) -> Result<Vec<u8>, Failure> {
+        let file = self.resolve(path)?;
+        read_limited(&file, limit, &path.text)
+    }
 }
 
 /// Immutable root/base configuration; no active file IDs or registered banks.

@@ -110,7 +110,15 @@ const VCO: &[Port] = &[
     p("width", 0.5),
 ];
 const FM_OP: &[Port] = &[FREQ, p("ratio", 1.0), p("index", 1.0), p("mod", 0.0)];
-const FM_MOD: &[Port] = &[IN, p("mod", 0.0), p("index", 1.0)];
+const FM_MOD: &[Port] = &[
+    IN,
+    p("mod", 0.0),
+    p("index", 1.0),
+    p("algorithm", 0.0),
+    FREQ,
+    p("ratio", 1.0),
+    p("velocity", 1.0),
+];
 const FM_DRUM: &[Port] = &[
     p("freq", 110.0),
     p("fm-amount", 1.5),
@@ -220,6 +228,7 @@ pub fn ports(node: &Node) -> &'static [Port] {
         Node::Vco { .. } => VCO,
         Node::FmOp => FM_OP,
         Node::FmMod => FM_MOD,
+        Node::Fm6Core { .. } => FM6_CORE,
         Node::FmDrum => FM_DRUM,
         Node::FeedbackMetal => FEEDBACK_METAL,
         Node::DigitalDrumCore => DIGITAL_DRUM,
@@ -227,6 +236,12 @@ pub fn ports(node: &Node) -> &'static [Port] {
         Node::DigitalMetalCore => DIGITAL_METAL,
         Node::DigitalHatCore => DIGITAL_HAT,
         Node::BassCore => BASS_CORE,
+        Node::KalimbaCore => KALIMBACORE,
+        Node::TonewheelCore => TONEWHEELCORE,
+        Node::HurdyGurdyCore => HURDYGURDYCORE,
+        Node::VosimCore => VOSIMCORE,
+        Node::GendynCore => GENDYNCORE,
+        Node::ScannedCore => SCANNEDCORE,
         Node::AnalogPercussion => ANALOG_PERCUSSION,
         Node::VaSource => VA_SOURCE,
         Node::VaFilter => VA_FILTER,
@@ -383,6 +398,13 @@ pub fn ugen_name(spec: &UGenSpec) -> &'static str {
         UGenSpec::DigitalMetalCore => "digital-metal-core",
         UGenSpec::DigitalHatCore => "digital-hat-core",
         UGenSpec::BassCore => "bass-core",
+        UGenSpec::KalimbaCore => "kalimba-core",
+        UGenSpec::TonewheelCore => "tonewheel-core",
+        UGenSpec::HurdyGurdyCore => "hurdy-gurdy-core",
+        UGenSpec::VosimCore => "vosim-core",
+        UGenSpec::GendynCore => "gendyn-core",
+        UGenSpec::ScannedCore => "scanned-core",
+        UGenSpec::Fm6Core { .. } => "fm6-core",
         UGenSpec::AnalogPercussion => "analog-percussion",
         UGenSpec::VaSource => "va-source",
         UGenSpec::VaFilter => "va-filter",
@@ -550,6 +572,13 @@ pub const UGEN_NAMES: &[&str] = &[
     "wavetable",
     "granular",
     "bass-core",
+    "kalimba-core",
+    "tonewheel-core",
+    "hurdy-gurdy-core",
+    "vosim-core",
+    "gendyn-core",
+    "scanned-core",
+    "fm6-core",
 ];
 
 /// The prelude synthesis templates (design 12.4).
@@ -627,6 +656,12 @@ pub const TEMPLATE_NAMES: &[&str] = &[
     "wobble-bass",
     "sub-bass",
     "reese-bass",
+    "kalimba",
+    "tonewheel-organ",
+    "hurdy-gurdy",
+    "vosim",
+    "gendyn",
+    "scanned",
 ];
 
 /// The node of a spec (an effect's parameters are not included).
@@ -674,6 +709,15 @@ pub fn node_of(spec: &UGenSpec) -> Node {
         UGenSpec::DigitalMetalCore => Node::DigitalMetalCore,
         UGenSpec::DigitalHatCore => Node::DigitalHatCore,
         UGenSpec::BassCore => Node::BassCore,
+        UGenSpec::KalimbaCore => Node::KalimbaCore,
+        UGenSpec::TonewheelCore => Node::TonewheelCore,
+        UGenSpec::HurdyGurdyCore => Node::HurdyGurdyCore,
+        UGenSpec::VosimCore => Node::VosimCore,
+        UGenSpec::GendynCore => Node::GendynCore,
+        UGenSpec::ScannedCore => Node::ScannedCore,
+        UGenSpec::Fm6Core { .. } => Node::Fm6Core {
+            slot: super::NO_FM6_PATCH,
+        },
         UGenSpec::AnalogPercussion => Node::AnalogPercussion,
         UGenSpec::VaSource => Node::VaSource,
         UGenSpec::VaFilter => Node::VaFilter,

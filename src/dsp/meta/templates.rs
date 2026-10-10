@@ -2,6 +2,7 @@
 
 mod bass;
 mod plaits;
+mod voices;
 pub(super) use bass::DEFAULT_OVERRIDES as BASS_DEFAULT_OVERRIDES;
 
 pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
@@ -752,4 +753,10 @@ pub(super) const TEMPLATE_PARAMS: &[(&str, &[&str])] = &[
     ("wobble-bass", bass::WOBBLE_BASS),
     ("sub-bass", bass::SUB_BASS),
     ("reese-bass", bass::REESE_BASS),
+    ("kalimba", voices::KALIMBA),
+    ("tonewheel-organ", voices::TONEWHEEL_ORGAN),
+    ("hurdy-gurdy", voices::HURDY_GURDY),
+    ("vosim", voices::VOSIM),
+    ("gendyn", voices::GENDYN),
+    ("scanned", voices::SCANNED),
 ];

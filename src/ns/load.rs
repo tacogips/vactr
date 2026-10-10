@@ -42,6 +42,20 @@ pub trait SourceLoader {
     /// Any failure to read, `host-unavailable` when there is no host.
     fn read(&mut self, path: &PathVal) -> Result<(FileId, Rc<str>), Failure>;
 
+    /// Reads raw bytes from `path`, bounded by `limit`. Loaders without
+    /// byte-file support (including browser loaders) fail with
+    /// `host-unavailable`.
+    ///
+    /// # Errors
+    /// Any read failure, or `host-unavailable` when raw-byte loading is not
+    /// supported.
+    fn read_bytes(&mut self, _path: &PathVal, _limit: u64) -> Result<Vec<u8>, Failure> {
+        Err(Failure::new(
+            FailCode::HostUnavailable,
+            "raw-byte file loading is not available",
+        ))
+    }
+
     /// The self-analysis context (14.5.9). The session's loader returns
     /// its `AnalysisCx` here, so a native reaches the capabilities and taps
     /// through the VM's `LoaderHost` (`host.0.analysis()`) without a new VM
@@ -77,6 +91,11 @@ pub fn take_load_diags(vm: &mut Vm) -> Vec<Diagnostic> {
 pub fn register_load(p: &mut Prelude) {
     if p.slot(crate::value::intern::intern_sym("load")).is_none() {
         p.register("load", load);
+    }
+    if p.slot(crate::value::intern::intern_sym("fm6-sysex"))
+        .is_none()
+    {
+        p.register("fm6-sysex", crate::ns::fm6_sysex::fm6_sysex);
     }
 }
 

@@ -107,6 +107,10 @@ impl SourceLoader for SessionLoader {
         self.inner.read(path)
     }
 
+    fn read_bytes(&mut self, path: &PathVal, limit: u64) -> Result<Vec<u8>, Failure> {
+        self.inner.read_bytes(path, limit)
+    }
+
     fn analysis(&mut self) -> Option<&mut AnalysisCx> {
         Some(&mut self.cx)
     }

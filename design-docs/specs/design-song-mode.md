@@ -249,10 +249,10 @@ The review identifies two implementation blockers and one resource design risk:
   That uniform-allocation proposal is superseded by the verified heterogeneous
   layout: six original full regions plus 45 smaller constructor-owned regions.
   Added state is about 82.8864 MB on either tier at 48 kHz, excluding scratch
-  and metadata. Production adapters now select that layout and 128 templates.
+  and metadata. Production adapters now select that layout and 134 templates.
   Five adapter tests pass, including genuine overlapping original preparations,
   one-below refusal preserving old audio, cleanup and compatibility defaults.
-  Template sizing includes the real 73-template prelude and both retained owners.
+  Template sizing includes the real 79-template prelude and both retained owners.
 
 The follow-up probe uses the genuine Session bootstrap and unchanged score.
 At 8 kHz, an explicitly configured measurement host has 55 free templates after

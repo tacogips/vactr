@@ -764,6 +764,7 @@ impl Graph<'_> {
             let listed = port_list.iter().position(|p| **p == *pname);
             if (matches!(spec, UGenSpec::FrameKeyframe { .. }) && &*pname == "frames")
                 || (matches!(spec, UGenSpec::StageLinked { .. }) && &*pname == "segments")
+                || (matches!(spec, UGenSpec::Fm6Core { .. }) && &*pname == "patch")
             {
                 if !matches!(inp, UGenInput::List(_)) {
                     return Err(LowerError::ty("payload requires a constant numeric list"));
@@ -858,6 +859,16 @@ impl Graph<'_> {
                 let parsed = crate::dsp::ugen::stage_linked::StageData::from_flat(xs)
                     .map_err(LowerError::ty)?;
                 *data = Some(Box::new(parsed));
+            }
+            UGenSpec::Fm6Core { patch } => {
+                if let Some(value) = arg("patch") {
+                    let UGenInput::List(values) = value else {
+                        return Err(LowerError::ty("patch: requires a constant numeric list"));
+                    };
+                    let parsed = crate::dsp::ugen::fm::patch::Fm6Patch::from_flat(values)
+                        .map_err(LowerError::ty)?;
+                    *patch = Some(Box::new(parsed));
+                }
             }
             UGenSpec::Vco { unison_max } => {
                 *unison_max = match arg("unison") {

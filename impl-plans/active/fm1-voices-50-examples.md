@@ -1,10 +1,19 @@
 # FM1V-50: Examples for the FM Algorithms and the Six New Voices
 
 **Status**: Ready
-**Plan ID**: FM1V-50 (run 2, serial wave 5 of 6)
+**Plan ID**: FM1V-50 (run 3, serial wave 5 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Presets and examples", "SysEx import" -> Usage syntax)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 352)
+**Last Updated**: 2026-10-10 (session 353)
+
+## Session 353 Note (run 3)
+
+- Base is `48d651c`. FM1V-40 is accepted before this plan starts, and
+  strict clippy is green from FM1V-30 on.
+- This plan adds Rust code (`fm1_examples.rs`), so it adds one gate,
+  Verification 7:
+  `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-50/clippy.log 2>&1; echo "exit=$?"`
+  must print `exit=0`.
 
 ## Session 352 Revision (read first)
 
@@ -199,6 +208,8 @@ Apply `gain` so the peak stays at or below 1.0.
 6. Full nextest under the measurement lock (the same `bash -c` lock wrapper
    as FM1V-30 Verification 4, owner `FM1V-50`, log
    `tmp/fm1-voices/FM1V-50/full.log`) must print `exit=0` with 0 failed.
+7. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-50/clippy.log 2>&1; echo "exit=$?"`
+   must print `exit=0` (session 353).
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
@@ -211,7 +222,7 @@ Never commit, stash, checkout, reset or push.
 
 - [ ] Five examples are added; each is formatted and renders audibly and
       within bounds.
-- [ ] Verification 1-6 pass and are recorded.
+- [ ] Verification 1-7 pass and are recorded.
 
 ## Progress Log
 

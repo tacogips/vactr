@@ -1,12 +1,39 @@
 # FM1V-30: Register the Six Voice Kernels and Templates
 
-**Status**: In Progress (session 352 redispatch: audit and finish the partial edits)
-**Plan ID**: FM1V-30 (run 2, serial wave 3 of 6; registry plan, before FM1V-40)
+**Status**: In Progress (session 353 redispatch: audit and finish the partial edits, fix clippy)
+**Plan ID**: FM1V-30 (run 3, serial wave 3 of 6; registry plan, before FM1V-40)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Templates", "Registration and digest stability", "Implementation partition", "Verification" -> Voice kernels/E2e)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 352)
+**Last Updated**: 2026-10-10 (session 353)
 
-## Session 352 Redispatch (read first)
+## Session 353 Redispatch (run 3, read first)
+
+Base is `48d651c`. FM1V-21 and FM1V-20 are accepted before this plan
+starts. The session 352 jobs below still apply in full, with these run 3
+changes:
+
+- **Template slots are already fixed.** Commit `48d651c` set
+  `template_slots: 102` (`src/dsp/ring.rs:811`, comment already says 79
+  prelude + 2 live-input + 4 quad-stem) and `SONG_TEMPLATE_SLOTS = 134`
+  (`src/host/song_profile.rs:12`). Do not change either value or the
+  comment. Wherever this plan says "the value stays 96" or "fix the stale
+  comment", read it as "the value stays 102 and the comment is already
+  correct; verify only".
+- **Fix strict clippy in `src/host/tests/e2e/templates/fm1_voices.rs`** and
+  in any other writePath that has diagnostics. Fix the cause. Do not
+  weaken an assertion, and do not add a blanket `#[allow]`. After FM1V-20,
+  these should be the last WIP warnings in the tree. So this plan is the
+  first where strict `cargo clippy --all-targets -- -D warnings` must exit
+  0 (Verification 5).
+- **Slot regression check.** Verification 4a (below) runs
+  `tests/song_bus_memory_layout.rs` and `tests/song_host_profile.rs`. Both
+  must pass with unchanged expectations (4/4 for `song_bus_memory_layout`).
+  These files are read-only for this plan. If they fail, the template
+  count drifted from 79. Fix the registry, not the test.
+- Logs for this attempt go under `tmp/fm1-voices/FM1V-30/attempt-02/`.
+  Save `status-before.txt` and `hashes-before.txt` fresh there.
+
+## Session 352 Redispatch (historical; steps 1-6 still apply)
 
 The previous attempt timed out. Its partial, unreviewed edits are committed
 at `25d3e80`. A quick inventory, which you must verify and not trust:
@@ -104,8 +131,9 @@ tag.
   to FM1V-40.
 - No examples or docs (FM1V-50/51).
 - No `controls.rs` rows.
-- No change to `template_slots`. 79 + 2 + 4 = 85, or 87 with the
-  stage-linked example, is below 96. Only fix the stale comment.
+- No change to `template_slots` (102) or `SONG_TEMPLATE_SLOTS` (134). Both
+  were set in `48d651c`, so the free-slot headroom from before the six
+  voices is kept. 79 + 2 + 4 = 85, or 87 with the stage-linked example.
 
 ## Dependencies
 
@@ -199,8 +227,9 @@ None. This plan is the only owner of these files in its wave.
 
 - `commit.rs`: add `| UGenSpec::TonewheelCore | UGenSpec::HurdyGurdyCore` to
   the `wants_tempo_anchor` `matches!`. This is the only edit in this file.
-- `ring.rs`: correct the `template_slots` comment to say 79 prelude, 2
-  live-input and 4 quad-stem definitions. The value stays 96.
+- `ring.rs`: verify only. The `template_slots` comment already says 79
+  prelude, 2 live-input and 4 quad-stem definitions, and the value is 102
+  (`48d651c`). Do not edit.
 
 **Metadata:**
 
@@ -381,8 +410,14 @@ moved.
    It must print `exit=0` with 0 failed. No other plan is in flight. A
    failure outside writePaths is a real defect: record it with the log
    path and set the plan Blocked. Do not edit other plans' files.
-5. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` must
-   exit 0.
+4a. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_bus_memory_layout --test song_host_profile > tmp/fm1-voices/FM1V-30/attempt-02/slots.log 2>&1; echo "exit=$?"`
+   must print `exit=0`. `song_bus_memory_layout` must show 4 run and 4
+   passed. Also `grep -n 'template_slots: 102' src/dsp/ring.rs` and
+   `grep -n 'SONG_TEMPLATE_SLOTS: usize = 134' src/host/song_profile.rs`
+   must each print one line.
+5. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-30/attempt-02/clippy.log 2>&1; echo "exit=$?"`
+   must print `exit=0`. This is the first plan where strict clippy is
+   gating (session 353).
 6. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
    must exit 0.
 7. `wc -l` of `catalog.rs`, `voice_ports.rs`, `codec.rs`, `names/table.rs`,
@@ -409,7 +444,10 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
       and audible.
 - [ ] Against `9ac8d1f`: 18 golden lines added and 0 removed; 0 removed
       lines in `templates.vact` and `codec.rs`; tag 105 unused.
-- [ ] Verification 1-8 (and 2a) pass and are recorded.
+- [ ] Clippy diagnostics in `fm1_voices.rs` and the other writePaths are
+      fixed; strict clippy exits 0.
+- [ ] Verification 1-8 (and 2a, 4a) pass on base `48d651c` and are recorded
+      under `tmp/fm1-voices/FM1V-30/attempt-02/` (session 353).
 
 ## Progress Log
 

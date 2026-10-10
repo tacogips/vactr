@@ -1,12 +1,39 @@
 # FM1V-20: Six-Operator FM Engine and `fm-mod` Algorithm Mode Kernel
 
-**Status**: In Progress (session 352 redispatch: verification and test integrity)
-**Plan ID**: FM1V-20 (run 2, serial wave 2 of 6)
+**Status**: In Progress (session 353 redispatch: canonical filter, clippy, reviews)
+**Plan ID**: FM1V-20 (run 3, serial wave 2 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility", "Macro patch", "Algorithm topologies" including "Algorithms 4 and 6", "Operator, EG and scaling behaviour" numeric rules, "`fm6-core` UGen")
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 352)
+**Last Updated**: 2026-10-10 (session 353)
 
-## Session 352 Redispatch (read first)
+## Session 353 Redispatch (run 3, read first)
+
+Base is `48d651c`. FM1V-21 is accepted before this plan starts, so the
+`fm6_sysex` fixture that turned the canonical filter red is fixed (it
+passed 50/50 in `tmp/fm1-voices/FM1V-21/attempt-01/nextest-fm-filter.log`).
+Do the four session 352 jobs below unchanged, plus this clippy job:
+
+5. **Fix this plan's strict-clippy warnings.** They are known to be in
+   `src/dsp/ugen/fm/engine.rs` and `src/dsp/tests/dsp/fm6_engine.rs`.
+   - Fix the cause. Do not add `#[allow(...)]` to silence a lint unless the
+     lint is a false positive. If you do, give the reason in a one-line
+     comment and the Progress Log. `clippy::too_many_arguments` on an
+     internal render helper may be solved with a small parameter struct.
+   - Do not change rendered output. Run the canonical filter again after
+     the fixes. Fixing a warning must not reduce what a test asserts.
+   - `engine.rs` must stay below 400 lines. Use the existing
+     `engine/setup.rs` split rule if needed.
+   - Do not fix `src/host/tests/e2e/templates/fm1_voices.rs`. FM1V-30 owns
+     it and fixes it next.
+
+Algorithms 4 and 6 are settled by the accepted design and are no longer an
+open risk. Keep the delayed-history cross-operator edges. This plan only
+proves the comment and the live-edge assertion exist (job 2).
+
+Logs for this attempt go under `tmp/fm1-voices/FM1V-20/attempt-03/`.
+`status-before.txt` is taken fresh into that directory.
+
+## Session 352 Redispatch (historical; jobs 1-4 still apply)
 
 The engine is already in the tree at `25d3e80`. Its 11 module tests passed.
 The canonical filter was red only because of FM1V-21's fixture, which
@@ -321,8 +348,16 @@ Keep `fm6_ports_contract`. Add:
    as FM1V-21 Verification 7, owner `FM1V-20`, log
    `tmp/fm1-voices/FM1V-20/full.log`) must print `exit=0` with 0 failed. It
    follows the same rule for later-plan-owned failures as FM1V-21.
-8. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-20/clippy.log 2>&1; echo "exit=$?"`
-   must print `exit=0`.
+8. Clippy (revised in session 353):
+   `CARGO_TERM_QUIET=true cargo clippy --all-targets > tmp/fm1-voices/FM1V-20/attempt-03/clippy-scan.log 2>&1; echo "exit=$?"`
+   must print `exit=0`. Without `-D warnings`, every target is linted. Then
+   `test "$(grep -c -E -- '--> src/dsp/(ugen/fm\.rs|ugen/fm/engine\.rs|ugen/fm/engine/setup\.rs|tests/dsp/fm6_engine\.rs):' tmp/fm1-voices/FM1V-20/attempt-03/clippy-scan.log)" = 0`
+   must exit 0. List any remaining diagnostic location in the Progress Log.
+   Every one must be in an FM1V-30 writePath, such as
+   `src/host/tests/e2e/templates/fm1_voices.rs`. If a remaining warning
+   is in neither plan's paths, record it as a real defect with the log path.
+   The strict `cargo clippy --all-targets -- -D warnings` exit 0 is
+   required from FM1V-30 on, once the last WIP warning owner has run.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
@@ -341,8 +376,11 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
       0 and 7.
 - [ ] The test-integrity audit is recorded per test. Mutation evidence is
       recorded separately, with the files restored (hash match).
-- [ ] Verification 1-8 pass and are recorded.
-      Static checks 1, 3 and 4 passed. The canonical focused filter ran with
+- [ ] This plan's clippy warnings are fixed (Verification 8 scan shows 0
+      diagnostics in this plan's files) without changing rendered output.
+- [ ] Verification 1-8 pass on base `48d651c` and are recorded under
+      `tmp/fm1-voices/FM1V-20/attempt-03/` (session 353).
+      Session 352 note: static checks 1, 3 and 4 passed. The canonical focused filter ran with
       an isolated declared target directory and completed 50 tests (49
       passed, 1 failed). The only failure is the FM1V-21
       `fm6_sysex_native_returns_bulk_voices` test, whose fixture uses invalid

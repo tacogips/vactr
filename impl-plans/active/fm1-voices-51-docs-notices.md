@@ -1,10 +1,21 @@
 # FM1V-51: Documentation, Language Reference and msfa Third-Party Notice
 
 **Status**: Ready
-**Plan ID**: FM1V-51 (run 2, serial wave 6 of 6)
+**Plan ID**: FM1V-51 (run 3, serial wave 6 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("License boundary", "Algorithm topologies" -> "Algorithms 4 and 6", "SysEx import" -> Usage, "Presets and examples" -> Documentation, "References")
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 352)
+**Last Updated**: 2026-10-10 (session 353)
+
+## Session 353 Note (run 3)
+
+- Base is `48d651c`. FM1V-50 is accepted before this plan starts.
+- This plan edits documents only. The editor and wasm integration gates
+  (`mise run build-wasm-release`, `npm run check`, `npm run test`,
+  `VACTR_REQUIRE_SESSION_ABI=1 npm run build`, `npm run test:style`,
+  `mise run fmt-vact-check`) and moving accepted plans to
+  `impl-plans/completed/` are done by the workflow's serial final
+  integration after this plan (dispatch manifest
+  `executionModel.finalIntegration`). They are not done here.
 
 ## Session 352 Revision (read first)
 

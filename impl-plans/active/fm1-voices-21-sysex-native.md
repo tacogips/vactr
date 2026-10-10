@@ -1,12 +1,48 @@
 # FM1V-21: `fm6-sysex` Native and `SourceLoader::read_bytes`
 
-**Status**: In Progress (session 352 redispatch: fixture repair and verification)
-**Plan ID**: FM1V-21 (run 2, serial wave 1 of 6)
+**Status**: In Progress (session 353 redispatch: full-gate rerun and reviews only)
+**Plan ID**: FM1V-21 (run 3, serial wave 1 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import" -> "Native", "Usage"; user question FV6)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 352)
+**Last Updated**: 2026-10-10 (session 353)
 
-## Session 352 Redispatch (read first)
+## Session 353 Redispatch (run 3, read first)
+
+Base is now `48d651c`. The session 352 attempt already audited the source,
+repaired the fixture and passed Verification 1-6 (logs under
+`tmp/fm1-voices/FM1V-21/attempt-01/`). Only Verification 7 failed, on two
+tests in `tests/song_bus_memory_layout.rs` that are outside this plan. The
+owner fixed that root cause in `48d651c`: six new templates used six fixed
+slots, so `template_slots` went 96 -> 102 (`src/dsp/ring.rs:811`) and
+`SONG_TEMPLATE_SLOTS` 128 -> 134 (`src/host/song_profile.rs:12`).
+
+Jobs, in order (logs under `tmp/fm1-voices/FM1V-21/attempt-02/`):
+
+1. Save `git status --porcelain=v1` to `attempt-02/status-before.txt`.
+2. Do not edit source unless a gate below fails inside writePaths. Do not
+   touch `ring.rs`, `song_profile.rs` or `tests/song_bus_memory_layout.rs`.
+3. Rerun Verification 1-6 into `attempt-02/` (cheap, proves nothing
+   drifted), then Verification 7 (full nextest under the lock) and
+   Verification 8 (clippy scan, below).
+4. Record every result in the Progress Log in the
+   `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`
+   format. A full run that was cancelled after a failure is not a pass, and
+   cancelled tests are not counted as passed.
+
+Clippy ownership in run 3. Strict `-D warnings` clippy is known to fail
+on WIP warnings in FM1V-20 files (`src/dsp/ugen/fm/engine.rs`,
+`src/dsp/tests/dsp/fm6_engine.rs`) and an FM1V-30 file
+(`src/host/tests/e2e/templates/fm1_voices.rs`). This plan must not fix
+them; their owners do. This plan only proves that it adds no diagnostics
+of its own (Verification 8). Strict `-D warnings` exit 0 is first required
+at FM1V-30 and in every plan after it.
+
+If Verification 7 fails in a test owned by FM1V-20 or FM1V-30 that cannot
+be fixed inside this plan's writePaths, follow the rule in Verification 7
+and record the test name and log path. Never loosen, skip or re-bless a
+test.
+
+## Session 352 Redispatch (historical)
 
 The source for this plan is already in the tree at `25d3e80` and is
 unreviewed. Do not rewrite it. This redispatch has three jobs:
@@ -254,6 +290,14 @@ and `read_bytes`, serving bytes from FM1V-12's `encode_single`/`encode_bulk`.
      writePaths.
    - The reviewer then decides acceptance with that evidence. Never loosen
      or skip a test to pass.
+8. Clippy scan (session 353). Run
+   `CARGO_TERM_QUIET=true cargo clippy --all-targets > tmp/fm1-voices/FM1V-21/attempt-02/clippy-scan.log 2>&1; echo "exit=$?"`.
+   It must print `exit=0`. Without `-D warnings`, warnings do not stop the
+   build, so every target is linted. Then
+   `test "$(grep -c -E -- '--> src/(ns/fm6_sysex|ns/load|ns/mod|ns/tests/mod|ns/tests/fm6_sysex|types/natives|host/native/loader|session/session|vm/tests/native_table)\.rs:' tmp/fm1-voices/FM1V-21/attempt-02/clippy-scan.log)" = 0`
+   must exit 0. That proves there are no clippy diagnostics in this plan's
+   files. List any other diagnostic locations in the Progress Log as owned
+   by FM1V-20 or FM1V-30.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
@@ -272,7 +316,8 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
       deviations are fixed.
 - [x] The fixture at `src/ns/tests/fm6_sysex.rs:92-93` is rewritten with
       `{}` and `>` forms (Verification 5 prints 0).
-- [ ] Verification 1-7 pass and are recorded.
+- [ ] Verification 1-8 pass on base `48d651c` and are recorded under
+      `tmp/fm1-voices/FM1V-21/attempt-02/` (session 353).
 
 ## Progress Log
 

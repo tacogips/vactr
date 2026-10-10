@@ -808,7 +808,8 @@ are stale.
 | Highest codec tag | 104 (`BassCore`) | `fm6-core` 105, `kalimba-core` 106, `tonewheel-core` 107, `hurdy-gurdy-core` 108, `vosim-core` 109, `gendyn-core` 110, `scanned-core` 111. Existing tags are never renumbered. |
 | `UGEN_NAMES` (`catalog.rs`) | 98 | 105, appended at the end |
 | `TEMPLATE_NAMES` (`catalog.rs` and `src/ns/insts.rs`, `[&str; 73]`) | 73 | 79, appended after `reese-bass` |
-| `template_slots` (`src/dsp/ring.rs:810`) | 102 | Raised from 96 to preserve the previous local-song headroom after six FM1 voices were added to the prelude. 79 prelude + 2 live-input + 4 quad-stem = 85, or 87 with the stage-linked example. |
+| `template_slots` (`src/dsp/ring.rs:811`) | 102 | Raised from 96 to preserve the previous local-song headroom after six FM1 voices were added to the prelude. 79 prelude + 2 live-input + 4 quad-stem = 85, or 87 with the stage-linked example. |
+| `SONG_TEMPLATE_SLOTS` (`src/host/song_profile.rs:12`) | 134 | Raised from 128 by the same six slots (commit 48d651c), so `tests/song_bus_memory_layout.rs` keeps its free-slot expectations (4/4). Any later template addition needs the same adjustment in both constants. |
 | Control rows | last id 161 | No new rows. Row 21's default and range change (see Part 1). |
 | Custom header ids | first-use order from 192 | New names are first used only by the appended templates, so no existing id shifts |
 

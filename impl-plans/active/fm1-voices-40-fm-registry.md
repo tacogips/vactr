@@ -1,10 +1,24 @@
 # FM1V-40: Wire `fm-mod` Algorithm Mode and Register `fm6-core` With Patch Payload
 
 **Status**: Ready
-**Plan ID**: FM1V-40 (run 2, serial wave 4 of 6; registry plan, after FM1V-30)
+**Plan ID**: FM1V-40 (run 3, serial wave 4 of 6; registry plan, after FM1V-30)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility (chosen mechanism)", "`fm6-core` UGen", "SysEx import" usage, "Registration and digest stability", "Implementation partition", "Verification" -> `fm` template and Native)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10 (session 352)
+**Last Updated**: 2026-10-10 (session 353)
+
+## Session 353 Note (run 3)
+
+- Base is `48d651c`. FM1V-21, FM1V-20 and FM1V-30 are accepted before this
+  plan starts, so strict clippy is already green. Verification 6 must keep
+  it at exit 0.
+- `fm6-core` gets no prelude template (FV7), so the template count stays
+  79. Do not touch `template_slots` (102, `src/dsp/ring.rs:811`) or
+  `SONG_TEMPLATE_SLOTS` (134, `src/host/song_profile.rs:12`). The full
+  nextest run includes `tests/song_bus_memory_layout.rs`, which must stay
+  4/4.
+- Algorithms 4 and 6 are settled by the design (delayed-history
+  cross-operator edge). The `fm` algorithm mode inherits that behaviour from
+  the FM1V-20 engine. Do not change it here.
 
 ## Session 352 Revision (read first)
 

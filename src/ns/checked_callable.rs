@@ -435,9 +435,21 @@ impl WalkState<'_> {
             | PatNode::Striate(p, x)
             | PatNode::LoopAt(p, x)
             | PatNode::Arp(p, x)
+            | PatNode::Harp {
+                subject: p, pos: x, ..
+            }
+            | PatNode::Inversion {
+                subject: p, n: x, ..
+            }
             | PatNode::Segment(p, x) => {
                 self.pattern(c, p)?;
                 self.param(c, x)?;
+            }
+            PatNode::Strum(p, time, dir, curve) => {
+                self.pattern(c, p)?;
+                self.param(c, time)?;
+                self.param(c, dir)?;
+                self.param(c, curve)?;
             }
             PatNode::Rev(p)
             | PatNode::Fit(p)
@@ -477,7 +489,14 @@ impl WalkState<'_> {
                 self.cuts(c, cuts)?;
                 self.pattern(c, index)?;
             }
-            PatNode::Grid(a, b) | PatNode::Control(_, a, b) | PatNode::Chord(a, b) => {
+            PatNode::Grid(a, b)
+            | PatNode::Control(_, a, b)
+            | PatNode::Chord(a, b)
+            | PatNode::Tune {
+                tunings: a,
+                subject: b,
+                ..
+            } => {
                 self.pattern(c, a)?;
                 self.pattern(c, b)?;
             }

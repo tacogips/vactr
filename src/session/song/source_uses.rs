@@ -84,6 +84,7 @@ impl Builder<'_> {
             PatNode::Maybe(p, _) => Some((p.as_ref(), O::Maybe, M::Preserve)),
             PatNode::ScaleNotes(_, _, p) => Some((p.as_ref(), O::ScaleNotes, M::Preserve)),
             PatNode::Voicing(p) => Some((p.as_ref(), O::Voicing, M::Preserve)),
+            PatNode::Inversion { subject: p, .. } => Some((p.as_ref(), O::Inversion, M::Preserve)),
             PatNode::Fit(p) => Some((p.as_ref(), O::Fit, M::Preserve)),
             _ => None,
         };
@@ -316,9 +317,20 @@ impl Builder<'_> {
             PatNode::Iter(_, n) => count(n).map_or(M::Uncertifiable(R::DynamicCount), |count| {
                 M::Iterate { count }
             }),
-            PatNode::Range(..) | PatNode::LoopAt(..) | PatNode::Arp(..) => M::Preserve,
+            PatNode::Range(..)
+            | PatNode::LoopAt(..)
+            | PatNode::Arp(..)
+            | PatNode::Strum(..)
+            | PatNode::Harp { .. }
+            | PatNode::Inversion { .. } => M::Preserve,
             PatNode::Euclid(_, k, n, r) => static_sampling(k, n, r)?,
-            PatNode::Control(_, value, content) | PatNode::Chord(value, content) => {
+            PatNode::Control(_, value, content)
+            | PatNode::Chord(value, content)
+            | PatNode::Tune {
+                tunings: value,
+                subject: content,
+                ..
+            } => {
                 if crate::pattern::combinators::control::gives_structure(content, value) {
                     M::Restructure {
                         timing: 0,
@@ -475,6 +487,10 @@ fn operation(node: &PatNode) -> O {
         PatNode::Segment(..) => O::Segment,
         PatNode::Range(..) => O::Range,
         PatNode::MidiNotes { .. } => O::MidiNotes,
+        PatNode::Tune { .. } => O::Tune,
+        PatNode::Strum(..) => O::Strum,
+        PatNode::Harp { .. } => O::Harp,
+        PatNode::Inversion { .. } => O::Inversion,
     }
 }
 

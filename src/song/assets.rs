@@ -715,9 +715,25 @@ impl DependencyWalk {
             | PatNode::Striate(child, param)
             | PatNode::LoopAt(child, param)
             | PatNode::Arp(child, param)
+            | PatNode::Harp {
+                subject: child,
+                pos: param,
+                ..
+            }
+            | PatNode::Inversion {
+                subject: child,
+                n: param,
+                ..
+            }
             | PatNode::Segment(child, param) => {
                 self.pat(child, depth + 1)?;
                 self.param(param, depth + 1, false)
+            }
+            PatNode::Strum(child, time, dir, curve) => {
+                self.pat(child, depth + 1)?;
+                self.param(time, depth + 1, false)?;
+                self.param(dir, depth + 1, false)?;
+                self.param(curve, depth + 1, false)
             }
             _ => self.pat_inner(pat, depth),
         }
@@ -766,7 +782,16 @@ impl DependencyWalk {
             | PatNode::Fit(p)
             | PatNode::Voicing(p)
             | PatNode::ScaleNotes(_, _, p)
-            | PatNode::MidiNotes { subject: p, .. } => self.pat(p, depth + 1)?,
+            | PatNode::MidiNotes { subject: p, .. }
+            | PatNode::Harp { subject: p, .. }
+            | PatNode::Inversion { subject: p, .. }
+            | PatNode::Strum(p, _, _, _) => self.pat(p, depth + 1)?,
+            PatNode::Tune {
+                tunings, subject, ..
+            } => {
+                self.pat(tunings, depth + 1)?;
+                self.pat(subject, depth + 1)?;
+            }
             PatNode::Every(a, v, p) | PatNode::SometimesBy(a, v, p) => {
                 self.param(a, depth + 1, false)?;
                 self.value(v, depth + 1)?;

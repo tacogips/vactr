@@ -3,16 +3,17 @@
 //! Note numbers are MIDI-style: `12 * octave + pitch class`, and a note name
 //! without an octave is in octave 5, so `:c` is 60 and `:e2` is 28.
 
-use crate::pattern::combinators::control::query_child;
+use crate::pattern::combinators::control::{pair_up, query_child};
 use std::rc::Rc;
 
-use crate::pattern::combinators::control::query_mapped;
 use crate::pattern::combinators::{count, event_fault, kw, op, split_event};
 use crate::pattern::eval::{eval_param, exact_value, int_of, num_f64, num_ratio, QState};
 use crate::pattern::occ::ProducerKind;
 use crate::pattern::pat::{PParam, Pat, PatNode};
 use crate::pattern::query::{Event, TimeSpan};
+use crate::pattern::tuning::{scale_preset, Tuning};
 use crate::reader::span::Span;
+use crate::value::eq::deep_eq;
 use crate::value::intern::{name_of_kw, KwId};
 use crate::value::ratio::Ratio64;
 use crate::value::value::Value;
@@ -133,7 +134,8 @@ pub fn scale(p: Rc<Pat>, root: KwId, name: KwId, span: Option<Span>) -> Result<P
     if note_number(&name_of_kw(root)).is_none() {
         return Err(type_err("unknown scale root"));
     }
-    if scale_steps(&name_of_kw(name)).is_none() {
+    let scale_name = name_of_kw(name);
+    if scale_steps(&scale_name).is_none() && scale_preset(&scale_name).is_none() {
         return Err(type_err(format!("unknown scale :{}", name_of_kw(name))));
     }
     let s = p.structured;
@@ -187,6 +189,20 @@ pub fn scale_note(root: KwId, name: KwId, degree: i64) -> Result<i64, Failure> {
 /// Applies a scale to one event: `n` sets `note`, a numeric value becomes
 /// the note number.
 pub(crate) fn scale_event(e: &mut Event, root: KwId, name: KwId) -> Result<(), Failure> {
+    let scale_name = name_of_kw(name);
+    let Some(legacy_steps) = scale_steps(&scale_name) else {
+        let preset = scale_preset(&scale_name)
+            .ok_or_else(|| type_err(format!("unknown scale :{scale_name}")))?;
+        return scale_event_tuned(e, root, preset.steps, preset.size, preset.period);
+    };
+    match event_tuning(e) {
+        None => scale_event_legacy(e, root, name),
+        Some(Err(f)) => Err(f),
+        Some(Ok(_)) => scale_event_tuned(e, root, legacy_steps, 12, (2, 1)),
+    }
+}
+
+fn scale_event_legacy(e: &mut Event, root: KwId, name: KwId) -> Result<(), Failure> {
     let nk = kw("n");
     if let Some(n) = e.controls.get(&nk) {
         let deg = int_of(n).ok_or_else(|| type_err("a scale degree must be an integer"))?;
@@ -194,6 +210,68 @@ pub(crate) fn scale_event(e: &mut Event, root: KwId, name: KwId) -> Result<(), F
         e.controls.insert(kw("note"), note_value(note));
     } else if let Some(deg) = int_of(&e.value) {
         e.value = note_value(scale_note(root, name, deg)?);
+    }
+    Ok(())
+}
+
+fn event_tuning(e: &Event) -> Option<Result<Tuning, Failure>> {
+    e.controls.get(&kw("tuning")).and_then(Tuning::from_control)
+}
+
+fn scale_event_tuned(
+    e: &mut Event,
+    root: KwId,
+    steps: &[i64],
+    size: i64,
+    period: (i64, i64),
+) -> Result<(), Failure> {
+    let existing = event_tuning(e);
+    let tuning = match existing {
+        Some(Ok(tuning)) => tuning,
+        Some(Err(f)) => return Err(f),
+        None => {
+            let (numerator, denominator) = period;
+            let period = Ratio64::new(numerator, denominator)
+                .map_err(|_| type_err("invalid scale preset period"))?;
+            let tuning = Tuning::edo(size, period)?;
+            e.controls
+                .entry(kw("tuning"))
+                .or_insert_with(|| tuning.to_control());
+            tuning
+        }
+    };
+    let root_key = tuning
+        .note_key(&name_of_kw(root))?
+        .ok_or_else(|| type_err("unknown scale root"))?;
+    let degree = if let Some(n) = e.controls.get(&kw("n")) {
+        Some(int_of(n).ok_or_else(|| type_err("a scale degree must be an integer"))?)
+    } else {
+        int_of(&e.value)
+    };
+    let Some(degree) = degree else {
+        return Ok(());
+    };
+    let len = i64::try_from(steps.len()).map_err(|_| type_err("empty scale"))?;
+    let octave = degree.div_euclid(len);
+    let index = usize::try_from(degree.rem_euclid(len))
+        .map_err(|_| type_err("scale degree out of range"))?;
+    let key = if tuning.keys_per_period() == size {
+        octave
+            .checked_mul(size)
+            .and_then(|offset| root_key.checked_add(offset))
+            .and_then(|key| key.checked_add(steps[index]))
+            .ok_or_else(|| Failure::new(FailCode::Overflow, "scale degree out of range"))?
+    } else {
+        let scale_cents = 1200.0 * (period.0 as f64 / period.1 as f64).log2();
+        let cents = octave as f64 * scale_cents + steps[index] as f64 * scale_cents / size as f64;
+        root_key
+            .checked_add(tuning.nearest(root_key, cents)?)
+            .ok_or_else(|| Failure::new(FailCode::Overflow, "scale degree out of range"))?
+    };
+    if e.controls.contains_key(&kw("n")) {
+        e.controls.insert(kw("note"), note_value(key));
+    } else {
+        e.value = note_value(key);
     }
     Ok(())
 }
@@ -223,9 +301,65 @@ pub(crate) fn query_chord(
     span: TimeSpan,
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
-    query_mapped(kw("note"), chords, subject, p, span, st, |v| {
-        Ok(int_list(&chord_notes(v)?))
-    })
+    let note = kw("note");
+    let pairs = pair_up(chords, subject, p, span, st);
+    let mut out = Vec::with_capacity(pairs.len());
+    for (mut e, chord, late) in pairs {
+        let mapped = match event_tuning(&e) {
+            Some(Ok(tuning)) => chord_notes_tuned(&chord, &tuning).map(|tones| int_list(&tones)),
+            Some(Err(f)) => Err(f),
+            None => chord_notes(&chord).map(|tones| int_list(&tones)),
+        };
+        match mapped {
+            Ok(mapped) => {
+                match late {
+                    Some(cell) if deep_eq(&mapped, &chord).unwrap_or(false) => {
+                        e.cells.insert(note, cell);
+                    }
+                    _ => {
+                        e.cells.remove(&note);
+                    }
+                }
+                e.controls.insert(note, mapped);
+                out.push(e);
+            }
+            Err(f) => event_fault(st, &e, p, f),
+        }
+    }
+    out
+}
+
+fn chord_notes_tuned(value: &Value, tuning: &Tuning) -> Result<Vec<i64>, Failure> {
+    let Value::List(list) = value else {
+        return Err(type_err("a chord is [root quality]"));
+    };
+    let [root, quality] = &*list.items else {
+        return Err(type_err("a chord is [root quality]"));
+    };
+    let root = match root {
+        Value::Keyword(name) => tuning
+            .note_key(&name_of_kw(*name))?
+            .ok_or_else(|| type_err("unknown chord root"))?,
+        value => int_of(value).ok_or_else(|| type_err("unknown chord root"))?,
+    };
+    let Value::Keyword(quality) = quality else {
+        return Err(type_err("a chord quality is a keyword"));
+    };
+    let quality = name_of_kw(*quality);
+    let intervals = crate::types::chords::chord_intervals(&quality)
+        .ok_or_else(|| type_err(format!("unknown chord quality :{quality}")))?;
+    intervals
+        .iter()
+        .map(|interval| {
+            let offset = if tuning.keys_per_period() == 12 {
+                *interval
+            } else {
+                tuning.nearest(root, 100.0 * *interval as f64)?
+            };
+            root.checked_add(offset)
+                .ok_or_else(|| Failure::new(FailCode::Overflow, "chord root out of range"))
+        })
+        .collect()
 }
 
 /// Close position: the first tone in `[60, 72)`, each next tone the lowest
@@ -265,22 +399,81 @@ pub(crate) fn query_voicing(
 ) -> Vec<Event> {
     let mut out = Vec::new();
     for mut e in query_child(inner, span, 0, st) {
-        match notes_of(&e) {
-            Some(notes) => {
-                e.controls.insert(kw("note"), int_list(&voice(&notes)));
-                out.push(e);
-            }
-            None if e
-                .controls
-                .get(&kw("note"))
-                .is_some_and(|v| matches!(v, Value::List(_))) =>
+        match event_tuning(&e) {
+            Some(Err(f)) => event_fault(st, &e, p, f),
+            Some(Ok(tuning)) => match notes_of_tuned(&e, &tuning)
+                .and_then(|notes| notes.map(|notes| voice_tuned(&notes, &tuning)).transpose())
             {
-                event_fault(st, &e, p, type_err("a chord tone must be a note"));
-            }
-            None => out.push(e),
+                Ok(Some(notes)) => {
+                    e.controls.insert(kw("note"), int_list(&notes));
+                    out.push(e);
+                }
+                Ok(None) => out.push(e),
+                Err(f) => event_fault(st, &e, p, f),
+            },
+            None => match notes_of(&e) {
+                Some(notes) => {
+                    e.controls.insert(kw("note"), int_list(&voice(&notes)));
+                    out.push(e);
+                }
+                None if e
+                    .controls
+                    .get(&kw("note"))
+                    .is_some_and(|v| matches!(v, Value::List(_))) =>
+                {
+                    event_fault(st, &e, p, type_err("a chord tone must be a note"));
+                }
+                None => out.push(e),
+            },
         }
     }
     out
+}
+
+fn notes_of_tuned(e: &Event, tuning: &Tuning) -> Result<Option<Vec<i64>>, Failure> {
+    let Some(Value::List(list)) = e.controls.get(&kw("note")) else {
+        return Ok(None);
+    };
+    list.items
+        .iter()
+        .map(|value| match value {
+            Value::Keyword(name) => tuning
+                .note_key(&name_of_kw(*name))?
+                .ok_or_else(|| type_err("a chord tone must be a note")),
+            other => int_of(other).ok_or_else(|| type_err("a chord tone must be a note")),
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
+}
+
+fn voice_tuned(notes: &[i64], tuning: &Tuning) -> Result<Vec<i64>, Failure> {
+    let root = tuning.root();
+    let period = tuning.keys_per_period();
+    let mut out: Vec<i64> = Vec::with_capacity(notes.len());
+    for note in notes {
+        let pc = note
+            .checked_sub(root)
+            .ok_or_else(|| Failure::new(FailCode::Overflow, "chord tone out of range"))?
+            .rem_euclid(period);
+        let mut key = root
+            .checked_add(pc)
+            .ok_or_else(|| Failure::new(FailCode::Overflow, "chord tone out of range"))?;
+        if let Some(previous) = out.last() {
+            if key <= *previous {
+                let periods = previous
+                    .checked_sub(key)
+                    .and_then(|delta| delta.checked_div_euclid(period))
+                    .and_then(|delta| delta.checked_add(1))
+                    .ok_or_else(|| Failure::new(FailCode::Overflow, "chord tone out of range"))?;
+                key = periods
+                    .checked_mul(period)
+                    .and_then(|offset| key.checked_add(offset))
+                    .ok_or_else(|| Failure::new(FailCode::Overflow, "chord tone out of range"))?;
+            }
+        }
+        out.push(key);
+    }
+    Ok(out)
 }
 
 /// The arpeggio order of a chord.
@@ -440,3 +633,6 @@ fn rewrite_chords(p: &Rc<Pat>, depth: u32) -> Rc<Pat> {
         _ => Rc::clone(p),
     }
 }
+
+#[cfg(test)]
+mod tuning_tests;

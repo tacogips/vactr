@@ -7,7 +7,7 @@ use super::{rd, spec_blocks, DESIGN_MUSIC, LANG_REFERENCE};
 fn every_line_prefix_of_every_block_reads() {
     let mut blocks = spec_blocks(LANG_REFERENCE);
     blocks.extend(spec_blocks(DESIGN_MUSIC));
-    assert_eq!(blocks.len(), 11);
+    assert_eq!(blocks.len(), 13);
     for block in &blocks {
         let mut end = 0;
         while let Some(k) = block[end..].find('\n') {

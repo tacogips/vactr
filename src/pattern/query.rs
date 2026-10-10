@@ -345,6 +345,23 @@ fn dispatch(p: &Pat, span: TimeSpan, st: &mut QState<'_, '_>) -> Vec<Event> {
         PatNode::Arp(inner, mode) => music::query_arp(inner, mode, p, span, st),
         PatNode::Range(inner, lo, hi) => music::query_range(inner, lo, hi, p, span, st),
         PatNode::MidiNotes { .. } => input::query_midi_notes(),
+        PatNode::Tune {
+            tunings,
+            subject,
+            mapping,
+        } => super::combinators::tune::query_tune(tunings, subject, *mapping, p, span, st),
+        PatNode::Strum(inner, time, dir, curve) => {
+            super::combinators::strum::query_strum(inner, time, dir, curve, p, span, st)
+        }
+        PatNode::Harp {
+            subject,
+            pos,
+            strips,
+            base,
+        } => super::combinators::strum::query_harp(subject, pos, *strips, *base, p, span, st),
+        PatNode::Inversion { subject, n, bass } => {
+            super::combinators::strum::query_inversion(subject, n, *bass, p, span, st)
+        }
     }
 }
 

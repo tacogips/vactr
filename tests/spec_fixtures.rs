@@ -91,9 +91,9 @@ fn case_file(case: &Table) -> FileId {
 }
 
 #[test]
-fn manifest_has_eleven_blocks() {
+fn manifest_has_thirteen_blocks() {
     let m = manifest();
-    assert_eq!(m.blocks.len(), 11);
+    assert_eq!(m.blocks.len(), 13);
     assert!(!m.cases.is_empty());
 }
 

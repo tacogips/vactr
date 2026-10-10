@@ -294,6 +294,8 @@ fn dependencies<'a, 'c: 'a>(
         | Striate(_, k)
         | LoopAt(_, k)
         | Arp(_, k)
+        | Harp { pos: k, .. }
+        | Inversion { n: k, .. }
         | Segment(_, k)
         | Hold(_, k)
         | Repeat(_, k)
@@ -304,6 +306,11 @@ fn dependencies<'a, 'c: 'a>(
         Range(_, a, b) | WhenMod(a, b, _, _) => {
             parameter(a)?;
             parameter(b)?;
+        }
+        Strum(_, time, dir, curve) => {
+            parameter(time)?;
+            parameter(dir)?;
+            parameter(curve)?;
         }
         Euclid(_, a, b, c) => {
             parameter(a)?;
@@ -353,6 +360,9 @@ fn dependencies<'a, 'c: 'a>(
         | Striate(p, _)
         | LoopAt(p, _)
         | Arp(p, _)
+        | Strum(p, _, _, _)
+        | Harp { subject: p, .. }
+        | Inversion { subject: p, .. }
         | Segment(p, _)
         | Hold(p, _)
         | Repeat(p, _)
@@ -387,6 +397,11 @@ fn dependencies<'a, 'c: 'a>(
         Grid(p, q)
         | Control(_, p, q)
         | Chord(p, q)
+        | Tune {
+            tunings: p,
+            subject: q,
+            ..
+        }
         | Slice {
             pat: p, index: q, ..
         }
@@ -501,12 +516,24 @@ impl TimingCapture<'_> {
             | Striate(p, k)
             | LoopAt(p, k)
             | Arp(p, k)
+            | Harp {
+                subject: p, pos: k, ..
+            }
+            | Inversion {
+                subject: p, n: k, ..
+            }
             | Segment(p, k) => {
                 self.param(node, k, depth + 1)?;
                 self.unary(node, p, depth)?;
             }
             Hold(p, k) => {
                 self.param(node, k, depth + 1)?;
+                self.unary(node, p, depth)?;
+            }
+            Strum(p, time, dir, curve) => {
+                self.param(node, time, depth + 1)?;
+                self.param(node, dir, depth + 1)?;
+                self.param(node, curve, depth + 1)?;
                 self.unary(node, p, depth)?;
             }
             Repeat(p, n) => {
@@ -562,7 +589,14 @@ impl TimingCapture<'_> {
                 }
                 self.unary(node, p, depth)?;
             }
-            Grid(p, q) | Control(_, p, q) | Chord(p, q) => {
+            Grid(p, q)
+            | Control(_, p, q)
+            | Chord(p, q)
+            | Tune {
+                tunings: p,
+                subject: q,
+                ..
+            } => {
                 let a = self.pat(p, depth + 1, false)?;
                 self.child(node, 0, a, &[exact(ProducerKind::Child, 0)])?;
                 let b = self.pat(q, depth + 1, false)?;

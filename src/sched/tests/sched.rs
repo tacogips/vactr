@@ -18,6 +18,8 @@ mod merge;
 mod output;
 mod rebind;
 mod timestamps;
+mod tuning;
+mod tuning_natives;
 
 use std::rc::Rc;
 use std::sync::Arc;

@@ -229,6 +229,25 @@ impl<'a> Freeze<'a> {
             Striate(_, a) => Striate(child, self.param(a)?),
             LoopAt(_, a) => LoopAt(child, self.param(a)?),
             Arp(_, a) => Arp(child, self.param(a)?),
+            Strum(_, time, dir, curve) => Strum(
+                child,
+                self.param(time)?,
+                self.param(dir)?,
+                self.param(curve)?,
+            ),
+            Harp {
+                pos, strips, base, ..
+            } => Harp {
+                subject: child,
+                pos: self.param(pos)?,
+                strips: *strips,
+                base: *base,
+            },
+            Inversion { n, bass, .. } => Inversion {
+                subject: child,
+                n: self.param(n)?,
+                bass: *bass,
+            },
             Segment(_, a) => Segment(child, self.param(a)?),
             _ => return Err(fail("freeze unary reconstruction invariant")),
         })
@@ -483,10 +502,29 @@ impl<'a> Freeze<'a> {
             | Control(..)
             | Euclid(..)
             | Range(..)
-            | MidiNotes { .. } => self.pat_complex(&pat.node)?,
-            Fast(..) | Slow(..) | Hurry(..) | Rev(..) | Fit(..) | Voicing(..) | ScaleNotes(..)
-            | DegradeBy(..) | Maybe(..) | Hold(..) | Repeat(..) | Iter(..) | Chop(..) | Ply(..)
-            | Striate(..) | LoopAt(..) | Arp(..) | Segment(..) => self.pat_unary(&pat.node)?,
+            | MidiNotes { .. }
+            | Tune { .. } => self.pat_complex(&pat.node)?,
+            Fast(..)
+            | Slow(..)
+            | Hurry(..)
+            | Rev(..)
+            | Fit(..)
+            | Voicing(..)
+            | ScaleNotes(..)
+            | DegradeBy(..)
+            | Maybe(..)
+            | Hold(..)
+            | Repeat(..)
+            | Iter(..)
+            | Chop(..)
+            | Ply(..)
+            | Striate(..)
+            | LoopAt(..)
+            | Arp(..)
+            | Strum(..)
+            | Harp { .. }
+            | Inversion { .. }
+            | Segment(..) => self.pat_unary(&pat.node)?,
         };
         Ok(Pat {
             node,
@@ -548,6 +586,28 @@ impl<'a> Freeze<'a> {
             Striate(p, a) => Striate(self.pattern(p)?, self.param(a)?),
             LoopAt(p, a) => LoopAt(self.pattern(p)?, self.param(a)?),
             Arp(p, a) => Arp(self.pattern(p)?, self.param(a)?),
+            Strum(p, time, dir, curve) => Strum(
+                self.pattern(p)?,
+                self.param(time)?,
+                self.param(dir)?,
+                self.param(curve)?,
+            ),
+            Harp {
+                subject,
+                pos,
+                strips,
+                base,
+            } => Harp {
+                subject: self.pattern(subject)?,
+                pos: self.param(pos)?,
+                strips: *strips,
+                base: *base,
+            },
+            Inversion { subject, n, bass } => Inversion {
+                subject: self.pattern(subject)?,
+                n: self.param(n)?,
+                bass: *bass,
+            },
             Segment(p, a) => Segment(self.pattern(p)?, self.param(a)?),
             _ => return Err(fail("freeze pattern dispatch invariant")),
         })
@@ -580,6 +640,15 @@ impl<'a> Freeze<'a> {
             },
             Grid(p, q) => Grid(self.pattern(p)?, self.pattern(q)?),
             Chord(p, q) => Chord(self.pattern(p)?, self.pattern(q)?),
+            Tune {
+                tunings,
+                subject,
+                mapping,
+            } => Tune {
+                tunings: self.pattern(tunings)?,
+                subject: self.pattern(subject)?,
+                mapping: *mapping,
+            },
             Control(k, p, q) => Control(*k, self.pattern(p)?, self.pattern(q)?),
             Euclid(p, a, b, c) => Euclid(
                 self.pattern(p)?,
@@ -638,6 +707,9 @@ fn unary_child(node: &PatNode) -> Option<&Rc<Pat>> {
         | Striate(p, _)
         | LoopAt(p, _)
         | Arp(p, _)
+        | Strum(p, _, _, _)
+        | Harp { subject: p, .. }
+        | Inversion { subject: p, .. }
         | Segment(p, _) => Some(p),
         _ => None,
     }
@@ -700,10 +772,18 @@ pub(super) fn children(pattern: &Pat) -> Vec<&Pat> {
         | Segment(p, _)
         | Range(p, _, _)
         | Euclid(p, _, _, _)
-        | MidiNotes { subject: p, .. } => vec![p],
+        | MidiNotes { subject: p, .. }
+        | Strum(p, _, _, _)
+        | Harp { subject: p, .. }
+        | Inversion { subject: p, .. } => vec![p],
         Grid(p, q)
         | Control(_, p, q)
         | Chord(p, q)
+        | Tune {
+            tunings: p,
+            subject: q,
+            ..
+        }
         | Slice {
             pat: p, index: q, ..
         }

@@ -100,6 +100,9 @@ fn contains_lane(p: &Pat) -> bool {
         }
         PatNode::Grid(a, b) | PatNode::Chord(a, b) => contains_lane(a) || contains_lane(b),
         PatNode::Control(_, v, s) => contains_lane(v) || contains_lane(s),
+        PatNode::Tune {
+            tunings, subject, ..
+        } => contains_lane(tunings) || contains_lane(subject),
         PatNode::Slice { pat, index, .. } | PatNode::Splice { pat, index, .. } => {
             contains_lane(pat) || contains_lane(index)
         }
@@ -128,6 +131,9 @@ fn contains_lane(p: &Pat) -> bool {
         | PatNode::ScaleNotes(_, _, x)
         | PatNode::Voicing(x)
         | PatNode::Arp(x, _)
+        | PatNode::Strum(x, _, _, _)
+        | PatNode::Harp { subject: x, .. }
+        | PatNode::Inversion { subject: x, .. }
         | PatNode::Segment(x, _)
         | PatNode::Range(x, _, _) => contains_lane(x),
     }

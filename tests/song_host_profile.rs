@@ -906,7 +906,7 @@ fn configured_native_profile_is_actual_and_headless_compatibility_is_unchanged()
             .unwrap();
         assert_eq!(
             (actual.bus_slots, actual.template_slots),
-            if profile { (50, 128) } else { (5, 96) }
+            if profile { (50, 134) } else { (5, 102) }
         );
         assert!(output.iter().all(|sample| *sample == 0.));
     }

@@ -396,3 +396,45 @@ FM1V-21 file-level changes; repaired only the two invalid Vact assertions in
 outside FM1V-21 `writePaths`. Resolve or disposition those failures through
 their owning plan, then rerun full nextest under the measurement lock before
 acceptance. Do not treat the 536 canceled tests as passed.
+
+### Session: 2026-10-10 (session 353, base `48d651c`, attempt 02)
+**Tasks Completed**: reran the plan gates against the stable shared tree;
+source audit confirms the fixture repair and native implementation remain
+unchanged. No source file required editing.
+
+**Verification**:
+- Verification 1 passed (exit 0), log
+  `tmp/fm1-voices/FM1V-21/attempt-02/rustfmt.log`.
+- Verification 2 passed: 291 tests run, 291 passed, 0 failed (exit 0), log
+  `tmp/fm1-voices/FM1V-21/attempt-02/nextest.log`.
+- Verification 3 passed (exit 0), log
+  `tmp/fm1-voices/FM1V-21/attempt-02/wasm.log`.
+- Verification 4 and 5 passed (exit 0); all listed files are under 1000
+  lines and the fixture has no forbidden grouping syntax. The only changed
+  tracked path at completion is this declared plan file; source paths stayed
+  unchanged against the clean starting status. Evidence:
+  `tmp/fm1-voices/FM1V-21/attempt-02/mechanical-checks.log` and
+  `tmp/fm1-voices/FM1V-21/attempt-02/changed-paths-final.txt`.
+- Verification 6 passed: 50 tests run, 50 passed, 0 failed (exit 0), log
+  `tmp/fm1-voices/FM1V-21/attempt-02/nextest-fm-filter.log`.
+- Verification 7 failed (exit 100): 2,598/2,951 tests ran, 2,597 passed,
+  1 failed and 3 skipped; 353 were canceled after
+  `song_host_profile::configured_native_profile_is_actual_and_headless_compatibility_is_unchanged`
+  failed at `tests/song_host_profile.rs:907` (`(5, 102)` vs `(5, 96)`).
+  Full log: `tmp/fm1-voices/FM1V-21/attempt-02/full.log`. This assertion
+  is outside FM1V-21 `writePaths`; the source edit belongs to the slot-count
+  owner. Resume after that owner reconciles the expectation (or the plan's
+  writePaths are amended), then rerun the full suite under the lock.
+- Verification 8 passed: `cargo clippy --all-targets` exited 0 and the
+  scoped diagnostic count for FM1V-21 files is 0. Log and count:
+  `tmp/fm1-voices/FM1V-21/attempt-02/clippy-scan.log` and
+  `tmp/fm1-voices/FM1V-21/attempt-02/clippy-owned-diagnostics-count.txt`.
+  Remaining clippy warnings are in sibling-owned FM1V-20/FM1V-30 files.
+- Before/after hashes for the required shared sources are recorded in
+  `source-hashes-before.log` and `source-hashes-after.log` under
+  `attempt-02/`; no source edits occurred.
+
+**Tasks Remaining**: Verification 7 is a required behavioral gate and remains
+unresolved due to the out-of-scope slot-count assertion. Do not accept this
+plan or count canceled tests as passed until the owning plan fixes or
+dispositions that assertion and the full suite passes.

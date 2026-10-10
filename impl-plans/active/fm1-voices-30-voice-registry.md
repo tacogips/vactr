@@ -1,10 +1,72 @@
 # FM1V-30: Register the Six Voice Kernels and Templates
 
-**Status**: Ready
-**Plan ID**: FM1V-30 (wave 2; registry plan, serial with FM1V-40)
-**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Templates", "Registration and digest stability", "Verification" -> Voice kernels/E2e)
+**Status**: In Progress (session 352 redispatch: audit and finish the partial edits)
+**Plan ID**: FM1V-30 (run 2, serial wave 3 of 6; registry plan, before FM1V-40)
+**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Templates", "Registration and digest stability", "Implementation partition", "Verification" -> Voice kernels/E2e)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (session 352)
+
+## Session 352 Redispatch (read first)
+
+The previous attempt timed out. Its partial, unreviewed edits are committed
+at `25d3e80`. A quick inventory, which you must verify and not trust:
+
+- `TEMPLATE_NAMES: [&str; 79]` in `src/ns/insts.rs`;
+- six `inst` blocks at the end of `src/prelude/templates.vact` (lines
+  ~448-470);
+- codec tags 106..111 in `src/dsp/ugen/catalog/codec.rs` (encode ~94-99,
+  decode ~348-353);
+- `TonewheelCore | HurdyGurdyCore` in `src/sched/commit.rs`
+  `wants_tempo_anchor`;
+- the corrected `template_slots` comment in `src/dsp/ring.rs`;
+- `src/dsp/meta/templates/voices.rs`;
+- `src/dsp/tests/dsp/fm1_voice_registry.rs` (110 lines);
+- `src/host/tests/e2e/templates/fm1_voices.rs` (430 lines);
+- 18 added lines in `golden_digests.txt` (0 removed against `9ac8d1f`).
+
+Session 349 logs show compile errors in `fm1_voice_registry.rs` and
+`fm1_voices.rs` at some point
+(`tmp/fm1-voices/FM1V-21/nextest-final-attempt.log`).
+
+Do this in order:
+
+1. **Snapshot.** Save `git status --porcelain=v1` to
+   `tmp/fm1-voices/FM1V-30/status-before.txt`. Record `shasum -a 256` of
+   every writePath file to `tmp/fm1-voices/FM1V-30/hashes-before.txt`.
+2. **Audit, file by file.** Compare each writePath against "File-level
+   Changes" below. For each file, write one Progress Log line:
+   `path -> done / missing <item> / wrong <item> -> action`. Use
+   `git diff 9ac8d1f -- <path>` to see exactly what this run added.
+3. **Backward-compatibility audit.** Each command below must exit 0. Base
+   `9ac8d1f` is the pre-run tree.
+   - `test "$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')" = 0`
+   - `test "$(git diff -U0 9ac8d1f -- src/prelude/templates.vact | grep -c '^-[^-]')" = 0`
+     No pre-run template line changed. FM1V-40's later `fm` header edit is
+     not yet present.
+   - `test "$(git diff -U0 9ac8d1f -- src/dsp/ugen/catalog/codec.rs | grep -c '^-[^-]')" = 0`
+     No codec arm was removed or renumbered.
+   - The appended `TEMPLATE_NAMES` and `UGEN_NAMES` entries come after every
+     pre-run entry. The `fm1_voices_registered_after_bass` test proves this.
+4. **Finish or redo.** Complete every missing or wrong item inside
+   writePaths. Redoing a file is allowed. The result must still pass step 3.
+5. **Golden lines.** The 18 new lines may be re-blessed only if a new
+   template's graph or render changed during step 4. Never re-bless because
+   a pre-run line differs; fix the cause instead. After blessing, run the
+   step 3 checks again. Also confirm that exactly 18 lines are added against
+   `9ac8d1f`:
+   `test "$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^+[^+]')" = 18`.
+6. **Run Verification 1-8** (as revised below) and record it. Read the
+   "Long-running nextest" pitfall before running the focused run (3) or the
+   full run (4).
+
+Optional early run: right after step 2, you may run the full nextest once
+(same lock wrapper, log `tmp/fm1-voices/FM1V-30/attempt-0/full.log`). This
+finds real failures before the finish/redo work, so a late timeout does not
+lose all evidence. It does not replace Verification 4.
+
+This plan runs alone. FM1V-20 and FM1V-21 are accepted before it starts,
+so any failure in the full suite is real. Fix it if it is inside
+writePaths. Otherwise record it with the log path and set the plan Blocked.
 
 ## Intent and Context
 
@@ -48,6 +110,8 @@ tag.
 ## Dependencies
 
 - **dependsOn**: FM1V-13, FM1V-14, FM1V-15, FM1V-16, FM1V-17, FM1V-18
+  (accepted at `25d3e80`); FM1V-20 (serial order of run 2, so the full suite
+  is green when this plan is accepted)
 - **Blocks**: FM1V-40
 
 ## writePaths
@@ -204,6 +268,24 @@ row controls.
 
 ## Pitfalls
 
+- **Long-running nextest (command timeout). This is why the previous
+  attempt timed out.**
+  - Full nextest takes about 800 to 1700 s. The single test
+    `complete::tests::robust::every_prefix_and_mutant_is_panic_free` takes
+    about 500 s.
+  - The previous attempt's focused run (filter term `complete`) was killed
+    by SIGTERM at 1203.6 s with 569 of 570 passed
+    (`tmp/fm1-voices/FM1V-30/focused-final-blessed.log`, exitStatus 100).
+    Verification 3 now excludes the robust test.
+  - Run the lock-wrapped full nextest in the foreground with the executor
+    command timeout set to at least 3600 s, or to its maximum. Poll it
+    until it exits, and never background it.
+  - A SIGTERM or harness kill is neither a pass nor a code failure. Rerun
+    the same command once with the long timeout. Keep both logs as
+    `tmp/fm1-voices/FM1V-30/attempt-<n>/full.log` and record both
+    attempts.
+  - Never skip, ignore or filter out tests in the full run.
+
 - **Append only.** Inserting a template mid-file shifts other templates'
   custom control ids, and therefore their graph digests.
 - **Run the formatter on the prelude.** `templates.vact` must stay a
@@ -211,14 +293,16 @@ row controls.
   `CARGO_TERM_QUIET=true cargo run --quiet -- fmt --check src/prelude/templates.vact`.
 - **Bless procedure.**
   1. `CARGO_TERM_QUIET=true VACTR_BLESS_GOLDEN=1 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --run-ignored ignored-only -E 'test(/bless_golden_digests/)'`
-  2. `git diff -U0 -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]'`
+  2. `git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]'`
      must print `0`.
-  3. `git diff -U0 -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^+[^+]'`
+  3. `git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^+[^+]'`
      must print `18`.
 
-  If any existing line changed, restore the file
-  (`git checkout -- src/host/tests/e2e/templates/golden_digests.txt`), find
-  the cause and fix it. Never re-bless over a changed line.
+  The base is `9ac8d1f`, because the first 18 lines are already committed
+  at `25d3e80`. If any pre-run line changed, restore the file from
+  `tmp/fm1-voices/FM1V-30/golden_digests.before` (copy it there in step 1).
+  Never use `git checkout`. Find the cause and fix it. Never re-bless over
+  a changed line.
 - **Name rules.** `src/dsp/ported/tests.rs` bans upstream module tokens in
   names. Run it.
 - **Leave `fm` alone.** Do not touch `FM_MOD`, `fm.rs`, `controls.rs` or the
@@ -279,15 +363,24 @@ moved.
 1. `rustfmt --edition 2021 --check` on every `.rs` in writePaths must exit 0,
    and `cargo run --quiet -- fmt --check src/prelude/templates.vact` must
    exit 0.
-2. The bless counts are `0` removed and `18` added.
-3. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm1_voice|bass|e2e::templates|catalog|codec|seed_order|ported::tests|inst|meta|complete|live_input|contracts/)' > tmp/fm1-voices/FM1V-30/focused.log 2>&1; echo "exit=$?"`
+2. Against `9ac8d1f`, the bless counts are `0` removed and `18` added.
+   Also, `golden_digests.txt`, `templates.vact` and `codec.rs` have `0`
+   removed lines (Redispatch step 3).
+2a. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/golden/)' > tmp/fm1-voices/FM1V-30/golden.log 2>&1; echo "exit=$?"`
+   must print `exit=0`, without `VACTR_BLESS_GOLDEN`. This shows the
+   committed digests match the rendered output.
+3. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm1_voice|bass|e2e::templates|catalog|codec|seed_order|ported::tests|inst|meta|complete|live_input|contracts/) - test(/complete::tests::robust/)' > tmp/fm1-voices/FM1V-30/focused.log 2>&1; echo "exit=$?"`
+   The `- test(/complete::tests::robust/)` set difference keeps the
+   roughly 500 s robust test out of the focused run. It still runs in the
+   full nextest (Verification 4). The focused run should finish in under
+   15 minutes.
    must print `exit=0`. Record the test count; it must include the golden
    test.
 4. Run the full suite under the measurement lock, in one shell:
    `bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap "rm -rf $L" EXIT; echo FM1V-30 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-30/full.log 2>&1; echo "exit=$?"'`.
-   It must print `exit=0` with 0 failed. If a failure is in a file owned by
-   an in-flight wave-2 plan, wait for that plan and re-run. Do not edit its
-   files.
+   It must print `exit=0` with 0 failed. No other plan is in flight. A
+   failure outside writePaths is a real defect: record it with the log
+   path and set the plan Blocked. Do not edit other plans' files.
 5. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` must
    exit 0.
 6. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
@@ -295,7 +388,8 @@ moved.
 7. `wc -l` of `catalog.rs`, `voice_ports.rs`, `codec.rs`, `names/table.rs`,
    `meta.rs`, `meta/templates.rs`, `insts.rs`, `template.rs` and `mod.rs`
    must each be below 1000.
-8. `git diff --stat` shows only writePaths.
+8. Every path that is new or changed against `status-before.txt` is in
+   writePaths.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
@@ -304,15 +398,18 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 - Fresh-read each registry file right before editing it.
 - Record pre- and post-edit `shasum -a 256` for `templates.vact`,
   `golden_digests.txt`, `catalog.rs` and `codec.rs`.
-- FM1V-20 and FM1V-21 do not touch these files. If any file shows
-  unexpected drift, re-read it and apply only your intent.
+- This plan runs alone (serial wave 3 of run 2). Never commit, stash,
+  checkout, reset or push.
 
 ## Done Criteria
 
+- [ ] The per-file audit of the `25d3e80` partial edits is recorded in the
+      Progress Log.
 - [ ] Six kernels and templates are registered, editor-visible, completable
       and audible.
-- [ ] 18 golden lines are added and none removed.
-- [ ] Verification 1-8 pass and are recorded.
+- [ ] Against `9ac8d1f`: 18 golden lines added and 0 removed; 0 removed
+      lines in `templates.vact` and `codec.rs`; tag 105 unused.
+- [ ] Verification 1-8 (and 2a) pass and are recorded.
 
 ## Progress Log
 

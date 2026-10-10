@@ -1,10 +1,33 @@
 # FM1V-40: Wire `fm-mod` Algorithm Mode and Register `fm6-core` With Patch Payload
 
 **Status**: Ready
-**Plan ID**: FM1V-40 (wave 3; registry plan, after FM1V-30)
-**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility (chosen mechanism)", "`fm6-core` UGen", "SysEx import" usage, "Registration and digest stability", "Verification" -> `fm` template and Native)
+**Plan ID**: FM1V-40 (run 2, serial wave 4 of 6; registry plan, after FM1V-30)
+**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility (chosen mechanism)", "`fm6-core` UGen", "SysEx import" usage, "Registration and digest stability", "Implementation partition", "Verification" -> `fm` template and Native)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (session 352)
+
+## Session 352 Revision (read first)
+
+- **Vact syntax.** Vactr has no `( )` grouping and `let` takes no `=` (design
+  "SysEx import" -> Usage). Every `.vact` snippet in this plan's tests uses
+  `let name value`, `{}` grouping, `>` pipes and path literals. A list is
+  called with an index: `{bank 1}`.
+- **Start snapshot.** Before any edit:
+  - save `git status --porcelain=v1` to
+    `tmp/fm1-voices/FM1V-40/status-before.txt`;
+  - copy `src/host/tests/e2e/templates/golden_digests.txt` and
+    `src/prelude/templates.vact` to
+    `tmp/fm1-voices/FM1V-40/golden_digests.before` and
+    `tmp/fm1-voices/FM1V-40/templates.vact.before`.
+
+  Verification 2, 3 and 9 compare against these copies, not against `HEAD`.
+  This keeps the checks correct whether or not FM1V-30's work is committed.
+- **Tag 105** is free, because FM1V-30 used 106..111. Assign it here. It is
+  out of numeric order in the encode and decode arms, which is expected. Do
+  not renumber anything.
+- This plan runs alone. Stub files `src/dsp/tests/dsp/fm6_registry.rs` and
+  `src/host/tests/e2e/templates/fm_mod_algorithm.rs` exist from FM1V-00
+  (one `//!` line each). Replace their bodies.
 
 ## Intent and Context
 
@@ -175,6 +198,21 @@ None.
 
 ## Pitfalls
 
+- **Long-running nextest (command timeout).**
+  - Full nextest takes about 800 to 1700 s. The single test
+    `complete::tests::robust::every_prefix_and_mutant_is_panic_free` takes
+    about 500 s. Verification 4 excludes it; Verification 5 runs it.
+  - The previous FM1V-30 run was killed by SIGTERM at about 1200 s
+    (`tmp/fm1-voices/FM1V-30/focused-final-blessed.log`, exitStatus 100).
+  - Run the lock-wrapped full nextest in the foreground with the executor
+    command timeout set to at least 3600 s, or to its maximum. Poll it
+    until it exits, and never background it.
+  - A SIGTERM or harness kill is neither a pass nor a code failure. Rerun
+    the same command once with the long timeout. Keep both logs as
+    `tmp/fm1-voices/FM1V-40/attempt-<n>/full.log` and record both
+    attempts.
+  - Never skip, ignore or filter out tests in the full run.
+
 - **Golden lines must stay byte-identical.** After this plan, run the
   golden test without blessing. `golden_digests.txt` must have no diff.
   These lines are pinned:
@@ -219,12 +257,12 @@ or `fm6`):
   It renders bit-identically with and without `> algorithm 0`, and differs
   from `> algorithm 5`.
 - `fm6_core_let_bound_patch_renders`:
-  - a top-level `let p = [ ...155 synthetic ints... ]`;
+  - a top-level `let p [ ...155 synthetic ints... ]`;
   - then `inst t: fm6-core freq patch: p > * amp`;
   - then `s :t > note [:c4] > once`.
 
   The output is audible and bounded, and the voice finishes. Repeat with
-  `let bank = [p p]` and `patch: (bank 1)`. If the let-bound form cannot
+  `let bank [p p]` and `patch: {bank 1}`. If the let-bound form cannot
   lower as a constant, record it, switch the test to a literal list, and
   report it for FM1V-50/51 (design "SysEx import" fallback).
 - `fm6_core_bad_patch_reports_index`: 154 values gives an error containing
@@ -257,10 +295,16 @@ or `fm6`):
 1. `rustfmt --edition 2021 --check` on every `.rs` in writePaths, and
    `cargo run --quiet -- fmt --check src/prelude/templates.vact`. Both must
    exit 0.
-2. `git diff -- src/host/tests/e2e/templates/golden_digests.txt` is empty.
-3. `git diff -U0 -- src/prelude/templates.vact` shows exactly one changed
-   line: the `fm` header.
-4. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo|golden|e2e::templates|catalog|codec|meta|controls|inst|complete|cross_mod/)' > tmp/fm1-voices/FM1V-40/focused.log 2>&1; echo "exit=$?"`
+2. `cmp tmp/fm1-voices/FM1V-40/golden_digests.before src/host/tests/e2e/templates/golden_digests.txt`
+   must exit 0. Also,
+   `test "$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')" = 0`
+   must exit 0.
+3. `test "$(diff tmp/fm1-voices/FM1V-40/templates.vact.before src/prelude/templates.vact | grep -c '^<')" = 1 && test "$(diff tmp/fm1-voices/FM1V-40/templates.vact.before src/prelude/templates.vact | grep -c '^>')" = 1`
+   must exit 0. The one changed line must be the `fm` header, with
+   `algorithm: int = 5` changed to `algorithm: int = 0`.
+4. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo|golden|e2e::templates|catalog|codec|meta|controls|inst|complete|cross_mod/) - test(/complete::tests::robust/)' > tmp/fm1-voices/FM1V-40/focused.log 2>&1; echo "exit=$?"`
+   The robust test is excluded here only. It still runs in the full nextest
+   (Verification 5). The focused run should finish in under 15 minutes.
    must print `exit=0`, and the golden tests must pass.
 5. The full nextest under the measurement lock (the same `bash -c` lock
    wrapper as FM1V-30 Verification 4, owner `FM1V-40`) must print `exit=0`
@@ -271,13 +315,15 @@ or `fm6`):
    must exit 0.
 8. `wc -l src/dsp/voice.rs src/dsp/build.rs src/dsp/ugen/template.rs src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/dsp/meta.rs`
    shows each below 1000.
-9. `git diff --stat` shows only writePaths.
+9. Every path that is new or changed against `status-before.txt` is in
+   writePaths.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Concurrency and Drift Protocol
 
-This plan runs alone in its wave.
+This plan runs alone (serial wave 4 of run 2). Never commit, stash,
+checkout, reset or push.
 
 - Fresh-read every file before editing it.
 - Record pre- and post-edit `shasum -a 256` for `templates.vact`,

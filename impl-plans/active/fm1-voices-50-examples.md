@@ -1,10 +1,24 @@
 # FM1V-50: Examples for the FM Algorithms and the Six New Voices
 
 **Status**: Ready
-**Plan ID**: FM1V-50 (wave 4)
-**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Presets and examples")
+**Plan ID**: FM1V-50 (run 2, serial wave 5 of 6)
+**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("Presets and examples", "SysEx import" -> Usage syntax)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (session 352)
+
+## Session 352 Revision (read first)
+
+- **Vact syntax.** No `( )` grouping, and `let` takes no `=`. Group calls
+  with `{}` or use `>` pipes, and write paths as path literals (design
+  "SysEx import" -> Usage). The snippets below are corrected.
+- **Start snapshot.** Save `git status --porcelain=v1` to
+  `tmp/fm1-voices/FM1V-50/status-before.txt` before any edit.
+  Verification 4 compares against it.
+- `src/host/tests/e2e/templates/fm1_examples.rs` exists as a one-line
+  `//!` stub from FM1V-00, and its module line is already in
+  `src/host/tests/e2e/templates.rs`. Replace the stub body; do not add
+  another module line.
+- This plan runs alone. FM1V-51 runs after it.
 
 ## Intent and Context
 
@@ -30,7 +44,7 @@ list. It is not derived from any factory, ROM or third-party patch.
 
 - **dependsOn**: FM1V-40. Every template, `fm6-core` and the `fm` algorithm
   path must exist.
-- **Blocks**: none. FM1V-51 runs in parallel.
+- **Blocks**: FM1V-51 (serial order of run 2)
 
 ## writePaths
 
@@ -70,15 +84,18 @@ None.
 - `s :fm` patterns stepping `algorithm` through at least four values,
   including 0. Use the per-cycle alternation syntax used elsewhere in the
   examples, or one `d` slot per algorithm.
-- `let epiano-patch = [ ... 155 ints ... ]`. It is original and annotated
+- `let epiano-patch [ ... 155 ints ... ]`. It is original and annotated
   with comments, one line per operator (21 values) plus the global line. It
   is a two-carrier electric-piano-like patch on algorithm 5, with values in
   range.
 - `inst my-epiano: fm6-core freq velocity: velocity patch: epiano-patch > * amp`,
   played as a short chord progression.
 - A commented line showing user SysEx import:
-  `# let bank = fm6-sysex "./my-bank.syx"` and
-  `# inst from-bank: fm6-core freq patch: (bank 0) > * amp`.
+  `# let bank fm6-sysex ./my-bank.syx` and
+  `# inst from-bank: fm6-core freq patch: {bank 0} > * amp`.
+  If FM1V-40's Progress Log records that a let-bound `patch:` does not
+  lower, keep this comment and add a note that the browser and file-free
+  form is a literal list.
 
 ### `examples/kalimba.vact`
 
@@ -140,6 +157,21 @@ Apply `gain` so the peak stays at or below 1.0.
 
 ## Pitfalls
 
+- **Long-running nextest (command timeout).**
+  - Full nextest (Verification 6) takes about 800 to 1700 s. The single
+    test `complete::tests::robust::every_prefix_and_mutant_is_panic_free`
+    takes about 500 s. New examples add work to that test.
+  - The previous FM1V-30 run was killed by SIGTERM at about 1200 s
+    (`tmp/fm1-voices/FM1V-30/focused-final-blessed.log`, exitStatus 100).
+  - Run the lock-wrapped full nextest in the foreground with the executor
+    command timeout set to at least 3600 s, or to its maximum. Poll it
+    until it exits, and never background it.
+  - A SIGTERM or harness kill is neither a pass nor a code failure. Rerun
+    the same command once with the long timeout. Keep both logs as
+    `tmp/fm1-voices/FM1V-50/attempt-<n>/full.log` and record both
+    attempts.
+  - Never skip, ignore or filter out tests in the full run.
+
 - **Formatter fixed point.**
   `CARGO_TERM_QUIET=true cargo run --quiet -- fmt --check examples/<file>.vact`
   must exit 0 for each new file. The corpus tests use `git ls-files`, so
@@ -160,20 +192,26 @@ Apply `gain` so the peak stays at or below 1.0.
    must exit 0.
 3. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm1_examples|corpus|lsp::tests::analysis/)' > tmp/fm1-voices/FM1V-50/nextest.log 2>&1; echo "exit=$?"`
    must print `exit=0`, with at least 3 tests from this plan.
-4. `git diff --stat` and `git status --short` show only writePaths.
+4. Every path that is new or changed against `status-before.txt` is in
+   writePaths. `git status --short examples` lists only the five new files.
+5. `test "$(grep -c -F -e ' = [' -e '(bank' examples/fm6-algorithms.vact)" = 0`
+   must exit 0. This shows that no invalid `let =` or paren form is left.
+6. Full nextest under the measurement lock (the same `bash -c` lock wrapper
+   as FM1V-30 Verification 4, owner `FM1V-50`, log
+   `tmp/fm1-voices/FM1V-50/full.log`) must print `exit=0` with 0 failed.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Concurrency and Drift Protocol
 
-FM1V-51 runs in parallel on documentation files only. You own only your
-files.
+This plan runs alone (serial wave 5 of run 2). You own only your files.
+Never commit, stash, checkout, reset or push.
 
 ## Done Criteria
 
 - [ ] Five examples are added; each is formatted and renders audibly and
       within bounds.
-- [ ] Verification 1-4 pass and are recorded.
+- [ ] Verification 1-6 pass and are recorded.
 
 ## Progress Log
 

@@ -1,10 +1,22 @@
 # FM1V-51: Documentation, Language Reference and msfa Third-Party Notice
 
 **Status**: Ready
-**Plan ID**: FM1V-51 (wave 4)
-**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("License boundary", "Presets and examples" -> Documentation, "References")
+**Plan ID**: FM1V-51 (run 2, serial wave 6 of 6)
+**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("License boundary", "Algorithm topologies" -> "Algorithms 4 and 6", "SysEx import" -> Usage, "Presets and examples" -> Documentation, "References")
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (session 352)
+
+## Session 352 Revision (read first)
+
+- **Serial order.** This plan runs alone, after FM1V-50.
+- **Start snapshot.** Save `git status --porcelain=v1` to
+  `tmp/fm1-voices/FM1V-51/status-before.txt` before any edit.
+- **Vact syntax.** Any inline usage in README or lang-reference prose uses
+  valid forms: `let bank fm6-sysex ./my.syx`, `patch: {bank 0}`, no `( )`
+  grouping and no `let =`.
+- **msfa notice.** The "not imported" or "modification" text states one
+  divergence: algorithms 4 and 6 render their cross-operator feedback edge,
+  which msfa does not (design "Algorithms 4 and 6").
 
 ## Intent and Context
 
@@ -32,7 +44,8 @@ resolves the unverified kalimba citation.
 ## Dependencies
 
 - **dependsOn**: FM1V-40 (the final names, the msfa SHA in
-  `src/dsp/ugen/fm/patch.rs` docs, and FM1V-10/11 attribution comments)
+  `src/dsp/ugen/fm/patch.rs` docs, and FM1V-10/11 attribution comments);
+  FM1V-50 (serial order of run 2; README links to its examples)
 - **Blocks**: none
 
 ## writePaths
@@ -137,6 +150,21 @@ JASA 131(4), 2012, using one web search or the JASA site.
 
 ## Pitfalls
 
+- **Long-running nextest (command timeout).**
+  - Full nextest (Verification 6) takes about 800 to 1700 s. The single
+    test `complete::tests::robust::every_prefix_and_mutant_is_panic_free`
+    takes about 500 s.
+  - The previous FM1V-30 run was killed by SIGTERM at about 1200 s
+    (`tmp/fm1-voices/FM1V-30/focused-final-blessed.log`, exitStatus 100).
+  - Run the lock-wrapped full nextest in the foreground with the executor
+    command timeout set to at least 3600 s, or to its maximum. Poll it
+    until it exits, and never background it.
+  - A SIGTERM or harness kill is neither a pass nor a code failure. Rerun
+    the same command once with the long timeout. Keep both logs as
+    `tmp/fm1-voices/FM1V-51/attempt-<n>/full.log` and record both
+    attempts.
+  - Never skip, ignore or filter out tests in the full run.
+
 - **Use trademarks only in prose.** Write "DX7" only where the notices and
   design already do.
 - **Keep the `lang-reference.md` row a single table row.** The type tests
@@ -153,21 +181,28 @@ JASA 131(4), 2012, using one web search or the JASA site.
    notice contains the 40-hex msfa SHA that matches `patch.rs`.
 3. `grep -n "algorithm: int = 0" design-docs/specs/design-music.md` matches
    the `epiano` line.
-4. `git diff --stat` shows only writePaths.
+4. Every path that is new or changed against `status-before.txt` is in
+   writePaths.
+5. `grep -n -i "algorithms 4 and 6" THIRD_PARTY_NOTICES.md`
+   matches at least one line in the msfa section.
+6. Full nextest under the measurement lock:
+   `bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap "rm -rf $L" EXIT; echo FM1V-51 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-51/full.log 2>&1; echo "exit=$?"'`
+   must print `exit=0` with 0 failed. `lang-reference.md` is `include_str!`'d
+   by tests, so this run is part of acceptance.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Concurrency and Drift Protocol
 
-FM1V-50 runs in parallel on examples only. Fresh-read each document before
-editing it.
+This plan runs alone (serial wave 6 of run 2). Fresh-read each document
+before editing it. Never commit, stash, checkout, reset or push.
 
 ## Done Criteria
 
 - [ ] The notice, README, design-music, lang-reference and references edits
       are made.
 - [ ] The kalimba citation is resolved.
-- [ ] Verification 1-4 pass and are recorded.
+- [ ] Verification 1-6 pass and are recorded.
 
 ## Progress Log
 

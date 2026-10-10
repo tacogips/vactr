@@ -1,17 +1,60 @@
 # FM1V-21: `fm6-sysex` Native and `SourceLoader::read_bytes`
 
-**Status**: In Progress
-**Plan ID**: FM1V-21 (wave 2)
+**Status**: In Progress (session 352 redispatch: fixture repair and verification)
+**Plan ID**: FM1V-21 (run 2, serial wave 1 of 6)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import" -> "Native", "Usage"; user question FV6)
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (session 352)
+
+## Session 352 Redispatch (read first)
+
+The source for this plan is already in the tree at `25d3e80` and is
+unreviewed. Do not rewrite it. This redispatch has three jobs:
+
+1. **Audit** the committed files against "File-level Changes" below, and
+   fix any deviation inside writePaths.
+2. **Repair the invalid fixture** at `src/ns/tests/fm6_sysex.rs:92-93`.
+   Vactr has no `( )` grouping. The previous run failed with
+   `error[paren-form] 1:4..5: ( ) is not Vactr syntax; use {}` (log
+   `tmp/fm1-voices/FM1V-20/nextest-final-source-03.log`). Rewrite only
+   these two assertions:
+   - `len (fm6-sysex ./bank.syx)` -> `len {fm6-sysex ./bank.syx}` (expect
+     `"32"`);
+   - `len ((fm6-sysex ./bank.syx) 0)` -> `fm6-sysex ./bank.syx > first > len`
+     (expect `"155"`).
+
+   Both forms are valid. `{}` groups a call (lang-reference.md:27,
+   `src/ns/tests/reactive_basic.rs:340`). `>` threads the left value in as
+   the first argument. `first` is a list native
+   (`src/types/natives.rs:302`), and `len` is `fn any -> int`.
+
+   If either form fails for a reason other than syntax, find the cause in
+   this plan's native code and fix it there. Do not change the expected
+   values, and do not delete the assertion. Keep the existing
+   `voices.items.len() == 32` and `assert_patch_value` checks.
+3. **Verify.** Run Verification 1-7, then record them in the Progress Log.
+
+Scope check for this redispatch:
+
+- At start, save `git status --porcelain=v1` to
+  `tmp/fm1-voices/FM1V-21/status-before.txt`.
+- At the end, every path that is new or changed against that snapshot must
+  be in writePaths.
+- This replaces the bare `git diff --stat` check. Code from earlier waves
+  is already committed at `25d3e80`.
+
+The serial order for run 2 is FM1V-21 -> FM1V-20 -> FM1V-30 -> FM1V-40 ->
+FM1V-50 -> FM1V-51. No other plan runs at the same time. A build failure
+outside writePaths is therefore a real defect: record it in the Progress
+Log with the log path, and do not wait for a sibling plan.
 
 ## Intent and Context
 
-Users load their own six-operator SysEx files from `.vact` code:
+Users load their own six-operator SysEx files from `.vact` code (path
+literal, no `=`):
 
 ```
-let bank = fm6-sysex "./my-patches.syx"
+let bank fm6-sysex ./my-patches.syx
 ```
 
 `bank` is a list of voices, and each voice is a list of 155 ints. The bytes
@@ -39,7 +82,8 @@ The bytes are parsed by FM1V-12's `fm::sysex::parse`.
 
 - **dependsOn**: FM1V-12 (`parse`, `SysexError` and its `Display`, the
   test-only `encode_single`/`encode_bulk`)
-- **Blocks**: FM1V-40
+- **Blocks**: FM1V-20 (its canonical filter includes this plan's
+  `fm6_sysex` tests) and FM1V-40
 
 ## writePaths
 
@@ -132,6 +176,21 @@ This is an exact count, not a loosened one.
 
 ## Pitfalls
 
+- **Long-running nextest (command timeout).**
+  - Full nextest takes about 800 to 1700 s. The single test
+    `complete::tests::robust::every_prefix_and_mutant_is_panic_free` takes
+    about 500 s.
+  - The previous FM1V-30 run was killed by SIGTERM at about 1200 s
+    (`tmp/fm1-voices/FM1V-30/focused-final-blessed.log`, exitStatus 100).
+  - Run the lock-wrapped full nextest in the foreground with the executor
+    command timeout set to at least 3600 s, or to its maximum. Poll it
+    until it exits, and never background it.
+  - A SIGTERM or harness kill is neither a pass nor a code failure. Rerun
+    the same command once with the long timeout. Keep both logs as
+    `tmp/fm1-voices/<planId>/attempt-<n>/full.log` and record both
+    attempts.
+  - Never skip, ignore or filter out tests to beat the timeout.
+
 - **Respect the file limit.** Reading over the limit must fail through
   `read_limited`'s existing error, not by truncating.
 - **Keep the existing `read` path unchanged.** Only add.
@@ -149,8 +208,8 @@ The test loader is a `MapLoader`-like struct that implements both `read`
 and `read_bytes`, serving bytes from FM1V-12's `encode_single`/`encode_bulk`.
 
 - `fm6_sysex_native_returns_bulk_voices`: evaluating
-  `len (fm6-sysex "./bank.syx")` gives 32, and
-  `len ((fm6-sysex "./bank.syx") 0)` gives 155. The first voice's values
+  `len {fm6-sysex ./bank.syx}` gives 32, and
+  `fm6-sysex ./bank.syx > first > len` gives 155. The first voice's values
   equal the fixture's `params`.
 - `fm6_sysex_native_returns_single_voice`: the length is 1.
 - `fm6_sysex_native_reports_checksum_error`: corrupted bytes give a failure
@@ -176,8 +235,25 @@ and `read_bytes`, serving bytes from FM1V-12's `encode_single`/`encode_bulk`.
 3. `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/fm1-voices/FM1V-21/wasm.log 2>&1; echo "exit=$?"`
    must print `exit=0`. This proves the default trait method compiles for
    the browser.
-4. `git diff --stat` shows only writePaths, and each file stays under 1000
-   lines.
+4. Paths changed against `status-before.txt` are all in writePaths. Run
+   `wc -l src/ns/fm6_sysex.rs src/ns/load.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs | awk '$2 != "total" && $1 >= 1000 {bad=1} END {exit bad}'`;
+   it must exit 0.
+5. `test "$(grep -c -F -e '((' -e 'len (' src/ns/tests/fm6_sysex.rs)" = 0`
+   must exit 0. This shows that no paren grouping is left in the fixture.
+6. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo/)' > tmp/fm1-voices/FM1V-21/nextest-fm-filter.log 2>&1; echo "exit=$?"`
+   must print `exit=0` with 0 failed. This is FM1V-20's canonical filter. It
+   shows that this plan no longer leaves it red.
+7. Full nextest under the measurement lock:
+   `bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap "rm -rf $L" EXIT; echo FM1V-21 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-21/full.log 2>&1; echo "exit=$?"'`
+   must print `exit=0` with 0 failed. The full behavioral suite must be
+   green before acceptance.
+   - If a failure is in a test owned by a later plan (FM1V-30's
+     `fm1_voice*` or FM1V-40's `fm6_registry`/`fm_mod_algorithm` stubs),
+     record the test name and log path, and leave it for that plan. Do
+     this only if the failure cannot be fixed inside this plan's
+     writePaths.
+   - The reviewer then decides acceptance with that evidence. Never loosen
+     or skip a test to pass.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
@@ -185,14 +261,18 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 
 - Fresh-read each file before editing it.
 - Record the `shasum -a 256` before and after for `natives.rs`, `load.rs`,
-  `loader.rs` and `session.rs`.
-- FM1V-20 and FM1V-30 run in the same wave on other files. If a build fails
-  outside your writePaths, wait and re-run.
+  `loader.rs`, `session.rs` and `src/ns/tests/fm6_sysex.rs`.
+- This plan runs alone (serial wave 1 of run 2). Never commit, stash,
+  checkout, reset or push.
 
 ## Done Criteria
 
 - [x] `read_bytes`, the native and its registration are implemented.
-- [ ] Verification 1-4 pass and are recorded.
+- [ ] The committed source is audited against this plan, and any
+      deviations are fixed.
+- [ ] The fixture at `src/ns/tests/fm6_sysex.rs:92-93` is rewritten with
+      `{}` and `>` forms (Verification 5 prints 0).
+- [ ] Verification 1-7 pass and are recorded.
 
 ## Progress Log
 

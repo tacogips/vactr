@@ -4,7 +4,7 @@
   "implementationBranch": "wf/fm1-voices",
   "baseBranch": "wf/fm1-voices",
   "remote": "origin",
-  "originalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+  "originalHead": "25d3e80673980a591267454df789f410321b707c",
   "designDocPaths": [
     "design-docs/specs/design-fm1-voices.md",
     "design-docs/specs/design-music.md",
@@ -13,14 +13,118 @@
   ],
   "evidenceRoot": "tmp/fm1-voices",
   "evidenceLayout": "tmp/fm1-voices/<planId>/ (per plan) with per-attempt subdirectories tmp/fm1-voices/<planId>/attempt-<n>/ when a plan is retried; tmp/fm1-voices/msfa is the read-only msfa clone created by FM1V-00. Every command log is complete and ends with its exit status; each plan's Progress Log records {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}. tmp/ is gitignored (**/tmp) and stays untracked. A missing or truncated log is not a pass. Intentional negative-control runs are recorded as mutationEvidence, never in the gating list.",
-  "acceptedDependencies": [],
+  "acceptedDependencies": [
+    {
+      "planId": "FM1V-00",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-00-scaffold.md",
+      "provides": "Module scaffold, port contracts, Fm6Patch type and read-only msfa checkout (accepted at 25d3e80; sources: src/dsp/ugen/fm/patch.rs, src/dsp/ugen/fm/algorithms.rs, src/dsp/ugen/fm/envelope.rs, src/dsp/ugen/fm/scaling.rs, src/dsp/ugen/fm/engine.rs, src/dsp/ugen/fm/sysex.rs, src/dsp/ugen/kalimba.rs, src/dsp/ugen/tonewheel.rs, src/dsp/ugen/hurdy_gurdy.rs, src/dsp/ugen/hurdy_gurdy/bowed.rs, src/dsp/ugen/hurdy_gurdy/buzz.rs, src/dsp/ugen/vosim.rs, src/dsp/ugen/gendyn.rs, src/dsp/ugen/scanned.rs, src/dsp/tests/dsp/fm6_patch.rs, src/dsp/tests/dsp/fm_algorithms.rs, src/dsp/tests/dsp/fm6_envelope.rs, src/dsp/tests/dsp/fm6_engine.rs, src/dsp/tests/dsp/fm6_sysex.rs, src/dsp/tests/dsp/fm6_registry.rs, src/dsp/tests/dsp/fm1_voice_registry.rs, src/dsp/tests/dsp/kalimba.rs, src/dsp/tests/dsp/tonewheel.rs, src/dsp/tests/dsp/hurdy_gurdy.rs, src/dsp/tests/dsp/vosim.rs, src/dsp/tests/dsp/gendyn.rs, src/dsp/tests/dsp/scanned.rs, src/host/tests/e2e/templates/fm1_voices.rs, src/host/tests/e2e/templates/fm_mod_algorithm.rs, src/host/tests/e2e/templates/fm1_examples.rs)"
+    },
+    {
+      "planId": "FM1V-10",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-10-algorithms.md",
+      "provides": "The 32 six-operator algorithm topologies with feedback operator, cross-checked against msfa (accepted at 25d3e80; sources: src/dsp/ugen/fm/algorithms.rs, src/dsp/tests/dsp/fm_algorithms.rs)"
+    },
+    {
+      "planId": "FM1V-11",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-11-eg-scaling.md",
+      "provides": "Operator 4-rate/4-level envelope and keyboard/velocity/frequency scaling (accepted at 25d3e80; sources: src/dsp/ugen/fm/envelope.rs, src/dsp/ugen/fm/scaling.rs, src/dsp/tests/dsp/fm6_envelope.rs)"
+    },
+    {
+      "planId": "FM1V-12",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-12-sysex.md",
+      "provides": "Six-operator SysEx parser for single-voice and 32-voice bulk dumps with checksum validation (accepted at 25d3e80; sources: src/dsp/ugen/fm/sysex.rs, src/dsp/tests/dsp/fm6_sysex.rs)"
+    },
+    {
+      "planId": "FM1V-13",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-13-kalimba.md",
+      "provides": "kalimba-core modal tine kernel (accepted at 25d3e80; sources: src/dsp/ugen/kalimba.rs, src/dsp/tests/dsp/kalimba.rs)"
+    },
+    {
+      "planId": "FM1V-14",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-14-tonewheel.md",
+      "provides": "tonewheel-core drawbar tonewheel organ kernel (accepted at 25d3e80; sources: src/dsp/ugen/tonewheel.rs, src/dsp/tests/dsp/tonewheel.rs)"
+    },
+    {
+      "planId": "FM1V-15",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-15-hurdy-gurdy.md",
+      "provides": "hurdy-gurdy-core bowed waveguide, drones and buzz bridge kernel (accepted at 25d3e80; sources: src/dsp/ugen/hurdy_gurdy.rs, src/dsp/ugen/hurdy_gurdy/bowed.rs, src/dsp/ugen/hurdy_gurdy/buzz.rs, src/dsp/tests/dsp/hurdy_gurdy.rs)"
+    },
+    {
+      "planId": "FM1V-16",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-16-vosim.md",
+      "provides": "vosim-core VOSIM pulse-train kernel (accepted at 25d3e80; sources: src/dsp/ugen/vosim.rs, src/dsp/tests/dsp/vosim.rs)"
+    },
+    {
+      "planId": "FM1V-17",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-17-gendyn.md",
+      "provides": "gendyn-core dynamic stochastic synthesis kernel (accepted at 25d3e80; sources: src/dsp/ugen/gendyn.rs, src/dsp/tests/dsp/gendyn.rs)"
+    },
+    {
+      "planId": "FM1V-18",
+      "commit": "25d3e80673980a591267454df789f410321b707c",
+      "planPath": "impl-plans/active/fm1-voices-18-scanned.md",
+      "provides": "scanned-core scanned synthesis kernel (accepted at 25d3e80; sources: src/dsp/ugen/scanned.rs, src/dsp/tests/dsp/scanned.rs)"
+    }
+  ],
+  "run2": {
+    "session": "opus-luna-design-and-implement-review-loop-session-352",
+    "checkpointCommit": "25d3e80673980a591267454df789f410321b707c",
+    "preRunBaseForDiffChecks": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+    "remainingOrder": [
+      "FM1V-21",
+      "FM1V-20",
+      "FM1V-30",
+      "FM1V-40",
+      "FM1V-50",
+      "FM1V-51"
+    ],
+    "notes": "Diff-based invariants (golden lines, templates.vact, codec.rs, fm.rs) compare against 9ac8d1f because earlier work is committed at 25d3e80; per-plan scope checks compare against a git status snapshot taken at plan start under tmp/fm1-voices/<planId>/status-before.txt."
+  },
   "executionModel": {
     "waves": [
-      ["FM1V-00"],
-      ["FM1V-10", "FM1V-11", "FM1V-12", "FM1V-13", "FM1V-14", "FM1V-15", "FM1V-16", "FM1V-17", "FM1V-18"],
-      ["FM1V-20", "FM1V-21", "FM1V-30"],
-      ["FM1V-40"],
-      ["FM1V-50", "FM1V-51"]
+      [
+        "FM1V-21"
+      ],
+      [
+        "FM1V-20"
+      ],
+      [
+        "FM1V-30"
+      ],
+      [
+        "FM1V-40"
+      ],
+      [
+        "FM1V-50"
+      ],
+      [
+        "FM1V-51"
+      ]
+    ],
+    "run1Waves": [
+      [
+        "FM1V-00"
+      ],
+      [
+        "FM1V-10",
+        "FM1V-11",
+        "FM1V-12",
+        "FM1V-13",
+        "FM1V-14",
+        "FM1V-15",
+        "FM1V-16",
+        "FM1V-17",
+        "FM1V-18"
+      ]
     ],
     "maxConcurrency": 1,
     "sameBranchFanout": true,
@@ -28,10 +132,11 @@
     "registrySerial": "FM1V-30 and FM1V-40 are the only registry-touching plans (UGen/template/codec registries, templates.vact, golden_digests.txt); FM1V-40 depends on FM1V-30 and they never run concurrently. Registries are append-only; codec tags 106..111 (voices) and 105 (fm6-core) are appended after the current last tag; existing tags are never renumbered.",
     "commitOwner": "The workflow commits with the AGENTS.md 1-6 section message and no tool attribution, and may non-force push to origin wf/fm1-voices only. Workers never commit, stash, checkout, reset, branch, push or merge.",
     "editProtocol": "Fresh-read each file before editing; record shasum -a 256 before and after for shared and registry files; never edit outside writePaths; sharedPaths only per sharedPathNotes.",
-    "measurementLock": "/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock guards full nextest and every browser run (a sibling run is active in wf/fm1-tuning)."
+    "measurementLock": "/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock guards full nextest and every browser run (a sibling run is active in wf/fm1-tuning).",
+    "longRunningCommands": "Full nextest takes about 800-1700 s and complete::tests::robust::every_prefix_and_mutant_is_panic_free alone about 500 s; the previous FM1V-30 attempt was SIGTERMed at about 1200 s (tmp/fm1-voices/FM1V-30/focused-final-blessed.log, exitStatus 100). Run lock-wrapped full nextest in the foreground with an executor command timeout of at least 3600 s (or the maximum) and poll to exit; never background it. A SIGTERM/harness kill is neither pass nor code failure: rerun once with the long timeout and record both attempt logs under tmp/fm1-voices/<planId>/attempt-<n>/. Focused filters for FM1V-30 and FM1V-40 exclude the robust test via '- test(/complete::tests::robust/)'; full nextest still runs it. No test is skipped, ignored or loosened."
   },
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Extend existing FM with the 32 DX7 algorithms and add kalimba, drawbar tonewheel organ, hurdy-gurdy, and VOSIM/GENDYN/scanned-synthesis voices' (no GitHub issue or PR number); workflow opus-luna-design-and-implement-review-loop-session-349; intake design session 347",
+    "issueReference": "workflowInput issue: Extend existing FM with the 32 DX7 algorithms and add kalimba, drawbar tonewheel organ, hurdy-gurdy, and VOSIM/GENDYN/scanned-synthesis voices (no GitHub issue or PR number); workflow opus-luna-design-and-implement-review-loop-session-352, continuation of sessions 347/349; plan review accepted in comm-005971",
     "userProblem": "The fm template declares an algorithm parameter (default 5) that its fixed two-operator body ignores; vactr has no six-operator algorithm routing, operator feedback, operator EGs or SysEx patch import, and no kalimba, tonewheel organ, hurdy-gurdy, VOSIM, GENDYN or scanned-synthesis voice (design-fm1-voices.md Overview).",
     "requiredOutcomes": [
       "Design document for the six-operator extension of the existing FM engine (fm template backward compatibility, SysEx import) and each new voice (design-docs/specs/design-fm1-voices.md).",
@@ -120,343 +225,13 @@
   },
   "plans": [
     {
-      "planId": "FM1V-00",
-      "planPath": "impl-plans/active/fm1-voices-00-scaffold.md",
-      "dependsOn": [],
-      "writePaths": [
-        "src/dsp/ugen/fm/patch.rs",
-        "src/dsp/ugen/fm/algorithms.rs",
-        "src/dsp/ugen/fm/envelope.rs",
-        "src/dsp/ugen/fm/scaling.rs",
-        "src/dsp/ugen/fm/engine.rs",
-        "src/dsp/ugen/fm/sysex.rs",
-        "src/dsp/ugen/kalimba.rs",
-        "src/dsp/ugen/tonewheel.rs",
-        "src/dsp/ugen/hurdy_gurdy.rs",
-        "src/dsp/ugen/hurdy_gurdy/bowed.rs",
-        "src/dsp/ugen/hurdy_gurdy/buzz.rs",
-        "src/dsp/ugen/vosim.rs",
-        "src/dsp/ugen/gendyn.rs",
-        "src/dsp/ugen/scanned.rs",
-        "src/dsp/tests/dsp/fm6_patch.rs",
-        "src/dsp/tests/dsp/fm_algorithms.rs",
-        "src/dsp/tests/dsp/fm6_envelope.rs",
-        "src/dsp/tests/dsp/fm6_engine.rs",
-        "src/dsp/tests/dsp/fm6_sysex.rs",
-        "src/dsp/tests/dsp/fm6_registry.rs",
-        "src/dsp/tests/dsp/fm1_voice_registry.rs",
-        "src/dsp/tests/dsp/kalimba.rs",
-        "src/dsp/tests/dsp/tonewheel.rs",
-        "src/dsp/tests/dsp/hurdy_gurdy.rs",
-        "src/dsp/tests/dsp/vosim.rs",
-        "src/dsp/tests/dsp/gendyn.rs",
-        "src/dsp/tests/dsp/scanned.rs",
-        "src/host/tests/e2e/templates/fm1_voices.rs",
-        "src/host/tests/e2e/templates/fm_mod_algorithm.rs",
-        "src/host/tests/e2e/templates/fm1_examples.rs",
-        "impl-plans/active/fm1-voices-00-scaffold.md",
-        "target",
-        "tmp/fm1-voices/msfa",
-        "tmp/fm1-voices/FM1V-00"
-      ],
-      "sharedPaths": [
-        "src/dsp/ugen/fm.rs",
-        "src/dsp/ugen/mod.rs",
-        "src/dsp/tests/dsp.rs",
-        "src/host/tests/e2e/templates.rs"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "src/dsp/ugen/fm.rs",
-          "intendedEdit": "Add only pub mod algorithms; engine; envelope; patch; scaling; sysex; after the use lines. Existing op/modulate/phase_distortion bodies stay byte-identical (exactly 6 added lines)."
-        },
-        {
-          "path": "src/dsp/ugen/mod.rs",
-          "intendedEdit": "Add only pub mod gendyn; hurdy_gurdy; kalimba; scanned; tonewheel; vosim; in alphabetical position. No Node variants."
-        },
-        {
-          "path": "src/dsp/tests/dsp.rs",
-          "intendedEdit": "Add only 13 mod lines alphabetically: fm1_voice_registry, fm6_engine, fm6_envelope, fm6_patch, fm6_registry, fm6_sysex, fm_algorithms, gendyn, hurdy_gurdy, kalimba, scanned, tonewheel, vosim."
-        },
-        {
-          "path": "src/host/tests/e2e/templates.rs",
-          "intendedEdit": "Add only mod fm1_examples; mod fm1_voices; mod fm_mod_algorithm; alphabetically."
-        }
-      ],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/msfa",
-        "tmp/fm1-voices/FM1V-00"
-      ],
-      "acceptanceCriteria": [
-        "Module tree, kernel scaffolds with the pinned port tables, fm engine scaffold (FM6_PORTS, fm6_port, fm_mod_port, MACRO_FEEDBACK) and placeholder test files exist; renders are stubs writing 0.0.",
-        "Fm6Patch is implemented in full with the pinned offsets, max_of ranges, from_flat errors and validate.",
-        "msfa is cloned read-only into tmp/fm1-voices/msfa with its 40-hex SHA and file paths recorded in the Progress Log and patch.rs doc, or 'msfa unavailable' is recorded.",
-        "Shared paths change only by the stated lines; fm.rs diff is exactly 6 added pub mod lines; no registry edits.",
-        "At least 11 focused tests run with 0 failed; clippy clean."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/fm.rs src/dsp/ugen/mod.rs src/dsp/tests/dsp.rs src/host/tests/e2e/templates.rs src/dsp/ugen/fm/patch.rs src/dsp/ugen/fm/algorithms.rs src/dsp/ugen/fm/envelope.rs src/dsp/ugen/fm/scaling.rs src/dsp/ugen/fm/engine.rs src/dsp/ugen/fm/sysex.rs src/dsp/ugen/kalimba.rs src/dsp/ugen/tonewheel.rs src/dsp/ugen/hurdy_gurdy.rs src/dsp/ugen/hurdy_gurdy/bowed.rs src/dsp/ugen/hurdy_gurdy/buzz.rs src/dsp/ugen/vosim.rs src/dsp/ugen/gendyn.rs src/dsp/ugen/scanned.rs src/dsp/tests/dsp/fm6_patch.rs src/dsp/tests/dsp/fm_algorithms.rs src/dsp/tests/dsp/fm6_envelope.rs src/dsp/tests/dsp/fm6_engine.rs src/dsp/tests/dsp/fm6_sysex.rs src/dsp/tests/dsp/fm6_registry.rs src/dsp/tests/dsp/fm1_voice_registry.rs src/dsp/tests/dsp/kalimba.rs src/dsp/tests/dsp/tonewheel.rs src/dsp/tests/dsp/hurdy_gurdy.rs src/dsp/tests/dsp/vosim.rs src/dsp/tests/dsp/gendyn.rs src/dsp/tests/dsp/scanned.rs src/host/tests/e2e/templates/fm1_voices.rs src/host/tests/e2e/templates/fm_mod_algorithm.rs src/host/tests/e2e/templates/fm1_examples.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_patch|ports_are_unique|fm6_ports_contract/)' > tmp/fm1-voices/FM1V-00/nextest.log 2>&1; echo \"exit=$?\"",
-        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-00/clippy.log 2>&1; echo \"exit=$?\"",
-        "test \"$(git diff -U0 -- src/dsp/ugen/fm.rs | grep -c '^[-+][^-+]')\" = 6",
-        "git diff --stat",
-        "git status --short"
-      ]
-    },
-    {
-      "planId": "FM1V-10",
-      "planPath": "impl-plans/active/fm1-voices-10-algorithms.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/fm/algorithms.rs",
-        "src/dsp/tests/dsp/fm_algorithms.rs",
-        "design-docs/specs/design-fm1-voices.md",
-        "impl-plans/active/fm1-voices-10-algorithms.md",
-        "target",
-        "tmp/fm1-voices/FM1V-10"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-10"
-      ],
-      "acceptanceCriteria": [
-        "ALGORITHMS (32 entries), RENDER_ORDER, algorithm() clamping and carrier_count implemented with the pinned Algorithm struct.",
-        "derive(MSFA_FLAGS[k]) == ALGORITHMS[k] for all 32 algorithms; the msfa fixture carries the Apache-2.0 attribution comment with the SHA.",
-        "design-fm1-voices.md changes only in the Algorithm topologies table rows, and only if msfa disagrees, with each corrected row logged.",
-        "At least 5 fm_algo tests run with 0 failed; blocked (not substituted) if msfa is unavailable."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/fm/algorithms.rs src/dsp/tests/dsp/fm_algorithms.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm_algo/)' > tmp/fm1-voices/FM1V-10/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-11",
-      "planPath": "impl-plans/active/fm1-voices-11-eg-scaling.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/fm/envelope.rs",
-        "src/dsp/ugen/fm/scaling.rs",
-        "src/dsp/tests/dsp/fm6_envelope.rs",
-        "impl-plans/active/fm1-voices-11-eg-scaling.md",
-        "target",
-        "tmp/fm1-voices/FM1V-11"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-11"
-      ],
-      "acceptanceCriteria": [
-        "Eg (EG_BLOCK 64, EG_FLOATS, new/tick/key_off/released_and_silent/store/load), FULL_SCALE_LEVEL and log_to_amp implemented from msfa formulas with an attribution doc comment.",
-        "Scaling functions (midi_key, velocity_midi, scale_out_level, scale_level, scale_rate, scale_velocity, op_outlevel, op_rate_scaling, op_freq_hz, transpose_hz, feedback_gain) implemented to the pinned contract.",
-        "At least 12 focused tests run with 0 failed, including msfa-derived timing within +/- 1 tick and sample-rate independence; blocked if msfa is unavailable."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/fm/envelope.rs src/dsp/ugen/fm/scaling.rs src/dsp/tests/dsp/fm6_envelope.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_eg|fm6_scale|fm6_velocity|fm6_op_freq|fm6_feedback|fm6_log/)' > tmp/fm1-voices/FM1V-11/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-12",
-      "planPath": "impl-plans/active/fm1-voices-12-sysex.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/fm/sysex.rs",
-        "src/dsp/tests/dsp/fm6_sysex.rs",
-        "impl-plans/active/fm1-voices-12-sysex.md",
-        "target",
-        "tmp/fm1-voices/FM1V-12"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-12"
-      ],
-      "acceptanceCriteria": [
-        "parse, SysexError (with readable Display), SINGLE_LEN 163, BULK_LEN 4104 and test-only encode_single/encode_bulk implemented to the pinned contract and validation order.",
-        "Bulk unpack layout matches the plan table (msfa wins on disagreement, logged); out-of-range fields clamp to max_of.",
-        "All fixtures are synthetic; git ls-files '*.syx' is empty; at least 8 fm6_sysex tests run with 0 failed."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/fm/sysex.rs src/dsp/tests/dsp/fm6_sysex.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_sysex/)' > tmp/fm1-voices/FM1V-12/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat",
-        "test -z \"$(git ls-files '*.syx')\""
-      ]
-    },
-    {
-      "planId": "FM1V-13",
-      "planPath": "impl-plans/active/fm1-voices-13-kalimba.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/kalimba.rs",
-        "src/dsp/tests/dsp/kalimba.rs",
-        "impl-plans/active/fm1-voices-13-kalimba.md",
-        "target",
-        "tmp/fm1-voices/FM1V-13"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-13"
-      ],
-      "acceptanceCriteria": [
-        "kalimba-core modal kernel (beam ratios 1/6.2669/17.5475/34.3861, beating twin, half-sine pluck, damping, two body resonances, exact-bypass buzz) implemented with real STATE_FLOATS <= 64.",
-        "Deterministic, block-size independent, finite and bounded over the extreme grid, zero allocation.",
-        "At least 10 kalimba tests run with 0 failed; kernel file under 400 lines, test file under 1000."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/kalimba.rs src/dsp/tests/dsp/kalimba.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/kalimba/)' > tmp/fm1-voices/FM1V-13/nextest.log 2>&1; echo \"exit=$?\"",
-        "test \"$(wc -l < src/dsp/ugen/kalimba.rs)\" -lt 400 && test \"$(wc -l < src/dsp/tests/dsp/kalimba.rs)\" -lt 1000",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-14",
-      "planPath": "impl-plans/active/fm1-voices-14-tonewheel.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/tonewheel.rs",
-        "src/dsp/tests/dsp/tonewheel.rs",
-        "impl-plans/active/fm1-voices-14-tonewheel.md",
-        "target",
-        "tmp/fm1-voices/FM1V-14"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-14"
-      ],
-      "acceptanceCriteria": [
-        "tonewheel-core kernel (nine drawbar partials with foldback, 3 dB drawbar steps, single-trigger percussion, exact-bypass key click, 6.9 Hz scanner vibrato/chorus, gate-length note length) implemented with fixed STATE_FLOATS.",
-        "Deterministic, block-size independent, finite and bounded, zero allocation.",
-        "At least 12 tonewheel tests run with 0 failed; kernel under 400 lines, test under 1000."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/tonewheel.rs src/dsp/tests/dsp/tonewheel.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/tonewheel/)' > tmp/fm1-voices/FM1V-14/nextest.log 2>&1; echo \"exit=$?\"",
-        "test \"$(wc -l < src/dsp/ugen/tonewheel.rs)\" -lt 400 && test \"$(wc -l < src/dsp/tests/dsp/tonewheel.rs)\" -lt 1000",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-15",
-      "planPath": "impl-plans/active/fm1-voices-15-hurdy-gurdy.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/hurdy_gurdy.rs",
-        "src/dsp/ugen/hurdy_gurdy/bowed.rs",
-        "src/dsp/ugen/hurdy_gurdy/buzz.rs",
-        "src/dsp/tests/dsp/hurdy_gurdy.rs",
-        "impl-plans/active/fm1-voices-15-hurdy-gurdy.md",
-        "target",
-        "tmp/fm1-voices/FM1V-15"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-15"
-      ],
-      "acceptanceCriteria": [
-        "hurdy-gurdy-core kernel: self-oscillating bowed waveguide (hyperbolic friction) for chanterelle, bourdon, fifth and trompette strings, tempo-locked wheel strokes, exact-bypass buzz bridge, gate-length note length.",
-        "STATE_FLOATS fixed and <= 24_000; deterministic, block-size independent, finite and bounded at 44.1/48/96 kHz, zero allocation.",
-        "At least 12 gurdy tests run with 0 failed; each kernel file under 400 lines."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/hurdy_gurdy.rs src/dsp/ugen/hurdy_gurdy/bowed.rs src/dsp/ugen/hurdy_gurdy/buzz.rs src/dsp/tests/dsp/hurdy_gurdy.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gurdy/)' > tmp/fm1-voices/FM1V-15/nextest.log 2>&1; echo \"exit=$?\"",
-        "test \"$(wc -l < src/dsp/ugen/hurdy_gurdy.rs)\" -lt 400 && test \"$(wc -l < src/dsp/ugen/hurdy_gurdy/bowed.rs)\" -lt 400 && test \"$(wc -l < src/dsp/ugen/hurdy_gurdy/buzz.rs)\" -lt 400",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-16",
-      "planPath": "impl-plans/active/fm1-voices-16-vosim.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/vosim.rs",
-        "src/dsp/tests/dsp/vosim.rs",
-        "impl-plans/active/fm1-voices-16-vosim.md",
-        "target",
-        "tmp/fm1-voices/FM1V-16"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-16"
-      ],
-      "acceptanceCriteria": [
-        "vosim-core kernel (N sin^2 pulses of width 1/formant with geometric decay, period latching, N*T <= P clamp, 10 Hz DC blocker) implemented with STATE_FLOATS <= 8.",
-        "Deterministic, block-size independent, finite and bounded, zero allocation; at least 8 vosim tests run with 0 failed."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/vosim.rs src/dsp/tests/dsp/vosim.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/vosim/)' > tmp/fm1-voices/FM1V-16/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-17",
-      "planPath": "impl-plans/active/fm1-voices-17-gendyn.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/gendyn.rs",
-        "src/dsp/tests/dsp/gendyn.rs",
-        "impl-plans/active/fm1-voices-17-gendyn.md",
-        "target",
-        "tmp/fm1-voices/FM1V-17"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-17"
-      ],
-      "acceptanceCriteria": [
-        "gendyn-core kernel (second-order mirrored random walks on up to 32 breakpoints, four distributions, pitch lock at spread 0) implemented with STATE_FLOATS = 4*32 + 8.",
-        "Seed-deterministic, block-size independent, finite and bounded, zero allocation; at least 9 gendyn tests run with 0 failed."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/gendyn.rs src/dsp/tests/dsp/gendyn.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/gendyn/)' > tmp/fm1-voices/FM1V-17/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat"
-      ]
-    },
-    {
-      "planId": "FM1V-18",
-      "planPath": "impl-plans/active/fm1-voices-18-scanned.md",
-      "dependsOn": ["FM1V-00"],
-      "writePaths": [
-        "src/dsp/ugen/scanned.rs",
-        "src/dsp/tests/dsp/scanned.rs",
-        "impl-plans/active/fm1-voices-18-scanned.md",
-        "target",
-        "tmp/fm1-voices/FM1V-18"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "target",
-        "tmp/fm1-voices/FM1V-18"
-      ],
-      "acceptanceCriteria": [
-        "scanned-core kernel (64-mass ring, Jacobi semi-implicit Euler at scan-update rate, Catmull-Rom scan with prev/pos crossfade) implemented with STATE_FLOATS = 3*64 + 8 and coefficients() satisfying 4k + c < 4 - 2d - 0.1 at every corner.",
-        "Deterministic, block-size independent, finite and bounded over a 10 s stability grid at 44.1/48/96 kHz, zero allocation; at least 9 scanned tests run with 0 failed."
-      ],
-      "verification": [
-        "rustfmt --edition 2021 --check src/dsp/ugen/scanned.rs src/dsp/tests/dsp/scanned.rs",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/scanned/)' > tmp/fm1-voices/FM1V-18/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat"
-      ]
-    },
-    {
       "planId": "FM1V-20",
       "planPath": "impl-plans/active/fm1-voices-20-fm-engine.md",
-      "dependsOn": ["FM1V-10", "FM1V-11"],
+      "dependsOn": [
+        "FM1V-10",
+        "FM1V-11",
+        "FM1V-21"
+      ],
       "writePaths": [
         "src/dsp/ugen/fm/engine.rs",
         "src/dsp/ugen/fm/engine/setup.rs",
@@ -471,7 +246,7 @@
       "sharedPathNotes": [
         {
           "path": "src/dsp/ugen/fm.rs",
-          "intendedEdit": "Append exactly one new public function modulate_with_algorithm after modulate; no existing line changes or removals (FM1V-00 already added the module declarations)."
+          "intendedEdit": "modulate_with_algorithm is already appended after modulate at 25d3e80; edit only that function if the audit requires it and never append a duplicate. No pre-run line (base 9ac8d1f) may change or be removed."
         }
       ],
       "artifactRoots": [
@@ -482,20 +257,28 @@
         "fm6_render (patch and macro modes), fm_mod_algorithm and fm::modulate_with_algorithm implemented; real STATE_FLOATS <= 160; render order 6..1 with feedback from the source's last two outputs; carrier-count normalization; EG key-off at the next 64-frame chunk.",
         "Legacy branch (algorithm 0, -1, NaN) is bit-identical to fm::modulate and leaves mem untouched.",
         "All 32 algorithms render pairwise distinct; routing observability, feedback isolation, patch-mode EG, fixed-frequency, block-size independence, determinism, stability grid and zero-allocation tests pass (at least 11 from this plan, 0 failed).",
-        "fm.rs diff has no removed lines; engine.rs under 400 lines or split into engine/setup.rs."
+        "fm.rs diff against 9ac8d1f has no removed lines; engine.rs under 400 lines or split into engine/setup.rs.",
+        "Algorithms 4 and 6 keep the delayed-history cross-operator feedback edge (design 'Algorithms 4 and 6'); engine.rs comment states the msfa divergence; the feedback test asserts feedback 0 vs 7 differ for algorithms 4 and 6.",
+        "Per-test integrity audit recorded; mutation runs reported only as mutationEvidence with files restored by hash.",
+        "Canonical filter and full nextest under the lock exit 0 with 0 failed; clippy exits 0."
       ],
       "verification": [
         "rustfmt --edition 2021 --check src/dsp/ugen/fm.rs src/dsp/ugen/fm/engine.rs src/dsp/tests/dsp/fm6_engine.rs",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo/)' > tmp/fm1-voices/FM1V-20/nextest.log 2>&1; echo \"exit=$?\"",
-        "test -z \"$(git diff -U0 -- src/dsp/ugen/fm.rs | grep '^-[^-]')\"",
+        "test -z \"$(git diff -U0 9ac8d1f -- src/dsp/ugen/fm.rs | grep '^-[^-]')\"",
         "test \"$(wc -l < src/dsp/ugen/fm/engine.rs)\" -lt 400",
-        "git diff --stat"
+        "test \"$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')\" = 0",
+        "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-20 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-20/full.log 2>&1; echo \"exit=$?\"'",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-20/clippy.log 2>&1; echo \"exit=$?\"",
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-20/status-before.txt: new or changed paths are within writePaths or src/dsp/ugen/fm.rs"
       ]
     },
     {
       "planId": "FM1V-21",
       "planPath": "impl-plans/active/fm1-voices-21-sysex-native.md",
-      "dependsOn": ["FM1V-12"],
+      "dependsOn": [
+        "FM1V-12"
+      ],
       "writePaths": [
         "src/ns/fm6_sysex.rs",
         "src/ns/load.rs",
@@ -519,20 +302,33 @@
         "SourceLoader::read_bytes added with a host-unavailable default; NativeSampleLoader implements it with the same resolution/containment as read and read_limited; SessionLoader delegates.",
         "fm6-sysex native (effectful, fn path -> [[int]], 64 KiB cap) registered after load, mirroring load's query/type/host failures, returning per-voice 155-int lists; parse errors give LoadFailed naming fm6-sysex and the error.",
         "native_table test renamed to the_full_prelude_is_the_table_minus_loader_natives with an exact table.len() - 2 count.",
-        "At least 7 fm6_sysex tests from this plan run with 0 failed; wasm --lib build passes; each file under 1000 lines; no test files written inside the repository."
+        "At least 7 fm6_sysex tests from this plan run with 0 failed; wasm --lib build passes; each file under 1000 lines; no test files written inside the repository.",
+        "Committed 25d3e80 source audited against the plan; fixture src/ns/tests/fm6_sysex.rs:92-93 rewritten as `len {fm6-sysex ./bank.syx}` (32) and `fm6-sysex ./bank.syx > first > len` (155) with no ( ) grouping left.",
+        "FM1V-20's canonical filter test(/fm6|fm_mod|fm_algo/) and full nextest under the lock exit 0 with 0 failed."
       ],
       "verification": [
         "rustfmt --edition 2021 --check src/ns/fm6_sysex.rs src/ns/load.rs src/ns/mod.rs src/ns/tests/mod.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6_sysex|native_table|natives|load|infer|no_abort|session/)' > tmp/fm1-voices/FM1V-21/nextest.log 2>&1; echo \"exit=$?\"",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/fm1-voices/FM1V-21/wasm.log 2>&1; echo \"exit=$?\"",
         "wc -l src/ns/fm6_sysex.rs src/ns/load.rs src/ns/tests/fm6_sysex.rs src/types/natives.rs src/host/native/loader.rs src/session/session.rs src/vm/tests/native_table.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
-        "git diff --stat"
+        "test \"$(grep -c -F -e '((' -e 'len (' src/ns/tests/fm6_sysex.rs)\" = 0",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo/)' > tmp/fm1-voices/FM1V-21/nextest-fm-filter.log 2>&1; echo \"exit=$?\"",
+        "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-21 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-21/full.log 2>&1; echo \"exit=$?\"'",
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-21/status-before.txt: new or changed paths are within writePaths"
       ]
     },
     {
       "planId": "FM1V-30",
       "planPath": "impl-plans/active/fm1-voices-30-voice-registry.md",
-      "dependsOn": ["FM1V-13", "FM1V-14", "FM1V-15", "FM1V-16", "FM1V-17", "FM1V-18"],
+      "dependsOn": [
+        "FM1V-13",
+        "FM1V-14",
+        "FM1V-15",
+        "FM1V-16",
+        "FM1V-17",
+        "FM1V-18",
+        "FM1V-20"
+      ],
       "writePaths": [
         "src/dsp/graph.rs",
         "src/dsp/ugen/mod.rs",
@@ -569,27 +365,35 @@
       "acceptanceCriteria": [
         "Six UGenSpec/Node variants (KalimbaCore, TonewheelCore, HurdyGurdyCore, VosimCore, GendynCore, ScannedCore) appended with catalog ports, codec tags 106..111, names, natives_domain entries, meta ranges/stepped flags and template params; TEMPLATE_NAMES length 79 with six names appended after bass.",
         "Six prelude templates appended at the end of templates.vact (formatter fixed point); TonewheelCore and HurdyGurdyCore added to wants_tempo_anchor; template_slots value stays 96 (comment fixed).",
-        "golden_digests.txt gains exactly 18 added lines and 0 removed; no existing template graph or render digest changes.",
+        "Per-file audit of the partial 25d3e80 registry edits recorded in the Progress Log; missing or wrong items finished or redone within writePaths.",
+        "Against 9ac8d1f: golden_digests.txt has exactly 18 added lines and 0 removed; templates.vact and codec.rs have 0 removed lines; tag 105 unused; the non-bless golden tests pass; no existing template graph or render digest changes.",
         "fm1_voices e2e and fm1_voice registry tests (codec parity, tempo following, MemExceeded at one float less, metadata, completion) pass; focused and full nextest (under the lock), clippy and wasm --lib exit 0; listed registry files stay under 1000 lines."
       ],
       "verification": [
         "rustfmt --edition 2021 --check src/dsp/graph.rs src/dsp/ugen/mod.rs src/dsp/ugen/template.rs src/dsp/ugen/build_helpers.rs src/dsp/ugen/mixer.rs src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/voice_ports.rs src/dsp/ugen/catalog/codec.rs src/dsp/build/names.rs src/dsp/build/names/table.rs src/types/natives_domain.rs src/sched/commit.rs src/dsp/ring.rs src/dsp/meta.rs src/dsp/meta/templates.rs src/dsp/meta/templates/voices.rs src/ns/insts.rs src/dsp/tests/dsp/fm1_voice_registry.rs src/host/tests/e2e/templates/fm1_voices.rs src/host/tests/e2e/templates/bass.rs",
         "CARGO_TERM_QUIET=true cargo run --quiet -- fmt --check src/prelude/templates.vact",
         "CARGO_TERM_QUIET=true VACTR_BLESS_GOLDEN=1 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --run-ignored ignored-only -E 'test(/bless_golden_digests/)'",
-        "test \"$(git diff -U0 -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')\" = 0",
-        "test \"$(git diff -U0 -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^+[^+]')\" = 18",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm1_voice|bass|e2e::templates|catalog|codec|seed_order|ported::tests|inst|meta|complete|live_input|contracts/)' > tmp/fm1-voices/FM1V-30/focused.log 2>&1; echo \"exit=$?\"",
+        "test \"$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')\" = 0",
+        "test \"$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^+[^+]')\" = 18",
+        "test \"$(git diff -U0 9ac8d1f -- src/prelude/templates.vact | grep -c '^-[^-]')\" = 0",
+        "test \"$(git diff -U0 9ac8d1f -- src/dsp/ugen/catalog/codec.rs | grep -c '^-[^-]')\" = 0",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/golden/)' > tmp/fm1-voices/FM1V-30/golden.log 2>&1; echo \"exit=$?\"",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm1_voice|bass|e2e::templates|catalog|codec|seed_order|ported::tests|inst|meta|complete|live_input|contracts/) - test(/complete::tests::robust/)' > tmp/fm1-voices/FM1V-30/focused.log 2>&1; echo \"exit=$?\"",
         "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-30 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-30/full.log 2>&1; echo \"exit=$?\"'",
         "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "wc -l src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/voice_ports.rs src/dsp/ugen/catalog/codec.rs src/dsp/build/names/table.rs src/dsp/meta.rs src/dsp/meta/templates.rs src/ns/insts.rs src/dsp/ugen/template.rs src/dsp/ugen/mod.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
-        "git diff --stat"
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-30/status-before.txt: new or changed paths are within writePaths"
       ]
     },
     {
       "planId": "FM1V-40",
       "planPath": "impl-plans/active/fm1-voices-40-fm-registry.md",
-      "dependsOn": ["FM1V-20", "FM1V-21", "FM1V-30"],
+      "dependsOn": [
+        "FM1V-20",
+        "FM1V-21",
+        "FM1V-30"
+      ],
       "writePaths": [
         "src/dsp/graph.rs",
         "src/dsp/ugen/mod.rs",
@@ -627,20 +431,23 @@
       "verification": [
         "rustfmt --edition 2021 --check src/dsp/graph.rs src/dsp/ugen/mod.rs src/dsp/ugen/template.rs src/dsp/voice.rs src/dsp/ugen/build_helpers.rs src/dsp/ugen/mixer.rs src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/voice_ports.rs src/dsp/ugen/catalog/codec.rs src/dsp/build.rs src/dsp/build/names.rs src/dsp/build/names/table.rs src/dsp/controls.rs src/dsp/meta.rs src/types/natives_domain.rs src/dsp/tests/dsp/fm6_registry.rs src/host/tests/e2e/templates/fm_mod_algorithm.rs",
         "CARGO_TERM_QUIET=true cargo run --quiet -- fmt --check src/prelude/templates.vact",
-        "git diff --exit-code -- src/host/tests/e2e/templates/golden_digests.txt",
-        "test \"$(git diff -U0 -- src/prelude/templates.vact | grep -c '^-[^-]')\" = 1 && test \"$(git diff -U0 -- src/prelude/templates.vact | grep -c '^+[^+]')\" = 1",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo|golden|e2e::templates|catalog|codec|meta|controls|inst|complete|cross_mod/)' > tmp/fm1-voices/FM1V-40/focused.log 2>&1; echo \"exit=$?\"",
+        "cmp tmp/fm1-voices/FM1V-40/golden_digests.before src/host/tests/e2e/templates/golden_digests.txt",
+        "test \"$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')\" = 0",
+        "test \"$(diff tmp/fm1-voices/FM1V-40/templates.vact.before src/prelude/templates.vact | grep -c '^<')\" = 1 && test \"$(diff tmp/fm1-voices/FM1V-40/templates.vact.before src/prelude/templates.vact | grep -c '^>')\" = 1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo|golden|e2e::templates|catalog|codec|meta|controls|inst|complete|cross_mod/) - test(/complete::tests::robust/)' > tmp/fm1-voices/FM1V-40/focused.log 2>&1; echo \"exit=$?\"",
         "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-40 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-40/full.log 2>&1; echo \"exit=$?\"'",
         "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "wc -l src/dsp/voice.rs src/dsp/build.rs src/dsp/ugen/template.rs src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/dsp/meta.rs | awk '$2 != \"total\" && $1 >= 1000 {bad=1} END {exit bad}'",
-        "git diff --stat"
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-40/status-before.txt: new or changed paths are within writePaths"
       ]
     },
     {
       "planId": "FM1V-50",
       "planPath": "impl-plans/active/fm1-voices-50-examples.md",
-      "dependsOn": ["FM1V-40"],
+      "dependsOn": [
+        "FM1V-40"
+      ],
       "writePaths": [
         "examples/fm6-algorithms.vact",
         "examples/kalimba.vact",
@@ -670,14 +477,18 @@
         "CARGO_TERM_QUIET=true cargo run --quiet -- fmt --check examples/experimental-oscillators.vact",
         "rustfmt --edition 2021 --check src/host/tests/e2e/templates/fm1_examples.rs",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm1_examples|corpus|lsp::tests::analysis/)' > tmp/fm1-voices/FM1V-50/nextest.log 2>&1; echo \"exit=$?\"",
-        "git diff --stat",
-        "git status --short"
+        "test \"$(grep -c -F -e ' = [' -e '(bank' examples/fm6-algorithms.vact)\" = 0",
+        "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-50 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-50/full.log 2>&1; echo \"exit=$?\"'",
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-50/status-before.txt: new or changed paths are within writePaths"
       ]
     },
     {
       "planId": "FM1V-51",
       "planPath": "impl-plans/active/fm1-voices-51-docs-notices.md",
-      "dependsOn": ["FM1V-40"],
+      "dependsOn": [
+        "FM1V-40",
+        "FM1V-50"
+      ],
       "writePaths": [
         "README.md",
         "design-docs/specs/design-music.md",
@@ -704,7 +515,9 @@
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/reader::tests|no_abort|types::tests::natives/)' > tmp/fm1-voices/FM1V-51/nextest.log 2>&1; echo \"exit=$?\"",
         "test \"$(grep -c 'Apache License' THIRD_PARTY_NOTICES.md)\" -ge 1",
         "grep -n 'algorithm: int = 0' design-docs/specs/design-music.md",
-        "git diff --stat"
+        "grep -n -i 'algorithms 4 and 6' THIRD_PARTY_NOTICES.md",
+        "bash -c 'L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir $L 2>/dev/null; do sleep 30; done; trap \"rm -rf $L\" EXIT; echo FM1V-51 > $L/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-voices/FM1V-51/full.log 2>&1; echo \"exit=$?\"'",
+        "git status --porcelain=v1 compared with tmp/fm1-voices/FM1V-51/status-before.txt: new or changed paths are within writePaths"
       ]
     }
   ]

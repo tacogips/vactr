@@ -1,6 +1,6 @@
 # FM1V-14: `tonewheel-core` Kernel (Drawbar Tonewheel Organ)
 
-**Status**: In Progress
+**Status**: Completed (accepted at 25d3e80; header corrected in session 352)
 **Plan ID**: FM1V-14 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "Drawbar tonewheel organ")
 **Created**: 2026-10-10

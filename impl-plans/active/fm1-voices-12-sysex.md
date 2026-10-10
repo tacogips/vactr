@@ -1,6 +1,6 @@
 # FM1V-12: Six-Operator SysEx Parser (Single Voice and 32-Voice Bulk)
 
-**Status**: In Progress
+**Status**: Completed (accepted at 25d3e80; header corrected in session 352)
 **Plan ID**: FM1V-12 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` ("SysEx import": formats, validation order, unpacking)
 **Created**: 2026-10-10

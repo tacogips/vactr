@@ -1,10 +1,61 @@
 # FM1V-20: Six-Operator FM Engine and `fm-mod` Algorithm Mode Kernel
 
-**Status**: In Progress
-**Plan ID**: FM1V-20 (wave 2)
-**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility", "Macro patch", "Operator, EG and scaling behaviour" numeric rules, "`fm6-core` UGen")
+**Status**: In Progress (session 352 redispatch: verification and test integrity)
+**Plan ID**: FM1V-20 (run 2, serial wave 2 of 6)
+**Design Reference**: `design-docs/specs/design-fm1-voices.md` ("`fm` template backward compatibility", "Macro patch", "Algorithm topologies" including "Algorithms 4 and 6", "Operator, EG and scaling behaviour" numeric rules, "`fm6-core` UGen")
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (session 352)
+
+## Session 352 Redispatch (read first)
+
+The engine is already in the tree at `25d3e80`. Its 11 module tests passed.
+The canonical filter was red only because of FM1V-21's fixture, which
+FM1V-21 now repairs; this plan depends on it. Do not rewrite the engine.
+This redispatch has four jobs:
+
+1. **Rerun the canonical filter** (Verification 2). It must be green.
+2. **Algorithms 4 and 6 (design decision, session 352).** Keep the
+   cross-operator feedback edges `4->6` and `5->6`, read from the source
+   operator's delayed two-sample history (`src/dsp/ugen/fm/engine.rs:175-181`).
+   msfa renders no feedback for these two algorithms. The design records
+   this as an intentional divergence.
+   - Do not change the rendering.
+   - Make sure the code comment there states the divergence in one or two
+     lines and cites the design section.
+   - `src/dsp/tests/dsp/fm6_engine.rs::fm6_feedback_uses_source_history_only_and_covers_cross_operator_edges`
+     must assert that, for algorithms 4 and 6, feedback 0 and feedback 7
+     give different output. If it does not, add that assertion.
+3. **Test integrity.** Check every test in `fm6_engine.rs` against
+   "Tests" below:
+   - Each named behaviour is asserted, not only computed.
+   - No assertion is tautological (comparing a value with itself, or with
+     a copy taken after the call).
+   - No tolerance or threshold is looser than this plan states.
+   - Patch-mode fixtures set every audible field (Pitfall "`Fm6Patch::EMPTY`
+     is silent").
+
+   Fix any gap inside writePaths. Record each check in the Progress Log as
+   `test name -> asserted behaviour -> ok/fixed`.
+4. **Mutation evidence** (report as `mutationEvidence`, never as a gating
+   verification). Use a temporary local edit that is reverted before the
+   gating runs:
+   - make the legacy branch call the engine;
+   - drop the feedback edge.
+
+   Run the matching test and record that it fails. Then restore the files
+   and confirm the `shasum -a 256` equals the pre-mutation hash.
+
+Scope and line limits:
+
+- `engine.rs` is 399 lines. Any comment change that would reach 400 moves
+  setup code into `src/dsp/ugen/fm/engine/setup.rs` (already a writePath).
+- At start, save `git status --porcelain=v1` to
+  `tmp/fm1-voices/FM1V-20/status-before.txt`. At the end, every newly
+  changed path must be in writePaths or `src/dsp/ugen/fm.rs`.
+
+This plan runs alone. A failure outside writePaths is a real defect: record
+it with the log path. If the failure is in an `fm6_sysex` test, FM1V-21's
+acceptance is wrong, so report that instead of editing FM1V-21's files.
 
 ## Intent and Context
 
@@ -32,8 +83,9 @@ and memory.
 ## Dependencies
 
 - **dependsOn**: FM1V-10 (`ALGORITHMS`, `RENDER_ORDER`, `algorithm`,
-  `carrier_count`), FM1V-11 (`Eg`, `EG_BLOCK`, `log_to_amp`, the scaling
-  functions)
+  `carrier_count`) and FM1V-11 (`Eg`, `EG_BLOCK`, `log_to_amp`, the scaling
+  functions), both accepted at `25d3e80`; FM1V-21 (its repaired fixture
+  keeps the canonical filter green)
 - **Blocks**: FM1V-40
 
 ## writePaths
@@ -52,9 +104,10 @@ and memory.
 
 ## sharedPathNotes
 
-- `src/dsp/ugen/fm.rs`: append exactly one new public function,
-  `modulate_with_algorithm`, after `modulate`. Do not change any existing
-  line. FM1V-00 already added the module declarations.
+- `src/dsp/ugen/fm.rs`: `modulate_with_algorithm` is already appended after
+  `modulate` at `25d3e80`. Edit only that function, and only if the audit
+  requires it. Never append a duplicate. No pre-run line (base `9ac8d1f`)
+  may change or be removed.
 
 ## Read-only References
 
@@ -165,6 +218,21 @@ next note.
 
 ## Pitfalls
 
+- **Long-running nextest (command timeout).**
+  - Full nextest takes about 800 to 1700 s. The single test
+    `complete::tests::robust::every_prefix_and_mutant_is_panic_free` takes
+    about 500 s.
+  - The previous FM1V-30 run was killed by SIGTERM at about 1200 s
+    (`tmp/fm1-voices/FM1V-30/focused-final-blessed.log`, exitStatus 100).
+  - Run the lock-wrapped full nextest in the foreground with the executor
+    command timeout set to at least 3600 s, or to its maximum. Poll it
+    until it exits, and never background it.
+  - A SIGTERM or harness kill is neither a pass nor a code failure. Rerun
+    the same command once with the long timeout. Keep both logs as
+    `tmp/fm1-voices/<planId>/attempt-<n>/full.log` and record both
+    attempts.
+  - Never skip, ignore or filter out tests to beat the timeout.
+
 - **The legacy branch must be byte-identical** to calling `modulate`
   directly. Test it bit for bit.
 - **The macro index envelope must not depend on the host block size.** Use
@@ -196,7 +264,12 @@ Keep `fm6_ports_contract`. Add:
   that operator is a carrier, or reaches a carrier through modulator edges.
 - `fm6_feedback_acts_only_through_source`. With feedback 0 against 7 on
   algorithm 32 (all carriers, feedback 6->6), only operator 6's
-  contribution differs. Isolate it by silencing operators 1-5.
+  contribution differs. Isolate it by silencing operators 1-5. The tree
+  implements this as
+  `fm6_feedback_uses_source_history_only_and_covers_cross_operator_edges`.
+  It must also cover algorithms 4 (source 4) and 6 (source 5): feedback 0
+  and feedback 7 differ, so the cross-operator edges are live (design
+  "Algorithms 4 and 6").
 - `fm6_patch_mode_eg_shapes_output`. Start from `Fm6Patch::EMPTY` and set
   every field below explicitly:
   - `ALGORITHM` = 0 (algorithm 1) and `FEEDBACK` = 0;
@@ -231,27 +304,44 @@ Keep `fm6_ports_contract`. Add:
    must exit 0.
 2. `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run -E 'test(/fm6|fm_mod|fm_algo/)' > tmp/fm1-voices/FM1V-20/nextest.log 2>&1; echo "exit=$?"`
    must print `exit=0`, with at least 11 tests from this plan and 0 failed.
-3. `git diff -U0 -- src/dsp/ugen/fm.rs | grep '^-[^-]'` prints nothing:
-   there are no removed lines.
+3. `test -z "$(git diff -U0 9ac8d1f -- src/dsp/ugen/fm.rs | grep '^-[^-]')"`
+   must exit 0: no line of the pre-run `fm.rs` is removed or changed. The
+   base is `9ac8d1f`, because the edits are already committed at
+   `25d3e80`.
 4. `wc -l src/dsp/ugen/fm/engine.rs` is below 400. If it is not, split the
    setup into `src/dsp/ugen/fm/engine/setup.rs` and record the split.
    Declare it as a private child module of `engine.rs`, so `fm.rs` does not
    change.
-5. `git diff --stat` shows only writePaths and `fm.rs`.
+5. Paths changed against `status-before.txt` are all in writePaths or
+   `fm.rs`.
+6. `test "$(git diff -U0 9ac8d1f -- src/host/tests/e2e/templates/golden_digests.txt | grep -c '^-[^-]')" = 0`
+   must exit 0: no pre-run golden line (including `graph fm baseline` and
+   `render fm center/pan02`) is removed or changed.
+7. Full nextest under the measurement lock (the same `bash -c` lock wrapper
+   as FM1V-21 Verification 7, owner `FM1V-20`, log
+   `tmp/fm1-voices/FM1V-20/full.log`) must print `exit=0` with 0 failed. It
+   follows the same rule for later-plan-owned failures as FM1V-21.
+8. `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/fm1-voices/FM1V-20/clippy.log 2>&1; echo "exit=$?"`
+   must print `exit=0`.
 
 Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Concurrency and Drift Protocol
 
 - Fresh-read `fm.rs` and record its `shasum -a 256` before and after.
-- Other wave-2 plans (FM1V-21, FM1V-30) edit other files. If a build fails
-  outside your writePaths, wait and re-run.
+- This plan runs alone (serial wave 2 of run 2). Never commit, stash,
+  checkout, reset or push.
 
 ## Done Criteria
 
 - [x] The engine and `modulate_with_algorithm` are implemented, and the
       legacy branch is bit-identical.
-- [ ] Verification 1-5 pass and are recorded.
+- [ ] The algorithm 4/6 divergence is commented in `engine.rs`, and the
+      feedback test asserts that algorithms 4 and 6 differ between feedback
+      0 and 7.
+- [ ] The test-integrity audit is recorded per test. Mutation evidence is
+      recorded separately, with the files restored (hash match).
+- [ ] Verification 1-8 pass and are recorded.
       Static checks 1, 3 and 4 passed. The canonical focused filter ran with
       an isolated declared target directory and completed 50 tests (49
       passed, 1 failed). The only failure is the FM1V-21

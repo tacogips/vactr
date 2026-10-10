@@ -1,6 +1,6 @@
 # FM1V-18: `scanned-core` Kernel (Scanned Synthesis)
 
-**Status**: In Progress (implementation repair complete; independent re-review pending)
+**Status**: Completed (accepted at 25d3e80; header corrected in session 352)
 **Plan ID**: FM1V-18 (wave 1)
 **Design Reference**: `design-docs/specs/design-fm1-voices.md` (Part 2 common rules; "Scanned synthesis")
 **Created**: 2026-10-10

@@ -11,9 +11,10 @@ It is linked from
 [`design-music.md` section 4.4](design-music.md#44-six-operator-fm-algorithms-and-new-voices-author-2026-10-10).
 
 Status: accepted design for the wf/fm1-voices workflow (2026-10-10, session
-347). Unresolved decisions are in
-[`../user-qa/pending-fm1-voices-questions.md`](../user-qa/pending-fm1-voices-questions.md).
-Their recommendations are followed by default.
+347; reconciled in session 352). The user decisions in
+[`../user-qa/pending-fm1-voices-questions.md`](../user-qa/pending-fm1-voices-questions.md)
+are all decided: the owner accepted FV1 (a), FV2 (a), FV3, FV4 (a), FV5 (a),
+FV6 and FV7 on 2026-10-10.
 
 This run owns every UGen, template and codec registry change. A sibling run
 (wf/fm1-tuning) covers microtonal tuning and strum/harp chords and only
@@ -279,6 +280,22 @@ computed before the operators it modulates. A feedback edge reads the
 source operator's average of its two most recent outputs from earlier
 samples. A feedback loop never reads a value from the current sample.
 
+**Algorithms 4 and 6 (decided, session 352).** Their feedback edges cross
+operators (`4->6` and `5->6`). msfa encodes them as `FB_OUT` on the source
+and `FB_IN` on the destination, but its renderer applies feedback only to an
+operator that carries both flags. msfa therefore renders no feedback for
+these two algorithms. vactr keeps the chart's edge instead:
+
+- The engine applies the edge to operator 6 from the source operator's
+  delayed two-sample history, with the same scaling as a self-loop.
+- The topology cross-check is unchanged: the edge is still derived from the
+  `FB_OUT` to `FB_IN` flags, so it matches msfa's table.
+- This is a rendering divergence from msfa, listed in "Intentional
+  simplifications". Every engine path is new, so no existing golden digest
+  is affected. The legacy `fm` path never runs the engine.
+- Test: for algorithms 4 and 6, feedback 0 and feedback 7 render different
+  output, so the edge is live.
+
 **msfa cross-check.** The cross-check lives in the test file
 `src/dsp/tests/dsp/fm_algorithms.rs` and works as follows:
 
@@ -422,15 +439,24 @@ order using the documented bit packing (msfa layout, adapted):
 - Errors become `Failure` values whose message starts `fm6-sysex:` and
   includes the `SysexError` text and the path.
 
-Usage (a list is callable with an index):
+Usage. A list is callable with an index and returns that element, or nil
+when the index is out of range. Vactr has no `( )` grouping: a nested call
+is grouped with `{}` or written as a `>` pipe. `let` takes no `=`, and a
+path is a path literal, not a string.
 
 ```
-let bank = fm6-sysex "./my-patches.syx"
-inst my-epiano: fm6-core freq velocity: velocity patch: (bank 3) > * amp
+let bank fm6-sysex ./my-patches.syx
+inst my-epiano: fm6-core freq velocity: velocity patch: {bank 3} > * amp
 s :my-epiano > note [:c4 :e4 :g4] > d1
 ```
 
-Lowering requires `patch:` to be a constant list. Plan FM1V-03 confirms that
+Test fixtures and docs use the same forms. For example, the bank length is
+`len {fm6-sysex ./bank.syx}`, and the length of the first voice is
+`fm6-sysex ./bank.syx > first > len`. The FM1V-21 fixture at
+`src/ns/tests/fm6_sysex.rs:92-93` used `( )` grouping, which fails with
+`error[paren-form]`. It is rewritten in these forms.
+
+Lowering requires `patch:` to be a constant list. Plan FM1V-40 confirms that
 an instrument body can take a list computed by a top-level `let` as that
 constant. If it cannot, the documented form is a literal list in the body,
 and the example and `lang-reference.md` entry use that form.
@@ -1041,7 +1067,23 @@ Tests are silent: nothing plays audio. The macOS volume is never changed.
 
 ## Implementation partition
 
-These are recommendations for the plan step.
+These were recommendations for the plan step. The accepted plans
+(`impl-plans/active/fm1-voices-dispatch.json`) split them further. The
+table below uses the recommendation names; the actual plans are:
+
+| Recommendation | Actual plans |
+|----------------|--------------|
+| FM1V-01 engine core | FM1V-00 scaffold, FM1V-10 algorithms, FM1V-11 EG and scaling, FM1V-20 engine |
+| FM1V-02 SysEx parser | FM1V-12 |
+| FM1V-03 fm registry | FM1V-21 (`fm6-sysex` native and `read_bytes`), FM1V-40 (`fm-mod` ports, row 21, `fm6-core`, tag 105, payload) |
+| FM1V-04 voice kernels | FM1V-13 to FM1V-18 |
+| FM1V-05 voice registry | FM1V-30 |
+| FM1V-06 examples and docs | FM1V-50 examples, FM1V-51 docs and notices |
+
+Run order for the remaining plans is serial: FM1V-21, FM1V-20, FM1V-30,
+FM1V-40, FM1V-50, FM1V-51. FM1V-30 runs before FM1V-40, so it takes codec
+tags 106..111 and leaves tag 105 unused until FM1V-40 assigns it to
+`fm6-core`. No tag is renumbered.
 
 | Plan | Owns | Depends on | Parallel |
 |------|------|------------|----------|
@@ -1071,6 +1113,8 @@ Playwright outputs as `artifactRoots`, never as write paths.
   - The analytic sine replaces msfa's table, and f32 math replaces Q24
     integers. Behaviour matches within the stated tolerances, not bit for
     bit.
+  - Algorithms 4 and 6 render their cross-operator feedback edge from
+    delayed history, where msfa renders none (see "Algorithm topologies").
 - **`fm` algorithm mode** uses a macro operator set, not a patch. Patches
   are available through `fm6-core`.
 - **Organ:**
@@ -1090,16 +1134,16 @@ Playwright outputs as `artifactRoots`, never as write paths.
 
 - **Digest drift in `fm`.** This is mitigated by the implicit-port
   mechanism, the bit-exact legacy branch, and the golden plus removed-line
-  checks in FM1V-03 and FM1V-05 acceptance.
+  checks in FM1V-40 and FM1V-30 acceptance.
 - **msfa access.** Implementers need the msfa source at a pinned SHA to
   write the cross-check fixture and formulas. If the source cannot be
-  reached, the plan stops at FM1V-01 and reports it. It does not substitute
-  another source.
+  reached, the plan stops at FM1V-00 and reports it. It does not substitute
+  another source. (FM1V-00 and FM1V-10 are accepted, so this is resolved.)
 - **Row 21 default change.** Only the `fm` template declares `algorithm`,
   and only `fm-mod` reads row 21. The full suite and the editor metadata
   tests confirm this.
 - **Payload constant-ness of `patch: (bank 3)`.** This is checked early in
-  FM1V-03, with a literal-list fallback (see "SysEx import").
+  FM1V-40, with a literal-list fallback (see "SysEx import").
 - **Sound quality is only partly provable by automated checks.** The
   objective checks above bound behaviour; the example renders support a
   manual listening pass.

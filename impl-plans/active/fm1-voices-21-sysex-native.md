@@ -268,9 +268,9 @@ Record results as `{command, exitStatus: 0, testsRun, testsPassed, failureCount:
 ## Done Criteria
 
 - [x] `read_bytes`, the native and its registration are implemented.
-- [ ] The committed source is audited against this plan, and any
+- [x] The committed source is audited against this plan, and any
       deviations are fixed.
-- [ ] The fixture at `src/ns/tests/fm6_sysex.rs:92-93` is rewritten with
+- [x] The fixture at `src/ns/tests/fm6_sysex.rs:92-93` is rewritten with
       `{}` and `>` forms (Verification 5 prints 0).
 - [ ] Verification 1-7 pass and are recorded.
 
@@ -314,3 +314,40 @@ signature and the native loader's 64 KiB limit using a temporary directory.
 **Tasks Remaining**: focused behavioral tests after sibling compile errors
 are repaired. The wasm build, formatting, and scoped diff/file-limit checks
 are complete.
+
+### Session: 2026-10-10 (session 352 redispatch)
+**Tasks Completed**: audited the committed implementation against the
+FM1V-21 file-level changes; repaired only the two invalid Vact assertions in
+`src/ns/tests/fm6_sysex.rs:92-93`; reran all plan gates.
+
+**Verification**:
+- `rustfmt --edition 2021 --check` over all nine Rust paths in this plan
+  passed (exit 0), log `tmp/fm1-voices/FM1V-21/attempt-01/rustfmt.log`.
+- The exact focused nextest filter passed: 291 tests run, 291 passed,
+  including all eight `fm6_sysex` tests (exit 0), log
+  `tmp/fm1-voices/FM1V-21/attempt-01/nextest.log`.
+- The wasm `host-wasm` library build passed (exit 0), log
+  `tmp/fm1-voices/FM1V-21/attempt-01/wasm.log`.
+- FM1V-20's canonical FM filter passed: 50 tests run, 50 passed (exit 0),
+  log `tmp/fm1-voices/FM1V-21/attempt-01/nextest-fm-filter.log`.
+- Line limit, no-parenthesis fixture syntax, and changed-path scope checks
+  passed (exit 0); evidence is in
+  `tmp/fm1-voices/FM1V-21/attempt-01/mechanical-checks.log`.
+- Full nextest under the measurement lock exited 100 after 1,323.392 s:
+  2,415/2,951 tests executed, 2,413 passed, 2 failed, 536 not run after
+  cancellation, and 3 skipped. The failures are
+  `song_bus_memory_layout::generated_two_bootstrapped_originals_fit_measured_heterogeneous_regions`
+  (`tests/song_bus_memory_layout.rs:619`, `(50, 49)` vs `(50, 55)`) and
+  `song_bus_memory_layout::mixed_graphs_and_unadopted_claims_refuse_without_old_mutation`
+  (`tests/song_bus_memory_layout.rs:701`, `(49, 49)` vs `(49, 55)`). Both
+  test files are outside this plan's `writePaths`; full log:
+  `tmp/fm1-voices/FM1V-21/attempt-01/full.log`.
+- Before/after source hashes are in
+  `tmp/fm1-voices/FM1V-21/attempt-01/source-hashes-before.log`,
+  `source-hashes-after-edit.log` and `source-hashes-final.log`. The only
+  changed source path against `status-before.txt` is the declared fixture.
+
+**Tasks Remaining**: full nextest is not green because of the two failures
+outside FM1V-21 `writePaths`. Resolve or disposition those failures through
+their owning plan, then rerun full nextest under the measurement lock before
+acceptance. Do not treat the 536 canceled tests as passed.

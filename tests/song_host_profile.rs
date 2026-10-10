@@ -452,7 +452,7 @@ fn profile_preserves_default_memory_and_validates_before_construction() {
         for rate in [8000., 48000., 192000.] {
             let plain = EngineConfig::new(&caps, rate, 64, StoreKind::NativeArc);
             assert!(plain.song_bus_memory.is_none());
-            assert_eq!((plain.bus_slots, plain.template_slots), (6, 96));
+            assert_eq!((plain.bus_slots, plain.template_slots), (6, 102));
             let full =
                 (plain.bus_seconds * rate) as usize + dsp::granular::effect_mem_len(rate, &caps);
             let room = dsp::effects::mem_len(dsp::graph::EffectKind::Room, rate, &caps);
@@ -834,7 +834,7 @@ fn configured_native_profile_is_actual_and_headless_compatibility_is_unchanged()
         (configured.bus_slots, configured.template_slots),
         (SONG_BUS_SLOTS, SONG_TEMPLATE_SLOTS)
     );
-    assert_eq!((SONG_BUS_SLOTS, SONG_TEMPLATE_SLOTS), (51, 128));
+    assert_eq!((SONG_BUS_SLOTS, SONG_TEMPLATE_SLOTS), (51, 134));
     assert_eq!(
         configured.bus_seconds.to_bits(),
         generic.bus_seconds.to_bits()

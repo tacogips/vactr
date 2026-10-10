@@ -89,8 +89,8 @@ fn fm6_sysex_native_returns_bulk_voices() {
     };
     assert_eq!(voices.items.len(), 32);
     assert_patch_value(&voices.items[0], &patches[0]);
-    assert_eq!(h.show("len (fm6-sysex ./bank.syx)"), "32");
-    assert_eq!(h.show("len ((fm6-sysex ./bank.syx) 0)"), "155");
+    assert_eq!(h.show("len {fm6-sysex ./bank.syx}"), "32");
+    assert_eq!(h.show("fm6-sysex ./bank.syx > first > len"), "155");
 }
 
 #[test]

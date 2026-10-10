@@ -149,7 +149,7 @@ impl Rig {
                 StoreKind::NativeArc,
             );
             cfg.bus_slots = bus_slots;
-            cfg.template_slots = 128;
+            cfg.template_slots = 134;
             cfg.song_bus_memory = Some(ring::SongBusMemoryProfile {
                 full_slots: 6,
                 small_chain_seconds: 1.,
@@ -162,7 +162,7 @@ impl Rig {
             let mut cfg =
                 EngineConfig::new(&caps, 8000., 16, StoreKind::Arena { bytes: 1_000_000 });
             cfg.bus_slots = bus_slots;
-            cfg.template_slots = 128;
+            cfg.template_slots = 134;
             cfg.song_bus_memory = Some(ring::SongBusMemoryProfile {
                 full_slots: 6,
                 small_chain_seconds: 1.,
@@ -458,7 +458,7 @@ fn default_layout_keeps_every_legacy_region_and_profile_is_checked() {
         for rate in [8000., 48000., 192000.] {
             let plain = EngineConfig::new(&caps, rate, 64, StoreKind::NativeArc);
             assert!(plain.song_bus_memory.is_none());
-            assert_eq!((plain.bus_slots, plain.template_slots), (6, 96));
+            assert_eq!((plain.bus_slots, plain.template_slots), (6, 102));
             let full =
                 (plain.bus_seconds * rate) as usize + dsp::granular::effect_mem_len(rate, &caps);
             let room = dsp::effects::mem_len(dsp::graph::EffectKind::Room, rate, &caps);

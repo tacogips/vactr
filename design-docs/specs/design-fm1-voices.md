@@ -808,7 +808,7 @@ are stale.
 | Highest codec tag | 104 (`BassCore`) | `fm6-core` 105, `kalimba-core` 106, `tonewheel-core` 107, `hurdy-gurdy-core` 108, `vosim-core` 109, `gendyn-core` 110, `scanned-core` 111. Existing tags are never renumbered. |
 | `UGEN_NAMES` (`catalog.rs`) | 98 | 105, appended at the end |
 | `TEMPLATE_NAMES` (`catalog.rs` and `src/ns/insts.rs`, `[&str; 73]`) | 73 | 79, appended after `reese-bass` |
-| `template_slots` (`src/dsp/ring.rs:810`) | 96 | Unchanged. 79 prelude + 2 live-input + 4 quad-stem = 85, or 87 with the stage-linked example. Only the stale "73 definitions" comment is fixed. |
+| `template_slots` (`src/dsp/ring.rs:810`) | 102 | Raised from 96 to preserve the previous local-song headroom after six FM1 voices were added to the prelude. 79 prelude + 2 live-input + 4 quad-stem = 85, or 87 with the stage-linked example. |
 | Control rows | last id 161 | No new rows. Row 21's default and range change (see Part 1). |
 | Custom header ids | first-use order from 192 | New names are first used only by the appended templates, so no existing id shifts |
 

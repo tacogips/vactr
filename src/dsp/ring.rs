@@ -808,7 +808,7 @@ impl EngineConfig {
             // templates and six FM1 voices). Live input adds 2 and quad-stem
             // definitions add 4. Leave bounded room for local song voices and opt-in
             // instruments.
-            template_slots: 96,
+            template_slots: 102,
             bus_slots: DEFAULT_BUS_SLOTS,
             song_bus_memory: None,
             // Full stereo FDN/shimmer state fits one voice; buses have room

@@ -8,8 +8,8 @@ use crate::dsp::{
 
 /// Two measured generated-parts epochs plus the original legacy master.
 pub const SONG_BUS_SLOTS: usize = 51;
-/// The actual 73-template prelude plus two 22-template epochs and bounded headroom.
-pub const SONG_TEMPLATE_SLOTS: usize = 128;
+/// The actual 79-template prelude plus two 22-template epochs and bounded headroom.
+pub const SONG_TEMPLATE_SLOTS: usize = 134;
 
 /// Selects actual constructor-owned capacities without reducing any effect budget.
 ///

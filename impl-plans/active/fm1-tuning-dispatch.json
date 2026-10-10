@@ -1,0 +1,412 @@
+{
+  "taskId": "fm1-tuning",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/fm1-tuning",
+  "baseBranch": "wf/fm1-tuning",
+  "remote": "origin",
+  "originalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+  "designDocPaths": [
+    "design-docs/specs/design-tuning-and-strum.md",
+    "design-docs/specs/design-music.md",
+    "design-docs/user-qa/pending-tuning-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "evidenceRoot": "tmp/fm1-tuning",
+  "evidenceLayout": "tmp/fm1-tuning/pNN/ holds each plan's full command logs, one file per command, as named in that plan's Verification table. Retries use per-attempt subdirectories tmp/fm1-tuning/pNN/attempt-<n>/. Each plan's Progress Log records every command with its exit status and log path. tmp/ is gitignored (**/tmp) and stays untracked. A missing or truncated log is not a pass.",
+  "executionModel": {
+    "waves": [
+      ["fm1-tuning-01-model"],
+      ["fm1-tuning-02-pattern-graph", "fm1-tuning-03-resolution", "fm1-tuning-04-music"],
+      ["fm1-tuning-05-natives"],
+      ["fm1-tuning-06-docs-examples"],
+      ["fm1-tuning-07-closeout"]
+    ],
+    "sameBranchFanout": true,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The workflow's integration step commits and non-force pushes to origin wf/fm1-tuning. It uses the AGENTS.md 1-6 section message with no tool attribution. Workers never commit, stash, checkout, reset, branch, push or merge. No main push and no PRs.",
+    "editProtocol": "Before each edit, re-read the file and record shasum -a 256 in the plan's Progress Log; record it again after the edit. On drift, re-read and re-apply only the plan's own change, never reverting another plan's lines. Never edit outside writePaths. Edit sharedPaths only as their sharedPathNotes describe.",
+    "heavySuitePolicy": "Plans 01-06 run only focused nextest filters. The full nextest, full vitest and test:style run only in plan 07, under the /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock directory lock, because the sibling run wf/fm1-voices is active. All tests are silent, and the macOS volume is never changed.",
+    "serialReconciliation": "Shared indexes and broad formatting are serial. Plan 07 alone appends to impl-plans/README.md. Cargo fmt without paths is never run by plans 01-06. Appends to src/types/natives_domain.rs and design-docs/specs/lang-reference.md that conflict with wf/fm1-voices are reconciled append-only at merge."
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput 'Microtonal tuning (EDO, just intonation, Bohlen-Pierce, Scala) and strum/harp/Orchid-style chord performance combinators' (no GitHub issue); riela execution opus-luna-design-and-implement-review-loop-session-348; design accepted comm-005844; plan review comm-005846 (PR-1 high, repaired); revised plans comm-005847; plan review acceptance comm-005848",
+    "userProblem": "vactr resolves notes only through fixed 12-TET (src/sched/commit.rs:43 note_to_freq), and its 17 named scales are 12-tone only. It has chord, voicing and arp, but no strum, harp or chord-performance helper. The user asked for FM-1-inspired microtonal tuning and strum/harp chord performance, using the synth concepts only (no GPL firmware code).",
+    "requiredOutcomes": [
+      "Tuning model: n-EDO (steps 1..=1200, covering 5..53), non-octave EDO periods (Bohlen-Pierce 13 steps of 3:1), JI ratio lists, inline and loaded Scala .scl text with optional .kbm, and presets :ji-5 :ji-7 :partch-43 :bohlen-pierce plus 11 microtonal scale presets (plan 01).",
+      "The tune combinator and the strum, harp and inversion pattern nodes (hash tags 43-46), with explicit arms in every exhaustive PatNode match, including song freeze and timing capture (plan 02).",
+      "Tuned frequency resolution at audio commit, MIDI commit (nearest 12-TET note), song freeze and song encode. Untuned output stays bit-identical (plan 03).",
+      "Tuning-aware scale, chord and voicing, with microtonal scale presets accepted by scale (plan 04).",
+      "Nine natives (tune edo ratios scala load-scala strum harp inversion perform) appended to the DOMAIN table, which also supplies completion and hover metadata, plus scheduler and song end-to-end tests (plan 05).",
+      "A lang-reference.md section 6 and runnable examples/microtonal-tuning.vact and examples/strum-harp.vact (plan 06).",
+      "Full gates under the measurement lock: build, strict clippy, fmt, full nextest, wasm --lib and release-wasm, npm check, vitest, frontend build and test:style. Invariant checks and an impl-plans/README.md entry (plan 07)."
+    ],
+    "nonGoals": [
+      "No UGen, template, codec tag, TEMPLATE_NAMES, src/prelude/templates.vact or golden digest change. The sibling run wf/fm1-voices owns them.",
+      "No dsp::controls row for tuning and no audio-thread code.",
+      "No MIDI pitch bend or MPE output (TQ1).",
+      "No public bass or invert native.",
+      "No THIRD_PARTY_NOTICES.md change: no permissive upstream is used (design D8).",
+      "No load-scala in examples or lang-reference fences.",
+      "No archiving of plans to impl-plans/completed/ inside the plans."
+    ],
+    "constraints": [
+      "Work only on branch wf/fm1-tuning in this worktree. Workers make no git writes.",
+      "LICENSE: the FM-1 firmwares are GPL-3.0 and serve only as concept descriptions. No firmware code, tables or patch data. No Dexed beyond msfa, Grids, TB-3PO, 8W8/9W9 or CrispyZebra. No DX7 ROM or factory patch data.",
+      "Default (untuned) output stays bit-identical. golden_digests.txt is unchanged. Registries are append-only, and existing hash tags 0-42 are unchanged.",
+      "Every touched Rust file stays under 1000 lines. src/song/assets.rs (965 lines), src/song/source.rs (972) and src/sched/commit.rs (873) have wc -l gates.",
+      "No allocation or locks on the audio thread. Tuning work runs on the scheduler side.",
+      "Tests are silent. The macOS volume is never changed. The full nextest and browser runs go under the measurement lock.",
+      "cargo runs with CARGO_TERM_QUIET=true. nextest runs with NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1.",
+      "Verification records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}. Negative-control runs go under mutationEvidence.",
+      "No existing gate or threshold is loosened."
+    ],
+    "designDecisionsAndRationale": [
+      "D1: with no tuning, the exact existing code paths run (note_to_freq, integer scale/chord/voicing, MIDI rounding), so the default is bit-identical by construction.",
+      "D2: a tuning spec is a dict value. On events it travels as the 'tuning' control in a canonical list form ([:edo ..] or [:degrees ..]), so it freezes into song mode as FrozenControl::List without codec changes.",
+      "D3: tune is control-like (chord shape) and gives no structure to an unstructured subject unless the tunings pattern is structured.",
+      "D4: key root (default 60) is degree 0 and sounds at note_to_freq(root). ref-key and ref-freq override the anchor (TQ2).",
+      "D5: frequency resolution runs only on the scheduler side; the audio thread still receives f32 constants.",
+      "D6: MIDI out under a tuning sends the nearest 12-TET note of the tuned frequency, with no pitch bend (TQ1).",
+      "D7: 12-tone vocabularies map into a tuning by the nearest-key rule, and apply directly when K == 12.",
+      "D8: no permissive upstream is used, so THIRD_PARTY_NOTICES.md is unchanged.",
+      "D9: new public names are tune, edo, ratios, scala, load-scala, strum, harp, inversion and perform."
+    ],
+    "intentionalTradeoffs": [
+      "Tuned var-driven notes commit Ctl::Const frequencies instead of CellMap::NoteToFreq cells, so live retuning of held notes is deferred (TQ4).",
+      "MIDI loses up to 50 cents of microtonal deviation (nearest-note policy).",
+      "strum time must be exact (Int/Ratio). A Float is a Type fault that suggests a ratio such as 1/32.",
+      "Live MIDI input lanes do not support the new operators. walk keeps its 'cannot re-time live input' reject.",
+      "perform composes chord > voicing > inversion > mode and has no PatNode of its own."
+    ],
+    "supportedEdgeCases": [
+      "Fractional keys interpolate in log frequency. If either neighbor is unmapped, the result is no tone.",
+      "A .kbm 'x' entry (unmapped) drops that tone with no fault. An unmapped reference key is a Type failure.",
+      "Scala input with \\r\\n line endings, comments, and trailing text after values.",
+      "Patterned tunings (tune {alt {edo 19} {edo 31}}) alternate per step.",
+      "Microtonal scale presets on untuned events insert their EDO tuning control without overwriting an existing recognized tuning.",
+      "A non-default root (root: :d) anchors note names at ROOT (DR-2). Under 19-EDO, :d is key 63 by default (DR-1).",
+      "strum time is clamped (dt = min(time, len/N)). :alternate follows parity, and :random is a deterministic Fisher-Yates.",
+      "harp pos is clamped to [0, 1] and evaluated per event; strips outside 1..=64 is a constructor Type failure.",
+      "inversion with negative and multi-period n, and the bass flag.",
+      "An unrecognized tuning control value (for example Int 3) keeps today's instrument-parameter handling."
+    ],
+    "outOfScopeEdgeCases": [
+      "MPE or per-channel pitch-bend MIDI output.",
+      "Live retuning of already-sounding var-driven notes.",
+      "New strum, harp or inversion behavior on live MIDI input lanes.",
+      "load-scala on hosts without a SourceLoader (fails with host-unavailable)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-tuning-and-strum.md",
+      "design-docs/specs/design-music.md",
+      "design-docs/user-qa/pending-tuning-questions.md",
+      "src/sched/commit.rs",
+      "src/sched/song/encode.rs",
+      "src/song/source.rs",
+      "src/pattern/combinators/music.rs",
+      "src/pattern/pat.rs",
+      "src/pattern/query.rs",
+      "src/session/song/freeze.rs",
+      "src/session/song/source_uses/timing/capture.rs",
+      "src/types/natives_domain.rs",
+      "src/types/infer_call.rs",
+      "src/vm/natives/music.rs",
+      "src/ns/load.rs",
+      "design-docs/specs/lang-reference.md"
+    ],
+    "residualRisks": [
+      "low: the design doc writes calls in '( )' notation, which is a reader error in vactr. Plans 05/06 pin the brace syntax. Fix the design notation at integration.",
+      "low: the line anchors in plan 02's freeze.rs guidance are approximate. Symbol names are explicit.",
+      "low: the sibling run wf/fm1-voices also appends to src/types/natives_domain.rs and design-docs/specs/lang-reference.md, so merge reconciliation is append-only.",
+      "low: src/song/assets.rs (965 lines) and src/song/source.rs (972 lines) are near the 1000-line limit. Each has a wc -l gate."
+    ]
+  },
+  "plans": [
+    {
+      "planId": "fm1-tuning-01-model",
+      "planPath": "impl-plans/active/fm1-tuning-01-model.md",
+      "dependsOn": [],
+      "writePaths": [
+        "src/pattern/mod.rs",
+        "src/pattern/tuning/mod.rs",
+        "src/pattern/tuning/scala.rs",
+        "src/pattern/tuning/presets.rs",
+        "src/pattern/tuning/tests.rs",
+        "impl-plans/active/fm1-tuning-01-model.md",
+        "target",
+        "tmp/fm1-tuning/p01"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p01"
+      ],
+      "acceptanceCriteria": [
+        "The contract symbols (Tuning, Mapping, edo_spec, ratios_spec, TUNING_CONTROL, scala_spec, ScalePreset, tuning_preset, scale_preset) exist with the exact pinned signatures.",
+        "Key rules 1-11 hold: the default anchor calls note_to_freq, P == 2 EDO uses the exact exp2 closed form, Euclidean degree math, keymap, nearest tie-breaking, note_key DR-2, from_control recognition, validation bounds, Scala parsing, and the presets copied from design 4.8.",
+        "All listed unit tests in src/pattern/tuning/tests.rs pass. Analytic relative error is <= 1e-12.",
+        "build, strict clippy and rustfmt pass. Each tuning file is < 1000 lines. Only Files-table paths changed."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p01",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p01/build.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib pattern::tuning > tmp/fm1-tuning/p01/nextest-focused.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p01/clippy.log 2>&1",
+        "rustfmt --edition 2021 --check src/pattern/mod.rs src/pattern/tuning/mod.rs src/pattern/tuning/scala.rs src/pattern/tuning/presets.rs src/pattern/tuning/tests.rs",
+        "wc -l src/pattern/tuning/*.rs"
+      ]
+    },
+    {
+      "planId": "fm1-tuning-02-pattern-graph",
+      "planPath": "impl-plans/active/fm1-tuning-02-pattern-graph.md",
+      "dependsOn": ["fm1-tuning-01-model"],
+      "writePaths": [
+        "src/pattern/pat.rs",
+        "src/pattern/query.rs",
+        "src/pattern/combinators/mod.rs",
+        "src/pattern/combinators/tune.rs",
+        "src/pattern/combinators/tune/tests.rs",
+        "src/pattern/combinators/strum.rs",
+        "src/pattern/combinators/strum/tests.rs",
+        "src/pattern/combinators/input.rs",
+        "src/pattern/eval/song_clock/dispatch.rs",
+        "src/ns/checked_callable.rs",
+        "src/song/assets.rs",
+        "src/song/source_uses.rs",
+        "src/session/song/source_uses.rs",
+        "src/session/song/shape_preparation.rs",
+        "src/session/song/freeze.rs",
+        "src/session/song/source_uses/timing/capture.rs",
+        "impl-plans/active/fm1-tuning-02-pattern-graph.md",
+        "target",
+        "tmp/fm1-tuning/p02"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p02"
+      ],
+      "acceptanceCriteria": [
+        "Four PatNode variants (Tune, Strum, Harp, Inversion) are appended after MidiNotes with hash tags 43-46. Existing tags 0-42 and existing arms are unchanged; the git diff of pat.rs shows additions only.",
+        "Every exhaustive match has explicit new arms, with no new '_ =>' catch-all. This includes every freeze.rs dispatcher (pat, pat_complex, pat_unary, finish_unary, unary_child, children) and the timing/capture.rs param, child and node-capture matches.",
+        "query_tune uses control::query_mapped with Tuning::from_spec(..).with_mapping(..).to_control(). strum, harp and inversion follow the semantics in design 5.1-5.3.",
+        "Song classification matches the plan table (Tune Restructure/SelectContent; Strum, Harp, Inversion Preserve).",
+        "The listed tune/strum tests pass. The regression filter (pattern:: song:: session:: ns::) is green.",
+        "clippy and rustfmt pass on every Files-table file. Line limits hold (< 1000)."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p02",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p02/build.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib combinators::tune combinators::strum > tmp/fm1-tuning/p02/nextest-focused.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib pattern:: song:: session:: ns:: > tmp/fm1-tuning/p02/nextest-regression.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p02/clippy.log 2>&1",
+        "rustfmt --edition 2021 --check src/pattern/pat.rs src/pattern/query.rs src/pattern/combinators/mod.rs src/pattern/combinators/tune.rs src/pattern/combinators/tune/tests.rs src/pattern/combinators/strum.rs src/pattern/combinators/strum/tests.rs src/pattern/combinators/input.rs src/pattern/eval/song_clock/dispatch.rs src/ns/checked_callable.rs src/song/assets.rs src/song/source_uses.rs src/session/song/source_uses.rs src/session/song/shape_preparation.rs src/session/song/freeze.rs src/session/song/source_uses/timing/capture.rs",
+        "wc -l src/song/assets.rs src/ns/checked_callable.rs src/session/song/source_uses.rs src/session/song/shape_preparation.rs src/session/song/freeze.rs src/session/song/source_uses/timing/capture.rs src/pattern/combinators/strum.rs",
+        "test \"$(git diff src/pattern/pat.rs | grep -c '^-[^-]')\" = 0"
+      ]
+    },
+    {
+      "planId": "fm1-tuning-03-resolution",
+      "planPath": "impl-plans/active/fm1-tuning-03-resolution.md",
+      "dependsOn": ["fm1-tuning-01-model"],
+      "writePaths": [
+        "src/sched/commit.rs",
+        "src/sched/commit/tuned.rs",
+        "src/sched/song/encode.rs",
+        "src/song/source.rs",
+        "src/sched/tests/sched.rs",
+        "src/sched/tests/sched/tuning.rs",
+        "impl-plans/active/fm1-tuning-03-resolution.md",
+        "target",
+        "tmp/fm1-tuning/p03"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p03"
+      ],
+      "acceptanceCriteria": [
+        "Audio commit, MIDI commit, song freeze (src/song/source.rs expand_event) and song encode honor a recognized tuning control. Unrecognized or absent tuning takes today's code path unchanged (bit identity).",
+        "A recognized tuning skips the generic control loop next to speed-fit. Keyword tones go through Tuning::note_key. Unmapped tones drop silently. Tuned var-driven notes push Ctl::Const.",
+        "MIDI under a tuning sends round(69 + 12*log2(f/440)) clamped to 0..127. Untuned MIDI is unchanged.",
+        "The listed src/sched/tests/sched/tuning.rs tests pass. The existing sched and song suites are green.",
+        "golden_digests.txt is untouched. clippy and rustfmt pass. commit.rs, source.rs and encode.rs are each < 1000 lines; helpers move to src/sched/commit/tuned.rs if commit.rs would reach 950+."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p03",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p03/build.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib sched::tests > tmp/fm1-tuning/p03/nextest-sched.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib song:: > tmp/fm1-tuning/p03/nextest-song-lib.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_end_to_end --test song_issued_events --test song_frozen_cells > tmp/fm1-tuning/p03/nextest-song-int.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p03/clippy.log 2>&1",
+        "rustfmt --edition 2021 --check src/sched/commit.rs src/sched/song/encode.rs src/song/source.rs src/sched/tests/sched.rs src/sched/tests/sched/tuning.rs",
+        "git diff --exit-code src/host/tests/e2e/templates/golden_digests.txt",
+        "wc -l src/sched/commit.rs src/song/source.rs src/sched/song/encode.rs"
+      ]
+    },
+    {
+      "planId": "fm1-tuning-04-music",
+      "planPath": "impl-plans/active/fm1-tuning-04-music.md",
+      "dependsOn": ["fm1-tuning-01-model"],
+      "writePaths": [
+        "src/pattern/combinators/music.rs",
+        "src/pattern/combinators/music/tuning_tests.rs",
+        "impl-plans/active/fm1-tuning-04-music.md",
+        "target",
+        "tmp/fm1-tuning/p04"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p04"
+      ],
+      "acceptanceCriteria": [
+        "The scale constructor accepts legacy names or presets::scale_preset names. Unknown names keep the existing 'unknown scale' error.",
+        "scale_event, query_chord and voicing follow design 4.7 under a recognized tuning (K == P direct, otherwise nearest). Untuned paths are byte-for-byte unchanged. arp is unchanged.",
+        "A microtonal preset on an untuned event inserts Tuning::edo(size, period).to_control() and never overwrites an existing recognized tuning.",
+        "The listed music/tuning_tests.rs tests pass. Existing pattern, types and reader tests are green.",
+        "clippy and rustfmt pass. music.rs is < 1000 lines. Only the two files changed."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p04",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p04/build.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib combinators::music pattern::tests > tmp/fm1-tuning/p04/nextest-focused.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib types:: reader:: > tmp/fm1-tuning/p04/nextest-spec.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p04/clippy.log 2>&1",
+        "rustfmt --edition 2021 --check src/pattern/combinators/music.rs src/pattern/combinators/music/tuning_tests.rs",
+        "wc -l src/pattern/combinators/music.rs"
+      ]
+    },
+    {
+      "planId": "fm1-tuning-05-natives",
+      "planPath": "impl-plans/active/fm1-tuning-05-natives.md",
+      "dependsOn": [
+        "fm1-tuning-01-model",
+        "fm1-tuning-02-pattern-graph",
+        "fm1-tuning-03-resolution",
+        "fm1-tuning-04-music"
+      ],
+      "writePaths": [
+        "src/vm/natives/tuning.rs",
+        "src/vm/natives/mod.rs",
+        "src/types/natives_domain.rs",
+        "src/types/infer_call.rs",
+        "src/sched/tests/sched/tuning_natives.rs",
+        "tests/song_tuning.rs",
+        "tests/fixtures/tuning/slendro.scl",
+        "tests/fixtures/tuning/slendro.kbm",
+        "impl-plans/active/fm1-tuning-05-natives.md",
+        "target",
+        "tmp/fm1-tuning/p05"
+      ],
+      "sharedPaths": [
+        "src/sched/tests/sched.rs"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "src/sched/tests/sched.rs",
+          "intendedEdit": "Plan 03 (an earlier wave) adds 'mod tuning;'. Plan 05 appends exactly one line, 'mod tuning_natives;', to the module list and changes nothing else."
+        }
+      ],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p05"
+      ],
+      "acceptanceCriteria": [
+        "The 9 natives (tune edo ratios scala load-scala strum harp inversion perform) are registered by tuning::register(p) as the last line of register_domain. Their 9 f(..) entries are appended at the end of DOMAIN after play-song, and the git diff of natives_domain.rs shows additions only.",
+        "The infer_call.rs chord arm also checks perform argument index 1 with chord_arg.",
+        "load-scala copies the src/ns/load.rs effect-mode check and LoaderHost take/put-back. It returns host-unavailable with no loader and always restores the host.",
+        "The listed tuning_natives.rs tests pass, using brace call syntax.",
+        "tests/song_tuning.rs passes: tuned :d freezes to ResolvedNote::Int(63) and encodes note_to_freq(60)*2^(3/19) within 1 ulp; untuned stays 62 bit-equal; the untuned strum song gives 3 frozen events (60/64/67 at 0, 1/32, 2/32) with no dispatch-invariant failure; the tuned strum song gives keys 60/66/71 at analytic frequencies.",
+        "The wasm --lib build, clippy and rustfmt pass. Each file is < 1000 lines."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p05",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p05/build.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib sched::tests types:: vm:: ns:: complete:: lsp:: > tmp/fm1-tuning/p05/nextest-focused.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test song_tuning --test song_end_to_end --test song_natives > tmp/fm1-tuning/p05/nextest-song.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/fm1-tuning/p05/wasm-lib.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p05/clippy.log 2>&1",
+        "rustfmt --edition 2021 --check src/vm/natives/tuning.rs src/vm/natives/mod.rs src/types/natives_domain.rs src/types/infer_call.rs src/sched/tests/sched.rs src/sched/tests/sched/tuning_natives.rs tests/song_tuning.rs",
+        "test \"$(git diff src/types/natives_domain.rs | grep -c '^-[^-]')\" = 0",
+        "wc -l src/vm/natives/tuning.rs src/vm/natives/mod.rs src/types/natives_domain.rs src/types/infer_call.rs src/sched/tests/sched/tuning_natives.rs tests/song_tuning.rs"
+      ]
+    },
+    {
+      "planId": "fm1-tuning-06-docs-examples",
+      "planPath": "impl-plans/active/fm1-tuning-06-docs-examples.md",
+      "dependsOn": ["fm1-tuning-05-natives"],
+      "writePaths": [
+        "design-docs/specs/lang-reference.md",
+        "examples/microtonal-tuning.vact",
+        "examples/strum-harp.vact",
+        "impl-plans/active/fm1-tuning-06-docs-examples.md",
+        "target",
+        "tmp/fm1-tuning/p06"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p06"
+      ],
+      "acceptanceCriteria": [
+        "lang-reference.md gains '## 6. Tuning and Chord Performance', appended after section 5. Section 5 is not renumbered or edited. The new section documents all 9 names, the tuning and scale presets, the tune-first ordering rule, the default anchor and ref-key/ref-freq, the MIDI nearest-note limitation, and a link to design-tuning-and-strum.md. Fences use brace syntax and read and check without abort.",
+        "examples/microtonal-tuning.vact and examples/strum-harp.vact use only existing templates and inline scala (no load-scala), are formatter fixed points, and run silently on --host noop for 2 cycles.",
+        "The fmt, lsp, reader and types test filters are green. lang-reference.md has additions only."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p06",
+        "CARGO_TERM_QUIET=true cargo run -- fmt --check examples/microtonal-tuning.vact examples/strum-harp.vact > tmp/fm1-tuning/p06/fmt.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo run -- run examples/microtonal-tuning.vact --host noop --cycles 2 > tmp/fm1-tuning/p06/run-microtonal.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo run -- run examples/strum-harp.vact --host noop --cycles 2 > tmp/fm1-tuning/p06/run-strum.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib fmt::tests lsp::tests reader::tests types::tests > tmp/fm1-tuning/p06/nextest-docs.log 2>&1",
+        "test \"$(git diff design-docs/specs/lang-reference.md | grep -c '^-[^-]')\" = 0",
+        "grep -c \"tune\\|strum\\|harp\\|inversion\\|perform\\|edo\\|ratios\\|scala\" design-docs/specs/lang-reference.md"
+      ]
+    },
+    {
+      "planId": "fm1-tuning-07-closeout",
+      "planPath": "impl-plans/active/fm1-tuning-07-closeout.md",
+      "dependsOn": ["fm1-tuning-06-docs-examples"],
+      "writePaths": [
+        "impl-plans/README.md",
+        "impl-plans/active/fm1-tuning-07-closeout.md",
+        "target",
+        "tmp/fm1-tuning/p07",
+        "editor/dist",
+        "tmp/ui-style",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tmp/fm1-tuning/p07",
+        "editor/dist",
+        "tmp/ui-style",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
+      "acceptanceCriteria": [
+        "Gates 1-10 run serially and each exits 0 with a complete log under tmp/fm1-tuning/p07/. Gates 4 (full nextest), 8 (vitest) and 10 (test:style) run under the measurement lock.",
+        "Invariants hold: golden_digests.txt, src/dsp/ugen/catalog.rs, src/dsp/ugen/catalog/codec.rs, src/prelude/templates.vact, src/dsp/controls.rs, THIRD_PARTY_NOTICES.md, src/sched/cells.rs and src/host/caps.rs are unchanged versus 9ac8d1f. natives_domain.rs has additions only. Every changed .rs file is < 1000 lines.",
+        "impl-plans/README.md gains one appended paragraph linking the 7 plans and design-tuning-and-strum.md.",
+        "The progress log records each gate as {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: passed, log, notes}. Intentional negative runs go under mutationEvidence only."
+      ],
+      "verification": [
+        "mkdir -p tmp/fm1-tuning/p07",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p07/build.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p07/clippy.log 2>&1",
+        "cargo fmt -- --check > tmp/fm1-tuning/p07/fmt.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo fm1-tuning-closeout > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run > tmp/fm1-tuning/p07/nextest-full.log 2>&1'",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/fm1-tuning/p07/wasm-lib.log 2>&1",
+        "mise run build-wasm-release > tmp/fm1-tuning/p07/wasm-release.log 2>&1",
+        "cd editor && npm run check > ../tmp/fm1-tuning/p07/npm-check.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo fm1-tuning-closeout > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && ./node_modules/.bin/vitest run > ../tmp/fm1-tuning/p07/vitest-full.log 2>&1'",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build > ../tmp/fm1-tuning/p07/dist-build.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo fm1-tuning-closeout > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npm run test:style > ../tmp/fm1-tuning/p07/test-style.log 2>&1'",
+        "git diff --exit-code 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- src/host/tests/e2e/templates/golden_digests.txt src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/prelude/templates.vact src/dsp/controls.rs THIRD_PARTY_NOTICES.md src/sched/cells.rs src/host/caps.rs",
+        "test \"$(git diff 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- src/types/natives_domain.rs | grep -c '^-[^-]')\" = 0",
+        "{ git diff --name-only 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- '*.rs'; git ls-files -o --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'"
+      ]
+    }
+  ]
+}

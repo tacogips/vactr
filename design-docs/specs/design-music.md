@@ -622,3 +622,11 @@ chill, house, hip-hop and pop scores, and [lo-fi effect and collection](design-l
 for the researched `lofi` bus/voice effect and nine additional lo-fi scores.
 [Track catalog and export commands](../../examples/tracks/README.md) cover all
 24 arrangements and their production-engine WAV exports.
+
+## Microtonal tuning and chord performance
+
+See [tuning and strum](design-tuning-and-strum.md) for tunings (n-EDO,
+non-octave EDO, just-intonation ratio lists, Scala `.scl`/`.kbm`), the
+`tune` combinator, tuning-aware `scale`/`chord`/`voicing`, the MIDI-out
+policy, and the `strum`, `harp`, `inversion` and `perform` combinators.
+Without a tuning, section 3 behavior is unchanged.

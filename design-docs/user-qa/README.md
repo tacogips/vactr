@@ -27,6 +27,7 @@ Store questions, pending decisions, and items awaiting user approval.
 - [pending-bass-questions.md](./pending-bass-questions.md) - Bass voices (design-bass-voices.md): BQ1 (automatic previous-note slide via engine handoff), BQ2 (held-key sustain versus kernel-owned `gate-length`), BQ3 (rumble as an example recipe or a template): open, recommendations followed by default
 - [pending-song-mode-questions.md](./pending-song-mode-questions.md) - Song-mode production integration (2026-10-03, session 249): SM1 (Index retention work under production default limits), SM2 (runtime first-time execution of unseen seeds is out of scope for static songs): open, recommendations followed by default (design-song-mode.md production integration contract)
 - [pending-ui-style-questions.md](./pending-ui-style-questions.md) - Editor UI style (2026-10-05, session 275): UQ1 (accent hue), UQ2 (hush danger treatment), UQ3 (global `[hidden]` rule): open, recommendations followed by default (design-ui-style.md)
+- [pending-tuning-questions.md](./pending-tuning-questions.md) - Microtonal tuning and chord performance (2026-10-10, branch wf/fm1-tuning): TQ1 (MIDI microtonal output), TQ2 (default reference pitch), TQ3 (harp plate defaults), TQ4 (live retuning of held var-driven notes): open, recommendations followed by default (design-tuning-and-strum.md)
 - [qa-example.md](./qa-example.md) - Example: Database Selection (template example)
 - [pending-example.md](./pending-example.md) - Example: CLI Output Format (template example)
 

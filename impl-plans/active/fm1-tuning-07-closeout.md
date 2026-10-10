@@ -62,9 +62,11 @@ bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/
 
 Invariant checks (each exit 0):
 
-- `git diff --exit-code 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- src/host/tests/e2e/templates/golden_digests.txt src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/prelude/templates.vact src/dsp/controls.rs THIRD_PARTY_NOTICES.md src/sched/cells.rs src/host/caps.rs`
-- `git diff 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- src/types/natives_domain.rs` shows only added lines (`grep -c '^-[^-]'` on the diff = 0)
-- `wc -l` on every Rust file changed since 9ac8d1f (`git diff --name-only 9ac8d1f -- '*.rs'`): each < 1000
+Baseline is the run-2 originalHead `dbad8c3b53f10262ee6113fa6efa9bbff17bca08`. It is source-identical to run 1's `9ac8d1f`: `git diff --stat 9ac8d1f dbad8c3 -- src` is empty.
+
+- `git diff --exit-code dbad8c3b53f10262ee6113fa6efa9bbff17bca08 -- src/host/tests/e2e/templates/golden_digests.txt src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/prelude/templates.vact src/dsp/controls.rs THIRD_PARTY_NOTICES.md src/sched/cells.rs src/host/caps.rs`
+- `git diff dbad8c3b53f10262ee6113fa6efa9bbff17bca08 -- src/types/natives_domain.rs` shows only added lines (`grep -c '^-[^-]'` on the diff = 0)
+- `wc -l` on every Rust file changed since dbad8c3 or newly untracked (`git diff --name-only dbad8c3 -- '*.rs'` plus `git ls-files -o --exclude-standard -- '*.rs'`): each < 1000
 
 Record every gate as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`. Intentional negative runs go under `mutationEvidence`, never in the gate list.
 
@@ -79,4 +81,8 @@ Record every gate as `{command, exitStatus: 0, testsRun, testsPassed, failureCou
 
 ### Session: 2026-10-10
 **Tasks Completed**: Plan created
+**Notes**: Waits for plans 01-06
+
+### Session: 2026-10-10 (run 2 re-plan, session-351)
+**Tasks Completed**: Rebased the invariant checks onto the run-2 originalHead dbad8c3 (source-identical to 9ac8d1f)
 **Notes**: Waits for plans 01-06

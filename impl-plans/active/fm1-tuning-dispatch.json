@@ -4,7 +4,9 @@
   "implementationBranch": "wf/fm1-tuning",
   "baseBranch": "wf/fm1-tuning",
   "remote": "origin",
-  "originalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+  "originalHead": "dbad8c3b53f10262ee6113fa6efa9bbff17bca08",
+  "previousRunOriginalHead": "9ac8d1fdd7961b2a47bb000ef612742593cf131d",
+  "baselineNote": "Run 2 (session-351) starts at dbad8c3, which committed only design docs and plans on top of 9ac8d1f. git diff --stat 9ac8d1f dbad8c3 -- src is empty, so the two are source-identical.",
   "designDocPaths": [
     "design-docs/specs/design-tuning-and-strum.md",
     "design-docs/specs/design-music.md",
@@ -29,7 +31,7 @@
     "serialReconciliation": "Shared indexes and broad formatting are serial. Plan 07 alone appends to impl-plans/README.md. Cargo fmt without paths is never run by plans 01-06. Appends to src/types/natives_domain.rs and design-docs/specs/lang-reference.md that conflict with wf/fm1-voices are reconciled append-only at merge."
   },
   "reviewContext": {
-    "issueReference": "workflowInput 'Microtonal tuning (EDO, just intonation, Bohlen-Pierce, Scala) and strum/harp/Orchid-style chord performance combinators' (no GitHub issue); riela execution opus-luna-design-and-implement-review-loop-session-348; design accepted comm-005844; plan review comm-005846 (PR-1 high, repaired); revised plans comm-005847; plan review acceptance comm-005848",
+    "issueReference": "workflowInput 'Microtonal tuning (EDO, just intonation, Bohlen-Pierce, Scala) and strum/harp/Orchid-style chord performance combinators' (no GitHub issue); riela execution opus-luna-design-and-implement-review-loop-session-348; design accepted comm-005844; plan review comm-005846 (PR-1 high, repaired); revised plans comm-005847; plan review acceptance comm-005848. Run 2: execution opus-luna-design-and-implement-review-loop-session-351; intake comm-005859; design re-review accepted comm-005861 (TQ1-TQ4 decided as recommended); plans re-issued with a plan-01 WIP-patch starting point, plan-06 design notation fix and plan-07 baseline dbad8c3",
     "userProblem": "vactr resolves notes only through fixed 12-TET (src/sched/commit.rs:43 note_to_freq), and its 17 named scales are 12-tone only. It has chord, voicing and arp, but no strum, harp or chord-performance helper. The user asked for FM-1-inspired microtonal tuning and strum/harp chord performance, using the synth concepts only (no GPL firmware code).",
     "requiredOutcomes": [
       "Tuning model: n-EDO (steps 1..=1200, covering 5..53), non-octave EDO periods (Bohlen-Pierce 13 steps of 3:1), JI ratio lists, inline and loaded Scala .scl text with optional .kbm, and presets :ji-5 :ji-7 :partch-43 :bohlen-pierce plus 11 microtonal scale presets (plan 01).",
@@ -115,7 +117,8 @@
       "design-docs/specs/lang-reference.md"
     ],
     "residualRisks": [
-      "low: the design doc writes calls in '( )' notation, which is a reader error in vactr. Plans 05/06 pin the brace syntax. Fix the design notation at integration.",
+      "low: the design doc writes five calls in '( )' notation, which is a reader error in vactr. Plans 05/06 pin the brace syntax, and plan 06 rewrites those five spans to braces in design-tuning-and-strum.md.",
+      "low: plan 01 may start from tmp/fm1-tuning/p01-wip-session348.patch, which did not compile in session 348. Plan 01 treats it as untrusted and verifies it fresh into tmp/fm1-tuning/p01/run2/.",
       "low: the line anchors in plan 02's freeze.rs guidance are approximate. Symbol names are explicit.",
       "low: the sibling run wf/fm1-voices also appends to src/types/natives_domain.rs and design-docs/specs/lang-reference.md, so merge reconciliation is append-only.",
       "low: src/song/assets.rs (965 lines) and src/song/source.rs (972 lines) are near the 1000-line limit. Each has a wc -l gate."
@@ -142,16 +145,17 @@
         "tmp/fm1-tuning/p01"
       ],
       "acceptanceCriteria": [
+        "The progress log records the choice between applying tmp/fm1-tuning/p01-wip-session348.patch (git apply --check first, working tree only, no --index) and rewriting. Either way the code is verified fresh, and the session-348 logs are not evidence.",
         "The contract symbols (Tuning, Mapping, edo_spec, ratios_spec, TUNING_CONTROL, scala_spec, ScalePreset, tuning_preset, scale_preset) exist with the exact pinned signatures.",
         "Key rules 1-11 hold: the default anchor calls note_to_freq, P == 2 EDO uses the exact exp2 closed form, Euclidean degree math, keymap, nearest tie-breaking, note_key DR-2, from_control recognition, validation bounds, Scala parsing, and the presets copied from design 4.8.",
         "All listed unit tests in src/pattern/tuning/tests.rs pass. Analytic relative error is <= 1e-12.",
         "build, strict clippy and rustfmt pass. Each tuning file is < 1000 lines. Only Files-table paths changed."
       ],
       "verification": [
-        "mkdir -p tmp/fm1-tuning/p01",
-        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p01/build.log 2>&1",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib pattern::tuning > tmp/fm1-tuning/p01/nextest-focused.log 2>&1",
-        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p01/clippy.log 2>&1",
+        "mkdir -p tmp/fm1-tuning/p01/run2",
+        "CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p01/run2/build.log 2>&1",
+        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib pattern::tuning > tmp/fm1-tuning/p01/run2/nextest-focused.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p01/run2/clippy.log 2>&1",
         "rustfmt --edition 2021 --check src/pattern/mod.rs src/pattern/tuning/mod.rs src/pattern/tuning/scala.rs src/pattern/tuning/presets.rs src/pattern/tuning/tests.rs",
         "wc -l src/pattern/tuning/*.rs"
       ]
@@ -338,6 +342,7 @@
       "dependsOn": ["fm1-tuning-05-natives"],
       "writePaths": [
         "design-docs/specs/lang-reference.md",
+        "design-docs/specs/design-tuning-and-strum.md",
         "examples/microtonal-tuning.vact",
         "examples/strum-harp.vact",
         "impl-plans/active/fm1-tuning-06-docs-examples.md",
@@ -352,7 +357,8 @@
       "acceptanceCriteria": [
         "lang-reference.md gains '## 6. Tuning and Chord Performance', appended after section 5. Section 5 is not renumbered or edited. The new section documents all 9 names, the tuning and scale presets, the tune-first ordering rule, the default anchor and ref-key/ref-freq, the MIDI nearest-note limitation, and a link to design-tuning-and-strum.md. Fences use brace syntax and read and check without abort.",
         "examples/microtonal-tuning.vact and examples/strum-harp.vact use only existing templates and inline scala (no load-scala), are formatter fixed points, and run silently on --host noop for 2 cycles.",
-        "The fmt, lsp, reader and types test filters are green. lang-reference.md has additions only."
+        "The fmt, lsp, reader and types test filters are green. lang-reference.md has additions only.",
+        "design-tuning-and-strum.md: only the five '( )' call-notation spans (D3, 4.5, 10.4, 10.5, 10.11) are rewritten to brace syntax. No '(edo ' or '(alt ' remains, and no other text changes."
       ],
       "verification": [
         "mkdir -p tmp/fm1-tuning/p06",
@@ -361,6 +367,8 @@
         "CARGO_TERM_QUIET=true cargo run -- run examples/strum-harp.vact --host noop --cycles 2 > tmp/fm1-tuning/p06/run-strum.log 2>&1",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib fmt::tests lsp::tests reader::tests types::tests > tmp/fm1-tuning/p06/nextest-docs.log 2>&1",
         "test \"$(git diff design-docs/specs/lang-reference.md | grep -c '^-[^-]')\" = 0",
+        "grep -nE '\\((edo|alt) ' design-docs/specs/design-tuning-and-strum.md > tmp/fm1-tuning/p06/design-notation.log 2>&1; test $? -eq 1",
+        "git diff --numstat design-docs/specs/design-tuning-and-strum.md",
         "grep -c \"tune\\|strum\\|harp\\|inversion\\|perform\\|edo\\|ratios\\|scala\" design-docs/specs/lang-reference.md"
       ]
     },
@@ -387,7 +395,7 @@
       ],
       "acceptanceCriteria": [
         "Gates 1-10 run serially and each exits 0 with a complete log under tmp/fm1-tuning/p07/. Gates 4 (full nextest), 8 (vitest) and 10 (test:style) run under the measurement lock.",
-        "Invariants hold: golden_digests.txt, src/dsp/ugen/catalog.rs, src/dsp/ugen/catalog/codec.rs, src/prelude/templates.vact, src/dsp/controls.rs, THIRD_PARTY_NOTICES.md, src/sched/cells.rs and src/host/caps.rs are unchanged versus 9ac8d1f. natives_domain.rs has additions only. Every changed .rs file is < 1000 lines.",
+        "Invariants hold: golden_digests.txt, src/dsp/ugen/catalog.rs, src/dsp/ugen/catalog/codec.rs, src/prelude/templates.vact, src/dsp/controls.rs, THIRD_PARTY_NOTICES.md, src/sched/cells.rs and src/host/caps.rs are unchanged versus dbad8c3 (source-identical to 9ac8d1f). natives_domain.rs has additions only. Every changed .rs file is < 1000 lines.",
         "impl-plans/README.md gains one appended paragraph linking the 7 plans and design-tuning-and-strum.md.",
         "The progress log records each gate as {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: passed, log, notes}. Intentional negative runs go under mutationEvidence only."
       ],
@@ -403,9 +411,9 @@
         "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo fm1-tuning-closeout > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && ./node_modules/.bin/vitest run > ../tmp/fm1-tuning/p07/vitest-full.log 2>&1'",
         "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build > ../tmp/fm1-tuning/p07/dist-build.log 2>&1",
         "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo fm1-tuning-closeout > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npm run test:style > ../tmp/fm1-tuning/p07/test-style.log 2>&1'",
-        "git diff --exit-code 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- src/host/tests/e2e/templates/golden_digests.txt src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/prelude/templates.vact src/dsp/controls.rs THIRD_PARTY_NOTICES.md src/sched/cells.rs src/host/caps.rs",
-        "test \"$(git diff 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- src/types/natives_domain.rs | grep -c '^-[^-]')\" = 0",
-        "{ git diff --name-only 9ac8d1fdd7961b2a47bb000ef612742593cf131d -- '*.rs'; git ls-files -o --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'"
+        "git diff --exit-code dbad8c3b53f10262ee6113fa6efa9bbff17bca08 -- src/host/tests/e2e/templates/golden_digests.txt src/dsp/ugen/catalog.rs src/dsp/ugen/catalog/codec.rs src/prelude/templates.vact src/dsp/controls.rs THIRD_PARTY_NOTICES.md src/sched/cells.rs src/host/caps.rs",
+        "test \"$(git diff dbad8c3b53f10262ee6113fa6efa9bbff17bca08 -- src/types/natives_domain.rs | grep -c '^-[^-]')\" = 0",
+        "{ git diff --name-only dbad8c3b53f10262ee6113fa6efa9bbff17bca08 -- '*.rs'; git ls-files -o --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'"
       ]
     }
   ]

@@ -29,10 +29,14 @@ Out of scope (owned by the sibling run `wf/fm1-voices`, or not requested):
   design adds no UGen, no template, no codec tag and no golden digest line.
 - New `dsp::controls` rows. The tuning travels as an ordinary event control
   with no control-table row (section 4.6).
-- MIDI pitch bend or MPE output (section 4.9; recorded as TQ1).
+- MIDI pitch bend or MPE output (section 4.9; decided as TQ1 (a)).
 - Audio-thread code. All tuning work runs on the scheduler side.
 
 ### 1.2 Baseline (current behavior, verified in the tree at 9ac8d1f)
+
+Re-checked at dbad8c3 (2026-10-10): that commit changed only design docs
+and plans, so every source fact below still holds (the `PatNode` hash
+tag maximum is still 42, `src/pattern/pat.rs:230`).
 
 | Fact | Location |
 | --- | --- |
@@ -62,9 +66,9 @@ document extends it and is linked from it.
 | D1 | No tuning set means the exact existing code paths: `note_to_freq` is unchanged and is still the only conversion for an event without a tuning control; the 17 scales, `chord`, `voicing` and MIDI rounding keep their integer arithmetic. | Bit-identical default output and unchanged golden digests by construction, not by float coincidence. |
 | D2 | A tuning SPEC is a dict value (section 4.1). On events it travels as the `tuning` control in a canonical list form (section 4.6). | A dict is one `pure` step in any pattern position (`alt`, `choose`), so tunings are patternable per event; the list form freezes into song mode (`FrozenControl::List`) without touching the snapshot codec. |
 | D3 | `tune` is a control-like combinator (the `chord` shape): `subject > tune t`. It never gives structure to an unstructured subject unless `t` is itself a structured pattern. | Same first-structure rule as every control (design 10.1), so per-track (`s :x > tune t > ...`) and per-event (`tune (alt [..])`) both fall out. |
-| D4 | Keys are numbers. Under a tuning, key `root` (default 60) is degree 0, and by default key `root` sounds at its 12-TET pitch `note_to_freq(root)`; `ref-key`/`ref-freq` override the anchor. | Switching tunings keeps the root in place (middle C stays 261.6256 Hz); matches the common synth default. Recorded as TQ2. |
+| D4 | Keys are numbers. Under a tuning, key `root` (default 60) is degree 0, and by default key `root` sounds at its 12-TET pitch `note_to_freq(root)`; `ref-key`/`ref-freq` override the anchor. | Switching tunings keeps the root in place (middle C stays 261.6256 Hz); matches the common synth default. Decided as TQ2 (a). |
 | D5 | Frequency resolution runs only on the scheduler side (commit and song encode). The audio thread receives `f32` freq constants as today. | No allocation and no locks on the audio thread; no audio-thread code changes. |
-| D6 | MIDI out under a tuning sends the nearest 12-TET MIDI note of the tuned frequency, no pitch bend. | Smallest correct policy; `MidiEvent` and both MIDI hosts stay unchanged. Limitation documented; MPE recorded as TQ1. |
+| D6 | MIDI out under a tuning sends the nearest 12-TET MIDI note of the tuned frequency, no pitch bend. | Smallest correct policy; `MidiEvent` and both MIDI hosts stay unchanged. Limitation documented; decided as TQ1 (a), MPE out of scope. |
 | D7 | 12-tone interval vocabularies (chord qualities, the 17 scales, note names) map into a tuning by the nearest-key rule (section 4.7), except when the tuning has 12 keys per period, where they apply directly. | Makes `chord`/`scale`/`voicing` work in any tuning, and gives just intonation on the familiar 12-key layout. |
 | D8 | No permissive upstream is used: chord, scale and tuning tables come from public-domain music theory or are computed; the Scala format is implemented from its public format description. choralroot and Chordian are not used, so `THIRD_PARTY_NOTICES.md` is unchanged. | Removes the license-verification dependency; no GPL firmware is read. |
 | D9 | New public names: `tune`, `edo`, `ratios`, `scala`, `load-scala`, `strum`, `harp`, `inversion`, `perform`. No public `bass` or `invert`. | `invert` is a texture native; `bass` is a common user `let` name. The chosen names collide with no prelude native and no `let`/`var`/`fn` in `examples/`, `src/` or `tests/` (grep at 9ac8d1f). |
@@ -570,10 +574,12 @@ environment from `AGENTS.md`.
 
 ## 12. Open questions
 
-Non-blocking; recommendations are followed by default:
-[pending-tuning-questions.md](../user-qa/pending-tuning-questions.md)
-(TQ1 MIDI microtonal output, TQ2 default reference anchoring, TQ3 harp
-plate defaults, TQ4 live retuning of held var-driven notes).
+None open. The owner decided all four on 2026-10-10 as recommended
+([pending-tuning-questions.md](../user-qa/pending-tuning-questions.md)):
+TQ1 (a) nearest 12-TET MIDI note, no pitch bend or MPE (D6, 4.9); TQ2 (a)
+the root key keeps its 12-TET pitch (D4, 4.2); TQ3 12 strips starting one
+period below the root (5.2); TQ4 yes, tuned var-driven notes are read at
+commit and sent as constants (4.9).
 
 ## References
 

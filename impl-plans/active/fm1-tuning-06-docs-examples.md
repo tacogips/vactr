@@ -39,6 +39,7 @@ the sibling run: append at the end only.
 | `design-docs/specs/lang-reference.md` | append one new top-level section at the END (after the current last section) |
 | `examples/microtonal-tuning.vact` | new |
 | `examples/strum-harp.vact` | new |
+| `design-docs/specs/design-tuning-and-strum.md` | notation fix only: rewrite the five call-notation spans that use `( )` into brace syntax. The spans are in D3 (`tune (alt [..])`), 4.5 (`tune (alt [(edo 19) (edo 31)])`) and 10.4, 10.5 and 10.11 (`tune (edo 19)`). Example: `tune {alt [{edo 19} {edo 31}]}`. Change no other text |
 
 ## lang-reference section content
 
@@ -81,8 +82,9 @@ see existing blocks).
 
 SYNTAX: `( )` is a reader error in vactr (lang-reference.md:296, :332).
 Write nested calls with braces (`tune {edo 19}`, `tune {alt {edo 19} {edo 31}}`,
-`tune {scala "..."}`), even though the design doc writes `tune (edo 19)`
-as notation.
+`tune {scala "..."}`). The design doc still writes `tune (edo 19)` at
+dbad8c3; this plan corrects those five spans to braces (Files table) so
+the design no longer shows a reader error.
 
 After writing each file, run the formatter and copy its output back, so
 the file is a fixed point.
@@ -98,6 +100,7 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 | `CARGO_TERM_QUIET=true cargo run -- run examples/strum-harp.vact --host noop --cycles 2 > tmp/fm1-tuning/p06/run-strum.log 2>&1` | exit 0, no error diagnostics |
 | `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib fmt::tests lsp::tests reader::tests types::tests > tmp/fm1-tuning/p06/nextest-docs.log 2>&1` | exit 0, failureCount 0 (corpus fixed point, LSP formatting, spec fences) |
 | `git diff --stat design-docs/specs/lang-reference.md` | additions only |
+| `grep -nE '\((edo\|alt) ' design-docs/specs/design-tuning-and-strum.md > tmp/fm1-tuning/p06/design-notation.log 2>&1; test $? -eq 1` | exit 0: no `(edo ` or `(alt ` call notation remains. Also `git diff --numstat design-docs/specs/design-tuning-and-strum.md` must show at most 5 added and 5 deleted lines |
 | `grep -c "tune\|strum\|harp\|inversion\|perform\|edo\|ratios\|scala" design-docs/specs/lang-reference.md` | every new name present |
 
 ## Completion Criteria
@@ -105,10 +108,15 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 - [ ] A lang-reference section documents all 9 names, the presets, the ordering rule, the anchor and the MIDI limitation
 - [ ] Both examples run silently on the noop host and are formatter fixed points
 - [ ] The docs-related test filters are green
+- [ ] The design doc call notation uses braces (five spans, no other change)
 - [ ] Progress log updated
 
 ## Progress Log
 
 ### Session: 2026-10-10
 **Tasks Completed**: Plan created
+**Notes**: Implementation not started
+
+### Session: 2026-10-10 (run 2 re-plan, session-351)
+**Tasks Completed**: Added the five-span design notation fix (resolves the run-1 residual "fix design notation at integration")
 **Notes**: Implementation not started

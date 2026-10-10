@@ -45,6 +45,36 @@ Today note -> Hz is only `crate::sched::commit::note_to_freq`
   nextest or any browser command (plan 07 does that under the measurement
   lock).
 
+## Starting Point (run 2, session-351)
+
+A previous attempt (session-348) was killed by a backend stream hang. Its
+uncommitted partial code is saved as
+`tmp/fm1-tuning/p01-wip-session348.patch`. It is a 709-line patch, with
+about 679 added lines. It touches exactly the five Files-table paths below
+and contains 13 `#[test]` functions. Treat it as UNTRUSTED draft code. The
+session-348 logs in `tmp/fm1-tuning/p01/` (`build.log`, `nextest-focused.log`
+and the `*-retry-01.log` files) show 8 compile errors on the first build
+(for example E0507 at `tuning/mod.rs:372`, moving a non-`Copy` `Pitch` out
+of a reference) and a failing assertion (`left: 1, right: 0`) on the last
+focused run. They are stale and are NOT evidence for this run.
+
+Choose exactly one path and record the choice in the Progress Log:
+
+1. Apply the patch: run `git apply --check tmp/fm1-tuning/p01-wip-session348.patch`
+   and then `git apply tmp/fm1-tuning/p01-wip-session348.patch`. Apply to
+   the working tree only, with no `--index` and no `--3way`. Do this only
+   while `git status --porcelain -- src/pattern` is empty. Then review
+   every line against the Contract and Key rules below. Fix the compile
+   errors, add any missing tests from the Tests list, and remove anything
+   outside the Contract.
+2. Rewrite from scratch, if the check fails or the draft diverges from the
+   Contract. You may read the patch for ideas, but the Contract and the
+   design are the source of truth.
+
+Either way, the result is verified like new code: every Tests bullet
+exists and passes, and every gate below runs fresh into
+`tmp/fm1-tuning/p01/run2/`.
+
 ## Files
 
 | Path | Change |
@@ -193,13 +223,13 @@ doc-comment density of `music.rs`, and the dict building in
 
 ## Verification
 
-Evidence directory: `tmp/fm1-tuning/p01/`. Run from the repository root:
+Evidence directory: `tmp/fm1-tuning/p01/run2/`. Run `mkdir -p tmp/fm1-tuning/p01/run2` first. The session-348 files directly under `tmp/fm1-tuning/p01/` are stale. Run from the repository root:
 
 | Command | Must show |
 | --- | --- |
-| `CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p01/build.log 2>&1` | exit 0 |
-| `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib pattern::tuning > tmp/fm1-tuning/p01/nextest-focused.log 2>&1` | exit 0, all new tests pass, failureCount 0 |
-| `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p01/clippy.log 2>&1` | exit 0 |
+| `CARGO_TERM_QUIET=true cargo build > tmp/fm1-tuning/p01/run2/build.log 2>&1` | exit 0 |
+| `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib pattern::tuning > tmp/fm1-tuning/p01/run2/nextest-focused.log 2>&1` | exit 0, failureCount 0, testsRun >= the number of Tests bullets (at least 17) |
+| `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings > tmp/fm1-tuning/p01/run2/clippy.log 2>&1` | exit 0 |
 | `rustfmt --edition 2021 --check src/pattern/mod.rs src/pattern/tuning/mod.rs src/pattern/tuning/scala.rs src/pattern/tuning/presets.rs src/pattern/tuning/tests.rs` | exit 0 |
 | `wc -l src/pattern/tuning/*.rs` | every file < 1000 |
 
@@ -207,6 +237,7 @@ Record each as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0,
 
 ## Completion Criteria
 
+- [ ] The Progress Log records the choice between applying the WIP patch and rewriting, with the `git apply --check` exit status if it was applied
 - [ ] Contract symbols exist with the exact signatures above
 - [ ] All listed tests exist and pass
 - [ ] build, strict clippy and rustfmt pass; the line limits hold
@@ -218,3 +249,7 @@ Record each as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0,
 ### Session: 2026-10-10
 **Tasks Completed**: Plan created
 **Notes**: Implementation not started
+
+### Session: 2026-10-10 (run 2 re-plan, session-351)
+**Tasks Completed**: Added the Starting Point section (WIP patch, apply or rewrite) and moved the evidence directory to `tmp/fm1-tuning/p01/run2/`
+**Notes**: Session-348 implementation was interrupted (stream hang) with compile errors in the draft. Plan 01 is not started in run 2

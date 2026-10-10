@@ -398,7 +398,10 @@ impl ShapePreparation<'_> {
             | PatNode::Maybe(p, _)
             | PatNode::Voicing(p)
             | PatNode::Fit(p)
-            | PatNode::ScaleNotes(_, _, p) => self.pat(p, depth + 1),
+            | PatNode::ScaleNotes(_, _, p)
+            | PatNode::Strum(p, _, _, _)
+            | PatNode::Harp { subject: p, .. }
+            | PatNode::Inversion { subject: p, .. } => self.pat(p, depth + 1),
             _ => self.pat_inner(pat, depth),
         }
     }
@@ -417,6 +420,7 @@ impl ShapePreparation<'_> {
                 self.part(source.part(), depth + 1)?;
             }
             PatNode::Pure(step) => self.value(&step.value, depth + 1)?,
+            PatNode::Tune { .. } => {}
             PatNode::Steps(steps) => {
                 self.admit(steps.len(), depth)?;
                 for step in steps.iter() {

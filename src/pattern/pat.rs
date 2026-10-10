@@ -6,6 +6,7 @@ use crate::ns::namespace::VarSlotRef;
 use crate::pattern::rng::Hasher;
 use crate::pattern::signal::Sig;
 use crate::pattern::step::Step;
+use crate::pattern::tuning::Mapping;
 use crate::reader::span::{NodeId, Span};
 use crate::value::intern::{name_of_kw, KwId};
 use crate::value::value::Value;
@@ -120,6 +121,27 @@ pub enum PatNode {
     MidiNotes {
         subject: Rc<Pat>,
         channel: Option<u8>,
+    },
+    /// `tune tunings subject`: sets the canonical tuning event control.
+    Tune {
+        tunings: Rc<Pat>,
+        subject: Rc<Pat>,
+        mapping: Mapping,
+    },
+    /// Spread chord tones across an event.
+    Strum(Rc<Pat>, PParam, PParam, PParam),
+    /// Select a chord tone from a multi-period plate.
+    Harp {
+        subject: Rc<Pat>,
+        pos: PParam,
+        strips: i64,
+        base: Option<i64>,
+    },
+    /// Rotate chord tones by tuning periods.
+    Inversion {
+        subject: Rc<Pat>,
+        n: PParam,
+        bass: bool,
     },
 }
 
@@ -277,6 +299,44 @@ fn structural_id(node: &PatNode, span: Option<Span>) -> NodeId {
         PatNode::Range(p, lo, hi) => hash_param(hash_param(hash_pat(h.word(39), p), lo), hi),
         PatNode::MidiNotes { subject, channel } => {
             hash_pat(h.word(40), subject).word(channel.map_or(0, |c| u64::from(c) + 1))
+        }
+        PatNode::Tune {
+            tunings,
+            subject,
+            mapping,
+        } => {
+            let h = hash_pat(hash_pat(h.word(43), tunings), subject);
+            let h = match mapping.root {
+                Some(v) => h.word(1).int(v),
+                None => h.word(0),
+            };
+            let h = match mapping.ref_key {
+                Some(v) => h.word(1).int(v),
+                None => h.word(0),
+            };
+            match mapping.ref_freq {
+                Some(v) => h.word(1).word(v.to_bits()),
+                None => h.word(0),
+            }
+        }
+        PatNode::Strum(p, time, dir, curve) => hash_param(
+            hash_param(hash_param(hash_pat(h.word(44), p), time), dir),
+            curve,
+        ),
+        PatNode::Harp {
+            subject,
+            pos,
+            strips,
+            base,
+        } => {
+            let h = hash_param(hash_pat(h.word(45).int(*strips), subject), pos);
+            match base {
+                Some(v) => h.word(1).int(*v),
+                None => h.word(0),
+            }
+        }
+        PatNode::Inversion { subject, n, bass } => {
+            hash_param(hash_pat(h.word(46).word(u64::from(*bass)), subject), n)
         }
     };
     // Node ids are u32 (6.5.1); the fold keeps the high bits' entropy.

@@ -10,6 +10,7 @@
 //! Any failure is event-local: that event (and its held output) is dropped.
 
 pub(crate) mod timestamps;
+mod tuned;
 
 use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
@@ -37,6 +38,7 @@ use crate::value::ratio::Ratio64;
 use crate::value::sample::SampleBuf;
 use crate::value::value::{Sound, Value};
 use crate::vm::fail::{FailCode, Failure, Origin};
+use tuned::{notes as tuned_notes, tuning};
 
 /// A note number as a frequency (MIDI numbering, A4 = 69 = 440 Hz).
 #[must_use]
@@ -427,7 +429,7 @@ fn commit_inner(
             admit_grains(ev, &controls, inst, cx, ecx);
             audio_events(time, inst, bank, secs, window, &controls, cx, ecx).map(Committed::Audio)
         }
-        Route::Midi { ch } => Ok(Committed::Midi(midi_events(time, dur, ch, &controls, ecx))),
+        Route::Midi { ch } => Ok(Committed::Midi(midi_events(time, dur, ch, &controls, ecx)?)),
         Route::Osc { addr } => Ok(Committed::Osc(OscEvent {
             time,
             slot: ecx.slot,
@@ -459,6 +461,7 @@ fn audio_events(
     cx: &mut CommitCx<'_>,
     ecx: &EventCx<'_>,
 ) -> Result<Vec<AudioEvent>, Failure> {
+    let tuning = tuning(controls)?;
     let mut base = AudioEvent::new(time, ecx.slot, ecx.gen, inst);
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     {
@@ -517,6 +520,9 @@ fn audio_events(
         if row.is_none() {
             if &*name == "speed-fit" {
                 continue; // consumed above by sample speed resolution
+            }
+            if &*name == "tuning" && tuning.is_some() {
+                continue;
             }
             let param = cx.resolver.declared_param(inst, *k).ok_or_else(|| {
                 Failure::new(
@@ -608,17 +614,33 @@ fn audio_events(
         }
     }
     let has_freq = entry(controls, "freq").is_some();
-    let Some((notes, late)) = notes(controls, bank.is_some()).filter(|_| !has_freq) else {
+    let note_values = match &tuning {
+        Some(tuning) => tuned_notes(controls, bank.is_some(), tuning)?.map(|notes| (notes, None)),
+        None => notes(controls, bank.is_some()),
+    };
+    let Some((notes, late)) = note_values.filter(|_| !has_freq) else {
         return Ok(vec![base]);
     };
     let freq = controls::row("freq").map_or(crate::sched::slots::CtlId::new(0), |r| r.ctl);
     let mut out = Vec::with_capacity(notes.len());
     for n in notes {
+        let hz = if let Some(tuning) = &tuning {
+            let Some(hz) = tuning.freq(n)? else {
+                continue;
+            };
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                hz as f32
+            }
+        } else {
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                note_to_freq(n) as f32
+            }
+        };
         let mut e = base;
-        #[allow(clippy::cast_possible_truncation)]
-        let hz = note_to_freq(n) as f32;
-        let ctl = match (&late, controls::row("freq")) {
-            (Some(slot), Some(row)) => cx.cells.ctl_for(
+        let ctl = match (&tuning, &late, controls::row("freq")) {
+            (None, Some(slot), Some(row)) => cx.cells.ctl_for(
                 CellKey::Site {
                     slot: slot.id(),
                     ctl: row.ctl,
@@ -694,8 +716,13 @@ fn midi_events(
     ch: u8,
     controls: &Controls,
     ecx: &EventCx<'_>,
-) -> Vec<MidiEvent> {
-    let notes = notes(controls, false).map_or(vec![60.0], |(n, _)| n);
+) -> Result<Vec<MidiEvent>, Failure> {
+    let tuning = tuning(controls)?;
+    let notes = if let Some(tuning) = &tuning {
+        tuned_notes(controls, false, tuning)?.unwrap_or_else(|| vec![60.0])
+    } else {
+        notes(controls, false).map_or(vec![60.0], |(n, _)| n)
+    };
     let vel = number(controls, "velocity")
         .or_else(|| number(controls, "gain").map(|g| g.min(1.0)))
         .unwrap_or(100.0 / 127.0);
@@ -703,16 +730,29 @@ fn midi_events(
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     notes
         .into_iter()
-        .map(|n| MidiEvent::Note {
-            time,
-            slot: ecx.slot,
-            gen: ecx.gen,
-            ch,
-            note: n.round().clamp(0.0, 127.0) as u8,
-            vel: (vel * 127.0).round().clamp(0.0, 127.0) as u8,
-            dur: dur * legato,
+        .map(|n| {
+            let note = if let Some(tuning) = &tuning {
+                let Some(freq) = tuning.freq(n)? else {
+                    return Ok(None);
+                };
+                (69.0 + 12.0 * (freq / 440.0).log2())
+                    .round()
+                    .clamp(0.0, 127.0) as u8
+            } else {
+                n.round().clamp(0.0, 127.0) as u8
+            };
+            Ok(Some(MidiEvent::Note {
+                time,
+                slot: ecx.slot,
+                gen: ecx.gen,
+                ch,
+                note,
+                vel: (vel * 127.0).round().clamp(0.0, 127.0) as u8,
+                dur: dur * legato,
+            }))
         })
-        .collect()
+        .collect::<Result<Vec<_>, Failure>>()
+        .map(|events| events.into_iter().flatten().collect())
 }
 
 fn osc_args(controls: &Controls) -> Vec<OscArg> {

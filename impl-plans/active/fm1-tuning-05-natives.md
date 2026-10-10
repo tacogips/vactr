@@ -1,6 +1,6 @@
 # FM1 Tuning 05: Natives, Type Table, perform, and End-to-End Tests
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: fm1-tuning-05-natives
 **Wave**: 3 (depends on fm1-tuning-01-model, fm1-tuning-02-pattern-graph, fm1-tuning-03-resolution, fm1-tuning-04-music)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md sections 4.1, 4.5, 5.4, 6, 10 (items 2, 4-7, 11)
@@ -165,13 +165,23 @@ Evidence directory: `tmp/fm1-tuning/p05/`.
 
 ## Completion Criteria
 
-- [ ] 9 natives registered; table entries appended at the end of `DOMAIN`
-- [ ] All listed tests pass, including the song freeze/encode `:d -> 63` case
-- [ ] The wasm lib build, clippy and rustfmt pass; each file < 1000 lines
-- [ ] Progress log updated
+- [x] 9 natives registered; table entries appended at the end of `DOMAIN`
+- [x] All listed tests pass, including the song freeze/encode `:d -> 63` case
+- [x] The wasm lib build, clippy and rustfmt pass; each file < 1000 lines
+- [x] Progress log updated
 
 ## Progress Log
 
 ### Session: 2026-10-10
 **Tasks Completed**: Plan created
 **Notes**: Implementation not started
+
+### Session: 2026-10-10 (Step 6 implementation)
+**Tasks Completed**: Registered the nine tuning/chord natives; appended native metadata; added `perform` chord inference; added scheduler and song freeze/encode tests and Scala fixtures.
+**Verification**: Final-source build passed (`tmp/fm1-tuning/p05/build-final.log`); focused nextest passed 465/465 (`nextest-focused-final2.log`); song nextest passed 23/23 (`nextest-song-final.log`); wasm lib build passed (`wasm-lib-final.log`); strict clippy passed (`clippy-final.log`); rustfmt passed (`rustfmt-final.log`); `DOMAIN` additions-only invariant passed (`domain-additions-only.log`); line gates passed (`wc-lines-final.log`: 289/255/689/885/309/309).
+**Notes**: Earlier focused verification exposed an invalid `str` signature for `scala`; it was corrected to `string` and the final focused run passed. Earlier clippy output identified redundant `Ok(...?)` wrappers and an over-precise `f32` test literal; both were corrected and final strict clippy passed. Earlier scheduler-test expectation failures were corrected and the source-native suite passed as part of the final focused run. Formal test-integrity/adversarial/integration review and workflow closeout remain downstream.
+
+### Session: 2026-10-10 (Step 6 test-integrity repairs)
+**Tasks Completed**: Repaired P05-TI-1 and P05-TI-2 in `src/sched/tests/sched/tuning_natives.rs`.
+**Verification**: Final-source native scheduler tests passed 6/6 (`repair-ti2/nextest-natives-final.log`); focused nextest passed 465/465 (`repair-ti2/nextest-focused-final.log`); song integration nextest passed 23/23 (`repair-ti2/nextest-song-final.log`); strict clippy exited 0 (`repair-ti2/clippy-final.log`); and rustfmt check exited 0 (`repair-ti2/rustfmt-final.log`). An earlier rustfmt check reported two layout diffs (`repair-ti2/rustfmt.log`) and is superseded by the formatted source and final check. Mutation evidence under `tmp/fm1-tuning/p05/mutationEvidence/` shows that block-mode output fails the arp onset oracle, omitting inline `kbm:` fails with 3 events instead of 1, and omitting loaded `kbm:` fails with 3 events instead of 2. These controls altered only the test input in this file; production native code was not mutated because its path is outside the repair write set.
+**Notes**: `perform` now checks exact counts, onsets, and analytic 19-EDO frequencies for block/strum/arp/harp on `:pd` and `:fm`. Inline Scala asserts anchor, +100 cents, and 3/2 frequencies; inline and loaded keymap cases exercise an `x` entry with exact surviving-event counts. Earlier failed repair attempts are retained as distinct logs and are not gating evidence. Formal independent re-review remains downstream.

@@ -1,6 +1,6 @@
 # FM1 Tuning 03: Frequency Resolution at Commit, MIDI, Song Freeze and Song Encode
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: fm1-tuning-03-resolution
 **Wave**: 2 (depends on fm1-tuning-01-model; parallel with 02 and 04)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md D1, D5, D6, sections 4.6, 4.7 (note names), 4.9
@@ -52,7 +52,7 @@ and 04 run concurrently on disjoint files.
 | --- | --- |
 | `src/sched/commit.rs` | tuned branch in `notes`/`audio_events`/`midi_events`; skip recognized `tuning` in the generic loop (873 lines; keep it < 1000) |
 | `src/sched/song/encode.rs` | skip recognized frozen `tuning`; tuned `row.note` freq |
-| `src/song/source.rs` | keyword note under a recognized tuning -> `note_key` before `ResolvedNote::Int` (972 lines; keep it < 1000, so use a single helper call) |
+| `src/song/source.rs` | keyword note under a recognized tuning -> `note_key` before `ResolvedNote::Int`; skip unmapped tuned notes at freeze (985 lines; keep it < 1000) |
 | `src/sched/tests/sched.rs` | add `mod tuning;` to the module list |
 | `src/sched/tests/sched/tuning.rs` | new tests |
 
@@ -96,13 +96,17 @@ path is pre-declared in writePaths.
    `from_control` once. In the `Value::Keyword` arm use
    `t.note_key(name)` when tuned (`Ok(None)` -> the existing
    "invalid song note name" failure), else `note_number` (unchanged).
-   Numbers unchanged.
+   Numbers unchanged. After resolving a note, only when tuning is
+   recognized, evaluate `t.freq(note.to_f64())?`; `Ok(None)` skips the tone
+   at freeze with no row and no fault, matching live commit. Untuned freeze
+   remains unchanged.
 7. **Song encode**: convert the frozen `tuning` control
    (`FrozenControl::List`) back to a `Value` (extend the local `scalar`
    helper with a recursive list conversion used only for this key) and
    call `from_control`. If recognized, `continue` in the control loop for
    that key, and push `t.freq(note.to_f64())?` for `row.note`
-   (`Ok(None)` -> push no freq). If unrecognized, leave today's code path
+   (`Ok(None)` -> push no freq as a defensive fallback; freeze normally
+   drops unmapped tuned tones). If unrecognized, leave today's code path
    alone.
 
 ## Pitfalls
@@ -152,13 +156,25 @@ Evidence directory: `tmp/fm1-tuning/p03/`.
 
 ## Completion Criteria
 
-- [ ] All four sites are tuned under a recognized tuning; the untuned code is unchanged
-- [ ] The listed tests pass; the existing scheduler and song suites are green
-- [ ] Golden digests are untouched; clippy, rustfmt and line limits pass
-- [ ] Progress log updated
+- [x] All four sites are tuned under a recognized tuning; the untuned code is unchanged
+- [x] The listed tests pass; the existing scheduler and song suites are green
+- [x] Golden digests are untouched; clippy, rustfmt and line limits pass
+- [x] Progress log updated
 
 ## Progress Log
 
 ### Session: 2026-10-10
 **Tasks Completed**: Plan created
 **Notes**: Implementation not started
+
+### Session: 2026-10-10 implementation
+**Tasks Completed**: Audio commit, MIDI commit, song freeze and song encode tuning resolution; nine scheduler tuning tests; final verification
+**Notes**: Added recognized-control handling while retaining the untuned note and MIDI paths; moved commit tuning helpers to `src/sched/commit/tuned.rs` to keep `commit.rs` below 950 lines. Final-source logs: `tmp/fm1-tuning/p03/build-final.log`, `nextest-sched-final.log` (89 passed), `nextest-song-lib-final.log` (278 passed), `nextest-song-int-final.log` (13 passed), `clippy-final.log`, `rustfmt-final.log`, `golden-digests.log` and `wc-lines-final.log` (913/980/262). Earlier test setup failures and a strict-clippy type-complexity finding were corrected and superseded by final passing runs. Plan 05 owns song tuning end-to-end assertions; formal integrity/adversarial/combined-tree review and later workflow finalization remain downstream.
+
+### Session: 2026-10-10 P03-TI-1 repair
+**Tasks Completed**: Added a discriminating tuned-MIDI regression assertion for 19-EDO key 66 -> nearest 12-TET MIDI note 64; preserved tuned/untuned `:d` and untuned `60.6` assertions.
+**Notes**: `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --lib sched::tests` passed (89/89, exit 0; `tmp/fm1-tuning/p03/nextest-sched-ti1.log`); `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` passed (exit 0; empty `clippy-ti1.log`); `rustfmt --edition 2021 --check src/sched/tests/sched/tuning.rs` passed (exit 0; empty `rustfmt-ti1.log`). The correction awaits independent review.
+
+### Session: 2026-10-10 P03-ADV-1 repair
+**Tasks Completed**: `expand_event` now drops an unmapped numeric tone at song freeze only when a recognized tuning is present, matching live commit without changing the untuned path. Kept song encode's no-frequency branch as a defensive fallback.
+**Notes**: Current-source verification passed: build (`build-adv1.log`); scheduler tests 89/89 (`nextest-sched-adv1.log`); song library tests 278/278 (`nextest-song-lib-adv1.log`); song integration tests 13/13 (`nextest-song-int-adv1.log`); clippy (`clippy-adv1.log`); rustfmt (`rustfmt-adv1.log`); unchanged golden digests (`golden-digests-adv1.log`); line counts 913/985/262 (`wc-lines-adv1.log`). The end-to-end unmapped-key song assertion belongs to plan 05 `tests/song_tuning.rs`; this is recorded for the integration reviewer, and no plan-05 files were edited.

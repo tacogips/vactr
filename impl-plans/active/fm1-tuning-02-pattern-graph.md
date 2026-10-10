@@ -1,6 +1,6 @@
 # FM1 Tuning 02: Pattern Graph Nodes for tune, strum, harp, inversion
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: fm1-tuning-02-pattern-graph
 **Wave**: 2 (depends on fm1-tuning-01-model)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md sections 3, 4.5, 4.6, 5.1-5.3, 5.5
@@ -249,15 +249,20 @@ Invariant check: all existing hash tags 0-42 are unchanged
 
 ## Completion Criteria
 
-- [ ] Four variants appended; hash tags 43-46; no existing arm changed
-- [ ] Every exhaustive match compiles with explicit new arms (no new `_ =>` added to an exhaustive match), including `src/session/song/freeze.rs` and `src/session/song/source_uses/timing/capture.rs`
-- [ ] Every freeze.rs dispatcher (`pat`, `pat_complex`, `pat_unary`, `finish_unary`, `unary_child`, `children`) has explicit arms for the variants it handles. Plan 05's `tests/song_tuning.rs` strum and tune cases exercise these arms end to end
-- [ ] All listed tests pass; the regression filter is green
-- [ ] clippy, rustfmt and line limits pass; only the Files-table paths changed
-- [ ] Progress log updated
+- [x] Four variants appended; hash tags 43-46; existing arms and tags 0-42 unchanged
+- [x] Every exhaustive match compiles with explicit new arms (no new `_ =>` added to an exhaustive match), including `src/session/song/freeze.rs` and `src/session/song/source_uses/timing/capture.rs`
+- [x] Every freeze.rs dispatcher (`pat`, `pat_complex`, `pat_unary`, `finish_unary`, `unary_child`, `children`) has explicit arms for the variants it handles
+- [ ] Plan 05's `tests/song_tuning.rs` strum and tune cases exercise freeze/capture arms end to end (downstream-owned)
+- [x] All listed focused tests pass; the regression filter is green
+- [x] clippy, rustfmt and line limits pass; only the plan-02 Files-table paths changed (accepted plan-01 dependency files are also present in the shared tree)
+- [x] Progress log updated
 
 ## Progress Log
 
 ### Session: 2026-10-10
-**Tasks Completed**: Plan created
-**Notes**: Implementation not started
+**Tasks Completed**: Plan 02 implementation, unit tests, and required local verification
+**Notes**: Added Tune, Strum, Harp, and Inversion nodes and query semantics, all explicit freeze/timing/source-use arms, deterministic strum generation, tuning-aware harp/inversion behavior, and 16 focused unit tests. Final source-matched verification passed: build (`tmp/fm1-tuning/p02/final-retry1/build.log`), focused nextest 16/16 (`nextest-focused.log`), regression nextest 615/615 (`nextest-regression.log`), strict clippy (`clippy.log`), rustfmt (`rustfmt.log`), and line limits (`wc-lines.log`). Initial compile/test/clippy failures were corrected; their complete logs remain in `tmp/fm1-tuning/p02/build-initial.log`, `nextest-focused-initial.log`, `nextest-focused-retry1.log`, `nextest-focused-retry2.log`, and `final/clippy.log`. Plan 05 owns the remaining end-to-end song_tuning exercise. No git writes were made.
+
+### Session: 2026-10-10 test-integrity repairs
+**Tasks Completed**: P02-TI-1, P02-TI-2, and P02-TI-3 repairs
+**Notes**: Added `Strum(_, time, dir, curve)` parameter scheduling to the pre-scan in `src/session/song/source_uses/timing/capture.rs`. Strengthened `strum/tests.rs` to assert inversion note lists for n `[0 1 2 1]` and :alternate first tones `[60 67 60 67]` across four quarter events. Strengthened `tune/tests.rs` to compare the carried control with the requested ref-key/ref-frequency mapping and the default mapping. Explicit Plan 05 handoff: add a patterned-dir Strum song timing-capture case to `tests/song_tuning.rs`; this plan does not claim that end-to-end case as covered. Fresh final-source gates passed under `tmp/fm1-tuning/p02/repair1/retry-01/`: build, focused nextest 16/16, regression nextest 615/615, strict clippy, rustfmt and line limits. The earlier repair1 clippy attempt failed on `unnecessary_sort_by`; it was corrected to `sort_by_key` and superseded by the passing retry-01 clippy run. No git writes were made.

@@ -631,4 +631,59 @@ pub(crate) static DOMAIN: &[NativeSig] = &[
         "tail-seconds",
     ]),
     f("play-song", 1, 1, &["fn song -> song"], &[V]).effect(),
+    f(
+        "tune",
+        2,
+        2,
+        &["fn (pattern 'a) any -> pattern 'a"],
+        &[V, L],
+    )
+    .kw(&["root", "ref-key", "ref-freq"]),
+    f("edo", 1, 1, &["fn int -> [keyword: any]"], &[V]).kw(&["period"]),
+    f("ratios", 1, 1, &["fn [any] -> [keyword: any]"], &[V]),
+    f("scala", 1, 1, &["fn string -> [keyword: any]"], &[V]).kw(&["kbm"]),
+    f("load-scala", 1, 1, &["fn path -> [keyword: any]"], &[V])
+        .kw(&["kbm"])
+        .effect(),
+    f(
+        "strum",
+        2,
+        4,
+        &["fn (pattern 'a) any any any -> pattern 'a"],
+        &[V, L, L, L],
+    ),
+    f(
+        "harp",
+        2,
+        2,
+        &["fn (pattern 'a) any -> pattern 'a"],
+        &[V, L],
+    )
+    .kw(&["strips", "base"]),
+    f(
+        "inversion",
+        2,
+        2,
+        &["fn (pattern 'a) any -> pattern 'a"],
+        &[V, L],
+    ),
+    f(
+        "perform",
+        2,
+        2,
+        &["fn (pattern 'a) any -> pattern 'a"],
+        &[V, L],
+    )
+    .kw(&[
+        "mode",
+        "inversion",
+        "bass",
+        "time",
+        "dir",
+        "curve",
+        "arp",
+        "pos",
+        "strips",
+        "base",
+    ]),
 ];

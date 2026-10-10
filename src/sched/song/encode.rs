@@ -3,6 +3,7 @@ use crate::dsp::controls::{self, CtlDomain, CtlRoute};
 use crate::dsp::graph::InstId;
 use crate::host::caps::{SongPhysicalBranch, SongReadyBundle};
 use crate::host::wire::{AudioEvent, Ctl};
+use crate::pattern::tuning::Tuning;
 use crate::sched::slots::{CtlId, SlotId};
 use crate::song::routing::{SongAudioEvent, SongBranchRoute};
 use crate::song::snapshot::{FrozenControl, FrozenSongEvent};
@@ -29,6 +30,17 @@ fn scalar(value: &FrozenControl) -> Result<Value, Failure> {
             ))
         }
     })
+}
+fn tuning_value(value: &FrozenControl) -> Result<Value, Failure> {
+    match value {
+        FrozenControl::List(values) => Ok(Value::list(
+            values
+                .iter()
+                .map(tuning_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        )),
+        value => scalar(value),
+    }
 }
 fn push(event: &mut AudioEvent, id: CtlId, value: f32) -> Result<(), Failure> {
     if !value.is_finite() {
@@ -62,6 +74,14 @@ pub(super) fn encode(
         .iter()
         .find(|i| i.graph.id == branch.resolved_instrument)
         .ok_or_else(|| Failure::new(FailCode::Type, "closed song instrument missing"))?;
+    let tuning = row
+        .controls
+        .iter()
+        .find(|(key, _)| name_of_kw(*key).as_ref() == "tuning")
+        .map(|(_, value)| tuning_value(value))
+        .transpose()?
+        .and_then(|value| Tuning::from_control(&value))
+        .transpose()?;
     let config = pool.initial.config;
     let mut event = AudioEvent::new(
         frame as f64 / f64::from(ready.clock().sample_rate),
@@ -86,6 +106,9 @@ pub(super) fn encode(
     }
     for (key, frozen) in &row.controls {
         let name = name_of_kw(*key);
+        if name.as_ref() == "tuning" && tuning.is_some() {
+            continue;
+        }
         if matches!(name.as_ref(), "note" | "n") {
             continue;
         }
@@ -206,11 +229,14 @@ pub(super) fn encode(
         note.validate()?;
         let control = controls::row("freq")
             .ok_or_else(|| Failure::new(FailCode::Type, "frequency control missing"))?;
-        push(
-            &mut event,
-            control.ctl,
-            crate::sched::commit::note_to_freq(note.to_f64()) as f32,
-        )?;
+        let frequency = if let Some(tuning) = &tuning {
+            tuning.freq(note.to_f64())?
+        } else {
+            Some(crate::sched::commit::note_to_freq(note.to_f64()))
+        };
+        if let Some(frequency) = frequency {
+            push(&mut event, control.ctl, frequency as f32)?;
+        }
     }
     if !row
         .controls

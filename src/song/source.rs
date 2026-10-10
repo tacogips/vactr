@@ -156,6 +156,11 @@ pub(crate) fn expand_event(
     } else {
         None
     };
+    let tuning = event
+        .controls
+        .get(&intern_kw("tuning"))
+        .and_then(crate::pattern::tuning::Tuning::from_control)
+        .transpose()?;
     let chord = key
         .and_then(|key| event.controls.get(&key))
         .is_some_and(|value| matches!(value, Value::List(_)));
@@ -177,13 +182,21 @@ pub(crate) fn expand_event(
             .as_ref()
             .map(|value| match value {
                 Value::Keyword(name) => {
-                    crate::pattern::combinators::music::note_number(&name_of_kw(*name))
-                        .map(ResolvedNote::Int)
+                    let key = match &tuning {
+                        Some(tuning) => tuning.note_key(&name_of_kw(*name))?,
+                        None => crate::pattern::combinators::music::note_number(&name_of_kw(*name)),
+                    };
+                    key.map(ResolvedNote::Int)
                         .ok_or_else(|| Failure::new(FailCode::Type, "invalid song note name"))
                 }
                 value => ResolvedNote::try_from(value),
             })
             .transpose()?;
+        if let (Some(tuning), Some(resolved)) = (&tuning, note) {
+            if tuning.freq(resolved.to_f64())?.is_none() {
+                continue;
+            }
+        }
         let trace_len = event
             .producer
             .as_ref()

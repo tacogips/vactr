@@ -1,6 +1,6 @@
 # FM1 Tuning 04: Tuning-Aware scale, chord, voicing and Microtonal Scale Presets
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: fm1-tuning-04-music
 **Wave**: 2 (depends on fm1-tuning-01-model; parallel with 02 and 03)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md D1, D7, sections 4.7, 4.8
@@ -143,13 +143,15 @@ Evidence directory: `tmp/fm1-tuning/p04/`.
 
 ## Completion Criteria
 
-- [ ] Tuned scale/chord/voicing per design 4.7; presets accepted; untuned paths unchanged
-- [ ] All tests pass; existing pattern tests are green
-- [ ] clippy, rustfmt and line limits pass; only the two files changed
-- [ ] Progress log updated
+- [x] Tuned scale/chord/voicing per design 4.7; presets accepted; untuned paths unchanged
+- [x] All tests pass; existing pattern tests are green
+- [x] clippy, rustfmt and line limits pass; only the two implementation files changed
+- [x] Progress log updated
 
 ## Progress Log
 
 ### Session: 2026-10-10
-**Tasks Completed**: Plan created
-**Notes**: Implementation not started
+**Tasks Completed**: Tuned scale, chord and voicing paths; microtonal scale preset acceptance; focused regression tests; required verification
+**Notes**: `scale` now accepts the legacy names and microtonal presets. Recognized event tunings map scale roots, scale degrees, chord roots/intervals and voicing through the tuning model. Untuned legacy scale/chord/voicing paths and `arp` remain on their prior logic. Untuned microtonal presets add their default EDO control when no tuning control exists; existing control values are preserved.
+
+Verification passed on the final source: build (`tmp/fm1-tuning/p04/build.log`); focused music/pattern nextest, 73/73 (`nextest-focused.log`); types/reader nextest, 188/188 (`nextest-spec.log`); strict clippy (`clippy.log`); rustfmt check (`rustfmt.log`); and the 638-line file limit (`wc-lines.log`). Earlier verification attempts and their logs are retained under `pre-repair/`, `pre-repair-2/` and `pre-repair-3/`; the final-source run resolved their compilation, test-harness and lint issues. Formal independent review and integration remain downstream workflow steps.

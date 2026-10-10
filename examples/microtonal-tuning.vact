@@ -1,0 +1,20 @@
+# Microtonal tuning examples using the built-in synth voices
+use-bpm 96
+
+# 19-EDO: the root remains anchored at its usual pitch
+s :pd > tune {edo 19} > n [0 2 4 7] > scale :c :edo19-major > gain 0.22 > d1
+
+# 31-EDO chord tones and voicing use the active tuning
+s :fm > tune {edo 31} > chord [:d :maj7] > voicing > gain 0.16 > d2
+
+# Bohlen-Pierce uses its 3:1 period and lambda scale
+s :analog > tune :bohlen-pierce > scale :c :bp-lambda > wave :saw > gain 0.16 > d3
+
+# Five-limit just intonation chord
+s :pd > tune :ji-5 > chord [:g :maj] > voicing > gain 0.2 > d4
+
+# A maqam approximation supplies its own 24-EDO tuning
+s :additive > scale :c :maqam-rast > attack 0.2 > release 0.5 > gain 0.12 > d5
+
+# Inline Scala slendro; no source-loader capability is required
+s :analog > tune {scala "! slendro\nSlendro approximation\n5\n240.0\n480.0\n720.0\n960.0\n2/1\n"} > scale :c :slendro > wave :sine > gain 0.14 > d6

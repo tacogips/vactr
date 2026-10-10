@@ -1,6 +1,6 @@
 # FM1 Tuning 01: Tuning Model, Scala Parser and Presets
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: fm1-tuning-01-model
 **Wave**: 1 (no dependencies)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md sections 4.1-4.8, 4.9 (keyword sites use `note_key`), 8
@@ -237,12 +237,12 @@ Record each as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0,
 
 ## Completion Criteria
 
-- [ ] The Progress Log records the choice between applying the WIP patch and rewriting, with the `git apply --check` exit status if it was applied
-- [ ] Contract symbols exist with the exact signatures above
-- [ ] All listed tests exist and pass
-- [ ] build, strict clippy and rustfmt pass; the line limits hold
-- [ ] No file outside the Files table changed (`git status --porcelain`)
-- [ ] Progress log below updated
+- [x] The Progress Log records the choice between applying the WIP patch and rewriting, with the `git apply --check` exit status if it was applied
+- [x] Contract symbols exist with the exact signatures above
+- [x] All listed tests exist and pass
+- [x] build, strict clippy and rustfmt pass; the line limits hold
+- [x] No file outside the Files table changed (`git status --porcelain`)
+- [x] Progress log below updated
 
 ## Progress Log
 
@@ -253,3 +253,11 @@ Record each as `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0,
 ### Session: 2026-10-10 (run 2 re-plan, session-351)
 **Tasks Completed**: Added the Starting Point section (WIP patch, apply or rewrite) and moved the evidence directory to `tmp/fm1-tuning/p01/run2/`
 **Notes**: Session-348 implementation was interrupted (stream hang) with compile errors in the draft. Plan 01 is not started in run 2
+
+### Session: 2026-10-10 (run 2 implementation)
+**Tasks Completed**: Applied and reviewed the WIP patch; completed the pinned tuning model, Scala parsers, presets and 17 focused tests.
+**Notes**: Chose patch application. `git status --porcelain -- src/pattern` was empty and `git apply --check tmp/fm1-tuning/p01-wip-session348.patch` exited 0; applied to the working tree only, without `--index` or `--3way`. The session-348 logs were not used as evidence. Fresh review corrected degree-zero and fractional EDO resolution, keymap/control round-tripping, root mapping, and Scala final-period validation. First fresh gates exposed an invalid KBM root fixture and strict-Clippy `type_complexity`; both were corrected before final verification. Initial failed logs: `tmp/fm1-tuning/p01/run2/nextest-focused.log` (exit 100, 14 run, 13 passed, 1 failed) and `tmp/fm1-tuning/p01/run2/clippy.log` (exit 101). Final source-matched gates all passed; logs are under `tmp/fm1-tuning/p01/run2/final/`. Focused nextest: 17 run, 17 passed, 0 failed. Line counts: mod.rs 760, presets.rs 198, scala.rs 163, tests.rs 308. The only tracked changes are the five Files-table paths; no Git writes were made.
+
+### Session: 2026-10-10 (adversarial repair P01-ADV-1)
+**Tasks Completed**: Re-derived default anchors in `Tuning::with_mapping` for non-keymap tunings and added exact-frequency, `from_spec` equality, and control-round-trip assertions for EDO and JI mappings.
+**Notes**: Root-only mapping now follows the root with the default reference key/frequency; reference-key-only mapping re-anchors to `note_to_freq(ref_key)`. Explicit frequencies and keymap anchor defaults retain their prior behavior. Initial `repair1` rustfmt check exited 1 for a formatting-only issue; formatted the pattern and reran every required gate without overwriting evidence. Final source-matched build, focused nextest (17 run, 17 passed, 0 failed), strict Clippy, rustfmt and line-count logs are in `tmp/fm1-tuning/p01/run2/repair1/retry-01/`; all tuning files remain under 1000 lines. Finding P01-ADV-1 is addressed in code and tests; independent re-review remains pending.

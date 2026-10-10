@@ -1,6 +1,6 @@
 # FM1 Tuning 06: lang-reference Section and Runnable Examples
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: fm1-tuning-06-docs-examples
 **Wave**: 4 (depends on fm1-tuning-05-natives)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md sections 3, 4.8, 4.9 (MIDI limitation), 6, 9, 10 item 12
@@ -105,11 +105,11 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 
 ## Completion Criteria
 
-- [ ] A lang-reference section documents all 9 names, the presets, the ordering rule, the anchor and the MIDI limitation
-- [ ] Both examples run silently on the noop host and are formatter fixed points
-- [ ] The docs-related test filters are green
-- [ ] The design doc call notation uses braces (five spans, no other change)
-- [ ] Progress log updated
+- [x] A lang-reference section documents all 9 names, the presets, the ordering rule, the anchor and the MIDI limitation
+- [x] Both examples run on the noop host for two cycles and are formatter fixed points (the noop runs emit only a latency-widened warning)
+- [ ] The docs-related test filters are green (fmt/LSP/reader/types aggregate has one reader block-count failure; see blocker below)
+- [x] The design doc call notation uses braces (five spans, no other change)
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -120,3 +120,7 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 ### Session: 2026-10-10 (run 2 re-plan, session-351)
 **Tasks Completed**: Added the five-span design notation fix (resolves the run-1 residual "fix design notation at integration")
 **Notes**: Implementation not started
+
+### Session: 2026-10-10 (Step 6 implementation)
+**Tasks Completed**: Appended lang-reference section 6, added both runnable examples, and verified the five-span design notation change. The non-reader fmt/LSP/types filter passed (162/162); the required examples each completed two noop cycles; formatter check passed. The complete docs filter ran 201 tests: 200 passed and `reader::tests::no_panic::every_line_prefix_of_every_block_reads` failed because its fixed `assert_eq!(blocks.len(), 11)` now observes 13 blocks.
+**Notes**: The failing assertion is in `src/reader/tests/no_panic.rs`, outside this plan's declared `writePaths`; do not edit it until the serial integration owner amends ownership. Resume by adding that exact file to the approved write surface, updating the block-count expectation to 13, and rerunning the complete docs filter. No other test failure was observed. The noop runs emit `latency-widened` warnings but no error diagnostics or audio output.

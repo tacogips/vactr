@@ -9,6 +9,7 @@ pub mod query;
 pub mod rng;
 pub mod signal;
 pub mod step;
+pub mod tuning;
 
 pub use eval::{AnalyzerId, HostSig, InputCells, QueryCtx, QueryVm};
 pub use occ::OccKey;

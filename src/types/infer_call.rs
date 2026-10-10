@@ -429,7 +429,7 @@ impl Checker<'_> {
                     self.slice_points(points);
                 }
             }
-            "chord" => {
+            "chord" | "perform" => {
                 let target = if pos.len() >= 2 {
                     pos.get(1)
                 } else {

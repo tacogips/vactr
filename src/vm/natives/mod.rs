@@ -23,6 +23,7 @@ pub mod signal;
 pub mod song;
 pub mod sound;
 pub mod tex;
+pub mod tuning;
 pub mod value;
 
 use std::rc::Rc;
@@ -63,6 +64,7 @@ pub fn register_domain(p: &mut Prelude) {
     register_dsp(p);
     analysis::register(p);
     song::register(p);
+    tuning::register(p);
 }
 
 /// The DSP natives, except `spectrum`: `analysis` registers the one

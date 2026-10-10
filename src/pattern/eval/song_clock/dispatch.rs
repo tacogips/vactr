@@ -50,7 +50,11 @@ impl super::super::QState<'_, '_> {
             | PatNode::Chord(..)
             | PatNode::Voicing(_)
             | PatNode::Range(..)
-            | PatNode::MidiNotes { .. } => false,
+            | PatNode::MidiNotes { .. }
+            | PatNode::Tune { .. }
+            | PatNode::Harp { .. }
+            | PatNode::Inversion { .. } => false,
+            PatNode::Strum(..) => true,
         };
         if unsupported {
             self.with_clock_unknown(f)

@@ -65,7 +65,7 @@ document extends it and is linked from it.
 | --- | --- | --- |
 | D1 | No tuning set means the exact existing code paths: `note_to_freq` is unchanged and is still the only conversion for an event without a tuning control; the 17 scales, `chord`, `voicing` and MIDI rounding keep their integer arithmetic. | Bit-identical default output and unchanged golden digests by construction, not by float coincidence. |
 | D2 | A tuning SPEC is a dict value (section 4.1). On events it travels as the `tuning` control in a canonical list form (section 4.6). | A dict is one `pure` step in any pattern position (`alt`, `choose`), so tunings are patternable per event; the list form freezes into song mode (`FrozenControl::List`) without touching the snapshot codec. |
-| D3 | `tune` is a control-like combinator (the `chord` shape): `subject > tune t`. It never gives structure to an unstructured subject unless `t` is itself a structured pattern. | Same first-structure rule as every control (design 10.1), so per-track (`s :x > tune t > ...`) and per-event (`tune (alt [..])`) both fall out. |
+| D3 | `tune` is a control-like combinator (the `chord` shape): `subject > tune t`. It never gives structure to an unstructured subject unless `t` is itself a structured pattern. | Same first-structure rule as every control (design 10.1), so per-track (`s :x > tune t > ...`) and per-event (`tune {alt [..]}`) both fall out. |
 | D4 | Keys are numbers. Under a tuning, key `root` (default 60) is degree 0, and by default key `root` sounds at its 12-TET pitch `note_to_freq(root)`; `ref-key`/`ref-freq` override the anchor. | Switching tunings keeps the root in place (middle C stays 261.6256 Hz); matches the common synth default. Decided as TQ2 (a). |
 | D5 | Frequency resolution runs only on the scheduler side (commit and song encode). The audio thread receives `f32` freq constants as today. | No allocation and no locks on the audio thread; no audio-thread code changes. |
 | D6 | MIDI out under a tuning sends the nearest 12-TET MIDI note of the tuned frequency, no pitch bend. | Smallest correct policy; `MidiEvent` and both MIDI hosts stay unchanged. Limitation documented; decided as TQ1 (a), MPE out of scope. |
@@ -189,7 +189,7 @@ Strings with `{` must escape it (`\{`), per the string literal rules.
 `tune p t` with optional keyword arguments `root:` (int key or note
 keyword, converted by `note_number`), `ref-key:` (same), `ref-freq:`
 (number > 0). Keyword arguments are read once at the call. `t` is a spec,
-a preset keyword, or a pattern of them (`tune (alt [(edo 19) (edo 31)])`),
+a preset keyword, or a pattern of them (`tune {alt [{edo 19} {edo 31}]}`),
 sampled at each subject event like any control value. An invalid spec in a
 pattern is an event-local fault for that event.
 
@@ -533,9 +533,9 @@ Behavioral tests (all silent; no audio device):
 4. Tuning-aware music: `scale` with `K == P`, with mapping across sizes,
    and a microtonal preset with no `tune` (sets its tuning); `chord` and
    `voicing` in 19-EDO and in `:ji-5`; note names under 19-EDO (`:d` -> 63);
-   non-default root: under `tune (edo 19) root: :d`, `:d` is key 62 and
+   non-default root: under `tune {edo 19} root: :d`, `:d` is key 62 and
    sounds at `note_to_freq(62)` (also as a `scale :d` and `chord` root).
-5. Bare keyword note on every path: `s :pd > tune (edo 19) > note :d`
+5. Bare keyword note on every path: `s :pd > tune {edo 19} > note :d`
    commits key 63 (`note_to_freq(60) * 2^(3/19)`) on the audio commit path,
    sends the nearest MIDI note of that frequency on the MIDI path, and
    freezes `ResolvedNote` 63 and encodes the same frequency on the song
@@ -549,7 +549,7 @@ Behavioral tests (all silent; no audio device):
 10. `inversion`: positive, negative, multi-period, bass flag.
 11. `perform`: each mode yields the expected notes and onsets, and drives
     an existing template (`s :pd`, `s :fm`) to committed audio events with
-    tuned frequencies under `tune (edo 19)`.
+    tuned frequencies under `tune {edo 19}`.
 12. Examples are formatter fixed points and pass the existing corpus,
     LSP and spec-fence tests.
 

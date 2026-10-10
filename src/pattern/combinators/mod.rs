@@ -8,7 +8,9 @@ pub mod random;
 pub mod region;
 pub mod sound;
 pub mod structure;
+pub mod strum;
 pub mod time;
+pub mod tune;
 
 use std::rc::Rc;
 

@@ -96,6 +96,10 @@ pub enum FrozenUseOperation {
     Segment,
     Range,
     MidiNotes,
+    Tune,
+    Strum,
+    Harp,
+    Inversion,
 }
 /// Checked timing/structural recipe, without an evaluated event stream.
 #[derive(Clone, Debug, PartialEq)]

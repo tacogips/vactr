@@ -863,3 +863,52 @@ less common one was renamed (Hydra `repeat` -> `tile`).
 
 Domain vocabulary lives with its specification: `design-music.md`
 (patterns, signals, sound) and `design-visual.md` (Hydra names).
+
+## 6. Tuning and Chord Performance
+
+Tuning is applied per track or event. Put `tune` before `scale`, `chord`,
+`voicing`, `strum` or `harp` so those transforms interpret notes in the active
+tuning. Without `tune`, notes retain the existing 12-TET behavior. A tuning's
+default anchor is key 60 at its usual 12-TET frequency; `root:` chooses the
+degree-zero key, while `ref-key:` and `ref-freq:` override the reference pitch.
+MIDI output converts a tuned frequency to the nearest 12-TET note and sends no
+pitch bend, so microtonal deviation is not preserved over MIDI.
+
+- `tune subject spec` applies a tuning spec, preset or patterned tuning. Specs
+  include `edo`, `ratios` and `scala`; `root:`, `ref-key:` and `ref-freq:` set
+  the mapping anchor.
+- `edo steps period:` divides a period into equal steps; the default period is
+  an octave. For example, `{edo 13 period: 3}` describes Bohlen-Pierce.
+- `ratios [values]` builds a just-intonation tuning from frequency ratios.
+- `scala text kbm:` parses inline Scala `.scl` text and optional `.kbm` mapping
+  text. `load-scala path kbm:` reads those files through the host source loader;
+  use `scala` when a host has no loader.
+- Tuning preset keywords are `:ji-5`, `:ji-7`, `:partch-43` and
+  `:bohlen-pierce`.
+- Microtonal scale presets are `:edo19-major`, `:edo19-minor`,
+  `:edo31-major`, `:edo53-major`, `:maqam-rast`, `:maqam-bayati`,
+  `:maqam-saba`, `:maqam-hijaz`, `:slendro`, `:pelog` and `:bp-lambda`.
+  `scale` accepts these names and supplies their tuning when no recognized
+  tuning is already active.
+- `strum subject time dir curve` spreads chord tones across an exact duration.
+  Directions include `:up`, `:down`, `:alternate` and deterministic `:random`;
+  curves include `:flat` and `:fade`.
+- `harp subject position strips: base:` selects a chord tone from a multi-octave
+  plate. Position is usually a signal such as `{range sine 0 1}`.
+- `inversion subject amount` rotates chord tones by scale periods; `perform
+  subject chords` composes chord, voicing and inversion, then schedules `:block`,
+  `:strum`, `:arp` or `:harp` mode. Its `inversion:` and `bass:` options control
+  voicing rotation and the added bass tone.
+
+```vactr
+s :pd > tune {edo 19} > n [0 2 4 7] > scale :c :edo19-major > gain 0.2 > d1
+s :pd > tune :ji-5 > chord [:c :maj] > voicing > strum 1/32 :down > d2
+```
+
+```vactr
+s :fm > tune {alt {edo 19} {edo 31}} > perform [:c :maj7] mode: :strum dir: :alternate time: 1/32 > d3
+s :pd > chord [:c :maj7] > harp {range sine 0 1} strips: 12 > d4
+```
+
+See [design-tuning-and-strum.md](design-tuning-and-strum.md) for the tuning
+model, mapping rules and chord-performance details.

@@ -184,6 +184,9 @@ pub(crate) fn query_strum(
             }
             let direction = keyword_param(dir, e.anchor(), st, "strum direction")?;
             let curve = keyword_param(curve, e.anchor(), st, "strum curve")?;
+            if !matches!(curve.as_str(), "flat" | "fade" | "swell") {
+                return Err(type_err("strum curve must be :flat, :fade, or :swell"));
+            }
             let mut notes = values_for_event(&e)?.0;
             notes.sort_by_key(|(key, _, _)| *key);
             match direction.as_str() {

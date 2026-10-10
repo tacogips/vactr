@@ -881,8 +881,9 @@ pitch bend, so microtonal deviation is not preserved over MIDI.
   an octave. For example, `{edo 13 period: 3}` describes Bohlen-Pierce.
 - `ratios [values]` builds a just-intonation tuning from frequency ratios.
 - `scala text kbm:` parses inline Scala `.scl` text and optional `.kbm` mapping
-  text. `load-scala path kbm:` reads those files through the host source loader;
-  use `scala` when a host has no loader.
+  text; a `.kbm` `x` entry leaves that key without a tone. `load-scala path
+  kbm:` reads those files through the host source loader; use `scala` when a
+  host has no loader.
 - Tuning preset keywords are `:ji-5`, `:ji-7`, `:partch-43` and
   `:bohlen-pierce`.
 - Microtonal scale presets are `:edo19-major`, `:edo19-minor`,
@@ -892,13 +893,16 @@ pitch bend, so microtonal deviation is not preserved over MIDI.
   tuning is already active.
 - `strum subject time dir curve` spreads chord tones across an exact duration.
   Directions include `:up`, `:down`, `:alternate` and deterministic `:random`;
-  curves include `:flat` and `:fade`.
+  curves include `:flat`, `:fade` and `:swell`. An unknown direction or curve
+  keyword produces a type fault.
 - `harp subject position strips: base:` selects a chord tone from a multi-octave
   plate. Position is usually a signal such as `{range sine 0 1}`.
 - `inversion subject amount` rotates chord tones by scale periods; `perform
   subject chords` composes chord, voicing and inversion, then schedules `:block`,
-  `:strum`, `:arp` or `:harp` mode. Its `inversion:` and `bass:` options control
-  voicing rotation and the added bass tone.
+  `:strum`, `:arp` or `:harp` mode. Its keyword options are `mode:`,
+  `inversion:`, `bass:`, `time:`, `dir:`, `curve:`, `arp:`, `pos:`, `strips:`
+  and `base:`; `inversion:` controls voicing rotation and `bass:` adds a bass
+  tone.
 
 ```vactr
 s :pd > tune {edo 19} > n [0 2 4 7] > scale :c :edo19-major > gain 0.2 > d1

@@ -1,11 +1,11 @@
 # FM1 Tuning 06: lang-reference Section and Runnable Examples
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: fm1-tuning-06-docs-examples
 **Wave**: 4 (depends on fm1-tuning-05-natives)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md sections 3, 4.8, 4.9 (MIDI limitation), 6, 9, 10 item 12
 **Created**: 2026-10-10
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-11
 
 ## Intent and Context
 
@@ -120,11 +120,11 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 
 - [x] A lang-reference section documents all 9 names, the presets, the ordering rule, the anchor and the MIDI limitation
 - [x] Both examples run on the noop host for two cycles and are formatter fixed points (the noop runs emit only a latency-widened warning)
-- [ ] The docs-related test filters are green (fmt/LSP/reader/types aggregate has one reader block-count failure; see blocker below)
+- [x] The docs-related test filters are green (fmt/LSP/reader/types aggregate: 201/201)
 - [x] The design doc call notation uses braces (five spans, no other change)
 - [x] Progress log updated
-- [ ] Run-3 lang-reference lag fix applied (strum curves and faults, unmapped `.kbm` key, `perform` keywords)
-- [ ] Test-integrity and adversarial reviews completed
+- [x] Run-3 lang-reference lag fix applied (strum curves and faults, unmapped `.kbm` key, `perform` keywords)
+- [x] Test-integrity and adversarial reviews completed (session-354 Step 7 reviews accepted; integration review comm-006021 accepted all 7 plans)
 
 ## Progress Log
 
@@ -143,3 +143,11 @@ Evidence directory: `tmp/fm1-tuning/p06/`.
 ### Session: 2026-10-10 (run 3 design step, session-354)
 **Tasks Completed**: writePaths amended with `src/reader/tests/no_panic.rs` (already 13 in 82bbee2; owner reported the docs filter 201/201). Added the section 6 lag fix (strum curves and faults, unmapped `.kbm` key, `perform` keywords). Rebased the diff checks onto fixed commits (lang-reference versus dbad8c3; notation versus 086b94f..82bbee2), because the run-3 design step edits design-tuning-and-strum.md.
 **Notes**: Remaining: apply the lang-reference lag fix, rerun the docs filter and the p06 verification, then the test-integrity and adversarial reviews.
+
+### Session: 2026-10-10 (Step 6 continuation, session-354)
+**Tasks Completed**: Applied the section 6 documentation lag fix: `.kbm` `x` keys yield no tone; `strum` documents `:flat`, `:fade`, `:swell` and type faults for unknown direction/curve keywords; `perform` lists all ten keyword options. Re-ran example formatter and both two-cycle noop runs, docs-related nextest filters (201/201), additions-only and design notation invariants.
+**Notes**: Both example runs exit 0 and produce only the expected `latency-widened` warning. Implementation criteria are complete. Test-integrity and adversarial reviews remain downstream workflow steps.
+
+### Session: 2026-10-11 (Step 8 completion-state cleanup, session-354)
+**Tasks Completed**: Recorded the accepted test-integrity and adversarial reviews (integration review comm-006021 accepted all 7 plans). Status set to Completed and the plan archived to `impl-plans/completed/`.
+**Notes**: No source, test or documentation content changed in this session.

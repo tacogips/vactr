@@ -252,7 +252,7 @@ Invariant check: all existing hash tags 0-42 are unchanged
 - [x] Four variants appended; hash tags 43-46; existing arms and tags 0-42 unchanged
 - [x] Every exhaustive match compiles with explicit new arms (no new `_ =>` added to an exhaustive match), including `src/session/song/freeze.rs` and `src/session/song/source_uses/timing/capture.rs`
 - [x] Every freeze.rs dispatcher (`pat`, `pat_complex`, `pat_unary`, `finish_unary`, `unary_child`, `children`) has explicit arms for the variants it handles
-- [ ] Plan 05's `tests/song_tuning.rs` strum and tune cases exercise freeze/capture arms end to end (downstream-owned)
+- [x] Plan 05's `tests/song_tuning.rs` strum and tune cases exercise freeze/capture arms end to end (downstream-owned; covered by `tuned_and_untuned_note_freeze_and_play_with_expected_frequency` and `tuned_and_untuned_strum_songs_freeze_and_play_three_events`, 3/3 in `tmp/fm1-tuning/p07/nextest-focused-song-final.log`)
 - [x] All listed focused tests pass; the regression filter is green
 - [x] clippy, rustfmt and line limits pass; only the plan-02 Files-table paths changed (accepted plan-01 dependency files are also present in the shared tree)
 - [x] Progress log updated
@@ -266,3 +266,7 @@ Invariant check: all existing hash tags 0-42 are unchanged
 ### Session: 2026-10-10 test-integrity repairs
 **Tasks Completed**: P02-TI-1, P02-TI-2, and P02-TI-3 repairs
 **Notes**: Added `Strum(_, time, dir, curve)` parameter scheduling to the pre-scan in `src/session/song/source_uses/timing/capture.rs`. Strengthened `strum/tests.rs` to assert inversion note lists for n `[0 1 2 1]` and :alternate first tones `[60 67 60 67]` across four quarter events. Strengthened `tune/tests.rs` to compare the carried control with the requested ref-key/ref-frequency mapping and the default mapping. Explicit Plan 05 handoff: add a patterned-dir Strum song timing-capture case to `tests/song_tuning.rs`; this plan does not claim that end-to-end case as covered. Fresh final-source gates passed under `tmp/fm1-tuning/p02/repair1/retry-01/`: build, focused nextest 16/16, regression nextest 615/615, strict clippy, rustfmt and line limits. The earlier repair1 clippy attempt failed on `unnecessary_sort_by`; it was corrected to `sort_by_key` and superseded by the passing retry-01 clippy run. No git writes were made.
+
+### Session: 2026-10-11 (Step 8 completion-state cleanup, session-354)
+**Tasks Completed**: Ticked the downstream song criterion. Plan 05 (accepted) added the tune and strum song freeze and playback cases in `tests/song_tuning.rs`; the closeout focused run passed 3/3 and the full nextest passed 2888/2888 (`tmp/fm1-tuning/p07/nextest-full-rerun-20261011.log`). Archived to `impl-plans/completed/`.
+**Notes**: The optional patterned-direction strum song timing-capture case from the test-integrity handoff was not added; it was not part of the accepted plan 05 criteria.

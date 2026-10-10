@@ -307,3 +307,24 @@ fn tuned_and_untuned_strum_songs_freeze_and_play_three_events() {
         assert!(freq(event).to_bits().abs_diff(expected.to_bits()) <= 1);
     }
 }
+
+#[test]
+fn song_freeze_skips_unmapped_kbm_chord_tones() {
+    let tuned = "song {part [lead: {s :analog > tune {scala \"two\\n2\\n3/2\\n2/1\" kbm: \"2\\n60\\n61\\n60\\n60\\n261.6255653005986\\n2\\n0\\nx\"} > note [60 61] > gain 0.2}] duration: 1} tail-seconds: 0 > play-song";
+    let rows = frozen(tuned);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].note, Some(ResolvedNote::Int(60)));
+
+    let events = playback_events(tuned);
+    assert_eq!(events.len(), 1);
+    let expected = vactr::sched::commit::note_to_freq(60.0) as f32;
+    assert!(freq(&events[0]).to_bits().abs_diff(expected.to_bits()) <= 1);
+
+    let untuned = "song {part [lead: {s :analog > note [60 61] > gain 0.2}] duration: 1} tail-seconds: 0 > play-song";
+    let rows = frozen(untuned);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        rows.iter().map(|row| row.note).collect::<Vec<_>>(),
+        vec![Some(ResolvedNote::Int(60)), Some(ResolvedNote::Int(61))]
+    );
+}

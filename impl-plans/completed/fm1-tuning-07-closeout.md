@@ -1,6 +1,6 @@
 # FM1 Tuning 07: Full Gates and Index Closeout
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: fm1-tuning-07-closeout
 **Wave**: 5 (depends on fm1-tuning-06-docs-examples)
 **Design Reference**: design-docs/specs/design-tuning-and-strum.md sections 10, 11
@@ -131,11 +131,11 @@ Record every gate as `{command, exitStatus: 0, testsRun, testsPassed, failureCou
 
 ## Completion Criteria
 
-- [ ] F1 strum curve validation, T1 and T2 tests added; `nextest-focused-strum.log` and `nextest-focused-song.log` (testsRun 3) exit 0; rustfmt check and `wc -l` < 1000 pass; T1 negative control recorded under mutationEvidence
-- [ ] Gates 1-10 exit 0 with complete logs
-- [ ] All invariant checks pass
-- [ ] `impl-plans/README.md` entry added
-- [ ] Progress log updated with the verification table
+- [x] F1 strum curve validation, T1 and T2 tests added; `nextest-focused-strum-final.log` (12/12) and `nextest-focused-song-final.log` (3/3) exit 0; rustfmt check and `wc -l` < 1000 pass; T1 negative control fails without the guard and is recorded under mutationEvidence
+- [x] Gates 1-10 exit 0 with complete logs
+- [x] All invariant checks pass
+- [x] `impl-plans/README.md` entry added (applied by serial shared-index update R-354-README; 9/9 links resolve, `tmp/fm1-tuning/reconcile-354c/readme-links.log`)
+- [x] Progress log updated with the verification table
 
 ## Progress Log
 
@@ -154,3 +154,65 @@ Record every gate as `{command, exitStatus: 0, testsRun, testsPassed, failureCou
 ### Session: 2026-10-10 (run 3 plan step, session-354)
 **Tasks Completed**: Pinned T1/T2 inputs (T2 reuses the keymap proven at tuning_natives.rs:345) and split the focused nextest run into strum and song_tuning invocations (design-review finding S3-L1)
 **Notes**: Waits for plan 06 acceptance
+
+### Session: 2026-10-11 (run 3 implementation, session-354)
+**Tasks Completed**: Implemented F1, T1 and T2. Focused strum (12/12), song_tuning (3/3), rustfmt, and the <1000-line checks passed. The T1 mutation control failed as expected without the curve guard.
+**Gate evidence**:
+
+| Gate | Command | Exit | Result | Log |
+| --- | --- | ---: | --- | --- |
+| 1 | `CARGO_TERM_QUIET=true cargo build` | 0 | passed | `tmp/fm1-tuning/p07/build.log` |
+| 2 | `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` | 0 | passed | `tmp/fm1-tuning/p07/clippy.log` |
+| 3 | `cargo fmt -- --check` | 0 | passed | `tmp/fm1-tuning/p07/fmt.log` |
+| 4 | `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` | 100 | failed: 2,884 passed, 1 failed, 3 skipped; `spec_fixtures::every_spec_block_has_exactly_one_entry` sees new lang-reference blocks 6 and 7 without manifest entries | `tmp/fm1-tuning/p07/nextest-full.log` |
+
+**Notes**: Gates 5-10 and invariant checks were not started because the full suite exposed a required repair in `tests/spec_fixtures.rs` and `tests/fixtures/spec/manifest.toml`, both outside this plan's `writePaths`. Resume after an authorized checkpoint adds those paths and updates the fixture manifest/count expectations. `impl-plans/README.md` remains for post-review integration bookkeeping.
+
+### Session: 2026-10-11 (closeout rerun)
+**Tasks Completed**: Re-ran gates 1-10 after the shared fixture manifest and block-count repair appeared in the worktree; all gates passed. All three invariant checks passed.
+**Gate evidence**:
+
+| Gate | Command | Exit | Result | Log |
+| --- | --- | ---: | --- | --- |
+| 1 | `CARGO_TERM_QUIET=true cargo build` | 0 | passed | `tmp/fm1-tuning/p07/build-rerun-20261011.log` |
+| 2 | `CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings` | 0 | passed | `tmp/fm1-tuning/p07/clippy-rerun-20261011.log` |
+| 3 | `cargo fmt -- --check` | 0 | passed | `tmp/fm1-tuning/p07/fmt-rerun-20261011.log` |
+| 4 | `CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run` | 0 | passed: 2,888/2,888; 3 skipped | `tmp/fm1-tuning/p07/nextest-full-rerun-20261011.log` |
+| 5 | `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | 0 | passed | `tmp/fm1-tuning/p07/wasm-lib-rerun-20261011.log` |
+| 6 | `mise run build-wasm-release` | 0 | passed | `tmp/fm1-tuning/p07/wasm-release-rerun-20261011.log` |
+| 7 | `cd editor && npm run check` | 0 | passed | `tmp/fm1-tuning/p07/npm-check-rerun-20261011.log` |
+| 8 | `cd editor && ./node_modules/.bin/vitest run` | 0 | passed: 841/841 across 95 files | `tmp/fm1-tuning/p07/vitest-full-rerun-20261011.log` |
+| 9 | `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | 0 | passed | `tmp/fm1-tuning/p07/dist-build-rerun-20261011.log` |
+| 10 | `cd editor && npm run test:style` | 0 | passed: 4/4 combinations | `tmp/fm1-tuning/p07/test-style-rerun-20261011.log` |
+
+**Machine-readable gate records**:
+
+```json
+[
+  {"command":"CARGO_TERM_QUIET=true cargo build","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/build-rerun-20261011.log","notes":"non-test gate (no test cases); build completed successfully."},
+  {"command":"CARGO_TERM_QUIET=true cargo clippy --locked --all-targets -- -D warnings","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/clippy-rerun-20261011.log","notes":"non-test gate (no test cases); strict Clippy completed successfully."},
+  {"command":"cargo fmt -- --check","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/fmt-rerun-20261011.log","notes":"non-test gate (no test cases); formatting check passed."},
+  {"command":"CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run","exitStatus":0,"testsRun":2888,"testsPassed":2888,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/nextest-full-rerun-20261011.log","notes":"The 3 skipped tests are pre-existing #[ignore] tests at both dbad8c3 and HEAD (tmp/fm1-tuning/reconcile-354c/skipped-tests.log); the preceding attempt is retained above as historical failure evidence."},
+  {"command":"CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/wasm-lib-rerun-20261011.log","notes":"non-test gate (no test cases); WASM library build completed successfully."},
+  {"command":"mise run build-wasm-release","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/wasm-release-rerun-20261011.log","notes":"non-test gate (no test cases); release WASM build completed successfully."},
+  {"command":"cd editor && npm run check","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/npm-check-rerun-20261011.log","notes":"non-test gate (no test cases); editor check completed successfully."},
+  {"command":"cd editor && ./node_modules/.bin/vitest run","exitStatus":0,"testsRun":841,"testsPassed":841,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/vitest-full-rerun-20261011.log","notes":"95 test files passed."},
+  {"command":"cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/dist-build-rerun-20261011.log","notes":"non-test gate (no test cases); frontend build completed successfully."},
+  {"command":"cd editor && npm run test:style","exitStatus":0,"testsRun":4,"testsPassed":4,"failureCount":0,"outcome":"passed","log":"tmp/fm1-tuning/p07/test-style-rerun-20261011.log","notes":"Style assertions passed for 4 engine/viewport combinations (chromium and webkit x 2 viewports); run under the measurement lock."}
+]
+```
+
+**Invariant evidence**:
+
+| Check | Exit | Log |
+| --- | ---: | --- |
+| Baseline-owned files unchanged versus dbad8c3 | 0 | `tmp/fm1-tuning/p07/invariant-unchanged-rerun-20261011.log` |
+| `natives_domain.rs` additions only | 0 | `tmp/fm1-tuning/p07/invariant-natives-additions-only-rerun-20261011.log` |
+| Every changed Rust file below 1,000 lines | 0 | `tmp/fm1-tuning/p07/invariant-rust-lines-rerun-20261011.log` |
+
+**Notes**: The previous failed full-nextest attempt remains recorded above as historical evidence; the rerun passed after serial fixture repair R-354-SPECFIX added the entries for the new lang-reference blocks. The README index paragraph was applied by serial shared-index update R-354-README; 9/9 links resolve (`tmp/fm1-tuning/reconcile-354c/readme-links.log`).
+
+
+### Session: 2026-10-11 (record correction)
+**Tasks Completed**: Reconciled INT-354-P07-RECORD without changing source, tests, fixtures, or README.
+**Notes**: Original plan-record SHA-256 before correction: `b8ae668e757fe447982b80abbe5f7f277d16e4bf291743ce7db90c407e62750c`; corrected record SHA-256 before this audit entry: `f3bcda451263452084539b1d25811b0a6cb9bf5d6fd44254d067facaa566b5d1`. test:style records 4/4 (`tmp/fm1-tuning/p07/test-style-rerun-20261011.log`); three pre-existing ignored nextest tests are attributed in `tmp/fm1-tuning/reconcile-354c/skipped-tests.log`. R-354-README and R-354-SPECFIX ownership is recorded above. All completion criteria are checked; status is Completed.

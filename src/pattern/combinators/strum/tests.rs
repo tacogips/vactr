@@ -232,6 +232,57 @@ fn float_time_faults_and_scalar_notes_pass_through() {
 }
 
 #[test]
+fn unknown_curve_faults_without_changing_passthrough_or_valid_curves() {
+    let p = strum(
+        base_chord(),
+        ratio(1, 32),
+        keyword("up"),
+        keyword("bogus"),
+        None,
+    );
+    let result = run(&p, cycle(0));
+    assert!(result.events.is_empty());
+    assert_eq!(result.faults.len(), 1);
+    assert_eq!(result.faults[0].code, FailCode::Type);
+    assert!(result.faults[0].message.contains("curve"));
+
+    let p = strum(
+        base_chord(),
+        ratio(1, 32),
+        keyword("sideways"),
+        keyword("flat"),
+        None,
+    );
+    let result = run(&p, cycle(0));
+    assert!(result.events.is_empty());
+    assert_eq!(result.faults.len(), 1);
+    assert_eq!(result.faults[0].code, FailCode::Type);
+    assert!(result.faults[0].message.contains("direction"));
+
+    let scalar = strum(
+        s(kw("bd")),
+        ratio(1, 32),
+        keyword("up"),
+        keyword("bogus"),
+        None,
+    );
+    let result = run(&scalar, cycle(0));
+    assert_eq!(result.events.len(), 1);
+    assert!(result.faults.is_empty());
+
+    let p = strum(
+        base_chord(),
+        ratio(1, 32),
+        keyword("up"),
+        keyword("swell"),
+        None,
+    );
+    let result = run(&p, cycle(0));
+    assert_eq!(result.events.len(), 3);
+    assert!(result.faults.is_empty());
+}
+
+#[test]
 fn harp_selects_positions_across_twelve_tone_plate() {
     let p = harp(base_chord(), PParam::Const(Value::Int(0)), 12, None, None).unwrap();
     assert_eq!(tone(&run(&p, cycle(0)).events, 0), "Int(48)");

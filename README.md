@@ -49,6 +49,23 @@ Middle end (TASK-004..006):
   signals (the first list-valued step after `s` gives the structure;
   `midi-notes` is a structure-giving step), the cycle clock, and the
   visual chains with their shader and uniform plans.
+- Microtonal tuning and chord performance
+  ([design](design-docs/specs/design-tuning-and-strum.md),
+  `lang-reference.md` section 6): `tune` applies an `edo` (including
+  non-octave periods such as Bohlen-Pierce), a `ratios` just-intonation
+  list, inline `scala` text with an optional `.kbm` mapping, a
+  `load-scala` file (needs a host source loader), or a preset (`:ji-5`, `:ji-7`, `:partch-43`,
+  `:bohlen-pierce`). `scale`, `chord` and `voicing` resolve through the
+  active tuning, and microtonal scale presets such as `:edo19-major`,
+  `:maqam-rast`, `:slendro` and `:bp-lambda` work with `scale`. `strum`
+  spreads chord tones in time (`:up`, `:down`, `:alternate`, `:random`;
+  curves `:flat`, `:fade`, `:swell`), `harp` plays a position across a
+  multi-octave chord plate, `inversion` rotates chord tones by tuning
+  periods, and `perform` composes chord, voicing and inversion, then
+  plays a block, strum, arp or harp mode.
+  Without `tune`, output is bit-identical 12-TET. MIDI out sends the
+  nearest 12-TET note with no pitch bend. See
+  `examples/microtonal-tuning.vact` and `examples/strum-harp.vact`.
 
 Core modules use no OS threads and no I/O. Threads, files, sockets and
 child processes are used only in `src/host/native/`, `src/pkg/native/`,

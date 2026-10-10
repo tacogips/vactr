@@ -86,6 +86,26 @@ behaviour only. No emulation source code is consulted or adapted. See
 | Esqueda et al., Lockhart and Serge wavefolders (Applied Sciences 7(12), 2017) | https://doi.org/10.3390/app7121328 | Wavefolding models |
 | Bilbao et al., Antiderivative antialiasing (IEEE SPL 24(7), 2017) | https://doi.org/10.1109/LSP.2017.2675541 | First-order ADAA for the wavefolder |
 
+### Six-Operator FM and New Voices
+
+msfa is the only code reference, and its adapted items are recorded in
+`THIRD_PARTY_NOTICES.md`. Everything else is used for equations, physics and
+published user-level behaviour only. FM-1 firmwares (GPL-3.0) are concept
+descriptions only. See
+[`design-fm1-voices.md`](../specs/design-fm1-voices.md#license-boundary).
+
+| Name | URL | Description |
+|------|-----|-------------|
+| music-synthesizer-for-android (msfa), Apache-2.0 | https://github.com/google/music-synthesizer-for-android | Algorithm bus table (test fixture), EG, scaling, frequency and feedback formulas, bulk-dump unpack layout |
+| Kaegi and Tempelaars, VOSIM (JAES 26(6), 1978) | https://www.aes.org/e-lib/ | VOSIM pulse-train model |
+| Xenakis, Formalized Music (rev. ed., 1992) | https://www.pendragonpress.com/ | Dynamic stochastic synthesis (GENDYN) |
+| Serra, GENDY3 (Perspectives of New Music 31(1), 1993) | https://www.jstor.org/ (Perspectives of New Music 31(1)) | Analysis of GENDY3 random walks and barriers |
+| Hoffmann, The New GENDYN Program (CMJ 24(2), 2000) | https://direct.mit.edu/comj (CMJ 24(2)) | GENDYN reimplementation and parameters |
+| Verplank, Mathews and Shaw, Scanned synthesis (ICMC 2000) | https://quod.lib.umich.edu/i/icmc/ | Haptic-rate mass-spring string scanned at audio rate |
+| Smith, Physical Audio Signal Processing (2010) | https://ccrma.stanford.edu/~jos/pasp/ | Digital waveguides and bowed-string friction |
+| McIntyre, Schumacher and Woodhouse (JASA 74(5), 1983) | https://pubs.aip.org/asa/jasa (JASA 74(5)) | Self-sustained oscillation and bow friction |
+| Fletcher and Rossing, The Physics of Musical Instruments (2nd ed., 1998) | https://link.springer.com/ (2nd ed., 1998) | Clamped-free bar modes, lamellophones, organ pipes and tonewheels |
+
 ## Reference Documents
 
 Reference documents should be organized by topic:

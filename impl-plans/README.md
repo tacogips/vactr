@@ -24,6 +24,38 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 The [DOM renderer comparison](../design-docs/specs/design-dom-renderer.md) plans are Completed: [core](completed/dom-renderer-core.md), [mount](completed/dom-renderer-mount.md), [harness](completed/dom-renderer-harness.md), and [evidence](completed/dom-renderer-evidence.md); the [dispatch manifest](completed/dom-renderer-s296-dispatch.json) is archived. The measured report and raw data remain at [design-renderer-comparison.md](../design-docs/specs/design-renderer-comparison.md) and `design-docs/specs/evidence/renderer-comparison/rc-001/`. The DOM backend was removed afterwards because the comparison measured no performance benefit over canvas.
 
+## Six-operator FM algorithms and new voices (2026-10-10)
+
+These plans implement [design-fm1-voices.md](../design-docs/specs/design-fm1-voices.md). All are Ready.
+
+**Wave 0**
+
+- [FM1V-00 scaffold](active/fm1-voices-00-scaffold.md): module tree, port contracts, `Fm6Patch`, msfa checkout.
+
+**Wave 1** (parallel)
+
+- [FM1V-10 algorithms](active/fm1-voices-10-algorithms.md)
+- [FM1V-11 EG and scaling](active/fm1-voices-11-eg-scaling.md)
+- [FM1V-12 SysEx parser](active/fm1-voices-12-sysex.md)
+- Voice kernels: [FM1V-13 kalimba](active/fm1-voices-13-kalimba.md), [FM1V-14 tonewheel](active/fm1-voices-14-tonewheel.md), [FM1V-15 hurdy-gurdy](active/fm1-voices-15-hurdy-gurdy.md), [FM1V-16 VOSIM](active/fm1-voices-16-vosim.md), [FM1V-17 GENDYN](active/fm1-voices-17-gendyn.md), [FM1V-18 scanned](active/fm1-voices-18-scanned.md)
+
+**Wave 2**
+
+- [FM1V-20 FM engine](active/fm1-voices-20-fm-engine.md)
+- [FM1V-21 `fm6-sysex` native](active/fm1-voices-21-sysex-native.md)
+- [FM1V-30 voice registry](active/fm1-voices-30-voice-registry.md)
+
+**Wave 3**
+
+- [FM1V-40 FM registry](active/fm1-voices-40-fm-registry.md)
+
+**Wave 4**
+
+- [FM1V-50 examples](active/fm1-voices-50-examples.md)
+- [FM1V-51 docs and notices](active/fm1-voices-51-docs-notices.md)
+
+Registry plans FM1V-30 and FM1V-40 run serially.
+
 ## Purpose
 
 Implementation plans bridge design documents (what to build) and actual code (how to build). They provide:

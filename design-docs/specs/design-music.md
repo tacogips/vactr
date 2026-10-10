@@ -476,6 +476,32 @@ controls, digest-stability rules and verification are in
 [`design-bass-voices.md`](design-bass-voices.md). Existing templates and
 their render digests are unchanged.
 
+### 4.4 Six-operator FM algorithms and new voices (author, 2026-10-10)
+
+The existing FM engine is extended with the 32 classic six-operator
+algorithm topologies:
+
+- feedback operator;
+- ratio or fixed frequency with detune;
+- output level;
+- 4-rate/4-level envelopes;
+- keyboard rate and level scaling;
+- velocity sensitivity.
+
+The `fm` template's `algorithm` control now works: `0` (the new default) is
+the unchanged legacy two-operator stack, and `1..32` select a topology. The
+new `fm6-core` UGen takes a 155-value `patch:` list. The `fm6-sysex path`
+native imports user-supplied single-voice and 32-voice SysEx files, with
+checksum validation. No factory patch data is bundled.
+
+Six new prelude templates are added: `kalimba`, `tonewheel-organ`,
+`hurdy-gurdy`, `vosim`, `gendyn` and `scanned`.
+
+Models, controls, the backward-compatibility mechanism, the license boundary
+(msfa, Apache-2.0, is the only code reference) and verification are in
+[`design-fm1-voices.md`](design-fm1-voices.md). Existing templates and their
+golden digests are unchanged.
+
 ## 5. Effects (builtin catalog; author, 2026-09-24)
 
 Effects are builtins, usable in three positions: as per-event pattern

@@ -1,6 +1,6 @@
 # Vim Mode: Redo Records, Macros, Undo Ledger and Marks Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-14 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.9, 4.10, 4.11
 **Created**: 2026-10-16
@@ -157,9 +157,9 @@ contains a mark maps to the deletion start; the context mark; an unset mark
 
 ## Acceptance Criteria
 
-- [ ] The pinned exports exist with those signatures.
-- [ ] At least 28 tests pass across the three files.
-- [ ] Each file is within budget, and the purity test passes.
+- [x] The pinned exports exist with those signatures.
+- [x] At least 28 tests pass across the three files (39 passed in the required suite).
+- [x] Each file is within budget, and the purity test passes.
 
 ## Verification
 
@@ -171,4 +171,18 @@ contains a mark maps to the deletion start; the context mark; an unset mark
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 implementation
+**Tasks Completed**: All VIM-14 deliverables.
+**Notes**: Added UndoLedger, edit/dot and macro recorders, token/text conversion, MarkTable, and focused tests. Every new file is within its plan budget. Initial scoped typecheck found a local move-token mapping type error; corrected the annotation and reran both required commands on the final source. Formal integration and adversarial review remain downstream workflow steps.
+
+**Final source hashes**:
+- `editor/src/code/vim/undo.ts`: `1a763588665e20643b8d790b933e90c7f61ee69b`
+- `editor/src/code/vim/record.ts`: `b0f8d71878be02fb6f55c39939f74100913d3f36`
+- `editor/src/code/vim/marks.ts`: `4c53dbe5c100d1cc224697290ddc15032b77cca8`
+- `editor/test/code/vim/undo.test.ts`: `2e854ae48cffb4ad1a8f7aefbbfc439aad8b7722`
+- `editor/test/code/vim/record.test.ts`: `9189f509afb3c6ff0eceb089202205ff704965f0`
+- `editor/test/code/vim/marks.test.ts`: `ac46df48e830c749147b1d39956fa0f9e5fa1732`
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/typecheck-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests; `tmp/vim-mode/VIM-14/focused-vitest-final.log`.

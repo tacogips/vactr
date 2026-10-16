@@ -5,6 +5,7 @@ import { CodeSurface } from './surface';
 import { AccessibilityBridge, boundary } from './accessibility';
 import { KeyboardController, type KeyboardOptions } from './keyboard';
 import type { PhaseTimer } from './frame';
+import type { VimInputHook } from './vim/types';
 
 export interface InputPresentation { doc: Text; changes?: ChangeSetType; changesBase?: Text; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
 export interface InputOptions extends KeyboardOptions {
@@ -18,6 +19,8 @@ export class InputController {
   readonly accessibility: AccessibilityBridge;
   readonly keyboard: KeyboardController;
   private composing = false;
+  private discarding = false;
+  private vim: VimInputHook | null = null;
   private preedit = '';
   private original = '';
   private trailingComposition = false;
@@ -34,9 +37,20 @@ export class InputController {
     this.accessibility = new AccessibilityBridge(surface, container, options.label);
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
-    this.listen(el, 'compositionstart', () => this.withInput(() => { this.flushBeforeHandler(); this.surface.notifyCompositionStart(); this.beginComposition(); }));
-    this.listen(el, 'compositionupdate', (event) => this.withInput(() => this.updateComposition((event as CompositionEvent).data)));
-    this.listen(el, 'compositionend', (event) => this.withInput(() => this.endComposition((event as CompositionEvent).data)));
+    this.listen(el, 'compositionstart', () => this.withInput(() => {
+      this.flushBeforeHandler();
+      if (this.vim && !this.vim.allowsTextInput()) {
+        this.discarding = true; this.surface.notifyCompositionStart(); this.vim.noteCompositionDiscarded();
+        queueMicrotask(() => { if (this.discarding && !this.disposed) { this.accessibility.textarea.blur(); this.accessibility.focus(); } });
+        return;
+      }
+      this.surface.notifyCompositionStart(); this.beginComposition();
+    }));
+    this.listen(el, 'compositionupdate', (event) => this.withInput(() => { if (!this.discarding) this.updateComposition((event as CompositionEvent).data); }));
+    this.listen(el, 'compositionend', (event) => this.withInput(() => {
+      if (this.discarding) { this.discarding = false; this.trailingComposition = true; this.accessibility.refresh(); return; }
+      this.endComposition((event as CompositionEvent).data);
+    }));
     this.listen(el, 'beforeinput', (event) => this.withInput(() => { this.flushBeforeHandler(); this.beforeInput(event as InputEvent); }));
     this.listen(el, 'input', (event) => this.withInput(() => this.input(event as InputEvent)));
     this.listen(el, 'select', () => this.withInput(() => { this.syncSelection(); this.flushBeforeHandler(); }));
@@ -49,13 +63,23 @@ export class InputController {
       const key = event as KeyboardEvent;
       if (this.composing && key.key === 'Escape') { key.preventDefault(); this.cancelComposition(); return; }
       if (!this.composing) this.trailingComposition = false;
-      if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);
+      if (this.vim === null) {
+        if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);
+      } else if (!this.composing && !key.isComposing && key.keyCode !== 229) {
+        if (this.surface.runKeymaps(key, 'highest')) return;
+        if (this.vim.handleKey(key)) { key.preventDefault(); return; }
+        if (!this.surface.runKeymaps(key, 'default')) this.keyboard.handle(key);
+      }
     }));
     this.listen(el, 'copy', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'copy'); }));
     this.listen(el, 'cut', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'cut'); }));
     this.listen(el, 'paste', (event) => this.withInput(() => { this.flushBeforeHandler(); this.clipboard(event as ClipboardEvent, 'paste'); }));
     this.listen(el, 'focus', () => this.withInput(() => this.flushBeforeHandler()));
-    this.listen(el, 'blur', () => { this.surface.notifyBlur(); this.cancelComposition(); });
+    this.listen(el, 'blur', () => {
+      this.surface.notifyBlur();
+      if (this.discarding) { this.discarding = false; this.accessibility.refresh(); }
+      this.cancelComposition();
+    });
     const position = () => this.accessibility.markPositionDirty();
     this.listen(window, 'resize', position);
     this.listen(window, 'orientationchange', position);
@@ -70,6 +94,7 @@ export class InputController {
     });
     this.publish();
   }
+  setVim(hook: VimInputHook | null): void { this.vim = hook; }
   setPhases(phases: PhaseTimer | null): void { this.options.phases = phases; this.keyboard.setPhases(phases); }
   get isComposing(): boolean { return this.composing; }
   flushBridge(): void {
@@ -149,6 +174,10 @@ export class InputController {
   }
   private beforeInput(event: InputEvent): void {
     const kind = event.inputType;
+    if (this.discarding) {
+      if (event.isComposing || /insert.*Composition/i.test(kind)) { if (event.cancelable) event.preventDefault(); this.accessibility.refresh(); }
+      return;
+    }
     if (this.trailingComposition && (kind === 'insertFromComposition' || kind === 'insertCompositionText')) {
       if (event.cancelable) event.preventDefault();
       this.accessibility.refresh(); return;
@@ -159,6 +188,10 @@ export class InputController {
       return; // platform owns the textarea during IME
     }
     this.trailingComposition = false;
+    if (this.vim && !this.vim.allowsTextInput() && (kind.startsWith('insert') || kind.startsWith('delete'))) {
+      if (event.cancelable) event.preventDefault();
+      this.accessibility.refresh(); return;
+    }
     if (!event.cancelable) return; // fallback input reconciles the native mutation
     if (kind === 'historyUndo' || kind === 'historyRedo') {
       event.preventDefault(); if (kind === 'historyUndo') this.surface.undo(); else this.surface.redo(); return;
@@ -168,14 +201,23 @@ export class InputController {
     }
     const insert = kind === 'insertLineBreak' || kind === 'insertParagraph' ? '\n' : event.data;
     if ((kind === 'insertText' || kind === 'insertReplacementText' || kind === 'insertLineBreak' || kind === 'insertParagraph') && insert != null) {
-      event.preventDefault(); this.replaceSelection(insert, 'input.type');
+      event.preventDefault();
+      const overwrite = kind === 'insertText' ? this.vim?.overwriteRange(insert) : null;
+      if (overwrite) {
+        const text = this.surface.state.toText(insert);
+        this.surface.dispatch({ changes: { from: overwrite.from, to: overwrite.to, insert: text },
+          selection: { anchor: overwrite.from + text.length }, userEvent: 'input.type' });
+        this.options.scrollCaret?.();
+      } else this.replaceSelection(insert, 'input.type');
     }
   }
   private input(event: InputEvent): void {
+    if (this.discarding) { this.accessibility.refresh(); return; }
     if (this.composing || event.isComposing) return;
     if (this.trailingComposition && (event.inputType === 'insertFromComposition' || event.inputType === 'insertCompositionText')) {
       this.accessibility.refresh(); return;
     }
+    if (this.vim && !this.vim.allowsTextInput()) { this.accessibility.refresh(); return; }
     const old = this.accessibility.window, value = this.accessibility.textarea.value;
     if (old.outside && old.anchor !== old.head) {
       // A clipped selection represents more source than the textarea contains.

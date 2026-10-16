@@ -1,6 +1,6 @@
 # Vim Mode: Core Contract (types, keys, words, test host) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-00 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 3.2, 3.3.1-3.3.3, 3.4, 4.2-4.4, 8.1
 **Created**: 2026-10-16
@@ -289,11 +289,11 @@ implements exactly these exports; extra internal helpers are fine.
 
 ## Acceptance Criteria
 
-- [ ] `types.ts`, `keys.ts` and `words.ts` export exactly the names in
+- [x] `types.ts`, `keys.ts` and `words.ts` export exactly the names in
       the tables above, with the stated signatures.
-- [ ] `keys.test.ts`, `words.test.ts` and `purity.test.ts` pass, with at
+- [x] `keys.test.ts`, `words.test.ts` and `purity.test.ts` pass, with at
       least 30 test cases in total.
-- [ ] The scoped typecheck passes.
+- [x] The scoped typecheck passes.
 
 ## Verification
 
@@ -306,4 +306,29 @@ implements exactly these exports; extra internal helpers are fine.
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 VIM-00 implementation
+
+**Tasks Completed**: Shared Vim types, key normalization/pass-through,
+word classes and grapheme helpers, test host, focused tests and scoped
+typecheck.
+
+**Write-path hashes before edits**:
+- `types.ts`: missing; final `8e56214b356c2b58bd162aec877630f609eb26ed`
+- `keys.ts`: missing; final `712af27113c2cd455876833b852ca892725c4da3`
+- `words.ts`: missing; final `cb2f85ced58d54d4dde879cbbb33713fdaae5212`
+- `host.ts`: missing; final `e2a92faab5d4e3517459e2c50df2525a2c133ebf`
+- `keys.test.ts`: missing; final `d649502cc94b1febf64aa2503ebec9fa11769fd0`
+- `words.test.ts`: missing; final `77777c1c7ca0a85322451064b7d503a49b3036a3`
+- `purity.test.ts`: missing; final `b5665ecff9620ce4fd8ebd570dd60390ddcfc6ac`
+- This plan before update: `9aa650807f442c7b9c88e8c1768ed648bcd2faa1`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-00/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/typecheck-final-2.log", notes: "No diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/keys.test.ts test/code/vim/words.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 104, testsPassed: 104, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/focused-vitest-final-2.log", notes: "3 files passed."}`
+- `{command: "cd editor && wc -l src/code/vim/*.ts test/code/vim/host.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/line-count.log", notes: "Source/helper line counts: 38, 65, 77, 60; all under 300."}`
+
+**Earlier attempts**: The initial typecheck exposed a supplied-clipboard test-helper type mismatch; the first focused test run had six incorrect expected offsets. Both were corrected. The first log wrapper did not preserve pipeline exit status; final source verification was rerun with Bash and complete exit records above.
+
+**Drift**: None observed outside this plan's declared source/test paths and artifact roots.
+
+**Blockers**: None.

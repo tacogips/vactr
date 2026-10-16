@@ -1,6 +1,6 @@
 # Vim Mode: Setting, Clipboard Adapter, Status Row and Toggle Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-17 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 3.7, 4.8 (adapter), 5, 6; design-docs/specs/design-ui-style.md
 **Created**: 2026-10-16
@@ -198,11 +198,11 @@ tokens, in the same pattern as the existing pressed or primary rules
 
 ## Acceptance Criteria
 
-- [ ] The three new modules exist with the exact exports above, and the
+- [x] The three new modules exist with the exact exports above, and the
       transport option is optional.
-- [ ] At least 25 new tests pass, and `controls.test.ts` and
+- [x] At least 25 new tests pass, and `controls.test.ts` and
       `style-tokens.test.ts` pass unchanged.
-- [ ] Each new file is under 200 lines.
+- [x] Each new file is under 200 lines.
 
 ## Verification
 
@@ -216,4 +216,42 @@ tokens, in the same pattern as the existing pressed or primary rules
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 VIM-17 implementation
+
+**Tasks Completed**: Added guarded Vim setting persistence, browser
+clipboard adapter, reactive Solid status and prompt row, optional
+transport toggle, token-only square UI styles, and focused tests.
+
+**Write-path hashes before edits** (existing files were clean at the
+checkpoint; baseline hashes are from `09a3406bcd19afd4b9039eda787c4d23cf97ffdb`):
+- `vim-settings.ts`: missing; final `3e3a28a42bba471c818612049b09976e275bacaf`
+- `vim-clipboard.ts`: missing; final `ede05cc95ec3d07bf10fb8e0a0755f1e15eaa775`
+- `vim-status-view.tsx`: missing; final `903820c7716ab1aa83af65dc1e34df9467227a62`
+- `transport-view.tsx`: before `b22e08bcf90e79a22cd3b950b51af3db6954496f`; final `de3d5493065773bbeca1099feb2583e6b951a335`
+- `transport.ts`: before `930396aa34a16ff0cd8a83d2811e98c3c2a82c38`; final `523295c934d5cabf7f1b420b06bdca466cf06d01`
+- `code.css`: before `072ed338019fd53691c6d5ebc3c7e875a9f74ba0`; final `9279aebdc3b0da6fc3048a28a162ad521cde620a`
+- `app.css`: before `b9f175a88968e7ba0982f04840d8a420cb1f5793`; final `569c56d508728d573be8942126b69e21ce1997d8`
+- `vim-settings.test.ts`: missing; final `af1215f79b4264256db78744a58598db59952a6f`
+- `vim-clipboard.test.ts`: missing; final `41aa0da1b532510d4b4758722075091f894c1aef`
+- `vim-status.test.tsx`: missing; final `1a76f9c4538264997104c591dc884beee9a39637`
+- `vim-toggle.test.ts`: missing; final `e592d18009a6f0401eec6e7606913e3b61a266c3`
+- This plan before update: `9956c9420536c7cc1efa99cc4a9dbf80e333dbab`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/typecheck-final.log", notes: "Scoped typecheck passed with no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts", exitStatus: 0, testsRun: 43, testsPassed: 43, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/focused-vitest-attempt-02.log", notes: "6 files passed, including unchanged controls and style token tests; all 25 VIM-17 tests passed."}`
+- `{command: "cd editor && wc -l src/code/vim-settings.ts src/code/vim-clipboard.ts src/code/vim-status-view.tsx test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts | awk 'BEGIN { ok=1 } NF == 2 && $2 != \"total\" { if ($1 >= 200) ok=0; print } END { if (!ok) exit 1 }'", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/line-count-final-3.log", notes: "All seven new source/test files are below 200 lines."}`
+
+**Earlier Attempts**: `typecheck-attempt-01.log` caught an overly broad
+ARIA pressed type, corrected to the literal `true`/`false` union.
+`focused-vitest-attempt-01.log` caught prompt focus occurring before DOM
+insertion; focus now runs reactively after insertion and all 43 tests pass.
+The initial line-count shell checks counted `wc`'s total row; the final
+filtered check in `line-count-final-3.log` passed.
+
+**Drift**: Preserved concurrent edits in VIM-10..16 files, including
+`input.ts`, `renderer.ts`, `surface.ts`, cursor-shape code and their tests.
+No files outside this plan's write paths were edited here.
+
+**Blockers**: None. Mount wiring is owned by VIM-30; formal review and
+workflow finalization remain downstream.

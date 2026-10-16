@@ -120,11 +120,17 @@ export class CodeSurface implements SurfaceContract {
     const group = [...bindings]; registry.push(group);
     return () => { const index = registry.indexOf(group); if (index >= 0) registry.splice(index, 1); };
   }
-  runKeymaps(event: KeyboardEvent): boolean {
-    for (const group of [...this.highestKeymaps, ...this.defaultKeymaps]) for (const binding of group) {
+  runKeymaps(event: KeyboardEvent, precedence?: 'highest' | 'default'): boolean {
+    const groups = precedence === undefined ? [...this.highestKeymaps, ...this.defaultKeymaps]
+      : [...(precedence === 'highest' ? this.highestKeymaps : this.defaultKeymaps)];
+    for (const group of groups) for (const binding of group) {
       if (matchesKey(event, binding.key) && binding.run()) { event.preventDefault(); return true; }
     }
     return false;
+  }
+  matchesKeymap(event: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>, precedence: 'highest' | 'default'): boolean {
+    const registry = precedence === 'highest' ? this.highestKeymaps : this.defaultKeymaps;
+    return registry.some(group => group.some(binding => matchesKey(event, binding.key)));
   }
   registerNumericDrag(provider: (event: PointerEvent, pos: number) => NumericGesture | null): () => void {
     this.numericDragProviders.add(provider); return () => this.numericDragProviders.delete(provider);
@@ -153,7 +159,7 @@ export class CodeSurface implements SurfaceContract {
   }
 }
 
-function matchesKey(event: KeyboardEvent, binding: string): boolean {
+function matchesKey(event: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>, binding: string): boolean {
   const parts = binding.split('-'); const key = parts.pop()?.toLowerCase();
   if (!key) return false;
   const modifiers = new Set(parts);

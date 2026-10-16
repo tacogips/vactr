@@ -1,6 +1,6 @@
 # Vim Mode: Input Routing and Text-Input Gate Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-15 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 3.3 (all subsections), 3.5
 **Created**: 2026-10-16
@@ -167,13 +167,13 @@ Required cases (at least 18):
 
 ## Acceptance Criteria
 
-- [ ] `setVim`, the routing, the gate, discarding and overwrite are
+- [x] `setVim`, the routing, the gate, discarding and overwrite are
       implemented as specified.
-- [ ] `matchesKeymap` exists, and the `runKeymaps` precedence filter
+- [x] `matchesKeymap` exists, and the `runKeymaps` precedence filter
       exists.
-- [ ] `input-vim-hook.test.ts` has at least 18 passing cases, and
+- [x] `input-vim-hook.test.ts` has at least 18 passing cases, and
       `input.test.ts` passes unmodified.
-- [ ] `input.ts` is under 300 lines and `surface.ts` under 220.
+- [x] `input.ts` is under 300 lines and `surface.ts` under 220.
 
 ## Verification
 
@@ -187,4 +187,20 @@ Required cases (at least 18):
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16
+
+**Tasks Completed**: All VIM-15 implementation and verification criteria.
+**Notes**: Added the optional input hook, highest/hook/default routing, text-input gate, discarded composition handling, and insertText overwrite dispatch. Extended `CodeSurface` keymap matching/filtering while preserving the original unfiltered registry snapshot behavior. Added `input-vim-hook.test.ts` with 22 cases. Existing `input.test.ts` remains unmodified.
+
+**Changed Source Hashes**:
+- `editor/src/code/input.ts`: `af36c47b1ddf082838d7f95d033c8220e51fad0599dce5c2d7d29cc6ed818ca7`
+- `editor/src/code/surface.ts`: `07f92699faed318ec41f29083e03bfcd0cbcc40086d5482bcd8e7ef29c42cdf7`
+- `editor/test/canvas/input-vim-hook.test.ts`: `a90c39c37099a33eb921bd052df4b31f98e71ab437db002d311f509a0910b46d`
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json` — exit 0, no diagnostics; log `tmp/vim-mode/VIM-15/typecheck-final-02.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 102/102 tests passed; log `tmp/vim-mode/VIM-15/focused-vitest-final-02.log`.
+- `git diff --stat -- editor/test/canvas/input.test.ts` — empty, confirming the existing test is unchanged.
+- Line counts: `input.ts` 270; `surface.ts` 179.
+
+**Recovered Setup Issue**: The first typecheck invocation found no VIM-15 scoped `tsconfig.json`. Regenerated the verification-only scaffold per the VIM-00 common rule 5 and reran the required typecheck successfully.

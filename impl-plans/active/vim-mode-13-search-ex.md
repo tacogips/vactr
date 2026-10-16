@@ -1,6 +1,6 @@
 # Vim Mode: Search and Ex Parsing Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-13 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.12, 4.13; user-qa VQ2, VQ3, VQ6
 **Created**: 2026-10-16
@@ -131,9 +131,9 @@ export interface ExContext { currentLine: number; lastLine: number; visual: { fr
 
 ## Acceptance Criteria
 
-- [ ] The pinned exports and the `ExCommand`/`ExContext` types exist.
-- [ ] At least 40 tests pass.
-- [ ] Both files are under 250 lines, and the purity test passes.
+- [x] The pinned exports and the `ExCommand`/`ExContext` types exist.
+- [x] At least 40 tests pass.
+- [x] Both files are under 250 lines, and the purity test passes.
 
 ## Verification
 
@@ -145,4 +145,35 @@ export interface ExContext { currentLine: number; lastLine: number; visual: { fr
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 VIM-13 implementation
+
+**Tasks Completed**: Search helpers, Ex parser, focused tests, scoped typecheck, purity check.
+
+**Files**: `editor/src/code/vim/search.ts`, `editor/src/code/vim/ex.ts`, `editor/test/code/vim/search-ex.test.ts`.
+
+**Verification**:
+
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-13/tsconfig.json` — exit 0; log `tmp/vim-mode/VIM-13/typecheck-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/search-ex.test.ts test/code/vim/purity.test.ts` — exit 0; 2 files, 65/65 tests passed; log `tmp/vim-mode/VIM-13/focused-vitest-final.log`.
+- `wc -l editor/src/code/vim/search.ts editor/src/code/vim/ex.ts` — exit 0; 113 and 115 lines; log `tmp/vim-mode/VIM-13/line-count.log`.
+
+**Source Hashes (initial implementation, superseded by review repair)**: `search.ts` `4c9cddf241b9088f5f1a9dee7e70d02db2a39170`; `ex.ts` `4d9037f3025514faf6bd8bfedc7af34a6be035b5`; tests `0a9aabe40f3a26c2df143b5aa79a3c3caee30ae9`.
+
+**Prior Attempts**: The initial scoped typecheck and focused Vitest run failed before corrections; complete logs are `tmp/vim-mode/VIM-13/typecheck-02.log` (typing errors) and `tmp/vim-mode/VIM-13/focused-vitest-02.log` (62 passed, 3 failed due to initial expected-value mistakes). A wrapper attempt also used zsh's read-only `status` variable; the exact checks were rerun with `rc` and produced the results above. Final-source reruns supersede these failures.
+
+**Downstream**: VIM-20 owns execution of parsed search and Ex commands. Formal review and combined-tree integration verification remain downstream workflow steps.
+
+### Review repair: VIM13-ADV-01 (2026-10-16)
+
+**Finding**: `readDelimited` previously consumed a non-delimiter backslash one character at a time. In a backslash pair immediately before the delimiter, the second backslash incorrectly escaped that delimiter, shifting the replacement and flags.
+
+**Correction**: `editor/src/code/vim/ex.ts` now consumes backslash plus delimiter as a literal delimiter; otherwise it preserves the next character as part of the backslash pair and advances by two. A trailing lone backslash remains literal. Added two regression cases in `editor/test/code/vim/search-ex.test.ts` for an escaped-backslash pattern plus escaped-slash replacement and for an escaped-backslash replacement followed by `g`. Existing escaped-delimiter and preserved-escape cases remain unchanged.
+
+**Verification on repaired source**:
+
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-13/tsconfig.json` — exit 0; log `tmp/vim-mode/VIM-13/typecheck-repair-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/search-ex.test.ts test/code/vim/purity.test.ts` — exit 0; 2 files, 67/67 tests passed; log `tmp/vim-mode/VIM-13/focused-vitest-repair-final.log`.
+- `cd editor && node --experimental-strip-types --no-warnings --input-type=module` with assertions for both parse cases — exit 0; log `tmp/vim-mode/VIM-13/escaped-backslash-repro.log`.
+- `cd editor && wc -l src/code/vim/search.ts src/code/vim/ex.ts` — exit 0; 113 and 118 lines; log `tmp/vim-mode/VIM-13/line-count-repair-final.log`.
+
+**Repaired Source Hashes**: `search.ts` `4c9cddf241b9088f5f1a9dee7e70d02db2a39170`; `ex.ts` `be8d00f65c83964c830f1a6afc24e3151d3abf5e`; tests `706c570373b9445eef4542da85021aa4563e9eba`.

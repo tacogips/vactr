@@ -1,6 +1,6 @@
 # Vim Mode: Motions Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (implementation criteria met; independent review pending)
 **Plan ID**: VIM-10 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.3, 4.4, 4.5, 7
 **Created**: 2026-10-16
@@ -109,10 +109,10 @@ the `|` marker inline. Required rows (at least 60):
 
 ## Acceptance Criteria
 
-- [ ] `runMotion` handles all 34 `MotionKind` values with the results in
+- [x] `runMotion` handles all 34 `MotionKind` values with the results in
       the table above.
-- [ ] `motions.test.ts` has at least 60 cases, all passing.
-- [ ] `motions.ts` is under 450 lines, and the purity test still passes.
+- [x] `motions.test.ts` has at least 61 cases, all passing.
+- [x] `motions.ts` is under 450 lines, and the purity test still passes.
 
 ## Verification
 
@@ -125,4 +125,18 @@ the `|` marker inline. Required rows (at least 60):
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16
+
+**Tasks Completed**: Implemented the pure motion dispatcher for all 34 `MotionKind` values and added 61 focused cases covering grapheme movement, counts, word classes, viewport/page movement, find/till repetition, paragraphs and bounded bracket matching.
+
+**Implementation Notes**: Reused `words.ts` grapheme and column helpers. Bracket matching scans the ASCII bracket characters within `SCAN_LIMIT`, including nested pairs and an enclosing opener when the cursor is inside its region. `motions.ts` is 266 lines. The VIM-00 files and plan changes already present at session start were preserved.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/typecheck-final.log", notes: "Final scoped typecheck on current source."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 61, testsPassed: 61, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/focused-vitest-final.log", notes: "Both files passed; 61/61 cases."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/line-count.log", notes: "266 and 100 lines; motion implementation is below 450 lines."}`
+
+**Prior Attempts**: Earlier scoped runs exposed fixture expectation errors and motion defects; those changes were corrected and the final current-source commands above pass. Complete attempt logs are preserved as `focused-vitest-01.log` through `focused-vitest-07.log`, `typecheck-01.log` and `typecheck-02.log`; `focused-vitest-05.log` records the interrupted run during long-line scan diagnosis.
+
+**Review State**: Implementation criteria are met. Independent integrity, adversarial and combined-tree review remain downstream workflow steps.

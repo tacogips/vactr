@@ -1,6 +1,6 @@
 # Vim Mode: Text Objects Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress (implementation criteria met; independent review pending)
 **Plan ID**: VIM-11 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.4, 4.7
 **Created**: 2026-10-16
@@ -86,9 +86,9 @@ Format: `{ doc: 'foo b|ar baz', spec: { around: false, kind: 'w' }, count: 1, ex
 
 ## Acceptance Criteria
 
-- [ ] All 9 `TextObjectKind` values are handled for both `i` and `a`.
-- [ ] At least 30 test cases pass.
-- [ ] The file is under 300 lines, and the purity test passes.
+- [x] All 9 `TextObjectKind` values are handled for both `i` and `a`.
+- [x] At least 30 test cases pass.
+- [x] The file is under 300 lines, and the purity test passes.
 
 ## Verification
 
@@ -101,4 +101,37 @@ Format: `{ doc: 'foo b|ar baz', spec: { around: false, kind: 'w' }, count: 1, ex
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 VIM-11 implementation
+
+**Tasks Completed**: Added the DOM-free text-object selector and 35 focused behavior cases. All normalized kinds (`w`, `W`, quotes, and four bracket kinds) have inner and around coverage. Word runs use grapheme boundaries; quotes ignore escaped delimiters and stay on one line; nested bracket searches are bounded; multiline inner selections trim boundary line breaks and indentation; repeated visual bracket selection expands outward.
+
+**Source Hashes**:
+- `editor/src/code/vim/textobjects.ts`: `0dec6c731ccf14bbf917143518dcb0a0d317e668`
+- `editor/test/code/vim/textobjects.test.ts`: `1cb95cc9f4af8a7923f9b99593685f929f123e90`
+- This plan before progress update: `5136a8398646d6cb26194cba1d6529d416946c93`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/typecheck-final.log", notes: "Scoped typecheck of the implementation and tests; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 36, testsPassed: 36, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/focused-vitest-03.log", notes: "2 files passed, including 35 text-object cases and the Vim-core purity test."}`
+- `{command: "cd editor && wc -l src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/line-count-final.log", notes: "126 lines, below the 300-line limit."}`
+
+**Prior Attempts**: `typecheck-01.log` and `typecheck-02.log` exited 0. `focused-vitest-01.log` exited 1 (14 fixture/implementation failures); `focused-vitest-02.log` exited 1 (9 failures). The issues were corrected. `debug.log` contains a temporary matching trace used to isolate the range clamp; the diagnostic was removed before final tests.
+
+**Drift**: Preserved concurrent VIM-00 and VIM-10 files and plan edits. No edits outside VIM-11 write paths.
+
+**Blockers**: None. Independent integrity, adversarial and combined-tree review remain downstream workflow steps.
+
+### Session: 2026-10-16 VIM11-TI-1 repair
+
+**Finding Addressed**: `VIM11-TI-1` (mid). For `aw`/`aW` counts starting on a nonblank run, each additional count now skips one following blank run before taking the next nonblank class run. The `iw` count loop, start-on-blank `aw` behavior, and trailing/leading blank expansion remain unchanged. Added the two requested `2aw`/`2aW` cases. Compared with the pre-repair test snapshot at `tmp/riela-fanout/84534676-9233-44E0-89AE-A5B524DD28AF/BB0C238A-B1C7-49C8-AB4B-8F559BEE9016.json`; after removing only the two added rows, the test file matches the baseline exactly.
+
+**Final Source Hashes**:
+- `editor/src/code/vim/textobjects.ts`: `42f51b42095594efa607dac90b03b5a2002e835f`
+- `editor/test/code/vim/textobjects.test.ts`: `5a53c81734e6073d103cdb229d3f87f304a40e68`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/typecheck-final-2.log", notes: "Scoped typecheck on repaired source; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 38, testsPassed: 38, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/focused-vitest-04.log", notes: "2 files passed; all 35 prior text-object cases plus the two new count cases and purity test passed."}`
+- `{command: "cd editor && wc -l src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/line-count-final-2.log", notes: "138 lines, below 300."}`
+
+**Review State**: The targeted correction and regression evidence are ready for independent re-review; no review acceptance is claimed here.

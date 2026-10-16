@@ -1,6 +1,6 @@
 # Vim Mode: Operators and Registers Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-12 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.5 (operator adjustment), 4.6, 4.8 (store only)
 **Created**: 2026-10-16
@@ -160,10 +160,10 @@ unnamed; `isRegisterName` accepts and rejects; tokens are kept.
 
 ## Acceptance Criteria
 
-- [ ] Every export pinned in VIM-00 for these two modules exists with that
+- [x] Every export pinned in VIM-00 for these two modules exists with that
       signature.
-- [ ] At least 55 tests pass across both files.
-- [ ] Each file is under its line budget, and the purity test passes.
+- [x] At least 55 tests pass across both files.
+- [x] Each file is under its line budget, and the purity test passes.
 
 ## Verification
 
@@ -175,4 +175,16 @@ unnamed; `isRegisterName` accepts and rejects; tokens are kept.
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 22:00 JST
+**Tasks Completed**: All VIM-12 implementation criteria.
+**Changes**: Added `editor/src/code/vim/operators.ts` with all seven pinned pure edit builders and `editor/src/code/vim/registers.ts` with the pinned in-memory register store. Added `editor/test/code/vim/operators.test.ts` (44 cases) and `editor/test/code/vim/registers.test.ts` (31 cases); the purity test ran as the third file. Scoped verification scaffold: `tmp/vim-mode/VIM-12/tsconfig.json`.
+**Verification**: `./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json` from `editor/` exited 0 (`tmp/vim-mode/VIM-12/typecheck-final-2.log`). `./node_modules/.bin/vitest run test/code/vim/operators.test.ts test/code/vim/registers.test.ts test/code/vim/purity.test.ts` from `editor/` exited 0; 76/76 passed in 3 files (`tmp/vim-mode/VIM-12/focused-vitest-final-2.log`). Source line counts: operators.ts 163/400; registers.ts 54/160. All four changed source/test files are under 1000 lines (`tmp/vim-mode/VIM-12/line-count.log`).
+**Repair Notes**: The first focused run exposed 13 failures (63 passed); repaired case-map operators, linewise change, grapheme-relative replacement offsets and aligned cursor/range expectations. Initial run retained at `tmp/vim-mode/VIM-12/focused-vitest-final.log`; final-source run is the `final-2` log.
+**Handoff**: Implementation contract complete. VIM-20 consumes these primitives; formal integration and independent review are downstream workflow steps.
+
+
+### Session: 2026-10-16 22:06 JST — adversarial repair
+**Findings Repaired**: `VIM12-ADV-01` resolves linewise endpoints through `lastLine(doc, range)` at `lineAt(range.to)` (bounded to `doc.length`); charwise ranges retain the exclusive-end `to - 1` behavior. Deletion, indentation and linewise change use the helper. Added regressions for deletion/change through empty selected lines, empty middle/final lines, and a linewise motion ending on an empty line. `VIM12-ADV-02` preserves empty linewise parts in uppercase register append and verifies both append orders plus the unnamed register. Existing test rows were preserved.
+**Verification**: `cd editor && ./node_modules/.bin/vitest run test/code/vim/operators.test.ts test/code/vim/registers.test.ts test/code/vim/purity.test.ts` exited 0 with 84/84 passing (`tmp/vim-mode/VIM-12/focused-vitest-final-4.log`). `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json` exited 0 (`tmp/vim-mode/VIM-12/typecheck-final-4.log`). Final line counts are 168/400, 54/160, 134, and 114 (`tmp/vim-mode/VIM-12/line-count-final.log`).
+**Final Source Hashes**: `tmp/vim-mode/VIM-12/review-repair-hashes.txt` records operators.ts `adc028f261b36db86abcad7626ced139cc85ad29be445acc1ede73896e668331`, registers.ts `04fbb7a0b9e369790518fc0c46f100d95129baa57d984c501d5c45a8876f6d7d`, operators.test.ts `26588d2f66cc8016e4b20fd893b8e089ae1947b98ff0d55cb697bb7bdeac99ff`, and registers.test.ts `9519f90049c61cf9c345b28fc638ac5fcc2acdf7e2d3feb5a4d8d79aa791da7e`.
+**Completion Evidence**: Both new findings’ required regressions pass; existing rows remain in place; `range.to - 1` occurs only in `lastLine`’s charwise branch. Independent test-integrity and adversarial re-review are pending downstream.

@@ -7,6 +7,8 @@ import type { PhaseTimer } from './frame';
 import { FALLBACK_PALETTE, rgbaCss, type Palette } from './palette';
 import { CLIP_GUTTER, UNTINTED, InstanceWriter, LayerBuffer, VERTEX_SOURCE, FRAGMENT_SOURCE, type GeometryLayer } from './geometry';
 import { SegmentCache, MAX_TEXT_BLOCKS, type SegmentKey } from './segments';
+import { cursorColor, cursorRect } from './cursor-shape';
+import type { CursorShape } from './vim/types';
 
 export interface GpuStatus {
   kind: 'ready' | 'degraded' | 'unavailable' | 'context-lost'; message: string;
@@ -19,6 +21,7 @@ export interface RenderFeedback {
   annotationsRevision?: number;
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
+  cursorShape?: CursorShape; cursorEnd?: number | null;
 }
 interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; uv?: [number, number, number, number]; generation?: number; cursor?: boolean; flags?: number; layer: GeometryLayer; slot: number }
 export interface RendererOptions {
@@ -219,7 +222,7 @@ export class CanvasRenderer {
       const selectionKey = staticAnnotations.filter(a => a.kind === 'selection').map(a => `${a.from}:${a.to}`).join(';');
       const backgroundKey = `${viewportKey}|${feedback.textRevision ?? this.textRevisionCounter}|${feedback.annotationsRevision ?? 0}|${selectionKey}`;
       const handlesKey = (feedback.handles ?? []).map(handle => `${handle.pos}:${handle.end ? 1 : 0}`).join(',');
-      const overlayKey = `${backgroundKey}|${feedback.annotationsRevision ?? 0}|${feedback.cursor ?? ''}|${feedback.cursorVisible !== false}|${handlesKey}`;
+      const overlayKey = `${backgroundKey}|${feedback.annotationsRevision ?? 0}|${feedback.cursor ?? ''}|${feedback.cursorVisible !== false}|${handlesKey}|${feedback.cursorShape ?? 'bar'}|${feedback.cursorEnd ?? ''}`;
       const backgroundStaticDirty = this.backgroundKey !== backgroundKey;
       const overlayDirty = this.overlayKey !== overlayKey;
       for (const [layer, writer] of this.writers) {
@@ -257,7 +260,9 @@ export class CanvasRenderer {
         if (a.kind === 'call-head') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local({ ...r, top: r.bottom - 1 }), this.palette.callHead);
       }
       if (overlayDirty && feedback.cursorVisible !== false && feedback.cursor != null) {
-        const r = this.layout.coordsAtPos(feedback.cursor, this.view); if (r) this.quad(this.local(r), this.palette.cursor);
+        const shape = feedback.cursorShape ?? 'bar'; const r = this.layout.coordsAtPos(feedback.cursor, this.view);
+        const next = shape !== 'bar' && feedback.cursorEnd != null ? this.layout.coordsAtPos(feedback.cursorEnd, this.view) : null;
+        if (r) this.quad(this.local(cursorRect(shape, r, next)), cursorColor(shape, this.palette.cursor));
       }
       if (overlayDirty) for (const a of staticAnnotations) {
         if (a.kind === 'binding' && a.label) {

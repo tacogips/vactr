@@ -1,6 +1,6 @@
 # Vim Mode: Cursor-Shape Renderer Hook Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-16 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md section 3.6, rollout constraint in section 9
 **Created**: 2026-10-16
@@ -110,9 +110,9 @@ Do not modify any existing `it` in `gpu.test.ts`.
 
 ## Acceptance Criteria
 
-- [ ] `cursor-shape.ts` exports `cursorRect` and `cursorColor`.
-- [ ] The `renderer.ts` hook is in place, with at most 12 changed lines.
-- [ ] The new tests pass, and the full `gpu.test.ts` passes.
+- [x] `cursor-shape.ts` exports `cursorRect` and `cursorColor`.
+- [x] The `renderer.ts` hook is in place, with at most 12 changed lines.
+- [x] The new tests pass, and the full `gpu.test.ts` passes.
 
 ## Verification
 
@@ -130,4 +130,20 @@ Do not modify any existing `it` in `gpu.test.ts`.
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 22:40 Asia/Tokyo
+
+**Tasks Completed**: Cursor geometry/color helpers, minimal renderer feedback hook, focused geometry and GPU renderer tests.
+
+**Implementation Notes**:
+- Added pure `cursorRect` and `cursorColor` in `editor/src/code/cursor-shape.ts`.
+- Added `cursorShape`/`cursorEnd` feedback and overlay cache-key participation; missing shape remains the existing 1px bar.
+- Added 8 geometry/color cases and one GPU test that varies only cursor shape and verifies the overlay draw changes.
+- The renderer diff is 7 additions and 2 deletions. All touched code files are under 1000 lines.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/typecheck-final-2.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/focused-vitest-final-2.log`.
+- `git diff --numstat -- editor/src/code/renderer.ts` — exit 0; 7 additions, 2 deletions; `tmp/vim-mode/VIM-16/renderer-numstat-final.log`.
+- `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; longest touched file is 999 lines; `tmp/vim-mode/VIM-16/line-count-final.log`.
+
+Formal branch/integration review remains downstream.

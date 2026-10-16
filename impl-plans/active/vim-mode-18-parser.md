@@ -1,6 +1,6 @@
 # Vim Mode: Command Parser Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-18 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 2.1, 4.1, 4.2, 4.6, 4.7
 **Created**: 2026-10-16
@@ -177,9 +177,9 @@ The tests are table-driven: `{ mode: 'normal', keys: ['2','"','a','d','3','w'], 
 
 ## Acceptance Criteria
 
-- [ ] The pinned types and `CommandParser` methods are exported.
-- [ ] At least 50 test cases pass.
-- [ ] `parser.ts` is under 350 lines, and the purity test passes.
+- [x] The pinned types and `CommandParser` methods are exported.
+- [x] At least 50 test cases pass.
+- [x] `parser.ts` is under 350 lines, and the purity test passes.
 
 ## Verification
 
@@ -192,4 +192,20 @@ The tests are table-driven: `{ mode: 'normal', keys: ['2','"','a','d','3','w'], 
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-16 VIM-18 implementation
+
+**Tasks Completed**: Implemented the pure command parser and table-driven tests for normal, operator-pending, visual and visual-line commands. Added count/register parsing, motion aliases, text objects, operator expansions, actions, marks, macros, prompts, pending state, cancellation and reset behavior.
+
+**Write-path hashes before edits**:
+- `editor/src/code/vim/parser.ts`: missing; final `760ba7bd648527fac2e1c95210d2734c92215352`
+- `editor/test/code/vim/parser.test.ts`: missing; final `601afeb5a27e880028fef060fdd1862de3540b72`
+- This plan before update: `7c993b7e8324fb8eab79f9f53db751f4ba83ded3`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/typecheck-final.log", notes: "Scoped parser and parser-test typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 118, testsPassed: 118, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/focused-vitest-final.log", notes: "2 files passed; 118 tests passed, exceeding the 50-case threshold, and the purity test passed."}`
+- `{command: "cd editor && wc -l src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count.log", notes: "193 lines, under the 350-line plan limit."}`
+
+**Drift**: Existing sibling-plan changes were present in the shared tree. No files outside this plan's `writePaths` were edited; no existing shared source was overwritten.
+
+**Blockers**: None. Formal review and combined-tree verification remain downstream workflow steps.

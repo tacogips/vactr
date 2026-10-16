@@ -1,0 +1,484 @@
+{
+  "taskId": "examples",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/examples",
+  "baseBranch": "wf/examples",
+  "remote": "origin",
+  "originalHead": "2e14ed78d7b3dd588ef64d5bf14f5c2b9f3a1ac6",
+  "designDocPaths": [
+    "design-docs/specs/design-example-picker-and-persistence.md",
+    "design-docs/user-qa/pending-examples-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "evidenceRoot": "tmp/examples",
+  "evidenceLayout": "tmp/examples/EX-NN/ holds each plan's full command logs, one file per command as named in that plan's Verification section, each ending with its exit status. Retries use per-attempt subdirectories tmp/examples/EX-NN/attempt-<n>/. The Playwright scenario writes tmp/examples-e2e/ and the style gate writes tmp/ui-style/. tmp/ is gitignored (**/tmp) and stays untracked. A missing or truncated log is not a pass.",
+  "executionModel": {
+    "waves": [
+      ["EX-00"],
+      ["EX-10", "EX-20", "EX-30", "EX-40", "EX-50"],
+      ["EX-60"],
+      ["EX-70"]
+    ],
+    "sameBranchFanout": true,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The workflow integration step commits and non-force pushes to origin wf/examples with the AGENTS.md 1-6 section message and no tool attribution. Workers never commit, stash, checkout, reset, branch, push or merge. No main push and no PRs.",
+    "editProtocol": "Before each edit, re-read the file and record shasum -a 256 in the plan's Progress Log; record it again after the edit. On drift, stop, record, re-read and re-apply only the plan's own change. Never edit outside writePaths; edit sharedPaths only as their sharedPathNotes describe. EX-00 types are the contract: a dependent plan that needs a contract change records the request in its Progress Log for serial reconciliation instead of editing editor/src/documents/types.ts.",
+    "heavySuitePolicy": "Wave-1 plans run focused vitest files and npm run check only, except EX-10's wasm evaluation test. Full vitest (EX-60, EX-70), the wasm evaluation test (EX-10), npm run test:style and npm run e2e:examples (EX-70) run under the /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock directory lock (mkdir loop, owner file, trap removes only the lock this command created) because sibling runs wf/vim-mode and wf/code-render are active. Never kill processes this run did not start. Tests are silent (silent sink, offline wasm paths) and the system volume is never changed.",
+    "serialReconciliation": "Shared files are each edited by exactly one plan as noted in sharedPathNotes: editor/vite.config.ts (EX-10), editor/src-tauri/src/lib.rs and editor/src-tauri/Cargo.lock (EX-30), editor/src/app/main.ts and editor/test/app/main.test.ts (EX-60), editor/package.json, editor/test/style/ui-style.mjs and README.md (EX-70). npm run check errors confined to another wave-1 plan's files are recorded and re-checked after that plan lands; EX-60 runs the whole-project check. No broad formatting, lockfile refresh or impl-plans/README.md edit inside the plans.",
+    "buildPrerequisite": "The release wasm is absent in this worktree. Every command that needs editor/dist uses VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build. The debug wasm cdylib and tree-sitter-vact.wasm are prebuilt; npm ci is done."
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput issue 'Open a flashy example by default, add an example picker, save documents in localStorage (web) and choose a default template (app)' (no GitHub issue or PR number); riela execution opus-luna-design-and-implement-review-loop-session-379 authored and reviewed the design and plans EX-00..EX-70 (review findings ER-M1, ER-L1, ER-L2 and DR-L1 repaired in the plans and design), committed as WIP checkpoint 2e14ed7 when the run stopped at plan-checkpoint; resumed checkpoint in opus-luna-design-and-implement-review-loop-session-382",
+    "userProblem": "The vactr editor (Vite + TypeScript + Solid.js; Tauri shell wraps the same dist) opens an empty document, has no example list and no document persistence beyond small guarded preferences. The user wants a flashy example on open, a picker to open registered examples, localStorage saving on the web, and a choosable default template in the app.",
+    "requiredOutcomes": [
+      "EX-00: shared contracts in editor/src/documents/types.ts (ExampleEntry, ExampleSource, DocSource, DefaultTemplate, Draft, LibraryEntry, StorageResult, DocumentStore, TemplateStore, DocumentsOptions, PickerProps/PickerActions, DOC_MAX_CHARS, EXAMPLE_ID_PATTERN, isDocSource, isDefaultTemplate) and the ambient import.meta.glob typing.",
+      "EX-10: build-time registry over examples/**/*.vact (lazy ?raw glob, eager tracks/catalog.json) with a hand-written manifest, EXCLUDED list with reasons, new examples/showcase.vact (126-136 BPM, 5-8 sample-free slots, each gain <= 0.32 and sum <= 1.2, one visual chain to out o0, <= 40 lines), and a wasm evaluation test over every registered example.",
+      "EX-20: localStorage schema v1 (vactr.doc.v1.draft, vactr.doc.v1.item.<id>, vactr.doc.v1.default-template) in a DocumentStorage that never throws, ignores and never deletes corrupt or foreign-version values, maps quota/unavailable errors, plus LocalTemplateStore.",
+      "EX-30: Tauri commands default_template_get/set/reset writing one fixed file <app_config_dir>/default-template.json atomically with validation, Rust tests proving persistence across a fresh read, and TauriTemplateStore over an injected invoke; capabilities/default.json unchanged.",
+      "EX-40: DocumentSession (replace = one undo and one redo step; loadInitial adds no undo step and never overwrites a user edit), DraftAutosave (trailing 1000 ms debounce, dirty-only writes, clean loads clear the draft, pagehide/visibilitychange flush), resolveStartup/applyStartup implementing URL ?example= > draft (web) > default template > showcase, keeping a web draft recoverable by undo under ?example=.",
+      "EX-50: flat, square, spaced PickerView (Documents toggle, filter, action row, Saved in this browser, grouped Examples with badges, inline forms and confirmations, roving-tabindex keyboard navigation) and picker.css using only design tokens.",
+      "EX-60: documents/mount.ts controller wiring session, autosave, storage, template stores, picker actions and startup, plus optional createEditor documents parameter and boot wiring that awaits a never-rejecting ready promise.",
+      "EX-70: Playwright e2e:examples scenario (8 checks, silent sink), picker gated by npm run test:style, README and e2e README updates, and the final gates."
+    ],
+    "nonGoals": [
+      "No edits to editor/src/code/input.ts, keyboard.ts (wf/vim-mode), atlas.ts, renderer.ts (wf/code-render), any other editor/src/code/* file, ui/shell.tsx, transport-view.tsx, app.css, theme.css or the editor settings UI.",
+      "No evaluator, session protocol or wasm core changes; failing examples are excluded with a recorded reason, never fixed by editing existing example files.",
+      "No change to the bind-panel Save button or FileAccess model.",
+      "No native-tier-only or external-sample examples in the picker in any shell (XQ3).",
+      "No draft autosave or localStorage library in the Tauri app (XQ2).",
+      "No evaluation, hush, stop or audio resume on any document load (no autoplay).",
+      "No Tauri capability, build.rs, tauri.conf.json or fs-scope change; no command takes a path.",
+      "No CodeMirror EditorView; no third-party song data."
+    ],
+    "constraints": [
+      "Work only in this worktree on wf/examples; never touch other worktrees or main; never kill processes this run did not start.",
+      "AGENTS.md: English only, no emojis, no tool attribution in commits; every touched source file under 1000 lines.",
+      "UI style: solid, flat, square (border-radius 0), spaced, appearance none, token colors only; never a native widget look; npm run test:style gates the open picker.",
+      "@codemirror/state EditorState via CodeSurface stays the single document authority.",
+      "Heavy suites (full vitest, wasm evaluation test, test:style, e2e) run under /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock.",
+      "Tests produce no audible output; the e2e scenario requires post-sink peak exactly 0 and no direct destination connections; system volume is never changed.",
+      "Verification records use exactly {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls go only in mutationEvidence; repaired findings go only in addressedFeedback with status repaired.",
+      "Out-of-writePaths tests or fixtures broken mechanically by the change are fixed within the owning plan and listed."
+    ],
+    "designDecisionsAndRationale": [
+      "New examples/showcase.vact is the built-in default because no existing example has a visual chain and the issue asks for a visually and sonically busy first impression; gain bounds keep the level moderate.",
+      "Registered means evaluates without error in the wasm browser tier, proven by editor/test/wasm/examples.test.ts; requirement badges (audio-input, midi) mark openable entries with extra needs.",
+      "Lazy per-example glob chunks keep the main bundle from growing with the example count; only catalog.json is eager.",
+      "Replacement is one isolateHistory transaction so Mod-Z restores the previous text; dirty buffers get an inline confirmation row (no window.confirm).",
+      "Draft holds unsaved edits only; clean loads and saves clear it, so a reload after opening an unchanged example falls through to the template or showcase.",
+      "Storage reads never delete foreign or corrupt values; a future schema uses a new key prefix.",
+      "App default template uses a narrow Rust command writing a fixed file in app_config_dir because webview localStorage differs between dev and release origins, can be cleared with website data, and cannot be tested in-repo, while cargo test proves persistence against a real file; app commands are not ACL-gated (plain tauri_build::build()), so capabilities stay unchanged.",
+      "Default template snapshots are frozen copies because the dialog-only fs scope cannot reopen a stored path at the next launch.",
+      "Web also offers the default-template choice (XQ1 recommendation A)."
+    ],
+    "intentionalTradeoffs": [
+      "On the web a draft shadows the chosen default template at startup (precedence 2 before 3); New applies the template.",
+      "The app has no draft autosave or browser library; it uses file dialogs (XQ2).",
+      "Documents larger than 262144 UTF-16 code units are not stored in the browser; the status points to file Save.",
+      "Native-only and sample-dependent examples are hidden everywhere (XQ3).",
+      "No startup form for an explicit file exists; Open file is an in-session picker action."
+    ],
+    "supportedEdgeCases": [
+      "?example= with an existing web draft: the draft is loaded first without an undo step, then the example replaces it as one undoable step; Mod-Z recovers the draft and autosave rewrites it.",
+      "Unknown ?example= id, unregistered template example id or rejected chunk load: status notice and fall-through to the next source; all failing leaves an empty buffer with a notice.",
+      "localStorage null, throwing SecurityError on access, QuotaExceededError (including legacy codes 22/1014), corrupt JSON, wrong v, invalid shapes: the editor still opens with the startup document.",
+      "User edits during startup are never overwritten (loadInitial skips a changed buffer).",
+      "Name rules: trimmed 1-80 chars, no control characters, unique; renaming to its own name is allowed; rename/delete of the current library entry updates the session source.",
+      "FileCancelled from Open file is silent; confirmation happens before the file dialog.",
+      "Tauri template file missing, unparsable, wrong version or invalid: get returns null and leaves the file in place; invalid set input leaves the file unchanged."
+    ],
+    "outOfScopeEdgeCases": [
+      "Schema migration from a future vactr.doc.v2 prefix.",
+      "Cross-tab synchronization of drafts or the library.",
+      "Native-tier evaluation of examples for the app.",
+      "Stored file paths reopened across app launches.",
+      "MIDI-dependent examples (none exist today)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-example-picker-and-persistence.md",
+      "design-docs/user-qa/pending-examples-questions.md",
+      "design-docs/specs/design-ui-style.md",
+      "design-docs/specs/design-visual.md",
+      "editor/src/app/main.ts",
+      "editor/src/app/apis.ts",
+      "editor/src/app/song.ts",
+      "editor/src/code/surface.ts",
+      "editor/src/code/mount.ts",
+      "editor/src/platform/files.ts",
+      "editor/src/ui/shell.tsx",
+      "editor/src/protocol/document.ts",
+      "editor/src-tauri/src/lib.rs",
+      "editor/src-tauri/build.rs",
+      "editor/src-tauri/capabilities/default.json",
+      "editor/vite.config.ts",
+      "editor/test/wasm/first-track.test.ts",
+      "editor/test/support/wasm.ts",
+      "editor/test/app/main.test.ts",
+      "editor/test/e2e/serve.mjs",
+      "editor/test/e2e/silent-sink.mjs",
+      "editor/test/style/ui-style.mjs",
+      "examples/tracks/catalog.json",
+      "examples/acid-techno.vact",
+      "examples/wobble-techno.vact",
+      "examples/fm6-algorithms.vact"
+    ],
+    "residualRisks": [
+      "low: sibling runs wf/vim-mode and wf/code-render share the machine; heavy suites are serialized under the measurement lock and toolbar/shell edits are additive to ease later merges.",
+      "low: some registered examples may fail browser-tier evaluation; EX-10 excludes them with the first error message as the recorded reason.",
+      "low: editor/src-tauri cargo check/test need a built editor/dist (generate_context!); EX-30 and EX-70 build it with the debug wasm first."
+    ]
+  },
+  "plans": [
+    {
+      "planId": "EX-00",
+      "planPath": "impl-plans/active/examples-00-contract.md",
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/documents/types.ts",
+        "editor/src/examples/glob.d.ts",
+        "editor/test/documents/types.test.ts",
+        "impl-plans/active/examples-00-contract.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-00"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-00"
+      ],
+      "acceptanceCriteria": [
+        "editor/src/documents/types.ts exports every contract symbol with the exact names and shapes in the plan, imports only type { Accessor } from solid-js, and has no import side effects.",
+        "editor/src/examples/glob.d.ts declares both ImportMeta.glob overloads (eager Record<string, T>; lazy Record<string, () => Promise<T>>) with no export.",
+        "isDocSource and isDefaultTemplate guard tests pass; npm run check exits 0.",
+        "Progress Log has the verification records and pre/post sha256 of each written file."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-00",
+        "cd editor && npx vitest run test/documents/types.test.ts > ../tmp/examples/EX-00/vitest.log 2>&1",
+        "cd editor && npm run check > ../tmp/examples/EX-00/check.log 2>&1"
+      ]
+    },
+    {
+      "planId": "EX-10",
+      "planPath": "impl-plans/active/examples-10-registry.md",
+      "dependsOn": ["EX-00"],
+      "writePaths": [
+        "editor/src/examples/registry.ts",
+        "editor/src/examples/manifest.ts",
+        "examples/showcase.vact",
+        "editor/test/examples/registry.test.ts",
+        "editor/test/wasm/examples.test.ts",
+        "impl-plans/active/examples-10-registry.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-10"
+      ],
+      "sharedPaths": ["editor/vite.config.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "editor/vite.config.ts",
+          "intendedEdit": "Add only server: { fs: { allow: ['.', '../examples'] } } to the defineConfig object; nothing else changes. No other plan edits this file."
+        }
+      ],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-10"
+      ],
+      "acceptanceCriteria": [
+        "examples/showcase.vact meets every bound (header with Run hint, use-bpm 126-136, 5-8 sample-free slots, each gain <= 0.32 and sum <= 1.2, one visual chain to out o0, <= 40 lines, no sample/host input/MIDI) and evaluates cleanly.",
+        "Registry exports listExamples, findExample, loadExample, exampleSource, REGISTRY_FILES, excludedIds; manifest exports DEFAULT_EXAMPLE_ID, CURATED, EXCLUDED, TRACK_CATEGORY_PREFIX; the coverage test proves glob ids == registered UNION excluded with no overlap.",
+        "editor/test/wasm/examples.test.ts passes for every registered example (no error diagnostic, no failed form) and the showcase activity bounds (tempo, playing on >= 4 slots, render program record).",
+        "Existing example files are unchanged; every failing example is excluded with a concrete recorded reason.",
+        "vite.config.ts has server.fs.allow and nothing else changed; registry.ts and manifest.ts each under 1000 lines.",
+        "Progress Log: verification records, exclusions with reasons, pre/post sha256 of each written file."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-10",
+        "cd editor && npx vitest run test/examples/registry.test.ts > ../tmp/examples/EX-10/registry.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo EX-10 > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npx vitest run test/wasm/examples.test.ts > ../tmp/examples/EX-10/wasm-examples.log 2>&1'",
+        "cd editor && npm run check > ../tmp/examples/EX-10/check.log 2>&1"
+      ]
+    },
+    {
+      "planId": "EX-20",
+      "planPath": "impl-plans/active/examples-20-storage.md",
+      "dependsOn": ["EX-00"],
+      "writePaths": [
+        "editor/src/documents/storage.ts",
+        "editor/test/documents/storage.test.ts",
+        "impl-plans/active/examples-20-storage.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-20"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-20"
+      ],
+      "acceptanceCriteria": [
+        "DocumentStorage, LocalTemplateStore, pageBackend, normalizeName and the DRAFT_KEY, ITEM_PREFIX, TEMPLATE_KEY, PROBE_KEY constants are exported as specified.",
+        "No method throws or rejects; corrupt or foreign-version values are ignored, counted as unreadable and never deleted; only the v1 keys are touched.",
+        "Quota, SecurityError, null storage, name rules and the DOC_MAX_CHARS size cap behave as the plan's test table states; all listed tests pass.",
+        "npm run check is clean for this plan's files; storage.ts under 1000 lines; Progress Log with records and pre/post sha256."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-20",
+        "cd editor && npx vitest run test/documents/storage.test.ts > ../tmp/examples/EX-20/vitest.log 2>&1",
+        "cd editor && npm run check > ../tmp/examples/EX-20/check.log 2>&1"
+      ]
+    },
+    {
+      "planId": "EX-30",
+      "planPath": "impl-plans/active/examples-30-tauri-template.md",
+      "dependsOn": ["EX-00"],
+      "writePaths": [
+        "editor/src-tauri/src/template.rs",
+        "editor/src-tauri/Cargo.toml",
+        "editor/src/documents/tauri-templates.ts",
+        "editor/test/documents/tauri-templates.test.ts",
+        "impl-plans/active/examples-30-tauri-template.md",
+        "target",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "editor/dist",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-30"
+      ],
+      "sharedPaths": [
+        "editor/src-tauri/src/lib.rs",
+        "editor/src-tauri/Cargo.lock"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/src-tauri/src/lib.rs",
+          "intendedEdit": "Add mod template; and template::default_template_get, template::default_template_set, template::default_template_reset to generate_handler!; nothing else changes."
+        },
+        {
+          "path": "editor/src-tauri/Cargo.lock",
+          "intendedEdit": "Only the vactr-editor package dependency list gains serde and serde_json (versions already locked); no version changes. If resolution needs the network and fails, record a blocker."
+        }
+      ],
+      "artifactRoots": [
+        "target",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "editor/dist",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-30"
+      ],
+      "acceptanceCriteria": [
+        "Three commands default_template_get/set/reset registered; template.rs has DefaultTemplate (serde tag kind, lowercase), validate, read_template, write_template (tmp + rename), remove_template and the listed Rust tests; the path is fixed in Rust and no command takes a path.",
+        "TauriTemplateStore never rejects, maps invalid input without invoking, maps rejections to null or {ok:false, reason:'error'}; its vitest tests pass.",
+        "cargo check and cargo test pass for editor/src-tauri; capabilities/default.json is byte-identical; the Cargo.lock diff removes no lines and only adds the two dependency names.",
+        "Progress Log with records and pre/post sha256."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-30",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build > ../tmp/examples/EX-30/build.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml > tmp/examples/EX-30/cargo-check.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml > tmp/examples/EX-30/cargo-test.log 2>&1",
+        "cd editor && npx vitest run test/documents/tauri-templates.test.ts > ../tmp/examples/EX-30/vitest.log 2>&1",
+        "cd editor && npm run check > ../tmp/examples/EX-30/check.log 2>&1",
+        "git diff --exit-code editor/src-tauri/capabilities/default.json",
+        "git diff editor/src-tauri/Cargo.lock > tmp/examples/EX-30/lock-diff.log 2>&1",
+        "test \"$(git diff editor/src-tauri/Cargo.lock | grep -c '^-[^-]')\" = 0"
+      ]
+    },
+    {
+      "planId": "EX-40",
+      "planPath": "impl-plans/active/examples-40-session-startup.md",
+      "dependsOn": ["EX-00"],
+      "writePaths": [
+        "editor/src/documents/session.ts",
+        "editor/src/documents/autosave.ts",
+        "editor/src/documents/startup.ts",
+        "editor/test/documents/session.test.ts",
+        "editor/test/documents/autosave.test.ts",
+        "editor/test/documents/startup.test.ts",
+        "impl-plans/active/examples-40-session-startup.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-40"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-40"
+      ],
+      "acceptanceCriteria": [
+        "DocumentSession, DraftAutosave, resolveStartup and applyStartup are exported with the plan's signatures.",
+        "replace is exactly one undo and one redo step even right after typing; loadInitial adds no undo step and never overwrites a user edit; dirty() follows the baseline rule.",
+        "Autosave writes only dirty buffers after a trailing 1000 ms debounce, clean loads/saves clear the draft, pagehide/visibilitychange flush, notices are shown once.",
+        "Startup precedence is ?example= > draft (web only) > default template > showcase with notices and fall-through; ?example= over a web draft carries underlying and one undo restores the draft, which autosave then rewrites; resolveStartup never rejects.",
+        "All listed tests pass; npm run check clean for this plan's files; each file under 1000 lines; Progress Log with records and pre/post sha256."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-40",
+        "cd editor && npx vitest run test/documents/session.test.ts test/documents/autosave.test.ts test/documents/startup.test.ts > ../tmp/examples/EX-40/vitest.log 2>&1",
+        "cd editor && npm run check > ../tmp/examples/EX-40/check.log 2>&1"
+      ]
+    },
+    {
+      "planId": "EX-50",
+      "planPath": "impl-plans/active/examples-50-picker-view.md",
+      "dependsOn": ["EX-00"],
+      "writePaths": [
+        "editor/src/ui/picker-view.tsx",
+        "editor/src/ui/picker.css",
+        "editor/test/ui/picker-view.test.tsx",
+        "impl-plans/active/examples-50-picker-view.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-50"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-50"
+      ],
+      "acceptanceCriteria": [
+        "PickerView and ensurePickerStylesheet are exported; classes, roles and aria attributes match the plan (vact-doc-picker-toggle, role=dialog panel, role=status line, filter, alertdialog confirm, action row, library and grouped example rows with data-example-id and badges).",
+        "Keyboard: roving tabindex with ArrowUp/ArrowDown/Home/End, ArrowDown from the filter, Escape closes the panel and refocuses the trigger except inside inline forms.",
+        "The component only calls props.actions; every interactive element is a button or text input; no select, dialog element, type=search or native confirm.",
+        "picker.css uses only var(--vt-*) colors, border-radius 0, appearance none, 1px borders, token spacing and a 2px solid focus ring; style-tokens.test.ts passes.",
+        "All listed tests pass; npm run check clean for this plan's files; files under 1000 lines; Progress Log with records and pre/post sha256."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-50",
+        "cd editor && npx vitest run test/ui/picker-view.test.tsx test/ui/style-tokens.test.ts > ../tmp/examples/EX-50/vitest.log 2>&1",
+        "cd editor && npm run check > ../tmp/examples/EX-50/check.log 2>&1"
+      ]
+    },
+    {
+      "planId": "EX-60",
+      "planPath": "impl-plans/active/examples-60-integration.md",
+      "dependsOn": ["EX-10", "EX-20", "EX-30", "EX-40", "EX-50"],
+      "writePaths": [
+        "editor/src/documents/mount.ts",
+        "editor/test/documents/mount.test.ts",
+        "impl-plans/active/examples-60-integration.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-60"
+      ],
+      "sharedPaths": [
+        "editor/src/app/main.ts",
+        "editor/test/app/main.test.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/src/app/main.ts",
+          "intendedEdit": "Boot wiring only: createEditor gains an optional third parameter { documents?: DocumentsOptions } that mounts the documents area after the song handle and exposes Editor.documents; boot builds shell, DocumentStorage(pageBackend(win)), LocalTemplateStore or TauriTemplateStore(invoke), exampleSource and search, passes them, and awaits editor.documents?.ready. createEditor without options is unchanged; MOUNT_ORDER unchanged; PickerView is not imported here."
+        },
+        {
+          "path": "editor/test/app/main.test.ts",
+          "intendedEdit": "Mechanical fixes for assertions broken by the new boot wiring (each listed in the Progress Log) plus two new tests: createEditor without options renders no [data-doc-picker]; boot with a fake web window resolves editor.documents.ready."
+        }
+      ],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-60"
+      ],
+      "acceptanceCriteria": [
+        "documents/mount.ts implements every PickerActions action, dirty-replace confirmation, library refresh, template set/reset, status messages and startup through resolveStartup/applyStartup with the DraftAutosave created before applyStartup; ready never rejects; no deps.code renders nothing.",
+        "First open with empty storage shows the showcase without any eval; opening an example is one undoable replacement; ?example= over a web draft keeps the draft recoverable by undo; the app shell has no library section and writes no draft.",
+        "main.ts wiring done with createEditor unchanged when called without options; mechanical main.test.ts changes listed.",
+        "Focused tests, whole-project npm run check and full npm test pass; mount.ts and main.ts under 1000 lines; Progress Log with records and pre/post sha256."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-60",
+        "cd editor && npx vitest run test/documents test/app/main.test.ts test/examples test/ui/picker-view.test.tsx > ../tmp/examples/EX-60/focused.log 2>&1",
+        "cd editor && npm run check > ../tmp/examples/EX-60/check.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo EX-60 > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npm test > ../tmp/examples/EX-60/full-vitest.log 2>&1'"
+      ]
+    },
+    {
+      "planId": "EX-70",
+      "planPath": "impl-plans/active/examples-70-e2e-docs.md",
+      "dependsOn": ["EX-60"],
+      "writePaths": [
+        "editor/test/e2e/examples.mjs",
+        "editor/test/e2e/README.md",
+        "impl-plans/active/examples-70-e2e-docs.md",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-70",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
+      ],
+      "sharedPaths": [
+        "editor/package.json",
+        "editor/test/style/ui-style.mjs",
+        "README.md"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "editor/package.json",
+          "intendedEdit": "Add one script \"e2e:examples\": \"node test/e2e/examples.mjs\"; no dependency changes."
+        },
+        {
+          "path": "editor/test/style/ui-style.mjs",
+          "intendedEdit": "After the existing details-opening step, click .vact-doc-picker-toggle so the open picker panel is scanned, close it in the same cleanup, and fail the run when the toggle is missing (mechanical gate update)."
+        },
+        {
+          "path": "README.md",
+          "intendedEdit": "Editor section only: Documents picker, startup precedence table (?example=<id> > draft (web) > default template > showcase), vactr.doc.v1.* keys, 262144-char limit and failure behavior, <app config dir>/default-template.json, npm run e2e:examples."
+        }
+      ],
+      "artifactRoots": [
+        "editor/dist",
+        "editor/src-tauri/target",
+        "editor/src-tauri/gen/schemas",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/examples/EX-70",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
+      ],
+      "acceptanceCriteria": [
+        "npm run e2e:examples exists and passes 8/8 checks (first-open-showcase not auto-played, run-plays-moderately with pre-sink peak <= -1 dBFS, picker-keyboard-open-undo, draft-restore, library, default-template, explicit-example-url draft recovery, storage-unavailable) with post-sink peak exactly 0 and no direct destination connections; result JSON written to tmp/examples-e2e/result.json.",
+        "npm run test:style scans the open picker panel and passes.",
+        "README and editor/test/e2e/README.md updated; existing e2e harness files (run.mjs, behavior.mjs, measure.mjs, serve.mjs, silent-sink.mjs) unchanged; no feature code changes in this plan.",
+        "npm run check, full npm test, debug-wasm build, Tauri cargo check and cargo test pass; capabilities/default.json unchanged; each gate recorded with a complete log; Progress Log with records and pre/post sha256."
+      ],
+      "verification": [
+        "mkdir -p tmp/examples/EX-70",
+        "cd editor && npm run check > ../tmp/examples/EX-70/check.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo EX-70 > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npm test > ../tmp/examples/EX-70/full-vitest.log 2>&1'",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build > ../tmp/examples/EX-70/build.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml > tmp/examples/EX-70/cargo-check.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml > tmp/examples/EX-70/cargo-test.log 2>&1",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo EX-70 > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npm run test:style > ../tmp/examples/EX-70/style.log 2>&1'",
+        "bash -c 'until mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock 2>/dev/null; do sleep 30; done; trap \"rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock\" EXIT; echo EX-70 > /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock/owner; cd editor && npm run e2e:examples > ../tmp/examples/EX-70/e2e-examples.log 2>&1'",
+        "git diff --exit-code editor/src-tauri/capabilities/default.json"
+      ]
+    }
+  ]
+}

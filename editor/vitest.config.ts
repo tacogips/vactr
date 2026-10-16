@@ -12,6 +12,7 @@ const perf = env.VACTR_PERF === '1';
 export default defineConfig({
   plugins: [solid()],
   resolve: { conditions: ['development', 'browser'] },
+  server: { fs: { allow: ['.', '../examples'] } },
   test: {
     environment: 'jsdom',
     include: perf

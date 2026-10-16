@@ -104,6 +104,7 @@ async function inspectPage(page, engine, viewportName, probe) {
       const a = first.getBoundingClientRect();
       const candidates = controls.filter(({ element: second, inProbe: secondInProbe }) => {
         if (second === first || firstInProbe !== secondInProbe) return false;
+        if (Boolean(first.closest('.vact-doc-picker')) !== Boolean(second.closest('.vact-doc-picker'))) return false;
         const b = second.getBoundingClientRect();
         const overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
         return b.left >= a.left && overlap >= Math.min(a.height, b.height) / 2;
@@ -206,6 +207,10 @@ try {
             window.__uiStyleOpenedDetails.forEach((element) => { element.open = true; });
             return { opened: details.filter((element) => element.open).length, mapPresent: Boolean(document.querySelector('.vact-sample-map')), bankCount: document.querySelectorAll('.vact-bank').length };
           });
+          const pickerToggle = page.locator('.vact-doc-picker-toggle');
+          if (await pickerToggle.count() !== 1) throw new Error('document picker toggle is missing from the style gate');
+          await pickerToggle.click();
+          await page.waitForSelector('.vact-doc-picker[role="dialog"]');
           const probe = await page.evaluateHandle(makeProbe, viewport.name);
           probeAdded = true;
           const inspected = await inspectPage(page, engineName, viewport.name, probe);
@@ -214,6 +219,8 @@ try {
           console.log(`${engineName} ${viewport.name}: coarse-mode=${coarseMode}, file-pseudo=${inspected.filePseudo}, samples=${samples.opened}, proxy=${inspected.proxy.present ? 'present' : 'missing'}`);
         } finally {
           if (probeAdded) await page.locator('[data-style-probe]').evaluate((element) => element.remove()).catch(() => {});
+          const openPickerToggle = page.locator('.vact-doc-picker-toggle[aria-expanded="true"]');
+          if (await openPickerToggle.count()) await openPickerToggle.click().catch(() => {});
           await page.evaluate(() => window.__uiStyleOpenedDetails?.forEach((element) => { element.open = false; })).catch(() => {});
           await context.close();
         }

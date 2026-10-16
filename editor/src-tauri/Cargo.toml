@@ -20,4 +20,6 @@ tauri-build = { version = "=2.6.3", features = [] }
 tauri = { version = "=2.11.6", features = [] }
 tauri-plugin-dialog = "=2.7.3"
 tauri-plugin-fs = "=2.5.2"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
 vactr = { path = "../..", default-features = false, features = ["host-native"] }

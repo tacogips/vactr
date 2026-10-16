@@ -65,10 +65,28 @@ describe('createEditor', () => {
     expect(MOUNT_ORDER).toEqual(['code', 'midi', 'visual', 'bind', 'params', 'pkg']);
     expect(order).toEqual(['code', 'midi', 'visual', 'bind', 'params', 'pkg']);
     for (const p of PANES) expect(root.querySelector(`[data-pane="${p}"]`)).not.toBeNull();
+    expect(root.querySelector('[data-doc-picker]')).toBeNull();
     editor.dispose();
     expect(order.slice(6)).toEqual(['pkg', 'params', 'bind', 'visual', 'midi', 'code'].map((a) => `dispose:${a}`));
     // Mounting sends nothing on its own.
     expect(transport.sent).toEqual([]);
+  });
+
+  it('boot exposes a resolved documents area when the code mount has no surface', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const ctx = { currentTime: 1, sampleRate: 48000, resume: vi.fn(async () => {}) };
+    wasmStart.mockResolvedValue({ host: { ctx } });
+    const win = { location: { search: '' }, document: root.ownerDocument } as unknown as Window;
+    try {
+      const editor = await boot(root, win);
+      expect(editor.documents).toBeDefined();
+      await expect(editor.documents?.ready).resolves.toBeUndefined();
+      expect(root.querySelector('[data-doc-picker]')).toBeNull();
+      editor.dispose();
+    } finally {
+      root.remove();
+    }
   });
 });
 

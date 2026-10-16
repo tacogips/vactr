@@ -1,6 +1,7 @@
 //! Shared Tauri bootstrap for desktop and mobile entry points.
 
 mod session;
+mod template;
 
 use std::fs;
 use std::path::PathBuf;
@@ -38,7 +39,10 @@ pub fn run() {
             session_send,
             session_close,
             self_check_enabled,
-            self_check
+            self_check,
+            template::default_template_get,
+            template::default_template_set,
+            template::default_template_reset
         ])
         .build(tauri::generate_context!())
         .expect("error while building the Vactr Tauri shell")

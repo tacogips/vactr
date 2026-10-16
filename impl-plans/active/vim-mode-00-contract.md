@@ -366,3 +366,18 @@ typecheck.
 **Drift**: No concurrent changes to VIM-00 source or test paths observed.
 
 **Blockers**: None for VIM-00.
+
+### Session: 2026-10-17 Step 6 rerun (dispatch 8f758c7c)
+
+**Tasks Completed**: Confirmed the assigned plan has no dependencies and matches the accepted design boundary. Rechecked the committed pre-node snapshot against the VIM-00 source and tests. No implementation source or test edits were required; all three acceptance criteria remain complete.
+
+**Source identity** (git blob hashes): `types.ts` `8e56214b356c2b58bd162aec877630f609eb26ed`; `keys.ts` `712af27113c2cd455876833b852ca892725c4da3`; `words.ts` `cb2f85ced58d54d4dde879cbbb33713fdaae5212`; `host.ts` `e2a92faab5d4e3517459e2c50df2525a2c133ebf`; `keys.test.ts` `d649502cc94b1febf64aa2503ebec9fa11769fd0`; `words.test.ts` `77777c1c7ca0a85322451064b7d503a49b3036a3`; `purity.test.ts` `b5665ecff9620ce4fd8ebd570dd60390ddcfc6ac`.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-00/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/typecheck-current-dispatch.log", notes: "No diagnostics; complete log ends with exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/keys.test.ts test/code/vim/words.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 104, testsPassed: 104, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/focused-vitest-current-dispatch.log", notes: "Three files passed, 104 tests passed."}`
+- `{command: "wc -l editor/src/code/vim/types.ts editor/src/code/vim/keys.ts editor/src/code/vim/words.ts editor/test/code/vim/host.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/line-count-current-dispatch.log", notes: "Line counts 65, 38, 77 and 60; all below 300."}`
+
+**Drift**: None in owned source/test paths. No source changes were needed.
+
+**Blockers**: None for VIM-00.

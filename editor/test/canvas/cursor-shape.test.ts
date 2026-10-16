@@ -33,9 +33,9 @@ describe('cursor shape geometry', () => {
     expect(cursorRect('block', caret, { left: 26, right: 27, top: 20, bottom: 40 }).right - caret.left).toBe(16);
   });
 
-  it('dims only block cursor alpha', () => {
+  it('premultiplies only block cursor color', () => {
     const base = [0.9, 0.92, 0.94, 0.8] as const;
-    expect(cursorColor('block', [...base])).toMatchObject([0.9, 0.92, 0.94, expect.closeTo(0.36)]);
+    expect(cursorColor('block', [...base])).toMatchObject([expect.closeTo(0.405), expect.closeTo(0.414), expect.closeTo(0.423), expect.closeTo(0.36)]);
     expect(cursorColor('bar', [...base])).toEqual([...base]);
     expect(cursorColor('underline', [...base])).toEqual([...base]);
   });

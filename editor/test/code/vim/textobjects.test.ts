@@ -59,7 +59,19 @@ describe('selectTextObject', () => {
     expect(select(doc, '(', false)).toBeNull();
   });
 
-  it('expands a repeated visual bracket object to its enclosing pair', () => {
-    expect(select('((|x))', '(', true, 1, { anchor: 1, head: 4 })).toEqual([0, 5]);
+  it('expands an inclusive around visual bracket object to its enclosing pair', () => {
+    expect(select('((|x))', '(', true, 1, { anchor: 1, head: 3 })).toEqual([0, 5]);
+  });
+
+  it('expands an inclusive inner visual bracket object to its enclosing pair', () => {
+    expect(select('((x|y))', '(', false, 1, { anchor: 2, head: 3 })).toEqual([1, 5]);
+  });
+
+  it('expands a trimmed multi-line inner visual bracket object', () => {
+    expect(select('{\n {\n  |x\n }\n}', '{', false, 1, { anchor: 5, head: 7 })).toEqual([2, 11]);
+  });
+
+  it('does not expand a non-matching visual bracket selection', () => {
+    expect(select('((|x))', '(', true, 1, { anchor: 1, head: 2 })).toEqual([1, 4]);
   });
 });

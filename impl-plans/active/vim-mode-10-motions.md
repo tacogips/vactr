@@ -218,3 +218,21 @@ the `|` marker inline. Required rows (at least 60):
 **Prior Attempt**: `tmp/vim-mode/VIM-10/attempt-01/focused-vitest.log` records the initial new grapheme assertion using index 4 for `c` in `é bc`. Vitest observed index 3, the correct UTF-16 offset; only that new expected value was corrected, and the final run passes 90/90.
 
 **Review State**: VIM10-ADV-3 has been repaired and is pending independent Opus re-review. The separate VIM-20 `cw` handoff remains owned by VIM-20.
+
+### Session: 2026-10-17 Step 6 current-source runtime dispatch
+
+**Tasks Completed**: Revalidated the assigned VIM-10 behavior against design sections 4.3–4.5 and the accepted plan. The existing implementation covers all 34 `MotionKind` variants, includes 127 test lines with 90 passing Vitest cases, and remains under the 450-line motion limit. No motion source or test changes were needed. A bounded independent read-only scope check found no concrete missing requirement or correctness defect.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `b77d062068426ca21c1e0bfdf6784c708e1e1d0047894280c39a271a91a66289`; `editor/test/code/vim/motions.test.ts` SHA-256 `13af5d2d0720b93a1f0257f1e163766b739f8ae0171a6f3ac35e3f73094d2ced`.
+
+**Verification**:
+
+- `{command: "./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/typecheck-step6-runtime.log", notes: "Scoped typecheck of motions.ts and motions.test.ts; no diagnostics."}`
+- `{command: "./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 90, testsPassed: 90, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/focused-vitest-step6-runtime.log", notes: "Both focused files passed; 90/90 cases."}`
+- `{command: "wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/line-count-step6-runtime.log", notes: "248 and 127 lines; motions.ts is below 450 lines."}`
+
+**Shared-Tree Observation**: Other active plan files VIM-00, VIM-11, VIM-14 and VIM-18 appeared modified in `git status --short`; they are outside this plan's write paths and were not changed. VIM-10 source and test identity remained stable through verification.
+
+**Review State**: Assigned implementation and behavioral verification are complete. Independent test-integrity/adversarial and combined-tree integration review remain downstream workflow steps.
+
+**Final Self-Check**: `git diff --check -- impl-plans/active/vim-mode-10-motions.md editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts` exited 0; complete output is in `tmp/vim-mode/VIM-10/diff-check-step6-runtime.log`. The latest shared-tree status also showed edits under VIM-12, VIM-13 (`editor/src/code/vim/ex.ts`, `editor/test/code/vim/search-ex.test.ts`), VIM-15 and VIM-17; these remain outside VIM-10 write paths and were not touched.

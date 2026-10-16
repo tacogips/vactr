@@ -101,6 +101,15 @@ function enclosing(doc: Text, cursor: number, kind: string, before: number): Pai
   }
   return null;
 }
+function bracketRange(doc: Text, pair: Pair, around: boolean): TextRange {
+  if (around) return range(pair.open, pair.close + 1);
+  let from = pair.open + 1, to = pair.close;
+  if (doc.sliceString(from, from + 1) === '\n') from++;
+  const closeLine = doc.lineAt(pair.close);
+  const prefix = doc.sliceString(closeLine.from, pair.close);
+  if (/^[ \t]*$/u.test(prefix) && closeLine.from > 0) to = closeLine.from - 1;
+  return range(Math.min(from, to), Math.max(from, to));
+}
 function bracketObject(doc: Text, cursor: number, spec: TextObjectSpec, count: number, visual: { anchor: number; head: number } | null): TextRange | null {
   const kind = spec.kind;
   const cl = brackets[kind];
@@ -112,23 +121,18 @@ function bracketObject(doc: Text, cursor: number, spec: TextObjectSpec, count: n
   }
   if (!pair) pair = enclosing(doc, cursor, kind, at === cl ? cursor - 1 : cursor);
   if (!pair) return null;
-  const visualFrom = visual && Math.min(visual.anchor, visual.head), visualTo = visual && Math.max(visual.anchor, visual.head);
-  const repeat = Boolean(visual && visual.anchor !== visual.head && ((visualFrom === pair.open && visualTo === pair.close + 1) || (visualFrom === pair.open + 1 && visualTo === pair.close)));
+  const currentRange = bracketRange(doc, pair, spec.around);
+  const visualFrom = visual && Math.min(visual.anchor, visual.head);
+  const visualTo = visual && Math.max(visual.anchor, visual.head);
+  const visualLast = currentRange.to > currentRange.from ? prevGrapheme(doc, currentRange.to) : currentRange.from;
+  const repeat = Boolean(visual && visual.anchor !== visual.head && visualFrom === currentRange.from && visualTo === visualLast);
   let remaining = Math.max(1, Math.floor(count)) + (repeat ? 1 : 0);
   while (--remaining > 0) {
     const parent = enclosing(doc, pair.open - 1, kind, pair.open - 1);
     if (!parent) return null;
     pair = parent;
   }
-  if (spec.around) return range(pair.open, pair.close + 1);
-  let from = pair.open + 1, to = pair.close;
-  if (doc.sliceString(from, from + 1) === '\n') from++;
-  const closeLine = doc.lineAt(pair.close);
-  const prefix = doc.sliceString(closeLine.from, pair.close);
-  if (/^[ \t]*$/u.test(prefix) && closeLine.from > 0) {
-    to = closeLine.from - 1;
-  }
-  return range(Math.min(from, to), Math.max(from, to));
+  return bracketRange(doc, pair, spec.around);
 }
 
 export function selectTextObject(doc: Text, cursor: number, spec: TextObjectSpec, count: number, visual: { anchor: number; head: number } | null): TextRange | null {

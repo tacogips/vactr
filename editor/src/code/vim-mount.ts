@@ -11,6 +11,7 @@ import { mountVimStatus } from './vim-status-view';
 import { VimController } from './vim/controller';
 import type { CursorShape, VimHost, VimSnapshot } from './vim/types';
 import type { CodeViewHost } from './view-host';
+import type { StorageLike } from '../ui/shell';
 
 export interface VimDeps {
   surface: CodeSurface;
@@ -69,7 +70,7 @@ export function createSurfaceHost(deps: VimDeps): VimHost {
   };
 }
 
-export function createVimMode(storage: Pick<Storage, 'getItem' | 'setItem'> | null, hostEl: HTMLElement): VimMode {
+export function createVimMode(storage: StorageLike | null, hostEl: HTMLElement): VimMode {
   const [enabled, setEnabled] = createSignal(readVimEnabled(storage));
   let deps: VimDeps | null = null;
   let vim: VimController | null = null;

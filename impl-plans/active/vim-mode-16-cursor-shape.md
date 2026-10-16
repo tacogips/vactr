@@ -54,8 +54,9 @@ export function cursorRect(shape: CursorShape, caret: CodeRect, next: CodeRect |
 - `underline`: the same left and right as block, with
   `top = caret.bottom - 2`.
 - Also export `cursorColor(shape: CursorShape, base: Rgba): Rgba`. It
-  returns `base` for bar and underline, and `[r, g, b, a * 0.45]` for
-  block.
+  returns `base` for bar and underline, and
+  `[r * 0.45, g * 0.45, b * 0.45, a * 0.45]` for block. Block colors are
+  premultiplied to match the renderer's `ONE, ONE_MINUS_SRC_ALPHA` blend.
 - Use type imports only: `CodeRect` from `../app/apis`, `CursorShape` from
   `./vim/types`, and `Rgba` from `./palette`.
 
@@ -83,7 +84,8 @@ export function cursorRect(shape: CursorShape, caret: CodeRect, next: CodeRect |
   `next` on a different line (`top` differs) -> width 8; `next` null ->
   width 8; `next.left <= caret.left` -> width 8.
 - `underline` -> height 2, at the bottom.
-- `cursorColor` alpha is 0.45 times for block and unchanged otherwise.
+- `cursorColor` returns all four block channels scaled by 0.45 (premultiplied)
+  and returns bar/underline colors unchanged.
 - Wide grapheme: `next.left - caret.left === 16` -> width 16.
 
 **`editor/test/canvas/gpu.test.ts`**: append one `it` inside the existing
@@ -93,8 +95,8 @@ records (`rect`, `color`):
 - `render({ cursor: 1, textRevision: 1 })` -> the cursor-colored draw
   (`color[0]` about 0.9) has width 1.
 - `render({ cursor: 1, cursorShape: 'block', cursorEnd: 2, textRevision: 1 })`
-  -> the cursor draw width is greater than 1, and its alpha is about
-  0.45.
+  -> the cursor draw width is greater than 1, with red about 0.405 and alpha
+  about 0.45 for the default palette cursor color.
 - Changing only `cursorShape` re-renders: the second call returns true
   and the draw differs. This proves the overlay key includes the shape.
 
@@ -199,3 +201,40 @@ Formal branch/integration review remains downstream.
 - `git diff --quiet 84234f8^ 84234f8 -- editor/src/code/atlas.ts` — exit 0; unchanged; `tmp/vim-mode/VIM-16/attempt-04/atlas-unchanged.log`.
 - `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; 13/673/42/999 lines; `tmp/vim-mode/VIM-16/attempt-04/line-count.log`.
 - `shasum -a 256` over the four implementation/test files and this plan — exit 0; identities recorded in `tmp/vim-mode/VIM-16/attempt-04/source-sha.log`.
+
+### Session: 2026-10-17 Step 6 dispatch current-source verification
+
+**Tasks Completed**: Revalidated the assigned VIM-16 helpers, renderer seam, and focused tests against the current shared worktree. No source changes were needed; all three completion criteria remain met.
+
+**Implementation Notes**:
+- `cursor-shape.ts`, `renderer.ts`, `cursor-shape.test.ts`, and `gpu.test.ts` match the assigned contract. The renderer commit contains 7 additions and 2 deletions (9 changed lines); `atlas.ts` is unchanged in that commit.
+- Existing concurrent plan edits outside VIM-16 were preserved. No VIM-16 code or test files changed in this dispatch.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/attempt-05/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/attempt-05/focused-vitest.log`.
+- `git diff --numstat 84234f8 -- editor/src/code/renderer.ts` — exit 0; no uncommitted renderer drift; `tmp/vim-mode/VIM-16/attempt-05/renderer-numstat.log`.
+- `git show --numstat --format= 84234f8 -- editor/src/code/renderer.ts` — exit 0; 7 additions, 2 deletions; `tmp/vim-mode/VIM-16/attempt-05/renderer-commit-numstat.log`.
+- `git diff --quiet 84234f8^ 84234f8 -- editor/src/code/atlas.ts` — exit 0; atlas unchanged; `tmp/vim-mode/VIM-16/attempt-05/atlas-unchanged.log`.
+- `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; 13/673/42/999 lines; all touched files remain below 1000; `tmp/vim-mode/VIM-16/attempt-05/line-count.log`.
+- SHA-256 identities for the four implementation/test files and this plan are recorded in `tmp/vim-mode/VIM-16/attempt-05/source-sha.log`.
+
+Formal branch/integration review remains downstream.
+
+### Session: 2026-10-17 Step 6 repair for VIM-16-F1-block-cursor-premultiply
+
+**Tasks Completed**: Addressed the mid finding from Step 7. `cursorColor('block')` now scales all four channels by 0.45 for the premultiplied renderer blend. Updated the owned unit and GPU assertions; bar and underline remain unchanged. All VIM-16 behavioral criteria pass on this source.
+
+**Implementation Notes**:
+- Changed `editor/src/code/cursor-shape.ts`, `editor/test/canvas/cursor-shape.test.ts`, and only the VIM-16 appended case in `editor/test/canvas/gpu.test.ts`; updated this plan's formula and test contract.
+- The GPU case selects block red≈0.405 and alpha≈0.45 while preserving width, rect/color difference, and overlay draw-count assertions. The file remains 999 lines. `renderer.ts` and `atlas.ts` have no diff against HEAD.
+- Per-edit intentions are recorded as `tmp/vim-mode/VIM-16/attempt-06/edit-intention-01.json` through `edit-intention-07.json`.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/attempt-06/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/attempt-06/focused-vitest.log`.
+- `cd editor && git diff HEAD --numstat -- src/code/renderer.ts src/code/atlas.ts` — exit 0; empty diff; `tmp/vim-mode/VIM-16/attempt-06/renderer-atlas-unchanged.log`.
+- `wc -l editor/src/code/cursor-shape.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; 13/42/999 lines; `tmp/vim-mode/VIM-16/attempt-06/line-count.log`.
+- SHA-256 identities for the four owned implementation/test files are recorded in `tmp/vim-mode/VIM-16/attempt-06/source-sha.log`.
+
+Independent Step 7 re-review is required for acceptance.

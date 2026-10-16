@@ -444,6 +444,10 @@ For insert-mode typing, the helper simulates `InputController` with
 
 - [x] `VimController` exposes exactly the public API above and implements
       `VimInputHook`.
+- [x] VIM10-ADV-3 `cw` handoff: count-1 `cw` changes only a one-grapheme
+      word and stops at the current word end when started on its final
+      grapheme, including punctuation-class words; controller regressions
+      cover these cases.
 - [x] At least 146 new tests pass across the four files (80 + 21 + 15 + 30),
       and all wave-1 vim tests still pass.
 - [x] Every session exit records an `<Esc>` key token (except during
@@ -640,3 +644,71 @@ line-bounded behavior. The final focused and full VIM runs pass.
 **Handoff**: All three Step 7 findings have implementation and current-source
 behavioral evidence. Independent adversarial re-review and combined-tree review
 remain downstream; no acceptance decision is claimed here.
+
+### Session: 2026-10-17 Step 6 VIM10-ADV-3 cw handoff
+
+**Tasks Completed**: Fixed the VIM-10 controller handoff and added regressions.
+
+**Changes**:
+- Count-1 `cw` now changes from the cursor through the current word's
+  grapheme-aligned exclusive end. It no longer relies on `e` at a
+  one-grapheme word or the final grapheme, where that motion advances into
+  the next word.
+- `controller.test.ts` covers `cwX<Esc>` on `a bc` producing `X bc`, and
+  from the final `b` in `ab cd` producing `aX cd`; it also verifies that a
+  combining-mark grapheme is replaced intact.
+- The count-1 `cW` path and counted `cw` separator behavior are unchanged.
+
+**Verification** (final source):
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/controller.test.ts`
+  — 1 file, 113/113 passed; `tmp/vim-mode/VIM-20/attempt-step6-cw-handoff-20261017-01/controller-vitest-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/controller.test.ts test/code/vim/undo-repeat.test.ts test/code/vim/macro-marks.test.ts test/code/vim/controller-io.test.ts`
+  — 4 files, 207/207 passed; `tmp/vim-mode/VIM-20/attempt-step6-cw-handoff-20261017-01/vim20-focused-grapheme-final.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim`
+  — 18 files, 773/773 passed, including purity and wave-1 Vim tests;
+  `tmp/vim-mode/VIM-20/attempt-step6-cw-handoff-20261017-01/all-vim-vitest-grapheme-final.log`.
+- `cd editor && npm run check` — exit 0;
+  `tmp/vim-mode/VIM-20/attempt-step6-cw-handoff-20261017-01/npm-check-grapheme-final.log`.
+- `wc -l editor/src/code/vim/*.ts` — exit 0; `controller.ts` is 598 lines
+  and every Vim source is within the 600-line plan budget;
+  `tmp/vim-mode/VIM-20/attempt-step6-cw-handoff-20261017-01/line-count-grapheme-final.log`.
+- `git diff --check -- editor/src/code/vim/controller.ts editor/test/code/vim/controller.test.ts impl-plans/active/vim-mode-20-controller.md`
+  — exit 0; `tmp/vim-mode/VIM-20/attempt-step6-cw-handoff-20261017-01/diff-check-grapheme-final.log`.
+
+**Handoff**: The assigned implementation and verification are complete.
+Independent Step 7 and combined-tree integration review remain downstream;
+no review acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 repair VIM20-TI-1
+
+**Tasks Completed**: Restored three-class word handling for count-1 `cw`.
+
+**Changes**:
+- Added the pure `changeWordEnd` helper in `execute.ts`. It returns the
+  exclusive, grapheme-aligned end of the current non-blank class run and
+  stays within the cursor's line.
+- The count-1 `cw` branch now uses that helper. The count-1 `cW` E-motion
+  path, counted `cw` separator handling and blank-cursor fallback remain
+  unchanged.
+- Added controller regressions for `|.. foo` -> `X foo`, `a |=> b` ->
+  `a X b`, and `f|(x)` -> `fXx)` with the expected cursors.
+
+**Verification** (final source):
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/controller.test.ts test/code/vim/undo-repeat.test.ts test/code/vim/macro-marks.test.ts test/code/vim/controller-io.test.ts`
+  — 4 files, 210/210 passed; `tmp/vim-mode/VIM-20/attempt-step6-VIM20-TI-1-20261017-02/focused-vitest.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim`
+  — 18 files, 776/776 passed; `tmp/vim-mode/VIM-20/attempt-step6-VIM20-TI-1-20261017-02/all-vim-vitest.log`.
+- `cd editor && npm run check` — exit 0;
+  `tmp/vim-mode/VIM-20/attempt-step6-VIM20-TI-1-20261017-02/npm-check.log`.
+- `wc -l editor/src/code/vim/*.ts` — exit 0; `controller.ts` is 600 lines
+  and `execute.ts` is 102 lines;
+  `tmp/vim-mode/VIM-20/attempt-step6-VIM20-TI-1-20261017-02/line-count.log`.
+- `git diff --check -- editor/src/code/vim/controller.ts editor/src/code/vim/execute.ts editor/test/code/vim/controller.test.ts impl-plans/active/vim-mode-20-controller.md`
+  — exit 0; `tmp/vim-mode/VIM-20/attempt-step6-VIM20-TI-1-20261017-02/diff-check.log`.
+- Before the implementation repair, the three new punctuation cases failed
+  while the other 114 controller tests passed;
+  `tmp/vim-mode/VIM-20/attempt-step6-VIM20-TI-1-20261017-02/pre-fix-punctuation-reproduction-retry.log`.
+
+**Handoff**: VIM20-TI-1 is addressed with passing current-source evidence.
+Independent re-review and combined-tree review remain downstream; no review
+acceptance is claimed here.

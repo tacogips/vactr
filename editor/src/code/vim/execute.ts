@@ -3,7 +3,21 @@ import type { ParsedCommand } from './parser';
 import { joinLines, type EditOutcome } from './operators';
 import { textToTokens } from './record';
 import type { RecordToken, TextRange, VimMode } from './types';
-import { prevGrapheme, nextGrapheme } from './words';
+import { classAt, prevGrapheme, nextGrapheme } from './words';
+
+export function changeWordEnd(doc: Text, cursor: number): number | null {
+  const line = doc.lineAt(cursor);
+  if (cursor >= line.to || line.length === 0) return null;
+  const wordClass = classAt(line.text, cursor - line.from);
+  if (wordClass === 0) return null;
+  let end = nextGrapheme(doc, cursor);
+  while (end < line.to && classAt(line.text, end - line.from) === wordClass) {
+    const next = nextGrapheme(doc, end);
+    if (next <= end || next > line.to) break;
+    end = next;
+  }
+  return end;
+}
 
 export function commandInputTokens(command: ParsedCommand, pending: string): RecordToken[] {
   const keys = pending ? pending.split(/(?=<)/u).filter(Boolean) : [];

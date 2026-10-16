@@ -80,6 +80,7 @@ describe('Ex command parser', () => {
   it('parses visual marks when a visual range exists', () => expect(parseEx("'<,'>s/x/y/", ctx(1, 10, { fromLine: 2, toLine: 5 }))).toMatchObject({ kind: 'substitute', fromLine: 2, toLine: 5 }));
   it('errors for unset visual marks', () => expect(parseEx("'<,'>s/x/y/", ctx())).toEqual({ error: 'E20 Mark not set' }));
   it('supports a non-slash delimiter', () => expect(parseEx('s#a/b#c#', ctx())).toMatchObject({ kind: 'substitute', pattern: 'a/b', replacement: 'c' }));
+  it('supports underscore as a substitute delimiter', () => expect(parseEx('s_a_b_', ctx())).toMatchObject({ kind: 'substitute', pattern: 'a', replacement: 'b' }));
   it('supports empty replacement and default dot to last range', () => expect(parseEx('.,$s/a//', ctx(4))).toMatchObject({ kind: 'substitute', fromLine: 4, toLine: 10, replacement: '' }));
   it('swaps reversed substitution ranges', () => expect(parseEx('3,1s/a/b/', ctx())).toMatchObject({ kind: 'substitute', fromLine: 1, toLine: 3 }));
   it('unescapes an escaped delimiter in fields', () => expect(parseEx('s#a\\#b#c\\#d#', ctx())).toMatchObject({ kind: 'substitute', pattern: 'a#b', replacement: 'c#d' }));

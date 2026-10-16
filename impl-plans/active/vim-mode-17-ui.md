@@ -311,3 +311,18 @@ produced no verification logs; the corrected scoped typecheck above passed.
 outside VIM-17 write paths and does not change VIM-17 completion. VIM-15's
 concurrent edits and all sibling plan changes were preserved. Formal review
 and workflow finalization remain downstream.
+
+### Session: 2026-10-17 Step 6 implementation-node verification
+
+**Tasks Completed**: Rechecked VIM-17 on the current `wf/vim-mode` tree. No
+source or test changes were needed. The scoped typecheck, required six-file
+Vitest suite, and new-file line-count gate passed; controls and style-token
+tests remained unchanged.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-05/typecheck.log", notes: "Scoped typecheck completed without diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts", exitStatus: 0, testsRun: 43, testsPassed: 43, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-05/focused-vitest.log", notes: "Six files passed; all 25 assigned Vim tests and unchanged controls/style-token suites passed."}`
+- `{command: "cd editor && wc -l src/code/vim-settings.ts src/code/vim-clipboard.ts src/code/vim-status-view.tsx test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts | awk 'BEGIN { ok=1 } NF == 2 && $2 != \"total\" { if ($1 >= 200) ok=0; print } END { if (!ok) exit 1 }'", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-05/line-count.log", notes: "All seven new source/test files remain below 200 lines."}`
+
+**Evidence Intent**: `tmp/vim-mode/VIM-17/attempt-05/plan-update-intent.json`
+records the intended progress-log hunk before this update.

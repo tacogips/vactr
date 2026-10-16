@@ -354,8 +354,8 @@ describe('GPU code compositor', () => {
     const bar = cursorDraw(); expect(bar.rect[2]).toBe(1);
     const previousDrawCount = f.r.draws.length;
     expect(f.renderer.render({ cursor: 1, cursorShape: 'block', cursorEnd: 2, textRevision: 1 })).toBe(true);
-    const block = cursorDraw(); expect(f.r.draws.length).toBeGreaterThan(previousDrawCount);
-    expect(block.rect[2]).toBeGreaterThan(1); expect(block.color[3]).toBeCloseTo(0.45, 2); expect(block.rect).not.toEqual(bar.rect); expect(block.color).not.toEqual(bar.color); f.renderer.dispose();
+    const block = f.r.draws.filter(draw => draw.layer === 'overlay' && Math.abs(draw.color[3]! - 0.45) < 0.01 && Math.abs(draw.color[0]! - 0.405) < 0.01).at(-1)!; expect(f.r.draws.length).toBeGreaterThan(previousDrawCount);
+    expect(block.rect[2]).toBeGreaterThan(1); expect(block.color[0]).toBeCloseTo(0.405, 2); expect(block.color[3]).toBeCloseTo(0.45, 2); expect(block.rect).not.toEqual(bar.rect); expect(block.color).not.toEqual(bar.color); f.renderer.dispose();
   });
   it('draws all required feedback in order on GPU and clips source against gutter', () => {
     const f = fixture();

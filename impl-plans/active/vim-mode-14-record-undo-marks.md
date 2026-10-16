@@ -204,3 +204,12 @@ contains a mark maps to the deletion start; the context mark; an unset mark
 - `cd editor; ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/attempt-4/typecheck.log`.
 - `cd editor; ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests, 0 failures; `tmp/vim-mode/VIM-14/attempt-4/vitest.log`.
 - `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68 (all within their plan budgets).
+
+### Session: 2026-10-17 Step 6 implementation rerun (current dispatch)
+**Tasks Completed**: Revalidated all assigned VIM-14 deliverables on the current shared source and recorded current verification.
+**Notes**: VIM-00 is admitted by `acceptedPlanIds`. The pinned implementation and tests remain present and needed no edits. The scoped typecheck passed, the focused undo/record/marks/purity suite passed 39/39, and all six files remain within the plan budgets. No review repair was assigned to VIM-14. Formal integrity, adversarial and integration reviews remain downstream workflow steps. Two initial log-wrapper setup attempts did not launch their commands because their relative log paths were evaluated from `editor/` and the shell wrapper used zsh's read-only `status` variable; complete reruns below provide the current-source verification.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/step6-20261017-current/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests, 0 failures; `tmp/vim-mode/VIM-14/step6-20261017-current/vitest.log`.
+- `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68; `tmp/vim-mode/VIM-14/step6-20261017-current/line-count.log`.

@@ -158,3 +158,13 @@ sandbox. Every other gate must pass inside the sandbox.
 - First style and e2e failures and their complete logs are retained as `gate-4-style.log`, `gate-6-e2e.log`, and `gate-6-e2e-rerun.log`; corrected harness/style assertions pass in later runs.
 
 **Outstanding**: Chromium normal-mode IME commit regression requires a source-owner repair and rerun of the exact VIM-40 e2e gate. The accepted VIM-40 write paths do not include `editor/src/code/input.ts`.
+
+### Session: 2026-10-17 VIM-40 current-tree recheck
+
+**Status**: Blocked on source ownership
+**Tasks Completed**: Reproduced Gate 6 against the current tree; recorded current source identity and lock contention.
+**Notes**:
+- Current-tree Playwright run (`npm run e2e -- --browser all --profile behavior --run-id vim-002 --out ../tmp/vim-mode/e2e/vim-002`) reported `pass: false`, 32 checks, 31 passed, and the same Chromium `vim-ime-normal` failure. Complete runner output: `tmp/vim-mode/VIM-40/gate-6-e2e-current-01.log`. The shell wrapper did not append its exit line because zsh rejected its use of the reserved variable `status`; the complete previous gate log `gate-6-e2e-final.log` records the same failure with exit status 1.
+- Current hashes: `editor/src/code/input.ts` 68e94bb21ab210a2d995ad52ccf77d7bc86e353baac303e269360dafbb74a069; `editor/test/e2e/vim-behavior.mjs` 27f5e6eecedba230bf1f65ae3a5273caa7e0a8f90bf8434dc59e29ec20bde9be; `editor/test/e2e/behavior.mjs` 9a858bac4980886758324540a1bbe362156c896c63ee69cda3a5bf3f83e263bc.
+- A retry could not acquire `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` (exit 98). Foreground polling exceeded one minute; the lock remained present and was not touched. No further suite ran.
+- The regression is not a sandbox verification gap. The fix requires `editor/src/code/input.ts`, which is outside VIM-40 `writePaths` and excluded by this plan's non-goals. Resume after the input-routing owner repairs the normal-mode IME commit path; then rerun Gate 6 under the lock and record its exact exit and complete log.

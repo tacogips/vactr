@@ -240,3 +240,33 @@ syntax-checked here; it runs in VIM-40.
 - Initial scoped run failed 18 assertions across the two new files due to an incomplete mount fixture, incorrect expectations for existing Vim behavior, and the adapter's missed Shift-Alt-f binding match. Corrected the fixture, assertions and adapter matching, then added mounted alternate-modifier fallback coverage; final source matched run passes. Full initial log: `tmp/vim-mode/VIM-30/vitest-step6-01.log`.
 
 **Downstream**: VIM-40 owns full Vitest, style execution and Playwright e2e; formal test-integrity, adversarial review, integration, docs indexing, commit and push remain downstream workflow steps.
+
+### Session: 2026-10-17 VIM-30 current-tree verification
+
+**Tasks Completed**: Re-ran the assigned VIM-30 checks against the current shared tree; no VIM-30 source edits were needed.
+
+**Verification**:
+- `cd editor && npm run check` -> exit 0 (`tmp/vim-mode/VIM-30/npm-check-step6-current-02.log`).
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts test/canvas/cursor-shape.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts test/canvas/first-viewport.test.ts test/canvas/gpu.test.ts test/ui test/code/vim` -> exit 0, 30 files and 1005/1005 tests (`tmp/vim-mode/VIM-30/vitest-step6-current-01.log`). The run held `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` and released it on exit.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts` -> exit 0, 2 files and 40/40 new integration tests (`tmp/vim-mode/VIM-30/vitest-new-tests-step6-current-01.log`). The run held and released the measurement lock.
+- `cd editor && node --check test/style/ui-style.mjs` -> exit 0 (`tmp/vim-mode/VIM-30/node-check-style-step6-current-02.log`).
+
+### Session: 2026-10-17 VIM-30 API contract alignment
+
+**Tasks Completed**: Matched the exported `createVimMode` storage parameter to the planned `StorageLike | null` type; runtime behavior is unchanged.
+
+**Verification**:
+- `cd editor && npm run check` -> exit 0 (`tmp/vim-mode/VIM-30/npm-check-step6-current-03.log`).
+- `cd editor && node --check test/style/ui-style.mjs` -> exit 0 (`tmp/vim-mode/VIM-30/node-check-style-step6-current-03.log`).
+- The required current-source Vitest rerun is pending. Lock acquisition returned exit 98 because `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` is held by an active Rust nextest process (observed with `ps`); the lock was unchanged for over two minutes. Earlier 1005/1005 and 40/40 Vitest results apply to the immediately preceding source and are retained as prior verification, not as current-source passes.
+
+### Session: 2026-10-17 VIM-30 final-source verification after lock release
+
+**Tasks Completed**: Re-ran the required VIM-30 suites after the final `StorageLike | null` API alignment. Waited for the existing lock owner to finish, acquired the measurement lock, ran both suites, and released the lock.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts test/canvas/cursor-shape.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts test/canvas/first-viewport.test.ts test/canvas/gpu.test.ts test/ui test/code/vim` -> exit 0, 30 files and 1005/1005 tests (`tmp/vim-mode/VIM-30/vitest-final-source-02.log`). Start time 07:22:43; final source `editor/src/code/vim-mount.ts` mtime 07:02:38.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts` -> exit 0, 2 files and 40/40 tests (`tmp/vim-mode/VIM-30/vitest-new-tests-final-source-02.log`). Start time 07:22:49.
+- `cd editor && npm run check` -> exit 0 (`tmp/vim-mode/VIM-30/npm-check-step6-final-source-03.log`).
+- `cd editor && node --check test/style/ui-style.mjs` -> exit 0 (`tmp/vim-mode/VIM-30/node-check-style-step6-final-source-02.log`).
+- SHA-256 values for all five VIM-30 owned source/test files are recorded in `tmp/vim-mode/VIM-30/source-hashes-final-source-01.json`; `vim-mount.ts` matches the reviewed `840a1bdc…` hash. No VIM-30 source change was needed. The prior lock-acquisition failure remains historical evidence and was resolved by waiting for the lock owner to finish.

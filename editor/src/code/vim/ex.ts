@@ -72,7 +72,7 @@ function parseSubstitute(source: string, range: Range, ctx: ExContext): ExComman
   if (!command) return { error: `E492 Not an editor command: ${source.slice(i)}` };
   i += command[0].length;
   const delimiter = source[i];
-  if (!delimiter || /[\p{L}\p{N}_\\"]/u.test(delimiter)) return { error: 'E488 Trailing characters' };
+  if (!delimiter || /[\p{L}\p{N}\\"]/u.test(delimiter)) return { error: 'E488 Trailing characters' };
   const patternPart = readDelimited(source, i + 1, delimiter);
   i = patternPart.end;
   let replacement = '';
@@ -97,7 +97,7 @@ export function parseEx(text: string, ctx: ExContext): ExCommand | { error: stri
   const range = parsedRange ?? { from: ctx.currentLine, to: ctx.currentLine, end: 0 };
   const rest = source.slice(range.end).trim();
   if (!rest) return { kind: 'goto', line: Math.max(1, Math.min(range.to, ctx.lastLine)) };
-  if (/^(?:substitute|s)(?=$|[^\p{L}\p{N}_])/u.test(rest)) {
+  if (/^(?:substitute|s)(?=$|[^\p{L}\p{N}])/u.test(rest)) {
     const result = parseSubstitute(rest, { ...range, end: 0 }, ctx);
     // parseSubstitute receives the command without its address; retain the computed range.
     if ('kind' in result && result.kind === 'substitute') return { ...result, fromLine: range.from, toLine: range.to };

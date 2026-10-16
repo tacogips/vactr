@@ -9,5 +9,5 @@ export function cursorRect(shape: CursorShape, caret: CodeRect, next: CodeRect |
 }
 
 export function cursorColor(shape: CursorShape, base: Rgba): Rgba {
-  return shape === 'block' ? [base[0], base[1], base[2], base[3] * 0.45] : base;
+  return shape === 'block' ? [base[0] * 0.45, base[1] * 0.45, base[2] * 0.45, base[3] * 0.45] : base;
 }

@@ -2,7 +2,7 @@ import { isolateHistory, redoDepth, undoDepth } from '@codemirror/commands';
 import { Transaction, type ChangeSpec, type EditorSelection, type EditorState, type TransactionSpec } from '@codemirror/state';
 import type { ExCommand } from './ex';
 import { parseEx } from './ex';
-import { commandInputTokens, isChanging, lineTargetRange, preserveChangeWordSeparator, repeatTokens, selectionForVisual, visualJoin, visualRange, visualReplaceChars, withoutCounts } from './execute';
+import { changeWordEnd, commandInputTokens, isChanging, lineTargetRange, preserveChangeWordSeparator, repeatTokens, selectionForVisual, visualJoin, visualRange, visualReplaceChars, withoutCounts } from './execute';
 import { isPassThrough, normalizeKey } from './keys';
 import { MarkTable } from './marks';
 import { motionRange, applyOperator, openLine, putRegister, replaceChars, toggleCaseChars } from './operators';
@@ -243,11 +243,13 @@ export class VimController implements VimInputHook {
     }
     if (!command.operator) { this.finishMode(); return; }
     if (!range) { this.finishMode(); return; }
-    if (command.operator === 'c' && (command.count === null || command.count === 1) && target?.kind === 'motion' && ['w', 'W'].includes(target.motion.kind)) {
+    if (command.operator === 'c' && (command.count === null || command.count === 1) && target?.kind === 'motion' && target.motion.kind === 'w') {
+      const end = changeWordEnd(doc, cursor);
+      if (end !== null) range = { from: cursor, to: end, linewise: false };
+    } else if (command.operator === 'c' && (command.count === null || command.count === 1) && target?.kind === 'motion' && target.motion.kind === 'W') {
       const word = wordUnderCursor(doc, cursor);
       if (word && word.text && !/^\s/u.test(word.text)) {
-        const end = this.motion({ kind: target.motion.kind === 'w' ? 'e' : 'E' }, command.count);
-        if (end) range = motionRange(doc, cursor, end, 'c');
+        const end = this.motion({ kind: 'E' }, command.count); if (end) range = motionRange(doc, cursor, end, 'c');
       }
     } else if (command.operator === 'c' && target?.kind === 'motion' && ['w', 'W'].includes(target.motion.kind)) range = preserveChangeWordSeparator(doc, range, command.count ?? 1);
     const outcome = applyOperator(state, command.operator, range);

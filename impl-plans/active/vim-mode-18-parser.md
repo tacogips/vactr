@@ -258,3 +258,19 @@ The tests are table-driven: `{ mode: 'normal', keys: ['2','"','a','d','3','w'], 
 **Ownership handoff**: Prior Chromium normal-mode IME finding `opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1` is assigned to VIM-15 (`editor/src/code/input.ts`) and re-verified by VIM-40. It is outside VIM-18 `writePaths`; this plan does not claim it as repaired.
 
 **Blockers**: None for VIM-18. Independent review and the VIM-15/VIM-40 IME repair remain downstream.
+
+### Session: 2026-10-17 Step 6 current-source verification (dispatch)
+
+**Tasks Completed**: Reconfirmed VIM-00 admission from the assigned runtime `acceptedPlanIds`. The parser and test deliverables required no edits in this dispatch. Re-ran the scoped typecheck, parser plus purity suite, and parser line-count gate on the current shared-tree source; all passed with 129 tests and `parser.ts` at 193 lines.
+
+**Source identity**:
+- `editor/src/code/vim/parser.ts`: SHA-256 `b485e422022100a52c2cc579bd0d62379826ccd7fb41c62c494af155ea53adda`.
+- `editor/test/code/vim/parser.test.ts`: SHA-256 `8972e0204a6e22eb86e46ad35d91e9624812afe2af9b46926a24a190e3071bbd`.
+- Preserved the pre-existing `impl-plans/active/vim-mode-00-contract.md` worktree change; no VIM-18 source or test changes were made.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/typecheck-step6-current-03.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 129, testsPassed: 129, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/focused-vitest-step6-current-03.log", notes: "2 files passed; parser and purity tests passed."}`
+- `{command: "wc -l editor/src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-current-02.log", notes: "193 lines, below the 350-line plan limit."}`
+
+**Blockers**: None for VIM-18. Independent review and combined-tree verification remain downstream.

@@ -9,7 +9,7 @@ import { installSilentSink } from './silent-sink.mjs';
 const scenarios = (kalimba) => [
   { id: 'S1', text: 'use-bpm 108', type: true },
   { id: 'S2', text: '# hello\nabc def', type: true },
-  { id: 'S3', text: '# c\nuse-bpm 108\ns :kalimba > note :c5' },
+  { id: 'S3', text: '# c\nuse-bpm 108\ns :kalimbo > note :c5' }, // :kalimbo is deliberately unknown so P6 has a diagnostic to place
   { id: 'S4', text: kalimba },
 ];
 

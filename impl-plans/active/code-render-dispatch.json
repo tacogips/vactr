@@ -45,13 +45,23 @@
       "tree-sitter-vact/tree-sitter-vact.wasm": "ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609",
       "editor/package-lock.json": "f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749"
     },
-    "sha256Capture":"The planning node could not run shasum (sandbox approval). Before its first edit, every plan runs `shasum -a 256 target/wasm32-unknown-unknown/debug/vactr.wasm tree-sitter-vact/tree-sitter-vact.wasm editor/package-lock.json > tmp/code-render/<planId>/toolchain-sha256.txt` from the repository root and copies the three digests into its Progress Log (tracked). CR-07 re-runs the same command into tmp/code-render/CR-07/toolchain-sha256.txt and requires byte equality with every plan's recorded digests; any mismatch is a finding."
+    "sha256Capture": "The planning node could not run shasum (sandbox approval). Before its first edit, every plan runs `shasum -a 256 target/wasm32-unknown-unknown/debug/vactr.wasm tree-sitter-vact/tree-sitter-vact.wasm editor/package-lock.json > tmp/code-render/<planId>/toolchain-sha256.txt` from the repository root and copies the three digests into its Progress Log (tracked). CR-07 re-runs the same command into tmp/code-render/CR-07/toolchain-sha256.txt and requires byte equality with every plan's recorded digests; any mismatch is a finding."
   },
   "executionModel": {
     "waves": [
-      ["CR-01", "CR-02", "CR-03", "CR-04", "CR-06"],
-      ["CR-05"],
-      ["CR-07"]
+      [
+        "CR-01",
+        "CR-02",
+        "CR-03",
+        "CR-04",
+        "CR-06"
+      ],
+      [
+        "CR-05"
+      ],
+      [
+        "CR-07"
+      ]
     ],
     "maxConcurrency": 5,
     "sameBranchFanout": true,
@@ -358,7 +368,11 @@
     {
       "planId": "CR-05",
       "planPath": "impl-plans/active/code-render-05-renderer.md",
-      "dependsOn": ["CR-01", "CR-02", "CR-04"],
+      "dependsOn": [
+        "CR-01",
+        "CR-02",
+        "CR-04"
+      ],
       "writePaths": [
         "editor/src/code/renderer.ts",
         "editor/test/code/renderer-layers.test.ts",
@@ -394,7 +408,14 @@
     {
       "planId": "CR-07",
       "planPath": "impl-plans/active/code-render-07-closeout.md",
-      "dependsOn": ["CR-01", "CR-02", "CR-03", "CR-04", "CR-05", "CR-06"],
+      "dependsOn": [
+        "CR-01",
+        "CR-02",
+        "CR-03",
+        "CR-04",
+        "CR-05",
+        "CR-06"
+      ],
       "writePaths": [
         "design-docs/specs/design-canvas-editor-evidence.md",
         "impl-plans/active/code-render-07-closeout.md",
@@ -405,7 +426,8 @@
         "editor/dist",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/canvas-cutover/evidence"
       ],
       "sharedPaths": [
         "editor/test/e2e/code-pixels.mjs",
@@ -429,7 +451,8 @@
         "editor/dist",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/canvas-cutover/evidence"
       ],
       "acceptanceCriteria": [
         "Toolchain sha256 re-check equals every plan's recorded digests.",

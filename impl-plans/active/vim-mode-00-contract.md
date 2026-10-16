@@ -349,3 +349,20 @@ typecheck.
 **Drift**: No concurrent source changes observed. No implementation source or test changes were needed.
 
 **Blockers**: None.
+
+### Session: 2026-10-17 Step 6 rerun (current dispatch)
+
+**Tasks Completed**: Re-read the accepted VIM-00 contract and design, confirmed its dependency set is empty, and reran its scoped verification on the current shared source. No implementation source or tests required changes. Acceptance criteria remain complete.
+
+**Source identity**: `types.ts` `8e56214b356c2b58bd162aec877630f609eb26ed`; `keys.ts` `712af27113c2cd455876833b852ca892725c4da3`; `words.ts` `cb2f85ced58d54d4dde879cbbb33713fdaae5212`; `host.ts` `e2a92faab5d4e3517459e2c50df2525a2c133ebf`; focused tests `d649502cc94b1febf64aa2503ebec9fa11769fd0`, `77777c1c7ca0a85322451064b7d503a49b3036a3`, `b5665ecff9620ce4fd8ebd570dd60390ddcfc6ac`.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-00/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/typecheck-step6-rerun-final.log", notes: "No diagnostics; complete log records exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/keys.test.ts test/code/vim/words.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 104, testsPassed: 104, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/focused-vitest-step6-rerun-final.log", notes: "3 files passed; 104 tests passed."}`
+- `{command: "cd editor && wc -l src/code/vim/types.ts src/code/vim/keys.ts src/code/vim/words.ts test/code/vim/host.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/owned-line-count-step6-rerun-final.log", notes: "Owned files are 65, 38, 77 and 60 lines, each below the plan's 300-line target and the repository's 1000-line ceiling."}`
+
+**Review routing**: The supplied Chromium IME finding names `editor/src/code/input.ts`, outside VIM-00 `writePaths`. The accepted dispatch manifest routes it to VIM-15 and records it as verified by VIM-40. No VIM-00 source edit was made for that downstream integration finding.
+
+**Drift**: No concurrent changes to VIM-00 source or test paths observed.
+
+**Blockers**: None for VIM-00.

@@ -193,3 +193,17 @@ export interface ExContext { currentLine: number; lastLine: number; visual: { fr
 **Attempt Note**: The first rerun wrappers targeted a log path relative to the parent of the repository and exited before either gate ran. They are discarded attempts; the corrected commands above ran the exact plan gates successfully.
 
 **Downstream**: Formal test-integrity/adversarial review and combined-tree integration verification remain owned by later workflow steps. VIM-20 owns execution of the parsed search and Ex commands.
+
+### Session: 2026-10-17 Step 6 current-source verification
+
+**Tasks Completed**: Revalidated the assigned VIM-13 contract on the current shared tree. Search and Ex source plus focused tests already matched the plan, so no implementation source edits were needed.
+
+**Verification on current source**:
+
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-13/tsconfig.json` — exit 0; log `tmp/vim-mode/VIM-13/attempt-step6-20261017/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/search-ex.test.ts test/code/vim/purity.test.ts` — exit 0; 2 files, 67/67 tests passed; log `tmp/vim-mode/VIM-13/attempt-step6-20261017/focused-vitest.log`.
+- `wc -l editor/src/code/vim/search.ts editor/src/code/vim/ex.ts` — exit 0; 113 and 118 lines.
+
+**Source Hashes**: `search.ts` `4c9cddf241b9088f5f1a9dee7e70d02db2a39170`; `ex.ts` `be8d00f65c83964c830f1a6afc24e3151d3abf5e`; tests `706c570373b9445eef4542da85021aa4563e9eba`.
+
+**Downstream**: VIM-20 still owns command execution; formal review and combined-tree verification remain later workflow steps. The Chromium IME finding in `editor/src/code/input.ts` remains assigned to VIM-15 and VIM-40, outside this plan's write paths.

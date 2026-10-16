@@ -195,3 +195,12 @@ contains a mark maps to the deletion start; the context mark; an unset mark
 - `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/typecheck-step6-rerun-20261017.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests; `tmp/vim-mode/VIM-14/vitest-step6-rerun-20261017.log`.
 - `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68.
+
+### Session: 2026-10-17 Step 6 implementation rerun
+**Tasks Completed**: Re-ran both assigned VIM-14 verification gates and confirmed all acceptance criteria on the current shared source.
+**Notes**: VIM-00 is admitted by `acceptedPlanIds`; the pinned exports and six owned implementation/test files are unchanged, each remains under its plan budget, and the focused suite passes 39/39 including purity. The current shared tree also contains concurrent VIM-12/VIM-15 changes in their owned files; these were preserved. No VIM-14 repair request was present. The carried Chromium IME finding remains assigned to VIM-15 and is outside this plan's write paths. The first two logging wrappers had incomplete exit markers under zsh and are retained as incomplete attempts; attempt-4 provides complete final-source logs.
+
+**Verification**:
+- `cd editor; ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/attempt-4/typecheck.log`.
+- `cd editor; ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests, 0 failures; `tmp/vim-mode/VIM-14/attempt-4/vitest.log`.
+- `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68 (all within their plan budgets).

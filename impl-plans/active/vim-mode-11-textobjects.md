@@ -152,3 +152,34 @@ Format: `{ doc: 'foo b|ar baz', spec: { around: false, kind: 'w' }, count: 1, ex
 **Drift**: The VIM-11 source and test hashes match the prior repair record. The current shared worktree also has concurrent plan progress modifications in VIM-00, VIM-12, VIM-13 and VIM-14; these files were preserved and not edited by VIM-11. No VIM-11 source drift or blockers.
 
 **Review State**: Ready for downstream integrity and adversarial review; no review acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 final verification
+
+**Tasks Completed**: Confirmed the accepted VIM-11 implementation remains intact on the current shared tree. No source or test edits were needed. All 9 text-object kinds retain inner/around handling, the two `2aw`/`2aW` regressions remain, and the purity test is included.
+
+**Current Source Hashes**:
+- `editor/src/code/vim/textobjects.ts`: `42f51b42095594efa607dac90b03b5a2002e835f`
+- `editor/test/code/vim/textobjects.test.ts`: `5a53c81734e6073d103cdb229d3f87f304a40e68`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/typecheck-step6-final-2026-10-17-rerun.log", notes: "Scoped typecheck of implementation and tests; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 38, testsPassed: 38, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/focused-vitest-step6-final-2026-10-17.log", notes: "2 files passed; 37 text-object cases and the Vim-core purity test passed."}`
+- `{command: "wc -l editor/src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/line-count-step6-final-2026-10-17.log", notes: "138 lines, below the 300-line limit."}`
+
+**Review State**: Ready for downstream integrity and adversarial review; no review acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 implementation rerun
+
+**Tasks Completed**: Rechecked the committed VIM-11 contract and accepted design reference, then verified the current implementation without source or test edits. All 9 normalized text-object kinds retain inner and around handling; counted `aw`/`aW` regressions and purity coverage remain present. The independent scoped review found no concrete correctness gap.
+
+**Current Source Hashes** (Git blob IDs):
+- `editor/src/code/vim/textobjects.ts`: `42f51b42095594efa607dac90b03b5a2002e835f`
+- `editor/test/code/vim/textobjects.test.ts`: `5a53c81734e6073d103cdb229d3f87f304a40e68`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/attempt-step6-rerun-20261017-02/typecheck.log", notes: "Scoped check completed with no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 38, testsPassed: 38, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/attempt-step6-rerun-20261017-02/focused-vitest.log", notes: "2 files passed, including 37 text-object cases and the purity test."}`
+- `{command: "wc -l editor/src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/attempt-step6-rerun-20261017-02/line-count-final.log", notes: "138 lines, below the 300-line budget."}`
+- `{command: "git diff --check -- editor/src/code/vim/textobjects.ts editor/test/code/vim/textobjects.test.ts impl-plans/active/vim-mode-11-textobjects.md", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/attempt-step6-rerun-20261017-02/diff-check-final.log"}`
+
+**Scope/Handoff**: Preserved concurrent changes outside VIM-11 ownership. The Chromium IME finding at `editor/src/code/input.ts:44` remains assigned to VIM-15 and VIM-40; this VIM-11 rerun does not assess or clear it. Independent formal review remains downstream.

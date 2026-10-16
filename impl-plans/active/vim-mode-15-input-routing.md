@@ -173,6 +173,9 @@ Required cases (at least 18):
       exists.
 - [x] `input-vim-hook.test.ts` has at least 18 passing cases, and
       `input.test.ts` passes unmodified.
+- [x] Session-381 integration-review finding 1 is repaired: closed-gate
+      composition remains discarded through Chromium blur/refocus and later
+      composition events, with document and revision unchanged.
 - [x] `input.ts` is under 300 lines and `surface.ts` under 220.
 
 ## Verification
@@ -217,3 +220,23 @@ Required cases (at least 18):
 - `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 102/102 tests passed; log `tmp/vim-mode/VIM-15/focused-vitest-step6-rerun.log`.
 - `git diff --stat -- editor/test/canvas/input.test.ts` — empty; the existing test remains unmodified.
 - Line counts remain `input.ts` 270 and `surface.ts` 179. The hook test contains 22 cases.
+
+### Session: 2026-10-17 Step 6 IME repair rerun
+
+**Tasks Completed**: Repaired the session-381 Chromium normal-mode IME finding and reran VIM-15 verification on the repaired source.
+**Notes**: The discard latch now survives the blur/refocus termination attempt until `compositionend`; composing `beforeinput`, direct `beginComposition`/`updateComposition`/`endComposition`, and composition event paths check the Vim gate. If the gate closes during an active composition, it is finished without dispatch. Added a regression replay after blur/refocus, including the gate opening before `compositionend`; document and revision remain unchanged and no composition annotations appear. Existing `input.test.ts` remains untouched.
+
+**Changed Source Hashes**:
+- `editor/src/code/input.ts`: `f77078bccde921f3fc64aa47442a0413703ba4ebb436c61c2294a599d171c8f2`
+- `editor/src/code/surface.ts`: `07f92699faed318ec41f29083e03bfcd0cbcc40086d5482bcd8e7ef29c42cdf7` (unchanged)
+- `editor/test/canvas/input-vim-hook.test.ts`: `7be73c00252eb96d6be4d361f34bfa2690f900a84c7ceea41ff5c1e917f9998a`
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json` — exit 0; complete log `tmp/vim-mode/VIM-15/typecheck-step6-ime-repair.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 103/103 tests passed; complete log `tmp/vim-mode/VIM-15/focused-vitest-step6-ime-repair.log`.
+- `git diff --stat -- editor/test/canvas/input.test.ts` — empty; the existing test remains unmodified.
+- Hook test case count: 23. Line counts: `input.ts` 290; `surface.ts` 179.
+
+**Final-Source Follow-Up**: The self-check also canceled a composing `beforeinput` that reaches the gate-closed branch before the discard latch is set. Final `editor/src/code/input.ts` SHA-256: `68e94bb21ab210a2d995ad52ccf77d7bc86e353baac303e269360dafbb74a069`.
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json` — exit 0; complete final-source log `tmp/vim-mode/VIM-15/typecheck-step6-ime-repair-02.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 103/103 tests passed; complete final-source log `tmp/vim-mode/VIM-15/focused-vitest-step6-ime-repair-02.log`.

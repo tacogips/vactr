@@ -121,6 +121,27 @@ describe('Vim input hook', () => {
     vi.mocked(hook.allowsTextInput).mockReturnValue(true); composition(el, 'compositionend', '日本');
     expect(surface.state.doc.toString()).toBe('abc'); expect(sync.revision).toBe(1); expect(input.presentation.annotations).toEqual([]);
   });
+  it('keeps Chromium composition events discarded after blur/refocus and a gate change', async () => {
+    const { surface, sync, el, input, hook } = setup('stable', false); input.setVim(hook);
+    surface.dispatch({ selection: { anchor: 5 } });
+    const revision = sync.revision;
+    composition(el, 'compositionstart');
+    await Promise.resolve();
+    el.dispatchEvent(new FocusEvent('blur'));
+    composition(el, 'compositionupdate', 'にほん');
+    const composingInput = before(el, 'insertCompositionText', 'にほん', true);
+    input.updateComposition('日本');
+    expect(composingInput.defaultPrevented).toBe(true);
+    expect(input.isComposing).toBe(false);
+    expect(input.presentation.annotations).toEqual([]);
+    vi.mocked(hook.allowsTextInput).mockReturnValue(true);
+    composition(el, 'compositionend', '日本');
+    before(el, 'insertFromComposition', '日本', true);
+    expect(surface.state.doc.toString()).toBe('stable');
+    expect(sync.revision).toBe(revision);
+    expect(input.presentation.annotations).toEqual([]);
+    expect(hook.noteCompositionDiscarded).toHaveBeenCalledOnce();
+  });
   it('prevents trailing composition beforeinput after a discarded session', () => {
     const { el, input, hook } = setup('', false); input.setVim(hook);
     composition(el, 'compositionstart'); composition(el, 'compositionend', '語');

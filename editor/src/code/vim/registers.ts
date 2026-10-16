@@ -1,4 +1,5 @@
 import type { Register } from './types';
+import { textToTokens } from './record';
 
 export function isRegisterName(ch: string): boolean {
   return /^[a-zA-Z0-9_+*"]$/.test(ch);
@@ -36,8 +37,11 @@ export class RegisterStore {
     }
     if (/^[A-Z]$/.test(name)) {
       const prior = this.values.get(name.toLowerCase());
+      const tokens = prior && (prior.tokens || value.tokens)
+        ? [...(prior.tokens ?? textToTokens(prior.text)), ...(value.tokens ?? textToTokens(value.text))]
+        : undefined;
       const appended: Register = prior
-        ? { text: prior.linewise || value.linewise ? [prior.text, value.text].join('\n') : prior.text + value.text, linewise: prior.linewise || value.linewise, ...(value.tokens ? { tokens: value.tokens } : prior.tokens ? { tokens: prior.tokens } : {}) }
+        ? { text: prior.linewise || value.linewise ? [prior.text, value.text].join('\n') : prior.text + value.text, linewise: prior.linewise || value.linewise, ...(tokens ? { tokens } : {}) }
         : value;
       this.values.set(name.toLowerCase(), appended);
       this.unnamed = appended;

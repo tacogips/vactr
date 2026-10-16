@@ -40,15 +40,20 @@ export class InputController {
     this.listen(el, 'compositionstart', () => this.withInput(() => {
       this.flushBeforeHandler();
       if (this.vim && !this.vim.allowsTextInput()) {
-        this.discarding = true; this.surface.notifyCompositionStart(); this.vim.noteCompositionDiscarded();
+        this.discardComposition();
         queueMicrotask(() => { if (this.discarding && !this.disposed) { this.accessibility.textarea.blur(); this.accessibility.focus(); } });
         return;
       }
+      this.discarding = false;
       this.surface.notifyCompositionStart(); this.beginComposition();
     }));
     this.listen(el, 'compositionupdate', (event) => this.withInput(() => { if (!this.discarding) this.updateComposition((event as CompositionEvent).data); }));
     this.listen(el, 'compositionend', (event) => this.withInput(() => {
-      if (this.discarding) { this.discarding = false; this.trailingComposition = true; this.accessibility.refresh(); return; }
+      if (this.discarding || (this.vim && !this.vim.allowsTextInput())) {
+        if (!this.discarding) this.discardComposition();
+        if (this.composing) this.finishComposition();
+        this.discarding = false; this.trailingComposition = true; this.accessibility.refresh(); return;
+      }
       this.endComposition((event as CompositionEvent).data);
     }));
     this.listen(el, 'beforeinput', (event) => this.withInput(() => { this.flushBeforeHandler(); this.beforeInput(event as InputEvent); }));
@@ -77,7 +82,7 @@ export class InputController {
     this.listen(el, 'focus', () => this.withInput(() => this.flushBeforeHandler()));
     this.listen(el, 'blur', () => {
       this.surface.notifyBlur();
-      if (this.discarding) { this.discarding = false; this.accessibility.refresh(); }
+      if (this.discarding) this.accessibility.refresh();
       this.cancelComposition();
     });
     const position = () => this.accessibility.markPositionDirty();
@@ -142,6 +147,7 @@ export class InputController {
   }
   beginComposition(): void {
     if (this.composing || this.disposed) return;
+    if (this.vim && !this.vim.allowsTextInput()) { this.discardComposition(); return; }
     this.trailingComposition = false;
     const selection = this.surface.state.selection.main;
     this.original = this.surface.state.doc.sliceString(selection.from, selection.to);
@@ -149,12 +155,20 @@ export class InputController {
     this.preedit = ''; this.composing = true; this.publish();
   }
   updateComposition(text: string): void {
+    if (this.discarding) return;
+    if (this.vim && !this.vim.allowsTextInput()) { this.discardComposition(); return; }
     if (!this.composing) this.beginComposition();
+    if (!this.composing) return;
     const previous = this.presentation, range = this.surface.compositionRange;
     const changes = range ? ChangeSet.of({ from: range.from, to: range.from + this.preedit.length, insert: text }, previous.doc.length) : undefined;
     this.preedit = text; this.publish(changes, changes ? previous.doc : undefined);
   }
   endComposition(text: string): void {
+    if (this.discarding || (this.vim && !this.vim.allowsTextInput())) {
+      if (!this.discarding) this.discardComposition();
+      if (this.composing) this.finishComposition();
+      this.discarding = false; this.trailingComposition = true; this.accessibility.refresh(); return;
+    }
     if (!this.composing) return;
     const range = this.surface.compositionRange;
     // Empty end data denotes cancellation. Revalidate because independent edits may have mapped the range.
@@ -167,6 +181,11 @@ export class InputController {
     this.finishComposition();
   }
   cancelComposition(): void { if (this.composing) this.finishComposition(); }
+  private discardComposition(): void {
+    if (!this.discarding) { this.discarding = true; this.surface.notifyCompositionStart(); this.vim?.noteCompositionDiscarded(); }
+    if (this.composing) this.finishComposition();
+    this.accessibility.refresh();
+  }
   private finishComposition(): void {
     this.composing = false; this.preedit = ''; this.trailingComposition = true;
     this.surface.setCompositionRange(null); // commit is recorded before revalidating deferred writes
@@ -183,6 +202,7 @@ export class InputController {
       this.accessibility.refresh(); return;
     }
     if (this.composing || event.isComposing) {
+      if (this.vim && !this.vim.allowsTextInput()) { if (event.cancelable) event.preventDefault(); this.discardComposition(); return; }
       if (!this.composing) this.beginComposition();
       if (event.data != null) this.updateComposition(event.data);
       return; // platform owns the textarea during IME

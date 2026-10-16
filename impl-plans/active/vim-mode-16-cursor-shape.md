@@ -163,3 +163,39 @@ Do not modify any existing `it` in `gpu.test.ts`.
 - `shasum -a 256` over the four implementation/test files and this plan — exit 0; identities recorded in `tmp/vim-mode/VIM-16/source-sha-step6-rerun.log`.
 
 Formal branch/integration review remains downstream.
+
+### Session: 2026-10-17 03:47 Asia/Tokyo
+
+**Tasks Completed**: Re-ran VIM-16 verification against the shared source; no implementation changes were required.
+
+**Implementation Notes**:
+- Current helpers, renderer hook, and focused tests match the assigned contract. No VIM-16 source files are modified in the working tree.
+- The VIM-16 renderer change is 7 additions and 2 deletions in commit `84234f8` (9 changed lines total). `atlas.ts` is unchanged in that commit. Touched source files remain below 1000 lines; `gpu.test.ts` is 999 lines.
+- A concurrent VIM-15 edit is present in `editor/src/code/input.ts` and `editor/test/canvas/input-vim-hook.test.ts`; it is outside VIM-16 ownership and was preserved.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/attempt-03/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/attempt-03/focused-vitest.log`.
+- `git show --numstat --format= 84234f8 -- editor/src/code/renderer.ts` — exit 0; 7 additions, 2 deletions; total 9 changed lines, within the 12-line limit; `tmp/vim-mode/VIM-16/attempt-03/renderer-numstat.log`.
+- `git diff --quiet 84234f8^ 84234f8 -- editor/src/code/atlas.ts` — exit 0; atlas unchanged in the VIM-16 implementation commit.
+- `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; `tmp/vim-mode/VIM-16/attempt-03/line-count.log`.
+- `shasum -a 256` over the four implementation/test files and this plan — exit 0; identities recorded in `tmp/vim-mode/VIM-16/attempt-03/source-sha.log`.
+
+Formal branch/integration review remains downstream.
+
+### Session: 2026-10-17 Step 6 current-source rerun
+
+**Tasks Completed**: Re-ran the assigned VIM-16 verification on the shared worktree; no implementation source changes were needed.
+
+**Implementation Notes**:
+- `cursor-shape.ts`, the renderer hook, and both cursor/GPU test files remain as previously implemented. Concurrent edits in VIM-15 and other plans were preserved and are outside VIM-16 ownership.
+- Renderer hook remains 7 additions and 2 deletions in commit `84234f8` (9 changed lines, within the 12-line limit); `atlas.ts` is unchanged in that commit.
+- The known Chromium normal-mode IME finding at `editor/src/code/input.ts:44` remains assigned to VIM-15 and VIM-40; this plan does not claim it resolved.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/attempt-04/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/attempt-04/focused-vitest.log`.
+- `git show --numstat --format= 84234f8 -- editor/src/code/renderer.ts` — exit 0; 7 additions and 2 deletions; `tmp/vim-mode/VIM-16/attempt-04/renderer-numstat.log`.
+- `git diff --quiet 84234f8^ 84234f8 -- editor/src/code/atlas.ts` — exit 0; unchanged; `tmp/vim-mode/VIM-16/attempt-04/atlas-unchanged.log`.
+- `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; 13/673/42/999 lines; `tmp/vim-mode/VIM-16/attempt-04/line-count.log`.
+- `shasum -a 256` over the four implementation/test files and this plan — exit 0; identities recorded in `tmp/vim-mode/VIM-16/attempt-04/source-sha.log`.

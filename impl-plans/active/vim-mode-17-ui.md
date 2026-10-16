@@ -270,3 +270,44 @@ record and plan-local verification evidence were added in this rerun.
 
 **Shared Tree**: Other plan logs changed concurrently in the shared worktree;
 they were preserved. No VIM-17 source or test file is modified in this rerun.
+
+### Session: 2026-10-17 implementation-node rerun
+
+**Tasks Completed**: Confirmed the existing VIM-17 implementation against the
+assigned plan and reran its scoped typecheck, required six-file Vitest suite,
+and new-file line-count gate on the current shared tree. No source or test
+correction was required.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-02/typecheck.log", notes: "Scoped typecheck passed with no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts", exitStatus: 0, testsRun: 43, testsPassed: 43, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-02/focused-vitest.log", notes: "Six files passed; all 25 assigned Vim tests and unchanged controls/style-token suites passed."}`
+- `{command: "cd editor && wc -l src/code/vim-settings.ts src/code/vim-clipboard.ts src/code/vim-status-view.tsx test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts | awk 'BEGIN { ok=1 } NF == 2 && $2 != \"total\" { if ($1 >= 200) ok=0; print } END { if (!ok) exit 1 }'", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-02/line-count.log", notes: "All seven new source/test files are below 200 lines."}`
+
+**Source Review**: Confirmed the transport `vim` option remains optional and
+absent options do not render its control; the status row and toggle styling
+use existing `--vt-*` tokens and radius 0. VIM-15's concurrently modified
+`editor/src/code/input.ts` and `editor/test/canvas/input-vim-hook.test.ts`
+were preserved and remain outside VIM-17 write paths.
+
+### Session: 2026-10-17 Step 6 implementation rerun
+
+**Tasks Completed**: Revalidated the assigned VIM-17 contract on the shared
+`wf/vim-mode` tree. The VIM-17 implementation and tests required no source
+correction. Recorded current-source hashes and reran scoped typecheck, the
+required six-file Vitest suite, and the new-file line-count gate.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-03/typecheck.log", notes: "Scoped typecheck completed without diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts", exitStatus: 0, testsRun: 43, testsPassed: 43, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-03/focused-vitest.log", notes: "Six files passed, including all 25 VIM-17 cases and unchanged controls/style-token suites."}`
+- `{command: "wc -l src/code/vim-settings.ts src/code/vim-clipboard.ts src/code/vim-status-view.tsx test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts | awk 'BEGIN { ok=1 } NF == 2 && $2 != \"total\" { if ($1 >= 200) ok=0; print } END { if (!ok) exit 1 }'", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-03/line-count.log", notes: "Line counts are 19, 32, 80, 30, 29, 96 and 52; all are below 200."}`
+- `shasum -a 256` over all VIM-17 tracked paths recorded in the implementation-node output; source and test hashes match the pre-node VIM-17 snapshot at `tmp/riela-fanout/AEF7BFF2-312E-4395-BA2C-4F6FF3C45B90/5C69B9C2-8F5D-4DC3-83A6-CFB6AA3DB5AD.json`.
+
+**Prior Setup Errors**: Two initial command wrappers used an incorrect
+working-directory-relative log path and failed before `tsc` launched. They
+produced no verification logs; the corrected scoped typecheck above passed.
+
+**Scope Handoff**: The Chromium normal-mode IME finding at
+`editor/src/code/input.ts:44` remains assigned to VIM-15 and VIM-40. It is
+outside VIM-17 write paths and does not change VIM-17 completion. VIM-15's
+concurrent edits and all sibling plan changes were preserved. Formal review
+and workflow finalization remain downstream.

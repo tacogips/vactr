@@ -63,7 +63,7 @@ describe('Vim macros and marks', () => {
     vim.handleKey(key('q')); vim.handleKey(key('a')); vim.handleKey(key('x')); vim.handleKey(key('q'));
     vim.handleKey(key('q')); vim.handleKey(key('A')); vim.handleKey(key('x')); vim.handleKey(key('q'));
     vim.handleKey(key('@')); vim.handleKey(key('a'));
-    expect(host.state().doc.toString()).toBe('d');
+    expect(host.state().doc.toString()).toBe('');
   });
   it('puts macro text with its explicit Esc token', () => {
     const host = createTestHost('|abc'), vim = new VimController(host);

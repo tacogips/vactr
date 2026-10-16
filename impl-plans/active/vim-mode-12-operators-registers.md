@@ -164,6 +164,7 @@ unnamed; `isRegisterName` accepts and rejects; tokens are kept.
       signature.
 - [x] At least 55 tests pass across both files.
 - [x] Each file is under its line budget, and the purity test passes.
+- [x] Uppercase register append preserves and concatenates macro tokens, deriving tokens from text-only sides when needed; four register-combination regressions and the qA macro replay regression pass.
 
 ## Verification
 
@@ -200,3 +201,21 @@ unnamed; `isRegisterName` accepts and rejects; tokens are kept.
 **Verification**: `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json` exited 0 (`tmp/vim-mode/VIM-12/typecheck-adv03-final.log`). `cd editor && ./node_modules/.bin/vitest run test/code/vim/operators.test.ts test/code/vim/registers.test.ts test/code/vim/purity.test.ts` exited 0 with 87/87 passing across 3 files (`tmp/vim-mode/VIM-12/focused-vitest-adv03-final.log`). `cd editor && wc -l src/code/vim/operators.ts src/code/vim/registers.ts` reports 168 and 59 lines; both remain under budget (`tmp/vim-mode/VIM-12/line-count-adv03-final.log`).
 **Final Source Hashes**: `tmp/vim-mode/VIM-12/source-hashes-adv03-final.txt` records operators.ts `adc028f261b36db86abcad7626ced139cc85ad29be445acc1ede73896e668331`, registers.ts `6b73c07268c5a73b9822aa73e328c842c2d6ffc2cec531fadbc38a27328a7916`, operators.test.ts `26588d2f66cc8016e4b20fd893b8e089ae1947b98ff0d55cb697bb7bdeac99ff`, and registers.test.ts `2a2e39841368c86a4d7eb5618751633d1a6a0595ed9b809cad7a29a803ac32cf`.
 **Handoff**: The assigned repair and current-source behavioral verification are complete. Independent test-integrity and adversarial re-review remain pending.
+
+### Session: 2026-10-17 Step 6 implementation rerun — VIM-12
+**Tasks Completed**: Revalidated assigned VIM-12 contract and current-source evidence; no implementation or test edits were needed.
+**Verification**: `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json` exited 0 (`tmp/vim-mode/VIM-12/typecheck-step6-current.log`). `cd editor && ./node_modules/.bin/vitest run test/code/vim/operators.test.ts test/code/vim/registers.test.ts test/code/vim/purity.test.ts` exited 0 with 87/87 passing across 3 files (`tmp/vim-mode/VIM-12/focused-vitest-step6-current.log`).
+**Completion Evidence**: Exports remain pinned, operators/register tests pass above the 55-test threshold, purity passes, and line budgets remain satisfied. No high/mid VIM-12 feedback is pending. Formal review remains downstream.
+
+### Session: 2026-10-17 adversarial repair — VIM12-ADV-04
+**Finding Repaired**: `RegisterStore.write` now concatenates existing and appended macro tokens in order. When exactly one side has tokens, the text-only side is converted with `textToTokens`; text-only appends remain text-only. Added four register combination regressions and corrected `editor/test/code/vim/macro-marks.test.ts` so the qA replay case expects the result `''`.
+**Scoped Typecheck**: Added `editor/src/code/vim/record.ts` to `tmp/vim-mode/VIM-12/tsconfig.json` because `registers.ts` now uses its pinned `textToTokens` export.
+**Verification**: `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json` exited 0 (`tmp/vim-mode/VIM-12/typecheck-adv04.log`). `cd editor && ./node_modules/.bin/vitest run test/code/vim/operators.test.ts test/code/vim/registers.test.ts test/code/vim/purity.test.ts test/code/vim/macro-marks.test.ts test/code/vim/controller.test.ts` exited 0; 221/221 passed across 5 files (`tmp/vim-mode/VIM-12/focused-vitest-adv04.log`). `cd editor && wc -l src/code/vim/registers.ts` reports 63/160 (`tmp/vim-mode/VIM-12/line-count-adv04.log`).
+**Final Source Hashes**: `tmp/vim-mode/VIM-12/source-hashes-adv04.txt` records the current operator, register, operator-test, register-test, and macro-marks-test hashes.
+**Handoff**: The VIM12-ADV-04 fix and required current-source regressions are complete. Independent adversarial re-review remains pending. The separate Chromium normal-mode IME high finding remains owned by VIM-15 and VIM-40.
+
+### Session: 2026-10-17 Step 6 redispatch — VIM-12
+**Tasks Completed**: Revalidated the assigned operators/registers contract and ADV-04 macro-token append behavior on the current shared tree. No source or test edits were required.
+**Current-Source Identity**: All five hashes in `tmp/vim-mode/VIM-12/source-hashes-adv04.txt` match current files, including the `record.ts`-backed register token append logic and qA macro regression.
+**Verification**: `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json` exited 0 (`tmp/vim-mode/VIM-12/attempt-redispatch-01/typecheck.log`). The assigned focused suite exited 0 with 91/91 tests across 3 files (`tmp/vim-mode/VIM-12/attempt-redispatch-01/focused-vitest.log`). ADV-04 integration coverage (operators, registers, purity, macro-marks and controller) exited 0 with 221/221 tests across 5 files (`tmp/vim-mode/VIM-12/attempt-redispatch-01/integration-vitest.log`). Source/test line counts and `git diff --check` exited 0 (`line-count.log`, `diff-check.log`).
+**Handoff**: VIM-12 implementation and its required behavioral verification are complete. The Chromium IME finding remains assigned to VIM-15 and VIM-40; independent review and final integration checks remain downstream.

@@ -186,3 +186,35 @@ the `|` marker inline. Required rows (at least 60):
 - `{command: "git diff --quiet 6349b0ff833c99756874b2a3c9decc44773bdd09 -- editor/src/code/vim/words.ts editor/src/code/vim/types.ts", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/vim00-identity-adv-repair-01.log", notes: "VIM-00 words.ts and types.ts are unchanged from checkpoint."}`
 
 **Review State**: Repairs are implemented; independent test-integrity and adversarial re-review remain pending.
+
+### Session: 2026-10-17 Step 6 current-source verification
+
+**Tasks Completed**: Rechecked VIM-10 on the current shared branch. No motion source or test edits were needed; the existing implementation and 83 focused cases satisfy the assigned contract.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/typecheck-step6-current-rerun.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 83, testsPassed: 83, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/focused-vitest-step6-current-rerun.log", notes: "Both files passed, 83/83."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/line-count-step6-current.log", notes: "249 and 111 lines respectively; motions.ts remains below the 450-line limit."}`
+
+**Review State**: Assigned implementation and verification are complete. Independent integrity/adversarial re-review and combined-tree integration remain downstream workflow steps.
+
+### Session: 2026-10-17 adversarial repair VIM10-ADV-3
+
+**Tasks Completed**: Replaced the `e`/`E` `alreadyAtEnd` heuristic in `wordMove` with the specified grapheme-forward algorithm: step once, skip blank classes, then stop on the last grapheme of the next class run. Added seven regression assertions for single-grapheme words, punctuation, empty lines, counts, and grapheme offsets. Existing expectations and other motion branches are unchanged.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `b77d062068426ca21c1e0bfdf6784c708e1e1d0047894280c39a271a91a66289`; `editor/test/code/vim/motions.test.ts` SHA-256 `13af5d2d0720b93a1f0257f1e163766b739f8ae0171a6f3ac35e3f73094d2ced`.
+
+**VIM-20 Handoff**: `editor/src/code/vim/controller.ts:246-251` implements count-1 `cw` using `e`. With `e` repaired, `cw` on a one-grapheme word such as `a bc` needs VIM-20 to preserve Vim's single-character change behavior. VIM-20 should also handle the existing case where `cw` at the final grapheme of a multi-grapheme word (`ab cd` at `b`) changes too much. This implementation did not edit `controller.ts`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-01/typecheck-final.log", notes: "Scoped typecheck; log ends with exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 90, testsPassed: 90, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-01/focused-vitest-final.log", notes: "Both files passed; log ends with exit=0."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-01/line-count.log", notes: "248 and 127 lines; motions.ts is below 450 lines."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/controller.test.ts test/code/vim/undo-repeat.test.ts", exitStatus: 0, testsRun: 143, testsPassed: 143, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-01/cw-handoff-vitest.log", notes: "Informational VIM-20 coupling check; both files passed."}`
+- `{command: "git diff --check -- editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts impl-plans/active/vim-mode-10-motions.md", exitStatus: 0, failureCount: 0, outcome: "passed", notes: "No whitespace errors."}`
+
+**Prior Attempt**: `tmp/vim-mode/VIM-10/attempt-01/focused-vitest.log` records the initial new grapheme assertion using index 4 for `c` in `é bc`. Vitest observed index 3, the correct UTF-16 offset; only that new expected value was corrected, and the final run passes 90/90.
+
+**Review State**: VIM10-ADV-3 has been repaired and is pending independent Opus re-review. The separate VIM-20 `cw` handoff remains owned by VIM-20.

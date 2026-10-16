@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isRegisterName, RegisterStore } from '../../../src/code/vim/registers';
 import type { Register } from '../../../src/code/vim/types';
+import { textToTokens } from '../../../src/code/vim/record';
 
 const value = (text: string, linewise = false, tokens?: Register['tokens']): Register => ({ text, linewise, ...(tokens ? { tokens } : {}) });
 
@@ -72,6 +73,35 @@ describe('RegisterStore', () => {
     store.write('a', value('one', true), 'delete');
     store.write('A', value('two', true), 'delete');
     expect(store.read('a')).toEqual(value('one\ntwo', true));
+  });
+  it('appends existing macro tokens before newly recorded tokens', () => {
+    const store = new RegisterStore();
+    const first = [{ kind: 'key' as const, key: 'x' }];
+    const second = [{ kind: 'key' as const, key: 'y' }];
+    store.write('a', value('', false, first), 'yank');
+    store.write('A', value('', false, second), 'yank');
+    expect(store.read('a')?.tokens).toEqual([...first, ...second]);
+  });
+  it('tokenizes existing text when appending macro tokens', () => {
+    const store = new RegisterStore();
+    const appended = [{ kind: 'key' as const, key: 'x' }];
+    store.write('a', value('prior text'), 'delete');
+    store.write('A', value('', false, appended), 'yank');
+    expect(store.read('a')?.tokens).toEqual([...textToTokens('prior text'), ...appended]);
+  });
+  it('tokenizes appended text when extending an existing macro', () => {
+    const store = new RegisterStore();
+    const recorded = [{ kind: 'key' as const, key: 'x' }];
+    store.write('a', value('', false, recorded), 'yank');
+    store.write('A', value('appended text'), 'delete');
+    expect(store.read('a')?.tokens).toEqual([...recorded, ...textToTokens('appended text')]);
+  });
+  it('keeps text-only appends as text without creating macro tokens', () => {
+    const store = new RegisterStore();
+    store.write('a', value('prior text'), 'delete');
+    store.write('A', value('appended text'), 'delete');
+    expect(store.read('a')).toEqual(value('prior textappended text'));
+    expect(store.read('a')?.tokens).toBeUndefined();
   });
   it('preserves an empty appended linewise part and updates unnamed', () => {
     const store = new RegisterStore();

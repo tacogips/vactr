@@ -40,16 +40,15 @@ function wordMove(doc: Text, start: number, kind: 'w' | 'b' | 'e' | 'ge' | 'W' |
       while (pos < doc.length && cls(pos) === '0') pos = nextGrapheme(doc, pos);
     } else if (forward) {
       if (pos >= doc.length) break;
-      const prior = pos > 0 ? prevGrapheme(doc, pos) : pos;
-      const alreadyAtEnd = pos > 0 && cls(pos) !== '0' && cls(prior) === cls(pos) && cls(nextGrapheme(doc, pos)) !== cls(pos);
-      if (cls(pos) === '0' || alreadyAtEnd) {
-        pos = nextGrapheme(doc, pos);
-        while (pos < doc.length && cls(pos) === '0') pos = nextGrapheme(doc, pos);
-      }
+      pos = nextGrapheme(doc, pos);
+      while (pos < doc.length && cls(pos) === '0') pos = nextGrapheme(doc, pos);
       if (pos < doc.length) {
         const initial = cls(pos);
-        while (pos < doc.length && cls(pos) === initial) pos = nextGrapheme(doc, pos);
-        if (pos > 0) pos = prevGrapheme(doc, pos);
+        for (;;) {
+          const next = nextGrapheme(doc, pos);
+          if (next >= doc.length || next === pos || cls(next) !== initial) break;
+          pos = next;
+        }
       }
     } else if (kind === 'ge') {
       if (pos <= 0) break;

@@ -89,6 +89,22 @@ describe('find and repeat motions', () => {
   });
 });
 
+describe('end-of-word motions from single-grapheme classes', () => {
+  it.each([
+    ['a bc', 'e', 0, 3],
+    ['x = 1;', 'e', 0, 2],
+    ['foo.bar', 'e', 3, 6],
+    ['a b c', 'E', 0, 2],
+    ['a\n\nbc', 'e', 0, 4],
+    ['é bc', 'e', 0, 3],
+  ] as [string, 'e' | 'E', number, number][])('%s %s at %i => %i', (text, kind, pos, expected) => {
+    expect(move(text, kind, pos)?.pos).toBe(expected);
+  });
+  it('applies counts across one-grapheme word and punctuation runs', () => {
+    expect(move('i = 0', 'e', 0, { count: 2, explicitCount: true })?.pos).toBe(4);
+  });
+});
+
 describe('bracket and paragraph motions', () => {
   it.each([
     ['f(x) + g(y)', 3, 1], ['(a) (b)', 2, 0], ['f(x)(y)', 3, 1], ['f(x)(y)', 1, 3],

@@ -240,3 +240,21 @@ The tests are table-driven: `{ mode: 'normal', keys: ['2','"','a','d','3','w'], 
 - `{command: "cd editor && wc -l src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-repair-01.log", notes: "193 lines, below the 350-line plan limit."}`
 
 **Blockers**: None. Independent adversarial re-review remains downstream.
+
+### Session: 2026-10-17 Step 6 current-source verification
+
+**Tasks Completed**: Confirmed VIM-00 admission through the runtime-owned `acceptedPlanIds`. Re-ran the assigned scoped typecheck, parser and purity tests, and parser line-count gate against the current shared source. No VIM-18 source changes were needed. The latest current-source verification passes 129 cases (including the purity test); `parser.ts` is 193 lines.
+
+**Source identity**:
+- `editor/src/code/vim/parser.ts`: `git hash-object` `0b4e15d3da15c458cd0897e797223f2d10606a7a`.
+- `editor/test/code/vim/parser.test.ts`: `git hash-object` `e5f2a41a04c25baf66544dc8dc42d99b1a27af7c`.
+- The current identities differ from the earlier repair session's logged hashes; verification below was freshly run on the current files. The pre-existing VIM-00 worktree change and unrelated concurrent VIM-15/source and sibling-plan changes were preserved.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/typecheck-step6-current-02.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 129, testsPassed: 129, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/focused-vitest-step6-current-02.log", notes: "2 test files passed; parser suite and purity test passed."}`
+- `{command: "wc -l editor/src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-current-01.log", notes: "193 lines, below the 350-line plan limit."}`
+
+**Ownership handoff**: Prior Chromium normal-mode IME finding `opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1` is assigned to VIM-15 (`editor/src/code/input.ts`) and re-verified by VIM-40. It is outside VIM-18 `writePaths`; this plan does not claim it as repaired.
+
+**Blockers**: None for VIM-18. Independent review and the VIM-15/VIM-40 IME repair remain downstream.

@@ -4,16 +4,16 @@
   "implementationBranch": "wf/browser-voices",
   "baseBranch": "wf/browser-voices",
   "remote": "origin",
-  "originalHead": "c15799a",
-  "originalHeadNote": "Intake HEAD is c15799a (merge: code pane text rendering fix, wf/code-render) on wf/browser-voices. The planning node could not run git (sandbox approval), so only the abbreviated SHA from the intake git context is recorded.",
-  "checkpointHistory": "First checkpoint of workflow opus-luna-design-and-implement-review-loop-session-386. Design design-browser-tier-voices.md accepted at Step 3 with no findings; plans BV-10, BV-20 and BV-30 accepted by step5-impl-plan-review (comm-006771, reviewDecision 'accepted: no high or mid findings', two low residual findings). No implementation has started, so all three plans remain and acceptedDependencies is empty.",
+  "originalHead": "e8fd9ee4c86127ed1821345b632481a2476e8ac7",
+  "originalHeadNote": "Resume intake HEAD for session 387 is e8fd9ee (wip(browser-voices): session-386 checkpoint, run stopped by usage limit) on wf/browser-voices with a clean working tree. Its parent ed1806d is the first plan checkpoint; the original issue intake HEAD was c15799a (merge: code pane text rendering fix, wf/code-render).",
+  "checkpointHistory": "Session 386: design design-browser-tier-voices.md accepted at Step 3 with no findings; plans BV-10, BV-20 and BV-30 accepted by step5-impl-plan-review (comm-006771, 'accepted: no high or mid findings', two low residual findings) and checkpointed in ed1806d. BV-10 and BV-20 Luna implementations then landed in the WIP commit e8fd9ee (BV-10 completion criteria checked, focused gates and mutation evidence logged; BV-20 Status Completed) before the run stopped on a usage limit, with no independent Opus review and no BV-30 run. Session 387 resumes against unchanged accepted design and plans: all three plans remain. BV-10 and BV-20 workers start from the e8fd9ee state, re-run their gating verification, repair only gaps, and go through independent review; BV-30 follows both. acceptedDependencies stays empty because no plan has passed review.",
   "designDocPaths": [
     "design-docs/specs/design-browser-tier-voices.md",
     "design-docs/specs/design-bass-voices.md",
     "design-docs/specs/design-example-picker-and-persistence.md"
   ],
   "evidenceRoot": "tmp/browser-voices",
-  "evidenceLayout": "tmp/browser-voices/<planId>/ per plan (attempt-<n>/ subdirectories on retry). tmp/ is gitignored (**/tmp). Every command log ends with exit=<status>; a missing or truncated log is not a pass. Gating records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; intentional negative-control or mutation runs (BV-10 kit_keys revert) go only in mutationEvidence. BV-30 also owns tmp/examples-e2e (Playwright scenario output) and tmp/ui-style (style gate output).",
+  "evidenceLayout": "tmp/browser-voices/<planId>/ per plan (attempt-<n>/ subdirectories on retry). Session-386 BV-10/BV-20 logs already sit directly in tmp/browser-voices/BV-10 and tmp/browser-voices/BV-20; session-387 workers move them to attempt-1/ before re-running gating commands so the plan-root logs are the current attempt. tmp/ is gitignored (**/tmp). Every command log ends with exit=<status>; a missing or truncated log is not a pass. Gating records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; intentional negative-control or mutation runs (BV-10 kit_keys revert) go only in mutationEvidence. BV-30 also owns tmp/examples-e2e (Playwright scenario output) and tmp/ui-style (style gate output).",
   "executionModel": {
     "waves": [
       [
@@ -36,7 +36,7 @@
   "verificationNotes": "Each plan's verification array is its gating list only (exit 0 required). Commands run from the repository root and end with the command's own exit status. The BV-10 mutation run (revert the kit_keys union, template_sounds must fail, restore, must pass) is mutationEvidence only and stays in the plan text. Lock-wrapped commands retry mkdir up to 120 times at 30 s intervals and release only the lock they created.",
   "acceptedDependencies": [],
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Template voices (phase-drum, analog-bass, vosim, hurdy-gurdy, kalimba, tonewheel-organ, ...) are rejected in the browser tier as not a sound in the default sound kit' (no GitHub URL or number; found by the owner on main c15799a); workflow opus-luna-design-and-implement-review-loop-session-386; plan review step5-impl-plan-review comm-006771 accepted",
+    "issueReference": "workflowInput issue 'Template voices (phase-drum, analog-bass, vosim, hurdy-gurdy, kalimba, tonewheel-organ, ...) are rejected in the browser tier as not a sound in the default sound kit' (no GitHub URL or number; found by the owner on main c15799a); workflow opus-luna-design-and-implement-review-loop-session-386 resumed as session-387; plan review step5-impl-plan-review comm-006771 accepted",
     "userProblem": "editor/src/examples/manifest.ts EXCLUDED hides nine repository examples (acid-techno, offbeat-bass-techno, rumble-techno, wobble-techno, bass-presets, experimental-oscillators, hurdy-gurdy, kalimba, tonewheel-organ) because evaluation reports unknown-keyword '`:<name>` is not a sound in the default sound kit' for prelude template voices. The issue says 8 examples but its own list and manifest.ts:67-75 name nine; all nine are in scope.",
     "rootCause": "The checker accepts a sound keyword only from kit_keys (manifest.sound_kit_keys() = 13 SPEC_SOUNDS + 7 SPEC_SYNTHS, src/types/check.rs:185), document inst_names, or session Inst globals. load_templates realizes templates.vact in a scratch namespace (src/ns/insts.rs:930-951), so none of the three contains the templates. There is no tier divergence: native and wasm-host sessions assemble the checker identically; native tests pass only because they ignore check diagnostics (src/ns/evaluator.rs:357-367, src/host/tests/e2e.rs:123-135), while editor/test/wasm/examples.test.ts rejects error diagnostics.",
     "requiredOutcomes": [
@@ -93,7 +93,7 @@
       "Rig::eval (src/session/tests/support.rs:82) returns (EvalResultBody, Vec<ServerMsg>), so the BV-10 test must destructure before reading diagnostics (low; compiler-caught).",
       "The static Session::check over the nine examples may surface an unrelated pre-existing error; BV-10 stops for serial reconciliation instead of weakening the test, and BV-30 owns example fixes.",
       "Measurement-lock contention with the sibling wf-vim-mode run.",
-      "originalHead is recorded as the abbreviated c15799a because the planning node could not run git."
+      "BV-10 and BV-20 code in e8fd9ee was written in session 386 and has not been independently reviewed; it must be re-verified and reviewed in session 387, not treated as accepted."
     ],
     "sourcePaths": [
       "design-docs/specs/design-browser-tier-voices.md",

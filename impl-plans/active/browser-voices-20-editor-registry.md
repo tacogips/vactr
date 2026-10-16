@@ -1,6 +1,6 @@
 # BV-20: Register the Nine Template-Voice Examples in the Picker
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BV-20 (wave 1, parallel with BV-10)
 **Design Reference**: `design-docs/specs/design-browser-tier-voices.md`
 ("Editor registry", decision BTV-D7);
@@ -119,11 +119,11 @@ re-apply only this plan's change. Do not commit or change git state.
 
 ## Completion Criteria
 
-- [ ] `EXCLUDED` has exactly the six sample, native-only and song-mode rows
-- [ ] Nine `CURATED` `'Examples'` entries with title-cased titles and header-derived descriptions of at most 140 characters
-- [ ] registry.test.ts updated (6, song-mode probe, nine-id assertion) and passing
-- [ ] `npm run check` passes
-- [ ] Progress Log updated with hashes and results
+- [x] `EXCLUDED` has exactly the six sample, native-only and song-mode rows
+- [x] Nine `CURATED` `'Examples'` entries with title-cased titles and header-derived descriptions of at most 140 characters
+- [x] registry.test.ts updated (6, song-mode probe, nine-id assertion) and passing
+- [x] `npm run check` passes
+- [x] Progress Log updated with hashes and results
 
 ## Progress Log
 
@@ -132,3 +132,9 @@ re-apply only this plan's change. Do not commit or change git state.
 **Tasks In Progress**: none
 **Blockers**: none
 **Notes**: Plan created from the accepted design.
+
+### Session: 2026-10-17 (BV-20 implementation)
+**Tasks Completed**: Registered all nine template-voice examples, retained the six in-scope exclusions, and updated registry assertions.
+**Tasks In Progress**: none
+**Blockers**: none
+**Notes**: Pre-edit -> post-edit SHA-256: `editor/src/examples/manifest.ts` `bf9a2957d983daecdf322d88cd35bfaf371f326c8593da10c07c766a43b5fa62` -> `fbc5d0fd8e858f7852b6cb0170b3ad93c181538de47f1a4575e34aedf1e53a01`; `editor/test/examples/registry.test.ts` `db5abaf41dcc0cb56c277aab7fa744431e2ba402470472ff7679e69d79227073` -> `df63b67a4e800d78cf920367c420282052b77f2d85d83de50634a3072ea9abae`. Plan pre-edit SHA-256: `2280c3935d3bec312ac82dbff399b6a2e0178ba20792010f4f1d8b9acc44e944`. `cd editor && npm run check` passed (exit 0; `tmp/browser-voices/BV-20/check.log`). `cd editor && npx vitest run test/examples/registry.test.ts` passed 6 tests (exit 0; `tmp/browser-voices/BV-20/registry.log`). Browser-tier example evaluation remains assigned to BV-30 after BV-10's wasm rebuild.

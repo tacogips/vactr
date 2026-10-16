@@ -31,26 +31,36 @@ impl Evaluator {
         )
     }
 
-    /// Add installed instrument header names to the checker manifest.
+    /// Add installed instrument header names and realized templates to the checker manifest.
     #[must_use]
     pub fn dynamic_manifest(&self, base: &HostManifest) -> Rc<HostManifest> {
         let Some(insts) = self.insts() else {
             return Rc::new(base.clone());
         };
-        let controls = insts.borrow().declared_names_rc();
-        if controls.is_empty() {
+        let (controls, templates) = {
+            let registry = insts.borrow();
+            (registry.declared_names_rc(), registry.template_sounds_rc())
+        };
+        if controls.is_empty() && templates.is_empty() {
             return Rc::new(base.clone());
         }
         if let Some(manifest) = self
             .dynamic_manifest_cache
             .borrow()
             .iter()
-            .find(|entry| entry.base == *base && Rc::ptr_eq(&entry.controls, &controls))
+            .find(|entry| {
+                entry.base == *base
+                    && Rc::ptr_eq(&entry.controls, &controls)
+                    && Rc::ptr_eq(&entry.templates, &templates)
+            })
             .map(|entry| Rc::clone(&entry.manifest))
         {
             return manifest;
         }
-        let manifest = Rc::new(base.with_controls(controls.iter()));
+        let manifest = Rc::new(
+            base.with_controls(controls.iter())
+                .with_templates(templates.iter()),
+        );
         let mut cache = self.dynamic_manifest_cache.borrow_mut();
         if cache.len() == 4 {
             cache.remove(0);
@@ -58,6 +68,7 @@ impl Evaluator {
         cache.push(DynamicManifestCacheEntry {
             base: base.clone(),
             controls,
+            templates,
             manifest: Rc::clone(&manifest),
         });
         manifest

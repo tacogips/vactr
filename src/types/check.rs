@@ -146,7 +146,7 @@ pub(crate) struct Checker<'a> {
     pub(crate) inst_names: BTreeSet<Rc<str>>,
     /// `inst` header parameter names: control names (M3).
     pub(crate) inst_controls: BTreeSet<Rc<str>>,
-    /// The keys of `default-sound-kit`.
+    /// The keys of `default-sound-kit` plus the session's realized prelude templates.
     pub(crate) kit_keys: KeySet,
     /// Above 0 every diagnostic is dropped (`inst`/`look` bodies).
     pub(crate) mute: u32,
@@ -182,7 +182,7 @@ impl<'a> Checker<'a> {
                     KeySet::Open => Vec::new(),
                 })
                 .collect(),
-            kit_keys: manifest.sound_kit_keys(),
+            kit_keys: manifest.sound_kit_keys().union(&manifest.templates),
             mute: 0,
             mute_types: 0,
             too_deep_reported: false,

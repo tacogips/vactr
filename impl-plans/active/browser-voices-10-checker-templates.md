@@ -232,15 +232,15 @@ The full nextest run is BV-30's job, under the measurement lock.
 
 ## Completion Criteria
 
-- [ ] `InstRegistry::template_sounds_rc` is filled only from successful `load_templates` realizations
-- [ ] `HostManifest.templates` and `with_templates` added; `spec_default().templates` is empty
-- [ ] Checker `kit_keys` is the union of `sound_kit_keys()` and `templates`
-- [ ] `dynamic_manifest` adds templates, and the cache keys on both `Rc`s
-- [ ] `analyze_in` added; `analyze` unchanged for callers; `Session::check` uses the evaluator's dynamic manifest
-- [ ] `src/session/tests/template_sounds.rs` passes in both configurations, with no literal name list
-- [ ] fmt, clippy, focused nextest and the host-wasm lib build pass, with logs
-- [ ] Every touched file is under 1000 lines
-- [ ] Progress Log updated with hashes, commands and results
+- [x] `InstRegistry::template_sounds_rc` is filled only from successful `load_templates` realizations
+- [x] `HostManifest.templates` and `with_templates` added; `spec_default().templates` is empty
+- [x] Checker `kit_keys` is the union of `sound_kit_keys()` and `templates`
+- [x] `dynamic_manifest` adds templates, and the cache keys on both `Rc`s
+- [x] `analyze_in` added; `analyze` unchanged for callers; `Session::check` uses the evaluator's dynamic manifest
+- [x] `src/session/tests/template_sounds.rs` passes in both configurations, with no literal name list
+- [x] fmt, clippy, focused nextest and the host-wasm lib build pass, with logs
+- [x] Every touched file is under 1000 lines
+- [x] Progress Log updated with hashes, commands and results
 
 ## Progress Log
 
@@ -249,3 +249,18 @@ The full nextest run is BV-30's job, under the measurement lock.
 **Tasks In Progress**: none
 **Blockers**: none
 **Notes**: Plan created from the accepted design (Step 3 accepted, no findings).
+
+### Session: 2026-10-17 (BV-10 implementation)
+**Tasks Completed**: Registry template sound capture, dynamic checker manifest and cache, `analyze_in`/`Session::check` wiring, native and browser-capability regression tests, focused verification.
+**Tasks In Progress**: none in BV-10.
+**Blockers**: none.
+**Notes**:
+- Captured only child-1 names from forms whose `load_one` succeeded; merged names into the registry set, preserving union semantics. No template name array was used by implementation or regression tests.
+- Added `HostManifest.templates` as a separate empty-by-default set. `sound_kit_keys()` remains unchanged at 20 keys. Checker kit keys now union those keys with realized templates; diagnostic text and `song_rules.rs` remain unchanged.
+- Dynamic manifests add both registry controls and templates and cache on the base manifest plus both `Rc` identities. Static session analysis receives the evaluator manifest while `analyze` remains a default-manifest delegate.
+- New `src/session/tests/template_sounds.rs` derives template names from parsed `TEMPLATES`, checks registry state, eval and static-check acceptance in native and browser-capability rigs, one unknown-keyword for the negative name, all nine example static checks, and the unchanged 20-key default kit.
+- Pre-edit source hashes and per-edit intentions are preserved in `tmp/browser-voices/BV-10/pre-edit-hashes.log`, `edit-intentions.json`, `pre-*.snapshot`, and `intent-*.json`. Final source hashes are recorded in `tmp/browser-voices/BV-10/final-source-hashes.log`.
+- Initial post-edit focused compile failed before tests (exit 101) because the captured name set inferred `&str`; converted successful names to `Rc<str>`. Corrected focused suite passed: 322 run, 322 passed, 0 failures; full log `tmp/browser-voices/BV-10/focused.log`.
+- Verification passed: `CARGO_TERM_QUIET=true cargo fmt --check` (`fmt.log`), `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` (`clippy.log`), focused nextest above, `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` (`wasm-lib.log`), and the under-1000-lines check (`lines.log`).
+- Mutation evidence: reverting the checker union made `template_sounds_are_accepted_only_when_realized_in_each_tier` fail with `unknown-keyword`; restoring the union passed 2/2 regression tests. The temporary negative-control source SHA-256 was `953c7151eafbde31e507bb152707849621af88aac61b4629b798138826a8d4a6`; restored source SHA-256 is `3ae47a9516302cf06be3c9d9caab40f197e79828a927f5750a5c3415922cc8e4`. See `mutation.log`, `mutation-negative.log`, and `mutation-restored.log`.
+- Full nextest and broader editor/build/e2e gates are owned by BV-30; independent review, commit and push remain downstream workflow steps.

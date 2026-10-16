@@ -241,6 +241,7 @@ pub struct InstRegistry {
     bus_resources: BTreeMap<BusId, BusResourceDeclaration>,
     insts: BTreeMap<InstId, InstEntry>,
     declared_names: Rc<BTreeSet<Rc<str>>>,
+    template_sounds: Rc<BTreeSet<Rc<str>>>,
     names: BTreeMap<KwId, InstId>,
     buses: BTreeMap<KwId, BusEntry>,
     master: Option<BusEntry>,
@@ -270,6 +271,7 @@ impl InstRegistry {
             bus_resources: BTreeMap::new(),
             insts: BTreeMap::new(),
             declared_names: Rc::new(BTreeSet::new()),
+            template_sounds: Rc::new(BTreeSet::new()),
             names: BTreeMap::new(),
             buses: BTreeMap::new(),
             master: None,
@@ -324,6 +326,12 @@ impl InstRegistry {
     #[must_use]
     pub fn declared_names_rc(&self) -> Rc<BTreeSet<Rc<str>>> {
         Rc::clone(&self.declared_names)
+    }
+
+    /// Names of prelude templates successfully realized in this registry.
+    #[must_use]
+    pub fn template_sounds_rc(&self) -> Rc<BTreeSet<Rc<str>>> {
+        Rc::clone(&self.template_sounds)
     }
 
     /// The bus declared as `name`.
@@ -932,6 +940,7 @@ pub fn load_templates(vm: &mut Vm, prelude: &Rc<Prelude>, sink: &mut dyn EffectS
         return;
     };
     let mut errors = Vec::new();
+    let mut template_sounds = BTreeSet::new();
     match read_forms(TEMPLATES, TEMPLATE_FILE) {
         Err(d) => errors.push(format!("templates.vact: {d}")),
         Ok(forms) => {
@@ -941,13 +950,24 @@ pub fn load_templates(vm: &mut Vm, prelude: &Rc<Prelude>, sink: &mut dyn EffectS
                     errors.push(e);
                     vm.effects_mut().drop_all();
                 } else {
+                    if let Some(name) = form.children.get(1).and_then(Node::sym_name) {
+                        template_sounds.insert(Rc::from(name));
+                    }
                     vm.effects_mut().release(sink);
                 }
             }
         }
     }
     vm.dsp.diags.clear();
-    reg.borrow_mut().template_errors.extend(errors);
+    let mut registry = reg.borrow_mut();
+    registry.template_errors.extend(errors);
+    registry.template_sounds = Rc::new(
+        registry
+            .template_sounds
+            .union(&template_sounds)
+            .cloned()
+            .collect(),
+    );
 }
 
 fn load_one(vm: &mut Vm, ns: &Namespace, form: &Node, k: usize) -> Result<(), String> {

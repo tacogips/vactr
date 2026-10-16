@@ -13,4 +13,5 @@ mod packages;
 mod publish;
 mod repl;
 mod support;
+mod template_sounds;
 mod tiers;

@@ -137,6 +137,10 @@ Scanned directories: top-level `examples/*.vact`, `synth-labs/`,
   - needs a native-tier-only host: `quad-stems.vact` (four-output host);
   - any further example that fails the wasm evaluation test, unless the
     example itself is fixed (the evaluator is never changed).
+    The nine template-voice exclusions added under this rule
+    (`` `:<template>` is not a sound in the default sound kit ``) were a
+    checker bug that affected every tier. They were removed by
+    [`design-browser-tier-voices.md`](design-browser-tier-voices.md).
 - Marked (shown with a badge, still openable): entries whose `requires`
   is non-empty. `live-external-voices.vact` is `['audio-input']` (it reads
   `host-in-l`/`host-in-r`; disconnected lanes are zero). No repository

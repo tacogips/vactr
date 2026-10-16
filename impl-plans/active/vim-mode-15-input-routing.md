@@ -1,0 +1,190 @@
+# Vim Mode: Input Routing and Text-Input Gate Implementation Plan
+
+**Status**: Ready
+**Plan ID**: VIM-15 (wave 1)
+**Design Reference**: design-docs/specs/design-vim-mode.md sections 3.3 (all subsections), 3.5
+**Created**: 2026-10-16
+**Last Updated**: 2026-10-16
+
+## Related Plans
+
+- **Depends On**: VIM-00 (`VimInputHook`, `VimKeyInput` in `vim/types.ts`)
+- **Parallel (wave 1)**: VIM-10..14, VIM-16, VIM-17, VIM-18
+- **Consumers**: VIM-20 implements `VimInputHook`; VIM-30 installs it through `InputController.setVim`
+
+## Intent and Context
+
+`editor/src/code/input.ts` `InputController` owns the hidden textarea.
+Its keydown handler (line 52) does:
+`if (!this.composing && !key.isComposing && key.keyCode !== 229 && !this.surface.runKeymaps(key)) this.keyboard.handle(key);`.
+`editor/src/code/surface.ts` `runKeymaps` iterates the highest groups,
+then the default groups. The highest group holds the completion keys
+(`completion-view.ts` registers `COMPLETION_KEYS` at `'highest'`); the
+default group holds eval (`eval.ts:88-90`) and format (`format.ts:29`).
+The private `matchesKey` maps `Mod` to Meta when `navigator.platform`
+matches `/Mac|iP/`, and to Ctrl otherwise.
+
+This plan adds an optional Vim hook to `InputController`. With no hook,
+behavior is byte-identical. With a hook, the plan adds the 4-step routing
+of design 3.3, the non-insert text-input gate of 3.5, discarded
+compositions, and replace-mode overwrite. It also adds the read-only
+`CodeSurface.matchesKeymap` query used for the pass-through set P1. The
+common execution rules in `vim-mode-00-contract.md` apply.
+
+## Non-Goals
+
+- No Vim logic. The hook decides; this plan only routes and gates.
+- Do not change `keyboard.ts`, `completion*.ts`, `eval.ts` or `format.ts`,
+  or the precedence or bindings of any keymap.
+- Do not change any existing test file. The existing
+  `test/canvas/input.test.ts` must pass unchanged.
+
+## File-Level Changes
+
+### `editor/src/code/surface.ts`
+
+- Change the `matchesKey` parameter type to
+  `Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>`.
+  Its body is unchanged.
+- `runKeymaps(event: KeyboardEvent, precedence?: 'highest' | 'default'): boolean`.
+  With `precedence` undefined, iterate exactly as today
+  (`[...this.highestKeymaps, ...this.defaultKeymaps]`). Otherwise iterate
+  only the named registry. The `preventDefault` behavior is unchanged.
+- New method
+  `matchesKeymap(event: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>, precedence: 'highest' | 'default'): boolean`.
+  It returns true if any binding in that registry matches. It must **not**
+  call `run()`.
+- Imitate the existing dense one-line style. The file is 173 lines and
+  must stay under 220.
+
+### `editor/src/code/input.ts`
+
+Add `import type { VimInputHook } from './vim/types'`. Then:
+
+- **Hook storage.** Add `private vim: VimInputHook | null = null`,
+  `setVim(hook: VimInputHook | null): void`, and
+  `private discarding = false` (the composition being discarded).
+- **Keydown routing** (replace line 52's routing only; keep the
+  composition guard and the `composing && Escape` branch before it as
+  is):
+  - If `this.vim === null`, run the exact current expression.
+  - Otherwise, when the same guard passes (not composing, not
+    `isComposing`, `keyCode !== 229`), run in order:
+    1. `if (this.surface.runKeymaps(key, 'highest')) return;`
+    2. `if (this.vim.handleKey(key)) { key.preventDefault(); return; }`
+    3. `if (!this.surface.runKeymaps(key, 'default')) this.keyboard.handle(key);`
+- **Composition start.** In the `compositionstart` listener, if
+  `this.vim && !this.vim.allowsTextInput()`:
+  - set `this.discarding = true`;
+  - call `this.surface.notifyCompositionStart()` (the popup closes);
+  - call `this.vim.noteCompositionDiscarded()`;
+  - **do not** call `beginComposition()`;
+  - schedule `queueMicrotask(() => { if (this.discarding && !this.disposed) { this.accessibility.textarea.blur(); this.accessibility.focus(); } })`
+    to end the platform composition early;
+  - return.
+
+  Otherwise, run the existing path.
+- **During a discarded composition.**
+  - `compositionupdate` is ignored.
+  - `compositionend` sets `this.discarding = false`, sets
+    `this.trailingComposition = true` (so trailing `insertFromComposition`
+    input is dropped by the existing branches), calls
+    `this.accessibility.refresh()`, and returns. It never dispatches, even
+    if the hook now allows text.
+  - `beforeinput` with `isComposing` or `insert*Composition*` types is
+    `preventDefault`ed when cancelable, followed by a refresh.
+  - The `input` event refreshes the bridge and returns.
+  - A blur during discarding clears the flag and refreshes.
+- **Text-input gate.** In `beforeInput`, after the `trailingComposition`
+  branch and the `composing || event.isComposing` branch: if
+  `this.vim && !this.vim.allowsTextInput()` and `kind` starts with
+  `insert` or `delete`, then `preventDefault` when cancelable, call
+  `this.accessibility.refresh()`, and return. `historyUndo`/`historyRedo`
+  keep today's handling.
+
+  In `input()`: if `this.vim && !this.vim.allowsTextInput()`, call
+  `this.accessibility.refresh()` and return, before the diff
+  reconciliation.
+- **Replace overwrite.** In `beforeInput`'s `insertText` branch only (not
+  line breaks), if `this.vim` is set, call `this.vim.overwriteRange(insert)`.
+  When it returns a range, dispatch
+  `{ changes: { from: range.from, to: range.to, insert }, selection: { anchor: range.from + insert.length }, userEvent: 'input.type' }`
+  instead of `replaceSelection`. Then call `this.options.scrollCaret?.()`.
+- **Clipboard.** The `paste`/`copy`/`cut` handling is unchanged in every
+  mode (P3 in design 3.3.1).
+- The file is 228 lines and must stay under 300.
+
+### Tests: `editor/test/canvas/input-vim-hook.test.ts` (new)
+
+Copy the `setup()`/`key()`/`before()`/`composition()` helpers pattern
+from `test/canvas/input.test.ts` (do not import from it; it is not a
+module export). Use a stub hook:
+
+```ts
+{ handleKey: vi.fn(() => consume), allowsTextInput: () => allow, overwriteRange: vi.fn(() => range), noteCompositionDiscarded: vi.fn() }
+```
+
+Required cases (at least 18):
+
+- **No hook.** Typing via `beforeinput insertText`, `Ctrl-z` undo,
+  `Tab`, the Japanese composition commit and `Mod-Enter` -> the same
+  documents, revisions and `evalSelection` calls as without the hook code
+  (assert the concrete values).
+- **Hook consumes** `j` -> `defaultPrevented`, the document is unchanged,
+  `KeyboardController` is not reached (Tab consumed -> no tab inserted).
+- **Hook declines** `Ctrl-Enter` on platform `Linux x86_64` -> an eval
+  binding registered on the surface at `'default'` runs. On platform
+  `MacIntel`, `Meta-Enter` does the same. Stub with
+  `Object.defineProperty(navigator, 'platform', { value, configurable: true })`
+  and restore it in `afterEach`.
+- **Highest before hook.** With a highest binding for `Escape` returning
+  true, the hook's `handleKey` is never called.
+- **Gate closed.** `beforeinput insertText` -> prevented, doc unchanged;
+  `deleteContentBackward` -> prevented; `historyUndo` -> still undoes; a
+  non-cancelable insert followed by `input` with a mutated textarea value
+  -> doc unchanged and the textarea restored.
+- **Discarded composition.** With the gate closed, `compositionstart`,
+  then `compositionupdate('に')`, then `compositionend('日本')` -> doc and
+  revision unchanged, `presentation.annotations` empty,
+  `noteCompositionDiscarded` called once. The gate flips to open between
+  update and end -> still discarded. After the microtask, the textarea was
+  blurred and refocused (spy on `blur`/`focus`). A trailing
+  `beforeinput insertFromComposition` -> prevented.
+- **Gate open.** The existing Japanese commit assertions hold (one undo
+  group, committed once).
+- **Overwrite.** `overwriteRange` returns `{ from: 0, to: 1 }`, then
+  `beforeinput insertText 'x'` on `'abc'` -> `'xbc'`, cursor 1.
+  `insertLineBreak` ignores `overwriteRange`.
+- **`matchesKeymap`.** It returns true without running the binding
+  (the run spy is not called), for both precedences.
+  `runKeymaps(event, 'default')` does not run highest bindings.
+
+## Invariants
+
+- With `setVim` never called, every existing `test/canvas/*.test.ts`,
+  `test/code/*.test.ts` and `test/ui/*.test.ts` passes unchanged.
+- `runKeymaps(event)` with one argument behaves exactly as before.
+
+## Acceptance Criteria
+
+- [ ] `setVim`, the routing, the gate, discarding and overwrite are
+      implemented as specified.
+- [ ] `matchesKeymap` exists, and the `runKeymaps` precedence filter
+      exists.
+- [ ] `input-vim-hook.test.ts` has at least 18 passing cases, and
+      `input.test.ts` passes unmodified.
+- [ ] `input.ts` is under 300 lines and `surface.ts` under 220.
+
+## Verification
+
+1. A scoped typecheck per common rule 5 (`src/code/input.ts`,
+   `src/code/surface.ts`, `test/canvas/input-vim-hook.test.ts`):
+   `./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json`
+   must exit 0.
+2. `./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts`
+   must exit 0 with 0 failed. Record the counts.
+3. `git diff --stat -- test/canvas/input.test.ts` must show no change.
+
+## Progress Log
+
+### Session: (not started)

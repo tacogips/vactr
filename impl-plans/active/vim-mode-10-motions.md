@@ -90,9 +90,9 @@ the `|` marker inline. Required rows (at least 60):
 - `gg`, `G` and `3G`, with the result `jump: true`.
 - `f`/`t`/`F`/`T` with `;` and `,`; `t` then `;` with an adjacent match
   skips it; no match -> null.
-- `%` on `'(a [b] c)'` from inside `a` -> the matching `)`; an unbalanced
-  bracket -> null; a scan longer than `SCAN_LIMIT` -> null (build the doc
-  with `'('.padEnd(70_000, 'x')`).
+- `%` on `'(a [b] c)'` from `a` selects the first following bracket (`[`)
+  and its match (`]`); from `(` it selects the matching `)`. An unbalanced
+  bracket or a match beyond `SCAN_LIMIT` returns null.
 - `{`/`}` across paragraphs.
 - `H`/`M`/`L` with viewport `{ topLine: 5, rows: 10 }` on a 40-line doc.
 - `C-d` with rows 10 -> 5 lines and `scrollLines: 5`; `C-f` -> 8 lines;
@@ -129,7 +129,7 @@ the `|` marker inline. Required rows (at least 60):
 
 **Tasks Completed**: Implemented the pure motion dispatcher for all 34 `MotionKind` values and added 61 focused cases covering grapheme movement, counts, word classes, viewport/page movement, find/till repetition, paragraphs and bounded bracket matching.
 
-**Implementation Notes**: Reused `words.ts` grapheme and column helpers. Bracket matching scans the ASCII bracket characters within `SCAN_LIMIT`, including nested pairs and an enclosing opener when the cursor is inside its region. `motions.ts` is 266 lines. The VIM-00 files and plan changes already present at session start were preserved.
+**Implementation Notes**: Reused `words.ts` grapheme and column helpers. Bracket matching scans the ASCII bracket characters within `SCAN_LIMIT`, including nested pairs. Its original enclosing-opener scan was superseded by the test-integrity repair below: `%` uses the first bracket at or after the cursor on the current line, as specified by design section 4.5.
 
 **Verification**:
 
@@ -140,3 +140,49 @@ the `|` marker inline. Required rows (at least 60):
 **Prior Attempts**: Earlier scoped runs exposed fixture expectation errors and motion defects; those changes were corrected and the final current-source commands above pass. Complete attempt logs are preserved as `focused-vitest-01.log` through `focused-vitest-07.log`, `typecheck-01.log` and `typecheck-02.log`; `focused-vitest-05.log` records the interrupted run during long-line scan diagnosis.
 
 **Review State**: Implementation criteria are met. Independent integrity, adversarial and combined-tree review remain downstream workflow steps.
+
+### Session: 2026-10-17 Step 6 rerun
+
+**Tasks Completed**: Rechecked the assigned VIM-10 implementation on the current shared branch. No motion source or test edits were needed; the committed code already satisfies the assigned contract, including grapheme-boundary stepping and all 34 motion kinds.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `35c791aa9c6c829929729b11454f37f1064e6c536a7ebfb7bdcb17f13dda09fb`; `editor/test/code/vim/motions.test.ts` SHA-256 `71e229734bb691f89adee913a2f772da3edac3cc6e523b3f86a621cebf5f5bb6`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/typecheck-step6-rerun.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 61, testsPassed: 61, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/focused-vitest-step6-rerun.log", notes: "Both test files passed, 61/61."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/line-count-step6-rerun.log", notes: "266 and 100 lines respectively; motions.ts remains below the 450-line limit."}`
+
+**Review State**: VIM-10 implementation and assigned verification are complete. Independent integrity and adversarial review and shared-branch integration remain downstream workflow steps.
+
+### Session: 2026-10-17 test-integrity repairs
+
+**Tasks Completed**: Repaired both VIM-10 findings from `comm-006684`. `stepClass` now treats a non-empty line's end as blank for small-word movement, while `e` and `ge` skip empty lines and `w`/`b` retain their empty-line behavior. Rewrote `ge` to stop on the final grapheme of the previous word class. Added cross-line coverage for `w`, `e`, `b`, `ge`, punctuation, and counted `ge`; corrected only the flagged `ge` expectation. `words.ts` remains unchanged from checkpoint `6349b0f`.
+
+**Expectation Note**: The review requested `e` from index 2 of `foo\n\nbar` to return index 6. Index 6 is `a`, not the end of the next word. Design section 4.4 says empty lines count as words for `w`/`b` only; section 4.5 defines `e` as inclusive. The regression asserts index 7, the `r` at the end of `bar`.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `56e66075e4be5e973f8ed85a097c2c2a926af1e0553c404a7fc1485260ea0c3a`; `editor/test/code/vim/motions.test.ts` SHA-256 `c6eca1fb539e9cb8c3eb504c6617ea466dca853ef1122cc094e38795deeb329d`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/typecheck-ti-repair-01.log", notes: "Scoped typecheck on repaired source; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 71, testsPassed: 71, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/focused-vitest-ti-repair-01.log", notes: "Both files passed, 71/71, including added cross-line word-motion cases."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/line-count-ti-repair-01.log", notes: "272 and 105 lines; motions.ts remains below 450 lines."}`
+
+**Review State**: Code and assigned gates are complete. The empty-line `e` example's requested index 6 conflicts with the accepted inclusive-end semantics; implementation follows design and tests index 7. Independent re-review is pending.
+
+### Session: 2026-10-17 adversarial repairs
+
+**Tasks Completed**: Repaired `VIM10-ADV-1` and `VIM10-ADV-2` from `comm-006703`. `%` now selects only the first bracket at or after the cursor on the current line. Matching uses one depth-counted scan, forward for openers and backward for closers, bounded by `SCAN_LIMIT`. Removed the enclosing-opener scan and aligned the test bullet above with design section 4.5. The only prior expectation changed is `(a [b] c)` at index 1, from 8 to 5; added the requested opener/closer, nested, multi-line-context, mismatched and no-match regressions. The earlier implementation note describing an enclosing-opener scan is superseded.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `f35f29774ec45d49944fca3c3f1807f6a490cddcc919fd3b40fc5860878ba7aa`; `editor/test/code/vim/motions.test.ts` SHA-256 `8ffa170fab0ff2158ed5eb6d6e1084be2243714666966e0af54101dd910d58f0`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/typecheck-adv-repair-02.log", notes: "Scoped typecheck on final adversarial-repair source; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 83, testsPassed: 83, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/focused-vitest-adv-repair-02.log", notes: "Both files passed; the 12 % probes are independent Vitest cases, and the unmatched/SCAN_LIMIT assertions pass."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/line-count-adv-repair-02.log", notes: "249 and 111 lines; motions.ts remains below 450 lines."}`
+- `{command: "git diff --check -- editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts impl-plans/active/vim-mode-10-motions.md", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/diff-check-adv-repair-02.log", notes: "No whitespace errors."}`
+- `{command: "git diff --quiet 6349b0ff833c99756874b2a3c9decc44773bdd09 -- editor/src/code/vim/words.ts editor/src/code/vim/types.ts", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/vim00-identity-adv-repair-01.log", notes: "VIM-00 words.ts and types.ts are unchanged from checkpoint."}`
+
+**Review State**: Repairs are implemented; independent test-integrity and adversarial re-review remain pending.

@@ -146,4 +146,20 @@ Do not modify any existing `it` in `gpu.test.ts`.
 - `git diff --numstat -- editor/src/code/renderer.ts` — exit 0; 7 additions, 2 deletions; `tmp/vim-mode/VIM-16/renderer-numstat-final.log`.
 - `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; longest touched file is 999 lines; `tmp/vim-mode/VIM-16/line-count-final.log`.
 
+### Session: 2026-10-17 01:33 Asia/Tokyo
+
+**Tasks Completed**: Re-ran VIM-16 scoped verification on the current source and refreshed the implementation evidence.
+
+**Implementation Notes**:
+- No source changes were needed; the cursor geometry/color helpers, renderer feedback hook, and focused tests already match the plan. `atlas.ts` is unchanged from checkpoint `6349b0ff833c99756874b2a3c9decc44773bdd09`.
+- The renderer has no additional diff against that checkpoint; the existing implementation remains within the 12-line plan limit. Current touched source files are all under 1000 lines (largest: `gpu.test.ts`, 999).
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/typecheck-step6-rerun.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/focused-vitest-step6-rerun.log`.
+- `git diff --numstat 6349b0ff833c99756874b2a3c9decc44773bdd09 -- editor/src/code/renderer.ts` — exit 0; no additional checkpoint-relative diff; `tmp/vim-mode/VIM-16/renderer-numstat-step6-rerun.log`.
+- `git diff --quiet 6349b0ff833c99756874b2a3c9decc44773bdd09 -- editor/src/code/atlas.ts` — exit 0; atlas unchanged.
+- `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; `tmp/vim-mode/VIM-16/line-count-step6-rerun.log`.
+- `shasum -a 256` over the four implementation/test files and this plan — exit 0; identities recorded in `tmp/vim-mode/VIM-16/source-sha-step6-rerun.log`.
+
 Formal branch/integration review remains downstream.

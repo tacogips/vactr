@@ -186,3 +186,12 @@ contains a mark maps to the deletion start; the context mark; an unset mark
 **Verification**:
 - `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/typecheck-final.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests; `tmp/vim-mode/VIM-14/focused-vitest-final.log`.
+
+### Session: 2026-10-17 Step 6 rerun
+**Tasks Completed**: Revalidated the assigned VIM-14 implementation on the current shared tree.
+**Notes**: No VIM-14 source or test edits were needed. The scoped typecheck passed (exit 0), and the focused undo/record/marks/purity suite passed 39/39. All six owned source/test files remain within the file budgets. VIM-00's concurrent progress-log change was preserved. Formal integrity and adversarial reviews remain downstream workflow work.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/typecheck-step6-rerun-20261017.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests; `tmp/vim-mode/VIM-14/vitest-step6-rerun-20261017.log`.
+- `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68.

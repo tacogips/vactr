@@ -13,6 +13,7 @@ const sameLineStep = (doc: Text, pos: number, forward: boolean): number => {
 const stepClass = (doc: Text, pos: number): string => {
   const line = doc.lineAt(pos);
   if (!line.length) return 'empty';
+  if (pos === line.to) return '0';
   return String(classAt(line.text, Math.max(0, Math.min(pos - line.from, line.length - 1))));
 };
 const isBlank = (doc: Text, pos: number): boolean => {
@@ -27,7 +28,8 @@ function wordMove(doc: Text, start: number, kind: 'w' | 'b' | 'e' | 'ge' | 'W' |
   const cls = (p: number): string => {
     if (p >= doc.length) return 'end';
     if (big) return isBlank(doc, p) ? '0' : '1';
-    return stepClass(doc, p);
+    const value = stepClass(doc, p);
+    return (endKind || kind === 'ge') && value === 'empty' ? '0' : value;
   };
   for (let n = 0; n < count; n++) {
     const before = pos;
@@ -51,16 +53,20 @@ function wordMove(doc: Text, start: number, kind: 'w' | 'b' | 'e' | 'ge' | 'W' |
       }
     } else if (kind === 'ge') {
       if (pos <= 0) break;
-      pos = prevGrapheme(doc, pos);
-      while (pos > 0 && cls(pos) === '0') pos = prevGrapheme(doc, pos);
-      if (pos > 0) {
-        const initial = cls(pos);
-        while (pos > 0) {
-          const prev = prevGrapheme(doc, pos);
-          if (prev === pos || cls(prev) !== initial) break;
-          pos = prev;
+      if (pos >= doc.length) {
+        pos = prevGrapheme(doc, pos);
+      } else {
+        const current = cls(pos);
+        if (current !== '0') {
+          while (pos > 0) {
+            const prev = prevGrapheme(doc, pos);
+            if (prev === pos || cls(prev) !== current) break;
+            pos = prev;
+          }
         }
+        pos = prevGrapheme(doc, pos);
       }
+      while (pos > 0 && cls(pos) === '0') pos = prevGrapheme(doc, pos);
     } else {
       if (pos <= 0) break;
       const prior = prevGrapheme(doc, pos);
@@ -103,47 +109,24 @@ function bracketMatch(doc: Text, pos: number): number | null {
   const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
   const closes: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
   const text = doc.toString();
+  const line = doc.lineAt(pos);
   let at = pos;
-  const reverseStack: string[] = [];
-  const current = text[pos] ?? '';
-  if (!pairs[current] && !closes[current]) {
-    for (let scanned = 1; pos - scanned >= 0 && scanned <= SCAN_LIMIT; scanned++) {
-      const reverseCursor = pos - scanned;
-      const ch = text[reverseCursor];
-      if (closes[ch]) reverseStack.push(closes[ch]);
-      else if (pairs[ch]) {
-        if (reverseStack.at(-1) === ch) reverseStack.pop();
-        else if (!reverseStack.length) { at = reverseCursor; break; }
-      }
-    }
-  }
-  if (at === pos) {
-    const line = doc.lineAt(pos);
-    at = pos;
-    while (at <= line.to) {
-      const ch = text[at];
-      if (pairs[ch] || closes[ch]) break;
-      if (at === line.to) return null;
-      at++;
-    }
+  while (at <= line.to) {
+    const ch = text[at];
+    if (pairs[ch] || closes[ch]) break;
+    if (at === line.to) return null;
+    at++;
   }
   const token = text[at] ?? '';
   const open = !!pairs[token];
   const match = open ? pairs[token] : closes[token];
   if (!match) return null;
+  const step = open ? 1 : -1;
   let depth = 0;
-  let cursor = at;
-  for (let scanned = 0; cursor < text.length && scanned <= SCAN_LIMIT; scanned++, cursor++) {
+  for (let cursor = at, scanned = 0; cursor >= 0 && cursor < text.length && scanned <= SCAN_LIMIT; cursor += step, scanned++) {
     const ch = text[cursor];
     if (ch === token) depth++;
-    if (ch === match && --depth === 0) return cursor;
-  }
-  depth = 0;
-  cursor = at;
-  for (let scanned = 0; cursor >= 0 && scanned <= SCAN_LIMIT; scanned++, cursor--) {
-    const ch = text[cursor];
-    if (ch === token) depth++;
-    if (ch === match && --depth === 0) return cursor;
+    else if (ch === match && --depth === 0) return cursor;
   }
   return null;
 }

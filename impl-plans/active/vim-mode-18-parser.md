@@ -209,3 +209,34 @@ The tests are table-driven: `{ mode: 'normal', keys: ['2','"','a','d','3','w'], 
 **Drift**: Existing sibling-plan changes were present in the shared tree. No files outside this plan's `writePaths` were edited; no existing shared source was overwritten.
 
 **Blockers**: None. Formal review and combined-tree verification remain downstream workflow steps.
+
+### Session: 2026-10-17 Step 6 rerun
+
+**Tasks Completed**: Revalidated the assigned VIM-18 contract on the current shared tree. The parser and table-driven tests were already committed and matched the assigned scope, so no source/test edits were needed. The scoped typecheck, parser plus purity suite, and parser line-count gate passed. VIM-00 is accepted in the runtime-owned `acceptedPlanIds`; no assigned review repair was supplied in `reviewFeedback`.
+
+**Source identity**:
+- `editor/src/code/vim/parser.ts`: `git hash-object` `760ba7bd648527fac2e1c95210d2734c92215352`.
+- `editor/test/code/vim/parser.test.ts`: `git hash-object` `601afeb5a27e880028fef060fdd1862de3540b72`.
+- Existing shared-tree change `impl-plans/active/vim-mode-00-contract.md` was preserved; no VIM-18 source/test drift was found.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/typecheck-step6-final.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 118, testsPassed: 118, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/focused-vitest-step6-final.log", notes: "2 files passed; 118 tests passed, including the purity test."}`
+- `{command: "cd editor && wc -l src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-final.log", notes: "193 lines, below the 350-line plan limit."}`
+
+**Blockers**: None. Formal review and combined-tree verification remain downstream workflow steps.
+
+### Session: 2026-10-17 Step 6 review repair
+
+**Finding addressed**: `VIM-18-step7-finding-1-printable-lt` (mid). Updated `printable()` to accept any one-code-point `VimKey`, including literal `<`; named keys remain multi-character tokens and are rejected as `f`/`F`/`t`/`T` arguments. Added exact-result cases for `f<`, `F<`, `t<`, `T<`, `dt<`, `dt)`, `r<` in normal and visual modes, and invalid `f<Tab>` / `f<Other>`. Existing test cases were retained.
+
+**Source identity after repair**:
+- `editor/src/code/vim/parser.ts`: `git hash-object` `35455a302fed580ddd01cc8f55314e16f44d2be6`.
+- `editor/test/code/vim/parser.test.ts`: `git hash-object` `bfeefa8f98de0ec6efbf63b4a79018ac2590822f`.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/typecheck-step6-repair-01.log", notes: "Scoped typecheck on repaired sources; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 128, testsPassed: 128, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/focused-vitest-step6-repair-01.log", notes: "2 files passed; all 118 prior cases remain and 10 regression rows were added; purity passed."}`
+- `{command: "cd editor && wc -l src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-repair-01.log", notes: "193 lines, below the 350-line plan limit."}`
+
+**Blockers**: None. Independent adversarial re-review remains downstream.

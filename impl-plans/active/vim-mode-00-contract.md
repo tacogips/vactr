@@ -332,3 +332,20 @@ typecheck.
 **Drift**: None observed outside this plan's declared source/test paths and artifact roots.
 
 **Blockers**: None.
+
+### Session: 2026-10-17 Step 6 rerun
+
+**Tasks Completed**: Reconfirmed VIM-00 contract and reran the scoped typecheck and focused test suite on the current source. Acceptance criteria remain complete.
+
+**Source identity**: `types.ts` `8e56214b356c2b58bd162aec877630f609eb26ed`; `keys.ts` `712af27113c2cd455876833b852ca892725c4da3`; `words.ts` `cb2f85ced58d54d4dde879cbbb33713fdaae5212`; `host.ts` `e2a92faab5d4e3517459e2c50df2525a2c133ebf`; focused tests `d649502cc94b1febf64aa2503ebec9fa11769fd0`, `77777c1c7ca0a85322451064b7d503a49b3036a3`, `b5665ecff9620ce4fd8ebd570dd60390ddcfc6ac`.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-00/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/typecheck-step6-final.log", notes: "No diagnostics; final log records exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/keys.test.ts test/code/vim/words.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 104, testsPassed: 104, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/focused-vitest-step6-final.log", notes: "3 files passed; final log records exit=0."}`
+- `{command: "cd editor && wc -l src/code/vim/*.ts test/code/vim/host.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/line-count-step6-final.log", notes: "Every Vim source module and the test host is below 300 lines."}`
+
+**Earlier attempt**: `typecheck-step6-rerun.log` and `focused-vitest-step6-rerun.log` contain output from successful underlying commands, but their wrappers exited 1 because zsh reserves the variable name `status`; they were not used as verification. Both commands were rerun with `rc`, producing the complete final logs above.
+
+**Drift**: No concurrent source changes observed. No implementation source or test changes were needed.
+
+**Blockers**: None.

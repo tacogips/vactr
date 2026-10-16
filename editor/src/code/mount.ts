@@ -30,6 +30,7 @@ import { readPalette } from './palette';
 import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
 import { installPerfHook, recordOnset, recordPresented, retractOnset, removePerfHook, type VactrPerf } from './perf-hook';
+import { createVimMode } from './vim-mount';
 
 export const DOC_FILE = 'main.vact';
 
@@ -70,6 +71,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const holder = doc.createElement('div');
   const disposeCanvasHost = render(() => createComponent(CodeSurface, {}), holder);
   const hostEl = holder.firstElementChild as HTMLElement; codePane.appendChild(hostEl);
+  const vim = createVimMode(localStore(win), hostEl);
   const surfaceEl = doc.createElement('canvas');
   surfaceEl.className = 'vact-code-canvas'; surfaceEl.setAttribute('aria-hidden', 'true');
   const inputContainer = doc.createElement('div'); inputContainer.className = 'vact-code-input-bridge';
@@ -135,7 +137,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
 
   const transport = new TransportBar(transportPane, { client, clock, anchor,
     ...(deps.audible ? { audible: deps.audible, sample: () => store.transportSample } : {}),
-    onHush: () => highlight.clear(), audio: deps.core?.host.ctx ?? null, onRun: () => void evalCtl.evalAll() });
+    onHush: () => highlight.clear(), audio: deps.core?.host.ctx ?? null, onRun: () => void evalCtl.evalAll(),
+    vim: { enabled: vim.enabled, toggle: () => vim.toggle() } });
   let onEval: ((reply: Promise<ServerEnvelope>) => void) | null = null;
   onEval = (reply) => { void transport.audio.start(); transport.evalStarted(reply); };
 
@@ -166,7 +169,11 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   viewHost = new CodeViewHost(hostEl, surface, layout, schedulerHost, () => {
     hideDiagnosticTip(); scheduler?.invalidateText('view');
   });
-  input = new InputController(surface, inputContainer, { label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
+  input = new InputController(surface, inputContainer, {
+    label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
+    evalSelection: () => { if (vim.enabled()) void evalCtl.evalAtCursor(); },
+    evalAll: () => { if (vim.enabled()) void evalCtl.evalAll(); },
+    hush: () => { if (vim.enabled()) evalCtl.hush(); },
     onPresentation: (presentation) => {
       const previousDoc = displayDoc;
       if (previousDoc !== presentation.doc) {
@@ -181,6 +188,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   pointer = new PointerController(surface, surfaceEl, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
     onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText('selection'); },
     composing: () => input.isComposing });
+  vim.connect({ surface, input, viewHost, layout, evalCtl, formatter: () => deps.formatter,
+    onChange: () => scheduler?.invalidateText('selection') });
   const forwardPointer = (event: Event): void => surface.notifyPointer(event as PointerEvent);
   const pointerNames = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
   for (const name of pointerNames) surfaceEl.addEventListener(name, forwardPointer);
@@ -237,7 +246,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         staticAnnotations = annotations.staticRows;
         timed('upload', () => {
           renderer.setViewport(range.view, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, cursor: annotations.cursor, cursorVisible: true, handles });
+          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), cursorVisible: true, handles });
         });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
@@ -245,7 +254,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
         timed('upload', () => {
           renderer.setViewport(viewHost.viewport, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, cursor: input.presentation.cursor, cursorVisible: true, handles });
+          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), cursorVisible: true, handles });
         });
       }
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);
@@ -357,7 +366,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const mounted: Mounted = {
     dispose() {
       if (disposed) return; disposed = true;
-      scheduler.dispose(); pointer.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
+      scheduler.dispose(); pointer.dispose(); vim.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
       removePointerForwarding(); input.accessibility.textarea.removeEventListener('keydown', keyRecord);
       for (const name of diagInputEvents) input.accessibility.textarea.removeEventListener(name, noteDiagInput);
       surfaceEl.removeEventListener('pointermove', showDiagnosticTip); surfaceEl.removeEventListener('pointerleave', hideDiagnosticTip);

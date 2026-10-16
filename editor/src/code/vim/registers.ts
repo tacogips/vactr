@@ -19,9 +19,14 @@ export class RegisterStore {
 
   write(name: string | null, value: Register, kind: 'yank' | 'delete'): void {
     if (name === '_') return;
-    if (name === null) {
+    if (name === null || name === '"') {
       this.unnamed = value;
       if (kind === 'yank') this.values.set('0', value);
+      return;
+    }
+    if (name === '0') {
+      this.values.set('0', value);
+      this.unnamed = value;
       return;
     }
     if (/^[a-z]$/.test(name)) {

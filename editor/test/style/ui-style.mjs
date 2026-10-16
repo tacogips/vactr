@@ -145,6 +145,7 @@ async function inspectPage(page, engine, viewportName, probe) {
     return { problems, filePseudo, proxy };
   }, probe);
   for (const item of observed.problems) fail(engine, viewportName, item.check, item.selector, item.value);
+  await page.locator('[data-style-probe] input[type=text]').focus();
   await page.keyboard.press('Tab');
   const focus = await page.evaluate(() => ({
     isProbeButton: document.activeElement === document.querySelector('[data-style-probe] button:not([disabled])'),
@@ -178,9 +179,11 @@ try {
         }
         const page = await context.newPage();
         let probeAdded = false;
+        let vimTogglePresent = false;
         try {
           await page.goto(server.origin + '/');
           await page.waitForSelector('.vact-transport');
+          vimTogglePresent = await page.locator('.vact-vim-toggle').count() === 1;
           await page.waitForSelector('.pane-side');
           await page.evaluate(() => document.fonts.ready);
           await page.waitForTimeout(1000);
@@ -209,13 +212,58 @@ try {
           const probe = await page.evaluateHandle(makeProbe, viewport.name);
           probeAdded = true;
           const inspected = await inspectPage(page, engineName, viewport.name, probe);
-          const summary = { engine: engineName, viewport: viewport.name, coarseMode, filePseudo: inspected.filePseudo, samplesOpened: samples.opened, sampleMapPresent: samples.mapPresent, bankCount: samples.bankCount, proxy: inspected.proxy };
+          const summary = { engine: engineName, viewport: viewport.name, coarseMode, filePseudo: inspected.filePseudo, samplesOpened: samples.opened, sampleMapPresent: samples.mapPresent, bankCount: samples.bankCount, proxy: inspected.proxy, vimTogglePresent };
           results.push(summary);
-          console.log(`${engineName} ${viewport.name}: coarse-mode=${coarseMode}, file-pseudo=${inspected.filePseudo}, samples=${samples.opened}, proxy=${inspected.proxy.present ? 'present' : 'missing'}`);
+          console.log(`${engineName} ${viewport.name}: coarse-mode=${coarseMode}, file-pseudo=${inspected.filePseudo}, samples=${samples.opened}, proxy=${inspected.proxy.present ? 'present' : 'missing'}, vim-toggle=${vimTogglePresent}`);
         } finally {
           if (probeAdded) await page.locator('[data-style-probe]').evaluate((element) => element.remove()).catch(() => {});
           await page.evaluate(() => window.__uiStyleOpenedDetails?.forEach((element) => { element.open = false; })).catch(() => {});
           await context.close();
+        }
+        let vimContext;
+        try {
+          vimContext = await browser.newContext(contextOptions);
+        } catch (error) {
+          if (!viewport.hasTouch) throw error;
+          const { isMobile, ...fallback } = contextOptions;
+          vimContext = await browser.newContext(fallback);
+          void isMobile;
+        }
+        await vimContext.addInitScript(() => localStorage.setItem('vactr.vimMode', 'true'));
+        const vimPage = await vimContext.newPage();
+        let vimProbeAdded = false;
+        try {
+          await vimPage.goto(server.origin + '/');
+          await vimPage.waitForSelector('.vact-vim-status');
+          await vimPage.evaluate(() => document.fonts.ready);
+          await vimPage.waitForTimeout(1000);
+          if (viewport.hasTouch && !(await vimPage.evaluate(() => matchMedia('(pointer: coarse)').matches))) {
+            const coarseCss = await vimPage.evaluate(() => {
+              const rules = [];
+              for (const sheet of document.styleSheets) {
+                try {
+                  for (const rule of sheet.cssRules) {
+                    if (rule instanceof CSSMediaRule && rule.conditionText.includes('pointer: coarse')) rules.push([...rule.cssRules].map((child) => child.cssText).join('\n'));
+                  }
+                } catch {}
+              }
+              return rules.join('\n');
+            });
+            if (coarseCss) await vimPage.addStyleTag({ content: coarseCss });
+          }
+          await vimPage.locator('.vact-code-input-bridge textarea').focus();
+          await vimPage.keyboard.press(':');
+          await vimPage.waitForSelector('.vact-vim-ex');
+          await vimPage.screenshot({ path: path.join(outDir, `${engineName}-${viewport.name}-vim@2x.png`) });
+          const vimTogglePresent = await vimPage.locator('.vact-vim-toggle').count() === 1;
+          const vimProbe = await vimPage.evaluateHandle(makeProbe, `${viewport.name}-vim`);
+          vimProbeAdded = true;
+          const vimInspected = await inspectPage(vimPage, engineName, `${viewport.name}-vim`, vimProbe);
+          results.push({ engine: engineName, viewport: `${viewport.name}-vim`, filePseudo: vimInspected.filePseudo, proxy: vimInspected.proxy, vimTogglePresent });
+          console.log(`${engineName} ${viewport.name}-vim: file-pseudo=${vimInspected.filePseudo}, proxy=${vimInspected.proxy.present ? 'present' : 'missing'}, vim-toggle=${vimTogglePresent}`);
+        } finally {
+          if (vimProbeAdded) await vimPage.locator('[data-style-probe]').evaluate((element) => element.remove()).catch(() => {});
+          await vimContext.close();
         }
       }
     } finally {

@@ -1,10 +1,10 @@
 # Vim Mode: Mount Wiring, Integration Tests and Style Probe Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: VIM-30 (wave 3)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 3.1, 3.4, 3.6, 3.7, 6, 8.2, 8.4
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Related Plans
 
@@ -206,11 +206,11 @@ syntax-checked here; it runs in VIM-40.
 
 ## Acceptance Criteria
 
-- [ ] `vim-mount.ts` exports exactly the API above, and `mount.ts` is
+- [x] `vim-mount.ts` exports exactly the API above, and `mount.ts` is
       wired in the five places listed.
-- [ ] At least 35 new tests pass in the two new files.
-- [ ] `npm run check` exits 0.
-- [ ] `node --check test/style/ui-style.mjs` exits 0.
+- [x] At least 35 new tests pass in the two new files.
+- [x] `npm run check` exits 0.
+- [x] `node --check test/style/ui-style.mjs` exits 0.
 
 ## Verification
 
@@ -221,4 +221,22 @@ syntax-checked here; it runs in VIM-40.
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-17 VIM-30 implementation
+
+**Tasks Completed**: Adapter and mount wiring, real input and mount tests, style-probe second pass, assigned verification.
+
+**Changes**:
+- Added `editor/src/code/vim-mount.ts` with the planned `VimDeps`, `VimCursor`, `VimMode`, `createSurfaceHost` and `createVimMode` APIs.
+- Wired persisted opt-in state, status row, transport toggle, controller lifecycle, cursor feedback and enabled-only KeyboardController eval/hush fallbacks into `editor/src/code/mount.ts`.
+- Added 27 `vim-input.test.ts` integration cases and 13 `vim-mount.test.ts` cases; final run reports 40/40 across both files.
+- Extended `editor/test/style/ui-style.mjs` to inspect and screenshot the Vim ex-row pass per engine and viewport, while recording first-pass toggle visibility.
+- Fixed adapter keymap matching to pass DOM key/modifier fields explicitly. A spread of the keyboard event failed to preserve the shortcut fields required for the registered Shift-Alt-f binding.
+
+**Verification**:
+- `cd editor && npm run check` -> exit 0 (`tmp/vim-mode/VIM-30/npm-check-step6-final-04.log`).
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts test/canvas/cursor-shape.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts test/canvas/first-viewport.test.ts test/canvas/gpu.test.ts test/ui test/code/vim` -> exit 0, 30 files and 983/983 tests (`tmp/vim-mode/VIM-30/vitest-step6-final-04.log`).
+- `cd editor && node --check test/style/ui-style.mjs` -> exit 0 (`tmp/vim-mode/VIM-30/node-check-style-step6-final-02.log`).
+- File budgets: `vim-mount.ts` 121 lines; `mount.ts` 391 lines.
+- Initial scoped run failed 18 assertions across the two new files due to an incomplete mount fixture, incorrect expectations for existing Vim behavior, and the adapter's missed Shift-Alt-f binding match. Corrected the fixture, assertions and adapter matching, then added mounted alternate-modifier fallback coverage; final source matched run passes. Full initial log: `tmp/vim-mode/VIM-30/vitest-step6-01.log`.
+
+**Downstream**: VIM-40 owns full Vitest, style execution and Playwright e2e; formal test-integrity, adversarial review, integration, docs indexing, commit and push remain downstream workflow steps.

@@ -255,3 +255,18 @@ No files outside this plan's write paths were edited here.
 
 **Blockers**: None. Mount wiring is owned by VIM-30; formal review and
 workflow finalization remain downstream.
+
+### Session: 2026-10-17 Step 6 rerun
+
+**Tasks Completed**: Rechecked the VIM-17 source on the shared `wf/vim-mode`
+tree and reran the scoped typecheck, six-file focused suite, and new-file
+line-count gate. No VIM-17 source correction was needed; only this progress
+record and plan-local verification evidence were added in this rerun.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/typecheck-rerun.log", notes: "Scoped typecheck passed with no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts", exitStatus: 0, testsRun: 43, testsPassed: 43, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/focused-vitest-rerun.log", notes: "Six files passed, including unchanged controls and style-token tests."}`
+- `{command: "cd editor && wc -l src/code/vim-settings.ts src/code/vim-clipboard.ts src/code/vim-status-view.tsx test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts | awk 'BEGIN { ok=1 } NF == 2 && $2 != \"total\" { if ($1 >= 200) ok=0; print } END { if (!ok) exit 1 }'", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/line-count-rerun.log", notes: "All seven new source/test files remain below 200 lines."}`
+
+**Shared Tree**: Other plan logs changed concurrently in the shared worktree;
+they were preserved. No VIM-17 source or test file is modified in this rerun.

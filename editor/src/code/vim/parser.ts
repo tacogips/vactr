@@ -17,7 +17,7 @@ const invalid = (message: string | null = null): ParseResult => ({ kind: 'invali
 const command = (register: string | null, count: number | null, operator: OperatorKind | null, target: Target | null, action: ActionKind | null = null, arg: string | null = null): ParseResult => ({ kind: 'command', command: { register, count, operator, target, action, arg } });
 const motions: Record<string, MotionKind> = { h: 'h', l: 'l', j: 'j', k: 'k', '0': '0', '^': '^', '$': '$', w: 'w', b: 'b', e: 'e', W: 'W', B: 'B', E: 'E', G: 'G', '{': '{', '}': '}', '%': '%', H: 'H', M: 'M', L: 'L', ';': ';', ',': ',' };
 const aliases: Record<string, MotionKind> = { '<Left>': 'h', '<Right>': 'l', '<Up>': 'k', '<Down>': 'j', '<Home>': '0', '<End>': '$', '<BS>': 'BS', '<CR>': '+', '<C-d>': 'C-d', '<C-u>': 'C-u', '<C-f>': 'C-f', '<C-b>': 'C-b' };
-const printable = (key: VimKey): boolean => [...key].length === 1 && !key.startsWith('<');
+const printable = (key: VimKey): boolean => [...key].length === 1;
 const registerName = (key: string): boolean => /^[a-zA-Z0-9_+*"]$/.test(key);
 const alpha = (key: string): boolean => /^[a-zA-Z]$/.test(key);
 const markName = (key: string): boolean => /^[a-z]$/.test(key);
@@ -171,7 +171,7 @@ export class CommandParser {
       return kind ? command(register, count, null, { kind: 'textobject', spec: { around: first === 'a', kind } }) : invalid();
     }
     if (['d', 'x', '<Del>', 'c', 's', 'y', '>', '<', '~'].includes(first)) {
-      const op: OperatorKind = first === 'x' || first === '<Del>' ? 'd' : first === '~' ? 'g~' : first as OperatorKind;
+      const op: OperatorKind = first === 'x' || first === '<Del>' ? 'd' : first === 's' ? 'c' : first === '~' ? 'g~' : first as OperatorKind;
       return command(register, count, op, null);
     }
     const lineOps: Record<string, OperatorKind> = { D: 'd', X: 'd', C: 'c', S: 'c', R: 'c', Y: 'y' };

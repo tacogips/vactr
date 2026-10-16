@@ -12,8 +12,12 @@ const cases: [string, MotionKind, number][] = [
   ['|abc', 'h', 0], ['a|bc', 'h', 0], ['ab|c', 'h', 1], ['|abc', 'l', 1], ['a|bc', 'l', 2], ['ab|c', 'l', 2], ['a|bc', 'l', 2],
   ['|abc', '0', 0], ['ab|c', '0', 0], ['  |x', '^', 2], ['|  x', '^', 2], ['ab|c', '$', 2], ['ab\n|cd', 'BS', 1],
   ['|foo.bar baz', 'w', 3], ['|foo.bar baz', 'W', 8], ['sound-kit |x', 'w', 11], ['foo| bar', 'w', 4],
-  ['foo|\n\nbar', 'w', 4], ['|foo bar', 'e', 2], ['f|oo bar', 'e', 2], ['foo |bar baz', 'e', 6],
-  ['foo bar| baz', 'b', 4], ['foo |bar baz', 'b', 0], ['foo |bar baz', 'B', 0], ['foo.bar| baz', 'ge', 4],
+  ['foo|\n\nbar', 'w', 4], ['|foo\nbar', 'w', 4], ['|a.\n.b', 'w', 1],
+  ['|foo bar', 'e', 2], ['f|oo bar', 'e', 2], ['foo |bar baz', 'e', 6],
+  ['f|oo\nbar', 'e', 2], ['fo|o\nbar', 'e', 6], ['fo|o\n\nbar', 'e', 7],
+  ['foo bar| baz', 'b', 4], ['foo |bar baz', 'b', 0], ['foo |bar baz', 'B', 0],
+  ['foo\nb|ar', 'b', 4], ['foo\n|bar', 'b', 0], ['foo.bar| baz', 'ge', 6],
+  ['foo b|ar', 'ge', 2], ['foo.|bar', 'ge', 3], ['foo\n|bar', 'ge', 2],
   ['|foo bar', 'E', 2], ['|foo bar', 'W', 4], ['foo| bar', 'B', 0], ['|foo bar', 'ge', 0],
   ['abcdef|\nab\nabcdef', 'j', 8], ['a|\nb', 'j', 2], ['  a\n|  b\n c', '+', 9],
   ['a|\nb\nc', 'gg', 0], ['a\nb|\nc', 'G', 4], ['a\nb\nc\n|d', 'H', 0],
@@ -81,13 +85,20 @@ describe('find and repeat motions', () => {
     expect(move('😀x', 'l', 0)?.pos).toBe(2);
     expect(move('foo bar', 'w', 4)?.pos).toBe(7);
     expect(move('foo bar baz', 'w', 0, { count: 2 })?.pos).toBe(8);
+    expect(move('a b c', 'ge', 4, { count: 2 })).toMatchObject({ pos: 0, inclusive: true });
   });
 });
 
 describe('bracket and paragraph motions', () => {
-  it('matches nested brackets, scans from a containing opener, and bounds work', () => {
-    expect(move('(a [b] c)', '%', 1)?.pos).toBe(8);
-    expect(move('(a [b] c)', '%', 3)?.pos).toBe(5);
+  it.each([
+    ['f(x) + g(y)', 3, 1], ['(a) (b)', 2, 0], ['f(x)(y)', 3, 1], ['f(x)(y)', 1, 3],
+    ['(a [b] c)', 0, 8], ['(a [b] c)', 1, 5], ['(a [b] c)', 3, 5], ['(a [b] c)', 5, 3], ['(a [b] c)', 8, 0],
+    ['fn {\n  x = foo(a)\n}', 7, 16], ['[x, f(y)]', 1, 7], ['foo(bar)', 0, 7],
+  ] as [string, number, number][])('matches the first bracket on the line in %s at %i', (text, pos, expected) => {
+    expect(move(text, '%', pos)?.pos).toBe(expected);
+  });
+  it('returns null for unmatched brackets and matches beyond SCAN_LIMIT', () => {
+    expect(move('x) (abc', '%', 3)).toBeNull();
     expect(move('(abc', '%', 0)).toBeNull();
     expect(move(`(${''.padEnd(SCAN_LIMIT + 10, 'x')})`, '%', 0)).toBeNull();
   });

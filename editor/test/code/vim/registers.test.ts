@@ -23,6 +23,26 @@ describe('RegisterStore', () => {
     expect(store.read('"')).toEqual(value('d'));
     expect(store.read('0')).toEqual(value('y'));
   });
+  it('writes an explicit unnamed yank to unnamed and register 0', () => {
+    const store = new RegisterStore();
+    store.write('"', value('explicit yank'), 'yank');
+    expect(store.read('"')).toEqual(value('explicit yank'));
+    expect(store.read('0')).toEqual(value('explicit yank'));
+  });
+  it('writes an explicit unnamed delete without changing register 0', () => {
+    const store = new RegisterStore();
+    store.write(null, value('previous yank'), 'yank');
+    store.write('"', value('explicit delete'), 'delete');
+    expect(store.read('"')).toEqual(value('explicit delete'));
+    expect(store.read('0')).toEqual(value('previous yank'));
+  });
+  it('writes an explicit register 0 yank to register 0 and unnamed', () => {
+    const store = new RegisterStore();
+    store.write(null, value('old'), 'delete');
+    store.write('0', value('explicit register 0'), 'yank');
+    expect(store.read('0')).toEqual(value('explicit register 0'));
+    expect(store.read('"')).toEqual(value('explicit register 0'));
+  });
   it('stores a named register and unnamed value', () => {
     const store = new RegisterStore();
     store.write('a', value('first'), 'delete');

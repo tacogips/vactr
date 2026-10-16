@@ -2,6 +2,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 import fs from 'node:fs';
 import path from 'node:path';
 import { installSilentSink } from './silent-sink.mjs';
+import { runVimChecks } from './vim-behavior.mjs';
 export async function runBehavior(browser, origin, name) {
   const results = []; const limitations = [];
   let context; let page; let api;
@@ -188,6 +189,10 @@ export async function runBehavior(browser, origin, name) {
     if (!api) throw new Error('perf API was not installed');
   } catch (error) { results.push({ id:'browser-setup', pass:false, detail:String(error?.stack ?? error) }); }
   finally { await context?.close(); }
+  try {
+    const vim = await runVimChecks(browser, origin, name);
+    results.push(...vim.checks); limitations.push(...vim.limitations);
+  } catch (error) { results.push({ id:'vim-setup', pass:false, detail:String(error?.stack ?? error) }); }
   const counted = results.filter((result) => result.status !== 'limitation');
   return { name, checks:results, passed:counted.filter((result)=>result.pass===true).length, total:counted.length, limitations };
 }

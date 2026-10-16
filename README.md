@@ -215,6 +215,8 @@ It provides:
   check runs on a typing pause, after the next presented frame); a
   completion popup appears while typing, `Ctrl-Space` opens it manually,
   Arrow/PageUp/PageDown move, `Enter`/`Tab` accept, and `Escape` closes it;
+- an optional Vim mode (off by default; the vim button in the transport
+  bar), described below;
 - playing-step highlighting on the audible clock (playing events are
   announced ahead within the scheduling lookahead and shown at their
   audible time, never early), and the transport bar;
@@ -229,6 +231,51 @@ It provides:
 Browser self-analysis taps, browser MIDI out and per-slot level meters are
 not available on this host. ExternalFile binding persistence is handled
 by the editor.
+
+### Vim mode
+
+- **Turning it on.** Use the `vim` toggle in the transport bar. The setting
+  is saved per browser in `localStorage` (`vactr.vimMode`); the Tauri app
+  keeps its own setting.
+- **Modes.** Normal, insert, replace (`R`), visual (`v`), visual line
+  (`V`) and operator-pending. The status row shows the mode, pending keys,
+  `recording @q` and active search. Cursors are a block in normal and visual,
+  a bar in insert, and an underline in replace and operator-pending.
+- **Keys.** Motions: `h j k l`, `w b e W B E ge`, `0 ^ $`, `gg G {n}G`,
+  `f F t T ; ,`, `%`, `{ }`, `H M L`, `Ctrl-d Ctrl-u Ctrl-f Ctrl-b`,
+  `* #`, `/ ? n N`, arrows, `Home`/`End`, `Backspace` (as `h`) and
+  `Enter` (as `+`). Operators: `d c y > < g~ gu gU`, `dd cc yy >> <<
+  g~~ guu gUU`. Text objects: `iw aw iW aW`, `i" a" i' a'`, `` i` a`
+  ``, `i( a( ib ab i) a)`, `i[ a[ i] a]`, `i{ a{ iB aB i} a}`,
+  `i< a< i> a>`. Also `D C Y x X s S r{c} ~ J p P o O a A i I`, `u`,
+  `Ctrl-r`, `.`, counts, marks (`m{a-z}`, `'{a-z}`, `` `{a-z} ``), and
+  macros (`q{reg}`, `@{reg}`, `@@`). In visual mode, `o` swaps selection
+  ends. Registers: unnamed, `"a-z`, `A-Z`
+  append, `0`, `_`, `+` and `*` system clipboard.
+- **Ex commands.** `:{n}`, `:$`, `:[range]s/pat/rep/[gi]` (including
+  `%` and `'<,'>` ranges), and `:noh`. `:w`, `:q`, `:wq`, `:x` and `:q!`
+  show a message. `:eval`, `:evalall`/`:run`, `:hush` and `:format` run
+  the matching vactr actions.
+- **Live-coding shortcuts.** `Mod-Enter`, `Mod-Shift-Enter`, `Mod-.` and
+  `Shift-Alt-f` work in every mode. Mod is Cmd on macOS and iPadOS, Ctrl
+  elsewhere. `Ctrl-Space` and completion popup keys work in every mode.
+  When the popup is open, Escape closes it first; Escape then leaves insert
+  mode. `Ctrl-[` is Escape. With the code pane focused outside insert mode,
+  Vim handles the browser's `Ctrl-r`, `Ctrl-f`, `Ctrl-d`, `Ctrl-u` and
+  `Ctrl-b` shortcuts.
+- **IME (Japanese input).** Composition in insert mode works as without
+  Vim. In normal, visual and operator-pending modes, IME input is ignored
+  and does not insert text; the status row reports this. The browser cannot
+  turn off the OS IME, so switch it to direct input for normal-mode
+  commands. Escape during conversion cancels the conversion first. In
+  replace mode, an IME commit inserts rather than overwrites.
+- **Clipboard.** `"+` and `"*` use the browser clipboard API. If
+  unavailable or denied, an internal copy is used and a message is shown.
+- **Touch.** Vim mode is for hardware keyboards. Tap the mode label to
+  enter or leave insert mode with the on-screen keyboard, or use the toggle
+  to turn Vim off.
+- **Not included.** Visual block (`Ctrl-v`), search highlighting, numbered
+  registers and the other items in [the pending Vim questions](design-docs/user-qa/pending-vim-mode-questions.md).
 
 ```sh
 # the wasm artifact the editor loads (the --lib build keeps the cdylib at the default path)

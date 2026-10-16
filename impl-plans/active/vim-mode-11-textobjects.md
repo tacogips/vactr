@@ -135,3 +135,20 @@ Format: `{ doc: 'foo b|ar baz', spec: { around: false, kind: 'w' }, count: 1, ex
 - `{command: "cd editor && wc -l src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/line-count-final-2.log", notes: "138 lines, below 300."}`
 
 **Review State**: The targeted correction and regression evidence are ready for independent re-review; no review acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 verification rerun
+
+**Tasks Completed**: Re-read the accepted VIM-11 contract and current sources. No implementation source or test edit was needed: the previous `aw`/`aW` count repair is present, the two regression cases remain, all 9 normalized kinds have inner and around coverage, and the purity test remains in scope. Refreshed the scoped verification on the current tree.
+
+**Current Source Hashes**:
+- `editor/src/code/vim/textobjects.ts`: `42f51b42095594efa607dac90b03b5a2002e835f`
+- `editor/test/code/vim/textobjects.test.ts`: `5a53c81734e6073d103cdb229d3f87f304a40e68`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/typecheck-step6-rerun.log", notes: "Scoped typecheck on current source; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 38, testsPassed: 38, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/focused-vitest-step6-rerun.log", notes: "2 files passed; 37 text-object cases and the purity test passed, including 2aw/2aW."}`
+- `{command: "cd editor && wc -l src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/line-count-step6-rerun.log", notes: "138 lines, below the 300-line limit."}`
+
+**Drift**: The VIM-11 source and test hashes match the prior repair record. The current shared worktree also has concurrent plan progress modifications in VIM-00, VIM-12, VIM-13 and VIM-14; these files were preserved and not edited by VIM-11. No VIM-11 source drift or blockers.
+
+**Review State**: Ready for downstream integrity and adversarial review; no review acceptance is claimed here.

@@ -204,3 +204,16 @@ Required cases (at least 18):
 - Line counts: `input.ts` 270; `surface.ts` 179.
 
 **Recovered Setup Issue**: The first typecheck invocation found no VIM-15 scoped `tsconfig.json`. Regenerated the verification-only scaffold per the VIM-00 common rule 5 and reran the required typecheck successfully.
+
+### Session: 2026-10-17 Step 6 rerun
+
+**Tasks Completed**: Revalidated the VIM-15 source and behavioral gates against the current shared tree; no source changes were needed.
+**Notes**: The VIM-15 input hook, highest/hook/default routing, non-insert text gate, IME discard path, overwrite behavior, and keymap query remain unchanged from the recorded source identities. The integration tests include Linux `Ctrl-Enter` and Mac `Meta-Enter` default-keymap routing through `InputController`, addressing this plan's non-Apple routing seam for the prior design finding. Other pass-through normalization and Vim-mode behavior remain in their owning VIM-00/VIM-20/VIM-30 plans.
+
+**Changed Source Hashes**: Unchanged from the 2026-10-16 entry; current hashes recorded in `tmp/vim-mode/VIM-15/source-hashes.log`.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json` — exit 0, no diagnostics; log `tmp/vim-mode/VIM-15/typecheck-step6-rerun.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 102/102 tests passed; log `tmp/vim-mode/VIM-15/focused-vitest-step6-rerun.log`.
+- `git diff --stat -- editor/test/canvas/input.test.ts` — empty; the existing test remains unmodified.
+- Line counts remain `input.ts` 270 and `surface.ts` 179. The hook test contains 22 cases.

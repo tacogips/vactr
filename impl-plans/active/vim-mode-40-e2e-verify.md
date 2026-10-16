@@ -132,14 +132,29 @@ sandbox. Every other gate must pass inside the sandbox.
 
 ## Acceptance Criteria
 
-- [ ] `vim-behavior.mjs` implements the six checks in their own context,
+- [x] `vim-behavior.mjs` implements the six checks in their own context,
       and `behavior.mjs` merges them.
-- [ ] Gates 1-3, 5 and 7 pass in this plan, with the records in the
+- [x] Gates 1-3, 5 and 7 pass in this plan, with the records in the
       Progress Log.
 - [ ] Gates 4 and 6 pass, or carry a recorded verificationGap for the Opus
       verification step with the exact sandbox error.
-- [ ] No tracked evidence file changed.
+- [x] No tracked evidence file changed.
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-17 VIM-40 implementation
+
+**Status**: In Progress
+**Tasks Completed**: E2E checks and runner merge; README update; Gates 1-5 and 7.
+**Notes**:
+- Added `editor/test/e2e/vim-behavior.mjs` with `vim-toggle`, `vim-dcyp`, `vim-visual`, `vim-dot`, `vim-ime-normal`, and `vim-shortcut`, isolated in a separate Playwright context. `behavior.mjs` merges check results and limitations after closing its original context.
+- `npm run check`: exit 0 (`tmp/vim-mode/VIM-40/gate-1-check-rerun.log`).
+- Locked full Vitest: exit 0, 119 files / 1,682 tests passed (`tmp/vim-mode/VIM-40/gate-2-vitest.log`).
+- Debug-Wasm build with `VACTR_REQUIRE_SESSION_ABI=1`: exit 0 (`tmp/vim-mode/VIM-40/gate-3-build.log`); release Wasm was absent, so `VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm` was used.
+- Locked `npm run test:style`: exit 0, 8 engine/viewport combinations (`tmp/vim-mode/VIM-40/gate-4-style-rerun.log`). The Vim style pass now reports the actual toggle presence and resets focus to the probe input before testing Tab navigation.
+- `node --check test/e2e/vim-behavior.mjs`: exit 0 (`tmp/vim-mode/VIM-40/gate-5-node-check-final.log`).
+- Locked Playwright: exit 1, 32 checks / 31 passed (`tmp/vim-mode/VIM-40/gate-6-e2e-final.log`). Every Vim check passed in WebKit and five of six passed in Chromium. Chromium `vim-ime-normal` observed `stable` become `stabl日本e` (revision 2 -> 3) after CDP `Input.imeSetComposition` then `Input.insertText`; this violates the accepted normal-mode IME invariant. The relevant seam is `editor/src/code/input.ts:175-195` (beforeinput/composition routing) and `:214-220` (native input gate). VIM-40 allows no source change there; the failure is not a sandbox error and cannot be recorded as a verificationGap.
+- `git diff --stat -- design-docs/specs/evidence`: empty, exit 0 (`tmp/vim-mode/VIM-40/gate-7-evidence-diff.log`).
+- First style and e2e failures and their complete logs are retained as `gate-4-style.log`, `gate-6-e2e.log`, and `gate-6-e2e-rerun.log`; corrected harness/style assertions pass in later runs.
+
+**Outstanding**: Chromium normal-mode IME commit regression requires a source-owner repair and rerun of the exact VIM-40 e2e gate. The accepted VIM-40 write paths do not include `editor/src/code/input.ts`.

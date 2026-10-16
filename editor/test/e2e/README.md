@@ -33,3 +33,14 @@ cd editor && npm run e2e -- --browser all --profile all --write-evidence --run-i
 The `EXIT` trap releases the lock after the run. If the in-lock re-check fails, the procedure releases and reacquires the lock after the host quiets; do not wait while holding the lock.
 
 The archived DOM comparison results are in [design-renderer-comparison.md](../../../design-docs/specs/design-renderer-comparison.md); its harness was removed with the DOM backend and is recoverable from commit `56601c2`.
+
+
+## Vim mode checks
+
+The behavior profile runs `vim-toggle`, `vim-dcyp`, `vim-visual`, `vim-dot`,
+`vim-ime-normal`, and `vim-shortcut` in their own browser context, isolated from
+the existing canvas behavior checks. Run the non-gating checks with:
+
+```sh
+cd editor && npm run e2e -- --browser all --profile behavior --run-id vim-001 --out ../tmp/vim-mode/e2e/vim-001
+```

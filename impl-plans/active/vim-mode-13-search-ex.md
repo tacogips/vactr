@@ -177,3 +177,19 @@ export interface ExContext { currentLine: number; lastLine: number; visual: { fr
 - `cd editor && wc -l src/code/vim/search.ts src/code/vim/ex.ts` — exit 0; 113 and 118 lines; log `tmp/vim-mode/VIM-13/line-count-repair-final.log`.
 
 **Repaired Source Hashes**: `search.ts` `4c9cddf241b9088f5f1a9dee7e70d02db2a39170`; `ex.ts` `be8d00f65c83964c830f1a6afc24e3151d3abf5e`; tests `706c570373b9445eef4542da85021aa4563e9eba`.
+
+### Session: 2026-10-17 Step 6 rerun
+
+**Tasks Completed**: Rechecked the current VIM-13 implementation and its plan acceptance criteria. No search, Ex parser, or test source edits were needed.
+
+**Files**: `editor/src/code/vim/search.ts`, `editor/src/code/vim/ex.ts`, and `editor/test/code/vim/search-ex.test.ts` remain unchanged; this plan log records the rerun.
+
+**Verification on current source**:
+
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-13/tsconfig.json` — exit 0; log `tmp/vim-mode/VIM-13/typecheck-step6-rerun.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/search-ex.test.ts test/code/vim/purity.test.ts` — exit 0; 2 files, 67/67 tests passed; log `tmp/vim-mode/VIM-13/focused-vitest-step6-rerun.log`.
+- `wc -l editor/src/code/vim/search.ts editor/src/code/vim/ex.ts` — exit 0; 113 and 118 lines; log `tmp/vim-mode/VIM-13/line-count-step6-rerun.log`.
+
+**Attempt Note**: The first rerun wrappers targeted a log path relative to the parent of the repository and exited before either gate ran. They are discarded attempts; the corrected commands above ran the exact plan gates successfully.
+
+**Downstream**: Formal test-integrity/adversarial review and combined-tree integration verification remain owned by later workflow steps. VIM-20 owns execution of the parsed search and Ex commands.

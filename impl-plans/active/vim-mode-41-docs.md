@@ -1,10 +1,10 @@
 # Vim Mode: README Documentation Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-41 (wave 4)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 2, 3.3, 3.5, 3.7, 4.8, 4.13, 4.14, 6, 9; design-docs/user-qa/pending-vim-mode-questions.md
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Related Plans
 
@@ -93,19 +93,40 @@ Keep the subsection under about 70 lines.
 
 ## Acceptance Criteria
 
-- [ ] README.md has the new bullet and the `### Vim mode` subsection with
+- [x] README.md has the new bullet and the `### Vim mode` subsection with
       all ten parts.
-- [ ] Every key and command named exists in design section 2.1 or 4.13.
-- [ ] No other file is changed.
+- [x] Every key and command named exists in design section 2.1 or 4.13.
+- [x] No other product file is changed; `README.jd.md` is untouched.
 
 ## Verification
 
-1. `grep -n '### Vim mode' ../README.md` must print exactly one line.
-2. `grep -c 'vactr.vimMode\|IME\|:evalall\|Ctrl-\[' ../README.md` must
+1. `grep -n '### Vim mode' README.md` must print exactly one line.
+2. `grep -c 'vactr.vimMode\|IME\|:evalall\|Ctrl-\[' README.md` must
    print a count of 4 or more.
-3. `git diff --stat -- ../README.md ../README.jd.md` must show only
+3. `git diff --stat -- README.md README.jd.md` must show only
    README.md changed.
 
 ## Progress Log
 
-### Session: (not started)
+### Session: 2026-10-17
+
+**Tasks Completed**: Added the optional Vim bullet and the compact Vim mode
+subsection to `README.md`, covering toggle/persistence, modes/cursors, keys,
+ex commands, live-coding shortcuts, Japanese IME, clipboard, touch and
+excluded features.
+
+**Verification**: `grep -n '### Vim mode' README.md` returned one line
+(`tmp/vim-mode/VIM-41/final2-section.log`); the required content grep
+returned 8 (`final2-content.log`); the scoped diff stat showed only
+`README.md` (`final2-diff-stat.log`). The section spans 46 lines
+(`final2-section-length.log`), and `git diff --check -- README.md
+impl-plans/active/vim-mode-41-docs.md` passed (`final2-diff-check.log`).
+The scoped status lists only `README.md` and this plan
+(`final2-scoped-status.log`).
+
+**Notes**: The motions, operators, text-object pairs, shortcut commands,
+registers, marks, macros and Ex commands were checked against design
+sections 2.1 and 4.13. Other shared-tree files visible in
+`readme-status-final-02.log` belong to other fanout plans; this plan edited only
+`README.md` and its own progress record. `README.jd.md` is untouched. Formal
+review and serial finalization remain downstream workflow steps.

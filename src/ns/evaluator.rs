@@ -199,6 +199,7 @@ pub(super) struct Attempt {
 pub(super) struct DynamicManifestCacheEntry {
     pub(super) base: HostManifest,
     pub(super) controls: Rc<BTreeSet<Rc<str>>>,
+    pub(super) templates: Rc<BTreeSet<Rc<str>>>,
     pub(super) manifest: Rc<HostManifest>,
 }
 

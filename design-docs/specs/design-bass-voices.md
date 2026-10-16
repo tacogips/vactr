@@ -478,6 +478,12 @@ All ordered registries are **append-only**:
 - New custom controls get the next custom ids in first-use order.
 - The codec tag is the next free explicit tag, `98`. Existing tags are never
   renumbered.
+- No checker list exists for this. A template that realizes in a tier is
+  automatically a valid `s :name` sound there (through the registry's
+  realized template set, see
+  [`design-browser-tier-voices.md`](design-browser-tier-voices.md)).
+  `src/session/tests/template_sounds.rs` enforces this in the native and
+  host-wasm configurations.
 
 No new control row is added, so no existing template's custom-id assignment
 can shift.

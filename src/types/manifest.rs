@@ -22,6 +22,8 @@ pub struct HostManifest {
     pub sounds: KeySet,
     /// Synth templates, playable as sounds (`s :analog`).
     pub synths: KeySet,
+    /// Realized prelude templates playable as sounds; not part of `default-sound-kit`.
+    pub templates: KeySet,
     /// Pattern control names.
     pub controls: KeySet,
     /// Installed instrument header names, distinct from general controls
@@ -70,6 +72,7 @@ impl HostManifest {
         HostManifest {
             sounds: KeySet::of(SPEC_SOUNDS),
             synths: KeySet::of(SPEC_SYNTHS),
+            templates: KeySet::of([] as [&str; 0]),
             controls: KeySet::of(CONTROLS.iter().copied().chain(["n", "note"])),
             declared_controls: KeySet::of([] as [&str; 0]),
             caps: [
@@ -136,6 +139,19 @@ impl HostManifest {
     {
         HostManifest {
             sounds: self.sounds.union(&KeySet::of(extra)),
+            ..self.clone()
+        }
+    }
+
+    /// Extend the realized prelude templates accepted as sound keywords.
+    #[must_use]
+    pub fn with_templates<I, S>(&self, extra: I) -> HostManifest
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        HostManifest {
+            templates: self.templates.union(&KeySet::of(extra)),
             ..self.clone()
         }
     }

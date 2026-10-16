@@ -20,6 +20,13 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 [Route preparation metering](active/song-mode-route-preparation-meter.md) has held0003 source accepted after eight focused tests, 425 broader Rust tests, and fresh frontend/build verification. Actual route-builder adoption is now released in the following phase. It preserves original nested depth and certification failure work before the immutable routing bridge.
 
+## Template voices as sounds in every tier (2026-10-17)
+
+These plans implement [design-browser-tier-voices.md](../design-docs/specs/design-browser-tier-voices.md) on branch `wf/browser-voices` (designed in session 386). All three are Completed and archived (2026-10-17, session 387) after test-integrity, adversarial and integration review accepted them with no findings. BV-30 final gates: wasm example evaluation 84/84 (all nine new examples), full nextest 3029/3029 (3 skipped), full vitest 1027/1027, test:style 4/4, `npm run e2e:examples` 8/8 (`tmp/browser-voices/BV-30/`). The [dispatch manifest](active/browser-voices-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.
+
+- **Wave 1** (parallel): [BV-10 checker templates and regression test](completed/browser-voices-10-checker-templates.md), [BV-20 editor registry](completed/browser-voices-20-editor-registry.md)
+- **Wave 2**: [BV-30 browser evaluation and final gates](completed/browser-voices-30-integration.md)
+
 ## Example picker, flashy default and document persistence (2026-10-16)
 
 These plans implement [design-example-picker-and-persistence.md](../design-docs/specs/design-example-picker-and-persistence.md) (branch `wf/examples`, designed in session 379). All eight are Completed and archived (2026-10-17, session 382) after Step 7 test-integrity and adversarial review accepted them. EX-70 final gates on hash-matched source: full vitest 987/987, test:style 4/4 with the picker open, `npm run e2e:examples` 8/8 (`tmp/examples/EX-70/e2e-examples-final.log`, plus classify-1..10), Tauri cargo test 9/9, capabilities unchanged. The [dispatch manifest](active/examples-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.

@@ -15,10 +15,11 @@ use crate::pkg::driver::{drive, DriverReply, DriverRequest, Prefetched};
 use crate::pkg::lock::LockFile;
 use crate::pkg::mem_cache::MemCache;
 use crate::reader::span::{FileId, Span};
-use crate::session::eval::{analyze, PackageView};
+use crate::session::eval::{analyze_in, PackageView};
 use crate::session::protocol::{DiagBody, ServerMsg, WireDiag};
 use crate::session::publish::{diag_wire, failure_wire};
 use crate::session::session::Session;
+use crate::types::manifest::HostManifest;
 
 impl Session {
     /// Resolves every output's stored uniform plan at `host_now`
@@ -69,7 +70,8 @@ impl Session {
             lock: self.lock.as_ref(),
             cache: self.cache.as_deref(),
         };
-        let analysis = analyze(text, fid, &view);
+        let manifest = self.ev.dynamic_manifest(&HostManifest::spec_default());
+        let analysis = analyze_in(text, fid, &view, &manifest);
         let mut diags = analysis.diags;
         let (_, lint) = build_table(text, fid, &analysis.nodes, &analysis.trivia, &self.manifest);
         diags.extend(lint);

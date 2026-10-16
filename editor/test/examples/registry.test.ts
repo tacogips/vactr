@@ -14,7 +14,7 @@ describe('example registry', () => {
     expect([...registered].filter((id) => excluded.has(id))).toEqual([]);
     expect(partition).toEqual(globIds);
     expect(CURATED.every(({ id }) => globIds.has(id))).toBe(true);
-    expect(EXCLUDED.length).toBe(15);
+    expect(EXCLUDED.length).toBe(6);
   });
 
   it('keeps ids unique and metadata within the documented bounds', () => {
@@ -34,9 +34,28 @@ describe('example registry', () => {
     expect(findExample('live-external-voices')?.requires).toEqual(['audio-input']);
   });
 
+  it('registers the template-voice examples without requirements', () => {
+    const templateVoiceExamples = [
+      'acid-techno',
+      'bass-presets',
+      'experimental-oscillators',
+      'hurdy-gurdy',
+      'kalimba',
+      'offbeat-bass-techno',
+      'rumble-techno',
+      'tonewheel-organ',
+      'wobble-techno',
+    ];
+
+    for (const id of templateVoiceExamples) {
+      expect(findExample(id)).toMatchObject({ category: 'Examples', requires: [] });
+      expect(excludedIds()).not.toContain(id);
+    }
+  });
+
   it('loads lazy raw example text and rejects excluded or unknown ids', async () => {
     await expect(loadExample('first-track')).resolves.toContain('use-bpm 124');
-    await expect(loadExample('acid-techno')).rejects.toThrow('unknown example acid-techno');
+    await expect(loadExample('song-mode')).rejects.toThrow('unknown example song-mode');
     await expect(loadExample('sample-timestamps')).rejects.toThrow('unknown example sample-timestamps');
     await expect(loadExample('nope')).rejects.toThrow('unknown example nope');
   });

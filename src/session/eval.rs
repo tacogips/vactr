@@ -530,12 +530,23 @@ fn package_names(sources: &PkgSources, manifest: &HostManifest) -> BTreeMap<Rc<s
 /// (over `nodes` and `trivia`), which the caller runs.
 #[must_use]
 pub fn analyze(src: &str, file: FileId, view: &PackageView<'_>) -> Analysis {
+    analyze_in(src, file, view, &HostManifest::spec_default())
+}
+
+/// Static analysis using `base` plus fetched package asset banks.
+#[must_use]
+pub fn analyze_in(
+    src: &str,
+    file: FileId,
+    view: &PackageView<'_>,
+    base: &HostManifest,
+) -> Analysis {
     let mut diags = Vec::new();
     let imports = imports_of(src, file);
     let mut env = CheckEnv::empty();
     let mut broken: BTreeSet<Rc<str>> = BTreeSet::new();
     let mut fetched = Vec::new();
-    let mut manifest = HostManifest::spec_default();
+    let mut manifest = base.clone();
     for d in &imports {
         let id = PackageId(Rc::clone(&d.path));
         if let Ok(sources) = package_sources(view.lock, view.cache, &id) {

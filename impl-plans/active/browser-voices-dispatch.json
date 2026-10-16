@@ -1,0 +1,287 @@
+{
+  "taskId": "browser-voices",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/browser-voices",
+  "baseBranch": "wf/browser-voices",
+  "remote": "origin",
+  "originalHead": "e8fd9ee4c86127ed1821345b632481a2476e8ac7",
+  "originalHeadNote": "Resume intake HEAD for session 387 is e8fd9ee (wip(browser-voices): session-386 checkpoint, run stopped by usage limit) on wf/browser-voices with a clean working tree. Its parent ed1806d is the first plan checkpoint; the original issue intake HEAD was c15799a (merge: code pane text rendering fix, wf/code-render).",
+  "checkpointHistory": "Session 386: design design-browser-tier-voices.md accepted at Step 3 with no findings; plans BV-10, BV-20 and BV-30 accepted by step5-impl-plan-review (comm-006771, 'accepted: no high or mid findings', two low residual findings) and checkpointed in ed1806d. BV-10 and BV-20 Luna implementations then landed in the WIP commit e8fd9ee (BV-10 completion criteria checked, focused gates and mutation evidence logged; BV-20 Status Completed) before the run stopped on a usage limit, with no independent Opus review and no BV-30 run. Session 387 resumes against unchanged accepted design and plans: all three plans remain. BV-10 and BV-20 workers start from the e8fd9ee state, re-run their gating verification, repair only gaps, and go through independent review; BV-30 follows both. acceptedDependencies stays empty because no plan has passed review.",
+  "designDocPaths": [
+    "design-docs/specs/design-browser-tier-voices.md",
+    "design-docs/specs/design-bass-voices.md",
+    "design-docs/specs/design-example-picker-and-persistence.md"
+  ],
+  "evidenceRoot": "tmp/browser-voices",
+  "evidenceLayout": "tmp/browser-voices/<planId>/ per plan (attempt-<n>/ subdirectories on retry). Session-386 BV-10/BV-20 logs already sit directly in tmp/browser-voices/BV-10 and tmp/browser-voices/BV-20; session-387 workers move them to attempt-1/ before re-running gating commands so the plan-root logs are the current attempt. tmp/ is gitignored (**/tmp). Every command log ends with exit=<status>; a missing or truncated log is not a pass. Gating records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; intentional negative-control or mutation runs (BV-10 kit_keys revert) go only in mutationEvidence. BV-30 also owns tmp/examples-e2e (Playwright scenario output) and tmp/ui-style (style gate output).",
+  "executionModel": {
+    "waves": [
+      [
+        "BV-10",
+        "BV-20"
+      ],
+      [
+        "BV-30"
+      ]
+    ],
+    "maxConcurrency": 2,
+    "sameBranchFanout": true,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The workflow commits with the AGENTS.md 1-6 section message and no tool attribution or co-authorship. Workers never commit, stash, checkout, reset, branch, push, merge or create worktrees. BV-30 runs only read-only git status/diff.",
+    "editProtocol": "Fresh-read each file before editing and record shasum -a 256 before and after in the plan's Progress Log. On drift, stop, record, re-read and re-apply only this plan's change. Never edit outside writePaths. Each worker edits only its own plan's Progress Log.",
+    "measurementLock": "/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock guards full nextest, any vitest that loads wasm, full vitest, test:style and e2e:examples (sibling run wf-vim-mode is active). mkdir before, rmdir right after; if mkdir fails, foreground sleep 30 and retry (bounded); never remove a lock this command did not create; never kill processes this run did not start.",
+    "ports": "editor/test/e2e/serve.mjs serves dist on an OS-assigned port (listen(0)); 5173 and 5174 are never used. Foreground commands only.",
+    "wasmRebuild": "BV-10 and BV-30 rebuild the debug cdylib target/wasm32-unknown-unknown/debug/vactr.wasm after Rust changes; BV-30 runs mise run build-wasm-release before npm run build and e2e:examples."
+  },
+  "verificationNotes": "Each plan's verification array is its gating list only (exit 0 required). Commands run from the repository root and end with the command's own exit status. The BV-10 mutation run (revert the kit_keys union, template_sounds must fail, restore, must pass) is mutationEvidence only and stays in the plan text. Lock-wrapped commands retry mkdir up to 120 times at 30 s intervals and release only the lock they created.",
+  "acceptedDependencies": [],
+  "reviewContext": {
+    "issueReference": "workflowInput issue 'Template voices (phase-drum, analog-bass, vosim, hurdy-gurdy, kalimba, tonewheel-organ, ...) are rejected in the browser tier as not a sound in the default sound kit' (no GitHub URL or number; found by the owner on main c15799a); workflow opus-luna-design-and-implement-review-loop-session-386 resumed as session-387; plan review step5-impl-plan-review comm-006771 accepted",
+    "userProblem": "editor/src/examples/manifest.ts EXCLUDED hides nine repository examples (acid-techno, offbeat-bass-techno, rumble-techno, wobble-techno, bass-presets, experimental-oscillators, hurdy-gurdy, kalimba, tonewheel-organ) because evaluation reports unknown-keyword '`:<name>` is not a sound in the default sound kit' for prelude template voices. The issue says 8 examples but its own list and manifest.ts:67-75 name nine; all nine are in scope.",
+    "rootCause": "The checker accepts a sound keyword only from kit_keys (manifest.sound_kit_keys() = 13 SPEC_SOUNDS + 7 SPEC_SYNTHS, src/types/check.rs:185), document inst_names, or session Inst globals. load_templates realizes templates.vact in a scratch namespace (src/ns/insts.rs:930-951), so none of the three contains the templates. There is no tier divergence: native and wasm-host sessions assemble the checker identically; native tests pass only because they ignore check diagnostics (src/ns/evaluator.rs:357-367, src/host/tests/e2e.rs:123-135), while editor/test/wasm/examples.test.ts rejects error diagnostics.",
+    "requiredOutcomes": [
+      "Root cause documented in design-browser-tier-voices.md; fix applied at the shared checker manifest assembly with one source of truth (the InstRegistry's realized template set), no hand-maintained name list.",
+      "Every template that load_templates realizes in a tier is accepted as an `s :name` sound by both the eval check and Session::check (static/editor path) in that tier.",
+      "All nine examples evaluate without errors in the wasm browser tier and are registered in the picker ('Examples' category, title-cased titles, header-derived descriptions <= 140 chars); EXCLUDED keeps only the six sample, native-only and song-mode rows.",
+      "Rust regression test src/session/tests/template_sounds.rs proves every registry template is accepted in native and host-wasm configurations, that :not-a-template-voice is still rejected, and that the nine examples statically check without errors.",
+      "cargo fmt --check, strict clippy, full nextest, host-wasm build, build-wasm-release, npm run check, full vitest, npm run test:style, npm run build and npm run e2e:examples pass."
+    ],
+    "nonGoals": [
+      "No change to SPEC_SOUNDS, SPEC_SYNTHS, sound_kit_keys(), template_params(), default_sound_kit()/digital_kit() or either TEMPLATE_NAMES array; default-sound-kit keeps exactly 20 keys.",
+      "No template names in HostManifest.synths or sounds; the wire ManifestBody and completion stay byte-identical.",
+      "No change to analyze's signature/behavior, the standalone LSP (src/lsp/analysis.rs), src/ns/load.rs nested load checks, src/types/song_rules.rs or the diagnostic text.",
+      "Song-mode exclusions stay unchanged: they are the runtime fault 'finite song playback is unavailable until song transport is installed' (src/sched/runtime.rs:372-377), a separate intended limitation.",
+      "No DSP, codec, UGen, control-row or golden-digest change; VACTR_BLESS_GOLDEN is never set.",
+      "No UI/CSS or editor/src/code change; no CodeMirror EditorView."
+    ],
+    "constraints": [
+      "Work only in this worktree on wf/browser-voices; never touch other worktrees or main; never kill processes the run did not start (wf-vim-mode is active).",
+      "AGENTS.md: English only, no emojis, no tool attribution in commits; every touched source file under 1000 lines (src/ns/insts.rs is at 970; split template loading into src/ns/insts/templates.rs if it would reach 1000).",
+      "Project UI style (solid, flat, square, spaced); npm run test:style must pass.",
+      "Registries are append-only; golden digests append-only; follow design-bass-voices.md 'Registration and digest stability'.",
+      "Heavy suites serialized with the .measure-lock directory; e2e serve on port 0, never 5173/5174; foreground commands only.",
+      "Example fixes (BV-30 only): smallest edit, no new samples/MIDI/host input, every gain equal to or lower than current, never restore an exclusion; never change system volume.",
+      "Out-of-writePaths mechanical test/fixture updates caused by the change are fixed within the plan and listed."
+    ],
+    "designDecisionsAndRationale": [
+      "Source of truth is the set of templates.vact inst forms that load_templates realized into the session InstRegistry: it is already the file new voices are appended to and it is already tier-aware (a template beyond InstRegistry::caps goes to template_errors), so no new list exists.",
+      "InstRegistry gets template_sounds: Rc<BTreeSet<Rc<str>>> filled only on load_one success (union, because one registry may serve several Evaluators); accessor template_sounds_rc mirrors declared_names_rc.",
+      "HostManifest gets a separate templates: KeySet (empty in spec_default) plus with_templates, instead of widening synths, to keep the prelude dict, template_params, wire ManifestBody.synths and completion byte-identical.",
+      "Checker kit_keys = sound_kit_keys() union templates at src/types/check.rs:185, so sound_arg and song_rules change together with no edit at those sites; sound_kit_is_prelude still disables the check when sound-kit is rebound.",
+      "Evaluator::dynamic_manifest adds with_templates; early return only when both declared names and template sounds are empty; cache keys on both Rcs via Rc::ptr_eq; 4-entry eviction kept.",
+      "Session::check uses analyze_in(text, fid, view, &ev.dynamic_manifest(&spec_default())) so the editor's static check matches eval; analyze stays a one-line delegate for the LSP and packages tests."
+    ],
+    "intentionalTradeoffs": [
+      "Session::check now also sees the registry's declared template parameters (for example kalimba-beat), matching eval; a session test pinning a static-only diagnostic would need a listed mechanical update.",
+      "Standalone LSP and nested load ./file.vact keep spec-default behavior (no registry there); accepted design boundary.",
+      "A set union per dynamic-manifest cache miss; the cache hits after the first form."
+    ],
+    "supportedEdgeCases": [
+      "A template that fails realization in a tier (caps) is not accepted there and shows as a template_errors regression-test failure.",
+      "Registries with templates never loaded and Evaluators without a registry accept exactly what they accepted before.",
+      "One InstRegistry shared by several Evaluators (union semantics).",
+      "sound-kit rebound by the document (check disabled as before).",
+      "Unknown keywords (:not-a-template-voice, :not-a-sound) still produce exactly one unknown-keyword."
+    ],
+    "outOfScopeEdgeCases": [
+      "Standalone LSP without a session and nested load ./file.vact checks.",
+      "Song-mode finite playback (song-mode.vact, song-mode/generated-parts.vact, song-mode/requirement-song.vact).",
+      "Sample-dependent and native-only examples (sample-timestamps.vact, tracks/breakcore/glass-teeth.vact, quad-stems.vact)."
+    ],
+    "residualRisks": [
+      "BV-10 and BV-20 cite decision labels BTV-D2..D9 that design-browser-tier-voices.md does not define; each plan also names the design sections it means (low, non-blocking).",
+      "Rig::eval (src/session/tests/support.rs:82) returns (EvalResultBody, Vec<ServerMsg>), so the BV-10 test must destructure before reading diagnostics (low; compiler-caught).",
+      "The static Session::check over the nine examples may surface an unrelated pre-existing error; BV-10 stops for serial reconciliation instead of weakening the test, and BV-30 owns example fixes.",
+      "Measurement-lock contention with the sibling wf-vim-mode run.",
+      "BV-10 and BV-20 code in e8fd9ee was written in session 386 and has not been independently reviewed; it must be re-verified and reviewed in session 387, not treated as accepted."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-browser-tier-voices.md",
+      "design-docs/specs/design-bass-voices.md",
+      "design-docs/specs/design-example-picker-and-persistence.md",
+      "impl-plans/README.md",
+      "impl-plans/active/browser-voices-10-checker-templates.md",
+      "impl-plans/active/browser-voices-20-editor-registry.md",
+      "impl-plans/active/browser-voices-30-integration.md",
+      "src/types/check.rs",
+      "src/types/manifest.rs",
+      "src/types/song_rules.rs",
+      "src/ns/insts.rs",
+      "src/ns/eval_doc.rs",
+      "src/ns/evaluator.rs",
+      "src/prelude/templates.vact",
+      "src/session/eval.rs",
+      "src/session/frontend.rs",
+      "src/session/session.rs",
+      "src/session/tests/support.rs",
+      "src/session/tests/mod.rs",
+      "src/host/wasm/session_half.rs",
+      "src/sched/runtime.rs",
+      "editor/src/examples/manifest.ts",
+      "editor/test/examples/registry.test.ts",
+      "editor/test/wasm/examples.test.ts",
+      "editor/test/e2e/examples.mjs"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "BV-10",
+      "planPath": "impl-plans/active/browser-voices-10-checker-templates.md",
+      "dependsOn": [],
+      "writePaths": [
+        "src/ns/insts.rs",
+        "src/ns/insts",
+        "src/types/manifest.rs",
+        "src/types/check.rs",
+        "src/ns/eval_doc.rs",
+        "src/ns/evaluator.rs",
+        "src/session/eval.rs",
+        "src/session/frontend.rs",
+        "src/session/tests/template_sounds.rs",
+        "src/session/tests/mod.rs",
+        "impl-plans/active/browser-voices-10-checker-templates.md",
+        "target",
+        "tmp/browser-voices/BV-10"
+      ],
+      "writePathNotes": [
+        {
+          "path": "src/ns/insts",
+          "intendedEdit": "New child module directory only if the 1000-line split is needed (src/ns/insts/templates.rs holding TEMPLATES, TEMPLATE_FILE, TEMPLATE_NAMES, load_templates, load_one, re-exported from insts.rs)."
+        },
+        {
+          "path": "impl-plans/active/browser-voices-10-checker-templates.md",
+          "intendedEdit": "Progress Log and completion checkboxes only."
+        }
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target",
+        "tmp/browser-voices/BV-10"
+      ],
+      "acceptanceCriteria": [
+        "InstRegistry::template_sounds_rc is filled only from successful load_templates realizations (union, never '?').",
+        "HostManifest.templates and with_templates added; spec_default().templates is empty; sound_kit_keys() still has 20 keys.",
+        "Checker kit_keys is the union of sound_kit_keys() and templates; song_rules.rs and the message text unchanged.",
+        "dynamic_manifest adds templates and the cache keys on both Rcs; DynamicManifestCacheEntry has the templates field.",
+        "analyze_in added; analyze unchanged for callers; Session::check uses the evaluator's dynamic manifest.",
+        "src/session/tests/template_sounds.rs passes in native and wasm-host rigs with no literal name list and without TEMPLATE_NAMES.",
+        "fmt, clippy, focused nextest and the host-wasm lib build pass with logs; every touched .rs file under 1000 lines.",
+        "mutationEvidence: reverting the kit_keys union makes test(template_sounds) fail; restoring makes it pass (non-gating)."
+      ],
+      "verification": [
+        "mkdir -p tmp/browser-voices/BV-10 && CARGO_TERM_QUIET=true cargo fmt --check > tmp/browser-voices/BV-10/fmt.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-10/fmt.log; test $s -eq 0",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/browser-voices/BV-10/clippy.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-10/clippy.log; test $s -eq 0",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(template_sounds) | test(sound) | test(templates) | test(analysis) | test(packages)' > tmp/browser-voices/BV-10/focused.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-10/focused.log; test $s -eq 0",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/browser-voices/BV-10/wasm-lib.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-10/wasm-lib.log; test $s -eq 0",
+        "wc -l src/ns/insts.rs src/types/manifest.rs src/types/check.rs src/ns/eval_doc.rs src/ns/evaluator.rs src/session/eval.rs src/session/frontend.rs src/session/tests/template_sounds.rs src/session/tests/mod.rs $(find src/ns/insts -name '*.rs' 2>/dev/null) > tmp/browser-voices/BV-10/lines.log 2>&1; awk '$2 != \"total\" && $1 >= 1000 { bad = 1 } END { exit bad }' tmp/browser-voices/BV-10/lines.log; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-10/lines.log; test $s -eq 0"
+      ]
+    },
+    {
+      "planId": "BV-20",
+      "planPath": "impl-plans/active/browser-voices-20-editor-registry.md",
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/examples/manifest.ts",
+        "editor/test/examples/registry.test.ts",
+        "impl-plans/active/browser-voices-20-editor-registry.md",
+        "editor/node_modules",
+        "tmp/browser-voices/BV-20"
+      ],
+      "writePathNotes": [
+        {
+          "path": "impl-plans/active/browser-voices-20-editor-registry.md",
+          "intendedEdit": "Progress Log and completion checkboxes only."
+        }
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "editor/node_modules",
+        "tmp/browser-voices/BV-20"
+      ],
+      "acceptanceCriteria": [
+        "EXCLUDED has exactly the six rows sample-timestamps.vact, tracks/breakcore/glass-teeth.vact, quad-stems.vact, song-mode/generated-parts.vact, song-mode/requirement-song.vact, song-mode.vact, in their current order with unchanged reasons.",
+        "Nine CURATED 'Examples' entries (acid-techno, bass-presets, experimental-oscillators, hurdy-gurdy, kalimba, offbeat-bass-techno, rumble-techno, tonewheel-organ, wobble-techno) in alphabetical id position, title-cased titles, header-derived descriptions of at most 140 characters, no requires key; showcase stays first.",
+        "registry.test.ts: EXCLUDED.length toBe(6), excluded probe uses song-mode, and a new it asserts the nine ids are registered with category 'Examples' and requires [] and absent from excludedIds().",
+        "npm run check and the registry vitest pass."
+      ],
+      "verification": [
+        "mkdir -p tmp/browser-voices/BV-20 && (cd editor && npm run check) > tmp/browser-voices/BV-20/check.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-20/check.log; test $s -eq 0",
+        "(cd editor && npx vitest run test/examples/registry.test.ts) > tmp/browser-voices/BV-20/registry.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-20/registry.log; test $s -eq 0"
+      ]
+    },
+    {
+      "planId": "BV-30",
+      "planPath": "impl-plans/active/browser-voices-30-integration.md",
+      "dependsOn": [
+        "BV-10",
+        "BV-20"
+      ],
+      "writePaths": [
+        "examples/acid-techno.vact",
+        "examples/offbeat-bass-techno.vact",
+        "examples/rumble-techno.vact",
+        "examples/wobble-techno.vact",
+        "examples/bass-presets.vact",
+        "examples/experimental-oscillators.vact",
+        "examples/hurdy-gurdy.vact",
+        "examples/kalimba.vact",
+        "examples/tonewheel-organ.vact",
+        "impl-plans/active/browser-voices-30-integration.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp/browser-voices/BV-30",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
+      ],
+      "writePathNotes": [
+        {
+          "path": "examples/acid-techno.vact",
+          "intendedEdit": "The nine examples/*.vact paths are edited only if the browser evaluation fails for a non-unknown-keyword reason: smallest edit, gains never raised, demonstrated voice unchanged, before/after hashes and reason in the Progress Log."
+        },
+        {
+          "path": "impl-plans/active/browser-voices-30-integration.md",
+          "intendedEdit": "Progress Log and completion checkboxes only."
+        }
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp/browser-voices/BV-30",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
+      ],
+      "acceptanceCriteria": [
+        "Pre-check records BV-10/BV-20 Progress Log verification status, git status --porcelain=v1 -uall and shasum -a 256 of every BV-10/BV-20 writePath file.",
+        "The wasm example-evaluation vitest passes, listing all nine new examples as 'evaluates without errors'.",
+        "Any example fix is recorded with reason and hashes, with no gain increase; or none was needed; no exclusion restored.",
+        "fmt, clippy, nextest test(sound), full nextest, host-wasm debug build, build-wasm-release, npm check, full vitest, npm run build, test:style and e2e:examples all exit 0 with logs and counts.",
+        "Song-mode and other six exclusions unchanged (git diff editor/src/examples/manifest.ts shows only the nine removals and nine additions).",
+        "Every touched source file under 1000 lines; git status shows only declared writePaths plus design/plan documents; tmp/ untracked or ignored."
+      ],
+      "verification": [
+        "mkdir -p tmp/browser-voices/BV-30 && CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm > tmp/browser-voices/BV-30/wasm-debug.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/wasm-debug.log; test $s -eq 0",
+        "L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; got=0; for i in $(seq 1 120); do if mkdir \"$L\" 2>/dev/null; then got=1; break; fi; sleep 30; done; test $got -eq 1 && { (cd editor && npx vitest run test/wasm/examples.test.ts) > tmp/browser-voices/BV-30/examples-wasm.log 2>&1; s=$?; rmdir \"$L\"; echo \"exit=$s\" >> tmp/browser-voices/BV-30/examples-wasm.log; test $s -eq 0; }",
+        "CARGO_TERM_QUIET=true cargo fmt --check > tmp/browser-voices/BV-30/fmt.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/fmt.log; test $s -eq 0",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings > tmp/browser-voices/BV-30/clippy.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/clippy.log; test $s -eq 0",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'test(sound)' > tmp/browser-voices/BV-30/nextest-sound.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/nextest-sound.log; test $s -eq 0",
+        "L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; got=0; for i in $(seq 1 120); do if mkdir \"$L\" 2>/dev/null; then got=1; break; fi; sleep 30; done; test $got -eq 1 && { NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run > tmp/browser-voices/BV-30/nextest-full.log 2>&1; s=$?; rmdir \"$L\"; echo \"exit=$s\" >> tmp/browser-voices/BV-30/nextest-full.log; test $s -eq 0; }",
+        "mise run build-wasm-release > tmp/browser-voices/BV-30/wasm-release.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/wasm-release.log; test $s -eq 0",
+        "(cd editor && npm run check) > tmp/browser-voices/BV-30/npm-check.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/npm-check.log; test $s -eq 0",
+        "L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; got=0; for i in $(seq 1 120); do if mkdir \"$L\" 2>/dev/null; then got=1; break; fi; sleep 30; done; test $got -eq 1 && { (cd editor && npm run test) > tmp/browser-voices/BV-30/vitest-full.log 2>&1; s=$?; rmdir \"$L\"; echo \"exit=$s\" >> tmp/browser-voices/BV-30/vitest-full.log; test $s -eq 0; }",
+        "(cd editor && npm run build) > tmp/browser-voices/BV-30/build.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/build.log; test $s -eq 0",
+        "L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; got=0; for i in $(seq 1 120); do if mkdir \"$L\" 2>/dev/null; then got=1; break; fi; sleep 30; done; test $got -eq 1 && { (cd editor && npm run test:style) > tmp/browser-voices/BV-30/style.log 2>&1; s=$?; rmdir \"$L\"; echo \"exit=$s\" >> tmp/browser-voices/BV-30/style.log; test $s -eq 0; }",
+        "L=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; got=0; for i in $(seq 1 120); do if mkdir \"$L\" 2>/dev/null; then got=1; break; fi; sleep 30; done; test $got -eq 1 && { (cd editor && npm run e2e:examples) > tmp/browser-voices/BV-30/e2e-examples.log 2>&1; s=$?; rmdir \"$L\"; echo \"exit=$s\" >> tmp/browser-voices/BV-30/e2e-examples.log; test $s -eq 0; }",
+        "wc -l src/ns/insts.rs src/types/manifest.rs src/types/check.rs src/ns/eval_doc.rs src/ns/evaluator.rs src/session/eval.rs src/session/frontend.rs src/session/tests/template_sounds.rs src/session/tests/mod.rs $(find src/ns/insts -name '*.rs' 2>/dev/null) editor/src/examples/manifest.ts editor/test/examples/registry.test.ts > tmp/browser-voices/BV-30/lines.log 2>&1; awk '$2 != \"total\" && $1 >= 1000 { bad = 1 } END { exit bad }' tmp/browser-voices/BV-30/lines.log; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/lines.log; test $s -eq 0",
+        "git status --porcelain=v1 -uall > tmp/browser-voices/BV-30/git-status.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/browser-voices/BV-30/git-status.log; test $s -eq 0"
+      ]
+    }
+  ]
+}

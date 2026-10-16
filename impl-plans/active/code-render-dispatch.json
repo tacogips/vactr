@@ -4,9 +4,9 @@
   "implementationBranch": "wf/code-render",
   "baseBranch": "wf/code-render",
   "remote": "origin",
-  "originalHead": "e63b47168adb3b528d865d67538b12da6434115f",
+  "originalHead": "c7cee029d8e6a373a4f40be4c2d6b04d8d5a63f0",
   "defectBaselineCommit": "ea51a0733e301f6e29dddb009c87542b635e6722",
-  "checkpointHistory": "Resumed in workflow session opus-luna-design-and-implement-review-loop-session-377 at intake HEAD e63b471 (the session-373 checkpoint commit of the same design, plans and manifest). The accepted design and plan files are unchanged from e63b471; only this manifest is updated. ea51a07 remains the pre-fix defect baseline referenced by the plans for mutation evidence and the sibling-boundary diff.",
+  "checkpointHistory": "Resumed in workflow session opus-luna-design-and-implement-review-loop-session-380 at intake HEAD c7cee02 (the session-377 partial implementation checkpoint, committed when that run stopped on a usage limit; it follows the session-377 manifest refresh ccfe55f and the session-373 design/plan checkpoint e63b471). The accepted design and plan files are unchanged from c7cee02; only this manifest is updated. No plan has an accepted independent review on the c7cee02 source, so all seven plans remain and acceptedDependencies stays empty: each worker resumes from the committed partial source and its own progress log, re-verifies, and repairs the open findings in reviewContext.priorReviewFindings. ea51a07 remains the pre-fix defect baseline referenced by the plans for mutation evidence and the sibling-boundary diff.",
   "designDocPaths": [
     "design-docs/specs/design-code-pane-text-rendering.md",
     "design-docs/specs/design-canvas-editor-evidence.md",
@@ -65,7 +65,43 @@
   "verificationNotes": "Each plan's verification array is its gating list only (exit 0 required). Commands run from the repository root. Informational canvas runs (CR-01/02/04 canvas.log, CR-06 optional smoke) and CR-07 step-5 baseline runs on ea51a07 stay in the plan text and are recorded as handoff notes or mutationEvidence, never as gating records. Lock-wrapped commands release only the lock they created; if mkdir fails the lock is held by another run: wait 30 s and retry.",
   "acceptedDependencies": [],
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Code pane drops and garbles glyphs (missing line segments, '1' rendered as a bar) and text looks dirty' (no GitHub issue); workflow opus-luna-design-and-implement-review-loop-session-373, resumed in session-377 at e63b471; session-373 intake comm-006522, design comm-006523, design review comm-006524 accepted, plans comm-006525, plan review comm-006526 (PR-H1), repair comm-006527, plan review comm-006528 accepted",
+    "issueReference": "workflowInput issue 'Code pane drops and garbles glyphs (missing line segments, '1' rendered as a bar) and text looks dirty' (no GitHub issue); workflow opus-luna-design-and-implement-review-loop-session-373, resumed in session-377 at e63b471 and in session-380 at c7cee02; session-373 intake comm-006522, design comm-006523, design review comm-006524 accepted, plans comm-006525, plan review comm-006526 (PR-H1), repair comm-006527, plan review comm-006528 accepted; session-377 integration reviews integration-review-attempt-1-exec-5039 and exec-5078",
+    "priorReviewFindings": [
+      {
+        "id": "INT-377-W4-01",
+        "severity": "high",
+        "planId": "CR-01",
+        "path": "editor/src/code/layout.ts",
+        "finding": "Runs derived by TextLayout.geometrySegments were not registered in runWidths/runClusters, so textCells measured every prefix with canvas measureText (53 calls on edited line 2; mount.test.ts:321 requires 0); test/canvas exited 1 with 222/223.",
+        "stateAtC7cee02": "CR-01 progress log records the derived-run metadata/additivity propagation and the CR01-ADV-01 rebase repair (layout.ts bf574def..., 8/8 focused, test/canvas 223/223 in tmp/code-render/CR-01/attempt-7/). Needs independent re-review and re-verification on the committed source.",
+        "requiredAction": "CR-01 re-runs its gating verification plus the informational test/canvas run under the measurement lock; mount.test.ts stays unchanged."
+      },
+      {
+        "id": "INT-377-W4-02",
+        "severity": "mid",
+        "planId": "CR-05",
+        "path": "editor/test/canvas/gpu.test.ts",
+        "finding": "The 'retains every unchanged text tile across animation frames without backdrop uploads' first-frame upload assertion was weakened from an exact toBe(distinct glyph count) to a 1..8x bound; the fixture is deterministic, so the count is exact.",
+        "stateAtC7cee02": "Unrepaired: CR-05 progress log still lists the bound (observed 34).",
+        "requiredAction": "CR-05 restores an exact expectation derived from the fixture (distinct (glyph, texel width, phase) cells; 34 observed) with the reason in its mechanical-change list; gpu.test.ts stays under 1000 lines."
+      },
+      {
+        "id": "INT-377-03",
+        "severity": "mid",
+        "planId": "CR-04",
+        "path": "impl-plans/active/code-render-04-shader-placement.md",
+        "finding": "CR-04 has no accepted review on the current source; its earlier verification list mixed a nonzero cross-plan check and the CR-05-owned gpu.test.ts run.",
+        "requiredAction": "CR-04 records only its own exit-0 gating records (focused glyph-placement test and npm run check) on the current source for independent review."
+      },
+      {
+        "id": "INT-377-04",
+        "severity": "mid",
+        "planId": "CR-06",
+        "path": "impl-plans/active/code-render-06-pixel-test.md",
+        "finding": "The CR06-TI-01 and CR06-TI-02 repairs (pixel-compare.mjs compareLine visible.length guard and inkRatio null; code-pixels.mjs clamped caretColumns and caretCheck.caretX/columns; tolerances unchanged) have no independent test-integrity or adversarial re-review.",
+        "requiredAction": "CR-06 re-verifies on the current source for independent test-integrity and adversarial re-review; no tolerance change outside the CR-07 calibration rule."
+      }
+    ],
     "userProblem": "On ea51a07 the canvas/WebGL code pane drops and garbles glyphs: '1' in 'use-bpm 108' is drawn as a thin bar, leading characters are missing on every line after the first, short later lines are blank, caret and diagnostic underlines are drawn rows below their line, and text is heavy and soft compared with DOM text in the same font. The visuals pane repeatedly logs GL_INVALID_OPERATION from glBlitFramebuffer (render-host.ts:226). The existing canvas evidence passed all of this.",
     "requiredOutcomes": [
       "All four reproduction cases (typed 'use-bpm 108'; '# hello' Enter 'abc def' with completion open; 3-line insert; 5-line examples/kalimba.vact) render every character at the correct position, caret on its line and diagnostics under the right span, at DPR 1 and 2.",

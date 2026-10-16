@@ -4,15 +4,18 @@
   "implementationBranch": "wf/vim-mode",
   "baseBranch": "wf/vim-mode",
   "remote": "origin",
-  "originalHead": "08c2fb6382286f97fcca6d2c063910b32eb80436",
-  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (continuation workflowExecutionId opus-luna-design-and-implement-review-loop-session-388 resuming session-385, session-381 and session-374; session-374 intake comm-006526, design accepted comm-006530, plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; prior high finding step3-design-review-attempt-1-finding-1 repaired in design sections 3.3.1-3.3.3, 4.14 and 8.2; prior high finding opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1 (Chromium normal-mode IME commit inserts text, editor/src/code/input.ts:44) routed to VIM-15 and re-verified by VIM-40; no GitHub issue number)",
+  "originalHead": "e878431b2aec078b97f1d8c9541f138749030bb6",
+  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (continuation workflowExecutionId opus-luna-design-and-implement-review-loop-session-391 resuming session-388, session-385, session-381 and session-374; session-374 intake comm-006526, design accepted comm-006530, plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; prior high finding step3-design-review-attempt-1-finding-1 repaired in design sections 3.3.1-3.3.3, 4.14 and 8.2; prior high finding opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1 (Chromium normal-mode IME commit inserts text, editor/src/code/input.ts:44) routed to VIM-15 and re-verified by VIM-40; no GitHub issue number)",
   "resumeContext": {
-    "previousManifestHead": "7574714f55ba14cf0491c9336930e4b578ab83ec",
-    "partialImplementationCommit": "08c2fb6382286f97fcca6d2c063910b32eb80436",
+    "previousManifestHead": "f9bd88e49f6e876a74acabcba662525f372a9db6",
+    "partialImplementationCommit": "12f2d7988d44c938d24f9dd1c4674e38380dc9e2",
+    "ownerDiagnosisCommit": "e878431b2aec078b97f1d8c9541f138749030bb6",
     "earlierPartialImplementationCommits": [
+      "08c2fb6382286f97fcca6d2c063910b32eb80436",
       "ee90e1eb05c45763650b6c624121c601843c393b",
       "84234f86eb079e206413925074e97d430917b126"
     ],
+    "session388Notes": "Session-388 committed checkpoint 12f2d79 with VIM-40 reported blocked on the Chromium normal-mode IME commit. The owner diagnosis (e878431, VIM-40 Progress Log) found the blocker was a stale editor/dist built before later editor/src changes; with input.ts unchanged and a fresh VACTR_REQUIRE_SESSION_ABI=1 npm run build, npm run e2e --browser all --profile behavior passed 32/32 including vim-ime-normal in Chromium and WebKit. No input.ts change is needed. VIM-40 must rebuild editor/dist after the last source change and immediately before the e2e gate. The VIM20 cw handoff (VIM10-ADV-3) is recorded as done in the VIM-20 Progress Log, pending independent review. The session-388 integration review left one open mid finding, IR-388-VIM30-EVIDENCE, routed to VIM-30. VIM-30 must re-run its full verification into a new attempt directory against the current vim-mount.ts, record the sha256 of every owned file, and pass the Step 6 test-integrity and Step 7 adversarial review gates. All 14 plans stay in the remaining set because no plan has a recorded independent acceptance decision from session-388. Implementers resume from the committed files, re-run their plan verification into tmp/vim-mode/<planId>/attempt-<n>/ and append a session-391 Progress Log entry.",
     "notes": "Session-385 stopped on a backend failure and committed checkpoint 08c2fb6. In that run VIM-15 applied the session-381 Chromium normal-mode IME repair (input.ts discard latch survives blur/refocus until compositionend; 23 input-vim-hook cases, 103/103 focused tests) pending independent re-review and the VIM-40 Chromium vim-ime-normal re-check; VIM-10 repaired VIM10-ADV-3 (e/E grapheme-forward algorithm) and handed a cw follow-up to VIM-20 (controller.ts count-1 cw must keep Vim single-character change on a one-grapheme word such as 'a bc' and must not over-change at the final grapheme of a multi-grapheme word such as 'ab cd' at b); VIM-12 repaired VIM12-ADV-04 (uppercase register append concatenates macro tokens) and corrected the qA replay expectation in macro-marks.test.ts. Current self-reported statuses: VIM-00, 12, 13, 14, 15, 16, 17, 18, 41 Completed; VIM-10, 11, 20, 30 In Progress; VIM-40 Ready/In Progress. Not every plan has passed independent Opus review, so all 14 plans stay in the remaining set. Implementers resume from the committed files: re-read them, finish missing criteria, apply routed repairs and handoffs, re-run the plan verification into a new tmp/vim-mode/<planId>/attempt-<n>/ directory, and append a session-388 Progress Log entry. Do not discard committed work."
   },
   "designDocPaths": [
@@ -24,7 +27,7 @@
   "evidenceRoot": "tmp/vim-mode",
   "evidenceLayout": "tmp/vim-mode/<planId>/ per plan (scoped tsconfig.json, command logs ending with exit=<status>), with per-attempt subdirectories tmp/vim-mode/<planId>/attempt-<n>/; tmp/vim-mode/e2e/vim-001/ for the Playwright behavior run; tmp/ui-style/after/ for the style test. tmp/ is gitignored. Each Progress Log records {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls go only in mutationEvidence.",
   "reviewContext": {
-    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-388, continuing session-385, session-381 and session-374; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
+    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-391, continuing session-388, session-385, session-381 and session-374; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
     "priorReviewFindings": [
       {
         "id": "opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1",
@@ -37,7 +40,19 @@
         "owningPlan": "VIM-15",
         "reverifyingPlan": "VIM-40",
         "requiredRepair": "While the Vim hook is set and allowsTextInput() is false, no composition path may start a composition or dispatch: beginComposition() (and so updateComposition and the beforeInput isComposing branch) must not begin, and endComposition() must not dispatch. The blur/refocus that ends the platform composition must not reopen any path that commits text. Insert-mode and Vim-off composition behavior stays byte-identical. Add input-vim-hook.test.ts regressions that replay the Chromium order (compositionstart, microtask blur/refocus, compositionupdate, beforeinput isComposing insertCompositionText, compositionend '日本') and assert the document and revision are unchanged; then the VIM-40 Chromium vim-ime-normal check must pass.",
-        "session385State": "Repair committed in 08c2fb6 (VIM-15 Progress Log 'Step 6 IME repair rerun'); pending independent re-review and the VIM-40 Chromium vim-ime-normal re-check."
+        "session385State": "Repair committed in 08c2fb6 (VIM-15 Progress Log 'Step 6 IME repair rerun'); pending independent re-review and the VIM-40 Chromium vim-ime-normal re-check.",
+        "session388State": "Owner diagnosis e878431: the session-388 vim-ime-normal failure came from a stale editor/dist. A fresh build passes the behavior e2e 32/32 in Chromium and WebKit with input.ts unchanged. VIM-40 must re-run gate 3 (build) after the last source change and then gate 6 under the measurement lock, recording exit status and the complete log."
+      },
+      {
+        "id": "opus-luna-design-and-implement-review-loop-session-388-integration-review-attempt-1-finding-1",
+        "severity": "mid",
+        "workflowMode": "issue-resolution",
+        "sourceReviewStepId": "integration-review",
+        "sourceStepExecutionId": "integration-review-attempt-1-exec-5425",
+        "filePath": "tmp/vim-mode/VIM-30",
+        "message": "IR-388-VIM30-EVIDENCE: VIM-30 cannot be accepted. No Vitest run exists against the final vim-mount.ts (sha256 840a1bdc), and the Step 6 test-integrity and Step 7 adversarial review decisions for VIM-30 do not exist. The type-stripped runtime-equivalence proof narrows the risk but does not replace the required gates.",
+        "owningPlan": "VIM-30",
+        "requiredRepair": "Re-run every VIM-30 verification command against the current tree into a new tmp/vim-mode/VIM-30/attempt-<n>/ directory (the focused Vitest list under the measurement lock), with complete logs ending in the exit status. Record the sha256 of editor/src/code/vim-mount.ts and every other VIM-30 owned file in that attempt and confirm the hashes match the tree the logs ran against. Then pass the Step 6 test-integrity and Step 7 adversarial review gates for VIM-30, and record both decisions in the VIM-30 Progress Log."
       }
     ],
     "pendingHandoffs": [
@@ -46,7 +61,8 @@
         "fromPlan": "VIM-10",
         "owningPlan": "VIM-20",
         "filePath": "editor/src/code/vim/controller.ts",
-        "requiredChange": "With e/E repaired to the grapheme-forward algorithm, count-1 cw must still change only the single character on a one-grapheme word ('a bc' at a) and must change only to the end of the current word when the cursor is on its final grapheme ('ab cd' at b); add controller.test.ts regressions for both."
+        "requiredChange": "With e/E repaired to the grapheme-forward algorithm, count-1 cw must still change only the single character on a one-grapheme word ('a bc' at a) and must change only to the end of the current word when the cursor is on its final grapheme ('ab cd' at b); add controller.test.ts regressions for both.",
+        "session388State": "Recorded done in the VIM-20 Progress Log ('Step 6 VIM10-ADV-3 cw handoff' and 'Step 6 repair VIM20-TI-1'), pending independent review."
       }
     ],
     "userProblem": "The vactr editor code pane (WebGL canvas renderer, hidden-textarea input bridge, @codemirror/state EditorState as the only document authority, no EditorView) has no Vim mode, and @replit/codemirror-vim cannot be used because it requires an EditorView.",
@@ -534,7 +550,8 @@
         "At least 35 new tests pass in vim-input.test.ts and vim-mount.test.ts",
         "npm run check exits 0",
         "node --check test/style/ui-style.mjs exits 0",
-        "With Vim mode off, existing editor tests and behavior are unchanged"
+        "With Vim mode off, existing editor tests and behavior are unchanged",
+        "Repair of IR-388-VIM30-EVIDENCE: a new tmp/vim-mode/VIM-30/attempt-<n>/ holds complete passing logs for every verification command, run against the current vim-mount.ts, with sha256 values for all owned files matching that tree; the Step 6 test-integrity and Step 7 adversarial review decisions for VIM-30 are recorded in its Progress Log"
       ],
       "verification": [
         "cd editor && npm run check",
@@ -571,7 +588,8 @@
         "vim-ime-normal passes in Chromium (CDP Input.imeSetComposition then Input.insertText leaves 'stable' and its revision unchanged) and WebKit after the VIM-15 repair",
         "Gates 1-3, 5 and 7 pass with records in the Progress Log",
         "Gates 4 (test:style) and 6 (Playwright e2e) pass, or carry a recorded verificationGap for the serial Opus verification step with the exact sandbox error",
-        "No tracked evidence file under design-docs/specs/evidence changed"
+        "No tracked evidence file under design-docs/specs/evidence changed",
+        "editor/dist is rebuilt (gate 3) after the last source change and immediately before the e2e gate (gate 6), so the e2e never exercises a stale dist"
       ],
       "verification": [
         "cd editor && npm run check",

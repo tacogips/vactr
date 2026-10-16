@@ -160,3 +160,12 @@ Run from `editor/`. Each log ends with its exit status.
 - `cd editor && npm run check > ../tmp/code-render/CR-02/attempt-3/check.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-3/check.log; exit "$rc"` — exit 0 (`tsc --noEmit`).
 **CR-05 Handoff**: The prior informational GPU aggregate remains a failure, not a pass: `tmp/code-render/reconcile-377/canvas-informational.log` records 76/77 passing and the upload assertion expected 15, observed 34; `tmp/code-render/reconcile-377/retention-probe.log` is retained as related evidence. CR-05 owns reconciliation. No GPU test was added to CR-02 gating verification.
 **Branch Contract**: The CR-02 result includes `reviewBasis.sourcePaths`: `design-docs/specs/design-code-pane-text-rendering.md`, `impl-plans/active/code-render-dispatch.json`, `impl-plans/active/code-render-02-atlas-cells.md`, `editor/src/code/atlas.ts`, `editor/test/code/atlas-cells.test.ts`, `editor/test/code/recording-gl.ts`, and `editor/test/canvas/gpu.test.ts`. Independent test-integrity and adversarial review remain downstream workflow gates.
+
+### Session: 2026-10-17 (current-source revalidation)
+**Tasks Completed**: Revalidated the assigned CR-02 behavior on the current shared source; no implementation files required changes.
+**Tasks In Progress**: None for CR-02 implementation.
+**Blockers**: None.
+**Verification**:
+- `cd editor && npx vitest run test/code/atlas-cells.test.ts > ../tmp/code-render/CR-02/attempt-4/focused.log 2>&1; rc=$?; printf 'exit=%s\n' "$rc" >> ../tmp/code-render/CR-02/attempt-4/focused.log; exit "$rc"` — exit 0; 6/6 passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-02/attempt-4/check.log 2>&1; rc=$?; printf 'exit=%s\n' "$rc" >> ../tmp/code-render/CR-02/attempt-4/check.log; exit "$rc"` — exit 0 (`tsc --noEmit`).
+- `cd editor && npx vitest run test/canvas/gpu.test.ts test/canvas/edit-cost.test.ts > ../tmp/code-render/CR-02/attempt-4/canvas.log 2>&1; rc=$?; printf 'exit=%s\n' "$rc" >> ../tmp/code-render/CR-02/attempt-4/canvas.log; exit "$rc"` — exit 0; informational run 77/77 passed, no CR-05 handoff failure observed.

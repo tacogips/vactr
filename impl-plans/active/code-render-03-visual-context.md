@@ -112,3 +112,13 @@ pixel test check P8, run in CR-07.
 **Verification**:
 - `cd editor && npx vitest run test/visual/panes.test.ts test/visual/render-host.test.ts > ../tmp/code-render/CR-03/focused.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-03/focused.log` — exit 0; 2 files and 15 tests passed.
 - `cd editor && npm run check > ../tmp/code-render/CR-03/check.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-03/check.log` — exit 1 due only to `test/code/text-cells.test.ts(2,30): error TS2591: Cannot find name 'node:fs'`; this file is outside CR-03's write paths.
+
+### Session: 2026-10-17 (implementation rerun)
+**Tasks Completed**: Reverified CR-03 implementation and U6 on the current tree
+**Tasks In Progress**: None
+**Blockers**: None
+**Notes**: Source and test were already present in the pre-node snapshot. The historical check failure above is preserved; this rerun passes.
+
+**Verification**:
+- `cd editor && npx vitest run test/visual/panes.test.ts test/visual/render-host.test.ts > ../tmp/code-render/CR-03/focused-rerun.log 2>&1; rc=$?; echo "exit=$rc" >> ../tmp/code-render/CR-03/focused-rerun.log; exit $rc` — exit 0; 2 files and 15 tests passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-03/check-rerun.log 2>&1; rc=$?; echo "exit=$rc" >> ../tmp/code-render/CR-03/check-rerun.log; exit $rc` — exit 0.

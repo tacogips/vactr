@@ -138,8 +138,11 @@ only, cross-plan check errors recorded). Logs go under
 Run from `editor/`.
 
 1. `npx vitest run test/code/glyph-placement.test.ts > ../tmp/code-render/CR-04/focused.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-04/focused.log` -> exit 0.
-2. `npm run check > ../tmp/code-render/CR-04/check.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-04/check.log` -> exit 0 (or only cross-plan errors recorded).
-3. `npx vitest run test/canvas/gpu.test.ts > ../tmp/code-render/CR-04/canvas.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-04/canvas.log` -> informational; record CR-05 handoff notes.
+2. `npm run check > ../tmp/code-render/CR-04/check.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-04/check.log` -> exit 0.
+
+The optional `npx vitest run test/canvas/gpu.test.ts` run is informational and
+CR-05-owned; it is not a CR-04 gating verification. Record any such result only
+as a CR-05 handoff note, not as a CR-04 completion criterion.
 
 Real-GPU shader compilation is proven by the CR-06 pixel test in CR-07.
 
@@ -171,3 +174,9 @@ Real-GPU shader compilation is proven by the CR-06 pixel test in CR-07.
 **Tasks In Progress**: None for the assigned CR-04 contract.
 **Blockers**: None for the assigned CR-04 contract.
 **Notes**: Current-source `npx vitest run test/code/glyph-placement.test.ts` passed 6/6 (`tmp/code-render/CR-04/attempt-2/focused.log`). Current-source `npm run check` exited 0 (`tmp/code-render/CR-04/attempt-2/check.log`); the concurrent CR-06 declaration issue is resolved in the combined tree. The prior `test/canvas/gpu.test.ts` result remains an informational CR-05 handoff: 61/62 passed, with the atlas upload-count assertion observing 34 instead of 15; this plan did not edit `gpu.test.ts`. Real-GPU shader compilation remains owned by CR-06/CR-07. `renderer.ts` remains unchanged. Evidence intention: `tmp/code-render/CR-04/attempt-2/edit-intent.txt`.
+
+### Session: 2026-10-17 (INT-377-03 current-source evidence)
+**Tasks Completed**: Re-ran CR-04's two assigned gating checks on current source and clarified that the CR-05 canvas suite is informational rather than a CR-04 gate.
+**Tasks In Progress**: None for the CR-04 implementation contract.
+**Blockers**: None for implementation; independent review remains downstream.
+**Notes**: `editor/src/code/geometry.ts` still exports `SNAP_GLYPH`, `glyphPhase` and `glyphQuad`; vertex origin snapping is guarded by bit 16 and `u_device`; fragment output is premultiplied. CR-04 did not set `SNAP_GLYPH` on instances or edit `renderer.ts`; the current integrated branch includes CR-05-owned renderer wiring that sets the flag on text instances. Current-source focused verification passed 6/6 at `tmp/code-render/CR-04/attempt-3-focused.log`; `npm run check` exited 0 at `tmp/code-render/CR-04/attempt-3-check.log`. Both are CR-04 gating checks. Canvas GPU verification is CR-05-owned and is explicitly informational under the dispatch contract. Real-GPU shader compilation remains owned by CR-06/CR-07. Per-edit intents: `tmp/code-render/CR-04/attempt-3-edit-intent.txt` and `tmp/code-render/CR-04/attempt-3-edit-intent-02.txt`.

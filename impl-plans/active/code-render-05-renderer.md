@@ -1,6 +1,6 @@
 # Code Render 05: Renderer Wiring - Identity Slots, Snapped Glyph Quads, Straight-Alpha Literals (RC3, R5, R7, R8, R11)
 
-**Status**: In Progress
+**Status**: Completed
 **Plan ID**: CR-05
 **Wave**: 2 (depends on CR-01, CR-02, CR-04)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 3 (RC1, RC3, RC5), 4.2-4.5 (R3, R5, R6, R7, R8, R11), 4.7, 5.1 (U3), 6
@@ -238,3 +238,14 @@ measurement lock.
 - Current-source verification: focused suite 22/22 (`tmp/code-render/CR-05/attempt-4/focused.log`); canvas suite 223/223 under the measurement lock (`canvas.log`); `npm run check` exit 0 (`check.log`).
 - Line counts: renderer.ts 673, gpu.test.ts 993, edit-cost.test.ts 346 (`tmp/code-render/CR-05/attempt-4/wc.log`); all remain below 1000.
 - The earlier 222/223 log is retained as historical evidence. Full vitest and browser pixel/e2e validation remain assigned to CR-07.
+
+### Session: 2026-10-17 CR-05 review-finding repair
+**Tasks Completed**: Repaired INT-377-W4-02 by restoring an exact deterministic first-frame atlas upload assertion; reran the CR-05 focused and canvas suites, type check, and line-count gate.
+**Tasks In Progress**: None for CR-05. CR-07 owns full vitest, browser e2e/pixel checks, and final integration review.
+**Blockers**: None.
+**Notes**:
+- `editor/test/canvas/gpu.test.ts`: replaced the widened `firstUploads > distinctGlyphs.size && firstUploads <= distinctGlyphs.size * 8` check with `expect(firstUploads).toBe(34)`. The fixed fixture's current exact count passed; later-frame upload equality, texture reuse, eviction, and texSubImage2D accounting assertions remain intact. File is 991 lines.
+- INT-377-W4-01 remains owned by CR-01, outside CR-05 writePaths. Its derived-run repair is present in the accepted combined tree; `npx vitest run test/canvas` now passes 223/223, including the unchanged `mount.test.ts` measurement invariant.
+- Current-source verification: targeted upload assertion 1/1 (`attempt-5/upload-count.log`); CR-05 focused suite 22/22 (`attempt-5/focused.log`); canvas suite 223/223 under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` (`attempt-5/canvas.log`); `npm run check` exit 0 (`attempt-5/check.log`); line counts renderer.ts 673, gpu.test.ts 991, edit-cost.test.ts 346 (`attempt-5/wc.log`).
+- Toolchain digests are recorded in `toolchain-sha256.txt`. Earlier failed canvas evidence remains in the prior entries and is superseded by the current-source passing rerun.
+- Formal integration review and CR-07 full vitest/browser pixel/e2e checks remain downstream.

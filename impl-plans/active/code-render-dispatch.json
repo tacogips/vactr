@@ -4,9 +4,9 @@
   "implementationBranch": "wf/code-render",
   "baseBranch": "wf/code-render",
   "remote": "origin",
-  "originalHead": "c7cee029d8e6a373a4f40be4c2d6b04d8d5a63f0",
+  "originalHead": "0d59cd6bfea6d0ad2d3159c798f3ea39816bf789",
   "defectBaselineCommit": "ea51a0733e301f6e29dddb009c87542b635e6722",
-  "checkpointHistory": "Resumed in workflow session opus-luna-design-and-implement-review-loop-session-380 at intake HEAD c7cee02 (the session-377 partial implementation checkpoint, committed when that run stopped on a usage limit; it follows the session-377 manifest refresh ccfe55f and the session-373 design/plan checkpoint e63b471). The accepted design and plan files are unchanged from c7cee02; only this manifest is updated. No plan has an accepted independent review on the c7cee02 source, so all seven plans remain and acceptedDependencies stays empty: each worker resumes from the committed partial source and its own progress log, re-verifies, and repairs the open findings in reviewContext.priorReviewFindings. ea51a07 remains the pre-fix defect baseline referenced by the plans for mutation evidence and the sibling-boundary diff.",
+  "checkpointHistory": "Resumed in workflow session opus-luna-design-and-implement-review-loop-session-384 at intake HEAD 0d59cd6 on wf/code-render (session-380 resumed at c7cee02, the session-377 partial implementation checkpoint; earlier checkpoints ccfe55f and e63b471). Session-380 Luna re-verified CR-01 to CR-06 and repaired INT-377-W4-02, INT-377-03, INT-380-P6a, INT-380-P6b and INT-380-P3; CR-07 attempt 2 stopped at its calibration gate. This checkpoint commits the CR-01 to CR-07 progress logs, the repaired CR-07 plan (step5-impl-plan-review comm-006719 accepted) and this manifest. The session-380 source edits (editor/test/canvas/gpu.test.ts, editor/test/e2e/code-pixels.mjs, editor/test/e2e/pixel-compare.mjs, editor/test/e2e/pixel-compare.test.ts) stay uncommitted in this worktree for the implement step and its reviews, and the interim 'CR-07 closeout attempt (2026-10-17)' paragraph in design-docs/specs/design-canvas-editor-evidence.md stays uncommitted until CR-07 step 7 replaces it with the final Results subsection. No plan has an accepted independent review on the current source, so all seven plans remain and acceptedDependencies stays empty. ea51a07 remains the pre-fix defect baseline for mutation evidence and the sibling-boundary diff.",
   "designDocPaths": [
     "design-docs/specs/design-code-pane-text-rendering.md",
     "design-docs/specs/design-canvas-editor-evidence.md",
@@ -75,7 +75,7 @@
   "verificationNotes": "Each plan's verification array is its gating list only (exit 0 required). Commands run from the repository root. Informational canvas runs (CR-01/02/04 canvas.log, CR-06 optional smoke) and CR-07 step-5 baseline runs on ea51a07 stay in the plan text and are recorded as handoff notes or mutationEvidence, never as gating records. Lock-wrapped commands release only the lock they created; if mkdir fails the lock is held by another run: wait 30 s and retry.",
   "acceptedDependencies": [],
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Code pane drops and garbles glyphs (missing line segments, '1' rendered as a bar) and text looks dirty' (no GitHub issue); workflow opus-luna-design-and-implement-review-loop-session-373, resumed in session-377 at e63b471 and in session-380 at c7cee02; session-373 intake comm-006522, design comm-006523, design review comm-006524 accepted, plans comm-006525, plan review comm-006526 (PR-H1), repair comm-006527, plan review comm-006528 accepted; session-377 integration reviews integration-review-attempt-1-exec-5039 and exec-5078",
+    "issueReference": "workflowInput issue 'Code pane drops and garbles glyphs (missing line segments, '1' rendered as a bar) and text looks dirty' (no GitHub issue); workflow opus-luna-design-and-implement-review-loop-session-373, resumed in session-377 at e63b471 and in session-380 at c7cee02; session-373 intake comm-006522, design comm-006523, design review comm-006524 accepted, plans comm-006525, plan review comm-006526 (PR-H1), repair comm-006527, plan review comm-006528 accepted; session-377 integration reviews integration-review-attempt-1-exec-5039 and exec-5078; session-384 step5-impl-plan-review comm-006719 accepted the repaired CR-07 plan (CR07-STALE-RESULTS, CR07-UI-STYLE-ARTIFACT-ROOT)",
     "priorReviewFindings": [
       {
         "id": "INT-377-W4-01",
@@ -93,6 +93,7 @@
         "path": "editor/test/canvas/gpu.test.ts",
         "finding": "The 'retains every unchanged text tile across animation frames without backdrop uploads' first-frame upload assertion was weakened from an exact toBe(distinct glyph count) to a 1..8x bound; the fixture is deterministic, so the count is exact.",
         "stateAtC7cee02": "Unrepaired: CR-05 progress log still lists the bound (observed 34).",
+        "stateAt0d59cd6": "Reported repaired in session 380 (uncommitted gpu.test.ts: expect(firstUploads).toBe(34); 991 lines; tmp/code-render/CR-05/attempt-5/). Needs independent re-review.",
         "requiredAction": "CR-05 restores an exact expectation derived from the fixture (distinct (glyph, texel width, phase) cells; 34 observed) with the reason in its mechanical-change list; gpu.test.ts stays under 1000 lines."
       },
       {
@@ -110,6 +111,15 @@
         "path": "impl-plans/active/code-render-06-pixel-test.md",
         "finding": "The CR06-TI-01 and CR06-TI-02 repairs (pixel-compare.mjs compareLine visible.length guard and inkRatio null; code-pixels.mjs clamped caretColumns and caretCheck.caretX/columns; tolerances unchanged) have no independent test-integrity or adversarial re-review.",
         "requiredAction": "CR-06 re-verifies on the current source for independent test-integrity and adversarial re-review; no tolerance change outside the CR-07 calibration rule."
+      },
+      {
+        "id": "INT-380-P6a-P6b-P3",
+        "severity": "mid",
+        "planId": "CR-06",
+        "path": "editor/test/e2e/code-pixels.mjs",
+        "finding": "CR-07 attempt 2 calibration exited 1 (0/4 rows): P6 found no diagnostic in S2 at DPR 1 and empty underline rows for clipped S4 diagnostics; P3 extent differences reached 3 device px at DPR 2.",
+        "stateAt0d59cd6": "Reported repaired in session 380 (uncommitted code-pixels.mjs, pixel-compare.mjs, pixel-compare.test.ts): P6a waits up to 5 s for diagnostics in S2/S3; P6b checks only visible diagnostic spans and reports diagnosticSkipped; P3 measures the connected ink run nearest each cell center (selectDiagnosticRect export added). Thresholds unchanged. Evidence tmp/code-render/CR-06/repair-380/ (focused 7/7, locked matrix 4/4). The CR-06 P3 contract text still describes inkRight-inkLeft from cellInk (CR06-P3-CONTRACT-DRIFT, low).",
+        "requiredAction": "Independent test-integrity and adversarial re-review of the INT-380 repairs; CR-07 attempt 3 re-runs calibration and the full pixel matrix under tmp/code-render/CR-07/attempt-3/."
       }
     ],
     "userProblem": "On ea51a07 the canvas/WebGL code pane drops and garbles glyphs: '1' in 'use-bpm 108' is drawn as a thin bar, leading characters are missing on every line after the first, short later lines are blank, caret and diagnostic underlines are drawn rows below their line, and text is heavy and soft compared with DOM text in the same font. The visuals pane repeatedly logs GL_INVALID_OPERATION from glBlitFramebuffer (render-host.ts:226). The existing canvas evidence passed all of this.",
@@ -194,7 +204,10 @@
     "rootCauses": "RC1 atlas key leaves out texel width; RC2 textCells uses an absolute offset as run-relative; RC3 currentSlot leaks into non-text layers; RC4 straight-alpha output under a premultiplied blend; RC5 unsnapped, rescaled quads with LINEAR filtering; RC6 visuals context antialias:true so blitFramebuffer is invalid",
     "residualRisks": [
       "toolchainAudit records sizes and mtimes; the review-time sha256 values are in toolchainAudit.reviewSha256. Each plan records digests before its first edit and CR-07 re-checks equality.",
-      "P8 baseline reproduction depends on headless visuals present() running; SwiftShader availability is unverified (exit 2 = blocked)."
+      "P8 baseline reproduction depends on headless visuals present() running; SwiftShader availability is unverified (exit 2 = blocked).",
+      "CR06-P3-CONTRACT-DRIFT (low): CR-06 plan P3 text still describes inkRight-inkLeft from cellInk while the implementation measures the nearest connected ink run; the tolerance is unchanged and the CR-06 progress log records the change.",
+      "The interim CR-07 paragraph in design-canvas-editor-evidence.md is uncommitted; if CR-07 stops early again it must not be committed as final evidence.",
+      "CR-07 attempt 3 serializes behind the shared .measure-lock while the sibling wf/vim-mode run is active."
     ]
   },
   "plans": [
@@ -427,7 +440,8 @@
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules",
-        "tmp/canvas-cutover/evidence"
+        "tmp/canvas-cutover/evidence",
+        "tmp/ui-style/after"
       ],
       "sharedPaths": [
         "editor/test/e2e/code-pixels.mjs",
@@ -452,25 +466,27 @@
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules",
-        "tmp/canvas-cutover/evidence"
+        "tmp/canvas-cutover/evidence",
+        "tmp/ui-style/after"
       ],
       "acceptanceCriteria": [
         "Toolchain sha256 re-check equals every plan's recorded digests.",
-        "Calibration recorded (or defaults kept).",
+        "Final calibration outcome (defaults kept or calibrated values) recorded from the final-run calibration log.",
         "check, focused vitest, full vitest, test:style, debug-wasm build, e2e behavior profile (Chromium + WebKit, with code-pixels-dpr1/dpr2) and the full pixel matrix pass under the lock.",
         "Baseline mutation evidence shows P1, P3, P5, P6, P7, P8 and U1/U2/U3/U6 failing on ea51a07 (non-failing ones recorded as findings).",
         "Before/after screenshots, including the DR-L2 selection pair, named in the progress log.",
-        "Touched files under 1000 lines; input.ts, keyboard.ts and the cursor block untouched; results appended to design-canvas-editor-evidence.md outside the EVIDENCE markers."
+        "Touched files under 1000 lines; input.ts, keyboard.ts and the cursor block untouched; one final Results subsection (gate table, mutationEvidence summary, screenshot pairs) replaces the interim 'CR-07 closeout attempt (2026-10-17)' subsection in design-canvas-editor-evidence.md, outside the EVIDENCE markers."
       ],
       "verification": [
-        "shasum -a 256 target/wasm32-unknown-unknown/debug/vactr.wasm tree-sitter-vact/tree-sitter-vact.wasm editor/package-lock.json > tmp/code-render/CR-07/toolchain-sha256.txt",
-        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build > ../tmp/code-render/CR-07/build.log 2>&1; echo \"exit=$?\" >> ../tmp/code-render/CR-07/build.log",
-        "cd editor && npm run check > ../tmp/code-render/CR-07/check.log 2>&1; echo \"exit=$?\" >> ../tmp/code-render/CR-07/check.log",
-        "cd editor && npx vitest run test/code/text-cells.test.ts test/code/atlas-cells.test.ts test/code/glyph-placement.test.ts test/code/renderer-layers.test.ts test/code/perf-hook-annotations.test.ts test/visual/panes.test.ts test/e2e/pixel-compare.test.ts > ../tmp/code-render/CR-07/focused.log 2>&1; echo \"exit=$?\" >> ../tmp/code-render/CR-07/focused.log",
-        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && npx vitest run) > tmp/code-render/CR-07/vitest-full.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/vitest-full.log; }",
-        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && npm run test:style) > tmp/code-render/CR-07/test-style.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/test-style.log; }",
-        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run e2e -- --browser all --profile behavior) > tmp/code-render/CR-07/e2e-behavior.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/e2e-behavior.log; }",
-        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && node test/e2e/code-pixels.mjs --backend all --dpr all --out ../tmp/code-render/CR-07/pixels-after) > tmp/code-render/CR-07/pixels-after.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/pixels-after.log; }",
+        "mkdir -p tmp/code-render/CR-07/attempt-3 && shasum -a 256 target/wasm32-unknown-unknown/debug/vactr.wasm tree-sitter-vact/tree-sitter-vact.wasm editor/package-lock.json > tmp/code-render/CR-07/attempt-3/toolchain-sha256.txt",
+        "{ git rev-parse HEAD; git status --short -- editor; git diff HEAD -- editor | shasum -a 256; } > tmp/code-render/CR-07/attempt-3/source-state.txt",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build > ../tmp/code-render/CR-07/attempt-3/build.log 2>&1; echo \"exit=$?\" >> ../tmp/code-render/CR-07/attempt-3/build.log",
+        "cd editor && npm run check > ../tmp/code-render/CR-07/attempt-3/check.log 2>&1; echo \"exit=$?\" >> ../tmp/code-render/CR-07/attempt-3/check.log",
+        "cd editor && npx vitest run test/code/text-cells.test.ts test/code/atlas-cells.test.ts test/code/glyph-placement.test.ts test/code/renderer-layers.test.ts test/code/perf-hook-annotations.test.ts test/visual/panes.test.ts test/e2e/pixel-compare.test.ts > ../tmp/code-render/CR-07/attempt-3/focused.log 2>&1; echo \"exit=$?\" >> ../tmp/code-render/CR-07/attempt-3/focused.log",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && npx vitest run) > tmp/code-render/CR-07/attempt-3/vitest-full.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/attempt-3/vitest-full.log; }",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && npm run test:style) > tmp/code-render/CR-07/attempt-3/test-style.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/attempt-3/test-style.log; }",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run e2e -- --browser all --profile behavior) > tmp/code-render/CR-07/attempt-3/e2e-behavior.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/attempt-3/e2e-behavior.log; }",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && { (cd editor && node test/e2e/code-pixels.mjs --backend all --dpr all --out ../tmp/code-render/CR-07/attempt-3/pixels-after) > tmp/code-render/CR-07/attempt-3/pixels-after.log 2>&1; s=$?; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; echo \"exit=$s\" >> tmp/code-render/CR-07/attempt-3/pixels-after.log; }",
         "git diff --exit-code ea51a07 -- editor/src/code/input.ts editor/src/code/keyboard.ts"
       ]
     }

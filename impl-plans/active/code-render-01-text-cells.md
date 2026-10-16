@@ -197,3 +197,14 @@ failureCount: 0, outcome: "passed", log, notes}`.
 - Under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`, `cd editor && npx vitest run test/canvas`: exit 0, 223/223 passed; complete log `tmp/code-render/CR-01/attempt-7/canvas.log`. `editor/test/canvas/mount.test.ts:321` remains byte-identical and passes.
 - `cd editor && npx vitest run test/code/renderer-layers.test.ts test/code/atlas-cells.test.ts test/code/glyph-placement.test.ts`: exit 0, 14/14 passed; complete log `tmp/code-render/CR-01/attempt-7/adjacent.log`.
 - `layout.ts` remains under 1000 lines. `git diff --check` and the mount-test byte-identity check are recorded in `tmp/code-render/CR-01/attempt-7/final-audit.log`.
+
+### Session: 2026-10-17 (current-source verification)
+**Tasks Completed**: CR-01 assigned implementation and regression checks reconfirmed
+**Tasks In Progress**: None in CR-01
+**Blockers**: None
+**Notes**:
+- No implementation source changes were needed; the current source retains the run-relative ASCII start, derived-run metadata/additivity propagation, and cached-line-shift cluster rebasing.
+- Current-source focused verification: `cd editor && npx vitest run test/code/text-cells.test.ts`; exit 0, 8/8 passed. Complete log: `tmp/code-render/CR-01/attempt-8/focused.log`.
+- Current combined-tree check: `cd editor && npm run check`; exit 0. Complete log: `tmp/code-render/CR-01/attempt-8/check.log`.
+- Informational CR-05 handoff verification: under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`, `cd editor && npx vitest run test/canvas/gpu.test.ts test/canvas/edit-cost.test.ts`; exit 0, 77/77 passed. Complete log: `tmp/code-render/CR-01/attempt-8/canvas.log`. No remaining GPU/edit-cost handoff from this run.
+- Current-source checksums and the exact plan edit intent are recorded in `tmp/code-render/CR-01/attempt-8/pre-verification-sha256.txt` and `edit-intent-plan.txt`.

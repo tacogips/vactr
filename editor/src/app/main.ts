@@ -30,6 +30,11 @@ import type { EditorDeps, Mounted, MountFn } from './deps';
 import { buildLayout, pane, type Layout } from './layout';
 import { mount as mountSong } from './song';
 import { mountShell, pageStorage } from '../ui/shell';
+import { DocumentStorage, LocalTemplateStore, pageBackend } from '../documents/storage';
+import { TauriTemplateStore } from '../documents/tauri-templates';
+import type { DocumentsOptions } from '../documents/types';
+import { mount as mountDocuments, type DocumentsArea } from '../documents/mount';
+import { exampleSource } from '../examples/registry';
 import { BootFailure } from '../ui/status-view';
 import { createComponent } from 'solid-js';
 import { render } from 'solid-js/web';
@@ -51,19 +56,23 @@ export interface Editor {
   root: HTMLElement;
   deps: EditorDeps;
   layout: Layout;
+  documents?: DocumentsArea;
   dispose(): void;
 }
 
 /** Builds the layout and mounts every area in `MOUNT_ORDER`. */
-export function createEditor(root: HTMLElement, deps: EditorDeps): Editor {
+export function createEditor(root: HTMLElement, deps: EditorDeps, opts: { documents?: DocumentsOptions } = {}): Editor {
   const layout = buildLayout(root);
   const handles: Mounted[] = [mountShell(root, pageStorage(root.ownerDocument.defaultView))];
   for (const area of MOUNT_ORDER) handles.push(MOUNTS[area](root, deps));
   handles.push(mountSong(root, deps, DOC_FILE));
+  const documents = opts.documents ? mountDocuments(root, deps, opts.documents) : undefined;
+  if (documents) handles.push(documents);
   return {
     root,
     deps,
     layout,
+    ...(documents ? { documents } : {}),
     dispose() {
       for (const h of handles.reverse()) h.dispose();
     },
@@ -128,7 +137,16 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
   if (typeof Worker === 'function') {
     deps.syntaxWorker = () => new Worker(new URL('../code/syntax-worker.ts', import.meta.url), { type: 'module' });
   }
-  const editor = createEditor(root, deps);
+  const shell = isTauri(win) ? 'app' : 'web';
+  const storage = new DocumentStorage(pageBackend(win));
+  const documents: DocumentsOptions = {
+    shell,
+    store: storage,
+    templates: shell === 'app' ? new TauriTemplateStore(invoke) : new LocalTemplateStore(storage),
+    examples: exampleSource,
+    search: win.location.search,
+  };
+  const editor = createEditor(root, deps, { documents });
   if (tauriFallback) {
     const notice = root.ownerDocument.createElement('div');
     notice.setAttribute('role', 'status');
@@ -136,6 +154,7 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
     notice.textContent = `Native connection failed; using browser mode: ${tauriFallback}`;
     editor.layout.status.appendChild(notice);
   }
+  await editor.documents?.ready;
   audibleLifecycle.start();
   deps.client.subscribe({ telemetry: true, levels: true, diagnostics: true });
   if (isTauri(win)) void reportSelfCheck(root, win, deps);

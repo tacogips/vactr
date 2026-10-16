@@ -1,5 +1,27 @@
 # Canvas browser evidence harness
 
+## Examples scenario
+
+Run `cd editor && npm run e2e:examples` after building `editor/dist` with the
+debug wasm artifact:
+
+```sh
+cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build
+cd editor && npm run e2e:examples
+```
+
+The Chromium-only scenario checks first-open showcase behavior, moderate
+playback, keyboard example selection with undo/redo, draft restoration, the
+saved-document library, default-template persistence/reset, draft recovery
+under an explicit example URL, and startup when localStorage is unavailable.
+Each browser context installs the silent sink before navigation. Playback
+must remain at or below -1 dBFS before the sink, with post-sink peak exactly
+zero and no direct destination connections. The runner prints and writes its
+eight-check JSON result to `tmp/examples-e2e/result.json`; the complete command
+log belongs in `tmp/examples/EX-70/e2e-examples.log`. Exit 0 means all checks
+passed, exit 1 means one or more checks failed, and exit 2 means the browser or
+built distribution is unavailable.
+
 This is a plain Node.js Playwright-library harness. It does not use `@playwright/test`.
 
 ```sh

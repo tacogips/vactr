@@ -1,10 +1,10 @@
 # EX-50: Document Picker View (Solid component and CSS)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EX-50 (wave 1, parallel)
 **Design Reference**: `design-docs/specs/design-example-picker-and-persistence.md` section 8; `design-docs/specs/design-ui-style.md`
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Intent and Context
 
@@ -183,11 +183,11 @@ gate (`npm run test:style`) runs in EX-70.
 
 ## Completion Criteria
 
-- [ ] `PickerView` and `ensurePickerStylesheet` exported; classes and
+- [x] `PickerView` and `ensurePickerStylesheet` exported; classes and
       roles as specified.
-- [ ] All listed tests pass; `style-tokens.test.ts` passes.
-- [ ] Files under 1000 lines.
-- [ ] Progress Log with records and pre/post sha256.
+- [x] All listed tests pass; `style-tokens.test.ts` passes.
+- [x] Files under 1000 lines.
+- [x] Progress Log with records and pre/post sha256.
 
 ## Edit Protocol
 
@@ -199,3 +199,23 @@ record on drift; no git index or branch operations.
 ### Session: 2026-10-16
 **Tasks Completed**: Plan authored.
 **Blockers**: None.
+
+### Session: 2026-10-17
+**Tasks Completed**: Implemented the presentational picker, token-only stylesheet, keyboard navigation, filter, inline save/rename/delete flows, replacement confirmation, and focused tests. The view calls behavior only through `PickerActions`. Final acceptance self-check passed.
+**Blockers**: None for EX-50. The combined-tree integration and review gates remain downstream workflow work.
+
+**Verification**:
+
+```json
+{"command":"bash -c 'cd editor; npx vitest run test/ui/picker-view.test.tsx test/ui/style-tokens.test.ts > ../tmp/examples/EX-50/vitest-attempt-6.log 2>&1; result=$?; printf \"\\nexitStatus=%s\\n\" \"$result\" >> ../tmp/examples/EX-50/vitest-attempt-6.log; exit \"$result\"'","exitStatus":0,"testsRun":21,"testsPassed":21,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-50/vitest-attempt-6.log","notes":"PickerView and style-tokens suites; complete log records 2 files and 21 passing tests."}
+{"command":"bash -c 'cd editor; npm run check > ../tmp/examples/EX-50/check-attempt-6.log 2>&1; result=$?; printf \"\\nexitStatus=%s\\n\" \"$result\" >> ../tmp/examples/EX-50/check-attempt-6.log; exit \"$result\"'","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-50/check-attempt-6.log","notes":"Full TypeScript check passed on the shared tree."}
+```
+
+Earlier attempts and complete logs are retained in `tmp/examples/EX-50/`: `vitest.log` and `check.log` record attempt 1; `vitest-attempt-2.log` and `check-attempt-2.log` record attempt 2; `vitest-attempt-5.log` and `check-attempt-5.log` record attempt 5. Attempt 1 exposed three picker failures and strict type errors; attempt 2 passed its focused tests while the shared EX-30 Tauri template tests still had type errors; attempt 5 exposed the inline-form Escape propagation bug. The final run above follows those corrections and passes on the current source.
+
+**SHA-256 (pre -> post)**:
+
+- `editor/src/ui/picker-view.tsx`: absent (empty preimage `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`) -> `1f041d98f8c5cb4016aae821b896021c66f03920d2e6935c77c41ee68c83965e`
+- `editor/src/ui/picker.css`: absent (empty preimage `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`) -> `c4e72b1ad47d93f5cacb83849a5662303d4550cd1bc0d78119088dea87677ea9`
+- `editor/test/ui/picker-view.test.tsx`: absent (empty preimage `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`) -> `3fca85bdea1f8d62ac5eab2d31e8b3f5ff0c1acf604df0c752e05c460390f56d`
+- `impl-plans/active/examples-50-picker-view.md`: `336cbf67afb4c89ec099b97b5b05b8826bd00f3d764ad6af18bf35e30d2f190d` -> recorded in `tmp/examples/EX-50/plan-sha256-attempt-2.txt` after this update.

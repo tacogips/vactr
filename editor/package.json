@@ -14,7 +14,8 @@
     "test:style": "node test/style/ui-style.mjs",
     "build": "vite build",
     "dev": "vite",
-    "e2e": "node test/e2e/run.mjs"
+    "e2e": "node test/e2e/run.mjs",
+    "e2e:examples": "node test/e2e/examples.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

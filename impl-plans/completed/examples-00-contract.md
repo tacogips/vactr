@@ -1,6 +1,6 @@
 # EX-00: Shared Document and Example Contracts
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EX-00 (wave 0)
 **Design Reference**: `design-docs/specs/design-example-picker-and-persistence.md` sections 3.2, 4, 5.1, 5.2, 6, 7, 8
 **Created**: 2026-10-16
@@ -190,11 +190,11 @@ failureCount: 0, outcome: "passed", log, notes}` in the Progress Log.
 
 ## Completion Criteria
 
-- [ ] `editor/src/documents/types.ts` exports every symbol above with the
+- [x] `editor/src/documents/types.ts` exports every symbol above with the
       exact names and shapes.
-- [ ] `editor/src/examples/glob.d.ts` declares both overloads.
-- [ ] Guard tests pass; `npm run check` exits 0.
-- [ ] Progress Log has the verification records and pre/post sha256 of
+- [x] `editor/src/examples/glob.d.ts` declares both overloads.
+- [x] Guard tests pass; `npm run check` exits 0.
+- [x] Progress Log has the verification records and pre/post sha256 of
       each written file.
 
 ## Edit Protocol
@@ -210,3 +210,19 @@ re-read. Never run git commands that change the index or branches.
 **Tasks Completed**: Plan authored. Revised for ER-L1 (`StorageResult`
 void success is `{ ok: true }`).
 **Blockers**: None.
+
+### Session: 2026-10-17
+**Tasks Completed**: Implemented the shared document/example contracts and
+pure guards, the ambient eager/lazy `ImportMeta.glob` signatures, and guard
+tests. The assigned EX-00 contract is complete; downstream registry, storage,
+session and picker implementation remains with its own plans.
+**Blockers**: None.
+**File SHA-256 (pre -> post)**:
+- `editor/src/documents/types.ts`: missing -> `86f8e8cde6a2aaf510d1fb90012b63a6d3d01195213babdf51e751223409e00c`
+- `editor/src/examples/glob.d.ts`: missing -> `db22550aeadb0610072f7df0316200ae68df3e3f46df9183ab9721307676924a`
+- `editor/test/documents/types.test.ts`: missing -> `19c20b4092696d7b6e94156b4c7ae5c0f062179360a9ada15c19e3649f2306fd`
+- `impl-plans/active/examples-00-contract.md`: `b7b0abe002c0be2ad23452a533ac2d84d05aa6344e394138bb769076126f8fd3` -> recorded in `tmp/examples/EX-00/plan-sha256.txt` after this write.
+
+**Verification**:
+- `{command: "cd editor && npx vitest run test/documents/types.test.ts", exitStatus: 0, testsRun: 4, testsPassed: 4, failureCount: 0, outcome: "passed", log: "tmp/examples/EX-00/vitest.log", notes: "All DocSource and DefaultTemplate guard cases passed."}`
+- `{command: "cd editor && npm run check", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/examples/EX-00/check.log", notes: "TypeScript check completed with tsc --noEmit."}`

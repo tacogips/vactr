@@ -1,10 +1,10 @@
 # EX-40: Document Session, Draft Autosave and Startup Resolution
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EX-40 (wave 1, parallel)
 **Design Reference**: `design-docs/specs/design-example-picker-and-persistence.md` sections 4, 5.3, 7
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Intent and Context
 
@@ -221,11 +221,11 @@ failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Completion Criteria
 
-- [ ] `DocumentSession`, `DraftAutosave`, `resolveStartup` exported with the
+- [x] `DocumentSession`, `DraftAutosave`, `resolveStartup` exported with the
       signatures above.
-- [ ] All listed tests pass; check clean for this plan's files.
-- [ ] Each file under 1000 lines.
-- [ ] Progress Log with records and pre/post sha256.
+- [x] All listed tests pass; check clean for this plan's files.
+- [x] Each file under 1000 lines.
+- [x] Progress Log with records and pre/post sha256.
 
 ## Edit Protocol
 
@@ -238,3 +238,27 @@ record on drift; no git index or branch operations.
 **Tasks Completed**: Plan authored. Revised for review finding ER-M1
 (`StartupDocument.underlying`, `applyStartup` two-step load, recovery tests).
 **Blockers**: None.
+
+### Session: 2026-10-17
+**Tasks Completed**: Implemented `DocumentSession`, `DraftAutosave`, `resolveStartup` and `applyStartup`; added session, autosave and startup behavior tests; verified all assigned criteria. URL examples retain a web draft as an undo target; empty `?example=` is treated as unknown and falls through. Visibility flush listens on `document.visibilitychange` and checks hidden state.
+**Blockers**: None.
+**Downstream**: Formal test-integrity, adversarial and combined-tree integration review are owned by later workflow steps.
+
+**Verification**:
+
+```json
+{"command":"cd editor && npx vitest run test/documents/session.test.ts test/documents/autosave.test.ts test/documents/startup.test.ts > ../tmp/examples/EX-40/vitest.log 2>&1","exitStatus":0,"testsRun":18,"testsPassed":18,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-40/vitest.log","notes":"Final-source run: 3 files passed, 18 tests passed. Earlier failed attempt preserved at tmp/examples/EX-40/vitest-attempt-1.log."}
+{"command":"cd editor && npm run check > ../tmp/examples/EX-40/check.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-40/check.log","notes":"TypeScript compiler completed with tsc --noEmit exit 0 on the combined working tree."}
+```
+
+**File identities** (new files had no preimplementation file/hash; postimplementation SHA-256 shown):
+
+| File | Preimplementation | Postimplementation SHA-256 | Lines |
+|---|---|---|---:|
+| `editor/src/documents/session.ts` | absent | `719c068c07023c0bef2e2e0b8ef2094fcb976a84e5cdb8a59de953185da17bf5` | 78 |
+| `editor/src/documents/autosave.ts` | absent | `e1c77dfb6acb20828e47d80a48f66b5cf4644457eb1f8d4c5aa854a24fa82655` | 97 |
+| `editor/src/documents/startup.ts` | absent | `1481b826e3cf221db3affb6c8fad262d35ec436f439169c764379d59b5d3295d` | 109 |
+| `editor/test/documents/session.test.ts` | absent | `a2921ec1e488c9ad645369ce4f8aab00e42355e5c34da9e5a368cfa44ca141c9` | 80 |
+| `editor/test/documents/autosave.test.ts` | absent | `36cc86b7c86a8a251543f726cdb1859549c419368f595526da42e4fc58498d2f` | 135 |
+| `editor/test/documents/startup.test.ts` | absent | `32dc28d65372abfc9273f427d8b90720ce5edbfcbe805ad9606a5417dc3b9c09` | 137 |
+| `impl-plans/active/examples-40-session-startup.md` | `c6eae1b364463a9db7f02d8ab0e8e95621d4cfb2825818037240405aa64f70e3` | Recorded in `tmp/examples/EX-40/plan-sha256.txt` after this update | n/a |

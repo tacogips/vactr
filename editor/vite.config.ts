@@ -166,6 +166,7 @@ export default defineConfig({
   base: './',
   worker: { format: 'es' },
   plugins: [solid(), vactrAssets()],
+  server: { fs: { allow: ['.', '../examples'] } },
   build: {
     target: 'es2022',
   },

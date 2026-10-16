@@ -1,6 +1,6 @@
 # EX-20: Web Document Storage (localStorage schema v1) and LocalTemplateStore
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EX-20 (wave 1, parallel)
 **Design Reference**: `design-docs/specs/design-example-picker-and-persistence.md` sections 5.1, 5.2, 5.4, 6
 **Created**: 2026-10-16
@@ -159,11 +159,11 @@ failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Completion Criteria
 
-- [ ] `DocumentStorage`, `LocalTemplateStore`, `pageBackend`,
+- [x] `DocumentStorage`, `LocalTemplateStore`, `pageBackend`,
       `normalizeName` and the key constants exported as specified.
-- [ ] All listed tests pass; `npm run check` clean for this plan's files.
-- [ ] File under 1000 lines.
-- [ ] Progress Log with records and pre/post sha256.
+- [x] All listed tests pass; `npm run check` has no diagnostics for this plan's files.
+- [x] File under 1000 lines.
+- [x] Progress Log with records and pre/post sha256.
 
 ## Edit Protocol
 
@@ -176,3 +176,22 @@ operations.
 ### Session: 2026-10-16
 **Tasks Completed**: Plan authored.
 **Blockers**: None.
+
+### Session: 2026-10-17
+**Tasks Completed**: Implemented the v1 browser storage backend, schema validation,
+quota/unavailable handling, library CRUD, draft access, and `LocalTemplateStore`.
+Added 11 focused tests covering the plan table. Invalid item JSON is counted per
+entry and preserved; writes to unavailable storage resolve with `unavailable`.
+**Verification**:
+
+```json
+{"command":"cd editor && npx vitest run test/documents/storage.test.ts > ../tmp/examples/EX-20/vitest-final-source.log 2>&1","exitStatus":0,"testsRun":11,"testsPassed":11,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-20/vitest-final-source.log","notes":"Final-source focused storage suite; all 11 tests passed."}
+{"command":"cd editor && npm run check > ../tmp/examples/EX-20/check-final-source.log 2>&1","exitStatus":1,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"failed","log":"tmp/examples/EX-20/check-final-source.log","notes":"Aggregate TypeScript check reports errors only in concurrent EX-30/EX-50 files (editor/src/ui/picker-view.tsx and editor/test/documents/tauri-templates.test.ts); no diagnostics name editor/src/documents/storage.ts or editor/test/documents/storage.test.ts."}
+```
+
+**Source SHA-256** (pre -> post):
+- `editor/src/documents/storage.ts`: absent -> `272200ea33f9e1d19f07fc9bc1550895a055d8c8ae026bf095a6b07c5a9eabb7`
+- `editor/test/documents/storage.test.ts`: absent -> `877abdf0fca4613bc3183b93674dfe0136de7deedd621341d9de6d81d65016d9`
+- `impl-plans/active/examples-20-storage.md`: `4b20cf66204b4aac8fe944869f3c865446dcc37638d70a04ce7552e082ae275d` before this progress update; final hash is recorded at `tmp/examples/EX-20/plan-sha256.txt`.
+
+**Blockers**: None for EX-20. The full `npm run check` remains nonzero due to concurrent plan files and must be rechecked after their owners repair them.

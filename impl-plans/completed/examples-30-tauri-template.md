@@ -1,10 +1,10 @@
 # EX-30: Tauri Default-Template Commands and TauriTemplateStore
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: EX-30 (wave 1, parallel)
 **Design Reference**: `design-docs/specs/design-example-picker-and-persistence.md` sections 6, 6.1, 6.2
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Intent and Context
 
@@ -188,11 +188,11 @@ failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Completion Criteria
 
-- [ ] Three commands registered; `template.rs` functions and tests exist.
-- [ ] `TauriTemplateStore` and its tests exist and pass.
-- [ ] cargo check and cargo test pass; capabilities unchanged; lock diff
+- [x] Three commands registered; `template.rs` functions and tests exist.
+- [x] `TauriTemplateStore` and its tests exist and pass.
+- [x] cargo check and cargo test pass; capabilities unchanged; lock diff
       limited to the two names.
-- [ ] Progress Log with records and pre/post sha256.
+- [x] Progress Log with records and pre/post sha256.
 
 ## Edit Protocol
 
@@ -204,3 +204,35 @@ record on drift; no git index or branch operations.
 ### Session: 2026-10-16
 **Tasks Completed**: Plan authored.
 **Blockers**: None.
+
+### Session: 2026-10-17
+**Tasks Completed**: Implemented versioned fixed-path Rust template persistence, registered the three Tauri commands, added the injected TypeScript `TauriTemplateStore`, and added Rust and Vitest coverage. Updated direct serde dependencies to versions already present in the lockfile. No blockers remain for EX-30 implementation.
+
+**Verification**:
+
+```json
+{"command":"cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build > ../tmp/examples/EX-30/build-retry.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/build-retry.log","notes":"Build completed; required by tauri::generate_context!."}
+{"command":"CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml > tmp/examples/EX-30/cargo-check-final.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/cargo-check-final.log","notes":"Tauri crate compiled against the final source."}
+{"command":"CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml > tmp/examples/EX-30/cargo-test-final.log 2>&1","exitStatus":0,"testsRun":9,"testsPassed":9,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/cargo-test-final.log","notes":"All 9 crate tests passed, including template persistence, validation, removal and serde tests."}
+{"command":"cd editor && npx vitest run test/documents/tauri-templates.test.ts > ../tmp/examples/EX-30/vitest-final.log 2>&1","exitStatus":0,"testsRun":8,"testsPassed":8,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/vitest-final.log","notes":"All 8 TauriTemplateStore tests passed."}
+{"command":"cd editor && npm run check > ../tmp/examples/EX-30/check-final.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/check-final.log","notes":"TypeScript check passed on the final shared tree."}
+{"command":"git diff --exit-code editor/src-tauri/capabilities/default.json > tmp/examples/EX-30/capabilities.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/capabilities.log","notes":"Capability file is byte-identical."}
+{"command":"git diff editor/src-tauri/Cargo.lock > tmp/examples/EX-30/lock-diff.log 2>&1; removed_count=$(git diff editor/src-tauri/Cargo.lock | awk '/^-[^-]/{count += 1} END {print count + 0}'); added_count=$(git diff editor/src-tauri/Cargo.lock | awk '/^\\+[^+]/{count += 1} END {print count + 0}'); test \"$removed_count\" = 0 && test \"$added_count\" = 2","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/lock-validation.log","notes":"No lock lines removed; exactly the serde and serde_json names were added to the vactr-editor package dependency list."}
+{"command":"rustfmt --edition 2021 --check editor/src-tauri/src/template.rs editor/src-tauri/src/lib.rs > tmp/examples/EX-30/rustfmt.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-30/rustfmt.log","notes":"Both changed Rust files are formatted."}
+```
+
+**Earlier attempts**: The first build wrapper used zsh's read-only `status` variable and exited 1 after the build output completed; the corrected `build-retry.log` run above exited 0. The first TypeScript check found mock typing errors in this plan and transient type errors in the concurrent EX-50 `picker-view.tsx`; the mock was corrected and the final shared-tree check passed. Initial rustfmt check found formatting differences in `template.rs`; the file was formatted and the final selected-file check passed. Earlier logs remain in `build.log`, `check.log`, and `rustfmt` command output from the session; none are current unresolved failures.
+
+**Source SHA-256 (before -> after)**:
+
+| File | Before | After |
+|---|---|---|
+| `editor/src-tauri/src/template.rs` | absent | `028b211054f3e29c6f81a868886e8ab85c17f5cac42bbceb8aa954b14c0be557` |
+| `editor/src-tauri/src/lib.rs` | `ce78d8a2fa708018defccc3b784bc2549b4730464edaf6f4e460403d9feea35a` | `4e8456de93e6e65f5e5ebec031d9300de06ecb8ab330a1446f05f81681ee6001` |
+| `editor/src-tauri/Cargo.toml` | `4d046ee9d8fbc3504188f9e6965b1ac8908129901665a9eea94dc70249032b1b` | `2b3b80f9f4332925ce6e5bdeb5daaf8823950c6d8f632020d7d1c0ed6125ae35` |
+| `editor/src-tauri/Cargo.lock` | `c9e5194b2e908d0d283dad56ee52932f4b2d22691d194dc7661a48459fc79950` | `3c009a97f43c3d25afab9ed98b059ae5f04d6afbb37d9243951cc461c88ba174` |
+| `editor/src/documents/tauri-templates.ts` | absent | `22828bd86de63e1506b619c645b502a7fb0190d34e460f43c84bd8a3f0c67ca1` |
+| `editor/test/documents/tauri-templates.test.ts` | absent | `4c97a5afdaba902f837f7d49056fa4794dc5d0d738dd3f58fbb738c42f2a97fb` |
+| `impl-plans/active/examples-30-tauri-template.md` | `03bcdbf188fd8b92ca4b9d892a652d34ae6a67e31da16e5156c60a7f06a66144` | recorded after this update in `tmp/examples/EX-30/plan-sha256.txt` |
+
+Formal review, integration review, shared documentation/index changes, staging, commit and push remain owned by later workflow steps.

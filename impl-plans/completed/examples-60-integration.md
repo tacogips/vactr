@@ -1,10 +1,10 @@
 # EX-60: Documents Area Controller and Boot Wiring
 
-**Status**: Ready
+**Status**: Completed (session 382; Step 7 test-integrity and adversarial review accepted; archived 2026-10-17)
 **Plan ID**: EX-60 (wave 2)
 **Design Reference**: `design-docs/specs/design-example-picker-and-persistence.md` sections 4-8
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Intent and Context
 
@@ -224,11 +224,11 @@ failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Completion Criteria
 
-- [ ] `documents/mount.ts` implements every action and startup as above.
-- [ ] `main.ts` wiring done; `createEditor` without options unchanged.
-- [ ] Focused tests, `npm run check` and full `npm test` pass.
-- [ ] Mechanical `main.test.ts` changes listed.
-- [ ] Progress Log with records and pre/post sha256.
+- [x] `documents/mount.ts` implements every action and startup as above.
+- [x] `main.ts` wiring done; `createEditor` without options unchanged.
+- [x] Focused tests, `npm run check` and full `npm test` pass.
+- [x] Mechanical `main.test.ts` changes listed.
+- [x] Progress Log with records and pre/post sha256.
 
 ## Edit Protocol
 
@@ -243,4 +243,90 @@ request contract edits through serial reconciliation.
 **Tasks Completed**: Plan authored. Revised for ER-M1 (`ready` uses
 `applyStartup`, autosave created first, recovery test) and ER-L2
 (`newDocument` fallback for an unregistered template id).
+**Blockers**: None.
+
+### Session: 2026-10-17 — EX60-TI-DROPPED-CASES repair
+**Finding**: `EX60-TI-DROPPED-CASES` (mid; test-integrity review).
+**Changes**:
+- Added controller coverage in `editor/test/documents/mount.test.ts` for
+  queued file opening after dirty confirmation, file-source identity (verified
+  through the resulting `x.vact` template snapshot), one-step undo, silent
+  `FileCancelled`, confirmation-row cleanup, and New fallback from an
+  unregistered template example to the showcase with its status notice.
+- The first test-first run reproduced the stale confirmation row after
+  `FileCancelled`. Updated only the `FileCancelled` branch in
+  `editor/src/documents/mount.ts::runReplacement` to clear `pendingReplace`
+  and `pendingLoad` without setting a status. The captured first-run output is
+  `tmp/examples/EX-60/mount-ti-repair-first-attempt-captured.log`; the final
+  prescribed log is `tmp/examples/EX-60/mount-ti-repair.log`.
+- Cross-layer coverage retained without duplicating controller tests:
+  `editor/test/documents/startup.test.ts` covers the `?example=` draft recovery
+  ordering (ER-M1); EX-70 e2e checks 6-8 cover clean-example template use and
+  New, storage-unavailable startup, and reload recovery at boot level. Those
+  e2e checks remain assigned to the downstream EX-70 integration gate.
+
+**Verification Records** (final repair source; logs include exit status):
+
+```json
+{"command":"cd editor && npx vitest run test/documents/mount.test.ts > ../tmp/examples/EX-60/mount-ti-repair.log 2>&1","exitStatus":0,"testsRun":9,"testsPassed":9,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/mount-ti-repair.log","notes":"All nine controller tests pass, including the three new review cases."}
+{"command":"cd editor && npx vitest run test/documents test/app/main.test.ts test/examples test/ui/picker-view.test.tsx > ../tmp/examples/EX-60/focused.log 2>&1","exitStatus":0,"testsRun":82,"testsPassed":82,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/focused.log","notes":"10 test files passed on the repaired source."}
+{"command":"cd editor && npm run check > ../tmp/examples/EX-60/check.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/check.log","notes":"Whole-project TypeScript check."}
+{"command":"bash -c 'lock=/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock; until mkdir \"$lock\" 2>/dev/null; do sleep 30; done; cleanup() { unlink \"$lock/owner\" 2>/dev/null || true; rmdir \"$lock\" 2>/dev/null || true; }; trap cleanup EXIT; printf \"%s\\n\" EX-60 > \"$lock/owner\"; cd editor && npm test > ../tmp/examples/EX-60/full-vitest.log 2>&1; rc=$?; printf \"EXIT_STATUS=%s\\n\" \"$rc\" >> ../tmp/examples/EX-60/full-vitest.log; tail -n 35 ../tmp/examples/EX-60/full-vitest.log; exit \"$rc\"'","exitStatus":0,"testsRun":987,"testsPassed":987,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/full-vitest.log","notes":"105 test files passed under the measurement lock; lock owner EX-60."}
+```
+
+**Repair Hashes**: `tmp/examples/EX-60/ti-pre-edit-sha256.txt` records
+pre-edit hashes. `tmp/examples/EX-60/ti-repair-source-sha256.txt` records
+pre/post hashes for the changed test, controller, and this plan. Controller
+remains under 1000 lines. No `main.ts` or `main.test.ts` changes were needed.
+**Blockers**: None; the finding is repaired on the current source. Independent
+re-review remains pending.
+
+### Session: 2026-10-17 — Step 6 implementation
+**Tasks Completed**:
+- Added `editor/src/documents/mount.ts` (199 lines): controller wiring for
+  `DocumentSession`, web-only `DraftAutosave`, startup resolution/application,
+  picker rendering, dirty replacement confirmation, example/library/file
+  opening, New, library create/update/rename/delete, template set/reset,
+  status reporting, and disposal. `ready` absorbs startup/store failures.
+- Updated `editor/src/app/main.ts` with optional `createEditor` documents
+  options and boot store/template/example wiring. The two-argument
+  `createEditor(root, deps)` path still omits the documents area. Boot awaits
+  its optional `ready` after adding a Tauri fallback notice.
+- Added six documents-area integration tests using a real `CodeSurface` and
+  `DocumentSync` with a recording transport. They cover silent showcase
+  startup, undoable replacement, dirty confirmation, library save/rename/
+  delete, template set/use/reset, web draft autosave/clear, app no-draft
+  behavior, and the missing-code no-op.
+- Mechanical `main.test.ts` changes: added an assertion that the default
+  `createEditor` call renders no picker, and a boot test proving the optional
+  documents area exists and its no-op `ready` resolves when the mocked code
+  mount leaves `deps.code` unset. No existing assertions required repair.
+- No Rust files changed; Cargo checks were not applicable to EX-60.
+
+**Verification Records** (final source; logs include `EXIT_STATUS`):
+
+```json
+{"command":"cd editor && npx vitest run test/documents test/app/main.test.ts test/examples test/ui/picker-view.test.tsx > ../tmp/examples/EX-60/focused.log 2>&1","exitStatus":0,"testsRun":79,"testsPassed":79,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/focused.log","notes":"10 test files passed; focused tests include the six EX-60 controller cases."}
+{"command":"cd editor && npm run check > ../tmp/examples/EX-60/check.log 2>&1","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/check.log","notes":"Whole-project TypeScript check; tsc --noEmit."}
+{"command":"cd editor && npm test > ../tmp/examples/EX-60/full-vitest.log 2>&1","exitStatus":0,"testsRun":984,"testsPassed":984,"failureCount":0,"outcome":"passed","log":"tmp/examples/EX-60/full-vitest.log","notes":"Run in the foreground under /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock with owner EX-60; 105 test files passed."}
+```
+
+**Prior Attempts**: Retained intermediate logs include
+`tmp/examples/EX-60/focused-retry.log` (unsupported Vitest `waitFor` import),
+`mount-tests.log` and `mount-tests-retry.log` (replacement timing and picker
+reopen corrections), `mount-tests-final.log` (6/6 passed before the final
+selector typing-only edit), and `focused-final-attempt.log` (77/77 passed
+before the two added integration cases). All required checks were rerun on
+the final source and passed.
+
+**Source Hashes**: `tmp/examples/EX-60/pre-plan-final-sha256.txt` records the
+pre-plan-update hashes. `tmp/examples/EX-60/source-sha256.txt` records initial
+and final hashes, including the post-update plan hash. The newly created `mount.ts` and
+`mount.test.ts` were absent at the pre-node snapshot. Final `mount.ts` and
+`main.ts` are 199 and 238 lines, respectively. No shared-path drift was
+observed during the implementation edits.
+
+**Downstream**: Formal independent test-integrity/adversarial review and the
+EX-70 integration gates remain assigned to later workflow steps; no review
+acceptance is claimed here.
 **Blockers**: None.

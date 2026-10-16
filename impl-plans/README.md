@@ -22,12 +22,12 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 ## Example picker, flashy default and document persistence (2026-10-16)
 
-These plans implement [design-example-picker-and-persistence.md](../design-docs/specs/design-example-picker-and-persistence.md) (branch `wf/examples`, session 379). All are Ready.
+These plans implement [design-example-picker-and-persistence.md](../design-docs/specs/design-example-picker-and-persistence.md) (branch `wf/examples`, designed in session 379). All eight are Completed and archived (2026-10-17, session 382) after Step 7 test-integrity and adversarial review accepted them. EX-70 final gates on hash-matched source: full vitest 987/987, test:style 4/4 with the picker open, `npm run e2e:examples` 8/8 (`tmp/examples/EX-70/e2e-examples-final.log`, plus classify-1..10), Tauri cargo test 9/9, capabilities unchanged. The [dispatch manifest](active/examples-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.
 
-- **Wave 0**: [EX-00 contracts](active/examples-00-contract.md)
-- **Wave 1** (parallel): [EX-10 registry and showcase](active/examples-10-registry.md), [EX-20 web storage](active/examples-20-storage.md), [EX-30 Tauri default template](active/examples-30-tauri-template.md), [EX-40 session, autosave, startup](active/examples-40-session-startup.md), [EX-50 picker view](active/examples-50-picker-view.md)
-- **Wave 2**: [EX-60 integration](active/examples-60-integration.md)
-- **Wave 3**: [EX-70 e2e, style gate, docs](active/examples-70-e2e-docs.md)
+- **Wave 0**: [EX-00 contracts](completed/examples-00-contract.md)
+- **Wave 1** (parallel): [EX-10 registry and showcase](completed/examples-10-registry.md), [EX-20 web storage](completed/examples-20-storage.md), [EX-30 Tauri default template](completed/examples-30-tauri-template.md), [EX-40 session, autosave, startup](completed/examples-40-session-startup.md), [EX-50 picker view](completed/examples-50-picker-view.md)
+- **Wave 2**: [EX-60 integration](completed/examples-60-integration.md)
+- **Wave 3**: [EX-70 e2e, style gate, docs](completed/examples-70-e2e-docs.md)
 
 ## DOM renderer comparison (2026-10-08)
 

@@ -226,6 +226,23 @@ It provides:
 - visual panes o0..o3 on a WebGL2 render host;
 - the package import pane and the sample browser.
 
+The Documents picker opens registered examples, browser-saved documents, or
+files, and can set or reset the default template. Opening a document replaces
+the buffer as one undoable step (Mod-Z restores the previous text) and never
+starts playback; press Run to hear it. The built-in default is
+`examples/showcase.vact`. Only examples that evaluate in the browser tier are
+listed; examples that need native-only voices, external samples or song
+transport are excluded with a recorded reason in
+`editor/src/examples/manifest.ts`. On startup, an explicit
+`?example=<id>` URL takes precedence, followed on the web by the unsaved draft,
+then the chosen default template, then the built-in showcase. Web drafts,
+named documents, and the default template use versioned `vactr.doc.v1.*`
+localStorage keys. Documents over 262144 characters are not stored there, and
+unavailable or full browser storage leaves the editor usable while showing a
+status message. The app stores its default template at
+`<app config dir>/default-template.json`. Run `npm run e2e:examples` from
+`editor/` to verify the picker, persistence, startup, and silent audio path.
+
 Browser self-analysis taps, browser MIDI out and per-slot level meters are
 not available on this host. ExternalFile binding persistence is handled
 by the editor.

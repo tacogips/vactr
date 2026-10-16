@@ -1,6 +1,8 @@
 # Example Picker, Flashy Default Document and Document Persistence
 
-Status: Proposed (2026-10-16, workflow session 379, branch `wf/examples`).
+Status: Implemented (designed 2026-10-16 in workflow session 379; implemented
+and accepted 2026-10-17 in session 382, branch `wf/examples`). Plans EX-00..EX-70
+are archived under `impl-plans/completed/examples-*.md`.
 
 This design adds four things to the editor (`editor/`, web and Tauri shells):
 

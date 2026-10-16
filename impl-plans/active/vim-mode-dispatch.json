@@ -4,8 +4,13 @@
   "implementationBranch": "wf/vim-mode",
   "baseBranch": "wf/vim-mode",
   "remote": "origin",
-  "originalHead": "ea51a0733e301f6e29dddb009c87542b635e6722",
-  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-374; intake comm-006526; design accepted comm-006530; plan review comm-006532 needs_revision; plan revision comm-006533; plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; no GitHub issue number)",
+  "originalHead": "84234f86eb079e206413925074e97d430917b126",
+  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (continuation workflowExecutionId opus-luna-design-and-implement-review-loop-session-381 resuming session-374; session-374 intake comm-006526, design accepted comm-006530, plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; prior high finding step3-design-review-attempt-1-finding-1 (platform Mod/Ctrl pass-through and modifier Backspace/Delete) repaired in design sections 3.3.1-3.3.3, 4.14 and 8.2; no GitHub issue number)",
+  "resumeContext": {
+    "previousManifestHead": "ea51a0733e301f6e29dddb009c87542b635e6722",
+    "partialImplementationCommit": "84234f86eb079e206413925074e97d430917b126",
+    "notes": "Session-374 stopped by a usage limit after committing partial wave-0/1 work (VIM-00, VIM-12, VIM-13, VIM-14, VIM-15, VIM-16, VIM-17, VIM-18 self-reported Completed; VIM-10 and VIM-11 In Progress pending review; VIM-20, VIM-30, VIM-40, VIM-41 not started). None of these plans passed independent Opus review, so every plan stays in the remaining set. Implementers resume from the committed files: re-read them, finish missing criteria, re-run the plan verification into a new tmp/vim-mode/<planId>/attempt-<n>/ directory, and append a session-381 Progress Log entry; do not discard committed work."
+  },
   "designDocPaths": [
     "design-docs/specs/design-vim-mode.md",
     "design-docs/specs/architecture.md",
@@ -15,7 +20,7 @@
   "evidenceRoot": "tmp/vim-mode",
   "evidenceLayout": "tmp/vim-mode/<planId>/ per plan (scoped tsconfig.json, command logs ending with exit=<status>), with per-attempt subdirectories tmp/vim-mode/<planId>/attempt-<n>/; tmp/vim-mode/e2e/vim-001/ for the Playwright behavior run; tmp/ui-style/after/ for the style test. tmp/ is gitignored. Each Progress Log records {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls go only in mutationEvidence.",
   "reviewContext": {
-    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-374; intake comm-006526; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
+    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-381, continuing session-374; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
     "userProblem": "The vactr editor code pane (WebGL canvas renderer, hidden-textarea input bridge, @codemirror/state EditorState as the only document authority, no EditorView) has no Vim mode, and @replit/codemirror-vim cannot be used because it requires an EditorView.",
     "requiredOutcomes": [
       "Opt-in Vim toggle in the transport bar, default off, remembered per viewer through try/catch-wrapped localStorage",
@@ -49,7 +54,8 @@
     "designDecisionsAndRationale": [
       "Pure DOM-free Vim core under editor/src/code/vim/ producing TransactionSpecs, selection changes and host actions, because no EditorView exists and the core must be table-testable",
       "A thin adapter (vim-mount.ts) connects the core to InputController, CodeSurface, the clipboard, eval/format actions and the live region; when off no Vim object exists and the routing order is unchanged",
-      "The pass-through set for live-coding shortcuts is checked before Vim consumption in every mode (design 3.3.1)",
+      "The pass-through set for live-coding shortcuts is checked before Vim consumption in every mode (design 3.3.1): P1 registered 'default' surface keymaps via a read-only matchesKeymap query using the platform Mod rule (Meta on Apple, Ctrl elsewhere), P2 KeyboardController shortcuts for both Meta and Ctrl, P3 clipboard and shell chords; this repairs the session-374 high finding that Ctrl-Enter/Ctrl-./Ctrl-a/Ctrl-z/Ctrl-y were swallowed on Windows/Linux",
+      "Non-insert modes consume every key outside P, including Backspace/Delete/Tab with any modifier, so KeyboardController's modifier-agnostic delete branch is unreachable there (design 3.3.3)",
       "The text-input gate discards normal-mode composition/keyCode 229 input, and blur/refocus terminates composition (VQ5)",
       "Cursor shape is a RenderFeedback field drawn through cursorRect, keeping renderer edits minimal",
       "Every real session exit records an <Esc> token in the macro and redo records; dot replay always ends in normal mode with nothing pending; visual-mode changes do not start a redo record (PR-VIM-1 repair)",

@@ -285,6 +285,96 @@ run schedules those same cycle keys after the stall. Its complete log is
 | Silent audio and release module | Sink preceded the first connection; direct destination connections and post-sink peak are zero. Pre-sink peak was -13.0 dBFS and RMS was -32.6/-33.2 dBFS; release WASM retains its name section and has no DWARF. | Pass. | `summary.json`, `environment.json` |
 | iPad simulator self-check | Latest Vactr-process line reports `playingEvents: 0`; `selfCheck.silent` and `selfCheck.pass` are true, and app mtime is after `6f6b807`. | Pass for simulator launch and silence only. Physical-iPad checks remain pending. | `ios-sim.json`, `tmp/canvas-cutover/evidence/ios-sim.png` |
 
+## Code-pane text rendering gap (2026-10-16)
+
+Run run-001 and the 2026-10-07 final gates passed. Main at `ea51a07`
+still drew wrong text: characters missing on every line after the first,
+a squashed `1`, caret and underlines drawn rows below their lines, and
+heavy, soft glyphs. The visuals pane also logged `glBlitFramebuffer`
+errors. Root causes and fixes are in
+[design-code-pane-text-rendering.md](design-code-pane-text-rendering.md)
+(RC1 to RC6). The harness passed these defects because:
+
+- The only canvas pixel check (`editor/test/e2e/behavior.mjs`) reads the
+  line-1 glyph rectangle. Line 1 starts at document offset 0, where the
+  RC2 offset error has no effect.
+- That check passes when the rectangle shows at least 2 colors and is
+  wider than 4 px. That does not detect missing, squashed, heavy or
+  blurred glyphs.
+- The DPR 2 checks compare `devicePixelRatio` and `effectiveDpr` only; no
+  pixels are read at DPR 2.
+- No check covers caret or underline positions after a multi-line edit,
+  or the backdrop, and the browser console is not scanned for WebGL
+  errors.
+- The unit tests run `textCells` on line 0 only, and they do not check
+  instance slots or atlas-key uniqueness.
+
+Closure (design-code-pane-text-rendering.md section 5):
+`editor/test/e2e/code-pixels.mjs` compares per-character canvas coverage
+with DOM text in the same font for four typing and insert scenarios.
+It checks caret and diagnostic row bands, backdrop uniformity, and an
+empty WebGL error console, at DPR 1 and 2, on ANGLE Metal and
+SwiftShader. `behavior.mjs` gates its DPR 1 and DPR 2 runs as
+`code-pixels-dpr1` and `code-pixels-dpr2`. New unit tests cover
+run-relative cluster ranges, width-keyed atlas cells, identity slots for
+non-text layers, glyph placement, the shader and filter contract, and
+the visuals context options. Results are recorded in the
+`impl-plans/active/code-render-*` progress logs. This change does not
+regenerate the canonical run-001 files.
+
+### Results (CR-07 final run, 2026-10-17)
+
+Owner verification (2026-10-17, after integration review rejected the attempt-3 change evidence for its symlinked artifact root): the owner removed tmp/code-render/node_modules and re-ran every gate on the combined tree (CR-01..CR-06 accepted by session-384 integration review plus the CR-07 docs). Fresh logs are in tmp/code-render/CR-07/owner-closeout/: npm run check exit 0; full vitest 101 files, 871/871 passed; npm run test:style 4/4 engine/viewport combinations; VACTR_REQUIRE_SESSION_ABI=1 npm run build exit 0; npm run e2e -- --browser all --profile behavior pass, 22/22 (chromium 13/13 including code-pixels-dpr1 and code-pixels-dpr2 on the Metal backend; webkit 9/9 with the documented synthetic clipboard/IME limitations). The original reproduction (tmp/code-render/repro-shot.mjs plus a kalimba.vact insert, real GPU via ANGLE Metal, DPR 2) now renders every line, syntax color, cursor and completion-time line correctly with zero glBlitFramebuffer errors; before images are tmp/code-render/t-*.png and code-gpu2x.png, after images were captured by the owner in the session scratchpad. The figures above are backed by these owner runs, not by the rejected attempt-3 logs.
+
+
+The final calibration kept the defaults: P3 `extentPx: 1` and P4
+`ratio: [0.8, 1.25]` (`tmp/code-render/CR-07/attempt-3/calibration.log`,
+4/4 backend/DPR rows passed). The fixed build, checks, behavior suite and
+full pixel matrix passed on the source state recorded in
+`tmp/code-render/CR-07/attempt-3/source-state.txt`.
+
+| Gate | Command | Exit and counts | Complete log |
+|---|---|---:|---|
+| Build | `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run build` | 0 | `tmp/code-render/CR-07/attempt-3/build.log` |
+| Type check | `cd editor && npm run check` | 0 | `tmp/code-render/CR-07/attempt-3/check.log` |
+| Focused Vitest | `cd editor && npx vitest run test/code/text-cells.test.ts test/code/atlas-cells.test.ts test/code/glyph-placement.test.ts test/code/renderer-layers.test.ts test/code/perf-hook-annotations.test.ts test/visual/panes.test.ts test/e2e/pixel-compare.test.ts` | 7 files, 36/36; 0 | `tmp/code-render/CR-07/attempt-3/focused.log` |
+| Full Vitest | `cd editor && npx vitest run` | 101 files, 871/871; 0 | `tmp/code-render/CR-07/attempt-3/vitest-full.log` |
+| Style | `cd editor && npm run test:style` | 4/4 engine/viewport combinations; 0 | `tmp/code-render/CR-07/attempt-3/test-style.log` |
+| Behavior e2e | `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npm run e2e -- --browser all --profile behavior` | 22/22; Chromium 13/13 including `code-pixels-dpr1`/`dpr2`, WebKit 9/9; 0 | `tmp/code-render/CR-07/attempt-3/e2e-behavior.log` |
+| Pixel matrix | `cd editor && node test/e2e/code-pixels.mjs --backend all --dpr all --out ../tmp/code-render/CR-07/attempt-3/pixels-after` | 4/4 Metal/SwiftShader x DPR 1/2; 0 | `tmp/code-render/CR-07/attempt-3/pixels-after.log` |
+
+Baseline mutation evidence on `ea51a07` is in
+`tmp/code-render/CR-07/attempt-3/baseline-vitest-rerun.log` and
+`pixels-baseline-rerun.log` (the old built bundle received an artifact-only
+empty `annotations()` compatibility method so the current driver could
+report the old rendering behavior). The unit suite had 22 failures and 14
+passes across 36 tests: U1 (7), U2 (5), U3 (2), and U6 (1) failed; U4/U5
+also fail on the old shader/placement code. Across the four pixel rows P1
+failed 652 character checks, P3 32 extents, P5 14 caret checks, P6 had no
+visible diagnostic checks in S2/S3 (12 aggregate P6 failures), P7 failed
+16 uniformity samples, and P8 reported the multisampled-framebuffer blit
+error in all 16 scenarios. P5 passed for S1 at DPR 2 on both backends;
+P7's three sampled columns included one passing column for Metal DPR 1
+S3/S4, Metal DPR 2 S4, SwiftShader DPR 1 S4, and SwiftShader DPR 2 S4,
+while each pixel row still had failing P7 samples. The old code therefore
+fails every required mutation check; the non-failing samples are recorded
+here as findings.
+
+Before/after screenshot pairs: `tmp/code-render/t-typed-code.png` ->
+`tmp/code-render/after/t-typed-code.png`;
+`tmp/code-render/t-typed-two.png` -> `tmp/code-render/after/t-typed-two.png`;
+`tmp/code-render/t-scroll-redraw.png` -> `tmp/code-render/after/t-inserted.png`;
+`tmp/code-render/code-gpu2x.png` -> `tmp/code-render/after/t-kalimba.png`. The DR-L2
+selection pair is `tmp/code-render/after/selection-drl2-baseline.png` ->
+`tmp/code-render/after/selection-drl2.png`. The baseline selection and
+underline are displaced with the old line-slot leakage; the fixed selection
+and diagnostic underline align to their text rows, with the blue selection
+and red underline composites visually preserved. The direct original
+`repro-shot.mjs` attempt timed out waiting for network idle; the successful
+foreground capture and selection commands and their complete logs are
+recorded in the CR-07 attempt-3 plan progress log. No canonical run-001
+evidence was regenerated.
+
 ## Raw evidence
 
 - `design-docs/specs/evidence/canvas-cutover/run-001/environment.json`

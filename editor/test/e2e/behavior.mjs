@@ -2,6 +2,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 import fs from 'node:fs';
 import path from 'node:path';
 import { installSilentSink } from './silent-sink.mjs';
+import { runCodePixels } from './code-pixels.mjs';
 export async function runBehavior(browser, origin, name) {
   const results = []; const limitations = [];
   let context; let page; let api;
@@ -185,6 +186,10 @@ export async function runBehavior(browser, origin, name) {
       const api = window.__vactrPerf; const ledger = api.ledger; api.disposeCode();
       if (ledger.usedBytes !== 0 || window.__vactrPerf !== undefined) throw Error(`dispose ledger=${ledger.usedBytes}`); return `usedBytes=${ledger.usedBytes}`;
     }));
+    if (name === 'chromium') {
+      await check('code-pixels-dpr1', () => runCodePixels(browser, origin, { dpr:1, expectBackend:'metal' }));
+      await check('code-pixels-dpr2', () => runCodePixels(browser, origin, { dpr:2, expectBackend:'metal' }));
+    }
     if (!api) throw new Error('perf API was not installed');
   } catch (error) { results.push({ id:'browser-setup', pass:false, detail:String(error?.stack ?? error) }); }
   finally { await context?.close(); }

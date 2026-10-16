@@ -2,7 +2,7 @@
 // panes, the selection, the diagnostic banner, the tier notices, and the
 // wiring of `0x72` records and the frame loop to the WebGL2 host.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { EditorDeps } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
@@ -182,6 +182,19 @@ describe('visual mount', () => {
     const m = mount(root, deps('browser', core.as()), { scheduler: new StepRaf() });
     expect(root.querySelector('[data-role="notice"]')?.textContent).toBe(NO_WEBGL2_NOTICE);
     expect(core.listening).toBe(0);
+    m.dispose();
+  });
+
+  it('requests WebGL2 without antialiasing for the visuals canvas', () => {
+    const gl = new RecordingGL();
+    fakes = installCanvasFakes({ webgl2: () => gl });
+    const root = document.createElement('div');
+    const core = new FakeRenderCore();
+    const m = mount(root, deps('browser', core.as()), { scheduler: new StepRaf() });
+    const calls = vi.mocked(HTMLCanvasElement.prototype.getContext).mock.calls as unknown[][];
+    const webglCalls = calls.filter(([kind]) => kind === 'webgl2');
+
+    expect(webglCalls).toEqual([['webgl2', { antialias: false }]]);
     m.dispose();
   });
 

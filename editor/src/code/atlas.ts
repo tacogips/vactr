@@ -4,7 +4,7 @@ import type { LayoutFont, ShapedRun } from './layout';
 export type CanvasFactory = () => HTMLCanvasElement;
 export interface CellRequest {
   kind: 'mask' | 'color' | 'run'; text: string; font: LayoutFont; dpr: number; width: number;
-  run?: ShapedRun; piece?: { from: number; to: number }; chunkX?: number;
+  run?: ShapedRun; piece?: { from: number; to: number }; chunkX?: number; phase?: number;
 }
 export interface AtlasCell { u0: number; v0: number; u1: number; v1: number; width: number; height: number; pad: number; generation: number }
 interface Entry { cell: AtlasCell; reservation: Reservation }
@@ -85,11 +85,13 @@ export class GlyphAtlas {
     if (this.disposed) throw new Error('Atlas disposed');
     const { text, font, dpr } = request;
     if (!Number.isFinite(dpr) || dpr <= 0 || !Number.isFinite(request.width) || request.width <= 0) throw new RangeError('Invalid atlas cell');
+    const phase = request.phase ?? 0;
+    if (phase !== 0 && phase !== 0.25 && phase !== 0.5 && phase !== 0.75) throw new RangeError('Invalid atlas cell');
     const pad = Math.ceil(PAD_DPR * dpr);
     const width = Math.max(1, Math.ceil(request.width * dpr) + pad * 2);
     const height = Math.max(1, Math.ceil(font.lineHeight * dpr));
     const exact = text.length <= 256 ? `:${text}` : '';
-    const key = `${request.kind}|${font.font}|${font.fallback ?? ''}|${font.generation ?? 0}|${dpr}|${text.length}:${hashText(text)}${exact}|${request.piece?.from ?? 0}|${request.piece?.to ?? text.length}|${request.chunkX ?? 0}`;
+    const key = `${request.kind}|${font.font}|${font.fallback ?? ''}|${font.generation ?? 0}|${dpr}|${text.length}:${hashText(text)}${exact}|${request.piece?.from ?? 0}|${request.piece?.to ?? text.length}|${request.chunkX ?? 0}|w${width}|p${phase}`;
     const hit = this.cells.get(key);
     if (hit) { this.stats.hits++; return hit.cell; }
     const bytes = width * height * 4;
@@ -117,9 +119,9 @@ export class GlyphAtlas {
     ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#ffffff';
     const pieceOffset = request.piece?.from ?? 0;
     if (request.run && request.kind === 'run') {
-      ctx.save(); ctx.beginPath(); ctx.rect(pad / dpr, 0, request.width, font.lineHeight); ctx.clip();
-      ctx.fillText(text, pad / dpr - (request.chunkX ?? 0), font.baseline); ctx.restore();
-    } else ctx.fillText(text, pad / dpr - pieceOffset, font.baseline);
+      ctx.save(); ctx.beginPath(); ctx.rect((pad + phase) / dpr, 0, request.width, font.lineHeight); ctx.clip();
+      ctx.fillText(text, (pad + phase) / dpr - (request.chunkX ?? 0), font.baseline); ctx.restore();
+    } else ctx.fillText(text, (pad + phase) / dpr - pieceOffset, font.baseline);
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureValue);
     this.gl.pixelStorei(this.gl.UNPACK_SKIP_PIXELS, 0);
     this.gl.pixelStorei(this.gl.UNPACK_SKIP_ROWS, 0);
@@ -152,8 +154,8 @@ export class GlyphAtlas {
 
   private configure(texture: WebGLTexture, width: number, height: number): void {
     this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, width, height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);

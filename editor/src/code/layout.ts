@@ -65,7 +65,7 @@ export class TextLayout {
     const pieces: Array<{ text: string; start: number; end: number }> = [];
     let ascii = true; for (const char of run.text) if (char.codePointAt(0)! > 0x7f) { ascii = false; break; }
     if (ascii) {
-      let start = Math.max(0, this.offsetInRun(run, visibleFrom, -1));
+      let start = Math.max(0, this.offsetInRun(run, visibleFrom, -1) - run.from);
       while (start < run.text.length) {
         const left = this.widthAt(run, index, start);
         if (left > visibleTo) break;
@@ -190,7 +190,7 @@ export class TextLayout {
       start = end;
     }
   }
-  private runWidthIndex(run: ShapedRun, measured?: readonly MeasuredChunk[]): RunWidthIndex {
+  private runWidthIndex(run: ShapedRun, measured?: readonly MeasuredChunk[], additive = false): RunWidthIndex {
     const cached = this.runWidths.get(run);
     if (cached) return cached;
     const metadata = this.runClusters.get(run);
@@ -206,7 +206,7 @@ export class TextLayout {
         if (part.segment.length > 1) clusterRanges.push([part.index, part.index + part.segment.length]);
       }
     }
-    const index: RunWidthIndex = { chunks: [], clusterRanges, additive: false };
+    const index: RunWidthIndex = { chunks: [], clusterRanges, additive };
     let cumulative = 0;
     if (measured) {
       for (const chunk of measured) {
@@ -221,7 +221,15 @@ export class TextLayout {
         while (clusterIndex < clusterRanges.length && clusterRanges[clusterIndex]![1] <= start) clusterIndex++;
         const cluster = clusterRanges[clusterIndex];
         if (cluster && cluster[0] < end && cluster[1] > end) end = cluster[0] > start ? cluster[0] : cluster[1];
-        const width = start === 0 && end === run.text.length ? run.width : this.measureDirect(run.text.slice(start, end));
+        let width: number;
+        if (start === 0 && end === run.text.length) width = run.width;
+        else if (additive && this.advances) {
+          const localClusters: number[] = [];
+          for (const [clusterStart, clusterEnd] of clusterRanges) {
+            if (clusterStart >= start && clusterEnd <= end) localClusters.push(clusterStart - start, clusterEnd - start);
+          }
+          width = this.advances.width(run.text.slice(start, end), localClusters);
+        } else width = this.measureDirect(run.text.slice(start, end));
         const prefixWidths = new Map<number, number>([[0, 0], [end - start, width]]);
         cumulative += width;
         index.chunks.push({ start, end, width, cumulative, prefixWidths });
@@ -389,10 +397,14 @@ export class TextLayout {
       this.geometryPartitions.set(line.runs, partitions);
     }
     return partitions.map((parts, chunk) => ({ chunk, runs: parts.map(part => {
-      const run = line.runs[part.run]!;
-      const from = run.from + part.from, to = run.from + part.to;
-      const left = this.runOffset(run, part.from), right = this.runOffset(run, part.to);
-      return { text: run.text.slice(part.from, part.to), from, to, x: run.x + left, width: right - left };
+      const parent = line.runs[part.run]!;
+      const from = parent.from + part.from, to = parent.from + part.to;
+      const left = this.runOffset(parent, part.from), right = this.runOffset(parent, part.to);
+      const derived = { text: parent.text.slice(part.from, part.to), from, to, x: parent.x + left, width: right - left };
+      const metadata = this.runClusters.get(parent);
+      if (metadata) this.runClusters.set(derived, { lineFrom: line.from, clusters: metadata.clusters });
+      this.runWidthIndex(derived, undefined, this.runWidthIndex(parent).additive);
+      return derived;
     }) }));
   }
   private lineAt(pos: number): number {

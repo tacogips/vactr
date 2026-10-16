@@ -787,9 +787,7 @@ describe('GPU code compositor', () => {
         const textures = r.draws.slice(start).map(draw => draw.texture);
         if (revision === 1) {
           firstUploads = renderer.atlasStats.uploads; firstTextures = textures; firstBytes = b.usedBytes;
-          const distinctGlyphs = new Set([...Array.from({ length: 40 }, (_, i) => `line ${i}`)].join('') + Array.from({ length: 40 }, (_, i) => String(i + 1)).join(''));
-          expect(firstUploads).toBeGreaterThan(distinctGlyphs.size);
-          expect(firstUploads).toBeLessThanOrEqual(distinctGlyphs.size * 8); // Two cell widths and four subpixel phases per glyph.
+          expect(firstUploads).toBe(34); // Fixed fixture: exact unique (glyph, texel width, phase) atlas requests.
           expect(raster.text.some(entry => entry.text === 'l')).toBe(true);
         } else {
           expect(renderer.atlasStats.uploads).toBe(firstUploads);

@@ -62,19 +62,19 @@ These plans implement [design-code-pane-text-rendering.md](../design-docs/specs/
 
 **Wave 1** (parallel)
 
-- [CR-01 text cells](active/code-render-01-text-cells.md): run-relative `textCells` (RC2)
-- [CR-02 atlas cells](active/code-render-02-atlas-cells.md): width- and phase-keyed cells, `NEAREST` (RC1)
-- [CR-03 visual context](active/code-render-03-visual-context.md): visuals context without MSAA (RC6)
-- [CR-04 shader and placement](active/code-render-04-shader-placement.md): `SNAP_GLYPH`, `u_device`, premultiplied output, placement helpers (RC4, RC5)
-- [CR-06 pixel test](active/code-render-06-pixel-test.md): Playwright pixel test and harness gap closure
+- [CR-01 text cells](completed/code-render-01-text-cells.md): run-relative `textCells` (RC2)
+- [CR-02 atlas cells](completed/code-render-02-atlas-cells.md): width- and phase-keyed cells, `NEAREST` (RC1)
+- [CR-03 visual context](completed/code-render-03-visual-context.md): visuals context without MSAA (RC6)
+- [CR-04 shader and placement](completed/code-render-04-shader-placement.md): `SNAP_GLYPH`, `u_device`, premultiplied output, placement helpers (RC4, RC5)
+- [CR-06 pixel test](completed/code-render-06-pixel-test.md): Playwright pixel test and harness gap closure
 
 **Wave 2**
 
-- [CR-05 renderer](active/code-render-05-renderer.md): identity slots, snapped glyph quads, straight-alpha literals (RC3, RC5), canvas test reconciliation
+- [CR-05 renderer](completed/code-render-05-renderer.md): identity slots, snapped glyph quads, straight-alpha literals (RC3, RC5), canvas test reconciliation
 
 **Wave 3**
 
-- [CR-07 closeout](active/code-render-07-closeout.md): calibration, gates, mutation evidence, before/after screenshots
+- [CR-07 closeout](completed/code-render-07-closeout.md): calibration, gates, mutation evidence, before/after screenshots
 
 ## Purpose
 

@@ -50,10 +50,11 @@ async function compareCaptures(analysisPage, canvasPng, refPng, blinkPngs, chars
       const row = state.text.slice(0, annotation.from).split('\n').length - 1;
       const start = annotation.from - state.text.lastIndexOf('\n', annotation.from - 1) - 1;
       const end = annotation.to - state.text.lastIndexOf('\n', annotation.to - 1) - 1;
-      const boxes = charsByLine[row] ?? []; const fallbackLeft = Math.round((48 + start * 7.8) * dpr); const fallbackRight = Math.round((48 + Math.max(start + 1, end) * 7.8) * dpr);
-      const rect = { left: boxes[start]?.left ?? fallbackLeft, right: boxes[Math.max(start, end - 1)]?.right ?? fallbackRight, top: row * 18 * dpr, bottom: (row + 1) * 18 * dpr };
+      const selected = api.selectDiagnosticRect(charsByLine, row, start, end, dpr);
+      if (selected.skipped) return { line: row, skipped: true, rows: [], pass: true };
+      const rect = selected.rect;
       const rows = api.bandRows(c, rect, danger, 40);
-      return { line: row, rows, pass: rows.length > 0 && rows.every((y) => y >= rect.bottom - 2 * dpr && y < rect.bottom) };
+      return { line: row, skipped: false, rows, pass: rows.length > 0 && rows.every((y) => y >= rect.bottom - 2 * dpr && y < rect.bottom) };
     });
     const p7 = [8, 40, 80].map((margin) => {
       const x = c.width - Math.round(margin * dpr); const covered = popupRects.some((rect) => x >= rect.left && x < rect.right);
@@ -69,7 +70,7 @@ export async function runCodePixels(browser, origin, { dpr, expectBackend = 'met
   const failures = []; let checkedDiagnostics = 0;
   const analysis = await browser.newPage(); await analysis.goto('about:blank');
   const helperSource = fs.readFileSync(new URL('./pixel-compare.mjs', import.meta.url), 'utf8').replaceAll('export function ', 'function ');
-  await analysis.addScriptTag({ content: `${helperSource}\nwindow.__pixelCompare={modeColor,cellInk,compareLine,verticalRuns,bandRows,columnUniform};` });
+  await analysis.addScriptTag({ content: `${helperSource}\nwindow.__pixelCompare={modeColor,cellInk,compareLine,verticalRuns,bandRows,columnUniform,selectDiagnosticRect};` });
   try {
     for (const scenario of inputs) {
       const context = await browser.newContext({ viewport: { width: 1100, height: 700 }, deviceScaleFactor: dpr });
@@ -90,28 +91,44 @@ export async function runCodePixels(browser, origin, { dpr, expectBackend = 'met
           if (scenario.id === 'S2') { await keyboard.press('Enter'); await keyboard.type('abc def', { delay: 20 }); }
         } else await page.keyboard.insertText(scenario.text);
         await settle(page);
+        let diagnosticWaitMs = 0; let diagnosticWaitTimedOut = false;
+        if (scenario.id === 'S2' || scenario.id === 'S3') {
+          const diagnosticWaitStarted = Date.now();
+          try { await page.waitForFunction(() => window.__vactrPerf.annotations().some((a) => a.kind === 'diagnostic'), { timeout: 5000 }); }
+          catch { diagnosticWaitTimedOut = true; }
+          diagnosticWaitMs = Date.now() - diagnosticWaitStarted;
+          await settle(page);
+        }
         const state = await page.evaluate(() => {
           const sample = (value) => { const probe = document.createElement('span'); probe.style.color = `var(${value})`; document.body.append(probe); const color = getComputedStyle(probe).color.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [255, 255, 255]; probe.remove(); return color; };
           return { text: window.__vactrPerf.doc(), caret: window.__vactrPerf.selection().head, annotations: window.__vactrPerf.annotations(),
           backend: (() => { const gl = document.querySelector('.vact-code-canvas').getContext('webgl2'); const ext = gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown'; })(),
+          completionVisible: (() => { const popup = document.querySelector('.vact-completion'); if (!popup) return false; const rect = popup.getBoundingClientRect(); const style = getComputedStyle(popup); return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'; })(),
           cursorColor: sample('--vt-text'), dangerColor: sample('--vt-danger') };
         });
+        const documentMatch = state.text === scenario.text;
+        if (!documentMatch) failures.push(`${scenario.id} document mismatch: expected ${JSON.stringify(scenario.text)}, got ${JSON.stringify(state.text)}`);
+        if (scenario.id === 'S2' && !state.completionVisible) failures.push('S2 completion popup is not visible at capture time');
         if (expectBackend && !state.backend.toLowerCase().includes(expectBackend === 'metal' ? 'metal' : 'swiftshader')) throw Object.assign(new Error(`backend mismatch: expected ${expectBackend}, got ${state.backend}`), { blocked: true });
         const clip = { x: Math.max(0, bounds.x), y: Math.max(0, bounds.y), width: Math.min(bounds.width, 1100 - bounds.x), height: Math.min(bounds.height, 700 - bounds.y) };
         const canvasPng = await page.screenshot({ clip });
         const shape = await page.evaluate(({ text, clip, dpr }) => {
           const overlay = document.createElement('div'); overlay.setAttribute('aria-hidden', 'true');
           Object.assign(overlay.style, { position: 'fixed', left: `${clip.x + 48}px`, top: `${clip.y}px`, width: `${clip.width - 48}px`, height: `${clip.height}px`, zIndex: '2147483647', pointerEvents: 'none', color: '#fff', background: '#000', font: '13px ui-monospace, SFMono-Regular, Menlo, monospace' });
-          const rows = text.split('\n'); const spans = [];
-          for (const row of rows) { const div = document.createElement('div'); Object.assign(div.style, { height: '18px', lineHeight: '18px', whiteSpace: 'pre' }); for (const char of row) { const span = document.createElement('span'); span.textContent = char; div.append(span); spans.push(span); } overlay.append(div); }
+          const rows = text.split('\n'); const textNodes = [];
+          for (const row of rows) { const div = document.createElement('div'); Object.assign(div.style, { height: '18px', lineHeight: '18px', whiteSpace: 'pre' }); const node = document.createTextNode(row); div.append(node); textNodes.push(node); overlay.append(div); }
           document.body.append(overlay);
           const obscurers = [...document.querySelectorAll('.vact-completion,.vact-code-diag-tooltip')].map((el) => el.getBoundingClientRect()).filter((r) => r.width && r.height);
-          const chars = rows.map((row) => Array.from(row).map(() => null)); let index = 0; let skipCount = 0;
-          for (let line = 0; line < rows.length; line++) for (let col = 0; col < Array.from(rows[line]).length; col++) {
-            const span = spans[index++]; const r = span.getBoundingClientRect(); const clipped = r.right > clip.x + clip.width - 8;
+          const chars = rows.map((row) => Array.from(row).map(() => null)); let skipCount = 0;
+          for (let line = 0; line < rows.length; line++) {
+            let offset = 0;
+            for (let col = 0; col < Array.from(rows[line]).length; col++) {
+            const char = Array.from(rows[line])[col]; const range = document.createRange(); range.setStart(textNodes[line], offset); range.setEnd(textNodes[line], offset + char.length); offset += char.length;
+            const r = range.getBoundingClientRect(); const clipped = r.right > clip.x + clip.width - 8;
             const obscured = obscurers.some((o) => r.left < o.right && r.right > o.left && r.top < o.bottom && r.bottom > o.top);
             if (clipped || obscured) { skipCount++; continue; }
-            chars[line][col] = { left: Math.round((r.left - clip.x) * dpr), right: Math.round((r.right - clip.x) * dpr), char: Array.from(rows[line])[col] };
+            chars[line][col] = { left: Math.round((r.left - clip.x) * dpr), right: Math.round((r.right - clip.x) * dpr), char };
+            }
           }
           const popupRects = obscurers.map((r) => ({ left: Math.round((r.left - clip.x) * dpr), right: Math.round((r.right - clip.x) * dpr) }));
           return { chars, skipCount, popupRects };
@@ -126,9 +143,11 @@ export async function runCodePixels(browser, origin, { dpr, expectBackend = 'met
         const diag = state.annotations.filter((a) => a.kind === 'diagnostic');
         const diagRows = diag.map((a) => Math.max(0, state.text.slice(0, a.from).split('\n').length - 1));
         if (!compare.p5) failures.push(`${scenario.id} P5 caret not isolated on expected row`);
+        const diagnosticSkipped = compare.p6.filter((check) => check.skipped).length;
+        const visibleDiagnosticChecks = compare.p6.filter((check) => !check.skipped).length;
+        checkedDiagnostics += visibleDiagnosticChecks;
         if (scenario.id === 'S2' || scenario.id === 'S3') {
-          if (!diag.length) failures.push(`${scenario.id} P6 no diagnostic to check`);
-          else checkedDiagnostics += diag.length;
+          if (!diag.length || !visibleDiagnosticChecks) failures.push(`${scenario.id} P6 no diagnostic to check`);
         }
         for (const check of compare.p6) if (!check.pass) failures.push(`${scenario.id} P6 diagnostic underline rows ${check.rows} outside line ${check.line + 1}`);
         if (compare.p7.some((uniform) => uniform === false)) failures.push(`${scenario.id} P7 backdrop is not uniform below the document`);
@@ -136,9 +155,9 @@ export async function runCodePixels(browser, origin, { dpr, expectBackend = 'met
         if (outDir) {
           fs.mkdirSync(outDir, { recursive: true }); fs.writeFileSync(path.join(outDir, `${scenario.id}-dpr${dpr}-canvas.png`), canvasPng); fs.writeFileSync(path.join(outDir, `${scenario.id}-dpr${dpr}-reference.png`), referencePng);
         }
-        report.scenarios.push({ id: scenario.id, documentLength: state.text.length, backend: state.backend, syntaxTimeout, caret: state.caret,
+        report.scenarios.push({ id: scenario.id, documentLength: state.text.length, expectedDocumentLength: scenario.text.length, documentMatch, completionVisible: state.completionVisible, backend: state.backend, syntaxTimeout, caret: state.caret,
           caretCheck: { pass: compare.p5, line: compare.caretLine, column: compare.caretColumn, caretX: compare.caretX, columns: compare.caretColumns }, skippedCells: shape.skipCount,
-          diagnostics: diag.length, diagnosticLines: diagRows, diagnosticChecks: compare.p6, backdropUniform: compare.p7, checks: lineChecks, consoleErrors });
+          diagnostics: diag.length, diagnosticWaitMs, diagnosticWaitTimedOut, diagnosticSkipped, diagnosticLines: diagRows, diagnosticChecks: compare.p6, backdropUniform: compare.p7, checks: lineChecks, consoleErrors });
       } finally { await context.close(); }
     }
   } finally { await analysis.close(); }

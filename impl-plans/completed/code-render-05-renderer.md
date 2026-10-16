@@ -249,3 +249,14 @@ measurement lock.
 - Current-source verification: targeted upload assertion 1/1 (`attempt-5/upload-count.log`); CR-05 focused suite 22/22 (`attempt-5/focused.log`); canvas suite 223/223 under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` (`attempt-5/canvas.log`); `npm run check` exit 0 (`attempt-5/check.log`); line counts renderer.ts 673, gpu.test.ts 991, edit-cost.test.ts 346 (`attempt-5/wc.log`).
 - Toolchain digests are recorded in `toolchain-sha256.txt`. Earlier failed canvas evidence remains in the prior entries and is superseded by the current-source passing rerun.
 - Formal integration review and CR-07 full vitest/browser pixel/e2e checks remain downstream.
+
+### Session: 2026-10-17 CR-05 current-source verification
+**Tasks Completed**: Re-read the assigned renderer implementation and reran its focused, canvas, type-check, and source-size gates on the current shared tree.
+**Tasks In Progress**: None for CR-05. CR-07 owns full vitest and browser pixel/e2e validation; integration review remains downstream.
+**Blockers**: None.
+**Notes**:
+- Current-source focused verification passed 22/22 (`tmp/code-render/CR-05/focused-current-rerun.log`); the canvas suite passed 223/223 under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` (`canvas-current.log`); `npm run check` passed (`check-current.log`, `tsc --noEmit`).
+- Current line counts are renderer.ts 673, gpu.test.ts 991, and edit-cost.test.ts 346 (`wc-current.log`), all below 1000. Prebuilt artifact digests still match `toolchain-sha256.txt`.
+- The exact 34 upload assertion at `editor/test/canvas/gpu.test.ts:790` passed again on the fixed 40-line fixture. It represents the fixture's distinct atlas requests keyed by glyph text, texel width, and phase; later-frame upload stability, texture reuse, eviction, and upload accounting assertions also passed in the canvas suite.
+- The first `focused-current.log` capture is retained as an incomplete attempt: zsh rejected the shell variable name `status` after Vitest completed. The successful, complete rerun is `focused-current-rerun.log` and is the gating result.
+- No CR-05 source or test edits were needed in this verification turn. Formal integration review and CR-07 full vitest/browser checks remain downstream.

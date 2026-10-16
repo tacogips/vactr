@@ -169,3 +169,14 @@ Run from `editor/`. Each log ends with its exit status.
 - `cd editor && npx vitest run test/code/atlas-cells.test.ts > ../tmp/code-render/CR-02/attempt-4/focused.log 2>&1; rc=$?; printf 'exit=%s\n' "$rc" >> ../tmp/code-render/CR-02/attempt-4/focused.log; exit "$rc"` — exit 0; 6/6 passed.
 - `cd editor && npm run check > ../tmp/code-render/CR-02/attempt-4/check.log 2>&1; rc=$?; printf 'exit=%s\n' "$rc" >> ../tmp/code-render/CR-02/attempt-4/check.log; exit "$rc"` — exit 0 (`tsc --noEmit`).
 - `cd editor && npx vitest run test/canvas/gpu.test.ts test/canvas/edit-cost.test.ts > ../tmp/code-render/CR-02/attempt-4/canvas.log 2>&1; rc=$?; printf 'exit=%s\n' "$rc" >> ../tmp/code-render/CR-02/attempt-4/canvas.log; exit "$rc"` — exit 0; informational run 77/77 passed, no CR-05 handoff failure observed.
+
+### Session: 2026-10-17 (current-source CR-02 verification)
+**Tasks Completed**: Revalidated the assigned atlas behavior and TypeScript compatibility on the current shared source. No CR-02 source or test files required changes; the implementation matched the pre-node snapshot.
+**Tasks In Progress**: None for CR-02.
+**Blockers**: None.
+**Toolchain SHA-256**: `target/wasm32-unknown-unknown/debug/vactr.wasm` de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210; `tree-sitter-vact/tree-sitter-vact.wasm` ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609; `editor/package-lock.json` f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749 (`tmp/code-render/CR-02/attempt-5/toolchain-sha256.txt`).
+**Verification**:
+- `cd editor && npx vitest run test/code/atlas-cells.test.ts > ../tmp/code-render/CR-02/attempt-5/focused.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-5/focused.log; exit "$rc"` — exit 0; 6/6 tests passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-02/attempt-5/check.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-5/check.log; exit "$rc"` — exit 0 (`tsc --noEmit`).
+- `cd editor && npx vitest run test/canvas/gpu.test.ts test/canvas/edit-cost.test.ts > ../tmp/code-render/CR-02/attempt-5/canvas.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-5/canvas.log; exit "$rc"` — exit 0; informational run 77/77 passed. This current-source result supersedes the earlier CR-05 informational failure as a handoff concern.
+**Scope**: `editor/test/canvas/gpu.test.ts` is outside CR-02 write scope and had concurrent changes before this step; it was not edited by this plan. Independent integrity/adversarial reviews and remaining plans are downstream workflow work.

@@ -22,14 +22,37 @@ export function cellInk(img, rect, backdrop) {
   for (let y = Math.max(0, rect.top); y < Math.min(img.height, rect.bottom); y++)
     for (let x = Math.max(0, rect.left); x < Math.min(img.width, rect.right); x++) brightest = Math.max(brightest, distance(img, x, y, backdrop));
   if (brightest <= 8) return { ink: 0, inkLeft: null, inkRight: null };
-  let ink = 0; let inkLeft = null; let inkRight = null;
+  let ink = 0; const inkColumns = [];
   for (let x = Math.max(0, rect.left); x < Math.min(img.width, rect.right); x++) {
     let column = 0;
     for (let y = Math.max(0, rect.top); y < Math.min(img.height, rect.bottom); y++) column += Math.max(0, Math.min(1, distance(img, x, y, backdrop) / brightest));
     ink += column;
-    if (column >= 0.25) { if (inkLeft === null) inkLeft = x; inkRight = x; }
+    if (column >= 0.25) inkColumns.push(x);
   }
-  return { ink, inkLeft, inkRight };
+  const runs = [];
+  for (const x of inkColumns) {
+    const last = runs.at(-1);
+    if (last && x === last[1] + 1) last[1] = x;
+    else runs.push([x, x]);
+  }
+  const center = (rect.left + rect.right - 1) / 2;
+  const run = runs.sort((a, b) => {
+    const distanceToRun = (entry) => center < entry[0] ? entry[0] - center : center > entry[1] ? center - entry[1] : 0;
+    return distanceToRun(a) - distanceToRun(b);
+  })[0];
+  return { ink, inkLeft: run?.[0] ?? null, inkRight: run?.[1] ?? null };
+}
+
+export function selectDiagnosticRect(charsByLine, row, start, end, dpr) {
+  const boxes = charsByLine[row] ?? [];
+  const first = boxes[start];
+  if (!first) return { skipped: true };
+  let last = null;
+  for (let i = Math.max(start, end - 1); i >= start; i--) {
+    if (boxes[i]) { last = boxes[i]; break; }
+  }
+  if (!last) return { skipped: true };
+  return { skipped: false, rect: { left: first.left, right: last.right, top: row * 18 * dpr, bottom: (row + 1) * 18 * dpr } };
 }
 
 export function compareLine(canvasCells, referenceCells, chars, tolerances = { minInk: 0.5, extentPx: 1, ratio: [0.8, 1.25] }) {

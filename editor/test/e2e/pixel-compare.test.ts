@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error The helper is plain injectable JavaScript by design.
-import { bandRows, cellInk, columnUniform, compareLine, modeColor, verticalRuns } from './pixel-compare.mjs';
+import { bandRows, cellInk, columnUniform, compareLine, modeColor, selectDiagnosticRect, verticalRuns } from './pixel-compare.mjs';
 
 function image(width: number, height: number, color: [number, number, number] = [0, 0, 0]) {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -38,5 +38,23 @@ describe('pixel comparison helpers', () => {
     img.data.set([5, 0, 0, 255], 5 * img.width * 4);
     expect(columnUniform(img, 0, 0, 10, 2)).toBe(false);
     expect(modeColor(img, { left: 0, top: 0, right: 5, bottom: 20 })).toEqual([0, 0, 0]);
+  });
+  it('ignores disconnected neighbor ink for P3 while detecting a squashed glyph', () => {
+    const canvas = image(12, 10); const reference = image(12, 10);
+    rect(canvas, 3, 2, 4, 8, [255, 255, 255]); rect(canvas, 5, 2, 9, 8, [255, 255, 255]);
+    rect(reference, 4, 2, 8, 8, [255, 255, 255]);
+    const actual = cellInk(canvas, { left: 3, top: 0, right: 10, bottom: 10 }, [0, 0, 0]);
+    const expected = cellInk(reference, { left: 3, top: 0, right: 10, bottom: 10 }, [0, 0, 0]);
+    expect(compareLine([actual], [expected], 'b').failures).toEqual([]);
+
+    const squashed = image(12, 10); rect(squashed, 5, 2, 7, 8, [255, 255, 255]);
+    const narrow = cellInk(squashed, { left: 3, top: 0, right: 10, bottom: 10 }, [0, 0, 0]);
+    expect(compareLine([narrow], [expected], '1').failures.join()).toContain('P3 char 0');
+  });
+  it('selects only visible diagnostic spans and clamps partial ends', () => {
+    const row = [{ left: 48, right: 56 }, { left: 56, right: 64 }, null];
+    expect(selectDiagnosticRect([row], 0, 2, 3, 2)).toEqual({ skipped: true });
+    expect(selectDiagnosticRect([row], 0, 1, 3, 2)).toEqual({ skipped: false, rect: { left: 56, right: 64, top: 0, bottom: 36 } });
+    expect(selectDiagnosticRect([row], 0, 0, 2, 2)).toEqual({ skipped: false, rect: { left: 48, right: 64, top: 0, bottom: 36 } });
   });
 });

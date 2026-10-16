@@ -122,3 +122,13 @@ pixel test check P8, run in CR-07.
 **Verification**:
 - `cd editor && npx vitest run test/visual/panes.test.ts test/visual/render-host.test.ts > ../tmp/code-render/CR-03/focused-rerun.log 2>&1; rc=$?; echo "exit=$rc" >> ../tmp/code-render/CR-03/focused-rerun.log; exit $rc` — exit 0; 2 files and 15 tests passed.
 - `cd editor && npm run check > ../tmp/code-render/CR-03/check-rerun.log 2>&1; rc=$?; echo "exit=$rc" >> ../tmp/code-render/CR-03/check-rerun.log; exit $rc` — exit 0.
+
+### Session: 2026-10-17 (implementation boundary rerun)
+**Tasks Completed**: Confirmed the CR-03 source and U6 test in the current boundary snapshot; reran assigned verification.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Notes**: The visual context requests `getContext('webgl2', { antialias: false })`; U6 asserts the visuals mount's WebGL2 call includes exactly that options object. `render-host.ts` remains unchanged. Per-edit intent and current toolchain digests are recorded under `tmp/code-render/CR-03/attempt-2/`.
+
+**Verification**:
+- `cd editor && npx vitest run test/visual/panes.test.ts test/visual/render-host.test.ts > ../tmp/code-render/CR-03/attempt-2/focused.log 2>&1; rc=$?; echo "exit=$rc" >> ../tmp/code-render/CR-03/attempt-2/focused.log; exit $rc` — exit 0; 2 files and 15 tests passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-03/attempt-2/check.log 2>&1; rc=$?; echo "exit=$rc" >> ../tmp/code-render/CR-03/attempt-2/check.log; exit $rc` — exit 0.

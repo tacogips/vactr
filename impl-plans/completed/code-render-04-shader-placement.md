@@ -180,3 +180,9 @@ Real-GPU shader compilation is proven by the CR-06 pixel test in CR-07.
 **Tasks In Progress**: None for the CR-04 implementation contract.
 **Blockers**: None for implementation; independent review remains downstream.
 **Notes**: `editor/src/code/geometry.ts` still exports `SNAP_GLYPH`, `glyphPhase` and `glyphQuad`; vertex origin snapping is guarded by bit 16 and `u_device`; fragment output is premultiplied. CR-04 did not set `SNAP_GLYPH` on instances or edit `renderer.ts`; the current integrated branch includes CR-05-owned renderer wiring that sets the flag on text instances. Current-source focused verification passed 6/6 at `tmp/code-render/CR-04/attempt-3-focused.log`; `npm run check` exited 0 at `tmp/code-render/CR-04/attempt-3-check.log`. Both are CR-04 gating checks. Canvas GPU verification is CR-05-owned and is explicitly informational under the dispatch contract. Real-GPU shader compilation remains owned by CR-06/CR-07. Per-edit intents: `tmp/code-render/CR-04/attempt-3-edit-intent.txt` and `tmp/code-render/CR-04/attempt-3-edit-intent-02.txt`.
+
+### Session: 2026-10-17 (CR-04 current-source implementation handoff)
+**Tasks Completed**: Rechecked the assigned helpers and shaders; reran both CR-04 gates and refreshed toolchain digests.
+**Tasks In Progress**: None for CR-04.
+**Blockers**: None.
+**Notes**: Current `geometry.ts` satisfies the pinned signatures, bit-16 `u_device` origin snap, and premultiplied fragment output. The focused suite passed 6/6 in `tmp/code-render/CR-04/attempt-4/focused.log`; `npm run check` exited 0 in `tmp/code-render/CR-04/attempt-4/check.log`. Toolchain digests are in `tmp/code-render/CR-04/attempt-4/toolchain-sha256.txt`. CR-04 source/test files are already present in the worktree; this session made no implementation-source changes. Renderer wiring remains owned by CR-05.

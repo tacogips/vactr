@@ -1,11 +1,11 @@
 # Code Render 07: Calibration, Gates, Mutation Evidence, Before/After Screenshots
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CR-07
 **Wave**: 3 (depends on CR-01, CR-02, CR-03, CR-04, CR-05, CR-06)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 5.2 (calibration), 5.3, 5.5, 6; design-docs/specs/design-canvas-editor-evidence.md "Code-pane text rendering gap (2026-10-16)"
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Intent and Context
 
@@ -41,9 +41,9 @@ change system volume.
 
 Mirrors `impl-plans/active/code-render-dispatch.json` plans[CR-07].
 
-- writePaths: `design-docs/specs/design-canvas-editor-evidence.md`, `impl-plans/active/code-render-07-closeout.md`, `tmp/code-render/CR-07`, `tmp/code-render/baseline`, `tmp/code-render/after`, `tmp/code-render/node_modules`, `editor/dist`, `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules`
+- writePaths: `design-docs/specs/design-canvas-editor-evidence.md`, `impl-plans/active/code-render-07-closeout.md`, `tmp/code-render/CR-07`, `tmp/code-render/baseline`, `tmp/code-render/after`, `tmp/code-render/node_modules`, `editor/dist`, `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules`, `tmp/canvas-cutover/evidence`
 - sharedPaths: `editor/test/e2e/code-pixels.mjs` (only the P3 `extentPx` and P4 `ratio` constants, within the CR-06 calibration rule), `impl-plans/active/code-render-06-pixel-test.md` (append the calibration record to its Progress Log only)
-- artifactRoots: `tmp/code-render/CR-07`, `tmp/code-render/baseline`, `tmp/code-render/after`, `tmp/code-render/node_modules`, `editor/dist`, `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules` (the last three are prebuilt read-only inputs: never rebuild, reinstall or delete them)
+- artifactRoots: `tmp/code-render/CR-07`, `tmp/code-render/baseline`, `tmp/code-render/after`, `tmp/code-render/node_modules`, `editor/dist`, `target`, `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules`, `tmp/canvas-cutover/evidence` (`target`, the grammar wasm and `editor/node_modules` are prebuilt read-only inputs: never rebuild, reinstall or delete them; `tmp/canvas-cutover/evidence` is the diagnostic output directory written by the pre-existing behavior.mjs:120 WebKit touch diagnostic and measure.mjs:24 during the required behavior e2e gate. CR-07 owns it only as an artifact root and must not delete the existing s274-webkit-touch-events.json; added by the owner for integration-review finding CR07-ARTIFACT-ROOT)
 - The before-screenshots and `tmp/code-render/repro-shot.mjs` sit directly in `tmp/code-render/`. They are read-only inputs owned by no plan; never modify or delete them.
 - Toolchain audit re-check (step 0 below): CR-07 recomputes the digests and requires equality with every plan's recorded digests.
 
@@ -150,12 +150,12 @@ exitStatus, failingChecks, log, notes}`.
 
 ## Completion Criteria
 
-- [ ] Calibration recorded (or "defaults kept")
+- [x] Calibration recorded: defaults kept; the matrix exposed P3/P6 failures requiring upstream disposition.
 - [ ] check, focused vitest, full vitest, test:style, build, e2e behavior (Chromium + WebKit, with code-pixels-dpr1/dpr2) and the full pixel matrix pass
 - [ ] Mutation evidence shows the required old-code failures
 - [ ] Before/after screenshots, including the DR-L2 selection pair, named in the progress log
 - [ ] Line counts below 1000; input.ts, keyboard.ts and the cursor block untouched
-- [ ] Results appended to design-canvas-editor-evidence.md
+- [x] Results appended to design-canvas-editor-evidence.md
 
 ## Progress Log
 
@@ -164,3 +164,15 @@ exitStatus, failingChecks, log, notes}`.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Runs after all other code-render plans.
+
+### Session: 2026-10-17 (CR-07 attempt 1)
+**Tasks Completed**: Toolchain digest re-check; debug-WASM app build; `npm run check`; focused CR-07 vitest suite; calibration matrix captured.
+**Tasks In Progress**: Remaining full gates, baseline mutation evidence and before/after screenshots are stopped pending upstream P3/P6 disposition.
+**Blockers**: Calibration command failed on the combined tree. DPR-2 P3 character extents differed by up to 3 device pixels (S4, versus the permitted maximum of 2), so the CR-06 calibration rule does not permit changing the threshold. P6 failed with no diagnostic in S2 at DPR 1 and empty underline rows for some S4 diagnostics at DPR 1/2. P3 pixel-width mismatch is assigned for CR-04/CR-02 investigation; P6 diagnostic behavior and/or assertion is assigned for CR-05/CR-06 investigation. No product code is changed by CR-07.
+**Notes**: Toolchain SHA-256 values match the CR-01–CR-06 progress records: `vactr.wasm` `de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210`, `tree-sitter-vact.wasm` `ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609`, `package-lock.json` `f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749` (`tmp/code-render/CR-07/toolchain-sha256.txt`). `npm run build` exit 0 (`build.log`); `npm run check` exit 0 (`check.log`); focused suite 7 files / 34 tests passed (`focused.log`). Calibration command `node test/e2e/code-pixels.mjs --backend all --dpr all --out ../tmp/code-render/CR-07/calibration` exited 1: four backend/DPR rows, zero passed. Full details and screenshots are in `calibration.log` and `calibration/{metal,swiftshader}-dpr{1,2}/`. Existing P3/P4 defaults remain `extentPx: 1`, `ratio: [0.8, 1.25]`; no calibration edit is justified. The plan's stop-on-product-failure rule applies; full vitest, style, behavior e2e, final pixel matrix, mutation baseline and after/DR-L2 screenshots were not run. The implementation remains incomplete pending upstream repair and a fresh CR-07 run.
+
+### Session: 2026-10-17 (CR-07 attempt 2)
+**Tasks Completed**: Rechecked toolchain digests; rebuilt the editor with the declared debug WASM; reran check, focused and full Vitest, test:style, pixel calibration, and Chromium + WebKit behavior profile.
+**Tasks In Progress**: Full CR-07 pixel matrix, baseline mutation evidence, after/DR-L2 screenshots and final documentation/evidence records.
+**Blockers**: Stopped after the behavior profile wrote `tmp/canvas-cutover/evidence/s274-webkit-touch-events.json`, outside this plan's declared artifactRoots. The runtime contract requires a checkpoint amendment before continuing commands that generate outputs outside declared artifact roots. Resume after `tmp/canvas-cutover/evidence/` is admitted as an artifact root (or the e2e harness is configured to write the diagnostic under `tmp/code-render/CR-07/`).
+**Notes**: `tmp/code-render/CR-07/toolchain-sha256-rerun.txt` matches the recorded wasm and package-lock digests. `build-rerun.log`, `check-rerun.log`, `focused-rerun.log` (7 files / 36 tests), `vitest-full-rerun.log` (101 files / 871 tests), and `test-style-rerun.log` (4 engine/viewport combinations) all exit 0. `calibration-rerun.log` and its `report.json` pass 4/4 rows (Metal and SwiftShader at DPR 1 and 2); P3/P4 defaults remain `extentPx: 1`, `ratio: [0.8, 1.25]`. `e2e-behavior-rerun.log` exits 0 with 22/22 checks: Chromium 13/13, including `code-pixels-dpr1` and `code-pixels-dpr2`; WebKit 9/9. The WebKit synthetic clipboard and IME limitations remain excluded by the runner. The diagnostic artifact is timestamped Oct 17 02:09:44 and hashes to `2a50eb17571f1c516c2ce0d4ca7ac59eef272c0187724160932e6addfa86c211`. CR-07 remains incomplete; no thresholds or product sources were changed.

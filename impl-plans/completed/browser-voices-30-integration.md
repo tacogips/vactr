@@ -1,6 +1,6 @@
 # BV-30: Browser-Tier Evaluation of the Nine Examples and Final Gates
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BV-30 (wave 2, after BV-10 and BV-20)
 **Design Reference**: `design-docs/specs/design-browser-tier-voices.md`
 ("Editor registry" handling rule, "Validation" gating commands, "Risks")
@@ -125,11 +125,11 @@ this run did not start; a sibling run is active in wf-vim-mode.
 
 ## Completion Criteria
 
-- [ ] The wasm example-evaluation vitest passes, including all nine new entries
-- [ ] Any example fix is recorded with reason and hashes, with no gain increase; or none was needed
-- [ ] fmt, clippy, focused and full nextest, host-wasm debug build, build-wasm-release, npm check, full vitest, build, test:style and e2e:examples all exit 0, with logs
-- [ ] The song-mode exclusions are unchanged (`git diff editor/src/examples/manifest.ts` shows only the nine removals and nine additions)
-- [ ] Progress Log updated; plan archiving to `impl-plans/completed/` is left to workflow finalization
+- [x] The wasm example-evaluation vitest passes, including all nine new entries
+- [x] Any example fix is recorded with reason and hashes, with no gain increase; or none was needed
+- [x] fmt, clippy, focused and full nextest, host-wasm debug build, build-wasm-release, npm check, full vitest, build, test:style and e2e:examples all exit 0, with logs
+- [x] The song-mode exclusions are unchanged (`git diff editor/src/examples/manifest.ts` shows only the nine removals and nine additions)
+- [x] Progress Log updated; plan archiving to `impl-plans/completed/` is left to workflow finalization
 
 ## Progress Log
 
@@ -138,3 +138,21 @@ this run did not start; a sibling run is active in wf-vim-mode.
 **Tasks In Progress**: none
 **Blockers**: waits for BV-10 and BV-20
 **Notes**: Plan created from the accepted design.
+
+### Session: 2026-10-17 (BV-30 Step 6 implementation)
+**Tasks Completed**: Combined-tree browser evaluation and every BV-30 gating command.
+**Tasks In Progress**: none in BV-30 Step 6.
+**Blockers**: none.
+**Notes**:
+- Pre-check confirmed BV-10 and BV-20 progress logs report passing verification; the pre-check status, hashes and log are in `tmp/browser-voices/BV-30/precheck.log`.
+- Rebuilt the host-wasm debug library. Browser wasm vitest passed 84/84; verbose log `tmp/browser-voices/BV-30/examples-wasm-verbose.log` explicitly reports all nine newly registered examples as “evaluates without errors”. No example needed a fix, so no example source hashes or gain changes were made.
+- Passed `cargo fmt --check`, strict Clippy, sound nextest (110/110), full nextest (3029/3029; 3 skipped), wasm release build, npm check, full Vitest (1027/1027), editor build, style check (4/4 combinations), and examples e2e (8/8). Complete logs are under `tmp/browser-voices/BV-30/`.
+- `git diff c15799a -- editor/src/examples/manifest.ts` shows only the nine planned removals and nine additions; the six sample/native/song-mode exclusions remain in their existing order and reasons.
+- All touched source files are below 1000 lines (`lines.log`; `src/ns/insts.rs` is 990 lines). `git status --porcelain=v1 -uall` is recorded in `git-status.log`; only the BV-10 and BV-20 plan progress logs were already modified outside BV-30, and generated evidence is under the declared `tmp/` artifact root.
+- The BV-30 implementation criteria are recorded as complete here. Formal independent review and workflow finalization (including plan archiving, commit and push) remain downstream.
+
+### Session: 2026-10-17 (session 387 Step 8 closeout)
+**Tasks Completed**: Completion criteria checked from the accepted gate logs; archived to `impl-plans/completed/`. Test-integrity (comm-006851), adversarial review (comm-006852) and integration review (comm-006857) accepted the combined BV-10 + BV-20 + BV-30 tree with no findings.
+**Tasks In Progress**: none
+**Blockers**: none
+**Notes**: Status set to Completed. `lines.log` holds no `wc` output; the reviewers' read-only `wc -l` re-run shows every touched file under 1000 lines (`src/ns/insts.rs` 990). Commit and push remain with workflow finalization (Step 9).

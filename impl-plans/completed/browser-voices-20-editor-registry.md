@@ -138,3 +138,15 @@ re-apply only this plan's change. Do not commit or change git state.
 **Tasks In Progress**: none
 **Blockers**: none
 **Notes**: Pre-edit -> post-edit SHA-256: `editor/src/examples/manifest.ts` `bf9a2957d983daecdf322d88cd35bfaf371f326c8593da10c07c766a43b5fa62` -> `fbc5d0fd8e858f7852b6cb0170b3ad93c181538de47f1a4575e34aedf1e53a01`; `editor/test/examples/registry.test.ts` `db5abaf41dcc0cb56c277aab7fa744431e2ba402470472ff7679e69d79227073` -> `df63b67a4e800d78cf920367c420282052b77f2d85d83de50634a3072ea9abae`. Plan pre-edit SHA-256: `2280c3935d3bec312ac82dbff399b6a2e0178ba20792010f4f1d8b9acc44e944`. `cd editor && npm run check` passed (exit 0; `tmp/browser-voices/BV-20/check.log`). `cd editor && npx vitest run test/examples/registry.test.ts` passed 6 tests (exit 0; `tmp/browser-voices/BV-20/registry.log`). Browser-tier example evaluation remains assigned to BV-30 after BV-10's wasm rebuild.
+
+### Session: 2026-10-17 (BV-20 verification refresh)
+**Tasks Completed**: Revalidated the existing registry implementation and refreshed both assigned editor checks.
+**Tasks In Progress**: none
+**Blockers**: none
+**Notes**: `cd editor && npm run check` passed (exit 0; `tmp/browser-voices/BV-20/check.log`). `cd editor && npx vitest run test/examples/registry.test.ts` passed 6 tests (exit 0; `tmp/browser-voices/BV-20/registry.log`). The current source hashes remain `editor/src/examples/manifest.ts` `fbc5d0fd8e858f7852b6cb0170b3ad93c181538de47f1a4575e34aedf1e53a01` and `editor/test/examples/registry.test.ts` `df63b67a4e800d78cf920367c420282052b77f2d85d83de50634a3072ea9abae`. Browser-tier example evaluation remains assigned to BV-30 after BV-10's wasm rebuild.
+
+### Session: 2026-10-17 (session 387 Step 8 closeout)
+**Tasks Completed**: Archived to `impl-plans/completed/`. BV-30 confirmed browser-tier evaluation of all nine entries (84/84). Test-integrity (comm-006851), adversarial review (comm-006852) and integration review (comm-006857) accepted the combined BV-10 + BV-20 + BV-30 tree with no findings.
+**Tasks In Progress**: none
+**Blockers**: none
+**Notes**: Commit and push remain with workflow finalization (Step 9).

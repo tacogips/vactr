@@ -22,10 +22,10 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 ## Template voices as sounds in every tier (2026-10-17)
 
-These plans implement [design-browser-tier-voices.md](../design-docs/specs/design-browser-tier-voices.md) on branch `wf/browser-voices` (session 386). They are Ready.
+These plans implement [design-browser-tier-voices.md](../design-docs/specs/design-browser-tier-voices.md) on branch `wf/browser-voices` (designed in session 386). All three are Completed and archived (2026-10-17, session 387) after test-integrity, adversarial and integration review accepted them with no findings. BV-30 final gates: wasm example evaluation 84/84 (all nine new examples), full nextest 3029/3029 (3 skipped), full vitest 1027/1027, test:style 4/4, `npm run e2e:examples` 8/8 (`tmp/browser-voices/BV-30/`). The [dispatch manifest](active/browser-voices-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.
 
-- **Wave 1** (parallel): [BV-10 checker templates and regression test](active/browser-voices-10-checker-templates.md), [BV-20 editor registry](active/browser-voices-20-editor-registry.md)
-- **Wave 2**: [BV-30 browser evaluation and final gates](active/browser-voices-30-integration.md)
+- **Wave 1** (parallel): [BV-10 checker templates and regression test](completed/browser-voices-10-checker-templates.md), [BV-20 editor registry](completed/browser-voices-20-editor-registry.md)
+- **Wave 2**: [BV-30 browser evaluation and final gates](completed/browser-voices-30-integration.md)
 
 ## Example picker, flashy default and document persistence (2026-10-16)
 

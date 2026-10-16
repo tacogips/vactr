@@ -1,6 +1,6 @@
 # BV-10: Realized Template Voices as Checker Sounds (Rust) and Regression Test
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: BV-10 (wave 1, parallel with BV-20)
 **Design Reference**: `design-docs/specs/design-browser-tier-voices.md`
 ("Source of truth", "Design" components 1-5, "Validation"; decisions
@@ -264,3 +264,22 @@ The full nextest run is BV-30's job, under the measurement lock.
 - Verification passed: `CARGO_TERM_QUIET=true cargo fmt --check` (`fmt.log`), `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` (`clippy.log`), focused nextest above, `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` (`wasm-lib.log`), and the under-1000-lines check (`lines.log`).
 - Mutation evidence: reverting the checker union made `template_sounds_are_accepted_only_when_realized_in_each_tier` fail with `unknown-keyword`; restoring the union passed 2/2 regression tests. The temporary negative-control source SHA-256 was `953c7151eafbde31e507bb152707849621af88aac61b4629b798138826a8d4a6`; restored source SHA-256 is `3ae47a9516302cf06be3c9d9caab40f197e79828a927f5750a5c3415922cc8e4`. See `mutation.log`, `mutation-negative.log`, and `mutation-restored.log`.
 - Full nextest and broader editor/build/e2e gates are owned by BV-30; independent review, commit and push remain downstream workflow steps.
+
+### Session: 2026-10-17 (BV-10 Step 6 fresh verification)
+**Tasks Completed**: Re-ran all BV-10 assigned verification gates against the recorded final source hashes.
+**Tasks In Progress**: none in BV-10.
+**Blockers**: none.
+**Notes**:
+- Fresh `CARGO_TERM_QUIET=true cargo fmt --check` passed (exit 0; `tmp/browser-voices/BV-10/fmt-session387.log`).
+- Fresh `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` passed (exit 0; `tmp/browser-voices/BV-10/clippy-session387.log`).
+- Focused nextest passed: 322 run, 322 passed, 0 failures, 2710 skipped (exit 0; `tmp/browser-voices/BV-10/focused-session387.log`).
+- Fresh host-wasm library build passed (exit 0; `tmp/browser-voices/BV-10/wasm-lib-session387.log`).
+- Fresh line-count gate passed (exit 0; `tmp/browser-voices/BV-10/lines-session387.log`); every touched Rust file is under 1000 lines.
+- Existing non-gating mutation evidence remains source-matched and shows the regression fails without the checker union and passes after restoration (`mutation-negative.log`, `mutation-restored.log`).
+- Formal review, BV-30 integration/editor gates, commit and push remain downstream workflow work.
+
+### Session: 2026-10-17 (session 387 Step 8 closeout)
+**Tasks Completed**: Archived to `impl-plans/completed/`. Test-integrity (comm-006851), adversarial review (comm-006852) and integration review (comm-006857) accepted the combined BV-10 + BV-20 + BV-30 tree with no findings.
+**Tasks In Progress**: none
+**Blockers**: none
+**Notes**: Status set to Completed. Commit and push remain with workflow finalization (Step 9).

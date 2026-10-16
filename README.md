@@ -231,9 +231,13 @@ files, and can set or reset the default template. Opening a document replaces
 the buffer as one undoable step (Mod-Z restores the previous text) and never
 starts playback; press Run to hear it. The built-in default is
 `examples/showcase.vact`. Only examples that evaluate in the browser tier are
-listed; examples that need native-only voices, external samples or song
-transport are excluded with a recorded reason in
-`editor/src/examples/manifest.ts`. On startup, an explicit
+listed; examples that need a four-output native host, external samples or
+song transport are excluded with a recorded reason in
+`editor/src/examples/manifest.ts`. Every template voice the prelude realizes
+in a tier (for example `phase-drum`, `analog-bass`, `vosim`, `kalimba`) is a
+valid `s :name` sound there, in both the eval check and the editor's static
+check ([design](design-docs/specs/design-browser-tier-voices.md)), so the
+bass and FM voice examples are listed. On startup, an explicit
 `?example=<id>` URL takes precedence, followed on the web by the unsaved draft,
 then the chosen default template, then the built-in showcase. Web drafts,
 named documents, and the default template use versioned `vactr.doc.v1.*`

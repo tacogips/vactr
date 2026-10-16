@@ -4,12 +4,13 @@
   "implementationBranch": "wf/vim-mode",
   "baseBranch": "wf/vim-mode",
   "remote": "origin",
-  "originalHead": "84234f86eb079e206413925074e97d430917b126",
-  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (continuation workflowExecutionId opus-luna-design-and-implement-review-loop-session-381 resuming session-374; session-374 intake comm-006526, design accepted comm-006530, plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; prior high finding step3-design-review-attempt-1-finding-1 (platform Mod/Ctrl pass-through and modifier Backspace/Delete) repaired in design sections 3.3.1-3.3.3, 4.14 and 8.2; no GitHub issue number)",
+  "originalHead": "ee90e1eb05c45763650b6c624121c601843c393b",
+  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (continuation workflowExecutionId opus-luna-design-and-implement-review-loop-session-385 resuming session-381 and session-374; session-374 intake comm-006526, design accepted comm-006530, plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; prior high finding step3-design-review-attempt-1-finding-1 repaired in design sections 3.3.1-3.3.3, 4.14 and 8.2; prior high finding opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1 (Chromium normal-mode IME commit inserts text, editor/src/code/input.ts:44) routed to VIM-15 and re-verified by VIM-40; no GitHub issue number)",
   "resumeContext": {
-    "previousManifestHead": "ea51a0733e301f6e29dddb009c87542b635e6722",
-    "partialImplementationCommit": "84234f86eb079e206413925074e97d430917b126",
-    "notes": "Session-374 stopped by a usage limit after committing partial wave-0/1 work (VIM-00, VIM-12, VIM-13, VIM-14, VIM-15, VIM-16, VIM-17, VIM-18 self-reported Completed; VIM-10 and VIM-11 In Progress pending review; VIM-20, VIM-30, VIM-40, VIM-41 not started). None of these plans passed independent Opus review, so every plan stays in the remaining set. Implementers resume from the committed files: re-read them, finish missing criteria, re-run the plan verification into a new tmp/vim-mode/<planId>/attempt-<n>/ directory, and append a session-381 Progress Log entry; do not discard committed work."
+    "previousManifestHead": "6349b0ff833c99756874b2a3c9decc44773bdd09",
+    "partialImplementationCommit": "ee90e1eb05c45763650b6c624121c601843c393b",
+    "earlierPartialImplementationCommit": "84234f86eb079e206413925074e97d430917b126",
+    "notes": "Session-381 stopped after a fanout dependency failure and committed checkpoint ee90e1e (VIM-30 self-reported Completed while VIM-20 is In Progress; VIM-10 and VIM-11 In Progress pending independent review; VIM-40 In Progress with the Chromium vim-ime-normal gate failing; the remaining plans self-reported Completed). The session-381 integration review raised one high finding in editor/src/code/input.ts (see reviewContext.priorReviewFindings). Not every plan has passed independent Opus review, so all 14 plans stay in the remaining set. Implementers resume from the committed files: re-read them, finish missing criteria, apply the routed repair, re-run the plan verification into a new tmp/vim-mode/<planId>/attempt-<n>/ directory, and append a session-385 Progress Log entry. Do not discard committed work."
   },
   "designDocPaths": [
     "design-docs/specs/design-vim-mode.md",
@@ -20,7 +21,21 @@
   "evidenceRoot": "tmp/vim-mode",
   "evidenceLayout": "tmp/vim-mode/<planId>/ per plan (scoped tsconfig.json, command logs ending with exit=<status>), with per-attempt subdirectories tmp/vim-mode/<planId>/attempt-<n>/; tmp/vim-mode/e2e/vim-001/ for the Playwright behavior run; tmp/ui-style/after/ for the style test. tmp/ is gitignored. Each Progress Log records {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls go only in mutationEvidence.",
   "reviewContext": {
-    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-381, continuing session-374; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
+    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-385, continuing session-381 and session-374; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
+    "priorReviewFindings": [
+      {
+        "id": "opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1",
+        "severity": "high",
+        "workflowMode": "issue-resolution",
+        "sourceReviewStepId": "integration-review",
+        "filePath": "editor/src/code/input.ts",
+        "line": 44,
+        "message": "In Chromium, a normal-mode IME commit inserts text: 'stable' (revision 2) becomes 'stabl日本e' (revision 3) after CDP Input.imeSetComposition('にほん') then Input.insertText('日本'). The Vim text-input gate is checked only in the compositionstart handler (input.ts:42). The blur handler (input.ts:78-81) clears discarding during the microtask blur/refocus queued at input.ts:44. After that, compositionupdate (input.ts:49), the beforeInput isComposing branch (input.ts:185-188) and updateComposition (input.ts:152) call beginComposition() with no Vim gate, and compositionend calls endComposition() (input.ts:52), which dispatches the commit at the caret.",
+        "owningPlan": "VIM-15",
+        "reverifyingPlan": "VIM-40",
+        "requiredRepair": "While the Vim hook is set and allowsTextInput() is false, no composition path may start a composition or dispatch: beginComposition() (and so updateComposition and the beforeInput isComposing branch) must not begin, and endComposition() must not dispatch. The blur/refocus that ends the platform composition must not reopen any path that commits text. Insert-mode and Vim-off composition behavior stays byte-identical. Add input-vim-hook.test.ts regressions that replay the Chromium order (compositionstart, microtask blur/refocus, compositionupdate, beforeinput isComposing insertCompositionText, compositionend '日本') and assert the document and revision are unchanged; then the VIM-40 Chromium vim-ime-normal check must pass."
+      }
+    ],
     "userProblem": "The vactr editor code pane (WebGL canvas renderer, hidden-textarea input bridge, @codemirror/state EditorState as the only document authority, no EditorView) has no Vim mode, and @replit/codemirror-vim cannot be used because it requires an EditorView.",
     "requiredOutcomes": [
       "Opt-in Vim toggle in the transport bar, default off, remembered per viewer through try/catch-wrapped localStorage",
@@ -77,6 +92,7 @@
       "A-Z register append, black hole _, the 0 yank register, + and * clipboard with fallback",
       "j/k desired column across short lines",
       "Japanese IME keystrokes in normal mode never mutate the document",
+      "Chromium normal-mode IME: a composition that continues after the discard blur/refocus (compositionupdate, beforeinput isComposing, compositionend with data) still never dispatches",
       "iPad on-screen typing stays usable; Vim applies to hardware keyboards; the toggle stays reachable"
     ],
     "outOfScopeEdgeCases": [
@@ -302,6 +318,7 @@
         "setVim, the routing, the text-input gate, normal-mode IME discarding and replace overwrite are implemented as specified",
         "matchesKeymap and the runKeymaps precedence filter exist",
         "input-vim-hook.test.ts has at least 18 passing cases and input.test.ts passes unmodified",
+        "Repair of session-381 integration-review finding 1: with the gate closed, no composition path (compositionupdate, beforeinput isComposing, updateComposition, compositionend) begins a composition or dispatches, including after the discard blur/refocus; regression cases replaying the Chromium event order assert unchanged document and revision",
         "input.ts is under 300 lines and surface.ts under 220"
       ],
       "verification": [
@@ -537,6 +554,7 @@
       "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "editor/dist", "tmp/ui-style", "tmp/vim-mode/e2e", "tmp/vim-mode/VIM-40"],
       "acceptanceCriteria": [
         "vim-behavior.mjs implements the six checks vim-toggle, vim-dcyp, vim-visual, vim-dot, vim-ime-normal and vim-shortcut in their own context, and behavior.mjs merges them",
+        "vim-ime-normal passes in Chromium (CDP Input.imeSetComposition then Input.insertText leaves 'stable' and its revision unchanged) and WebKit after the VIM-15 repair",
         "Gates 1-3, 5 and 7 pass with records in the Progress Log",
         "Gates 4 (test:style) and 6 (Playwright e2e) pass, or carry a recorded verificationGap for the serial Opus verification step with the exact sandbox error",
         "No tracked evidence file under design-docs/specs/evidence changed"

@@ -4,7 +4,9 @@
   "implementationBranch": "wf/code-render",
   "baseBranch": "wf/code-render",
   "remote": "origin",
-  "originalHead": "ea51a0733e301f6e29dddb009c87542b635e6722",
+  "originalHead": "e63b47168adb3b528d865d67538b12da6434115f",
+  "defectBaselineCommit": "ea51a0733e301f6e29dddb009c87542b635e6722",
+  "checkpointHistory": "Resumed in workflow session opus-luna-design-and-implement-review-loop-session-377 at intake HEAD e63b471 (the session-373 checkpoint commit of the same design, plans and manifest). The accepted design and plan files are unchanged from e63b471; only this manifest is updated. ea51a07 remains the pre-fix defect baseline referenced by the plans for mutation evidence and the sibling-boundary diff.",
   "designDocPaths": [
     "design-docs/specs/design-code-pane-text-rendering.md",
     "design-docs/specs/design-canvas-editor-evidence.md",
@@ -63,7 +65,7 @@
   "verificationNotes": "Each plan's verification array is its gating list only (exit 0 required). Commands run from the repository root. Informational canvas runs (CR-01/02/04 canvas.log, CR-06 optional smoke) and CR-07 step-5 baseline runs on ea51a07 stay in the plan text and are recorded as handoff notes or mutationEvidence, never as gating records. Lock-wrapped commands release only the lock they created; if mkdir fails the lock is held by another run: wait 30 s and retry.",
   "acceptedDependencies": [],
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Code pane drops and garbles glyphs (missing line segments, '1' rendered as a bar) and text looks dirty' (no GitHub issue); workflow opus-luna-design-and-implement-review-loop-session-373; intake comm-006522, design comm-006523, design review comm-006524 accepted, plans comm-006525, plan review comm-006526 (PR-H1), repair comm-006527, plan review comm-006528 accepted",
+    "issueReference": "workflowInput issue 'Code pane drops and garbles glyphs (missing line segments, '1' rendered as a bar) and text looks dirty' (no GitHub issue); workflow opus-luna-design-and-implement-review-loop-session-373, resumed in session-377 at e63b471; session-373 intake comm-006522, design comm-006523, design review comm-006524 accepted, plans comm-006525, plan review comm-006526 (PR-H1), repair comm-006527, plan review comm-006528 accepted",
     "userProblem": "On ea51a07 the canvas/WebGL code pane drops and garbles glyphs: '1' in 'use-bpm 108' is drawn as a thin bar, leading characters are missing on every line after the first, short later lines are blank, caret and diagnostic underlines are drawn rows below their line, and text is heavy and soft compared with DOM text in the same font. The visuals pane repeatedly logs GL_INVALID_OPERATION from glBlitFramebuffer (render-host.ts:226). The existing canvas evidence passed all of this.",
     "requiredOutcomes": [
       "All four reproduction cases (typed 'use-bpm 108'; '# hello' Enter 'abc def' with completion open; 3-line insert; 5-line examples/kalimba.vact) render every character at the correct position, caret on its line and diagnostics under the right span, at DPR 1 and 2.",

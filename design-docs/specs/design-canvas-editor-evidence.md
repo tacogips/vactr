@@ -285,6 +285,43 @@ run schedules those same cycle keys after the stall. Its complete log is
 | Silent audio and release module | Sink preceded the first connection; direct destination connections and post-sink peak are zero. Pre-sink peak was -13.0 dBFS and RMS was -32.6/-33.2 dBFS; release WASM retains its name section and has no DWARF. | Pass. | `summary.json`, `environment.json` |
 | iPad simulator self-check | Latest Vactr-process line reports `playingEvents: 0`; `selfCheck.silent` and `selfCheck.pass` are true, and app mtime is after `6f6b807`. | Pass for simulator launch and silence only. Physical-iPad checks remain pending. | `ios-sim.json`, `tmp/canvas-cutover/evidence/ios-sim.png` |
 
+## Code-pane text rendering gap (2026-10-16)
+
+Run run-001 and the 2026-10-07 final gates passed. Main at `ea51a07`
+still drew wrong text: characters missing on every line after the first,
+a squashed `1`, caret and underlines drawn rows below their lines, and
+heavy, soft glyphs. The visuals pane also logged `glBlitFramebuffer`
+errors. Root causes and fixes are in
+[design-code-pane-text-rendering.md](design-code-pane-text-rendering.md)
+(RC1 to RC6). The harness passed these defects because:
+
+- The only canvas pixel check (`editor/test/e2e/behavior.mjs`) reads the
+  line-1 glyph rectangle. Line 1 starts at document offset 0, where the
+  RC2 offset error has no effect.
+- That check passes when the rectangle shows at least 2 colors and is
+  wider than 4 px. That does not detect missing, squashed, heavy or
+  blurred glyphs.
+- The DPR 2 checks compare `devicePixelRatio` and `effectiveDpr` only; no
+  pixels are read at DPR 2.
+- No check covers caret or underline positions after a multi-line edit,
+  or the backdrop, and the browser console is not scanned for WebGL
+  errors.
+- The unit tests run `textCells` on line 0 only, and they do not check
+  instance slots or atlas-key uniqueness.
+
+Closure (design-code-pane-text-rendering.md section 5):
+`editor/test/e2e/code-pixels.mjs` compares per-character canvas coverage
+with DOM text in the same font for four typing and insert scenarios.
+It checks caret and diagnostic row bands, backdrop uniformity, and an
+empty WebGL error console, at DPR 1 and 2, on ANGLE Metal and
+SwiftShader. `behavior.mjs` gates its DPR 1 and DPR 2 runs as
+`code-pixels-dpr1` and `code-pixels-dpr2`. New unit tests cover
+run-relative cluster ranges, width-keyed atlas cells, identity slots for
+non-text layers, glyph placement, the shader and filter contract, and
+the visuals context options. Results are recorded in the
+`impl-plans/active/code-render-*` progress logs. This change does not
+regenerate the canonical run-001 files.
+
 ## Raw evidence
 
 - `design-docs/specs/evidence/canvas-cutover/run-001/environment.json`

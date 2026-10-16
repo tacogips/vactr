@@ -1,6 +1,6 @@
 # Code Render 03: Visuals Context Without MSAA (RC6)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CR-03
 **Wave**: 1 (no dependencies)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 3 (RC6), 4.6 (R12), 5.1 (U6)
@@ -91,9 +91,9 @@ pixel test check P8, run in CR-07.
 
 ## Completion Criteria
 
-- [ ] Visuals context requested with `{ antialias: false }`
-- [ ] U6 test added and passing
-- [ ] Progress log updated with verification records
+- [x] Visuals context requested with `{ antialias: false }`
+- [x] U6 test added and passing
+- [x] Progress log updated with verification records
 
 ## Progress Log
 
@@ -102,3 +102,13 @@ pixel test check P8, run in CR-07.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-16 (implementation)
+**Tasks Completed**: CR-03 implementation and U6 regression test
+**Tasks In Progress**: None
+**Blockers**: None for CR-03. `npm run check` is permitted to report only cross-plan errors; its sole diagnostic is in the concurrently added `editor/test/code/text-cells.test.ts`, outside this plan's write paths.
+**Notes**: `editor/src/visual/mount.ts` requests `getContext('webgl2', { antialias: false })`; `editor/test/visual/panes.test.ts` asserts every visuals WebGL2 request includes those options. `editor/src/visual/render-host.ts` remains unchanged. Toolchain digests: `target/wasm32-unknown-unknown/debug/vactr.wasm` `de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210`; `tree-sitter-vact/tree-sitter-vact.wasm` `ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609`; `editor/package-lock.json` `f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749` (full record: `tmp/code-render/CR-03/toolchain-sha256.txt`).
+
+**Verification**:
+- `cd editor && npx vitest run test/visual/panes.test.ts test/visual/render-host.test.ts > ../tmp/code-render/CR-03/focused.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-03/focused.log` — exit 0; 2 files and 15 tests passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-03/check.log 2>&1; echo "exit=$?" >> ../tmp/code-render/CR-03/check.log` — exit 1 due only to `test/code/text-cells.test.ts(2,30): error TS2591: Cannot find name 'node:fs'`; this file is outside CR-03's write paths.

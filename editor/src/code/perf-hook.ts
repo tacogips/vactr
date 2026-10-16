@@ -21,6 +21,7 @@ export interface VactrPerf {
   ledger: ResourceLedger;
   doc(): string;
   selection(): { anchor: number; head: number };
+  annotations(): { kind: string; from: number; to: number }[];
   presented(): PresentedRecord[];
   onsets(): OnsetRecord[];
   transportSample(): TransportSample | null;
@@ -51,6 +52,7 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
     revision: input.revision, ledger: input.ledger,
     doc: () => input.surface.state.doc.toString(),
     selection: () => ({ anchor: input.surface.state.selection.main.anchor, head: input.surface.state.selection.main.head }),
+    annotations: () => input.surface.annotationRanges().map(({ kind, from, to }) => ({ kind, from, to })),
     presented: () => ordered(presentedRows, presentedNext, presentedCount),
     onsets: () => ordered(onsetRows, onsetNext, onsetCount),
     transportSample: () => input.store.transportSample ?? null,

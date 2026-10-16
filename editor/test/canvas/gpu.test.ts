@@ -6,6 +6,7 @@ import { CanvasRenderer, GPU_TOKEN_COLORS } from '../../src/code/renderer';
 import { MiB, ResourceLedger, RESOURCE_LIMITS, effectiveSize } from '../../src/code/resources';
 import type { CodeAnnotation } from '../../src/app/apis';
 import { FALLBACK_PALETTE, readPalette, rgbaCss } from '../../src/code/palette';
+import { CLIP_GUTTER } from '../../src/code/geometry';
 
 const font: LayoutFont = { font: '16px test-mono', fallback: 'test-ja', lineHeight: 20, baseline: 16 };
 function width(text: string): number {
@@ -357,7 +358,7 @@ describe('GPU code compositor', () => {
     ];
     expect(f.renderer.render({ annotations, cursor: 5, handles: [{ pos: 0 }, { pos: 9, end: true }] })).toBe(true);
     const colors = f.r.draws.map(d => d.color); const q = (rgba: number[]) => rgba.map(channel => Math.round(channel * 255) / 255);
-    expect(colors.slice(0, 4)).toEqual([[0.04, 0.05, 0.07, 0.85], [0.12, 0.22, 0.32, 0.55], [0.35, 0.29, 0.13, 0.5], [0.2, 0.32, 0.36, 0.5]].map(q));
+    expect(colors.slice(0, 4)).toEqual([[0.047, 0.059, 0.082, 0.85], [0.218, 0.4, 0.582, 0.55], [0.7, 0.58, 0.26, 0.5], [0.4, 0.64, 0.72, 0.5]].map(q));
     const diagnostic = colors.findIndex(c => Math.abs(c[0]! - 0.75) < 0.01); const cursor = colors.findIndex(c => Math.abs(c[0]! - 0.9) < 0.01); const badge = colors.findIndex(c => Math.abs(c[0]! - 0.15) < 0.01);
     expect(diagnostic).toBeGreaterThan(3); expect(cursor).toBeGreaterThan(diagnostic); expect(badge).toBeGreaterThan(cursor);
     expect(colors.filter(c => Math.abs(c[0]! - 0.53) < 0.01 && Math.abs(c[1]! - 0.75) < 0.01).length).toBeGreaterThanOrEqual(2);
@@ -384,7 +385,7 @@ describe('GPU code compositor', () => {
     expect(control.renderer.render({ textRevision: 1 })).toBe(true);
     const glyphAndGutterInstances = control.r.calls.find(call => call.name === 'drawArraysInstanced' && call.args[4] === 'text')!.args[3];
     const hasColor = (draws: typeof f.r.draws, color: number[]) => draws.some(draw => color.every((channel, index) => Math.abs(draw.color[index]! - channel) < 0.01));
-    const playing = [0.35, 0.29, 0.13, 0.5], selection = [0.12, 0.22, 0.32, 0.55];
+    const playing = [0.7, 0.58, 0.26, 0.5], selection = [0.218, 0.4, 0.582, 0.55];
 
     let drawStart = f.r.draws.length;
     expect(f.renderer.render({ textRevision: 1, annotations: [
@@ -477,8 +478,8 @@ describe('GPU code compositor', () => {
   it('replays gutter numbers unscissored and source text clipped on cached frames', () => {
     const f = fixture();
     const frameDraws = (start: number) => f.r.draws.slice(start).filter(draw => draw.layer === 'text' && draw.rect[3] === font.lineHeight);
-    const gutterDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => draw.flags === 0);
-    const sourceDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => (draw.flags & 1) !== 0);
+    const gutterDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => (draw.flags & CLIP_GUTTER) === 0);
+    const sourceDraws = (draws: ReturnType<typeof frameDraws>) => draws.filter(draw => (draw.flags & CLIP_GUTTER) !== 0);
     const firstStart = f.r.draws.length;
     expect(f.renderer.render({ textRevision: 1 })).toBe(true);
     const rebuildDraws = frameDraws(firstStart);
@@ -644,7 +645,7 @@ describe('GPU code compositor', () => {
     const text = ['x'.repeat(600), 'row 1', 'row 2', '', 'row 3', ...Array.from({ length: 57 }, (_, index) => `row ${index + 4}`)].join('\n');
     const f = fixture(text);
     const gutterAt = (start: number, scrollTop: number) => {
-      const draws = f.r.draws.slice(start).filter(draw => draw.layer === 'text' && draw.flags === 0 && draw.rect[3] > 0 && draw.absTop >= 0 && draw.absTop < 100);
+      const draws = f.r.draws.slice(start).filter(draw => draw.layer === 'text' && (draw.flags & CLIP_GUTTER) === 0 && draw.rect[3] > 0 && draw.absTop >= 0 && draw.absTop < 100);
       expect(draws.length).toBeGreaterThan(0);
       expect(draws.every(draw => draw.absLeft >= 0 && draw.absLeft < 48)).toBe(true);
       const instances = draws.map(draw => `${draw.absTop}:${draw.absLeft}:${draw.rect[2]}:${draw.rect[3]}:${draw.color.join(',')}`);
@@ -786,7 +787,9 @@ describe('GPU code compositor', () => {
         const textures = r.draws.slice(start).map(draw => draw.texture);
         if (revision === 1) {
           firstUploads = renderer.atlasStats.uploads; firstTextures = textures; firstBytes = b.usedBytes;
-          expect(firstUploads).toBe(new Set([...Array.from({ length: 40 }, (_, i) => `line ${i}`)].join('') + Array.from({ length: 40 }, (_, i) => String(i + 1)).join('')).size);
+          const distinctGlyphs = new Set([...Array.from({ length: 40 }, (_, i) => `line ${i}`)].join('') + Array.from({ length: 40 }, (_, i) => String(i + 1)).join(''));
+          expect(firstUploads).toBeGreaterThan(distinctGlyphs.size);
+          expect(firstUploads).toBeLessThanOrEqual(distinctGlyphs.size * 8); // Two cell widths and four subpixel phases per glyph.
           expect(raster.text.some(entry => entry.text === 'l')).toBe(true);
         } else {
           expect(renderer.atlasStats.uploads).toBe(firstUploads);

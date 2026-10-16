@@ -1,6 +1,6 @@
 # Code Render 06: Playwright Pixel Test and Harness Gap Closure
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CR-06
 **Wave**: 1 (no dependencies; its gating run happens in CR-07 after CR-05)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 5.2 (P1-P8), 5.4; design-docs/specs/design-canvas-editor-evidence.md "Code-pane text rendering gap (2026-10-16)"
@@ -266,12 +266,12 @@ Run from `editor/`.
 
 ## Completion Criteria
 
-- [ ] `pixel-compare.mjs` exports the pinned functions; unit tests pass
-- [ ] `code-pixels.mjs` implements S1-S4, P1-P8, the backend check, the CLI and exit codes 0/1/2
-- [ ] `behavior.mjs` gates `code-pixels-dpr1` and `code-pixels-dpr2` for Chromium
-- [ ] `perf-hook.ts` exposes `annotations()`; its unit test passes
-- [ ] README documents the pixel test
-- [ ] Progress log updated
+- [x] `pixel-compare.mjs` exports the pinned functions; unit tests pass
+- [x] `code-pixels.mjs` implements S1-S4, P1-P8, the backend check, the CLI and exit codes 0/1/2
+- [x] `behavior.mjs` gates `code-pixels-dpr1` and `code-pixels-dpr2` for Chromium
+- [x] `perf-hook.ts` exposes `annotations()`; its unit test passes
+- [x] README documents the pixel test
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -280,3 +280,16 @@ Run from `editor/`.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-16 implementation
+**Tasks Completed**: Pure comparison helpers and synthetic tests; S1-S4/P1-P8 pixel driver with Metal/SwiftShader CLI and Chromium DPR gates; perf annotations accessor and test; README update.
+**Tasks In Progress**: None for CR-06. CR-07 owns the serialized browser matrix and single P3/P4 calibration opportunity.
+**Blockers**: None.
+**Artifact SHA-256**: `target/wasm32-unknown-unknown/debug/vactr.wasm` de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210; `tree-sitter-vact/tree-sitter-vact.wasm` ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609; `editor/package-lock.json` f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749.
+**Verification**: Focused Vitest passed (2 files, 4 tests); Node syntax checks passed; `npm run check` initially found TS7016 on the pure `.mjs` import, corrected with a file-local `@ts-expect-error`, final rerun recorded below. Logs are under `tmp/code-render/CR-06/`.
+**Browser smoke**: Not run; it is optional here, and CR-07 owns the serialized gating browser run after renderer integration.
+**Final Verification Logs**: `tmp/code-render/CR-06/focused-final.log` (exit 0; 2 files, 4 tests passed); `tmp/code-render/CR-06/syntax-final.log` (exit 0; all three `node --check` commands passed); `tmp/code-render/CR-06/check-final.log` (exit 0; `npm run check`). The initial type-check failure is preserved in `tmp/code-render/CR-06/check.log` and was resolved before this final-source rerun.
+**Current-Source Rerun**: After refining diagnostic span geometry, final evidence is `tmp/code-render/CR-06/focused-current.log` (exit 0; 2 files, 4 tests passed), `tmp/code-render/CR-06/syntax-current.log` (exit 0), and `tmp/code-render/CR-06/check-current.log` (exit 0).
+**Integrity Review Repairs (comm-006552)**: CR06-TI-01 guards P2/P4 when no non-whitespace cell is comparable, reports a null ink ratio for those lines, adds empty/whitespace-only assertions, and records `comparedCells` for every line. CR06-TI-02 samples the clamped `caretX-1..caretX+1` columns for both caret presence and row exclusion, preserving run-length and color tolerances; `caretCheck` records `caretX` and its columns. Repair verification: `tmp/code-render/CR-06/focused-repair.log` (exit 0; 2 files, 5 tests passed), `syntax-repair.log` (exit 0), `check-repair.log` (exit 0). Direct empty-line reproduction now prints `{"failures":[],"inkRatio":null}`. Independent re-review remains pending.
+**Integrity Repair Redispatch (INT-377-04)**: Fresh SHA-256 identities match the review brief: `pixel-compare.mjs` 84d0bf85b8b74b1d9950df764c3e82e54088c095c3f3e8599d1fbdb998f04c11, `pixel-compare.test.ts` e79ee536fab4e3788e8c112e7d0166a0641f684712e043e45137af4f787e8a24, and `code-pixels.mjs` c4dab2409c789136ce48924699386cbb747ccd22f38c192e36cf60172eccde6c. Re-ran on these sources: `attempt-redispatch/focused.log` (exit 0; 2 files, 5 tests passed), `syntax.log` (exit 0; all three Node syntax checks passed), and `check.log` (exit 0; `npm run check`). Inspection confirms P2/P4 empty-line handling and clamped caret columns remain present; thresholds and P1-P8 definitions are unchanged. CR06-TI-01 and CR06-TI-02 are reported repaired against these hashes; independent test-integrity and adversarial decisions remain downstream.
+**Downstream**: Independent integrity/adversarial review, CR-07 browser gating/calibration, review-dependent docs, commit and push remain owned by later workflow steps.

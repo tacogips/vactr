@@ -7,10 +7,24 @@ export const CLIP_GUTTER = 1;
 export const UNTINTED = 2;
 export const TEXT_SPACE = 4;
 export const NO_HSCROLL = 8;
+export const SNAP_GLYPH = 16;
 export type GeometryLayer = 'background' | 'text' | 'overlay' | 'overlayText';
 export type InstanceRect = CodeRect | readonly [number, number, number, number];
 export type InstanceUv = readonly [number, number, number, number];
 export type InstanceColor = readonly [number, number, number, number];
+
+export function glyphPhase(cssX: number, scale: number): { devicePixel: number; phase: number } {
+  if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(cssX)) throw new RangeError('Invalid glyph position or scale');
+  const deviceX = cssX * scale;
+  const base = Math.floor(deviceX);
+  const phase = Math.round((deviceX - base) * 4) / 4;
+  return phase === 1 ? { devicePixel: base + 1, phase: 0 } : { devicePixel: base, phase };
+}
+
+export function glyphQuad(devicePixel: number, scale: number, cell: { width: number; height: number; pad: number }): { left: number; width: number; height: number } {
+  if (!Number.isFinite(scale) || scale <= 0) throw new RangeError('Invalid glyph scale');
+  return { left: (devicePixel - cell.pad) / scale, width: cell.width / scale, height: cell.height / scale };
+}
 
 export const VERTEX_SOURCE = `#version 300 es
 in vec2 a_corner;
@@ -19,6 +33,7 @@ in vec4 a_uv;
 in vec4 a_color;
 in uvec2 a_meta;
 uniform vec2 u_view;
+uniform vec2 u_device;
 uniform sampler2D u_slots;
 out vec2 v_uv;
 out vec4 v_color;
@@ -26,7 +41,9 @@ out float v_screen_x;
 flat out uint v_flags;
 void main() {
   vec2 slot = texelFetch(u_slots, ivec2(int(a_meta.x), 0), 0).rg;
-  vec2 p = a_rect.xy + slot + a_corner * a_rect.zw;
+  vec2 origin = a_rect.xy + slot;
+  if ((a_meta.y & 16u) != 0u) origin = floor(origin * u_device + 0.5) / u_device;
+  vec2 p = origin + a_corner * a_rect.zw;
   v_screen_x = p.x;
   v_uv = mix(a_uv.xy, a_uv.zw, a_corner);
   v_color = a_color;
@@ -47,7 +64,9 @@ out vec4 out_color;
 void main() {
   if ((v_flags & 1u) != 0u && v_screen_x < u_gutter) discard;
   vec4 texel = texture(u_texture, v_uv);
-  out_color = (v_flags & 2u) != 0u ? texel : texel * v_color;
+  bool untinted = (v_flags & 2u) != 0u;
+  vec4 c = untinted ? texel : vec4(v_color.rgb, v_color.a * texel.a);
+  out_color = vec4(c.rgb * c.a, c.a);
 }`;
 
 /** Ledger-owned growable GPU instance buffer for one compositing layer. */

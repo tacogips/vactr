@@ -1,6 +1,6 @@
 # Code Render 05: Renderer Wiring - Identity Slots, Snapped Glyph Quads, Straight-Alpha Literals (RC3, R5, R7, R8, R11)
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: CR-05
 **Wave**: 2 (depends on CR-01, CR-02, CR-04)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 3 (RC1, RC3, RC5), 4.2-4.5 (R3, R5, R6, R7, R8, R11), 4.7, 5.1 (U3), 6
@@ -201,13 +201,13 @@ measurement lock.
 
 ## Completion Criteria
 
-- [ ] Non-text instances carry slot 0; the text slot is reset after each build
-- [ ] Mask and run glyph quads use `glyphPhase`/`glyphQuad`, request `phase`, and set `SNAP_GLYPH`
-- [ ] `u_device` set every frame
-- [ ] Translucent literals converted to straight alpha
-- [ ] `renderer-layers.test.ts` passes; `test/canvas` passes; every mechanical change listed
-- [ ] Line counts below 1000; cursor block and input/keyboard untouched
-- [ ] Progress log updated
+- [x] Non-text instances carry slot 0; the text slot is reset after each build
+- [x] Mask and run glyph quads use `glyphPhase`/`glyphQuad`, request `phase`, and set `SNAP_GLYPH`
+- [x] `u_device` set every frame
+- [x] Translucent literals converted to straight alpha
+- [x] `renderer-layers.test.ts` passes; `test/canvas` passes; every mechanical change listed
+- [x] Line counts below 1000; cursor block and input/keyboard untouched
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -216,3 +216,25 @@ measurement lock.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Starts after CR-01, CR-02 and CR-04 are complete.
+
+### Session: 2026-10-16 CR-05 implementation
+**Tasks Completed**: Renderer slot scoping, glyph phase/quad wiring, device uniform, straight-alpha literals, renderer-layer regression test, canvas GPU assertion reconciliation.
+**Tasks In Progress**: Resolve the combined canvas suite measurement assertion with its owning upstream plan; rerun the full canvas suite.
+**Blockers**: `editor/test/canvas/mount.test.ts:321` is outside CR-05 writePaths and fails in the combined tree with 53 `measureText` calls where the test expects 0. CR-05 does not edit `layout.ts` or invoke layout measurement; request the CR-01/serial integration owner to diagnose and repair within its ownership, then rerun `cd editor && npx vitest run test/canvas`.
+**Notes**:
+- `editor/src/code/renderer.ts`: `addCommand` now stores slot 0 outside the text layer; gutter and segment builds reset `currentSlot`; both mask and run paths request phase-specific cells, use `glyphQuad`, and set `SNAP_GLYPH`; `u_device` is looked up and uploaded every render; backdrop, selection, playing, eval-error and eval literals are converted to straight alpha. Cursor block remains untouched.
+- `editor/test/code/renderer-layers.test.ts`: added DPR 1/2 checks for non-text slots, cursor/diagnostic/backdrop rows, snapped glyph dimensions, gutter/document `1` UV separation, device uniform and backdrop color.
+- Mechanical `editor/test/canvas/gpu.test.ts` changes: the first four color expectations and playing/selection expectation changed to straight-alpha RGB; gutter selection changed from `flags === 0` to `(flags & CLIP_GUTTER) === 0` at the cached-frame and scroll cases because glyphs now carry `SNAP_GLYPH`; upload count changed from one cell per unique character (15) to a bound of 1..8 cells per distinct glyph (up to two widths times four phases), with the existing later-frame no-upload, no-eviction and same-texture assertions retained. Observed first upload count is 34.
+- Verification: final focused suite passed 20/20 (`tmp/code-render/CR-05/focused-final.log`); `npm run check` exited 0 (`check-final.log`); `test/canvas/gpu.test.ts` passed 62/62 (`gpu-attempt-2.log`); final `test/canvas` exited 1 with 222/223 passed and only the mount measurement failure (`canvas-final.log`); line counts are renderer 673, gpu.test.ts 993, edit-cost.test.ts 346 (`wc.log`).
+- Toolchain digests captured before edits in `toolchain-sha256.txt`: vactr.wasm `de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210`, tree-sitter-vact.wasm `ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609`, package-lock `f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749`.
+- Input and keyboard files have no diff against `ea51a07`; source-level cursor-block byte comparison is recorded in the CR-05 author self-check.
+
+### Session: 2026-10-16 CR-05 continuation verification
+**Tasks Completed**: Re-ran CR-05 focused and canvas verification against the combined source after CR-01's accepted additive-run repair; updated completion criteria.
+**Tasks In Progress**: None for CR-05. CR-07 owns full vitest, browser e2e/pixel checks, and final integration review.
+**Blockers**: None.
+**Notes**:
+- The previous `canvas-final.log` failure (222/223; `mount.test.ts:321`, 53 `measureText` calls) is superseded by CR-01's accepted `layout.ts` derived-run metadata/additivity fix. The CR-05 rerun passes all 223 canvas tests; the mount test is unchanged.
+- Current-source verification: focused suite 22/22 (`tmp/code-render/CR-05/attempt-4/focused.log`); canvas suite 223/223 under the measurement lock (`canvas.log`); `npm run check` exit 0 (`check.log`).
+- Line counts: renderer.ts 673, gpu.test.ts 993, edit-cost.test.ts 346 (`tmp/code-render/CR-05/attempt-4/wc.log`); all remain below 1000.
+- The earlier 222/223 log is retained as historical evidence. Full vitest and browser pixel/e2e validation remain assigned to CR-07.

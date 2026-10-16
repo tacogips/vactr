@@ -1,6 +1,6 @@
 # Code Render 01: Run-Relative Text Cells (RC2)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CR-01
 **Wave**: 1 (no dependencies)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 3 (RC2), 4.1 (R1, R2), 5.1 (U1)
@@ -34,9 +34,9 @@ carry absolute `from` (`layout.ts:393`). Repro evidence:
 
 | Path | Change |
 | --- | --- |
-| `editor/src/code/layout.ts` | In `textCells`, ASCII branch only: convert the `offsetInRun` result to a run offset by subtracting `run.from` before clamping to 0. Nothing else in this file changes. |
-| `editor/test/code/text-cells.test.ts` | New unit test file (U1). |
-| `impl-plans/active/code-render-01-text-cells.md` | Progress log only. |
+| `editor/src/code/layout.ts` | Keep the run-relative ASCII start. Propagate parent cluster metadata and additive width behavior to derived runs from `geometrySegments` so their prefix widths remain accurate without per-edit `measureText` calls. |
+| `editor/test/code/text-cells.test.ts` | U1 cases plus derived-run coverage for cell geometry and zero measured text calls. |
+| `impl-plans/active/code-render-01-text-cells.md` | Scope amendment and progress log. |
 
 Imitate `editor/test/canvas/gpu.test.ts:layout` (lines 10-18) for the
 fake metrics: a `TextLayout` built with `{ font: '', measureText: t => ({
@@ -45,9 +45,9 @@ lineHeight: 18, baseline: 14 }`.
 
 ## Key Points and Pitfalls
 
-- The fix is one expression. Do not rewrite the loop, the non-ASCII
-  `segmenter` branch (already run-relative via `part.index`), or the
-  `pieces.map` that computes `x` and `width`.
+- The run-relative start remains `offsetInRun(run, visibleFrom, -1) - run.from`, clamped at 0. Preserve the non-ASCII `segmenter` behavior and the `pieces.map` geometry contract.
+- INT-377-W4-01 amendment: derived runs inherit the parent run's cluster metadata and additive flag. Additive derived chunks use `AdvanceTable` widths; non-additive lines retain exact measured widths. Do not broaden the repair beyond this metadata/width propagation seam.
+- CR01-ADV-01: when deriving a run after `setText` shifted a cached line, rebase copied cluster metadata to the current `line.from`; the cluster offsets remain line-relative while the parent run's absolute `from` has moved.
 - `visibleFrom > 0` must still skip leading clusters. With the fix,
   `offsetInRun(run, visibleFrom, -1) - run.from` is the run-relative
   boundary at or before `visibleFrom`.
@@ -75,6 +75,8 @@ Use a width function of 8 px per ASCII character.
   boundary at or before `visibleFrom`, not at 0 and not past the line).
 - A tab-split line `a\tbc` on line 1 (document `x\na\tbc`) -> each run's
   cells concatenate to that run's text.
+- For an additive line, `geometrySegments`-derived run cells match the parent run's cell x positions, and calling `textCells` on the derived runs does not increase `stats.measuredTextCalls`.
+- For `aaaa\nx👍🏽y👍🏽z`, shift the cached second line by inserting `bbb` at document offset 0 through `EditorState.update` and `setText(doc, changes)`. With cluster-aware metrics (16 px per multi-code-unit grapheme, 8 px otherwise), assert the moved line keeps its runs identity and derived cells still match pre-shift and parent cells, including trailing `z`.
 
 Each case fails on ea51a07 (cells missing, empty, or starting at the
 absolute offset). CR-07 records that as mutationEvidence.
@@ -127,11 +129,12 @@ failureCount: 0, outcome: "passed", log, notes}`.
 
 ## Completion Criteria
 
-- [ ] `textCells` ASCII branch uses a run-relative start; no other source change
-- [ ] `editor/test/code/text-cells.test.ts` has the 6 cases and passes
-- [ ] `npm run check` passes (or only cross-plan errors are recorded)
-- [ ] gpu/edit-cost handoff notes recorded (or "none")
-- [ ] Progress log updated with verification records
+- [x] `textCells` ASCII branch uses a run-relative start; derived runs inherit parent cluster metadata and additive width behavior
+- [x] `editor/test/code/text-cells.test.ts` has the 6 U1 cases plus derived-run regression coverage and passes
+- [x] A cluster-aware cached-line-shift regression fails on layout.ts `f0a370b5…` and passes after metadata rebasing
+- [x] `npm run check` passes (or only cross-plan errors are recorded)
+- [x] gpu/edit-cost handoff notes recorded (or "none")
+- [x] Progress log updated with verification records
 
 ## Progress Log
 
@@ -140,3 +143,57 @@ failureCount: 0, outcome: "passed", log, notes}`.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-16
+**Tasks Completed**: CR-01 implementation and U1 verification
+**Tasks In Progress**: None
+**Blockers**: None
+**Notes**:
+- Changed only the ASCII `textCells` start to subtract `run.from`; added the six planned U1 cases in `editor/test/code/text-cells.test.ts`.
+- Toolchain SHA-256: `target/wasm32-unknown-unknown/debug/vactr.wasm` = `de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210`; `tree-sitter-vact/tree-sitter-vact.wasm` = `ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609`; `editor/package-lock.json` = `f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749` (capture: `tmp/code-render/CR-01/toolchain-sha256.txt`).
+- Focused verification: `cd editor && npx vitest run test/code/text-cells.test.ts`; exit 0, 6/6 passed; complete log `tmp/code-render/CR-01/attempt-3/focused.log`.
+- Type check: `cd editor && npm run check`; retried after 5 seconds, exit 1 both times only for `test/e2e/pixel-compare.test.ts(2,88)` (CR-06 cross-plan missing declaration for `./pixel-compare.mjs`); complete final log `tmp/code-render/CR-01/attempt-4/check.log`. The initial `node:fs` type error in this plan's test was corrected using the repository's typed dynamic-import pattern.
+- Informational canvas verification: `cd editor && npx vitest run test/canvas/gpu.test.ts test/canvas/edit-cost.test.ts`; 76/77 passed, one failure in `GPU code compositor > retains every unchanged text tile across animation frames without backdrop uploads`: expected 15 atlas uploads, observed 34 (`tmp/code-render/CR-01/attempt-2/canvas.log`). `edit-cost.test.ts` passed. Handoff to CR-05: reconcile the `gpu.test.ts:789` upload-count expectation with the restored text cells/cache keys; do not alter that file in CR-01.
+- Initial focused run passed 6 tests but its log lacks the required exit line due to the shell's reserved `status` variable; retained at `tmp/code-render/CR-01/focused.log`. Complete source-matched rerun is recorded above.
+
+### Session: 2026-10-16 (evidence repair)
+**Tasks Completed**: INT-377-01 evidence repair
+**Tasks In Progress**: None
+**Blockers**: None
+**Notes**:
+- Fresh SHA-256 identities match the review: `editor/src/code/layout.ts` = `7d865bef9f61c86689ced11ad553968e9fe29c30463281f85561a11f07e5f237`; `editor/test/code/text-cells.test.ts` = `a88b94e008c768a7ae2f790e3494408d0dc246b37197d949eb771e4b98505390`. No source changes were needed.
+- Current-source U1 verification: `cd editor && npx vitest run test/code/text-cells.test.ts`; exit 0, 6/6 passed. Complete log: `tmp/code-render/CR-01/attempt-5/focused.log`.
+- Current combined-tree type check: `cd editor && npm run check`; exit 0. Complete log: `tmp/code-render/CR-01/attempt-5/check.log`.
+- Gating verification for this repair consists only of these two exit-0 records. The earlier informational CR-05 handoff remains: `gpu.test.ts:789` expected 15 atlas uploads and observed 34 after CR-02's cache-key change; see `tmp/code-render/reconcile-377/canvas-informational.log`. It is not a CR-01 gate.
+- Exact per-edit intent: `tmp/code-render/CR-01/attempt-5/edit-plan-intent.txt`.
+
+### Session: 2026-10-16 (INT-377-W4-01 repair)
+**Tasks Completed**: Scope amendment recorded; implementation and verification in progress
+**Tasks In Progress**: Derived-run metadata/additivity propagation and regression coverage
+**Blockers**: None
+**Notes**:
+- Amended CR-01 because derived runs created by `geometrySegments` were not registered in the parent's cluster metadata or additive width index, causing `textCells` to call `measureText` for every prefix on later lines. Preserve the existing run-relative start at `textCells`.
+- Per-edit intent and source identities are recorded under `tmp/code-render/CR-01/attempt-6/`.
+- Implemented only the amended seam in `layout.ts`: additive derived chunks use the existing `AdvanceTable`, while non-additive derived runs continue through `measureDirect`. The original `textCells` run-relative expression is unchanged.
+- SHA-256 before repair: `layout.ts` = `7d865bef9f61c86689ced11ad553968e9fe29c30463281f85561a11f07e5f237`; `text-cells.test.ts` = `a88b94e008c768a7ae2f790e3494408d0dc246b37197d949eb771e4b98505390`. After repair: `layout.ts` = `f0a370b5c15aeddae53f680366a2ca959780624510a9d7f1d6a033919f9e8366`; `text-cells.test.ts` = `fcccb4f96de508c0abdca4291d6ac4f9172ffab070310fc14f2a7a2038230732`.
+- `cd editor && npx vitest run test/code/text-cells.test.ts`: exit 0, 7/7 passed; complete log `tmp/code-render/CR-01/attempt-6/focused.log`. This includes matching global cell x positions and unchanged `measuredTextCalls` for additive derived runs.
+- `cd editor && npm run check`: exit 0; complete log `tmp/code-render/CR-01/attempt-6/check.log`.
+- Under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`, `cd editor && npx vitest run test/canvas`: exit 0, 223/223 passed; complete log `tmp/code-render/CR-01/attempt-6/canvas.log`. The unchanged `editor/test/canvas/mount.test.ts:321` zero-measureText assertion passed. This resolves the CR-05 GPU/edit-cost handoff in the combined tree.
+- `cd editor && npx vitest run test/code/renderer-layers.test.ts test/code/atlas-cells.test.ts test/code/glyph-placement.test.ts`: exit 0, 14/14 passed; complete log `tmp/code-render/CR-01/attempt-6/adjacent.log`.
+- `layout.ts` is 511 lines. `git diff --check` passes. `mount.test.ts` remains byte-identical to HEAD.
+- Per-edit intents and initial hashes are in `tmp/code-render/CR-01/attempt-6/`; all verification logs end with the exact shell exit status.
+
+### Session: 2026-10-16 (CR01-ADV-01 adversarial repair)
+**Tasks Completed**: Stale derived cluster metadata corrected; line-shift regression and required verification passed
+**Tasks In Progress**: Independent review of this correction
+**Blockers**: None
+**Notes**:
+- Rebased derived run metadata at `geometrySegments` to `{ lineFrom: line.from, clusters: metadata.clusters }`; `setText` can shift cached run offsets without changing the parent cluster offsets.
+- Added a cluster-aware regression using `EditorState.update` and `setText` for `aaaa\nx👍🏽y👍🏽z`. It asserts runs identity, pre/post and parent/derived cell equality, retained `z`, and no additional `measureText` calls.
+- Mutation evidence: focused test failed on the exact pre-fix `layout.ts` SHA-256 `f0a370b5c15aeddae53f680366a2ca959780624510a9d7f1d6a033919f9e8366` (8 run, 7 passed, 1 failed); it observed 32 px emoji cells and missing `z`. Log and structured record: `tmp/code-render/CR-01/attempt-7/mutationEvidence/f0a370b5-focused.log` and `tmp/code-render/CR-01/attempt-7/mutationEvidence.json`.
+- SHA-256 before this correction: `layout.ts` = `f0a370b5c15aeddae53f680366a2ca959780624510a9d7f1d6a033919f9e8366`; `text-cells.test.ts` = `fcccb4f96de508c0abdca4291d6ac4f9172ffab070310fc14f2a7a2038230732`. After correction and test: `layout.ts` = `bf574defa2099bd89b014497dfc5cdd67edd71169194f2ac813e6c8699dbe61c`; `text-cells.test.ts` = `db4618440b367674e7015b50e37985bc9b8fbc9b9c90bbd75bd585850cec4992`.
+- `cd editor && npx vitest run test/code/text-cells.test.ts`: exit 0, 8/8 passed; complete log `tmp/code-render/CR-01/attempt-7/focused.log`.
+- `cd editor && npm run check`: exit 0; complete log `tmp/code-render/CR-01/attempt-7/check.log`.
+- Under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`, `cd editor && npx vitest run test/canvas`: exit 0, 223/223 passed; complete log `tmp/code-render/CR-01/attempt-7/canvas.log`. `editor/test/canvas/mount.test.ts:321` remains byte-identical and passes.
+- `cd editor && npx vitest run test/code/renderer-layers.test.ts test/code/atlas-cells.test.ts test/code/glyph-placement.test.ts`: exit 0, 14/14 passed; complete log `tmp/code-render/CR-01/attempt-7/adjacent.log`.
+- `layout.ts` remains under 1000 lines. `git diff --check` and the mount-test byte-identity check are recorded in `tmp/code-render/CR-01/attempt-7/final-audit.log`.

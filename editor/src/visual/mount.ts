@@ -5,7 +5,8 @@
 // Browser tier: the wasm core's `0x72` render records drive a WebGL2
 // `GlRenderHost` on an offscreen canvas, and the frame loop runs
 // `session_frame` then `draw` once per animation frame. A null
-// `getContext('webgl2')` shows "WebGL2 not available". The native tier
+// `getContext('webgl2', { antialias: false })` shows
+// "WebGL2 not available". The native tier
 // renders nothing (the session uses NoopRender) and says so. Meters and
 // scopes render from `levels` on both tiers.
 
@@ -68,7 +69,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
 
   const core = deps.tier === 'browser' ? deps.core : undefined;
   glCanvas = core ? doc.createElement('canvas') : null;
-  const gl = glCanvas ? glCanvas.getContext('webgl2') : null;
+  const gl = glCanvas ? glCanvas.getContext('webgl2', { antialias: false }) : null;
   if (!core || !glCanvas || !gl) {
     const notice = deps.tier === 'native' ? NATIVE_NOTICE : core ? NO_WEBGL2_NOTICE : 'visuals: no render source';
     const panes = new VisualPanes(layout.visual, { notice });

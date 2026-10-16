@@ -1,6 +1,6 @@
 # Code Render 04: Glyph Snap Flag, Shader Snap and Premultiply, Placement Helpers (R6-R8, R10)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CR-04
 **Wave**: 1 (no dependencies)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 3 (RC4, RC5), 4.4 (R6, R7, R8), 4.5 (R10), 5.1 (U4, U5 shader part)
@@ -145,11 +145,11 @@ Real-GPU shader compilation is proven by the CR-06 pixel test in CR-07.
 
 ## Completion Criteria
 
-- [ ] `SNAP_GLYPH`, `glyphPhase`, `glyphQuad` exported with the pinned signatures
-- [ ] Vertex shader snaps flagged instance origins using `u_device`
-- [ ] Fragment shader emits premultiplied color
-- [ ] `glyph-placement.test.ts` passes
-- [ ] Progress log updated
+- [x] `SNAP_GLYPH`, `glyphPhase`, `glyphQuad` exported with the pinned signatures
+- [x] Vertex shader snaps flagged instance origins using `u_device`
+- [x] Fragment shader emits premultiplied color
+- [x] `glyph-placement.test.ts` passes
+- [x] Progress log updated
 
 ## Progress Log
 
@@ -158,3 +158,16 @@ Real-GPU shader compilation is proven by the CR-06 pixel test in CR-07.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-16
+**Tasks Completed**: CR-04 placement helpers and shader contract; focused regression coverage; plan progress update.
+**Tasks In Progress**: None for CR-04.
+**Blockers**: None for the assigned contract.
+**Notes**: `editor/src/code/geometry.ts` exports `SNAP_GLYPH`, `glyphPhase` and `glyphQuad`; vertex snapping is gated by bit 16 and `u_device`; fragment output is premultiplied. No instances receive `SNAP_GLYPH`, and `renderer.ts` remains untouched for CR-05. `geometry.ts` is 158 lines. The prebuilt input digests are recorded in `tmp/code-render/CR-04/toolchain-sha256.txt`: `target/wasm32-unknown-unknown/debug/vactr.wasm` `de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210`; `tree-sitter-vact/tree-sitter-vact.wasm` `ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609`; `editor/package-lock.json` `f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749`.
+**Verification**: Focused `npx vitest run test/code/glyph-placement.test.ts` passed 6/6 (`tmp/code-render/CR-04/focused.log`). `npm run check` exited 1 only for a TypeScript declaration error on the concurrent, out-of-scope `test/e2e/pixel-compare.mjs` import (`check.log`). Informational `npx vitest run test/canvas/gpu.test.ts` ran 62, passed 61; its existing upload-count expectation received 34 vs 15 after CR-02's atlas key now distinguishes rasterized cell widths (`canvas.log`). Hand off this changed expectation to CR-05 integration; do not change the excluded `gpu.test.ts` here. The first focused run's wrapper hit zsh's read-only `status` variable after Vitest passed; its incomplete log is preserved as `focused-attempt-1.log`, and the complete rerun is the verification record.
+
+### Session: 2026-10-16 (INT-377-03 evidence repair)
+**Tasks Completed**: Re-ran the assigned focused suite and combined TypeScript check; corrected the CR-04 verification record for review.
+**Tasks In Progress**: None for the assigned CR-04 contract.
+**Blockers**: None for the assigned CR-04 contract.
+**Notes**: Current-source `npx vitest run test/code/glyph-placement.test.ts` passed 6/6 (`tmp/code-render/CR-04/attempt-2/focused.log`). Current-source `npm run check` exited 0 (`tmp/code-render/CR-04/attempt-2/check.log`); the concurrent CR-06 declaration issue is resolved in the combined tree. The prior `test/canvas/gpu.test.ts` result remains an informational CR-05 handoff: 61/62 passed, with the atlas upload-count assertion observing 34 instead of 15; this plan did not edit `gpu.test.ts`. Real-GPU shader compilation remains owned by CR-06/CR-07. `renderer.ts` remains unchanged. Evidence intention: `tmp/code-render/CR-04/attempt-2/edit-intent.txt`.

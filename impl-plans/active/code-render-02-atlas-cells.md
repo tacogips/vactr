@@ -1,6 +1,6 @@
 # Code Render 02: Width- and Phase-Keyed Atlas Cells, NEAREST Sampling (RC1, R6 raster, R9)
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: CR-02
 **Wave**: 1 (no dependencies)
 **Design Reference**: design-docs/specs/design-code-pane-text-rendering.md sections 3 (RC1, RC5), 4.2 (R3, R4), 4.4 (R6 raster part, R9), 5.1 (U2, U5 texture part)
@@ -118,12 +118,12 @@ Run from `editor/`. Each log ends with its exit status.
 
 ## Completion Criteria
 
-- [ ] `CellRequest.phase` added and validated; key includes texel width and phase
-- [ ] Raster x (and the run clip) shifted by `phase / dpr`
-- [ ] Atlas texture uses `NEAREST` for min and mag
-- [ ] `editor/test/code/recording-gl.ts` exports `width`, `rasterizer`, `recordingGL`
-- [ ] `editor/test/code/atlas-cells.test.ts` passes
-- [ ] Progress log updated with verification records and handoff notes
+- [x] `CellRequest.phase` added and validated; key includes texel width and phase
+- [x] Raster x (and the run clip) shifted by `phase / dpr`
+- [x] Atlas texture uses `NEAREST` for min and mag
+- [x] `editor/test/code/recording-gl.ts` exports `width`, `rasterizer`, `recordingGL`
+- [x] `editor/test/code/atlas-cells.test.ts` passes
+- [x] Progress log updated with verification records and handoff notes
 
 ## Progress Log
 
@@ -132,3 +132,31 @@ Run from `editor/`. Each log ends with its exit status.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-16 (implementation)
+**Tasks Completed**: CR-02 atlas phase/cache/filter behavior, shared recording helper, and focused unit tests.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Toolchain SHA-256**: `target/wasm32-unknown-unknown/debug/vactr.wasm` de9c55f37b4037d73e28f8aaa11e06d3bc87a3a41a3bc95dd8e64ebf02c93210; `tree-sitter-vact/tree-sitter-vact.wasm` ae3e5cdf1217e943f19c3ff15f111801e537ba9b7e463f84d6bf8cedd7fd0609; `editor/package-lock.json` f32e9585c409487e0d74ee9b8dc1880d4e54ff8610ab2cefa529828c53449749.
+**Notes**: `editor/test/canvas/gpu.test.ts` remained unchanged (SHA-256 f8ea1191bf8e65c3f73ca260f84f2f43c32c9c497ec3efa4a13cad2f9c29f3dd). Focused suite verifies widths, float-noise hits, phase validation/placement, run clipping and NEAREST filters.
+
+### Session: 2026-10-16 (evidence repair)
+**Tasks Completed**: Re-ran CR-02's focused suite and combined TypeScript check on the current source; both passed. Corrected the current verification record to contain only exit-0 gates.
+**Tasks In Progress**: None for CR-02.
+**Blockers**: None. The earlier canvas suite result is a CR-05 handoff, not a CR-02 gate.
+**Prior Attempt History**: The original focused suite passed 6/6 (`tmp/code-render/CR-02/focused.log`). The original `npm run check` exited 1 on the then-current CR-06 TS7016 declaration diagnostic (`tmp/code-render/CR-02/check.log`); attempt-2 below passes on the current combined tree. The informational canvas run exited 1 with 76/77 passed (`tmp/code-render/CR-02/canvas.log`); its single upload-count failure remains assigned to CR-05.
+**Verification**:
+- `cd editor && npx vitest run test/code/atlas-cells.test.ts > ../tmp/code-render/CR-02/attempt-2/focused.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-2/focused.log; exit "$rc"` — exit 0; 6/6 tests passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-02/attempt-2/check.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-2/check.log; exit "$rc"` — exit 0.
+**CR-05 Handoff**: The informational run in `tmp/code-render/CR-02/canvas.log` had 76/77 passing and one atlas upload-count assertion (`gpu.test.ts:789`, expected 15, observed 34) after the width-keyed atlas change. Reconciliation evidence is retained at `tmp/code-render/reconcile-377/canvas-informational.log` and `tmp/code-render/reconcile-377/retention-probe.log`. CR-05 owns this assertion; CR-02 leaves `gpu.test.ts` unchanged (SHA-256 `f8ea1191bf8e65c3f73ca260f84f2f43c32c9c497ec3efa4a13cad2f9c29f3dd`).
+
+### Session: 2026-10-16 (INT-377-02 contract repair)
+**Tasks Completed**: Re-read and verified the CR-02 implementation identities; reran focused atlas tests and the TypeScript check on the current source; corrected the missing output-contract evidence by preparing `reviewBasis.sourcePaths` for the branch result.
+**Tasks In Progress**: None for CR-02 implementation.
+**Blockers**: None. The nonzero canvas aggregate remains a CR-05 handoff and is not a CR-02 gate.
+**Finding**: INT-377-02 is repaired. The source and test files were unchanged: `atlas.ts` SHA-256 `cb03915bfe3fb9ce57c4fae06b836a27680e856f1a87f84c015242e0ffa2af06`; `atlas-cells.test.ts` `a0f375891ebdfaac477af5bc42a2e52c80f4d40d8fe5ec74688e6380ab26e48a`; `recording-gl.ts` `46c8e8332fd7b7b17f60dd9e916866856471527c418dcb9d5d8c1fe22caa73bd`; protected `gpu.test.ts` `f8ea1191bf8e65c3f73ca260f84f2f43c32c9c497ec3efa4a13cad2f9c29f3dd`.
+**Verification**:
+- `cd editor && npx vitest run test/code/atlas-cells.test.ts > ../tmp/code-render/CR-02/attempt-3/focused.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-3/focused.log; exit "$rc"` — exit 0; 6/6 tests passed.
+- `cd editor && npm run check > ../tmp/code-render/CR-02/attempt-3/check.log 2>&1; rc=$?; printf 'exit=%s\\n' "$rc" >> ../tmp/code-render/CR-02/attempt-3/check.log; exit "$rc"` — exit 0 (`tsc --noEmit`).
+**CR-05 Handoff**: The prior informational GPU aggregate remains a failure, not a pass: `tmp/code-render/reconcile-377/canvas-informational.log` records 76/77 passing and the upload assertion expected 15, observed 34; `tmp/code-render/reconcile-377/retention-probe.log` is retained as related evidence. CR-05 owns reconciliation. No GPU test was added to CR-02 gating verification.
+**Branch Contract**: The CR-02 result includes `reviewBasis.sourcePaths`: `design-docs/specs/design-code-pane-text-rendering.md`, `impl-plans/active/code-render-dispatch.json`, `impl-plans/active/code-render-02-atlas-cells.md`, `editor/src/code/atlas.ts`, `editor/test/code/atlas-cells.test.ts`, `editor/test/code/recording-gl.ts`, and `editor/test/canvas/gpu.test.ts`. Independent test-integrity and adversarial review remain downstream workflow gates.

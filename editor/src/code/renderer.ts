@@ -5,7 +5,7 @@ import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from
 import { ResourceLedger, effectiveSize, RESOURCE_LIMITS, type Reservation } from './resources';
 import type { PhaseTimer } from './frame';
 import { FALLBACK_PALETTE, rgbaCss, type Palette } from './palette';
-import { CLIP_GUTTER, UNTINTED, InstanceWriter, LayerBuffer, VERTEX_SOURCE, FRAGMENT_SOURCE, type GeometryLayer } from './geometry';
+import { CLIP_GUTTER, SNAP_GLYPH, UNTINTED, InstanceWriter, LayerBuffer, VERTEX_SOURCE, FRAGMENT_SOURCE, glyphPhase, glyphQuad, type GeometryLayer } from './geometry';
 import { SegmentCache, MAX_TEXT_BLOCKS, type SegmentKey } from './segments';
 
 export interface GpuStatus {
@@ -169,7 +169,7 @@ export class CanvasRenderer {
       gl.bindTexture(gl.TEXTURE_2D, this.white);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-      for (const name of ['u_view', 'u_texture']) this.locations[name] = gl.getUniformLocation(this.program, name);
+      for (const name of ['u_view', 'u_device', 'u_texture']) this.locations[name] = gl.getUniformLocation(this.program, name);
       if (gl.getError() !== gl.NO_ERROR) throw new Error('GPU initialization failed');
       this.atlas = new GlyphAtlas(gl, this.ledger, this.createCanvas);
     } finally { for (const shader of shaders) gl.deleteShader(shader); }
@@ -209,7 +209,7 @@ export class CanvasRenderer {
       gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.uniform2f(this.locations.u_view, this.view.width, this.view.height); gl.uniform1i(this.locations.u_texture, 0); gl.uniform1i(this.locations.u_slots, 1); gl.activeTexture(gl.TEXTURE0);
+      gl.uniform2f(this.locations.u_view, this.view.width, this.view.height); gl.uniform2f(this.locations.u_device, this.canvas.width / this.view.width, this.canvas.height / this.view.height); gl.uniform1i(this.locations.u_texture, 0); gl.uniform1i(this.locations.u_slots, 1); gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.atlas.texture);
       const annotations = feedback.annotations ?? [];
       const staticAnnotations = annotations.filter(a => a.kind !== 'playing' && a.kind !== 'eval');
@@ -230,7 +230,7 @@ export class CanvasRenderer {
       }
       const rebuildText = this.textCommands === null || this.cacheKey !== key;
       this.currentLayer = 'background';
-      if (backgroundStaticDirty) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.04, 0.05, 0.07, 0.85]);
+      if (backgroundStaticDirty) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.047, 0.059, 0.082, 0.85]);
       if (rebuildText) {
         const lineHeight = this.layout.font.lineHeight;
         const overscan = Math.ceil(this.view.height / lineHeight) * lineHeight;
@@ -243,12 +243,12 @@ export class CanvasRenderer {
       }
       this.currentLayer = 'background';
       if (backgroundStaticDirty) {
-        for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.12, 0.22, 0.32, 0.55]);
+        for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.218, 0.4, 0.582, 0.55]);
         this.backgroundStaticCount = this.writers.get('background')!.count;
         this.backgroundKey = backgroundKey;
       }
       for (const a of [...annotations, ...(feedback.animated ?? [])]) if (a.kind === 'playing' || a.kind === 'eval') {
-        const color = a.kind === 'playing' ? [0.35, 0.29, 0.13, 0.5] : a.className?.includes('error') ? [0.4, 0.12, 0.16, 0.5] : [0.2, 0.32, 0.36, 0.5];
+        const color = a.kind === 'playing' ? [0.7, 0.58, 0.26, 0.5] : a.className?.includes('error') ? [0.8, 0.24, 0.32, 0.5] : [0.4, 0.64, 0.72, 0.5];
         for (const r of this.animatedRects(a)) this.quad(this.local(r), color);
       }
       this.currentLayer = 'overlay';
@@ -294,7 +294,7 @@ export class CanvasRenderer {
     this.drawCommand(command);
   }
   private addCommand(command: Omit<DrawCommand, 'layer' | 'slot'> & { flags?: number }): void {
-    const recorded: DrawCommand = { ...command, flags: command.flags ?? 0, layer: this.currentLayer, slot: this.currentSlot, ...(command.texture ? { generation: this.textureGeneration } : {}) };
+    const recorded: DrawCommand = { ...command, flags: command.flags ?? 0, layer: this.currentLayer, slot: this.currentLayer === 'text' ? this.currentSlot : 0, ...(command.texture ? { generation: this.textureGeneration } : {}) };
     if (this.collecting) {
       this.collecting.push(recorded);
       return;
@@ -410,6 +410,7 @@ export class CanvasRenderer {
         gutter = this.segments.set(gutterKey, this.collecting, 0) ?? undefined;
         if (!gutter) this.pendingText = true;
         else { this.stats.gutterBuilds++; if (this.currentSegmentPending) this.pendingSegments.add(gutterId); }
+        this.currentSlot = 0;
       }
       let gutterPacked = false;
       for (let chunkIndex = 0; chunkIndex < textKeys.length; chunkIndex++) {
@@ -429,6 +430,7 @@ export class CanvasRenderer {
           this.view.width = oldWidth;
           const built = this.segments.set(textKey, this.collecting, 0);
           this.collecting = null;
+          this.currentSlot = 0;
           if (!built) this.pendingText = true;
           segment = built ?? undefined;
           if (built) {
@@ -569,14 +571,15 @@ export class CanvasRenderer {
         const style = styles.find(a => a.kind === 'syntax' && a.from < to && a.to > from);
         const tint = color ?? (style ? rgbaCss(this.palette.token[style.className ?? ''] ?? this.palette.text) : rgbaCss(this.palette.text));
         const emoji = /\p{Extended_Pictographic}/u.test(cluster.text);
-        const cell = atlas.cell({ kind: emoji ? 'color' : 'mask', text: cluster.text, font: this.layout.font, dpr: this.scale, width: cluster.width });
+        const { devicePixel, phase } = glyphPhase(glyphX, this.scale);
+        const cell = atlas.cell({ kind: emoji ? 'color' : 'mask', text: cluster.text, font: this.layout.font, dpr: this.scale, width: cluster.width, phase });
         if (!cell) {
           if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length);
           this.pendingText = true; this.currentSegmentPending = true; continue;
         }
-        const flags = (gutter ? 0 : CLIP_GUTTER) | (emoji ? UNTINTED : 0);
-        const cssPad = cell.pad / this.scale;
-        this.quad({ left: glyphX - cssPad, right: glyphX + cluster.width + cssPad, top: y, bottom: y + this.layout.font.lineHeight }, parseCssColor(tint), atlas.texture,
+        const flags = (gutter ? 0 : CLIP_GUTTER) | (emoji ? UNTINTED : 0) | SNAP_GLYPH;
+        const quad = glyphQuad(devicePixel, this.scale, cell);
+        this.quad({ left: quad.left, right: quad.left + quad.width, top: y, bottom: y + quad.height }, parseCssColor(tint), atlas.texture,
           [cell.u0, cell.v0, cell.u1, cell.v1], flags);
       }
       return;
@@ -600,10 +603,12 @@ export class CanvasRenderer {
       while (offset < visibleTo) {
         const width = Math.min(step, segmentTo - offset, visibleTo - offset);
         if (width <= 0) break;
-        const cell = atlas.cell({ kind: 'run', text: run.text, run, piece: { from: offset, to: offset + width }, chunkX: offset, font: this.layout.font, dpr: this.scale, width });
+        const { devicePixel, phase } = glyphPhase(x + offset, this.scale);
+        const cell = atlas.cell({ kind: 'run', text: run.text, run, piece: { from: offset, to: offset + width }, chunkX: offset, font: this.layout.font, dpr: this.scale, width, phase });
         if (!cell) { if (!this.pendingText) this.pendingStartLine = (this.currentLineIndex + 1) % Math.max(1, this.visibleLines.length); this.pendingText = true; this.currentSegmentPending = true; offset += width; continue; }
-        const cssPad = cell.pad / this.scale, flags = gutter ? 0 : CLIP_GUTTER;
-        this.quad({ left: x + offset - cssPad, right: x + offset + width + cssPad, top: y, bottom: y + this.layout.font.lineHeight }, parseCssColor(tint), atlas.texture,
+        const flags = (gutter ? 0 : CLIP_GUTTER) | SNAP_GLYPH;
+        const quad = glyphQuad(devicePixel, this.scale, cell);
+        this.quad({ left: quad.left, right: quad.left + quad.width, top: y, bottom: y + quad.height }, parseCssColor(tint), atlas.texture,
           [cell.u0, cell.v0, cell.u1, cell.v1], flags);
         offset += width;
       }

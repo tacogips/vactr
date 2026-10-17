@@ -22,13 +22,13 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 ## Vim keymap, next-key hints and hop jumps (2026-10-17)
 
-These plans implement [design-vim-keymap-hints-hop.md](../design-docs/specs/design-vim-keymap-hints-hop.md) on branch `wf/vim-keymap` (designed in session 395). All are Ready. The [dispatch manifest](active/vim-keymap-dispatch.json) lists paths, dependencies and gates; common execution rules are in VK-00.
+These plans implement [design-vim-keymap-hints-hop.md](../design-docs/specs/design-vim-keymap-hints-hop.md) on branch `wf/vim-keymap` (designed in session 395). All 16 plans are Completed and archived (2026-10-17, workflow session 401) after test-integrity, adversarial and integration review accepted them. The combined-tree gates passed (`tmp/vim-keymap/reconcile/s401-attempt-3/`): `npm run check`, full Vitest 2349/2349, `npm run test:style` (16 engine/viewport combinations), `VACTR_REQUIRE_SESSION_ABI=1 npm run build`, the behavior e2e 44/44 in Chromium and WebKit (including the five `vim-keymap-*` checks), `npm run e2e:examples` 8/8 on rerun, and `cargo test` for `editor/src-tauri`. The [dispatch manifest](active/vim-keymap-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations. Common execution rules are in VK-00.
 
-- **Wave 0** (parallel): [VK-00 core contract](active/vim-keymap-00-contract.md), [VK-01 notation and schema](active/vim-keymap-01-notation-schema.md), [VK-02 Tauri store](active/vim-keymap-02-tauri-store.md), [VK-03 web store and JSON files](active/vim-keymap-03-web-store-files.md), [VK-04 renderer hop overlay](active/vim-keymap-04-renderer-hop-overlay.md)
-- **Wave 1** (parallel): [VK-10 mapper](active/vim-keymap-10-mapper.md), [VK-11 hints](active/vim-keymap-11-hints.md), [VK-12 hop](active/vim-keymap-12-hop.md), [VK-13 extended built-ins and surround](active/vim-keymap-13-extended-builtins.md), [VK-14 presets](active/vim-keymap-14-presets.md), [VK-15 input hooks](active/vim-keymap-15-input-hooks.md), [VK-16 views](active/vim-keymap-16-views.md)
-- **Wave 2**: [VK-20 controller integration](active/vim-keymap-20-controller.md)
-- **Wave 3**: [VK-30 mount wiring](active/vim-keymap-30-mount.md)
-- **Wave 4** (parallel): [VK-40 e2e and final gates](active/vim-keymap-40-e2e-gates.md), [VK-41 docs](active/vim-keymap-41-docs.md)
+- **Wave 0** (parallel): [VK-00 core contract](completed/vim-keymap-00-contract.md), [VK-01 notation and schema](completed/vim-keymap-01-notation-schema.md), [VK-02 Tauri store](completed/vim-keymap-02-tauri-store.md), [VK-03 web store and JSON files](completed/vim-keymap-03-web-store-files.md), [VK-04 renderer hop overlay](completed/vim-keymap-04-renderer-hop-overlay.md)
+- **Wave 1** (parallel): [VK-10 mapper](completed/vim-keymap-10-mapper.md), [VK-11 hints](completed/vim-keymap-11-hints.md), [VK-12 hop](completed/vim-keymap-12-hop.md), [VK-13 extended built-ins and surround](completed/vim-keymap-13-extended-builtins.md), [VK-14 presets](completed/vim-keymap-14-presets.md), [VK-15 input hooks](completed/vim-keymap-15-input-hooks.md), [VK-16 views](completed/vim-keymap-16-views.md)
+- **Wave 2**: [VK-20 controller integration](completed/vim-keymap-20-controller.md)
+- **Wave 3**: [VK-30 mount wiring](completed/vim-keymap-30-mount.md)
+- **Wave 4** (parallel): [VK-40 e2e and final gates](completed/vim-keymap-40-e2e-gates.md), [VK-41 docs](completed/vim-keymap-41-docs.md)
 
 ## Template voices as sounds in every tier (2026-10-17)
 

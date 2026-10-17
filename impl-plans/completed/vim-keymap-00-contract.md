@@ -1,6 +1,6 @@
 # Vim Keymap: Core Contract (types, test host, mount stubs) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VK-00 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 1, 4.1, 4.3, 4.4, 5, 6.4, 7.2, 7.4, 11.1
 **Created**: 2026-10-17

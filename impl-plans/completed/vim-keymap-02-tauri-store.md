@@ -10,7 +10,7 @@
 
 - **Parallel (wave 0)**: VK-00, VK-01, VK-03, VK-04
 - **Consumer**: VK-03 `TauriKeymapStore` invokes these commands by name; VK-30 wires the store
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full; this plan runs cargo, not npm)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full; this plan runs cargo, not npm)
 
 ## Intent and Context
 

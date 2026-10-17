@@ -1,6 +1,6 @@
 # Vim Keymap: Hop Targets, Labels and Session Implementation Plan
 
-**Status**: Completed (implementation; serial integration pending)
+**Status**: Completed
 **Plan ID**: VK-12 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 7.1-7.3, 7.5
 **Created**: 2026-10-17
@@ -11,7 +11,7 @@
 - **Depends on**: VK-00 (`HopView`, `HopLabel`, `VimViewport`)
 - **Parallel (wave 1)**: VK-10, VK-11, VK-13, VK-14, VK-15, VK-16
 - **Consumer**: VK-20 starts sessions from `hop.*` actions and applies jumps; VK-04/VK-30 draw `HopView.labels`
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

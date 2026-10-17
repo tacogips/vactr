@@ -10,7 +10,7 @@
 
 - **Parallel (wave 0)**: VK-00, VK-01, VK-02 (Rust commands this store calls), VK-04
 - **Consumer**: VK-30 mount wiring and `app/main.ts`
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

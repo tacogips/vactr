@@ -1,6 +1,6 @@
 # Vim Keymap: KeyMapper (resolution, timeouts, remap) Implementation Plan
 
-**Status**: Completed (implementation; independent review and serial integration pending)
+**Status**: Completed
 **Plan ID**: VK-10 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 4.1, 4.2, 4.4, 4.6, 6.3
 **Created**: 2026-10-17
@@ -11,7 +11,7 @@
 - **Depends on**: VK-00 (types: `MapMode`, `VimHost.timer` shape), VK-01 (`CompiledKeymap`, `RhsSegment`, `ActionId`)
 - **Parallel (wave 1)**: VK-11, VK-12, VK-13, VK-14, VK-15, VK-16
 - **Consumer**: VK-20 controller implements `MapperSink` and owns `routeKey`
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

@@ -1,6 +1,6 @@
 # Vim Keymap: Hint Panel, Keymap Settings Panel and Status-Row Views Implementation Plan
 
-**Status**: Completed (implementation; independent review and serial integration pending)
+**Status**: Completed
 **Plan ID**: VK-16 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 4.5, 6.4, 8.1; design-docs/specs/design-ui-style.md
 **Created**: 2026-10-17
@@ -11,7 +11,7 @@
 - **Depends on**: VK-00 (`HintView`, `VimKeyInput`), VK-01 (`KeymapIssue` type)
 - **Parallel (wave 1)**: VK-10, VK-11, VK-12, VK-13, VK-14, VK-15
 - **Consumer**: VK-30 mounts these views; VK-40 adds them to the style probe
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

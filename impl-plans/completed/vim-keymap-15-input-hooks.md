@@ -1,6 +1,6 @@
 # Vim Keymap: InputController Hooks (typeText, defaultKey, flushPendingInput) Implementation Plan
 
-**Status**: Completed (implementation; independent review and serial finalization pending)
+**Status**: Completed
 **Plan ID**: VK-15 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 4.2 (forced flush), 4.4, 4.4.1
 **Created**: 2026-10-17
@@ -11,7 +11,7 @@
 - **Depends on**: VK-00 (`VimInputHook.flushPendingInput?`)
 - **Parallel (wave 1)**: VK-10, VK-11, VK-12, VK-13, VK-14, VK-16
 - **Consumer**: VK-30 implements `VimHost.typeText`/`defaultKey` with these methods
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

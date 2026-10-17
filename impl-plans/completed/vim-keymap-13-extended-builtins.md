@@ -1,6 +1,6 @@
 # Vim Keymap: Extended Built-ins, Surround and Parser Contract Implementation Plan
 
-**Status**: Completed (implementation; independent review and serial integration pending)
+**Status**: Completed
 **Plan ID**: VK-13 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 1 (K0), 3 (last paragraph), 4.1 (`awaitingArgument`), 5, 7.5 (operator target)
 **Created**: 2026-10-17
@@ -11,7 +11,7 @@
 - **Depends on**: VK-00 (`MotionKind` gains `'g;' | 'g,'`)
 - **Parallel (wave 1)**: VK-10, VK-11, VK-12, VK-14, VK-15, VK-16
 - **Consumer**: VK-20 executes the new parsed commands through the pure helpers delivered here
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

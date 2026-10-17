@@ -1,6 +1,8 @@
 # Vim Mode: JSON Keymap, Next-Key Hints and Hop Jumps
 
-Status: Proposed (2026-10-17, workflow session 395, branch `wf/vim-keymap`).
+Status: Implemented (2026-10-17, workflow session 401, branch `wf/vim-keymap`;
+proposed 2026-10-17, session 395). The implementation plans are archived as
+`impl-plans/completed/vim-keymap-*.md`.
 Extends `design-vim-mode.md`, which is implemented and stays the baseline.
 Open decisions are in `design-docs/user-qa/pending-vim-keymap-questions.md`
 (KQ1-KQ7). Until they are answered, implementation follows the

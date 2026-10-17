@@ -1,6 +1,6 @@
 # Vim Keymap: Default and mise-darwin Presets Implementation Plan
 
-**Status**: Completed (implementation; independent review pending)
+**Status**: Completed
 **Plan ID**: VK-14 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 8.1 (Default document), 9.1-9.3; user-qa KQ2, KQ7
 **Created**: 2026-10-17
@@ -11,7 +11,7 @@
 - **Depends on**: VK-00 (`resolveJsonModule`), VK-01 (`compileKeymap` for the zero-issue test)
 - **Parallel (wave 1)**: VK-10, VK-11, VK-12, VK-13, VK-15, VK-16
 - **Consumers**: VK-20 (preset regression tests), VK-30 (panel preset buttons), VK-40 (e2e)
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

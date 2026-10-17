@@ -4,7 +4,7 @@ Status: Implemented (2026-10-17, workflow session 391, branch `wf/vim-mode`;
 proposed 2026-10-16, session 374). The implementation plans are archived as
 `impl-plans/completed/vim-mode-*.md`.
 
-Extension (proposed 2026-10-17, session 395, branch `wf/vim-keymap`):
+Extension (implemented 2026-10-17, session 401, branch `wf/vim-keymap`):
 user mappings from a JSON keymap document, a `mise-darwin` preset, extra
 built-ins (`gj gk gJ g; g, zz <C-e> <C-y>`, `ys cs ds`), next-key hints and
 hop jumps are specified in `design-vim-keymap-hints-hop.md`. With no stored

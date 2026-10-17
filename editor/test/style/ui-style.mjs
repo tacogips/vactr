@@ -96,14 +96,24 @@ async function inspectPage(page, engine, viewportName, probe) {
       const value = luminance(fill);
       if (value.alpha !== 0 && (!Number.isFinite(value.value) || value.value > 0.5)) add('native-fill', element.tagName.toLowerCase(), { fill, luminance: value.value });
     }
-    const controls = [...document.querySelectorAll('button, select, input')].filter(isVisible).map((element) => {
+    const activeOverlays = [...document.querySelectorAll('.vact-vim-keymap, .vact-vim-hints')].filter(isVisible);
+    const controls = [...document.querySelectorAll('button, select, input')].filter((element) => isVisible(element) && !activeOverlays.some((overlay) => {
+      if (overlay.contains(element)) return false;
+      const controlRect = element.getBoundingClientRect();
+      const overlayRect = overlay.getBoundingClientRect();
+      return controlRect.left < overlayRect.right && controlRect.right > overlayRect.left
+        && controlRect.top < overlayRect.bottom && controlRect.bottom > overlayRect.top;
+    })).map((element) => {
       if (element instanceof HTMLInputElement && element.type === 'checkbox') return element.closest('label') ?? element;
       return element;
     }).filter((element, index, all) => all.indexOf(element) === index).map((element) => ({ element, inProbe: fixture.contains(element) }));
-    for (const { element: first, inProbe: firstInProbe } of controls) {
+    const overlayGroup = (element) => element.closest('.vact-vim-keymap, .vact-vim-hints');
+    const gapControls = activeOverlays.length ? controls.filter(({ element }) => overlayGroup(element)) : controls;
+    for (const { element: first, inProbe: firstInProbe } of gapControls) {
       const a = first.getBoundingClientRect();
-      const candidates = controls.filter(({ element: second, inProbe: secondInProbe }) => {
+      const candidates = gapControls.filter(({ element: second, inProbe: secondInProbe }) => {
         if (second === first || firstInProbe !== secondInProbe) return false;
+        if (overlayGroup(first) !== overlayGroup(second)) return false;
         if (Boolean(first.closest('.vact-doc-picker')) !== Boolean(second.closest('.vact-doc-picker'))) return false;
         const b = second.getBoundingClientRect();
         const overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
@@ -268,6 +278,46 @@ try {
           const vimInspected = await inspectPage(vimPage, engineName, `${viewport.name}-vim`, vimProbe);
           results.push({ engine: engineName, viewport: `${viewport.name}-vim`, filePseudo: vimInspected.filePseudo, proxy: vimInspected.proxy, vimTogglePresent });
           console.log(`${engineName} ${viewport.name}-vim: file-pseudo=${vimInspected.filePseudo}, proxy=${vimInspected.proxy.present ? 'present' : 'missing'}, vim-toggle=${vimTogglePresent}`);
+          await vimPage.keyboard.press('Escape');
+          await vimPage.locator('.vact-vim-keymap-button').evaluate((element) => element.click());
+          await vimPage.waitForSelector('.vact-vim-keymap');
+          await vimPage.screenshot({ path: path.join(outDir, `${engineName}-${viewport.name}-vim-keymap@2x.png`) });
+          if (vimProbeAdded) {
+            await vimPage.locator('[data-style-probe]').evaluate((element) => element.remove());
+            vimProbeAdded = false;
+          }
+          let keymapProbeAdded = false;
+          try {
+            const keymapProbe = await vimPage.evaluateHandle(makeProbe, `${viewport.name}-vim-keymap`);
+            keymapProbeAdded = true;
+            const keymapInspected = await inspectPage(vimPage, engineName, `${viewport.name}-vim-keymap`, keymapProbe);
+            results.push({ engine: engineName, viewport: `${viewport.name}-vim-keymap`, filePseudo: keymapInspected.filePseudo, proxy: keymapInspected.proxy });
+            console.log(`${engineName} ${viewport.name}-vim-keymap: file-pseudo=${keymapInspected.filePseudo}, proxy=${keymapInspected.proxy.present ? 'present' : 'missing'}`);
+          } finally {
+            if (keymapProbeAdded) await vimPage.locator('[data-style-probe]').evaluate((element) => element.remove()).catch(() => {});
+          }
+          await vimPage.getByRole('button', { name: 'mise-darwin' }).click();
+          await vimPage.locator('.vact-vim-keymap-apply').click();
+          await vimPage.locator('.vact-vim-keymap-close').click();
+          await vimPage.locator('.vact-code-input-bridge textarea').focus();
+          await vimPage.keyboard.press('Space');
+          await vimPage.waitForSelector('.vact-vim-hints');
+          await vimPage.waitForTimeout(300);
+          await vimPage.screenshot({ path: path.join(outDir, `${engineName}-${viewport.name}-vim-hints@2x.png`) });
+          let hintsProbeAdded = false;
+          try {
+            const hintsProbe = await vimPage.evaluateHandle(makeProbe, `${viewport.name}-vim-hints`);
+            hintsProbeAdded = true;
+            const hintsInspected = await inspectPage(vimPage, engineName, `${viewport.name}-vim-hints`, hintsProbe);
+            results.push({ engine: engineName, viewport: `${viewport.name}-vim-hints`, filePseudo: hintsInspected.filePseudo, proxy: hintsInspected.proxy });
+            console.log(`${engineName} ${viewport.name}-vim-hints: file-pseudo=${hintsInspected.filePseudo}, proxy=${hintsInspected.proxy.present ? 'present' : 'missing'}`);
+          } finally {
+            if (hintsProbeAdded) await vimPage.locator('[data-style-probe]').evaluate((element) => element.remove()).catch(() => {});
+          }
+          await vimPage.keyboard.press('Escape');
+          await vimPage.locator('.vact-vim-keymap-button').evaluate((element) => element.click());
+          await vimPage.locator('.vact-vim-keymap-reset').click();
+          await vimPage.waitForFunction(() => localStorage.getItem('vactr.vimKeymap') === null);
         } finally {
           if (vimProbeAdded) await vimPage.locator('[data-style-probe]').evaluate((element) => element.remove()).catch(() => {});
           await vimContext.close();

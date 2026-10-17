@@ -4,6 +4,7 @@ import path from 'node:path';
 import { installSilentSink } from './silent-sink.mjs';
 import { runCodePixels } from './code-pixels.mjs';
 import { runVimChecks } from './vim-behavior.mjs';
+import { runVimKeymapChecks } from './vim-keymap.mjs';
 export async function runBehavior(browser, origin, name) {
   const results = []; const limitations = [];
   let context; let page; let api;
@@ -198,6 +199,10 @@ export async function runBehavior(browser, origin, name) {
     const vim = await runVimChecks(browser, origin, name);
     results.push(...vim.checks); limitations.push(...vim.limitations);
   } catch (error) { results.push({ id:'vim-setup', pass:false, detail:String(error?.stack ?? error) }); }
+  try {
+    const vimKeymap = await runVimKeymapChecks(browser, origin, name);
+    results.push(...vimKeymap.checks); limitations.push(...vimKeymap.limitations);
+  } catch (error) { results.push({ id:'vim-keymap-setup', pass:false, detail:String(error?.stack ?? error) }); }
   const counted = results.filter((result) => result.status !== 'limitation');
   return { name, checks:results, passed:counted.filter((result)=>result.pass===true).length, total:counted.length, limitations };
 }

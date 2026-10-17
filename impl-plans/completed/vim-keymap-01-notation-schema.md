@@ -10,7 +10,7 @@
 
 - **Parallel (wave 0)**: VK-00, VK-02, VK-03, VK-04
 - **Next**: VK-10 mapper, VK-11 hints, VK-14 presets, VK-16 views consume `CompiledKeymap`, `KeymapIssue`, `formatNotation`
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

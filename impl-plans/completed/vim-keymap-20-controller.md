@@ -1,6 +1,6 @@
 # Vim Keymap: Controller Integration (routeKey, mapper, hints, hop, extended) Implementation Plan
 
-**Status**: Completed (implementation; independent review and serial integration pending)
+**Status**: Completed
 **Plan ID**: VK-20 (wave 2)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 1, 4.1-4.4, 4.6, 5, 6.2, 6.3, 7.1, 7.5, 8.2, 11.1
 **Created**: 2026-10-17
@@ -10,7 +10,7 @@
 
 - **Depends on**: VK-00, VK-01, VK-10 (mapper), VK-11 (hints), VK-12 (hop), VK-13 (parser/extended/surround/change list), VK-14 (presets for regressions)
 - **Next**: VK-30 mount wiring (wave 3)
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full; this wave runs the full `npm run check`)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full; this wave runs the full `npm run check`)
 
 ## Intent and Context
 
@@ -286,3 +286,23 @@ corrected, and the subsequent full focused suite passed. An initial npm check
 wrapper also used zsh's readonly `status` variable; the successful final-source
 rerun is recorded above. Independent test-integrity and adversarial review are
 still pending; this is not a review acceptance claim.
+
+### Session: 2026-10-17 VK-20 session-401 implementation continuation
+
+**Tasks completed**: Revalidated the accepted VK-20 integration and closed
+`session-398-integration-review-attempt-1-finding-1` against current source.
+The change-list test asserts the first `+` reaches the newest entry (head 3)
+and the second reaches the older entry (head 0); the Test Cases section above
+states the same two-press expectation. `marks.ts` remains unchanged. No source
+or test edits were needed in this continuation because the repaired test and
+plan wording are present in the selected checkpoint.
+
+**Verification**:
+- `cd editor && npm run check`: exitStatus 0; log `tmp/vim-keymap/VK-20/s401-attempt-1/npm-check.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/keymap-controller.test.ts`: exitStatus 0, 26/26 passed; log `tmp/vim-keymap/VK-20/s401-attempt-1/keymap-controller-vitest.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts`: exitStatus 0, 1,234/1,234 passed; log `tmp/vim-keymap/VK-20/s401-attempt-1/focused-vitest.log`.
+- `cd editor && wc -l src/code/vim/controller.ts src/code/vim/keymap-runtime.ts`: exitStatus 0, 843/135 lines; log `tmp/vim-keymap/VK-20/s401-attempt-1/line-budget.log`.
+- `git diff --check` on VK-20 paths: exitStatus 0; log `tmp/vim-keymap/VK-20/s401-attempt-1/diff-check.log`.
+
+Independent test-integrity and adversarial reviews, followed by serial
+integration, remain downstream; no approval is claimed here.

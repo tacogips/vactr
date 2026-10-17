@@ -1,6 +1,6 @@
 # Vim Keymap: Renderer Hop Label Overlay Hook Implementation Plan
 
-**Status**: Completed (implementation; review and serial finalization are downstream)
+**Status**: Completed
 **Plan ID**: VK-04 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md section 7.4, 12
 **Created**: 2026-10-17
@@ -10,7 +10,7 @@
 
 - **Parallel (wave 0)**: VK-00, VK-01, VK-02, VK-03
 - **Consumer**: VK-30 passes `hopLabels`/`hopRevision` from the Vim snapshot in `mount.ts`
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 

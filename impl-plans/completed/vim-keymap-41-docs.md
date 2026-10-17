@@ -1,6 +1,6 @@
 # Vim Keymap: Documentation Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VK-41 (wave 4)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 2, 5-9, 12 (documentation)
 **Created**: 2026-10-17
@@ -10,7 +10,7 @@
 
 - **Depends on**: VK-30
 - **Parallel (wave 4)**: VK-40
-- Common Execution Rules: `impl-plans/active/vim-keymap-00-contract.md` (apply in full)
+- Common Execution Rules: `impl-plans/completed/vim-keymap-00-contract.md` (apply in full)
 
 ## Intent and Context
 
@@ -70,10 +70,36 @@ profile after the Vim checks, and the gate command from VK-40 gate 6
 
 ## Completion Criteria
 
-- [ ] README Vim section covers keymap, format, extra built-ins, hints, hop, IME, links
-- [ ] e2e README lists the five checks and the gate command
-- [ ] Progress Log entry added
+- [x] README Vim section covers keymap, format, extra built-ins, hints, hop, IME, links
+- [x] e2e README lists the five checks and the gate command
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 (session-401 continuation)
+
+**Tasks Completed**: README and e2e README documentation; VK-41 completion record.
+
+**Verification**:
+- `rg -n 'vactr.vimKeymap|hop.char1|vim-keymap-hints|design-vim-keymap-hints-hop' README.md editor/test/e2e/README.md` -> exit 0; each required term found. Log: `tmp/vim-keymap/VK-41/s401-attempt-2/terms.log`.
+- `rg -n '[^\x00-\x7F]' README.md editor/test/e2e/README.md` -> exit 1 with no matches, confirming no non-ASCII characters (including emojis) in either README. Log: `tmp/vim-keymap/VK-41/s401-attempt-2/nonascii.log`.
+
+**Notes**: The first logging wrapper did not run the checks because zsh rejected assignment to its read-only `status` variable; both commands were rerun with a safe exit-code variable and the complete logs above. Source and test files were not changed.
+
+### Session: 2026-10-17 (Step 6 verification rerun)
+
+**Tasks Completed**: Reverified the VK-41 documentation contract and added positive-count behavior evidence to resolve the carried implementation-materially-unverified gate.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim test/code/vim-keymap-store.test.ts` -> exit 0; 34 files and 1,171 tests passed. Log: `tmp/vim-keymap/VK-41/s402-attempt-1/focused-vitest.log`.
+- `rg -n 'vactr.vimKeymap|hop.char1|vim-keymap-hints|design-vim-keymap-hints-hop' README.md editor/test/e2e/README.md` -> exit 0; all required terms found. Log: `tmp/vim-keymap/VK-41/s402-attempt-1/terms.log`.
+- `rg -n '[^\x00-\x7F]' README.md editor/test/e2e/README.md` -> exit 1 with no matches. Log: `tmp/vim-keymap/VK-41/s402-attempt-1/nonascii.log`.
+- `git diff --check -- README.md editor/test/e2e/README.md impl-plans/active/vim-keymap-41-docs.md` -> exit 0. Log: `tmp/vim-keymap/VK-41/s402-attempt-1/diff-check.log`.
+
+**Notes**: VK-41 is documentation-only and no implementation source was modified. The focused Vim suite exercises the documented keymap behavior on the current tree; build/e2e outputs are owned by VK-40 and are not required by this plan.
+
+### Session: 2026-10-17 (Step 8 documentation refresh and archive)
+
+**Tasks Completed**: Corrected the README hop-off sentence (`gj` falls back to the built-in line motion; `gf` does nothing because vactr has no built-in `gf`). Archived all 16 VK plans to `impl-plans/completed/` after the session-401 integration review accepted the combined tree.
+
+**Verification**: The README term, non-ASCII and `git diff --check` checks were rerun after the edit. Logs: `tmp/vim-keymap/step8/`.

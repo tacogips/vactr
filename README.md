@@ -295,6 +295,42 @@ by the editor.
 - **Touch.** Vim mode is for hardware keyboards. Tap the mode label to
   enter or leave insert mode with the on-screen keyboard, or use the toggle
   to turn Vim off.
+- **Keymap.** The `keymap` button in the Vim status row opens a JSON editor
+  with Default and mise-darwin presets. Apply validates entries and applies
+  them live; Import and Export use `.json` files; Reset returns to built-in
+  behavior. The web stores the document in `localStorage` as
+  `vactr.vimKeymap`; Tauri stores `vim-keymap.json` in the app config
+  directory. Without a stored document, Vim behaves as before.
+- **Document format.** Schema version 1 supports `leader`, `timeoutlen`,
+  per-mode `maps` (`n`, `i`, `x`/`v`, `o`, `c`), `lhs`, `rhs` or a named
+  `action`, `remap`, `desc`, and `<Nop>`, plus `hints`, `hop` and documented
+  `unsupported` entries. Actions are `vactr.evaluate`, `vactr.evaluateAll`,
+  `vactr.hush`, `vactr.format`, `vactr.diagnostic.next`,
+  `vactr.diagnostic.prev`, `vactr.completion`, `hop.char1`,
+  `hop.char1Line`, `hop.word` and `hop.line`. For example, an insert map
+  with `lhs: "kj"` and `rhs: "<Esc>"` returns to normal mode. Physical
+  `Ctrl-a`, `Ctrl-z`, `Ctrl-y`, `Ctrl-c`, `Ctrl-x` and `Ctrl-v` are reserved
+  in normal, insert, visual and operator-pending modes; command-line mode
+  reserves `Ctrl-c`, `Ctrl-x` and `Ctrl-v`.
+- **Extra built-ins with a keymap.** `gj` and `gk` are plain line motions
+  (there is no soft wrap); `gJ`, `g;`, `g,`, `zz`, `<C-e>`, `<C-y>`,
+  `ys`, `yss`, `cs` and `ds` are also available. Physical `Ctrl-y` remains
+  redo, so scrolling with `<C-y>` is available only from a mapping rhs.
+- **Hints.** After a configured trigger prefix, a bottom-left panel lists
+  next keys and descriptions (`hints.triggers`, `hints.delayMs`, default
+  200 ms). It does not take focus, and the mapping timeout pauses while
+  the panel is visible.
+- **Hop.** `hop.char1`, `hop.char1Line`, `hop.word` and `hop.line` use
+  labels from `hop.keys`; matching is smartcase. Visual jumps extend the
+  selection, and operator targets work when mapped in `o` mode (they do
+  not repeat with `.`). Setting `hop.enabled` to `false` drops the hop
+  mappings and removes them from the hints: `gj` falls back to the built-in
+  line motion, and `gf` does nothing because vactr has no built-in `gf`.
+- **IME mappings.** Insert-mode mappings do not see IME composition.
+  If a key is pending when composition starts, it is inserted before the
+  composition.
+- **Keymap references.** See the [keymap design](design-docs/specs/design-vim-keymap-hints-hop.md)
+  and [pending keymap questions](design-docs/user-qa/pending-vim-keymap-questions.md).
 - **Not included.** Visual block (`Ctrl-v`), search highlighting, numbered
   registers and the other items in [the pending Vim questions](design-docs/user-qa/pending-vim-mode-questions.md).
 

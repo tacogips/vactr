@@ -6,7 +6,12 @@ export type Platform = 'apple' | 'other';
 export interface VimKeyInput { key: string; code?: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }
 export type VimKey = string;
 export type OperatorKind = 'd' | 'c' | 'y' | '>' | '<' | 'g~' | 'gu' | 'gU';
-export type MotionKind = 'h' | 'l' | 'j' | 'k' | '0' | '^' | '$' | 'w' | 'b' | 'e' | 'ge' | 'W' | 'B' | 'E' | 'gg' | 'G' | 'f' | 'F' | 't' | 'T' | ';' | ',' | '%' | '{' | '}' | 'H' | 'M' | 'L' | 'C-d' | 'C-u' | 'C-f' | 'C-b' | '+' | 'BS';
+export type MotionKind = 'h' | 'l' | 'j' | 'k' | '0' | '^' | '$' | 'w' | 'b' | 'e' | 'ge' | 'W' | 'B' | 'E' | 'gg' | 'G' | 'f' | 'F' | 't' | 'T' | ';' | ',' | '%' | '{' | '}' | 'H' | 'M' | 'L' | 'C-d' | 'C-u' | 'C-f' | 'C-b' | '+' | 'BS' | 'g;' | 'g,';
+export type MapMode = 'n' | 'i' | 'x' | 'o' | 'c';
+export interface HintEntry { key: string; desc: string; group: boolean }
+export interface HintView { prefix: string; entries: readonly HintEntry[]; summary: string }
+export interface HopLabel { pos: number; text: string }
+export interface HopView { labels: readonly HopLabel[]; revision: number }
 export interface MotionSpec { kind: MotionKind; char?: string }
 export interface FindState { kind: 'f' | 'F' | 't' | 'T'; char: string }
 export interface VimViewport { topLine: number; rows: number }
@@ -18,7 +23,7 @@ export interface TextRange { from: number; to: number; linewise: boolean }
 export interface Register { text: string; linewise: boolean; tokens?: readonly RecordToken[] }
 export type RecordToken = { kind: 'key'; key: VimKey } | { kind: 'edit'; deleteBefore: number; deleteAfter: number; insert: string } | { kind: 'move'; motion: MotionKind };
 export interface ClipboardAdapter { read(): Promise<string>; write(text: string): Promise<void> }
-export interface VimActions { evalAtCursor(): void; evalAll(): void; hush(): void; format(): void }
+export interface VimActions { evalAtCursor(): void; evalAll(): void; hush(): void; format(): void; diagnosticNext(from: number): number | null; diagnosticPrev(from: number): number | null; openCompletion(): void }
 export interface VimUpdate { state: EditorState; changes: ChangeSet; docChanged: boolean; selectionSet: boolean; userEvent: string | null }
 export interface VimHost {
   state(): EditorState;
@@ -37,6 +42,10 @@ export interface VimHost {
   platform: Platform;
   matchesDefaultKeymap(input: VimKeyInput): boolean;
   compositionActive(): boolean;
+  typeText(text: string): void;
+  defaultKey(key: VimKey): boolean;
+  isVisible(pos: number): boolean;
+  timer(ms: number, cb: () => void): () => void;
 }
 export type PromptKind = ':' | '/' | '?';
 export interface VimSnapshot {
@@ -51,12 +60,15 @@ export interface VimSnapshot {
   cursorShape: CursorShape;
   displayCursor: number;
   displayCursorEnd: number;
+  hints?: HintView | null;
+  hop?: HopView | null;
 }
 export interface VimInputHook {
   handleKey(input: VimKeyInput): boolean;
   allowsTextInput(): boolean;
   overwriteRange(text: string): { from: number; to: number } | null;
   noteCompositionDiscarded(): void;
+  flushPendingInput?(): void;
 }
 export const COUNT_LIMIT = 10_000;
 export const SCAN_LIMIT = 65_536;

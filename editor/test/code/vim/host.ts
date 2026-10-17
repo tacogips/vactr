@@ -4,9 +4,9 @@ import { vi } from 'vitest';
 import type { ClipboardAdapter, Platform, VimHost, VimKeyInput, VimUpdate, VimViewport } from '../../../src/code/vim/types';
 
 export interface TestClipboard extends ClipboardAdapter { fail: boolean; value: string }
-export interface TestHost extends VimHost { messages: { message: string; assertive: boolean }[]; scrolls: number[]; memoryClipboard: TestClipboard }
+export interface TestHost extends VimHost { messages: { message: string; assertive: boolean }[]; scrolls: number[]; typed: string[]; defaultKeys: string[]; memoryClipboard: TestClipboard }
 
-export function createTestHost(text: string, opts: { platform?: Platform; viewport?: VimViewport; defaultKeymaps?: (input: VimKeyInput) => boolean; clipboard?: ClipboardAdapter } = {}): TestHost {
+export function createTestHost(text: string, opts: { platform?: Platform; viewport?: VimViewport; defaultKeymaps?: (input: VimKeyInput) => boolean; clipboard?: ClipboardAdapter; diagnostics?: number[]; isVisible?: (pos: number) => boolean } = {}): TestHost {
   const marker = text.indexOf('|');
   if (marker !== text.lastIndexOf('|')) throw new Error('Test fixture must contain at most one cursor marker');
   const source = marker < 0 ? text : `${text.slice(0, marker)}${text.slice(marker + 1)}`;
@@ -14,6 +14,8 @@ export function createTestHost(text: string, opts: { platform?: Platform; viewpo
   const listeners = new Set<(update: VimUpdate) => void>();
   const messages: { message: string; assertive: boolean }[] = [];
   const scrolls: number[] = [];
+  const typed: string[] = [];
+  const defaultKeys: string[] = [];
   let dispatching = false;
   const memoryClipboard: TestClipboard = {
     value: '', fail: false,
@@ -42,14 +44,62 @@ export function createTestHost(text: string, opts: { platform?: Platform; viewpo
     scrollCaret: vi.fn(),
     clipboard,
     memoryClipboard,
-    actions: { evalAtCursor: vi.fn(), evalAll: vi.fn(), hush: vi.fn(), format: vi.fn() },
+    actions: {
+      evalAtCursor: vi.fn(), evalAll: vi.fn(), hush: vi.fn(), format: vi.fn(),
+      diagnosticNext: (from) => {
+        const positions = opts.diagnostics ?? [];
+        return positions.find((pos) => pos > from) ?? (positions.length ? positions[0] : null);
+      },
+      diagnosticPrev: (from) => {
+        const positions = opts.diagnostics ?? [];
+        return [...positions].reverse().find((pos) => pos < from) ?? (positions.length ? positions[positions.length - 1] : null);
+      },
+      openCompletion: vi.fn(),
+    },
     closePopupWithEscape: () => false,
     announce(message, assertive = false) { messages.push({ message, assertive }); },
     platform: opts.platform ?? 'other',
     matchesDefaultKeymap: (input) => opts.defaultKeymaps?.(input) ?? false,
     compositionActive: () => false,
+    typeText(value) {
+      const from = state.selection.main.from;
+      const to = state.selection.main.to;
+      typed.push(value);
+      host.dispatch({ changes: { from, to, insert: value }, selection: { anchor: from + value.length }, userEvent: 'input.type' });
+    },
+    defaultKey(key) {
+      defaultKeys.push(key);
+      const { from, to } = state.selection.main;
+      if (key === '<BS>') {
+        const start = from === to ? Math.max(0, from - 1) : from;
+        host.dispatch({ changes: { from: start, to, insert: '' }, selection: { anchor: start }, userEvent: 'delete.backward' });
+        return true;
+      }
+      if (key === '<Del>') {
+        const end = from === to ? Math.min(state.doc.length, to + 1) : to;
+        host.dispatch({ changes: { from, to: end, insert: '' }, selection: { anchor: from }, userEvent: 'delete.forward' });
+        return true;
+      }
+      if (key === '<Left>' || key === '<Right>') {
+        const pos = Math.max(0, Math.min(state.doc.length, state.selection.main.head + (key === '<Left>' ? -1 : 1)));
+        host.dispatch({ selection: { anchor: pos }, userEvent: 'select' });
+        return true;
+      }
+      if (key === '<CR>') {
+        host.dispatch({ changes: { from, to, insert: '\n' }, selection: { anchor: from + 1 }, userEvent: 'input.type' });
+        return true;
+      }
+      return false;
+    },
+    isVisible: (pos) => opts.isVisible?.(pos) ?? true,
+    timer(ms, cb) {
+      const id = setTimeout(cb, ms);
+      return () => clearTimeout(id);
+    },
     messages,
     scrolls,
+    typed,
+    defaultKeys,
   };
   return host;
 }

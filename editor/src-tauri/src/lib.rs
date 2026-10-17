@@ -2,6 +2,7 @@
 
 mod session;
 mod template;
+mod vim_keymap;
 
 use std::fs;
 use std::path::PathBuf;
@@ -42,7 +43,10 @@ pub fn run() {
             self_check,
             template::default_template_get,
             template::default_template_set,
-            template::default_template_reset
+            template::default_template_reset,
+            vim_keymap::vim_keymap_get,
+            vim_keymap::vim_keymap_set,
+            vim_keymap::vim_keymap_reset
         ])
         .build(tauri::generate_context!())
         .expect("error while building the Vactr Tauri shell")

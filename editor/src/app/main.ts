@@ -32,6 +32,8 @@ import { mount as mountSong } from './song';
 import { mountShell, pageStorage } from '../ui/shell';
 import { DocumentStorage, LocalTemplateStore, pageBackend } from '../documents/storage';
 import { TauriTemplateStore } from '../documents/tauri-templates';
+import { BrowserJsonFiles, TauriJsonFiles } from '../platform/json-files';
+import { LocalKeymapStore, TauriKeymapStore } from '../code/vim-keymap-store';
 import type { DocumentsOptions } from '../documents/types';
 import { mount as mountDocuments, type DocumentsArea } from '../documents/mount';
 import { exampleSource } from '../examples/registry';
@@ -138,6 +140,10 @@ export async function boot(root: HTMLElement, win: Window = window): Promise<Edi
     deps.syntaxWorker = () => new Worker(new URL('../code/syntax-worker.ts', import.meta.url), { type: 'module' });
   }
   const shell = isTauri(win) ? 'app' : 'web';
+  const vimStorage = pageStorage(win) as Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null;
+  deps.vimKeymap = isTauri(win)
+    ? { store: new TauriKeymapStore(invoke), files: new TauriJsonFiles() }
+    : { store: new LocalKeymapStore(vimStorage), files: new BrowserJsonFiles(win) };
   const storage = new DocumentStorage(pageBackend(win));
   const documents: DocumentsOptions = {
     shell,

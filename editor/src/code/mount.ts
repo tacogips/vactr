@@ -71,7 +71,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const holder = doc.createElement('div');
   const disposeCanvasHost = render(() => createComponent(CodeSurface, {}), holder);
   const hostEl = holder.firstElementChild as HTMLElement; codePane.appendChild(hostEl);
-  const vim = createVimMode(localStore(win), hostEl);
+  const vim = createVimMode(localStore(win), hostEl, deps.vimKeymap);
   const surfaceEl = doc.createElement('canvas');
   surfaceEl.className = 'vact-code-canvas'; surfaceEl.setAttribute('aria-hidden', 'true');
   const inputContainer = doc.createElement('div'); inputContainer.className = 'vact-code-input-bridge';
@@ -189,6 +189,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText('selection'); },
     composing: () => input.isComposing });
   vim.connect({ surface, input, viewHost, layout, evalCtl, formatter: () => deps.formatter,
+    diagnostics,
     onChange: () => scheduler?.invalidateText('selection') });
   const forwardPointer = (event: Event): void => surface.notifyPointer(event as PointerEvent);
   const pointerNames = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
@@ -246,7 +247,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         staticAnnotations = annotations.staticRows;
         timed('upload', () => {
           renderer.setViewport(range.view, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), cursorVisible: true, handles });
+          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), ...vim.overlay(), cursorVisible: true, handles });
         });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
@@ -254,7 +255,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges];
         timed('upload', () => {
           renderer.setViewport(viewHost.viewport, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), cursorVisible: true, handles });
+          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), ...vim.overlay(), cursorVisible: true, handles });
         });
       }
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);

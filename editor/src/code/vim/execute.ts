@@ -97,6 +97,6 @@ export function visualReplaceChars(state: EditorState, range: TextRange, value: 
 export function isChanging(command: ParsedCommand, mode: VimMode): boolean {
   if (mode === 'visual' || mode === 'visual-line') return false;
   if (command.operator) return command.operator !== 'y';
-  return ['replace-char', 'toggle-case', 'join', 'put-after', 'put-before', 'open-below', 'open-above', 'insert', 'append', 'insert-line-start', 'append-line-end', 'replace-mode'].includes(command.action ?? '');
+  return ['replace-char', 'toggle-case', 'join', 'join-raw', 'surround-add', 'surround-change', 'surround-delete', 'put-after', 'put-before', 'open-below', 'open-above', 'insert', 'append', 'insert-line-start', 'append-line-end', 'replace-mode'].includes(command.action ?? '');
 }
 

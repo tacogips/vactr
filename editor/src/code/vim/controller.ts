@@ -4,7 +4,7 @@ import type { ExCommand } from './ex';
 import { parseEx } from './ex';
 import { changeWordEnd, commandInputTokens, isChanging, lineTargetRange, preserveChangeWordSeparator, repeatTokens, selectionForVisual, visualJoin, visualRange, visualReplaceChars, withoutCounts } from './execute';
 import { isPassThrough, normalizeKey } from './keys';
-import { MarkTable } from './marks';
+import { ChangeList, MarkTable } from './marks';
 import { motionRange, applyOperator, openLine, putRegister, replaceChars, toggleCaseChars } from './operators';
 import { CommandParser, type ParsedCommand, type Target } from './parser';
 import { MacroRecorder, RedoRecorder, textToTokens, tokensToText } from './record';
@@ -16,6 +16,12 @@ import { REPLAY_DEPTH_LIMIT, REPLAY_TOKEN_LIMIT } from './types';
 import { selectTextObject } from './textobjects';
 import { clampNormal, firstNonBlank, graphemeColumn, nextGrapheme, prevGrapheme } from './words';
 import { InsertSession, isTextEvent, modeAllowsText } from './session';
+import { isHopAction, type ActionId } from './actions';
+import { KeymapRuntime } from './keymap-runtime';
+import type { CompiledKeymap } from './keymap-schema';
+import type { HopKind, HopStep } from './hop';
+import { joinRaw, scrollCenterDelta, scrollLineResult } from './extended';
+import { surroundAdd, surroundChange, surroundDelete } from './surround';
 
 const labels: Record<VimMode, string> = { normal: 'NORMAL', insert: 'INSERT', replace: 'REPLACE', visual: 'VISUAL', 'visual-line': 'VISUAL LINE', 'operator-pending': 'NORMAL' };
 const isolated = (event: string): Pick<TransactionSpec, 'annotations'> => ({ annotations: [isolateHistory.of('full'), Transaction.userEvent.of(event)] });
@@ -46,6 +52,11 @@ export class VimController implements VimInputHook {
   private repeatCount: number | null = null;
   private lastSequence: RecordToken[] = [];
   private snapshotValue: VimSnapshot;
+  private runtime: KeymapRuntime | null = null;
+  private extended = false;
+  private changes = new ChangeList();
+  private pendingExternalFlush: (() => void) | null = null;
+  private hopPrompt: string | null = null;
 
   constructor(private readonly host: VimHost) {
     const state = host.state(), cursor = clampNormal(state.doc, state.selection.main.head);
@@ -65,17 +76,56 @@ export class VimController implements VimInputHook {
   handleKey(input: VimKeyInput): boolean {
     if (this.disposed || this.host.compositionActive()) return false;
     if (isPassThrough(input, this.host.platform, this.host.matchesDefaultKeymap)) return false;
-    const key = normalizeKey(input);
+    const key = normalizeKey(input, this.extended);
     if (key === null) return false;
-    if (this.mode === 'insert' || this.mode === 'replace') return this.handleSessionKey(key, input);
     if (key === '<Esc>' && input.ctrlKey && this.host.closePopupWithEscape()) return true;
-    if (this.macro.register && this.parser.pending() === '' && key === 'q') {
-      const stopped = this.macro.stop();
-      if (stopped) { const unnamed = this.registers.read('"'); this.registers.write(stopped.reg, { text: '', linewise: false, tokens: stopped.tokens }, 'yank'); if (unnamed) this.registers.write('"', unnamed, 'delete'); }
-      this.refresh();
-      return true;
+    if (!this.runtime) return this.processKey(key, input);
+    if (this.mode !== 'insert' && this.mode !== 'replace' && this.stopMacroOnQ(key)) return true;
+    if (this.macro.register && !this.replaying && this.mode !== 'insert' && this.mode !== 'replace') this.macro.push({ kind: 'key', key });
+    const consumed = this.routeKey(key, input);
+    this.runtime.afterKey();
+    this.refresh();
+    return consumed;
+  }
+
+  setKeymap(keymap: CompiledKeymap | null): void {
+    if (this.runtime) {
+      this.runtime.flush();
+      this.runtime.closeHints();
+      this.runtime.endHop();
+      this.runtime.dispose();
     }
-    if (this.macro.register && !this.replaying) this.macro.push({ kind: 'key', key });
+    this.runtime = null;
+    this.extended = keymap !== null;
+    this.parser.setExtended(this.extended);
+    this.snapshotValue.hints = null;
+    this.snapshotValue.hop = null;
+    this.hopPrompt = null;
+    if (keymap) this.runtime = this.createRuntime(keymap);
+    this.refresh();
+  }
+
+  flushPendingInput(): void {
+    if (!this.runtime) return;
+    this.runtime.flush();
+    this.runtime.closeHints();
+    this.refresh();
+  }
+
+  blur(): void {
+    this.flushPendingInput();
+    this.runtime?.endHop();
+    this.parser.reset();
+    if (this.mode === 'operator-pending') this.mode = this.visual ? 'visual' : 'normal';
+    this.snapshotValue.hop = null;
+    this.hopPrompt = null;
+    this.refresh();
+  }
+
+  private processKey(key: VimKey, input?: VimKeyInput): boolean {
+    if (this.mode === 'insert' || this.mode === 'replace') return this.handleSessionKey(key, input ?? { key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false });
+    if (this.stopMacroOnQ(key)) return true;
+    if (!this.runtime && this.macro.register && !this.replaying) this.macro.push({ kind: 'key', key });
     this.lastSequence = textToTokens(this.parser.pending() + key);
     const result = this.parser.feed(key, this.mode);
     if (result.kind === 'pending') {
@@ -93,7 +143,7 @@ export class VimController implements VimInputHook {
     return true;
   }
 
-  allowsTextInput(): boolean { return modeAllowsText(this.mode); }
+  allowsTextInput(): boolean { return !this.runtime?.hopActive() && modeAllowsText(this.mode); }
 
   overwriteRange(text: string): { from: number; to: number } | null {
     if (this.mode !== 'replace' || !text) return null;
@@ -136,18 +186,157 @@ export class VimController implements VimInputHook {
   cancelPrompt(): void { if (this.snapshotValue.prompt) { this.snapshotValue.prompt = null; this.mode = this.visual ? (this.snapshotValue.mode === 'visual-line' ? 'visual-line' : 'visual') : 'normal'; this.refresh(); } }
 
   tapMode(): void {
+    this.flushPendingInput();
     if (this.mode === 'insert' || this.mode === 'replace') this.exitSession(false);
     else this.execute({ register: null, count: null, operator: null, target: null, action: 'insert', arg: null });
   }
 
   dispose(): void {
     if (this.disposed) return;
+    this.runtime?.dispose();
+    this.runtime = null;
+    if (this.pendingExternalFlush) this.pendingExternalFlush();
+    this.pendingExternalFlush = null;
     this.disposed = true;
     this.unsubscribe();
     this.listeners.clear();
     this.parser.reset();
     this.session.clear();
     this.redo.abort();
+  }
+
+  private stopMacroOnQ(key: VimKey): boolean {
+    if (!this.macro.register || this.parser.pending() !== '' || key !== 'q') return false;
+    const stopped = this.macro.stop();
+    if (stopped) {
+      const unnamed = this.registers.read('"');
+      this.registers.write(stopped.reg, { text: '', linewise: false, tokens: stopped.tokens }, 'yank');
+      if (unnamed) this.registers.write('"', unnamed, 'delete');
+    }
+    this.refresh();
+    return true;
+  }
+
+  private createRuntime(keymap: CompiledKeymap): KeymapRuntime {
+    return new KeymapRuntime(keymap, this.host, {
+      processKey: (key) => { if (this.mode === 'insert' || this.mode === 'replace') this.deliverMappedInsertKey(key); else this.processKey(key); },
+      routeKey: (key) => {
+        const consumed = this.routeKey(key);
+        if (!consumed && (this.mode === 'insert' || this.mode === 'replace')) this.deliverInsertFallbackKey(key);
+      },
+      runAction: (id) => this.runMappedAction(id),
+      executeEx: (command) => this.executeEx(command),
+      openPrompt: () => this.executeAction({ register: null, count: null, operator: null, target: null, action: 'prompt', arg: ':' }),
+      error: (message) => this.message(message, 'error'),
+      mapMode: () => this.mapMode(),
+      parserPending: () => this.parser.pending(),
+      hasCountOrRegister: () => this.parser.pending() !== '' && /^[0-9"]/.test(this.parser.pending()),
+      replaying: () => this.replaying,
+      promptOpen: () => this.snapshotValue.prompt !== null,
+      extended: () => this.extended,
+      refresh: () => this.refresh(),
+    });
+  }
+
+  private mapMode(): import('./types').MapMode {
+    return this.mode === 'insert' || this.mode === 'replace' ? 'i' : this.mode === 'visual' || this.mode === 'visual-line' ? 'x' : this.mode === 'operator-pending' ? 'o' : 'n';
+  }
+
+  private deliverMappedInsertKey(key: VimKey): void {
+    const input = { key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false };
+    if (this.handleSessionKey(key, input)) return;
+    this.deliverInsertFallbackKey(key);
+  }
+
+  private deliverInsertFallbackKey(key: VimKey): void {
+    if (!key.startsWith('<') && [...key].length === 1) this.host.typeText(key);
+    else this.host.defaultKey(key);
+  }
+
+  private routeKey(key: VimKey, input?: VimKeyInput): boolean {
+    const runtime = this.runtime;
+    if (!runtime) return this.processKey(key, input);
+    if (runtime.hopActive()) { this.handleHopStep(runtime.feedHop(key)); return true; }
+    if (this.parser.awaitingArgument()) { this.processKey(key); return true; }
+    const result = runtime.feed(key);
+    if (result === 'unmapped') return this.processKey(key, input);
+    return true;
+  }
+
+  private runMappedAction(id: ActionId): void {
+    if (isHopAction(id)) { this.startHop(id.slice(4) as HopKind); return; }
+    switch (id) {
+      case 'vactr.evaluate': this.host.actions.evalAtCursor(); break;
+      case 'vactr.evaluateAll': this.host.actions.evalAll(); break;
+      case 'vactr.hush': this.host.actions.hush(); break;
+      case 'vactr.format': this.host.actions.format(); break;
+      case 'vactr.completion': this.host.actions.openCompletion(); break;
+      case 'vactr.diagnostic.next': this.moveToDiagnostic(this.host.actions.diagnosticNext(this.cursor())); break;
+      case 'vactr.diagnostic.prev': this.moveToDiagnostic(this.host.actions.diagnosticPrev(this.cursor())); break;
+    }
+    this.refresh();
+  }
+
+  private moveToDiagnostic(pos: number | null): void {
+    if (pos === null) { this.message('no diagnostics', 'info'); return; }
+    if (this.visual) {
+      this.visual.head = clampNormal(this.host.state().doc, pos);
+      this.dispatch({ selection: selectionForVisual(this.host.state(), visualRange(this.host.state(), this.visual.anchor, this.visual.head, this.mode)), ...isolated('select.vim') });
+    } else {
+      this.marks.setContext(this.cursor());
+      this.dispatch({ selection: { anchor: clampNormal(this.host.state().doc, pos) }, ...isolated('select.vim') });
+    }
+    this.host.scrollCaret();
+  }
+
+  private startHop(kind: HopKind): void {
+    if (!this.runtime) return;
+    const step = this.runtime.startHop(kind, { doc: this.host.state().doc, cursor: this.cursor(), viewport: this.host.viewport(), isVisible: (pos) => this.host.isVisible(pos) });
+    this.handleHopStep(step);
+  }
+
+  private handleHopStep(step: HopStep): void {
+    if (step.kind === 'pending') {
+      this.hopPrompt = step.prompt;
+      this.snapshotValue.hop = step.view;
+      if (step.view) this.host.announce(step.prompt);
+      this.refresh();
+      return;
+    }
+    this.snapshotValue.hop = null;
+    this.hopPrompt = null;
+    if (step.kind === 'cancel') {
+      if (step.message) this.message(step.message, 'info');
+      if (this.mode === 'operator-pending') { this.parser.reset(); this.mode = this.visual ? 'visual' : 'normal'; }
+      this.refresh();
+      return;
+    }
+    this.applyHopJump(step.pos);
+  }
+
+  private applyHopJump(pos: number): void {
+    const state = this.host.state(), target = clampNormal(state.doc, pos), cursor = this.cursor();
+    const operator = this.parser.pendingOperator();
+    if (operator) {
+      const result: MotionResult = { pos: target, linewise: false, inclusive: target > cursor, desiredColumn: null, jump: false };
+      const range = motionRange(state.doc, cursor, result, operator.operator);
+      const outcome = applyOperator(state, operator.operator, range);
+      this.redo.abort();
+      if (outcome.yanked) this.writeRegister(operator.register, outcome.yanked, operator.operator === 'y' ? 'yank' : 'delete');
+      if (outcome.changes) this.dispatch({ changes: outcome.changes, selection: { anchor: outcome.cursor }, ...isolated(`vim.${operator.operator === 'd' ? 'delete' : operator.operator === 'c' ? 'change' : operator.operator === 'y' ? 'yank' : 'case'}`) });
+      this.parser.reset(); this.mode = this.visual ? 'visual' : 'normal';
+    } else if (this.visual) {
+      this.visual.head = target;
+      this.mode = this.mode === 'visual-line' ? 'visual-line' : 'visual';
+      this.dispatch({ selection: selectionForVisual(state, visualRange(state, this.visual.anchor, this.visual.head, this.mode)), ...isolated('select.vim') });
+    } else {
+      this.marks.setContext(cursor);
+      this.dispatch({ selection: { anchor: target }, ...isolated('select.vim') });
+    }
+    this.host.scrollCaret();
+    this.runtime?.endHop();
+    this.snapshotValue.hop = null;
+    this.refresh();
   }
 
   private handleSessionKey(key: VimKey, input: VimKeyInput): boolean {
@@ -185,7 +374,8 @@ export class VimController implements VimInputHook {
     this.lastSequence = [];
     const changing = isChanging(command, this.mode);
     if (changing && !this.replaying && !wasVisual) { this.redo.begin(withoutCounts(tokens)); this.repeatCount = command.count; }
-    if (command.operator || command.target) this.executeTarget(command);
+    if (command.action?.startsWith('surround-')) this.executeExtendedAction(command);
+    else if (command.operator || command.target) this.executeTarget(command);
     else this.executeAction(command);
     if (!this.session.mode && this.redo.active && !this.replaying) this.redo.end();
     this.refresh();
@@ -302,6 +492,19 @@ export class VimController implements VimInputHook {
         if (outcome) this.dispatch({ changes: outcome.changes, selection: { anchor: outcome.cursor }, ...isolated('vim.join') }); else this.redo.abort();
         break;
       }
+      case 'join-raw': {
+        const { outcome, range } = joinRaw(state, cursor, count, this.visual);
+        if (range) this.leaveVisual(range.from);
+        if (outcome) this.dispatch({ changes: outcome.changes, selection: { anchor: outcome.cursor }, ...isolated('vim.join') }); else this.redo.abort();
+        break;
+      }
+      case 'scroll-center': this.host.scrollLines(scrollCenterDelta(doc, cursor, this.host.viewport())); break;
+      case 'scroll-line-down': case 'scroll-line-up': {
+        const result = scrollLineResult(doc, cursor, this.host.viewport(), (action === 'scroll-line-down' ? 1 : -1) * count, this.desiredColumn);
+        this.host.scrollLines(result.scrollLines);
+        if (result.cursor !== null) this.dispatch({ selection: { anchor: result.cursor }, ...isolated('select.vim') });
+        break;
+      }
       case 'undo': for (let i = 0; i < count; i++) this.ledger.undo(this.host); break;
       case 'redo': for (let i = 0; i < count; i++) this.ledger.redo(this.host); break;
       case 'repeat': this.repeat(command.count); break;
@@ -322,8 +525,33 @@ export class VimController implements VimInputHook {
     }
   }
 
+  private executeExtendedAction(command: ParsedCommand): void {
+    const state = this.host.state(), cursor = this.cursor(), action = command.action;
+    let outcome: ReturnType<typeof surroundAdd> = null;
+    if (action === 'surround-delete') outcome = surroundDelete(state, cursor, command.arg ?? '');
+    else if (action === 'surround-change') outcome = surroundChange(state, cursor, command.arg?.[0] ?? '', command.arg?.[1] ?? '');
+    else if (action === 'surround-add') {
+      const target = command.target;
+      let range = this.visual ? visualRange(state, this.visual.anchor, this.visual.head, this.mode) : null;
+      if (target?.kind === 'motion') {
+        const result = this.motion(target.motion, command.count);
+        if (result) range = motionRange(state.doc, cursor, result, null);
+      } else if (target?.kind === 'textobject') range = selectTextObject(state.doc, cursor, target.spec, command.count ?? 1, this.visual);
+      else if (target?.kind === 'line') range = lineTargetRange(state, cursor, command.count ?? 1, this.visual);
+      if (range) outcome = surroundAdd(state, range, command.arg ?? '');
+    }
+    if (!outcome) { this.redo.abort(); this.finishMode(); return; }
+    if (this.visual) this.leaveVisual(cursor);
+    this.dispatch({ changes: outcome.changes, selection: { anchor: outcome.cursor }, ...isolated('vim.surround') });
+  }
+
   private motion(spec: { kind: import('./types').MotionKind; char?: string }, count: number | null): MotionResult | null {
     const state = this.host.state();
+    if (spec.kind === 'g;' || spec.kind === 'g,') {
+      const result = this.changes.step(spec.kind === 'g;' ? -1 : 1, count ?? 1);
+      if (typeof result !== 'number') { this.message(result.error, 'error'); return null; }
+      return { pos: clampNormal(state.doc, result), linewise: false, inclusive: false, desiredColumn: null, jump: false };
+    }
     return importMotion(state.doc, this.cursor(), spec, { count: count ?? 1, explicitCount: count !== null, desiredColumn: this.desiredColumn, viewport: this.host.viewport(), lastFind: this.lastFind });
   }
 
@@ -427,6 +655,7 @@ export class VimController implements VimInputHook {
   }
 
   private startSession(mode: 'insert' | 'replace', count: number, entryDepth = undoDepth(this.host.state()), recordsDot = true): void {
+    if (this.runtime?.pending()) this.runtime.flush();
     const cursor = this.host.state().selection.main.head;
     this.dispatch({ selection: this.host.state().selection, ...isolated('vim.insert') });
     this.session.start(mode, count, entryDepth, cursor, recordsDot);
@@ -467,11 +696,14 @@ export class VimController implements VimInputHook {
     if (!recorded) return;
     const tokens = repeatTokens(recorded, count ?? this.repeatCount);
     this.replaying = true; this.replayDepth++;
-    if (this.replayDepth > REPLAY_DEPTH_LIMIT || tokens.length > REPLAY_TOKEN_LIMIT) { this.message('E169 Command too recursive', 'error'); this.replaying = false; this.replayDepth = 0; return; }
+    this.runtime?.setReplay(true);
+    if (this.replayDepth > REPLAY_DEPTH_LIMIT || tokens.length > REPLAY_TOKEN_LIMIT) { this.runtime?.setReplay(false); this.message('E169 Command too recursive', 'error'); this.replaying = false; this.replayDepth = 0; return; }
     const start = this.host.state(), entryDepth = undoDepth(start);
     try {
       this.replayTokens(tokens);
     } finally {
+      this.runtime?.flush();
+      this.runtime?.setReplay(false);
       if (this.session.mode) this.exitSession(false);
       this.parser.reset(); this.mode = 'normal';
       this.dispatch({ selection: this.host.state().selection, ...isolated('vim.repeat') });
@@ -496,6 +728,7 @@ export class VimController implements VimInputHook {
         }
       } else {
         if (token.key === '<Esc>') { this.parser.reset(); this.mode = 'normal'; continue; }
+        if (this.runtime) { this.routeKey(token.key); continue; }
         const normalized: VimKey = token.key;
         this.lastSequence = textToTokens(this.parser.pending() + normalized);
         const result = this.parser.feed(normalized, this.mode);
@@ -514,9 +747,10 @@ export class VimController implements VimInputHook {
     this.lastPlayed = actual;
     const wasReplaying = this.replaying;
     this.replaying = true; this.replayDepth++;
+    this.runtime?.setReplay(true);
     if (this.replayDepth > REPLAY_DEPTH_LIMIT || tokens.length * count > REPLAY_TOKEN_LIMIT) { this.message('E169 Command too recursive', 'error'); this.replayDepth--; this.replaying = wasReplaying; return; }
-    try { for (let n = 0; n < count; n++) this.replayTokens(tokens); }
-    finally { this.replayDepth--; this.replaying = wasReplaying; this.refresh(); }
+    try { for (let n = 0; n < count; n++) this.replayTokens(tokens); this.runtime?.flush(); }
+    finally { this.runtime?.setReplay(false); this.replayDepth--; this.replaying = wasReplaying; this.refresh(); }
   }
 
   private moveByMotion(kind: import('./types').MotionKind): void {
@@ -550,6 +784,7 @@ export class VimController implements VimInputHook {
   private onUpdate(update: import('./types').VimUpdate): void {
     if (update.docChanged) {
       this.marks.map(update.changes);
+      this.changes.record(update.changes, update.state.doc);
       this.ledger.noteChange(update.userEvent === 'undo' || update.userEvent === 'redo');
       if (this.session.mode && isTextEvent(update) && !this.selfDispatch) {
         const token = this.session.track(update);
@@ -564,6 +799,13 @@ export class VimController implements VimInputHook {
     this.hadHistory = reduced;
     if (!this.selfDispatch && update.selectionSet) this.externalSelection(update.state.selection);
     if (this.session.mode) this.session.rebaseHead(update.state.selection.main.head);
+    if (!this.selfDispatch && this.runtime && (update.docChanged || update.selectionSet)) {
+      if (this.pendingExternalFlush) this.pendingExternalFlush();
+      this.pendingExternalFlush = this.host.timer(0, () => {
+        this.pendingExternalFlush = null;
+        if (!this.disposed) this.flushPendingInput();
+      });
+    }
     this.refresh();
   }
 
@@ -590,7 +832,8 @@ export class VimController implements VimInputHook {
     const state = this.host.state(), cursor = Math.min(this.visual ? this.visual.head : this.mode === 'normal' ? clampNormal(state.doc, state.selection.main.head) : state.selection.main.head, state.doc.length);
     const shape = this.mode === 'insert' ? 'bar' : this.mode === 'replace' || this.mode === 'operator-pending' ? 'underline' : 'block';
     const next = this.mode === 'insert' ? cursor : Math.min(nextGrapheme(state.doc, cursor), state.doc.lineAt(cursor).to);
-    this.snapshotValue = { ...this.snapshotValue, mode: this.mode, label: labels[this.mode], pending: this.parser.pending(), recording: this.macro.register, cursorShape: shape, displayCursor: cursor, displayCursorEnd: next };
+    const pending = this.hopPrompt ?? `${this.parser.pending()}${this.runtime?.pending() ?? ''}`;
+    this.snapshotValue = { ...this.snapshotValue, mode: this.mode, label: labels[this.mode], pending, recording: this.macro.register, cursorShape: shape, displayCursor: cursor, displayCursorEnd: next, hints: this.runtime?.hints() ?? null, hop: this.runtime?.hopView() ?? null };
     const snapshot = this.snapshot;
     for (const listener of [...this.listeners]) listener(snapshot);
   }

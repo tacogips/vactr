@@ -6,14 +6,12 @@ import { AccessibilityBridge, boundary } from './accessibility';
 import { KeyboardController, type KeyboardOptions } from './keyboard';
 import type { PhaseTimer } from './frame';
 import type { VimInputHook } from './vim/types';
-
 export interface InputPresentation { doc: Text; changes?: ChangeSetType; changesBase?: Text; readonly text: string; cursor: number; annotations: readonly CodeAnnotation[] }
 export interface InputOptions extends KeyboardOptions {
   label?: string;
   onPresentation?: (presentation: InputPresentation) => void;
   onError?: (message: string) => void;
 }
-
 /** Platform input reconciliation; the document is never changed by preedit. */
 export class InputController {
   readonly accessibility: AccessibilityBridge;
@@ -38,6 +36,7 @@ export class InputController {
     this.keyboard = new KeyboardController(surface, { ...options, composing: () => this.composing });
     const el = this.accessibility.textarea;
     this.listen(el, 'compositionstart', () => this.withInput(() => {
+      this.flushPendingInput();
       this.flushBeforeHandler();
       if (this.vim && !this.vim.allowsTextInput()) {
         this.discardComposition();
@@ -56,8 +55,12 @@ export class InputController {
       }
       this.endComposition((event as CompositionEvent).data);
     }));
-    this.listen(el, 'beforeinput', (event) => this.withInput(() => { this.flushBeforeHandler(); this.beforeInput(event as InputEvent); }));
-    this.listen(el, 'input', (event) => this.withInput(() => this.input(event as InputEvent)));
+    this.listen(el, 'beforeinput', (event) => this.withInput(() => { this.flushPendingInput(event as InputEvent); this.flushBeforeHandler(); this.beforeInput(event as InputEvent); }));
+    this.listen(el, 'input', (event) => this.withInput(() => {
+      const inputEvent = event as InputEvent, previousDoc = this.surface.state.doc;
+      this.flushPendingInput(inputEvent);
+      this.input(inputEvent, this.surface.state.doc !== previousDoc);
+    }));
     this.listen(el, 'select', () => this.withInput(() => { this.syncSelection(); this.flushBeforeHandler(); }));
     this.listen(document, 'selectionchange', () => {
       if (document.activeElement !== el) return;
@@ -102,6 +105,25 @@ export class InputController {
   setVim(hook: VimInputHook | null): void { this.vim = hook; }
   setPhases(phases: PhaseTimer | null): void { this.options.phases = phases; this.keyboard.setPhases(phases); }
   get isComposing(): boolean { return this.composing; }
+  typeText(text: string): void {
+    if (this.composing) return;
+    this.insertText(text);
+  }
+  defaultKey(key: string): boolean {
+    const keys: Record<string, string> = {
+      '<BS>': 'Backspace', '<Del>': 'Delete', '<CR>': 'Enter', '<Tab>': 'Tab',
+      '<Left>': 'ArrowLeft', '<Right>': 'ArrowRight', '<Up>': 'ArrowUp', '<Down>': 'ArrowDown',
+      '<Home>': 'Home', '<End>': 'End',
+    };
+    const nativeKey = keys[key];
+    const view = this.accessibility.textarea.ownerDocument.defaultView;
+    if (!nativeKey || !view) return false;
+    const event = new view.KeyboardEvent('keydown', { key: nativeKey, cancelable: true });
+    if (!this.surface.runKeymaps(event, 'default') && !this.keyboard.handle(event) && nativeKey === 'Enter') {
+      this.replaceSelection('\n', 'input.type');
+    }
+    return true;
+  }
   flushBridge(): void {
     const position = this.accessibility.isDirty || this.accessibility.isPositionDirty;
     if (position) this.accessibility.flush({ position: true });
@@ -126,6 +148,9 @@ export class InputController {
   }
   private flushBeforeHandler(): void {
     if (this.accessibility.isDirty) this.accessibility.flush({ position: false });
+  }
+  private flushPendingInput(event?: InputEvent): void {
+    if (!this.composing && !event?.isComposing) this.vim?.flushPendingInput?.();
   }
   private syncSelection(): void {
     const el = this.accessibility.textarea;
@@ -222,22 +247,36 @@ export class InputController {
     const insert = kind === 'insertLineBreak' || kind === 'insertParagraph' ? '\n' : event.data;
     if ((kind === 'insertText' || kind === 'insertReplacementText' || kind === 'insertLineBreak' || kind === 'insertParagraph') && insert != null) {
       event.preventDefault();
-      const overwrite = kind === 'insertText' ? this.vim?.overwriteRange(insert) : null;
-      if (overwrite) {
-        const text = this.surface.state.toText(insert);
-        this.surface.dispatch({ changes: { from: overwrite.from, to: overwrite.to, insert: text },
-          selection: { anchor: overwrite.from + text.length }, userEvent: 'input.type' });
-        this.options.scrollCaret?.();
-      } else this.replaceSelection(insert, 'input.type');
+      if (kind === 'insertText') this.insertText(insert);
+      else this.replaceSelection(insert, 'input.type');
     }
   }
-  private input(event: InputEvent): void {
+  private insertText(text: string): void {
+    const overwrite = this.vim?.overwriteRange(text);
+    if (overwrite) {
+      const insert = this.surface.state.toText(text);
+      this.surface.dispatch({ changes: { from: overwrite.from, to: overwrite.to, insert },
+        selection: { anchor: overwrite.from + insert.length }, userEvent: 'input.type' });
+      this.options.scrollCaret?.();
+    } else this.replaceSelection(text, 'input.type');
+  }
+  private input(event: InputEvent, flushedDocumentChange = false): void {
     if (this.discarding) { this.accessibility.refresh(); return; }
     if (this.composing || event.isComposing) return;
     if (this.trailingComposition && (event.inputType === 'insertFromComposition' || event.inputType === 'insertCompositionText')) {
       this.accessibility.refresh(); return;
     }
     if (this.vim && !this.vim.allowsTextInput()) { this.accessibility.refresh(); return; }
+    if (flushedDocumentChange) {
+      if (event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward') {
+        this.keyboard.delete(event.inputType === 'deleteContentBackward' ? -1 : 1);
+      } else {
+        const insert = event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph' ? '\n' : event.data;
+        if (event.inputType.startsWith('insert') && insert != null) this.replaceSelection(insert, 'input.type');
+      }
+      this.accessibility.refresh();
+      return;
+    }
     const old = this.accessibility.window, value = this.accessibility.textarea.value;
     if (old.outside && old.anchor !== old.head) {
       // A clipped selection represents more source than the textarea contains.

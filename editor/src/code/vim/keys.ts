@@ -7,7 +7,7 @@ const namedKeys: Record<string, VimKey> = {
 const modifiers = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
 const controlKeys: Record<string, VimKey> = { r: '<C-r>', d: '<C-d>', u: '<C-u>', f: '<C-f>', b: '<C-b>' };
 
-export function normalizeKey(input: VimKeyInput): VimKey | null {
+export function normalizeKey(input: VimKeyInput, extended = false): VimKey | null {
   const { key } = input;
   if (modifiers.has(key)) return null;
   if (input.ctrlKey && !input.metaKey && !input.altKey) {
@@ -15,6 +15,7 @@ export function normalizeKey(input: VimKeyInput): VimKey | null {
     for (const [letter, normalized] of Object.entries(controlKeys)) {
       if (key === letter || input.code === `Key${letter.toUpperCase()}`) return normalized;
     }
+    if (extended && /^[a-z]$/i.test(key)) return `<C-${key.toLowerCase()}>`;
   }
   if (input.ctrlKey || input.metaKey || input.altKey) return '<Other>';
   if (namedKeys[key]) return namedKeys[key];

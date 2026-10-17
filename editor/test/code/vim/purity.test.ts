@@ -30,6 +30,7 @@ describe('Vim core purity', () => {
     for (const file of files) {
       const source = withoutComments(fs.readFileSync(file, 'utf8'));
       if (/\b(?:document|window|navigator|localStorage|HTMLElement)\b/.test(source)) violations.push(`${file}: DOM global`);
+      if (/\b(?:setTimeout|clearTimeout|setInterval|clearInterval)\b/.test(source)) violations.push(`${file}: timer global`);
       if (/from\s+['"]@codemirror\/view['"]/.test(source)) violations.push(`${file}: @codemirror/view import`);
     }
     expect(violations, violations.join('\n')).toEqual([]);

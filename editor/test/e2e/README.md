@@ -71,3 +71,13 @@ the existing canvas behavior checks. Run the non-gating checks with:
 ```sh
 cd editor && npm run e2e -- --browser all --profile behavior --run-id vim-001 --out ../tmp/vim-mode/e2e/vim-001
 ```
+
+The `vim-keymap.mjs` checks run in the behavior profile after the Vim checks:
+`vim-keymap-preset`, `vim-keymap-kj`, `vim-keymap-hints`, `vim-keymap-hop`,
+and `vim-keymap-hop-off`. Run VK-40 gate 6 under the measurement lock. The
+session ABI build must run immediately before e2e because the runner serves
+the prebuilt `editor/dist`:
+
+```sh
+cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build && npm run e2e -- --browser all --profile behavior --run-id vim-keymap-001 --out ../tmp/vim-keymap/VK-40/e2e/vim-keymap-001
+```

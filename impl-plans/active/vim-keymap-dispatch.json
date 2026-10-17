@@ -1,0 +1,597 @@
+{
+  "taskId": "vim-keymap",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/vim-keymap",
+  "baseBranch": "wf/vim-keymap",
+  "remote": "origin",
+  "originalHead": "635a8bd11273c901761751fece228aba71db6852",
+  "designDocPaths": [
+    "design-docs/specs/design-vim-keymap-hints-hop.md",
+    "design-docs/specs/design-vim-mode.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/pending-vim-keymap-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "evidenceRoot": "tmp/vim-keymap",
+  "reviewContext": {
+    "issueReference": "workflowInput issueTitle 'Vim mode: JSON key config (mise-darwin compatible), helix/which-key next-key hints, and hop/easymotion jumps' (no GitHub issue number); workflow opus-luna-design-and-implement-review-loop-session-395; intake comm-007071, design review comm-007073 (DR-K1 repaired), design accepted comm-007075, plan review comm-007077, plan repair comm-007078, plans accepted comm-007079",
+    "userProblem": "The user wants the vactr code pane Vim key config to be specifiable in JSON and configurable like their Neovim setup in /Users/taco/gits/tacogips/mise-darwin, with helix/which-key style next-key candidates at the bottom left after a prefix key, and hop/easymotion jumps on gj/gf that can be switched on or off in the config.",
+    "requiredOutcomes": [
+      "Versioned JSON keymap document (schema version 1): leader, timeoutlen, per-mode maps (n, i, x/v, o, c) in Vim notation, rhs as a noremap/remap key sequence or a named action id, <Nop>, desc; per-entry validation that reports and skips invalid entries and never stops the editor from starting (design 2, 3, 4)",
+      "Web storage in localStorage key vactr.vimKeymap and Tauri storage in vim-keymap.json in the app config directory via vim_keymap_get/set/reset; JSON import/export; a flat, square in-editor settings panel; live apply without reload (design 8)",
+      "Bundled Default and mise-darwin presets; mise-darwin reproduces the reference mappings, with unsupported entries documented (design 9)",
+      "Extended built-ins needed by the preset: gk gj gJ g; g, zz <C-e> <C-y> and minimal surround ys/cs/ds (design 5)",
+      "Next-key hint panel at the bottom left after the triggers <Space> g m z, with delayMs (default 200 ms), descriptions, multi-level prefixes and aria-live; it does not steal focus or break IME (design 6)",
+      "hop.char1 (gj), hop.char1Line (gf), hop.word and hop.line in normal and visual mode, with labels from hop.keys drawn through a narrow renderer overlay hook; hop.enabled off makes the mappings inert and removes them from the hints (design 7)",
+      "Invariant K0: with no stored document, behavior is exactly the merged Vim mode (design 1)",
+      "Unit, InputController integration and Playwright e2e coverage (kj escape, <Space> hint content, gj hop jump, hop off); README and the vim design doc updated (design 11)"
+    ],
+    "nonGoals": [
+      "No CodeMirror EditorView and no @replit/codemirror-vim",
+      "No new npm or cargo dependencies and no Tauri capability changes",
+      "No code copied from hop.nvim, mini.clue, which-key or vim-surround",
+      "No soft wrap; gj/gk are plain line motions (D2)",
+      "No tag or function surrounds and no visual S (D3)",
+      "File write/quit, LSP restart, QuickRun, Chilla and telescope mappings have no vactr meaning; they map to the nearest vactr action or are listed as unsupported"
+    ],
+    "constraints": [
+      "Work only in this worktree on wf/vim-keymap; never touch other worktrees or main; never kill processes you did not start",
+      "AGENTS.md: English only, no emojis, no tool attribution in commits; every touched source file stays under 1000 lines (controller.ts <= 850 lines, keymap-runtime.ts <= 300 lines)",
+      "UI is solid, flat and square (border-radius 0), spaced, never a native widget look; npm run test:style must pass",
+      "EditorState is the single document authority; the renderer change is limited to the hop overlay hook; insert-mode Japanese IME is unchanged and normal-mode IME never inserts text",
+      "Heavy suites (full vitest, Playwright) run under the measurement lock /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock",
+      "Run VACTR_REQUIRE_SESSION_ABI=1 npm run build immediately before any npm run e2e",
+      "Each plan declares artifactRoots and edits only its writePaths and its sharedPaths with the recorded intended edits; each plan owns its Progress Log; commit and push happen only in serial finalization",
+      "Verification records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: passed, log, notes}; negative controls go in mutationEvidence"
+    ],
+    "designDecisionsAndRationale": [
+      "A pure mapping layer (mapper.ts) in front of CommandParser. Leftover and remapped keys re-enter through sink.route, so pass-through and mode routing stay correct (DR-K1)",
+      "Action ids only for features without Vim keys (vactr.*, hop.*); Vim motions, registers and ex commands are reached through noremap rhs sequences (D1)",
+      "Extended built-ins turn on whenever a document is stored, so K0 parity is preserved without one (KQ6)",
+      "Hints and hop are off without a stored document; the mise-darwin preset turns them on (KQ1)",
+      "Tauri storage follows the existing default-template command pattern with atomic writes and size/version validation, with no capability change",
+      "Hop labels go through optional RenderFeedback.hopLabels/hopRevision rather than glyph geometry changes",
+      "Insert-mode multi-key maps such as kj defer the first key, as Vim does (KQ3)"
+    ],
+    "intentionalTradeoffs": [
+      "The hint panel suspends timeoutlen while it is visible (D6)",
+      "Under the mise-darwin preset, a single <Esc> in normal mode and a single k in visual or insert mode wait up to timeoutlen (Neovim-equivalent)",
+      "Hop smartcase, label order and the prefix-free labels are this design's own (D7, KQ4)",
+      "Hop label quad width uses a fixed 8px advance (VKPR-L1, low residual risk)",
+      "Insert <C-v> paste from + is listed as unsupported in the preset; Mod-v pastes (KQ7)",
+      "P keys can never be remapped; <C-y> scroll is reachable only from an rhs (D4)"
+    ],
+    "supportedEdgeCases": [
+      "Invalid JSON or a missing version 1 falls back to K0",
+      "Invalid entries are reported with path-qualified messages and skipped",
+      "Recursive remap loops are bounded",
+      "Multi-character hop labels when targets outnumber hop.keys; 4,096 target cap",
+      "Hop in visual mode extends the selection; hop as an operator target when mapped in o mode (KQ5)",
+      "kj typed through an active IME stays IME input (D5)",
+      "Blur and focusout clear pending mapping, hint and hop state",
+      "Command-line c-mode mappings (<C-g> cancel, <C-a> home)"
+    ],
+    "outOfScopeEdgeCases": [
+      "Soft-wrapped display lines for gj/gk",
+      "Linewise surround beyond one charwise span, tag surrounds and visual S",
+      "Visual block mode (deferred in the baseline VQ1)",
+      "Preset entries the reference dotfiles cannot supply; they fall back to the design 9.2 table and the gap is recorded (KQ2)"
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-vim-keymap-hints-hop.md",
+      "design-docs/specs/design-vim-mode.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/user-qa/pending-vim-keymap-questions.md",
+      "design-docs/user-qa/README.md",
+      "impl-plans/README.md",
+      "editor/src/code/vim",
+      "editor/src/code/vim-mount.ts",
+      "editor/src/code/mount.ts",
+      "editor/src/code/input.ts",
+      "editor/src/code/renderer.ts",
+      "editor/src/code/vim-status-view.tsx",
+      "editor/src/platform/files.ts",
+      "editor/src/app/main.ts",
+      "editor/src-tauri/src/lib.rs",
+      "/Users/taco/gits/tacogips/mise-darwin/dotfiles/.config/nvim/lua/taco/core/keymaps.lua",
+      "/Users/taco/gits/tacogips/mise-darwin/dotfiles/.config/nvim/lua/taco/core/options.lua",
+      "/Users/taco/gits/tacogips/mise-darwin/dotfiles/.config/nvim/lua/taco/plugins/init.lua"
+    ],
+    "priorReviewFindings": [
+      {"findingId": "DR-K1", "status": "repaired", "summary": "Mapper leftover/remap keys must re-enter routing through sink.route"},
+      {"findingId": "VKPR-1", "status": "verified-repaired", "summary": "editor/src-tauri/target declared as an artifact root and write path in VK-02 and VK-40"},
+      {"findingId": "VKPR-2", "status": "verified-repaired", "summary": "Only gitignored editor/src-tauri/gen/schemas is declared; tracked editor/src-tauri/gen/apple must not be modified"},
+      {"findingId": "VKPR-L1", "status": "residual-low", "summary": "Fixed 8px hop label advance in VK-04"}
+    ]
+  },
+  "issueReference": "workflowInput issueTitle 'Vim mode: JSON key config (mise-darwin compatible), helix/which-key next-key hints, and hop/easymotion jumps' (no GitHub issue number); workflow opus-luna-design-and-implement-review-loop-session-395; intake comm-007071, design review comm-007073 (DR-K1 repaired), design accepted comm-007075, plan review comm-007077, plan repair comm-007078, plans accepted comm-007079",
+  "designReferences": [
+    "design-docs/specs/design-vim-keymap-hints-hop.md",
+    "design-docs/specs/design-vim-mode.md",
+    "design-docs/user-qa/pending-vim-keymap-questions.md"
+  ],
+  "commonRules": "impl-plans/active/vim-keymap-00-contract.md#common-execution-rules-apply-to-every-vim-keymap-plan",
+  "waves": [
+    ["VK-00", "VK-01", "VK-02", "VK-03", "VK-04"],
+    ["VK-10", "VK-11", "VK-12", "VK-13", "VK-14", "VK-15", "VK-16"],
+    ["VK-20"],
+    ["VK-30"],
+    ["VK-40", "VK-41"]
+  ],
+  "plans": [
+    {
+      "planId": "VK-00",
+      "planPath": "impl-plans/active/vim-keymap-00-contract.md",
+      "wave": 0,
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/code/vim/types.ts",
+        "editor/test/code/vim/host.ts",
+        "editor/test/code/vim/host-keymap.test.ts",
+        "editor/test/code/vim/purity.test.ts",
+        "impl-plans/active/vim-keymap-00-contract.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-00"
+      ],
+      "sharedPaths": ["editor/src/code/vim-mount.ts", "editor/tsconfig.json"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/vim-mount.ts", "intendedEdit": "Add compile-only stubs for the new VimHost/VimActions members in createSurfaceHost only; VK-30 replaces them in wave 3."},
+        {"path": "editor/tsconfig.json", "intendedEdit": "Add compilerOptions.resolveJsonModule true for the preset JSON imports."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-00"],
+      "acceptanceCriteria": [
+        "types.ts exports exactly the pinned additions and stays under 140 lines",
+        "host-keymap.test.ts has at least 8 passing cases; purity test rejects timer globals and passes",
+        "Existing vim and canvas vim tests pass unchanged; scoped typecheck exits 0"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-00/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts",
+        "cd editor && npm run check"
+      ]
+    },
+    {
+      "planId": "VK-01",
+      "planPath": "impl-plans/active/vim-keymap-01-notation-schema.md",
+      "wave": 0,
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/code/vim/notation.ts",
+        "editor/src/code/vim/actions.ts",
+        "editor/src/code/vim/keymap-schema.ts",
+        "editor/test/code/vim/notation.test.ts",
+        "editor/test/code/vim/keymap-schema.test.ts",
+        "editor/test/code/vim/actions.test.ts",
+        "impl-plans/active/vim-keymap-01-notation-schema.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-01"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-01"],
+      "acceptanceCriteria": [
+        "notation.ts, actions.ts and keymap-schema.ts export the pinned signatures",
+        "compileKeymap never throws and reports path-qualified issues per the plan rules",
+        "At least 62 new passing cases; purity passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-01/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/notation.test.ts test/code/vim/keymap-schema.test.ts test/code/vim/actions.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-02",
+      "planPath": "impl-plans/active/vim-keymap-02-tauri-store.md",
+      "wave": 0,
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src-tauri/src/vim_keymap.rs",
+        "impl-plans/active/vim-keymap-02-tauri-store.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/src-tauri/gen/schemas", "editor/src-tauri/target",
+        "tmp/vim-keymap/VK-02"
+      ],
+      "sharedPaths": ["editor/src-tauri/src/lib.rs"],
+      "sharedPathNotes": [
+        {"path": "editor/src-tauri/src/lib.rs", "intendedEdit": "Add mod vim_keymap and register vim_keymap_get/set/reset in generate_handler after the template commands; nothing else."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "editor/src-tauri/gen/schemas", "editor/src-tauri/target", "tmp/vim-keymap/VK-02"],
+      "acceptanceCriteria": [
+        "vim_keymap.rs exports the pinned items with size, object and version-1 validation and atomic writes",
+        "At least 7 new Rust tests; cargo check and cargo test for editor/src-tauri exit 0",
+        "capabilities/default.json unchanged"
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml"
+      ]
+    },
+    {
+      "planId": "VK-03",
+      "planPath": "impl-plans/active/vim-keymap-03-web-store-files.md",
+      "wave": 0,
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/code/vim-keymap-store.ts",
+        "editor/src/platform/json-files.ts",
+        "editor/test/code/vim-keymap-store.test.ts",
+        "editor/test/platform/json-files.test.ts",
+        "impl-plans/active/vim-keymap-03-web-store-files.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-03"
+      ],
+      "sharedPaths": ["editor/src/platform/files.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/src/platform/files.ts", "intendedEdit": "Export loadTauriPlugins, isAbort, baseName and a new downloadText extracted from BrowserFiles.download; behavior unchanged."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-03"],
+      "acceptanceCriteria": [
+        "LocalKeymapStore, TauriKeymapStore, BrowserJsonFiles and TauriJsonFiles match the pinned APIs",
+        "files.test.ts passes unchanged; at least 14 new cases pass"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-03/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim-keymap-store.test.ts test/platform/json-files.test.ts test/platform/files.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-04",
+      "planPath": "impl-plans/active/vim-keymap-04-renderer-hop-overlay.md",
+      "wave": 0,
+      "dependsOn": [],
+      "writePaths": [
+        "editor/test/canvas/renderer-hop.test.ts",
+        "impl-plans/active/vim-keymap-04-renderer-hop-overlay.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-04"
+      ],
+      "sharedPaths": ["editor/src/code/renderer.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/renderer.ts", "intendedEdit": "Add optional RenderFeedback.hopLabels/hopRevision, include hopRevision in the overlay key, draw labels with the existing labelFill/labelRun path; about 10 lines."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-04"],
+      "acceptanceCriteria": [
+        "No-label render output identical; labels drawn and rebuilt on revision change",
+        "At least 4 new cases; existing canvas renderer tests pass; diff within the narrow-hook budget"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-04/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/renderer-hop.test.ts test/canvas/gpu.test.ts test/canvas/cursor-shape.test.ts test/canvas/frame.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-10",
+      "planPath": "impl-plans/active/vim-keymap-10-mapper.md",
+      "wave": 1,
+      "dependsOn": ["VK-00", "VK-01"],
+      "writePaths": [
+        "editor/src/code/vim/mapper.ts",
+        "editor/test/code/vim/mapper.test.ts",
+        "impl-plans/active/vim-keymap-10-mapper.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-10"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-10"],
+      "acceptanceCriteria": [
+        "KeyMapper API exactly as pinned; leftover and remap keys go through sink.route (DR-K1)",
+        "At least 16 passing cases including recursion, timeout suspension, replay and the DR-K1 re-entry case"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-10/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-11",
+      "planPath": "impl-plans/active/vim-keymap-11-hints.md",
+      "wave": 1,
+      "dependsOn": ["VK-00", "VK-01"],
+      "writePaths": [
+        "editor/src/code/vim/hints.ts",
+        "editor/test/code/vim/hints.test.ts",
+        "impl-plans/active/vim-keymap-11-hints.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-11"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-11"],
+      "acceptanceCriteria": [
+        "buildHints and isTrigger as pinned; built-in table, overrides, Nop removal and ordering per the plan",
+        "At least 10 passing cases"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-11/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/hints.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-12",
+      "planPath": "impl-plans/active/vim-keymap-12-hop.md",
+      "wave": 1,
+      "dependsOn": ["VK-00"],
+      "writePaths": [
+        "editor/src/code/vim/hop.ts",
+        "editor/test/code/vim/hop.test.ts",
+        "impl-plans/active/vim-keymap-12-hop.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-12"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-12"],
+      "acceptanceCriteria": [
+        "hopTargets, assignLabels and HopSession as pinned; labels prefix-free; 4,096 cap",
+        "At least 14 passing cases"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-12/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/hop.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-13",
+      "planPath": "impl-plans/active/vim-keymap-13-extended-builtins.md",
+      "wave": 1,
+      "dependsOn": ["VK-00"],
+      "writePaths": [
+        "editor/src/code/vim/parser.ts",
+        "editor/src/code/vim/keys.ts",
+        "editor/src/code/vim/execute.ts",
+        "editor/src/code/vim/marks.ts",
+        "editor/src/code/vim/extended.ts",
+        "editor/src/code/vim/surround.ts",
+        "editor/test/code/vim/parser-extended.test.ts",
+        "editor/test/code/vim/keys-extended.test.ts",
+        "editor/test/code/vim/surround.test.ts",
+        "editor/test/code/vim/extended.test.ts",
+        "impl-plans/active/vim-keymap-13-extended-builtins.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-13"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-13"],
+      "acceptanceCriteria": [
+        "Extended grammar, awaitingArgument, pendingOperator, normalizeKey extended flag, ChangeList, extended and surround helpers as pinned",
+        "Extended off: all existing Vim tests pass unchanged (K0)",
+        "At least 40 new passing cases"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-13/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim"
+      ]
+    },
+    {
+      "planId": "VK-14",
+      "planPath": "impl-plans/active/vim-keymap-14-presets.md",
+      "wave": 1,
+      "dependsOn": ["VK-00", "VK-01"],
+      "writePaths": [
+        "editor/src/code/vim/presets",
+        "editor/test/code/vim/presets.test.ts",
+        "impl-plans/active/vim-keymap-14-presets.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-14"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-14"],
+      "acceptanceCriteria": [
+        "default.json, mise-darwin.json and index.ts exist; both presets compile with zero issues",
+        "Reference readability and classification (or the KQ2 gap) recorded",
+        "At least 6 passing cases"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-14/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/presets.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-15",
+      "planPath": "impl-plans/active/vim-keymap-15-input-hooks.md",
+      "wave": 1,
+      "dependsOn": ["VK-00"],
+      "writePaths": [
+        "editor/src/code/input.ts",
+        "editor/test/canvas/input-keymap-hooks.test.ts",
+        "impl-plans/active/vim-keymap-15-input-hooks.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-15"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-15"],
+      "acceptanceCriteria": [
+        "InputController.typeText and defaultKey public; flushPendingInput called before composition and text input",
+        "At least 8 new cases; existing input tests unchanged and passing"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-15/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/input-keymap-hooks.test.ts test/canvas/input.test.ts test/canvas/input-vim-hook.test.ts test/canvas/vim-input.test.ts"
+      ]
+    },
+    {
+      "planId": "VK-16",
+      "planPath": "impl-plans/active/vim-keymap-16-views.md",
+      "wave": 1,
+      "dependsOn": ["VK-00", "VK-01"],
+      "writePaths": [
+        "editor/src/code/vim-hints-view.tsx",
+        "editor/src/code/vim-keymap-view.tsx",
+        "editor/test/canvas/vim-hints-view.test.ts",
+        "editor/test/canvas/vim-keymap-view.test.ts",
+        "editor/test/canvas/vim-status-keymap.test.ts",
+        "impl-plans/active/vim-keymap-16-views.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-16"
+      ],
+      "sharedPaths": ["editor/src/code/vim-status-view.tsx", "editor/src/code/code.css"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/vim-status-view.tsx", "intendedEdit": "Optional openKeymap handler with a keymap button and an optional resolveCmdline 4th parameter for c-mode keys; existing callers unchanged."},
+        {"path": "editor/src/code/code.css", "intendedEdit": "Add square, token-based rules for the hint panel, keymap panel and keymap button under .vact-code[data-vim='on']."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-16"],
+      "acceptanceCriteria": [
+        "mountVimHints and mountVimKeymapPanel as pinned; status view additions optional and backward compatible",
+        "At least 14 new cases; existing vim view tests pass; all border-radius values are 0"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-16/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/vim-hints-view.test.ts test/canvas/vim-keymap-view.test.ts test/canvas/vim-status-keymap.test.ts test/canvas/vim-mount.test.ts test/canvas/vim-input.test.ts",
+        "cd editor && rg -n 'border-radius' src/code/code.css"
+      ]
+    },
+    {
+      "planId": "VK-20",
+      "planPath": "impl-plans/active/vim-keymap-20-controller.md",
+      "wave": 2,
+      "dependsOn": ["VK-00", "VK-01", "VK-10", "VK-11", "VK-12", "VK-13", "VK-14"],
+      "writePaths": [
+        "editor/src/code/vim/controller.ts",
+        "editor/src/code/vim/keymap-runtime.ts",
+        "editor/test/code/vim/keymap-controller.test.ts",
+        "editor/test/code/vim/keymap-parity.test.ts",
+        "editor/test/code/vim/extended-controller.test.ts",
+        "impl-plans/active/vim-keymap-20-controller.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-20"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-20"],
+      "acceptanceCriteria": [
+        "routeKey ordering, setKeymap, blur, flushPendingInput, hint and hop sessions, extended execution as specified",
+        "All listed cases pass including every DR-K1 regression and the parity table; K0 tests unchanged",
+        "controller.ts <= 850 lines and keymap-runtime.ts <= 300 lines"
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts",
+        "cd editor && wc -l src/code/vim/controller.ts src/code/vim/keymap-runtime.ts"
+      ]
+    },
+    {
+      "planId": "VK-30",
+      "planPath": "impl-plans/active/vim-keymap-30-mount.md",
+      "wave": 3,
+      "dependsOn": ["VK-02", "VK-03", "VK-04", "VK-14", "VK-15", "VK-16", "VK-20"],
+      "writePaths": [
+        "editor/test/canvas/vim-keymap-input.test.ts",
+        "editor/test/canvas/vim-keymap-mount.test.ts",
+        "impl-plans/active/vim-keymap-30-mount.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-30"
+      ],
+      "sharedPaths": ["editor/src/code/vim-mount.ts", "editor/src/code/mount.ts", "editor/src/app/deps.ts", "editor/src/app/main.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/vim-mount.ts", "intendedEdit": "Replace the VK-00 stubs with real host members; keymap load/compile/apply; mount hint and keymap panels; resolveCmdline; overlay(); focusout blur."},
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Pass deps.vimKeymap to createVimMode, diagnostics to vim.connect, and ...vim.overlay() to both renderer.render calls."},
+        {"path": "editor/src/app/deps.ts", "intendedEdit": "Add optional EditorDeps.vimKeymap { store, files }."},
+        {"path": "editor/src/app/main.ts", "intendedEdit": "Choose TauriKeymapStore/TauriJsonFiles or LocalKeymapStore/BrowserJsonFiles with isTauri before createEditor."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-30"],
+      "acceptanceCriteria": [
+        "No VK-00 stub remains in vim-mount.ts; store choice in main.ts; EditorDeps.vimKeymap optional",
+        "At least 14 new integration cases pass; existing canvas tests unchanged and passing"
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas test/code/vim test/code/vim-keymap-store.test.ts test/platform"
+      ]
+    },
+    {
+      "planId": "VK-40",
+      "planPath": "impl-plans/active/vim-keymap-40-e2e-gates.md",
+      "wave": 4,
+      "dependsOn": ["VK-30"],
+      "writePaths": [
+        "editor/test/e2e/vim-keymap.mjs",
+        "impl-plans/active/vim-keymap-40-e2e-gates.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "editor/src-tauri/gen/schemas", "editor/src-tauri/target",
+        "tmp/vim-keymap/VK-40",
+        "tmp/ui-style/after",
+        "tmp/examples-e2e"
+      ],
+      "sharedPaths": ["editor/test/e2e/behavior.mjs", "editor/test/style/ui-style.mjs"],
+      "sharedPathNotes": [
+        {"path": "editor/test/e2e/behavior.mjs", "intendedEdit": "Call runVimKeymapChecks after runVimChecks in its own try/catch."},
+        {"path": "editor/test/style/ui-style.mjs", "intendedEdit": "Probe the keymap panel and the hint panel in the vim page block, then reset the keymap."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "editor/dist", "editor/src-tauri/gen/schemas", "editor/src-tauri/target", "tmp/vim-keymap/VK-40", "tmp/ui-style/after", "tmp/examples-e2e"],
+      "acceptanceCriteria": [
+        "vim-keymap.mjs with five checks wired into the behavior profile; style probe covers both panels",
+        "Gates 1-7 exit 0 with complete logs; all vim-* and vim-keymap-* checks pass in Chromium and WebKit"
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas test/code/vim-keymap-store.test.ts test/platform",
+        "CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && cd editor && ./node_modules/.bin/vitest run; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && cd editor && npm run test:style; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build && npm run e2e -- --browser all --profile behavior --run-id vim-keymap-001 --out ../tmp/vim-keymap/VK-40/e2e/vim-keymap-001; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock",
+        "mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock && cd editor && npm run e2e:examples; rmdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock"
+      ]
+    },
+    {
+      "planId": "VK-41",
+      "planPath": "impl-plans/active/vim-keymap-41-docs.md",
+      "wave": 4,
+      "dependsOn": ["VK-30"],
+      "writePaths": [
+        "impl-plans/active/vim-keymap-41-docs.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-keymap/VK-41"
+      ],
+      "sharedPaths": ["README.md", "editor/test/e2e/README.md"],
+      "sharedPathNotes": [
+        {"path": "README.md", "intendedEdit": "Extend the Vim mode section with keymap, format, extra built-ins, hints, hop, IME and links."},
+        {"path": "editor/test/e2e/README.md", "intendedEdit": "Document vim-keymap.mjs checks and the gate command."}
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-keymap/VK-41"],
+      "acceptanceCriteria": [
+        "README and e2e README updated as listed; rg finds each required term; no emojis"
+      ],
+      "verification": [
+        "rg -n 'vactr.vimKeymap|hop.char1|vim-keymap-hints|design-vim-keymap-hints-hop' README.md editor/test/e2e/README.md"
+      ]
+    }
+  ],
+  "finalIntegration": {
+    "serialSteps": [
+      "Re-run VK-40 gates 1-7 on the joined tree after any serial repair (build immediately before e2e)",
+      "Set design-docs/specs/design-vim-keymap-hints-hop.md status to Implemented and update the impl-plans/README.md section",
+      "Archive the 15 vim-keymap plans to impl-plans/completed/",
+      "Commit and push to origin wf/vim-keymap without tool attribution"
+    ]
+  }
+}

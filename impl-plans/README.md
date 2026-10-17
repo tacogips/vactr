@@ -20,6 +20,16 @@ The [editor UI style redesign](completed/ui-style-dispatch.json) is Completed (d
 
 [Route preparation metering](active/song-mode-route-preparation-meter.md) has held0003 source accepted after eight focused tests, 425 broader Rust tests, and fresh frontend/build verification. Actual route-builder adoption is now released in the following phase. It preserves original nested depth and certification failure work before the immutable routing bridge.
 
+## Vim keymap, next-key hints and hop jumps (2026-10-17)
+
+These plans implement [design-vim-keymap-hints-hop.md](../design-docs/specs/design-vim-keymap-hints-hop.md) on branch `wf/vim-keymap` (designed in session 395). All are Ready. The [dispatch manifest](active/vim-keymap-dispatch.json) lists paths, dependencies and gates; common execution rules are in VK-00.
+
+- **Wave 0** (parallel): [VK-00 core contract](active/vim-keymap-00-contract.md), [VK-01 notation and schema](active/vim-keymap-01-notation-schema.md), [VK-02 Tauri store](active/vim-keymap-02-tauri-store.md), [VK-03 web store and JSON files](active/vim-keymap-03-web-store-files.md), [VK-04 renderer hop overlay](active/vim-keymap-04-renderer-hop-overlay.md)
+- **Wave 1** (parallel): [VK-10 mapper](active/vim-keymap-10-mapper.md), [VK-11 hints](active/vim-keymap-11-hints.md), [VK-12 hop](active/vim-keymap-12-hop.md), [VK-13 extended built-ins and surround](active/vim-keymap-13-extended-builtins.md), [VK-14 presets](active/vim-keymap-14-presets.md), [VK-15 input hooks](active/vim-keymap-15-input-hooks.md), [VK-16 views](active/vim-keymap-16-views.md)
+- **Wave 2**: [VK-20 controller integration](active/vim-keymap-20-controller.md)
+- **Wave 3**: [VK-30 mount wiring](active/vim-keymap-30-mount.md)
+- **Wave 4** (parallel): [VK-40 e2e and final gates](active/vim-keymap-40-e2e-gates.md), [VK-41 docs](active/vim-keymap-41-docs.md)
+
 ## Template voices as sounds in every tier (2026-10-17)
 
 These plans implement [design-browser-tier-voices.md](../design-docs/specs/design-browser-tier-voices.md) on branch `wf/browser-voices` (designed in session 386). All three are Completed and archived (2026-10-17, session 387) after test-integrity, adversarial and integration review accepted them with no findings. BV-30 final gates: wasm example evaluation 84/84 (all nine new examples), full nextest 3029/3029 (3 skipped), full vitest 1027/1027, test:style 4/4, `npm run e2e:examples` 8/8 (`tmp/browser-voices/BV-30/`). The [dispatch manifest](active/browser-voices-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.

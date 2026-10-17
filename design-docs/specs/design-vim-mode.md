@@ -4,6 +4,12 @@ Status: Implemented (2026-10-17, workflow session 391, branch `wf/vim-mode`;
 proposed 2026-10-16, session 374). The implementation plans are archived as
 `impl-plans/completed/vim-mode-*.md`.
 
+Extension (proposed 2026-10-17, session 395, branch `wf/vim-keymap`):
+user mappings from a JSON keymap document, a `mise-darwin` preset, extra
+built-ins (`gj gk gJ g; g, zz <C-e> <C-y>`, `ys cs ds`), next-key hints and
+hop jumps are specified in `design-vim-keymap-hints-hop.md`. With no stored
+keymap document, everything in this document applies unchanged.
+
 This document covers an opt-in Vim modal editing mode for the canvas code
 pane in the browser and Tauri editor (`editor/`). It defines the module
 boundary, how the mode joins the existing input path, the Vim behavior in
@@ -66,8 +72,10 @@ code path and the status row is not in the DOM (section 3.7).
   the status row.
 - Numbered registers `1-9`, the small-delete register `-`, read-only
   registers (`.`, `%`, `:`), insert-mode `Ctrl-r`/`Ctrl-o`/`Ctrl-w`/`Ctrl-d`/`Ctrl-t`,
-  `gv`, `gi`, tag text objects `it`/`at`, `:g`, `:normal`, user mappings and
-  vimrc, ex history, incremental search, the `c` substitute flag (VQ4).
+  `gv`, `gi`, tag text objects `it`/`at`, `:g`, `:normal`, a vimrc, ex
+  history, incremental search, the `c` substitute flag (VQ4). User
+  mappings are now covered by the JSON keymap document of
+  `design-vim-keymap-hints-hop.md`.
 - Folding, windows, buffers and tabs. They do not apply to a single
   document.
 
@@ -854,6 +862,9 @@ See `design-docs/user-qa/pending-vim-mode-questions.md`:
 - VQ7: the desired-column unit
 - VQ8: the Tauri clipboard
 - VQ9: replace-mode IME
+
+Keymap, hint and hop questions (KQ1-KQ7) are in
+`design-docs/user-qa/pending-vim-keymap-questions.md`.
 
 ## References
 

@@ -61,3 +61,13 @@ The archived DOM comparison results are in [design-renderer-comparison.md](../..
 `node test/e2e/code-pixels.mjs --backend metal|swiftshader|all --dpr 1|2|all --out <dir>` compares the canvas code pane with an opaque DOM reference using the same monospace font. It exercises typed `use-bpm 108`, completion-open multiline typing, a three-line insert, and `examples/kalimba.vact`. Per-character ink and width checks cover missing, blank, clipped and heavy glyphs; the harness also checks caret placement, diagnostic underline rows, backdrop uniformity and WebGL errors. Each run verifies the requested renderer and writes `report.json` plus canvas/reference PNG captures.
 
 The CLI starts its own server on `127.0.0.1` port 0 and installs the silent audio sink before each page. The Chromium behavior profile adds `code-pixels-dpr1` and `code-pixels-dpr2` on ANGLE Metal. Run standalone Metal/SwiftShader pixel matrices under `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`; never use ports 5173 or 5174.
+
+## Vim mode checks
+
+The behavior profile runs `vim-toggle`, `vim-dcyp`, `vim-visual`, `vim-dot`,
+`vim-ime-normal`, and `vim-shortcut` in their own browser context, isolated from
+the existing canvas behavior checks. Run the non-gating checks with:
+
+```sh
+cd editor && npm run e2e -- --browser all --profile behavior --run-id vim-001 --out ../tmp/vim-mode/e2e/vim-001
+```

@@ -77,6 +77,8 @@ export interface TransportOptions {
   audio?: AudioContextLike | null;
   /** The Run button (evaluate the whole document); omitted hides it. */
   onRun?: () => void;
+  /** Optional per-viewer Vim mode toggle. */
+  vim?: { enabled: Accessor<boolean>; toggle: () => void };
   timers?: Timers;
 }
 
@@ -170,6 +172,7 @@ export class TransportBar {
           evalStatus,
           onAudio: () => void audio.start(),
           ...(opts.onRun ? { onRun: () => opts.onRun?.() } : {}),
+          ...(opts.vim ? { vim: opts.vim } : {}),
           onHush: () => this.hush(),
           onStopAll: () => this.stopAll(),
           onStop: (slot: string) => this.opts.client.stop(slot),

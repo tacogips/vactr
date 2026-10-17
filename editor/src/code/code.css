@@ -119,3 +119,61 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Optional Vim mode status row (vim-status-view.tsx). */
+.vact-code[data-vim='on'] {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.vact-code[data-vim='on'] > .vact-code-canvas {
+  grid-row: 1;
+  height: 100%;
+  min-height: 0;
+}
+.vact-vim-status {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  min-width: 0;
+  padding: var(--vt-space-1) var(--vt-space-2);
+  border-top: var(--vt-border-w) solid var(--vt-border);
+  border-radius: 0;
+  background: var(--vt-surface);
+  color: var(--vt-text);
+  font-family: var(--vt-font-mono);
+  font-size: var(--vt-text-sm);
+}
+.vact-vim-mode {
+  min-width: var(--vt-control-h);
+  height: var(--vt-control-h-compact);
+  border-radius: 0;
+  font-family: var(--vt-font-mono);
+  font-weight: 600;
+}
+.vact-vim-mode[data-mode='insert'],
+.vact-vim-mode[data-mode='replace'] { border-color: var(--vt-accent); }
+.vact-vim-mode[data-mode='visual'],
+.vact-vim-mode[data-mode='visual-line'] { background: var(--vt-selection); }
+.vact-vim-pending,
+.vact-vim-recording,
+.vact-vim-search { white-space: nowrap; }
+.vact-vim-message[data-kind='error'] { color: var(--vt-danger); }
+.vact-vim-prompt {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: var(--vt-space-1);
+}
+.vact-vim-ex {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--vt-control-h-compact);
+  border-radius: 0;
+  font: inherit;
+}
+@media (pointer: coarse) {
+  .vact-vim-mode,
+  .vact-vim-ex { min-height: var(--vt-control-h-compact); }
+}

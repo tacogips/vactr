@@ -53,6 +53,7 @@ export interface TransportViewProps {
   evalStatus: Accessor<EvalStatus>;
   onAudio: () => void;
   onRun?: () => void;
+  vim?: { enabled: Accessor<boolean>; toggle: () => void };
   onHush: () => void;
   onStopAll: () => void;
   onStop: (slot: string) => void;
@@ -60,17 +61,20 @@ export interface TransportViewProps {
 
 function IconButton(props: {
   class: string;
-  label: string;
+  label: string | Accessor<string>;
   onClick: () => void;
   disabled?: boolean;
+  ariaPressed?: Accessor<'true' | 'false'>;
   children: JSX.Element;
 }): JSX.Element {
+  const label = () => typeof props.label === 'function' ? props.label() : props.label;
   return (
     <button
       type="button"
       class={`vact-icon-button ${props.class}`}
-      aria-label={props.label}
-      title={props.label}
+      aria-label={label()}
+      title={label()}
+      aria-pressed={props.ariaPressed?.()}
       disabled={props.disabled}
       onClick={() => props.onClick()}
     >
@@ -202,6 +206,14 @@ export function TransportView(props: TransportViewProps): JSX.Element {
       <IconButton class="vact-stop-all" label="stop every slot" onClick={props.onStopAll}>
         <StopSquare />
       </IconButton>
+      <Show when={props.vim}>
+        {(vim) => <IconButton
+          class="vact-vim-toggle"
+          label={() => `Vim mode: ${vim().enabled() ? 'on' : 'off'}`}
+          ariaPressed={(): 'true' | 'false' => vim().enabled() ? 'true' : 'false'}
+          onClick={vim().toggle}
+        >vim</IconButton>}
+      </Show>
       <span class="vact-level" aria-label={`master level ${levelText()} dB`} title={`master level ${levelText()} dB`}>
         <SpeakerOn />
         <span class="vact-level-value">{levelText()}</span>

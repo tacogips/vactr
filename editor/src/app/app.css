@@ -281,6 +281,16 @@
   cursor: default;
 }
 
+.vact-vim-toggle {
+  font-family: var(--vt-font-mono);
+  font-size: var(--vt-text-xs);
+}
+.vact-vim-toggle[aria-pressed='true'] {
+  border-color: var(--vt-accent);
+  background: var(--vt-accent);
+  color: var(--vt-on-accent);
+}
+
 .vact-stop-all,
 .vact-mute {
   color: var(--vt-danger);

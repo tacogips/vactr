@@ -213,3 +213,12 @@ contains a mark maps to the deletion start; the context mark; an unset mark
 - `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/step6-20261017-current/typecheck.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests, 0 failures; `tmp/vim-mode/VIM-14/step6-20261017-current/vitest.log`.
 - `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68; `tmp/vim-mode/VIM-14/step6-20261017-current/line-count.log`.
+
+### Session: 2026-10-17 Step 6 implementation rerun (dispatch nested-v1-3b3f6333)
+**Tasks Completed**: Revalidated the assigned VIM-14 contract on the current shared source and updated this plan's progress record.
+**Notes**: VIM-00 is accepted in the dispatch `acceptedPlanIds`. All seven VIM-14 source, test and plan files match the pre-node change snapshot; no source or test edits were required. Scoped typecheck passed, the focused undo/record/marks/purity suite passed 39/39, and all six implementation/test files remain within the plan budgets. The prior mid finding `IR-388-VIM30-EVIDENCE` is assigned to VIM-30 and remains downstream; it does not change VIM-14 scope. Formal test-integrity, adversarial and integration review remain downstream workflow steps.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-14/step6-20261017-dispatch/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts` — exit 0; 4 files, 39/39 tests, 0 failures; `tmp/vim-mode/VIM-14/step6-20261017-dispatch/vitest.log`.
+- `wc -l editor/src/code/vim/undo.ts editor/src/code/vim/record.ts editor/src/code/vim/marks.ts editor/test/code/vim/undo.test.ts editor/test/code/vim/record.test.ts editor/test/code/vim/marks.test.ts` — exit 0; line counts 60, 115, 31, 128, 151, 68; `tmp/vim-mode/VIM-14/step6-20261017-dispatch/line-count.log`.

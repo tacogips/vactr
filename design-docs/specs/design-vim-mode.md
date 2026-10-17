@@ -1,6 +1,8 @@
 # Optional Vim Mode for the Code Pane
 
-Status: Proposed (2026-10-16, workflow session 374, branch `wf/vim-mode`).
+Status: Implemented (2026-10-17, workflow session 391, branch `wf/vim-mode`;
+proposed 2026-10-16, session 374). The implementation plans are archived as
+`impl-plans/completed/vim-mode-*.md`.
 
 This document covers an opt-in Vim modal editing mode for the canvas code
 pane in the browser and Tauri editor (`editor/`). It defines the module

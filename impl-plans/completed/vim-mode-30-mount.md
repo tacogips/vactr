@@ -1,6 +1,6 @@
 # Vim Mode: Mount Wiring, Integration Tests and Style Probe Implementation Plan
 
-**Status**: In Progress
+**Status**: Completed (accepted in workflow session 391; archived 2026-10-17)
 **Plan ID**: VIM-30 (wave 3)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 3.1, 3.4, 3.6, 3.7, 6, 8.2, 8.4
 **Created**: 2026-10-16
@@ -270,3 +270,42 @@ syntax-checked here; it runs in VIM-40.
 - `cd editor && npm run check` -> exit 0 (`tmp/vim-mode/VIM-30/npm-check-step6-final-source-03.log`).
 - `cd editor && node --check test/style/ui-style.mjs` -> exit 0 (`tmp/vim-mode/VIM-30/node-check-style-step6-final-source-02.log`).
 - SHA-256 values for all five VIM-30 owned source/test files are recorded in `tmp/vim-mode/VIM-30/source-hashes-final-source-01.json`; `vim-mount.ts` matches the reviewed `840a1bdc…` hash. No VIM-30 source change was needed. The prior lock-acquisition failure remains historical evidence and was resolved by waiting for the lock owner to finish.
+
+### Session: 2026-10-17 VIM-30 final-source evidence repair
+
+**Tasks Completed**: Re-ran the assigned final-source verification against the current mount adapter and recorded source-bound evidence to resolve IR-388-VIM30-EVIDENCE.
+
+**Source Identity**:
+- `editor/src/code/vim-mount.ts`: `840a1bdc72b8d9afb6a41b96d1b82be12e8c20c2453a3c4ecf7866e857cd1a81` (matches the source hash named by IR-388-VIM30-EVIDENCE).
+- `editor/src/code/mount.ts`: `a3f68c6d8f963b8c19232f762881fbad873b4fbb218f72229d3314a65e958482`.
+- `editor/test/canvas/vim-input.test.ts`: `255f87a02550db26f7c942883082602a609b0aa1a60dc631c15e01e5b12e9dac`.
+- `editor/test/canvas/vim-mount.test.ts`: `649341590340228098e687f8c5ad5dbb979bfdde899727e70183c6cdd84842a3`.
+- `editor/test/style/ui-style.mjs`: `801d979e33ac6903e2c24cc4d4ca40877f2a8171813dfd22ec2ecdba0ca2a3d2`.
+- Hash manifest: `tmp/vim-mode/VIM-30/attempt-step6-final-source-20261017-01/source-hashes.json`.
+
+**Verification** (complete logs are under `tmp/vim-mode/VIM-30/attempt-step6-final-source-20261017-01/`):
+- `cd editor && npm run check` -> exit 0 (`npm-check.log`).
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts test/canvas/cursor-shape.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts test/canvas/first-viewport.test.ts test/canvas/gpu.test.ts test/ui test/code/vim` -> exit 0, 30 files and 1007/1007 tests (`vitest-focused.log`).
+- `cd editor && node --check test/style/ui-style.mjs` -> exit 0 (`node-check-style.log`).
+- `wc -l editor/src/code/vim-mount.ts editor/src/code/mount.ts` -> 122 and 391 lines, respectively.
+
+**Review Handoff**:
+- IR-388-VIM30-EVIDENCE implementation evidence is repaired for the current `vim-mount.ts` hash above.
+- Step 6 test-integrity decision: pending independent test-integrity gate.
+- Step 7 adversarial decision: pending independent adversarial gate.
+- These independent review decisions are downstream workflow actions; this session records their pending ownership without claiming a review result.
+
+### Session: 2026-10-17 VIM-30 review decisions (serial reconcile, session-391 wave 5)
+
+**Tasks Completed**: Recorded the independent review decisions for the final-source evidence repair above. No source or test change.
+
+**Review Decisions** (branch session `nested-v1-310c6903c25bf94f95d429faa3f8250b29b59b76a62b356f385b42624b9ba6ea`, against `vim-mount.ts` `840a1bdc…` and `mount.ts` `a3f68c6d…`):
+- Step 6 test-integrity decision: accepted, no findings. Owned files byte-identical to HEAD; `vitest-focused.log` (1007/1007) postdates the last shared edits; new tests 40/40 (`tmp/vim-mode/VIM-30/vitest-new-tests-final-source-02.log`); no skip/only/todo markers; protected suites unchanged.
+- Step 7 adversarial decision: accepted, no high or mid findings. Exports and the five `mount.ts` wiring points confirmed; Vim-off routing unchanged; P1/P2 pass-through, IME cursor fallback and teardown order hold.
+- IR-388-VIM30-EVIDENCE: resolved (final-source evidence plus both decisions now recorded).
+
+**Residual (low, non-gating)**: with Vim on, Mod-Enter with no form calls `evalAtCursor` twice (both return null); the `ui-style.mjs` second pass and the full combined-tree gates (`npm run test:style`, `VACTR_REQUIRE_SESSION_ABI=1 npm run build`, vim Playwright e2e) remain with VIM-40.
+
+### Session: 2026-10-17 archive (session 391, Step 8)
+
+**Tasks Completed**: Marked Completed and moved to `impl-plans/completed/`. IR-388-VIM30-EVIDENCE is resolved (session above). The combined-tree gates that remained with VIM-40 passed in the serial integration review (`tmp/vim-mode/reconcile-391-wave8/`: check, full vitest, build, style, e2e 32/32, all exit 0). No source change in this step.

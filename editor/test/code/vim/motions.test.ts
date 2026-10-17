@@ -117,11 +117,20 @@ describe('bracket and paragraph motions', () => {
     expect(move('x) (abc', '%', 3)).toBeNull();
     expect(move('(abc', '%', 0)).toBeNull();
     expect(move(`(${''.padEnd(SCAN_LIMIT + 10, 'x')})`, '%', 0)).toBeNull();
+    expect(move(`${'x'.repeat(SCAN_LIMIT + 1)}()`, '%', 0)).toBeNull();
   });
   it('moves between blank paragraph lines with both directions', () => {
     expect(move('one\n\ntwo\nthree', '}', 0)?.pos).toBe(4);
     expect(move('one\n\ntwo\nthree', '{', 6)?.pos).toBe(4);
     expect(move('one\ntwo', '}', 0)?.pos).toBe(7);
     expect(move('one\n\ntwo', '{', 0)?.pos).toBe(0);
+    const oversizedLine = 'x'.repeat(SCAN_LIMIT + 1);
+    expect(move(`start\n${oversizedLine}\n\nend`, '}', 0)).toBeNull();
+    const backwardDoc = `start\n\n${oversizedLine}\nend`;
+    expect(move(backwardDoc, '{', backwardDoc.length - 1)).toBeNull();
+    const exactBudgetLine = 'x'.repeat(SCAN_LIMIT - 1);
+    expect(move(`start\n${exactBudgetLine}\n\nend`, '}', 0)).toBeNull();
+    const exactBudgetBackwardDoc = `start\n\n${exactBudgetLine}\nend`;
+    expect(move(exactBudgetBackwardDoc, '{', exactBudgetBackwardDoc.length - 1)).toBeNull();
   });
 });

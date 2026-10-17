@@ -381,3 +381,20 @@ typecheck.
 **Drift**: None in owned source/test paths. No source changes were needed.
 
 **Blockers**: None for VIM-00.
+
+### Session: 2026-10-17 Step 6 rerun (dispatch 66182ed0)
+
+**Tasks Completed**: Reconfirmed the VIM-00 dependency set is empty and the assigned contract remains aligned with the accepted design. No implementation source or test edits were required. The three acceptance criteria remain complete.
+
+**Source identity** (git blob hashes): `types.ts` `8e56214b356c2b58bd162aec877630f609eb26ed`; `keys.ts` `712af27113c2cd455876833b852ca892725c4da3`; `words.ts` `cb2f85ced58d54d4dde879cbbb33713fdaae5212`; `host.ts` `e2a92faab5d4e3517459e2c50df2525a2c133ebf`; `keys.test.ts` `d649502cc94b1febf64aa2503ebec9fa11769fd0`; `words.test.ts` `77777c1c7ca0a85322451064b7d503a49b3036a3`; `purity.test.ts` `b5665ecff9620ce4fd8ebd570dd60390ddcfc6ac`.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-00/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/typecheck-step6-rerun-20261017.log", notes: "No diagnostics; complete log ends with exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/keys.test.ts test/code/vim/words.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 104, testsPassed: 104, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/focused-vitest-step6-rerun-20261017.log", notes: "Three files passed; 104 tests passed."}`
+- `{command: "wc -l editor/src/code/vim/types.ts editor/src/code/vim/keys.ts editor/src/code/vim/words.ts editor/test/code/vim/host.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-00/owned-line-count-current-dispatch.log", notes: "Owned files are 65, 38, 77 and 60 lines; all below the 300-line plan target and 1000-line repository ceiling."}`
+
+**Review routing**: The supplied prior finding `IR-388-VIM30-EVIDENCE` concerns `VIM-30` and does not identify a VIM-00 path or criterion. Its missing final-source Vitest and formal review records remain assigned to VIM-30; they are not VIM-00 blockers. The current VIM-00 focused suite was freshly rerun above.
+
+**Drift**: No concurrent changes observed in VIM-00 source or test paths.
+
+**Blockers**: None for VIM-00.

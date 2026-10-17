@@ -1,6 +1,6 @@
 # Vim Mode: VimController (mode machine and command execution) Implementation Plan
 
-**Status**: In Progress
+**Status**: Completed (accepted in workflow session 391; archived 2026-10-17)
 **Plan ID**: VIM-20 (wave 2)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 3.3.1-3.3.3, 3.4, 3.5 (hook side), 4.1-4.14, 5, 7
 **Created**: 2026-10-16
@@ -712,3 +712,72 @@ no review acceptance is claimed here.
 **Handoff**: VIM20-TI-1 is addressed with passing current-source evidence.
 Independent re-review and combined-tree review remain downstream; no review
 acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 final-source verification
+
+**Tasks Completed**: Revalidated the VIM-20 controller implementation against
+the assigned plan on the current shared tree. The accepted VIM-10/11/12/13/14/18
+dependencies are present in the fanout contract. No controller source or test
+changes were needed in this verification pass.
+
+**Verification** (current source):
+- `cd editor && npm run check` — exit 0;
+  `tmp/vim-mode/VIM-20/attempt-step6-20261017-03/npm-check.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim` — 18 files,
+  776/776 passed including controller tests, wave-1 suites and purity;
+  `tmp/vim-mode/VIM-20/attempt-step6-20261017-03/vitest-vim.log`.
+- `wc -l editor/src/code/vim/controller.ts editor/src/code/vim/execute.ts editor/src/code/vim/session.ts`
+  — exit 0; 600/102/51 lines, within each plan budget.
+- `git diff --check -- editor/src/code/vim/controller.ts editor/src/code/vim/execute.ts editor/src/code/vim/session.ts editor/test/code/vim/controller.test.ts editor/test/code/vim/undo-repeat.test.ts editor/test/code/vim/macro-marks.test.ts editor/test/code/vim/controller-io.test.ts impl-plans/active/vim-mode-20-controller.md`
+  — exit 0.
+- Current-source SHA-256 values are recorded in the Step 6 execution result;
+  plan edit intent is preserved at
+  `tmp/vim-mode/VIM-20/attempt-step6-20261017-03/plan-edit-intention.json`.
+
+**Handoff**: VIM-20 implementation criteria are complete. Independent review
+and combined-tree integration review remain downstream. The prior
+`IR-388-VIM30-EVIDENCE` finding belongs to VIM-30 and remains with that plan;
+it does not block this controller plan.
+
+### Session: 2026-10-17 repair VIM20-ADV-VISUAL-INDENT-EOF
+
+**Tasks Completed**: Fixed visual operator changes using a pre-change
+selection position before dispatch. `VimController.executeTarget` now calls
+`leaveVisual(range.from)`; the following change transaction still selects
+`outcome.cursor` in the post-change document. Added controller scenario rows
+for `V>` on the final line and `v>` on a one-character document. Existing
+`leaveVisual` recording and visual redo behavior are unchanged.
+
+**Source Identity**:
+- `editor/src/code/vim/controller.ts` SHA-256:
+  `71a5f6d98d6c9955c9c26180c732b0ca03661fa5e3c2d693da344d140a1d98cd`.
+- `editor/test/code/vim/controller.test.ts` SHA-256:
+  `e6851a3e0db29a0ecb27ee6d8addc4b3b6a654e477b2840588584c91749afafd`.
+- Per-edit intentions: `tmp/vim-mode/VIM-20/attempt-step6-visual-indent-eof-20261017-01/{controller-edit-intention,test-edit-intention,plan-edit-intention}.json`.
+
+**Verification** (current source):
+- Focused VIM-20 suites plus purity: 5 files, 213/213 passed;
+  `tmp/vim-mode/VIM-20/attempt-step6-visual-indent-eof-20261017-01/vitest-focused.log`.
+- All Vim suites: 18 files, 778/778 passed;
+  `tmp/vim-mode/VIM-20/attempt-step6-visual-indent-eof-20261017-01/vitest-vim.log`.
+- `cd editor && npm run check` — exit 0;
+  `tmp/vim-mode/VIM-20/attempt-step6-visual-indent-eof-20261017-01/npm-check.log`.
+- `wc -l editor/src/code/vim/controller.ts` — 600 lines, exit 0;
+  `tmp/vim-mode/VIM-20/attempt-step6-visual-indent-eof-20261017-01/line-count.log`.
+- `git diff --check -- editor/src/code/vim/controller.ts editor/test/code/vim/controller.test.ts impl-plans/active/vim-mode-20-controller.md`
+  — exit 0;
+  `tmp/vim-mode/VIM-20/attempt-step6-visual-indent-eof-20261017-01/diff-check-final.log`.
+
+**Handoff**: VIM20-ADV-VISUAL-INDENT-EOF is repaired with current-source
+behavioral evidence. Independent adversarial re-review remains downstream.
+
+### Session: 2026-10-17 archive (session 391, Step 8)
+
+**Tasks Completed**: Marked Completed and moved to `impl-plans/completed/`.
+Acceptance basis: the session-391 fanout lists VIM-20 in
+`acceptedPlanIds`/`completedBranchIds`
+(`shared-branch-implementation:dispatch-plans-attempt-8-exec-5554`), and the
+serial integration review ran the combined-tree gates on this source
+(`tmp/vim-mode/reconcile-391-wave8/`: check, full vitest, build, style, e2e
+32/32, all exit 0; `tree-identity.log` records `controller.ts`
+`71a5f6d9…`). No source change in this step.

@@ -274,3 +274,23 @@ The tests are table-driven: `{ mode: 'normal', keys: ['2','"','a','d','3','w'], 
 - `{command: "wc -l editor/src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-current-02.log", notes: "193 lines, below the 350-line plan limit."}`
 
 **Blockers**: None for VIM-18. Independent review and combined-tree verification remain downstream.
+
+### Session: 2026-10-17 Step 6 current-source rerun (dispatch)
+
+**Tasks Completed**: Reconfirmed accepted dependency VIM-00 from the runtime-owned `acceptedPlanIds`. No parser or test edits were required. Re-ran the scoped typecheck, parser plus purity suite, and line-count gate against the current source; all passed. The parser remains 193 lines and the focused suite passes 129 tests.
+
+**Source identity**:
+- `editor/src/code/vim/parser.ts`: `git hash-object` `0b4e15d3da15c458cd0897e797223f2d10606a7a`.
+- `editor/test/code/vim/parser.test.ts`: `git hash-object` `e5f2a41a04c25baf66544dc8dc42d99b1a27af7c`.
+- The pre-existing `impl-plans/active/vim-mode-00-contract.md` change was preserved; no VIM-18 source/test drift was found.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/typecheck-step6-rerun-02-20261017.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 129, testsPassed: 129, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/focused-vitest-step6-rerun-02-20261017.log", notes: "2 test files passed; parser and purity tests passed."}`
+- `{command: "wc -l editor/src/code/vim/parser.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-18/line-count-step6-rerun-02-20261017.log", notes: "193 lines, below the 350-line plan limit."}`
+
+**Rerun note**: The first attempt's logging wrapper stopped after typecheck because zsh reserves the variable name `status`; its incomplete log is not used as passing evidence. The uniquely named reruns above completed and recorded exit statuses.
+
+**Ownership handoff**: Prior review finding `IR-388-VIM30-EVIDENCE` remains assigned to VIM-30 (`vim-mount.ts` evidence and review decisions); it is outside VIM-18 scope and does not block this parser plan.
+
+**Blockers**: None for VIM-18. Formal review and combined-tree verification remain downstream.

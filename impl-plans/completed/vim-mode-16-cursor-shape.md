@@ -238,3 +238,20 @@ Formal branch/integration review remains downstream.
 - SHA-256 identities for the four owned implementation/test files are recorded in `tmp/vim-mode/VIM-16/attempt-06/source-sha.log`.
 
 Independent Step 7 re-review is required for acceptance.
+
+### Session: 2026-10-17 Step 6 dispatch current-source verification (attempt 07)
+
+**Tasks Completed**: Revalidated the assigned cursor geometry/color helpers, renderer hook, and focused tests on the current shared source. No implementation source changes were needed; the three acceptance criteria remain met.
+
+**Implementation Notes**:
+- `cursor-shape.ts`, `renderer.ts`, `cursor-shape.test.ts`, and the VIM-16 GPU case match the assigned contract. Renderer hook remains 7 additions and 2 deletions (9 changed lines), within the 12-line limit.
+- All touched source files remain below 1000 lines (13/673/42/999). Fresh source hashes are in `tmp/vim-mode/VIM-16/attempt-07/source-sha.log`.
+- No VIM-16 source/test edits were needed. Concurrent edits in other plan files were preserved.
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json` — exit 0; `tmp/vim-mode/VIM-16/attempt-07/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts` — exit 0; 2 files, 71/71 tests passed; `tmp/vim-mode/VIM-16/attempt-07/focused-vitest.log`.
+- `git show --numstat --format= 84234f8 -- editor/src/code/renderer.ts` — exit 0; 7 additions, 2 deletions; `tmp/vim-mode/VIM-16/attempt-07/renderer-numstat.log`.
+- `wc -l editor/src/code/cursor-shape.ts editor/src/code/renderer.ts editor/test/canvas/cursor-shape.test.ts editor/test/canvas/gpu.test.ts` — exit 0; 13/673/42/999 lines; `tmp/vim-mode/VIM-16/attempt-07/line-count.log`.
+
+Formal Step 7 and integration review remain downstream.

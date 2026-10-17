@@ -110,12 +110,16 @@ function bracketMatch(doc: Text, pos: number): number | null {
   const text = doc.toString();
   const line = doc.lineAt(pos);
   let at = pos;
-  while (at <= line.to) {
+  let scanned = 0;
+  let found = false;
+  while (at <= line.to && scanned < SCAN_LIMIT) {
     const ch = text[at];
-    if (pairs[ch] || closes[ch]) break;
+    if (pairs[ch] || closes[ch]) { found = true; break; }
     if (at === line.to) return null;
     at++;
+    scanned++;
   }
+  if (!found) return null;
   const token = text[at] ?? '';
   const open = !!pairs[token];
   const match = open ? pairs[token] : closes[token];
@@ -129,7 +133,7 @@ function bracketMatch(doc: Text, pos: number): number | null {
   }
   return null;
 }
-function paragraph(doc: Text, pos: number, forward: boolean, count: number): number {
+function paragraph(doc: Text, pos: number, forward: boolean, count: number): number | null {
   let lineNo = doc.lineAt(pos).number;
   let cursor = pos;
   for (let n = 0; n < count; n++) {
@@ -137,23 +141,31 @@ function paragraph(doc: Text, pos: number, forward: boolean, count: number): num
     let scanned = 0;
     if (forward) {
       lineNo++;
+      let foundBoundary = false;
       while (lineNo <= doc.lines && scanned < SCAN_LIMIT) {
         const line = doc.line(lineNo);
-        scanned += line.length + 1;
+        const lineWidth = line.length + (lineNo < doc.lines ? 1 : 0);
+        if (scanned + lineWidth > SCAN_LIMIT) return null;
+        scanned += lineWidth;
         cursor = line.from;
-        if (!line.text.trim()) break;
+        if (!line.text.trim()) { foundBoundary = true; break; }
         lineNo++;
       }
+      if (!foundBoundary && lineNo <= doc.lines && scanned >= SCAN_LIMIT) return null;
       if (lineNo > doc.lines) cursor = doc.length;
     } else {
       lineNo--;
+      let foundBoundary = false;
       while (lineNo >= 1 && scanned < SCAN_LIMIT) {
         const line = doc.line(lineNo);
-        scanned += line.length + 1;
+        const lineWidth = line.length + (lineNo < doc.lines ? 1 : 0);
+        if (scanned + lineWidth > SCAN_LIMIT) return null;
+        scanned += lineWidth;
         cursor = line.from;
-        if (!line.text.trim()) break;
+        if (!line.text.trim()) { foundBoundary = true; break; }
         lineNo--;
       }
+      if (!foundBoundary && lineNo >= 1 && scanned >= SCAN_LIMIT) return null;
       if (lineNo < 1) cursor = 0;
     }
     if (lineNo === initial) break;
@@ -222,7 +234,7 @@ function runOne(doc: Text, pos: number, spec: MotionSpec, ctx: MotionContext): M
       result.pos = at; result.inclusive = base === 'f' || base === 't'; result.lastFind = { kind: base, char: ctx.lastFind.char }; break;
     }
     case '%': { const match = bracketMatch(doc, pos); if (match == null) return null; result.pos = match; result.inclusive = true; result.jump = true; break; }
-    case '{': case '}': result.pos = paragraph(doc, pos, kind === '}', ctx.count); result.jump = true; break;
+    case '{': case '}': { const target = paragraph(doc, pos, kind === '}', ctx.count); if (target == null) return null; result.pos = target; result.jump = true; break; }
     case 'H': case 'M': case 'L': {
       const top = clampLine(doc, ctx.viewport.topLine);
       const target = kind === 'H' ? top + ctx.count - 1 : kind === 'L' ? top + Math.max(0, ctx.viewport.rows - ctx.count) : top + Math.floor((ctx.viewport.rows - 1) / 2);

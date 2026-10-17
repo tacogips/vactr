@@ -58,36 +58,36 @@ Registry plans FM1V-30 and FM1V-40 ran serially.
 
 ## Optional Vim mode (2026-10-16)
 
-These plans implement [design-vim-mode.md](../design-docs/specs/design-vim-mode.md). Its open questions are VQ1-VQ9 in [pending-vim-mode-questions.md](../design-docs/user-qa/pending-vim-mode-questions.md). All plans are Ready. The [dispatch manifest](active/vim-mode-dispatch.json) lists each plan's write ownership, artifact roots and gates.
+These plans implement [design-vim-mode.md](../design-docs/specs/design-vim-mode.md). Its open questions are VQ1-VQ9 in [pending-vim-mode-questions.md](../design-docs/user-qa/pending-vim-mode-questions.md). All 14 plans are Completed and archived (2026-10-17, workflow session 391). The combined-tree gates passed: `npm run check`, full Vitest, `npm run test:style`, `VACTR_REQUIRE_SESSION_ABI=1 npm run build` (debug wasm) and the behavior e2e 32/32 in Chromium and WebKit. The [dispatch manifest](active/vim-mode-dispatch.json) lists each plan's write ownership, artifact roots and gates.
 
 **Wave 0**
 
-- [VIM-00 contract](active/vim-mode-00-contract.md): shared types, key normalization with the pass-through set, word classes, the test host, the purity test, and the common execution rules.
+- [VIM-00 contract](completed/vim-mode-00-contract.md): shared types, key normalization with the pass-through set, word classes, the test host, the purity test, and the common execution rules.
 
 **Wave 1** (parallel)
 
-- [VIM-10 motions](active/vim-mode-10-motions.md)
-- [VIM-11 text objects](active/vim-mode-11-textobjects.md)
-- [VIM-12 operators and registers](active/vim-mode-12-operators-registers.md)
-- [VIM-13 search and ex](active/vim-mode-13-search-ex.md)
-- [VIM-14 record, undo and marks](active/vim-mode-14-record-undo-marks.md)
-- [VIM-18 parser](active/vim-mode-18-parser.md)
-- [VIM-15 input routing](active/vim-mode-15-input-routing.md)
-- [VIM-16 cursor shape](active/vim-mode-16-cursor-shape.md)
-- [VIM-17 setting, clipboard, status row and toggle](active/vim-mode-17-ui.md)
+- [VIM-10 motions](completed/vim-mode-10-motions.md)
+- [VIM-11 text objects](completed/vim-mode-11-textobjects.md)
+- [VIM-12 operators and registers](completed/vim-mode-12-operators-registers.md)
+- [VIM-13 search and ex](completed/vim-mode-13-search-ex.md)
+- [VIM-14 record, undo and marks](completed/vim-mode-14-record-undo-marks.md)
+- [VIM-18 parser](completed/vim-mode-18-parser.md)
+- [VIM-15 input routing](completed/vim-mode-15-input-routing.md)
+- [VIM-16 cursor shape](completed/vim-mode-16-cursor-shape.md)
+- [VIM-17 setting, clipboard, status row and toggle](completed/vim-mode-17-ui.md)
 
 **Wave 2**
 
-- [VIM-20 controller](active/vim-mode-20-controller.md)
+- [VIM-20 controller](completed/vim-mode-20-controller.md)
 
 **Wave 3**
 
-- [VIM-30 mount wiring and integration tests](active/vim-mode-30-mount.md)
+- [VIM-30 mount wiring and integration tests](completed/vim-mode-30-mount.md)
 
 **Wave 4** (parallel)
 
-- [VIM-40 e2e and full gates](active/vim-mode-40-e2e-verify.md)
-- [VIM-41 README](active/vim-mode-41-docs.md)
+- [VIM-40 e2e and full gates](completed/vim-mode-40-e2e-verify.md)
+- [VIM-41 README](completed/vim-mode-41-docs.md)
 
 ## Purpose
 

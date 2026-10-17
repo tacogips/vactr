@@ -43,6 +43,8 @@ const scenarios = [
   ['yy then put', '|one\ntwo', ['y', 'y', 'p'], 'one\none\ntwo', 4],
   ['> motion', '|one\ntwo', ['>', 'j'], '  one\n  two', 2],
   ['> object', '|one two', ['>', 'i', 'w'], '  one two', 2], ['>>', '|one\ntwo', ['>', '>'], '  one\ntwo', 2],
+  ['visual-line indent last line', 'a\n|x', ['V', '>'], 'a\n  x', 4],
+  ['visual indent single char doc', '|x', ['v', '>'], '  x', 2],
   ['< motion', '  |one\n  two', ['<', 'j'], 'one\ntwo', 0],
   ['< object', '  |one two', ['<', 'i', 'w'], 'one two', 0], ['<<', '  |one\ntwo', ['<', '<'], 'one\ntwo', 0],
   ['g~ motion', '|one two', ['g', '~', 'w'], 'ONE two', 0], ['g~ object', '|one two', ['g', '~', 'i', 'w'], 'ONE two', 0],

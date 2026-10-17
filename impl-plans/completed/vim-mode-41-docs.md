@@ -130,3 +130,68 @@ sections 2.1 and 4.13. Other shared-tree files visible in
 `readme-status-final-02.log` belong to other fanout plans; this plan edited only
 `README.md` and its own progress record. `README.jd.md` is untouched. Formal
 review and serial finalization remain downstream workflow steps.
+
+### Session: 2026-10-17 VIM-41 current-source confirmation
+
+**Tasks Completed**: No product edits were needed in this execution: the VIM-41
+README bullet and subsection are already present in the shared branch. Rechecked
+the current README and confirmed the ten documentation parts and their keys and
+commands against design sections 2.1, 3.3, 3.5, 3.7, 4.8, 4.13 and 4.14.
+
+**Verification**: `grep -n '### Vim mode' README.md` printed exactly one line
+at 235 (`tmp/vim-mode/VIM-41/step6-final-20261017-01/grep-section.log`);
+the required content grep returned 8 (`grep-content.log`). The scoped diff
+stat and whitespace check both exited 0 (`diff-stat.log`, `diff-check.log`).
+The README is already at HEAD, so the current diff stat is empty; the prior
+implementation evidence above records the original README-only change.
+`README.jd.md` remains untouched.
+
+**Notes**: This run updated only this plan's Progress Log. Existing shared-tree
+changes owned by other plans were left intact. Formal review and serial
+finalization remain downstream workflow steps.
+
+### Session: 2026-10-17 VIM-41 count-bearing documentation verification
+
+**Tasks Completed**: Added a plan-local read-only Node assertion script for the
+README documentation contract. It checks the single heading, the Editor
+bullet, all nine ordered subsection labels, each extracted key/command token
+against design sections 2.1 and 4.13, required content, subsection length and
+the unchanged `README.jd.md` state.
+
+**Verification**: `node tmp/vim-mode/VIM-41/step6-countcheck-20261017-02/doc-check.mjs`
+passed with `testsRun=158`, `testsPassed=158`, `failureCount=0`, including 140
+design-token assertions (`doc-check.log`, exit 0). `grep -n '### Vim mode'
+README.md` returned the single heading at line 235 (`grep-section.log`, exit 0).
+`git diff --stat -- README.md README.jd.md` was empty (`diff-stat.log`, exit 0),
+and `git diff --check -- impl-plans/active/vim-mode-41-docs.md` passed before
+this entry (`plan-diff-check-preappend.log`, exit 0). The README files remain
+unchanged from `HEAD`; this session changes only this plan's Progress Log and
+adds evidence under `tmp/vim-mode/VIM-41/step6-countcheck-20261017-02/`.
+
+
+### Session: 2026-10-17 VIM-41 node:test evidence-runner repair
+
+**Tasks Completed**: Added a Node `node:test` suite under
+`tmp/vim-mode/VIM-41/step6-countcheck-20261017-03/` that retains the existing
+README checks as individually named tests. It verifies the heading, Editor
+bullet, all nine ordered subsection parts, each extracted design token against
+sections 2.1 and 4.13, a minimum token-count guard, the required README tokens,
+section length, and `README.jd.md` readability and unchanged status.
+
+**Verification**: `node --test
+tmp/vim-mode/VIM-41/step6-countcheck-20261017-03/doc-check.test.mjs` passed
+with 159 tests, 159 passed, and 0 failed (exit 0;
+`doc-check-test.log`), including 140 design-token tests.
+`node --check tmp/vim-mode/VIM-41/step6-countcheck-20261017-03/doc-check.test.mjs`
+passed (exit 0; `node-check.log`). `grep -n '### Vim mode' README.md`
+returned exactly one heading at line 235 (exit 0; `grep-section.log`).
+`git diff --stat -- README.md README.jd.md` was empty (exit 0;
+`diff-stat.log`), and `git diff --quiet HEAD -- README.md README.jd.md`
+confirmed both README files are byte-identical to `HEAD` (exit 0;
+`readme-identity.log`).
+
+**Notes**: The Progress Log is the only tracked file changed for VIM-41 in this
+repair; test code and logs are plan-local evidence. The initial failed runner
+transcription attempts are preserved as `doc-check-test-attempt-01.log` and
+`doc-check-test-attempt-02.log` and are not gating verification. Independent
+Step 6 test-integrity and Step 7 adversarial decisions remain downstream.

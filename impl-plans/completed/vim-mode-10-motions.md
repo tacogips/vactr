@@ -1,6 +1,6 @@
 # Vim Mode: Motions Implementation Plan
 
-**Status**: In Progress (implementation criteria met; independent review pending)
+**Status**: Completed (accepted in workflow session 391; archived 2026-10-17)
 **Plan ID**: VIM-10 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.3, 4.4, 4.5, 7
 **Created**: 2026-10-16
@@ -236,3 +236,70 @@ the `|` marker inline. Required rows (at least 60):
 **Review State**: Assigned implementation and behavioral verification are complete. Independent test-integrity/adversarial and combined-tree integration review remain downstream workflow steps.
 
 **Final Self-Check**: `git diff --check -- impl-plans/active/vim-mode-10-motions.md editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts` exited 0; complete output is in `tmp/vim-mode/VIM-10/diff-check-step6-runtime.log`. The latest shared-tree status also showed edits under VIM-12, VIM-13 (`editor/src/code/vim/ex.ts`, `editor/test/code/vim/search-ex.test.ts`), VIM-15 and VIM-17; these remain outside VIM-10 write paths and were not touched.
+
+### Session: 2026-10-17 Step 6 dispatch rerun
+
+**Tasks Completed**: Revalidated the VIM-10 implementation on the current shared tree. No motion source or test changes were needed. The implementation still covers all 34 `MotionKind` values; 90 focused tests pass, and `motions.ts` remains under the 450-line limit. The assigned dependency VIM-00 is accepted. The supplied `IR-388-VIM30-EVIDENCE` finding is owned by downstream VIM-30 and does not alter VIM-10's contract or write paths.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `b77d062068426ca21c1e0bfdf6784c708e1e1d0047894280c39a271a91a66289`; `editor/test/code/vim/motions.test.ts` SHA-256 `13af5d2d0720b93a1f0257f1e163766b739f8ae0171a6f3ac35e3f73094d2ced`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-tsc-attempt2.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 90, testsPassed: 90, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-vitest-attempt2.log", notes: "Both files passed; 90/90 tests."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-line-count.log", notes: "248 and 127 lines respectively; implementation is below the 450-line limit."}`
+
+**Verification Harness Note**: The first logging attempt used a path relative to `editor/` and zsh's readonly `status` variable; both wrappers failed after invocation, and the initial Vitest output showed 90/90 passing. The exact verification commands were rerun with complete logs at the paths above and exited 0.
+
+**Review State**: VIM-10 implementation and required behavioral verification are complete. Independent review and combined-tree integration remain downstream workflow steps.
+
+### Session: 2026-10-17 Step 6 bounded-scan repair
+
+**Tasks Completed**: The bounded contract audit identified two concrete `SCAN_LIMIT` gaps. `bracketMatch` now stops first-bracket discovery at the limit and returns null if no bracket was inspected within budget. Paragraph `{`/`}` scans now reject a candidate line before trimming it when that complete line would exceed the remaining budget, and propagate null as a failed motion. Added regression assertions for an over-limit first bracket and oversized paragraph lines in both directions. No downstream VIM-30 code or review finding was changed.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `31dbc4a839d12e7f70d74b27029a953f8d490f2f8b63326b553968cea839e205`; `editor/test/code/vim/motions.test.ts` SHA-256 `607361217e4b2fd38a2f667eada7eb56b7b2bf0ca52c965ffef4fd4ebdc08cc0`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-bound-repair-tsc.log", notes: "Scoped typecheck on the repaired source; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 90, testsPassed: 90, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-bound-repair-vitest.log", notes: "Both files passed; 90/90 tests, including the new scan-bound regressions."}`
+- `{command: "cd editor && wc -l src/code/vim/motions.ts test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-bound-repair-line-count.log", notes: "256 and 132 lines; motions.ts remains below 450 lines."}`
+- `{command: "git diff --check -- editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts impl-plans/active/vim-mode-10-motions.md", exitStatus: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/step6-dispatch-20261017-diff-check.log", notes: "No whitespace errors."}`
+
+**Review State**: The identified VIM-10 scan-bound defects are repaired and verified on current source. Independent integrity, adversarial, and combined-tree integration review remain downstream workflow steps.
+
+### Session: 2026-10-17 Step 6 current-source verification (dispatch attempt 04)
+
+**Tasks Completed**: Revalidated the assigned VIM-10 contract on the current shared tree. The bounded `%` first-bracket scan and `{`/`}` paragraph scans remain in place with regression assertions for over-limit discovery and oversized lines in both directions. VIM-00 is accepted by the dispatch dependency record. The carried `IR-388-VIM30-EVIDENCE` finding is owned by VIM-30 and does not change VIM-10 ownership or block these gates.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `31dbc4a839d12e7f70d74b27029a953f8d490f2f8b63326b553968cea839e205`; `editor/test/code/vim/motions.test.ts` SHA-256 `607361217e4b2fd38a2f667eada7eb56b7b2bf0ca52c965ffef4fd4ebdc08cc0`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-04/typecheck.log", notes: "Current-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 90, testsPassed: 90, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-04/vitest.log", notes: "Both files passed; 90/90 tests, including bounded-scan regressions."}`
+- `{command: "wc -l editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-04/lines.log", notes: "256 and 132 lines; motions.ts is below the 450-line limit."}`
+- `{command: "git diff --check -- editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts impl-plans/active/vim-mode-10-motions.md", exitStatus: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-04/diff-check.log", notes: "No whitespace errors."}`
+
+**Verification Harness Note**: The first attempt's tee path was relative to `editor/` after the command changed directories, so the wrapper produced no complete log. It is excluded; the exact scoped typecheck and Vitest commands above were rerun with complete logs and exited 0.
+
+**Review State**: VIM-10's assigned implementation and behavioral verification are complete on this source. Independent integrity/adversarial review and combined-tree integration remain downstream; `IR-388-VIM30-EVIDENCE` remains owned by VIM-30.
+
+### Session: 2026-10-17 Step 6 exact-limit paragraph-scan repair (dispatch attempt 05)
+
+**Tasks Completed**: Addressed `VIM10-PARAGRAPH-EXACT-LIMIT`. A paragraph scan that exhausted exactly `SCAN_LIMIT` on a nonblank line could return that line's start without inspecting the next boundary. `{` and `}` now return null when the budget is exhausted before a blank boundary or document edge. Added exact-budget forward and backward regression assertions. The existing 90-case test total is unchanged because the assertions extend one test case. The unrelated `IR-388-VIM30-EVIDENCE` finding remains assigned to VIM-30.
+
+**Source Identity**: `editor/src/code/vim/motions.ts` SHA-256 `9a8565cc1a02c02d1fccd92d9d075ab28fb1e3f7726a046d699148796d6b871a`; `editor/test/code/vim/motions.test.ts` SHA-256 `770116c8e59a37e625c260576e91ab6c0eef430a19b69098dd5729b52b18a7df`.
+
+**Verification**:
+
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-05/typecheck.log", notes: "Final-source scoped typecheck; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 90, testsPassed: 90, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-05/vitest.log", notes: "Both files passed, including exact-limit forward and backward paragraph regressions."}`
+- `{command: "wc -l editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-05/lines.log", notes: "260 and 136 lines; motions.ts remains below the 450-line limit."}`
+- `{command: "git diff --check -- editor/src/code/vim/motions.ts editor/test/code/vim/motions.test.ts impl-plans/active/vim-mode-10-motions.md", exitStatus: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-10/attempt-dispatch-20261017-05/diff-check.log", notes: "No whitespace errors."}`
+
+**Review State**: The VIM-10 exact-limit paragraph scan finding is repaired and verified on current source. Independent re-review and combined-tree integration remain downstream workflow steps.
+
+### Session: 2026-10-17 archive (session 391, Step 8)
+
+**Tasks Completed**: Marked Completed and moved to `impl-plans/completed/`. Acceptance basis: the session-391 fanout lists VIM-10 in `acceptedPlanIds`/`completedBranchIds` (`shared-branch-implementation:dispatch-plans-attempt-8-exec-5554`), and the serial integration review ran the combined-tree gates on this source (`tmp/vim-mode/reconcile-391-wave8/`: check, full vitest, build, style, e2e 32/32, all exit 0; `tree-identity.log` records `motions.ts` `9a8565cc…`). No source change in this step.

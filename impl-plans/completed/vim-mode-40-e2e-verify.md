@@ -1,10 +1,10 @@
 # Vim Mode: Playwright e2e and Full Verification Gates Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VIM-40 (wave 4)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 8.3, 8.4, 9
 **Created**: 2026-10-16
-**Last Updated**: 2026-10-16
+**Last Updated**: 2026-10-17
 
 ## Related Plans
 
@@ -136,7 +136,7 @@ sandbox. Every other gate must pass inside the sandbox.
       and `behavior.mjs` merges them.
 - [x] Gates 1-3, 5 and 7 pass in this plan, with the records in the
       Progress Log.
-- [ ] Gates 4 and 6 pass, or carry a recorded verificationGap for the Opus
+- [x] Gates 4 and 6 pass, or carry a recorded verificationGap for the Opus
       verification step with the exact sandbox error.
 - [x] No tracked evidence file changed.
 
@@ -172,3 +172,17 @@ sandbox. Every other gate must pass inside the sandbox.
 ### Session: 2026-10-17 (owner diagnosis of the vim-ime-normal blocker)
 
 The session-388 blocker "Chromium vim-ime-normal fails in normal mode" was not a product regression. `npm run e2e` serves the prebuilt `editor/dist` and only refuses a missing dist; the dist under test was built at 03:19, before later `editor/src` changes, so the e2e gate exercised stale code. With the committed `editor/src/code/input.ts` unchanged and a fresh `VACTR_REQUIRE_SESSION_ABI=1 npm run build`, `npm run e2e -- --browser all --profile behavior` passes 32/32, including vim-ime-normal in Chromium and WebKit (owner logs: tmp/vim-mode/ime-fix/e2e-fixed.log and e2e-old.log; the Chromium CDP sequence is compositionstart, insertCompositionText beforeinput/input (non-cancelable), compositionend, and the document stays "stable"). No input.ts change is needed. Gate order for VIM-40: always rebuild `editor/dist` immediately before the e2e gate (gate 3 must run after the last source change and before gate 6). VIM-41 is documentation-only and already complete (README.md "### Vim mode"); its gate evidence is the grep/diff record plus the focused vitest run that covers the docs-referenced commands.
+
+### Session: 2026-10-17 VIM-40 final-source verification
+
+**Status**: Complete
+**Tasks Completed**: All seven gates passed against the current source tree; the stale-dist Chromium IME failure is resolved by rebuilding `editor/dist` after all source changes and immediately before Gate 6.
+**Notes**:
+- Gate 1 `cd editor && npm run check`: exit 0 (`tmp/vim-mode/VIM-40/step6-gate-1-check-current.log`).
+- Gate 2, under the measurement lock, `cd editor && ./node_modules/.bin/vitest run`: exit 0, 119 files and 1,706 tests passed (`tmp/vim-mode/VIM-40/step6-gate-2-vitest-current.log`).
+- Gate 3 `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build`: exit 0 (`tmp/vim-mode/VIM-40/step6-gate-3-build-current.log`). The release Wasm is absent; the existing debug Wasm was used. This build ran after all source changes and immediately before Gate 6.
+- Gate 4, under the measurement lock, `cd editor && npm run test:style`: exit 0; style assertions passed for 8 engine/viewport combinations (`tmp/vim-mode/VIM-40/step6-gate-4-style-current.log`).
+- Gate 5 `cd editor && node --check test/e2e/vim-behavior.mjs`: exit 0 (`tmp/vim-mode/VIM-40/step6-gate-5-node-check-current.log`).
+- Gate 6, under the measurement lock, `cd editor && npm run e2e -- --browser all --profile behavior --run-id vim-001 --out ../tmp/vim-mode/e2e/vim-001`: exit 0; 32/32 checks passed, including `vim-ime-normal` in Chromium and WebKit, with zero failures (`tmp/vim-mode/VIM-40/step6-gate-6-e2e-current.log`). WebKit's clipboard, physical-IME, and synthetic-touch limitations are recorded by the runner; `vim-ime-normal` passed.
+- Gate 7 `git diff --stat -- design-docs/specs/evidence`: exit 0, empty diff (`tmp/vim-mode/VIM-40/step6-gate-7-evidence-diff-current.log`).
+- Earlier Gate 6 failures remain in their original logs. They exercised stale `editor/dist`; the successful Gate 3 -> Gate 6 run above is the final-source result and used the exact required command.

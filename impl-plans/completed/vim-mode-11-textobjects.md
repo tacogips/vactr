@@ -1,6 +1,6 @@
 # Vim Mode: Text Objects Implementation Plan
 
-**Status**: In Progress (implementation criteria met; independent review pending)
+**Status**: Completed (accepted in workflow session 391; archived 2026-10-17)
 **Plan ID**: VIM-11 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-mode.md sections 4.4, 4.7
 **Created**: 2026-10-16
@@ -217,3 +217,39 @@ Format: `{ doc: 'foo b|ar baz', spec: { around: false, kind: 'w' }, count: 1, ex
 - `{command: "git diff --check -- editor/src/code/vim/textobjects.ts editor/test/code/vim/textobjects.test.ts impl-plans/active/vim-mode-11-textobjects.md", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/attempt-step6-dispatch-20261017-03/diff-check.log"}`
 
 **Review State**: Ready for downstream integrity and adversarial review; no review acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 dispatch rerun
+
+**Tasks Completed**: Confirmed VIM-00 is accepted for this dispatch and rechecked the accepted VIM-11 scope against the current tree. No implementation or test edit was needed. All 9 normalized text-object kinds retain inner/around handling, the counted `aw`/`aW` regressions and inclusive visual bracket regressions remain, and the purity test is included. The earlier mid finding `IR-388-VIM30-EVIDENCE` is assigned to downstream VIM-30 and is outside this plan's ownership.
+
+**Current Source SHA-256**:
+- `editor/src/code/vim/textobjects.ts`: `5bdd4ca6f1d18e5172937f809c825bf38435b5defb997508a9df53bb11b12355`
+- `editor/test/code/vim/textobjects.test.ts`: `4fd50096b1300358d903f412d07b50bf3effee28dd65c8386aca60d6ecd9c96d`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/typecheck-step6-dispatch-20261017.log", notes: "Scoped typecheck on current implementation and tests; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 41, testsPassed: 41, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/focused-vitest-step6-dispatch-20261017.log", notes: "2 files passed: 40 text-object cases and the Vim-core purity test."}`
+- `{command: "wc -l editor/src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/line-count-step6-dispatch-20261017.log", notes: "142 lines, below the 300-line limit."}`
+- `{command: "git diff --check -- editor/src/code/vim/textobjects.ts editor/test/code/vim/textobjects.test.ts impl-plans/active/vim-mode-11-textobjects.md", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/diff-check-step6-dispatch-20261017.log"}`
+
+**Handoff**: VIM-11 implementation criteria remain met. The VIM-30 evidence finding and formal independent review remain downstream; no review acceptance is claimed here.
+
+### Session: 2026-10-17 Step 6 current-source rerun
+
+**Tasks Completed**: Rechecked VIM-11 against the accepted VIM-00 contract and design sections 4.4 and 4.7. No implementation or test edits were needed. All nine text-object kinds retain inner and around handling; counted `aw`/`aW`, inclusive visual bracket expansion, and the DOM-free purity gate remain covered. `IR-388-VIM30-EVIDENCE` is owned by downstream VIM-30 and does not block this plan.
+
+**Current Source SHA-256**:
+- `editor/src/code/vim/textobjects.ts`: `5bdd4ca6f1d18e5172937f809c825bf38435b5defb997508a9df53bb11b12355`
+- `editor/test/code/vim/textobjects.test.ts`: `4fd50096b1300358d903f412d07b50bf3effee28dd65c8386aca60d6ecd9c96d`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/step6-rerun-20261017-current/typecheck.log", notes: "Scoped typecheck of current implementation and tests; no diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 41, testsPassed: 41, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/step6-rerun-20261017-current/vitest.log", notes: "2 files passed; 40 text-object cases and the purity test passed."}`
+- `{command: "wc -l editor/src/code/vim/textobjects.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/step6-rerun-20261017-current/line-count.log", notes: "142 lines, below the 300-line limit."}`
+- `{command: "git diff --check -- editor/src/code/vim/textobjects.ts editor/test/code/vim/textobjects.test.ts impl-plans/active/vim-mode-11-textobjects.md", exitStatus: 0, outcome: "passed", log: "tmp/vim-mode/VIM-11/step6-rerun-20261017-current/diff-check.log"}`
+
+**Handoff**: Assigned implementation criteria remain met. Downstream VIM-30 evidence and formal review remain with their respective owners; no review acceptance is claimed here.
+
+### Session: 2026-10-17 archive (session 391, Step 8)
+
+**Tasks Completed**: Marked Completed and moved to `impl-plans/completed/`. Acceptance basis: the session-391 fanout lists VIM-11 in `acceptedPlanIds`/`completedBranchIds` (`shared-branch-implementation:dispatch-plans-attempt-8-exec-5554`), and the serial integration review ran the combined-tree gates on the current source (`tmp/vim-mode/reconcile-391-wave8/`: check, full vitest, build, style, e2e 32/32, all exit 0). No source change in this step.

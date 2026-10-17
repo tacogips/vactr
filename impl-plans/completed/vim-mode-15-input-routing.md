@@ -256,3 +256,19 @@ Required cases (at least 18):
 - `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 103/103 tests passed; complete log `tmp/vim-mode/VIM-15/focused-vitest-step6-current.log`.
 - `git diff --stat -- editor/test/canvas/input.test.ts` — empty; existing input tests remain unmodified.
 - Line counts: `input.ts` 290; `surface.ts` 179. Hook test cases: 23.
+
+### Session: 2026-10-17 Step 6 dispatch revalidation
+
+**Tasks Completed**: Re-ran the assigned VIM-15 typecheck and focused behavioral suite against the current source after the session-381 IME repair; no implementation edits were needed.
+**Notes**: The closed-gate discard latch remains active through the browser blur/refocus attempt until `compositionend`; the regression exercises later composition events, composing `beforeinput`, direct composition updates, and a gate opening before `compositionend`, while asserting unchanged document and revision. `input.test.ts` remains unmodified. The VIM-30 evidence finding remains assigned to downstream VIM-30 and integration review.
+
+**Current Source Hashes**:
+- `editor/src/code/input.ts`: `68e94bb21ab210a2d995ad52ccf77d7bc86e353baac303e269360dafbb74a069`
+- `editor/src/code/surface.ts`: `07f92699faed318ec41f29083e03bfcd0cbcc40086d5482bcd8e7ef29c42cdf7`
+- `editor/test/canvas/input-vim-hook.test.ts`: `7be73c00252eb96d6be4d361f34bfa2690f900a84c7ceea41ff5c1e917f9998a`
+
+**Verification**:
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json` — exit 0; complete log `tmp/vim-mode/VIM-15/typecheck-step6-dispatch-20261017-rerun.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts` — exit 0, 6 files and 103/103 tests passed; complete log `tmp/vim-mode/VIM-15/focused-vitest-step6-dispatch-20261017.log`.
+- `git diff --stat -- editor/test/canvas/input.test.ts` — empty; the existing input tests remain unmodified.
+- Line counts remain `input.ts` 290 and `surface.ts` 179. The hook test contains 23 cases.

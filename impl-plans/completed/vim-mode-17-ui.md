@@ -326,3 +326,23 @@ tests remained unchanged.
 
 **Evidence Intent**: `tmp/vim-mode/VIM-17/attempt-05/plan-update-intent.json`
 records the intended progress-log hunk before this update.
+
+
+### Session: 2026-10-17 Step 6 implementation rerun (dispatch VIM-17)
+
+**Tasks Completed**: Revalidated the assigned VIM-17 implementation on the
+shared `wf/vim-mode` tree. The modules, optional transport toggle, styles and
+focused tests were already present; no source correction was needed. Reran
+the scoped typecheck, six-file Vitest suite, and new-file line-count gate.
+The unchanged controls and style-token tests passed in the same Vitest run.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-07-typecheck.log", notes: "Scoped typecheck completed without diagnostics."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts", exitStatus: 0, testsRun: 43, testsPassed: 43, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-07-focused-vitest.log", notes: "All six files passed; 43/43 tests passed, including unchanged controls and style-token suites."}`
+- `{command: "cd editor && wc -l src/code/vim-settings.ts src/code/vim-clipboard.ts src/code/vim-status-view.tsx test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts | awk 'BEGIN { ok=1 } NF == 2 && $2 != \"total\" { if ($1 >= 200) ok=0; print } END { if (!ok) exit 1 }'", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-mode/VIM-17/attempt-07-line-count.log", notes: "All seven new source/test files remain below 200 lines."}`
+
+**Shared Tree**: `controls.test.ts` and `style-tokens.test.ts` remain byte-identical
+to HEAD. Existing VIM-00 shared-tree changes and the VIM-30 review handoff were
+preserved. Formal review and final integration verification remain downstream.
+
+**Evidence Intent**: `tmp/vim-mode/VIM-17/attempt-07-plan-update-intent-final.json`.

@@ -221,3 +221,17 @@ export interface ExContext { currentLine: number; lastLine: number; visual: { fr
 **Prior Verification**: `tmp/vim-mode/VIM-13/attempt-step6-20261017-dispatch/focused-vitest-final.log` records the first regression attempt after the delimiter validator edit: 67 passed and 1 failed because command recognition still treated `_` as part of the short command name. The follow-up command-boundary correction above resolves that regression; final-source verification is recorded separately.
 
 **Downstream**: Formal test-integrity/adversarial review and combined-tree verification remain owned by later workflow steps. VIM-20 owns execution of parsed search and Ex commands.
+
+### Session: 2026-10-17 Step 6 implementation rerun
+
+**Tasks Completed**: Revalidated the assigned search and Ex parser contract against the current shared source. The implementation and tests were already present, so no TypeScript source or test edits were needed. The immutable pre-node snapshot hashes match the current files.
+
+**Verification on current source**:
+
+- `cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-13/tsconfig.json` — exit 0; log `tmp/vim-mode/VIM-13/attempt-step6-implementation-20261017/typecheck.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim/search-ex.test.ts test/code/vim/purity.test.ts` — exit 0; 2 files, 68/68 tests passed; log `tmp/vim-mode/VIM-13/attempt-step6-implementation-20261017/focused-vitest.log`.
+- `wc -l editor/src/code/vim/search.ts editor/src/code/vim/ex.ts` — exit 0; 113 and 118 lines; log `tmp/vim-mode/VIM-13/attempt-step6-implementation-20261017/line-count.log`.
+
+**Current Source SHA-256**: `search.ts` `8e64244a8453f993e664ef28126c912f1b6d7b1ea907d067d08b00eadd7632b9`; `ex.ts` `3a7b74207b6dc118f0ec5a972dc361dd9740d960cb4d3cdea45402746f2b590b`; tests `adf1a65750ccb641e498fcc065daacdbab3619df48b7b0b1cc2856027a4f8cc4`.
+
+**Downstream**: Formal review and combined-tree integration verification remain owned by later workflow steps. VIM-20 owns execution of parsed search and Ex commands.

@@ -259,7 +259,7 @@ export class VimController implements VimInputHook {
     }
     if (range.from === range.to && !range.linewise) { this.finishMode(); return; }
     if (outcome.yanked) this.writeRegister(command.register, outcome.yanked, command.operator === 'y' ? 'yank' : 'delete');
-    if (wasVisual) this.leaveVisual(outcome.cursor); this.dispatch({ changes: outcome.changes, selection: { anchor: outcome.cursor }, ...isolated(`vim.${command.operator === 'd' ? 'delete' : command.operator === 'c' ? 'change' : command.operator === 'y' ? 'yank' : command.operator === '>' ? 'indent' : command.operator === '<' ? 'outdent' : 'case'}`) });
+    if (wasVisual) this.leaveVisual(range.from); this.dispatch({ changes: outcome.changes, selection: { anchor: outcome.cursor }, ...isolated(`vim.${command.operator === 'd' ? 'delete' : command.operator === 'c' ? 'change' : command.operator === 'y' ? 'yank' : command.operator === '>' ? 'indent' : command.operator === '<' ? 'outdent' : 'case'}`) });
     if (outcome.enterInsert) this.startSession('insert', 1, entryDepth, !wasVisual); else this.finishMode();
   }
 

@@ -1,6 +1,6 @@
 # Vim Keymap: Renderer Hop Label Overlay Hook Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; review and serial finalization are downstream)
 **Plan ID**: VK-04 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md section 7.4, 12
 **Created**: 2026-10-17
@@ -75,11 +75,57 @@ equality (`it('keeps Text-backed and string-backed renderer commands identical')
 
 ## Completion Criteria
 
-- [ ] RenderFeedback has the two optional fields; overlay key includes `hopRevision`
-- [ ] At least 4 new passing cases; existing canvas tests pass
-- [ ] Diff within the narrow-hook budget
-- [ ] Progress Log entry added
+- [x] RenderFeedback has the two optional fields; overlay key includes `hopRevision`
+- [x] At least 4 new passing cases; existing canvas tests pass
+- [x] Diff within the narrow-hook budget
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-04 implementation
+
+**Tasks Completed**: Renderer hop overlay hook, four dedicated renderer tests,
+scoped typecheck and focused canvas verification.
+
+**Files and identities**:
+- `editor/src/code/renderer.ts`: `38162d3b855a2d2d09de8d1a4d926b106639d74c`; 685 lines.
+- `editor/test/canvas/renderer-hop.test.ts`: `a1985cc5ba1dff68b0445e1ad4bb5063c0cf48aa`.
+- `impl-plans/active/vim-keymap-04-renderer-hop-overlay.md` before this entry:
+  `347e74bf695d6e2c0f26540b716f1a1b373013df`.
+- `git diff --stat -- src/code/renderer.ts`: 8 insertions, 1 deletion (9 changed lines).
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-04/tsconfig.json", exitStatus: 0, outcome: "passed", log: "tmp/vim-keymap/VK-04/attempt-3-typecheck.log"}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/renderer-hop.test.ts test/canvas/gpu.test.ts test/canvas/cursor-shape.test.ts test/canvas/frame.test.ts", exitStatus: 0, testsRun: 91, testsPassed: 91, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-04/attempt-3-canvas-tests.log"}`
+- The scoped typecheck first reported TS7053 in the fake GL proxy; the test target was typed as `Record<string, unknown>` and both required gates passed on the final source. Initial wrapper logs were incomplete due to zsh's read-only `status` name and are not verification evidence.
+
+**Notes**: `hopRevision` invalidates the overlay, labels render through the existing fill/text overlay path, absent and empty labels preserve draw counts, unchanged revisions reuse the overlay, and null positions are skipped. Review and serial finalization remain downstream workflow steps.
+
+### Session: 2026-10-17 VK-04 author self-check
+
+The tests were strengthened to observe uploads to the overlay and overlayText
+buffers directly. The following source identity and verification supersede the
+attempt-3 evidence above; the earlier logs remain preserved.
+
+- Final renderer identity: `38162d3b855a2d2d09de8d1a4d926b106639d74c` (685 lines).
+- Final test identity: `bfefe97af10fcc73ad3ab7bc30f73aa6242ca01b`.
+- Final plan identity before this follow-up: `67e54a08721d755d5d96cc9e2ed50fcac3aab24f`.
+- `git diff --stat -- src/code/renderer.ts`: 8 insertions, 1 deletion; `git diff --check -- src/code/renderer.ts test/canvas/renderer-hop.test.ts` exited 0.
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-04/tsconfig.json", exitStatus: 0, outcome: "passed", log: "tmp/vim-keymap/VK-04/attempt-4-typecheck.log"}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/renderer-hop.test.ts test/canvas/gpu.test.ts test/canvas/cursor-shape.test.ts test/canvas/frame.test.ts", exitStatus: 0, testsRun: 91, testsPassed: 91, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-04/attempt-4-canvas-tests.log"}`
+
+### Session: 2026-10-17 VK-04 independent review repair
+
+Read-only reviewer `/root/vk04_review` found that the previous fixture
+compared instance counts rather than command geometry. The fixture now records
+each emitted layer and each instance rectangle/color, compares full draw
+commands for absent versus empty labels, and asserts that a visible label
+emits both fill (`overlay`) and text (`overlayText`) commands. This is within
+VK-04's test ownership. The prior mapper finding remains outside this renderer
+plan; the accepted design assigns its routing behavior to the mapper/controller
+implementation plans.
+
+- Final renderer identity remains `38162d3b855a2d2d09de8d1a4d926b106639d74c`.
+- Final test identity: `51979ff3a0293a0a9bcca6bb481813f34226ebd7`.
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-04/tsconfig.json", exitStatus: 0, outcome: "passed", log: "tmp/vim-keymap/VK-04/attempt-5-typecheck.log"}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/renderer-hop.test.ts test/canvas/gpu.test.ts test/canvas/cursor-shape.test.ts test/canvas/frame.test.ts", exitStatus: 0, testsRun: 91, testsPassed: 91, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-04/attempt-5-canvas-tests.log"}`

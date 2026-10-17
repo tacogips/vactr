@@ -1,6 +1,6 @@
 # Vim Keymap: Notation, Schema Compiler and Action Table Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VK-01 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 2, 3, 4.2 (step 6), 4.3, 4.4.1, 4.5, 7.5, 8.1
 **Created**: 2026-10-17
@@ -174,11 +174,35 @@ human readable and include the offending value where short.
 
 ## Completion Criteria
 
-- [ ] Exports match the pinned signatures exactly
-- [ ] All three files within budget; purity test passes
-- [ ] At least 62 new passing test cases
-- [ ] Verification records logged; Progress Log entry added
+- [x] Exports match the pinned signatures exactly
+- [x] All three files within budget; purity test passes
+- [x] At least 62 new passing test cases
+- [x] Verification records logged; Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-01 implementation
+**Tasks Completed**: Notation parser/formatter, action ID table, schema compiler, and focused tests.
+**Source hashes**: notation.ts `124c1b29a8d356956b7f8fc30f3e5aaa895bc0e1`; actions.ts `aa05e1e83dc2ea5d6efd69fa94eef9866ec77559`; keymap-schema.ts `c95643dd240786d811737c0a0c24340d882cc8a7`; notation.test.ts `202c61c4fd91ed2a39261251313aab354b511c38`; keymap-schema.test.ts `284a23c0750aef3e37e699ff6c4fffeb3687fa9a`; actions.test.ts `9b78935d5c8ac1fcbc1c39d26976c96c49e693c6`.
+**Notes**: The initial scoped typecheck exposed a test-only union narrowing error (`tmp/vim-keymap/VK-01/attempt-1/typecheck.log`, exit 1); the assertion was narrowed by target kind and the exact required typecheck then passed at `tmp/vim-keymap/VK-01/attempt-2/typecheck.log`. The action-mode assertions were tightened to match the accepted design table and exercise an incompatible mode. Adversarial finding VK01-ADV-1 was repaired by segmenting plain runs once, remembering a failed closing-angle search, and appending segments iteratively to avoid argument-stack limits. Attempt-3 long-input tests exposed the spread-call limit (Vitest exit 1); the correction passed all attempt-4 checks. The earlier mapper re-entry review finding concerns mapper/controller routing and regression tests allocated to downstream VK-10/VK-13/VK-20; no mapper behavior is in VK-01 writePaths.
+**Verification**:
+- {"command":"cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-01/tsconfig.json","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-2/typecheck.log","notes":"Scoped VK-01 sources and tests."}
+- {"command":"cd editor && ./node_modules/.bin/vitest run test/code/vim/notation.test.ts test/code/vim/keymap-schema.test.ts test/code/vim/actions.test.ts test/code/vim/purity.test.ts","exitStatus":0,"testsRun":123,"testsPassed":123,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-2/vitest.log","notes":"Four files passed; 123 total passing tests, including purity and more than 62 new cases."}
+
+
+### Session: 2026-10-17 VK-01 adversarial repair
+**Tasks Completed**: Repaired linear-time notation parsing; added 200,000-character plain and unmatched-angle tests, mixed long-run token parsing, and a capped long-rhs compile test that verifies invalid-entry skipping and sibling retention; corrected hash labels.
+**Verification**:
+- {"command":"cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-01/tsconfig.json","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-4/typecheck.log","notes":"Scoped VK-01 sources and tests."}
+- {"command":"cd editor && ./node_modules/.bin/vitest run test/code/vim/notation.test.ts test/code/vim/keymap-schema.test.ts test/code/vim/actions.test.ts test/code/vim/purity.test.ts","exitStatus":0,"testsRun":127,"testsPassed":127,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-4/vitest.log","notes":"Four files passed, including purity and all long-input regressions."}
+- {"command":"node --experimental-strip-types --no-warnings --input-type=module -e \"const {parseNotation}=await import('./src/code/vim/notation.ts'); for (const n of [2000,8000,32000,250000]) { const t=performance.now(); const r=parseNotation('a'.repeat(n), null); console.log('plain',n,Math.round(performance.now()-t)+'ms',r.keys?.length); } for (const n of [250000]) { const t=performance.now(); const r=parseNotation('<'.repeat(n), null); console.log('unmatched-angle',n,Math.round(performance.now()-t)+'ms',r.keys?.length); }\"","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-4/timing.log","notes":"Plain inputs: 2K 0ms, 8K 1ms, 32K 2ms, 250K 15ms. Unmatched angle run: 250K 2ms."}
+**Prior attempt**: attempt-3 Vitest initially exited 1 because `keys.push(...segments)` exceeded the argument stack for 200,000 keys; fixed with iterative appends. Full output is preserved in `tmp/vim-keymap/VK-01/attempt-3/vitest.log`.
+
+### Session: 2026-10-17 VK-01 current-source verification
+**Tasks Completed**: Rechecked VK01-ADV-1's linear-time parser correction on the current shared source tree; no implementation-source edits were needed in this session.
+**Source hashes (git blob)**: notation.ts `124c1b29a8d356956b7f8fc30f3e5aaa895bc0e1`; actions.ts `aa05e1e83dc2ea5d6efd69fa94eef9866ec77559`; keymap-schema.ts `c95643dd240786d811737c0a0c24340d882cc8a7`; notation.test.ts `202c61c4fd91ed2a39261251313aab354b511c38`; keymap-schema.test.ts `284a23c0750aef3e37e699ff6c4fffeb3687fa9a`; actions.test.ts `9b78935d5c8ac1fcbc1c39d26976c96c49e693c6`.
+**Notes**: An initial attempt to append the typecheck exit used zsh's read-only `status` variable; the typecheck was rerun with `rc`, and the complete attempt-5 log records exit 0. Current-source parser timing: 250,000 plain characters in 16 ms and 250,000 unmatched `<` characters in 2 ms. Formal independent review and downstream mapper/integration work remain assigned to later workflow plans.
+**Verification**:
+- {"command":"cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-01/tsconfig.json","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-5/typecheck.log","notes":"Scoped VK-01 sources and tests on the current shared tree."}
+- {"command":"cd editor && ./node_modules/.bin/vitest run test/code/vim/notation.test.ts test/code/vim/keymap-schema.test.ts test/code/vim/actions.test.ts test/code/vim/purity.test.ts","exitStatus":0,"testsRun":127,"testsPassed":127,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-5/vitest.log","notes":"Four files passed, including purity and all long-input regressions."}
+- {"command":"cd editor && node --experimental-strip-types --no-warnings --input-type=module -e \"const {parseNotation}=await import('./src/code/vim/notation.ts'); for (const n of [2000,8000,32000,250000]) { const t=performance.now(); const r=parseNotation('a'.repeat(n), null); console.log('plain',n,Math.round(performance.now()-t)+'ms',r.keys?.length); } const n=250000; const t=performance.now(); const r=parseNotation('<'.repeat(n), null); console.log('unmatched-angle',n,Math.round(performance.now()-t)+'ms',r.keys?.length);\"","exitStatus":0,"testsRun":0,"testsPassed":0,"failureCount":0,"outcome":"passed","log":"tmp/vim-keymap/VK-01/attempt-5/timing.log","notes":"250K plain parsed in 16 ms; 250K unmatched-angle parsed in 2 ms."}

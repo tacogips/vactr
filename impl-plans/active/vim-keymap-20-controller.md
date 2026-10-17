@@ -1,6 +1,6 @@
 # Vim Keymap: Controller Integration (routeKey, mapper, hints, hop, extended) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review and serial integration pending)
 **Plan ID**: VK-20 (wave 2)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 1, 4.1-4.4, 4.6, 5, 6.2, 6.3, 7.1, 7.5, 8.2, 11.1
 **Created**: 2026-10-17
@@ -172,7 +172,7 @@ byte equivalent (all new code paths guarded by `runtime !== null`);
 - insert `abkj` (keys `i a b k j`) -> doc gains `ab`, mode normal, nothing extra typed
 - insert `k` then advance timeoutlen -> `k` inserted via `typed`; `k` then `x` -> `kx`; dot repeat replays the insert including `k`
 - `<Space>y` then `iw` -> `+` register clipboard write with the word
-- `+` after two edits -> cursor at the older change; `mm` on `(a)` -> jumps to the match
+- `+` after two edits -> first press lands on the newest change, second press on the older change (design 357, VK-13 lines 90-95); `mm` on `(a)` -> jumps to the match
 - `zc`/`zj`/`zk` -> `scrolls` records center delta, +1, -1
 - `<Esc><Esc>` with an active search -> snapshot.search null; single `<Esc>` + timeout -> pending cleared
 - `gn`/`<C-g>` with `diagnostics: [5, 20]` -> cursor 5 then 20; no diagnostics -> message `no diagnostics`
@@ -196,11 +196,93 @@ byte equivalent (all new code paths guarded by `runtime !== null`);
 
 ## Completion Criteria
 
-- [ ] `setKeymap`, `blur`, `flushPendingInput`, `routeKey` behavior as specified
-- [ ] All listed cases pass, including every DR-K1 regression and the parity table
-- [ ] Line budgets met; purity passes
-- [ ] Progress Log entry added
+- [x] `setKeymap`, `blur`, `flushPendingInput`, `routeKey` behavior as specified
+- [x] All listed cases pass, including every DR-K1 regression and the parity table
+- [x] Line budgets met; purity passes
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-20 implementation attempt 1
+
+**Tasks completed**: Controller/runtime integration, 33-row K0 parity table,
+extended controller coverage, DR-K1 routing regressions, hints, hop, macros,
+flush/blur lifecycle, and plan-owned progress record.
+
+**Implementation**: Added `keymap-runtime.ts` (mapper sink, timeout/hint
+lifecycle and hop session) and connected it to `VimController`. `routeKey`
+now orders hop session, parser argument bypass, then mapper; leftover and remap
+keys use the same route. Added live `setKeymap`, K0 reset, insert key delivery,
+diagnostic/hop actions, extended join/scroll/surround execution, change-list
+recording, replay, asynchronous external-update flush, and snapshot views.
+
+**Verification**:
+- `cd editor && npm run check`: exit 0; `tmp/vim-keymap/VK-20/attempt-1/npm-check-final-5.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts`: exit 1; 1,229 passed, 1 failed. The new `+` older-change regression expected offset 0 but `ChangeList.step(-1, 1)` returned the newest position at offset 3. Log: `tmp/vim-keymap/VK-20/attempt-1/focused-exact-blocked-final.log`.
+- Earlier complete selected suite run: exit 0, 1,227/1,227 passed before adding the final `+` regression case; `tmp/vim-keymap/VK-20/attempt-1/focused-exact-final-2.log`.
+- New controller/parity/extended suites passed 59/59 before the final cases; `tmp/vim-keymap/VK-20/attempt-1/vk20-positive-final-4.log`.
+- `wc -l`: controller 836 (<=850), runtime 135 (<=300); `tmp/vim-keymap/VK-20/attempt-1/line-budget-final.log`.
+- `git diff --check` on VK-20 paths: exit 0.
+
+### Session: 2026-10-17 VK-20 review repair
+
+**Tasks completed**: Corrected the `+` controller regression to assert the
+accepted ChangeList behavior: after two edits, the first `+` (mise-darwin
+`g;`) lands on the newest recorded change at offset 3, and the second reaches
+the older change at offset 0. Renamed the case to describe walking newest to
+older. The prior VK-13/`marks.ts` ownership blocker was a test expectation
+mistake; production `marks.ts` remains unchanged (blob
+`7df7653c4ffc294cfa79cd95f61bb2c90801c3d7`).
+
+**Rationale**: `design-docs/specs/design-vim-keymap-hints-hop.md:357` specifies
+that a new change resets the walk index to after newest, and
+`impl-plans/active/vim-keymap-13-extended-builtins.md:90-95` specifies that
+`g;` moves older from that position. The probe
+`tmp/vim-keymap/reconcile/attempt-5/changelist-probe.log` observes first step
+3, second step 0, then E662. The previous focused failure log remains preserved
+at `tmp/vim-keymap/VK-20/attempt-1/focused-exact-blocked-final.log`.
+
+**Verification**:
+- `cd editor && npm run check`: exit 0; `tmp/vim-keymap/VK-20/attempt-2/npm-check.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts`: exit 0, 1,230/1,230 passed; `tmp/vim-keymap/VK-20/attempt-2/focused-vitest.log`.
+- `cd editor && wc -l src/code/vim/controller.ts src/code/vim/keymap-runtime.ts`: exit 0, 836/135 lines; within 850/300 limits.
+- `git hash-object editor/src/code/vim/marks.ts`: exit 0, `7df7653c4ffc294cfa79cd95f61bb2c90801c3d7` (unchanged accepted VK-13 source).
+- `git diff --check -- <VK-20 paths>`: exit 0.
+
+Independent test-integrity and adversarial reviews, then serial integration,
+remain downstream; no approval is claimed here.
+
+### Session: 2026-10-17 VK-20 insert-mismatch review repair
+
+**Finding**: `VK20-insert-mismatch-key-dropped` (high, adversarial review
+`comm-007201`). The runtime callback discarded the boolean returned by the
+re-entrant `routeKey`; `handleKey` then consumed the original prefix-mismatch
+event, so its key was neither inserted natively nor delivered by the controller.
+
+**Correction**: The callback now checks the route result and, only when it is
+false and the controller remains in insert or replace mode, delivers the key
+through a shared printable `host.typeText` / non-printable `host.defaultKey`
+helper. `deliverMappedInsertKey` shares that helper after its existing single
+`handleSessionKey` call. The route order and top-level unmapped-key behavior
+remain unchanged. The test input helper now translates `<BS>` to the actual
+`Backspace` keyboard event.
+
+**Regression coverage**: Added immediate, no-timer tests for `kx|`, `like|`,
+`k\n|` after `<CR>`, and `a|` after `k<BS>`. Existing `kj` consumption,
+timeout behavior, DR-K1 routing cases, `+` newest-then-older assertions, and
+parity cases remain in the focused suite.
+
+**Verification**:
+- `cd editor && npm run check`: exitStatus 0; log `tmp/vim-keymap/VK-20/attempt-3/retry-1-final-npm-check.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts`: exitStatus 0, 1,234/1,234 passed; log `tmp/vim-keymap/VK-20/attempt-3/retry-1-focused-vitest.log`.
+- `wc -l editor/src/code/vim/controller.ts editor/src/code/vim/keymap-runtime.ts`: exitStatus 0, 843/135 lines; log `tmp/vim-keymap/VK-20/attempt-3/structural-checks.log`.
+- Protected blobs: `marks.ts` remains `7df7653c4ffc294cfa79cd95f61bb2c90801c3d7`; `mapper.ts` remains `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986` (VK-10 accepted blob); same structural-check log.
+- `git diff --check` on VK-20 paths: exitStatus 0; same structural-check log.
+
+The first attempt-3 Vitest run exposed that the test helper was passing the literal
+string `<BS>` instead of a browser Backspace key; that run failed 1/1,234 and is
+preserved at `tmp/vim-keymap/VK-20/attempt-3/focused-vitest.log`. The helper was
+corrected, and the subsequent full focused suite passed. An initial npm check
+wrapper also used zsh's readonly `status` variable; the successful final-source
+rerun is recorded above. Independent test-integrity and adversarial review are
+still pending; this is not a review acceptance claim.

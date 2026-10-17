@@ -35,7 +35,7 @@ export function sidecarName(name: string): string {
   return `${stem}.bindings.json`;
 }
 
-function baseName(path: string): string {
+export function baseName(path: string): string {
   const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
   return i >= 0 ? path.slice(i + 1) : path;
 }
@@ -100,7 +100,7 @@ export interface TauriPlugins {
   fs: TauriFs;
 }
 
-async function loadTauriPlugins(): Promise<TauriPlugins> {
+export async function loadTauriPlugins(): Promise<TauriPlugins> {
   const [dialog, fs] = await Promise.all([
     import('@tauri-apps/plugin-dialog'),
     import('@tauri-apps/plugin-fs'),
@@ -180,7 +180,7 @@ const BINDINGS_TYPE: PickerType = {
   accept: { 'application/json': ['.json'] },
 };
 
-function isAbort(e: unknown): boolean {
+export function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError';
 }
 
@@ -236,7 +236,7 @@ export class BrowserFiles implements FileAccess {
       await w.close();
       return;
     }
-    this.download(baseName(name), text, mime);
+    downloadText(this.win.document, baseName(name), text, mime);
   }
 
   private openWithInput(): Promise<OpenedFile> {
@@ -258,15 +258,15 @@ export class BrowserFiles implements FileAccess {
     });
   }
 
-  private download(name: string, text: string, mime: string): void {
-    const doc = this.win.document;
-    const url = URL.createObjectURL(new Blob([text], { type: mime }));
-    const a = doc.createElement('a');
-    a.href = url;
-    a.download = name;
-    doc.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
+}
+
+export function downloadText(doc: Document, name: string, text: string, mime: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const a = doc.createElement('a');
+  a.href = url;
+  a.download = name;
+  doc.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

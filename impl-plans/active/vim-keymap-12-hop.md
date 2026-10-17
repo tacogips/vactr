@@ -1,6 +1,6 @@
 # Vim Keymap: Hop Targets, Labels and Session Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; serial integration pending)
 **Plan ID**: VK-12 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 7.1-7.3, 7.5
 **Created**: 2026-10-17
@@ -106,10 +106,37 @@ Session:
 
 ## Completion Criteria
 
-- [ ] Pinned API; file within budget; purity passes
-- [ ] At least 14 passing cases, including prefix-freeness and the 4,096 cap
-- [ ] Progress Log entry added
+- [x] Pinned API; file within budget; purity passes
+- [x] At least 14 passing cases, including prefix-freeness and the 4,096 cap
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 implementation
+
+**Tasks completed**: VK-12 pure hop engine and unit coverage.
+
+**Files**:
+- `editor/src/code/vim/hop.ts` (157 lines; blob `333b4c53d2d712c3def6c25360d0adc985d20ef1`): pinned exports, visible target collection, smartcase, ordering, 4096 cap, prefix-free labels and hop session.
+- `editor/test/code/vim/hop.test.ts` (88 lines; blob `32b8e117530ac18f7b36b4d300e27aaa93c1cb24`): 22 hop cases including label sizes 1/26/27/100/700, session flow and cap.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-12/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-12/attempt-2/scoped-typecheck.log", notes: "Scoped to hop.ts and hop.test.ts; exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/hop.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 24, testsPassed: 24, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-12/attempt-2/vitest.log", notes: "Two files passed; 22 hop assertions plus 2 purity assertions."}`
+
+**Prior attempt**: `tmp/vim-keymap/VK-12/attempt-1/vitest.log` exited 1 (6/24 assertions). The failures were incorrect expected positions/order in newly authored fixtures and prompted a non-printable-grapheme guard; attempt 2 passed on final source.
+
+**Notes**: Dependency VK-00 was admitted by `acceptedPlanIds`. No controller, renderer, or DOM integration was added; those seams remain assigned to VK-20/VK-04/VK-30. Formal review and serial combined-tree verification remain downstream.
+
+### Session: 2026-10-17 current-tree verification rerun
+
+**Tasks completed**: Re-ran VK-12's scoped typecheck and hop/purity tests on the current shared tree; implementation source was unchanged.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-12/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-12/attempt-3/scoped-typecheck.log", notes: "Current-tree scoped typecheck; exit=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/hop.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 24, testsPassed: 24, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-12/attempt-3/vitest.log", notes: "Two files passed; exit=0."}`
+
+**Notes**: The DR-K1 mapper re-entry finding remains assigned to VK-10/VK-13/VK-20 and combined integration review; it is outside VK-12's pure hop engine contract. Controller and renderer integration remain assigned to downstream plans.
+
+### Session: 2026-10-17 (owner fix after session-398 VK-30 blocker)
+**Notes**: `hopTargets` ordering recomputed `graphemeColumn` inside the sort comparator, which is quadratic on long lines (the 5,000-character cap case took 1.3 s alone and timed out under aggregate load). Line and grapheme column are now recorded once per target during the scan and the sort uses precomputed keys; ordering is unchanged. Cap case 1 ms; `hop.test.ts` 23/23; VK-30 aggregate `vitest run test/canvas test/code/vim test/code/vim-keymap-store.test.ts test/platform` 1537/1537.

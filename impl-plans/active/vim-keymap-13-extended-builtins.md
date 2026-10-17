@@ -1,6 +1,6 @@
 # Vim Keymap: Extended Built-ins, Surround and Parser Contract Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review and serial integration pending)
 **Plan ID**: VK-13 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 1 (K0), 3 (last paragraph), 4.1 (`awaitingArgument`), 5, 7.5 (operator target)
 **Created**: 2026-10-17
@@ -153,11 +153,66 @@ after delete/change: the start of the former pair. One `EditOutcome`
 
 ## Completion Criteria
 
-- [ ] Pinned exports and grammar; file budgets met; purity passes
-- [ ] Existing Vim tests unchanged and passing (K0)
-- [ ] At least 40 new passing cases
-- [ ] Progress Log entry added
+- [x] Pinned exports and grammar; file budgets met; purity passes
+- [x] Existing Vim tests unchanged and passing (K0)
+- [x] At least 40 new passing cases
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-13 implementation
+**Tasks Completed**: Parser extended grammar and argument-state contract; Ctrl-letter normalization gate; extended change classification; ChangeList; raw join and viewport scroll helpers; pure surround add/change/delete; four new test files.
+**Notes**: Controller execution remains owned by VK-20. No Rust files or shared host/controller files were edited. Sibling edits in `editor/src/code/input.ts`, `editor/src/code/vim/hop.ts`, and sibling plans were observed on the shared worktree and left untouched.
+**Source Hashes**:
+- `editor/src/code/vim/parser.ts`: `1a975000811c01758af4442c15b2eb64e1f90134` (298 lines)
+- `editor/src/code/vim/keys.ts`: `a5a8d7261f0286433c50da821dc99e58219ae7a8`
+- `editor/src/code/vim/execute.ts`: `06d29a4f9cc74d6e23512cbec4c3f759f76f7f41`
+- `editor/src/code/vim/marks.ts`: `7df7653c4ffc294cfa79cd95f61bb2c90801c3d7` (65 lines)
+- `editor/src/code/vim/extended.ts`: `5312005cf0ef30457d4ee5660ed886f82b482a01` (35 lines)
+- `editor/src/code/vim/surround.ts`: `e5460d7d418cb04ec716454eca4b92cad6fc8b75` (73 lines)
+- `editor/test/code/vim/parser-extended.test.ts`: `e76d73722763b598423abb6f7e56096caa6bbe77`
+- `editor/test/code/vim/keys-extended.test.ts`: `fab8137cca2f608469ee8433325f10ac8c7431e9`
+- `editor/test/code/vim/surround.test.ts`: `bdfdeb8c3f8880ca9158a944e87d08500cdaf227`
+- `editor/test/code/vim/extended.test.ts`: `d1a899f5a734ac662925f8731f5b1b12bef0bc1b`
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-13/attempt-1/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-5/final-typecheck.log", notes: "Final source; includes assigned files and controller.ts."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim", exitStatus: 0, testsRun: 1030, testsPassed: 1030, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-5/final-vitest.log", notes: "28 Vim test files passed; existing Vim tests were not modified."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser-extended.test.ts test/code/vim/keys-extended.test.ts test/code/vim/surround.test.ts test/code/vim/extended.test.ts", exitStatus: 0, testsRun: 80, testsPassed: 80, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-5/new-tests.log", notes: "80 new passing cases, exceeding the 40-case minimum."}`
+**Prior Verification**: Attempt-1 scoped typecheck failed on new test syntax (`tmp/vim-keymap/VK-13/attempt-1/typecheck.log`; shell did not append the exit marker because zsh reserves `status`). Attempt-2 failed on malformed test table (`attempt-2/typecheck.log`, exit 1). Attempt-3 found test typing issues (`attempt-3/typecheck.log`, exit 1). Attempt-4 full Vim suite found 8 failures (`attempt-4/vitest.log`, exit 1); corrected in source/test attempt 5. Attempt-5 typecheck and focused suite passed; final-source reruns above passed.
+
+### Session: 2026-10-17 VK-13 test-integrity repairs
+**Tasks Completed**: Repaired VK13-TI-1, VK13-TI-2 and VK13-TI-3 within VK-13 paths. `joinRaw` now clamps to two lines and expands a single-line visual selection; parser argument-state scanning skips operator/ys counts, covers g~/gu/gU and incomplete ys targets, and reports combined operator/surround counts; surround aliases b/r/B/a are tight. Added requested regression cases, including literal `ysiwb` and `cs)B` parser inputs, without modifying existing parser test files.
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-13/attempt-1/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-6/retry-3/typecheck.log", notes: "Final repair source including literal alias sequence assertions; scoped VK-13 TypeScript files and controller dependency typecheck."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim", exitStatus: 0, testsRun: 1055, testsPassed: 1055, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-6/retry-3/vitest.log", notes: "28 test files; final repair source including literal alias sequence assertions."}`
+- `wc -l editor/src/code/vim/parser.ts` -> 298 lines.
+**Prior Verification**: First attempt-6 Vim run failed 2 newly added awaitingArgument rows (`tmp/vim-keymap/VK-13/attempt-6/vitest.log`, 1053 passed / 2 failed, exit 1); added cs-pair pending handling and distinguished incomplete `g~g` from doubled `g~g~`, then reran final source successfully. Retry-3 is the current-source gate after adding literal alias-input assertions; the earlier retry-2 gate was superseded.
+**Source Hashes**:
+- `editor/src/code/vim/parser.ts`: `1a975000811c01758af4442c15b2eb64e1f90134` (298 lines)
+- `editor/src/code/vim/extended.ts`: `5312005cf0ef30457d4ee5660ed886f82b482a01` (35 lines)
+- `editor/src/code/vim/surround.ts`: `e5460d7d418cb04ec716454eca4b92cad6fc8b75`
+- `editor/test/code/vim/parser-extended.test.ts`: `e76d73722763b598423abb6f7e56096caa6bbe77`
+- `editor/test/code/vim/surround.test.ts`: `bdfdeb8c3f8880ca9158a944e87d08500cdaf227`
+- `editor/test/code/vim/extended.test.ts`: `d1a899f5a734ac662925f8731f5b1b12bef0bc1b`
+**Handoff**: Independent test-integrity and adversarial review of the three repairs, followed by serial integration gates, remain downstream workflow steps.
+
+### Session: 2026-10-17 VK-13 current-tree verification
+**Tasks Completed**: Re-ran the assigned scoped TypeScript check and complete Vim test directory on the current shared source tree. Completion criteria remain satisfied: extended-off parity, new behavior coverage, and parser line budget.
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-13/attempt-1/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-8/typecheck.log", notes: "Current-tree scoped typecheck."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim", exitStatus: 0, testsRun: 1055, testsPassed: 1055, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-8/vitest.log", notes: "28 test files passed on current tree."}`
+- `wc -l editor/src/code/vim/parser.ts` -> 298 lines; `git diff --check` on VK-13 source and test paths -> exit 0.
+**Handoff**: DR-K1 mapper re-entry behavior remains owned by mapper integration (VK-10/VK-20) and final integration review; VK-13 provides the parser `awaitingArgument` contract and tests its parser states. Independent review and serial integration gates remain downstream.
+
+### Session: 2026-10-17 VK-13 quote-surround repair
+**Tasks Completed**: Repaired VK13-ADV-1-quote-surround-blanks. `selectedPair` now trims only outer spaces/tabs for quote text-object ranges and verifies that both span endpoints are the requested quote. Bracket ranges and `trimInnerSpaces` are unchanged. Added four regression cases for double/single quote deletion and change with adjacent blanks; the first also asserts the cursor remains at the former opening quote (position 4).
+**Reproduction**: Before the source fix, `tmp/vim-keymap/VK-13/attempt-9/pre-fix-surround-repro.log` showed the four new cases failing (13 passed, 4 failed), including the reviewed stray-quote and deleted-blank outputs.
+**Source Hashes**:
+- `editor/src/code/vim/surround.ts`: `6494645d7860bec52371e67fc2055da4706c5da0` (79 lines)
+- `editor/test/code/vim/surround.test.ts`: `045ab627c94f2a24889a5c69797343c1313766fa`
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-13/attempt-1/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-10/typecheck.log", notes: "Current-source scoped typecheck."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/surround.test.ts test/code/vim/parser-extended.test.ts test/code/vim/keys-extended.test.ts test/code/vim/extended.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 110, testsPassed: 110, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-10/focused-vitest.log", notes: "All five selected files passed, including quote and bracket regressions plus purity."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim", exitStatus: 0, testsRun: 1104, testsPassed: 1104, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-10/vim-suite.log", notes: "All 31 Vim test files passed on the current shared tree, including the previously failing VK-10 mapper tests."}`
+- `{command: "git diff --check -- editor/src/code/vim/surround.ts editor/test/code/vim/surround.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-13/attempt-10/diff-check.log", notes: "No whitespace errors."}`
+**Handoff**: Independent adversarial re-review of VK13-ADV-1 and serial integration gates remain downstream.

@@ -1,6 +1,6 @@
 # Vim Keymap: Hint Tree Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review and serial finalization pending)
 **Plan ID**: VK-11 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 6.1, 6.2
 **Created**: 2026-10-17
@@ -83,10 +83,25 @@ Build keymaps with `compileKeymap` from VK-01.
 
 ## Completion Criteria
 
-- [ ] Pinned API; file within budget; purity passes
-- [ ] At least 10 passing cases covering groups, overrides, `<Nop>` removal, ordering, triggers
-- [ ] Progress Log entry added
+- [x] Pinned API; file within budget; purity passes
+- [x] At least 10 passing cases covering groups, overrides, `<Nop>` removal, ordering, triggers
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-11 implementation
+
+**Tasks Completed**: Added pure hint generation and trigger matching from compiled maps plus the design's built-in table. Mapping descriptions, action-id fallbacks, descendant groups, exact-map overrides, `<Nop>` removal, mode-specific built-ins, deterministic key-class ordering, formatted prefix/summary, and trigger equality are covered. Hop-off mappings are already dropped by VK-01 compilation and therefore do not enter the hint list.
+
+**Source Hashes and Budgets**:
+- `editor/src/code/vim/hints.ts`: `1c2fb0ae0afa1d74475e2ee0dcb9ab3fc0f98b29` (112 lines; budget 200)
+- `editor/test/code/vim/hints.test.ts`: `ffb829824581a96db6011091dde1dfb54fe9051f` (110 lines)
+- `impl-plans/active/vim-keymap-11-hints.md`: refreshed after this entry
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-11/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-11/attempt-3/typecheck.log", notes: "Scoped to VK-11 implementation and test files plus their imported modules."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/hints.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 16, testsPassed: 16, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-11/attempt-3/vitest.log", notes: "15 hint cases and the Vim purity test passed, including n/x built-in parity."}`
+
+**Prior Verification**: The first scoped typecheck found two test-call argument errors, corrected before the passing rerun. The first focused Vitest run passed 14/15 because the hop-off test expected the wrong class ordering; the test expectation was corrected to match the specified lowercase, uppercase, digit, punctuation and special-key ordering. A further x-mode parity assertion was added, and the final run passed 16/16. Earlier logs remain in `tmp/vim-keymap/VK-11/attempt-1/` and `attempt-2/`.
+
+**Evidence**: Per-edit intentions are recorded in `tmp/vim-keymap/VK-11/attempt-1/source-edit-intent.md`. The scoped config is `tmp/vim-keymap/VK-11/tsconfig.json`. No files outside this plan's write paths were edited. Independent review and serial integration verification remain downstream.

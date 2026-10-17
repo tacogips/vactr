@@ -173,6 +173,87 @@
   border-radius: 0;
   font: inherit;
 }
+.vact-code[data-vim='on'] .vact-vim-hints {
+  position: absolute;
+  z-index: 4;
+  left: 8px;
+  bottom: calc(var(--vt-control-h-compact) + 16px);
+  max-height: 40%;
+  max-width: min(48rem, calc(100% - 16px));
+  overflow: hidden;
+  padding: var(--vt-space-2);
+  border: var(--vt-border-w) solid var(--vt-border);
+  border-radius: 0;
+  color: var(--vt-text);
+  background: var(--vt-surface);
+  font-family: var(--vt-font-mono);
+  font-size: var(--vt-text-sm);
+  pointer-events: none;
+}
+.vact-code[data-vim='on'] .vact-vim-hints-prefix { margin-bottom: var(--vt-space-2); color: var(--vt-accent); }
+.vact-code[data-vim='on'] .vact-vim-hints-grid { display: grid; gap: var(--vt-space-1) var(--vt-space-2); grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr)); }
+.vact-code[data-vim='on'] .vact-vim-hints-row { display: grid; grid-template-columns: 5ch minmax(0, 1fr); gap: var(--vt-space-2); }
+.vact-code[data-vim='on'] .vact-vim-hints-row[data-group='true'] .vact-vim-hints-desc { color: var(--vt-text-muted); }
+.vact-code[data-vim='on'] .vact-vim-hints-key { color: var(--vt-text); }
+.vact-code[data-vim='on'] .vact-vim-hints-desc { overflow: hidden; color: var(--vt-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.vact-code[data-vim='on'] .vact-vim-hints-summary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+.vact-code[data-vim='on'] .vact-vim-keymap {
+  position: absolute;
+  z-index: 5;
+  right: var(--vt-space-2);
+  bottom: calc(var(--vt-control-h-compact) + 16px);
+  display: grid;
+  gap: var(--vt-space-2);
+  width: min(36rem, calc(100% - 16px));
+  max-height: min(40rem, 70%);
+  overflow: auto;
+  padding: var(--vt-space-2);
+  border: var(--vt-border-w) solid var(--vt-border-strong);
+  border-radius: 0;
+  color: var(--vt-text);
+  background: var(--vt-surface);
+  font-family: var(--vt-font-mono);
+  font-size: var(--vt-text-sm);
+}
+.vact-code[data-vim='on'] .vact-vim-keymap-presets,
+.vact-code[data-vim='on'] .vact-vim-keymap-actions { display: flex; flex-wrap: wrap; gap: var(--vt-space-2); }
+.vact-code[data-vim='on'] .vact-vim-keymap button {
+  min-height: var(--vt-control-h-compact);
+  padding: 0 var(--vt-space-2);
+  border: var(--vt-border-w) solid var(--vt-border);
+  border-radius: 0;
+  color: var(--vt-text);
+  background: var(--vt-raised);
+  font: inherit;
+}
+.vact-code[data-vim='on'] .vact-vim-keymap button:hover { background: var(--vt-raised-hover); }
+.vact-code[data-vim='on'] .vact-vim-keymap button[aria-pressed='true'] { border-color: var(--vt-accent); background: var(--vt-selection); }
+.vact-code[data-vim='on'] .vact-vim-keymap-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 12rem;
+  resize: vertical;
+  padding: var(--vt-space-2);
+  border: var(--vt-border-w) solid var(--vt-border);
+  border-radius: 0;
+  color: var(--vt-text);
+  background: var(--vt-bg-sunken);
+  font-family: var(--vt-font-mono);
+  font-size: var(--vt-text-sm);
+}
+.vact-code[data-vim='on'] .vact-vim-keymap-status { color: var(--vt-text-muted); }
+.vact-code[data-vim='on'] .vact-vim-keymap-issues { display: grid; gap: var(--vt-space-1); margin: 0; padding-left: var(--vt-space-4); }
+.vact-code[data-vim='on'] .vact-vim-keymap-issues li[data-severity='error'] { color: var(--vt-danger); }
+.vact-code[data-vim='on'] .vact-vim-keymap-issues li[data-severity='warning'] { color: var(--vt-warn); }
+.vact-code[data-vim='on'] .vact-vim-keymap-button { border-radius: 0; font-family: var(--vt-font-mono); }
 @media (pointer: coarse) {
   .vact-vim-mode,
   .vact-vim-ex { min-height: var(--vt-control-h-compact); }

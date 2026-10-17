@@ -22,6 +22,7 @@ export interface RenderFeedback {
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
   cursorShape?: CursorShape; cursorEnd?: number | null;
+  hopLabels?: readonly { pos: number; text: string }[]; hopRevision?: number;
 }
 interface DrawCommand { rect: CodeRect; color: number[]; texture?: WebGLTexture; uv?: [number, number, number, number]; generation?: number; cursor?: boolean; flags?: number; layer: GeometryLayer; slot: number }
 export interface RendererOptions {
@@ -222,7 +223,7 @@ export class CanvasRenderer {
       const selectionKey = staticAnnotations.filter(a => a.kind === 'selection').map(a => `${a.from}:${a.to}`).join(';');
       const backgroundKey = `${viewportKey}|${feedback.textRevision ?? this.textRevisionCounter}|${feedback.annotationsRevision ?? 0}|${selectionKey}`;
       const handlesKey = (feedback.handles ?? []).map(handle => `${handle.pos}:${handle.end ? 1 : 0}`).join(',');
-      const overlayKey = `${backgroundKey}|${feedback.annotationsRevision ?? 0}|${feedback.cursor ?? ''}|${feedback.cursorVisible !== false}|${handlesKey}|${feedback.cursorShape ?? 'bar'}|${feedback.cursorEnd ?? ''}`;
+      const overlayKey = `${backgroundKey}|${feedback.annotationsRevision ?? 0}|${feedback.cursor ?? ''}|${feedback.cursorVisible !== false}|${handlesKey}|${feedback.cursorShape ?? 'bar'}|${feedback.cursorEnd ?? ''}|${feedback.hopRevision ?? ''}`;
       const backgroundStaticDirty = this.backgroundKey !== backgroundKey;
       const overlayDirty = this.overlayKey !== overlayKey;
       for (const [layer, writer] of this.writers) {
@@ -272,6 +273,12 @@ export class CanvasRenderer {
           this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
           this.currentLayer = 'overlayText'; this.drawRun(this.labelRun(a.label, width), x + 4, y, [], rgbaCss(this.palette.labelText)); this.currentLayer = 'overlay';
         }
+      }
+      if (overlayDirty) for (const label of feedback.hopLabels ?? []) {
+        const r = this.layout.coordsAtPos(label.pos, this.view); if (!r) continue;
+        const x = r.left - (this.view.left ?? 0), y = r.top - (this.view.top ?? 0), width = Math.max(8, label.text.length * 8 + 4);
+        this.quad({ left: x, right: x + width, top: y, bottom: y + this.layout.font.lineHeight }, this.palette.labelFill);
+        this.currentLayer = 'overlayText'; this.drawRun(this.labelRun(label.text, width), x + 2, y, [], rgbaCss(this.palette.labelText)); this.currentLayer = 'overlay';
       }
       this.currentLayer = 'overlay';
       if (overlayDirty) for (const handle of feedback.handles ?? []) {

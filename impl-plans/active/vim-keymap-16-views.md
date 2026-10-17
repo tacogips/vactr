@@ -1,6 +1,6 @@
 # Vim Keymap: Hint Panel, Keymap Settings Panel and Status-Row Views Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review and serial integration pending)
 **Plan ID**: VK-16 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 4.5, 6.4, 8.1; design-docs/specs/design-ui-style.md
 **Created**: 2026-10-17
@@ -135,11 +135,46 @@ square), the issue list, and `.vact-vim-keymap-button`. All scoped under
 
 ## Completion Criteria
 
-- [ ] Pinned view APIs; budgets met
-- [ ] At least 14 new passing cases; existing vim view tests pass
-- [ ] CSS square and token-based
-- [ ] Progress Log entry added
+- [x] Pinned view APIs; budgets met (35/90 and 67/170 lines; status view 121 lines)
+- [x] At least 14 new passing cases; existing vim view tests pass (18 new; 58/58 focused suite)
+- [x] CSS square and token-based; every `border-radius` match is `0`
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-16 implementation
+
+**Tasks Completed**: Added the hint panel and keymap settings views, optional status-row keymap button and command-line resolver, square token-based CSS, and 18 view/status test cases. Existing Vim mount/input tests passed unchanged.
+
+**Source Hashes**:
+- `editor/src/code/vim-hints-view.tsx`: `f240faecd5fb12bd9a36f9fdcc25cf2aef020935a05147526c6d5bcb3d2dad28` (35 lines)
+- `editor/src/code/vim-keymap-view.tsx`: `0587174cf6c656cb032ba01b2811b5961136a42f31ccc74da2d71770fe2b1bb6` (67 lines)
+- `editor/src/code/vim-status-view.tsx`: `a7423643cbc5c29fa21323851bb28152450d74b4276966fcb7fc23dc04fc1366` (121 lines)
+- `editor/test/canvas/vim-hints-view.test.ts`: `bfb381deefd8958867306a229613a2c48751151492e8a92513fb54f679295b48`
+- `editor/test/canvas/vim-keymap-view.test.ts`: `e972594cee016f6550af7f7839cb57cf0cbe552b396b5e45373b7c5ab3b3d1fa`
+- `editor/test/canvas/vim-status-keymap.test.ts`: `b3dee54d41e89446750e59dab9117bde1b85fc09470cae90c31ebc3dc6f16472`
+- `editor/src/code/code.css`: `cb22a1eeb26854e00adbc95e59037ca18743da1178a1f71c097d3502d2c075ae`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-16/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-16/attempt-3/typecheck.log", notes: "Scoped VK-16 TSX and tests typecheck."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/vim-hints-view.test.ts test/canvas/vim-keymap-view.test.ts test/canvas/vim-status-keymap.test.ts test/canvas/vim-mount.test.ts test/canvas/vim-input.test.ts", exitStatus: 0, testsRun: 58, testsPassed: 58, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-16/attempt-3/vitest.log", notes: "5 files passed; the three new files contribute 18 cases; existing Vim mount/input tests pass."}`
+- `{command: "cd editor && rg -n 'border-radius' src/code/code.css", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-16/attempt-3/css-radius.log", notes: "Every reported value is 0."}`
+- Scope note: `cd editor && npm run test:style` exited 1 in attempt-3 before analysis because `editor/dist/index.html` was absent. This is outside VK-16 gates: the committed manifest assigns `npm run test:style` and the `editor/dist` artifact root to VK-40, whose style probe covers both panels. This attempt is not a VK-16 verification gate or blocker.
+
+**Evidence**: Per-edit intent and full logs are under `tmp/vim-keymap/VK-16/attempt-1/` through `attempt-3/`. Initial focused failures were corrected; the final-source focused run passes 58/58. The prior DR-K1 mapper argument-routing finding remains owned by VK-10/VK-13/VK-20 and is outside VK-16 paths.
+
+**Downstream**: VK-30 owns mounting these views. Independent review and serial integration are later workflow steps. VK-40 owns the shared style probe and includes both panels.
+
+
+### Session: 2026-10-17 VK-16 review repair
+
+**Tasks Completed**: Resolved `IR-VK16-false-style-gate-blocker`. VK-16's three manifest-owned gates pass on the current sources. The `npm run test:style` check belongs to VK-40, as recorded above; it is not a VK-16 blocker. The initial attempt-4 wrapper log is preserved at `tmp/vim-keymap/VK-16/attempt-4/` and was incomplete because zsh rejected assignment to its read-only `status` variable; all gates were rerun with complete logs under `attempt-4/retry-1/`.
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-16/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-16/attempt-4/retry-1/typecheck.log", notes: "Scoped VK-16 typecheck on unchanged plan source identities."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/vim-hints-view.test.ts test/canvas/vim-keymap-view.test.ts test/canvas/vim-status-keymap.test.ts test/canvas/vim-mount.test.ts test/canvas/vim-input.test.ts", exitStatus: 0, testsRun: 58, testsPassed: 58, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-16/attempt-4/retry-1/vitest.log", notes: "Five files passed; 18 new view/status cases and existing Vim mount/input tests passed."}`
+- `{command: "cd editor && rg -n 'border-radius' src/code/code.css", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-16/attempt-4/retry-1/css-radius.log", notes: "Every reported border-radius value is 0."}`
+
+**Source Identities**: The seven VK-16 source/test Git blobs remain `53e1c8a8`, `71e911f2`, `53b8e755`, `ccfe3183`, `79ca810b`, `2b8a7d51`, and `dd95b81b`; no source files were changed by this repair. The dispatch manifest is unchanged.
+
+**Downstream**: Independent test-integrity and adversarial review, VK-30 mounting, and serial integration remain downstream. VK-16 implementation has no remaining owned blocker.

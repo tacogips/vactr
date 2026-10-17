@@ -1,6 +1,6 @@
 # Vim Keymap: Web/Tauri Keymap Store and JSON Import/Export Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VK-03 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 8.3, 8.4 (TS side), 8.5
 **Created**: 2026-10-17
@@ -106,11 +106,30 @@ export class TauriJsonFiles implements JsonFiles { constructor(load?: () => Prom
 
 ## Completion Criteria
 
-- [ ] Pinned exports exist; files within budget
-- [ ] files.test.ts unchanged and passing
-- [ ] At least 14 new passing cases
-- [ ] Progress Log entry added
+- [x] Pinned exports exist; files within budget
+- [x] files.test.ts unchanged and passing
+- [x] At least 14 new passing cases
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-03 implementation
+
+**Tasks Completed**: Keymap store, JSON file adapters, focused tests, progress record.
+
+**Source hashes after edits**:
+- `editor/src/code/vim-keymap-store.ts`: `a00d7834275d81cc84f818a06630796db6370fba`
+- `editor/src/platform/files.ts`: `e7138814ef2847a394c701af63899126cdd19eec`
+- `editor/src/platform/json-files.ts`: `24eebfc4cae6c542d3eacee9f91d0708f5831acc`
+- `editor/test/code/vim-keymap-store.test.ts`: `ae254fb9b69101e1a3bc84b3f67a6ee016491e22`
+- `editor/test/platform/json-files.test.ts`: `77687f52be81444f89cf1890be09a108e1dde1fb`
+
+`editor/src/platform/json-files.ts` is 140 lines (the plan's maximum); all other touched source files are below their stated limits.
+
+**Verification** (final source):
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-03/attempt-1/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-03/attempt-1/scoped-tsc-final3.log", notes: "Scoped TS check includes all VK-03 modules, focused tests, and unchanged files.test.ts; rerun after final source adjustment."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim-keymap-store.test.ts test/platform/json-files.test.ts test/platform/files.test.ts", exitStatus: 0, testsRun: 31, testsPassed: 31, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-03/attempt-1/vitest-focused-final2.log", notes: "24 new tests pass; files.test.ts passes unchanged; rerun after final source adjustment."}`
+
+**Earlier attempts**: Initial scoped-tsconfig path was incorrect; its correction exposed mock typing errors. The initial test run had one invalid post-removal anchor assertion (30/31 passed). These were corrected; final source-matched commands above pass. Logs are retained in `tmp/vim-keymap/VK-03/attempt-1/`.
+
+**Drift**: Other wave-0 plans modified their declared files while this plan ran. No edits were made outside this plan's paths; `editor/test/platform/files.test.ts` remains unchanged.

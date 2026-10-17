@@ -1,6 +1,6 @@
 # Vim Keymap: KeyMapper (resolution, timeouts, remap) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review and serial integration pending)
 **Plan ID**: VK-10 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 4.1, 4.2, 4.4, 4.6, 6.3
 **Created**: 2026-10-17
@@ -127,10 +127,77 @@ throw.
 
 ## Completion Criteria
 
-- [ ] Pinned API exactly; file within budget; purity passes
-- [ ] All listed cases pass, including the DR-K1 re-entry case
-- [ ] Progress Log entry added
+- [x] Pinned API exactly; file within budget; purity passes
+- [x] All listed cases pass, including the DR-K1 re-entry case
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-10 implementation
+
+**Tasks Completed**: Added the pure KeyMapper trie and timer lifecycle, resolution/replay/recursion behavior, remap and leftover `sink.route` re-entry, and 24 focused mapper/purity tests. DR-K1 regressions cover normal `gg`, `zz`, `mk`, `mgj`, a remapped `mgj` sequence, and visual-mode `gg`. Mapper is 205 lines (260-line budget); test file is 230 lines.
+
+**Source Hashes**:
+- `editor/src/code/vim/mapper.ts`: `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986`
+- `editor/test/code/vim/mapper.test.ts`: `ef266bb64e8905a9fed480b9ce4e1156c853a7ec`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-1/final-typecheck.log", notes: "Scoped to mapper.ts and mapper.test.ts; exitStatus=0."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 24, testsPassed: 24, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-1/final-vitest.log", notes: "2 files passed; includes all 23 mapper cases and the purity suite."}`
+- `{command: "git diff --check -- editor/src/code/vim/mapper.ts editor/test/code/vim/mapper.test.ts impl-plans/active/vim-keymap-10-mapper.md", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "inline (command output)", notes: "No whitespace errors."}`
+
+**Superseded Attempts**:
+- Initial focused vitest run: exit 1, 10 harness expectation failures / 24 tests (`tmp/vim-keymap/VK-10/attempt-1/vitest.log`). Corrected route fallback expectations and parser-state fixture behavior.
+- Retry 2 focused vitest run: exit 1, 2 harness assertion failures / 24 tests (`tmp/vim-keymap/VK-10/attempt-1/retry-2-vitest.log`). Corrected the prompt counter getter and accounted for routed re-entry.
+
+**Evidence**: Per-edit intentions and complete verification logs are under `tmp/vim-keymap/VK-10/attempt-1/`. Scoped tsconfig is `tmp/vim-keymap/VK-10/tsconfig.json`.
+
+**Drift**: Shared worktree contains changes owned by concurrent plans, including mapper dependencies in `types.ts`, `keymap-schema.ts`, `notation.ts`, and `actions.ts`; preserved as read-only inputs. No other paths were edited.
+
+**Downstream**: Independent test-integrity/adversarial review and combined-tree integration are pending. VK-20 owns controller integration and confirms the route callback contract against the production parser.
+
+### Session: 2026-10-17 VK-10 test-integrity repair
+
+**Finding Repaired**: `VK10-TI-1` (`comm-007156`). Replaced the direct-recursion emitted-limit fixture with a depth-2 fan-out (`a -> b*256`, `b -> cccc`). The test asserts E223 once, empty buffer, positive truncated builtin output under 1024, and a second E223 after a new top-level feed. That second-feed assertion verifies `recursionFailed` reset only; `VK10-TI-2` below separately verifies emitted-key counter reset. The direct `a -> a` depth-limit test and all DR-K1 cases remain unchanged.
+
+**Source Hashes**:
+- `editor/src/code/vim/mapper.ts`: `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986` (unchanged after mutation restore)
+- `editor/test/code/vim/mapper.test.ts`: `e69c974e83eaf1472ce277323cc28f1777f7a46a`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-2/typecheck.log", notes: "Scoped mapper and test typecheck on repaired test source."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 24, testsPassed: 24, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-2/vitest.log", notes: "2 files passed on repaired test source."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts -t 'stops a fan-out remap expansion after 1,000 emitted keys'", exitStatus: 0, testsRun: 1, testsPassed: 1, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-2/fanout-positive.log", notes: "New cap regression passes with production guard present."}`
+
+**Mutation Evidence**: Temporarily removed the emitted-key comparison from `mapper.ts`; the new test failed (1 failed, 22 skipped) because no E223 was produced, demonstrating cap sensitivity. Full log: `tmp/vim-keymap/VK-10/attempt-2/mutation-cap-removed.log`. Restored from `mapper.pre-mutation.ts`; current mapper hash exactly matches the pre-mutation `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986`. Mutation source copy and intent are under `tmp/vim-keymap/VK-10/attempt-2/`.
+
+### Session: 2026-10-17 VK-10 Step 6 rerun
+
+**Tasks Completed**: Rechecked the existing `VK10-TI-1` repair and the DR-K1 re-entry coverage on the current shared-tree source. No implementation source changes were needed. Updated the plan status to distinguish completed implementation from pending independent review and serial integration.
+
+**Source Hashes**:
+- `editor/src/code/vim/mapper.ts`: `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986`
+- `editor/test/code/vim/mapper.test.ts`: `e69c974e83eaf1472ce277323cc28f1777f7a46a`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-3/retry/typecheck.log", notes: "Scoped typecheck includes mapper.ts and mapper.test.ts."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 24, testsPassed: 24, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-3/vitest.log", notes: "Current source passed all mapper and purity tests."}`
+
+**Evidence**: The initial typecheck log wrapper used zsh's reserved `status` variable and did not record a command exit; the successful exact rerun and complete log are preserved under `tmp/vim-keymap/VK-10/attempt-3/retry/`.
+
+**Downstream**: Independent review of the repaired finding and combined-tree integration/finalization remain pending; they are not VK-10 implementation gates.
+
+### Session: 2026-10-17 VK-10 test-integrity repair VK10-TI-2
+
+**Finding Repaired**: `VK10-TI-2` (`comm-007177`). Added `resets the emitted-key budget at each top-level feed` beside the fan-out guard test. With `a -> b.repeat(200)` and `b -> cc`, each top-level `a` emits 600 remap keys and yields 400 `c` builtins. Two feeds produce 800 `c` builtins without E223, proving the budget resets between feeds. The prior fan-out test's second-feed assertion is now explicitly described as checking only the `recursionFailed` reset.
+
+**Source Hashes**:
+- `editor/src/code/vim/mapper.ts`: `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986` (restored byte-identically after negative control)
+- `editor/test/code/vim/mapper.test.ts`: `ee4c3f15a06c8d8883acd8f9e3c49cc6bdea69f6`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-10/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-4/typecheck.log", notes: "Scoped typecheck on restored mapper and updated mapper tests."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts test/code/vim/purity.test.ts", exitStatus: 0, testsRun: 25, testsPassed: 25, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-4/vitest.log", notes: "All existing mapper/purity cases and VK10-TI-2 pass on restored source."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/mapper.test.ts -t 'resets the emitted-key budget at each top-level feed'", exitStatus: 0, testsRun: 1, testsPassed: 1, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-10/attempt-4/reset-positive.log", notes: "New regression passes with the production reset present."}`
+
+**Mutation Evidence**: Saved exact pre-mutation source at `tmp/vim-keymap/VK-10/attempt-4/mapper.pre-mutation.ts`, then removed only `this.emittedKeys = 0;` while retaining `this.recursionFailed = false;`. The new test failed as expected: one failed, 23 skipped, exitStatus=1, with E223 on the second top-level feed (`tmp/vim-keymap/VK-10/attempt-4/mutation-reset-removed.log`). Restored mapper.ts from the saved copy; `git hash-object` returned `b6bda6bd39ced1d0840bbc7e49f9a6aac7d11986`.

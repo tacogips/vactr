@@ -9,6 +9,7 @@ import type { AudibleClock, Clock } from './clock';
 import type { Formatter } from '../code/format';
 import type { CompletionEngine } from '../code/completion-types';
 import type { SyntaxLoader, SyntaxWorkerPort } from '../code/syntax';
+import type { VimKeymapDeps } from '../code/vim-mount';
 
 export type Tier = 'browser' | 'native';
 
@@ -30,6 +31,8 @@ export interface EditorDeps {
   formatter?: Formatter;
   /** Optional wasm completion engine for the code area. */
   completion?: CompletionEngine;
+  /** Optional Vim keymap persistence and JSON file adapters. */
+  vimKeymap?: VimKeymapDeps;
   /** Set by the owning area's mount; read at use time. */
   code?: CodeApi;
   midi?: MidiApi;

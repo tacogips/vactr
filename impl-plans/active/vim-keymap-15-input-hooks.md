@@ -1,6 +1,6 @@
 # Vim Keymap: InputController Hooks (typeText, defaultKey, flushPendingInput) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review and serial finalization pending)
 **Plan ID**: VK-15 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 4.2 (forced flush), 4.4, 4.4.1
 **Created**: 2026-10-17
@@ -80,10 +80,36 @@ composing; keep `historyUndo`/`historyRedo` handling unchanged.
 
 ## Completion Criteria
 
-- [ ] `typeText`, `defaultKey` public; flush call sites added; file under 330 lines
-- [ ] At least 8 new passing cases; existing input tests unchanged and passing
-- [ ] Progress Log entry added
+- [x] `typeText`, `defaultKey` public; flush call sites added; file under 330 lines
+- [x] At least 8 new passing cases; existing input tests unchanged and passing
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 — VK-15 implementation
+
+**Tasks Completed**: VK-15 implementation and plan-scoped verification.
+
+**Changes**:
+- Added public `InputController.typeText` using the shared insert-text/overwrite path, with a composition guard.
+- Added public `defaultKey` for the ten contracted Vim notation keys, routed through default keymaps and `KeyboardController`; synthetic Enter falls back to the existing text insertion path because synthetic keydown does not produce browser `beforeinput`.
+- Flushed pending Vim input before compositionstart, beforeinput and fallback input, while honoring controller and platform composition state. When a fallback input flush changes the document, apply the captured native text mutation at the post-flush selection to preserve event order.
+- Added 12 cases in `input-keymap-hooks.test.ts`. Existing `input.test.ts`, `input-vim-hook.test.ts` and `vim-input.test.ts` are unchanged.
+
+**Source Hashes (git blob)**:
+- `editor/src/code/input.ts`: `7745ad239b1a08220368dfd41cb455cb786caa48` (329 lines)
+- `editor/test/canvas/input-keymap-hooks.test.ts`: `789616aef0ef00c8622de6c5bdcaea422758c1c5`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-15/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-15/attempt-5/typecheck.log", notes: "Scoped to InputController and the new input keymap hook suite."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/input-keymap-hooks.test.ts test/canvas/input.test.ts test/canvas/input-vim-hook.test.ts test/canvas/vim-input.test.ts", exitStatus: 0, testsRun: 100, testsPassed: 100, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-15/attempt-5/vitest.log", notes: "4 files passed, including 12 new hook cases; existing input test files remain unchanged."}`
+- `{command: "cd editor && git diff --check -- src/code/input.ts test/canvas/input-keymap-hooks.test.ts", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-15/attempt-5/diff-check.log", notes: "No whitespace errors in owned source/test paths."}`
+- `wc -l editor/src/code/input.ts` — 329 lines; existing input test files remain byte-identical to HEAD.
+
+**Resolved During Implementation**:
+- Prior failed run `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/input-keymap-hooks.test.ts test/canvas/input.test.ts test/canvas/input-vim-hook.test.ts test/canvas/vim-input.test.ts", exitStatus: 1, testsRun: 98, testsPassed: 97, failureCount: 1, outcome: "failed-resolved", log: "tmp/vim-keymap/VK-15/attempt-1/vitest.log", notes: "Test caret started at document position 0; the Backspace case now places it at the end."}`.
+- Prior failed run `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/input-keymap-hooks.test.ts test/canvas/input.test.ts test/canvas/input-vim-hook.test.ts test/canvas/vim-input.test.ts", exitStatus: 1, testsRun: 100, testsPassed: 99, failureCount: 1, outcome: "failed-resolved", log: "tmp/vim-keymap/VK-15/attempt-2/vitest.log", notes: "Synthetic keydown does not generate browser beforeinput for Enter; defaultKey now applies the newline fallback when keymaps and KeyboardController decline it."}`.
+- Prior failed run `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/input-keymap-hooks.test.ts", exitStatus: 1, testsRun: 12, testsPassed: 11, failureCount: 1, outcome: "failed-resolved", log: "tmp/vim-keymap/VK-15/attempt-3/fallback-probe.log", notes: "Reproduced native fallback insertion preceding deferred text (`axkb`); fallback reconciliation now applies it at the post-flush selection."}`.
+- Prior failed run `{command: "cd editor && ./node_modules/.bin/vitest run test/canvas/input-keymap-hooks.test.ts test/canvas/input.test.ts test/canvas/input-vim-hook.test.ts test/canvas/vim-input.test.ts", exitStatus: 1, testsRun: 100, testsPassed: 99, failureCount: 1, outcome: "failed-resolved", log: "tmp/vim-keymap/VK-15/attempt-4/vitest.log", notes: "Same strengthened native fallback ordering regression as the focused probe; fixed before attempt 5."}`.
+
+**Pending**: Independent test-integrity/adversarial review and serial combined-tree integration/finalization remain downstream workflow steps.

@@ -1,6 +1,6 @@
 # Vim Keymap: Tauri App-Config Store Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Plan ID**: VK-02 (wave 0)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md section 8.4
 **Created**: 2026-10-17
@@ -97,11 +97,13 @@ after the template commands in `generate_handler!`. No other edits.
 
 ## Completion Criteria
 
-- [ ] vim_keymap.rs exports the pinned items; lib.rs registers the three commands
-- [ ] At least 7 new Rust tests pass; cargo check and test exit 0
-- [ ] capabilities/default.json unchanged (`git diff --stat` shows no change)
-- [ ] Progress Log entry added
+- [x] vim_keymap.rs exports the pinned items; lib.rs registers the three commands
+- [x] Eight new Rust tests pass; cargo check and test exit 0
+- [x] capabilities/default.json unchanged
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17
+**Tasks Completed**: VK-02 implementation and assigned verification
+**Notes**: Added `editor/src-tauri/src/vim_keymap.rs` with size/object/version-1 validation, exact-text reads/writes, atomic temp-file replacement, reset behavior, three app-config commands, and eight unit tests. Registered the commands in `editor/src-tauri/src/lib.rs`. `CARGO_TERM_QUIET=true cargo check --manifest-path editor/src-tauri/Cargo.toml` exited 0 (`tmp/vim-keymap/VK-02/logs/cargo-check.log`). `CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml` exited 0 with 17 passed and 0 failed (`tmp/vim-keymap/VK-02/logs/cargo-test.log`). `CARGO_TERM_QUIET=true cargo fmt --manifest-path editor/src-tauri/Cargo.toml -- --check` and `git diff --check` exited 0. `editor/src-tauri/capabilities/default.json` has no changes. Independent review and serial finalization remain downstream workflow steps.

@@ -190,14 +190,35 @@ identifier. Keep the DOM and `@codemirror/view` rules. The existing
 
 ## Completion Criteria
 
-- [ ] types.ts exports exactly the pinned additions; file under 140 lines
-- [ ] host.ts implements every new member; host-keymap.test.ts has at least 8 passing cases
-- [ ] vim-mount.ts contains only the listed stubs
-- [ ] tsconfig.json has `resolveJsonModule: true`
-- [ ] purity.test.ts rejects timer globals and passes
-- [ ] Verification records 1-3 logged
-- [ ] Progress Log entry added
+- [x] types.ts exports exactly the pinned additions; file under 140 lines
+- [x] host.ts implements every new member; host-keymap.test.ts has at least 8 passing cases
+- [x] vim-mount.ts contains only the listed stubs
+- [x] tsconfig.json has `resolveJsonModule: true`
+- [x] purity.test.ts rejects timer globals and passes
+- [x] Verification records 1-3 logged; full check failure is confined to concurrent sibling files and scoped typecheck passes
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-00 implementation
+
+**Tasks Completed**: Added the pinned shared types, test-host behavior and 11 host tests, compile-only mount stubs, JSON module resolution, and the timer-global purity rule.
+
+**Source Hashes**:
+- `editor/src/code/vim/types.ts`: `f2f683bcd8ae79b9879d81edd9e551708a494687` (77 lines)
+- `editor/test/code/vim/host.ts`: `687af56ce09765227c35bd918e8eb62ed9419ff9`
+- `editor/test/code/vim/host-keymap.test.ts`: `423bbd8ce04a1efc48b409f959f4f5947954749d` (11 cases)
+- `editor/test/code/vim/purity.test.ts`: `11642c2323020157ed371ab26b4a5ec374a2c5b8`
+- `editor/src/code/vim-mount.ts`: `785a9fc69321b0177c6923fc7065ed0ef46ee5dc`
+- `editor/tsconfig.json`: `8a27b24d9fe1b993d1c891fa8b7437f3ab252c86`
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-00/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-00/attempt-1/scoped-typecheck.log", notes: "Included the plan-pinned Vim types, motions, record, controller, mount, test host and host-keymap test."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts", exitStatus: 0, testsRun: 841, testsPassed: 841, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-00/attempt-1/vitest-focused.log", notes: "22 files passed, including all 11 new host cases and purity."}`
+- `{command: "cd editor && npm run check", exitStatus: 1, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "sibling-drift", log: "tmp/vim-keymap/VK-00/attempt-1/npm-check.log", notes: "TypeScript errors are in concurrent VK-04 test/canvas/renderer-hop.test.ts, VK-03 test/code/vim-keymap-store.test.ts, and VK-01 test/code/vim/keymap-schema.test.ts. These paths are outside VK-00 writePaths; the scoped check above passes. No sibling files were edited."}`
+
+**Evidence**: Per-edit intentions and verification logs are under `tmp/vim-keymap/VK-00/attempt-1/`. The provided design-review concern about mapper argument routing is outside VK-00's file ownership and belongs to the mapper/controller plans; this plan adds only the contract seam.
+
+**Drift**: The shared worktree contains concurrent edits in other plan paths. Preserved without modification.
+
+**Blockers**: None for VK-00. Repository-wide check must be rerun after concurrent plan files are repaired.

@@ -1,6 +1,6 @@
 # Vim Keymap: Default and mise-darwin Presets Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review pending)
 **Plan ID**: VK-14 (wave 1)
 **Design Reference**: design-docs/specs/design-vim-keymap-hints-hop.md sections 8.1 (Default document), 9.1-9.3; user-qa KQ2, KQ7
 **Created**: 2026-10-17
@@ -101,11 +101,29 @@ export const KEYMAP_PRESETS: readonly KeymapPreset[];   // [Default, mise-darwin
 
 ## Completion Criteria
 
-- [ ] Both JSON presets and index.ts exist; zero compile issues
-- [ ] Classification recorded (or the KQ2 gap recorded)
-- [ ] Tests pass
-- [ ] Progress Log entry added
+- [x] Both JSON presets and index.ts exist; zero compile issues
+- [x] Classification recorded; all three reference files were readable
+- [x] Preset tests pass (7/7)
+- [x] Progress Log entry added
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-17 VK-14 implementation
+
+**Tasks Completed**: Added both bundled preset documents, the typed preset index, and seven preset tests. The source dotfiles were readable at `/Users/taco/gits/tacogips/mise-darwin/dotfiles/.config/nvim/lua/taco/core/keymaps.lua`, `core/options.lua`, and `plugins/init.lua`. `options.lua` contains no `timeoutlen`, so the preset uses 1000 ms. No KQ2 readability gap applies.
+
+**Classification**: Reproduced keymaps include `kj`, `k`, `J`, `+`, `mm`, `zc/zj/zk`, `<Esc><Esc>`, the complete explicit `<Nop>` sets from the reference, `+` register maps, insert navigation/deletion, command-line controls, surround (`ms/mr/md`), text-object targets (`ma/mi`), diagnostic navigation and hop (`gj/gf`). The QuickRun mapping `<leader>R` uses the nearest `vactr.evaluateAll` action. The reference's unsupported hover, restart, file operations, path/Chilla actions, LSP navigation/code actions/rename, Ctrl-v paste, and insert Ctrl-a completion mapping are recorded in `unsupported` with reasons. The reference has no explicit format mapping; format-on-save is configured separately. Window/buffer/tab categories and additional Telescope picker categories are recorded as absent in the inspected keymaps file, not as invented active mappings. The plan contract requests `<leader>Y` in both n and x; x therefore includes that extra plan-required entry while the reference itself maps `Y` only in n.
+
+**Source Hashes**:
+- `editor/src/code/vim/presets/default.json`: `7619700d1480c07345bbe754ef6e6f5eb813d243`
+- `editor/src/code/vim/presets/mise-darwin.json`: `a3f897a94853041b2a1abccbc468d646902f7250`
+- `editor/src/code/vim/presets/index.ts`: `68b59dde96845e79da0c61e60d50db6aa3098436` (10 lines; under 30)
+- `editor/test/code/vim/presets.test.ts`: `63e98a54416e8dd3c59c980a0bd2b1961c44eac1` (72 lines)
+
+**Verification**:
+- `{command: "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-keymap/VK-14/tsconfig.json", exitStatus: 0, testsRun: 0, testsPassed: 0, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-14/attempt-2/typecheck.log", notes: "Scoped to presets/index.ts, the imported schema/action/notation modules and presets.test.ts; final source after the leader-qualified QuickRun correction."}`
+- `{command: "cd editor && ./node_modules/.bin/vitest run test/code/vim/presets.test.ts", exitStatus: 0, testsRun: 7, testsPassed: 7, failureCount: 0, outcome: "passed", log: "tmp/vim-keymap/VK-14/attempt-2/vitest.log", notes: "One file, seven cases; final source after the leader-qualified QuickRun correction."}`
+
+**Drift**: Shared worktree includes concurrent changes in other plan paths; VK-14 did not edit those paths. The first typecheck setup attempt used a wrong relative config path and zsh's reserved `status` variable, so TypeScript did not run in that attempt; the corrected command above passed. The initial successful source verification preceded the QuickRun lhs correction and is superseded by attempt-2.
+
+**Blockers**: None for VK-14. Formal review and consumer wiring remain downstream.

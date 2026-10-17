@@ -14,7 +14,7 @@
   ],
   "evidenceRoot": "tmp/vim-keymap",
   "reviewContext": {
-    "issueReference": "workflowInput issueTitle 'Vim mode: JSON key config (mise-darwin compatible), helix/which-key next-key hints, and hop/easymotion jumps' (no GitHub issue number); workflow opus-luna-design-and-implement-review-loop-session-395; intake comm-007071, design review comm-007073 (DR-K1 repaired), design accepted comm-007075, plan review comm-007077, plan repair comm-007078, plans accepted comm-007079",
+    "issueReference": "workflowInput issueTitle 'Vim mode: JSON key config (mise-darwin compatible), helix/which-key next-key hints, and hop/easymotion jumps' (no GitHub issue number); workflow opus-luna-design-and-implement-review-loop-session-395; intake comm-007071, design review comm-007073 (DR-K1 repaired), design accepted comm-007075, plan review comm-007077, plan repair comm-007078, plans accepted comm-007079; rerun checkpoint opus-luna-design-and-implement-review-loop-session-398 step plan-checkpoint",
     "userProblem": "The user wants the vactr code pane Vim key config to be specifiable in JSON and configurable like their Neovim setup in /Users/taco/gits/tacogips/mise-darwin, with helix/which-key style next-key candidates at the bottom left after a prefix key, and hop/easymotion jumps on gj/gf that can be switched on or off in the config.",
     "requiredOutcomes": [
       "Versioned JSON keymap document (schema version 1): leader, timeoutlen, per-mode maps (n, i, x/v, o, c) in Vim notation, rhs as a noremap/remap key sequence or a named action id, <Nop>, desc; per-entry validation that reports and skips invalid entries and never stops the editor from starting (design 2, 3, 4)",
@@ -99,6 +99,11 @@
         "findingId": "DR-K1",
         "status": "repaired",
         "summary": "Mapper leftover/remap keys must re-enter routing through sink.route"
+      },
+      {
+        "findingId": "opus-luna-design-and-implement-review-loop-session-395-step3-design-review-attempt-1-finding-1",
+        "status": "repaired",
+        "summary": "Same defect as DR-K1 (design 4.1/4.2 argument keys after buffered prefixes and remap rhs). Repaired at design 4.1 (awaitingArgument covers f F t T r m q @ ' `, register names, the second key after a parser-pending g/z, text-object characters and surround pair characters) and 4.2 steps 4-5 (leftover and remap keys re-enter the full routeKey ordering); regression tests pinned in VK-13 (awaitingArgument cases) and VK-20 (gg/zz burst, mk, mgj, fk/tk, remap X -> fk). Re-verified unchanged at HEAD 7868b1e in session-398 plan-checkpoint."
       },
       {
         "findingId": "VKPR-1",

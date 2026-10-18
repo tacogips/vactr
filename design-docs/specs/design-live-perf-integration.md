@@ -1,7 +1,9 @@
 # Live performance integration with main (merge/live-perf)
 
 **Status**: Proposed (author, 2026-10-18), workflow run
-opus-luna-design-and-implement-review-loop-session-433.
+opus-luna-design-and-implement-review-loop-session-433; revised in place
+in session-438 (UF-1 style regression, section 10; wave-1 acceptance,
+section 11; artifact roots and plan graph, section 8).
 **Branch**: `merge/live-perf`, at merge commit 9474491. This merges main
 v0.1.1 (Vim mode, Vim keymap, hints, hop) with `wf/live-perf`.
 **Baseline designs (unchanged; source of truth)**:
@@ -9,7 +11,9 @@ v0.1.1 (Vim mode, Vim keymap, hints, hop) with `wf/live-perf`.
 `impl-plans/active/live-perf-*.md` with `live-perf-dispatch.json`;
 `design-vim-mode.md` and `design-vim-keymap-hints-hop.md`.
 
-This addendum fixes the five merge regressions and finishes LP-EVIDENCE.
+This addendum fixes the five merge regressions and the UF-1 style
+regression, accepts the wave-1 work through independent review, and
+finishes LP-EVIDENCE.
 It does not redesign any accepted feature. Each change either:
 
 - restores a contract that already exists on main, or
@@ -32,6 +36,10 @@ In scope:
 6. Reviewing the unreviewed session-349 work in commit 4ca8edc (I6).
 7. Finishing LP-EVIDENCE: full gates, the section 12 record, archiving the
    plans and README updates (I7).
+8. The `npm run test:style` regression UF-1 in the right pane (I8,
+   section 10).
+9. Independent review and acceptance of the wave-1 work committed at
+   b327141 (LPI-WIRE, LPI-VIM-STOP, LPI-NS-INDEX) (I9, section 11).
 
 Out of scope:
 
@@ -41,7 +49,7 @@ Out of scope:
 - Merging into main, and any physical-iPad validation (an existing stated
   limitation).
 
-## 2. Evidence at 9474491 (2026-10-18)
+## 2. Evidence at 9474491 (2026-10-18; I8 and I9 at b327141)
 
 | ID | Observation | Root cause |
 |----|-------------|------------|
@@ -51,6 +59,8 @@ Out of scope:
 | I4 | The behavior checks momentary-right-drag, momentary-two-finger, stop-gentle-shortcut and cut-shortcut fail in Chromium and WebKit (44/52). They had never been run. | **Not yet diagnosed.** All four checks share `loadLiveFixture`, which fills the textarea, clicks `.vact-run` and waits for `momentaryHit`, so a shared failure point is likely. Run normally starts audio (editor/src/code/mount.ts:146: `onEval` calls `transport.audio.start()`, and the Run click is a user gesture). So "audio never starts" is only a candidate. It is not an established cause and must not be recorded as one unless the diagnosis run shows it. One check-side defect is established: the checks hard-code `Meta+.`, which is correct only where `navigator.platform` is Apple. |
 | I5 | e2e:examples `run-plays-moderately` fails with "no playback onset within 10 seconds". It passes on main. | **Not yet confirmed.** The failure record (tmp/examples-e2e/result.json) shows that audio **is** produced: pre-sink peak -3.05 dBFS, RMS -22.26 dBFS, eval status `ok`, audio `running`, `onsetCount: 0`. The silent sink counts an onset only when a 10 ms block at >= -40 dBFS RMS follows at least five consecutive 10 ms blocks at <= -50 dBFS (editor/test/e2e/silent-sink.mjs:64-73). So on the merged tree, from audio start, no 50 ms quiet window comes before a loud block. Either the output is not quiet before the first note, or the first note rises through the -50..-40 dB band. Static review rules out the `OutputStage` initial state (Running, gate 1.0), the `VarSlot` momentary default (`None`) and the `RampedCells` fall-through. The mechanism needs the diagnosis in 5.2. |
 | I6 | Commit 4ca8edc contains the perf-hook accessors, the four behavior checks, and a "tweak/depgraph scaling attempt" in src/ns/{depgraph,evaluator,tweak}.rs with src/ns/tests/migrate_scale.rs. It has not been reviewed. Full vitest large-eval scaling now passes (ratio 2.61; it failed at 7.59-7.83 in session 349). | Needs review (section 6). |
+| I8 | UF-1: `npm run test:style` fails on the merged tree and on 4ca8edc (`wf/live-perf`), passes on main 8866a43. Gap check findings: `button -> input` (gap -563.6, minimum 8) at 1440x900 and `button -> button` (gap -459.6) at 1180x820-coarse, Chromium and WebKit, with and without Vim (tmp/ui-style/after/report.json; baselines tmp/live-perf-int/reconcile/7-main-style.log exit 0, 9-wf-live-perf-style.log exit 1). | **Partly established.** The reconcile probe (tmp/live-perf-int/reconcile/3-gap-probe.log) at 1440x900 pairs the `.vact-section-toggle` "visuals" header button (rect y 385-413, x 864-1440, full width) with the `.pkg-proxy` URL input (y 382-410). `.pane-right` is `overflow: auto` (editor/src/app/app.css:352-355) and the package area is appended inside it (editor/src/pkg/mount.ts:72). LP-EDITOR-MOMENTARY prepends the `.vact-glide-setting` row to `.pane-right` (editor/src/bind/mount.ts:168, editor/src/bind/glide-setting.ts:20), which shifts all right-pane content down by one row. The proxy input therefore sits below the right pane's bottom edge, where it is scrolled out of view, and its unclipped rect falls inside the visuals header band. The gap check's `isVisible` (editor/test/style/ui-style.mjs:42-50) checks display, visibility and opacity only, not scroll clipping. Whether the 1180x820-coarse pair is the same mechanism, and whether the input is fully clipped, is confirmed by the S0 probe in section 10. A second, independent defect is visible in tmp/ui-style/after/chromium-1440x900@2x.png: the glide row has no horizontal inset (`padding: var(--vt-space-2) 0`, bind.css:154) and runs flush with the pane edges, while the sibling `.bind-panel`/`.bind-controls` rows use `var(--vt-space-3)` (bind.css:7). |
+| I9 | b327141 contains the wave-1 implementations: `TAG_OUTPUT_STOP = 0x1F`, `TAG_CELL_RAMP = 0x20` (src/host/wire.rs:351-352); the song arm `song::GRAPH \| song::BEGIN \| song::SLICE => song::decode(b)` (src/dsp/ring.rs:526); `fallbackStopShortcut` (editor/src/ui/stop-keys.ts:20); mount.ts:179-180 `stopAll`/`cut` gated on `vim.enabled()`; `input.code === 'Period'` pass-through (editor/src/code/vim/keys.ts:31); src/ns/tests/migrate_index_equivalence.rs. None has had an independent review. LPI-VIM-STOP has no test-integrity or adversarial review. Line counts: ring.rs 928, wire.rs 928, contracts.rs 604, evaluator.rs 957. | Accepted only through section 11. |
 
 ## 3. Wire tags (I1)
 
@@ -367,13 +377,17 @@ integration adjustments:
   each logs to
   `tmp/live-perf-int/gates/<n>-<name>.log`. There is no `--write-evidence`
   run, and the canvas `run-001` evidence stays untouched.
-- **Section 12.** design-live-performance.md gains "12. Verification record
-  (integration, workflow session 433)". It records:
+- **Section 12.** design-live-performance.md gains exactly one
+  "## 12. Verification record (integration, workflow session 438)". The
+  LPI-CLOSEOUT plan and the manifest use this same heading string. It
+  records:
   - each gate's command, exit status, tests run and passed, and log path;
   - the four behavior results per browser;
   - the e2e output path;
-  - the integration fixes I1-I6, each with a one-line pointer to this
-    document;
+  - the integration fixes I1-I6 and I8, each with a one-line pointer to
+    this document, quoting only established root causes;
+  - the wave-1 acceptance decisions of section 11 (reviewer, verdict and
+    any repair commit);
   - the stated limitation: synthetic multi-touch only, physical iPad check
     pending.
 - **Archive.** Set each live-perf plan's status to Completed, with a final
@@ -381,8 +395,13 @@ integration adjustments:
   impl-plans/active/ to impl-plans/completed/, one file at a time.
   The live-perf-int plans and their manifest stay in impl-plans/active/
   while this workflow run references them (the precedent is the
-  vim-keymap dispatch note in impl-plans/README.md). They are archived
-  in the integration commit after final review accepts them. In
+  vim-keymap dispatch note in impl-plans/README.md). After the final
+  integration review accepts every LPI plan, the workflow's integration
+  step in this same run sets each LPI plan to Completed and moves the
+  seven `live-perf-int-*.md` plans and live-perf-int-dispatch.json to
+  impl-plans/completed/, one file at a time, in the integration commit.
+  impl-plans/README.md then links only completed paths for both plan
+  sets. In
   impl-plans/README.md, the "Live performance controls" section becomes
   Completed and links to the completed paths and this addendum.
 - **README.md.**
@@ -411,26 +430,47 @@ integration adjustments:
 ## 8. Plan decomposition
 
 Plans use the prefix `impl-plans/active/live-perf-int-`. Every plan
-declares these artifactRoots:
+declares these artifactRoots, identically in its plan file and in its
+manifest entry. A bare `tmp` or `tmp/` root is never declared, so the
+fanout evidence directories are never inside an artifact root:
 
-- `target/`
+- `target`
 - `tree-sitter-vact/tree-sitter-vact.wasm`
 - `editor/node_modules`
-- `editor/dist`
-- `editor/src-tauri/target`
-- `tmp/`
-- Playwright outputs under `tmp/live-perf-int/e2e`
+- `tmp/live-perf-int/<plan>`, where `<plan>` is the plan's short name
+  (`wire`, `vim-stop`, `ns-index`, `playback`, `style`, `behavior`,
+  `closeout`)
+- plans that build the editor or run Playwright also declare
+  `editor/dist` and the specific e2e output directories
+  `tmp/canvas-cutover`, `tmp/code-render`, `tmp/canvas`,
+  `tmp/examples-e2e` and `tmp/ui-style`; LPI-PLAYBACK adds
+  `tmp/live-perf-int/main-ref` and `tmp/live-perf-int/main-ref-target`;
+  LPI-CLOSEOUT adds `editor/src-tauri/target`
 
-| Plan | Covers | Depends on | Parallel |
-|------|--------|------------|----------|
-| live-perf-int-wire | I1 (section 3) | none | wave 1 |
-| live-perf-int-vim-stop | I2, I3 (section 4) | none | wave 1 |
-| live-perf-int-ns-index | I6 name-space index part (section 6) | none | wave 1 |
-| live-perf-int-playback | I5 (5.2) | all wave-1 plans (it builds the dist and the wasm from the combined tree) | wave 2 |
-| live-perf-int-behavior | I4 (5.1), the I6 perf-hook and check part | playback (its e2e run needs the fixed product; it shares editor/dist and the lock) | wave 3 |
-| live-perf-int-closeout | I7 (section 7) | all of the above | wave 4 |
+| Plan | Covers | Depends on | Wave |
+|------|--------|------------|------|
+| live-perf-int-wire | I1 (section 3); review-and-repair rerun (section 11) | none | 1 |
+| live-perf-int-vim-stop | I2, I3 (section 4); review-and-repair rerun with test-integrity and adversarial review (section 11) | none | 1 |
+| live-perf-int-ns-index | I6 name-space index part (section 6); review-and-repair rerun (section 11) | none | 1 |
+| live-perf-int-playback | I5 (5.2) | all wave-1 plans (it builds the dist and the wasm from the combined tree) | 2 |
+| live-perf-int-style | I8 (section 10) | all wave-1 plans (its editor build includes the reviewed wave-1 editor code) and playback (serialization edge only) | 3 |
+| live-perf-int-behavior | I4 (5.1), the I6 perf-hook and check part | playback and style (its e2e run needs the fixed product and the fixed right pane; it shares editor/dist and the lock) | 4 |
+| live-perf-int-closeout | I7 (section 7) | all of the above, including style | 5 |
 
-The manifest is impl-plans/active/live-perf-int-dispatch.json.
+LPI-PLAYBACK and LPI-STYLE have disjoint source writePaths, and LPI-STYLE
+uses none of LPI-PLAYBACK's content. Both rebuild editor/dist, write the
+e2e output roots and take the measurement lock, so they must not run at
+the same time. Native fanout starts every dependency-ready plan of a wave
+at once, so the serialization is an explicit `dependsOn` edge
+(LPI-STYLE after LPI-PLAYBACK), not only a concurrency note. The
+manifest's `executionModel` states the reason.
+
+The manifest is impl-plans/active/live-perf-int-dispatch.json. It is
+revised in place: same `taskId` `live-perf-int`, same `evidenceRoot`
+`tmp/live-perf-int`, a new LPI-STYLE entry, LPI-STYLE added to the
+`dependsOn` of LPI-BEHAVIOR and LPI-CLOSEOUT, and `workflowExecutionId`
+and `originalHead` updated to this run (session-438, b327141). No second
+manifest is created.
 
 ## 9. Risks
 
@@ -447,3 +487,199 @@ The manifest is impl-plans/active/live-perf-int-dispatch.json.
 - **The I4 hypothesis may be wrong** (feature defects behind the
   check-side ones). The decision table in 5.1 assigns ownership, so this
   cannot stall.
+- **The UF-1 fix touches a gate.** S2 in section 10 excludes from gap
+  pairing only a non-probe control that is mostly clipped out by an
+  overflow ancestor (not painted). It is allowed only on the S0
+  classification (a). It keeps every threshold and every per-control
+  check, keeps painted pairs checked in the same container and across
+  containers, and carries mutation evidence that both kinds of painted
+  overlap still fail.
+- **The right-pane fix can shift other layouts.** S1 changes only the
+  glide row's own padding and width. LPI-BEHAVIOR (canvas, Vim and keymap
+  e2e) and LPI-CLOSEOUT (all gates) run after LPI-STYLE and catch a
+  shift.
+- **A wave-1 review finding may need a change outside the plan's
+  writePaths.** Section 11 R5 treats that like any other plan: stop and
+  report a scope amendment, except mechanical test or fixture updates.
+
+## 10. Right-pane style regression (I8, UF-1)
+
+The glide setting is accepted LP-EDITOR-MOMENTARY behavior
+(design-live-performance.md D6 and line 401: a "momentary glide" number
+field with an adjacent range in the controls pane, stored under
+`vactr.momentary.glideMs`). Its position as
+the first row of the right pane (editor/src/bind/mount.ts:168) stays as it
+is. This section fixes only how the row is styled and how the regression
+is classified.
+
+**S0. Diagnosis (required, before any change).** A temporary probe,
+`tmp/live-perf-int/style/probe/style-probe.mjs` (an artifact, not
+committed; modelled on tmp/live-perf-int/reconcile/probe/gap-probe.mjs),
+runs under the measurement lock against a fresh dist
+(`mise run build-wasm-release`, then
+`VACTR_REQUIRE_SESSION_ABI=1 npm run build`). It uses the same page
+setup, viewports (1440x900, 1180x820-coarse) and engines (Chromium,
+WebKit) as editor/test/style/ui-style.mjs. For each failing gap pair it
+records:
+
+- both controls' rects, classes and parents;
+- for each control, its nearest ancestor whose computed `overflow-x` or
+  `overflow-y` is not `visible` (its clipping container), that
+  container's rect, `clientHeight`, `scrollHeight` and `scrollTop`;
+- the fraction of each control's height that lies inside its clipping
+  container's rect.
+
+It classifies each pair:
+
+- **(a)** The two controls have different clipping containers, and one
+  of them lies at least half outside its container's rect (it is scrolled
+  out of view and not painted where the check measures it).
+- **(b)** Both controls are painted in the overlapping band (a real
+  overlap a user sees).
+
+The expected outcome from the I8 evidence is (a) for the 1440x900 pair.
+The 1180x820-coarse `button -> button` pair is classified the same way,
+not assumed.
+
+**S1. Glide row styling (always applied; product, bind.css).** The
+screenshot shows a real spacing defect independent of the gap finding:
+
+- `.vact-glide-setting` gets the same horizontal inset as the sibling
+  right-pane rows: `padding: var(--vt-space-2) var(--vt-space-3)`, as in
+  `.bind-panel, .bind-controls` (bind.css:7). The label no longer starts
+  at the pane edge and the range no longer runs to it.
+- The row stays solid, flat and square (no radius, no native look); the
+  coarse-pointer 36 px minimum control height stays.
+- The gaps between title, number input and range meet the test:style
+  minimum (8 px between controls).
+- editor/src/bind/glide-setting.ts changes only if the class or element
+  structure must change for this; the DOM contract tested by
+  editor/test/bind/glide-setting.test.ts (labelled number and range,
+  clamp, round, persist, `.vact-glide-setting`) stays.
+
+**S2. Painted-visibility rule for gap pairing (only on S0
+classification (a); test, editor/test/style/ui-style.mjs).** The gap
+check pairs controls that sit side by side in one painted row. The I8
+defect is that `isVisible` (ui-style.mjs:42-50) treats a control that is
+scrolled out of view as visible, so its unpainted rect can be paired
+with a painted control that happens to share the band. S2 fixes exactly
+that, and nothing broader:
+
+- **Rule.** A new predicate is used only in gap-candidate selection, in
+  the generic pairing loop (ui-style.mjs:111-122). A control is excluded
+  from gap pairing when it is mostly clipped out. That means: intersect
+  its rect with the rect of every ancestor whose computed `overflow-x`
+  or `overflow-y` is not `visible`; if the remaining painted part is
+  less than half of the control's height, or less than half of its
+  width, the control is excluded. This is the same half fraction S0 uses
+  for classification (a). Conservative guard: a control that has
+  computed `position` `fixed` or `absolute`, or has such an ancestor, is
+  never excluded. Such a control's painting can escape ancestor clipping
+  (for example the document picker popover), so it stays checked.
+- **Painted pairs stay checked, whatever their container.** Two painted
+  controls in different clipping containers (for example `.pane-code`,
+  app.css:337-342, and `.pane-right`, app.css:352-355, or a right-pane
+  control and a `.pane-section-header` toggle) are still paired and
+  gap-checked exactly as today. Container identity is never a reason to
+  skip a pair.
+- **Probe fixture unchanged.** `[data-style-probe]` controls
+  (`inProbe === true`) are never excluded by the rule. Their pairs are
+  measured exactly as today, because their gaps relative to each other do
+  not depend on scroll clipping.
+- **Everything else unchanged.** `isVisible` itself, the explicit
+  `gapCheck` calls (song-apply, sample map, bank), the gap minimums 4 and
+  8, viewports, engines, and the radius, fill, border, coarse-height,
+  native-fill and proxy checks stay as they are. Every control is still
+  inspected by every per-control check. No check is deleted.
+- This is an intentional test change for a merged-behavior difference:
+  the accepted glide row makes the right pane overflow at the two tested
+  viewports, which main's content did not. The reason is recorded in the
+  LPI-STYLE plan.
+- Mutation evidence (in `mutationEvidence`, never in the gating list):
+  1. with S2 locally reverted, test:style fails with the UF-1 findings;
+  2. a temporary fixture with two painted, overlapping controls inside
+     one container (for example the existing `[data-style-probe]` fixture
+     with a negative margin) still fails the gap check with S2 applied;
+  3. a temporary fixture with two painted, overlapping controls in
+     different clipping containers (for example a control positioned
+     inside `.pane-code` so it overlaps a painted `.pane-right` control
+     in the same band, or a painted right-pane control overlapping a
+     section-header toggle) still fails the gap check with S2 applied.
+
+**On classification (b)**, S2 is not applied. The overlap is a product
+layout defect, fixed in bind.css or glide-setting.ts. If the fix needs a
+file outside the LPI-STYLE writePaths, the plan stops and reports a scope
+amendment.
+
+**Forbidden fixes.** Resizing or reshaping the glide row only so the
+clipped proxy input leaves the header band (a pixel-coincidence fix);
+moving or hiding the glide row; changing viewports or thresholds; removing
+the gap check or the proxy check.
+
+**LPI-STYLE writePaths.** editor/src/bind/glide-setting.ts,
+editor/src/bind/bind.css, editor/test/bind/* (glide-setting.test.ts),
+editor/test/style/ui-style.mjs (S2 only), the plan file, and
+tmp/live-perf-int/style. Artifact roots per section 8, including
+`editor/dist` and `tmp/ui-style`.
+
+**Acceptance.**
+
+- The S0 probe output and classification per pair are in the plan's
+  Progress Log.
+- `npm run test:style` exits 0 ("Style assertions passed for 16
+  engine/viewport combinations"), Chromium and WebKit, with and without
+  Vim, keymap and hints, immediately after
+  `VACTR_REQUIRE_SESSION_ABI=1 npm run build`.
+- The 1440x900 screenshot shows the glide row inset like the sibling
+  rows.
+- `npm run check` reports zero errors; `vitest run test/bind` passes.
+- No touched file reaches 1000 lines.
+
+## 11. Wave-1 acceptance (I9)
+
+The wave-1 code at b327141 implements sections 3, 4 and 6 but is not yet
+accepted. LPI-WIRE, LPI-VIM-STOP and LPI-NS-INDEX stay remaining plans and
+run as **review-and-repair reruns**. Their status becomes
+"In Progress (implemented at b327141; review-and-repair rerun pending)".
+A rerun does not re-implement. It:
+
+- **R1. Checks the deliverables.** The committed code matches the plan's
+  deliverables and this design's sections 3, 4 or 6, file by file.
+- **R2. Verifies.** It runs the plan's verification commands on the
+  current tree and records each in the exact verification-record shape,
+  with logs under `tmp/live-perf-int/<plan>/rerun-438/`. Full nextest or
+  vitest runs take the measurement lock.
+- **R3. Records mutation evidence.** Local, never committed:
+  - LPI-WIRE: the CtlMsg-first song arm restored makes
+    `graph_and_begin_reject_every_truncation_trailing_bytes_and_wrong_kind`
+    fail; a colliding tag makes the disjointness guard fail.
+  - LPI-VIM-STOP: `fallbackStopShortcut` made platform-strict makes both
+    vim-mount alternate-shortcut cases fail; the `code === 'Period'`
+    pass-through removed makes the vim keys test fail.
+  - LPI-NS-INDEX: a perturbed index lookup makes
+    migrate_index_equivalence fail.
+- **R4. Is independently reviewed.** A read-only reviewer that did not
+  author the commit reviews correctness against the design and the
+  1000-line rule. For LPI-VIM-STOP the review also includes:
+  - **test-integrity review:** every changed test file in b327141
+    (vim-mount, vim-input, input-vim-hook, stop-keys, vim keys tests).
+    The vim-mount change is the intentional one of section 4 and removes
+    no assertion; the vim-input and input-vim-hook changes are mechanical
+    option renames; the new cases cover both alternate modifiers, Shift
+    `'>'`, Alt rejection and the `code === 'Period'` pass-through; no
+    test was weakened to pass.
+  - **adversarial review** of the V1-V3 edge cases: no double send for a
+    platform-Mod press with Vim on; the alternate modifier does nothing
+    with Vim off; Alt-period is ignored; `Mod-Shift-.` passes through in
+    every Vim mode; `:hush`, `vactr.hush` and keymap bindings still cut.
+- **R5. Repairs only findings.** Every high or mid finding is repaired
+  inside the plan's writePaths, with a failing-first test for a behavior
+  defect, and is listed in `addressedFeedback` with status repaired. A
+  finding that needs a change outside writePaths stops the plan (scope
+  amendment), except mechanical test or fixture updates.
+- **R6. Accepts.** The plan becomes Completed only with the reviewer's
+  verdict recorded in its Progress Log. For LPI-VIM-STOP this includes
+  both the test-integrity and the adversarial verdicts.
+
+Wave 2 (LPI-PLAYBACK) starts only after all three wave-1 plans are
+accepted.

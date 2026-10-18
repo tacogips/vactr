@@ -1,8 +1,8 @@
 # LPI-NS-INDEX: review and prove the session-349 name-space lookup index
 
-**Status**: Ready
+**Status**: In Progress (implemented at b327141; review-and-repair rerun pending)
 **Plan ID**: LPI-NS-INDEX (wave 1)
-**Design Reference**: `design-docs/specs/design-live-perf-integration.md` section 6 (I6, name-space index part)
+**Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 6 (I6, name-space index part), 2 (I9) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
 **Branch**: `merge/live-perf` (shared working directory; no private branch)
 **Created**: 2026-10-18
@@ -157,6 +157,82 @@ Keep the test file under 300 lines. Do not edit `migrate_scale.rs`.
 - [x] Verification 1-4 exit 0. Mutation evidence is recorded separately.
 - [x] The Progress Log records pre/post sha256 for every edited file.
 
+## Rerun (workflow session 438): verify and review the committed work
+
+TASK-N1 and TASK-N2 are implemented in commit b327141. The work is the
+differential test plus a no-product-change verdict. This rerun does
+**not** re-implement anything. All logs go to
+`tmp/live-perf-int/ns-index/rerun-438/`.
+
+### TASK-NR1: Deliverable check (no edit; `rerun-438/r1-deliverables.log`)
+
+- `grep -n 'mod migrate_index_equivalence' src/ns/tests/mod.rs` [1 match]
+- `test -f src/ns/tests/migrate_index_equivalence.rs` [exit 0]
+- `git diff 9474491 HEAD -- src/ns/depgraph.rs src/ns/tweak.rs src/ns/evaluator.rs`
+  [empty: no product change, matching the recorded verdict]
+- `grep -n '!members.is_empty()' src/ns/evaluator.rs` [the guard that
+  makes the empty-write-set candidate unreachable; recorded line around
+  475]
+- `git diff 9474491 HEAD -- src/ns/tests/migrate_scale.rs` [empty]
+
+### TASK-NR2: Verification rerun
+
+Run verification steps 1-4 of this plan again, unchanged, with logs
+`rerun-438/1-fmt.log` to `rerun-438/4-line-counts.log`. Step 3 must
+include `migrate_index_equivalence` and `migrate_scale` with 0 failures.
+
+### TASK-NR3: Mutation evidence (only in `mutationEvidence`)
+
+Record the sha256 before and after each mutation; the restored hash must
+match the original.
+
+- M1: `current_gen_at_span` uses `.next_back()` instead of `.next()` ->
+  the differential test fails (`rerun-438/m1.log`).
+- M2: in `DepGraph::claim`, temporarily skip the `remove_current_span`
+  call for superseded forms -> the supersession differential case fails
+  (`rerun-438/m2.log`). If it does not fail, record that as a coverage gap
+  for the reviewer. Do not add a test unless the review asks for one.
+- Afterwards, rerun NR2 step 3 green (`rerun-438/m-restore-3.log`).
+
+When NR1-NR3 are done, set Status to
+`Implemented (b327141); awaiting independent review`.
+
+### TASK-NR4: Independent review (performed by the workflow review step; read-only)
+
+- The Progress Log has an equivalence argument for each of the four
+  lookups, and it matches the code. Compare with
+  `git show 4ca8edc^:src/ns/{depgraph,tweak,evaluator}.rs`.
+- The empty-write-set verdict holds: `eval_form_checked` adds a form only
+  when `!members.is_empty()`, and the reactive-commit path that empties a
+  write set calls `claim`.
+- Ownership changes only through `claim`.
+- The `#[cfg(test)]` `migration_lookup_work` instrumentation has no
+  production effect.
+- `evaluator.rs` is at most 957 lines.
+- The differential test compares against an independent linear reference.
+  It does not compare the index with itself.
+
+### TASK-NR5: Repair only findings
+
+Fix each high or mid finding inside writePaths. A behavior defect gets a
+failing-first test. List each fix in `addressedFeedback` with status
+`repaired`, then rerun NR2. If a finding needs a file outside writePaths,
+stop and report a scope amendment.
+
+### TASK-NR6: Acceptance
+
+After the review step accepts, add a Progress Log entry with the reviewer
+step id and verdict. Then set Status to `Completed`.
+
+### Rerun Completion Criteria
+
+- [ ] NR1 log shows every expected result.
+- [ ] NR2 steps 1-4 exit 0 with positive test counts.
+- [ ] NR3 M1 fails as expected (M2 fails, or is recorded as a coverage
+  gap); restore hashes match.
+- [ ] Review verdict recorded; every high or mid finding repaired.
+- [ ] Status is Completed only after the recorded acceptance.
+
 ## Execution Rules (all plans in this manifest)
 
 - Read each file fresh immediately before editing it. Record
@@ -255,3 +331,7 @@ Keep the test file under 300 lines. Do not edit `migrate_scale.rs`.
 - No changes were made to `depgraph.rs`, `tweak.rs`, or `evaluator.rs` in the
   final tree. Formal review and any workflow-finalization tasks remain with
   their downstream steps.
+
+### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
+**Tasks Completed**: none (plan revision only).
+**Notes**: Converted to a review-and-repair rerun (design section 11). Added TASK-NR1 to TASK-NR6 and the Rerun Completion Criteria. Status is In Progress until the independent review verdict is recorded.

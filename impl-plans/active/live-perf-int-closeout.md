@@ -1,7 +1,7 @@
 # LPI-CLOSEOUT: full gates, section 12 record, archive and README (finishes LP-EVIDENCE)
 
 **Status**: Ready
-**Plan ID**: LPI-CLOSEOUT (wave 4)
+**Plan ID**: LPI-CLOSEOUT (wave 5)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` section 7; `design-docs/specs/design-live-performance.md` 8.4 and 9; `impl-plans/active/live-perf-evidence.md` TASK-V3 to TASK-V5
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
 **Branch**: `merge/live-perf` (shared working directory; no private branch)
@@ -10,8 +10,9 @@
 
 ## Intent and Context
 
-After LPI-WIRE, LPI-VIM-STOP, LPI-NS-INDEX, LPI-PLAYBACK and LPI-BEHAVIOR,
-the merged tree should be fully green. This plan:
+After LPI-WIRE, LPI-VIM-STOP, LPI-NS-INDEX (accepted after the session-438
+review-and-repair reruns), LPI-PLAYBACK, LPI-STYLE and LPI-BEHAVIOR, the
+merged tree should be fully green. This plan:
 
 - proves that with every gate, run serially;
 - writes the verification record into design-live-performance.md as
@@ -30,19 +31,20 @@ the integration adjustments in design section 7.
   loosened here.
 - No `--write-evidence` e2e run, and no edit to the canvas `run-001`
   evidence.
-- Do not archive the `live-perf-int-*` plans or
+- Do not archive the seven `live-perf-int-*` plans or
   `live-perf-int-dispatch.json`. The running workflow references them at
-  their active paths. They move in the integration commit after final
-  review (precedent: the vim-keymap dispatch note in
-  `impl-plans/README.md`).
+  their active paths. The workflow's integration step moves them after the
+  final integration review accepts every LPI plan, using the "Post-review
+  archive" procedure at the end of this plan (design section 7; precedent:
+  the vim-keymap dispatch note in `impl-plans/README.md`).
 - No commit or push. The workflow's integration step commits on
   `merge/live-perf`. Merging into main is out of scope.
 
 ## Dependencies
 
 - **dependsOn**: LPI-WIRE, LPI-VIM-STOP, LPI-NS-INDEX, LPI-PLAYBACK,
-  LPI-BEHAVIOR.
-- Runs alone in wave 4.
+  LPI-STYLE, LPI-BEHAVIOR.
+- Runs alone in wave 5.
 
 ## writePaths
 
@@ -131,14 +133,16 @@ threshold.
   - Vim and stop shortcuts belong to LPI-VIM-STOP;
   - `src/ns` belongs to LPI-NS-INDEX;
   - examples playback belongs to LPI-PLAYBACK;
+  - `npm run test:style` and the glide row belong to LPI-STYLE;
   - behavior checks belong to LPI-BEHAVIOR;
   - anything else is reported as unowned.
 - Report blocked. Do not continue to TASK-C2.
 
 ### TASK-C2: Section 12 record (`design-docs/specs/design-live-performance.md`)
 
-Append `## 12. Verification record (integration, workflow session 433)`
-after section 11 and before `## References`. Change nothing else in the
+Append exactly one heading,
+`## 12. Verification record (integration, workflow session 438)`, after
+section 11 and before `## References`. Change nothing else in the
 document. It contains:
 
 - a table of gates 1-13: command, exit status, tests run and passed, log
@@ -154,7 +158,13 @@ document. It contains:
   - I5: the root cause established by LPI-PLAYBACK (or "stale build"),
     quoted from its Progress Log;
   - I6: name-space index equivalence proven by
-    `src/ns/tests/migrate_index_equivalence.rs`.
+    `src/ns/tests/migrate_index_equivalence.rs`;
+  - I8 (UF-1): the S0 classification established by LPI-STYLE, quoted from
+    its Progress Log, the S1 glide-row inset, and S2 (only if applied);
+  - wave-1 acceptance (I9): for LPI-WIRE, LPI-VIM-STOP and LPI-NS-INDEX,
+    the reviewer step, the verdicts (for LPI-VIM-STOP: correctness, test
+    integrity and adversarial) and any repair, quoted from each plan's
+    Progress Log.
 
   Only record root causes the diagnosis runs established; never record a
   hypothesis as a cause.
@@ -178,7 +188,7 @@ document. It contains:
    - the exact-length CtlMsg-first workaround in `ByteInbox::next` was
      removed (W2).
 4. In `live-perf-dispatch.json`, add a top-level key
-   `"archivedBy": "LPI-CLOSEOUT, workflow session 433, 2026-10-18"`.
+   `"archivedBy": "LPI-CLOSEOUT, workflow session 438, 2026-10-18"`.
    Keep the JSON valid.
 5. Move the eight files one at a time from `impl-plans/active/` to
    `impl-plans/completed/` with the same names.
@@ -190,14 +200,15 @@ document. It contains:
 ### TASK-C4: Indexes and docs
 
 - `impl-plans/README.md`, section "Live performance controls (2026-10-08)":
-  - status becomes Completed (2026-10-18, workflow session 433);
+  - status becomes Completed (2026-10-18, workflow session 438);
   - every link points to `completed/` paths;
   - one sentence names the integration addendum
     (`../design-docs/specs/design-live-perf-integration.md`) and the gate
     summary.
-  - In the "Live performance integration" section that the plan author
-    added, mark the six LPI plans Completed. Their links stay at
-    `active/`, with the archive note.
+  - In the "Live performance integration with main" section, mark the
+    seven LPI plans "gates passed; awaiting final integration review".
+    Their links stay at `active/`. The integration step switches them to
+    `completed/` in the post-review archive.
 - `README.md`:
   - The transport bullet (around line 203-208) says the stop button stops
     gently (`Mod-.`, effect tails ring out) and the cut/hush button cuts
@@ -210,7 +221,7 @@ document. It contains:
     `Mod-.` (stop) and `Mod-Shift-.` (cut) instead of "`Mod-.`".
   - English only, no emojis, and match the surrounding style.
 - `design-docs/specs/design-live-perf-integration.md`: the status line
-  becomes `Implemented (2026-10-18, workflow session 433)`.
+  becomes `Implemented (2026-10-18, workflow session 438)`.
   `design-docs/specs/architecture.md`: the 2026-10-18 integration row
   status becomes `Implemented`.
 
@@ -229,7 +240,8 @@ document. It contains:
 - `test ! -e impl-plans/active/live-perf-evidence.md && test -e impl-plans/completed/live-perf-evidence.md`
   -> exit 0. Repeat for each of the eight moved files, in one logged
   command chained with `&&`.
-- `grep -c "## 12. Verification record" design-docs/specs/design-live-performance.md`
+- `grep -c "## 12. Verification record (integration, workflow session 438)" design-docs/specs/design-live-performance.md`
+  -> `1`, and `grep -c "## 12. Verification record" design-docs/specs/design-live-performance.md`
   -> `1`.
 - `! grep -n "active/live-perf-\(contract\|engine\|session\|editor\|evidence\|dispatch\)" impl-plans/README.md`
   -> exit 0. This means no stale `active/` link to an archived live-perf
@@ -247,6 +259,27 @@ document. It contains:
   and the architecture row are updated.
 - [ ] The Progress Log records pre/post sha256 for every edited file and
   the `git diff --stat` invariant check.
+
+## Post-review archive (performed by the workflow integration step, not by LPI-CLOSEOUT)
+
+The workflow's integration step runs this in session 438, only after the
+final integration review accepts every LPI plan. It is recorded here so
+the procedure is fixed in advance (design section 7).
+
+1. In each of the seven LPI plans (`live-perf-int-wire.md`, `-vim-stop.md`,
+   `-ns-index.md`, `-playback.md`, `-style.md`, `-behavior.md`,
+   `-closeout.md`), set `**Status**: Completed` and add a final Progress
+   Log entry that names the final review decision.
+2. Add `"archivedBy": "integration step, workflow session 438, 2026-10-18"`
+   to `live-perf-int-dispatch.json`. `jq .` must exit 0.
+3. Move the eight files one at a time with `mv` from `impl-plans/active/`
+   to `impl-plans/completed/`. After each move, check
+   `test ! -e <active> && test -e <completed>`.
+4. In `impl-plans/README.md`, switch the "Live performance integration
+   with main" section to Completed with `completed/` links. Then:
+   `! grep -n 'active/live-perf-' impl-plans/README.md` -> exit 0.
+5. Commit on `merge/live-perf` with no tool attribution, together with
+   the integration commit.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -271,3 +304,12 @@ document. It contains:
 ### Session: 2026-10-18 (plan authored, workflow session 433 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design.
 **Notes**: Ready for wave 4 after all other LPI plans.
+
+### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
+**Tasks Completed**: none (plan revision only).
+**Notes**:
+- Now wave 5, depending also on LPI-STYLE. test:style failures are owned by LPI-STYLE.
+- The section 12 heading is `## 12. Verification record (integration, workflow session 438)`, and the record adds I8 and the wave-1 acceptance verdicts.
+- archivedBy and the status strings use session 438.
+- The README marks the seven LPI plans "gates passed; awaiting final integration review".
+- Added the Post-review archive procedure, which the integration step runs.

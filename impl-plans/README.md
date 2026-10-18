@@ -55,12 +55,13 @@ The [live performance controls](../design-docs/specs/design-live-performance.md)
 
 ## Live performance integration with main (2026-10-18)
 
-These plans implement [design-live-perf-integration.md](../design-docs/specs/design-live-perf-integration.md) on branch `merge/live-perf` (workflow session 433). They fix the merge regressions between live performance and Vim mode, and finish LP-EVIDENCE. They are Ready. The [dispatch manifest](active/live-perf-int-dispatch.json) runs four waves. Wave 1 is logically parallel; the later waves run alone and own `editor/dist` and the measurement lock. These plans stay in `active/` while the workflow references them, and are archived in the integration commit after final review.
+These plans implement [design-live-perf-integration.md](../design-docs/specs/design-live-perf-integration.md) on branch `merge/live-perf` (workflow session 433; revised in session 438). They fix the merge regressions between live performance and Vim mode and the right-pane style regression UF-1, and finish LP-EVIDENCE. The [dispatch manifest](active/live-perf-int-dispatch.json) runs five waves. Wave 1 is implemented at b327141 and is accepted only through review-and-repair reruns (design section 11). The later waves run alone and own `editor/dist` and the measurement lock. LPI-STYLE has a dependsOn edge on LPI-PLAYBACK for that serialization only. These plans stay in `active/` while the workflow references them, and are archived by the integration step after final review.
 
-- **Wave 1**: [LPI-WIRE song and control tags](active/live-perf-int-wire.md), [LPI-VIM-STOP stop and cut with Vim](active/live-perf-int-vim-stop.md), [LPI-NS-INDEX name-space index review](active/live-perf-int-ns-index.md)
+- **Wave 1** (review-and-repair reruns): [LPI-WIRE song and control tags](active/live-perf-int-wire.md), [LPI-VIM-STOP stop and cut with Vim](active/live-perf-int-vim-stop.md), [LPI-NS-INDEX name-space index review](active/live-perf-int-ns-index.md)
 - **Wave 2**: [LPI-PLAYBACK playback onset after Run](active/live-perf-int-playback.md)
-- **Wave 3**: [LPI-BEHAVIOR live-perf behavior checks](active/live-perf-int-behavior.md)
-- **Wave 4**: [LPI-CLOSEOUT gates, section 12, archive and README](active/live-perf-int-closeout.md)
+- **Wave 3**: [LPI-STYLE right-pane style regression](active/live-perf-int-style.md)
+- **Wave 4**: [LPI-BEHAVIOR live-perf behavior checks](active/live-perf-int-behavior.md)
+- **Wave 5**: [LPI-CLOSEOUT gates, section 12, archive and README](active/live-perf-int-closeout.md)
 
 ## DOM renderer comparison (2026-10-08)
 

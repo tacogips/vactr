@@ -1,8 +1,8 @@
 # LPI-VIM-STOP: stop and cut shortcuts with Vim on, and the removed hush option
 
-**Status**: Completed (implementation; independent review pending)
+**Status**: In Progress (implemented at b327141; review-and-repair rerun with test-integrity and adversarial review pending)
 **Plan ID**: LPI-VIM-STOP (wave 1)
-**Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I2, I3) and 4 (V1-V3, Tests)
+**Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I2, I3, I9), 4 (V1-V3, Tests) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
 **Branch**: `merge/live-perf` (shared working directory; no private branch)
 **Created**: 2026-10-18
@@ -221,6 +221,123 @@ Record the reason in the Progress Log.
 - [x] Verification 1-4 exit 0. Mutation evidence is recorded separately.
 - [x] The Progress Log records pre/post sha256 for every edited file.
 
+## Rerun (workflow session 438): verify and review the committed work
+
+TASK-V1 to TASK-V4 are implemented in commit b327141. This plan has never
+had a test-integrity or adversarial review. Design section 11 requires
+both before acceptance. This rerun does **not** re-implement anything. All
+logs go to `tmp/live-perf-int/vim-stop/rerun-438/`, written from `editor/`
+as `../tmp/live-perf-int/vim-stop/rerun-438/<name>.log`.
+
+### TASK-VR1: Deliverable check (no edit; `rerun-438/r1-deliverables.log`, from the repository root)
+
+- `grep -n 'export function fallbackStopShortcut' editor/src/ui/stop-keys.ts`
+  [1 match]
+- `grep -n 'fallbackStopShortcut(' editor/src/code/keyboard.ts` [1 match,
+  after the `Mod-Enter` check in `handle`]
+- `grep -n 'stopAll: () => { if (vim.enabled()) transport.stopAll(); }' editor/src/code/mount.ts`
+  and `grep -n 'cut: () => { if (vim.enabled()) transport.hush(); }' editor/src/code/mount.ts`
+  [1 match each]
+- `grep -n 'hush:' editor/src/code/mount.ts` [no InputController option]
+- `grep -n "input.code === 'Period'" editor/src/code/vim/keys.ts` [1 match
+  inside `isPassThrough`]
+- `git diff 9474491 b327141 --stat -- editor/test editor/src` [only this
+  plan's writePaths are listed]
+- `git diff 9474491 HEAD -- editor/src/code/transport.ts editor/src/code/eval.ts editor/src/code/vim/ex.ts editor/src/code/vim/controller.ts editor/src/code/vim-mount.ts`
+  [empty: the app-level handler and the Vim hush paths are unchanged]
+
+If any result differs, record it and stop. The review step decides.
+
+### TASK-VR2: Verification rerun
+
+Run verification steps 1-4 of this plan again, unchanged, with logs
+`rerun-438/1-check.log` to `rerun-438/4-line-counts.log`. Report each as
+a verification record. Step 2 must show both
+`alternate shortcut fallback while Vim is on` cases and the Vim-off case
+passing.
+
+### TASK-VR3: Mutation evidence (only in `mutationEvidence`)
+
+Take the sha256 before each mutation. Restore byte-for-byte afterwards
+and record the matching hash. Run only the named focused vitest file for
+each mutation.
+
+- M1: remove the `vim.enabled()` gate from `stopAll` in mount.ts -> the
+  Vim-off case in `test/canvas/vim-mount.test.ts` fails.
+- M2: make `KeyboardController.handle` call
+  `stopShortcut(event, isApplePlatform())` instead of
+  `fallbackStopShortcut(event)` -> both
+  `alternate shortcut fallback while Vim is on` cases fail.
+- M3: drop `|| input.code === 'Period'` from `isPassThrough` -> the new
+  `test/code/vim/keys.test.ts` `'>'` pass-through cases fail.
+- M4: drop the `!altKey` condition from `fallbackStopShortcut` -> the Alt
+  rejection case in `test/ui/stop-keys.test.ts` fails.
+- Afterwards, rerun VR2 step 2 green (`rerun-438/m-restore-2.log`).
+
+When VR1-VR3 are done, set Status to
+`Implemented (b327141); awaiting independent review`.
+
+### TASK-VR4: Independent review (performed by the workflow review step; read-only; reviewer did not author b327141)
+
+**Correctness** against design section 4: V1 matcher, V2 wiring and the
+`vim.enabled()` gate, V3 pass-through. `stopShortcut` stays
+platform-strict, and the period rule is shared through one helper.
+
+**Test-integrity review** of `git diff 9474491 b327141 -- editor/test`:
+
+- `vim-mount.test.ts` is the only intentional assertion change. Its reason
+  (D2/D10: the unshifted alternate period means gentle stop-all) is
+  recorded. It still asserts 2 `eval`, exactly 1 `stop-all` and exactly 1
+  `hush` per platform. No assertion is removed, and no count is loosened
+  (for example to `>= 1`).
+- `vim-input.test.ts` and `input-vim-hook.test.ts` contain only the
+  mechanical `hush` -> `stopAll`/`cut` option rename.
+- `stop-keys.test.ts` keeps every existing `stopShortcut` case and adds
+  the seven fallback cases: both modifiers, Shift `'>'`, empty `code`,
+  Alt rejection, no modifier, non-period code.
+- `test/code/vim/keys.test.ts` adds both `'>'` pass-through cases and the
+  no-modifier negative case.
+- No test was skipped, deleted or made weaker. `test/canvas/input.test.ts`
+  is unchanged.
+
+**Adversarial review**, each case backed by a test or an argument with a
+file:line citation:
+
+- A platform-Mod press with Vim on sends exactly one message (the
+  capture-phase handler at transport.ts consumes it, so there is no
+  fallback double send).
+- An alternate-modifier press with Vim off sends nothing.
+- Alt-period is ignored.
+- `Mod-Shift-.` with key `'>'` passes through in Vim normal, insert,
+  visual and ex/command-line modes.
+- `:hush`, `vactr.hush` and keymap presets bound to `vactr.hush` still
+  send `hush`.
+- A missing `event.code` (synthetic event) is treated as `''`.
+- Key repeat on a held alternate-modifier period routes once per keydown,
+  as on main; no new debounce is expected.
+
+### TASK-VR5: Repair only findings
+
+Fix each high or mid finding inside writePaths. A behavior defect gets a
+failing-first test. List each fix in `addressedFeedback` with status
+`repaired`, then rerun VR2. If a finding needs a file outside writePaths,
+stop and report a scope amendment (mechanical test updates excepted).
+
+### TASK-VR6: Acceptance
+
+After the review step accepts, add a Progress Log entry with the reviewer
+step id and three verdicts: correctness, test integrity and adversarial.
+Then set Status to `Completed`.
+
+### Rerun Completion Criteria
+
+- [ ] VR1 log shows every expected result.
+- [ ] VR2 steps 1-4 exit 0 with positive test counts.
+- [ ] VR3 M1-M4 fail as expected; restore hashes match.
+- [ ] Correctness, test-integrity and adversarial verdicts are recorded;
+  every high or mid finding is repaired.
+- [ ] Status is Completed only after the recorded acceptance.
+
 ## Execution Rules (all plans in this manifest)
 
 - Read each file fresh immediately before editing it. Record
@@ -265,3 +382,7 @@ Record the reason in the Progress Log.
 - Current-source verification: `npm run check` passed (exit 0; `tmp/live-perf-int/vim-stop/6-redispatch-check.log`); focused Vitest passed 188/188 (exit 0; `7-redispatch-vitest-focused.log`); Vim/canvas Vitest passed 1528/1528 (exit 0; `8-redispatch-vitest-vim-canvas.log`); line-count gate passed (exit 0; `9-redispatch-line-counts.log`). These are the plan's verification steps 1-4 only.
 - Existing mutation evidence remains `tmp/live-perf-int/vim-stop/mutation-vim-off-gate.log`: removing the `vim.enabled()` gate made the Vim-off regression test fail, and the gate was restored. Mutation evidence is not a gating verification record.
 - Status remains Completed for implementation; typed test-integrity and adversarial review decisions are downstream review steps.
+
+### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
+**Tasks Completed**: none (plan revision only).
+**Notes**: Status reset to In Progress. Converted to a review-and-repair rerun (design section 11). Added TASK-VR1 to TASK-VR6, including the test-integrity and adversarial review checklists, and the Rerun Completion Criteria. Completed only after correctness, test-integrity and adversarial verdicts are recorded.

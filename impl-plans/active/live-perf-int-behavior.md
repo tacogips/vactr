@@ -1,8 +1,8 @@
 # LPI-BEHAVIOR: diagnose and fix the four LP-EVIDENCE behavior checks
 
 **Status**: Ready
-**Plan ID**: LPI-BEHAVIOR (wave 3)
-**Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I4), 5.1 (B1-B3, decision table), 6 (perf-hook and check part of I6), plus rules D-a/D-b/D-c
+**Plan ID**: LPI-BEHAVIOR (wave 4)
+**Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I4), 5.1 (B1-B3, decision table), 6 (perf-hook and check part of I6), plus rules D-a/D-b/D-c; section 8 (depends on LPI-STYLE, revised session 438)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
 **Branch**: `merge/live-perf` (shared working directory; no private branch)
 **Created**: 2026-10-18
@@ -57,10 +57,14 @@ The behavior required by design-live-performance.md 8.3:
 
 ## Dependencies
 
-- **dependsOn**: LPI-PLAYBACK (and through it all wave-1 plans). The e2e
-  run needs the fixed product, and this plan shares `editor/dist` and the
-  measurement lock with LPI-PLAYBACK.
-- Runs alone in wave 3.
+- **dependsOn**: LPI-PLAYBACK and LPI-STYLE (and through them all wave-1
+  plans). The e2e run needs the fixed product and the fixed right pane.
+  This plan shares `editor/dist` and the measurement lock with both.
+- Runs alone in wave 4.
+- Do not touch `editor/src/bind/glide-setting.ts`, `editor/src/bind/bind.css`,
+  `editor/test/bind/glide-setting.test.ts` or `editor/test/style/ui-style.mjs`;
+  LPI-STYLE owns them. If the glide row's position or styling must change,
+  stop and report a scope amendment.
 
 ## writePaths
 
@@ -241,3 +245,7 @@ e2e under the lock with
 ### Session: 2026-10-18 (plan authored, workflow session 433 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design.
 **Notes**: Ready for wave 3 after LPI-PLAYBACK.
+
+### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
+**Tasks Completed**: none (plan revision only).
+**Notes**: Now wave 4, depending on LPI-PLAYBACK and LPI-STYLE. The LPI-STYLE files (glide-setting.ts, bind.css, glide-setting.test.ts, ui-style.mjs) are off-limits. No task content changed.

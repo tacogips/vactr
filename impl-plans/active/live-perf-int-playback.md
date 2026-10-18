@@ -53,9 +53,16 @@ fixes it in product code.
 ## Dependencies
 
 - **dependsOn**: LPI-WIRE, LPI-VIM-STOP, LPI-NS-INDEX. The wasm and the
-  dist must be built from the combined wave-1 tree.
-- Runs alone in wave 2. It owns `editor/dist` and the measurement lock
-  while it runs.
+  dist must be built from the combined wave-1 tree. Start only after all
+  three wave-1 plans are accepted (design section 11, session 438).
+- Runs alone in wave 2. LPI-STYLE (wave 3) has a dependsOn edge on this
+  plan only to serialize `editor/dist`, the e2e output roots and the
+  measurement lock; it uses none of this plan's content. While this plan
+  runs, it owns `editor/dist` and the lock.
+- Do not touch `editor/src/bind/glide-setting.ts`, `editor/src/bind/bind.css`
+  or `editor/test/style/ui-style.mjs`; LPI-STYLE owns them. If
+  `npm run test:style` fails here, that is the known UF-1 baseline. It is
+  not a gate of this plan.
 
 ## writePaths
 
@@ -305,3 +312,7 @@ under the lock. It must pass 8/8.
 ### Session: 2026-10-18 (plan authored, workflow session 433 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design.
 **Notes**: Ready for wave 2 after all wave-1 plans.
+
+### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
+**Tasks Completed**: none (plan revision only).
+**Notes**: Wave-1 plans must now be accepted through their R1-R6 reruns before this plan starts. LPI-STYLE (new, wave 3) follows this plan through a serialization-only edge. test:style failures are the UF-1 baseline and not a gate here. No task content changed.

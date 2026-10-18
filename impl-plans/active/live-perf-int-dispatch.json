@@ -1,0 +1,418 @@
+{
+  "taskId": "live-perf-int",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-433",
+  "issueReference": "workflowInput (no GitHub issue): 'Integrate wf/live-perf with main: fix merge regressions and finish LP-EVIDENCE' (branch merge/live-perf, merge commit 9474491; plan review comm-007582 accepted)",
+  "implementationBranch": "merge/live-perf",
+  "baseBranch": "merge/live-perf",
+  "remote": "origin",
+  "originalHead": "947449162e90f380ce4e9e83d7e9a547987463fd",
+  "designDocPaths": [
+    "design-docs/specs/design-live-perf-integration.md",
+    "design-docs/specs/design-live-performance.md",
+    "design-docs/specs/design-vim-mode.md",
+    "design-docs/specs/design-vim-keymap-hints-hop.md",
+    "design-docs/specs/architecture.md"
+  ],
+  "evidenceRoot": "tmp/live-perf-int",
+  "executionModel": "Four waves on one branch and one working directory. Wave 1 (LPI-WIRE, LPI-VIM-STOP, LPI-NS-INDEX) has disjoint source writePaths and is logically parallel; the plans share target/ and editor/node_modules, so a compile error in a file outside a plan's writePaths is waited on (2 min, at most 3 retries) and then reported as drift, never repaired. Operator lesson: in a shared worktree, fanout concurrency 1 avoids compile and test races. Wave 2 (LPI-PLAYBACK), wave 3 (LPI-BEHAVIOR) and wave 4 (LPI-CLOSEOUT) run alone; each owns editor/dist and the measurement lock while running. The design and plans are committed before fanout. Workers edit only their own Progress Log and record pre/post sha256 for every edit. Heavy suites (full vitest, Playwright, full nextest) take the measurement lock at /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock. mise run build-wasm-release and VACTR_REQUIRE_SESSION_ABI=1 npm run build run immediately before any e2e.",
+  "reviewContext": {
+    "issueReference": "workflowInput 'Integrate wf/live-perf with main: fix merge regressions and finish LP-EVIDENCE' (no GitHub issue; branch merge/live-perf at merge commit 9474491; workflow session 433)",
+    "userProblem": "merge/live-perf (main v0.1.1 with Vim mode/keymap merged with wf/live-perf) is not green: song-record tags collide with new live-perf control tags (song_resource_carriers fails), npm run check has 3 errors from the removed hush input option, Vim alternate-modifier stop routing fails 2 vitest cases, the four LP-EVIDENCE behavior checks fail in Chromium and WebKit, e2e:examples run-plays-moderately finds no playback onset, the session-349 work in 4ca8edc is unreviewed, and LP-EVIDENCE is unfinished.",
+    "requiredOutcomes": [
+      "I1: song graph/begin/slice tags keep 0x1c/0x1d/0x1e; CtlMsg::OutputStop moves to 0x1F and CtlMsg::CellRamp to 0x20; ByteInbox::next song arm returns to song::decode(b); a disjointness/round-trip guard is added in src/host/tests/contracts.rs; tests/song_resource_carriers.rs passes unchanged.",
+      "I2/I3: mount.ts passes stopAll/cut gated on vim.enabled() instead of hush; the KeyboardController fallback accepts metaKey||ctrlKey without Alt for the period rule (Shift selects cut); Vim isPassThrough also passes mod && code === 'Period'; npm run check reports zero errors; vim-mount alternate-shortcut cases pass with the intentionally updated assertions.",
+      "I4: the four behavior checks pass silently in Chromium and WebKit with all existing behavior, Vim and keymap checks, after check corrections B1-B3 (audio precondition, platform Mod, hush on failure) and product fixes by the decision table.",
+      "I5: e2e:examples passes 8/8 after a diagnosed root-cause fix in engine/session/editor runtime with a failing-first regression test (or a recorded stale-build outcome).",
+      "I6: the session-349 name-space index is proven equivalent to the linear lookups by src/ns/tests/migrate_index_equivalence.rs; the empty-write-set divergence is settled.",
+      "I7: full gates green on the merged tree; design-live-performance.md section 12 records the verification; the seven live-perf plans and live-perf-dispatch.json are archived to impl-plans/completed; impl-plans/README.md and README.md are updated."
+    ],
+    "nonGoals": [
+      "New live-perf behavior, constants or thresholds.",
+      "Changes to Vim behavior beyond design-live-perf-integration.md section 4.",
+      "Changes to song-mode semantics or song record tags.",
+      "Merging into main, and physical-iPad two-finger validation.",
+      "Relaxing any threshold, design constant, silent-sink rule or examples.mjs assertion, or deleting a check."
+    ],
+    "constraints": [
+      "Work only in this worktree on merge/live-perf; never touch other worktrees or main; never kill processes you did not start.",
+      "AGENTS.md: English only, no emojis, no tool attribution in commits; every touched source file stays under 1000 lines.",
+      "UI style: solid, flat, square, spaced; run npm run test:style.",
+      "Use the existing editor stack; no CodeMirror EditorView.",
+      "Serialize full vitest, Playwright and full nextest with the measurement lock: mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock before and rmdir after; wait and retry if present.",
+      "Run VACTR_REQUIRE_SESSION_ABI=1 npm run build (after mise run build-wasm-release) immediately before any npm run e2e.",
+      "Verification records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; mutation/negative-control runs go only in mutationEvidence.",
+      "Never change the Mac system volume; e2e audio stays on the silent sink.",
+      "Do not weaken or delete failing tests; a test changes only for intentionally different merged behavior, with the reason recorded in the plan.",
+      "Intended-edit limits written in the plans: bus.rs net-zero-or-split in LPI-PLAYBACK; mount.ts perf-hook lines only in LPI-BEHAVIOR; design-live-performance.md append-only (section 12) and the architecture.md status cell only in LPI-CLOSEOUT.",
+      "A required fix outside a plan's writePaths stops that plan and is reported (scope amendment), except mechanical test/fixture updates caused by the plan's own change."
+    ],
+    "designDecisionsAndRationale": [
+      "W1: renumber the live-perf control tags (0x1F/0x20) rather than the song tags, because the song tags are the earlier, test-pinned main contract; the LP-CONTRACT pre-check grep was case-sensitive and missed the lowercase song constants.",
+      "W2: remove the exact-length CtlMsg-first workaround in ByteInbox::next so malformed song records are rejected again.",
+      "W3: one regression guard in contracts.rs (537 lines) proves tag-set disjointness instead of growing song_resource_carriers.rs (991 lines).",
+      "V1-V3: keep the platform-strict app-level handler (D10) and restore main's modifier-tolerant Vim P2 fallback with the live-perf Shift form; Mod-. is gentle stop-all and Mod-Shift-. is cut (D2).",
+      "D-a/D-b/D-c: diagnose I4 and I5 with real runs first; check defects are fixed in the check, product deviations in product code; nothing is relaxed.",
+      "I6: keep the name-space index because large-eval scaling depends on it, but only after a differential test proves results equal the old linear lookups."
+    ],
+    "intentionalTradeoffs": [
+      "test/canvas/vim-mount.test.ts alternate-shortcut cases change intentionally: the unshifted alternate-modifier period now means gentle stop-all per D2/D10; no assertion is removed.",
+      "The Vim fallback is a slightly stricter superset of main's rule (adds Shift form, rejects Alt).",
+      "Wave-1 plans are logically parallel but share target/ and editor/node_modules; fanout concurrency 1 is recommended.",
+      "LPI-PLAYBACK root cause is unknown at plan time; if the only fix changes an accepted live-perf semantic, the plan stops with a user-QA file instead of redesigning."
+    ],
+    "supportedEdgeCases": [
+      "Corrupted or truncated song GRAPH/BEGIN/SLICE records (including wrong kind byte 0 or 1) are rejected, never decoded as control messages.",
+      "Meta-. on Linux/Windows and Ctrl-. on Apple with Vim on route through the fallback exactly once; platform-Mod presses are consumed only by the app-level handler (no double send).",
+      "Mod-Shift-. with key '>' and code 'Period' passes through Vim in every mode.",
+      "With Vim off, the alternate modifier does nothing, as on main.",
+      "Vim :hush, vactr.hush and keymap presets binding vactr.hush still send hush (cut).",
+      "Behavior checks on non-Apple platforms use the platform Mod; a failing live-perf check leaves the engine stopped for later checks.",
+      "A form with an empty write set in the name-space index lookup."
+    ],
+    "outOfScopeEdgeCases": [
+      "Physical iPad two-finger momentary tweak (synthetic multi-touch only).",
+      "Song-mode live isolation and modular-live-input plans that also touch ring/record paths beyond restoring main's song decoding.",
+      "Non-US keyboard layouts beyond the code === 'Period' rule."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-live-perf-integration.md",
+      "design-docs/specs/design-live-performance.md",
+      "design-docs/specs/design-vim-mode.md",
+      "design-docs/specs/design-vim-keymap-hints-hop.md",
+      "design-docs/specs/architecture.md",
+      "impl-plans/README.md",
+      "impl-plans/active/live-perf-dispatch.json",
+      "impl-plans/active/live-perf-evidence.md",
+      "src/host/wire.rs",
+      "src/dsp/ring.rs",
+      "src/dsp/ring/song.rs",
+      "tests/song_resource_carriers.rs",
+      "editor/src/code/mount.ts",
+      "editor/src/code/keyboard.ts",
+      "editor/src/ui/stop-keys.ts",
+      "editor/src/code/vim/keys.ts",
+      "editor/test/canvas/vim-mount.test.ts",
+      "editor/test/e2e/behavior.mjs",
+      "editor/test/e2e/examples.mjs",
+      "editor/test/e2e/silent-sink.mjs",
+      "src/ns/depgraph.rs",
+      "src/ns/tweak.rs",
+      "src/ns/evaluator.rs"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "LPI-WIRE",
+      "planPath": "impl-plans/active/live-perf-int-wire.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "src/host/wire.rs",
+        "src/dsp/ring.rs",
+        "src/host/tests/contracts.rs",
+        "impl-plans/active/live-perf-int-wire.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/live-perf-int/wire"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/live-perf-int/wire"
+      ],
+      "acceptanceCriteria": [
+        "Case-insensitive tag pre-check shows no prior wire use of 0x1f/0x20.",
+        "TAG_OUTPUT_STOP == 0x1F and TAG_CELL_RAMP == 0x20.",
+        "ByteInbox::next song arm equals main's song::decode(b); the CtlMsg-first workaround is removed.",
+        "contracts.rs has the mechanical 0x1f update and the new live_perf_control_tags_are_disjoint_from_song_record_tags guard.",
+        "graph_and_begin_reject_every_truncation_trailing_bytes_and_wrong_kind passes with no song test changes.",
+        "ring.rs gets shorter, wire.rs stays <= 928 lines, contracts.rs < 1000 lines.",
+        "Verification steps 1-6 exit 0 with positive test counts; mutation evidence recorded separately; pre/post sha256 in Progress Log."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --test song_resource_carriers --test song_hosts --test song_audio_wire",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib host::tests::contracts dsp::tests::dsp::output_stop dsp::tests::dsp::ramp",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run build-wasm-release",
+        "wc -l src/dsp/ring.rs src/host/wire.rs src/host/tests/contracts.rs"
+      ]
+    },
+    {
+      "planId": "LPI-VIM-STOP",
+      "planPath": "impl-plans/active/live-perf-int-vim-stop.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/ui/stop-keys.ts",
+        "editor/src/code/keyboard.ts",
+        "editor/src/code/mount.ts",
+        "editor/src/code/vim/keys.ts",
+        "editor/test/ui/stop-keys.test.ts",
+        "editor/test/code/vim/keys.test.ts",
+        "editor/test/canvas/vim-mount.test.ts",
+        "editor/test/canvas/vim-input.test.ts",
+        "editor/test/canvas/input-vim-hook.test.ts",
+        "impl-plans/active/live-perf-int-vim-stop.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/live-perf-int/vim-stop"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/live-perf-int/vim-stop"
+      ],
+      "acceptanceCriteria": [
+        "fallbackStopShortcut is exported from stop-keys.ts and used by KeyboardController.",
+        "mount.ts passes stopAll/cut gated on vim.enabled(); no hush option remains in InputController options.",
+        "isPassThrough passes mod && code === 'Period'.",
+        "Tests updated as listed; the intentional vim-mount change is recorded with its reason.",
+        "npm run check has zero errors; both 'alternate shortcut fallback while Vim is on' cases pass.",
+        "Verification 1-4 exit 0; mutation evidence recorded separately; pre/post sha256 in Progress Log."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/ui/stop-keys.test.ts test/code/vim/keys.test.ts test/canvas/vim-mount.test.ts test/canvas/vim-input.test.ts test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/code/transport.test.ts test/code/eval.test.ts",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim test/canvas",
+        "wc -l editor/src/ui/stop-keys.ts editor/src/code/keyboard.ts editor/src/code/mount.ts editor/src/code/vim/keys.ts editor/test/ui/stop-keys.test.ts editor/test/code/vim/keys.test.ts editor/test/canvas/vim-mount.test.ts editor/test/canvas/vim-input.test.ts editor/test/canvas/input-vim-hook.test.ts"
+      ]
+    },
+    {
+      "planId": "LPI-NS-INDEX",
+      "planPath": "impl-plans/active/live-perf-int-ns-index.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "src/ns/depgraph.rs",
+        "src/ns/tweak.rs",
+        "src/ns/evaluator.rs",
+        "src/ns/tests/mod.rs",
+        "src/ns/tests/migrate_index_equivalence.rs",
+        "impl-plans/active/live-perf-int-ns-index.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/live-perf-int/ns-index"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/live-perf-int/ns-index"
+      ],
+      "acceptanceCriteria": [
+        "Progress Log holds the equivalence argument for the four lookups and the reachability verdict for the empty-write-set candidate.",
+        "The divergence is closed in depgraph.rs if reachable; otherwise no product change.",
+        "migrate_index_equivalence differential test is added, registered in src/ns/tests/mod.rs, and passes.",
+        "evaluator.rs and all touched files stay under 1000 lines.",
+        "Verification 1-4 exit 0; mutation evidence recorded separately; pre/post sha256 in Progress Log."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib ns::",
+        "wc -l src/ns/depgraph.rs src/ns/tweak.rs src/ns/evaluator.rs src/ns/tests/migrate_index_equivalence.rs"
+      ]
+    },
+    {
+      "planId": "LPI-PLAYBACK",
+      "planPath": "impl-plans/active/live-perf-int-playback.md",
+      "wave": 2,
+      "dependsOn": ["LPI-WIRE", "LPI-VIM-STOP", "LPI-NS-INDEX"],
+      "writePaths": [
+        "src/dsp/engine.rs",
+        "src/dsp/engine",
+        "src/dsp/ramp.rs",
+        "src/dsp/voice.rs",
+        "src/dsp/voice",
+        "src/dsp/bus.rs",
+        "src/dsp/bus",
+        "src/sched/control.rs",
+        "src/sched/runtime/live.rs",
+        "src/sched/ramps.rs",
+        "src/session/session.rs",
+        "src/session/momentary.rs",
+        "src/host/wasm",
+        "editor/src/code/transport.ts",
+        "editor/src/protocol/client.ts",
+        "src/dsp/tests/dsp.rs",
+        "src/dsp/tests/dsp/playback_onset.rs",
+        "src/session/tests/mod.rs",
+        "src/session/tests/playback_onset.rs",
+        "editor/test/code/playback-onset.test.ts",
+        "design-docs/user-qa/pending-live-perf-integration-questions.md",
+        "impl-plans/active/live-perf-int-playback.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp"
+      ],
+      "acceptanceCriteria": [
+        "The P1 fresh-build reproduction is recorded (stale-build outcome or reproduced failure).",
+        "If reproduced: probe classification, localization evidence and named root cause are in the Progress Log.",
+        "The fix lies within writePaths with a failing-first regression test and keeps every accepted live-perf semantic (gentle drain to idle, cut fade and clear, D3); otherwise the plan is Blocked with a user-QA file.",
+        "e2e:examples passes 8/8 (testsRun 8, testsPassed 8, failureCount 0); DSP tests 8.1(1)-(4) stay green.",
+        "No examples.mjs or silent-sink.mjs change; no touched file reaches 1000 lines; pre/post sha256 in Progress Log."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib dsp::tests::dsp::output_stop dsp::tests::dsp::ramp dsp::tests::dsp::release dsp::tests::dsp::playback_onset session::tests",
+        "cd editor && ./node_modules/.bin/vitest run test/code/playback-onset.test.ts",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run build-wasm-release",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && npm run e2e:examples"
+      ]
+    },
+    {
+      "planId": "LPI-BEHAVIOR",
+      "planPath": "impl-plans/active/live-perf-int-behavior.md",
+      "wave": 3,
+      "dependsOn": ["LPI-PLAYBACK"],
+      "writePaths": [
+        "editor/test/e2e/behavior.mjs",
+        "editor/src/code/perf-hook.ts",
+        "editor/test/canvas/mount.test.ts",
+        "editor/src/bind/momentary.ts",
+        "editor/src/bind/mount.ts",
+        "editor/src/code/momentary-pointer.ts",
+        "editor/src/code/surface.ts",
+        "editor/src/code/transport.ts",
+        "editor/src/code/mount.ts",
+        "src/session/momentary.rs",
+        "src/sched/runtime/live.rs",
+        "editor/test/bind/momentary.test.ts",
+        "editor/test/canvas/momentary-pointer.test.ts",
+        "editor/test/code/transport.test.ts",
+        "src/session/tests/momentary.rs",
+        "src/session/tests/live_stop.rs",
+        "impl-plans/active/live-perf-int-behavior.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp"
+      ],
+      "acceptanceCriteria": [
+        "The session-349 editor work review (plan TASK-B1) is recorded.",
+        "The diagnosis log and per-check classification are in the Progress Log; no hypothesis is recorded as a cause.",
+        "Design check corrections B1-B3 (audio precondition, platform Mod from navigator.platform, hush on failure) are applied in behavior.mjs.",
+        "Remaining failures are fixed by owner per the design 5.1 decision table, each product fix with a unit test; no threshold or check is relaxed or deleted.",
+        "Final behavior e2e passes in chromium and webkit with failureCount 0, the four live-perf checks and all existing behavior, Vim and keymap checks passing, post-sink peak 0.",
+        "Verification 1-7 exit 0 (Rust steps only if Rust changed); touched files under 1000 lines; pre/post sha256 in Progress Log."
+      ],
+      "verification": [
+        "node --check editor/test/e2e/behavior.mjs",
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/mount.test.ts test/bind test/canvas/momentary-pointer.test.ts test/code/transport.test.ts",
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib session::tests sched::tests",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run build-wasm-release",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && npm run e2e -- --browser all --profile behavior --run-id live-perf-int-behavior --out ../tmp/live-perf-int/behavior/final"
+      ]
+    },
+    {
+      "planId": "LPI-CLOSEOUT",
+      "planPath": "impl-plans/active/live-perf-int-closeout.md",
+      "wave": 4,
+      "dependsOn": ["LPI-WIRE", "LPI-VIM-STOP", "LPI-NS-INDEX", "LPI-PLAYBACK", "LPI-BEHAVIOR"],
+      "writePaths": [
+        "design-docs/specs/design-live-performance.md",
+        "design-docs/specs/design-live-perf-integration.md",
+        "design-docs/specs/architecture.md",
+        "README.md",
+        "impl-plans/README.md",
+        "impl-plans/active/live-perf-contract.md",
+        "impl-plans/active/live-perf-engine.md",
+        "impl-plans/active/live-perf-session-momentary.md",
+        "impl-plans/active/live-perf-session-stop.md",
+        "impl-plans/active/live-perf-editor-momentary.md",
+        "impl-plans/active/live-perf-editor-stop.md",
+        "impl-plans/active/live-perf-evidence.md",
+        "impl-plans/active/live-perf-dispatch.json",
+        "impl-plans/completed/live-perf-contract.md",
+        "impl-plans/completed/live-perf-engine.md",
+        "impl-plans/completed/live-perf-session-momentary.md",
+        "impl-plans/completed/live-perf-session-stop.md",
+        "impl-plans/completed/live-perf-editor-momentary.md",
+        "impl-plans/completed/live-perf-editor-stop.md",
+        "impl-plans/completed/live-perf-evidence.md",
+        "impl-plans/completed/live-perf-dispatch.json",
+        "impl-plans/active/live-perf-int-closeout.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "tmp"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "editor/src-tauri/target",
+        "tmp"
+      ],
+      "acceptanceCriteria": [
+        "Gates 1-13 of TASK-C1 pass serially with positive test counts where applicable, logs under tmp/live-perf-int/closeout/; timing-sensitive re-runs recorded as separate records, never relaxed.",
+        "design-live-performance.md gains exactly one '## 12. Verification record (integration, workflow session 433)' with gate table, per-browser behavior results, e2e output path, I1-I6 pointers quoting only established root causes, and the synthetic-multi-touch limitation.",
+        "The seven live-perf plans are Completed with a final Progress Log entry, live-perf-dispatch.json gains archivedBy and stays valid JSON, and all eight files are moved one at a time to impl-plans/completed/.",
+        "impl-plans/README.md has no stale active/ links to archived live-perf files; README.md transport, Live performance paragraph and Vim Live-coding shortcuts bullet are updated; integration design status is Implemented; architecture.md integration row is Implemented.",
+        "No product or test file is modified (git diff --stat invariant recorded); pre/post sha256 in Progress Log."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --all-targets",
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run build-wasm-release",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml",
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run test:perf",
+        "cd editor && npm run test:style",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && npm run e2e -- --browser all --profile behavior --run-id live-perf-int-001 --out ../tmp/live-perf-int/closeout/e2e/live-perf-int-001",
+        "cd editor && npm run e2e:examples",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast",
+        "jq . impl-plans/completed/live-perf-dispatch.json",
+        "test ! -e impl-plans/active/live-perf-contract.md && test -e impl-plans/completed/live-perf-contract.md && test ! -e impl-plans/active/live-perf-engine.md && test -e impl-plans/completed/live-perf-engine.md && test ! -e impl-plans/active/live-perf-session-momentary.md && test -e impl-plans/completed/live-perf-session-momentary.md && test ! -e impl-plans/active/live-perf-session-stop.md && test -e impl-plans/completed/live-perf-session-stop.md && test ! -e impl-plans/active/live-perf-editor-momentary.md && test -e impl-plans/completed/live-perf-editor-momentary.md && test ! -e impl-plans/active/live-perf-editor-stop.md && test -e impl-plans/completed/live-perf-editor-stop.md && test ! -e impl-plans/active/live-perf-evidence.md && test -e impl-plans/completed/live-perf-evidence.md && test ! -e impl-plans/active/live-perf-dispatch.json && test -e impl-plans/completed/live-perf-dispatch.json",
+        "grep -c '## 12. Verification record' design-docs/specs/design-live-performance.md",
+        "! grep -n 'active/live-perf-\\(contract\\|engine\\|session\\|editor\\|evidence\\|dispatch\\)' impl-plans/README.md"
+      ]
+    }
+  ]
+}

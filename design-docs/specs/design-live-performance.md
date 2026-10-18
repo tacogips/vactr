@@ -14,6 +14,12 @@ opus-luna-design-and-implement-review-loop-session-307.
 **Supersedes, for the items named in section 9 only**: design-implementation.md
 11.3 "stop / hush", 15.1.5 "Eval" (`Mod-.`) and "Transport bar", and the 15.3.8
 eval bullet (`Mod-.` (hush)). Everything else in those sections stands.
+**Integration addendum (2026-10-18)**: `design-live-perf-integration.md`
+records the fixes made when this feature was merged with main: the
+`OutputStop`/`CellRamp` wire tags move to `0x1F`/`0x20`, and stop and cut
+are routed through the Vim fallback. It also covers the behavior and
+playback diagnosis and the LP-EVIDENCE closeout. Everything in this
+document stands.
 
 ## 1. Overview
 
@@ -599,8 +605,8 @@ uses the existing tokens and border-radius 0.
 
   | Direction | Record | Fields |
   |-----------|--------|--------|
-  | to audio | `OutputStop` | `{mode: Gentle \| Cut}` |
-  | to audio | `CellRamp` | `{cell, epoch, seq, target, frames, release}` |
+  | to audio | `OutputStop` (tag `0x1F`, integration addendum W1) | `{mode: Gentle \| Cut}` |
+  | to audio | `CellRamp` (tag `0x20`, integration addendum W1) | `{cell, epoch, seq, target, frames, release}` |
   | from audio | `OutputState` | `{state, frame}` |
   | from audio | `CellRampAck` | `{cell, seq}` |
 

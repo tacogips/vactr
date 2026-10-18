@@ -53,6 +53,15 @@ The [live performance controls](../design-docs/specs/design-live-performance.md)
 - Wave 2: [engine](active/live-perf-engine.md), [session stop](active/live-perf-session-stop.md), [session momentary](active/live-perf-session-momentary.md), [editor stop](active/live-perf-editor-stop.md) and [editor momentary](active/live-perf-editor-momentary.md).
 - Wave 3: [evidence](active/live-perf-evidence.md) (silent behavior e2e, serial gates, verification record, closeout).
 
+## Live performance integration with main (2026-10-18)
+
+These plans implement [design-live-perf-integration.md](../design-docs/specs/design-live-perf-integration.md) on branch `merge/live-perf` (workflow session 433). They fix the merge regressions between live performance and Vim mode, and finish LP-EVIDENCE. They are Ready. The [dispatch manifest](active/live-perf-int-dispatch.json) runs four waves. Wave 1 is logically parallel; the later waves run alone and own `editor/dist` and the measurement lock. These plans stay in `active/` while the workflow references them, and are archived in the integration commit after final review.
+
+- **Wave 1**: [LPI-WIRE song and control tags](active/live-perf-int-wire.md), [LPI-VIM-STOP stop and cut with Vim](active/live-perf-int-vim-stop.md), [LPI-NS-INDEX name-space index review](active/live-perf-int-ns-index.md)
+- **Wave 2**: [LPI-PLAYBACK playback onset after Run](active/live-perf-int-playback.md)
+- **Wave 3**: [LPI-BEHAVIOR live-perf behavior checks](active/live-perf-int-behavior.md)
+- **Wave 4**: [LPI-CLOSEOUT gates, section 12, archive and README](active/live-perf-int-closeout.md)
+
 ## DOM renderer comparison (2026-10-08)
 
 The [DOM renderer comparison](../design-docs/specs/design-dom-renderer.md) plans are Completed: [core](completed/dom-renderer-core.md), [mount](completed/dom-renderer-mount.md), [harness](completed/dom-renderer-harness.md), and [evidence](completed/dom-renderer-evidence.md); the [dispatch manifest](completed/dom-renderer-s296-dispatch.json) is archived. The measured report and raw data remain at [design-renderer-comparison.md](../design-docs/specs/design-renderer-comparison.md) and `design-docs/specs/evidence/renderer-comparison/rc-001/`. The DOM backend was removed afterwards because the comparison measured no performance benefit over canvas.

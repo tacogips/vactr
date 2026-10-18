@@ -648,6 +648,22 @@ The range forms are: none (the current line), `%`, `{n}`, `{n},{m}`, `.`,
 | popup open: arrows, PageUp/PageDown, Enter, Tab | popup | popup | popup | popup | popup |
 | popup open: Escape / `Ctrl-[` | closes the popup | closes the popup | closes the popup | closes the popup (insert is left on the next one) | same as insert |
 
+**Amendment (2026-10-18, live performance integration).**
+
+- The period shortcuts follow `design-live-performance.md` D2/D10.
+  - `Mod-.` sends gentle `stop-all`.
+  - `Mod-Shift-.` sends `hush` (cut).
+  - The platform Mod form is owned by one app-level window handler that
+    runs before Vim, so it is no longer a P1 keymap entry.
+- With Vim on, the P2 fallbacks route the same pair:
+  - `Ctrl-.` / `Ctrl-Shift-.` on Apple;
+  - `Meta-.` / `Meta-Shift-.` on Windows and Linux.
+- P2 pass-through also covers `code === 'Period'`, so the Shift form
+  (key `>`) is passed.
+- `:hush` and `vactr.hush` still cut ("same as `Mod-Shift-.`").
+
+See `design-live-perf-integration.md` section 4.
+
 Evaluation uses the form at `selection.main.head`. In visual mode that is
 the selection's exclusive end.
 

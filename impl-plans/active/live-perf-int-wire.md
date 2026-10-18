@@ -200,14 +200,14 @@ lock.
 
 ## Completion Criteria
 
-- [ ] The tag pre-check log shows no prior use of `0x1f`/`0x20`.
-- [ ] `TAG_OUTPUT_STOP == 0x1F` and `TAG_CELL_RAMP == 0x20`.
-- [ ] `ByteInbox::next` song arm equals main's `song::decode(b)`.
-- [ ] contracts.rs: the mechanical `0x1f` update and the new
+- [x] The tag pre-check log shows no prior use of `0x1f`/`0x20`.
+- [x] `TAG_OUTPUT_STOP == 0x1F` and `TAG_CELL_RAMP == 0x20`.
+- [x] `ByteInbox::next` song arm equals main's `song::decode(b)`.
+- [x] contracts.rs: the mechanical `0x1f` update and the new
   disjointness/round-trip test are in place.
-- [ ] Verification steps 1-6 exit 0 with positive test counts. Mutation
+- [x] Verification steps 1-6 exit 0 with positive test counts. Mutation
   evidence is recorded separately.
-- [ ] The Progress Log records pre/post sha256 for every edited file.
+- [x] The Progress Log records pre/post sha256 for every edited file.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -232,3 +232,14 @@ lock.
 ### Session: 2026-10-18 (plan authored, workflow session 433 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design.
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-18 (Step 6 implementation, workflow session nested-v1-c50154ad)
+**Tasks Completed**: TASK-W1, TASK-W2 and TASK-W3; verification steps 1-6 and mutation evidence.
+**Notes**:
+- W1: case-insensitive pre-check printed no matches (`tmp/live-perf-int/wire/0-tag-precheck.log`, exit 0). `TAG_OUTPUT_STOP` is `0x1F`; `TAG_CELL_RAMP` is `0x20`.
+- W2: `ByteInbox::next` now dispatches song GRAPH/BEGIN/SLICE only through `song::decode(b)`.
+- W3: updated the malformed OutputStop fixture to `0x1f`; added `live_perf_control_tags_are_disjoint_from_song_record_tags`, checking song/control tag disjointness and OutputStop/CellRamp inbox round-trips.
+- Verification: final-source fmt (`1-fmt-final.log`) exit 0; clippy (`2-clippy-rerun.log`) exit 0; song nextest (`3a-nextest-song-final.log`) exit 0, 47/47 passed, including `graph_and_begin_reject_every_truncation_trailing_bytes_and_wrong_kind`; library nextest (`3b-nextest-lib-final.log`) exit 0, 38/38 passed, including the new guard and output_stop/ramp suites; debug wasm (`4-wasm-debug.log`) exit 0; release wasm (`5-wasm-release.log`) exit 0; line counts (`6-line-counts.log`) are 928, 928 and 604.
+- Mutation evidence: temporarily restored OutputStop to `0x1C`; the new test failed as expected (1 run, 0 passed, 1 failed) in `mutation-1-test.log`; restored `0x1F` and reran both nextest groups successfully. Mutation edit intent and restoration are in `mutation-1-output-stop.intent` and `mutation-1-restore.intent`.
+- A first clippy attempt (`2-clippy.log`) found the new test needed the `ControlSource` trait in scope. Added that local import and reran clippy successfully; no product behavior changed.
+- SHA-256 pre/post: `src/host/wire.rs` 7da604f7d10c0ee073580fc50ec7ab26f9f3998cafd09ac84572169ff02f6968 -> 612e31b53190d1c81a02c1f62fe4c346cd39a092103fbe30a8d8b229e592c3b8; `src/dsp/ring.rs` affe8d90f8b1c0e968ea1f0d7013ed72ffad918b12da1549c055298be404ad19 -> c0dca46babd1af2329a400ccc03b327215885ee1da229d1e94968d3e1dce201e; `src/host/tests/contracts.rs` 8b18c082192f6b9c3d388e90d7ce17dece6b0b8d06dc28fec6174bc5ca43f3b9 -> 8a8e024d8cb5f580b3452435ad8da521c6fd5997c02c183c578c85a97ff5d8df; this plan 23cd300e799226efb0ed9981841961306f8e8f22632d1e3bdd3c9b0011050f3e -> final hash recorded in `tmp/live-perf-int/wire/plan-post-sha256.log`.

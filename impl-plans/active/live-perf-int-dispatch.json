@@ -228,7 +228,11 @@
       "planId": "LPI-PLAYBACK",
       "planPath": "impl-plans/active/live-perf-int-playback.md",
       "wave": 2,
-      "dependsOn": ["LPI-WIRE", "LPI-VIM-STOP", "LPI-NS-INDEX"],
+      "dependsOn": [
+        "LPI-WIRE",
+        "LPI-VIM-STOP",
+        "LPI-NS-INDEX"
+      ],
       "writePaths": [
         "src/dsp/engine.rs",
         "src/dsp/engine",
@@ -256,7 +260,14 @@
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules",
         "editor/dist",
-        "tmp"
+        "tmp/live-perf-int/playback",
+        "tmp/live-perf-int/main-ref",
+        "tmp/live-perf-int/main-ref-target",
+        "tmp/canvas-cutover",
+        "tmp/code-render",
+        "tmp/canvas",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
       ],
       "sharedPaths": [],
       "artifactRoots": [
@@ -264,7 +275,14 @@
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules",
         "editor/dist",
-        "tmp"
+        "tmp/live-perf-int/playback",
+        "tmp/live-perf-int/main-ref",
+        "tmp/live-perf-int/main-ref-target",
+        "tmp/canvas-cutover",
+        "tmp/code-render",
+        "tmp/canvas",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
       ],
       "acceptanceCriteria": [
         "The P1 fresh-build reproduction is recorded (stale-build outcome or reproduced failure).",
@@ -288,7 +306,9 @@
       "planId": "LPI-BEHAVIOR",
       "planPath": "impl-plans/active/live-perf-int-behavior.md",
       "wave": 3,
-      "dependsOn": ["LPI-PLAYBACK"],
+      "dependsOn": [
+        "LPI-PLAYBACK"
+      ],
       "writePaths": [
         "editor/test/e2e/behavior.mjs",
         "editor/src/code/perf-hook.ts",
@@ -311,7 +331,12 @@
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules",
         "editor/dist",
-        "tmp"
+        "tmp/live-perf-int/behavior",
+        "tmp/canvas-cutover",
+        "tmp/code-render",
+        "tmp/canvas",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
       ],
       "sharedPaths": [],
       "artifactRoots": [
@@ -319,7 +344,12 @@
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules",
         "editor/dist",
-        "tmp"
+        "tmp/live-perf-int/behavior",
+        "tmp/canvas-cutover",
+        "tmp/code-render",
+        "tmp/canvas",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
       ],
       "acceptanceCriteria": [
         "The session-349 editor work review (plan TASK-B1) is recorded.",
@@ -346,7 +376,13 @@
       "planId": "LPI-CLOSEOUT",
       "planPath": "impl-plans/active/live-perf-int-closeout.md",
       "wave": 4,
-      "dependsOn": ["LPI-WIRE", "LPI-VIM-STOP", "LPI-NS-INDEX", "LPI-PLAYBACK", "LPI-BEHAVIOR"],
+      "dependsOn": [
+        "LPI-WIRE",
+        "LPI-VIM-STOP",
+        "LPI-NS-INDEX",
+        "LPI-PLAYBACK",
+        "LPI-BEHAVIOR"
+      ],
       "writePaths": [
         "design-docs/specs/design-live-performance.md",
         "design-docs/specs/design-live-perf-integration.md",
@@ -375,7 +411,12 @@
         "editor/node_modules",
         "editor/dist",
         "editor/src-tauri/target",
-        "tmp"
+        "tmp/live-perf-int/closeout",
+        "tmp/canvas-cutover",
+        "tmp/code-render",
+        "tmp/canvas",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
       ],
       "sharedPaths": [],
       "artifactRoots": [
@@ -384,7 +425,12 @@
         "editor/node_modules",
         "editor/dist",
         "editor/src-tauri/target",
-        "tmp"
+        "tmp/live-perf-int/closeout",
+        "tmp/canvas-cutover",
+        "tmp/code-render",
+        "tmp/canvas",
+        "tmp/examples-e2e",
+        "tmp/ui-style"
       ],
       "acceptanceCriteria": [
         "Gates 1-13 of TASK-C1 pass serially with positive test counts where applicable, logs under tmp/live-perf-int/closeout/; timing-sensitive re-runs recorded as separate records, never relaxed.",

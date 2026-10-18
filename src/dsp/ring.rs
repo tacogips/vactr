@@ -523,11 +523,7 @@ impl ControlSource for ByteInbox {
         self.current = Some(i);
         let b = self.slot(i);
         let parsed = match b[0] {
-            song::GRAPH | song::BEGIN | song::SLICE => CtlMsg::decode(b)
-                .ok()
-                .filter(|(_, n)| *n == b.len())
-                .map(|(msg, _)| Record::Msg(msg))
-                .or_else(|| song::decode(b)),
+            song::GRAPH | song::BEGIN | song::SLICE => song::decode(b),
             crate::song::routing::SONG_COMMAND_TAG => CtlMsg::decode(b)
                 .ok()
                 .filter(|(_, n)| *n == b.len())

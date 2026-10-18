@@ -116,8 +116,25 @@ describe('Vim mount adapter', () => {
       key(rig, 'Enter', { [modKey]: true });
       key(rig, 'Enter', { [modKey]: true, shiftKey: true });
       key(rig, '.', { [modKey]: true });
+      expect(rig.transport.of('stop-all')).toHaveLength(1);
+      expect(rig.transport.of('hush')).toHaveLength(0);
+      key(rig, '>', { [modKey]: true, shiftKey: true, code: 'Period' });
       expect(rig.transport.of('eval')).toHaveLength(2);
+      expect(rig.transport.of('stop-all')).toHaveLength(1);
       expect(rig.transport.of('hush')).toHaveLength(1);
+    } finally {
+      if (original) Object.defineProperty(navigator, 'platform', original); else Reflect.deleteProperty(navigator, 'platform');
+    }
+  });
+
+  it('ignores the alternate stop shortcut while Vim is off', () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'platform');
+    Object.defineProperty(navigator, 'platform', { configurable: true, value: 'Linux x86_64' });
+    try {
+      const rig = setup();
+      key(rig, '.', { metaKey: true });
+      expect(rig.transport.of('stop-all')).toHaveLength(0);
+      expect(rig.transport.of('hush')).toHaveLength(0);
     } finally {
       if (original) Object.defineProperty(navigator, 'platform', original); else Reflect.deleteProperty(navigator, 'platform');
     }

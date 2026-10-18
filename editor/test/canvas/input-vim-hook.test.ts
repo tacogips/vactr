@@ -16,14 +16,14 @@ function setup(text = '', allow = true, consume = false, range: { from: number; 
   const sync = new DocumentSync(client.document('main.vact'), Text.of(text.split('\n')));
   const surface = new CodeSurface({ sync });
   const container = document.createElement('div'); document.body.append(container);
-  const evalSelection = vi.fn(), evalAll = vi.fn(), hush = vi.fn(), scrollCaret = vi.fn();
-  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret, onPresentation });
+  const evalSelection = vi.fn(), evalAll = vi.fn(), stopAll = vi.fn(), cut = vi.fn(), scrollCaret = vi.fn();
+  const input = new InputController(surface, container, { evalSelection, evalAll, stopAll, cut, scrollCaret, onPresentation });
   const hook: VimInputHook = {
     handleKey: vi.fn(() => consume), allowsTextInput: vi.fn(() => allow),
     overwriteRange: vi.fn(() => range), noteCompositionDiscarded: vi.fn(),
   };
   cleanup.push(() => { input.dispose(); surface.dispose(); container.remove(); });
-  return { surface, sync, input, container, el: input.accessibility.textarea, transport, evalSelection, evalAll, hush, scrollCaret, hook };
+  return { surface, sync, input, container, el: input.accessibility.textarea, transport, evalSelection, evalAll, stopAll, cut, scrollCaret, hook };
 }
 function composition(el: HTMLElement, kind: string, data = '') { el.dispatchEvent(new CompositionEvent(kind, { data, bubbles: true })); }
 function before(el: HTMLElement, inputType: string, data: string | null = null, isComposing = false, cancelable = true) {

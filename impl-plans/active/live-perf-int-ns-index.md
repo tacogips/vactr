@@ -149,13 +149,13 @@ Keep the test file under 300 lines. Do not edit `migrate_scale.rs`.
 
 ## Completion Criteria
 
-- [ ] The Progress Log holds the equivalence argument for the four lookups
+- [x] The Progress Log holds the equivalence argument for the four lookups
   and the reachability verdict for the empty-write-set candidate.
-- [ ] The divergence is closed in `depgraph.rs` if reachable; otherwise no
+- [x] The divergence is closed in `depgraph.rs` if reachable; otherwise no
   product change is made.
-- [ ] The differential test is added and registered, and passes.
-- [ ] Verification 1-4 exit 0. Mutation evidence is recorded separately.
-- [ ] The Progress Log records pre/post sha256 for every edited file.
+- [x] The differential test is added and registered, and passes.
+- [x] Verification 1-4 exit 0. Mutation evidence is recorded separately.
+- [x] The Progress Log records pre/post sha256 for every edited file.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -180,3 +180,78 @@ Keep the test file under 300 lines. Do not edit `migrate_scale.rs`.
 ### Session: 2026-10-18 (plan authored, workflow session 433 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design.
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-18 (workflow session 433, step 6, LPI-NS-INDEX)
+**Tasks Completed**: TASK-N1 and TASK-N2.
+**Notes**:
+
+- Equivalence review:
+  - `current_gen_at_span`: the old `ids()` scan selects the lowest current
+    `FormId` at an exact span; `current_by_span` is a `BTreeSet<FormId>` and
+    `.next()` selects that same form. `claim` removes superseded forms and
+    adds each current form.
+  - `migrate`: old `sites_of` ordering is index order with `TweakId` order
+    preserved for ties. The indexed maps record the first matching position;
+    binding matches choose the earlier of slot-id and name matches, while
+    non-binding matches use `(origin, index, type)`, preserving the old
+    `.find` result.
+  - `sites_of`: the prior `BTreeMap<TweakId, _>` iteration followed by stable
+    sort on index is equivalent to the new explicit `(index, TweakId)` sort.
+  - Tweak `insert` removes a replaced site's old generation/span membership
+    before adding the new membership. `retire` removes each site's primary,
+    generation, and span entries.
+  - `migration_generation_in_span`: the span-key range includes starts within
+    the query span; its containment and prior-generation filter matches the
+    old full scan, and max `(generation, id)` preserves latest-generation
+    tie selection.
+- Empty-write-set verdict: standalone forms with no writes are not added to
+  the graph (`Evaluator::eval_form_checked` guards `DepGraph::add` with
+  `!members.is_empty()`). Every add is followed by `claim`. A reactive commit
+  may replace a recorded form's write set with an empty set, but then also
+  calls `claim`, whose vacuous `is_current` check inserts the form into the
+  span index. Thus no graph record with an empty write set is left unclaimed
+  and absent from the index; no product change was needed. Ownership changes
+  only in `DepGraph::claim` through `name_owner.insert` and `bind_owner.insert`;
+  no owner removal path exists.
+- Added and registered `src/ns/tests/migrate_index_equivalence.rs`. It compares
+  the index to the old linear reference after each evaluation step and covers
+  independent forms and reevaluation, supersession, twice-evaluated empty
+  expression, failed then successful same-span evaluation, and concrete tweak
+  migration ids. The empty expression evaluates to `3` and is absent from the
+  graph, matching the reachability finding.
+- Final source hashes: `src/ns/tests/mod.rs` pre
+  `fc5a0a6a0568d72efdf628416bf302881312baeb90fa5acbf64bf000930f7e3f`, post
+  `14258cfe84b2b57934209655428516f7eaa59303fe11e8ecb21e3707ecb0b45e`;
+  `src/ns/tests/migrate_index_equivalence.rs` absent before creation, post
+  `d8cb4f0b765c6154664ac1831253401b30a1b39ed4f343eb20c7ef6264419ccc`.
+  `src/ns/depgraph.rs` was temporarily mutated for the negative control and
+  restored byte-for-byte (`9088d5bc5b1284d6890ac9bbdc776963ffb7de6c5ffb095ecefcc4e9dd0cfa5b`
+  before and after); `src/ns/tweak.rs` and `src/ns/evaluator.rs` were unchanged.
+  This plan's pre-edit SHA256 was
+  `03e8f21a2cf863bc705aca27810016c242147980aac8c0911bc24294a8c52934`; its
+  final post-edit digest is recorded in
+  `tmp/live-perf-int/ns-index/final-sha256.txt` to avoid self-referential
+  checksum text.
+- Final verification (source after mutation restoration):
+  - `CARGO_TERM_QUIET=true cargo fmt --check` — exit 0,
+    `tmp/live-perf-int/ns-index/1-fmt-final.log`.
+  - `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` — exit 0,
+    `tmp/live-perf-int/ns-index/2-clippy-final.log`.
+  - `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --lib ns::`
+    — exit 0; 125 passed, 0 failed, 2316 skipped,
+    `tmp/live-perf-int/ns-index/3-nextest-ns-final.log`.
+  - `wc -l src/ns/depgraph.rs src/ns/tweak.rs src/ns/evaluator.rs src/ns/tests/migrate_index_equivalence.rs`
+    — exit 0; 598, 220, 957, and 101 lines,
+    `tmp/live-perf-int/ns-index/4-line-counts-final.log`.
+- Mutation evidence only: selecting `.next_back()` failed the differential
+  test as expected (1 run, 0 passed, 1 failed; expected index `FormGen(2)` vs
+  linear `FormGen(1)`), log
+  `tmp/live-perf-int/ns-index/mutation-current-span-last.log` (exit 100).
+- Earlier failed attempts were corrected and retained: initial invalid
+  expression syntax (`3-nextest-ns.log`, exit 100), then invalid identifier
+  and formatting (`1-fmt-retry1.log`, exit 1;
+  `3-nextest-ns-retry1.log`, exit 100); legal syntax and formatting passed in
+  final verification.
+- No changes were made to `depgraph.rs`, `tweak.rs`, or `evaluator.rs` in the
+  final tree. Formal review and any workflow-finalization tasks remain with
+  their downstream steps.

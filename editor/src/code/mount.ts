@@ -176,7 +176,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
     evalSelection: () => { if (vim.enabled()) void evalCtl.evalAtCursor(); },
     evalAll: () => { if (vim.enabled()) void evalCtl.evalAll(); },
-    hush: () => { if (vim.enabled()) evalCtl.hush(); },
+    stopAll: () => { if (vim.enabled()) transport.stopAll(); },
+    cut: () => { if (vim.enabled()) transport.hush(); },
     onPresentation: (presentation) => {
       const previousDoc = displayDoc;
       if (previousDoc !== presentation.doc) {

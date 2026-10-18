@@ -348,8 +348,8 @@ const TAG_GRAPH_INSTALL: u8 = 0x16;
 const TAG_GRAPH_RETIRE: u8 = 0x17;
 const TAG_SAMPLE_SLICE: u8 = 0x18;
 const TAG_SAMPLE_RETIRE: u8 = 0x19;
-const TAG_OUTPUT_STOP: u8 = 0x1C;
-const TAG_CELL_RAMP: u8 = 0x1D;
+const TAG_OUTPUT_STOP: u8 = 0x1F;
+const TAG_CELL_RAMP: u8 = 0x20;
 
 const TAG_SLOT_CONTROL_ACK: u8 = 0x40;
 const TAG_CELL_INIT_ACK: u8 = 0x41;

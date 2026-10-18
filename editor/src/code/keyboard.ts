@@ -3,7 +3,7 @@ import type { Text } from '@codemirror/state';
 import { CodeSurface } from './surface';
 import { boundary } from './accessibility';
 import type { PhaseTimer } from './frame';
-import { isApplePlatform, stopShortcut } from '../ui/stop-keys';
+import { fallbackStopShortcut } from '../ui/stop-keys';
 
 const words = new Intl.Segmenter(undefined, { granularity: 'word' });
 export function wordRange(text: string, position: number): { from: number; to: number } {
@@ -86,7 +86,7 @@ export class KeyboardController {
     this.options.phases?.begin('input');
     try {
     const mod = event.metaKey || event.ctrlKey, key = event.key.toLowerCase();
-    const stopAction = stopShortcut(event, isApplePlatform());
+    const stopAction = fallbackStopShortcut(event);
     let handled = true;
     if (mod && key === 'enter') { if (event.shiftKey) this.options.evalAll?.(); else this.options.evalSelection?.(); }
     else if (stopAction === 'stop-all') this.options.stopAll?.();

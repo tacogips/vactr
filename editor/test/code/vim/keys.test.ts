@@ -29,6 +29,7 @@ describe('isPassThrough', () => {
   const passthrough = [
     input('Enter', { ctrlKey: true }), input('Enter', { metaKey: true }), input('Enter', { ctrlKey: true, shiftKey: true }),
     input('.', { ctrlKey: true }), input('.', { metaKey: true }), input('a', { ctrlKey: true }), input('z', { metaKey: true }),
+    input('>', { ctrlKey: true, shiftKey: true, code: 'Period' }), input('>', { metaKey: true, shiftKey: true, code: 'Period' }),
     input('z', { ctrlKey: true, shiftKey: true }), input('y', { ctrlKey: true }), input('c', { ctrlKey: true }),
     input('v', { metaKey: true }), input('\\', { ctrlKey: true }),
   ];
@@ -37,6 +38,7 @@ describe('isPassThrough', () => {
   });
   it.each([
     input('r', { ctrlKey: true }), input('d', { ctrlKey: true }), input('Backspace', { altKey: true }),
+    input('>', { shiftKey: true, code: 'Period' }),
     input('Backspace', { metaKey: true }), input('Backspace', { ctrlKey: true }), input('Tab', { shiftKey: true }), input('j'),
     input('v', { ctrlKey: true, altKey: true }),
   ])('does not pass Vim or unrelated keys', (event) => {

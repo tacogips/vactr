@@ -28,7 +28,7 @@ export function isPassThrough(input: VimKeyInput, _platform: Platform, matchesDe
   if (matchesDefaultKeymap(input)) return true;
   const key = input.key.toLowerCase();
   const mod = input.metaKey || input.ctrlKey;
-  if (mod && (['enter', '.', 'a', 'z'].includes(key) || (input.ctrlKey && key === 'y'))) return true;
+  if (mod && (['enter', '.', 'a', 'z'].includes(key) || (input.ctrlKey && key === 'y') || input.code === 'Period')) return true;
   return mod && !input.altKey && ['c', 'x', 'v', '\\'].includes(key);
 }
 

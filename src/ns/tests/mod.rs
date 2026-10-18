@@ -4,6 +4,7 @@ mod evaluator;
 mod fm6_sysex;
 mod inst;
 mod load;
+mod migrate_index_equivalence;
 mod migrate_scale;
 mod namespace;
 mod pkg;

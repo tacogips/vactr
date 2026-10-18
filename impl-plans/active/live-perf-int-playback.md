@@ -96,7 +96,7 @@ Plan file: `impl-plans/active/live-perf-int-playback.md` (Progress Log
 only).
 
 Artifact roots: `target`, `tree-sitter-vact/tree-sitter-vact.wasm`,
-`editor/node_modules`, `editor/dist`, `tmp`.
+`editor/node_modules`, `editor/dist`, `tmp/live-perf-int/playback`, `tmp/live-perf-int/main-ref`, `tmp/live-perf-int/main-ref-target`, `tmp/canvas-cutover`, `tmp/code-render`, `tmp/canvas`, `tmp/examples-e2e`, `tmp/ui-style`.
 
 ## sharedPaths
 

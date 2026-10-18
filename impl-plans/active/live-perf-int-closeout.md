@@ -71,7 +71,7 @@ the integration adjustments in design section 7.
 - `impl-plans/active/live-perf-int-closeout.md` (this plan; Progress Log
   only)
 - Artifact roots: `target`, `tree-sitter-vact/tree-sitter-vact.wasm`,
-  `editor/node_modules`, `editor/dist`, `editor/src-tauri/target`, `tmp`
+  `editor/node_modules`, `editor/dist`, `editor/src-tauri/target`, `tmp/live-perf-int/closeout`, `tmp/canvas-cutover`, `tmp/code-render`, `tmp/canvas`, `tmp/examples-e2e`, `tmp/ui-style`
 
 ## sharedPaths
 

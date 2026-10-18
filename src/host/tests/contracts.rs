@@ -213,7 +213,7 @@ fn bad_tags_and_fields_are_wire_errors() {
     let n = CtlMsg::SlotControl(control(1, 0.0, Release::None)).encode(&mut buf);
     buf[n - 1] = 7; // release byte out of range
     assert_eq!(CtlMsg::decode(&buf[..n]), Err(WireError::BadValue));
-    assert_eq!(CtlMsg::decode(&[0x1c, 9]), Err(WireError::BadValue));
+    assert_eq!(CtlMsg::decode(&[0x1f, 9]), Err(WireError::BadValue));
     assert_eq!(
         HostMsg::decode(&[0x4b, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         Err(WireError::BadValue)
@@ -222,6 +222,73 @@ fn bad_tags_and_fields_are_wire_errors() {
     let n = full_event().encode(&mut ev);
     ev[1 + 24] = u8::try_from(MAX_CTLS + 1).expect("fits wire field");
     assert_eq!(AudioEvent::decode(&ev[..n]), Err(WireError::BadValue));
+}
+
+#[test]
+fn live_perf_control_tags_are_disjoint_from_song_record_tags() {
+    use crate::dsp::ring::{Budget, ByteInbox, ControlSource, Record};
+    use crate::song::{
+        routing::{SongLeaseKey, SongResourceKind, SongResourceRef},
+        SnapshotEpoch,
+    };
+
+    let lease = |kind| SongLeaseKey {
+        epoch: SnapshotEpoch(u64::MAX),
+        resource: SongResourceRef {
+            id: u32::MAX,
+            generation: u32::MAX,
+        },
+        kind,
+    };
+    let mut song_record = [0u8; 64];
+    let graph_len = crate::dsp::ring::encode_song_graph_record(
+        lease(SongResourceKind::Track),
+        &[0, 1, 2],
+        &mut song_record,
+    );
+    assert!(graph_len > 0);
+    let graph_tag = song_record[0];
+    let begin_len = crate::dsp::ring::encode_song_sample_begin(
+        lease(SongResourceKind::Sample),
+        1,
+        1,
+        48_000,
+        &mut song_record,
+    );
+    assert!(begin_len > 0);
+    let begin_tag = song_record[0];
+    let slice_len = crate::dsp::ring::encode_song_slice(
+        lease(SongResourceKind::Sample),
+        0,
+        &[0.0],
+        &mut song_record,
+    );
+    assert!(slice_len > 0);
+    let song_tags = [graph_tag, begin_tag, song_record[0]];
+    assert_eq!(song_tags, [0x1c, 0x1d, 0x1e]);
+
+    for msg in every_ctl_msg() {
+        let mut encoded = [0u8; CtlMsg::MAX_LEN];
+        let n = msg.encode(&mut encoded);
+        assert!(n > 0, "{msg:?}");
+        assert!(!song_tags.contains(&encoded[0]), "{msg:?}");
+        match msg {
+            CtlMsg::OutputStop { .. } => assert_eq!(encoded[0], 0x1f),
+            CtlMsg::CellRamp { .. } => assert_eq!(encoded[0], 0x20),
+            _ => {}
+        }
+        if matches!(msg, CtlMsg::OutputStop { .. } | CtlMsg::CellRamp { .. }) {
+            let mut inbox = ByteInbox::new();
+            assert!(inbox.push(&encoded[..n]));
+            assert!(matches!(
+                inbox.next(Budget {
+                    install_bytes: usize::MAX,
+                    batch: true,
+                }),
+                Some(Record::Msg(decoded)) if decoded == msg
+            ));
+        }
+    }
 }
 
 #[test]

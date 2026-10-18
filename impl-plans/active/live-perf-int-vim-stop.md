@@ -1,6 +1,6 @@
 # LPI-VIM-STOP: stop and cut shortcuts with Vim on, and the removed hush option
 
-**Status**: Ready
+**Status**: Completed (implementation; independent review pending)
 **Plan ID**: LPI-VIM-STOP (wave 1)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I2, I3) and 4 (V1-V3, Tests)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -210,16 +210,16 @@ Record the reason in the Progress Log.
 
 ## Completion Criteria
 
-- [ ] `fallbackStopShortcut` is exported, and `KeyboardController` uses it.
-- [ ] `mount.ts` passes `stopAll`/`cut`, gated on `vim.enabled()`. No
+- [x] `fallbackStopShortcut` is exported, and `KeyboardController` uses it.
+- [x] `mount.ts` passes `stopAll`/`cut`, gated on `vim.enabled()`. No
   `hush` option remains anywhere in `InputController` options
   (`grep -rn "hush:" editor/src/code/mount.ts` shows no InputController
   use).
-- [ ] `isPassThrough` passes `mod && code === 'Period'`.
-- [ ] Tests are updated as listed, and the intentional change is recorded
+- [x] `isPassThrough` passes `mod && code === 'Period'`.
+- [x] Tests are updated as listed, and the intentional change is recorded
   with its reason.
-- [ ] Verification 1-4 exit 0. Mutation evidence is recorded separately.
-- [ ] The Progress Log records pre/post sha256 for every edited file.
+- [x] Verification 1-4 exit 0. Mutation evidence is recorded separately.
+- [x] The Progress Log records pre/post sha256 for every edited file.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -244,3 +244,24 @@ Record the reason in the Progress Log.
 ### Session: 2026-10-18 (plan authored, workflow session 433 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design.
 **Notes**: Ready for wave 1.
+
+### Session: 2026-10-18 (implementation, workflow step6-implement)
+**Tasks Completed**: TASK-V1 through TASK-V4.
+**Notes**:
+- Exported `fallbackStopShortcut` with a shared period matcher; `stopShortcut` remains platform-strict. `KeyboardController` uses the fallback after the existing Mod-Enter precedence.
+- Replaced the obsolete InputController `hush` option in `mount.ts` with Vim-gated `transport.stopAll()` and `transport.hush()` callbacks. Vim Shift-period passes through by `code === 'Period'`.
+- Added fallback matcher and Vim pass-through cases. Updated Vim mount alternate-modifier tests intentionally: unshifted alternate period sends gentle stop-all; shifted alternate period sends cut. Added Vim-off no-op coverage. Updated the two InputController fixture option objects mechanically; Vim hush commands/bindings remain unchanged.
+- Pre-edit SHA-256 values: `tmp/live-perf-int/vim-stop/pre-edit-sha256.txt`; post-edit values: `tmp/live-perf-int/vim-stop/post-edit-sha256.txt`. The plan's pre-update hash is `tmp/live-perf-int/vim-stop/plan-pre-update.sha256`; its final hash is captured in `tmp/live-perf-int/vim-stop/plan-post-update.sha256` after this update.
+- Verification: `cd editor && npm run check` exit 0; focused Vitest exit 0 (8 files, 188 tests passed); Vim/canvas Vitest exit 0 (57 files, 1528 tests passed); line-count gate exit 0 (all touched source/test files under 1000 lines). Logs: `tmp/live-perf-int/vim-stop/1-check.log`, `2-vitest-focused.log`, `3-vitest-vim-canvas.log`, `4-line-counts.log`.
+- Mutation evidence: removing the `vim.enabled()` gate caused the new Vim-off test to fail (1 failed, 13 skipped); the gate was restored and `mount.ts` SHA-256 matches the pre-mutation value. Evidence: `tmp/live-perf-int/vim-stop/mutation-vim-off-gate.log`, `mutation-before-sha256.txt`, `mutation-restored-sha256.txt`.
+- Non-gating style context: `cd editor && npm run test:style` exited 1 on eight `button -> input` / `button -> button` spacing measurements across Chromium and WebKit (`tmp/live-perf-int/vim-stop/5-style.log`). This command is not in LPI-VIM-STOP verification steps 1-4. The eight findings are JSON-identical with and without this plan's editor changes (`tmp/live-perf-int/reconcile/5-baseline-style.log` and `2-style.log`) and the check passes on main (`tmp/live-perf-int/reconcile/7-main-style.log`). Track the baseline findings as UF-1 under its separate scope; do not count this command as a passing verification.
+- Implementation is complete for this plan. Formal review and shared closeout remain downstream workflow work.
+
+### Session: 2026-10-18 (UF-2 redispatch, workflow step6-implement)
+**Tasks Completed**: Reconciled the style-gate disposition and reran LPI-VIM-STOP verification steps 1-4 on the current source.
+**Notes**:
+- Confirmed `editor/src/ui/stop-keys.ts`, `editor/src/code/keyboard.ts`, `editor/src/code/mount.ts`, and `editor/src/code/vim/keys.ts` SHA-256 values exactly match `tmp/live-perf-int/vim-stop/post-edit-sha256.txt`; recorded the pre-edit plan hash at `tmp/live-perf-int/vim-stop/plan-pre-redispatch.sha256`. No editor source or test file changed in this redispatch.
+- Recorded the test:style result as non-gating baseline context only. Its eight findings match the baseline with and without the LPI-VIM-STOP edits, while main passes; UF-1 owns that separate scope.
+- Current-source verification: `npm run check` passed (exit 0; `tmp/live-perf-int/vim-stop/6-redispatch-check.log`); focused Vitest passed 188/188 (exit 0; `7-redispatch-vitest-focused.log`); Vim/canvas Vitest passed 1528/1528 (exit 0; `8-redispatch-vitest-vim-canvas.log`); line-count gate passed (exit 0; `9-redispatch-line-counts.log`). These are the plan's verification steps 1-4 only.
+- Existing mutation evidence remains `tmp/live-perf-int/vim-stop/mutation-vim-off-gate.log`: removing the `vim.enabled()` gate made the Vim-off regression test fail, and the gate was restored. Mutation evidence is not a gating verification record.
+- Status remains Completed for implementation; typed test-integrity and adversarial review decisions are downstream review steps.

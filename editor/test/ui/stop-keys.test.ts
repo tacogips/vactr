@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isApplePlatform, stopShortcut } from '../../src/ui/stop-keys';
+import { fallbackStopShortcut, isApplePlatform, stopShortcut } from '../../src/ui/stop-keys';
 
 describe('stopShortcut', () => {
   it('maps Apple Meta Period to gentle stop and Shift to cut', () => {
@@ -25,5 +25,20 @@ describe('stopShortcut', () => {
     expect(isApplePlatform('MacIntel')).toBe(true);
     expect(isApplePlatform('iPad')).toBe(true);
     expect(isApplePlatform('Linux x86_64')).toBe(false);
+  });
+});
+
+describe('fallbackStopShortcut', () => {
+  it('accepts either modifier and maps Shift to cut', () => {
+    expect(fallbackStopShortcut({ code: 'Period', key: '.', metaKey: false, ctrlKey: true, altKey: false, shiftKey: false })).toBe('stop-all');
+    expect(fallbackStopShortcut({ code: 'Period', key: '.', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBe('stop-all');
+    expect(fallbackStopShortcut({ code: 'Period', key: '>', metaKey: true, ctrlKey: false, altKey: false, shiftKey: true })).toBe('cut');
+    expect(fallbackStopShortcut({ code: '', key: '>', metaKey: false, ctrlKey: true, altKey: false, shiftKey: true })).toBe('cut');
+  });
+
+  it('rejects Alt, missing modifiers, and non-period codes', () => {
+    expect(fallbackStopShortcut({ code: 'Period', key: '.', metaKey: false, ctrlKey: true, altKey: true, shiftKey: false })).toBeNull();
+    expect(fallbackStopShortcut({ code: 'Period', key: '.', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false })).toBeNull();
+    expect(fallbackStopShortcut({ code: 'KeyA', key: '.', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBeNull();
   });
 });

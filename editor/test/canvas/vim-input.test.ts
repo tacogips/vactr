@@ -19,8 +19,8 @@ function setup(text = 'alpha beta\ngamma', vim = true) {
   const sync = new DocumentSync(client.document('main.vact'), Text.of(text.split('\n')));
   const surface = new CodeSurface({ sync });
   const container = document.createElement('div'); document.body.append(container);
-  const evalSelection = vi.fn(), evalAll = vi.fn(), hush = vi.fn(), scrollCaret = vi.fn();
-  const input = new InputController(surface, container, { evalSelection, evalAll, hush, scrollCaret });
+  const evalSelection = vi.fn(), evalAll = vi.fn(), stopAll = vi.fn(), cut = vi.fn(), scrollCaret = vi.fn();
+  const input = new InputController(surface, container, { evalSelection, evalAll, stopAll, cut, scrollCaret });
   const scrollBy = vi.fn(), viewHost = {
     viewport: { scrollTop: 0, height: 180 }, scrollBy, scrollCaret,
   };
@@ -39,7 +39,7 @@ function setup(text = 'alpha beta\ngamma', vim = true) {
     { key: 'Shift-Alt-f', run: defaultBindings.format },
   ], 'default');
   cleanup.push(() => { removeBindings(); controller?.dispose(); input.dispose(); surface.dispose(); client.close(); container.remove(); });
-  return { surface, input, controller, el: input.accessibility.textarea, evalSelection, evalAll, hush, scrollBy, defaultBindings };
+  return { surface, input, controller, el: input.accessibility.textarea, evalSelection, evalAll, stopAll, cut, scrollBy, defaultBindings };
 }
 function key(el: HTMLElement, value: string, options: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true, ...options });

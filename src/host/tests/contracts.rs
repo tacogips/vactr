@@ -267,6 +267,30 @@ fn live_perf_control_tags_are_disjoint_from_song_record_tags() {
     let song_tags = [graph_tag, begin_tag, song_record[0]];
     assert_eq!(song_tags, [0x1c, 0x1d, 0x1e]);
 
+    let truncated_graph_lease = SongLeaseKey {
+        epoch: SnapshotEpoch(0),
+        resource: SongResourceRef {
+            id: u32::MAX,
+            generation: u32::MAX,
+        },
+        kind: SongResourceKind::Track,
+    };
+    let mut truncated_graph = [0u8; 64];
+    let truncated_graph_len = crate::dsp::ring::encode_song_graph_record(
+        truncated_graph_lease,
+        &[0, 1, 2],
+        &mut truncated_graph,
+    );
+    assert!(truncated_graph_len > 2);
+    let mut inbox = ByteInbox::new();
+    assert!(inbox.push(&truncated_graph[..2]));
+    assert!(inbox
+        .next(Budget {
+            install_bytes: usize::MAX,
+            batch: true,
+        })
+        .is_none());
+
     for msg in every_ctl_msg() {
         let mut encoded = [0u8; CtlMsg::MAX_LEN];
         let n = msg.encode(&mut encoded);

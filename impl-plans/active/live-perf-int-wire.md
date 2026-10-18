@@ -297,9 +297,9 @@ step id, the verdict and any repair. Then set Status to `Completed`.
 
 ### Rerun Completion Criteria
 
-- [ ] WR1 log shows every expected result.
-- [ ] WR2 steps 1-6 exit 0 with positive test counts (logs in `rerun-438/`).
-- [ ] WR3 M1 and M2 fail as expected; restore hashes match.
+- [x] WR1 log shows every expected result (`rerun-438/r1-deliverables.log`).
+- [x] WR2 steps 1-6 exit 0 with positive test counts (`rerun-438/final-source/`).
+- [x] WR3 M1 and the legacy-collision regression guard fail as expected; restore hashes match.
 - [ ] Independent review verdict recorded (WR4/WR6); every high or mid
   finding repaired (WR5).
 - [ ] Status is Completed only after the recorded acceptance.
@@ -342,3 +342,13 @@ step id, the verdict and any repair. Then set Status to `Completed`.
 ### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
 **Tasks Completed**: none (plan revision only).
 **Notes**: Converted to a review-and-repair rerun (design section 11). Added TASK-WR1 to TASK-WR6 and the Rerun Completion Criteria. Status is In Progress until the independent review verdict is recorded. The original completion criteria remain as the implementation record.
+
+### Session: 2026-10-18 (Step 6 implementation, workflow session 438)
+**Tasks Completed**: TASK-WR1 to TASK-WR3; final-source verification steps 1-6.
+**Notes**:
+- WR1 matches the expected tags, song-only decode arm, guard, mechanical `0x1f` fixture, unchanged song tests/tags, and no editor-side `0x1c`/`0x1d` encoder. Evidence: `tmp/live-perf-int/wire/rerun-438/r1-deliverables.log`.
+- Added a two-byte truncated graph case with epoch zero to the existing contracts guard. The planned carrier-test mutation was not discriminating: that fixture uses epoch `u64::MAX`, so the byte read as the old OutputStop mode is `0xFF`. The added `[GRAPH, 0]` case directly exercises the malformed-record contract inside this plan's `writePaths` and fails under the legacy colliding tag plus CtlMsg-first arm.
+- Final-source verification: fmt and clippy passed; nextest song suites 47/47; nextest contracts/output-stop/ramp 38/38; wasm debug and release builds passed; line counts were ring.rs 928, wire.rs 928, contracts.rs 628. Logs: `tmp/live-perf-int/wire/rerun-438/final-source/1-fmt.log` through `6-line-counts.log`.
+- Mutation evidence: M1 fails the disjointness guard (1 run, 0 passed, 1 failed). The legacy-collision guard mutation fails (1 run, 0 passed, 1 failed). The arm-only and original carrier-test controls passed because their current fixture/tag values do not trigger a collision; preserved in `m2.log`, `m2-legacy-pair.log`, and `m2-forced-rebuild.log`. Both modified production files were restored byte-for-byte; before/after hashes match in `m1-before.sha256`/`m1-after.sha256` and `m2-guard-before.sha256`/`m2-guard-after.sha256`.
+- `src/host/tests/contracts.rs` SHA-256 changed from `8a8e024d8cb5f580b3452435ad8da521c6fd5997c02c183c578c85a97ff5d8df` to `2c0390414f0e040fa08a9ab026b871bd0b16addb8b1562285d9d2eb08cd2b9c8`. Independent review and acceptance remain pending; no verdict is claimed.
+- Plan SHA-256 before this audit note: `22abdacf42c7c4b3f23f8a08fea842d3aa940a82811058415e118bd60c7e37f7`; final post-edit hash is recorded in `tmp/live-perf-int/wire/rerun-438/plan-final.sha256`.

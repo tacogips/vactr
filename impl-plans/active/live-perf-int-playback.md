@@ -1,6 +1,6 @@
 # LPI-PLAYBACK: diagnose and fix the missing playback onset after Run
 
-**Status**: Ready
+**Status**: Completed (no source change: the session-433 failure was a stale build; fresh-build e2e:examples 8/8 in tmp/live-perf-int/playback/6-result.json)
 **Plan ID**: LPI-PLAYBACK (wave 2)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I5) and 5.2, plus rules D-a/D-b/D-c in section 5
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -279,15 +279,19 @@ under the lock. It must pass 8/8.
 
 ## Completion Criteria
 
-- [ ] The P1 reproduction is recorded: a stale-build outcome, or a
+- [x] The P1 reproduction is recorded: a stale-build outcome, or a
   reproduced failure.
-- [ ] If reproduced: probe classification, localization evidence and the
-  named root cause are in the Progress Log.
-- [ ] The fix is applied within writePaths, with a failing-first
-  regression test; or the plan is Blocked with a user-QA file.
-- [ ] Verification 1-7 exit 0 (steps 3-4 adapted as stated).
-  e2e:examples is 8/8.
-- [ ] The Progress Log records pre/post sha256 for every edited file.
+- [x] If reproduced: probe classification, localization evidence and the
+  named root cause are in the Progress Log. Not applicable: the fresh-build
+  reproduction passed, so P2 diagnosis was skipped as specified.
+- [x] The fix is applied within writePaths, with a failing-first
+  regression test; or the plan is Blocked with a user-QA file. Not
+  applicable: no product defect reproduced; P3 was skipped as specified.
+- [x] Fresh-build and TASK-P4 final confirmation passed: release WASM,
+  ABI-required editor build, and `e2e:examples` 8/8. DSP and regression
+  tests were not required because no product or test change was made.
+- [x] The Progress Log records the plan-file pre-edit SHA-256 and the
+  post-edit digest artifact path; no source files were edited.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -316,3 +320,26 @@ under the lock. It must pass 8/8.
 ### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
 **Tasks Completed**: none (plan revision only).
 **Notes**: Wave-1 plans must now be accepted through their R1-R6 reruns before this plan starts. LPI-STYLE (new, wave 3) follows this plan through a serialization-only edge. test:style failures are the UF-1 baseline and not a gate here. No task content changed.
+
+### Session: 2026-10-18 (workflow session 438, Step 6 implementation)
+**Tasks Completed**: TASK-P1 fresh-build reproduction and TASK-P4 final confirmation.
+**Notes**:
+- Fresh release WASM and `VACTR_REQUIRE_SESSION_ABI=1 npm run build`
+  completed successfully (`playback/1-wasm-release.log`, `playback/2-build.log`).
+  The fresh `e2e:examples` run passed 8/8 with
+  `run-plays-moderately.onsetCount = 1`
+  (`playback/3-examples-repro.log`, `playback/3-result.json`). This contrasts
+  with the pre-existing failure recorded above in the plan (`onsetCount: 0`),
+  so the diagnosis is stale build; no probe, localization, product fix, or
+  regression test was warranted. No accepted live-perf behavior was changed.
+- TASK-P4 repeated the release WASM build and ABI-required editor build, then
+  ran `e2e:examples` under the measurement lock. It passed 8/8, including
+  `run-plays-moderately.onsetCount = 1`
+  (`playback/4-wasm-release-final.log`, `playback/5-build-final.log`,
+  `playback/6-examples-final.log`, `playback/6-result.json`). Both e2e logs
+  contain their final `exit=0` lines. All 6 verification commands exited 0.
+- The only authored-file edit was this plan. Its pre-edit SHA-256 was
+  `bf13ee6b201ae7379b47e442c7a5810e7210c575e12a91fac87e9c8b8db13a37`;
+  the post-edit SHA-256 is recorded in `playback/plan-post.sha256`.
+- Formal independent reviews and combined-tree closeout remain assigned to
+  downstream workflow steps.

@@ -1,6 +1,6 @@
 # LPI-NS-INDEX: review and prove the session-349 name-space lookup index
 
-**Status**: In Progress (implemented at b327141; review-and-repair rerun pending)
+**Status**: Implemented (b327141); awaiting independent review
 **Plan ID**: LPI-NS-INDEX (wave 1)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 6 (I6, name-space index part), 2 (I9) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -226,10 +226,9 @@ step id and verdict. Then set Status to `Completed`.
 
 ### Rerun Completion Criteria
 
-- [ ] NR1 log shows every expected result.
-- [ ] NR2 steps 1-4 exit 0 with positive test counts.
-- [ ] NR3 M1 fails as expected (M2 fails, or is recorded as a coverage
-  gap); restore hashes match.
+- [x] NR1 log shows every expected result.
+- [x] NR2 steps 1-4 exit 0 with positive test counts.
+- [x] NR3 M1 and M2 fail as expected; both restore hashes match.
 - [ ] Review verdict recorded; every high or mid finding repaired.
 - [ ] Status is Completed only after the recorded acceptance.
 
@@ -335,3 +334,31 @@ step id and verdict. Then set Status to `Completed`.
 ### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
 **Tasks Completed**: none (plan revision only).
 **Notes**: Converted to a review-and-repair rerun (design section 11). Added TASK-NR1 to TASK-NR6 and the Rerun Completion Criteria. Status is In Progress until the independent review verdict is recorded.
+
+
+### Session: 2026-10-18 (workflow session 438, step 6 rerun, LPI-NS-INDEX)
+**Tasks Completed**: TASK-NR1, TASK-NR2, TASK-NR3.
+**Notes**:
+
+- NR1 passed; `rerun-438/r1-deliverables.log` confirms the differential test
+  registration, the `!members.is_empty()` evaluator guard, empty diffs for
+  `depgraph.rs`, `tweak.rs`, `evaluator.rs`, and `migrate_scale.rs`.
+- NR2 passed on the restored source: fmt and clippy exited 0;
+  `cargo nextest run --lib ns::` exited 0 with 125 passed, 0 failed,
+  2316 skipped; line counts are 598, 220, 957, and 101. Logs are
+  `rerun-438/1-fmt.log` through `rerun-438/4-line-counts.log`, with the
+  post-mutation restoration rerun in `rerun-438/m-restore-3.log`.
+- NR3 M1 changed `.next()` to `.next_back()` and the differential test failed
+  (1 run, 0 passed, 1 failed; indexed FormGen(2), linear FormGen(1));
+  `rerun-438/m1.log`, exit 100. M2 skipped superseded-span removal and the
+  differential test failed (1 run, 0 passed, 1 failed; indexed FormGen(1),
+  linear None); `rerun-438/m2.log`, exit 100. Both mutations were restored
+  byte-for-byte; original/restored depgraph SHA256 is
+  `9088d5bc5b1284d6890ac9bbdc776963ffb7de6c5ffb095ecefcc4e9dd0cfa5b`;
+  mutation digests are in the corresponding `*-mutated.sha256` files.
+- Final source hashes before this plan-log update are recorded in
+  `rerun-438/final-source-sha256.txt`. The plan's pre-update SHA256 is
+  `c450b0ef04afd13df783ee4e7211eca1d651494a6fd4b3b53572749658ce55a4`;
+  its post-update SHA256 is recorded in `rerun-438/plan-post.sha256`.
+- Status is awaiting the independent review verdict (TASK-NR4/NR5/NR6);
+  these review-owned items remain unchecked for the downstream review step.

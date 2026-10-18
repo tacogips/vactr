@@ -1,6 +1,6 @@
 # LPI-VIM-STOP: stop and cut shortcuts with Vim on, and the removed hush option
 
-**Status**: In Progress (implemented at b327141; review-and-repair rerun with test-integrity and adversarial review pending)
+**Status**: Implemented (b327141); awaiting independent correctness, test-integrity and adversarial review
 **Plan ID**: LPI-VIM-STOP (wave 1)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I2, I3, I9), 4 (V1-V3, Tests) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -331,9 +331,9 @@ Then set Status to `Completed`.
 
 ### Rerun Completion Criteria
 
-- [ ] VR1 log shows every expected result.
-- [ ] VR2 steps 1-4 exit 0 with positive test counts.
-- [ ] VR3 M1-M4 fail as expected; restore hashes match.
+- [x] VR1 log shows every expected result.
+- [x] VR2 steps 1-4 exit 0 with positive test counts; focused step 2 also passed after mutation restoration.
+- [x] VR3 M1-M4 fail as expected; restore hashes match.
 - [ ] Correctness, test-integrity and adversarial verdicts are recorded;
   every high or mid finding is repaired.
 - [ ] Status is Completed only after the recorded acceptance.
@@ -386,3 +386,13 @@ Then set Status to `Completed`.
 ### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
 **Tasks Completed**: none (plan revision only).
 **Notes**: Status reset to In Progress. Converted to a review-and-repair rerun (design section 11). Added TASK-VR1 to TASK-VR6, including the test-integrity and adversarial review checklists, and the Rerun Completion Criteria. Completed only after correctness, test-integrity and adversarial verdicts are recorded.
+
+
+### Session: 2026-10-18 (rerun, workflow session 438 step6-implement)
+**Tasks Completed**: TASK-VR1, TASK-VR2, TASK-VR3.
+**Notes**:
+- VR1 deliverables match the accepted design and assigned writePaths; `rerun-438/r1-deliverables.log` records the expected matcher, Vim-gated callbacks, code-period passthrough, scoped commit diff, and empty diffs for transport/eval/Vim hush files.
+- VR2 current-source checks passed: `npm run check` (exit 0); focused Vitest (8 files, 188/188 tests); Vim/canvas Vitest (57 files, 1528/1528 tests); line counts (all listed files under 1000). Logs are `rerun-438/1-check.log` through `rerun-438/4-line-counts.log`. After mutation restoration, focused Vitest passed again (8 files, 188/188; `rerun-438/m-restore-2.log`).
+- VR3 mutation controls M1-M4 each failed the intended focused assertion and each restore hash matched its immediately pre-mutation file hash. Logs: `rerun-438/mutation-m1.log`, `mutation-m2-retry.log`, `mutation-m3.log`, `mutation-m4.log`; intents and SHA-256 pairs are in the adjacent `m*-intent.txt`, `m*-before.sha256`, and `m*-restored.sha256` files. The first M2 setup attempt imported a nonexistent `../ui/platform` path and failed before tests loaded (`mutation-m2.log`); it was corrected to use the existing `../ui/stop-keys` export, and the valid retry produced the expected two failing alternate-modifier cases.
+- No implementation source changed in this rerun. Correctness, test-integrity, and adversarial verdicts and any resulting repair/acceptance remain assigned to the downstream review step; do not mark Completed before those verdicts.
+- Plan-file SHA-256 before this Progress Log update: `9bd84945b1e1f647d0b0056a2e0286c6215a0428c68dcc69cbe24eab5937c52d`; the final plan hash is recorded at `rerun-438/plan-after-hash-note-retry.sha256`.

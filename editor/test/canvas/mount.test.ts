@@ -232,6 +232,23 @@ describe('headless canvas mount', () => {
     rig.mounted.dispose();
   });
 
+  it('exposes transport and momentary accessors as plain perf-hook data', () => {
+    const rig = setup(true);
+    const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    const surface = rig.deps.code!.surface;
+    vi.spyOn(surface, 'momentaryHit').mockReturnValue(true);
+    vi.spyOn(surface, 'coordsAtPos').mockReturnValue({ left: 1, right: 9, top: 2, bottom: 18 });
+    rig.host.step(16);
+    expect(perf.transportOutput()).toBe('running');
+    expect(perf.outputHistory()).toEqual(['running']);
+    expect(perf.momentaryLabels()).toEqual([]);
+    expect(perf.momentaryHit(4)).toBe(true);
+    const rect = perf.coordsAtPos(4);
+    expect(rect).toEqual({ left: 1, right: 9, top: 2, bottom: 18 });
+    expect(Object.getPrototypeOf(rect)).toBe(Object.prototype);
+    rig.mounted.dispose();
+  });
+
   it('keeps active playing frames separate from text work and records the audible presentation contract', () => {
     const audible = new AudibleClock({ at: () => ({ time: 1.05, uncertainty: 0.002, provenance: 'measured' }) });
     const rig = setup(true, true, audible); const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf;

@@ -143,6 +143,9 @@ impl FormRec {
 #[derive(Debug, Default)]
 pub struct DepGraph {
     forms: Vec<FormRec>,
+    /// Current form records by exact source span. The set preserves the
+    /// definition-order choice made by the original linear lookup.
+    current_by_span: BTreeMap<(u32, u32, u32), BTreeSet<FormId>>,
     /// Committed generation -> form record.
     generations: BTreeMap<u64, FormId>,
     /// Defined name (slot id) -> owning form.
@@ -301,7 +304,47 @@ impl DepGraph {
                 prev.push(g);
             }
         }
+        for old in &prev {
+            self.remove_current_span(*old);
+        }
+        if self.is_current(f) {
+            self.add_current_span(f);
+        }
         prev
+    }
+
+    fn span_key(&self, form: FormId) -> Option<(u32, u32, u32)> {
+        let span = self.get(form)?.node.span;
+        Some((span.file.get(), span.start, span.end))
+    }
+
+    fn add_current_span(&mut self, form: FormId) {
+        if let Some(key) = self.span_key(form) {
+            self.current_by_span.entry(key).or_default().insert(form);
+        }
+    }
+
+    fn remove_current_span(&mut self, form: FormId) {
+        let Some(key) = self.span_key(form) else {
+            return;
+        };
+        if let Some(forms) = self.current_by_span.get_mut(&key) {
+            forms.remove(&form);
+            if forms.is_empty() {
+                self.current_by_span.remove(&key);
+            }
+        }
+    }
+
+    /// The earliest current form generation whose source span matches.
+    #[must_use]
+    pub fn current_gen_at_span(&self, span: crate::reader::span::Span) -> Option<FormGen> {
+        self.current_by_span
+            .get(&(span.file.get(), span.start, span.end))?
+            .iter()
+            .next()
+            .and_then(|form| self.get(*form))
+            .map(|rec| rec.gen)
     }
 
     /// True when `f` owns every member of its write set (5.6 eligibility

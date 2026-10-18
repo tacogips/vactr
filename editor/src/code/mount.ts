@@ -99,6 +99,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let disposed = false;
   let evalRanges: CodeAnnotation[] = [];
   let playingRanges: { from: number; to: number }[] = [];
+  let lastMomentaryLabels: string[] = [];
   let handles: readonly SelectionHandle[] = [];
   let syntaxProvider: SpanProvider = new FallbackSpans();
   let syntaxTruncated = 0;
@@ -232,6 +233,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
           ...(selection.empty ? [] : [{ from: selection.from, to: selection.to, kind: 'selection' as const }]),
           ...input.presentation.annotations];
         const momentaryRows = surface.animatedRows(ctx.frameMs);
+        if (perfEnabled) lastMomentaryLabels = momentaryRows.filter((row) => row.kind === 'momentary').map((row) => row.label ?? '');
         scheduler?.setActive('momentary', momentaryRows.length > 0);
         const animatedRows: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
         const annotations = { staticRows, animatedRows, cursor: input.presentation.cursor };
@@ -248,6 +250,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
       } else {
         const momentaryRows = surface.animatedRows(ctx.frameMs);
+        if (perfEnabled) lastMomentaryLabels = momentaryRows.filter((row) => row.kind === 'momentary').map((row) => row.label ?? '');
         scheduler?.setActive('momentary', momentaryRows.length > 0);
         const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
         timed('upload', () => {
@@ -356,6 +359,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   } else loadMainThreadSyntax();
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
     ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
+    transportOutput: () => transport.el.querySelector<HTMLElement>('.vact-stop-all')?.dataset.output ?? 'running',
+    outputHistory: () => transport.outputHistory(), momentaryLabels: () => lastMomentaryLabels,
     disposeCode: () => mounted.dispose() });
 
   const colorScheme = win.matchMedia?.('(prefers-color-scheme: dark)');

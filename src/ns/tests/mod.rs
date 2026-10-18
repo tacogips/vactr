@@ -3,6 +3,7 @@
 mod evaluator;
 mod inst;
 mod load;
+mod migrate_scale;
 mod namespace;
 mod pkg;
 mod reactive_basic;

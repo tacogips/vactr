@@ -1,11 +1,11 @@
 # LP-EVIDENCE: Silent behavior e2e, full gates, verification record, closeout
 
-**Status**: Ready (after all wave-2 plans)
+**Status**: In Progress
 **Plan ID**: LP-EVIDENCE (wave 3)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 8.3, 8.4, 9, 11
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-10 (session 346: section 12 title; all six dependencies accepted)
+**Last Updated**: 2026-10-10 (session 349: implementation and gate run)
 
 ## Intent and Context
 
@@ -266,7 +266,7 @@ Change nothing else in the design.
 - [ ] Section 12 is appended to the design doc with log paths.
 - [ ] The plans and the manifest are archived file by file, and the README
   is updated.
-- [ ] The Progress Log is updated.
+- [x] The Progress Log is updated.
 
 ## Progress Log
 
@@ -293,3 +293,13 @@ Change nothing else in the design.
   empty `dependsOn`.
 - The section 12 title now reads "session 346".
 - TASK-V1 to TASK-V5 are unchanged and still pending.
+
+### Session: 2026-10-10 (session 349 implementation)
+**Tasks Completed**: TASK-V1 implementation and focused test; TASK-V2 implementation; gates 1-7; final-source syntax, type-check and focused-test checks.
+**Notes**:
+- Implemented perf-only transport output/history, momentary label, hit-test and coordinate accessors in `editor/src/code/perf-hook.ts` and wired them through `editor/src/code/mount.ts`. Momentary label sampling is guarded by `?perf=1` to keep normal render frames free of the new instrumentation.
+- Added the focused accessor row in `editor/test/canvas/mount.test.ts` and four silent behavior checks in `editor/test/e2e/behavior.mjs`. The touch check records synthetic multi-touch success and physical iPad validation pending. Chromium/WebKit behavior e2e has not run yet.
+- Gates 1-7 passed; logs are `tmp/live-perf/gates/{1-cargo-build-all-targets,2-cargo-clippy,3-rustfmt-touched,4-cargo-build-wasm-debug,5-build-wasm-release,6-tauri-cargo-check,7-npm-check}.log`. Final-source focused checks passed: `tmp/live-perf/gates/session-349/node-check-final.log`, `npm-check-final.log`, and `vitest-perf-hook-final.log` (1/1).
+- Full vitest failed twice at the existing `test/e2e/large-eval.test.ts` scaling assertion: first 5k=5156.1 ms, 20k=40377.5 ms, ratio 7.83 (>6), exit 1 in `tmp/live-perf/gates/8-vitest-full.log`; then 5k=5625.6 ms, 20k=42694.2 ms, ratio 7.59 (>6), exit 1 in `tmp/live-perf/gates/8-vitest-full-retry1.log`. All other tests passed in both runs (871/872). The retry was after removing label sampling from non-perf frames; the scaling failure persisted.
+- Stopped after gate 8 per TASK-V3. Gates 9-13, full behavior e2e, section 12, and archival closeout remain pending. The failing large-eval test and its underlying evaluation scaling are outside LP-EVIDENCE's authorized source write paths; workflow review must assign/disposition that gate before this plan resumes.
+- Bounded self-check moved the existing `dispose-ledger` e2e check after all four new checks so they retain the perf hook; the final `node --check editor/test/e2e/behavior.mjs` passed at `tmp/live-perf/gates/session-349/node-check-final2.log`.

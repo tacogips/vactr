@@ -62,6 +62,8 @@ pub struct TweakSite {
 #[derive(Debug, Default)]
 pub struct TweakTable {
     sites: BTreeMap<TweakId, TweakSite>,
+    by_generation: BTreeMap<FormGen, Vec<TweakId>>,
+    by_span_start: BTreeMap<(u32, u32, u32, TweakId), TweakId>,
     next: u32,
 }
 
@@ -75,7 +77,15 @@ impl TweakTable {
 
     /// Records a site.
     pub fn insert(&mut self, site: TweakSite) {
-        self.sites.insert(site.id, site);
+        let id = site.id;
+        let span = site.span;
+        let generation = site.form_gen;
+        if let Some(previous) = self.sites.insert(id, site) {
+            self.remove_indexes(&previous);
+        }
+        self.by_generation.entry(generation).or_default().push(id);
+        self.by_span_start
+            .insert((span.file.get(), span.start, span.end, id), id);
     }
 
     /// The site `id`.
@@ -95,18 +105,95 @@ impl TweakTable {
     #[must_use]
     pub fn sites_of(&self, gen: FormGen) -> Vec<TweakSite> {
         let mut out: Vec<TweakSite> = self
-            .sites
-            .values()
-            .filter(|s| s.form_gen == gen)
-            .cloned()
+            .by_generation
+            .get(&gen)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| self.sites.get(id).cloned())
             .collect();
-        out.sort_by_key(|s| s.index);
+        out.sort_by_key(|s| (s.index, s.id));
         out
+    }
+
+    fn migration_candidates(
+        &self,
+        span: crate::reader::span::Span,
+    ) -> impl Iterator<Item = &TweakSite> + '_ {
+        let start = (span.file.get(), span.start, 0, TweakId::new(0));
+        let end = (span.file.get(), span.end, u32::MAX, TweakId::new(u32::MAX));
+        self.by_span_start
+            .range(start..=end)
+            .filter_map(|(_, id)| self.sites.get(id))
+    }
+
+    fn is_migration_candidate(
+        site: &TweakSite,
+        span: crate::reader::span::Span,
+        before: FormGen,
+    ) -> bool {
+        site.form_gen < before && site.span.end <= span.end && site.span.start >= span.start
+    }
+
+    /// Finds the latest prior-generation tweak contained by `span`.
+    #[cfg(test)]
+    pub(super) fn migration_generation_in_span(
+        &self,
+        span: crate::reader::span::Span,
+        before: FormGen,
+    ) -> (Option<FormGen>, usize) {
+        let mut visited = 0;
+        let latest = self
+            .migration_candidates(span)
+            .inspect(|_| visited += 1)
+            .filter(|site| Self::is_migration_candidate(site, span, before))
+            .max_by_key(|site| (site.form_gen, site.id))
+            .map(|site| site.form_gen);
+        (latest, visited)
+    }
+
+    /// Production lookup without test instrumentation.
+    #[cfg(not(test))]
+    pub(super) fn migration_generation_in_span(
+        &self,
+        span: crate::reader::span::Span,
+        before: FormGen,
+    ) -> Option<FormGen> {
+        self.migration_candidates(span)
+            .filter(|site| Self::is_migration_candidate(site, span, before))
+            .max_by_key(|site| (site.form_gen, site.id))
+            .map(|site| site.form_gen)
+    }
+
+    fn remove_indexes(&mut self, site: &TweakSite) {
+        let span_key = (
+            site.span.file.get(),
+            site.span.start,
+            site.span.end,
+            site.id,
+        );
+        self.by_span_start.remove(&span_key);
+        if let Some(ids) = self.by_generation.get_mut(&site.form_gen) {
+            ids.retain(|id| *id != site.id);
+            if ids.is_empty() {
+                self.by_generation.remove(&site.form_gen);
+            }
+        }
     }
 
     /// Drops the sites of a superseded generation.
     pub fn retire(&mut self, gen: FormGen) {
-        self.sites.retain(|_, s| s.form_gen != gen);
+        if let Some(ids) = self.by_generation.remove(&gen) {
+            for id in ids {
+                if let Some(site) = self.sites.remove(&id) {
+                    self.by_span_start.remove(&(
+                        site.span.file.get(),
+                        site.span.start,
+                        site.span.end,
+                        site.id,
+                    ));
+                }
+            }
+        }
     }
 
     /// Every site.

@@ -24,6 +24,11 @@ export interface VactrPerf {
   presented(): PresentedRecord[];
   onsets(): OnsetRecord[];
   transportSample(): TransportSample | null;
+  transportOutput(): string;
+  outputHistory(): string[];
+  momentaryLabels(): string[];
+  momentaryHit(pos: number): boolean;
+  coordsAtPos(pos: number): { left: number; right: number; top: number; bottom: number } | null;
   counters(): { highlight: HighlightScheduler['stats']; probe: null; client: Client['queueStats']; syntaxTruncated: number;
     textPending: boolean; renderer: CodeRenderer['stats']; domNodes: number;
     gpuStatus: { kind: string; effectiveDpr: number }; layout: CodeRenderer['layout']['stats'];
@@ -34,6 +39,7 @@ export interface VactrPerf {
 interface PerfInputs {
   win: Window; perf: PerfRecorder; surface: CodeSurface; revision(): number; ledger: ResourceLedger;
   highlight: HighlightScheduler; renderer: CodeRenderer; client: Client; store: Store;
+  transportOutput(): string; outputHistory(): readonly string[]; momentaryLabels(): readonly string[];
   syntaxTruncated(): number; disposeCode(): void;
 }
 
@@ -54,6 +60,14 @@ export function installPerfHook(input: PerfInputs): VactrPerf {
     presented: () => ordered(presentedRows, presentedNext, presentedCount),
     onsets: () => ordered(onsetRows, onsetNext, onsetCount),
     transportSample: () => input.store.transportSample ?? null,
+    transportOutput: input.transportOutput,
+    outputHistory: () => [...input.outputHistory()],
+    momentaryLabels: () => [...input.momentaryLabels()],
+    momentaryHit: (pos) => input.surface.momentaryHit(pos),
+    coordsAtPos: (pos) => {
+      const rect = input.surface.coordsAtPos(pos);
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    },
     counters: () => ({ highlight: input.highlight.stats, probe: null, client: input.client.queueStats,
       syntaxTruncated: input.syntaxTruncated(), textPending: input.renderer.textPending, renderer: input.renderer.stats,
       domNodes: input.win.document.getElementsByTagName('*').length,

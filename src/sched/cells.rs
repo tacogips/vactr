@@ -21,13 +21,15 @@
 use std::collections::BTreeMap;
 
 use crate::dsp::cells::{AtomicCells, CellId};
-use crate::dsp::controls::ControlRow;
+use crate::dsp::controls::{ControlRow, CtlDomain};
+use crate::host::caps::AudioHost;
 use crate::host::wire::{Ctl, CtlMsg, HostMsg};
 use crate::ns::namespace::VarSlotRef;
 use crate::reader::span::{FileId, Span};
 use crate::sched::commit::encode_value;
 use crate::sched::slots::CtlId;
 use crate::types::diag::{DiagCode, Diagnostic};
+use crate::value::value::Value;
 
 /// The browser tier's cell channel to the worklet.
 pub trait CellPort {
@@ -83,6 +85,7 @@ struct Entry {
     init_reported: bool,
     row: Option<&'static ControlRow>,
     map: CellMap,
+    momentary: Option<f32>,
 }
 
 #[derive(Debug)]
@@ -207,7 +210,7 @@ impl ControlCells {
         if e.acked && usable {
             Ctl::Cell(e.cell)
         } else {
-            Ctl::Const(e.value)
+            Ctl::Const(e.momentary.unwrap_or(e.value))
         }
     }
 
@@ -254,6 +257,7 @@ impl ControlCells {
                 init_reported: false,
                 row,
                 map,
+                momentary: None,
             },
         );
     }
@@ -276,7 +280,7 @@ impl ControlCells {
     /// cell unchanged).
     pub fn write_slot(&mut self, slot: &VarSlotRef) {
         let id = slot.id();
-        let value = slot.get();
+        let value = slot.base();
         let updates: Vec<(CellId, u32, f32, CellKey)> = self
             .entries
             .iter()
@@ -493,6 +497,78 @@ impl ControlCells {
     #[must_use]
     pub fn value(&self, key: CellKey) -> Option<f32> {
         self.entries.get(&key).map(|e| e.value)
+    }
+
+    /// Cells currently fed by a slot: cell, epoch, row, map and ack state.
+    #[must_use]
+    pub fn site_cells(
+        &self,
+        slot_id: u64,
+    ) -> Vec<(CellId, u32, &'static ControlRow, CellMap, bool)> {
+        self.entries
+            .iter()
+            .filter_map(|(key, entry)| {
+                matches!(key, CellKey::Site { slot, .. } if *slot == slot_id).then_some((
+                    entry.cell,
+                    entry.epoch,
+                    entry.row?,
+                    entry.map,
+                    entry.acked,
+                ))
+            })
+            .collect()
+    }
+
+    /// Encodes `value` exactly as a commit to this cell would.
+    #[must_use]
+    pub fn encode_for(&self, cell: CellId, value: &Value) -> Option<f32> {
+        self.entries.values().find_map(|entry| {
+            (entry.cell == cell)
+                .then(|| encode_value(entry.row?, entry.map, value))
+                .flatten()
+        })
+    }
+
+    /// Whether this cell incarnation is still represented by the table.
+    #[must_use]
+    pub fn has_cell(&self, cell: CellId, epoch: u32) -> bool {
+        self.entries
+            .values()
+            .any(|entry| entry.cell == cell && entry.epoch == epoch)
+    }
+
+    /// Metadata for a live cell, used by the momentary ramp sender.
+    #[must_use]
+    pub fn cell_state(&self, cell: CellId) -> Option<(u32, bool, f32)> {
+        self.entries
+            .values()
+            .find(|entry| entry.cell == cell)
+            .map(|entry| (entry.epoch, entry.acked, entry.value))
+    }
+
+    /// Whether a row's encoded value is discrete.
+    #[must_use]
+    pub fn stepped(row: &ControlRow) -> bool {
+        matches!(row.domain, CtlDomain::Bool | CtlDomain::Enum(_))
+    }
+
+    /// Sets the fallback value used while a browser cell is not acknowledged.
+    pub fn set_momentary(&mut self, cell: CellId, epoch: u32, value: Option<f32>) {
+        if let Some(entry) = self
+            .entries
+            .values_mut()
+            .find(|entry| entry.cell == cell && entry.epoch == epoch)
+        {
+            entry.momentary = value;
+        }
+    }
+
+    /// Posts a ramp through the tier's priority control channel.
+    pub fn post_ctl(&mut self, msg: CtlMsg, audio: &mut dyn AudioHost) {
+        match &mut self.tier {
+            Tier::Native(_) => audio.post(msg),
+            Tier::Browser(port) => port.post(msg),
+        }
     }
 
     /// Batches outstanding: `(in flight, pending)`, each 0 or 1.

@@ -95,6 +95,20 @@ afterEach(() => {
 });
 
 describe('headless canvas mount', () => {
+  it('renders animated surface rows without changing annotation revision or text builds', () => {
+    const rig = setup(true, true); const surface = rig.deps.code!.surface;
+    const render = vi.spyOn(CanvasRenderer.prototype, 'render');
+    const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    rig.host.step(16); render.mockClear();
+    const baselineBuilds = perf.counters().renderer.textBuilds;
+    const animation = surface.registerAnimated('test-momentary', () => [{ from: 0, to: 0, kind: 'momentary', label: ' ~ 1' }]);
+    animation.wake();
+    for (let i = 0; i < 5; i++) rig.host.step(100 + i * 16);
+    const revisions = render.mock.calls.map(([feedback]) => feedback?.annotationsRevision);
+    expect(new Set(revisions).size).toBe(1);
+    expect(perf.counters().renderer.textBuilds).toBe(baselineBuilds);
+    animation.dispose();
+  });
   it('forwards bridge keydown to diagnostics and removes the listener on dispose', () => {
     const noteInput = vi.spyOn(DiagnosticsController.prototype, 'noteInput');
     const rig = setup();
@@ -215,6 +229,23 @@ describe('headless canvas mount', () => {
     expect((window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf).toBeUndefined();
     expect((globalThis as typeof globalThis & { __vactrPhaseTimer?: unknown }).__vactrPhaseTimer).toBeUndefined();
     expect(install).not.toHaveBeenCalled();
+    rig.mounted.dispose();
+  });
+
+  it('exposes transport and momentary accessors as plain perf-hook data', () => {
+    const rig = setup(true);
+    const perf = (window as Window & { __vactrPerf?: VactrPerf }).__vactrPerf!;
+    const surface = rig.deps.code!.surface;
+    vi.spyOn(surface, 'momentaryHit').mockReturnValue(true);
+    vi.spyOn(surface, 'coordsAtPos').mockReturnValue({ left: 1, right: 9, top: 2, bottom: 18 });
+    rig.host.step(16);
+    expect(perf.transportOutput()).toBe('running');
+    expect(perf.outputHistory()).toEqual(['running']);
+    expect(perf.momentaryLabels()).toEqual([]);
+    expect(perf.momentaryHit(4)).toBe(true);
+    const rect = perf.coordsAtPos(4);
+    expect(rect).toEqual({ left: 1, right: 9, top: 2, bottom: 18 });
+    expect(Object.getPrototypeOf(rect)).toBe(Object.prototype);
     rig.mounted.dispose();
   });
 

@@ -182,6 +182,24 @@ pub struct VoiceTag {
     pub seq: u32,
 }
 
+/// Whole-output stop behavior requested by the session.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum OutputMode {
+    Gentle = 0,
+    Cut = 1,
+}
+
+/// Externally visible whole-output state.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum OutputPhase {
+    Running = 0,
+    Draining = 1,
+    Cutting = 2,
+    Idle = 3,
+}
+
 /// Evaluator -> audio records on the priority control channel (design
 /// 12.8.5). Resource ids name installed samples and graph templates (16.1).
 ///
@@ -191,6 +209,17 @@ pub struct VoiceTag {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum CtlMsg {
     Song(crate::song::routing::SongCommand),
+    OutputStop {
+        mode: OutputMode,
+    },
+    CellRamp {
+        cell: CellId,
+        epoch: u32,
+        seq: u32,
+        target: f32,
+        frames: u32,
+        release: bool,
+    },
     SlotControl(SlotControl),
     CellInit {
         cell: CellId,
@@ -238,6 +267,14 @@ pub enum CtlMsg {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum HostMsg {
     Song(crate::song::routing::SongHostAck),
+    OutputState {
+        phase: OutputPhase,
+        frame: u64,
+    },
+    CellRampAck {
+        cell: CellId,
+        seq: u32,
+    },
     SlotControlAck(SlotControlAck),
     CellInitAck {
         cell: CellId,
@@ -311,6 +348,8 @@ const TAG_GRAPH_INSTALL: u8 = 0x16;
 const TAG_GRAPH_RETIRE: u8 = 0x17;
 const TAG_SAMPLE_SLICE: u8 = 0x18;
 const TAG_SAMPLE_RETIRE: u8 = 0x19;
+const TAG_OUTPUT_STOP: u8 = 0x1C;
+const TAG_CELL_RAMP: u8 = 0x1D;
 
 const TAG_SLOT_CONTROL_ACK: u8 = 0x40;
 const TAG_CELL_INIT_ACK: u8 = 0x41;
@@ -321,6 +360,8 @@ const TAG_SLICE_OK: u8 = 0x45;
 const TAG_INSTALLED: u8 = 0x46;
 const TAG_COUNTERS: u8 = 0x47;
 const TAG_ANALYSIS_CELL: u8 = 0x48;
+const TAG_OUTPUT_STATE: u8 = 0x4B;
+const TAG_CELL_RAMP_ACK: u8 = 0x4C;
 
 const CTL_CONST: u8 = 0;
 const CTL_CELL: u8 = 1;
@@ -353,6 +394,26 @@ impl CtlMsg {
         let mut w = Writer::new(out);
         match *self {
             CtlMsg::Song(_) => unreachable!("song command encoded above"),
+            CtlMsg::OutputStop { mode } => {
+                w.u8(TAG_OUTPUT_STOP);
+                w.u8(mode as u8);
+            }
+            CtlMsg::CellRamp {
+                cell,
+                epoch,
+                seq,
+                target,
+                frames,
+                release,
+            } => {
+                w.u8(TAG_CELL_RAMP);
+                w.u32(cell.get());
+                w.u32(epoch);
+                w.u32(seq);
+                w.f32(target);
+                w.u32(frames);
+                w.u8(u8::from(release));
+            }
             CtlMsg::SlotControl(c) => {
                 w.u8(TAG_SLOT_CONTROL);
                 put_slot_control(&mut w, &c);
@@ -421,6 +482,25 @@ impl CtlMsg {
         }
         let mut r = Reader::new(bytes);
         let msg = match r.u8()? {
+            TAG_OUTPUT_STOP => CtlMsg::OutputStop {
+                mode: match r.u8()? {
+                    0 => OutputMode::Gentle,
+                    1 => OutputMode::Cut,
+                    _ => return Err(WireError::BadValue),
+                },
+            },
+            TAG_CELL_RAMP => CtlMsg::CellRamp {
+                cell: CellId::new(r.u32()?),
+                epoch: r.u32()?,
+                seq: r.u32()?,
+                target: r.f32()?,
+                frames: r.u32()?,
+                release: match r.u8()? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(WireError::BadValue),
+                },
+            },
             TAG_SLOT_CONTROL => CtlMsg::SlotControl(get_slot_control(&mut r)?),
             TAG_CELL_INIT => CtlMsg::CellInit {
                 cell: CellId::new(r.u32()?),
@@ -495,7 +575,11 @@ impl HostMsg {
         for x in &mut words[..n] {
             *x = r.u32()?;
         }
-        let msg = HostMsg::from_words(tag, words).ok_or(WireError::BadTag(tag))?;
+        let msg = match HostMsg::from_words(tag, words) {
+            Some(msg) => msg,
+            None if tag == TAG_OUTPUT_STATE => return Err(WireError::BadValue),
+            None => return Err(WireError::BadTag(tag)),
+        };
         Ok((msg, r.pos))
     }
 
@@ -504,6 +588,19 @@ impl HostMsg {
     fn words(&self) -> (u8, [u32; 4], usize) {
         match *self {
             HostMsg::Song(_) => unreachable!("song ack encoded above"),
+            HostMsg::OutputState { phase, frame } => (
+                TAG_OUTPUT_STATE,
+                [
+                    phase as u32,
+                    u32::try_from(frame & u64::from(u32::MAX)).unwrap_or_default(),
+                    u32::try_from(frame >> 32).unwrap_or_default(),
+                    0,
+                ],
+                3,
+            ),
+            HostMsg::CellRampAck { cell, seq } => {
+                (TAG_CELL_RAMP_ACK, [cell.get(), seq, 0, 0], 2)
+            }
             HostMsg::SlotControlAck(a) =>
                 (TAG_SLOT_CONTROL_ACK, [a.slot.get(), a.gen, 0, 0], 2),
             HostMsg::CellInitAck { cell, epoch } =>
@@ -525,6 +622,20 @@ impl HostMsg {
     #[rustfmt::skip]
     fn from_words(tag: u8, [a, b, c, d]: [u32; 4]) -> Option<Self> {
         Some(match tag {
+            TAG_OUTPUT_STATE => HostMsg::OutputState {
+                phase: match a {
+                    0 => OutputPhase::Running,
+                    1 => OutputPhase::Draining,
+                    2 => OutputPhase::Cutting,
+                    3 => OutputPhase::Idle,
+                    _ => return None,
+                },
+                frame: u64::from(b) | (u64::from(c) << 32),
+            },
+            TAG_CELL_RAMP_ACK => HostMsg::CellRampAck {
+                cell: CellId::new(a),
+                seq: b,
+            },
             TAG_SLOT_CONTROL_ACK =>
                 HostMsg::SlotControlAck(SlotControlAck { slot: SlotId::new(a), gen: b }),
             TAG_CELL_INIT_ACK => HostMsg::CellInitAck { cell: CellId::new(a), epoch: b },
@@ -546,6 +657,8 @@ const fn host_arity(tag: u8) -> Option<usize> {
         TAG_CELL_BATCH_ACK | TAG_RETIRED => Some(1),
         TAG_SLOT_CONTROL_ACK | TAG_CELL_INIT_ACK | TAG_CELL_RETIRED | TAG_SLICE_OK
         | TAG_INSTALLED | TAG_ANALYSIS_CELL => Some(2),
+        TAG_OUTPUT_STATE => Some(3),
+        TAG_CELL_RAMP_ACK => Some(2),
         TAG_COUNTERS => Some(4),
         _ => None,
     }

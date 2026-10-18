@@ -176,6 +176,15 @@ export interface SetTweakBody {
   edit_epoch: number;
 }
 
+export interface MomentaryBody {
+  file: string;
+  id: number;
+  form_gen: number;
+  edit_epoch: number;
+  target: number | null;
+  ramp_ms: number;
+}
+
 export interface DocChangedBody {
   file: string;
   doc_revision: number;
@@ -221,8 +230,10 @@ export type ClientMsg =
   | { kind: 'eval'; body: EvalBody }
   | { kind: 'hush'; body: EmptyBody }
   | { kind: 'stop'; body: StopBody }
+  | { kind: 'stop-all'; body: EmptyBody }
   | { kind: 'set-var'; body: SetVarBody }
   | { kind: 'set-tweak'; body: SetTweakBody }
+  | { kind: 'momentary'; body: MomentaryBody }
   | { kind: 'doc-changed'; body: DocChangedBody }
   | { kind: 'learn'; body: LearnBody }
   | { kind: 'subscribe'; body: SubscribeBody }
@@ -237,8 +248,10 @@ export const CLIENT_KINDS: readonly ClientKind[] = [
   'eval',
   'hush',
   'stop',
+  'stop-all',
   'set-var',
   'set-tweak',
+  'momentary',
   'doc-changed',
   'learn',
   'subscribe',
@@ -302,7 +315,9 @@ export type StaleReason =
   | 'stale-form-gen'
   | 'edit-invalidated'
   | 'unreconciled-edit'
-  | 'superseded-definition';
+  | 'superseded-definition'
+  | 'momentary-ineligible'
+  | 'momentary-capacity';
 
 export interface StaleBindingBody {
   /** A tweak id or a name. */
@@ -419,6 +434,7 @@ export interface TransportSample {
   latency_seconds: number | null;
   latency_kind: 'measured' | 'estimate' | 'unavailable';
   uncertainty_seconds: number | null;
+  output?: 'running' | 'draining' | 'cutting' | 'idle';
 }
 
 export interface TempoBody {

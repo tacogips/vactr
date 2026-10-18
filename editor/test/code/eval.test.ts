@@ -110,11 +110,11 @@ describe('EvalController', () => {
     expect(flashes(view)).toEqual([{ from: 0, to: 15, cls: FLASH_CLASS }]);
   });
 
-  it('Mod-. sends hush', () => {
+  it('Mod-. is not a code keymap binding (handled app-level)', () => {
     const { transport, view, onHush } = setup('d1 "bd"');
-    expect(key(view, '.')).toBe(true);
-    expect(transport.kinds()).toEqual(['hush']);
-    expect(onHush).toHaveBeenCalledTimes(1);
+    expect(key(view, '.')).toBe(false);
+    expect(transport.kinds()).toEqual([]);
+    expect(onHush).not.toHaveBeenCalled();
   });
 
   it('flashes the eval span for 200 ms', () => {

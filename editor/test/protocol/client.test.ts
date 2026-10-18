@@ -114,6 +114,46 @@ describe('Client', () => {
     expect(t.of('set-tweak').map((e) => e.body.value)).toEqual([0.1, 0.9, 0.3, 0.4]);
   });
 
+  it('sends stop-all with an empty body', () => {
+    const t = new RecordingTransport();
+    const client = new Client(t);
+    client.stopAll();
+    expect(t.of('stop-all').map((e) => e.body)).toEqual([{}]);
+  });
+
+  it('rate-limits momentary targets per site and sends the latest trailing target', () => {
+    const t = new RecordingTransport();
+    const client = new Client(t);
+    edit(client);
+    client.momentary(FILE, 4, 7, 0.1, 500);
+    client.momentary(FILE, 4, 7, 0.2, 500);
+    client.momentary(FILE, 4, 7, 0.3, 500);
+    expect(t.of('momentary').map((e) => e.body.target)).toEqual([0.1]);
+    vi.advanceTimersByTime(TWEAK_INTERVAL_MS - 1);
+    expect(t.of('momentary')).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(t.of('momentary').map((e) => e.body.target)).toEqual([0.1, 0.3]);
+    expect(t.of('momentary').map((e) => e.body.edit_epoch)).toEqual([1, 1]);
+  });
+
+  it('sends momentary release immediately and cancels the queued drag', () => {
+    const t = new RecordingTransport();
+    const client = new Client(t);
+    client.momentary(FILE, 4, 7, 0.2, 400);
+    client.momentary(FILE, 4, 7, 0.3, 400);
+    client.momentary(FILE, 4, 7, null, 0);
+    expect(t.of('momentary').map((e) => e.body.target)).toEqual([0.2, null]);
+    vi.advanceTimersByTime(100);
+    expect(t.of('momentary').map((e) => e.body.target)).toEqual([0.2, null]);
+  });
+
+  it('clamps momentary ramp duration to 10000 milliseconds', () => {
+    const t = new RecordingTransport();
+    const client = new Client(t);
+    client.momentary(FILE, 4, 7, 0.5, 20000);
+    expect(t.of('momentary')[0]?.body.ramp_ms).toBe(10000);
+  });
+
   it('flushes an edit made while a trailing tweak is queued before sending it', () => {
     const t = new RecordingTransport();
     const client = new Client(t);

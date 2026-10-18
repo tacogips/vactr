@@ -45,6 +45,13 @@ These plans implement [design-example-picker-and-persistence.md](../design-docs/
 - **Wave 1** (parallel): [EX-10 registry and showcase](completed/examples-10-registry.md), [EX-20 web storage](completed/examples-20-storage.md), [EX-30 Tauri default template](completed/examples-30-tauri-template.md), [EX-40 session, autosave, startup](completed/examples-40-session-startup.md), [EX-50 picker view](completed/examples-50-picker-view.md)
 - **Wave 2**: [EX-60 integration](completed/examples-60-integration.md)
 - **Wave 3**: [EX-70 e2e, style gate, docs](completed/examples-70-e2e-docs.md)
+## Live performance controls (2026-10-08)
+
+The [live performance controls](../design-docs/specs/design-live-performance.md) plans are Ready. They cover the right-drag and two-finger momentary tweak with glide or snap return, gentle stop (effect tails) as the default, and the instant cut. The [dispatch manifest](active/live-perf-dispatch.json) runs three waves; wave 2 is logically parallel but runs with fanout concurrency 1 in the shared worktree.
+
+- Wave 1: [contract](active/live-perf-contract.md) (wire records, protocol messages, wiring stubs).
+- Wave 2: [engine](active/live-perf-engine.md), [session stop](active/live-perf-session-stop.md), [session momentary](active/live-perf-session-momentary.md), [editor stop](active/live-perf-editor-stop.md) and [editor momentary](active/live-perf-editor-momentary.md).
+- Wave 3: [evidence](active/live-perf-evidence.md) (silent behavior e2e, serial gates, verification record, closeout).
 
 ## DOM renderer comparison (2026-10-08)
 

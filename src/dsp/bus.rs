@@ -318,6 +318,53 @@ impl BusSlot {
         }
     }
 
+    fn clear_len(&self) -> usize {
+        let mut end = self.room_region.0.saturating_add(self.room_region.1);
+        for (offset, len) in &self.regions[..self.n] {
+            end = end.max(offset.saturating_add(*len));
+        }
+        end.min(self.mem.len())
+    }
+
+    fn clear_memory(&mut self, from: usize, max: usize) -> usize {
+        let end = self.clear_len();
+        let start = from.min(end);
+        let count = max.min(end - start);
+        self.mem[start..start + count].fill(0.0);
+        if start + count >= end {
+            self.l.fill(0.0);
+            self.r.fill(0.0);
+        }
+        count
+    }
+    fn reinitialize_clear_region(
+        &mut self,
+        region: usize,
+        sr: f32,
+        caps: &CapabilitySet,
+    ) -> Option<usize> {
+        match region {
+            0 => {
+                let (offset, len) = self.room_region;
+                self.room
+                    .clear_state(&mut self.mem[offset..offset + len], sr, caps);
+                Some(len)
+            }
+            unit if unit <= self.n => {
+                let index = unit - 1;
+                let (offset, len) = self.regions[index];
+                self.units[index].clear_state(&mut self.mem[offset..offset + len], sr, caps);
+                Some(len)
+            }
+            _ => None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn memory_is_clear(&self) -> bool {
+        let mut samples = self.mem.iter().chain(&self.l[..]).chain(&self.r[..]);
+        samples.all(|&sample| sample == 0.0)
+    }
     /// Sets the built-in reverb from the `room` (mix) and `size` controls.
     pub fn set_room(&mut self, room: Option<f32>, size: Option<f32>) {
         if let (Some(v), Some(i)) = (room, effects::mix_index(EffectKind::Room)) {
@@ -416,6 +463,7 @@ pub struct BusGraph {
     pub slots: Box<[BusSlot]>,
     snapshots: Box<[KeySnapshot]>,
     key: Box<[f32]>,
+    hold_retiring: bool,
 }
 
 impl BusGraph {
@@ -522,6 +570,7 @@ impl BusGraph {
             slots,
             snapshots,
             key: vec![0.0; max_block].into_boxed_slice(),
+            hold_retiring: false,
         })
     }
 
@@ -621,12 +670,56 @@ impl BusGraph {
         }
     }
 
+    /// Defers collection of retiring legacy slots while their effect tails render.
+    pub(crate) fn hold_retiring(&mut self, hold: bool) {
+        self.hold_retiring = hold;
+    }
+
+    pub(crate) fn clear_slot_memory(&mut self, index: usize, from: usize, max: usize) -> usize {
+        self.slots
+            .get_mut(index)
+            .filter(|slot| {
+                slot.song_key.is_none()
+                    && matches!(slot.state, SlotState::Live | SlotState::Retiring)
+            })
+            .map_or(0, |slot| slot.clear_memory(from, max))
+    }
+
+    pub(crate) fn reinitialize_clear_region(
+        &mut self,
+        index: usize,
+        region: usize,
+        sr: f32,
+        caps: &CapabilitySet,
+    ) -> Option<usize> {
+        let slot = self.slots.get_mut(index)?;
+        (slot.song_key.is_none() && matches!(slot.state, SlotState::Live | SlotState::Retiring))
+            .then(|| slot.reinitialize_clear_region(region, sr, caps))
+            .flatten()
+    }
+
+    pub(crate) fn clear_region_len(&self, index: usize, region: usize) -> Option<usize> {
+        let slot = self.slots.get(index).filter(|slot| {
+            slot.song_key.is_none() && matches!(slot.state, SlotState::Live | SlotState::Retiring)
+        })?;
+        match region {
+            0 => Some(slot.room_region.1),
+            region if region <= slot.n => slot.regions.get(region - 1).map(|(_, len)| *len),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn clear_len(&self, index: usize) -> usize {
+        self.slots[index].clear_len()
+    }
+
     /// Frees retiring slots nobody uses; returns their resource ids through
     /// `out` (at most `out.len()`), and the count.
     pub fn collect(&mut self, out: &mut [u32]) -> usize {
         let mut n = 0;
         for s in self.slots.iter_mut() {
-            if s.song_key.is_none()
+            if !self.hold_retiring
+                && s.song_key.is_none()
                 && s.state == SlotState::Retiring
                 && s.users == 0
                 && n < out.len()
@@ -721,6 +814,30 @@ impl OrbitDelay {
             in_l: vec![0.0; max_block].into_boxed_slice(),
             in_r: vec![0.0; max_block].into_boxed_slice(),
         }
+    }
+
+    /// Clears at most `max` delay-memory samples, resetting line positions at completion.
+    pub fn clear_memory(&mut self, from: usize, max: usize) -> usize {
+        let start = from.min(self.mem.len());
+        let count = max.min(self.mem.len().saturating_sub(start));
+        self.mem[start..start + count].fill(0.0);
+        if start + count >= self.mem.len() {
+            self.l.pos = 0;
+            self.r.pos = 0;
+            self.in_l.fill(0.0);
+            self.in_r.fill(0.0);
+        }
+        count
+    }
+
+    #[must_use]
+    pub fn memory_len(&self) -> usize {
+        self.mem.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn memory_is_clear(&self) -> bool {
+        self.mem.iter().all(|sample| *sample == 0.0)
     }
 
     /// Sets the time (seconds) and feedback from an event's controls.

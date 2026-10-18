@@ -670,6 +670,13 @@ impl FxUnit {
         params(self.kind)[i].clamp(raw)
     }
 
+    /// Clears algorithm state without changing configured parameter targets.
+    pub fn clear_state(&mut self, mem: &mut [f32], sr: f32, caps: &CapabilitySet) {
+        self.st = FxState::default();
+        init(self.kind, &mut self.st, mem, sr, caps);
+        self.vals = self.target;
+    }
+
     /// Re-reads cell-backed parameters (once per block).
     pub fn update<C: CellRead + ?Sized>(&mut self, cells: &C) {
         for i in 0..usize::from(self.n) {

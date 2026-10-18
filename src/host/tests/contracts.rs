@@ -16,8 +16,8 @@ use crate::host::testing::{
     RecordingOscHost, RecordingRenderHost, RenderCall, SinkCall,
 };
 use crate::host::wire::{
-    batch_len, decode_batch, encode_batch, AudioEvent, Ctl, CtlMsg, HostMsg, Release, SlotControl,
-    SlotControlAck, VoiceTag, WireError, MAX_CTLS,
+    batch_len, decode_batch, encode_batch, AudioEvent, Ctl, CtlMsg, HostMsg, OutputMode,
+    OutputPhase, Release, SlotControl, SlotControlAck, VoiceTag, WireError, MAX_CTLS,
 };
 use crate::sched::slots::{CtlId, SlotId};
 use crate::tex::texnode::OutId;
@@ -59,6 +59,20 @@ fn control(gen: u32, time: f64, release: Release) -> SlotControl {
 
 fn every_ctl_msg() -> Vec<CtlMsg> {
     vec![
+        CtlMsg::OutputStop {
+            mode: OutputMode::Gentle,
+        },
+        CtlMsg::OutputStop {
+            mode: OutputMode::Cut,
+        },
+        CtlMsg::CellRamp {
+            cell: CellId::new(5),
+            epoch: 2,
+            seq: 3,
+            target: -0.5,
+            frames: 240,
+            release: true,
+        },
         CtlMsg::SlotControl(control(4, 2.5, Release::Panic)),
         CtlMsg::CellInit {
             cell: CellId::new(5),
@@ -88,6 +102,14 @@ fn every_ctl_msg() -> Vec<CtlMsg> {
 
 fn every_host_msg() -> Vec<HostMsg> {
     vec![
+        HostMsg::OutputState {
+            phase: OutputPhase::Draining,
+            frame: u64::MAX,
+        },
+        HostMsg::CellRampAck {
+            cell: CellId::new(5),
+            seq: 3,
+        },
         HostMsg::SlotControlAck(SlotControlAck {
             slot: SlotId::new(1),
             gen: 4,
@@ -191,6 +213,11 @@ fn bad_tags_and_fields_are_wire_errors() {
     let n = CtlMsg::SlotControl(control(1, 0.0, Release::None)).encode(&mut buf);
     buf[n - 1] = 7; // release byte out of range
     assert_eq!(CtlMsg::decode(&buf[..n]), Err(WireError::BadValue));
+    assert_eq!(CtlMsg::decode(&[0x1c, 9]), Err(WireError::BadValue));
+    assert_eq!(
+        HostMsg::decode(&[0x4b, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        Err(WireError::BadValue)
+    );
     let mut ev = [0u8; AudioEvent::ENCODED_LEN];
     let n = full_event().encode(&mut ev);
     ev[1 + 24] = u8::try_from(MAX_CTLS + 1).expect("fits wire field");

@@ -146,6 +146,31 @@
   font-size: var(--vt-text-xs);
 }
 
+.vact-glide-setting {
+  display: grid;
+  grid-template-columns: auto 5rem minmax(6rem, 1fr);
+  align-items: center;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-2) 0;
+  color: var(--vt-text-muted);
+  font: var(--vt-text-xs) var(--vt-font-sans);
+}
+
+.vact-glide-setting input {
+  min-width: 0;
+  min-height: var(--vt-control-h-compact);
+  box-sizing: border-box;
+  border: var(--vt-border-w) solid var(--vt-border);
+  border-radius: 0;
+  background: var(--vt-surface);
+  color: var(--vt-text);
+  font: inherit;
+}
+
+@media (pointer: coarse) {
+  .vact-glide-setting input { min-height: 36px; }
+}
+
 .bind-ctl-group h4 {
   margin: var(--vt-space-1) 0 0;
   font-size: var(--vt-text-xs);

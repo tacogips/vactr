@@ -16,6 +16,15 @@ export async function runBehavior(browser, origin, name) {
     }
     catch (error) { results.push({ id, pass: false, detail: String(error?.stack ?? error) }); }
   };
+  const liveFixture = 'd1 s :analog > note [:a4 :c5] > lpf 800 > room 0.6 > gain 0.1';
+  const loadLiveFixture = async () => {
+    const textarea = page.locator('.vact-code-input-bridge textarea');
+    await textarea.fill(liveFixture);
+    await page.locator('.vact-run').click();
+    const pos = liveFixture.indexOf('800') + 1;
+    await page.waitForFunction((sitePos) => window.__vactrPerf.momentaryHit(sitePos), pos, { timeout: 10000 });
+    return { pos, doc: await page.evaluate(() => window.__vactrPerf.doc()) };
+  };
   try {
     context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, hasTouch: true,
       permissions: name === 'chromium' ? ['clipboard-read', 'clipboard-write'] : [] });
@@ -183,6 +192,84 @@ export async function runBehavior(browser, origin, name) {
       await sleep(150); const now = await page.evaluate(() => window.__vactrPerf.perf.snapshot().frames.length);
       if (hidden !== before.frames) throw Error(`frames grew while hidden: ${before.frames} -> ${hidden}`);
       if (now < hidden) throw Error('frame count regressed');const recovered=await page.evaluate(()=>({presented:window.__vactrPerf.presented(),onsets:window.__vactrPerf.onsets()}));const first=recovered.presented.at(-1);if(first){const expected=recovered.onsets.filter(o=>o.time<=first.audibleTime&&first.audibleTime<o.end).map(o=>`${o.from}-${o.to}`).sort().join(',');if(expected!==String(first.activeKey).split(',').filter(Boolean).sort().join(','))throw Error(`first resumed active set mismatch: expected ${expected}, got ${first.activeKey}`);for(const o of recovered.onsets)if(recovered.presented.some(p=>p.activeKey.includes(`${o.from}-${o.to}`)&&p.audibleTime>=o.end))throw Error('expired highlight replayed after resume');}return `frames hidden=${hidden}, resumed=${now}`;
+    });
+    await check('momentary-right-drag', async () => {
+      const fixture = await loadLiveFixture();
+      const start = await page.evaluate((pos) => {
+        const rect = window.__vactrPerf.coordsAtPos(pos);
+        if (!rect || !window.__vactrPerf.momentaryHit(pos)) throw Error(`site geometry missing: ${JSON.stringify({ rect, pos })}`);
+        window.__momentaryContexts = [];
+        window.addEventListener('contextmenu', (event) => { setTimeout(() => window.__momentaryContexts.push(event.defaultPrevented), 0); }, true);
+        return { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2, doc: window.__vactrPerf.doc() };
+      }, fixture.pos);
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down({ button: 'right' });
+      for (let step = 1; step <= 8; step++) await page.mouse.move(start.x, start.y - step * 10);
+      await page.waitForFunction(() => window.__vactrPerf.momentaryLabels().some((label) => !/800/.test(label)), undefined, { timeout: 3000 });
+      const held = await page.evaluate(() => ({ labels: window.__vactrPerf.momentaryLabels(), doc: window.__vactrPerf.doc(), contexts: window.__momentaryContexts }));
+      if (held.doc !== start.doc || held.labels.length !== 1 || held.contexts.some((prevented) => !prevented)) throw Error(`right-drag state=${JSON.stringify(held)}`);
+      await page.keyboard.down('Shift'); await page.mouse.up({ button: 'right' }); await page.keyboard.up('Shift');
+      await page.waitForFunction(() => window.__vactrPerf.momentaryLabels().length === 0, undefined, { timeout: 200 });
+      await page.mouse.move(start.x, start.y); await page.mouse.click(start.x, start.y, { button: 'right' });
+      await sleep(50);
+      const siteContexts = await page.evaluate(() => window.__momentaryContexts);
+      if (!siteContexts.some((prevented) => prevented === true)) throw Error(`bound-site context menu was not observed as prevented: ${JSON.stringify(siteContexts)}`);
+
+      const glideStart = await page.evaluate((pos) => window.__vactrPerf.coordsAtPos(pos), fixture.pos);
+      await page.mouse.move((glideStart.left + glideStart.right) / 2, (glideStart.top + glideStart.bottom) / 2);
+      await page.mouse.down({ button: 'right' });
+      await page.mouse.move((glideStart.left + glideStart.right) / 2, (glideStart.top + glideStart.bottom) / 2 - 80, { steps: 8 });
+      await page.mouse.up({ button: 'right' });
+      await sleep(100);
+      const gliding = await page.evaluate(() => window.__vactrPerf.momentaryLabels());
+      if (!gliding.length) throw Error('glide label disappeared immediately after release');
+      await page.waitForFunction(() => window.__vactrPerf.momentaryLabels().length === 0, undefined, { timeout: 1500 });
+      const canvas = await page.locator('.vact-code-canvas').boundingBox();
+      await page.mouse.move(canvas.x + 5, canvas.y + 5); await page.mouse.click(canvas.x + 5, canvas.y + 5, { button: 'right' });
+      await sleep(50);
+      const contexts = await page.evaluate(() => window.__momentaryContexts);
+      if (!contexts.some((prevented) => prevented === false)) throw Error(`non-site context menu was not observed as allowed: ${JSON.stringify(contexts)}`);
+      return `site=${fixture.pos}; Shift snap and 1000ms glide verified; contexts=${JSON.stringify(contexts)}`;
+    });
+    await check('momentary-two-finger', async () => {
+      const fixture = await loadLiveFixture();
+      const rect = await page.evaluate((pos) => window.__vactrPerf.coordsAtPos(pos), fixture.pos);
+      if (!rect) throw Error('momentary site coordinates unavailable');
+      const x = (rect.left + rect.right) / 2, y = (rect.top + rect.bottom) / 2;
+      const canvas = page.locator('.vact-code-canvas');
+      const dispatch = (type, pointerId, clientY, buttons) => canvas.dispatchEvent(type, {
+        pointerId, pointerType: 'touch', isPrimary: pointerId === 21, button: 0, buttons, width: 1, height: 1,
+        pressure: buttons ? 0.5 : 0, clientX: x, clientY,
+      });
+      await dispatch('pointerdown', 21, y, 1); await sleep(60); await dispatch('pointerdown', 22, y, 1);
+      await dispatch('pointermove', 21, y - 60, 1); await dispatch('pointermove', 22, y - 60, 1);
+      await page.waitForFunction(() => window.__vactrPerf.momentaryLabels().length > 0, undefined, { timeout: 3000 });
+      const held = await page.evaluate(() => ({ labels: window.__vactrPerf.momentaryLabels(), doc: window.__vactrPerf.doc() }));
+      if (held.doc !== fixture.doc || !held.labels.length) throw Error(`two-finger state=${JSON.stringify(held)}`);
+      await dispatch('pointerup', 22, y - 60, 0);
+      await page.waitForFunction(() => window.__vactrPerf.momentaryLabels().length === 0, undefined, { timeout: 1500 });
+      limitations.push('Synthetic browser multi-touch passed; physical iPad two-finger gesture check is pending.');
+      return 'Synthetic two-finger tweak and glide verified; physical iPad validation pending.';
+    });
+    await check('stop-gentle-shortcut', async () => {
+      await loadLiveFixture();
+      await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'running', undefined, { timeout: 10000 });
+      await page.keyboard.press('Meta+.');
+      await page.waitForFunction(() => {
+        const history = window.__vactrPerf.outputHistory(); const draining = history.lastIndexOf('draining');
+        return draining >= 0 && history.slice(draining + 1).includes('idle');
+      }, undefined, { timeout: 20000 });
+      return JSON.stringify(await page.evaluate(() => window.__vactrPerf.outputHistory()));
+    });
+    await check('cut-shortcut', async () => {
+      await loadLiveFixture(); await sleep(500);
+      await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'running', undefined, { timeout: 10000 });
+      const historyBefore = await page.evaluate(() => window.__vactrPerf.outputHistory());
+      await page.keyboard.press('Meta+Shift+.');
+      await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'idle', undefined, { timeout: 3000 });
+      const historyAfter = await page.evaluate(() => window.__vactrPerf.outputHistory());
+      if (historyAfter.slice(historyBefore.length).includes('draining')) throw Error(`cut entered draining: ${JSON.stringify({ historyBefore, historyAfter })}`);
+      return JSON.stringify(historyAfter);
     });
     await check('dispose-ledger', async () => page.evaluate(() => {
       const api = window.__vactrPerf; const ledger = api.ledger; api.disposeCode();

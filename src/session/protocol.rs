@@ -203,6 +203,17 @@ pub struct SetTweakBody {
     pub edit_epoch: u64,
 }
 
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct MomentaryBody {
+    pub file: String,
+    pub id: u32,
+    pub form_gen: u64,
+    pub edit_epoch: u64,
+    #[serde(default)]
+    pub target: Option<WireNum>,
+    pub ramp_ms: u32,
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct DocChangedBody {
     pub file: String,
@@ -404,9 +415,11 @@ pub enum ClientMsg {
     ClockProbe(ClockProbeBody),
     Eval(EvalBody),
     Hush(Empty),
+    StopAll(Empty),
     Stop(StopBody),
     SetVar(SetVarBody),
     SetTweak(SetTweakBody),
+    Momentary(MomentaryBody),
     DocChanged(DocChangedBody),
     Learn(LearnBody),
     Subscribe(SubscribeBody),
@@ -416,13 +429,15 @@ pub enum ClientMsg {
 
 impl ClientMsg {
     /// Every client kind.
-    pub const KINDS: [&'static str; 12] = [
+    pub const KINDS: [&'static str; 14] = [
         "clock-probe",
         "eval",
         "hush",
+        "stop-all",
         "stop",
         "set-var",
         "set-tweak",
+        "momentary",
         "doc-changed",
         "learn",
         "subscribe",
@@ -440,9 +455,11 @@ impl ClientMsg {
             ClientMsg::ClockProbe(_) => "clock-probe",
             ClientMsg::Eval(_) => "eval",
             ClientMsg::Hush(_) => "hush",
+            ClientMsg::StopAll(_) => "stop-all",
             ClientMsg::Stop(_) => "stop",
             ClientMsg::SetVar(_) => "set-var",
             ClientMsg::SetTweak(_) => "set-tweak",
+            ClientMsg::Momentary(_) => "momentary",
             ClientMsg::DocChanged(_) => "doc-changed",
             ClientMsg::Learn(_) => "learn",
             ClientMsg::Subscribe(_) => "subscribe",
@@ -539,6 +556,8 @@ pub enum StaleReason {
     EditInvalidated,
     UnreconciledEdit,
     SupersededDefinition,
+    MomentaryIneligible,
+    MomentaryCapacity,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -784,6 +803,8 @@ pub struct TransportSample {
     pub bpm: f64,
     pub beats_per_cycle: f64,
     pub running: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
     pub latency_seconds: Option<f64>,
     pub latency_kind: String,
     pub uncertainty_seconds: Option<f64>,

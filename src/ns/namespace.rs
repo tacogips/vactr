@@ -70,6 +70,7 @@ pub struct VarSlot {
     pub name: SymId,
     kind: Cell<SlotKind>,
     pub value: RefCell<Value>,
+    momentary: RefCell<Option<Value>>,
     pub version: Cell<u64>,
     bound: Cell<bool>,
     /// A frame-local `var` cell: never a top-level slot, never recorded
@@ -90,6 +91,7 @@ impl VarSlotRef {
             name,
             kind: Cell::new(kind),
             value: RefCell::new(value),
+            momentary: RefCell::new(None),
             version: Cell::new(0),
             bound: Cell::new(bound),
             local,
@@ -114,7 +116,29 @@ impl VarSlotRef {
     /// The current value (a clone).
     #[must_use]
     pub fn get(&self) -> Value {
+        self.0
+            .momentary
+            .borrow()
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| self.0.value.borrow().clone())
+    }
+
+    /// The stored value, excluding transient live-performance overrides.
+    #[must_use]
+    pub fn base(&self) -> Value {
         self.0.value.borrow().clone()
+    }
+
+    /// Sets the transient value without changing the slot or its version.
+    pub fn set_momentary(&self, value: Option<Value>) {
+        *self.0.momentary.borrow_mut() = value;
+    }
+
+    /// The current transient override, if any.
+    #[must_use]
+    pub fn momentary(&self) -> Option<Value> {
+        self.0.momentary.borrow().clone()
     }
 
     #[must_use]

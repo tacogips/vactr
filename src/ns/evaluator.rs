@@ -12,7 +12,7 @@
 //! followed by ONE `bindings` batch.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use crate::compile::proto::FnProto;
@@ -213,6 +213,9 @@ pub struct Evaluator {
     pub(super) dynamic_manifest_cache: RefCell<Vec<DynamicManifestCacheEntry>>,
     queued: Vec<(VarSlotRef, Value)>,
     last_pass: Option<PassReport>,
+    last_migrations: Vec<(TweakId, TweakId)>,
+    #[cfg(test)]
+    migration_lookup_work: usize,
 }
 
 impl std::fmt::Debug for Evaluator {
@@ -230,6 +233,8 @@ pub(super) fn one_shot(e: &StagedEffect) -> bool {
         StagedEffect::OneShot { .. }
             | StagedEffect::Console(_)
             | StagedEffect::Revoke(_)
+            | StagedEffect::StopAll
+            | StagedEffect::Cut
             | StagedEffect::PlaySong(_)
     )
 }
@@ -289,6 +294,9 @@ impl Evaluator {
             dynamic_manifest_cache: RefCell::new(Vec::new()),
             queued: Vec::new(),
             last_pass: None,
+            last_migrations: Vec::new(),
+            #[cfg(test)]
+            migration_lookup_work: 0,
         }
     }
 
@@ -342,6 +350,11 @@ impl Evaluator {
         self.last_pass.as_ref()
     }
 
+    /// Takes tweak-site migrations accumulated since the previous take.
+    pub fn take_migrations(&mut self) -> Vec<(TweakId, TweakId)> {
+        std::mem::take(&mut self.last_migrations)
+    }
+
     pub(super) fn next_gen(&mut self) -> FormGen {
         self.form_gen += 1;
         FormGen::new(self.form_gen)
@@ -380,7 +393,33 @@ impl Evaluator {
         } else {
             BTreeSet::new()
         };
-        let a = self.attempt(form, gen, None, &[], BTreeSet::new(), bad);
+        let current_span_gen = self.graph.current_gen_at_span(form.span);
+        let migrate_from = if current_span_gen.is_some() {
+            #[cfg(test)]
+            {
+                self.migration_lookup_work += 1;
+            }
+            current_span_gen
+        } else {
+            #[cfg(test)]
+            let (tweak_span_gen, visited) = self
+                .ns
+                .tweaks()
+                .borrow()
+                .migration_generation_in_span(form.span, gen);
+            #[cfg(test)]
+            {
+                self.migration_lookup_work += 1 + visited;
+            }
+            #[cfg(not(test))]
+            let tweak_span_gen = self
+                .ns
+                .tweaks()
+                .borrow()
+                .migration_generation_in_span(form.span, gen);
+            tweak_span_gen
+        };
+        let a = self.attempt(form, gen, migrate_from, &[], BTreeSet::new(), bad);
         let checked_callables = checked.callables;
         let mut diags = checked.diags;
         diags.extend(a.diags);
@@ -841,19 +880,49 @@ impl Evaluator {
     /// Override migration (section 13): a new site matched by index, type
     /// and origin to a site of the previous generation whose slot carries
     /// a controller override starts from the overridden value.
-    fn migrate(&self, old: FormGen, new: &[TweakSite]) {
+    fn migrate(&mut self, old: FormGen, new: &[TweakSite]) {
         let prev = self.ns.tweaks().borrow().sites_of(old);
-        for n in new.iter().filter(|s| s.origin != SiteOrigin::Binding) {
-            let hit = prev
-                .iter()
-                .find(|p| p.index == n.index && p.ty == n.ty && p.origin == n.origin);
-            if let Some(p) = hit {
-                let cur = p.slot.get();
-                if changed(&p.initial, &cur) {
-                    n.slot.set(cur);
+        let mut binding_slots = BTreeMap::new();
+        let mut binding_names = BTreeMap::new();
+        let mut indexed_sites = HashMap::new();
+        for (position, site) in prev.iter().enumerate() {
+            if site.origin == SiteOrigin::Binding {
+                binding_slots.entry(site.slot.id()).or_insert(position);
+                binding_names.entry(site.slot.name()).or_insert(position);
+            } else {
+                indexed_sites
+                    .entry((site.origin, site.index, site.ty))
+                    .or_insert(position);
+            }
+        }
+        for n in new {
+            let position = if n.origin == SiteOrigin::Binding {
+                [
+                    binding_slots.get(&n.slot.id()),
+                    binding_names.get(&n.slot.name()),
+                ]
+                .into_iter()
+                .flatten()
+                .copied()
+                .min()
+            } else {
+                indexed_sites.get(&(n.origin, n.index, n.ty)).copied()
+            };
+            if let Some(p) = position.and_then(|position| prev.get(position)) {
+                self.last_migrations.push((p.id, n.id));
+                if n.origin != SiteOrigin::Binding {
+                    let cur = p.slot.base();
+                    if changed(&p.initial, &cur) {
+                        n.slot.set(cur);
+                    }
                 }
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn migration_lookup_work(&self) -> usize {
+        self.migration_lookup_work
     }
 
     /// Releases `lead` effects and, when names changed, one `bindings`

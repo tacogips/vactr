@@ -13,6 +13,7 @@ pub mod midi_clock;
 pub mod midi_in;
 pub mod offline;
 pub mod oneshot;
+pub(crate) mod ramps;
 pub mod render;
 pub mod runtime;
 pub mod slots;

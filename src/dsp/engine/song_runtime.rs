@@ -294,6 +294,7 @@ impl Engine {
             seed,
         );
         self.buses.slots[destination].users += 1;
+        self.output.admit(self.frame);
         self.buses.slots[destination].set_room(
             event_ctl(&audio, ROOM).map(|c| resolve(c, &cells)),
             event_ctl(&audio, SIZE).map(|c| resolve(c, &cells)),
@@ -677,5 +678,14 @@ impl Engine {
             }
         }
         self.finish_song_deadlines(frame);
+    }
+}
+
+impl crate::dsp::song::SongRuntime {
+    pub(crate) fn has_live_branches(&self) -> bool {
+        self.branches
+            .iter()
+            .any(|branch| !branch.ended && !branch.closed)
+            || self.voices.iter().any(Option::is_some)
     }
 }

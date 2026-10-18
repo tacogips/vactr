@@ -599,6 +599,7 @@ impl Session {
         for f in files {
             self.refresh_auth(f);
         }
+        self.momentary_rebase();
     }
 
     /// The binding identity a `learn` names.

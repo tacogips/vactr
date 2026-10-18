@@ -1,6 +1,6 @@
 # LPI-NS-INDEX: review and prove the session-349 name-space lookup index
 
-**Status**: Implemented (b327141); awaiting independent review
+**Status**: Completed (2026-10-18; accepted by the final integration review, workflow session 441)
 **Plan ID**: LPI-NS-INDEX (wave 1)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 6 (I6, name-space index part), 2 (I9) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -229,8 +229,8 @@ step id and verdict. Then set Status to `Completed`.
 - [x] NR1 log shows every expected result.
 - [x] NR2 steps 1-4 exit 0 with positive test counts.
 - [x] NR3 M1 and M2 fail as expected; both restore hashes match.
-- [ ] Review verdict recorded; every high or mid finding repaired.
-- [ ] Status is Completed only after the recorded acceptance.
+- [x] Review verdict recorded; every high or mid finding repaired.
+- [x] Status is Completed only after the recorded acceptance.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -362,3 +362,38 @@ step id and verdict. Then set Status to `Completed`.
   its post-update SHA256 is recorded in `rerun-438/plan-post.sha256`.
 - Status is awaiting the independent review verdict (TASK-NR4/NR5/NR6);
   these review-owned items remain unchecked for the downstream review step.
+
+### Session: 2026-10-18 (workflow session 441, step 6 rerun, LPI-NS-INDEX)
+**Tasks Completed**: TASK-NR1, TASK-NR2, TASK-NR3 source identity confirmation.
+**Notes**:
+
+- NR1 passed on the current tree. `rerun-441/r1-deliverables.log` confirms
+  the registered differential test, the evaluator's `!members.is_empty()`
+  guard, empty product-source diffs from 9474491, and unchanged
+  `migrate_scale.rs`.
+- NR2 passed twice on the current source identity: the first run is in
+  `rerun-441/1-fmt.log` through `4-line-counts.log`; the independent
+  check-and-test run is in `rerun-441/postcheck/`. Both fmt and clippy exited
+  0; both namespaced nextest runs exited 0 with 125 passed and 0 failed;
+  line counts are 598, 220, 957, and 101.
+- NR3 mutation evidence from `rerun-438/` remains source-matched: current
+  `depgraph.rs` SHA256 equals the original and both restored hashes
+  (`9088d5bc5b1284d6890ac9bbdc776963ffb7de6c5ffb095ecefcc4e9dd0cfa5b`).
+  M1 `.next_back()` and M2 skipped superseded-span removal each failed the
+  differential test as expected; both mutations restored to the same hash.
+- The read-only implementation audit found no high or mid issue. It
+  independently confirmed the linear reference, exercised edge-case coverage
+  by inspection, and found no additional graph add or ownership mutation
+  paths. No product source change was needed.
+- The plan remains awaiting the independent review verdict. TASK-NR4/NR5/NR6
+  and the review-owned completion record remain with the downstream review
+  step; this step does not claim acceptance.
+- Current authored source hashes are in `rerun-441/final-source-sha256.txt`.
+  The plan pre-edit SHA256 is recorded in
+  `rerun-441/plan-edit-intention.md`; the post-edit plan hash is recorded in
+  `rerun-441/plan-post.sha256`.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

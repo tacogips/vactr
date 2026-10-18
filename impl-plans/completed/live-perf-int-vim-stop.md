@@ -1,6 +1,6 @@
 # LPI-VIM-STOP: stop and cut shortcuts with Vim on, and the removed hush option
 
-**Status**: Implemented (b327141); awaiting independent correctness, test-integrity and adversarial review
+**Status**: Completed (2026-10-18; accepted by the final integration review, workflow session 441)
 **Plan ID**: LPI-VIM-STOP (wave 1)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I2, I3, I9), 4 (V1-V3, Tests) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -334,9 +334,9 @@ Then set Status to `Completed`.
 - [x] VR1 log shows every expected result.
 - [x] VR2 steps 1-4 exit 0 with positive test counts; focused step 2 also passed after mutation restoration.
 - [x] VR3 M1-M4 fail as expected; restore hashes match.
-- [ ] Correctness, test-integrity and adversarial verdicts are recorded;
+- [x] Correctness, test-integrity and adversarial verdicts are recorded;
   every high or mid finding is repaired.
-- [ ] Status is Completed only after the recorded acceptance.
+- [x] Status is Completed only after the recorded acceptance.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -396,3 +396,27 @@ Then set Status to `Completed`.
 - VR3 mutation controls M1-M4 each failed the intended focused assertion and each restore hash matched its immediately pre-mutation file hash. Logs: `rerun-438/mutation-m1.log`, `mutation-m2-retry.log`, `mutation-m3.log`, `mutation-m4.log`; intents and SHA-256 pairs are in the adjacent `m*-intent.txt`, `m*-before.sha256`, and `m*-restored.sha256` files. The first M2 setup attempt imported a nonexistent `../ui/platform` path and failed before tests loaded (`mutation-m2.log`); it was corrected to use the existing `../ui/stop-keys` export, and the valid retry produced the expected two failing alternate-modifier cases.
 - No implementation source changed in this rerun. Correctness, test-integrity, and adversarial verdicts and any resulting repair/acceptance remain assigned to the downstream review step; do not mark Completed before those verdicts.
 - Plan-file SHA-256 before this Progress Log update: `9bd84945b1e1f647d0b0056a2e0286c6215a0428c68dcc69cbe24eab5937c52d`; the final plan hash is recorded at `rerun-438/plan-after-hash-note-retry.sha256`.
+
+### Session: 2026-10-18 (rerun, workflow session 441 step6-implement)
+**Tasks Completed**: VR1 deliverable check and VR2 verification steps 1-4.
+**Notes**:
+- Current-source VR1 results are recorded in `rerun-441/r1-deliverables.log`: all expected symbols and callbacks match, the scoped `9474491..b327141` diff contains nine editor files within this plan's writePaths, and shared transport/eval/Vim hush files have an empty diff.
+- VR2 passed on the current source: `npm run check` exit 0; focused Vitest 8 files and 188/188 tests passed; Vim/canvas Vitest 57 files and 1528/1528 tests passed; all nine listed source/test files are below 1000 lines. Logs: `rerun-441/1-check.log` through `rerun-441/4-line-counts.log`.
+- No editor source or test files changed in this rerun. Status remains In Progress pending the downstream correctness, test-integrity, and adversarial verdicts required by VR4/VR6.
+- The supplied unresolved mid finding targets `design-docs/specs/design-live-perf-integration.md` section 10 (LPI-STYLE's cross-container painted-pair behavior), which is outside this plan's writePaths and does not concern the Vim-stop implementation. Preserve it for routing to the LPI-STYLE/design owner; no out-of-scope design file was edited.
+- Plan snapshot and intended hunk are recorded in `rerun-441/plan-before-update.md`, `plan-before-update.sha256`, and `plan-update-intent.txt`.
+
+### Session: 2026-10-18 (rerun, workflow session 442 step6-implement)
+**Tasks Completed**: Closed stale review-feedback disposition; reran VR1 source identity and VR2 verification steps 1-4.
+**Notes**:
+- Integration review session 441 closed finding `opus-luna-design-and-implement-review-loop-session-438-step3-design-review-attempt-1-finding-1` as resolved at `3bf738b` (design section 10 painted-visibility rule and LPI-STYLE M3). It no longer blocks LPI-VIM-STOP. The revised design says painted pairs remain checked across containers; this plan did not edit the design or LPI-STYLE files.
+- Confirmed the nine editor source/test files are byte-identical to `b327141`; their SHA-256 values are in `rerun-442/source-sha256.txt` and `source-sha256-final.txt`, and both before/after source diffs are empty (`source-diff.log`, `source-diff-final.log`, exit 0).
+- Fresh current-source verification passed: `cd editor && npm run check` exit 0 (`rerun-442/1-check.log`); focused Vitest passed 188/188 across 8 files (`2-vitest-focused.log`); Vim/canvas Vitest passed 1528/1528 across 57 files (`3-vitest-vim-canvas.log`); line-count gate passed with all nine files below 1000 (`4-line-counts.log`).
+- One initial check wrapper did not record an exit marker because zsh reserves the variable name `status`; it is preserved as `1-check-attempt1-incomplete.log`. The clean rerun above is the complete evidence.
+- Status remains In Progress pending independent correctness, test-integrity and adversarial verdicts. No reviewer verdict is claimed here.
+- Plan snapshot, intended change, and hashes: `rerun-442/plan-before-update.md`, `plan-edit-intention.txt`, `plan-pre-update.sha256`; post-update hash: `plan-post-update.sha256`.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

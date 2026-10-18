@@ -108,7 +108,30 @@ async function inspectPage(page, engine, viewportName, probe) {
       return element;
     }).filter((element, index, all) => all.indexOf(element) === index).map((element) => ({ element, inProbe: fixture.contains(element) }));
     const overlayGroup = (element) => element.closest('.vact-vim-keymap, .vact-vim-hints');
-    const gapControls = activeOverlays.length ? controls.filter(({ element }) => overlayGroup(element)) : controls;
+    const paintedForGap = (element) => {
+      for (let node = element; node instanceof Element; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.position === 'fixed' || style.position === 'absolute') return true;
+      }
+      const rect = element.getBoundingClientRect();
+      let left = rect.left;
+      let top = rect.top;
+      let right = rect.right;
+      let bottom = rect.bottom;
+      for (let node = element.parentElement; node instanceof Element; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+        const clip = node.getBoundingClientRect();
+        left = Math.max(left, clip.left);
+        top = Math.max(top, clip.top);
+        right = Math.min(right, clip.right);
+        bottom = Math.min(bottom, clip.bottom);
+      }
+      // UF-1: a control scrolled out of its overflow container is not painted where it is measured.
+      return bottom - top >= rect.height / 2 && right - left >= rect.width / 2;
+    };
+    const visibleGapControls = activeOverlays.length ? controls.filter(({ element }) => overlayGroup(element)) : controls;
+    const gapControls = visibleGapControls.filter(({ element, inProbe }) => inProbe || paintedForGap(element));
     for (const { element: first, inProbe: firstInProbe } of gapControls) {
       const a = first.getBoundingClientRect();
       const candidates = gapControls.filter(({ element: second, inProbe: secondInProbe }) => {

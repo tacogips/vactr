@@ -1,6 +1,6 @@
 # LP-EDITOR-STOP: Stop and cut shortcuts, toolbar labels, output state display
 
-**Status**: In Progress (implementation complete; awaiting assigned review steps)
+**Status**: Completed (2026-10-18, workflow session 438)
 **Plan ID**: LP-EDITOR-STOP (wave 2; parallel with LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-MOMENTARY)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.1, 4.5, 6, 8.2 (shortcuts, toolbar), D1, D2, D10
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -250,3 +250,7 @@ Write logs to `tmp/live-perf/editor-stop/*.log`.
 **Tasks Completed**: Revalidated TASK-T1 through TASK-T4 on the current shared source; all assigned completion criteria remain satisfied.
 **Verification**: `cd editor && npm run check` exit 0 (`tmp/live-perf/editor-stop/editor-check-step6.log`); `cd editor && ./node_modules/.bin/vitest run test/ui test/code/transport.test.ts test/code/eval.test.ts test/canvas/input.test.ts` exit 0 (81/81; `tmp/live-perf/editor-stop/vitest-focused-step6.log`); `cd editor && ./node_modules/.bin/vitest run test/code test/ui test/protocol` exit 0 (279/279; `tmp/live-perf/editor-stop/vitest-code-ui-protocol-step6.log`). The explicit keymap absence check passed (`tmp/live-perf/editor-stop/eval-keymap-step6.log`).
 **Notes**: The assigned implementation was already present on the accepted shared branch, so no editor source or test files required changes in this node. Browser style verification, formal review and closeout remain with downstream workflow steps.
+
+### Session: 2026-10-18 (LPI-CLOSEOUT, workflow session 438)
+**Tasks Completed**: Final integration verification and archive closeout.
+**Notes**: Serial gates 1-13 passed with logs under `tmp/live-perf-int/closeout/`; the full behavior e2e passed 54/54 and examples e2e passed 8/8. See `design-docs/specs/design-live-performance.md` section 12.

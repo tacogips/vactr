@@ -343,3 +343,30 @@ under the lock. It must pass 8/8.
   the post-edit SHA-256 is recorded in `playback/plan-post.sha256`.
 - Formal independent reviews and combined-tree closeout remain assigned to
   downstream workflow steps.
+
+### Session: 2026-10-18 (workflow session 442, Step 6 implementation rerun)
+**Tasks Completed**: repeated TASK-P1 fresh-build reproduction and TASK-P4
+confirmation on the current shared tree.
+**Notes**:
+- `mise run build-wasm-release` and
+  `VACTR_REQUIRE_SESSION_ABI=1 npm run build` both exited 0
+  (`playback/1-wasm-release-rerun.log`, `playback/2-build-rerun.log`).
+- With the measurement lock held and released by the foreground command,
+  `npm run e2e:examples` exited 0 and passed 8/8 with
+  `run-plays-moderately.onsetCount = 1`
+  (`playback/3-examples-rerun.log`, `playback/3-result.json`). This
+  reconfirms the prior diagnosis: the earlier onset failure came from a
+  stale build. TASK-P2 and TASK-P3 remain not applicable; no product code,
+  tests, or accepted live-perf semantics changed.
+- Current-tree Rust verification also passed: `cargo fmt --check`, clippy
+  with `-D warnings`, 133 selected DSP/session nextest tests, and the debug
+  WASM build (`playback/4-fmt.log`, `5-clippy.log`, `6-nextest.log`,
+  `7-wasm-debug.log`).
+- Plan pre-edit SHA-256: `81c0c90d9f93363585c1247123692ee35873751c698148027eead8a56fa57fb2`
+  (`playback/plan-rerun-before.sha256`). Post-edit SHA-256 is recorded in
+  `playback/plan-rerun-verify-after.sha256`.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

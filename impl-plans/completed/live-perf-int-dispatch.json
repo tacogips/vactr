@@ -1,5 +1,6 @@
 {
   "taskId": "live-perf-int",
+  "archivedBy": "integration step, workflow session 438, 2026-10-18",
   "workflowMode": "issue-resolution",
   "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-441",
   "issueReference": "workflowInput (no GitHub issue): 'Integrate wf/live-perf with main: revise the integration plans (style regression, wave-1 acceptance) and finish' (branch merge/live-perf; merge commit 9474491; wave-1 at b327141; session-438 intake comm-007612, design accepted comm-007616; session-438 rerun checkpoint 9610246; continued in workflow session 441)",

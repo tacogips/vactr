@@ -1,6 +1,6 @@
 # LPI-WIRE: make the song-record tags and live-perf control tags unambiguous
 
-**Status**: In Progress (implemented at b327141; review-and-repair rerun pending)
+**Status**: Completed (2026-10-18; accepted by the final integration review, workflow session 441)
 **Plan ID**: LPI-WIRE (wave 1)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I1, I9), 3 (W1-W3) and 11 (R1-R6)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -299,10 +299,10 @@ step id, the verdict and any repair. Then set Status to `Completed`.
 
 - [x] WR1 log shows every expected result (`rerun-438/r1-deliverables.log`).
 - [x] WR2 steps 1-6 exit 0 with positive test counts (`rerun-438/final-source/`).
-- [x] WR3 M1 and the legacy-collision regression guard fail as expected; restore hashes match.
-- [ ] Independent review verdict recorded (WR4/WR6); every high or mid
+- [x] WR3 M1 and M2 fail as expected; restore hashes match (`rerun-442`).
+- [x] Independent review verdict recorded (WR4/WR6); every high or mid
   finding repaired (WR5).
-- [ ] Status is Completed only after the recorded acceptance.
+- [x] Status is Completed only after the recorded acceptance.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -352,3 +352,29 @@ step id, the verdict and any repair. Then set Status to `Completed`.
 - Mutation evidence: M1 fails the disjointness guard (1 run, 0 passed, 1 failed). The legacy-collision guard mutation fails (1 run, 0 passed, 1 failed). The arm-only and original carrier-test controls passed because their current fixture/tag values do not trigger a collision; preserved in `m2.log`, `m2-legacy-pair.log`, and `m2-forced-rebuild.log`. Both modified production files were restored byte-for-byte; before/after hashes match in `m1-before.sha256`/`m1-after.sha256` and `m2-guard-before.sha256`/`m2-guard-after.sha256`.
 - `src/host/tests/contracts.rs` SHA-256 changed from `8a8e024d8cb5f580b3452435ad8da521c6fd5997c02c183c578c85a97ff5d8df` to `2c0390414f0e040fa08a9ab026b871bd0b16addb8b1562285d9d2eb08cd2b9c8`. Independent review and acceptance remain pending; no verdict is claimed.
 - Plan SHA-256 before this audit note: `22abdacf42c7c4b3f23f8a08fea842d3aa940a82811058415e118bd60c7e37f7`; final post-edit hash is recorded in `tmp/live-perf-int/wire/rerun-438/plan-final.sha256`.
+
+### Session: 2026-10-18 (Step 6 implementation rerun, workflow session 441)
+**Tasks Completed**: TASK-WR1 and TASK-WR2 verification steps 1-6 on the current source; no source repair was required.
+**Notes**:
+- WR1 expected results are present in `tmp/live-perf-int/wire/rerun-441/r1-deliverables.log`: tags are `0x1F`/`0x20`, the song arm uses `song::decode(b)`, the contracts guard and `0x1f` bad-value fixture are present, song tags/tests are unchanged, and no editor-side `0x1c`/`0x1d` encoder was found.
+- Current-source verification: fmt, clippy, nextest song suites (47/47, including `graph_and_begin_reject_every_truncation_trailing_bytes_and_wrong_kind`), nextest contracts/output-stop/ramp suites (38/38, including the disjointness guard), debug wasm, release wasm, and line counts all exited 0. Logs are `tmp/live-perf-int/wire/rerun-441/1-fmt.log` through `6-line-counts.log`; tests are in `3a-nextest-song.log` and `3b-nextest-lib.log`.
+- Source hashes match the session-438 final/restoration evidence: `src/host/wire.rs` `612e31b53190d1c81a02c1f62fe4c346cd39a092103fbe30a8d8b229e592c3b8`; `src/dsp/ring.rs` `c0dca46babd1af2329a400ccc03b327215885ee1da229d1e94968d3e1dce201e`; `src/host/tests/contracts.rs` `2c0390414f0e040fa08a9ab026b871bd0b16addb8b1562285d9d2eb08cd2b9c8`. Current line counts are 928, 928 and 628 respectively.
+- A read-only scoped implementation audit found no in-scope LPI-WIRE issue. The prior S2 cross-container style-check finding belongs to LPI-STYLE and does not authorize a LPI-WIRE edit.
+- Mutation evidence from the source-identical session-438 run remains in `tmp/live-perf-int/wire/rerun-438/`: M1 and the legacy-collision regression guard failed as expected, and restoration hashes match. Formal workflow independent review/acceptance remains pending downstream; no reviewer verdict or plan completion is claimed.
+- **WR3 M2 disposition:** the exact requested assertion is not demonstrated. With both the historical CtlMsg-first song arm and old `TAG_OUTPUT_STOP = 0x1C` restored, `graph_and_begin_reject_every_truncation_trailing_bytes_and_wrong_kind` still passes (`tmp/live-perf-int/wire/rerun-438/m2-legacy-pair.log`; the forced-rebuild rerun also passes in `m2-forced-rebuild.log`). The in-scope `live_perf_control_tags_are_disjoint_from_song_record_tags` guard does fail under that combined legacy mutation (`m2-guard-mutation.log`). The test named by M2 is in `tests/song_resource_carriers.rs`, expressly excluded from edits and outside `writePaths`; no test or source change was made to force that assertion to fail. WR3 therefore needs either an amended mutation target accepting the in-scope guard, or an authorized test/write-path amendment. The arm-only mutation is also non-discriminating after W1 has moved the tag.
+
+
+### Session: 2026-10-18 (Step 6 implementation rerun, workflow session 442)
+**Tasks Completed**: Corrected and completed WR3 M2 mutation evidence; restored sources byte-for-byte; reran verification steps 3a and 3b.
+**Notes**:
+- The earlier session-441 M2 disposition came from an incomplete mutation: it restored `TAG_OUTPUT_STOP = 0x1C` but left `TAG_CELL_RAMP = 0x20`, so it did not recreate the historical collision at song tag `BEGIN = 0x1D`.
+- Before mutation, `src/dsp/ring.rs` was `c0dca46babd1af2329a400ccc03b327215885ee1da229d1e94968d3e1dce201e` and `src/host/wire.rs` was `612e31b53190d1c81a02c1f62fe4c346cd39a092103fbe30a8d8b229e592c3b8` (`rerun-442/m2-full-before.sha256`). Applied exactly the historical CtlMsg-first arm and both old tags, `0x1C`/`0x1D` (`m2-full-edit.intent`).
+- WR3 M2 now fails as required: `graph_and_begin_reject_every_truncation_trailing_bytes_and_wrong_kind` exited 100 at `tests/song_resource_carriers.rs:807`, the BEGIN truncation assertion (`rerun-442/m2-full.log`).
+- Restored both files from saved byte copies. Post-mutation hashes match the before hashes exactly (`rerun-442/m2-full-after.sha256`); `cmp` confirmed byte matches.
+- Restored verification passed: 3a song suites 47/47, exit 0 (`rerun-442/3a-nextest-song.log`); 3b contracts/output-stop/ramp suites 38/38, exit 0 (`rerun-442/3b-nextest-lib.log`).
+- Status remains In Progress pending independent WR4/WR6 review and acceptance. No source or test changes remain from the temporary mutation.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

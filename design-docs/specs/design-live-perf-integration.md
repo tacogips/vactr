@@ -1,9 +1,11 @@
 # Live performance integration with main (merge/live-perf)
 
-**Status**: Proposed (author, 2026-10-18), workflow run
-opus-luna-design-and-implement-review-loop-session-433; revised in place
-in session-438 (UF-1 style regression, section 10; wave-1 acceptance,
-section 11; artifact roots and plan graph, section 8).
+**Status**: Implemented (2026-10-18, workflow session 438)
+**Plans**: archived after the final integration review (workflow session
+441) as `impl-plans/completed/live-perf-int-*.md` with
+`live-perf-int-dispatch.json`. The legacy live-perf plans are in
+`impl-plans/completed/live-perf-*.md`. Plan paths under `active/` below
+record where the plans lived while this design was in progress.
 **Branch**: `merge/live-perf`, at merge commit 9474491. This merges main
 v0.1.1 (Vim mode, Vim keymap, hints, hop) with `wf/live-perf`.
 **Baseline designs (unchanged; source of truth)**:

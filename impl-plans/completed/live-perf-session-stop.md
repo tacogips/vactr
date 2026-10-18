@@ -1,6 +1,6 @@
 # LP-SESSION-STOP: Scheduler stop modes, output-stop delivery, song stop, output telemetry
 
-**Status**: In Progress. TASK-S1 to TASK-S4 are implemented. TASK-S5 (session-343 scope amendment: host-native `stop_song` tests) is Ready.
+**Status**: Completed (2026-10-18, workflow session 438)
 **Plan ID**: LP-SESSION-STOP (wave 2; the only wave-2 plan redispatched in session 343)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.1, 4.4, 4.5, 4.6, 8.1(5), D1, D2, D5
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -658,3 +658,7 @@ and refusal tests; completed final-source verification 1-7.
 - No product file changed. The test file remains below the plan's 700-line
   target. Formal reviews, LP-EVIDENCE, shared closeout, commit, and push remain
   downstream workflow steps.
+
+### Session: 2026-10-18 (LPI-CLOSEOUT, workflow session 438)
+**Tasks Completed**: Final integration verification and archive closeout.
+**Notes**: Serial gates 1-13 passed with logs under `tmp/live-perf-int/closeout/`; the full behavior e2e passed 54/54 and examples e2e passed 8/8. See `design-docs/specs/design-live-performance.md` section 12.

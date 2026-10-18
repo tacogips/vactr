@@ -16,14 +16,45 @@ export async function runBehavior(browser, origin, name) {
     }
     catch (error) { results.push({ id, pass: false, detail: String(error?.stack ?? error) }); }
   };
-  const liveFixture = 'd1 s :analog > note [:a4 :c5] > lpf 800 > room 0.6 > gain 0.1';
+  const liveFixture = 's :analog > note [:a4 :c5] > lpf 800 > room 0.6 > gain 0.1 > d1';
   const loadLiveFixture = async () => {
     const textarea = page.locator('.vact-code-input-bridge textarea');
+    await textarea.focus();
+    await textarea.press('ControlOrMeta+a');
     await textarea.fill(liveFixture);
     await page.locator('.vact-run').click();
+    const audioState = await page.locator('.vact-audio-state').getAttribute('data-state');
+    if (audioState !== 'running') {
+      await page.locator('.vact-audio').click();
+      await page.waitForFunction(() => document.querySelector('.vact-audio-state')?.getAttribute('data-state') === 'running', undefined, { timeout: 10000 });
+    }
     const pos = liveFixture.indexOf('800') + 1;
-    await page.waitForFunction((sitePos) => window.__vactrPerf.momentaryHit(sitePos), pos, { timeout: 10000 });
+    try {
+      await page.waitForFunction((sitePos) => window.__vactrPerf.momentaryHit(sitePos), pos, { timeout: 10000 });
+    } catch (error) {
+      const state = await page.evaluate((sitePos) => ({
+        audio: document.querySelector('.vact-audio-state')?.getAttribute('data-state'),
+        evaluation: {
+          status: document.querySelector('.vact-eval-status')?.getAttribute('data-status'),
+          label: document.querySelector('.vact-eval-status')?.getAttribute('aria-label'),
+        },
+        momentaryHit: window.__vactrPerf.momentaryHit(sitePos),
+        doc: window.__vactrPerf.doc(),
+      }), pos);
+      throw new Error(`momentary site readiness failed: ${JSON.stringify(state)}; ${String(error)}`);
+    }
     return { pos, doc: await page.evaluate(() => window.__vactrPerf.doc()) };
+  };
+  const withLiveCleanup = async (action) => {
+    try { return await action(); }
+    catch (error) {
+      await page.locator('.vact-hush').click().catch(() => {});
+      throw error;
+    }
+  };
+  const hushAndWaitIdle = async () => {
+    await page.locator('.vact-hush').click();
+    await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'idle', undefined, { timeout: 3000 });
   };
   try {
     context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, hasTouch: true,
@@ -193,7 +224,7 @@ export async function runBehavior(browser, origin, name) {
       if (hidden !== before.frames) throw Error(`frames grew while hidden: ${before.frames} -> ${hidden}`);
       if (now < hidden) throw Error('frame count regressed');const recovered=await page.evaluate(()=>({presented:window.__vactrPerf.presented(),onsets:window.__vactrPerf.onsets()}));const first=recovered.presented.at(-1);if(first){const expected=recovered.onsets.filter(o=>o.time<=first.audibleTime&&first.audibleTime<o.end).map(o=>`${o.from}-${o.to}`).sort().join(',');if(expected!==String(first.activeKey).split(',').filter(Boolean).sort().join(','))throw Error(`first resumed active set mismatch: expected ${expected}, got ${first.activeKey}`);for(const o of recovered.onsets)if(recovered.presented.some(p=>p.activeKey.includes(`${o.from}-${o.to}`)&&p.audibleTime>=o.end))throw Error('expired highlight replayed after resume');}return `frames hidden=${hidden}, resumed=${now}`;
     });
-    await check('momentary-right-drag', async () => {
+    await check('momentary-right-drag', () => withLiveCleanup(async () => {
       const fixture = await loadLiveFixture();
       const start = await page.evaluate((pos) => {
         const rect = window.__vactrPerf.coordsAtPos(pos);
@@ -229,9 +260,10 @@ export async function runBehavior(browser, origin, name) {
       await sleep(50);
       const contexts = await page.evaluate(() => window.__momentaryContexts);
       if (!contexts.some((prevented) => prevented === false)) throw Error(`non-site context menu was not observed as allowed: ${JSON.stringify(contexts)}`);
+      await hushAndWaitIdle();
       return `site=${fixture.pos}; Shift snap and 1000ms glide verified; contexts=${JSON.stringify(contexts)}`;
-    });
-    await check('momentary-two-finger', async () => {
+    }));
+    await check('momentary-two-finger', () => withLiveCleanup(async () => {
       const fixture = await loadLiveFixture();
       const rect = await page.evaluate((pos) => window.__vactrPerf.coordsAtPos(pos), fixture.pos);
       if (!rect) throw Error('momentary site coordinates unavailable');
@@ -249,28 +281,47 @@ export async function runBehavior(browser, origin, name) {
       await dispatch('pointerup', 22, y - 60, 0);
       await page.waitForFunction(() => window.__vactrPerf.momentaryLabels().length === 0, undefined, { timeout: 1500 });
       limitations.push('Synthetic browser multi-touch passed; physical iPad two-finger gesture check is pending.');
+      await hushAndWaitIdle();
       return 'Synthetic two-finger tweak and glide verified; physical iPad validation pending.';
-    });
-    await check('stop-gentle-shortcut', async () => {
+    }));
+    await check('stop-gentle-shortcut', () => withLiveCleanup(async () => {
       await loadLiveFixture();
-      await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'running', undefined, { timeout: 10000 });
-      await page.keyboard.press('Meta+.');
+      try {
+        await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'running', undefined, { timeout: 10000 });
+      } catch (error) {
+        const output = await page.evaluate(() => ({
+          state: window.__vactrPerf.transportOutput(), history: window.__vactrPerf.outputHistory(),
+          evaluation: document.querySelector('.vact-eval-status')?.getAttribute('data-status'),
+          evalLabel: document.querySelector('.vact-eval-status')?.getAttribute('aria-label'),
+          sink: window.__vactrSink?.report()?.pre,
+        }));
+        throw new Error(`output did not reach running: ${JSON.stringify(output)}; ${String(error)}`);
+      }
+      const mod = await page.evaluate(() => /Mac|iP/.test(navigator.platform) ? 'Meta' : 'Control');
+      await page.keyboard.press(`${mod}+.`);
       await page.waitForFunction(() => {
         const history = window.__vactrPerf.outputHistory(); const draining = history.lastIndexOf('draining');
         return draining >= 0 && history.slice(draining + 1).includes('idle');
       }, undefined, { timeout: 20000 });
       return JSON.stringify(await page.evaluate(() => window.__vactrPerf.outputHistory()));
-    });
-    await check('cut-shortcut', async () => {
+    }));
+    await check('cut-shortcut', () => withLiveCleanup(async () => {
       await loadLiveFixture(); await sleep(500);
       await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'running', undefined, { timeout: 10000 });
       const historyBefore = await page.evaluate(() => window.__vactrPerf.outputHistory());
-      await page.keyboard.press('Meta+Shift+.');
+      const mod = await page.evaluate(() => /Mac|iP/.test(navigator.platform) ? 'Meta' : 'Control');
+      await page.keyboard.press(`${mod}+Shift+.`);
       await page.waitForFunction(() => window.__vactrPerf.transportOutput() === 'idle', undefined, { timeout: 3000 });
       const historyAfter = await page.evaluate(() => window.__vactrPerf.outputHistory());
       if (historyAfter.slice(historyBefore.length).includes('draining')) throw Error(`cut entered draining: ${JSON.stringify({ historyBefore, historyAfter })}`);
       return JSON.stringify(historyAfter);
-    });
+    }));
+    await check('silent-sink-post-peak', async () => page.evaluate(() => {
+      const report = window.__vactrSink?.report();
+      if (!report) throw Error('silent sink report unavailable');
+      if (report.post.peak !== 0 || report.violations.length) throw Error(`silent sink output=${JSON.stringify(report.post)} violations=${JSON.stringify(report.violations)}`);
+      return `post-sink peak=${report.post.peak}; violations=${report.violations.length}`;
+    }));
     await check('dispose-ledger', async () => page.evaluate(() => {
       const api = window.__vactrPerf; const ledger = api.ledger; api.disposeCode();
       if (ledger.usedBytes !== 0 || window.__vactrPerf !== undefined) throw Error(`dispose ledger=${ledger.usedBytes}`); return `usedBytes=${ledger.usedBytes}`;

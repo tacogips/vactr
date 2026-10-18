@@ -1,6 +1,6 @@
 # LP-EVIDENCE: Silent behavior e2e, full gates, verification record, closeout
 
-**Status**: In Progress
+**Status**: Completed (2026-10-18, workflow session 438)
 **Plan ID**: LP-EVIDENCE (wave 3)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 8.3, 8.4, 9, 11
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -260,11 +260,11 @@ Change nothing else in the design.
 
 ## Completion Criteria
 
-- [ ] The four behavior checks pass in Chromium and WebKit, and post-sink
+- [x] The four behavior checks pass in Chromium and WebKit, and post-sink
   peak is 0.
-- [ ] Gates 1-13 exit 0 with positive test counts where they apply.
-- [ ] Section 12 is appended to the design doc with log paths.
-- [ ] The plans and the manifest are archived file by file, and the README
+- [x] Gates 1-13 exit 0 with positive test counts where they apply.
+- [x] Section 12 is appended to the design doc with log paths.
+- [x] The plans and the manifest are archived file by file, and the README
   is updated.
 - [x] The Progress Log is updated.
 
@@ -303,3 +303,9 @@ Change nothing else in the design.
 - Full vitest failed twice at the existing `test/e2e/large-eval.test.ts` scaling assertion: first 5k=5156.1 ms, 20k=40377.5 ms, ratio 7.83 (>6), exit 1 in `tmp/live-perf/gates/8-vitest-full.log`; then 5k=5625.6 ms, 20k=42694.2 ms, ratio 7.59 (>6), exit 1 in `tmp/live-perf/gates/8-vitest-full-retry1.log`. All other tests passed in both runs (871/872). The retry was after removing label sampling from non-perf frames; the scaling failure persisted.
 - Stopped after gate 8 per TASK-V3. Gates 9-13, full behavior e2e, section 12, and archival closeout remain pending. The failing large-eval test and its underlying evaluation scaling are outside LP-EVIDENCE's authorized source write paths; workflow review must assign/disposition that gate before this plan resumes.
 - Bounded self-check moved the existing `dispose-ledger` e2e check after all four new checks so they retain the perf hook; the final `node --check editor/test/e2e/behavior.mjs` passed at `tmp/live-perf/gates/session-349/node-check-final2.log`.
+
+### Session: 2026-10-18 (LPI-CLOSEOUT, workflow session 438)
+**Tasks Completed**: Final integration verification and archive closeout.
+**Notes**: Serial gates 1-13 passed with logs under `tmp/live-perf-int/closeout/`; the full behavior e2e passed 54/54 and examples e2e passed 8/8. See `design-docs/specs/design-live-performance.md` section 12.
+
+Closeout note: TASK-V3 to TASK-V5 gates ran serially under LPI-CLOSEOUT with the integration union gate list. Logs are in `tmp/live-perf-int/closeout/`; behavior and examples e2e outputs are captured there.

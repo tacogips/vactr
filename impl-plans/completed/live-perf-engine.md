@@ -1,6 +1,6 @@
 # LP-ENGINE: Output stop state machine, cut and clear, cell ramps, Natural release
 
-**Status**: In Progress (implementation complete; awaiting serial integration review)
+**Status**: Completed (2026-10-18, workflow session 438)
 **Plan ID**: LP-ENGINE (wave 2; parallel with LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-STOP, LP-EDITOR-MOMENTARY)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 4.2, 4.3, 5.7, 7, 8.1(1)-(4), D3, D4, D8, D9
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -624,3 +624,7 @@ sequence, native/browser parity, and backpressure assertions remain intact.
 **Resolved exploratory attempt**: The first ordering regression run reached the memory-clear predicate before the deferred Idle transition and passed 49/50; two bounded callbacks were added before draining. Its log is `tmp/live-perf/engine/nextest-frame-order-attempt-1.log`. The final focused and broad runs above are post-edit evidence.
 **Notes**: Assigned LP-ENGINE implementation and behavioral verification are complete.
 Formal integration review and workflow closeout remain downstream.
+
+### Session: 2026-10-18 (LPI-CLOSEOUT, workflow session 438)
+**Tasks Completed**: Final integration verification and archive closeout.
+**Notes**: Integration W1 reassigned `OutputStop`/`CellRamp` tags to `0x1F`/`0x20` because the case-sensitive pre-check grep missed lowercase song constants. Integration W2 removed the exact-length CtlMsg-first workaround in `ByteInbox::next`. Serial gates 1-13 passed; see `design-docs/specs/design-live-performance.md` section 12 and `tmp/live-perf-int/closeout/`.

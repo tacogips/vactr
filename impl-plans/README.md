@@ -47,21 +47,21 @@ These plans implement [design-example-picker-and-persistence.md](../design-docs/
 - **Wave 3**: [EX-70 e2e, style gate, docs](completed/examples-70-e2e-docs.md)
 ## Live performance controls (2026-10-08)
 
-The [live performance controls](../design-docs/specs/design-live-performance.md) plans are Ready. They cover the right-drag and two-finger momentary tweak with glide or snap return, gentle stop (effect tails) as the default, and the instant cut. The [dispatch manifest](active/live-perf-dispatch.json) runs three waves; wave 2 is logically parallel but runs with fanout concurrency 1 in the shared worktree.
+The [live performance controls](../design-docs/specs/design-live-performance.md) plans are Completed (2026-10-18, workflow session 438). The serial integration gate summary is in section 12 of the design document; the integration decisions are in the [addendum](../design-docs/specs/design-live-perf-integration.md). The [dispatch manifest](completed/live-perf-dispatch.json) is archived with `archivedBy: LPI-CLOSEOUT, workflow session 438, 2026-10-18`.
 
-- Wave 1: [contract](active/live-perf-contract.md) (wire records, protocol messages, wiring stubs).
-- Wave 2: [engine](active/live-perf-engine.md), [session stop](active/live-perf-session-stop.md), [session momentary](active/live-perf-session-momentary.md), [editor stop](active/live-perf-editor-stop.md) and [editor momentary](active/live-perf-editor-momentary.md).
-- Wave 3: [evidence](active/live-perf-evidence.md) (silent behavior e2e, serial gates, verification record, closeout).
+- Wave 1: [contract](completed/live-perf-contract.md) (wire records, protocol messages, wiring stubs).
+- Wave 2: [engine](completed/live-perf-engine.md), [session stop](completed/live-perf-session-stop.md), [session momentary](completed/live-perf-session-momentary.md), [editor stop](completed/live-perf-editor-stop.md) and [editor momentary](completed/live-perf-editor-momentary.md).
+- Wave 3: [evidence](completed/live-perf-evidence.md) (silent behavior e2e, serial gates, verification record and closeout).
 
 ## Live performance integration with main (2026-10-18)
 
-These plans implement [design-live-perf-integration.md](../design-docs/specs/design-live-perf-integration.md) on branch `merge/live-perf` (workflow session 433; revised in session 438). They fix the merge regressions between live performance and Vim mode and the right-pane style regression UF-1, and finish LP-EVIDENCE. The [dispatch manifest](active/live-perf-int-dispatch.json) runs five waves. Wave 1 is implemented at b327141 and is accepted only through review-and-repair reruns (design section 11). The later waves run alone and own `editor/dist` and the measurement lock. LPI-STYLE has a dependsOn edge on LPI-PLAYBACK for that serialization only. These plans stay in `active/` while the workflow references them, and are archived by the integration step after final review.
+These plans implement [design-live-perf-integration.md](../design-docs/specs/design-live-perf-integration.md) on branch `merge/live-perf` (workflow session 433; revised in session 438). They fix the merge regressions between live performance and Vim mode and the right-pane style regression UF-1, and finish LP-EVIDENCE. All seven plans are **Completed** and archived (2026-10-18, workflow session 441) after the final serial integration review accepted them with no findings. Closeout gates 1-13 passed on the combined tree (behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17; logs in `tmp/live-perf-int/closeout/`). The [dispatch manifest](completed/live-perf-int-dispatch.json) lists five waves and is archived with `archivedBy: integration step, workflow session 438, 2026-10-18`.
 
-- **Wave 1** (review-and-repair reruns): [LPI-WIRE song and control tags](active/live-perf-int-wire.md), [LPI-VIM-STOP stop and cut with Vim](active/live-perf-int-vim-stop.md), [LPI-NS-INDEX name-space index review](active/live-perf-int-ns-index.md)
-- **Wave 2**: [LPI-PLAYBACK playback onset after Run](active/live-perf-int-playback.md)
-- **Wave 3**: [LPI-STYLE right-pane style regression](active/live-perf-int-style.md)
-- **Wave 4**: [LPI-BEHAVIOR live-perf behavior checks](active/live-perf-int-behavior.md)
-- **Wave 5**: [LPI-CLOSEOUT gates, section 12, archive and README](active/live-perf-int-closeout.md)
+- **Wave 1** (review-and-repair reruns): [LPI-WIRE song and control tags](completed/live-perf-int-wire.md), [LPI-VIM-STOP stop and cut with Vim](completed/live-perf-int-vim-stop.md), [LPI-NS-INDEX name-space index review](completed/live-perf-int-ns-index.md)
+- **Wave 2**: [LPI-PLAYBACK playback onset after Run](completed/live-perf-int-playback.md)
+- **Wave 3**: [LPI-STYLE right-pane style regression](completed/live-perf-int-style.md)
+- **Wave 4**: [LPI-BEHAVIOR live-perf behavior checks](completed/live-perf-int-behavior.md)
+- **Wave 5**: [LPI-CLOSEOUT gates, section 12, archive and README](completed/live-perf-int-closeout.md)
 
 ## DOM renderer comparison (2026-10-08)
 

@@ -1,6 +1,6 @@
 # LPI-BEHAVIOR: diagnose and fix the four LP-EVIDENCE behavior checks
 
-**Status**: Ready
+**Status**: Completed (2026-10-18; accepted by the final integration review, workflow session 441)
 **Plan ID**: LPI-BEHAVIOR (wave 4)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I4), 5.1 (B1-B3, decision table), 6 (perf-hook and check part of I6), plus rules D-a/D-b/D-c; section 8 (depends on LPI-STYLE, revised session 438)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -211,16 +211,16 @@ e2e under the lock with
 
 ## Completion Criteria
 
-- [ ] The B1 review is recorded.
-- [ ] The diagnosis log and per-check classification are in the Progress
+- [x] The B1 review is recorded.
+- [x] The diagnosis log and per-check classification are in the Progress
   Log.
-- [ ] B1-B3 check corrections are applied.
-- [ ] Remaining failures are fixed by owner, each product fix with a unit
+- [x] B1-B3 check corrections are applied.
+- [x] Remaining failures are fixed by owner, each product fix with a unit
   test.
-- [ ] The final behavior e2e passes in Chromium and WebKit with
+- [x] The final behavior e2e passes in Chromium and WebKit with
   `failureCount: 0`.
-- [ ] Verification 1-7 exit 0 (step 4 only if Rust changed).
-- [ ] The Progress Log records pre/post sha256 for every edited file.
+- [x] Verification 1-7 exit 0 (step 4 only if Rust changed).
+- [x] The Progress Log records pre/post sha256 for every edited file.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -249,3 +249,32 @@ e2e under the lock with
 ### Session: 2026-10-18 (plan revised, workflow session 438 step 4)
 **Tasks Completed**: none (plan revision only).
 **Notes**: Now wave 4, depending on LPI-PLAYBACK and LPI-STYLE. The LPI-STYLE files (glide-setting.ts, bind.css, glide-setting.test.ts, ui-style.mjs) are off-limits. No task content changed.
+
+### Session: 2026-10-18 (implementation, workflow Step 6)
+**Tasks Completed**: TASK-B1 through TASK-B5.
+**TASK-B1 review**: Kept the session-349 perf-hook work. The accessors remain installed only behind `perfEnabled && scheduler.perf` (`?perf=1`); momentary label snapshots remain guarded by `perfEnabled`; the `mount.test.ts` row verifies plain-data accessors and absence without the flag; `dispose-ledger` remains after all four live-perf checks. No concrete defect was found. Temporary diagnosis-only accessors in `perf-hook.ts` and their `mount.ts` wiring were removed; both files' final hashes match their pre-edit hashes below.
+**Diagnosis and per-check classification**:
+- Initial run `tmp/live-perf-int/behavior/diag/2-diag.log`: all four checks failed in both browsers at the shared `momentaryHit` wait (Chromium and WebKit, 8 failures). With the required audio-ready check and diagnostic capture, audio reached `running`, but the original fixture `d1 s :analog > note [...] ...` evaluated with `d1 takes 1 arguments, found 2`; its site was not bound. This was a fixture/check defect, not a product deviation.
+- The standard equivalent sink pipeline `s :analog > note [:a4 :c5] > lpf 800 > room 0.6 > gain 0.1 > d1` made the site and momentary behaviors valid. Repeated `.fill()` calls then appended to the editor document; the detailed run recorded the concrete form failure ``d1s` is not defined` and no sink onset. This was a repeated-fixture input defect, not a product deviation. `loadLiveFixture` now focuses and selects all before filling, keeping each check on the same intended fixture.
+- The final check classifies all four checks as passing in Chromium and WebKit: right-drag, synthetic two-finger, gentle `Mod-.`, and cut `Mod-Shift-.`. No product fix or product unit test was needed. Diagnosis artifacts are under `tmp/live-perf-int/behavior/diag/`.
+**Corrections**: B1 verifies audio state after Run and starts audio only when it is not running. B2 derives Meta vs Control from `navigator.platform`. B3 hushes on failure, and successful momentary checks hush then await idle within the design's 3-second cut bound. Existing assertions and thresholds are retained. Added `silent-sink-post-peak` to assert peak 0 and zero violations in the behavior run.
+**Final verification** (all logs are complete; exit=0):
+- `node --check editor/test/e2e/behavior.mjs` — `tmp/live-perf-int/behavior/final/retry-2/1-node-check.log`.
+- `cd editor && npm run check` — `tmp/live-perf-int/behavior/final/retry-2/2-check.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/canvas/mount.test.ts test/bind test/canvas/momentary-pointer.test.ts test/code/transport.test.ts` — 16 files, 133 tests passed; `tmp/live-perf-int/behavior/final/retry-2/3-vitest.log`.
+- No Rust files changed; verification 4 was not applicable.
+- `CARGO_TERM_QUIET=true mise run build-wasm-release` — `tmp/live-perf-int/behavior/final/retry-2/5-wasm-release.log`.
+- `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` — `tmp/live-perf-int/behavior/final/retry-2/5-editor-build.log`.
+- `cd editor && npm run e2e -- --browser all --profile behavior --run-id live-perf-int-behavior --out ../tmp/live-perf-int/behavior/final` — `pass=true`, 54/54 checks, failureCount 0; Chromium 29/29, WebKit 25/25; all four assigned checks and existing Vim/keymap checks passed, both post-sink checks reported peak 0 and zero violations; log `tmp/live-perf-int/behavior/final/retry-2/6-behavior-final.log`.
+- Touched source line counts: behavior.mjs 346; perf-hook.ts 114; mount.ts 406; all under 1000. `perf-hook.ts` and `mount.ts` were temporarily used for diagnosis then restored exactly.
+**SHA-256**:
+- `editor/test/e2e/behavior.mjs`: pre `a657133d3fa1c517127a04ea5840a961ebfa411a003e248cd57f839572ee2614`; post `72f833896f090d24fc6c99c5b16ee58e35820777f614999a8c017219879d815f`.
+- `editor/src/code/perf-hook.ts`: pre/post `ed4baf0195408d7f7ab1189d29b0a494012143cdaddaee41538a11ef0a6d7223`.
+- `editor/src/code/mount.ts`: pre/post `008a3e32301b6ec6f110394d6d1ea2b83716eee0018b9d8bf3e6de2289afb8c9`.
+- `impl-plans/active/live-perf-int-behavior.md`: pre `c6ae076beefea179fdcde02ddaff1b89dd5cf43d001b72c533a88d1f564d4f97`; post SHA-256 recorded in `tmp/live-perf-int/behavior/final/plan-post-hash.json`.
+**Notes**: Independent test-integrity/adversarial and serial combined-tree reviews remain downstream workflow work. The physical iPad gesture check remains an accepted out-of-scope limitation.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

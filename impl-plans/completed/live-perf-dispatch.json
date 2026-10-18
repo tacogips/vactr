@@ -168,7 +168,14 @@
       "planPath": "impl-plans/active/live-perf-evidence.md",
       "wave": 3,
       "dependsOn": [],
-      "acceptedDependsOn": ["LP-CONTRACT", "LP-ENGINE", "LP-SESSION-MOMENTARY", "LP-EDITOR-STOP", "LP-EDITOR-MOMENTARY", "LP-SESSION-STOP"],
+      "acceptedDependsOn": [
+        "LP-CONTRACT",
+        "LP-ENGINE",
+        "LP-SESSION-MOMENTARY",
+        "LP-EDITOR-STOP",
+        "LP-EDITOR-MOMENTARY",
+        "LP-SESSION-STOP"
+      ],
       "redispatchScope": "Session 346: the whole plan (TASK-V1 to TASK-V5); nothing in it is implemented yet. Design section 12 is titled for session 346.",
       "writePaths": [
         "editor/src/code/perf-hook.ts",
@@ -236,5 +243,6 @@
         "jq . impl-plans/completed/live-perf-dispatch.json"
       ]
     }
-  ]
+  ],
+  "archivedBy": "LPI-CLOSEOUT, workflow session 438, 2026-10-18"
 }

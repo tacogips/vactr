@@ -199,13 +199,19 @@ sample browser, and package pane are Solid views. Protocol, binding
 write-back, the document state, canvas drawing, and the WebGL2 render host
 remain in TypeScript hosts.
 
+Live performance supports right-drag on a bound number (two-finger
+drag on iPad) for a momentary tweak without editing the text. On release,
+the value glides back over the "momentary glide" setting (default 1 s); hold
+Shift to snap back.
+
 It provides:
 
 - a transport bar of icons (design 15.2): the audio control (click to
   start; shows off / running / suspended / failed with the reason), Run
   (evaluate the whole document), the eval outcome (ok, diagnostics count,
   or not delivered), tempo, cycle.beat with a beat ring, clock source,
-  hush and stop; every icon has a tooltip;
+  gentle stop (`Mod-.`, effect tails ring out) and cut/hush
+  (`Mod-Shift-.`); every icon has a tooltip;
 - a side column that folds to a rail (button or `Mod-\\`) with sections
   that fold individually, remembered per browser;
 - the `.vact` mode (tree-sitter highlighting once `tree-sitter-vact.wasm`
@@ -277,9 +283,9 @@ by the editor.
   `%` and `'<,'>` ranges), and `:noh`. `:w`, `:q`, `:wq`, `:x` and `:q!`
   show a message. `:eval`, `:evalall`/`:run`, `:hush` and `:format` run
   the matching vactr actions.
-- **Live-coding shortcuts.** `Mod-Enter`, `Mod-Shift-Enter`, `Mod-.` and
-  `Shift-Alt-f` work in every mode. Mod is Cmd on macOS and iPadOS, Ctrl
-  elsewhere. `Ctrl-Space` and completion popup keys work in every mode.
+- **Live-coding shortcuts.** `Mod-Enter`, `Mod-Shift-Enter`, `Mod-.`
+  (stop), `Mod-Shift-.` (cut) and `Shift-Alt-f` work in every mode. Mod
+  is Cmd on macOS and iPadOS, Ctrl elsewhere. `Ctrl-Space` and completion popup keys work in every mode.
   When the popup is open, Escape closes it first; Escape then leaves insert
   mode. `Ctrl-[` is Escape. With the code pane focused outside insert mode,
   Vim handles the browser's `Ctrl-r`, `Ctrl-f`, `Ctrl-d`, `Ctrl-u` and

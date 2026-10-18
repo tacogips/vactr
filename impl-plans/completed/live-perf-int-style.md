@@ -1,6 +1,6 @@
 # LPI-STYLE: right-pane style regression UF-1 (glide row and gap-check clipping)
 
-**Status**: Ready
+**Status**: Completed (2026-10-18; accepted by the final integration review, workflow session 441)
 **Plan ID**: LPI-STYLE (wave 3; dependsOn edge on LPI-PLAYBACK for editor/dist and lock serialization)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` sections 2 (I8), 8 (plan graph, artifact roots), 9 (risks) and 10 (S0, S1, S2, forbidden fixes, acceptance)
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -296,16 +296,16 @@ verification step 6 green afterwards (`m-restore-style.log`).
 
 ## Completion Criteria
 
-- [ ] S0a and S0b probe JSON files and per-pair classification are
+- [x] S0a and S0b probe JSON files and per-pair classification are
   recorded in the Progress Log.
-- [ ] S1 is applied: `.vact-glide-setting` padding is
+- [x] S1 is applied: `.vact-glide-setting` padding is
   `var(--vt-space-2) var(--vt-space-3)`.
-- [ ] S2 is applied only if S0b found classification (a), exactly as
+- [x] S2 is applied only if S0b found classification (a), exactly as
   specified, with the reason recorded; or it is recorded as not applied.
-- [ ] Verification 1-8 exit 0. test:style passes all 16 combinations.
-- [ ] M1-M3 fail as expected (when S2 is applied); restore hashes match.
-- [ ] No forbidden fix was used; touched files are under 1000 lines.
-- [ ] The Progress Log records pre/post sha256 for every edited file.
+- [x] Verification 1-8 exit 0. test:style passes all 16 combinations.
+- [x] M1-M3 fail as expected (when S2 is applied); restore hashes match.
+- [x] No forbidden fix was used; touched files are under 1000 lines.
+- [x] The Progress Log records pre/post sha256 for every edited file.
 
 ## Execution Rules (all plans in this manifest)
 
@@ -331,3 +331,23 @@ verification step 6 green afterwards (`m-restore-style.log`).
 ### Session: 2026-10-18 (plan authored, workflow session 438 step 4)
 **Tasks Completed**: none. Plan authored from the accepted design (section 10, with the DR-1 repair).
 **Notes**: Ready for wave 3. It runs after LPI-PLAYBACK (serialization edge), once all wave-1 plans are accepted.
+
+### Session: 2026-10-18 (Step 6, LPI-STYLE implementation rerun)
+**Tasks Completed**: TASK-S0a, TASK-S1, TASK-S0b, TASK-S2, TASK-S3.
+**S0a classification (before S1)**: Probe JSON is in `tmp/live-perf-int/style/probe/s0a-chromium.json` and `s0a-webkit.json`; the full console log is `s0a-probe.log`. For Chromium and WebKit, at 1440x900 with Vim off/on, `.vact-section-toggle` -> `.pkg-proxy input` has gap -563.59 (minimum 8), toggle painted fraction 1.00 x 1.00, input 0.106 x 1.00: classification (a). At 1180x820-coarse with Vim off/on, `.vact-section-toggle` -> `.params-tab` has gap -459.59 (minimum 8), toggle 1.00 x 1.00, params-tab 0.00 x 1.00: classification (a). No failing pair was classification (b). Other raw `.params-tabs` pairs have gap 4 and their unchanged minimum is 4, so they are not findings.
+**S1**: Changed only `editor/src/bind/bind.css` padding from `var(--vt-space-2) 0` to `var(--vt-space-2) var(--vt-space-3)`. The S1 screenshot shows the label and range inset; the range stays within the pane. No vertical padding, grid, gap, control shape, coarse height, class or DOM contract changed.
+**S0b classification (after S1)**: `tmp/live-perf-int/style/probe/s0b-chromium.json`, `s0b-webkit.json`, and `s0b-probe.log` record the same per-engine, per-viewport, per-Vim classifications above: 1440x900 toggle -> proxy input (a), 1180x820-coarse toggle -> params-tab (a), with the same painted fractions. `2-style-after-s1.log` records the eight UF-1 failures, all these pairs classified (a), so S2 applied. S1 alone did not remove the findings.
+**S2**: Added `paintedForGap` only to generic gap candidate selection in `editor/test/style/ui-style.mjs`. It intersects each candidate with every overflow ancestor, retains fixed/absolute positioned elements and ancestors, and filters as `inProbe || paintedForGap(element)`. No container identity, `isVisible`, explicit `gapCheck`, threshold, overlay/picker rule, or per-control check changed.
+**Mutation evidence (all temporary edits restored)**:
+- M1: `m1-style.log` exits 1 and restores the eight UF-1 findings after the S2 candidate filter is removed.
+- M2: `m2-style.log` exits 1 with probe `gap: -12` findings at eight engine/viewport states when a temporary -20px margin is applied to the enabled `[data-style-probe]` button.
+- M3: `m3-style-cross-container-visible.log` exits 1 on `button -> input` at 1180x820-coarse in Chromium and WebKit, gap -336.52. `m3-cross-container-fractions.json` records the `visuals` `.vact-section-toggle` (painted fraction 1.00 x 1.00, no clipping ancestor) overlapping a painted `.pane-right` input (1.00 x 1.00, clipped by `.pane-right`): these cross-container painted controls remain checked. Earlier M3 attempts did not meet this exact cross-container condition; they are not counted as M3 evidence. The final mutation edit was restored.
+- S2 source hash after M1/M2/M3 restoration is `5775d7577ea88060649414d0f5fcb60da953de2ca0027bb200d650821314eec0`, matching the pre-mutation S2 hash; S2 file was restored after each control.
+**Verification (final source)**: `tmp/live-perf-int/style/final/v1-check.log` (`cd editor && npm run check`, exit 0, zero TypeScript errors); `v2-vitest-bind.log` (`cd editor && ./node_modules/.bin/vitest run test/bind`, exit 0, 90/90); `v3-node-check.log` (`node --check editor/test/style/ui-style.mjs`, exit 0); `v4-wasm-release.log` (`mise run build-wasm-release`, exit 0); `v5-build.log` (`cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`, exit 0); `v6-style.log` (`cd editor && npm run test:style`, exit 0, `Style assertions passed for 16 engine/viewport combinations.`); `tmp/ui-style/after/report.json` has `failures: []`; `v7-line-counts.log` records 208/22/363/26 lines; `v8-diff-stat.log` shows only the two intended source files before this plan update. The measurement lock was released.
+**Pre/post SHA-256**: `editor/src/bind/bind.css` pre `deda81e59dad03c9db3e855a2a81e499a0bd02f73647627da91b8971b8651748`; post `5ce07bbb63a7ec8b00951d570e954c5cb9df77419f4ee7ef848a15e188eb7718`. `editor/test/style/ui-style.mjs` pre-S2 `7d083cad6adfcf6abd466bcdecd09f850a3e4669267384fbddec6758f2a9a1fb`; post `5775d7577ea88060649414d0f5fcb60da953de2ca0027bb200d650821314eec0`. `editor/src/bind/glide-setting.ts` and `editor/test/bind/glide-setting.test.ts` were not edited; their hashes remain `af00ecb1470b5aefc5d3190115f09fe10dd17449978b97a3b5220d335d0a02fb` and `4c3a6662a85ef54398b47bac5b29981a424ab7962592c34c282d5983bbae0f06`. This plan file pre-update hash was `5c07f7f57ea22ece3b1d4d9a2fca97ed4ebfe7a4424aeeb861f233c1cd5fd301`.
+**Review handoff**: Implementation-phase acceptance is complete. Independent test-integrity/adversarial and combined-tree review remain downstream; no commit or staging performed.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

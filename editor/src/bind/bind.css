@@ -151,7 +151,7 @@
   grid-template-columns: auto 5rem minmax(6rem, 1fr);
   align-items: center;
   gap: var(--vt-space-2);
-  padding: var(--vt-space-2) 0;
+  padding: var(--vt-space-2) var(--vt-space-3);
   color: var(--vt-text-muted);
   font: var(--vt-text-xs) var(--vt-font-sans);
 }

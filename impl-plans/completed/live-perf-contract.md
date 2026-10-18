@@ -1,6 +1,6 @@
 # LP-CONTRACT: Live-performance wire, protocol and wiring contract
 
-**Status**: Ready
+**Status**: Completed (2026-10-18, workflow session 438)
 **Plan ID**: LP-CONTRACT (wave 1; no dependencies)
 **Design Reference**: `design-docs/specs/design-live-performance.md` sections 4.1, 4.5, 5.5, 5.7, 7 (wire records), D1-D2, D7-D8, D10
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -398,3 +398,7 @@ registered downstream test modules.
   these were resolved by exact-file formatting and narrow lint fixes. Evidence:
   `rustfmt-check.log`, `rust-clippy.log`, `rustfmt-check-final2.log`, and
   `rust-clippy-final2.log`.
+
+### Session: 2026-10-18 (LPI-CLOSEOUT, workflow session 438)
+**Tasks Completed**: Final integration verification and archive closeout.
+**Notes**: Integration W1 reassigned `OutputStop`/`CellRamp` tags to `0x1F`/`0x20` because the case-sensitive pre-check grep missed lowercase song constants. Integration W2 removed the exact-length CtlMsg-first workaround in `ByteInbox::next`. Serial gates 1-13 passed; see `design-docs/specs/design-live-performance.md` section 12 and `tmp/live-perf-int/closeout/`.

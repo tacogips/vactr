@@ -808,6 +808,41 @@ wire and protocol files.
 - A cut issued while a song install is pending waits for the existing
   control-drain gate.
 
+## 12. Verification record (integration, workflow session 438)
+
+All 13 gates ran serially on the combined `merge/live-perf` tree. Logs are under `tmp/live-perf-int/closeout/`.
+
+| Gate | Command | Exit | Tests run / passed | Log |
+|---|---|---:|---:|---|
+| 1 | `CARGO_TERM_QUIET=true cargo build --all-targets` | 0 | n/a | `1-build-all-targets.log` |
+| 2 | `CARGO_TERM_QUIET=true cargo fmt --check` | 0 | n/a | `2-fmt.log` |
+| 3 | `CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings` | 0 | n/a | `3-clippy.log` |
+| 4 | `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | 0 | n/a | `4-wasm-debug.log` |
+| 5 | `mise run build-wasm-release` | 0 | n/a | `5-wasm-release.log` |
+| 6 | `CARGO_TERM_QUIET=true cargo test --manifest-path editor/src-tauri/Cargo.toml` | 0 | 17 / 17 (lib harness: session::tests 2, template::tests 7, vim_keymap::tests 8; bin and doc harnesses 0) | `6-tauri-test.log` |
+| 7 | `cd editor && npm run check` | 0 | n/a | `7-editor-check.log` |
+| 8 | `cd editor && ./node_modules/.bin/vitest run` | 0 | 2384 / 2384 | `8-vitest.log` |
+| 9 | `cd editor && npm run test:perf` | 0 | 1 / 1 | `9-test-perf.log` |
+| 10 | `cd editor && npm run test:style` | 0 | 16 / 16 engine/viewport combinations | `10-test-style.log` |
+| 11a | `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | 0 | n/a | `11-editor-build.log` |
+| 11b | `cd editor && npm run e2e -- --browser all --profile behavior --run-id live-perf-int-001 --out ../tmp/live-perf-int/closeout/e2e/live-perf-int-001` | 0 | 54 / 54, 0 failures | `11-e2e-behavior.log`; output `tmp/live-perf-int/closeout/e2e/live-perf-int-001/` |
+| 12a | `mise run build-wasm-release` | 0 | n/a | `12-wasm-release.log` |
+| 12b | `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build` | 0 | n/a | `12-editor-build.log` |
+| 12c | `cd editor && npm run e2e:examples` | 0 | 8 / 8, 0 failures | `12-e2e-examples.log`; copied result `12-examples-result.json` |
+| 13 | `NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run --no-fail-fast` | 0 | 3093 / 3093 (3 skipped) | `13-nextest.log` |
+
+Behavior e2e results: Chromium passed 29/29 and WebKit passed 25/25. In both browsers `momentary-right-drag`, `momentary-two-finger`, `stop-gentle-shortcut`, `cut-shortcut`, and `silent-sink-post-peak` passed; post-sink peak was 0 with no violations. `dispose-ledger` and all existing behavior, Vim and keymap checks passed. Output: `tmp/live-perf-int/closeout/e2e/live-perf-int-001/`. Synthetic browser multi-touch passed; physical iPad two-finger validation remains pending.
+
+Integration findings (see [integration addendum](design-live-perf-integration.md)):
+
+- I1: song tags remain `0x1c`/`0x1d`/`0x1e`; `OutputStop`/`CellRamp` use `0x1F`/`0x20`, and `ByteInbox` decodes song tags only with `song::decode` (W1/W2).
+- I2/I3: Vim fallback routes platform-modified `Period` to stop/cut while the platform-strict app handler owns the platform modifier.
+- I4: LPI-BEHAVIOR's diagnosis records the fixture error as `d1 takes 1 arguments, found 2`; the retry diagnosis records `d1s is not defined`. These were fixture/check defects; no product fix or check relaxation was needed. See `impl-plans/completed/live-perf-evidence.md` and the LPI-BEHAVIOR Progress Log.
+- I5: LPI-PLAYBACK records that “the earlier onset failure came from a stale build.” The fresh-build examples run passed 8/8; no product change was needed.
+- I6: the session-349 name-space index is differentially proven against linear lookups by `src/ns/tests/migrate_index_equivalence.rs`; the empty-write-set case is settled in LPI-NS-INDEX.
+- I8 (UF-1): LPI-STYLE classifies the 1440x900 toggle-to-proxy-input and 1180x820-coarse toggle-to-params-tab failures as (a): the non-probe control was mostly outside its overflow clip. S1 applies the sibling inset `padding: var(--vt-space-2) var(--vt-space-3)`. S2 filters only mostly clipped controls from generic gap candidates; painted cross-container pairs remain checked. See the LPI-STYLE Progress Log and `10-test-style.log`.
+- I9: runtime integration accepted `LPI-WIRE`, `LPI-VIM-STOP`, and `LPI-NS-INDEX` after the R1-R6 review-and-repair reruns. The workflow acceptance decision records the LPI-VIM-STOP correctness, test-integrity and adversarial verdicts as accepted. See each plan's Progress Log and the integration review record.
+
 ## References
 
 - design-docs/specs/design-implementation.md 11.3, 11.4, 12.2, 12.5, 12.8,

@@ -1,6 +1,6 @@
 # LPI-CLOSEOUT: full gates, section 12 record, archive and README (finishes LP-EVIDENCE)
 
-**Status**: Ready
+**Status**: Completed (2026-10-18; accepted by the final integration review, workflow session 441)
 **Plan ID**: LPI-CLOSEOUT (wave 5)
 **Design Reference**: `design-docs/specs/design-live-perf-integration.md` section 7; `design-docs/specs/design-live-performance.md` 8.4 and 9; `impl-plans/active/live-perf-evidence.md` TASK-V3 to TASK-V5
 **Manifest**: `impl-plans/active/live-perf-int-dispatch.json`
@@ -250,14 +250,14 @@ document. It contains:
 
 ## Completion Criteria
 
-- [ ] Gates 1-13 pass, with positive test counts where they apply.
-- [ ] Section 12 is appended with log paths and only established root
+- [x] Gates 1-13 pass, with positive test counts where they apply.
+- [x] Section 12 is appended with log paths and only established root
   causes.
-- [ ] The seven plans and the manifest are completed and archived file by
+- [x] The seven plans and the manifest are completed and archived file by
   file. The archived manifest is valid JSON.
-- [ ] `impl-plans/README.md`, `README.md`, the integration design status
+- [x] `impl-plans/README.md`, `README.md`, the integration design status
   and the architecture row are updated.
-- [ ] The Progress Log records pre/post sha256 for every edited file and
+- [x] The Progress Log records pre/post sha256 for every edited file and
   the `git diff --stat` invariant check.
 
 ## Post-review archive (performed by the workflow integration step, not by LPI-CLOSEOUT)
@@ -313,3 +313,20 @@ the procedure is fixed in advance (design section 7).
 - archivedBy and the status strings use session 438.
 - The README marks the seven LPI plans "gates passed; awaiting final integration review".
 - Added the Post-review archive procedure, which the integration step runs.
+
+### Session: 2026-10-18 (implementation, workflow Step 6; LPI-CLOSEOUT)
+**Tasks Completed**: TASK-C1 gates 1-13, TASK-C2 section 12, TASK-C3 legacy live-perf plan completion and archive, TASK-C4 indexes and docs.
+**Verification**: All gates exited 0. Vitest 2384/2384; perf 1/1; style 16/16 combinations; behavior e2e 54/54 (Chromium 29/29, WebKit 25/25); examples 8/8; nextest 3093/3093 with 3 skipped. Tauri cargo test 17/17 (exit 0), with the lib harness passing 17 tests and bin/doc harnesses running 0; log: `tmp/live-perf-int/closeout/6-tauri-test-rerun-2.log`. Complete logs are under `tmp/live-perf-int/closeout/`.
+**Archive**: The seven `live-perf-*` plans and `live-perf-dispatch.json` were moved one at a time to `impl-plans/completed/`. The seven `live-perf-int-*` plans and `live-perf-int-dispatch.json` remain active for final integration review and its post-review archive.
+**Scope and hashes**: LPI-CLOSEOUT made no product or test source edits. Pre/post `git diff --stat` summaries are recorded in `tmp/live-perf-int/closeout/diff-stat-invariant.txt`; current tracked documentation hashes and pre-edit hashes are recorded in `tmp/live-perf-int/closeout/final-sha256.txt` and `pre-edit-sha256.txt`. The closeout plan's own post-write hash is listed in `final-sha256.txt` because embedding its own final digest would change that digest.
+**Review boundary**: The runtime accepted-plan decision admits all six dependencies. The final serial integration review, review-dependent LPI plan updates, and archive of the LPI plans remain downstream workflow work.
+
+### Session: 2026-10-18 (gate-6 review correction, workflow Step 6; LPI-CLOSEOUT)
+**Tasks Completed**: Corrected gate 6 test accounting in this Progress Log and design section 12 row 6.
+**Evidence**: `tmp/live-perf-int/closeout/6-tauri-test.log` and rerun `tmp/live-perf-int/closeout/6-tauri-test-rerun-2.log` each show the lib harness passing 17 tests, with bin/doc harnesses at 0 and exit 0; `tmp/live-perf-int/reconcile/reconcile-446/1-tauri-test-list.log` lists 17 tests.
+**Scope**: Documentation correction only; no product or test source edits. The existing live-perf-int plans and manifest remain active pending final integration review.
+
+### Session: 2026-10-18 (final integration review and post-review archive, workflow session 441 step 8)
+**Tasks Completed**: Post-review archive steps 1-4 of `live-perf-int-closeout.md` for this plan.
+**Final review decision**: Accepted with no findings. The final serial integration review of the combined tree (`integration-review-attempt-1-exec-6264`, comm-007718) accepted all seven LPI plans after each fanout branch passed test-integrity and adversarial review (fanout group run `shared-branch-implementation:dispatch-plans-attempt-7-exec-6256`). Closeout gates 1-13 passed on the combined tree (`tmp/live-perf-int/closeout/`: behavior e2e 54/54, e2e:examples 8/8, nextest 3093/3093, vitest 2384/2384, test:style 16/16, Tauri cargo test 17/17).
+**Archive**: Status set to Completed; this plan was moved from `impl-plans/active/` to `impl-plans/completed/` together with the other LPI plans and `live-perf-int-dispatch.json`. Physical iPad two-finger validation remains an accepted out-of-scope limitation.

@@ -1,6 +1,6 @@
 # LP-EDITOR-MOMENTARY: Right-drag and two-finger momentary tweak, live value label, glide setting
 
-**Status**: Ready (after LP-CONTRACT)
+**Status**: Completed (2026-10-18, workflow session 438)
 **Plan ID**: LP-EDITOR-MOMENTARY (wave 2; parallel with LP-ENGINE, LP-SESSION-STOP, LP-SESSION-MOMENTARY, LP-EDITOR-STOP)
 **Design Reference**: `design-docs/specs/design-live-performance.md` 5.1-5.4, 5.8, 5.9, 8.2, D6, D7, D11
 **Manifest**: `impl-plans/active/live-perf-dispatch.json`
@@ -454,3 +454,7 @@ Write logs to `tmp/live-perf/editor-momentary/*.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/bind test/canvas/momentary-pointer.test.ts test/canvas/gpu.test.ts test/canvas/mount.test.ts` — exit 0, 182/182; `tmp/live-perf/editor-momentary/focused-rerun-20261009.log`.
 - `cd editor && ./node_modules/.bin/vitest run test/canvas test/bind test/code` — exit 0, 494/494; `tmp/live-perf/editor-momentary/regression-rerun-20261009.log`.
 **Notes**: `test:style`, `test:perf`, behavior e2e, and release evidence remain owned by downstream LP-EVIDENCE. Physical iPad validation remains pending as designed.
+
+### Session: 2026-10-18 (LPI-CLOSEOUT, workflow session 438)
+**Tasks Completed**: Final integration verification and archive closeout.
+**Notes**: Serial gates 1-13 passed with logs under `tmp/live-perf-int/closeout/`; the full behavior e2e passed 54/54 and examples e2e passed 8/8. See `design-docs/specs/design-live-performance.md` section 12.

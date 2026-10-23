@@ -7,8 +7,8 @@
 // `session_frame` then `draw` once per animation frame. A null
 // `getContext('webgl2', { antialias: false })` shows
 // "WebGL2 not available". The native tier
-// renders nothing (the session uses NoopRender) and says so. Meters and
-// scopes render from `levels` on both tiers.
+// has no shader output (the session uses NoopRender). Comment media
+// backgrounds and telemetry-driven analyzers work on both tiers.
 
 import type { VisualApi } from '../app/apis';
 import type { EditorDeps, Mounted } from '../app/deps';
@@ -20,9 +20,10 @@ import { GlRenderHost, type RenderSize } from './render-host';
 import { mountSpectrum } from './spectrum';
 import { VideoBackground } from './video';
 import { ResourceLedger } from '../code/resources';
+import { EditorBackground } from './background';
 
 export const RENDER_SIZE: RenderSize = { width: 640, height: 360 };
-export const NATIVE_NOTICE = 'visuals: browser tier only';
+export const NATIVE_NOTICE = 'shader outputs: browser tier only';
 export const NO_WEBGL2_NOTICE = 'WebGL2 not available';
 
 // The pane's stylesheet as a Vite asset URL. A side-effect `import
@@ -52,6 +53,9 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
   const cleanups: (() => void)[] = [];
   const backgroundListeners = new Set<(canvas: HTMLCanvasElement | null) => void>();
   let glCanvas: HTMLCanvasElement | null = null;
+  let visualPanes!: VisualPanes;
+  let renderHost: GlRenderHost | undefined;
+  let background: EditorBackground | undefined;
 
   const analyzers = new AnalyzerArea(layout.analyzers, deps.store,
     () => deps.audible?.now() ?? deps.clock.now(), deps.tier === 'native');
@@ -73,11 +77,13 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
   if (!core || !glCanvas || !gl) {
     const notice = deps.tier === 'native' ? NATIVE_NOTICE : core ? NO_WEBGL2_NOTICE : 'visuals: no render source';
     const panes = new VisualPanes(layout.visual, { notice });
+    visualPanes = panes;
     cleanups.push(() => panes.dispose());
   } else {
     glCanvas.width = RENDER_SIZE.width;
     glCanvas.height = RENDER_SIZE.height;
     const host = new GlRenderHost(gl, RENDER_SIZE, { createCanvas: () => doc.createElement('canvas') });
+    renderHost = host;
     let panes!: VisualPanes;
     const video = new VideoBackground(doc, { ledger: deps.resourceBudget ?? new ResourceLedger(), onStatus: (s) => panes?.showVideoStatus(s) });
     let videoRevision = 0;
@@ -85,8 +91,9 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
       host.setVideoSource(null, ++videoRevision);
       void video.load(file);
     } });
+    visualPanes = panes;
     cleanups.push(host.onDiagnostic((d) => panes.showDiagnostic(d)));
-    cleanups.push(host.onProgram((out) => panes.clearDiagnostic(out)));
+    cleanups.push(host.onProgram((out) => { panes.clearDiagnostic(out); background?.shaderChanged(); }));
     cleanups.push(core.onRender((rec) => host.onRecord(rec)));
     const drawHost = { draw: (t: number): void => {
       const frame = video.frame();
@@ -118,6 +125,14 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: VisualMountOpti
     cleanups.push(() => host.dispose());
     cleanups.push(() => panes.dispose());
   }
+
+  background = new EditorBackground(layout.code, layout.visual, deps, {
+    ...(opts.scheduler ? { scheduler: opts.scheduler } : {}),
+    shaderAvailable: !!(core && glCanvas && gl),
+    selectShader: (output) => visualPanes.select(output),
+    hasShader: (output) => renderHost?.hasProgram(output) ?? false,
+  });
+  cleanups.push(() => background?.dispose());
 
   return {
     dispose(): void {

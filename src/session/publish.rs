@@ -573,6 +573,7 @@ impl Session {
                     source: ":master".to_string(),
                     rms,
                     bands: Some(sigs.fft),
+                    waveform: sigs.waveform.map(|samples| samples.to_vec()),
                 }],
                 analyzers: analyzers.filter(|v| !v.is_empty()),
                 time: Some(host_now),
@@ -617,6 +618,7 @@ impl Session {
                 bpm: tempo.bpm.to_f64(),
                 beats_per_cycle: tempo.beats_per_cycle.to_f64(),
                 running: !frozen && !lost,
+                active: self.rt.playback_active(),
                 output: self.rt.output.wire(),
                 latency_seconds: self
                     .observed_clock

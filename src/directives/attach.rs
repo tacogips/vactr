@@ -451,9 +451,13 @@ pub fn attach(
         let text = src
             .get(item.span.start as usize..item.span.end as usize)
             .unwrap_or("");
-        let d = parse_directive(text, item.span, diags);
         let line = doc.lines.line_of(item.span.start);
         let trailing = doc.lines.first(line) < item.span.start;
+        // Own-line editor JSON is presentation metadata, not a control binding.
+        if !trailing && editor_settings_comment(text) {
+            continue;
+        }
+        let d = parse_directive(text, item.span, diags);
         let attach = if trailing {
             block = None;
             doc.target_on_line(line)
@@ -507,4 +511,13 @@ pub fn attach(
         });
     }
     (placed, midi_ch)
+}
+
+/// Reserve only the editor JSON namespace; similarly named sites remain bindings.
+fn editor_settings_comment(text: &str) -> bool {
+    text.strip_prefix("#@")
+        .and_then(|body| body.trim_start().strip_prefix("editor"))
+        .is_some_and(|rest| {
+            rest.starts_with(char::is_whitespace) && rest.trim_start().starts_with('{')
+        })
 }

@@ -21,7 +21,7 @@ function track(bar: TransportBar): () => void {
   return dispose;
 }
 
-function setup(options: Pick<TransportOptions, 'platform' | 'shortcuts' | 'sample' | 'onHush'> = {}) {
+function setup(options: Pick<TransportOptions, 'platform' | 'shortcuts' | 'sample' | 'onHush' | 'onRun' | 'pauseReason'> = {}) {
   const clock = new MockClock(10);
   const transport = new RecordingTransport();
   const client = new Client(transport, { store: new Store() });
@@ -39,13 +39,77 @@ const tempo = (extra: Partial<TempoBody> = {}): TempoBody => ({ bpm: 120, beats_
 const play = (slot: string, time: number): WirePlaying => ({ slot, beat: [0, 1], time, dur: [1, 4] });
 
 describe('TransportBar', () => {
+  it('keeps a running empty-session clock hidden and ignores stale activity after Stop', () => {
+    let sample: TransportSample = {
+      epoch: 'e', sample_time: 10, cycle: [7, 1], bpm: 120, beats_per_cycle: 4,
+      running: true, active: false, output: 'running', latency_seconds: null,
+      latency_kind: 'unavailable', uncertainty_seconds: null,
+    };
+    const { bar, clock, text, parent } = setup({ sample: () => sample, onRun: () => {} });
+    bar.onTempo(tempo());
+    clock.advance(20); bar.tick();
+    expect(text('vact-position-value')).toBe('-.-');
+    expect(text('vact-playback-state')).toBe('Stopped');
+    sample = { ...sample, active: true }; bar.tick();
+    expect(text('vact-playback-state')).toBe('Playing');
+    parent.querySelector<HTMLButtonElement>('.vact-play-toggle')?.click();
+    clock.advance(5); bar.onPlaying([play('d1', 35)]); bar.tick();
+    expect(text('vact-position-value')).toBe('-.-');
+    expect(text('vact-play-toggle')).toBe('Play');
+    expect(bar.state.beatFlash).toBe(false);
+    sample = { ...sample, active: false, output: 'idle' }; bar.tick();
+    expect(text('vact-playback-state')).toBe('Stopped');
+  });
+
+  it('uses Play/Stop and separate Pause/Resume without reevaluating on resume', () => {
+    let sample: TransportSample = {
+      epoch: 'e', sample_time: 10, cycle: [3, 1], bpm: 120, beats_per_cycle: 4,
+      running: true, active: false, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+    };
+    const onRun = vi.fn();
+    const { bar, clock, parent, text, transport } = setup({ sample: () => sample, onRun });
+    const primary = parent.querySelector<HTMLButtonElement>('.vact-play-toggle')!;
+    const pause = parent.querySelector<HTMLButtonElement>('.vact-pause')!;
+    expect(pause.disabled).toBe(true);
+    primary.click(); expect(onRun).toHaveBeenCalledOnce();
+    sample = { ...sample, active: true };
+    bar.onTempo(tempo());
+    expect(primary.textContent).toBe('Stop');
+    pause.click();
+    sample = { ...sample, running: false }; bar.tick();
+    const held = text('vact-position-value');
+    clock.advance(30); bar.tick();
+    expect(text('vact-position-value')).toBe(held);
+    expect(text('vact-playback-state')).toBe('Paused');
+    expect(primary.textContent).toBe('Stop');
+    pause.click(); sample = { ...sample, running: true }; bar.tick();
+    expect(text('vact-playback-state')).toBe('Playing');
+    expect(transport.kinds()).toEqual(['transport-pause', 'transport-continue']);
+    expect(onRun).toHaveBeenCalledOnce();
+    primary.click();
+    expect(transport.kinds()).toEqual(['transport-pause', 'transport-continue', 'stop-all']);
+    // Stopping the last slot while paused leaves an empty frozen scheduler.
+    sample = { ...sample, active: false, running: false }; bar.tick();
+    primary.click();
+    expect(transport.kinds().at(-1)).toBe('transport-continue');
+    expect(onRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps finite-song pause disabled and explains why', () => {
+    const { bar, parent } = setup({ pauseReason: () => 'Pause is unavailable for finite songs' });
+    bar.onPlaying([play('d1', 10)]); bar.tick();
+    const pause = parent.querySelector<HTMLButtonElement>('.vact-pause');
+    expect(pause?.disabled).toBe(true);
+    expect(pause?.title).toBe('Pause is unavailable for finite songs');
+  });
+
   it('projects the current transport sample at audible time and hides stale positions', () => {
     const clock = new MockClock(10);
     let audibleTime = 10.04;
     let correlationValid = true;
     let sample: TransportSample = {
       epoch: 'run-1', sample_time: 10, cycle: [2, 1], bpm: 120, beats_per_cycle: 4,
-      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+      running: true, active: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
     };
     const client = new Client(new RecordingTransport());
     const parent = document.createElement('div'); document.body.appendChild(parent);
@@ -88,7 +152,7 @@ describe('TransportBar', () => {
     }) });
     let sample: TransportSample = {
       epoch: 'run-1', sample_time: 0, cycle: [0, 1], bpm: 120, beats_per_cycle: 4,
-      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
+      running: true, active: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null,
     };
     const bar = new TransportBar(parent, { client, clock, audible, sample: () => sample });
     const dispose = track(bar);
@@ -125,6 +189,7 @@ describe('TransportBar', () => {
 
   it('renders tempo and extrapolates cycle/beat on the clock between messages', () => {
     const { clock, bar, text, label } = setup();
+    bar.onPlaying([play('d1', 10)]);
     bar.onTempo(tempo());
     expect(text('vact-tempo-value')).toBe('120.0');
     expect(label('vact-tempo')).toBe('tempo 120.0 bpm');
@@ -220,21 +285,21 @@ describe('TransportBar', () => {
   it('projects output state only on transitions and bounds output history', () => {
     let sample: TransportSample = {
       epoch: 'run-1', sample_time: 10, cycle: [0, 1], bpm: 120, beats_per_cycle: 4,
-      running: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null, output: 'draining',
+      running: true, active: true, latency_seconds: null, latency_kind: 'unavailable', uncertainty_seconds: null, output: 'draining',
     };
     const { bar, parent } = setup({ sample: () => sample });
-    const stop = parent.querySelector<HTMLButtonElement>('.vact-stop-all');
+    const stop = parent.querySelector<HTMLButtonElement>('.vact-play-toggle');
     bar.tick();
     expect(stop?.dataset.output).toBe('draining');
-    expect(stop?.getAttribute('aria-label')).toBe('stop: stop every slot, let effects ring out (Mod-.) - tails ringing out');
-    expect(stop?.getAttribute('title')).toBe(stop?.getAttribute('aria-label'));
+    expect(parent.querySelector('.vact-playback-state')?.textContent).toBe('Playing');
+    expect(stop?.getAttribute('title')).toBe('Stop every slot and let effects ring out (Mod-.)');
     expect(bar.outputHistory()).toEqual(['draining']);
     bar.tick();
     expect(bar.outputHistory()).toEqual(['draining']);
     sample = { ...sample, output: 'idle' };
     bar.tick();
     expect(stop?.dataset.output).toBe('idle');
-    expect(stop?.getAttribute('aria-label')).toBe('stop: stop every slot, let effects ring out (Mod-.)');
+    expect(stop?.getAttribute('aria-label')).toBe('Stop playback (Mod-.)');
     expect(bar.outputHistory()).toEqual(['draining', 'idle']);
     const states: Array<NonNullable<TransportSample['output']>> = ['running', 'draining', 'cutting', 'idle'];
     for (let index = 0; index < 20; index += 1) {

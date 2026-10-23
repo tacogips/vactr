@@ -65,6 +65,8 @@ describe('documents area', () => {
     try {
       await env.area.ready;
       expect(env.surface.state.doc.toString()).toBe('SHOWCASE');
+      expect(env.root.querySelector('.vact-document-title')?.textContent).toBe('Showcase');
+      expect(env.root.querySelector('.vact-document-dirty')).toBeNull();
       expect(env.root.querySelector('[data-doc-picker]')).not.toBeNull();
       expect(env.transport.kinds()).not.toContain('eval');
       env.root.querySelector<HTMLButtonElement>('.vact-doc-picker-toggle')?.click();
@@ -72,7 +74,10 @@ describe('documents area', () => {
         .find((button) => button.textContent?.includes('Acid'))?.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(env.surface.state.doc.toString()).toBe('ACID');
+      expect(env.root.querySelector('.vact-document-title')?.textContent).toBe('Acid');
+      expect(env.root.querySelector('.vact-document-dirty')).toBeNull();
       expect(env.surface.undo()).toBe(true);
+      expect(env.root.querySelector('.vact-document-dirty')?.getAttribute('aria-label')).toBe('Unsaved changes');
       expect(env.surface.state.doc.toString()).toBe('SHOWCASE');
     } finally { env.dispose(); }
   });

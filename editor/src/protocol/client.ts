@@ -187,6 +187,14 @@ export class Client {
     return this.request({ kind: 'mute-instrument', body: { epoch, selector, muted } });
   }
 
+  pauseTransport(): void {
+    this.send({ kind: 'transport-pause', body: {} });
+  }
+
+  continueTransport(): void {
+    this.send({ kind: 'transport-continue', body: {} });
+  }
+
   hush(): void {
     this.send({ kind: 'hush', body: {} });
   }

@@ -18,7 +18,7 @@ use std::cell::{Cell, RefCell};
 pub const TAG_CONSOLE: u8 = 0x70;
 /// Worklet -> main: an install fault, `[code u8][resource u32]`.
 pub const TAG_FAULT: u8 = 0x60;
-/// Worklet -> main: the host signals, `[amp f32][fft 8 x f32]`.
+/// Worklet -> main: `[amp f32][fft 8 x f32]`, optionally followed by 256 waveform floats.
 pub const TAG_SIGS: u8 = 0x61;
 /// Session -> page: one Session Protocol v1 server envelope, or the
 /// browser-local `check` record, as UTF-8 JSON (design 15.1.2 G1).

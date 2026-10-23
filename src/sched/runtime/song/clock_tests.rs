@@ -283,6 +283,7 @@ fn genuine_playing_runtime(source: &str) -> (Runtime, crate::host::native::audio
         playing,
         "genuine native song reached Playing within the bound"
     );
+    assert!(runtime.playback_active());
     (runtime, side)
 }
 
@@ -341,6 +342,10 @@ fn stop_song_gentle_drains_installed_song_until_tail_deadline() {
         runtime.song.owners[0].transport.state(),
         SongTransportState::Draining
     );
+    assert!(
+        !runtime.playback_active(),
+        "effect tails are not active music"
+    );
 
     let mut ended = false;
     for _ in 0..512 {
@@ -361,6 +366,7 @@ fn stop_song_gentle_drains_installed_song_until_tail_deadline() {
         "gentle native stop reached Ended within the bounded tail"
     );
     assert_eq!(runtime.song_state(), Some(SongTransportState::Ended));
+    assert!(!runtime.playback_active());
 }
 
 #[cfg(feature = "host-native")]
@@ -609,4 +615,24 @@ fn rejected_new_epoch_clock_preserves_other_genuine_ready_owner() {
         SongTransportState::Failed
     );
     assert!(runtime.song.owners[1].transport.take_cancelled().is_err());
+}
+
+#[cfg(feature = "host-native")]
+#[test]
+fn finite_song_waveform_matches_actual_final_native_output() {
+    let source = "inst tone freq: float = 440:\n\tsin-osc freq > * amp\nsong {part [tone: {s :tone}] duration: 8} tail-seconds: 0 > play-song";
+    let (runtime, mut side) = genuine_playing_runtime(source);
+    let mut output = [0.0; 512];
+    let (_, allocations) = crate::dsp::alloc_probe::armed(|| side.render(&mut output, 2));
+    assert_eq!(allocations, 0);
+    let expected: Vec<_> = output
+        .chunks_exact(2)
+        .map(|lr| 0.5 * (lr[0] + lr[1]))
+        .collect();
+    let signals = runtime.hosts.audio.analysis();
+    assert_eq!(
+        signals.waveform.as_ref().map(|samples| samples.as_slice()),
+        Some(expected.as_slice())
+    );
+    assert!(expected.iter().any(|sample| sample.abs() > 1e-6));
 }

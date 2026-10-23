@@ -237,7 +237,7 @@ It provides:
 The Documents picker opens registered examples, browser-saved documents, or
 files, and can set or reset the default template. Opening a document replaces
 the buffer as one undoable step (Mod-Z restores the previous text) and never
-starts playback; press Run to hear it. The built-in default is
+starts playback; press Play to hear it. The built-in default is
 `examples/showcase.vact`. Only examples that evaluate in the browser tier are
 listed; examples that need a four-output native host, external samples or
 song transport are excluded with a recorded reason in
@@ -254,6 +254,35 @@ unavailable or full browser storage leaves the editor usable while showing a
 status message. The app stores its default template at
 `<app config dir>/default-template.json`. Run `npm run e2e:examples` from
 `editor/` to verify the picker, persistence, startup, and silent audio path.
+
+### Editor backgrounds and visualizers
+
+Use own-line `#@ editor` JSON comments to save appearance with a document:
+
+```vactr
+#@ editor {"background":{"kind":"image","src":"/examples/editor-background.svg","opacity":0.85,"scrim":0.5}}
+#@ editor {"visualizers":[{"kind":"oscilloscope","opacity":0.8,"position":"bottom"}]}
+```
+
+Open **Editor Background** in Documents for a runnable example. Changes apply
+immediately without evaluating music. `background.kind` accepts `image`,
+`video`, `shader`, or `none`; video takes a served media URL such as
+`"src":"/media/loop.mp4"` and plays muted, inline and looped. Image/video URLs
+can be relative or HTTPS; relative paths resolve against the editor page and
+must be served or packaged, rather than arbitrary local filesystem paths.
+`fit` is `cover` or `contain`; `blur` is 0–32 pixels, `opacity` is 0–1, and
+`scrim` controls darkness behind code (0–1). Shader backgrounds select an
+existing `output` 0–3 and require the browser render host.
+
+Up to four master-output overlays can be selected: `oscilloscope`, `spectrum`,
+`spectrogram`, and `level`, with `position` set to `top`, `bottom`, or `full`.
+They use real final-output samples, RMS and eight FFT bands in both browser and
+native audio, including finite songs; no analyzer units need to be added to the
+music. Older hosts without waveform telemetry show a waiting message for the
+scope. Later comments replace individual top-level settings. Use `visualizers: []`,
+background kind `none`, or remove the comments to clear them. Invalid comments
+and media load failures appear in the Visuals panel. Undo restores settings.
+See [the complete appearance contract](design-docs/specs/design-visual.md#editor-background-comments-2026-10-18).
 
 Browser self-analysis taps, browser MIDI out and per-slot level meters are
 not available on this host. ExternalFile binding persistence is handled
@@ -487,3 +516,7 @@ Cargo features:
 The native-only crates are in the non-wasm32 target table, so both wasm32
 builds stay clean. To build for a Wasm host, run
 `cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`.
+
+### Unapplied edit highlights
+
+Edits that have not been successfully evaluated have a translucent yellow background. Play or Update clears successfully applied edits; Evaluate form clears edits within that form. Failed evaluations and newer edits stay highlighted. Undoing a change back to its applied text clears it. Deletions show a marker at their position. Use **Editor → Unapplied edit color** to choose a color, or **Reset color** to restore yellow. The preference is saved locally. Replacements crossing a partial-evaluation boundary remain highlighted until the whole replacement is applied.

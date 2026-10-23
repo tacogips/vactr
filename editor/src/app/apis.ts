@@ -40,7 +40,7 @@ export interface ResourceBudget {
 export interface CodeRange { from: number; to: number }
 export interface CodeRect { left: number; right: number; top: number; bottom: number }
 export interface CodeAnnotation extends CodeRange {
-  kind: 'syntax' | 'selection' | 'playing' | 'eval' | 'diagnostic' | 'binding' | 'composition' | 'call-head' | 'momentary';
+  kind: 'unapplied' | 'syntax' | 'selection' | 'playing' | 'eval' | 'diagnostic' | 'binding' | 'composition' | 'call-head' | 'momentary';
   className?: string;
   label?: string;
 }
@@ -80,6 +80,8 @@ export interface CodeSurface {
 
 export interface CodeApi {
   surface: CodeSurface;
+  /** Scrim beneath text; presentation only, never changes source or selection. */
+  setBackgroundOpacity?(opacity: number): void;
   /** A wire span of revision `rev` mapped to the current UTF-16 range, or null when gone. */
   mapWireSpan(span: Span, rev: number): { from: number; to: number } | null;
   /** current revision; UTF-16 range to UTF-8 byte span; O(changed lines) */

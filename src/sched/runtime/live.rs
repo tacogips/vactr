@@ -104,6 +104,12 @@ impl Runtime {
         }
     }
 
+    /// Whether live bindings or a finite song still schedule music.
+    #[must_use]
+    pub fn playback_active(&self) -> bool {
+        self.slots.iter().any(|slot| !slot.is_idle()) || self.song_playback_active()
+    }
+
     pub(crate) fn stop_all(&mut self, _ev: &mut Evaluator, rep: &mut DrainReport) {
         let now = self.revoke_with(SlotKey::All, Release::Natural);
         self.close_live_notes(SlotKey::All, now);
@@ -112,6 +118,10 @@ impl Runtime {
         self.hosts.audio.post(CtlMsg::OutputStop { mode });
         self.output.request(mode, frame);
         self.stop_song(mode, rep);
+        // Internal playback must be ready for the next evaluation after a stop.
+        if !self.midi_clock().is_slave() {
+            self.transport_continue(now);
+        }
     }
 
     pub(crate) fn cut(&mut self, _ev: &mut Evaluator, rep: &mut DrainReport) {
@@ -123,6 +133,10 @@ impl Runtime {
         self.hosts.audio.post(CtlMsg::OutputStop { mode });
         self.output.request(mode, frame);
         self.stop_song(mode, rep);
+        // Internal playback must be ready for the next evaluation after a stop.
+        if !self.midi_clock().is_slave() {
+            self.transport_continue(now);
+        }
     }
 }
 

@@ -18,6 +18,8 @@
 
 use std::cell::RefCell;
 
+use crate::host::signals::{encode_signals, SIGNALS_MAX_LEN};
+
 use crate::dsp::arena::{FaultCode, StoreKind, DEFAULT_ARENA_BYTES};
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
@@ -26,7 +28,7 @@ use crate::dsp::ring::{
     AckConsumer, AckProducer, ByteInbox, ControlSource, EventConsumer, EventProducer, EventRing,
     SpscRing, EVENT_CAPACITY, INBOX_SLOTS, INBOX_SLOT_BYTES,
 };
-use crate::host::wasm::abi::{fix_outbox, outbox_dropped, push_record, TAG_FAULT, TAG_SIGS};
+use crate::host::wasm::abi::{fix_outbox, outbox_dropped, push_record, TAG_FAULT};
 use crate::host::wasm::cells::{ProbeMirror, PROBES, READ_LOG};
 use crate::host::wire::{AudioEvent, HostMsg};
 use crate::ns::insts::{INST_CELL_BASE, INST_CELL_COUNT};
@@ -422,13 +424,9 @@ impl Worklet {
         }
         if self.quanta % 8 == 0 {
             let sigs = self.engine.host_sigs();
-            let mut rec = [0u8; 1 + 4 * 9];
-            rec[0] = TAG_SIGS;
-            rec[1..5].copy_from_slice(&sigs.amp.to_le_bytes());
-            for (i, x) in sigs.fft.iter().enumerate() {
-                rec[5 + 4 * i..9 + 4 * i].copy_from_slice(&x.to_le_bytes());
-            }
-            push_record(&rec);
+            let mut rec = [0u8; SIGNALS_MAX_LEN];
+            let len = encode_signals(&sigs, &mut rec);
+            push_record(&rec[..len]);
         }
     }
 

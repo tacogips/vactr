@@ -537,6 +537,14 @@ impl Runtime {
             }
         }
     }
+    pub(super) fn song_playback_active(&self) -> bool {
+        self.song.owners.iter().any(|owner| {
+            matches!(
+                owner.transport.state(),
+                SongTransportState::Prepared | SongTransportState::Playing
+            )
+        })
+    }
     pub fn song_state(&self) -> Option<SongTransportState> {
         self.song
             .owners

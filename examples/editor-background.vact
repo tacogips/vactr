@@ -1,0 +1,12 @@
+# Editor background and master analysis, configured entirely by comments.
+# These settings update without evaluating music; Play starts the sound below.
+#@ editor {"background":{"kind":"image","src":"/examples/editor-background.svg","opacity":0.85,"scrim":0.5}}
+#@ editor {"visualizers":[{"kind":"oscilloscope","opacity":0.85,"position":"bottom"},{"kind":"spectrum","opacity":0.3,"position":"top"}]}
+
+use-bpm 108
+s :analog > note [:c4 :eb4 :g4 :bb4] > lpf 1800 > gain 0.12 > d1
+
+# To use your video, replace the background object with:
+# {"kind":"video","src":"/media/loop.mp4","opacity":0.8,"scrim":0.55}
+# Media paths are served/packaged URLs, not unrestricted local file paths.
+# Use background kind "none" or visualizers [] to clear either setting.

@@ -69,6 +69,8 @@ fn clients() -> Vec<ClientMsg> {
         }),
         ClientMsg::Hush(Empty {}),
         ClientMsg::StopAll(Empty {}),
+        ClientMsg::TransportPause(Empty {}),
+        ClientMsg::TransportContinue(Empty {}),
         ClientMsg::Stop(StopBody {
             slot: "d2".to_string(),
         }),
@@ -355,6 +357,7 @@ fn servers() -> Vec<ServerMsg> {
                 source: ":master".to_string(),
                 rms: 0.125,
                 bands: None,
+                waveform: None,
             }],
             analyzers: None,
             time: None,
@@ -645,4 +648,21 @@ fn playing_timing_rejects_invalid_duration_time_and_source_bounds() {
             ErrorCode::BadBody
         );
     }
+}
+
+#[test]
+fn optional_waveform_keeps_legacy_levels_usable() {
+    let level: WireLevel =
+        serde_json::from_str(r#"{"source":":master","rms":0.2,"bands":null}"#).unwrap();
+    assert!(level.waveform.is_none());
+    let json = serde_json::to_value(&level).unwrap();
+    assert!(json.get("waveform").is_none());
+    let level = WireLevel {
+        waveform: Some(vec![0.5; 256]),
+        ..level
+    };
+    assert_eq!(
+        serde_json::from_value::<WireLevel>(serde_json::to_value(&level).unwrap()).unwrap(),
+        level
+    );
 }

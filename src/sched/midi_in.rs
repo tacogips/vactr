@@ -208,7 +208,10 @@ impl Runtime {
                 MidiInEvent::Clock { time } => self.clock_pulse(time),
                 MidiInEvent::Start => self.transport_start(host_now),
                 MidiInEvent::Stop => self.transport_stop(host_now),
-                MidiInEvent::Continue => self.transport_continue(host_now),
+                MidiInEvent::Continue if self.midi_clock.is_slave() => {
+                    self.transport_continue(host_now);
+                }
+                MidiInEvent::Continue => {}
             }
         }
         self.check_clock_lost(host_now, &mut rep.diags);

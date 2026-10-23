@@ -66,7 +66,7 @@ export interface EvalOptions {
   /** Called after `hush` is sent (the highlight scheduler clears). */
   onHush?: () => void;
   /** Called with every eval reply, right after the request is sent (design 15.2: the outcome is shown, audio is started). */
-  onEval?: (reply: Promise<ServerEnvelope>) => void;
+  onEval?: (reply: Promise<ServerEnvelope>, range: CodeRange) => void;
 }
 
 export class EvalController {
@@ -102,7 +102,7 @@ export class EvalController {
     const span = this.opts.sync.toWireSpan(range.from, range.to);
     const reply = this.opts.client.eval(this.opts.sync.file, surface.state.doc.toString(), span);
     this.flash(range, FLASH_CLASS);
-    return this.watch(reply);
+    return this.watch(reply, range);
   }
 
   /** `Mod-Shift-Enter`: the whole document. */
@@ -110,8 +110,9 @@ export class EvalController {
     const surface = this.surface;
     if (!surface) return null;
     const reply = this.opts.client.eval(this.opts.sync.file, surface.state.doc.toString());
-    this.flash({ from: 0, to: surface.state.doc.length }, FLASH_CLASS);
-    return this.watch(reply);
+    const range = { from: 0, to: surface.state.doc.length };
+    this.flash(range, FLASH_CLASS);
+    return this.watch(reply, range);
   }
 
   /** Sends `hush` for callers that explicitly request an immediate cut. */
@@ -139,8 +140,8 @@ export class EvalController {
   }
 
   /** Flashes the failed forms of the reply. */
-  private watch(reply: Promise<ServerEnvelope>): Promise<ServerEnvelope> {
-    this.opts.onEval?.(reply);
+  private watch(reply: Promise<ServerEnvelope>, range: CodeRange): Promise<ServerEnvelope> {
+    this.opts.onEval?.(reply, range);
     reply.then(
       (env) => {
         if (env.kind !== 'eval-result' || env.body.file !== this.opts.sync.file) return;

@@ -13,6 +13,7 @@ export interface CodeRenderer {
   setViewport(view: LayoutViewport, dpr?: number): void;
   render(feedback?: RenderFeedback): boolean;
   setPalette(palette: Palette): void;
+  setBackgroundOpacity(opacity: number): void;
   setPhases(phases: PhaseTimer | null): void;
   dispose(): void;
 }

@@ -616,6 +616,20 @@ impl Session {
                 self.stage_now(StagedEffect::StopAll);
                 Vec::new()
             }
+            ClientMsg::TransportPause(Empty {}) => {
+                if self.rt.owns_song_resources() {
+                    vec![bad_body(
+                        "pause is unavailable while finite-song resources are owned",
+                    )]
+                } else {
+                    self.rt.transport_pause(self.rt.hosts.audio.now());
+                    Vec::new()
+                }
+            }
+            ClientMsg::TransportContinue(Empty {}) => {
+                self.rt.transport_continue(self.rt.hosts.audio.now());
+                Vec::new()
+            }
             ClientMsg::Stop(b) => match slot_key(&b.slot) {
                 Some(key) => {
                     self.revoke(key);

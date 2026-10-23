@@ -163,3 +163,9 @@ independent algorithms and verification requirements.
 [Retained geometry checkpoint archive](song-mode/reconciliation-geometry-checkpoints-20261003.md) preserves all geometry checkpoint bodies verbatim, including failed fixtures, lint repair and scoped frontend acceptance.
 
 [Query authority checkpoint archive](song-mode/reconciliation-query-checkpoints-20261003.md) preserves query/replay issuance, all focused failures and compatibility repairs, accepted joined gates, and historical log-retention limitations verbatim.
+
+## Editor header and transport (2026-10-18)
+
+- [Ableton Live 12: Live Concepts, Control Bar](https://www.ableton.com/en/live-manual/12/live-concepts/): functional grouping of transport, tempo, position and global status.
+- [Logic Pro: Control bar and view control bar](https://support.apple.com/guide/logicpro-ipad/control-bar-and-view-control-bar-devc8a6b875d/ipados): project browser, transport, display and More controls.
+- [Strudel: Getting Started](https://strudel.cc/workshop/getting-started/) and [REPL](https://strudel.cc/technical-manual/repl/): explicit live-code evaluation/update interaction.

@@ -122,3 +122,15 @@ looks :d1 > kaleid 4 > out o1    # an ordinary texture, so it chains
 ```
 
 ---
+
+## Editor header and transport
+
+The [editor header design](design-editor-header.md) defines grouped menus, Play/Stop, Pause/Resume, truthful playback position, and document identity (2026-10-18).
+
+
+## Comment-driven editor appearance
+
+Implemented 2026-10-18: [editor background comments](design-visual.md#editor-background-comments-2026-10-18)
+configure image/video/shader backgrounds and master audio overlays without
+evaluating or rewriting music. The existing final-output ring supplies real
+waveform telemetry in browser and native hosts, including finite songs.

@@ -12,6 +12,7 @@ export const DEFAULT_EXAMPLE_ID = 'showcase';
 
 export const CURATED: readonly ManifestEntry[] = Object.freeze([
   { id: 'showcase', title: 'Showcase', description: 'A sample-free techno showcase with a live visual chain.', category: 'Showcase' },
+  { id: 'editor-background', title: 'Editor Background', description: 'Comment-driven image/video backgrounds and real master-output visualizers.', category: 'Examples' },
   { id: 'acid-techno', title: 'Acid Techno', description: 'Acid techno at 132 BPM: accented and sliding diode-ladder bass.', category: 'Examples' },
   { id: 'bass-presets', title: 'Bass Presets', description: 'Bass patch library for techno at 125-140 BPM. Call a patch with a note pattern, then route its returned sound pattern: acid-squelch [:c2 :c2', category: 'Examples' },
   { id: 'canon-in-d', title: 'Canon In D', description: "Canon in D: Johann Pachelbel. The eight-chord ground bass loops under three of the canon's entries, one per two cycles. The sounds are new", category: 'Examples', },

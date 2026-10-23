@@ -96,3 +96,37 @@
   font: var(--vt-text-sm)/1.3 var(--vt-font-mono);
   color: var(--vt-text);
 }
+
+/* Source-comment backgrounds stay beneath the transparent code canvas. */
+.vact-editor-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.vact-background-media {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.vact-code-backdrop { opacity: var(--vt-shader-opacity, 1); filter: blur(var(--vt-shader-blur, 0px)); }
+.vact-code:is([data-editor-background='image'], [data-editor-background='video'], [data-editor-background='none']) > .vact-code-backdrop { display: none; }
+.vact-background-visualizer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 35%;
+}
+.vact-background-visualizer[data-position='top'] { top: 0; bottom: auto; }
+.vact-background-visualizer[data-position='full'] { top: 0; height: 100%; }
+.visual-editor-settings-status {
+  padding: var(--vt-space-2) var(--vt-space-3);
+  color: var(--vt-warn);
+  font-size: var(--vt-text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

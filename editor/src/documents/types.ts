@@ -115,6 +115,8 @@ export interface PickerActions {
 }
 
 export interface PickerProps {
+  documentTitle?: Accessor<string>;
+  dirty?: Accessor<boolean>;
   shell: Shell;
   open: Accessor<boolean>;
   examples: readonly ExampleEntry[];

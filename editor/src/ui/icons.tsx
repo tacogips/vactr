@@ -157,3 +157,13 @@ export const ChevronDown = (p: IconProps) => (
     <path d="M6 9l6 6 6-6" />
   </Svg>
 );
+
+/** Pause without revoking the current patterns. */
+export const Pause = (p: IconProps) => (
+  <Svg {...p}><path d="M8 5v14M16 5v14" stroke-width="4" /></Svg>
+);
+
+/** Reevaluate edits during playback. */
+export const Update = (p: IconProps) => (
+  <Svg {...p}><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1" /></Svg>
+);

@@ -30,7 +30,7 @@ use crate::dsp::ring::{
 };
 use crate::dsp::ugen::{BuildEnv, RawGraph, Template, BANK};
 use crate::dsp::voice::{self, event_ctl, resolve, SlotGens, VoicePool, BUS};
-use crate::host::caps::HostSigs;
+use crate::host::caps::{HostSigs, MASTER_WAVEFORM_SAMPLES};
 use crate::host::wire::{AudioEvent, Ctl, CtlMsg, HostMsg, SlotControlAck, VoiceTag};
 use crate::sched::slots::{CtlId, SlotId};
 
@@ -250,7 +250,16 @@ impl Engine {
     /// The host signals (`amp`, 8 `fft` bands of the master).
     #[must_use]
     pub fn host_sigs(&self) -> HostSigs {
-        self.sigs
+        let waveform = (self.frame > 0).then(|| {
+            std::array::from_fn(|i| {
+                self.master_ring
+                    [(self.ring_pos + FFT_SIZE - MASTER_WAVEFORM_SAMPLES + i) % FFT_SIZE]
+            })
+        });
+        HostSigs {
+            waveform,
+            ..self.sigs
+        }
     }
 
     /// Sounding voices.

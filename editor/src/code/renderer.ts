@@ -9,6 +9,7 @@ import { CLIP_GUTTER, SNAP_GLYPH, UNTINTED, InstanceWriter, LayerBuffer, VERTEX_
 import { SegmentCache, MAX_TEXT_BLOCKS, type SegmentKey } from './segments';
 import { cursorColor, cursorRect } from './cursor-shape';
 import type { CursorShape } from './vim/types';
+import { unappliedRgba, DEFAULT_UNAPPLIED_COLOR } from './unapplied-settings';
 
 export interface GpuStatus {
   kind: 'ready' | 'degraded' | 'unavailable' | 'context-lost'; message: string;
@@ -19,6 +20,7 @@ export interface RenderFeedback {
   handles?: readonly { pos: number; end?: boolean }[];
   textRevision?: number;
   annotationsRevision?: number;
+  unappliedColor?: string;
   animated?: readonly CodeAnnotation[];
   cursorVisible?: boolean;
   cursorShape?: CursorShape; cursorEnd?: number | null;
@@ -66,6 +68,7 @@ export class CanvasRenderer {
   private writers = new Map<GeometryLayer, InstanceWriter>(LAYERS.map(layer => [layer, new InstanceWriter()]));
   private layerBuffers = new Map<GeometryLayer, LayerBuffer>();
   private backgroundKey = '';
+  private backgroundOpacity = 0.85;
   private backgroundStaticCount = 0;
   private overlayKey = '';
   private overlayStaticCount = 0;
@@ -128,6 +131,12 @@ export class CanvasRenderer {
   setDocument(text: string): void { this.layout.setDocument(text); this.textRevisionCounter++; this.clearFrameCache(); }
   setText(doc: Text): void { this.layout.setText(doc); this.textRevisionCounter++; this.clearFrameCache(); }
   setPalette(palette: Palette): void { this.palette = palette; this.clearDrawCache(); }
+  setBackgroundOpacity(opacity: number): void {
+    if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) throw new RangeError('Invalid editor background opacity');
+    if (opacity === this.backgroundOpacity) return;
+    this.backgroundOpacity = opacity;
+    this.backgroundKey = '';
+  }
   setViewport(view: LayoutViewport, dpr = 1): void {
     if (![view.width, view.height, view.scrollLeft, view.scrollTop, view.left ?? 0, view.top ?? 0, view.gutter ?? 48].every(Number.isFinite) || view.width <= 0 || view.height <= 0 || view.scrollLeft < 0 || view.scrollTop < 0 || dpr <= 0 || !Number.isFinite(dpr)) throw new RangeError('Invalid viewport');
     this.view = { ...view }; this.requestedDpr = dpr;
@@ -223,7 +232,7 @@ export class CanvasRenderer {
       const key = `${feedback.textRevision ?? this.textRevisionCounter}|${this.view.width},${this.view.height},${this.view.scrollLeft},${this.view.scrollTop},${this.view.left ?? 0},${this.view.top ?? 0},${this.view.gutter ?? 48}|${this.scale}|${this.layout.font.generation ?? 0}|${this.atlas.stats.generation}|${syntaxKey}`;
       const viewportKey = `${this.view.width},${this.view.height},${this.view.scrollLeft},${this.view.scrollTop},${this.view.left ?? 0},${this.view.top ?? 0},${this.view.gutter ?? 48}|${this.scale}|${this.layout.font.generation ?? 0}|${this.atlas.stats.generation}`;
       const selectionKey = staticAnnotations.filter(a => a.kind === 'selection').map(a => `${a.from}:${a.to}`).join(';');
-      const backgroundKey = `${viewportKey}|${feedback.textRevision ?? this.textRevisionCounter}|${feedback.annotationsRevision ?? 0}|${selectionKey}`;
+      const backgroundKey = `${viewportKey}|${feedback.textRevision ?? this.textRevisionCounter}|${feedback.annotationsRevision ?? 0}|${selectionKey}|${feedback.unappliedColor ?? DEFAULT_UNAPPLIED_COLOR}`;
       const handlesKey = (feedback.handles ?? []).map(handle => `${handle.pos}:${handle.end ? 1 : 0}`).join(',');
       const overlayKey = `${backgroundKey}|${feedback.annotationsRevision ?? 0}|${feedback.cursor ?? ''}|${feedback.cursorVisible !== false}|${handlesKey}|${feedback.cursorShape ?? 'bar'}|${feedback.cursorEnd ?? ''}|${feedback.hopRevision ?? ''}`;
       const backgroundStaticDirty = this.backgroundKey !== backgroundKey;
@@ -238,7 +247,7 @@ export class CanvasRenderer {
       }
       const rebuildText = this.textCommands === null || this.cacheKey !== key;
       this.currentLayer = 'background';
-      if (backgroundStaticDirty) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.047, 0.059, 0.082, 0.85]);
+      if (backgroundStaticDirty) this.quad({ left: 0, right: this.view.width, top: 0, bottom: this.view.height }, [0.047, 0.059, 0.082, this.backgroundOpacity]);
       if (rebuildText) {
         const lineHeight = this.layout.font.lineHeight;
         const overscan = Math.ceil(this.view.height / lineHeight) * lineHeight;
@@ -251,6 +260,12 @@ export class CanvasRenderer {
       }
       this.currentLayer = 'background';
       if (backgroundStaticDirty) {
+        for (const a of staticAnnotations) if (a.kind === 'unapplied') {
+          for (const rect of this.layout.rangeRects(a, this.view)) {
+            const r = a.from === a.to ? { ...rect, right: rect.left + 6 } : rect;
+            this.quad(this.local(r), unappliedRgba(feedback.unappliedColor ?? DEFAULT_UNAPPLIED_COLOR));
+          }
+        }
         for (const a of staticAnnotations) if (a.kind === 'selection') for (const r of this.layout.rangeRects(a, this.view)) this.quad(this.local(r), [0.218, 0.4, 0.582, 0.55]);
         this.backgroundStaticCount = this.writers.get('background')!.count;
         this.backgroundKey = backgroundKey;

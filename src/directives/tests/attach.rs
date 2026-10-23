@@ -234,3 +234,43 @@ fn table_summary_serializes_for_the_protocol() {
     // Positional provenance has no key.
     assert!(json.contains("\"key\":null"), "{json}");
 }
+
+#[test]
+fn own_line_editor_json_is_ignored_without_changing_control_bindings() {
+    let source = "s :bd > lpf 800 > d1\n#@ lpf cc: 74\n#@ editor {\"background\":{\"kind\":\"image\",\"src\":\"/cover#one.png\"}}\n#@ lpf cc: 75\n";
+    let (with_editor, warnings) = table(source);
+    assert!(warnings.is_empty(), "{warnings:?}");
+    let ordinary = source
+        .lines()
+        .filter(|line| !line.starts_with("#@ editor "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let (without_editor, warnings) = table(&ordinary);
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(with_editor.resolved.len(), without_editor.resolved.len());
+    assert_eq!(with_editor.entries.len(), without_editor.entries.len());
+    assert_eq!(with_editor.resolved[0].cc, without_editor.resolved[0].cc);
+}
+
+#[test]
+fn editor_like_names_and_quoted_directive_text_remain_ordinary_source() {
+    let source = "let text \"#@ editor {\\\"background\\\":{}}\"\ns :bd > lpf 800 > d1 #@ editorial:\n#@ editorial.lpf cc: 71\n";
+    let (settings, warnings) = table(source);
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(
+        settings.entries.len(),
+        2,
+        "the quoted comment is not a directive"
+    );
+    assert_eq!(
+        settings
+            .resolved
+            .iter()
+            .filter_map(|binding| binding.cc)
+            .collect::<Vec<_>>(),
+        [71]
+    );
+    let (settings, warnings) = table("s :bd > lpf 800 > d1 #@ editor:\n#@ editor.lpf cc: 70\n");
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(settings.resolved[0].cc, Some(70));
+}

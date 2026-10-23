@@ -37,8 +37,12 @@ export function mount(root: HTMLElement, deps: EditorDeps, file = 'main.vact'): 
   const failure = doc.createElement('span');
   failure.setAttribute('role', 'alert');
   const instruments = doc.createElement('div');
+  instruments.className = 'vact-song-instruments';
   instruments.setAttribute('aria-label', 'Song instruments');
-  panel.append(apply, status, failure, instruments);
+  const label = doc.createElement('span');
+  label.className = 'vact-song-label';
+  label.textContent = 'Song';
+  panel.append(label, apply, status, failure, instruments);
   pane(root, 'transport').appendChild(panel);
   let disposed = false;
   let error = '';
@@ -55,6 +59,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, file = 'main.vact'): 
         : 'No song applied';
     failure.textContent = error || state?.failure?.message || '';
     instruments.replaceChildren();
+    instruments.hidden = !(state?.transport?.instruments?.length);
     for (const [index, selector] of (state?.transport?.instruments ?? []).entries()) {
       const button = doc.createElement('button');
       button.type = 'button';

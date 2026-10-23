@@ -18,9 +18,11 @@
 //! template or bus by instrument (or bus) identity and hands the box back
 //! through the garbage ring, which `drain` empties on this thread.
 
+mod signals;
 mod song;
 mod song_capacity;
 mod stream;
+use signals::SharedSigs;
 use song_capacity::SongCapacityCache;
 
 use std::cell::RefCell;
@@ -109,28 +111,6 @@ impl FrameClock {
     pub fn advance(&self, n: u64) {
         let now = self.frames.load(Ordering::Relaxed);
         self.frames.store(now.wrapping_add(n), Ordering::Release);
-    }
-}
-
-/// `HostSigs` as atomic `f32` bit patterns: `amp`, then the 8 fft bands.
-#[derive(Debug, Default)]
-struct SharedSigs([AtomicU32; 9]);
-
-impl SharedSigs {
-    fn store(&self, s: &HostSigs) {
-        self.0[0].store(s.amp.to_bits(), Ordering::Release);
-        for (slot, v) in self.0[1..].iter().zip(s.fft.iter()) {
-            slot.store(v.to_bits(), Ordering::Release);
-        }
-    }
-
-    fn load(&self) -> HostSigs {
-        let get = |i: usize| f32::from_bits(self.0[i].load(Ordering::Acquire));
-        let mut fft = [0.0; 8];
-        for (i, v) in fft.iter_mut().enumerate() {
-            *v = get(i + 1);
-        }
-        HostSigs { amp: get(0), fft }
     }
 }
 

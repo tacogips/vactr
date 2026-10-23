@@ -9,6 +9,8 @@
 
 pub mod caps;
 pub mod noop;
+#[cfg(any(test, all(target_arch = "wasm32", feature = "host-wasm")))]
+pub(crate) mod signals;
 pub mod song_profile;
 pub mod wire;
 

@@ -73,7 +73,7 @@ impl MidiClockState {
         self.sync.is_some()
     }
 
-    /// True between a MIDI `Stop` and the next `Start`/`Continue`.
+    /// True while live pause or MIDI `Stop` holds the scheduler.
     #[must_use]
     pub fn is_frozen(&self) -> bool {
         self.frozen
@@ -111,7 +111,7 @@ impl Runtime {
         &self.midi_clock
     }
 
-    /// True while a MIDI `Stop` holds the scheduler.
+    /// True while live pause or MIDI `Stop` holds the scheduler.
     pub(crate) fn transport_frozen(&self) -> bool {
         self.midi_clock.frozen
     }
@@ -331,13 +331,19 @@ impl Runtime {
     /// cleared and every pattern slot gets `Natural` (open input voices
     /// enter their release stage).
     pub(crate) fn transport_stop(&mut self, now: f64) {
-        let Some(sync) = self.midi_clock.sync.as_mut() else {
-            return;
-        };
+        if self.midi_clock.is_slave() {
+            self.transport_pause(now);
+        }
+    }
+
+    /// Pauses live scheduling without revoking bindings, for either clock source.
+    pub(crate) fn transport_pause(&mut self, now: f64) {
         if self.midi_clock.frozen {
             return;
         }
-        sync.stop();
+        if let Some(sync) = self.midi_clock.sync.as_mut() {
+            sync.stop();
+        }
         let pos = self.pos;
         for k in self.slots.keys() {
             let Some(slot) = self.slots.get_mut(k) else {
@@ -373,9 +379,9 @@ impl Runtime {
         }
     }
 
-    /// MIDI `Continue`: resumes from the frozen position.
+    /// Resumes live scheduling from the frozen position.
     pub(crate) fn transport_continue(&mut self, now: f64) {
-        if !self.midi_clock.frozen || self.midi_clock.sync.is_none() {
+        if !self.midi_clock.frozen {
             return;
         }
         self.pin_clock(now);

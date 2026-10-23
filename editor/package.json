@@ -15,7 +15,9 @@
     "build": "vite build",
     "dev": "vite",
     "e2e": "node test/e2e/run.mjs",
-    "e2e:examples": "node test/e2e/examples.mjs"
+    "e2e:examples": "node test/e2e/examples.mjs",
+    "e2e:header": "node test/e2e/header.mjs",
+    "e2e:background": "node test/e2e/background.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

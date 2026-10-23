@@ -18,8 +18,9 @@ use serde_json::json;
 
 use crate::dsp::arena::{FaultCode, DEFAULT_ARENA_BYTES};
 use crate::dsp::caps::CapabilitySet;
-use crate::host::caps::{HostSigs, Hosts, SampleData};
+use crate::host::caps::{Hosts, SampleData};
 use crate::host::noop::NoopHost;
+use crate::host::signals::decode_signals;
 use crate::host::wasm::abi::{for_each_record, input, TAG_FAULT, TAG_PKG, TAG_SESSION, TAG_SIGS};
 use crate::host::wasm::messages::{console, HostState, WasmAudioHost, WasmCellPort, WasmSamples};
 use crate::host::wasm::session_hosts::{
@@ -272,16 +273,10 @@ pub unsafe extern "C" fn session_inbox(ptr: *const u8, len: u32) {
                 console(&format!("diag {d}"));
                 h.abort(resource);
             }
-            Some(TAG_SIGS) if rec.len() >= 37 => {
-                let f = |i: usize| f32::from_le_bytes([rec[i], rec[i + 1], rec[i + 2], rec[i + 3]]);
-                let mut sigs = HostSigs {
-                    amp: f(1),
-                    ..HostSigs::default()
-                };
-                for (k, x) in sigs.fft.iter_mut().enumerate() {
-                    *x = f(5 + 4 * k);
+            Some(TAG_SIGS) => {
+                if let Some(sigs) = decode_signals(rec) {
+                    h.sigs = sigs;
                 }
-                h.sigs = sigs;
             }
             _ => {
                 if let Ok((msg, _)) = HostMsg::decode(rec) {

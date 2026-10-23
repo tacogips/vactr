@@ -1,4 +1,5 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from 'solid-js';
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from 'solid-js';
+import { ChevronDown } from './icons';
 import type { ExampleEntry, LibraryEntry, PickerProps } from '../documents/types';
 
 const STYLESHEET = new URL('./picker.css', import.meta.url).href;
@@ -136,6 +137,22 @@ export function PickerView(props: PickerProps): JSX.Element {
     const active = activeRow();
     if (visible.length && !visible.some((row) => rowId(row) === active)) setActiveRow(rowId(visible[0]));
   });
+  onMount(() => {
+    const doc = trigger.ownerDocument;
+    const outside = (event: PointerEvent) => {
+      if (props.open() && !trigger.parentElement?.contains(event.target as Node)) props.actions.close();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && props.open() && !event.defaultPrevented) {
+        props.actions.close();
+        trigger.focus();
+        event.preventDefault();
+      }
+    };
+    doc.addEventListener('pointerdown', outside);
+    doc.addEventListener('keydown', escape);
+    onCleanup(() => { doc.removeEventListener('pointerdown', outside); doc.removeEventListener('keydown', escape); });
+  });
   onCleanup(() => rowButtons.clear());
 
   return (
@@ -147,10 +164,17 @@ export function PickerView(props: PickerProps): JSX.Element {
         aria-haspopup="dialog"
         aria-expanded={props.open()}
         onClick={() => props.actions.toggle()}
-      >Documents</button>
-      <span class="vact-doc-picker-status" role="status">{props.status()}</span>
+      >Documents <ChevronDown /></button>
+      <Show when={props.documentTitle}>
+        <span class="vact-document-title" title={props.documentTitle?.()}>{props.documentTitle?.()}</span>
+        <Show when={props.dirty?.()}><span class="vact-document-dirty" aria-label="Unsaved changes" title="Unsaved changes">*</span></Show>
+      </Show>
       <Show when={props.open()}>
         <div class="vact-doc-picker" role="dialog" aria-label="Documents" onKeyDown={onPanelKeyDown}>
+          <div class="vact-doc-picker-heading"><strong>Documents &amp; examples</strong>
+            <button type="button" aria-label="Close documents" onClick={() => { props.actions.close(); trigger.focus(); }}>Close</button>
+          </div>
+          <Show when={props.status()}><p class="vact-doc-picker-status">{props.status()}</p></Show>
           <input
             ref={filterInput}
             class="vact-doc-picker-filter"
@@ -259,6 +283,7 @@ export function PickerView(props: PickerProps): JSX.Element {
           </section>
         </div>
       </Show>
+      <span class="vact-doc-picker-status" role="status">{props.status()}</span>
     </div>
   );
 }

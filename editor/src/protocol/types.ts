@@ -228,6 +228,8 @@ export type ClientMsg =
   | { kind: 'mute-instrument'; body: SongMuteRequest }
   | { kind: 'clock-probe'; body: ClockProbeBody }
   | { kind: 'eval'; body: EvalBody }
+  | { kind: 'transport-pause'; body: EmptyBody }
+  | { kind: 'transport-continue'; body: EmptyBody }
   | { kind: 'hush'; body: EmptyBody }
   | { kind: 'stop'; body: StopBody }
   | { kind: 'stop-all'; body: EmptyBody }
@@ -246,6 +248,8 @@ export const CLIENT_KINDS: readonly ClientKind[] = [
   'mute-instrument',
   'clock-probe',
   'eval',
+  'transport-pause',
+  'transport-continue',
   'hush',
   'stop',
   'stop-all',
@@ -401,6 +405,8 @@ export interface WireLevel {
   rms: number;
   /** TASK-010 (G4): the 8 host FFT bands. */
   bands?: number[];
+  /** Chronological final master-output samples; omitted by older/unsupported hosts. */
+  waveform?: number[];
 }
 
 /** One analyzer unit of the installed bus graph (TASK-010, G4). */
@@ -431,6 +437,8 @@ export interface TransportSample {
   bpm: number;
   beats_per_cycle: number;
   running: boolean;
+  /** Music is scheduled, independently of the free-running clock. */
+  active?: boolean;
   latency_seconds: number | null;
   latency_kind: 'measured' | 'estimate' | 'unavailable';
   uncertainty_seconds: number | null;

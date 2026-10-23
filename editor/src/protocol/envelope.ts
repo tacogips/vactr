@@ -63,6 +63,8 @@ const CLIENT_FIELDS: Record<ClientKind, Record<string, FieldType>> = {
   'mute-instrument': { epoch: 'string', selector: 'object', muted: 'boolean' },
   'clock-probe': { page_send: 'number' },
   eval: { file: 'string', code: 'string', doc_revision: 'number', edit_epoch: 'number' },
+  'transport-pause': {},
+  'transport-continue': {},
   hush: {},
   stop: { slot: 'string' },
   'stop-all': {},
@@ -222,6 +224,7 @@ function latency(v: Record<string, unknown>): boolean {
 function transport(v: unknown): boolean {
   return isObject(v) && epoch(v.epoch) && nonnegative(v.sample_time) && ratio(v.cycle) &&
     positive(v.bpm) && positive(v.beats_per_cycle) && typeof v.running === 'boolean' && latency(v) &&
+    (v.active === undefined || typeof v.active === 'boolean') &&
     (v.output === undefined || (typeof v.output === 'string' &&
       ['running', 'draining', 'cutting', 'idle'].includes(v.output)));
 }
@@ -288,7 +291,9 @@ export function decodeServer(text: string): Decoded<ServerEnvelope> {
     case 'levels':
       if (!env.body.levels.every((v) => isObject(v) && typeof v.source === 'string' &&
         nonnegative(v.rms) && (v.bands === undefined ||
-        (Array.isArray(v.bands) && v.bands.every(nonnegative)))) ||
+        (Array.isArray(v.bands) && v.bands.every(nonnegative))) &&
+        (v.waveform === undefined || (Array.isArray(v.waveform) && v.waveform.length === 256 &&
+          v.waveform.every((sample) => finite(sample) && Math.abs(sample as number) <= 1)))) ||
         (env.body.time !== undefined && !nonnegative(env.body.time)) ||
         (env.body.epoch !== undefined && !epoch(env.body.epoch)) ||
         (env.body.analyzers !== undefined && (!Array.isArray(env.body.analyzers) ||

@@ -430,11 +430,16 @@ pub enum MidiInEvent {
     Continue,
 }
 
+/// Samples in one chronological final-output waveform snapshot.
+pub const MASTER_WAVEFORM_SAMPLES: usize = 256;
+
 /// The host signals published by the audio side.
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
 pub struct HostSigs {
     pub amp: f32,
     pub fft: [f32; 8],
+    /// Real final mono output, oldest first; absent on unsupported hosts.
+    pub waveform: Option<[f32; MASTER_WAVEFORM_SAMPLES]>,
 }
 
 /// The host bundle the runtime owns.

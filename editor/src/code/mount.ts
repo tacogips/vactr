@@ -2,7 +2,7 @@
 // The headless CodeSurface owns the document; DOM owns input and accessibility only.
 
 import { Text } from '@codemirror/state';
-import { createComponent } from 'solid-js';
+import { createComponent, createSignal } from 'solid-js';
 import { render } from 'solid-js/web';
 import type { CodeApi, CodeAnnotation, SampleLibraryApi } from '../app/apis';
 import type { ServerEnvelope } from '../protocol/types';
@@ -32,6 +32,8 @@ import { ResourceLedger } from './resources';
 import { CodeViewHost } from './view-host';
 import { installPerfHook, recordOnset, recordPresented, retractOnset, removePerfHook, type VactrPerf } from './perf-hook';
 import { createVimMode } from './vim-mount';
+import { UnappliedEdits } from './unapplied';
+import { readUnappliedColor, saveUnappliedColor, validUnappliedColor } from './unapplied-settings';
 
 export const DOC_FILE = 'main.vact';
 
@@ -82,10 +84,14 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
 
   const sync = new DocumentSync(client.document(DOC_FILE), Text.of(['']));
   const surface = new HeadlessSurface({ sync });
+  const unapplied = new UnappliedEdits(surface.state.doc);
+  const [unappliedColor, setUnappliedColor] = createSignal(readUnappliedColor(localStore(win)));
   const metrics = createMeasureContext(doc);
   const textMetrics = metrics ?? { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
   const layout = new TextLayout(textMetrics, { font: '13px ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 18, baseline: 14 });
-  const ledger = new ResourceLedger();
+  const previousBudget = deps.resourceBudget;
+  const ledger = previousBudget instanceof ResourceLedger ? previousBudget : new ResourceLedger();
+  if (!previousBudget) deps.resourceBudget = ledger;
   const onStatus = (status: import('./renderer').GpuStatus): void => {
     gpuStatus.textContent = status.kind === 'unavailable' ? 'GPU unavailable; editing and save remain available' : status.message;
     gpuStatus.dataset.gpu = status.kind;
@@ -118,7 +124,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     if (!next) return;
     next.classList.add('vact-code-backdrop');
     next.setAttribute('aria-hidden', 'true');
-    hostEl.insertBefore(next, surfaceEl);
+    hostEl.prepend(next);
   };
   let staticAnnotations: CodeAnnotation[] = [];
   let syntaxSpans: CodeAnnotation[] = [];
@@ -130,7 +136,15 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const highlight = new HighlightScheduler({ clock, file: DOC_FILE, map: (span, rev) => sync.mapWireSpan(span, rev),
     pin: (owner, rev) => sync.pin(owner, rev), unpin: (owner) => sync.unpin(owner), revision: () => sync.revision,
     tempo: () => store.tempo, anchor, ...(deps.audible ? { audible: deps.audible, epoch: () => store.transportSample?.epoch ?? null } : {}) });
-  const evalCtl = new EvalController({ client, sync, onHush: () => highlight.clear(), onEval: (reply) => onEval?.(reply) });
+  const evalCtl = new EvalController({ client, sync, onHush: () => highlight.clear(), onEval: (reply, range) => {
+    const ids = unapplied.snapshot(range);
+    void reply.then(env => {
+      if (disposed || env.kind !== 'eval-result' || env.body.file !== DOC_FILE) return;
+      unapplied.acknowledge(ids, env.body, sync);
+      scheduler?.invalidateText('annotations');
+    }, () => {});
+    onEval?.(reply);
+  } });
   const diagnostics = new DiagnosticsController({ client, sync, tier, ...(deps.core ? { core: deps.core } : {}),
     text: () => surface.state.doc.toString(), afterPresent: (callback) => scheduler?.afterPresent(callback) ?? (() => {}),
     isComposing: () => input?.isComposing ?? false, announce: (message) => input?.accessibility.announce(message) });
@@ -139,9 +153,19 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const completion = deps.completion ? attachCompletion(surface, deps.completion) : null;
 
   const transport = new TransportBar(transportPane, { client, clock, anchor,
-    ...(deps.audible ? { audible: deps.audible, sample: () => store.transportSample } : {}),
+    sample: () => store.transportSample,
+    ...(deps.audible ? { audible: deps.audible } : {}),
+    pauseReason: () => {
+      const song = store.song(DOC_FILE);
+      return song?.applied && song.transport?.state !== 'ended' && song.transport?.state !== 'failed'
+        ? 'Pause is unavailable for finite songs' : '';
+    },
     onHush: () => highlight.clear(), audio: deps.core?.host.ctx ?? null, onRun: () => void evalCtl.evalAll(),
-    vim: { enabled: vim.enabled, toggle: () => vim.toggle() } });
+    vim: { enabled: vim.enabled, toggle: () => vim.toggle() },
+    unapplied: { color: unappliedColor, setColor: (color) => {
+      if (!validUnappliedColor(color)) return;
+      setUnappliedColor(color); saveUnappliedColor(localStore(win), color); scheduler?.invalidateText('annotations');
+    } } });
   let onEval: ((reply: Promise<ServerEnvelope>) => void) | null = null;
   onEval = (reply) => { void transport.audio.start(); transport.evalStarted(reply); };
 
@@ -152,6 +176,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const samples: SampleLibraryApi = { frames: (bank, index) => library?.frames(bank, index) ?? null, openBrowser: (bank) => browser.open(bank) };
   let evalRev: number | null = null;
   const api: CodeApi = {
+    setBackgroundOpacity: (opacity) => { renderer.setBackgroundOpacity(opacity); scheduler?.invalidateText('gpu'); },
     surface, mapWireSpan: (span, rev) => sync.mapWireSpan(span, rev),
     toWireSpan: (from, to) => sync.toWireSpan(from, to),
     currentRevision: (file) => file === DOC_FILE ? sync.revision : 0,
@@ -240,7 +265,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         syntaxTruncated += result.truncated ? 1 : 0;
         if (syntaxProvider instanceof FallbackSpans) codePane.dataset.syntax = 'fallback';
         const selection = surface.state.selection.main;
-        const staticRows = [...result.spans, ...surface.annotationRanges(),
+        const staticRows = [...result.spans, ...unapplied.annotations(surface.state.doc), ...surface.annotationRanges(),
           ...(selection.empty ? [] : [{ from: selection.from, to: selection.to, kind: 'selection' as const }]),
           ...input.presentation.annotations];
         const momentaryRows = surface.animatedRows(ctx.frameMs);
@@ -255,7 +280,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         staticAnnotations = annotations.staticRows;
         timed('upload', () => {
           renderer.setViewport(range.view, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), ...vim.overlay(), cursorVisible: true, handles });
+          renderer.render({ unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), ...vim.overlay(), cursorVisible: true, handles });
         });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
@@ -266,7 +291,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
         timed('upload', () => {
           renderer.setViewport(viewHost.viewport, viewport.dpr);
-          renderer.render({ annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), ...vim.overlay(), cursorVisible: true, handles });
+          renderer.render({ unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), ...vim.overlay(), cursorVisible: true, handles });
         });
       }
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);
@@ -299,6 +324,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   });
   let surfaceDocLength = surface.state.doc.length;
   const stopSurface = surface.subscribe((update) => {
+    unapplied.update(update, sync.revision);
     scheduler.invalidateText(update.docChanged ? 'doc' : update.selectionSet ? 'selection' : 'annotations');
     if (update.docChanged) {
       let changeCount = 0, wholeDocumentReplacement = false;
@@ -336,7 +362,10 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     }),
     client.on('eval-result', (env) => {
       if (env.kind !== 'eval-result') return;
-      if (env.body.file === DOC_FILE) { evalRev = env.body.doc_revision; sync.pin('eval', evalRev); }
+      if (env.body.file === DOC_FILE) {
+        evalRev = env.body.doc_revision; sync.pin('eval', evalRev);
+        unapplied.acknowledgeForms(env.body, sync); scheduler.invalidateText('annotations');
+      }
       transport.onDiagnostics(env.body.diagnostics);
     }),
     client.on('diag', (env) => { if (env.kind === 'diag') transport.onDiagnostics(env.body.add); }),
@@ -370,7 +399,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   } else loadMainThreadSyntax();
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
     ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
-    transportOutput: () => transport.el.querySelector<HTMLElement>('.vact-stop-all')?.dataset.output ?? 'running',
+    transportOutput: () => transport.el.querySelector<HTMLElement>('.vact-play-toggle')?.dataset.output ?? 'idle',
     outputHistory: () => transport.outputHistory(), momentaryLabels: () => lastMomentaryLabels,
     disposeCode: () => mounted.dispose() });
 
@@ -391,6 +420,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       backgroundCanvas?.remove(); backgroundCanvas = null;
       transport.dispose(); browser.dispose(); surface.dispose(); disposeCanvasHost(); hostEl.remove();
       if (deps.code === api) delete deps.code;
+      if (!previousBudget && deps.resourceBudget === ledger) delete deps.resourceBudget;
       if (phaseTimer && (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer === phaseTimer)
         delete (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer;
       removePerfHook(win);

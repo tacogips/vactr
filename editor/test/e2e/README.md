@@ -81,3 +81,24 @@ the prebuilt `editor/dist`:
 ```sh
 cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build && npm run e2e -- --browser all --profile behavior --run-id vim-keymap-001 --out ../tmp/vim-keymap/VK-40/e2e/vim-keymap-001
 ```
+
+## Header and playback controls
+
+After rebuilding the release wasm and editor, run `npm run e2e:header` from
+`editor/`. The test uses a silent audio sink and checks actual session playback
+in Chromium and WebKit: empty/constant-only documents keep the counter stopped,
+Play/Stop and Pause/Resume update real playback, and menus remain usable within
+1440, 768 and 390 pixel viewports. Screenshots and results are written to
+`tmp/editor-header/` at the repository root.
+
+
+## Source-comment backgrounds
+
+After rebuilding release wasm and the editor, run `npm run e2e:background`
+from `editor/`. This requires `ffmpeg` on PATH to generate a temporary silent
+H.264 fixture. The test serves proper media MIME types and byte ranges, then
+checks actual image compositing, real master-waveform scope pixels, all four
+overlays, muted/looping video playback, undo/removal, invalid URLs, and media
+load failures in Chromium and WebKit. The audio sink is silent. Evidence is
+written to `tmp/editor-background/`; the temporary video is removed after the
+run. User syntax and the bundled example are documented in the root README.

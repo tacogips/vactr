@@ -193,11 +193,11 @@ describe('eval outcome (design 15.2)', () => {
   });
 });
 
-describe('icon-only transport (design 15.2)', () => {
-  it('shows no words for tempo, clock, hush or stop; every control has a name and a tooltip', () => {
+describe('grouped transport header', () => {
+  it('labels primary actions and units and names icon controls', () => {
     const { q, parent, b, transport } = bar({ ctx: new FakeCtx(), onRun: () => undefined });
     b.onPlaying([{ slot: 'd1', beat: [0, 1], time: 0, dur: [1, 1] }]);
-    for (const sel of ['.vact-audio', '.vact-run', '.vact-hush', '.vact-stop-all', '.vact-clock']) {
+    for (const sel of ['.vact-audio', '.vact-hush', '.vact-clock']) {
       const el = q(sel);
       expect(el, sel).not.toBeNull();
       expect(el?.textContent?.trim(), sel).toBe('');
@@ -206,8 +206,9 @@ describe('icon-only transport (design 15.2)', () => {
       expect(el?.querySelector('svg'), sel).not.toBeNull();
     }
     // Numbers stay visible; the unit words live in the name.
-    expect(q('.vact-tempo')?.textContent).toBe('120.0');
-    expect(parent.textContent).not.toMatch(/bpm|internal|hush|mute|master/);
+    expect(q('.vact-tempo')?.textContent).toBe('120.0BPM');
+    expect(q('.vact-run')?.textContent).toBe('Update');
+    expect(q('.vact-play-toggle')?.textContent).toBe('Stop');
     q<HTMLButtonElement>('.vact-stop-all')?.click();
     expect(transport.of('stop-all').map((m) => m.body)).toEqual([{}]);
   });

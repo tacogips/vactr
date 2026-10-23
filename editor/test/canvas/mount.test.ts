@@ -239,8 +239,8 @@ describe('headless canvas mount', () => {
     vi.spyOn(surface, 'momentaryHit').mockReturnValue(true);
     vi.spyOn(surface, 'coordsAtPos').mockReturnValue({ left: 1, right: 9, top: 2, bottom: 18 });
     rig.host.step(16);
-    expect(perf.transportOutput()).toBe('running');
-    expect(perf.outputHistory()).toEqual(['running']);
+    expect(perf.transportOutput()).toBe('idle');
+    expect(perf.outputHistory()).toEqual(['idle']);
     expect(perf.momentaryLabels()).toEqual([]);
     expect(perf.momentaryHit(4)).toBe(true);
     const rect = perf.coordsAtPos(4);

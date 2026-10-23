@@ -1,10 +1,9 @@
-// The transport bar view (design 15.1.5 "Transport bar", 15.2). Icons
-// instead of words: every control has an accessible name and a tooltip
-// carrying the text the icon replaces. State arrives as accessors; the view
-// owns no protocol logic.
+// Grouped editor transport (design-editor-header.md). State arrives as
+// accessors; this view owns disclosure interactions, not protocol logic.
 
-import { For, Match, Show, Switch, type Accessor, type JSX } from 'solid-js';
+import { For, Match, Show, Switch, onCleanup, onMount, type Accessor, type JSX } from 'solid-js';
 import type { AudioState } from './audio';
+import { DEFAULT_UNAPPLIED_COLOR } from '../code/unapplied-settings';
 import { audioLabel } from './audio';
 import {
   Alert,
@@ -16,6 +15,9 @@ import {
   Hush,
   Metronome,
   Play,
+  Pause,
+  Update,
+  ChevronDown,
   SpeakerOff,
   SpeakerOn,
   StopSquare,
@@ -41,7 +43,13 @@ export interface SlotView {
   lit: Accessor<boolean>;
 }
 
+export type PlaybackState = 'stopped' | 'playing' | 'paused';
+
 export interface TransportViewProps {
+  playback: Accessor<PlaybackState>;
+  pauseReason: Accessor<string>;
+  onToggle: () => void;
+  onPause: () => void;
   bpm: Accessor<number>;
   position: Accessor<Position | null>;
   clock: Accessor<ClockStatus>;
@@ -55,8 +63,8 @@ export interface TransportViewProps {
   onAudio: () => void;
   onRun?: () => void;
   vim?: { enabled: Accessor<boolean>; toggle: () => void };
+  unapplied?: { color: Accessor<string>; setColor: (color: string) => void };
   onHush: () => void;
-  onStopAll: () => void;
   onStop: (slot: string) => void;
 }
 
@@ -66,7 +74,6 @@ function IconButton(props: {
   onClick: () => void;
   disabled?: boolean;
   ariaPressed?: Accessor<'true' | 'false'>;
-  dataOutput?: string;
   children: JSX.Element;
 }): JSX.Element {
   const label = () => typeof props.label === 'function' ? props.label() : props.label;
@@ -78,7 +85,6 @@ function IconButton(props: {
       title={label()}
       aria-pressed={props.ariaPressed?.()}
       disabled={props.disabled}
-      data-output={props.dataOutput}
       onClick={() => props.onClick()}
     >
       {props.children}
@@ -89,7 +95,7 @@ function IconButton(props: {
 function evalLabel(s: EvalStatus): string {
   switch (s.kind) {
     case 'idle':
-      return 'not evaluated yet (Run, or Mod-Shift-Enter)';
+      return 'not evaluated yet (Play, Update, or Mod-Shift-Enter)';
     case 'pending':
       return 'evaluating';
     case 'ok':
@@ -135,112 +141,170 @@ export function TransportView(props: TransportViewProps): JSX.Element {
     if (!Number.isFinite(l)) return '-inf';
     return l.toFixed(1);
   };
+  let toolbar!: HTMLDivElement;
+  onMount(() => {
+    const doc = toolbar.ownerDocument;
+    const dismiss = (event: PointerEvent | KeyboardEvent) => {
+      for (const details of toolbar.querySelectorAll<HTMLDetailsElement>('details[open]')) {
+        if (event instanceof KeyboardEvent ? event.key === 'Escape' : !details.contains(event.target as Node)) {
+          details.open = false;
+          if (event instanceof KeyboardEvent) { details.querySelector('summary')?.focus(); event.preventDefault(); }
+        }
+      }
+    };
+    doc.addEventListener('pointerdown', dismiss);
+    doc.addEventListener('keydown', dismiss);
+    onCleanup(() => { doc.removeEventListener('pointerdown', dismiss); doc.removeEventListener('keydown', dismiss); });
+  });
   return (
-    <div class="vact-transport" role="toolbar" aria-label="transport">
-      <IconButton
-        class="vact-audio"
-        label={audioLabel(props.audio(), props.audioReason())}
-        onClick={props.onAudio}
-        disabled={props.audio() === 'unavailable' || props.audio() === 'starting'}
-      >
-        <span class="vact-audio-state" data-state={props.audio()}>
-          <Switch fallback={<SpeakerOff />}>
-            <Match when={props.audio() === 'running' || props.audio() === 'unavailable'}>
-              <SpeakerOn />
+    <div ref={toolbar} class="vact-transport" role="toolbar" aria-label="transport">
+      <div class="vact-transport-group vact-playback-group" role="group" aria-label="Playback">
+        <button type="button" class="vact-play-toggle vact-primary"
+          classList={{ 'vact-stop-all': props.playback() !== 'stopped' }}
+          data-output={props.output()} aria-pressed={props.playback() !== 'stopped'}
+          aria-label={props.playback() === 'stopped' ? 'Play document' : 'Stop playback (Mod-.)'}
+          title={props.playback() === 'stopped' ? 'Play the whole document' : 'Stop every slot and let effects ring out (Mod-.)'}
+          disabled={props.playback() === 'stopped' && !props.onRun}
+          onClick={props.onToggle}>
+          <Show when={props.playback() !== 'stopped'} fallback={<Play />}><StopSquare /></Show>
+          {props.playback() === 'stopped' ? 'Play' : 'Stop'}
+        </button>
+        <IconButton class="vact-pause"
+          label={() => props.pauseReason() || (props.playback() === 'paused' ? 'Resume playback' : 'Pause scheduled music and position; visuals continue')}
+          disabled={props.playback() === 'stopped' || !!props.pauseReason()}
+          ariaPressed={() => props.playback() === 'paused' ? 'true' : 'false'} onClick={props.onPause}>
+          <Show when={props.playback() === 'paused'} fallback={<Pause />}><Play /></Show>
+        </IconButton>
+        <span class="vact-playback-state" data-state={props.playback()} role="status">
+          {props.playback() === 'paused' ? 'Paused' : props.playback() === 'playing' ? 'Playing'
+            : props.output() === 'draining' ? 'Effects tail' : props.output() === 'cutting' ? 'Cutting' : 'Stopped'}
+        </span>
+      </div>
+      <div class="vact-transport-group vact-time-group" role="group" aria-label="Position and tempo">
+        <span class="vact-tempo" aria-label={`tempo ${props.bpm().toFixed(1)} bpm`} title={`${props.bpm().toFixed(1)} bpm`}>
+          <Metronome />
+          <span class="vact-tempo-value">{props.bpm().toFixed(1)}</span><span class="vact-unit">BPM</span>
+        </span>
+        <span class="vact-position" aria-label={positionLabel()} title={positionLabel()}>
+          <BeatRing position={props.position} /><span class="vact-unit">CYCLE</span>
+          <span class="vact-position-value">
+            {(() => {
+              const p = props.position();
+              return p ? `${p.cycle}.${p.beat}` : '-.-';
+            })()}
+          </span>
+        </span>
+        <span class="vact-clock" data-status={props.clock().replace(' ', '-')} aria-label={`clock: ${props.clock()}`} title={`clock: ${props.clock()}`}>
+          <Switch fallback={<ClockInternal />}>
+            <Match when={props.clock() === 'midi locked'}>
+              <ClockMidiLocked />
             </Match>
-            <Match when={props.audio() === 'failed'}>
-              <Alert />
+            <Match when={props.clock() === 'midi lost'}>
+              <ClockMidiLost />
             </Match>
           </Switch>
         </span>
-      </IconButton>
-      <Show when={props.onRun}>
-        <IconButton class="vact-run" label="run the whole document (Mod-Shift-Enter)" onClick={() => props.onRun?.()}>
-          <Play />
-        </IconButton>
-      </Show>
-      <span class="vact-eval-status" data-status={props.evalStatus().kind} role="status" aria-label={evalLabel(props.evalStatus())} title={evalLabel(props.evalStatus())}>
-        <Switch>
-          <Match when={props.evalStatus().kind === 'pending'}>
-            <Hourglass />
-          </Match>
-          <Match when={props.evalStatus().kind === 'ok'}>
-            <Check />
-          </Match>
-          <Match when={props.evalStatus().kind === 'diagnostics' || props.evalStatus().kind === 'not-delivered'}>
-            <Alert />
-          </Match>
-        </Switch>
-        <Show when={props.evalStatus().kind === 'diagnostics'}>
-          <span class="vact-eval-count">
-            {(() => {
-              const s = props.evalStatus();
-              return s.kind === 'diagnostics' ? String(s.errors + s.warnings) : '';
-            })()}
-          </span>
+      </div>
+      <div class="vact-transport-group vact-evaluate-group" role="group" aria-label="Live code">
+        <Show when={props.onRun}>
+          <button type="button" class="vact-run" title="Update the whole document (Mod-Shift-Enter)"
+            aria-label="Update document (Mod-Shift-Enter)" onClick={() => props.onRun?.()}>
+            <Update /><span>Update</span>
+          </button>
         </Show>
-      </span>
-      <span class="vact-tempo" aria-label={`tempo ${props.bpm().toFixed(1)} bpm`} title={`${props.bpm().toFixed(1)} bpm`}>
-        <Metronome />
-        <span class="vact-tempo-value">{props.bpm().toFixed(1)}</span>
-      </span>
-      <span class="vact-position" aria-label={positionLabel()} title={positionLabel()}>
-        <BeatRing position={props.position} />
-        <span class="vact-position-value">
-          {(() => {
-            const p = props.position();
-            return p ? `${p.cycle}.${p.beat}` : '-.-';
-          })()}
+        <span class="vact-eval-status" data-status={props.evalStatus().kind} role="status" aria-label={evalLabel(props.evalStatus())} title={evalLabel(props.evalStatus())}>
+          <Switch>
+            <Match when={props.evalStatus().kind === 'pending'}>
+              <Hourglass />
+            </Match>
+            <Match when={props.evalStatus().kind === 'ok'}>
+              <Check />
+            </Match>
+            <Match when={props.evalStatus().kind === 'diagnostics' || props.evalStatus().kind === 'not-delivered'}>
+              <Alert />
+            </Match>
+          </Switch>
+          <Show when={props.evalStatus().kind === 'diagnostics'}>
+            <span class="vact-eval-count">
+              {(() => {
+                const s = props.evalStatus();
+                return s.kind === 'diagnostics' ? String(s.errors + s.warnings) : '';
+              })()}
+            </span>
+          </Show>
         </span>
-      </span>
-      <span class="vact-clock" data-status={props.clock().replace(' ', '-')} aria-label={`clock: ${props.clock()}`} title={`clock: ${props.clock()}`}>
-        <Switch fallback={<ClockInternal />}>
-          <Match when={props.clock() === 'midi locked'}>
-            <ClockMidiLocked />
-          </Match>
-          <Match when={props.clock() === 'midi lost'}>
-            <ClockMidiLost />
-          </Match>
-        </Switch>
-      </span>
-      <IconButton class="vact-hush" label="cut: silence everything now and clear effects (Mod-Shift-.)" onClick={props.onHush}>
-        <Hush />
-      </IconButton>
-      <IconButton
-        class="vact-stop-all"
-        label={() => props.output() === 'draining'
-          ? 'stop: stop every slot, let effects ring out (Mod-.) - tails ringing out'
-          : 'stop: stop every slot, let effects ring out (Mod-.)'}
-        dataOutput={props.output()}
-        onClick={props.onStopAll}
-      >
-        <StopSquare />
-      </IconButton>
-      <Show when={props.vim}>
-        {(vim) => <IconButton
-          class="vact-vim-toggle"
-          label={() => `Vim mode: ${vim().enabled() ? 'on' : 'off'}`}
-          ariaPressed={(): 'true' | 'false' => vim().enabled() ? 'true' : 'false'}
-          onClick={vim().toggle}
-        >vim</IconButton>}
+      </div>
+      <div class="vact-transport-group vact-output-group" role="group" aria-label="Audio output">
+        <IconButton class="vact-hush" label="cut: silence everything now and clear effects (Mod-Shift-.)" onClick={props.onHush}>
+          <Hush />
+        </IconButton>
+        <IconButton class="vact-audio" label={audioLabel(props.audio(), props.audioReason())} onClick={props.onAudio}
+          disabled={props.audio() === 'unavailable' || props.audio() === 'starting'}>
+          <span class="vact-audio-state" data-state={props.audio()}>
+            <Switch fallback={<SpeakerOff />}>
+              <Match when={props.audio() === 'running' || props.audio() === 'unavailable'}><SpeakerOn /></Match>
+              <Match when={props.audio() === 'failed'}><Alert /></Match>
+            </Switch>
+          </span>
+        </IconButton>
+        <span class="vact-level" aria-label={`master level ${levelText()} dB`} title={`master level ${levelText()} dB`}>
+          <SpeakerOn />
+          <span class="vact-level-value">{levelText()}</span><span class="vact-unit">dB</span>
+        </span>
+      </div>
+      <EditorOptions vim={props.vim} unapplied={props.unapplied} />
+      <Show when={props.slots().length > 0}>
+        <details class="vact-slot-disclosure"><summary>Slots <span>{props.slots().length}</span><ChevronDown /></summary>
+          <div class="vact-header-popover">
+            <ul class="vact-slots">
+              <For each={props.slots()}>
+                {(slot) => (
+                  <li class="vact-slot" data-slot={slot.name}>
+                    <span class="vact-light" data-lit={slot.lit() ? 'true' : 'false'} aria-hidden="true" />
+                    <span class="vact-slot-name">{slot.name}</span>
+                    <IconButton class="vact-mute" label={`stop ${slot.name}: release its notes`} onClick={() => props.onStop(slot.name)}>
+                      <StopSquare />
+                    </IconButton>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </details>
       </Show>
-      <span class="vact-level" aria-label={`master level ${levelText()} dB`} title={`master level ${levelText()} dB`}>
-        <SpeakerOn />
-        <span class="vact-level-value">{levelText()}</span>
-      </span>
-      <ul class="vact-slots">
-        <For each={props.slots()}>
-          {(slot) => (
-            <li class="vact-slot" data-slot={slot.name}>
-              <span class="vact-light" data-lit={slot.lit() ? 'true' : 'false'} aria-hidden="true" />
-              <span class="vact-slot-name">{slot.name}</span>
-              <IconButton class="vact-mute" label={`stop ${slot.name}: release its notes`} onClick={() => props.onStop(slot.name)}>
-                <StopSquare />
-              </IconButton>
-            </li>
-          )}
-        </For>
-      </ul>
     </div>
   );
+}
+
+function EditorOptions(props: { vim?: TransportViewProps['vim']; unapplied?: TransportViewProps['unapplied'] }): JSX.Element {
+  return <details class="vact-editor-options">
+    <summary>Editor <ChevronDown /></summary>
+    <div class="vact-header-popover">
+      <Show when={props.vim}>{(vim) => <div class="vact-editor-option">
+        <span>Vim mode</span>
+        <IconButton class="vact-vim-toggle" label={() => `Vim mode: ${vim().enabled() ? 'on' : 'off'}`}
+          ariaPressed={() => vim().enabled() ? 'true' : 'false'} onClick={vim().toggle}>vim</IconButton>
+      </div>}</Show>
+      <Show when={props.unapplied}>{(setting) => <>
+        <label class="vact-editor-option vact-unapplied-setting">
+          <span>Unapplied edit color</span>
+          <input type="color" aria-label="Unapplied edit color" value={setting().color()}
+            onInput={(event) => setting().setColor(event.currentTarget.value)} />
+        </label>
+        <div class="vact-editor-option">
+          <span class="vact-shortcut-note">Clears after a successful update.</span>
+          <button type="button" class="vact-unapplied-reset" onClick={() => setting().setColor(DEFAULT_UNAPPLIED_COLOR)}>Reset color</button>
+        </div>
+      </>}</Show>
+      <p class="vact-popover-heading">Keyboard shortcuts</p>
+      <dl class="vact-shortcut-list">
+        <dt>Evaluate form</dt><dd>Mod-Enter</dd>
+        <dt>Update document</dt><dd>Mod-Shift-Enter</dd>
+        <dt>Stop</dt><dd>Mod-.</dd>
+        <dt>Cut immediately</dt><dd>Mod-Shift-.</dd>
+        <dt>Toggle side pane</dt><dd>Mod-\</dd>
+      </dl>
+      <p class="vact-shortcut-note">Mod is Command on Mac, Ctrl elsewhere.</p>
+    </div>
+  </details>;
 }

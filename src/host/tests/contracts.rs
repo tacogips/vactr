@@ -436,6 +436,7 @@ fn recording_hosts_log_calls_in_order_with_arrival_time() {
     let sigs = HostSigs {
         amp: 0.5,
         fft: [0.25; 8],
+        ..HostSigs::default()
     };
     audio.set_sigs(sigs);
     assert_eq!(boxed.analysis(), sigs);

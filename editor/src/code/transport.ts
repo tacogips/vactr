@@ -1,8 +1,9 @@
 // The transport bar (design 15.1.5 "Transport bar", 11.7 clock status,
 // 15.2 icons, audio state and eval outcome).
 //
-// - Tempo and cycle/beat from `tempo`, extrapolated on the tier clock
-//   between messages (held while an external MIDI clock is lost).
+// - Position advances only while scheduled music is active. The session clock
+//   can run in an empty session; its `running` flag alone is not playback.
+// - Pause freezes existing bindings; Stop revokes them and lets tails finish.
 // - MIDI clock status from `tempo.clock`: `internal`, `midi locked`,
 //   `midi lost`, shown as a glyph with the word as its accessible name.
 // - Hush sends `hush` for an immediate cut; stop-all sends one session-level
@@ -27,7 +28,7 @@ import { defaultTimers, type Timers } from '../protocol/document';
 import type { Diagnostic, LevelsBody, ServerEnvelope, TempoBody, TransportSample, WirePlaying } from '../protocol/types';
 import { audioModel, type AudioContextLike, type AudioModel } from '../ui/audio';
 import { isApplePlatform, stopShortcut } from '../ui/stop-keys';
-import { TransportView, type ClockStatus, type EvalStatus, type Position, type SlotView } from '../ui/transport-view';
+import { TransportView, type ClockStatus, type EvalStatus, type Position, type PlaybackState, type SlotView } from '../ui/transport-view';
 import { DEFAULT_BEATS_PER_CYCLE, DEFAULT_BPM, TimeAnchor } from './highlight';
 
 export type { ClockStatus, EvalStatus } from '../ui/transport-view';
@@ -80,10 +81,13 @@ export interface TransportOptions {
   onHush?: () => void;
   /** The browser tier's AudioContext; omitted on the native tier. */
   audio?: AudioContextLike | null;
-  /** The Run button (evaluate the whole document); omitted hides it. */
+  /** Evaluates the whole document from Play or Update. */
   onRun?: () => void;
+  /** Explain why the current playback cannot pause, or return an empty string. */
+  pauseReason?: () => string;
   /** Optional per-viewer Vim mode toggle. */
   vim?: { enabled: Accessor<boolean>; toggle: () => void };
+  unapplied?: { color: Accessor<string>; setColor: (color: string) => void };
   timers?: Timers;
 }
 
@@ -120,6 +124,14 @@ export class TransportBar {
   private evalTimer: unknown = null;
   private tempo: TempoBody | null = null;
   private tempoAt = 0;
+  private playback!: Accessor<PlaybackState>;
+  private setPlayback!: Setter<PlaybackState>;
+  private legacyActive = false;
+  private stopHeld = false;
+  private pauseRequested: boolean | null = null;
+  private pausedCycle: number | null = null;
+  private pauseReason!: Accessor<string>;
+  private setPauseReason!: Setter<string>;
 
   constructor(parent: HTMLElement, opts: TransportOptions) {
     this.opts = opts;
@@ -154,7 +166,9 @@ export class TransportBar {
       const [position, setPosition] = createSignal<Position | null>(null);
       const [clock, setClock] = createSignal<ClockStatus>('internal');
       const [level, setLevel] = createSignal<number | null>(null);
-      const [output, setOutput] = createSignal<'running' | 'draining' | 'cutting' | 'idle'>('running');
+      const [output, setOutput] = createSignal<'running' | 'draining' | 'cutting' | 'idle'>('idle');
+      [this.playback, this.setPlayback] = createSignal<PlaybackState>('stopped');
+      [this.pauseReason, this.setPauseReason] = createSignal(opts.pauseReason?.() ?? '');
       const [slots, setSlots] = createSignal<SlotView[]>([]);
       const [status, setStatus] = createSignal<EvalStatus>({ kind: 'idle' });
       setters = { bpm: setBpm, position: setPosition, clock: setClock, level: setLevel, output: setOutput, slots: setSlots, evalStatus: setStatus };
@@ -177,6 +191,10 @@ export class TransportBar {
     this.disposeRender = render(
       () =>
         createComponent(TransportView, {
+          playback: this.playback,
+          pauseReason: this.pauseReason,
+          onToggle: () => this.playback() === 'stopped' ? this.play() : this.stopAll(),
+          onPause: () => this.togglePause(),
           bpm: accessors.bpm,
           position: accessors.position,
           clock: accessors.clock,
@@ -189,8 +207,8 @@ export class TransportBar {
           onAudio: () => void audio.start(),
           ...(opts.onRun ? { onRun: () => opts.onRun?.() } : {}),
           ...(opts.vim ? { vim: opts.vim } : {}),
+          ...(opts.unapplied ? { unapplied: opts.unapplied } : {}),
           onHush: () => this.hush(),
-          onStopAll: () => this.stopAll(),
           onStop: (slot: string) => this.opts.client.stop(slot),
         }),
       this.el,
@@ -216,14 +234,56 @@ export class TransportBar {
   }
 
   hush(): void {
+    this.resetPlayback('cutting');
     this.opts.client.hush();
     this.opts.onHush?.();
   }
 
   /** Stops every slot, including slots that have not appeared in the editor. */
   stopAll(): void {
+    this.resetPlayback('draining');
     this.opts.client.stopAll();
     this.opts.onHush?.();
+  }
+
+  private play(): void {
+    // A per-slot stop can leave an empty scheduler paused. An explicit Play
+    // should resume it before evaluating new bindings.
+    const sample = this.opts.sample?.() ?? this.tempo?.transport;
+    if (sample && !sample.running && clockStatus(this.tempo) !== 'midi lost') this.opts.client.continueTransport();
+    this.pauseRequested = null;
+    this.pausedCycle = null;
+    this.opts.onRun?.();
+  }
+
+  private resetPlayback(output: 'draining' | 'cutting'): void {
+    this.stopHeld = true;
+    this.legacyActive = false;
+    this.pauseRequested = null;
+    this.pausedCycle = null;
+    this.setPlayback('stopped');
+    this.setOutput(output);
+    this.setPosition(null);
+    this.state.cycle = null;
+    this.state.beatFlash = false;
+    this.state.hidden = true;
+    for (const row of this.slots.values()) { row.times = []; row.setLit(false); }
+  }
+
+  private togglePause(): void {
+    if (this.playback() === 'stopped' || this.opts.pauseReason?.()) return;
+    const pause = this.playback() !== 'paused';
+    this.pauseRequested = pause;
+    if (pause) {
+      this.pausedCycle = this.state.cycle ?? this.cycles();
+      this.setPlayback('paused');
+      this.opts.client.pauseTransport();
+      this.opts.onHush?.();
+    } else {
+      this.opts.client.continueTransport();
+      void this.audio.start();
+    }
+    this.tick();
   }
 
   /** The distinct transport output states seen, retaining at most 16 transitions. */
@@ -247,6 +307,9 @@ export class TransportBar {
       (env) => {
         if (seq !== this.evalSeq) return;
         this.setEvalStatus(evalOutcome(env));
+        // A successful request permits fresh engine activity after a local stop.
+        // Evaluation alone (constants, definitions) is not proof of playback.
+        if (env.kind === 'eval-result' && env.body.forms.some((form) => !form.failure)) this.stopHeld = false;
       },
       (e: unknown) => {
         if (seq !== this.evalSeq) return;
@@ -265,7 +328,7 @@ export class TransportBar {
     this.tempoAt = this.opts.clock.now();
     this.setBpm(tempo.bpm);
     this.setClock(clockStatus(tempo));
-    this.renderPosition();
+    this.tick();
   }
 
   onLevels(levels: LevelsBody): void {
@@ -275,9 +338,14 @@ export class TransportBar {
   }
 
   onPlaying(events: readonly WirePlaying[]): void {
+    if (events.length && !this.stopHeld) {
+      this.legacyActive = true;
+      if (this.playback() === 'stopped') this.setPlayback('playing');
+    }
     this.anchor.observe(events.map((e) => e.time));
     for (const ev of events) {
       const row = this.row(ev.slot);
+      if (this.stopHeld) continue;
       row.times.push(this.anchor.local(ev.time));
       if (row.times.length > MAX_SLOT_TIMES) row.times.splice(0, row.times.length - MAX_SLOT_TIMES);
     }
@@ -311,8 +379,19 @@ export class TransportBar {
 
   /** Per frame: the position and the activity lights. */
   tick(frameMs?: number): void {
-    const sample = this.opts.sample?.() ?? null;
-    const output = sample?.output ?? 'running';
+    this.setPauseReason(this.opts.pauseReason?.() ?? '');
+    const sample = this.opts.sample?.() ?? this.tempo?.transport ?? null;
+    if (sample?.active === false) { this.legacyActive = false; this.stopHeld = false; }
+    else if (sample?.active === undefined && sample?.output && sample.output !== 'running') this.legacyActive = false;
+    const active = !this.stopHeld && (sample?.active ?? this.legacyActive);
+    if (!active) this.setPlayback('stopped');
+    else if (this.pauseRequested !== null) {
+      if (sample && sample.running === !this.pauseRequested) {
+        this.pauseRequested = null;
+        this.setPlayback(sample.running ? 'playing' : 'paused');
+      }
+    } else this.setPlayback(sample?.running === false ? 'paused' : 'playing');
+    const output = sample?.output ?? (active ? 'running' : 'idle');
     if (this.output() !== output) this.setOutput(output);
     if (this.outputStates[this.outputStates.length - 1] !== output) {
       this.outputStates.push(output);
@@ -337,6 +416,21 @@ export class TransportBar {
   }
 
   private renderPosition(frameMs?: number, transportSample?: TransportSample | null): void {
+    if (this.playback() === 'stopped') {
+      this.setPosition(null);
+      this.state.cycle = null;
+      this.state.beatFlash = false;
+      this.state.hidden = true;
+      this.setBeatFlash(false);
+      const position = this.el.querySelector<HTMLElement>('.vact-position');
+      if (position) position.dataset.sync = 'hidden';
+      return;
+    }
+    if (this.playback() === 'paused' && this.pauseRequested !== null) {
+      this.state.beatFlash = false;
+      this.setBeatFlash(false);
+      return;
+    }
     if (this.opts.audible && this.opts.sample) {
       const audible = this.opts.audible.sample(frameMs ?? performance.now());
       const s = transportSample === undefined ? this.opts.sample() : transportSample;
@@ -350,11 +444,11 @@ export class TransportBar {
           const bpm = s.bpm > 0 ? s.bpm : DEFAULT_BPM;
           const beatDuration = 60 / bpm;
           cycle = sampleCycle;
-          if (s.running) cycle += age * bpm / 60 / bpc;
+          if (s.running && this.playback() === 'playing') cycle += age * bpm / 60 / bpc;
           const sampleBeatPhase = (sampleCycle - Math.floor(sampleCycle)) * bpc;
           const beatElapsed = ((sampleBeatPhase % 1) * beatDuration) + (s.running ? age : 0);
           const beatAge = ((beatElapsed % beatDuration) + beatDuration) % beatDuration;
-          beatFlash = s.running && beatAge < 0.08;
+          beatFlash = this.playback() === 'playing' && s.running && beatAge < 0.08;
           const whole = Math.floor(cycle);
           const beat = Math.floor((cycle - whole) * bpc + 1e-9) + 1;
           this.setPosition({ cycle: whole, beat, beatsPerCycle: bpc });
@@ -371,14 +465,24 @@ export class TransportBar {
       if (cycle === null) this.setPosition(null);
       return;
     }
-    const c = this.cycles();
+    const held = transportSample ? transportSample.cycle[0] / transportSample.cycle[1] : this.pausedCycle;
+    const c = this.playback() === 'paused' ? held ?? this.cycles() : this.cycles();
     if (c === null) return;
+    this.pausedCycle = c;
+    this.state.cycle = c;
+    this.state.hidden = false;
+    this.state.beatFlash = false;
     const bpc = this.tempo && this.tempo.beats_per_cycle > 0 ? this.tempo.beats_per_cycle : DEFAULT_BEATS_PER_CYCLE;
     const cycle = Math.floor(c);
     const beat = Math.floor((c - cycle) * bpc + 1e-9) + 1;
     this.setPosition((prev) =>
       prev && prev.cycle === cycle && prev.beat === beat && prev.beatsPerCycle === bpc ? prev : { cycle, beat, beatsPerCycle: bpc },
     );
+  }
+
+  private setBeatFlash(on: boolean): void {
+    const position = this.el.querySelector<HTMLElement>('.vact-position');
+    if (position) position.dataset.beatFlash = on ? 'on' : 'off';
   }
 
   private row(slot: string): SlotRow {

@@ -416,6 +416,8 @@ pub enum ClientMsg {
     Eval(EvalBody),
     Hush(Empty),
     StopAll(Empty),
+    TransportPause(Empty),
+    TransportContinue(Empty),
     Stop(StopBody),
     SetVar(SetVarBody),
     SetTweak(SetTweakBody),
@@ -429,11 +431,13 @@ pub enum ClientMsg {
 
 impl ClientMsg {
     /// Every client kind.
-    pub const KINDS: [&'static str; 14] = [
+    pub const KINDS: [&'static str; 16] = [
         "clock-probe",
         "eval",
         "hush",
         "stop-all",
+        "transport-pause",
+        "transport-continue",
         "stop",
         "set-var",
         "set-tweak",
@@ -456,6 +460,8 @@ impl ClientMsg {
             ClientMsg::Eval(_) => "eval",
             ClientMsg::Hush(_) => "hush",
             ClientMsg::StopAll(_) => "stop-all",
+            ClientMsg::TransportPause(_) => "transport-pause",
+            ClientMsg::TransportContinue(_) => "transport-continue",
             ClientMsg::Stop(_) => "stop",
             ClientMsg::SetVar(_) => "set-var",
             ClientMsg::SetTweak(_) => "set-tweak",
@@ -757,6 +763,9 @@ pub struct WireLevel {
     /// The host FFT bands (TASK-010 G4); `:master` only in v1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bands: Option<[f32; 8]>,
+    /// The newest 256 final master mono samples, in chronological order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waveform: Option<Vec<f32>>,
 }
 
 /// One analyzer unit's current cells (`levels.analyzers`, TASK-010 G4).
@@ -803,6 +812,9 @@ pub struct TransportSample {
     pub bpm: f64,
     pub beats_per_cycle: f64,
     pub running: bool,
+    /// Scheduled music exists, independently of clock progression or effect tails.
+    #[serde(default)]
+    pub active: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
     pub latency_seconds: Option<f64>,

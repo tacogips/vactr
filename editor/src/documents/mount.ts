@@ -33,6 +33,17 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
   const surface = deps.code.surface;
   const session = new DocumentSession(surface);
   const [open, setOpen] = createSignal(false);
+  const [documentTitle, setDocumentTitle] = createSignal('Untitled');
+  const [dirty, setDirty] = createSignal(session.dirty());
+  const refreshIdentity = () => {
+    const source = session.source;
+    setDocumentTitle(source.kind === 'library' ? source.name : source.kind === 'file'
+      ? source.name.split(/[\\/]/).pop() || source.name : source.kind === 'example'
+        ? opts.examples.find(source.id)?.title ?? source.id : source.kind === 'template' ? 'New from template' : 'Untitled');
+    setDirty(session.dirty());
+  };
+  const stopIdentity = surface.subscribe((update) => { if (update.docChanged) refreshIdentity(); });
+  const stopIdentityBaseline = session.onBaseline(refreshIdentity);
   const [library, setLibrary] = createSignal<LibraryView>(opts.shell === 'web' && opts.store.available
     ? { available: true, ...opts.store.list() }
     : { available: false, entries: [], unreadable: 0 });
@@ -128,6 +139,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
       session.markSaved({ kind: 'library', id: result.value.id, name: result.value.name });
       setStatus(`Saved ${result.value.name}`);
       refreshLibrary();
+      refreshIdentity();
       return null;
     },
     rename(id, name) {
@@ -137,6 +149,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
         session.setSource({ kind: 'library', id, name: result.value.name });
       setStatus(`Renamed ${result.value.name}`);
       refreshLibrary();
+      refreshIdentity();
       return null;
     },
     remove(id) {
@@ -147,6 +160,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
         setStatus('Saved document deleted');
       }
       refreshLibrary();
+      refreshIdentity();
     },
     useAsTemplate() {
       const source = session.source;
@@ -171,6 +185,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
   };
 
   const disposeRender = render(() => createComponent(PickerView, {
+    documentTitle, dirty,
     shell: opts.shell, open, examples: opts.examples.list(), library,
     templateExampleId: () => template()?.kind === 'example' ? (template() as { kind: 'example'; id: string }).id : null,
     hasTemplate: () => template() !== null,
@@ -195,6 +210,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
       if (disposed) return;
       disposed = true;
       autosave?.dispose();
+      stopIdentity();
+      stopIdentityBaseline();
       session.dispose();
       disposeRender();
       section.remove();

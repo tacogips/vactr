@@ -21,8 +21,9 @@ use crate::dsp::cells::CellId;
 use crate::dsp::controls::row;
 use crate::dsp::graph::InstId;
 use crate::dsp::ring::{encode_sample_begin, encode_slice};
-use crate::host::caps::{HostSigs, Hosts, InstResolver, SampleData, SampleSrc};
+use crate::host::caps::{Hosts, InstResolver, SampleData, SampleSrc};
 use crate::host::noop::NoopHost;
+use crate::host::signals::decode_signals;
 use crate::host::wasm::abi::{for_each_record, input, push_record, TAG_FAULT, TAG_SIGS};
 use crate::host::wasm::messages::{
     console, HostState, WasmAudioHost, WasmCellPort, WasmSamples, SLICE_FLOATS,
@@ -203,16 +204,10 @@ pub unsafe extern "C" fn inbox(ptr: *const u8, len: u32) {
                 console(&format!("diag {d}"));
                 h.abort(resource);
             }
-            Some(TAG_SIGS) if rec.len() >= 37 => {
-                let f = |i: usize| f32::from_le_bytes([rec[i], rec[i + 1], rec[i + 2], rec[i + 3]]);
-                let mut sigs = HostSigs {
-                    amp: f(1),
-                    ..HostSigs::default()
-                };
-                for (k, x) in sigs.fft.iter_mut().enumerate() {
-                    *x = f(5 + 4 * k);
+            Some(TAG_SIGS) => {
+                if let Some(sigs) = decode_signals(rec) {
+                    h.sigs = sigs;
                 }
-                h.sigs = sigs;
             }
             _ => {
                 if let Ok((msg, _)) = HostMsg::decode(rec) {

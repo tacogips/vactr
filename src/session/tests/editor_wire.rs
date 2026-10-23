@@ -476,6 +476,7 @@ fn levels_carries_master_bands_and_analyzer_cells() {
     rig.audio.set_sigs(HostSigs {
         amp: 0.5,
         fft: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+        waveform: Some([0.25; 256]),
     });
     rig.s.rt.input.set_analyzer(AnalyzerId::new(5), 0.3);
     rig.s.rt.input.set_analyzer(AnalyzerId::new(6), 0.7);
@@ -489,6 +490,7 @@ fn levels_carries_master_bands_and_analyzer_cells() {
     };
     let master = &levels.levels[0];
     assert_eq!(master.source, ":master");
+    assert_eq!(master.waveform.as_deref(), Some([0.25; 256].as_slice()));
     assert_eq!(master.bands, Some([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]));
     let analyzers = levels.analyzers.as_ref().expect("an analyzer is installed");
     let level = analyzers

@@ -56,3 +56,20 @@ describe('live-performance protocol envelopes', () => {
     expect(decodeServer(stale('unknown')).ok).toBe(false);
   });
 });
+
+
+describe('master output waveform telemetry', () => {
+  const levels = (extra: Record<string, unknown> = {}) => JSON.stringify({ v: 1, seq: 1, kind: 'levels', body: {
+    levels: [{ source: ':master', rms: 0.2, bands: [0.1, 0.4], ...extra }],
+  } });
+  it('accepts legacy levels and fixed chronological waveforms', () => {
+    expect(decodeServer(levels()).ok).toBe(true);
+    expect(decodeServer(levels({ waveform: Array.from({ length: 256 }, (_, i) => i % 2 ? -1 : 1) })).ok).toBe(true);
+  });
+  it('rejects malformed, unbounded and non-audio waveform values', () => {
+    for (const waveform of [null, {}, [], Array(255).fill(0), Array(257).fill(0),
+      Array(256).fill('0'), Array(256).fill(2), Array(256).fill(Number.NaN)]) {
+      expect(decodeServer(levels({ waveform })).ok).toBe(false);
+    }
+  });
+});

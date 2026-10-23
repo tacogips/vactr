@@ -134,3 +134,37 @@ fn clock_master_emits_start_clock_and_stop_with_commit_discipline() {
     assert!((time - (3.0 + lead)).abs() < 1e-9);
     assert_eq!(sent.len(), n + 2, "no clock after Stop");
 }
+
+#[test]
+fn live_internal_pause_controls_clock_master_and_ignores_incoming_midi_transport() {
+    let mut rig = MidiRig::new();
+    rig.run("midi-clock-out true\ns :bd > d1");
+    rig.run_to(0.7);
+    rig.send(MidiInEvent::Stop);
+    rig.tick_at(0.71);
+    assert!(
+        !rig.rt.midi_clock().is_frozen(),
+        "internal clock ignores MIDI Stop"
+    );
+    rig.rt.transport_pause(0.71);
+    assert!(rig.rt.midi_clock().is_frozen());
+    assert!(matches!(
+        rig.midi_sent().last(),
+        Some((_, MidiEvent::Stop { .. }))
+    ));
+    let sent = rig.midi_sent().len();
+    rig.send(MidiInEvent::Continue);
+    rig.tick_at(1.0);
+    assert!(
+        rig.rt.midi_clock().is_frozen(),
+        "MIDI Continue cannot resume live internal pause"
+    );
+    assert_eq!(rig.midi_sent().len(), sent);
+    rig.rt.transport_continue(1.0);
+    assert!(matches!(
+        rig.midi_sent().last(),
+        Some((_, MidiEvent::Continue { .. }))
+    ));
+    rig.run_to(1.3);
+    assert!(rig.midi_sent().len() > sent + 1);
+}

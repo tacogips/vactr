@@ -115,3 +115,29 @@ fn analysis_cells_are_published() {
     assert!(rig.engine.host_sigs().amp > 0.0);
     assert!(rig.engine.host_sigs().fft.iter().any(|b| *b > 0.0));
 }
+
+#[test]
+fn master_waveform_matches_final_output_chronologically_across_ring_wraps() {
+    let (rig, channels) = render(None, UGenSpec::WhiteNoise, 440.0);
+    let half = channels.len() / 2;
+    let expected: Vec<_> = channels[half - 256..half]
+        .iter()
+        .zip(&channels[channels.len() - 256..])
+        .map(|(left, right)| 0.5 * (left + right))
+        .collect();
+    let (signals, allocations) = crate::dsp::alloc_probe::armed(|| rig.engine.host_sigs());
+    assert_eq!(allocations, 0);
+    assert_eq!(
+        signals.waveform.as_ref().map(|samples| samples.as_slice()),
+        Some(expected.as_slice())
+    );
+    assert!(expected.iter().any(|sample| *sample != 0.0));
+}
+
+#[test]
+fn waveform_is_absent_until_output_exists_and_then_reports_real_silence() {
+    let mut rig = NativeRig::native();
+    assert!(rig.engine.host_sigs().waveform.is_none());
+    rig.run(4);
+    assert_eq!(rig.engine.host_sigs().waveform, Some([0.0; 256]));
+}

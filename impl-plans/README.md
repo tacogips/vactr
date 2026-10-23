@@ -1,5 +1,9 @@
 # Implementation Plans
 
+## Unapplied edit highlights (2026-10-23)
+
+Completed [pending ranges, evaluation acknowledgement, and persistent highlight color](completed/editor-unapplied-edits.md). TypeScript checking passed; tests were not requested.
+
 This directory contains implementation plans that translate design documents into actionable implementation specifications.
 
 The [GPU canvas editor cutover](active/canvas-cutover-dispatch.json) is Completed (2026-10-07; design 15.3.8): all plans accepted; canonical silent release-wasm `run-001` passes in Chromium and WebKit; WebKit input p95 is 16 ms and sync p95 is 12.7 ms. The historical canvas-editor-224 chain is superseded.
@@ -504,3 +508,18 @@ Implementation is in progress; statuses and evidence are recorded per plan. Shar
 [Shared issued query work](completed/song-mode-shared-issued-query-work.md) is Completed (session 261 final receipt).
 
 FM1 microtonal tuning and chord performance ([design-tuning-and-strum.md](../design-docs/specs/design-tuning-and-strum.md)) is Completed (session 354, 2026-10-11; integration review comm-006021 accepted all 7 plans; full nextest 2888/2888, vitest 841/841, test:style 4/4): [01 tuning model](completed/fm1-tuning-01-model.md), [02 pattern graph](completed/fm1-tuning-02-pattern-graph.md), [03 frequency resolution](completed/fm1-tuning-03-resolution.md), [04 tuning-aware music](completed/fm1-tuning-04-music.md), [05 natives](completed/fm1-tuning-05-natives.md), [06 docs and examples](completed/fm1-tuning-06-docs-examples.md) and [07 closeout](completed/fm1-tuning-07-closeout.md). The dispatch manifest [fm1-tuning-dispatch.json](active/fm1-tuning-dispatch.json) stays in `active/` because the running workflow references that path; archive it after the branch commit.
+
+## Editor header and transport (2026-10-18)
+
+[Editor header redesign](completed/editor-header.md) is Completed: grouped document/playback/output controls, Play/Stop toggle, real live Pause/Resume, activity-based counter, document identity and accessible responsive menus. [Design](../design-docs/specs/design-editor-header.md). Frontend 81 focused tests, Rust 77 focused tests plus independent checks, style checks across 16 combinations, and Chromium/WebKit playback/menu checks at three widths passed. Finite-song pause is explicitly unavailable.
+
+## Comment-driven editor backgrounds (2026-10-18)
+
+[Editor background comments](completed/editor-background-comments.md) is Completed.
+Own-line `#@ editor` JSON configures image/video/shader backgrounds and real
+master oscilloscope, spectrum, rolling spectrogram and level overlays. The
+registered **Editor Background** example demonstrates the feature. Related
+frontend tests (63), focused Rust tests (89), independent Rust verification
+(67), and final Chromium/WebKit media, waveform, shader and example checks
+passed. See [usage](../README.md#editor-backgrounds-and-visualizers) and the
+[design contract](../design-docs/specs/design-visual.md#editor-background-comments-2026-10-18).

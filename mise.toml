@@ -17,6 +17,7 @@ fi
 '''
 
 [tools]
+node = "24.22.1"
 rust = "1.83.0"
 python = "3.12.14"
 clang = "21.1.8"

@@ -25,7 +25,11 @@ export interface EditorOptions {
   gl?: WebGL2RenderingContext; frameHost?: FrameHost; createCanvas?: () => HTMLCanvasElement;
 }
 export interface PresentSample { frameStart: number; frameEnd: number; workMs: number; revision: number; visibleComplete: boolean }
-export interface InputSample { eventTimeStamp: number; start: number; end: number; workMs: number; revisionAfter: number }
+/**
+ * One handled `keydown` or `beforeinput`. `revisionBefore` is the presentation revision when the event
+ * started: a keydown and the beforeinput it produces share it, so callers can combine their work.
+ */
+export interface InputSample { type: 'keydown' | 'beforeinput'; eventTimeStamp: number; start: number; end: number; workMs: number; revisionBefore: number; revisionAfter: number }
 export interface EditorHandle {
   readonly state: EditorState; dispatch(spec: TransactionSpec): void; undo(): boolean; redo(): boolean; setDoc(text: string): void;
   onUpdate(cb: (update: EditorUpdate) => void): () => void; onScroll(cb: (top: number) => void): () => void;
@@ -86,9 +90,11 @@ export function createEditor(host: HTMLElement, options: EditorOptions = {}): Ed
     widgetRevision = result.widgetRevision; const end = performance.now();
     if (result.rendered) for (const cb of presents) cb({ frameStart: start, frameEnd: end, workMs: end - start, revision, visibleComplete: result.visibleComplete });
   } });
-  const starts = new WeakMap<Event, number>(); const capture = (event: Event) => { starts.set(event, performance.now()); };
-  const bubble = (event: Event) => { const end = performance.now(), start = starts.get(event) ?? end;
-    for (const cb of inputs) cb({ eventTimeStamp: event.timeStamp, start, end, workMs: end - start, revisionAfter: revision }); };
+  const starts = new WeakMap<Event, { start: number; revision: number }>();
+  const capture = (event: Event) => { starts.set(event, { start: performance.now(), revision }); };
+  const bubble = (event: Event) => { const end = performance.now(), begun = starts.get(event) ?? { start: end, revision };
+    const type = event.type === 'keydown' ? 'keydown' : 'beforeinput';
+    for (const cb of inputs) cb({ type, eventTimeStamp: event.timeStamp, start: begun.start, end, workMs: end - begun.start, revisionBefore: begun.revision, revisionAfter: revision }); };
   for (const name of ['keydown', 'beforeinput']) { host.addEventListener(name, capture, true); host.addEventListener(name, bubble); }
   for (const plugin of options.plugins ?? []) runtime.add(plugin);
   scheduler.invalidateText('doc');

@@ -87,6 +87,7 @@ export interface TransportOptions {
   pauseReason?: () => string;
   /** Optional per-viewer Vim mode toggle. */
   vim?: { enabled: Accessor<boolean>; toggle: () => void };
+  inline?: { enabled: Accessor<boolean>; toggle: () => void };
   unapplied?: { color: Accessor<string>; setColor: (color: string) => void };
   timers?: Timers;
 }
@@ -207,6 +208,7 @@ export class TransportBar {
           onAudio: () => void audio.start(),
           ...(opts.onRun ? { onRun: () => opts.onRun?.() } : {}),
           ...(opts.vim ? { vim: opts.vim } : {}),
+          ...(opts.inline ? { inline: opts.inline } : {}),
           ...(opts.unapplied ? { unapplied: opts.unapplied } : {}),
           onHush: () => this.hush(),
           onStop: (slot: string) => this.opts.client.stop(slot),
@@ -355,6 +357,9 @@ export class TransportBar {
   onDiagnostics(diags: readonly Diagnostic[]): void {
     for (const d of diags) if (d.slot) this.row(d.slot);
   }
+
+  /** Whether the transport is actively playing. */
+  isRunning(): boolean { return this.playback() === 'playing'; }
 
   /** The extrapolated position in cycles, or null before the first `tempo`. */
   cycles(): number | null {

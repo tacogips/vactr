@@ -45,6 +45,12 @@ branches and no worktrees.
    - release: `rm -rf /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock`
 
    Never kill processes you did not start.
+   Operator note (after session 615): the lock is always a directory. If
+   the path exists as a regular file, it is stale (left by a broken
+   writer); if no vitest, Playwright or nextest process is running, delete
+   it and acquire normally instead of reporting a blocker. If the sandbox
+   cannot create the lock outside the worktree, run the heavy command
+   without the lock, note that in the result, and continue.
 8. Rebuild right before any vactr e2e run:
    - `export CARGO_TERM_QUIET=true; cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`
    - `mise run build-wasm-release`

@@ -8,7 +8,11 @@ import type { CodeApi, CodeAnnotation, SampleLibraryApi } from '../app/apis';
 import type { ServerEnvelope } from '../protocol/types';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { pane } from '../app/layout';
-import { FrameScheduler, type FrameHost } from 'emaki/engine';
+import { FrameScheduler, DecorationStore, WidgetSet, WidgetLayer, PluginRuntime, type FrameHost } from 'emaki/engine';
+import { createBeatGlowPlugin } from './beat-glow';
+import { createSequencerPlugin } from './inline/sequencer';
+import { createScopePlugin } from './inline/scope';
+import { readInlineWidgets, writeInlineWidgets } from './inline-settings';
 import { DiagnosticsController } from './diagnostics';
 import { EvalController } from './eval';
 import { HighlightScheduler, TimeAnchor } from './highlight';
@@ -107,6 +111,10 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let viewHost: CodeViewHost;
   let disposed = false;
   let evalRanges: CodeAnnotation[] = [];
+  const [inlineOn, setInlineOn] = createSignal(readInlineWidgets(localStore(win)));
+  let sequencer: ReturnType<typeof createSequencerPlugin>;
+  let scope: ReturnType<typeof createScopePlugin>;
+  const hushHighlights = (): void => { highlight.clear(); sequencer?.clear(); };
   let playingRanges: { from: number; to: number }[] = [];
   let lastMomentaryLabels: string[] = [];
   let handles: readonly SelectionHandle[] = [];
@@ -139,7 +147,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const highlight = new HighlightScheduler({ clock, file: DOC_FILE, map: (span, rev) => sync.mapWireSpan(span, rev),
     pin: (owner, rev) => sync.pin(owner, rev), unpin: (owner) => sync.unpin(owner), revision: () => sync.revision,
     tempo: () => store.tempo, anchor, ...(deps.audible ? { audible: deps.audible, epoch: () => store.transportSample?.epoch ?? null } : {}) });
-  const evalCtl = new EvalController({ client, sync, onHush: () => highlight.clear(), onEval: (reply, range) => {
+  const evalCtl = new EvalController({ client, sync, onHush: hushHighlights, onEval: (reply, range) => {
     const ids = unapplied.snapshot(range);
     void reply.then(env => {
       if (disposed || env.kind !== 'eval-result' || env.body.file !== DOC_FILE) return;
@@ -163,8 +171,10 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       return song?.applied && song.transport?.state !== 'ended' && song.transport?.state !== 'failed'
         ? 'Pause is unavailable for finite songs' : '';
     },
-    onHush: () => highlight.clear(), audio: deps.core?.host.ctx ?? null, onRun: () => void evalCtl.evalAll(),
+    onHush: hushHighlights, audio: deps.core?.host.ctx ?? null, onRun: () => void evalCtl.evalAll(),
     vim: { enabled: vim.enabled, toggle: () => vim.toggle() },
+    inline: { enabled: inlineOn, toggle: () => { const next = !inlineOn(); setInlineOn(next);
+      writeInlineWidgets(localStore(win), next); sequencer?.refresh(); scope?.refresh(); } },
     unapplied: { color: unappliedColor, setColor: (color) => {
       if (!validUnappliedColor(color)) return;
       setUnappliedColor(color); saveUnappliedColor(localStore(win), color); scheduler?.invalidateText('annotations');
@@ -200,6 +210,27 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   viewHost = new CodeViewHost(hostEl, surface, layout, schedulerHost, () => {
     hideDiagnosticTip(); scheduler?.invalidateText('view');
   });
+  const decorations = new DecorationStore(() => surface.state.doc.length);
+  const widgets = new WidgetSet(surface.state.doc.length);
+  const widgetLayer = new WidgetLayer(hostEl, layout, ledger);
+  const pluginViewport = () => { const v = viewHost.viewport; return {
+    fromLine: layout.heightmap.lineAtHeight(Math.max(0, v.scrollTop - v.height)).line,
+    toLine: Math.min(surface.state.doc.lines, layout.heightmap.lineAtHeight(v.scrollTop + v.height * 2).line + 1),
+    top: v.scrollTop, height: v.height }; };
+  const runtime = new PluginRuntime({ store: decorations, widgets, getState: () => surface.state,
+    requestFrame: () => scheduler?.request(), coordsAtPos: pos => surface.coordsAtPos(pos),
+    lineTop: line => layout.heightmap.lineTop(line), viewport: pluginViewport,
+    theme: () => { const palette = readPalette(doc.documentElement); return { palette, tokens: palette.token }; } });
+  sequencer = createSequencerPlugin({ file: DOC_FILE, beatsPerCycle: () => store.tempo?.beats_per_cycle ?? 4,
+    mapSpan: (span, rev) => sync.mapWireSpan(span, rev),
+    forms: () => evalRev === null ? [] : store.forms(DOC_FILE).flatMap(form => {
+      const mapped = sync.mapWireSpan(form.span, evalRev!); return mapped ? [mapped] : []; }),
+    cycles: () => transport.cycles(), running: () => transport.isRunning(), enabled: inlineOn });
+  scope = createScopePlugin({ time: () => clock.now(), latestOnReceipt: () => tier === 'native' && !deps.audible, enabled: inlineOn });
+  runtime.add(createBeatGlowPlugin({ playing: () => playingRanges,
+    flashes: () => evalRanges.map(r => ({ from: r.from, to: r.to, error: !!r.className?.includes('error') })) }));
+  runtime.add(sequencer.plugin); runtime.add(scope.plugin);
+  let widgetRevision = widgets.revision;
   input = new InputController(surface, inputContainer, {
     label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
     evalSelection: () => { if (vim.enabled()) void evalCtl.evalAtCursor(); },
@@ -245,6 +276,21 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       playingRanges = highlight.tick(ctx.frameMs);
       scheduler?.setActive('playing', highlight.size > 0);
       transport.tick(ctx.frameMs);
+      runtime.viewportChanged(pluginViewport());
+      const runtimeActive = runtime.frame(ctx.frameMs);
+      if (widgetRevision !== widgets.revision) {
+        const before = layout.heightmap.revision;
+        const caret = surface.coordsAtPos(surface.state.selection.main.head);
+        const view = viewHost.viewport;
+        const caretVisible = caret !== null && caret.bottom > (view.top ?? 0) && caret.top < (view.top ?? 0) + view.height;
+        layout.heightmap.setBlocks(widgets.entries(surface.state.doc)); widgetRevision = widgets.revision;
+        if (layout.heightmap.revision !== before) {
+          const caretLine = surface.state.doc.lineAt(surface.state.selection.main.head).number - 1;
+          if (caretVisible && widgets.blocks(surface.state.doc).some(block => block.line < caretLine || (block.line === caretLine && block.side === 'above'))) viewHost.scrollCaret();
+          if (!ctx.textDirty) scheduler?.invalidateText('view');
+        }
+      }
+      const plugin = decorations.collect(ctx.frameMs, surface.state.doc);
       scheduler?.setActive('transport', !!store.tempo);
       if (ctx.textDirty && (displayDirty || displayRevision !== sync.revision)) {
         displayRevision = sync.revision;
@@ -274,7 +320,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const momentaryRows = surface.animatedRows(ctx.frameMs);
         if (perfEnabled) lastMomentaryLabels = momentaryRows.filter((row) => row.kind === 'momentary').map((row) => row.label ?? '');
         scheduler?.setActive('momentary', momentaryRows.length > 0);
-        const animatedRows: CodeAnnotation[] = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
+        const animatedRows: CodeAnnotation[] = momentaryRows;
         const annotations = { staticRows, animatedRows, cursor: input.presentation.cursor };
         const selectionChanged = !renderedSelection || renderedSelection.anchor !== surface.state.selection.main.anchor ||
           renderedSelection.head !== surface.state.selection.main.head;
@@ -283,7 +329,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         staticAnnotations = annotations.staticRows;
         timed('upload', () => {
           renderer.setViewport(range.view, viewport.dpr);
-          renderer.render({ unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), ...vim.overlay(), cursorVisible: true, handles });
+          renderer.render({ plugin, unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), ...vim.overlay(), cursorVisible: true, handles });
         });
         const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
         if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
@@ -291,12 +337,15 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
         const momentaryRows = surface.animatedRows(ctx.frameMs);
         if (perfEnabled) lastMomentaryLabels = momentaryRows.filter((row) => row.kind === 'momentary').map((row) => row.label ?? '');
         scheduler?.setActive('momentary', momentaryRows.length > 0);
-        const animated = [...playingRanges.map((r) => ({ ...r, kind: 'playing' as const })), ...evalRanges, ...momentaryRows];
+        const animated = momentaryRows;
         timed('upload', () => {
           renderer.setViewport(viewHost.viewport, viewport.dpr);
-          renderer.render({ unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), ...vim.overlay(), cursorVisible: true, handles });
+          renderer.render({ plugin, unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), ...vim.overlay(), cursorVisible: true, handles });
         });
       }
+      const layerAnimating = widgetLayer.update({ view: viewHost.viewport, dpr: viewport.dpr, frameMs: ctx.frameMs,
+        blocks: widgets.blocks(surface.state.doc), eols: widgets.eols(surface.state.doc) }).animating;
+      scheduler?.setActive('plugins', runtimeActive || layerAnimating);
       if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);
       if (renderer.textPending) scheduler?.request();
       const perf = scheduler?.perf;
@@ -330,6 +379,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     unapplied.update(update, sync.revision);
     scheduler.invalidateText(update.docChanged ? 'doc' : update.selectionSet ? 'selection' : 'annotations');
     if (update.docChanged) {
+      runtime.docChanged(update);
       let changeCount = 0, wholeDocumentReplacement = false;
       update.changes.iterChanges((fromA, toA) => {
         changeCount++;
@@ -361,6 +411,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     client.on('playing', (env) => {
       if (env.kind !== 'playing') return;
       highlight.onPlaying(env.body.events, { ahead: env.body.ahead, retract: env.body.retract });
+      sequencer.onPlaying(env.body.events);
       transport.onPlaying(env.body.events); scheduler.setActive('playing', true);
     }),
     client.on('eval-result', (env) => {
@@ -373,13 +424,13 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
     }),
     client.on('diag', (env) => { if (env.kind === 'diag') transport.onDiagnostics(env.body.add); }),
     store.subscribe(['tempo'], (_c, s) => { if (s.tempo) transport.onTempo(s.tempo); }),
-    store.subscribe(['levels'], (_c, s) => { if (s.levels) transport.onLevels(s.levels); }),
+    store.subscribe(['levels'], (_c, s) => { if (s.levels) { transport.onLevels(s.levels); scope.onLevels(s.levels); } }),
     store.subscribe(['manifest'], (_c, s) => browser.setSounds(s.manifest?.sounds ?? [])),
     highlight.onAccept((onset) => recordOnset(perfApi, { ...onset, receivedMs: win.performance.now() })),
     highlight.onRetract((id) => retractOnset(perfApi, id)),
   ];
   if (store.tempo) transport.onTempo(store.tempo);
-  if (store.levels) transport.onLevels(store.levels);
+  if (store.levels) { transport.onLevels(store.levels); scope.onLevels(store.levels); }
   browser.setSounds(store.manifest?.sounds ?? []);
 
   const loadMainThreadSyntax = (): void => {
@@ -413,7 +464,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   const mounted: Mounted = {
     dispose() {
       if (disposed) return; disposed = true;
-      scheduler.dispose(); momentaryPointer.dispose(); pointer.dispose(); vim.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
+      runtime.destroy(); widgetLayer.dispose(); scheduler.dispose(); momentaryPointer.dispose(); pointer.dispose(); vim.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
       removePointerForwarding(); input.accessibility.textarea.removeEventListener('keydown', keyRecord);
       for (const name of diagInputEvents) input.accessibility.textarea.removeEventListener(name, noteDiagInput);
       surfaceEl.removeEventListener('pointermove', showDiagnosticTip); surfaceEl.removeEventListener('pointerleave', hideDiagnosticTip);

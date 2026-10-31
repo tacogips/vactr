@@ -1,3 +1,25 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Diff</title><link rel="stylesheet" href="../shared/demo.css"></head>
-<body><main><h1>Diff</h1><p>Not implemented yet.</p></main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Split diff | emaki</title>
+  <link rel="stylesheet" href="../shared/demo.css">
+  <style>
+    .diff-panes { display: flex; gap: var(--emaki-space-2); min-width: 0; }
+    .diff-pane { flex: 1 1 0; min-width: 0; background: var(--emaki-panel); }
+    .diff-pane h2 { margin: 0; padding: var(--emaki-space-2); color: var(--emaki-muted); font-size: 14px; }
+    .diff-editor { height: min(70vh, 720px); min-height: 240px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Split diff</h1>
+    <div class="diff-panes">
+      <section class="diff-pane" data-diff-pane="left"><h2>master (read-only)</h2><div class="diff-editor" id="left-editor"></div></section>
+      <section class="diff-pane" data-diff-pane="right"><h2>working copy</h2><div class="diff-editor" id="right-editor"></div></section>
+    </div>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

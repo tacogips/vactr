@@ -1,6 +1,6 @@
 # EMK-SHOWCASE: plugin showcase page with video, animation and format demo plugins
 
-**Status**: Ready (after EMK-API)
+**Status**: Completed (accepted in session 615 wave 1: test-integrity, adversarial review and branch evidence passed; browser gates per rules 13/14)
 **Plan ID**: EMK-SHOWCASE (wave 4; parallel with EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-VAC-PLUGINS)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 8.1, 11.1; requirement 3 (demo plugins: video widget, animated canvas widget, mark plugin)
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -151,7 +151,7 @@ pixel-change check runs at the wave-4 join.
 
 ## Completion Criteria
 
-- [ ] P1-P4 delivered. Style follows rule 16.
+- [x] P1-P4 delivered. Style follows rule 16.
 - [ ] Verification steps pass. Mutation evidence is recorded. Hashes are
   logged.
 
@@ -167,3 +167,11 @@ pixel-change check runs at the wave-4 join.
 **Mutation Evidence**: constant waveform phase caused the focused assertion to fail (exit 1, `mutation.log`); original source restored with identical `mutation-before.sha256` and `mutation-after.sha256`.
 **Drift**: none in owned source during final verification. Shared-tree checks are subject to the serial wave join.
 **Blocked**: Chromium and WebKit smoke requires the browser-capable orchestrator and wave-4 build under the measurement lock (rules 11 and 12a); no browser result is claimed.
+
+### Session: 2026-11-01 (redispatch verification)
+**Tasks Completed**: Rechecked the committed P1-P4 implementation against the accepted design and plan. No source changes were needed. Formal review and the browser smoke belong to subsequent workflow steps.
+**Files Changed**: This progress log and P1-P4 checkbox; intent and before/after hashes are in `tmp/emaki/EMK-SHOWCASE/redispatch-plan-intent.txt`, `redispatch-before.sha256`, and `redispatch-after.sha256`.
+**Verification**: scoped vitest 3/3 exit 0 (`redispatch-scoped.log`); `npm run check` exit 0 (`redispatch-check.log`); `node --check scripts/smoke.mjs` exit 0 (`redispatch-node.log`); full vitest informational 129/129 exit 0 (`redispatch-full.log`); file lengths under 1000 (`redispatch-lines.log`). Logs are under `tmp/emaki/EMK-SHOWCASE/` and reflect a shared tree.
+**Mutation Evidence**: The earlier constant-phase mutation failed the focused waveform assertion (exit 1, `mutation.log`) and was restored byte-identically (`mutation-before.sha256`, `mutation-after.sha256`).
+**Drift**: None observed in the assigned source during this verification.
+**Deferred Verification**: The orchestrator runs `cd emaki && npm run build && node scripts/smoke.mjs --browser all --out ../tmp/emaki/wave-4-join/smoke` at the wave-4 join, without placeholder skips.

@@ -1,6 +1,6 @@
 # EMK-DIFF-DEMO: realtime split diff demo page and its Playwright e2e
 
-**Status**: Ready (after EMK-API and EMK-DIFF)
+**Status**: Completed (accepted in session 615 wave 1: test-integrity, adversarial review and branch evidence passed; browser gates per rules 13/14)
 **Plan ID**: EMK-DIFF-DEMO (wave 4; parallel with EMK-JSON-DEMO, EMK-SHOWCASE, EMK-VAC-PLUGINS)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 10.1, 11.1, 12.1, 12.3; decision EM-D11
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -190,7 +190,7 @@ unit test fails). Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] DD1-DD5 delivered, using only public APIs (grep shows no
+- [x] DD1-DD5 delivered, using only public APIs (grep shows no
   `../../src/render` or `../../src/layout` imports in `examples/diff`).
 - [ ] Verification steps 1-4 and 6 pass on this plan's scope. Step 5 (G4
   in both browsers) is green at the wave-4 join and appended here. Mutation
@@ -200,3 +200,15 @@ unit test fails). Restore afterwards.
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (implementation, step 6)
+**Tasks Completed**: DD1-DD5. Diff composition, fixture page, presentation hook and browser script are implemented. Formal review and the wave-4 browser join remain downstream.
+**Files and hashes**: pre/post and edit intentions are in `tmp/emaki/EMK-DIFF-DEMO/` (`root-sha256.txt`, `page-*-hashes.txt`, `sha256-e2e.txt`, `test-hashes.txt`, `final-hashes.txt`, and corresponding intent files).
+**Verification**: scoped vitest 3/3 (`scoped-final.log`); `npm run check` exit 0 (`check-final.log`); informational full vitest 132/132 (`full-vitest.log`); `node --check scripts/e2e.mjs` exit 0 (`node-check-final.log`); all written files under 1000 lines (`lines.log`). Runs reflect the shared moving tree.
+**Timing**: 100 `doc.toJSON()` calls on a 10,000-line CodeMirror document took 92.944 ms total in Node (`tojson-timing.log`); browser-visible latency remains for EMK-PERF.
+**Mutation evidence**: disabled scroll forwarding, scoped scroll test failed as expected (exit 1, `mutation.log`), and restored the plugin byte-identically (`root-sha256.txt`).
+**Drift**: none observed in owned files. **Deferred**: `cd emaki && npm run build && npm run e2e -- --browser all --out ../tmp/emaki/wave-4-join/e2e` is owned by the orchestrator wave-4 join.
+
+### Session: 2026-11-01 (adversarial review repair EMK-DIFF-DEMO-AR-1)
+**Tasks Completed**: synchronized caret-driven viewport scrolling through the existing guarded forwarders, while retaining synchronous scroll callbacks and the original scroll-loop assertions. Added a real-editor caret-to-line-90 regression.
+**Evidence**: pre/post hashes and per-edit intentions are in `tmp/emaki/EMK-DIFF-DEMO/ar1-hashes.txt` and `ar1-intents.txt`. Before repair, the regression failed with left 0 and right 1520 (`ar1-reproduction.log`). Scoped vitest passed 4/4 (`ar1-final-vitest.log`); `npm run check` and `node --check scripts/e2e.mjs` passed (`ar1-final-check.log`, `ar1-final-node.log`). The viewport-forwarding mutation failed the new test as expected and the source was restored byte-identically (`ar1-mutation.log`, `ar1-hashes.txt`). These checks ran on the shared moving tree. Chromium/WebKit verification remains assigned to the wave-4 join; independent review remains downstream.

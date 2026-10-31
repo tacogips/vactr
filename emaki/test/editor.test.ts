@@ -27,6 +27,15 @@ describe('createEditor', () => {
     frameHost.step(); expect(present).toHaveBeenLastCalledWith(expect.objectContaining({ revision: 1 }));
     editor.destroy(); editor.destroy(); expect(host.children).toHaveLength(0);
   });
+  it('tags input samples with their event type and the revision before the event', () => {
+    const { host, editor } = setup(); const input = vi.fn(); editor.perf.onInput(input);
+    const textarea = host.querySelector('textarea')!;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'x' }));
+    textarea.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: 'x' }));
+    const [keydown, beforeinput] = input.mock.calls.map(call => call[0]);
+    expect(keydown).toEqual(expect.objectContaining({ type: 'keydown', revisionBefore: 0, revisionAfter: 0 }));
+    expect(beforeinput).toEqual(expect.objectContaining({ type: 'beforeinput', revisionBefore: 0, revisionAfter: 1 }));
+  });
   it('rejects user input in read-only mode but accepts programmatic dispatch', () => {
     const { host, editor } = setup({ readOnly: true });
     host.querySelector('textarea')!.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: 'x' }));

@@ -121,6 +121,14 @@ function settingLines(doc: Text): SettingLine[] {
   return lines;
 }
 
+/** Parse each directive independently so inline widgets retain their source line. */
+export function editorSettingLines(doc: Text): { line: number; settings: EditorSettings }[] {
+  return settingLines(doc).flatMap((entry) => {
+    const parsed = parseLines([entry]);
+    return parsed.errors.length ? [] : [{ line: entry.number, settings: parsed.settings }];
+  });
+}
+
 /** Ordinary edits inspect changed lines; full scans happen only when directives can change. */
 export class EditorSettingsSource {
   private doc: Text;

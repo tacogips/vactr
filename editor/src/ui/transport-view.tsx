@@ -63,6 +63,7 @@ export interface TransportViewProps {
   onAudio: () => void;
   onRun?: () => void;
   vim?: { enabled: Accessor<boolean>; toggle: () => void };
+  inline?: { enabled: Accessor<boolean>; toggle: () => void };
   unapplied?: { color: Accessor<string>; setColor: (color: string) => void };
   onHush: () => void;
   onStop: (slot: string) => void;
@@ -252,7 +253,7 @@ export function TransportView(props: TransportViewProps): JSX.Element {
           <span class="vact-level-value">{levelText()}</span><span class="vact-unit">dB</span>
         </span>
       </div>
-      <EditorOptions vim={props.vim} unapplied={props.unapplied} />
+      <EditorOptions vim={props.vim} inline={props.inline} unapplied={props.unapplied} />
       <Show when={props.slots().length > 0}>
         <details class="vact-slot-disclosure"><summary>Slots <span>{props.slots().length}</span><ChevronDown /></summary>
           <div class="vact-header-popover">
@@ -276,7 +277,7 @@ export function TransportView(props: TransportViewProps): JSX.Element {
   );
 }
 
-function EditorOptions(props: { vim?: TransportViewProps['vim']; unapplied?: TransportViewProps['unapplied'] }): JSX.Element {
+function EditorOptions(props: { vim?: TransportViewProps['vim']; inline?: TransportViewProps['inline']; unapplied?: TransportViewProps['unapplied'] }): JSX.Element {
   return <details class="vact-editor-options">
     <summary>Editor <ChevronDown /></summary>
     <div class="vact-header-popover">
@@ -284,6 +285,11 @@ function EditorOptions(props: { vim?: TransportViewProps['vim']; unapplied?: Tra
         <span>Vim mode</span>
         <IconButton class="vact-vim-toggle" label={() => `Vim mode: ${vim().enabled() ? 'on' : 'off'}`}
           ariaPressed={() => vim().enabled() ? 'true' : 'false'} onClick={vim().toggle}>vim</IconButton>
+      </div>}</Show>
+      <Show when={props.inline}>{(inline) => <div class="vact-editor-option">
+        <span>Inline widgets</span>
+        <IconButton class="vact-inline-toggle" label={() => `Inline widgets: ${inline().enabled() ? 'on' : 'off'}`}
+          ariaPressed={() => inline().enabled() ? 'true' : 'false'} onClick={inline().toggle}>inline</IconButton>
       </div>}</Show>
       <Show when={props.unapplied}>{(setting) => <>
         <label class="vact-editor-option vact-unapplied-setting">

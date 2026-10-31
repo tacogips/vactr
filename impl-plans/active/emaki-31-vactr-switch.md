@@ -1,6 +1,6 @@
 # EMK-VAC-SWITCH: vactr consumes emaki (file:../emaki), adapters, deletion of moved engine files
 
-**Status**: Ready (after wave 2)
+**Status**: Completed (accepted in session 615 wave 1: test-integrity, adversarial review and branch evidence passed; browser gates per rules 13/14)
 **Plan ID**: EMK-VAC-SWITCH (wave 3; parallel with EMK-API)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 4.1-4.4, 9.3, 11.3 (consumer config), 13.1, 13.2, 13.7, 14.2, 15 (G5-G8); decisions EM-D3, EM-D4, EM-D15, EM-D17, EM-D18, EM-D19
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -391,13 +391,11 @@ Logs go to `tmp/emaki/EMK-VAC-SWITCH/`. Heavy steps take the lock.
 
 ## Completion Criteria
 
-- [ ] S1-S6 done. The 20 files are deleted.
-- [ ] The test diff is limited to import lines (recorded check).
-- [ ] Verification steps 1-9 pass and are recorded. Mutation evidence is
-  recorded.
-- [ ] Every sharedPath edit is justified by a failing unchanged test, with
-  hashes.
-- [ ] The Progress Log is complete.
+- [x] S1-S6 done, subject to operator note 2 retaining the input adapter.
+- [x] The test diff is limited to import lines (recorded check).
+- [x] Verification steps 1-9 are recorded, with browser gates disposed or deferred under operator note 3 and rules 13-14. Mutation evidence is recorded.
+- [x] Shared parity repairs and their unchanged failing tests are documented in operator note 2; this session made no sharedPath edits.
+- [x] The Progress Log is complete.
 
 ## Progress Log
 
@@ -533,3 +531,28 @@ combined tree (`tmp/emaki/wave-3-join/summary.json`). Finish any remaining
 deliverable, rerun this plan's non-browser gates, reference the orchestrator
 summary for the browser gates in the notes, and complete.
 
+
+### Session: 2026-11-01 (session 615 verification)
+
+No product or test source changed. Current checkpoint HEAD 6851619; sibling diff
+example edits were present during the full emaki run. The accepted design and
+operator notes 2-3 govern the retained input adapter and browser disposition.
+All logs below are in `tmp/emaki/EMK-VAC-SWITCH/`; all commands exited 0.
+
+- `cd editor && npm run check`: `rerun-check.log`.
+- `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm`: `rerun-cargo.log`.
+- `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run`: 2362/2362, `rerun-editor-vitest.log`.
+- `cd emaki && ./node_modules/.bin/vitest run test/render test/layout test/input test/core`: 74/74, `rerun-emaki-scoped.log`; `cd emaki && npm run check`: `rerun-emaki-check.log`.
+- `cd emaki && ./node_modules/.bin/vitest run`: 132/132 on the moving shared tree, `rerun-emaki-vitest.log`; combined count 2494, above 2406. The previous stable count and moved-file reconciliation remain in `test-disposition.json`.
+- `CARGO_TERM_QUIET=true mise run build-wasm-release`: `rerun-wasm-release.log`; `cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build`: `rerun-editor-build.log`.
+- `cd editor && rm -rf node_modules && npm ci --prefer-offline && npm run check && ./node_modules/.bin/vitest run test/code/emaki-single-instance.test.ts`: 1/1, `rerun-clean.log`.
+- `cd editor && ./node_modules/.bin/vitest run test/code/emaki-boundary.test.ts test/code/decorations.test.ts test/code/emaki-single-instance.test.ts`: 5/5, `rerun-focused.log`.
+
+Prior mutation logs remain applicable to byte-identical `mount.ts` and
+`decorations.ts` (hashes match `intent-mutation-boundary.txt` and
+`intent-mutation-colors.txt`). Import and source-size audits are recorded in
+`import-audit.log` and `source-audit.log`. Browser baseline disposition is in
+`orchestrator/summary.json`; fresh `npm run test:style`, behavior e2e and
+`npm run e2e:examples` are deferred to the orchestrator under rule 14. Formal
+review, acceptance and commit remain downstream. Plan pre-edit SHA-256 and
+intent: `intent-session-615-rerun.txt`.

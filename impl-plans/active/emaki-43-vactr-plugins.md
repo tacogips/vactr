@@ -351,3 +351,9 @@ Restore afterwards.
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (partial implementation)
+**Tasks Completed**: Implemented beat/eval animated marks, inline widget controllers, persisted toggle and mount integration. Completion remains unverified.
+**Files and intent**: See `tmp/emaki/EMK-VAC-PLUGINS/intent-*.txt`, `widget-intent.txt`, and pre/post SHA-256 files in that directory. Sibling changes were preserved.
+**Verification**: `npm run check` passed (`check-7.log`, exit 0). Scoped vitest passed 148/148 (`scoped-7.log`, exit 0). An earlier geometry regression was corrected by preserving the visible caret when a block shifts it; earlier attempts are in `scoped-final.log` and `scoped-2.log`. The default-off diagnostic control was restored byte-identically (`control-before.sha256`, `control-after.sha256`).
+**Blocked**: Full vitest, wasm and release builds cannot take the required mkdir-based measurement lock: `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` is an existing regular file. Resolve the lock protocol/state, then run all remaining gates and mutation controls. Browser gates require the orchestrator under rule 14. No completion criteria are checked.

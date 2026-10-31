@@ -281,11 +281,13 @@
   cursor: default;
 }
 
-.vact-vim-toggle {
+.vact-vim-toggle,
+.vact-inline-toggle {
   font-family: var(--vt-font-mono);
   font-size: var(--vt-text-xs);
 }
-.vact-vim-toggle[aria-pressed='true'] {
+.vact-vim-toggle[aria-pressed='true'],
+.vact-inline-toggle[aria-pressed='true'] {
   border-color: var(--vt-accent);
   background: var(--vt-accent);
   color: var(--vt-on-accent);

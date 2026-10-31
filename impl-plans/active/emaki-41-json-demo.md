@@ -140,3 +140,15 @@ case 2 fails. Restore afterwards.
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+## Operator note (after session 615)
+
+The perf seam J2 needs now exists (operator change in `emaki/src/editor.ts`,
+covered by `emaki/test/editor.test.ts` "tags input samples with their event
+type and the revision before the event"): `InputSample` has
+`type: 'keydown' | 'beforeinput'` and `revisionBefore`. A keydown and the
+beforeinput it produces share `revisionBefore`; combine their work by that
+key (keydown work + beforeinput work), and treat a keydown with no matching
+beforeinput as a non-editing key. No engine change is needed in this plan.
+Playwright perf runs that the sandbox cannot execute follow rule 14.
+

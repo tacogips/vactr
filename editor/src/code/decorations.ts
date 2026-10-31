@@ -12,7 +12,7 @@ export interface RenderFeedback {
   hopLabels?: readonly { pos: number; text: string }[]; hopRevision?: number;
   plugin?: { marks?: readonly Mark[]; animatedMarks?: readonly AnimatedMark[]; lineFormats?: readonly ResolvedLineFormat[]; key?: string };
 }
-export const PLAYING_MARK: MarkStyle = { background: [0.7, 0.58, 0.26, 0.5] };
+export const PLAYING_MARK: MarkStyle = { background: [0.7, 0.58, 0.26, 0.5], glow: { color: [0.7, 0.58, 0.26, 0.5], radius: 4 } };
 export const EVAL_MARK: MarkStyle = { background: [0.4, 0.64, 0.72, 0.5] };
 export const EVAL_ERROR_MARK: MarkStyle = { background: [0.8, 0.24, 0.32, 0.5] };
 export function toRenderInput(feedback: RenderFeedback, palette: VactrPalette): RenderInput {

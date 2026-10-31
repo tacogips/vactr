@@ -1,5 +1,16 @@
 # Implementation Plans
 
+## music-things DSP extraction (2026-10-31)
+
+These plans implement [design-music-things-extraction.md](../design-docs/specs/design-music-things-extraction.md) on branch `wf/music-things-extract` (workflow session 577). They move vactr's synth and effect kernels into the in-tree crates `music-things/crates/music-things-{dsp,synth,fx}`, keeping audio bit-identical. All plans are Ready. Common rules are in [music-things-protocol.md](active/music-things-protocol.md), and waves are in the [dispatch manifest](active/music-things-dispatch.json).
+
+- **Wave 0**: [MTX-00 foundation](active/music-things-00-foundation.md)
+- **Wave 1** (parallel): [MTX-S1 classic, FM and MI roles](active/music-things-s1-classic-mi.md), [MTX-F1 dynamics to lo-fi groups](active/music-things-f1-dynamics-time.md)
+- **Wave 2** (parallel): [MTX-S2 pairs and LPG](active/music-things-s2-pairs-lpg.md), [MTX-F2 texture, granular, stream and analyzer](active/music-things-f2-texture-granular.md)
+- **Wave 3** (parallel): [MTX-S3 Braids and voice cores](active/music-things-s3-braids-voices.md), [MTX-F3 cross-mod and banks](active/music-things-f3-crossmod-banks.md)
+- **Wave 4**: [MTX-90 fx dispatch](active/music-things-90-fx-dispatch.md)
+- **Wave 5**: [MTX-91 notices and final drop-in gates](active/music-things-91-notices-final.md)
+
 ## Unapplied edit highlights (2026-10-23)
 
 Completed [pending ranges, evaluation acknowledgement, and persistent highlight color](completed/editor-unapplied-edits.md). TypeScript checking passed; tests were not requested.

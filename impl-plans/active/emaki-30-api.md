@@ -265,3 +265,22 @@ error-isolation test fails. Restore afterwards.
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (partial implementation)
+**Tasks Completed**: Started A1: added a plugin runtime and barrel export. A1 remains unverified against its required new tests; A2-A5 remain incomplete.
+**Precondition**: `tmp/emaki/wave-2-join/summary.json` reports green.
+**Files and hashes**: `emaki/src/plugin/runtime.ts`, `emaki/src/plugin/index.ts`, and this plan; pre/post hashes are recorded in `tmp/emaki/EMK-API/sha256.txt` and edit intentions in `tmp/emaki/EMK-API/intent.txt`.
+**Verification**: `npm run check` exited 0 (`tmp/emaki/EMK-API/check-partial.log`). The scoped vitest command exited 0 with 2 tests passed (`tmp/emaki/EMK-API/scoped-partial.log`), but the required new runtime and editor tests do not exist yet, so this is partial evidence only.
+**Blocked**: A2 promises the `lineNumbers` option, while `emaki/src/render/text-pass.ts` unconditionally renders line numbers and `emaki/src/view/view-host.ts` fixes the gutter at 48 pixels. Neither is in this plan's writePaths. Amend ownership for the renderer and view host, or provide an accepted engine seam, before completing the composition. No mutation evidence or final verification has been recorded.
+
+## Operator amendment (after session 609 wave 1)
+
+The `createEditor` `lineNumbers` option needs an engine seam: the text pass
+draws line numbers unconditionally and the view host fixes the gutter
+width. `emaki/src/render/text-pass.ts` and `emaki/src/view/view-host.ts`
+are now in this plan's sharedPaths. Add the smallest seam: a gutter
+option (line numbers on/off; gutter width 0 when off) read by the view
+host's gutter-width computation and by the text pass's gutter drawing,
+defaulting to today's behavior so every existing test stays unchanged.
+Add tests for both settings. EMK-VAC-SWITCH may also touch these files
+only for parity defects; keep edits small and localized.

@@ -403,3 +403,30 @@ Logs go to `tmp/emaki/EMK-VAC-SWITCH/`. Heavy steps take the lock.
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (pre-edit baseline)
+**Tasks Completed**: S1 baseline recorded; implementation remains blocked.
+The wasm build passed (`tmp/emaki/EMK-VAC-SWITCH/baseline-cargo.log`, exit 0).
+The baseline full Vitest run failed (`baseline-vitest.log`, exit 1, 2401 tests,
+2400 passed): `test/canvas/mount.test.ts` detects a large slice on edit.
+The focused rerun also failed (`baseline-mount.log`, exit 1, 25 tests,
+24 passed). The existing `editor/src/code/unapplied.ts` merges a pending
+whole-document insertion and slices the merged range on the subsequent edit;
+that file is outside this plan's writePaths. An ownership amendment or an
+accepted upstream repair is needed before the required full-suite gate can
+pass. No product files or tests were changed. Wave-2 join was green at
+`tmp/emaki/wave-2-join/summary.json`; no shared-path drift was observed.
+Plan pre-edit SHA-256: e94082fc807d3c204f29e51774ac7f7cb6040ce3ad7a3d91b81694e61b7f66a9.
+Mutation evidence and remaining verification are pending implementation.
+
+## Operator note (after session 609 wave 1)
+
+The pre-edit baseline failure (`editor/test/canvas/mount.test.ts` "does no
+whole-document work on an edit frame ...", `editHadLargeSlice`) was a real
+regression on origin/main from e7face0: `UnappliedEdits.update` sliced the
+whole merged region on every keystroke inside a large pending insertion.
+The operator fixed `editor/src/code/unapplied.ts` (bounded head/tail
+comparison, gaps-only document reads). Baseline is now green:
+`cd editor && npm run check` exit 0 and full vitest 166 files / 2401 tests
+passed (`tmp/emaki/wave-2-join/editor-vitest-baseline.log`). Use 2401 as the
+pre-switch baseline count.

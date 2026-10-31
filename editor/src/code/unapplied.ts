@@ -21,22 +21,30 @@ export class UnappliedEdits {
       const touching = this.edits.filter(e => e.from <= change.to && e.to >= change.from);
       const from = Math.min(change.from, ...touching.map(e => e.from));
       const to = Math.max(change.to, ...touching.map(e => e.to));
-      let before = doc.sliceString(from, to);
-      for (const edit of [...touching].sort((a, b) => b.from - a.from)) {
-        before = before.slice(0, edit.from - from) + edit.before + before.slice(edit.to - from);
+      // The merged region's original text: touching edits contribute their
+      // stored `before`, and only the gaps between them (inside the change)
+      // are read from the document, so a keystroke inside a large pending
+      // insertion never slices the whole region.
+      let before = '', pos = from;
+      for (const edit of [...touching].sort((a, b) => a.from - b.from)) {
+        before += doc.sliceString(pos, edit.from) + edit.before;
+        pos = edit.to;
       }
+      before += doc.sliceString(pos, to);
       const delta = change.insert.length - (change.to - change.from);
       const next = ChangeSet.of({ from: change.from, to: change.to, insert: change.insert }, doc.length).apply(doc);
       this.edits = this.edits.filter(e => !touching.includes(e)).map(e => e.from > change.to
         ? { ...e, from: e.from + delta, to: e.to + delta } : e);
       const end = to + delta;
-      const after = next.sliceString(from, end);
-      if (after !== before) {
-        // Keep unchanged prefixes/suffixes out of the highlight and preserve undo.
-        let prefix = 0, suffix = 0;
-        while (prefix < Math.min(before.length, after.length) && before[prefix] === after[prefix]) prefix++;
-        while (suffix < Math.min(before.length, after.length) - prefix &&
-          before[before.length - suffix - 1] === after[after.length - suffix - 1]) suffix++;
+      // Keep unchanged prefixes/suffixes out of the highlight and preserve undo.
+      // Only `before.length` characters at each end can match, so read just those.
+      const limit = Math.min(before.length, end - from);
+      const head = next.sliceString(from, from + limit);
+      let prefix = 0, suffix = 0;
+      while (prefix < limit && before[prefix] === head[prefix]) prefix++;
+      const tail = next.sliceString(end - (limit - prefix), end);
+      while (suffix < limit - prefix && before[before.length - suffix - 1] === tail[tail.length - suffix - 1]) suffix++;
+      if (before.length !== end - from || prefix !== limit) {
         this.edits.push({ from: from + prefix, to: end - suffix,
           before: before.slice(prefix, before.length - suffix), id: ++this.nextId, revision });
       }

@@ -256,7 +256,10 @@
         "emaki/dist",
         "impl-plans/active/emaki-30-api.md"
       ],
-      "sharedPaths": [],
+      "sharedPaths": [
+        "emaki/src/render/text-pass.ts",
+        "emaki/src/view/view-host.ts"
+      ],
       "artifactRoots": [
         "emaki/node_modules",
         "emaki/dist"

@@ -1,7 +1,7 @@
 {
   "taskId": "emaki",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-615",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-616",
   "previousWorkflowExecutionIds": [
     "opus-terra-design-and-implement-review-loop-session-586",
     "opus-terra-design-and-implement-review-loop-session-596",
@@ -10,13 +10,14 @@
     "opus-terra-design-and-implement-review-loop-session-607",
     "opus-terra-design-and-implement-review-loop-session-609",
     "opus-terra-design-and-implement-review-loop-session-611",
-    "opus-terra-design-and-implement-review-loop-session-614"
+    "opus-terra-design-and-implement-review-loop-session-614",
+    "opus-terra-design-and-implement-review-loop-session-615"
   ],
-  "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; rerun session-596 plans accepted comm-011369; rerun session-597 plans accepted comm-011389; rerun session-599 plans accepted comm-011407; rerun session-607 plans accepted comm-011626; rerun session-609 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011699; rerun session-611 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011723; rerun session-614 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011808; rerun session-615 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011843). Target repo for the operator's later copy: https://github.com/tacogips/emaki @0d49bb0",
+  "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; rerun session-596 plans accepted comm-011369; rerun session-597 plans accepted comm-011389; rerun session-599 plans accepted comm-011407; rerun session-607 plans accepted comm-011626; rerun session-609 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011699; rerun session-611 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011723; rerun session-614 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011808; rerun session-615 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011843; rerun session-616 plans accepted, step5-impl-plan-review -> plan-checkpoint comm-011888). Target repo for the operator's later copy: https://github.com/tacogips/emaki @0d49bb0",
   "implementationBranch": "wf/emaki",
   "baseBranch": "wf/emaki",
   "remote": "origin",
-  "originalHead": "44cbabca93eb2c3aa4aaa4d4fc0ed6d7ed55cea8",
+  "originalHead": "961dc6d558c4c5aeeab07d33c907e88137022dac",
   "designDocPaths": [
     "design-docs/specs/design-emaki.md",
     "design-docs/user-qa/pending-emaki-questions.md",
@@ -28,7 +29,7 @@
   "commonRules": "impl-plans/active/emaki-00-rules.md",
   "evidenceRoot": "tmp/emaki",
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number); workflow opus-terra-design-and-implement-review-loop-session-586; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; plan revision comm-011217 (repairs EMK-R5-01 high, EMK-R5-02 mid); plans accepted comm-011218 (step5-impl-plan-review attempt 1); first checkpoint bd9ff06. Session 586 wave 1 blocked because EMK-CORE mutationEvidence created emaki/src/zz-mutation.ts outside writePaths; amendment ca265cc moves the boundary negative controls into owned files (emaki/src/types.ts for EMK-CORE, editor/src/code/mount.ts for EMK-VAC-SWITCH) with byte-identical restore. Rerun session-596 re-reviewed the plans and accepted them (comm-011369); its wave 1 stopped because the offline Codex sandbox could not resolve npm registry metadata. Operator commit 7b77feb adds a partial EMK-CORE scaffold and engine copy plus the operator-supplied emaki/package-lock.json (exact pins unchanged; the EMK-CORE plan forbids reinstalling). EMK-CORE is not complete, so no plan is an accepted dependency and all 13 plans remain; EMK-CORE resumes from the committed partial files inside its writePaths. Rerun session-597 re-reviewed the plans and accepted them (comm-011389); its wave 1 stopped because the moved text-cells test read examples/kalimba.vact outside the emaki package. Commit b75f8a0 authorizes a byte-identical package-local copy at emaki/test/fixtures/kalimba.vact (in EMK-CORE writePaths) and lets implementers resolve in-scope ambiguities without stopping (rule 12). Rerun session-599 re-reviewed the plans and accepted them (comm-011407); EMK-CORE is still incomplete, so acceptedDependencies stays empty and all 13 plans remain; that checkpoint was at HEAD b75f8a0. Session 599 wave 1 then accepted EMK-CORE (test-integrity, adversarial review and branch evidence passed). In wave 2, EMK-DECOR blocked because text-affecting marks needed a renderer cache-key seam change in emaki/src/render/renderer.ts, which was outside its writePaths. EMK-WIDGETS, EMK-LANG and EMK-DIFF stopped only because of provider usage-limit errors. Commit 2daf798 keeps the partial wave-2 work, marks EMK-CORE Completed and adds emaki/src/render/renderer.ts to EMK-DECOR writePaths. Rerun session-607 re-reviewed the plans and accepted them (comm-011626, no findings or repair requests). EMK-CORE is now recorded in acceptedDependencies at 2daf798. The 12 remaining plans resumed at wave 2 from the committed partial files inside each plan's writePaths; that checkpoint was at HEAD 2daf798. Session 607 wave 2 then accepted EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF (test-integrity, adversarial review and branch evidence passed). The orchestrator wave-2 join (emaki check, vitest 113/113 in 24 files, build) is green in tmp/emaki/wave-2-join/. Commit df4b9dc marks those four plans Completed, and rule 12a now lets a wave n+1 implementer run a missing non-Playwright join itself instead of blocking. Rerun session-609 re-reviewed all 13 plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011699; accepted=true, no findings or repair requests). The four wave-2 plans are now in acceptedDependencies at df4b9dc. The 8 remaining plans (EMK-API, EMK-VAC-SWITCH, EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE, EMK-VAC-PLUGINS, EMK-PERF, EMK-CLOSEOUT) resume at wave 3; that checkpoint was at HEAD df4b9dc. Session 609 wave 3 then stopped: EMK-API blocked because the createEditor lineNumbers option needs a gutter seam in emaki/src/render/text-pass.ts and emaki/src/view/view-host.ts, which were outside its writePaths. Commit 9b8fa4e fixes editor/src/code/unapplied.ts so unapplied-edit tracking is O(change), restoring the canvas mount test baseline (editor vitest 166 files / 2401 tests), adds both gutter files to EMK-API sharedPaths with an operator amendment, and records the new baseline in EMK-VAC-SWITCH. Commit bdd8376 keeps the partial EMK-API plugin runtime (emaki/src/plugin/runtime.ts, emaki/src/plugin/index.ts). Rerun session-611 re-reviewed all 13 plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011723; accepted=true, no findings or repair requests). acceptedDependencies is unchanged. The 8 remaining plans resume at wave 3 from the committed partial files inside each plan's writePaths. That checkpoint was at HEAD bdd8376. Session 611 wave 3 then stopped: EMK-API reached 'Implemented; awaiting review' (createEditor composition, gutter seam, public exports, README, emaki/test/editor.test.ts and emaki/test/plugin/runtime.test.ts), while EMK-VAC-SWITCH was partial with 3 failing unchanged vactr tests (test/canvas/input.test.ts stop/cut fallback shortcut, gpu.test.ts entering-line build count, mount.test.ts edit-frame geometry budget). Operator commit bc07f98 keeps both plans' partial work and repairs the blockers without changing test expectations: editor/src/code/input.ts stays as a thin vactr adapter subclassing emaki's InputController and injecting fallbackShortcut (emaki stays free of vactr shortcuts, design EM-D2; vactr tests change only import specifiers); emaki/src/layout/heightmap.ts bumps revision on line-count change only when blocks exist and gains totalHeight(lineCount); emaki/src/view/view-host.ts clamps scroll with heightmap.totalHeight(doc.lines); emaki/src/render/text-pass.ts makes visibleLast exclusive at the bottom edge again (original ceil semantics). The orchestrator wave-3 join is green at bc07f98 (tmp/emaki/wave-3-join/summary.json: emaki check, vitest 125/125, build; editor check; editor vitest 2357/2357 in 161 files, the drop from 2401 being moved tests now counted in emaki). EMK-VAC-SWITCH operator note 2 records these fixes and tells the implementer not to revert them. Rerun session-614 re-reviewed all 13 plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011808; accepted=true, no findings or repair requests). Neither wave-3 plan has passed formal review yet, so acceptedDependencies is unchanged. The 8 remaining plans resume at wave 3: EMK-API and EMK-VAC-SWITCH verify their deliverables against the current tree, finish anything missing, rerun their gates and go through review. That checkpoint was at HEAD bc07f98. Session 614 wave 3 then accepted EMK-API (test-integrity, adversarial review and branch evidence passed). Its integration review raised IR-VS-1 (editor/src/code/mount.ts: toolbar gap and coarse-target test:style violations, and the invisible .vact-vim-toggle timing out the six vim-* e2e checks) and IR-VS-2 (editor/src/code/renderer.ts: Chromium canvas-only-text and code-pixels-dpr1/dpr2 glyph-extent failures). The operator reproduced these failures on the pre-emaki baseline a6e5bea (tmp/emaki/EMK-VAC-SWITCH/baseline/; orchestrator comparison tmp/emaki/EMK-VAC-SWITCH/orchestrator/summary.json, verdict parity-with-baseline, e2e:examples 8/8). Commit 44cbabc adds rule 13 (these pre-existing browser failures are out of scope; the vactr e2e/style gate is no new failure versus that baseline list; canvas-only-text, touch-selection and vim-keymap-kj count as passing when one of up to 3 reruns passes) and rule 14 (sandbox-impossible Playwright commands go to deferredVerification for the orchestrator wave join). It also marks EMK-API Completed, reruns the wave-3 join green on the combined tree (emaki 129 tests, editor 2362 tests), and keeps the partial wave-4 EMK-SHOWCASE work and the EMK-VAC-SWITCH boundary, single-instance and decorations tests. Rerun session-615 re-reviewed the plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011843; accepted=true, no findings or repair requests). EMK-API is now in acceptedDependencies at 44cbabc. The 7 remaining plans (EMK-VAC-SWITCH, EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE, EMK-VAC-PLUGINS, EMK-PERF, EMK-CLOSEOUT) resume from the committed partial files inside each plan's writePaths. This checkpoint is at HEAD 44cbabc on wf/emaki. Later copy target: https://github.com/tacogips/emaki @0d49bb0",
+    "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number); workflow opus-terra-design-and-implement-review-loop-session-586; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; plan revision comm-011217 (repairs EMK-R5-01 high, EMK-R5-02 mid); plans accepted comm-011218 (step5-impl-plan-review attempt 1); first checkpoint bd9ff06. Session 586 wave 1 blocked because EMK-CORE mutationEvidence created emaki/src/zz-mutation.ts outside writePaths; amendment ca265cc moves the boundary negative controls into owned files (emaki/src/types.ts for EMK-CORE, editor/src/code/mount.ts for EMK-VAC-SWITCH) with byte-identical restore. Rerun session-596 re-reviewed the plans and accepted them (comm-011369); its wave 1 stopped because the offline Codex sandbox could not resolve npm registry metadata. Operator commit 7b77feb adds a partial EMK-CORE scaffold and engine copy plus the operator-supplied emaki/package-lock.json (exact pins unchanged; the EMK-CORE plan forbids reinstalling). EMK-CORE is not complete, so no plan is an accepted dependency and all 13 plans remain; EMK-CORE resumes from the committed partial files inside its writePaths. Rerun session-597 re-reviewed the plans and accepted them (comm-011389); its wave 1 stopped because the moved text-cells test read examples/kalimba.vact outside the emaki package. Commit b75f8a0 authorizes a byte-identical package-local copy at emaki/test/fixtures/kalimba.vact (in EMK-CORE writePaths) and lets implementers resolve in-scope ambiguities without stopping (rule 12). Rerun session-599 re-reviewed the plans and accepted them (comm-011407); EMK-CORE is still incomplete, so acceptedDependencies stays empty and all 13 plans remain; that checkpoint was at HEAD b75f8a0. Session 599 wave 1 then accepted EMK-CORE (test-integrity, adversarial review and branch evidence passed). In wave 2, EMK-DECOR blocked because text-affecting marks needed a renderer cache-key seam change in emaki/src/render/renderer.ts, which was outside its writePaths. EMK-WIDGETS, EMK-LANG and EMK-DIFF stopped only because of provider usage-limit errors. Commit 2daf798 keeps the partial wave-2 work, marks EMK-CORE Completed and adds emaki/src/render/renderer.ts to EMK-DECOR writePaths. Rerun session-607 re-reviewed the plans and accepted them (comm-011626, no findings or repair requests). EMK-CORE is now recorded in acceptedDependencies at 2daf798. The 12 remaining plans resumed at wave 2 from the committed partial files inside each plan's writePaths; that checkpoint was at HEAD 2daf798. Session 607 wave 2 then accepted EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF (test-integrity, adversarial review and branch evidence passed). The orchestrator wave-2 join (emaki check, vitest 113/113 in 24 files, build) is green in tmp/emaki/wave-2-join/. Commit df4b9dc marks those four plans Completed, and rule 12a now lets a wave n+1 implementer run a missing non-Playwright join itself instead of blocking. Rerun session-609 re-reviewed all 13 plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011699; accepted=true, no findings or repair requests). The four wave-2 plans are now in acceptedDependencies at df4b9dc. The 8 remaining plans (EMK-API, EMK-VAC-SWITCH, EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE, EMK-VAC-PLUGINS, EMK-PERF, EMK-CLOSEOUT) resume at wave 3; that checkpoint was at HEAD df4b9dc. Session 609 wave 3 then stopped: EMK-API blocked because the createEditor lineNumbers option needs a gutter seam in emaki/src/render/text-pass.ts and emaki/src/view/view-host.ts, which were outside its writePaths. Commit 9b8fa4e fixes editor/src/code/unapplied.ts so unapplied-edit tracking is O(change), restoring the canvas mount test baseline (editor vitest 166 files / 2401 tests), adds both gutter files to EMK-API sharedPaths with an operator amendment, and records the new baseline in EMK-VAC-SWITCH. Commit bdd8376 keeps the partial EMK-API plugin runtime (emaki/src/plugin/runtime.ts, emaki/src/plugin/index.ts). Rerun session-611 re-reviewed all 13 plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011723; accepted=true, no findings or repair requests). acceptedDependencies is unchanged. The 8 remaining plans resume at wave 3 from the committed partial files inside each plan's writePaths. That checkpoint was at HEAD bdd8376. Session 611 wave 3 then stopped: EMK-API reached 'Implemented; awaiting review' (createEditor composition, gutter seam, public exports, README, emaki/test/editor.test.ts and emaki/test/plugin/runtime.test.ts), while EMK-VAC-SWITCH was partial with 3 failing unchanged vactr tests (test/canvas/input.test.ts stop/cut fallback shortcut, gpu.test.ts entering-line build count, mount.test.ts edit-frame geometry budget). Operator commit bc07f98 keeps both plans' partial work and repairs the blockers without changing test expectations: editor/src/code/input.ts stays as a thin vactr adapter subclassing emaki's InputController and injecting fallbackShortcut (emaki stays free of vactr shortcuts, design EM-D2; vactr tests change only import specifiers); emaki/src/layout/heightmap.ts bumps revision on line-count change only when blocks exist and gains totalHeight(lineCount); emaki/src/view/view-host.ts clamps scroll with heightmap.totalHeight(doc.lines); emaki/src/render/text-pass.ts makes visibleLast exclusive at the bottom edge again (original ceil semantics). The orchestrator wave-3 join is green at bc07f98 (tmp/emaki/wave-3-join/summary.json: emaki check, vitest 125/125, build; editor check; editor vitest 2357/2357 in 161 files, the drop from 2401 being moved tests now counted in emaki). EMK-VAC-SWITCH operator note 2 records these fixes and tells the implementer not to revert them. Rerun session-614 re-reviewed all 13 plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011808; accepted=true, no findings or repair requests). Neither wave-3 plan has passed formal review yet, so acceptedDependencies is unchanged. The 8 remaining plans resume at wave 3: EMK-API and EMK-VAC-SWITCH verify their deliverables against the current tree, finish anything missing, rerun their gates and go through review. That checkpoint was at HEAD bc07f98. Session 614 wave 3 then accepted EMK-API (test-integrity, adversarial review and branch evidence passed). Its integration review raised IR-VS-1 (editor/src/code/mount.ts: toolbar gap and coarse-target test:style violations, and the invisible .vact-vim-toggle timing out the six vim-* e2e checks) and IR-VS-2 (editor/src/code/renderer.ts: Chromium canvas-only-text and code-pixels-dpr1/dpr2 glyph-extent failures). The operator reproduced these failures on the pre-emaki baseline a6e5bea (tmp/emaki/EMK-VAC-SWITCH/baseline/; orchestrator comparison tmp/emaki/EMK-VAC-SWITCH/orchestrator/summary.json, verdict parity-with-baseline, e2e:examples 8/8). Commit 44cbabc adds rule 13 (these pre-existing browser failures are out of scope; the vactr e2e/style gate is no new failure versus that baseline list; canvas-only-text, touch-selection and vim-keymap-kj count as passing when one of up to 3 reruns passes) and rule 14 (sandbox-impossible Playwright commands go to deferredVerification for the orchestrator wave join). It also marks EMK-API Completed, reruns the wave-3 join green on the combined tree (emaki 129 tests, editor 2362 tests), and keeps the partial wave-4 EMK-SHOWCASE work and the EMK-VAC-SWITCH boundary, single-instance and decorations tests. Rerun session-615 re-reviewed the plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011843; accepted=true, no findings or repair requests). EMK-API is now in acceptedDependencies at 44cbabc. The 7 remaining plans (EMK-VAC-SWITCH, EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE, EMK-VAC-PLUGINS, EMK-PERF, EMK-CLOSEOUT) resume from the committed partial files inside each plan's writePaths. That checkpoint was at HEAD 44cbabc (manifest commit 6851619). Session 615 then accepted EMK-VAC-SWITCH, EMK-DIFF-DEMO (including adversarial-review repair EMK-DIFF-DEMO-AR-1, synced caret-driven scrolling) and EMK-SHOWCASE (test-integrity, adversarial review and branch evidence passed; browser gates per rules 13/14). EMK-JSON-DEMO needed keydown/beforeinput pairing, so operator commit 961dc6d tags InputSample with type and revisionBefore in emaki/src/editor.ts (test in emaki/test/editor.test.ts) and records it as an operator note in emaki-41-json-demo.md; no engine change is needed in that plan. EMK-VAC-PLUGINS left partial work (beat-glow marks, inline anchors/sequencer/scope controllers, persisted toggle, mount integration; check and scoped vitest 148/148 green) and stopped on a stale regular file at the measurement-lock path; the operator removed it and rule 7 now says to delete such a stale file when no heavy process runs, or run without the lock if the sandbox cannot create it. 961dc6d also marks the three accepted plans Completed. Rerun session-616 re-reviewed the plans and accepted them (step5-impl-plan-review -> plan-checkpoint comm-011888; accepted=true, no findings or repair requests). EMK-VAC-SWITCH, EMK-DIFF-DEMO and EMK-SHOWCASE are now in acceptedDependencies at 961dc6d. The 4 remaining plans (EMK-JSON-DEMO, EMK-VAC-PLUGINS, EMK-PERF, EMK-CLOSEOUT) resume from the committed partial files inside each plan's writePaths. This checkpoint is at HEAD 961dc6d on wf/emaki. Later copy target: https://github.com/tacogips/emaki @0d49bb0",
     "userProblem": "vactr's canvas editor engine (editor/src/code, ~12k lines) is tied to vactr types and has no plugin, widget, range/line-format or variable-height mechanism. The user wants it extracted into a standalone library emaki that vactr loads, with line-embedded plugins (video, animation), character and line formats (beat glow via marks), inline sequencer and oscilloscope plugins in vactr, a realtime GitHub-style side-by-side diff demo, and fast virtualized rendering of a 10k-line JSON file.",
     "requiredOutcomes": [
       "emaki/ is a standalone package: cd emaki && npm ci --prefer-offline && npm run check && npm test && npm run build pass, and the boundary test proves no import escapes emaki/.",
@@ -110,7 +111,7 @@
       "design-docs/specs/design-canvas-editor-evidence.md"
     ]
   },
-  "executionModel": "Continuation: wave 1 (EMK-CORE, at 2daf798), wave 2 (EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF, at df4b9dc) and EMK-API (wave 3, at 44cbabc) are complete and recorded in acceptedDependencies. Dispatch resumes with EMK-VAC-SWITCH alone in wave 3, starting from its committed partial work and the operator parity repairs (bc07f98), which it must not revert; its vactr e2e/style gate is no new failure versus the rule-13 baseline list. The wave-3 join is green on the combined tree at 44cbabc (tmp/emaki/wave-3-join/summary.json) and reruns after EMK-VAC-SWITCH. Wave 4 resumes from the committed partial EMK-SHOWCASE work; sandbox-impossible Playwright commands go to deferredVerification for the wave join (rule 14). Six waves on one branch and one working directory. W1: EMK-CORE runs alone. It creates the package and pins the shared contract types, so it is the root of the DAG. W2: EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF run in parallel with disjoint writePaths. W3: EMK-API and EMK-VAC-SWITCH run in parallel. EMK-VAC-SWITCH may edit the listed emaki engine sharedPaths only for parity defects that unchanged vactr tests expose; EMK-API edits only emaki/src/render/text-pass.ts and emaki/src/view/view-host.ts, and only for the lineNumbers gutter seam (operator amendment after session 609); it does not edit the other engine sharedPaths. W4: EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE and EMK-VAC-PLUGINS run in parallel. W5: EMK-PERF runs alone, with perf-repair sharedPaths. W6: EMK-CLOSEOUT runs alone and runs all gates G1-G10 on the combined tree. Heavy runs (full vitest in editor, any Playwright, emaki and editor builds, mise run build-wasm-release) take the measurement lock at /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock. The lock serializes these runs but does not isolate a sibling's half-written files, so plans that share a wave are judged only on scoped gates (rule 12b). After every wave the orchestrator runs a serial wave-join gate (rule 12a: emaki check, full vitest and build; editor check from wave 3; editor full vitest at wave 3; diff e2e (G4), smoke and the dist page checks at wave 4) under the lock, with logs in tmp/emaki/wave-<n>-join/. Failures are routed by failing file path, and the next wave starts only when the join is green. Evidence goes under tmp/emaki/<planId>/ and is never in writePaths. Workers edit only their own plan file's Progress Log. The design and all plans are committed before native fanout starts.",
+  "executionModel": "Continuation: wave 1 (EMK-CORE, at 2daf798), wave 2 (EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF, at df4b9dc), wave 3 (EMK-API at 44cbabc; EMK-VAC-SWITCH at 961dc6d) and the wave-4 plans EMK-DIFF-DEMO and EMK-SHOWCASE (at 961dc6d) are complete and recorded in acceptedDependencies. Dispatch resumes in wave 4 with EMK-JSON-DEMO (using the 961dc6d InputSample type/revisionBefore seam per its operator note) and EMK-VAC-PLUGINS (from its committed partial work; it is the sole editor writer in wave 4 and keeps full editor gates; its vactr e2e/style gate is no new failure versus the rule-13 baseline list). Sandbox-impossible Playwright commands go to deferredVerification for the wave-4 join (rule 14), which the orchestrator runs on the combined tree after both remaining wave-4 plans report; its diff e2e and smoke evidence is still appended to the accepted EMK-DIFF-DEMO and EMK-SHOWCASE logs. Then EMK-PERF (wave 5) and EMK-CLOSEOUT (wave 6) run alone. Six waves on one branch and one working directory. W1: EMK-CORE runs alone. It creates the package and pins the shared contract types, so it is the root of the DAG. W2: EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF run in parallel with disjoint writePaths. W3: EMK-API and EMK-VAC-SWITCH run in parallel. EMK-VAC-SWITCH may edit the listed emaki engine sharedPaths only for parity defects that unchanged vactr tests expose; EMK-API edits only emaki/src/render/text-pass.ts and emaki/src/view/view-host.ts, and only for the lineNumbers gutter seam (operator amendment after session 609); it does not edit the other engine sharedPaths. W4: EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE and EMK-VAC-PLUGINS run in parallel. W5: EMK-PERF runs alone, with perf-repair sharedPaths. W6: EMK-CLOSEOUT runs alone and runs all gates G1-G10 on the combined tree. Heavy runs (full vitest in editor, any Playwright, emaki and editor builds, mise run build-wasm-release) take the measurement lock at /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock. The lock serializes these runs but does not isolate a sibling's half-written files, so plans that share a wave are judged only on scoped gates (rule 12b). After every wave the orchestrator runs a serial wave-join gate (rule 12a: emaki check, full vitest and build; editor check from wave 3; editor full vitest at wave 3; diff e2e (G4), smoke and the dist page checks at wave 4) under the lock, with logs in tmp/emaki/wave-<n>-join/. Failures are routed by failing file path, and the next wave starts only when the join is green. Evidence goes under tmp/emaki/<planId>/ and is never in writePaths. Workers edit only their own plan file's Progress Log. The design and all plans are committed before native fanout starts.",
   "waveJoinGates": [
     {
       "afterWave": 1,
@@ -245,199 +246,42 @@
         "public entry emaki/src/index.ts exporting createEditor and the design 5.1 types; emaki/README.md documenting the public API, consumer config and metric definitions",
         "tests emaki/test/editor.test.ts and emaki/test/plugin/runtime.test.ts"
       ]
-    }
-  ],
-  "plans": [
+    },
     {
       "planId": "EMK-VAC-SWITCH",
       "planPath": "impl-plans/active/emaki-31-vactr-switch.md",
-      "wave": 3,
-      "dependsOn": [
-        "EMK-CORE",
-        "EMK-DECOR",
-        "EMK-WIDGETS",
-        "EMK-LANG"
-      ],
-      "writePaths": [
-        "editor/package.json",
-        "editor/package-lock.json",
-        "editor/vite.config.ts",
-        "editor/vitest.config.ts",
-        "editor/tsconfig.json",
-        "editor/src/code/mount.ts",
-        "editor/src/code/surface.ts",
-        "editor/src/code/renderer.ts",
-        "editor/src/code/history.ts",
-        "editor/src/code/perf-hook.ts",
-        "editor/src/code/vim-mount.ts",
-        "editor/src/code/momentary-pointer.ts",
-        "editor/src/code/unapplied-settings.ts",
-        "editor/src/code/decorations.ts",
-        "editor/src/code/theme.ts",
-        "editor/src/code/vact-language.ts",
-        "editor/src/app/apis.ts",
-        "editor/src/bind/drag.ts",
-        "editor/src/params/mount.ts",
-        "editor/src/visual/video.ts",
-        "editor/src/visual/mount.ts",
-        "editor/src/visual/background.ts",
-        "editor/src/code/atlas.ts",
-        "editor/src/code/frame.ts",
-        "editor/src/code/geometry.ts",
-        "editor/src/code/segments.ts",
-        "editor/src/code/palette.ts",
-        "editor/src/code/cursor-shape.ts",
-        "editor/src/code/resources.ts",
-        "editor/src/code/renderer-types.ts",
-        "editor/src/code/layout.ts",
-        "editor/src/code/advances.ts",
-        "editor/src/code/input.ts",
-        "editor/src/code/keyboard.ts",
-        "editor/src/code/pointer.ts",
-        "editor/src/code/accessibility.ts",
-        "editor/src/code/view-host.ts",
-        "editor/test/code/atlas-cells.test.ts",
-        "editor/test/code/glyph-placement.test.ts",
-        "editor/test/code/text-cells.test.ts",
-        "editor/test/canvas/frame.test.ts",
-        "editor/test/canvas/cursor-shape.test.ts",
-        "editor/test/canvas/edit-cost.test.ts",
-        "editor/test/canvas/first-viewport.test.ts",
-        "editor/test/canvas/gpu.test.ts",
-        "editor/test/canvas/input-keymap-hooks.test.ts",
-        "editor/test/canvas/input-vim-hook.test.ts",
-        "editor/test/canvas/input.test.ts",
-        "editor/test/canvas/mount.test.ts",
-        "editor/test/canvas/renderer-hop.test.ts",
-        "editor/test/canvas/view-host.test.ts",
-        "editor/test/canvas/vim-input.test.ts",
-        "editor/test/canvas/vim-keymap-input.test.ts",
-        "editor/test/canvas/vim-keymap-mount.test.ts",
-        "editor/test/canvas/vim-mount.test.ts",
-        "editor/test/code/recording-gl.ts",
-        "editor/test/code/renderer-layers.test.ts",
-        "editor/test/code/vim/controller-io.test.ts",
-        "editor/test/visual/background.test.ts",
-        "editor/test/visual/overlays.test.ts",
-        "editor/test/code/emaki-boundary.test.ts",
-        "editor/test/code/emaki-single-instance.test.ts",
-        "editor/test/code/decorations.test.ts",
-        "editor/node_modules",
-        "editor/dist",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "impl-plans/active/emaki-31-vactr-switch.md"
-      ],
-      "sharedPaths": [
-        "emaki/src/render/renderer.ts",
-        "emaki/src/render/text-pass.ts",
-        "emaki/src/render/decoration-pass.ts",
-        "emaki/src/layout/layout.ts",
-        "emaki/src/input/input.ts",
-        "emaki/src/input/keyboard.ts",
-        "emaki/src/input/pointer.ts",
-        "emaki/src/view/view-host.ts",
-        "emaki/src/core/editor-core.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "emaki/src/render/renderer.ts",
-          "intendedEdit": "Parity repair only, for a draw-order/cache defect exposed by an unchanged vactr test (gpu, renderer-layers, renderer-hop, first-viewport, mount); record the failing test and hashes."
-        },
-        {
-          "path": "emaki/src/render/text-pass.ts",
-          "intendedEdit": "Parity repair only, for glyph/token tint or gutter defects exposed by unchanged vactr tests; record the failing test and hashes."
-        },
-        {
-          "path": "emaki/src/render/decoration-pass.ts",
-          "intendedEdit": "Parity repair only, for background/overlay order or geometry defects exposed by unchanged vactr tests; record the failing test and hashes."
-        },
-        {
-          "path": "emaki/src/layout/layout.ts",
-          "intendedEdit": "Parity repair only, for coordinate/hit-test defects exposed by unchanged vactr tests; record the failing test and hashes."
-        },
-        {
-          "path": "emaki/src/input/input.ts",
-          "intendedEdit": "Parity repair only, for input bridge/IME/presentation defects exposed by unchanged vactr input tests; record the failing test and hashes."
-        },
-        {
-          "path": "emaki/src/input/keyboard.ts",
-          "intendedEdit": "Parity repair only, for key routing defects exposed by unchanged vactr tests; stop-all vs cut routing must stay tri-state."
-        },
-        {
-          "path": "emaki/src/input/pointer.ts",
-          "intendedEdit": "Parity repair only, for pointer/selection/drag-gesture defects exposed by unchanged vactr tests."
-        },
-        {
-          "path": "emaki/src/view/view-host.ts",
-          "intendedEdit": "Parity repair only, for scroll/caret-reveal defects exposed by unchanged vactr view-host tests."
-        },
-        {
-          "path": "emaki/src/core/editor-core.ts",
-          "intendedEdit": "Parity repair only, for dispatch-order/undo-budget/subclass defects exposed by unchanged vactr state, sync or surface tests."
-        }
-      ],
-      "artifactRoots": [
-        "editor/node_modules",
-        "editor/dist",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm"
-      ],
-      "acceptanceCriteria": [
-        "editor depends on emaki via file:../emaki, with dedupe, inline and preserveSymlinks config. The present-case clean npm ci, check and single-instance test pass.",
-        "The 15 engine sources and 5 moved tests are deleted. vactr adapters exist: surface subclass, renderer adapter of at most 150 lines with no GL, decorations, theme, vact-language, reduced history.",
-        "The test diff is limited to import lines. Full vitest, test:style, behavior e2e (Chromium and WebKit) and e2e:examples pass.",
-        "The emaki-boundary and decorations tests pass. Test counts are reconciled in test-disposition.json."
-      ],
-      "verification": [
-        "cd editor && npm run check",
-        "export CARGO_TERM_QUIET=true; cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run",
-        "cd emaki && ./node_modules/.bin/vitest run test/render test/layout test/input test/core",
-        "cd emaki && npm run check",
-        "mise run build-wasm-release",
-        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
-        "cd editor && npm run test:style",
-        "cd editor && npm run e2e -- --browser all --profile behavior --out ../tmp/emaki/EMK-VAC-SWITCH/e2e",
-        "cd editor && npm run e2e:examples",
-        "cd editor && rm -rf node_modules && npm ci --prefer-offline && npm run check && ./node_modules/.bin/vitest run test/code/emaki-single-instance.test.ts"
+      "commit": "961dc6d558c4c5aeeab07d33c907e88137022dac",
+      "acceptedIn": "opus-terra-design-and-implement-review-loop-session-615 wave 1 (test-integrity, adversarial review and branch evidence passed; browser gates per rules 13/14; wave-3 join green in tmp/emaki/wave-3-join/summary.json; browser parity in tmp/emaki/EMK-VAC-SWITCH/orchestrator/summary.json)",
+      "provides": [
+        "editor depends on emaki via file:../emaki with dedupe, inline and preserveSymlinks consumer config (editor/package.json, package-lock.json, vite.config.ts, vitest.config.ts, tsconfig.json)",
+        "moved engine sources and tests deleted from editor/src/code and editor/test; thin vactr adapters: surface subclass, renderer adapter, input adapter injecting fallbackShortcut, decorations, theme, vact-language, reduced history",
+        "editor/test/code/emaki-boundary.test.ts, emaki-single-instance.test.ts and decorations.test.ts; editor vitest 2362/2362 with counts reconciled in tmp/emaki/EMK-VAC-SWITCH/test-disposition.json",
+        "operator parity repairs in emaki heightmap, view-host and text-pass (bc07f98) that later plans must not revert"
       ]
     },
     {
       "planId": "EMK-DIFF-DEMO",
       "planPath": "impl-plans/active/emaki-40-diff-demo.md",
-      "wave": 4,
-      "dependsOn": [
-        "EMK-API",
-        "EMK-DIFF"
-      ],
-      "writePaths": [
-        "emaki/examples/diff/index.html",
-        "emaki/examples/diff/main.ts",
-        "emaki/examples/diff/diff-plugin.ts",
-        "emaki/examples/diff/hook.ts",
-        "emaki/scripts/e2e.mjs",
-        "emaki/test/examples/diff-plugin.test.ts",
-        "emaki/node_modules",
-        "emaki/dist",
-        "impl-plans/active/emaki-40-diff-demo.md"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "emaki/node_modules",
-        "emaki/dist"
-      ],
-      "acceptanceCriteria": [
-        "The diff demo uses only public mark, line-format and widget APIs. It shows red/green line backgrounds, word marks, hatched fillers, both gutters and synced scroll.",
-        "__emakiDiff implements the pinned contract.",
-        "e2e.mjs passes in Chromium and WebKit: diff rows and marks update on typing, and scrollTops stay equal."
-      ],
-      "verification": [
-        "cd emaki && ./node_modules/.bin/vitest run test/examples/diff-plugin.test.ts",
-        "cd emaki && npm run check",
-        "cd emaki && node --check scripts/e2e.mjs"
+      "commit": "961dc6d558c4c5aeeab07d33c907e88137022dac",
+      "acceptedIn": "opus-terra-design-and-implement-review-loop-session-615 wave 1 (test-integrity, adversarial review and branch evidence passed, including repair EMK-DIFF-DEMO-AR-1; G4 diff e2e runs at the wave-4 join per rule 14)",
+      "provides": [
+        "realtime split diff demo built only on the public mark, line-format and widget APIs (emaki/examples/diff/index.html, main.ts, diff-plugin.ts, hook.ts)",
+        "__emakiDiff page contract and synced scroll including caret-driven viewport scrolling (emaki/test/examples/diff-plugin.test.ts)",
+        "Playwright diff e2e script emaki/scripts/e2e.mjs for Chromium and WebKit"
       ]
     },
+    {
+      "planId": "EMK-SHOWCASE",
+      "planPath": "impl-plans/active/emaki-42-showcase.md",
+      "commit": "961dc6d558c4c5aeeab07d33c907e88137022dac",
+      "acceptedIn": "opus-terra-design-and-implement-review-loop-session-615 wave 1 (test-integrity, adversarial review and branch evidence passed; showcase smoke runs at the wave-4 join per rule 14)",
+      "provides": [
+        "plugin showcase page with a captureStream video block widget, an animated canvas wave widget, an EOL badge, marks including glow, and line formats (emaki/examples/plugin-showcase/index.html, main.ts, video-widget.ts, wave-widget.ts, format-plugin.ts)",
+        "emaki/test/examples/showcase-plugins.test.ts and the Playwright smoke script emaki/scripts/smoke.mjs"
+      ]
+    }
+  ],
+  "plans": [
     {
       "planId": "EMK-JSON-DEMO",
       "planPath": "impl-plans/active/emaki-41-json-demo.md",
@@ -467,40 +311,6 @@
       "verification": [
         "cd emaki && ./node_modules/.bin/vitest run test/examples/json-perf-hook.test.ts",
         "cd emaki && npm run check"
-      ]
-    },
-    {
-      "planId": "EMK-SHOWCASE",
-      "planPath": "impl-plans/active/emaki-42-showcase.md",
-      "wave": 4,
-      "dependsOn": [
-        "EMK-API"
-      ],
-      "writePaths": [
-        "emaki/examples/plugin-showcase/index.html",
-        "emaki/examples/plugin-showcase/main.ts",
-        "emaki/examples/plugin-showcase/video-widget.ts",
-        "emaki/examples/plugin-showcase/wave-widget.ts",
-        "emaki/examples/plugin-showcase/format-plugin.ts",
-        "emaki/scripts/smoke.mjs",
-        "emaki/test/examples/showcase-plugins.test.ts",
-        "emaki/node_modules",
-        "emaki/dist",
-        "impl-plans/active/emaki-42-showcase.md"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": [
-        "emaki/node_modules",
-        "emaki/dist"
-      ],
-      "acceptanceCriteria": [
-        "The showcase has a video block widget (captureStream, no binary asset), an animated canvas widget, an EOL badge, marks including glow, and line formats.",
-        "smoke.mjs passes the showcase checks in Chromium and WebKit."
-      ],
-      "verification": [
-        "cd emaki && ./node_modules/.bin/vitest run test/examples/showcase-plugins.test.ts",
-        "cd emaki && npm run check",
-        "cd emaki && node --check scripts/smoke.mjs"
       ]
     },
     {

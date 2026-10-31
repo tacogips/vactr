@@ -1,6 +1,6 @@
 # EMK-LANG: incremental highlighter, JSON language and deterministic fixture
 
-**Status**: In Progress (implementation complete; review pending)
+**Status**: Completed (accepted in session 607 wave 1: test-integrity, adversarial review and branch evidence passed; wave-2 join green in tmp/emaki/wave-2-join/summary.json)
 **Plan ID**: EMK-LANG (wave 2; parallel with EMK-DECOR, EMK-WIDGETS, EMK-DIFF)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 9.1-9.3, 11.2; decision EM-D9
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -198,3 +198,15 @@ end) -> the convergence test fails. Restore afterwards.
 ### Session: 2026-11-01 (implementation)
 **Tasks Completed**: L1-L4. Implemented checkpointed incremental tokenization, bounded catch-up, LRU, JSON tokens, and deterministic fixture. Multi-range edits cannot converge before the last changed line.
 **Evidence**: scoped vitest 15/15 (`tmp/emaki/EMK-LANG/vitest-final-5.log`); `npm run check` exit 0 (`tmp/emaki/EMK-LANG/check-final-3.log`). Full vitest informational 93/93 (`tmp/emaki/EMK-LANG/full-final.log`); the serial wave join is authoritative. Convergence negative control failed as intended and was restored byte-identically (`tmp/emaki/EMK-LANG/mutation-3.log`, `mutation-3-before.sha256`, `mutation-3-after.sha256`). Fixture SHA-256: `78d56a6b3cd73f3c437f83203525c73eafbbc6c579f4fd7609cf06ea4fd8d46c`. Source hashes and line counts: `tmp/emaki/EMK-LANG/final-hashes.txt`, `tmp/emaki/EMK-LANG/final-lines.log`. Formal reviews and wave join remain downstream.
+
+### Session: 2026-11-01 (Step 6 re-verification)
+**Tasks Completed**: Rechecked L1-L4 against the accepted design and dispatched scope; no source changes were necessary.
+**Evidence**: scoped vitest 15/15 (`tmp/emaki/EMK-LANG/step6-scoped-20261101.log`); `npm run check` exit 0 (`tmp/emaki/EMK-LANG/step6-check-20261101.log`); full vitest informational 93/93 (`tmp/emaki/EMK-LANG/step6-full-20261101.log`); all assigned source files under 1000 lines (`tmp/emaki/EMK-LANG/step6-lines-20261101.log`). The recorded convergence mutation restores the current `incremental.ts` hash byte-identically. Formal reviews and wave join remain downstream.
+
+### Session: 2026-11-01 (test-integrity revision EMK-LANG-TI-01)
+**Tasks Completed**: Added stateful JSON fixture coverage for catch-up and nonzero checkpoint resumption, including visible-created checkpoints. Existing tests and fixture pin remain unchanged.
+**Evidence**: scoped vitest 16/16 (`tmp/emaki/EMK-LANG/ti01-final-vitest.log`); `npm run check` exit 0 (`tmp/emaki/EMK-LANG/ti01-final-check.log`). Both checkpoint boundary and resume-state mutations fail the new test (`tmp/emaki/EMK-LANG/ti01-mutation-a3.log`, `ti01-mutation-b.log`); before/after hashes in `ti01-a3-{before,after}.sha256` and `ti01-b-{before,after}.sha256` match the original source. Independent re-review and wave join remain downstream.
+
+### Session: 2026-11-01 (adversarial revision EMK-LANG-AR-01)
+**Tasks Completed**: Bounded the catch-up target after document shrink and added a deletion regression without changing existing tests or the fixture.
+**Evidence**: scoped vitest 17/17 (`tmp/emaki/EMK-LANG/ar01-final-vitest.log`); `npm run check` exit 0 (`tmp/emaki/EMK-LANG/ar01-final-check.log`). Removing both bounds reproduced the RangeError (`tmp/emaki/EMK-LANG/ar01-mutation.log`); restored source hashes match (`tmp/emaki/EMK-LANG/ar01-before-mutation.sha256`, `tmp/emaki/EMK-LANG/ar01-after-mutation.sha256`). Independent re-review and wave join remain downstream.

@@ -95,6 +95,16 @@ branches and no worktrees.
      | 3 | `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run` (EMK-VAC-SWITCH is the only editor writer in wave 3, so its own full-suite run is attributable; the join repeats it on the joined tree) | `tmp/emaki/wave-3-join/` |
      | 4 | `cd emaki && npm run e2e -- --browser all --out ../tmp/emaki/wave-4-join/e2e` (G4), `cd emaki && node scripts/smoke.mjs --browser all --out ../tmp/emaki/wave-4-join/smoke`, and `test -f emaki/dist/json-10k/index.html && test -f emaki/dist/diff/index.html && test -f emaki/dist/plugin-showcase/index.html`. These Playwright runs happen outside the Codex sandbox (rule 11) | appended by the orchestrator to the Progress Logs of EMK-DIFF-DEMO (e2e), EMK-SHOWCASE (smoke) and EMK-JSON-DEMO (dist page check) |
 
+     **Self-service join (operator amendment after session 607).** If a
+     wave n+1 plan starts and `tmp/emaki/wave-<n>-join/summary.json` with
+     `"verdict": "green"` is absent, do NOT report a blocker. Instead run
+     the non-Playwright join commands above yourself under the lock, write
+     the logs plus `summary.json` (records in rule 10 shape, `verdict`) to
+     `tmp/emaki/wave-<n>-join/`, and continue if green. If another plan of
+     the same wave is already running the join (the lock owner file names
+     it), wait for its `summary.json`. Playwright parts of a join (wave 4)
+     are run by the orchestrator per rule 11 and never block a plan from
+     starting. A red join is routed by the routing rule below.
      **Routing.** A failure goes to the plan that owns the failing file path
      (by writePaths). The next wave does not start until the join is green.
      A repair reruns the whole join.

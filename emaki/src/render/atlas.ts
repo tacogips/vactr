@@ -4,7 +4,7 @@ import type { LayoutFont, ShapedRun } from '../layout/layout';
 export type CanvasFactory = () => HTMLCanvasElement;
 export interface CellRequest {
   kind: 'mask' | 'color' | 'run'; text: string; font: LayoutFont; dpr: number; width: number;
-  run?: ShapedRun; piece?: { from: number; to: number }; chunkX?: number; phase?: number;
+  run?: ShapedRun; piece?: { from: number; to: number }; chunkX?: number; phase?: number; opacity?: number;
 }
 export interface AtlasCell { u0: number; v0: number; u1: number; v1: number; width: number; height: number; pad: number; generation: number }
 interface Entry { cell: AtlasCell; reservation: Reservation }
@@ -91,7 +91,7 @@ export class GlyphAtlas {
     const width = Math.max(1, Math.ceil(request.width * dpr) + pad * 2);
     const height = Math.max(1, Math.ceil(font.lineHeight * dpr));
     const exact = text.length <= 256 ? `:${text}` : '';
-    const key = `${request.kind}|${font.font}|${font.fallback ?? ''}|${font.generation ?? 0}|${dpr}|${text.length}:${hashText(text)}${exact}|${request.piece?.from ?? 0}|${request.piece?.to ?? text.length}|${request.chunkX ?? 0}|w${width}|p${phase}`;
+    const key = `${request.kind}|${font.font}|${font.fallback ?? ''}|${font.generation ?? 0}|${dpr}|${text.length}:${hashText(text)}${exact}|${request.piece?.from ?? 0}|${request.piece?.to ?? text.length}|${request.chunkX ?? 0}|w${width}|p${phase}|a${request.opacity ?? 1}`;
     const hit = this.cells.get(key);
     if (hit) { this.stats.hits++; return hit.cell; }
     const bytes = width * height * 4;
@@ -117,11 +117,13 @@ export class GlyphAtlas {
     const fontKey = `${font.font}|${font.fallback ?? ''}|${font.generation ?? 0}|${dpr}|${this.stats.generation}`;
     if (this.rasterFontKey !== fontKey) { ctx.font = font.font; this.rasterFontKey = fontKey; }
     ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = request.opacity ?? 1;
     const pieceOffset = request.piece?.from ?? 0;
     if (request.run && request.kind === 'run') {
       ctx.save(); ctx.beginPath(); ctx.rect((pad + phase) / dpr, 0, request.width, font.lineHeight); ctx.clip();
       ctx.fillText(text, (pad + phase) / dpr - (request.chunkX ?? 0), font.baseline); ctx.restore();
     } else ctx.fillText(text, (pad + phase) / dpr - pieceOffset, font.baseline);
+    ctx.globalAlpha = 1;
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureValue);
     this.gl.pixelStorei(this.gl.UNPACK_SKIP_PIXELS, 0);
     this.gl.pixelStorei(this.gl.UNPACK_SKIP_ROWS, 0);

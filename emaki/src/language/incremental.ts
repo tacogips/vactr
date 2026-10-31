@@ -42,7 +42,7 @@ export class IncrementalHighlighter<S> {
       else if (delta === 0) this.stale.set(line, state);
       else if (line > lastOld && delta % this.every === 0) this.stale.set(line + delta, state);
     }
-    this.doc = newDoc; this.changedThrough = lastNew;
+    this.doc = newDoc; this.furthest = Math.min(this.furthest, newDoc.lines); this.changedThrough = lastNew;
     const start = Math.floor(first / this.every) * this.every;
     this.cursor = start; this.cursorState = this.checkpoints.get(start) ?? this.lang.startState();
     if (!this.checkpoints.has(start)) { this.cursor = 0; this.cursorState = this.lang.startState(); }
@@ -101,5 +101,5 @@ export class IncrementalHighlighter<S> {
     if (!this.approximate) { this.cursor = to; this.cursorState = state; }
     return result;
   }
-  catchUp(): boolean { this.advance(this.furthest); return this.cursor < this.furthest; }
+  catchUp(): boolean { const target = Math.min(this.furthest, this.doc.lines); this.advance(target); return this.cursor < target; }
 }

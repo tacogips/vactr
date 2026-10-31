@@ -1,7 +1,7 @@
 import { Text } from '@codemirror/state';
 import type { Rect as CodeRect, TokenSpan } from '../types';
 import type { GpuStatus, RenderInput } from './types';
-import { tokenKey, writeSlots, styleHash, gutterIdentity, rebuildTextSegments, drawRun, type TextPassContext, type DrawCommand } from './text-pass';
+import { tokenKey, writeSlots, styleHash, gutterIdentity, rebuildTextSegments, drawRun, indexTextDecorations, lineDecorations, fontVariantsForLine, type DecorationIndex, type TextDecoration, type TextPassContext, type DrawCommand } from './text-pass';
 import { drawDecorations, type DecorationContext } from './decoration-pass';
 import { GlyphAtlas, type CanvasFactory } from './atlas';
 import { TextLayout, type LayoutViewport, type ShapedLine, type ShapedRun } from '../layout/layout';
@@ -38,6 +38,8 @@ export class CanvasRenderer {
   private textCommands: DrawCommand[] | null = null;
   private textLayerDirty = true;
   private cacheKey = '';
+  private decorationIndex: DecorationIndex = indexTextDecorations([], []);
+  private decorationIndexKey: string | undefined;
   private textureGeneration = 0;
   private seenEvictions = 0;
   private collecting: DrawCommand[] | null = null;
@@ -205,8 +207,12 @@ export class CanvasRenderer {
       gl.uniform2f(this.locations.u_view, this.view.width, this.view.height); gl.uniform2f(this.locations.u_device, this.canvas.width / this.view.width, this.canvas.height / this.view.height); gl.uniform1i(this.locations.u_texture, 0); gl.uniform1i(this.locations.u_slots, 1); gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.atlas.texture);
       const tokens = feedback.tokens ?? [];
+      if (this.decorationIndexKey !== feedback.decorationsKey || this.textCommands === null) {
+        this.decorationIndex = indexTextDecorations(feedback.marks ?? [], feedback.lineFormats ?? []);
+        this.decorationIndexKey = feedback.decorationsKey;
+      }
       const viewportKey = `${this.view.width},${this.view.height},${this.view.scrollLeft},${this.view.scrollTop},${this.view.left ?? 0},${this.view.top ?? 0},${this.view.gutter ?? 48}|${this.scale}|${this.layout.font.generation ?? 0}|${this.atlas.stats.generation}|${this.layout.heightmap.revision}`;
-      const key = `${feedback.textRevision ?? this.textRevisionCounter}|${viewportKey}|${tokenKey(tokens)}`;
+      const key = `${feedback.textRevision ?? this.textRevisionCounter}|${viewportKey}|${tokenKey(tokens)}|${this.decorationIndex.key}`;
       const selectionKey = (feedback.selection ?? []).map(a => `${a.from}:${a.to}`).join(';');
       const backgroundKey = `${viewportKey}|${feedback.textRevision ?? this.textRevisionCounter}|${feedback.decorationsKey ?? ''}|${selectionKey}`;
       const handlesKey = (feedback.handles ?? []).map(handle => `${handle.pos}:${handle.end ? 1 : 0}`).join(',');
@@ -229,7 +235,11 @@ export class CanvasRenderer {
         const overscan = Math.ceil(this.view.height / lineHeight) * lineHeight;
         const overscanTop = Math.max(0, this.view.scrollTop - overscan);
         const overscanBottom = this.view.scrollTop + this.view.height + overscan;
-        this.visibleLines = this.layout.visible({ ...this.view, scrollTop: overscanTop, height: overscanBottom - overscanTop });
+        const shapeView = { ...this.view, scrollTop: overscanTop, height: overscanBottom - overscanTop };
+        this.visibleLines = this.layout.visible(shapeView);
+        const variants = new Map(this.visibleLines.map(line => [line.number, fontVariantsForLine(this.layout, line, lineDecorations(this.decorationIndex, line))]));
+        this.layout.setFontVariants(variants);
+        this.visibleLines = this.layout.visible(shapeView);
         this.rebuildTextSegments(tokens);
         if (!this.pendingText) { this.cacheKey = key; this.pendingStartLine = 0; } else this.cacheKey = '';
       }
@@ -322,7 +332,7 @@ export class CanvasRenderer {
     }
     this.stats.lastFrameDraws = this.stats.drawCalls - drawStart;
   }
-  private drawRun(run: ShapedRun, x: number, y: number, styles: readonly TokenSpan[], color?: string, gutter = false): void { drawRun.call(this as unknown as TextPassContext, run, x, y, styles, color, gutter); }
+  private drawRun(run: ShapedRun, x: number, y: number, styles: readonly TokenSpan[], color?: string, gutter = false, decorations: readonly TextDecoration[] = []): void { drawRun.call(this as unknown as TextPassContext, run, x, y, styles, color, gutter, decorations); }
   private local(r: CodeRect): CodeRect { return { left: r.left - (this.view.left ?? 0), right: r.right - (this.view.left ?? 0), top: r.top - (this.view.top ?? 0), bottom: r.bottom - (this.view.top ?? 0) }; }
   private quad(r: CodeRect, color: number[], texture = this.white, uv?: [number, number, number, number], flags = 0): void {
     if (r.right <= 0 || r.left >= this.view.width || r.bottom <= 0 || r.top >= this.view.height) return;

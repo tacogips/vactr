@@ -1,6 +1,6 @@
 # EMK-DECOR: marks, glow and line formats
 
-**Status**: Ready (after EMK-CORE)
+**Status**: Completed (accepted in session 607 wave 1: test-integrity, adversarial review and branch evidence passed; wave-2 join green in tmp/emaki/wave-2-join/summary.json)
 **Plan ID**: EMK-DECOR (wave 2; parallel with EMK-WIDGETS, EMK-LANG, EMK-DIFF)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 6.1-6.3; decisions EM-D5, EM-D6, EM-D7
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -250,13 +250,27 @@ order -> `precedence.test.ts` fails. Restore and record hashes.
 
 ## Completion Criteria
 
-- [ ] D1-D5 delivered. The `decor/index.ts` barrel exports `MarkSet`,
+- [x] D1-D5 delivered. The `decor/index.ts` barrel exports `MarkSet`,
   `LineFormatSet` and `DecorationStore`.
-- [ ] Verification steps 1-4 pass. Mutation evidence is recorded.
-- [ ] `decoration-order.test.ts` is unchanged and passing.
-- [ ] The Progress Log has hashes.
+- [x] Verification steps 1-4 pass. Mutation evidence is recorded.
+- [x] `decoration-order.test.ts` is unchanged and passing.
+- [x] The Progress Log has hashes.
 
 ## Progress Log
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+
+### Session: 2026-11-01 (EMK-DECOR partial implementation)
+**Tasks Completed**: Initial D1 stores and mapping tests; partial D3 line quads, gutter markers, static strike and glow; glow regression.
+**Remaining**: D2 text color/opacity, font variants, per-line cache seam and their tests; complete D3 precedence and animated style coverage; D5 precedence/font tests and mutation evidence. Completion criteria remain open.
+**Verification**: Scoped vitest: 63 passed; `npm run check`: passed; full vitest informational: 101 passed. Logs under `tmp/emaki/EMK-DECOR/`; measurements reflect a moving shared tree. All written source files are under 1000 lines.
+**Hashes (SHA-256)**: `marks.ts` 46db6e25898d66ac0578c1599b1187ba1673d63e74b5f9acfe13762af75263ec; `line-formats.ts` a45de31eb82956f2b73a2c13f011838f15cb66408196ec4ddf277898943ebe4e; `store.ts` 850609d9c9c769cc9f0366d237adc7d8fec2625be03ecba2ff7ad5a4639ce0ba; `decoration-pass.ts` c695b560af9ed54e846de0ec87a40d1e03c1cc5701007d1fec4db70215642bb2.
+
+
+### Session: 2026-11-01 (EMK-DECOR continuation)
+**Tasks Completed**: D2 text tint precedence and per-line retained segment identity; variant-aware layout, advances and atlas rasterization; D3 line, gutter, strike and glow ordering; D4 and D5 regression coverage. Colored glyph opacity is applied in the atlas without a shader change.
+**Verification**: Scoped suite 73 passed (`tmp/emaki/EMK-DECOR/continuation-scoped-014.log`); TypeScript check passed (`continuation-check-014.log`). Full suite 111 passed (`continuation-full-013.log`) and locked build passed (`continuation-build-013.log`), both informational; only the precedence comment changed afterwards. No changes to `decoration-order.test.ts`. All written files have fewer than 1000 lines (`continuation-line-counts-final.log`). Runs were on the moving shared tree; the serial join remains authoritative.
+**Mutation**: Swapping line and mark background ordering failed the precedence test (1 failed, 4 passed; `continuation-mutation-008.log`); before and after restore SHA-256 both `aa926be3ccaefeef1e75208ceb193d526d5fb89519bf1eb940c0955c633040c8`. The later source change to that file was a comment only.
+**Hashes**: final implementation and test hashes are recorded in `tmp/emaki/EMK-DECOR/continuation-hashes-014.sha256`; `decoration-pass.ts` is `28db1ab9d908e5012ef37928790e80e13bf43311a4fcbbbde6442280641a2f23`. Formal review, integration, and finalization are downstream.

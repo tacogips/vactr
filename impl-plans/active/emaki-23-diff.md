@@ -1,6 +1,6 @@
 # EMK-DIFF: reusable line/word diff and split alignment (`emaki/diff`)
 
-**Status**: In Progress (implementation complete; review pending)
+**Status**: Completed (accepted in session 607 wave 1: test-integrity, adversarial review and branch evidence passed; wave-2 join green in tmp/emaki/wave-2-join/summary.json)
 **Plan ID**: EMK-DIFF (wave 2; parallel with EMK-DECOR, EMK-WIDGETS, EMK-LANG)
 **Design Reference**: `design-docs/specs/design-emaki.md` section 10
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -160,3 +160,7 @@ property test fails. Restore afterwards.
 
 ### Session: 2026-11-01 (test-integrity repair EMK-DIFF-TI-01)
 **Tasks Completed**: Strengthened the cost-cap test with five scattered changes, asserting both the capped single hunk and five default-cost hunks. Ignoring the cap caused the focused test to fail; `lines.ts` was restored byte-identically. Evidence and refreshed hashes are under `tmp/emaki/EMK-DIFF/ti01-*`. Independent re-review remains downstream.
+
+### Session: 2026-11-01 (shared-branch implementation verification)
+**Tasks Completed**: Confirmed the existing F1-F3 implementation against design section 10 and the assigned contract. No source changes were needed. Scoped tests passed (10 tests), TypeScript check passed, and the informational full suite passed (93 tests) under the measurement lock. All assigned source and test files are under 1000 lines.
+**Evidence**: `tmp/emaki/EMK-DIFF/session-current-*.log`; prior mutation controls remain recorded above. Formal reviews and the serial wave join remain downstream.

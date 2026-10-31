@@ -1,6 +1,6 @@
 # EMK-WIDGETS: block and end-of-line widgets, virtualization and vertical motion
 
-**Status**: In Progress (implementation complete; review pending)
+**Status**: Completed (accepted in session 607 wave 1: test-integrity, adversarial review and branch evidence passed; wave-2 join green in tmp/emaki/wave-2-join/summary.json)
 **Plan ID**: EMK-WIDGETS (wave 2; parallel with EMK-DECOR, EMK-LANG, EMK-DIFF)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 8.1-8.4; decision EM-D8
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -230,3 +230,9 @@ forth: no remount) fails. Add that hysteresis test. Restore afterwards.
 ### Session: 2026-11-01 (EMK-WIDGETS implementation)
 **Tasks Completed**: W1-W4, barrels and scoped tests. Widget anchors map with TrackDel; layer virtualizes with hysteresis and accounts for canvas allocations; arrows use adjacent text-row coordinates.
 **Verification**: scoped vitest 5/5 and npm run check pass (scoped-final-2.log, check-final-2.log); layout informational 15/15. Full vitest informational 92/92 before final redraw-state adjustment. Earlier check reported sibling test/language/fixture.test.ts drift, resolved on rerun. Hysteresis mutation failed as expected (mutation-2.log), and restored hashes match (mutation-hashes-2.txt). Review and serial wave join remain downstream.
+
+### Session: 2026-11-01 (Step 6 verification rerun)
+**Tasks Completed**: Reviewed W1–W4 against design 8.1–8.4 and the dispatched contract; existing implementation remains in place. No source or test files changed in this session.
+**Verification**: Scoped vitest 5/5 (`rerun-scoped.log`), type check exit 0 (`rerun-check.log`), informational layout 15/15 (`rerun-layout.log`), and informational full suite 93/93 (`rerun-full.log`). All listed files are under 1000 lines (`rerun-lines.log`). Logs are under `tmp/emaki/EMK-WIDGETS/`. These runs observed the shared working tree; the serial wave join remains authoritative.
+**Mutation evidence**: Earlier `mutation-2.log` records the expected hysteresis failure, with byte-identical restoration recorded in `mutation-hashes-2.txt` before subsequent implementation changes.
+**Files changed**: This progress entry only; pre/post hashes are in `rerun-plan-hashes.txt`. Drift: none detected in this session. Formal review and wave join remain downstream; blockers: none.

@@ -100,3 +100,54 @@ mod param_set;
 pub use ctx::{FxContext, FxCtx, GrainLimits};
 pub use kind::{AnalyzerKind, EffectKind};
 pub use param_set::{ParamSet, MAX_PARAMS};
+
+/// Dynamics effects.
+pub mod dynamics;
+
+/// Eq effects.
+pub mod eq;
+
+/// Music filters effects.
+pub mod music_filters;
+
+/// Musicdsp effects.
+pub mod musicdsp;
+
+/// Resonator effects.
+pub mod resonator;
+
+/// Resonator extra effects.
+pub mod resonator_extra;
+
+/// Restoration effects.
+pub mod restoration;
+
+/// Utility effects.
+pub mod utility;
+
+/// Saturation effects.
+pub mod saturation;
+
+/// Delay effects.
+pub mod delay;
+
+/// Reverb effects.
+pub mod reverb;
+
+/// Modulation effects.
+pub mod modulation;
+
+/// Spatial effects.
+pub mod spatial;
+
+/// Lofi effects.
+pub mod lofi;
+
+/// Composite lofi effects.
+pub mod composite_lofi;
+
+/// Creative reverb effects.
+pub mod creative_reverb;
+
+/// Creative delay effects.
+pub mod creative_delay;

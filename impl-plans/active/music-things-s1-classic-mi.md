@@ -201,3 +201,20 @@ path.
 ## Progress Log
 
 (append sessions here per protocol section 8)
+
+### Session 2026-11-01 (MTX-S1 partial)
+- Moved 23 modules including FM; per-edit intentions and hashes: `tmp/music-things/MTX-S1/edit-intentions.jsonl`. Per-module checks are under `tmp/music-things/MTX-S1/mod-*-check-*.log`.
+- BLOCKED: `CARGO_TERM_QUIET=true cargo check -p vactr --all-targets` exits 101 (`tmp/music-things/MTX-S1/mod-fm-check-vactr.log`): unchanged vactr tests require FM `silence_op`, `encode_single`, and `encode_bulk`, which are `#[cfg(test)]` in a dependency compiled without test configuration. Protocol section 3 forbids removing existing attributes. An explicit protocol amendment or compatible in-scope solution is required before continuing the sequential module moves.
+- Remaining: va_filter and stage_chain shims, sample and wavetable adapters, public documentation, formatting, sibling check retries, and all final verification gates. No completion criteria are asserted.
+
+
+## Operator resume note (2026-11-01, after session 595 wave 2)
+
+MTX-S1's session-595 attempt is committed as WIP on `wf/music-things-extract`.
+It blocked only because `#[cfg(test)]` FM helpers were configured out of the
+synth dependency. The operator added the `test-support` features (protocol
+section 7, "test-only helpers") and re-gated `silence_op`, `encode_single`,
+`encode_bulk`, `encode_message` and `pack_bulk_voice`. `cargo check
+--workspace --all-targets` now passes on that tree. Continue from it, apply the
+same rule to any further moved test-only helpers, finish the remaining moves,
+and re-run every gate with fresh logs.

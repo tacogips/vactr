@@ -244,6 +244,19 @@ file lists filled in.
 V-nextest and V-vitest are the behavioral bit-identity proof. They must pass
 on the combined tree before the plan is accepted.
 
+Operator amendment (2026-11-01, after session 595 wave 2): test-only helpers.
+- Items that were `#[cfg(test)]` in vactr and that unchanged vactr tests call
+  (for example `fm::engine::silence_op`, `fm::sysex::encode_single`,
+  `encode_bulk` and their private helpers) must be gated
+  `#[cfg(any(test, feature = "test-support"))]` when they move into a crate.
+  Replacing the attribute this way is permitted and does not count as removing
+  it. Make such an item `pub` only when vactr calls it.
+- Every staged crate declares `[features] test-support = [...]` (forwarding to
+  its music-things dependencies), and vactr enables it only from
+  `[dev-dependencies]`, so production and wasm builds never include the
+  helpers. The operator added these manifest entries in the WIP commit;
+  `#[cfg(test)] mod tests` blocks stay unchanged.
+
 Operator amendment (2026-10-31, after session 581 wave 1):
 - Each plan's evidence directory `tmp/music-things/<PLAN-ID>/` is declared in
   that plan's `writePaths` and `artifactRoots`; write all logs, compiled

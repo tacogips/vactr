@@ -11,7 +11,7 @@ pub mod caps;
 pub mod cells;
 pub mod controls;
 pub mod effects;
-pub mod elements_ominous;
+pub use music_things_synth::elements_ominous;
 pub mod engine;
 pub use music_things_dsp::fft;
 pub mod granular;

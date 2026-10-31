@@ -79,3 +79,72 @@ impl KernelContext for KernelCtx {
 }
 mod ports;
 pub use ports::PortValues;
+
+/// Oscillator kernels.
+pub mod osc;
+
+/// Filter and delay kernels.
+pub mod filter;
+
+/// Envelope kernels.
+pub mod env;
+
+/// Additive synthesis kernel.
+pub mod additive;
+
+/// Phase pair kernel.
+pub mod phase_pair;
+
+/// analog percussion kernel.
+pub mod analog_percussion;
+
+/// feedback metal kernel.
+pub mod feedback_metal;
+
+/// fm drum kernel.
+pub mod fm_drum;
+
+/// fusion drum kernel.
+pub mod fusion_drum;
+
+/// rings part kernel.
+pub mod rings_part;
+
+/// string choir kernel.
+pub mod string_choir;
+
+/// tidal function kernel.
+pub mod tidal_function;
+
+/// tidal poly kernel.
+pub mod tidal_poly;
+
+/// peak function kernel.
+pub mod peak_function;
+
+/// peak pulse kernel.
+pub mod peak_pulse;
+
+/// stage segment kernel.
+pub mod stage_segment;
+
+/// Polyphonic LFO kernel.
+pub mod frame_lfo;
+
+/// Linked stage kernel.
+pub mod stage_linked;
+
+/// Keyframe interpolation kernel.
+pub mod frame_keyframe;
+
+/// Ominous Elements lookup helpers.
+pub mod elements_ominous;
+
+/// Elements internal kernel.
+pub mod elements_internal;
+
+/// MusicDSP synthesis kernels.
+pub mod musicdsp_synth;
+
+/// FM synthesis kernels.
+pub mod fm;

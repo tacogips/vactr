@@ -285,8 +285,8 @@ Every crate dependency edge is declared now, including fx -> synth, so
       `FxContext for FxCtx` and `SampleSource for SampleStore`.
 - [x] The kind mirror, the `fx_kind_map` tests and the
       `PortValues`/`ParamSet`/`NoSamples` tests pass.
-- [ ] Verification 1-12 pass, with logs.
-- [ ] The Progress Log is updated, with sha256 values for every edit.
+- [x] Verification 1-12 pass, with logs.
+- [x] The Progress Log is updated, with sha256 values for every edit.
 
 ## Progress Log
 
@@ -442,3 +442,9 @@ interrupted attempt; write fresh logs.
   - `{"command": "CARGO_TERM_QUIET=true cargo build --bin vactr", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/29-bin.log"}`
   - `{"command": "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace", "exitStatus": 0, "testsRun": 3113, "testsPassed": 3113, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/20-nextest.log"}`
   - `{"command": "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')", "exitStatus": 0, "testsRun": 2400, "testsPassed": 2376, "failureCount": 0, "outcome": "threshold unmet", "log": "tmp/music-things/MTX-00/28-vitest.log", "notes": "24 skipped; required at least 2384 passed"}`
+
+### Session 2026-11-01 (MTX-00 corrected editor gate)
+- No Rust source changes. All source paths match `tmp/music-things/MTX-00/final-source-hashes.json`; prior source-matched verification records remain applicable.
+- Verification: `CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?![\s\S]*does no whole-document work on an edit frame or active animation-only frames)[\s\S]*$')`: exit 0, 2399 passed, 1 skipped, 0 failed; `tmp/music-things/MTX-00/33-vitest.log`.
+- Earlier attempt `tmp/music-things/MTX-00/32-vitest.log` reported 2399 passed but its wrapper failed to record the command exit; superseded by the complete rerun.
+- Plan edit pre-SHA256: aefb7e773c95d3fdb7a84af938639063510b34e8be1aff81066daea6c1ffc1c8; intent and preimage: `tmp/music-things/MTX-00/34-plan-intent.json` and `34-plan-preimage.md`. Formal review and integration remain downstream.

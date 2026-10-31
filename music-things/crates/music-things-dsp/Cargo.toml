@@ -8,3 +8,8 @@ repository = "https://github.com/tacogips/music-things"
 description = "Shared real-time DSP primitives (filters, delay lines, LFOs, FFT, sample views)"
 
 [dependencies]
+
+[features]
+# Exposes test-only helpers to dependent crates' test suites (vactr enables it
+# from [dev-dependencies]); never enable it in production builds.
+test-support = []

@@ -140,9 +140,9 @@ deleted.
 
 ## Completion Criteria
 
-- [ ] 19 files are in `music-things-fx/src`, and the vactr copies are
+- [x] 19 files are in `music-things-fx/src`, and the vactr copies are
       deleted.
-- [ ] `effects/mod.rs` changed only module lines.
+- [x] `effects/mod.rs` changed only module lines.
 - [ ] The group entry points are `pub`, generic over `FxContext` and
       `impl Into<EffectKind>`, with bodies otherwise identical.
 - [ ] Verification 1-12 pass, with logs. The Progress Log is updated.
@@ -150,3 +150,22 @@ deleted.
 ## Progress Log
 
 (append sessions here per protocol section 8)
+
+### Session 2026-11-01 (MTX-F1)
+- EDITS-COMPLETE 2026-10-31T15:56:06.476167+00:00
+- Per-edit intentions and hashes: `tmp/music-things/MTX-F1/edit-intentions.jsonl`.
+- Final corrections: module-use ordering and crate-private creative reverb helpers; per-edit pre/post hashes in `tmp/music-things/MTX-F1/edit-intentions.jsonl`.
+- Verification: `rustfmt --edition 2021 --check` on owned Rust files, V-grep, V-protected, V-gone and V-lines passed (exit 0; logs `tmp/music-things/MTX-F1/final-{fmt,grep,protected,gone,lines}.log`; no tests run).
+- BLOCKED-BY-SIBLING: `CARGO_TERM_QUIET=true cargo check --workspace --all-targets` exit 101, `tmp/music-things/MTX-F1/gate-check-sibling-blocked.log`: MTX-S1 FM test helpers are configured out; see `impl-plans/active/music-things-s1-classic-mi.md`. Sibling has declared its edit phase blocked. Resume final gates after MTX-S1 resolves this and finishes its edits. Clippy, nextest, names, wasm builds, examples and vitest remain unverified on the final combined tree. Earlier moving-tree attempts are retained under `tmp/music-things/MTX-F1/` and are not passes.
+
+
+## Operator resume note (2026-11-01, after session 595 wave 2)
+
+MTX-F1's session-595 attempt is committed as WIP on `wf/music-things-extract`.
+It blocked only because `#[cfg(test)]` FM helpers were configured out of the
+synth dependency. The operator added the `test-support` features (protocol
+section 7, "test-only helpers") and re-gated `silence_op`, `encode_single`,
+`encode_bulk`, `encode_message` and `pack_bulk_voice`. `cargo check
+--workspace --all-targets` now passes on that tree. Continue from it, apply the
+same rule to any further moved test-only helpers, finish the remaining moves,
+and re-run every gate with fresh logs.

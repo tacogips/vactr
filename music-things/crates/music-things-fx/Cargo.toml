@@ -10,3 +10,8 @@ description = "Real-time stereo audio effects, granular and texture processors"
 [dependencies]
 music-things-dsp = { path = "../music-things-dsp" }
 music-things-synth = { path = "../music-things-synth" }
+
+[features]
+# Exposes test-only helpers to dependent crates' test suites (vactr enables it
+# from [dev-dependencies]); never enable it in production builds.
+test-support = ["music-things-dsp/test-support", "music-things-synth/test-support"]

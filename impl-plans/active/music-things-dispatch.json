@@ -12,16 +12,31 @@
   ],
   "protocolPath": "impl-plans/active/music-things-protocol.md",
   "evidenceRoot": "tmp/music-things",
-  "evidenceLayout": "evidenceRoot tmp/music-things (tmp/<taskId>) is the dispatcher's untracked root for per-plan and per-attempt fanout records (tmp/music-things/<planId>/<attempt>/). It is deliberately disjoint from the plans' declared artifact roots tmp/music-things-extraction/<planId>, so no artifact root contains a fanout evidence directory. Plan-authored command logs stay where the accepted plans put them: tmp/music-things-extraction/<planId>/ holds each plan's complete command logs (NN-<name>.log, each ending with exit=<status>). tmp/ is gitignored (**/tmp) and never committed. MTX-00 additionally owns baseline-tests.txt and check_test_names.py, which every later plan reads. A missing or truncated log is not a pass.",
+  "evidenceLayout": "evidenceRoot tmp/music-things is the runtime-owned, gitignored evidence root. Each plan writes its complete command logs (NN-<name>.log, each ending with exit=<status>) and any scratch outputs to its evidence directory tmp/music-things/<planId>/, which is NOT listed in writePaths or artifactRoots (the dispatcher owns tmp/<evidenceRoot>; amended 2026-10-31 after wave 1 blocked on the former disjoint tmp/music-things/<planId> log roots). MTX-00 additionally writes tmp/music-things/MTX-00/baseline-tests.txt and check_test_names.py, which every later plan reads. tmp/ is gitignored and never committed. A missing or truncated log is not a pass.",
   "standardEnv": "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1",
   "executionModel": {
     "waves": [
-      ["MTX-00"],
-      ["MTX-S1", "MTX-F1"],
-      ["MTX-S2", "MTX-F2"],
-      ["MTX-S3", "MTX-F3"],
-      ["MTX-90"],
-      ["MTX-91"]
+      [
+        "MTX-00"
+      ],
+      [
+        "MTX-S1",
+        "MTX-F1"
+      ],
+      [
+        "MTX-S2",
+        "MTX-F2"
+      ],
+      [
+        "MTX-S3",
+        "MTX-F3"
+      ],
+      [
+        "MTX-90"
+      ],
+      [
+        "MTX-91"
+      ]
     ],
     "sameBranchFanout": true,
     "worktrees": false,
@@ -83,7 +98,7 @@
       "A vactr EffectKind variant added without a crate counterpart fails to compile through the exhaustive From, and fx_kind_map checks every graph::EffectKind::ALL name (design 4.2).",
       "Tests moved between test binaries are matched by their <module>::tests::<name> suffix against the MTX-00 baseline list; none may be dropped (design 6.2).",
       "A transient compile failure caused only by the concurrent sibling plan is recorded BLOCKED-BY-SIBLING and rerun, never counted as a pass (protocol 5.1).",
-      "The staged crates build as a standalone virtual workspace copy under tmp/music-things-extraction/MTX-91/standalone, which proves the drop-in layout (design 9.1, gate 10)."
+      "The staged crates build as a standalone virtual workspace copy under tmp/music-things/MTX-91/standalone, which proves the drop-in layout (design 9.1, gate 10)."
     ],
     "outOfScopeEdgeCases": [
       "Copying music-things/crates/* into the tacogips/music-things repository and switching vactr to a pinned git dependency (an operator follow-up).",
@@ -151,9 +166,6 @@
         "src/dsp/tests/dsp.rs",
         "src/dsp/tests/dsp/fx_kind_map.rs",
         "impl-plans/active/music-things-00-foundation.md",
-        "tmp/music-things-extraction/MTX-00",
-        "tmp/music-things-extraction/MTX-00/check_test_names.py",
-        "tmp/music-things-extraction/MTX-00/baseline-tests.txt",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -161,7 +173,6 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-00",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -176,7 +187,7 @@
         "All protocol section 7 commands in the plan pass, with complete logs, and the Progress Log records sha256 and verification records."
       ],
       "verification": [
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-00/baseline-tests.txt (BEFORE any edit)",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-00/baseline-tests.txt (BEFORE any edit)",
         "CARGO_TERM_QUIET=true cargo check --workspace --all-targets",
         "rustfmt --edition 2021 --check <every .rs file created or modified by this plan>",
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-dsp --all-targets -- -D warnings",
@@ -184,7 +195,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-00/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-00/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-00/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-00/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "for c in music-things-dsp music-things-synth music-things-fx; do CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/$c/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p $c --target wasm32-unknown-unknown; done",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -201,7 +212,9 @@
     {
       "planId": "MTX-S1",
       "planPath": "impl-plans/active/music-things-s1-classic-mi.md",
-      "dependsOn": ["MTX-00"],
+      "dependsOn": [
+        "MTX-00"
+      ],
       "writePaths": [
         "src/dsp/ugen/osc.rs",
         "music-things/crates/music-things-synth/src/osc.rs",
@@ -275,7 +288,6 @@
         "src/dsp/ugen/mod.rs",
         "src/dsp/mod.rs",
         "impl-plans/active/music-things-s1-classic-mi.md",
-        "tmp/music-things-extraction/MTX-S1",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -295,7 +307,6 @@
         }
       ],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-S1",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -313,7 +324,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-synth --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-S1/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-S1/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-S1/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-S1/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-synth/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-synth --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -328,7 +339,9 @@
     {
       "planId": "MTX-F1",
       "planPath": "impl-plans/active/music-things-f1-dynamics-time.md",
-      "dependsOn": ["MTX-00"],
+      "dependsOn": [
+        "MTX-00"
+      ],
       "writePaths": [
         "src/dsp/effects/dynamics.rs",
         "music-things/crates/music-things-fx/src/dynamics.rs",
@@ -371,7 +384,6 @@
         "music-things/crates/music-things-fx/src/lib.rs",
         "src/dsp/effects/mod.rs",
         "impl-plans/active/music-things-f1-dynamics-time.md",
-        "tmp/music-things-extraction/MTX-F1",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -379,7 +391,6 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-F1",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -395,7 +406,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-F1/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-F1/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-F1/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-F1/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-fx/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-fx --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -409,7 +420,9 @@
     {
       "planId": "MTX-S2",
       "planPath": "impl-plans/active/music-things-s2-pairs-lpg.md",
-      "dependsOn": ["MTX-S1"],
+      "dependsOn": [
+        "MTX-S1"
+      ],
       "writePaths": [
         "src/dsp/ugen/analog_pair.rs",
         "music-things/crates/music-things-synth/src/analog_pair.rs",
@@ -475,7 +488,6 @@
         "src/dsp/ugen/mod.rs",
         "src/dsp/ported/manifest.rs",
         "impl-plans/active/music-things-s2-pairs-lpg.md",
-        "tmp/music-things-extraction/MTX-S2",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -490,7 +502,6 @@
         }
       ],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-S2",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -507,7 +518,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-synth --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-S2/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-S2/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-S2/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-S2/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-synth/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-synth --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -522,7 +533,9 @@
     {
       "planId": "MTX-F2",
       "planPath": "impl-plans/active/music-things-f2-texture-granular.md",
-      "dependsOn": ["MTX-F1"],
+      "dependsOn": [
+        "MTX-F1"
+      ],
       "writePaths": [
         "src/dsp/effects/texture.rs",
         "music-things/crates/music-things-fx/src/texture.rs",
@@ -547,7 +560,6 @@
         "music-things/crates/music-things-fx/src/lib.rs",
         "src/dsp/effects/mod.rs",
         "impl-plans/active/music-things-f2-texture-granular.md",
-        "tmp/music-things-extraction/MTX-F2",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -555,7 +567,6 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-F2",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -572,7 +583,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-F2/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-F2/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-F2/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-F2/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-fx/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-fx --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -586,7 +597,9 @@
     {
       "planId": "MTX-S3",
       "planPath": "impl-plans/active/music-things-s3-braids-voices.md",
-      "dependsOn": ["MTX-S2"],
+      "dependsOn": [
+        "MTX-S2"
+      ],
       "writePaths": [
         "src/dsp/ugen/braids_cloud.rs",
         "music-things/crates/music-things-synth/src/braids_cloud.rs",
@@ -655,7 +668,6 @@
         "music-things/crates/music-things-synth/src/lib.rs",
         "src/dsp/ugen/mod.rs",
         "impl-plans/active/music-things-s3-braids-voices.md",
-        "tmp/music-things-extraction/MTX-S3",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -670,7 +682,6 @@
         }
       ],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-S3",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -686,7 +697,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-synth --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-S3/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-S3/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-S3/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-S3/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-synth/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-synth --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -701,7 +712,10 @@
     {
       "planId": "MTX-F3",
       "planPath": "impl-plans/active/music-things-f3-crossmod-banks.md",
-      "dependsOn": ["MTX-F2", "MTX-S1"],
+      "dependsOn": [
+        "MTX-F2",
+        "MTX-S1"
+      ],
       "writePaths": [
         "src/dsp/effects/cross_mod.rs",
         "music-things/crates/music-things-fx/src/cross_mod.rs",
@@ -736,7 +750,6 @@
         "src/dsp/tests/dsp/quad_mixer_alloc.rs",
         "src/dsp/tests/dsp.rs",
         "impl-plans/active/music-things-f3-crossmod-banks.md",
-        "tmp/music-things-extraction/MTX-F3",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -744,7 +757,6 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-F3",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -760,7 +772,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-F3/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-F3/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-F3/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-F3/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-fx/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-fx --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -775,13 +787,14 @@
     {
       "planId": "MTX-90",
       "planPath": "impl-plans/active/music-things-90-fx-dispatch.md",
-      "dependsOn": ["MTX-F3"],
+      "dependsOn": [
+        "MTX-F3"
+      ],
       "writePaths": [
         "music-things/crates/music-things-fx/src/dispatch.rs",
         "music-things/crates/music-things-fx/src/lib.rs",
         "src/dsp/effects/mod.rs",
         "impl-plans/active/music-things-90-fx-dispatch.md",
-        "tmp/music-things-extraction/MTX-90",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -789,7 +802,6 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-90",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -805,7 +817,7 @@
         "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-90/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-90/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-90/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-90/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-fx/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p music-things-fx --target wasm32-unknown-unknown",
         "CARGO_TERM_QUIET=true cargo build --examples",
@@ -819,13 +831,15 @@
     {
       "planId": "MTX-91",
       "planPath": "impl-plans/active/music-things-91-notices-final.md",
-      "dependsOn": ["MTX-S3", "MTX-90"],
+      "dependsOn": [
+        "MTX-S3",
+        "MTX-90"
+      ],
       "writePaths": [
         "music-things/THIRD_PARTY_NOTICES.md",
         "THIRD_PARTY_NOTICES.md",
         "verification/compare_tides_poly.py",
         "impl-plans/active/music-things-91-notices-final.md",
-        "tmp/music-things-extraction/MTX-91",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -833,7 +847,6 @@
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/music-things-extraction/MTX-91",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
         "editor/node_modules"
@@ -851,13 +864,13 @@
         "grep -c 'Permission is hereby granted' THIRD_PARTY_NOTICES.md music-things/THIRD_PARTY_NOTICES.md",
         "python3 -I -m py_compile verification/compare_tides_poly.py",
         "gate 9: for each moved basename, test ! -e under src/dsp except the listed shims and adapters; grep -nE '^\\s*(for|while|loop)\\b' over the shims and adapters",
-        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=tmp/music-things-extraction/MTX-91/standalone/target cargo build --workspace --manifest-path tmp/music-things-extraction/MTX-91/standalone/Cargo.toml",
-        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=tmp/music-things-extraction/MTX-91/standalone/target cargo build --workspace --manifest-path tmp/music-things-extraction/MTX-91/standalone/Cargo.toml --target wasm32-unknown-unknown",
-        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=tmp/music-things-extraction/MTX-91/standalone/target cargo test --workspace --manifest-path tmp/music-things-extraction/MTX-91/standalone/Cargo.toml",
-        "for c in music-things-dsp music-things-synth music-things-fx; do diff -r music-things/crates/$c tmp/music-things-extraction/MTX-91/standalone/crates/$c; done",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=tmp/music-things/MTX-91/standalone/target cargo build --workspace --manifest-path tmp/music-things/MTX-91/standalone/Cargo.toml",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=tmp/music-things/MTX-91/standalone/target cargo build --workspace --manifest-path tmp/music-things/MTX-91/standalone/Cargo.toml --target wasm32-unknown-unknown",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=tmp/music-things/MTX-91/standalone/target cargo test --workspace --manifest-path tmp/music-things/MTX-91/standalone/Cargo.toml",
+        "for c in music-things-dsp music-things-synth music-things-fx; do diff -r music-things/crates/$c tmp/music-things/MTX-91/standalone/crates/$c; done",
         "CARGO_TERM_QUIET=true cargo clippy --workspace --all-targets -- -D warnings",
         "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/MTX-91/tests-after.txt && python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/MTX-91/tests-after.txt",
+        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-91/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-91/tests-after.txt",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
         "for c in music-things/crates/*; do CARGO_TERM_QUIET=true cargo build --manifest-path $c/Cargo.toml --target wasm32-unknown-unknown; done",
         "CARGO_TERM_QUIET=true cargo build --examples && CARGO_TERM_QUIET=true cargo check --features lsp && CARGO_TERM_QUIET=true cargo build --bin vactr",

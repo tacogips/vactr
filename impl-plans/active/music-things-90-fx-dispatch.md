@@ -98,7 +98,7 @@ with `graph::EffectKind` and `&CapabilitySet`.
   (for example `src/dsp/tests/dsp/{catalog,cross_mod,lofi_composite,music_filters,effects}.rs`)
   passes unchanged, and so does the full golden suite.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-90/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-90/`)
 
 1. V-check.
 2. V-fmt (`dispatch.rs`, fx `lib.rs`, `src/dsp/effects/mod.rs`).

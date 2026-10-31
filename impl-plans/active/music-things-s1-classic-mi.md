@@ -165,7 +165,7 @@ path.
   and the golden template tests must pass unchanged. They are the
   bit-identity proof.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-S1/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-S1/`)
 
 1. V-check.
 2. V-fmt on every created or modified `.rs` path in writePaths.

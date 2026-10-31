@@ -113,7 +113,7 @@ relocated unchanged into vactr's test tree.
   tests, and any others) run in the crate binary.
 - Every vactr test listed in Pitfalls passes unchanged.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-F3/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-F3/`)
 
 1. V-check.
 2. V-fmt (all created or modified `.rs` files, including

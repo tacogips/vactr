@@ -93,22 +93,22 @@ into https://github.com/tacogips/music-things. This plan:
   For those adapters and shims, `grep -nE '^\s*(for|while|loop)\b'` must
   print nothing except the granular adapter's `match`. Log the review.
 - **Gate 10: standalone drop-in.**
-  1. `mkdir -p tmp/music-things-extraction/MTX-91/standalone/crates`, then
-     `cp -R music-things/crates/music-things-dsp music-things/crates/music-things-synth music-things/crates/music-things-fx tmp/music-things-extraction/MTX-91/standalone/crates/`.
-  2. Write `tmp/music-things-extraction/MTX-91/standalone/Cargo.toml`
+  1. `mkdir -p tmp/music-things/MTX-91/standalone/crates`, then
+     `cp -R music-things/crates/music-things-dsp music-things/crates/music-things-synth music-things/crates/music-things-fx tmp/music-things/MTX-91/standalone/crates/`.
+  2. Write `tmp/music-things/MTX-91/standalone/Cargo.toml`
      containing only `[workspace]`, `members = ["crates/*"]` and
      `resolver = "2"`.
   3. With
-     `CARGO_TARGET_DIR=tmp/music-things-extraction/MTX-91/standalone/target`,
+     `CARGO_TARGET_DIR=tmp/music-things/MTX-91/standalone/target`,
      run:
-     - `cargo build --workspace --manifest-path tmp/music-things-extraction/MTX-91/standalone/Cargo.toml`
+     - `cargo build --workspace --manifest-path tmp/music-things/MTX-91/standalone/Cargo.toml`
      - the same with `--target wasm32-unknown-unknown`
      - `cargo test --workspace --manifest-path …`
 
      All must exit 0, and the test count must equal the number of crate
      tests in `cargo nextest list --workspace` for the three
      `music-things-*` binaries.
-  4. `diff -r music-things/crates/music-things-fx tmp/music-things-extraction/MTX-91/standalone/crates/music-things-fx`
+  4. `diff -r music-things/crates/music-things-fx tmp/music-things/MTX-91/standalone/crates/music-things-fx`
      (and the same for the other two) reports no difference.
 
 ## Pitfalls
@@ -124,7 +124,7 @@ into https://github.com/tacogips/music-things. This plan:
 - **Lockfile.** The standalone `Cargo.lock` is generated inside the tmp
   dir (artifact root) and must not be copied back.
 
-## Verification (logs under `tmp/music-things-extraction/MTX-91/`)
+## Verification (logs under `tmp/music-things/MTX-91/`)
 
 1. V-grep, which now covers the staged notices.
 2. `grep -n 'src/dsp/' THIRD_PARTY_NOTICES.md`: every remaining hit is a

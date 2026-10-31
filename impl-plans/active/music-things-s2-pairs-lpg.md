@@ -152,7 +152,7 @@ Moves go from `src/dsp/ugen/<f>` to `music-things/crates/music-things-synth/src/
 - `src/dsp/tests/dsp/{vactrol_gate,kernel_pairs,dual_kick,snare_pair,hat_pair,fm_pair,analog_pair,chord_pair,*_pair}.rs`,
   `src/dsp/ported/tests.rs` and the golden template tests pass unchanged.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-S2/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-S2/`)
 
 1. V-check.
 2. V-fmt (all created or modified `.rs` files).

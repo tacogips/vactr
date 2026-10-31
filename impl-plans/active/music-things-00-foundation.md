@@ -40,10 +40,10 @@ Every crate dependency edge is declared now, including fx -> synth, so
 ### Step 0: baseline (before ANY edit)
 
 1. Run `cargo nextest list --workspace --message-format oneline >
-   tmp/music-things-extraction/MTX-00/baseline-tests.txt` on the untouched
+   tmp/music-things/MTX-00/baseline-tests.txt` on the untouched
    tree (HEAD a6e5bea). Record the line count. It is expected to be 3093
    tests plus any skipped; record the exact number.
-2. Write `tmp/music-things-extraction/MTX-00/check_test_names.py`, a
+2. Write `tmp/music-things/MTX-00/check_test_names.py`, a
    Python 3 stdlib script run with `python3 -I`. Arguments:
    `BASELINE AFTER`. Each line is `<binary-id> <test-name>`, split on the
    first space. For each baseline `(bin, name)`:
@@ -250,7 +250,7 @@ Every crate dependency edge is declared now, including fx -> synth, so
   `set_named("x", 1.0)` -> `false`.
 - `fx_kind_map`: the two tests above.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-00/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-00/`)
 
 1. `00-baseline-list.log`: Step 0 list. Records the baseline count.
 2. V-check.

@@ -581,7 +581,7 @@ Plans must also meet these constraints:
   The largest plan has fewer than 120 entries, well under the 512 cap.
 - **artifactRoots.** Every plan declares `target/`,
   `tree-sitter-vact/tree-sitter-vact.wasm`, `editor/node_modules` and its
-  own `tmp/music-things-extraction/<plan-id>/`.
+  own `tmp/music-things/<plan-id>/`.
 - **Docs and generality in each plan.** Each plan documents its own public
   items and passes the 4.4 grep for its own files before handoff, so
   clippy never sees accumulated `missing_docs` warnings.
@@ -608,7 +608,7 @@ The final wave (MTX-91, W5) adds two gates:
    3.3 exists under `src/dsp` except the adapters listed in 4.3. The
    adapter files contain no DSP loops (a review check).
 10. **Standalone drop-in.** Copy `music-things/crates/*` into
-    `tmp/music-things-extraction/MTX-91/standalone/crates/`, next to a
+    `tmp/music-things/MTX-91/standalone/crates/`, next to a
     virtual workspace `Cargo.toml` (`members = ["crates/*"]`,
     `resolver = "2"`). Then
     `cargo build --workspace --manifest-path …/standalone/Cargo.toml` and
@@ -620,7 +620,7 @@ The final wave (MTX-91, W5) adds two gates:
 Verification records use
 `{command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: "passed", log, notes}`.
 Each `log` is a complete log path under the plan's
-`tmp/music-things-extraction/<plan-id>/`. Intentional negative controls
+`tmp/music-things/<plan-id>/`. Intentional negative controls
 go only in `mutationEvidence`. Example: a deliberately swapped kind
 mapping must fail `fx_kind_map` and golden tests.
 

@@ -54,7 +54,7 @@ For each module, do steps (a) to (f) in this order:
 - (e) Delete the vactr source files the plan says to delete.
 - (f) Run `cargo check -p <own crate> --all-targets`, then
   `cargo check -p vactr --all-targets`. Log both as
-  `tmp/music-things-extraction/<ID>/mod-<m>-check-{crate,vactr}.log`.
+  `tmp/music-things/<ID>/mod-<m>-check-{crate,vactr}.log`.
 
 Do not start the next module until step (f) passes. The one exception is a
 failure whose every error location lies in the concurrent sibling plan's
@@ -205,7 +205,7 @@ Other cases:
 
 ## 6. Evidence
 
-Each plan writes complete logs to `tmp/music-things-extraction/<PLAN-ID>/`.
+Each plan writes complete logs to `tmp/music-things/<PLAN-ID>/`.
 This directory is gitignored (`**/tmp`) and declared as an artifactRoot.
 Use one file per command, named `NN-<name>.log`, written with
 `… > LOG 2>&1; echo "exit=$?" >> LOG`. A missing log, a truncated log or one
@@ -231,7 +231,7 @@ file lists filled in.
 | V-fmt | `rustfmt --edition 2021 --check <every .rs file this plan created or modified>` | exit 0. Format only your own files; never run `cargo fmt` on the workspace |
 | V-clippy | `cargo clippy -p <crate> --all-targets -- -D warnings` for each crate the plan touched, and `cargo clippy -p vactr --all-targets -- -D warnings` | exit 0 |
 | V-nextest | `cargo nextest run --workspace` | exit 0, failureCount 0 |
-| V-names | `cargo nextest list --workspace --message-format oneline > tmp/music-things-extraction/<ID>/tests-after.txt`, then `python3 -I tmp/music-things-extraction/MTX-00/check_test_names.py tmp/music-things-extraction/MTX-00/baseline-tests.txt tmp/music-things-extraction/<ID>/tests-after.txt` | exit 0, prints `unmatched=0` and a total of at least the baseline count plus 2 (fx_kind_map) plus the new crate tests added so far. A failure caused only by a sibling compile error is BLOCKED-BY-SIBLING (section 5.1) |
+| V-names | `cargo nextest list --workspace --message-format oneline > tmp/music-things/<ID>/tests-after.txt`, then `python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/<ID>/tests-after.txt` | exit 0, prints `unmatched=0` and a total of at least the baseline count plus 2 (fx_kind_map) plus the new crate tests added so far. A failure caused only by a sibling compile error is BLOCKED-BY-SIBLING (section 5.1) |
 | V-wasm | `cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | exit 0 |
 | V-crate-wasm | `cargo build --manifest-path music-things/crates/<crate>/Cargo.toml --target wasm32-unknown-unknown` and `cargo build -p <crate> --target wasm32-unknown-unknown` for each touched crate | exit 0 |
 | V-examples | `cargo build --examples` | exit 0. All 15 examples compile unedited |

@@ -141,7 +141,7 @@ stream-control groups and the analyzers into the fx crate.
 - `src/dsp/tests/dsp/{texture,texture_loop,texture_quality,texture_spectral,texture_stretch,dynamic_control,stream_cv,stream_dynamics,analyzer}.rs`
   and the granular template tests pass unchanged.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-F2/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-F2/`)
 
 1. V-check.
 2. V-fmt (all created or modified `.rs` files).

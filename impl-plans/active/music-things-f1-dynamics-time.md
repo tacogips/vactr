@@ -123,7 +123,7 @@ deleted.
 - `src/dsp/tests/dsp/{effects,catalog,music_filters,musicdsp,creative_reverb,lofi_composite,sidechain}.rs`
   and the bus and offline golden tests pass unchanged.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-F1/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-F1/`)
 
 1. V-check.
 2. V-fmt (all created or modified `.rs` files).

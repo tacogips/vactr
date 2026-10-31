@@ -110,7 +110,7 @@ deleted, and `ugen/mod.rs` changes `pub mod` to
   vactr tests listed above, the golden templates and the examples pass
   unchanged.
 
-## Verification (protocol section 7; logs under `tmp/music-things-extraction/MTX-S3/`)
+## Verification (protocol section 7; logs under `tmp/music-things/MTX-S3/`)
 
 1. V-check.
 2. V-fmt (all created or modified `.rs` files).

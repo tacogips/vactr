@@ -38,14 +38,16 @@
       "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-595",
       "outcome": "Session 591 MTX-00 blocked on V-vitest because the -t skip filter used '.', which does not match newlines, so 24 tests were skipped (2376 passed < 2384). Commit 7670476 switched the filter to [\\s\\S] in this manifest and the protocol. Step5 impl-plan review in session 595 accepted all 9 plans on the 7670476 tree (reviewDecision accepted; MTX-R1 verified-repaired; two low residual findings only; path declarations bad=[] for all 9 plans; waves and DAG unchanged).",
       "resolution": "No plan or design change in this checkpoint. Re-dispatch from MTX-00 on the 7670476 tree per the MTX-00 operator resume note. The reviewer's tmp/music-things-extraction/MTX-00 wording again refers to the evidence dir named tmp/music-things/MTX-00. Plan IDs, waves and path ownership are unchanged."
+    },
+    {
+      "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-601",
+      "outcome": "Session 595 wave-001 completed MTX-00 (successful). Wave-002 blocked MTX-S1 (implementation-dependency) and MTX-F1 (materially unverified) because #[cfg(test)] FM helpers were configured out of the synth dependency. The operator committed the S1/F1 WIP with test-support crate features and the protocol section 7 test-only-helper amendment at b2b8755. Step5 impl-plan review in session 601 accepted all plans on the b2b8755 tree (reviewDecision accepted; MTX-R1 verified-repaired; two low residual findings only; path declarations bad=[]; waves and DAG unchanged).",
+      "resolution": "MTX-00 is recorded as an acceptedDependency at b2b8755 and removed from the dispatched plans so its baseline capture is not rerun. Re-dispatch from wave [MTX-S1, MTX-F1] on the b2b8755 tree per the S1/F1 operator resume notes. Remaining plan IDs, dependsOn edges and path ownership are unchanged; every file changed by the WIP commits lies inside MTX-00 (accepted) or MTX-S1/MTX-F1 writePaths."
     }
   ],
   "standardEnv": "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1",
   "executionModel": {
     "waves": [
-      [
-        "MTX-00"
-      ],
       [
         "MTX-S1",
         "MTX-F1"
@@ -75,7 +77,7 @@
     "serialReconciliation": "Workers do not do workspace-wide formatting, Cargo.lock regeneration (MTX-00 only), plan archiving or impl-plans/README.md updates. A defect found in another plan's files is recorded as a blocker and repaired serially by the review step, with file, cause, fix and pre/post sha256. Never edit test expectations, goldens or tolerances."
   },
   "reviewContext": {
-    "issueReference": "workflowInput 'Extract vactr synth/effect DSP kernels into reusable music-things crates (in-tree staging under music-things/crates)'; no GitHub issue number; target repo https://github.com/tacogips/music-things scaffold a72a955; baseline a6e5bea; branch wf/music-things-extract; workflows opus-terra-design-and-implement-review-loop-session-577 (wave-001 blocked on evidence root, amended at 1b0ecc1), opus-terra-design-and-implement-review-loop-session-581 (plans re-reviewed and accepted; MTX-00 wave blocked on gates, WIP and amended gates committed at 5c5cf09), opus-terra-design-and-implement-review-loop-session-590 (plans re-reviewed and accepted; MTX-00 blocked on evidence artifact root, amended at cea4f6a), opus-terra-design-and-implement-review-loop-session-591 (plans re-reviewed and accepted; MTX-00 blocked on the V-vitest newline filter, amended at 7670476) and opus-terra-design-and-implement-review-loop-session-595 (plans re-reviewed and accepted)",
+    "issueReference": "workflowInput 'Extract vactr synth/effect DSP kernels into reusable music-things crates (in-tree staging under music-things/crates)'; no GitHub issue number; target repo https://github.com/tacogips/music-things scaffold a72a955; baseline a6e5bea; branch wf/music-things-extract; workflows opus-terra-design-and-implement-review-loop-session-577 (wave-001 blocked on evidence root, amended at 1b0ecc1), opus-terra-design-and-implement-review-loop-session-581 (plans re-reviewed and accepted; MTX-00 wave blocked on gates, WIP and amended gates committed at 5c5cf09), opus-terra-design-and-implement-review-loop-session-590 (plans re-reviewed and accepted; MTX-00 blocked on evidence artifact root, amended at cea4f6a), opus-terra-design-and-implement-review-loop-session-591 (plans re-reviewed and accepted; MTX-00 blocked on the V-vitest newline filter, amended at 7670476) and opus-terra-design-and-implement-review-loop-session-595 (plans re-reviewed and accepted), opus-terra-design-and-implement-review-loop-session-595 (MTX-00 completed; MTX-S1/MTX-F1 blocked on configured-out FM test helpers, WIP and test-support amendment committed at b2b8755) and opus-terra-design-and-implement-review-loop-session-601 (plans re-reviewed and accepted; MTX-00 recorded as accepted dependency)",
     "userProblem": "vactr's synth and effect DSP is mixed with engine code in src/dsp and cannot be reused. It must move into dependency-free, wasm32-clean crates staged at music-things/crates/*, with vactr staying bit-identical.",
     "requiredOutcomes": [
       "Three crates music-things-dsp, music-things-synth and music-things-fx under music-things/crates/, each building natively and for wasm32-unknown-unknown, standalone and inside the vactr workspace (design 2.1, 2.2; gates 4 and 10).",
@@ -164,82 +166,6 @@
     ]
   },
   "plans": [
-    {
-      "planId": "MTX-00",
-      "planPath": "impl-plans/active/music-things-00-foundation.md",
-      "dependsOn": [],
-      "writePaths": [
-        "Cargo.toml",
-        "Cargo.lock",
-        "music-things/crates/music-things-dsp/Cargo.toml",
-        "music-things/crates/music-things-dsp/src/lib.rs",
-        "music-things/crates/music-things-dsp/src/prim.rs",
-        "music-things/crates/music-things-dsp/src/fft.rs",
-        "music-things/crates/music-things-dsp/src/sample_view.rs",
-        "music-things/crates/music-things-synth/Cargo.toml",
-        "music-things/crates/music-things-synth/src/lib.rs",
-        "music-things/crates/music-things-synth/src/ports.rs",
-        "music-things/crates/music-things-fx/Cargo.toml",
-        "music-things/crates/music-things-fx/src/lib.rs",
-        "music-things/crates/music-things-fx/src/kind.rs",
-        "music-things/crates/music-things-fx/src/ctx.rs",
-        "music-things/crates/music-things-fx/src/param_set.rs",
-        "src/dsp/effects/prim.rs",
-        "src/dsp/fft.rs",
-        "src/dsp/mod.rs",
-        "src/dsp/arena.rs",
-        "src/dsp/effects/mod.rs",
-        "src/dsp/effects/fx_adapter.rs",
-        "src/dsp/ugen/mod.rs",
-        "src/dsp/ugen/catalog.rs",
-        "src/dsp/tests/dsp.rs",
-        "src/dsp/tests/dsp/fx_kind_map.rs",
-        "impl-plans/active/music-things-00-foundation.md",
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules",
-        "tmp/music-things/MTX-00"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "target",
-        "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules",
-        "tmp/music-things/MTX-00"
-      ],
-      "acceptanceCriteria": [
-        "The baseline test list is captured before any edit, and the check_test_names.py self-test is recorded in mutationEvidence.",
-        "The root workspace has members [\".\", \"music-things/crates/*\"], resolver 2 and no default-members. There are three self-contained crate manifests (0.1.0, edition 2021, rust-version 1.83, MIT, repository URL, no external deps, ../<dir> path deps; fx depends on dsp and synth, synth on dsp).",
-        "The Cargo.lock diff adds only the three path packages.",
-        "Core types exist per design 3.1-3.4, and #![warn(missing_docs)] is satisfied in all three crates.",
-        "vactr is wired through re-exports, KernelContext for Kx, FxContext for FxCtx, SampleSource for SampleStore and exhaustive From conversions. The Kx and FxCtx structs are byte-identical.",
-        "fx_kind_map (2 tests) and the PortValues, ParamSet and NoSamples crate tests pass.",
-        "All protocol section 7 commands in the plan pass, with complete logs, and the Progress Log records sha256 and verification records."
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-00/baseline-tests.txt (BEFORE any edit)",
-        "CARGO_TERM_QUIET=true cargo check --workspace --all-targets",
-        "rustfmt --edition 2021 --check <every .rs file created or modified by this plan>",
-        "CARGO_TERM_QUIET=true cargo clippy -p music-things-dsp --all-targets -- -D warnings",
-        "CARGO_TERM_QUIET=true cargo clippy -p music-things-synth --all-targets -- -D warnings",
-        "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings",
-        "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings",
-        "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace",
-        "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-00/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-00/tests-after.txt",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
-        "for c in music-things-dsp music-things-synth music-things-fx; do CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/$c/Cargo.toml --target wasm32-unknown-unknown && CARGO_TERM_QUIET=true cargo build -p $c --target wasm32-unknown-unknown; done",
-        "CARGO_TERM_QUIET=true cargo build --examples",
-        "CARGO_TERM_QUIET=true cargo check --features lsp",
-        "CARGO_TERM_QUIET=true cargo build --bin vactr",
-        "! grep -rniE 'crate::|vactr|CtlId|InstDef|wire::Ctl' music-things/",
-        "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'",
-        "for f in src/dsp/effects/prim.rs src/dsp/fft.rs; do test ! -e \"$f\" || echo LEFT $f; done",
-        "wc -l <every .rs file created or modified by this plan>",
-        "git diff --stat a6e5bea -- Cargo.lock",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?![\\s\\S]*does no whole-document work on an edit frame or active animation-only frames)[\\s\\S]*$')"
-      ]
-    },
     {
       "planId": "MTX-S1",
       "planPath": "impl-plans/active/music-things-s1-classic-mi.md",
@@ -924,6 +850,20 @@
         "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'",
         "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?![\\s\\S]*does no whole-document work on an edit frame or active animation-only frames)[\\s\\S]*$')",
         "git diff --stat a6e5bea -- mise.toml editor src/pattern src/sched"
+      ]
+    }
+  ],
+  "acceptedDependencies": [
+    {
+      "planId": "MTX-00",
+      "planPath": "impl-plans/active/music-things-00-foundation.md",
+      "commit": "b2b87552d807cb895ca2e3300acab3820d25c36e",
+      "provides": [
+        "Root workspace members [\".\", \"music-things/crates/*\"] with path deps, plus the operator test-support dev-dependency features (root Cargo.toml and the three crate Cargo.toml files).",
+        "music-things-dsp crate with prim, fft and sample_view; music-things-synth crate root with ports (KernelContext, PortValues); music-things-fx crate root with kind, ctx and param_set (EffectKind mirror, FxContext, ParamSet).",
+        "vactr wiring: src/dsp/effects/fx_adapter.rs, From conversions, KernelContext for Kx, FxContext for FxCtx, SampleSource for SampleStore, and the fx_kind_map tests in src/dsp/tests/dsp/fx_kind_map.rs.",
+        "Baseline test list tmp/music-things/MTX-00/baseline-tests.txt and checker tmp/music-things/MTX-00/check_test_names.py, read by every later plan (untracked evidence).",
+        "Session-595 wave-001 classified MTX-00 successful (tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-595/wave-001/wave-summary.json); code committed at 5c5cf09, final plan state at b2b8755."
       ]
     }
   ]

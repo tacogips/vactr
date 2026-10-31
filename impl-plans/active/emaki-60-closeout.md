@@ -190,3 +190,8 @@ Run serially, each under the lock where heavy. Logs go to
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (closeout implementation)
+**Tasks Completed**: Missing wave-5 non-browser join passed serially under the measurement lock (emaki check, 138/138 tests, build, editor check; `tmp/emaki/wave-5-join/summary.json`). G1 passed (`tmp/emaki/EMK-CLOSEOUT/g1.log`, exit 0).
+**Blocked**: G2 clean install was rejected by automatic command approval because the required command removes `emaki/node_modules` and `emaki/dist`; it did not execute. Resume with the authorized clean-install gate in an environment that permits the specified removal, then continue C1 serially. C2 remains pending C1. No product files changed.
+**Evidence**: `tmp/emaki/EMK-CLOSEOUT/intent-g2-block.txt`, `plan-before-g2-block.txt`, and `plan-before-g2-block.sha256`; post-edit hash in `plan-after-g2-block.sha256`. Existing sibling changes were preserved.

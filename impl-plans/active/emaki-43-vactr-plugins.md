@@ -344,7 +344,7 @@ Restore afterwards.
   `kind: 'eval'` rows (check with
   `grep -n "kind: 'playing'\|kind: 'eval'" editor/src/code/mount.ts` ->
   none).
-- [ ] Verification steps 1-5 pass, with e2e in both browsers. Mutation
+- [x] Verification steps 1-5 pass, with e2e in both browsers under the operator baseline disposition. Mutation
   evidence is recorded. Hashes are logged.
 
 ## Progress Log
@@ -386,4 +386,22 @@ completion criterion under rules 13/14. Reference the summary path in the
 result notes (not in `verification`), keep the non-browser records
 (check, scoped vitest, full vitest 2370/2370, wasm/release/editor builds,
 mutation evidence), check the completion box, and complete.
+
+### Session: 2026-11-01 (step 6 redispatch)
+**Tasks Completed**: Checked the committed implementation against design sections 13.2–13.7 and the plan. No source changes were needed. Formal reviews and finalization remain downstream.
+**Verification**: `npm run check` passed (`check-step6-618.log`, exit 0); scoped vitest passed 148/148 (`scoped-step6-618.log`, exit 0). Browser disposition remains the operator's rule-13 baseline comparison in `orchestrator/summary.json`; it is not a clean browser pass. Prior mutation evidence remains recorded above.
+**Files changed**: This plan's completion checkbox and progress log only; pre-edit intent, snapshot and hash are in `intent-step6-618.txt`, `plan-pre-step6-618.txt`, and `plan-step6-618.sha256` under `tmp/emaki/EMK-VAC-PLUGINS/`.
+**Additional verification**: The debug wasm library build passed (`wasm-step6-618.log`, exit 0). A fresh full-suite rerun was canceled while waiting for EMK-PERF's measurement lock and its temporary `emaki/src/language/incremental.ts` mutation; the earlier `full-redispatch.log` records 2370/2370 on the committed implementation. Re-run after the sibling restores its mutation for stable joined-tree evidence. The second plan edit's intent and pre/post hashes are in `intent-step6-618b.txt` and `plan-step6-618b.sha256`.
+
+
+### Session: 2026-11-01 (stable-tree continuation)
+**Verification**: After EMK-PERF restored `emaki/src/language/incremental.ts` (SHA-256 `c0918b33432f400b1e21e68859451f46a8c4d7cc56749046a28f57811d1bd30b`), `npm run check` passed, scoped vitest passed 148/148, and full editor vitest passed 2370/2370 under the measurement lock. Complete logs: `check-continuation-2.log`, `scoped-continuation-2.log`, `full-continuation-2.log`. Browser gates retain the operator rule-13 disposition above. No source changes were required; formal review follows downstream.
+
+## Operator note (after session 618)
+
+The session-618 block was a race: EMK-PERF was mutating
+`emaki/src/language/incremental.ts` for its negative control while this plan
+ran the full suite. EMK-PERF is now Completed, the file is byte-identical to
+HEAD, and nothing else runs in this wave. Rerun the full editor vitest on the
+stable tree and complete.
 

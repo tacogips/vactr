@@ -1,6 +1,6 @@
 # EMK-PERF: emaki Playwright perf script, budget gates in WebKit and Chromium, perf repairs
 
-**Status**: Blocked (mutation control ownership clarification)
+**Status**: Completed (accepted in session 618 wave 1: test-integrity, adversarial review and branch evidence passed; tmp/emaki/EMK-PERF/run-final/summary.json allPass)
 **Plan ID**: EMK-PERF (wave 5; runs alone)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 9.2, 12.1, 12.2, 18 (risks); decisions EM-D9, EM-D11, EM-D12; user-QA default EQ1
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -234,3 +234,52 @@ The required mutation control remains unexecuted: it calls for editing
 gate repairs, while the dispatch requires negative controls to mutate an
 owned writePath. A checkpoint amendment resolving that ownership is needed.
 Formal reviews and finalization remain downstream.
+
+
+### Session: 2026-11-01 (mutation control amendment)
+Rule 15 now authorizes the temporary shared-path mutation. Two controls reset
+tokenization to line zero and remove the frame limits; the second also disables
+the token cache. The first run exited 2 on a diff canvas click intercepted by
+the input textarea; its scaling gate passed (8.3 ms versus 15.0 ms). The
+second, restricted to the scaling sizes, exited 0 and passed the scaling gate
+(8.5 ms versus 14.6 ms). Thus neither demonstrates the required failing
+first-paint or scaling gate; further investigation is required. Logs and
+raw results: `tmp/emaki/EMK-PERF/session-618-control/`. Both mutations were
+restored byte-identically; SHA-256 before and after: `c0918b33432f400b1e21e68859451f46a8c4d7cc56749046a28f57811d1bd30b`.
+
+Restored-source verification: self-test exit 0 (`self-test.log`); emaki
+check and 138/138 tests exit 0 (`full.log`); locked build and full browser
+run exit 0, all 12 gates pass (`final.log`, `run-final/summary.json` in the
+session evidence directory). Chromium/WebKit respectively: first paint
+81.8/105 ms, scroll p95 5.4/6 ms, key work p95 9.1/9 ms, next-frame
+1/1, scaling 9/9 ms against 14.4/18 ms, diff 30.2/30 ms. No persistent
+shared source edits; editor check is not required. Wave-4 join remains green.
+The previous ownership blocker is resolved; the mutation sensitivity gap
+remains open. Formal reviews and finalization are downstream.
+
+
+### Session: 2026-11-01 (control and harness repair)
+The prior control rescanned only to the same approximately 2,000-line
+viewport for both sizes. A stronger full-document regression control removed
+frame limits and checkpoint jumps and tokenized from line zero through the
+entire document on every tokens() call. Chromium scaling failed as intended:
+208.7 ms against 16.2 ms (exit 1; `tmp/emaki/EMK-PERF/continuation-1/mutation.log`).
+The 1k/100k control used one load and 20 keys; it does not prove detection of
+line-zero rescans limited to the viewport. The shared source was restored
+byte-identically (SHA-256 in `continuation-1/hashes.txt`).
+
+A restored-source WebKit run then exposed an intermittent diff click timeout
+when the invisible input textarea intercepted the canvas. `scripts/perf.mjs`
+now chooses an unobstructed nearby x on the same seeded line before a real
+click; no metric or budget changed. Pre/post hashes and intent are in
+`tmp/emaki/EMK-PERF/continuation-1/perf-hashes.txt` and `perf-intent.txt`.
+The earlier failed run is retained as `continuation-1/final.log`.
+
+Final checks: self-test exit 0 (`continuation-1/self-test-repair.log`);
+emaki check and 138/138 tests exit 0 (`continuation-1/full-repair.log`);
+locked build and full Chromium/WebKit perf exit 0, all gates pass
+(`continuation-1/final-repair.log`, `continuation-1/run-repair-final/`).
+Chromium/WebKit: first paint 65.5/137 ms, scroll p95 4.1/6 ms, key work
+5.2/9 ms, next-frame 1/1, scaling 6.9/9 ms against 13.6/14 ms, diff
+31.1/30 ms. No persistent shared-path edits; editor check is not required.
+Formal review and finalization remain downstream.

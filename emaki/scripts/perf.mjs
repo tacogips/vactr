@@ -81,7 +81,9 @@ for (const name of options.browser === 'all' ? ['chromium', 'webkit'] : [options
       await page.evaluate(() => { window.__perfDiffEvents = []; document.querySelector('#right-editor').addEventListener('keydown', e => window.__perfDiffEvents.push({ time: e.timeStamp, revision: window.__emakiDiff.stats().rightRevision + 1 }), true); window.__perfDiffApplied = []; window.__emakiDiff.onApplied(s => window.__perfDiffApplied.push(s)); });
       const rng = random(7), canvas = page.locator('#right-editor canvas.emaki-canvas'); const box = await canvas.boundingBox();
       for (let i = 0; i < edits; i++) {
-        await canvas.click({ position: { x: 80, y: 9 + Math.floor(rng() * Math.max(1, Math.floor((box.height - 18) / 18))) * 18 } });
+        const y = 9 + Math.floor(rng() * Math.max(1, Math.floor((box.height - 18) / 18))) * 18;
+        const x = await canvas.evaluate((element, y) => { const rect = element.getBoundingClientRect(); for (let x = 80; x <= 88; x++) if (document.elementFromPoint(rect.left + x, rect.top + y) === element) return x; throw new Error('No unobstructed diff canvas click point'); }, y);
+        await canvas.click({ position: { x, y } });
         const revision = await page.evaluate(() => window.__emakiDiff.stats().rightRevision + 1);
         await page.keyboard.press(String.fromCharCode(97 + Math.floor(rng() * 26)));
         await page.waitForFunction(rev => window.__perfDiffApplied.some(s => s.rightRevision >= rev), revision);

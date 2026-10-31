@@ -10,6 +10,18 @@ built-ins (`gj gk gJ g; g, zz <C-e> <C-y>`, `ys cs ds`), next-key hints and
 hop jumps are specified in `design-vim-keymap-hints-hop.md`. With no stored
 keymap document, everything in this document applies unchanged.
 
+emaki extraction (proposed 2026-10-31, `design-emaki.md` EM-D17): the Vim
+core `editor/src/code/vim/**` stays in vactr, unchanged. This includes its
+`vactr.*` action IDs, Ex actions and presets, so persisted keymaps keep
+working. The canvas engine moves to the `emaki` package. Vim attaches
+through the same seams as before, which emaki now exposes as generic
+interfaces:
+- `ModalKeyHook`, the former `VimInputHook`, via `setModalHook`;
+- the `CursorShape` render hook;
+- hop overlay labels.
+
+Behavior is unchanged.
+
 This document covers an opt-in Vim modal editing mode for the canvas code
 pane in the browser and Tauri editor (`editor/`). It defines the module
 boundary, how the mode joins the existing input path, the Vim behavior in

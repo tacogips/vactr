@@ -6125,6 +6125,14 @@ performance, accessibility or physical-device acceptance is claimed here.
 Historical issue #5 describes the baseline, not a newly supplied issue number.
 **Amended:** 2026-10-05 by 15.3.8 (cutover amendment); where 15.3.8 names a
 rule explicitly as superseding, it replaces the baseline text below.
+**Relocated:** 2026-10-31. The engine modules (renderer, atlas, layout, input,
+accessibility and the EditorState core; `vim/` stays in vactr) move to the
+`emaki` package
+(`emaki/`). Fixed line height is replaced by a heightmap. Fixed annotation
+kinds are replaced by marks and line formats. See `design-emaki.md`. The
+contracts, thresholds and measurement rules in this section are unchanged.
+vactr-side file references in this section now point to vactr glue or to
+`emaki/src` as listed in `design-emaki.md` section 4.
 
 #### 15.3.1 Baseline and boundary
 

@@ -7,6 +7,13 @@ coupling").
 
 Conventions are those of `lang-reference.md` (`# Decided`, `# => v`).
 
+Addition (proposed 2026-10-31, `design-emaki.md` section 13.5): each
+`#@ editor` line whose visualizers include `oscilloscope` also gets an inline
+oscilloscope block widget in the code pane. The widget draws the same master
+waveform through `visual/scopes.ts`. The background overlays described here
+are unchanged. The `vactr.inlineWidgets` toggle shows or hides the inline
+widget.
+
 ## 1. Visuals (Hydra model)
 
 ```vactr

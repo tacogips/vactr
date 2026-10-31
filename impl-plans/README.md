@@ -1,5 +1,25 @@
 # Implementation Plans
 
+## emaki editor library (2026-10-31)
+
+These plans implement [design-emaki.md](../design-docs/specs/design-emaki.md) on branch `wf/emaki` (workflow session 586). The work extracts the canvas editor engine into the standalone `emaki` package at `emaki/` and adds:
+- marks (including glow) and line formats;
+- plugins with block and end-of-line widgets on a heightmap;
+- incremental tokenization with JSON;
+- a diff module and three demos;
+- a Playwright perf script and gates.
+
+vactr then consumes emaki through `file:../emaki` and gains beat-glow marks, an inline sequencer, an inline oscilloscope and a persisted toggle.
+
+Status: Ready. The plans are not yet implemented. Common execution rules are in [emaki-00-rules.md](active/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
+
+- **Wave 1**: [EMK-CORE scaffold, contract types and engine extraction](active/emaki-10-core.md)
+- **Wave 2** (parallel): [EMK-DECOR marks, glow and line formats](active/emaki-20-decor.md), [EMK-WIDGETS widgets and vertical motion](active/emaki-21-widgets.md), [EMK-LANG incremental highlighter, JSON and fixture](active/emaki-22-lang.md), [EMK-DIFF diff module](active/emaki-23-diff.md)
+- **Wave 3** (parallel): [EMK-API plugin runtime, createEditor and README](active/emaki-30-api.md), [EMK-VAC-SWITCH vactr consumes emaki](active/emaki-31-vactr-switch.md)
+- **Wave 4** (parallel): [EMK-DIFF-DEMO](active/emaki-40-diff-demo.md), [EMK-JSON-DEMO](active/emaki-41-json-demo.md), [EMK-SHOWCASE](active/emaki-42-showcase.md), [EMK-VAC-PLUGINS beat glow, sequencer, scope and toggle](active/emaki-43-vactr-plugins.md)
+- **Wave 5**: [EMK-PERF perf script and budget gates](active/emaki-50-perf.md)
+- **Wave 6**: [EMK-CLOSEOUT full gates, docs and tasks](active/emaki-60-closeout.md)
+
 ## Unapplied edit highlights (2026-10-23)
 
 Completed [pending ranges, evaluation acknowledgement, and persistent highlight color](completed/editor-unapplied-edits.md). TypeScript checking passed; tests were not requested.

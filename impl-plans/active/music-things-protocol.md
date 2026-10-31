@@ -239,7 +239,7 @@ file lists filled in.
 | V-protected | `git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'`, then `git diff a6e5bea -- src/dsp/tests/dsp.rs` | First: exit 0. Second: the only changed lines are `+mod fx_kind_map;` and (from MTX-F3 on) `+mod quad_mixer_alloc;`. `git status --porcelain -- src/dsp/tests` lists no other new file |
 | V-gone | `for f in <moved sources>; do test ! -e "$f" || echo "LEFT $f"; done` | no `LEFT` lines (shim and adapter paths excluded) |
 | V-lines | `wc -l <every .rs file this plan created or modified>` | every count below 1000 |
-| V-vitest | `cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')` | exit 0, at least 2384 passed. May run outside the Codex sandbox; record who ran it and the log path |
+| V-vitest | `cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?![\s\S]*does no whole-document work on an edit frame or active animation-only frames)[\s\S]*$')` | exit 0, at least 2384 passed. May run outside the Codex sandbox; record who ran it and the log path |
 
 V-nextest and V-vitest are the behavioral bit-identity proof. They must pass
 on the combined tree before the plan is accepted.
@@ -252,7 +252,9 @@ Operator amendment (2026-10-31, after session 581 wave 1):
   frame or active animation-only frames" fails identically on the unmodified
   checkpoint sources (baseline failure on origin/main a6e5bea, unrelated to
   DSP; no plan touches editor/). V-vitest skips exactly that test with the
-  `-t` negative lookahead above; every other mount test still runs.
+  `-t` negative lookahead above (`[\s\S]`, not `.`, because many vim test
+  names contain newlines); every other test still runs. Expected result:
+  2399 passed, 1 skipped.
 - `editor/test/e2e/large-eval.test.ts` is a load-sensitive language-eval
   scaling test with a hard-coded 120 s timeout; on this shared host (load
   average 40-50) it times out regardless of the change. It is excluded from

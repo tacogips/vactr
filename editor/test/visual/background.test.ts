@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditorDeps } from '../../src/app/deps';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
-import { ResourceLedger } from '../../src/code/resources';
+import { ResourceLedger } from 'emaki/engine';
 import { MemoryFiles } from '../../src/platform/files';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';

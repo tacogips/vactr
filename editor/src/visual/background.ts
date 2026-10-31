@@ -1,5 +1,5 @@
 import type { EditorDeps } from '../app/deps';
-import { ResourceLedger } from '../code/resources';
+import { ResourceLedger } from 'emaki/engine';
 import { startFrameLoop, windowScheduler, type FrameLoop, type FrameScheduler } from './frame';
 import { BackgroundOverlays } from './overlays';
 import { EditorSettingsSource, mediaUrl, type BackgroundSettings, type ParsedEditorSettings } from './settings';

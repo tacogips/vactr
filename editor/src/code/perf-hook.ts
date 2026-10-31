@@ -3,9 +3,9 @@ import type { Store } from '../protocol/store';
 import type { Provenance } from '../app/clock';
 import type { CodeSurface } from './surface';
 import type { HighlightScheduler } from './highlight';
-import type { CodeRenderer } from './renderer-types';
-import type { ResourceLedger } from './resources';
-import { PERF_PHASES, type PerfPhase, type PerfRecorder } from './frame';
+import type { CanvasRenderer as CodeRenderer } from './renderer';
+import type { ResourceLedger } from 'emaki/engine';
+import { PERF_PHASES, type PerfPhase, type PerfRecorder } from 'emaki/engine';
 import type { TransportSample } from '../protocol/types';
 
 export interface PresentedRecord {

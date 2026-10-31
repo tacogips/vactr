@@ -1,4 +1,5 @@
 import type { CodeSurface, MomentaryGesture } from '../app/apis';
+import { markDragGesture } from 'emaki/engine';
 import { CONTEXT_WINDOW_MS, TWO_FINGER_WINDOW_MS } from '../bind/momentary';
 
 interface PendingTouch { id: number; startX: number; startY: number; x: number; y: number; time: number; pos: number }
@@ -31,7 +32,7 @@ export class MomentaryPointer {
       if (e.buttons & 1) return; // D11: a right press chorded into a left drag starts nothing.
       const pos = this.surface.posAtCoords({ x: e.clientX, y: e.clientY }); if (pos == null) return;
       const g = this.surface.momentaryDrag({ pos, clientY: e.clientY, kind: 'mouse' }); if (!g) return;
-      (e as PointerEvent & { vactrNumericGesture?: boolean }).vactrNumericGesture = true;
+      markDragGesture(e);
       this.mouse.set(e.pointerId, g); this.capture(e.pointerId); e.preventDefault(); return;
     }
     if (e.pointerType !== 'touch') return;
@@ -43,7 +44,7 @@ export class MomentaryPointer {
     this.pending.delete(candidate.id);
     const gesture = this.surface.momentaryDrag({ pos: candidate.pos, clientY: (candidate.y + e.clientY) / 2, kind: 'touch' });
     if (!gesture) return;
-    (e as PointerEvent & { vactrNumericGesture?: boolean }).vactrNumericGesture = true;
+    markDragGesture(e);
     this.options.cancelSelection();
     const pair: Pair = { ids: [candidate.id, e.pointerId], gesture, points: new Map([[candidate.id, { x: candidate.x, y: candidate.y }], [e.pointerId, { x: e.clientX, y: e.clientY }]]) };
     this.pairs.set(candidate.id, pair); this.pairByPointer.set(candidate.id, pair); this.pairByPointer.set(e.pointerId, pair);

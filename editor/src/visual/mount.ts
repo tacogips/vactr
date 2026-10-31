@@ -19,7 +19,7 @@ import { VisualPanes } from './panes';
 import { GlRenderHost, type RenderSize } from './render-host';
 import { mountSpectrum } from './spectrum';
 import { VideoBackground } from './video';
-import { ResourceLedger } from '../code/resources';
+import { ResourceLedger } from 'emaki/engine';
 import { EditorBackground } from './background';
 
 export const RENDER_SIZE: RenderSize = { width: 640, height: 360 };

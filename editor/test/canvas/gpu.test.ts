@@ -1,12 +1,12 @@
 import { ChangeSet, Text } from '@codemirror/state';
 import { describe, expect, it, vi } from 'vitest';
-import { TextLayout, type LayoutFont } from '../../src/code/layout';
-import { GlyphAtlas, type AtlasCell, type CanvasFactory } from '../../src/code/atlas';
+import { TextLayout, type LayoutFont } from 'emaki/engine';
+import { GlyphAtlas, type AtlasCell, type CanvasFactory } from 'emaki/engine';
 import { CanvasRenderer, GPU_TOKEN_COLORS } from '../../src/code/renderer';
-import { MiB, ResourceLedger, RESOURCE_LIMITS, effectiveSize } from '../../src/code/resources';
+import { MiB, ResourceLedger, RESOURCE_LIMITS, effectiveSize } from 'emaki/engine';
 import type { CodeAnnotation } from '../../src/app/apis';
-import { FALLBACK_PALETTE, readPalette, rgbaCss } from '../../src/code/palette';
-import { CLIP_GUTTER } from '../../src/code/geometry';
+import { FALLBACK_PALETTE, readPalette, rgbaCss } from '../../src/code/theme';
+import { CLIP_GUTTER } from 'emaki/engine';
 
 const font: LayoutFont = { font: '16px test-mono', fallback: 'test-ja', lineHeight: 20, baseline: 16 };
 function width(text: string): number {

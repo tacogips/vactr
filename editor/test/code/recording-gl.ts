@@ -1,5 +1,5 @@
 import { expect } from 'vitest';
-import type { CanvasFactory } from '../../src/code/atlas';
+import type { CanvasFactory } from 'emaki/engine';
 
 export function width(text: string): number {
   let result = 0;

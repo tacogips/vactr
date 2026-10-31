@@ -1,4 +1,4 @@
-import type { Rgba } from './palette';
+import type { Rgba } from './theme';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 export const DEFAULT_UNAPPLIED_COLOR = '#facc15';

@@ -8,12 +8,13 @@ import type { CodeApi, CodeAnnotation, SampleLibraryApi } from '../app/apis';
 import type { ServerEnvelope } from '../protocol/types';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { pane } from '../app/layout';
-import { FrameScheduler, type FrameHost } from './frame';
+import { FrameScheduler, type FrameHost } from 'emaki/engine';
 import { DiagnosticsController } from './diagnostics';
 import { EvalController } from './eval';
 import { HighlightScheduler, TimeAnchor } from './highlight';
 import { FallbackSpans, SyntaxSpans, WorkerSyntaxSpans, type SpanProvider } from './syntax';
 import { formatKeymap } from './format';
+import { createVactLanguage } from './vact-language';
 import { SampleBrowser, SampleLibrary, type DecodedAudio } from './samples';
 import { DocumentSync } from './sync';
 import { TransportBar } from './transport';
@@ -21,15 +22,15 @@ import { CodeSurface } from './code-view';
 import { attachCompletion } from './completion-view';
 import { CodeSurface as HeadlessSurface } from './surface';
 import { InputController } from './input';
-import { PointerController, type SelectionHandle } from './pointer';
+import { PointerController, type SelectionHandle } from 'emaki/engine';
 import { MomentaryPointer } from './momentary-pointer';
-import { TextLayout } from './layout';
-import { createMeasureContext } from './advances';
+import { TextLayout } from 'emaki/engine';
+import { createMeasureContext } from 'emaki/engine';
 import { CanvasRenderer } from './renderer';
-import type { CodeRenderer } from './renderer-types';
-import { readPalette } from './palette';
-import { ResourceLedger } from './resources';
-import { CodeViewHost } from './view-host';
+import type { CanvasRenderer as CodeRenderer } from './renderer';
+import { readPalette } from './theme';
+import { ResourceLedger } from 'emaki/engine';
+import { ViewHost as CodeViewHost } from 'emaki/engine';
 import { installPerfHook, recordOnset, recordPresented, retractOnset, removePerfHook, type VactrPerf } from './perf-hook';
 import { createVimMode } from './vim-mount';
 import { UnappliedEdits } from './unapplied';
@@ -110,6 +111,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let lastMomentaryLabels: string[] = [];
   let handles: readonly SelectionHandle[] = [];
   let syntaxProvider: SpanProvider = new FallbackSpans();
+  const vactLanguage = createVactLanguage(syntaxProvider);
+  const replaceSyntax = (next: SpanProvider): void => { syntaxProvider = next; vactLanguage.replace(next); };
   let syntaxTruncated = 0;
   let displayDoc: Text | null = null;
   let renderedDoc: Text | null = null;
@@ -251,15 +254,15 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       }
       if (ctx.textDirty) {
         const view = viewHost.viewport;
-        const first = Math.max(0, Math.floor(view.scrollTop / layout.font.lineHeight) - Math.ceil(view.height / layout.font.lineHeight));
-        const last = Math.min(surface.state.doc.lines, Math.ceil((view.scrollTop + view.height * 2) / layout.font.lineHeight));
+        const first = layout.heightmap.lineAtHeight(view.scrollTop - view.height).line;
+        const last = Math.min(surface.state.doc.lines, layout.heightmap.lineAtHeight(view.scrollTop + view.height * 2).line + 1);
         const from = surface.state.doc.line(Math.min(surface.state.doc.lines, first + 1)).from;
         const to = surface.state.doc.line(Math.max(1, last)).to;
         const range = { view, from, to };
         const windowChanged = !syntaxWindow || syntaxWindow.from !== range.from || syntaxWindow.to !== range.to;
         const syntaxDirty = ctx.reasons.has('doc') || ctx.reasons.has('syntax') || ctx.reasons.has('gpu') || windowChanged;
         const result = syntaxDirty
-          ? timed('syntax', () => syntaxProvider.spans(surface.state, range.from, range.to, 16384))
+          ? timed('syntax', () => { const result = vactLanguage.language.spans(surface.state, range.from, range.to, 16384); return { spans: result.spans.map((span) => ({ from: span.from, to: span.to, kind: 'syntax' as const, className: span.tag })), truncated: result.truncated }; })
           : { spans: syntaxSpans, truncated: false };
         if (syntaxDirty) { syntaxSpans = result.spans; syntaxWindow = { from: range.from, to: range.to }; }
         syntaxTruncated += result.truncated ? 1 : 0;
@@ -334,7 +337,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       });
       if (changeCount === 1 && wholeDocumentReplacement) layout.resetWidestShaped();
       surfaceDocLength = update.state.doc.length;
-      hideDiagnosticTip(); syntaxProvider.noteChanges?.(update.changes, update.state);
+      hideDiagnosticTip(); vactLanguage.language.noteChanges?.(update.changes, update.state);
     }
   });
   diagnostics.attach(surface);
@@ -380,13 +383,13 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   browser.setSounds(store.manifest?.sounds ?? []);
 
   const loadMainThreadSyntax = (): void => {
-    if (!deps.syntax) { syntaxProvider = new FallbackSpans(); codePane.dataset.syntax = 'fallback'; return; }
+    if (!deps.syntax) { replaceSyntax(new FallbackSpans()); codePane.dataset.syntax = 'fallback'; return; }
     void deps.syntax().then((syntax) => {
       if (disposed) return;
       syntaxProvider.dispose?.();
-      syntaxProvider = new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax'), (cb) => scheduler.afterPresent(cb));
+      replaceSyntax(new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax'), (cb) => scheduler.afterPresent(cb)));
       codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText('syntax');
-    }, () => { if (!disposed) { syntaxProvider = new FallbackSpans(); codePane.dataset.syntax = 'fallback'; scheduler.invalidateText('syntax'); } });
+    }, () => { if (!disposed) { replaceSyntax(new FallbackSpans()); codePane.dataset.syntax = 'fallback'; scheduler.invalidateText('syntax'); } });
   };
   if (deps.syntaxWorker) {
     try {
@@ -394,7 +397,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       workerProvider = new WorkerSyntaxSpans(deps.syntaxWorker(), doc.baseURI,
         () => scheduler.invalidateText('syntax'), loadMainThreadSyntax,
         () => { if (syntaxProvider === workerProvider) codePane.dataset.syntax = 'tree-sitter-worker'; });
-      syntaxProvider = workerProvider;
+      replaceSyntax(workerProvider);
     } catch { loadMainThreadSyntax(); }
   } else loadMainThreadSyntax();
   if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
@@ -415,7 +418,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
       for (const name of diagInputEvents) input.accessibility.textarea.removeEventListener(name, noteDiagInput);
       surfaceEl.removeEventListener('pointermove', showDiagnosticTip); surfaceEl.removeEventListener('pointerleave', hideDiagnosticTip);
       removeAnimatedWake(); for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
-      disposeFormat(); completion?.dispose(); syntaxProvider.dispose?.(); backgroundStop?.();
+      disposeFormat(); completion?.dispose(); vactLanguage.language.dispose?.(); backgroundStop?.();
       colorScheme?.removeEventListener('change', updatePalette);
       backgroundCanvas?.remove(); backgroundCanvas = null;
       transport.dispose(); browser.dispose(); surface.dispose(); disposeCanvasHost(); hostEl.remove();
@@ -429,8 +432,8 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   return mounted;
 }
 
-function timed<T>(phase: import('./frame').PerfPhase, run: () => T): T {
-  const timer = (globalThis as typeof globalThis & { __vactrPhaseTimer?: import('./frame').PhaseTimer }).__vactrPhaseTimer;
+function timed<T>(phase: import('emaki/engine').PerfPhase, run: () => T): T {
+  const timer = (globalThis as typeof globalThis & { __vactrPhaseTimer?: import('emaki/engine').PhaseTimer }).__vactrPhaseTimer;
   timer?.begin(phase);
   try { return run(); } finally { timer?.end(phase); }
 }

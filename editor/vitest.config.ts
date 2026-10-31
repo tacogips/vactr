@@ -11,9 +11,10 @@ const perf = env.VACTR_PERF === '1';
 // The serial absolute-time gate is isolated from default workers (design 15.3.8.11).
 export default defineConfig({
   plugins: [solid()],
-  resolve: { conditions: ['development', 'browser'] },
-  server: { fs: { allow: ['.', '../examples'] } },
+  resolve: { conditions: ['development', 'browser'], dedupe: ['@codemirror/state', '@codemirror/commands'] },
+  server: { fs: { allow: ['.', '../examples', '../emaki'] } },
   test: {
+    server: { deps: { inline: ['emaki'] } },
     environment: 'jsdom',
     include: perf
       ? ['test/**/*.perf.test.ts']

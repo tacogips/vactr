@@ -8,6 +8,7 @@ import { createComponent, createSignal, type Setter } from 'solid-js';
 import { render } from 'solid-js/web';
 import type { EditorDeps, Mounted } from '../app/deps';
 import { buildLayout } from '../app/layout';
+import { isDragGesture } from 'emaki/engine';
 import { DOC_FILE } from '../code/mount';
 import type { CodeSurface as HeadlessCodeSurface } from '../code/surface';
 import type { EditorKind, WireSite } from '../protocol/types';
@@ -163,7 +164,7 @@ export class ParamsArea {
         if (event.type === 'pointerdown') {
           down = { x: event.clientX, y: event.clientY, pointerId: event.pointerId,
             primary: event.button === 0 && event.isPrimary !== false,
-            numeric: (event as PointerEvent & { vactrNumericGesture?: boolean }).vactrNumericGesture === true };
+            numeric: isDragGesture(event) };
           return;
         }
         if (event.type !== 'pointerup' || !down || down.pointerId !== event.pointerId) return;

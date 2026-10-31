@@ -1,6 +1,6 @@
 # EMK-API: plugin runtime, createEditor, public entry and README
 
-**Status**: Ready (after wave 2)
+**Status**: Implemented; awaiting review
 **Plan ID**: EMK-API (wave 3; parallel with EMK-VAC-SWITCH)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 3, 5.1-5.3, 7.1-7.2, 11.3 (README content); decision EM-D2
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -256,8 +256,8 @@ error-isolation test fails. Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] A1-A5 delivered.
-- [ ] Verification steps 0-5 pass per rule 12b scoping. Mutation evidence
+- [x] A1-A5 delivered.
+- [x] Verification steps 0-5 pass per rule 12b scoping. Mutation evidence
   is recorded. Hashes are
   logged.
 
@@ -284,3 +284,16 @@ host's gutter-width computation and by the text pass's gutter drawing,
 defaulting to today's behavior so every existing test stays unchanged.
 Add tests for both settings. EMK-VAC-SWITCH may also touch these files
 only for parity defects; keep edits small and localized.
+
+### Session: 2026-11-01 (runtime test coverage, partial)
+**Tasks Completed**: Added five A5 runtime lifecycle tests for owner namespacing, hook isolation, cleanup, viewport deduplication, and mapping order. A2-A4 and the editor tests remain incomplete; completion criteria remain unchecked.
+**Precondition**: `tmp/emaki/wave-2-join/summary.json` reports green; runtime dispatch has no required predecessors.
+**Verification**: `npm run check` exited 0 (`tmp/emaki/EMK-API/check-final-session-611.log`). The scoped vitest command exited 0 with 7 tests (`tmp/emaki/EMK-API/scoped-final-session-611.log`), but `test/editor.test.ts` does not exist and thus the command does not establish the editor acceptance criteria. An earlier check failed due to an invalid animated test style and was corrected (`tmp/emaki/EMK-API/check-session-611.log`).
+**Mutation evidence**: Bypassing runtime hook error isolation made the isolation test fail (exit 1, `tmp/emaki/EMK-API/mutation-session-611.log`); `runtime.ts` was restored byte-identically, with hashes in `mutation-hash-before-session-611.txt` and `mutation-hash-after-session-611.txt` in the same evidence directory.
+**Remaining**: Implement editor composition, gutter seam, API exports, README and editor tests; rerun all prescribed checks on final sources.
+
+### Session: 2026-11-01 (continuation: API composition)
+**Tasks Completed**: A2-A4 and editor tests: composed editor, frame scheduling, input and presentation metrics, line and span languages, widgets and heightmap, public exports, README, and the authorized line-number gutter seam. Runtime lifecycle tests and mutation evidence were completed in the preceding session.
+**Precondition**: `tmp/emaki/wave-2-join/summary.json` is green; dispatch `dependsOn` is empty.
+**Verification**: `npm run check` passed (`tmp/emaki/EMK-API/check-cont1-source-final.log`); scoped vitest passed 14 tests (`tmp/emaki/EMK-API/scoped-cont1-source-final.log`). Export names and file sizes passed (`exports-cont1.log`, `lines-cont1.log` in the same directory). Full vitest passed 125 tests and build passed under the measurement lock (`full-cont1-final.log`, `build-cont1-final.log`); these are informational per rule 12b and the serial wave join remains authoritative. Final source hashes are in `hashes-cont1.txt`; per-edit intentions and snapshots are in `intent-cont1.txt` and `*-before-*-cont1.txt`. Mutation evidence from the previous session is `mutation-session-611.log`, with byte-identical restoration hashes. jsdom logs its unimplemented canvas measurement context; the fallback is used and tests pass with injected GL and rasterizer.
+**Review**: Formal integrity, adversarial and integration reviews and final workflow steps remain downstream.

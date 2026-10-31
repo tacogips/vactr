@@ -21,7 +21,7 @@ export class ViewHost {
 
   constructor(private readonly element: HTMLElement, private readonly surface: EditorCore,
     private readonly layout: TextLayout, private readonly frameHost: FrameHost,
-    private readonly onViewportChange: () => void) {
+    private readonly onViewportChange: () => void, private readonly lineNumbers = true) {
     this.detachBridge = surface.attachBridge({
       focus: () => this.focusInput(),
       posAtCoords: (coords) => layout.posAtCoords(coords, this.viewport),
@@ -43,7 +43,7 @@ export class ViewHost {
   get viewport(): LayoutViewport {
     const rect = this.readRect();
     return { width: Math.max(1, this.width), height: Math.max(1, this.height - this.inset),
-      scrollLeft: this.scrollLeft, scrollTop: this.scrollTop, left: rect.left, top: rect.top, gutter: 48 };
+      scrollLeft: this.scrollLeft, scrollTop: this.scrollTop, left: rect.left, top: rect.top, gutter: this.lineNumbers ? 48 : 0 };
   }
 
   get scrollPosition(): { left: number; top: number } { return { left: this.scrollLeft, top: this.scrollTop }; }
@@ -86,9 +86,9 @@ export class ViewHost {
   }
 
   private clampScroll(): void {
-    const maxTop = Math.max(0, this.layout.heightmap.totalHeight() - Math.max(1, this.height - this.inset));
+    const maxTop = Math.max(0, this.layout.heightmap.totalHeight(this.surface.state.doc.lines) - Math.max(1, this.height - this.inset));
     this.scrollTop = Math.min(this.scrollTop, maxTop);
-    this.scrollLeft = Math.min(this.scrollLeft, Math.max(0, this.layout.widestShaped - this.width + 48));
+    this.scrollLeft = Math.min(this.scrollLeft, Math.max(0, this.layout.widestShaped - this.width + (this.lineNumbers ? 48 : 0)));
   }
 
   private readRect(): { left: number; top: number } {

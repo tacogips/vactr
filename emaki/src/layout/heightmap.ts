@@ -32,9 +32,13 @@ export class Heightmap {
     if (!Number.isInteger(count) || count < 0) throw new RangeError('Invalid line count');
     if (count === this.lineCount) return;
     this.lineCount = count;
+    // Without blocks every line top is `line * lineHeight`, so a line-count
+    // change moves no existing line: keep the revision (geometry caches keyed
+    // on it stay valid across plain edits).
+    const hadBlocks = this.blocks.length > 0;
     this.blocks = this.blocks.filter((entry) => entry.line < count);
     this.rebuildPrefix();
-    this.version++;
+    if (hadBlocks) this.version++;
   }
 
   setBlocks(entries: readonly BlockEntry[]): void {
@@ -79,8 +83,10 @@ export class Heightmap {
     return entry?.line === line ? entry.below : 0;
   }
 
-  totalHeight(): number {
-    return this.lineCount * this.lineHeight + this.prefix[this.blocks.length];
+  /** Content height; `lineCount` lets callers measure the current document before `setLineCount` catches up. */
+  totalHeight(lineCount = this.lineCount): number {
+    const blocks = lineCount >= this.lineCount ? this.blocks.length : this.lowerBound(lineCount);
+    return lineCount * this.lineHeight + this.prefix[blocks];
   }
 
   lineAtHeight(y: number): { line: number; region: 'text' | 'above' | 'below' } {

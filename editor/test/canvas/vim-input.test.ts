@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Text } from '@codemirror/state';
 import { InputController } from '../../src/code/input';
-import { TextLayout } from '../../src/code/layout';
+import { TextLayout } from 'emaki/engine';
 import { CodeSurface } from '../../src/code/surface';
 import { DocumentSync } from '../../src/code/sync';
 import { VimController } from '../../src/code/vim/controller';

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CanvasRenderer } from '../../src/code/renderer';
-import { TextLayout, type LayoutFont } from '../../src/code/layout';
-import { ResourceLedger } from '../../src/code/resources';
-import type { CanvasFactory } from '../../src/code/atlas';
+import { TextLayout, type LayoutFont } from 'emaki/engine';
+import { ResourceLedger } from 'emaki/engine';
+import type { CanvasFactory } from 'emaki/engine';
 
 const font: LayoutFont = { font: '16px test-mono', lineHeight: 20, baseline: 16 };
 const view = { width: 320, height: 100, scrollLeft: 0, scrollTop: 0, left: 10, top: 20, gutter: 48 };

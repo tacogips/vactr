@@ -5,7 +5,7 @@ import type { EditorDeps } from '../../src/app/deps';
 import { buildLayout } from '../../src/app/layout';
 import { mount } from '../../src/code/mount';
 import { CanvasRenderer } from '../../src/code/renderer';
-import { effectiveSize, RESOURCE_LIMITS } from '../../src/code/resources';
+import { effectiveSize, RESOURCE_LIMITS } from 'emaki/engine';
 import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import { MemoryFiles } from '../../src/platform/files';

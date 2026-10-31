@@ -430,3 +430,47 @@ comparison, gaps-only document reads). Baseline is now green:
 `cd editor && npm run check` exit 0 and full vitest 166 files / 2401 tests
 passed (`tmp/emaki/wave-2-join/editor-vitest-baseline.log`). Use 2401 as the
 pre-switch baseline count.
+
+### Session: 2026-11-01 (switch implementation started)
+**Tasks Completed**: S1 fresh baseline passed: wasm build exit 0 (`tmp/emaki/EMK-VAC-SWITCH/session-baseline-cargo.log`); full editor Vitest exit 0, 166 files and 2401 tests (`tmp/emaki/EMK-VAC-SWITCH/session-baseline-vitest.log`). The default reporter did not print the five per-file counts; they remain to be captured. S2 dependency and consumer configuration are in place; npm install exit 0 (`tmp/emaki/EMK-VAC-SWITCH/npm-install.log`). Began S3 with `vact-language.ts`; it is not yet connected to mount. Editor TypeScript check exit 0 (`tmp/emaki/EMK-VAC-SWITCH/partial-check.log`).
+
+**Remaining**: S3-S6 integration, moved-test counts, required final-source checks and mutation evidence. No completion criteria are met yet. No shared parity paths were changed. Per-file intentions and hashes are in `tmp/emaki/EMK-VAC-SWITCH/intent.txt` and `sha256.txt`. Changes under `impl-plans/active/emaki-30-api.md` and `emaki/test/plugin/runtime.test.ts` are concurrent sibling work and were not modified.
+
+**Scoped check**: `vitest run test/code/syntax.test.ts test/code/syntax-fallback.test.ts` passed 16/16 (`tmp/emaki/EMK-VAC-SWITCH/partial-syntax.log`, exit 0); this does not exercise the not-yet-wired adapter.
+
+### Session: 2026-11-01 (switch continuation)
+**Tasks completed**: Replaced the vactr surface authority and undo helpers with emaki core, added renderer, theme and decoration adapters, migrated listed imports and mount glue, and deleted the 15 moved sources and five moved tests. `npm run check` passed (`tmp/emaki/EMK-VAC-SWITCH/continuation-check-5.log`, exit 0). Intentions and hashes are recorded in `tmp/emaki/EMK-VAC-SWITCH/intent.txt` and `sha256.txt`.
+
+**Focused verification**: `tmp/emaki/EMK-VAC-SWITCH/continuation-focused-1.log` exited 1: 147/150 tests passed. `test/canvas/input.test.ts` expects stop/cut shortcuts from a directly constructed `InputController` without supplying the injected `fallbackShortcut`; the accepted design requires injection and restricts existing test edits to import specifiers. This needs a design or test-scope amendment before the unchanged test can pass without introducing a vactr-specific default into emaki. `test/canvas/gpu.test.ts` entering-line build count and `test/canvas/mount.test.ts` edit-frame geometry budget also fail and require parity investigation. No shared parity path was edited.
+
+**Remaining**: New boundary, single-instance and decoration tests; parity fixes; test-count reconciliation; all required final-source gates and mutation evidence. Completion criteria remain unchecked. Shared sibling work was not modified.
+
+## Operator note 2 (after session 611)
+
+The operator resolved the wave-3 blockers directly; the wave-3 join is now
+green (`tmp/emaki/wave-3-join/summary.json`: emaki check/vitest 125/build,
+editor check, editor vitest 161 files / 2357 tests).
+
+- Input shortcut conflict: `editor/src/code/input.ts` is kept as a thin vactr
+  adapter (not deleted): `class InputController extends` emaki's
+  `InputController` and injects `fallbackShortcut: fallbackStopShortcut` by
+  default. `mount.ts` and the vactr tests that construct `InputController`
+  import it from the adapter (import-specifier changes only). This keeps
+  emaki free of vactr shortcuts (design EM-D2) and the tests unchanged.
+- Parity defects fixed in emaki engine sharedPaths:
+  - `emaki/src/layout/heightmap.ts`: `setLineCount` bumps `revision` only
+    when blocks exist (without blocks no line top moves), and
+    `totalHeight(lineCount?)` measures the current document before
+    `setLineCount` catches up. Fixes the double caret evaluation and the EOF
+    scroll clamp in `view-host.test.ts`.
+  - `emaki/src/view/view-host.ts`: the scroll clamp uses
+    `heightmap.totalHeight(doc.lines)`.
+  - `emaki/src/render/text-pass.ts`: `visibleLast` is exclusive (a line whose
+    top sits exactly on the bottom edge is not visible), restoring the
+    original `ceil` semantics. Fixes `gpu.test.ts` "builds only the entering
+    line" and the `mount.test.ts` edit-frame geometry budget.
+
+Resume: verify the remaining S1-S6 deliverables and completion criteria
+against the current tree, finish anything still missing, rerun this plan's
+gates and record the evidence. Do not revert the fixes above.
+

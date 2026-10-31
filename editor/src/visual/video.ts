@@ -1,5 +1,5 @@
 import type { ResourceBudget } from '../app/apis';
-import { RESOURCE_LIMITS } from '../code/resources';
+import { RESOURCE_LIMITS } from 'emaki/engine';
 
 const VIDEO_BYTES = RESOURCE_LIMITS.videoWidth * RESOURCE_LIMITS.videoHeight * 4;
 const FRAME_INTERVAL_MS = 1000 / 30;

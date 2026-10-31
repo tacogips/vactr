@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { TextLayout, type LayoutFont } from '../../src/code/layout';
+import { TextLayout, type LayoutFont } from 'emaki/engine';
 import { CanvasRenderer } from '../../src/code/renderer';
-import { CLIP_GUTTER, SNAP_GLYPH } from '../../src/code/geometry';
-import { ResourceLedger } from '../../src/code/resources';
+import { CLIP_GUTTER, SNAP_GLYPH } from 'emaki/engine';
+import { ResourceLedger } from 'emaki/engine';
 import { rasterizer, recordingGL, width } from './recording-gl';
 
 const font: LayoutFont = { font: '16px test-mono', fallback: 'test-ja', lineHeight: 20, baseline: 16 };

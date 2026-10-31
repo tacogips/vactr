@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ResourceLedger } from '../../src/code/resources';
+import { ResourceLedger } from 'emaki/engine';
 import { BackgroundOverlays } from '../../src/visual/overlays';
 import { installCanvasFakes, type CanvasFakes } from '../support/canvas';
 

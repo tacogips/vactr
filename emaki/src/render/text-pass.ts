@@ -151,7 +151,9 @@ export function gutterIdentity(this: TextPassContext, lineNumber: number): reado
   }
 export function rebuildTextSegments(this: TextPassContext, styles: readonly TokenSpan[]): void {
     const visibleFirst = this.layout.heightmap.lineAtHeight(this.view.scrollTop).line;
-    const visibleLast = this.layout.heightmap.lineAtHeight(this.view.scrollTop + this.view.height).line + 1;
+    // Exclusive end: a line whose text top sits exactly on the bottom edge is not visible.
+    const viewBottom = this.view.scrollTop + this.view.height, bottomHit = this.layout.heightmap.lineAtHeight(viewBottom).line;
+    const visibleLast = bottomHit + (this.layout.heightmap.lineTop(bottomHit) < viewBottom ? 1 : 0);
     const rows = this.visibleLines.map(line => {
       const runs = line.runs, identity = runs as object;
       const decorations = lineDecorations(this.decorationIndex, line);
@@ -194,8 +196,8 @@ export function rebuildTextSegments(this: TextPassContext, styles: readonly Toke
       const index = (this.pendingStartLine + offset) % Math.max(1, rows.length), { line, identity, textKeys, gutterKey, decorations, canBuild } = rows[index]!;
       const gutterId = this.segments.key(gutterKey);
       if (this.pendingSegments.delete(gutterId)) this.segments.delete(gutterKey);
-      let gutter = this.segments.get(gutterKey);
-      if (!gutter && canBuild) {
+      let gutter = (this.view.gutter ?? 48) > 0 ? this.segments.get(gutterKey) : undefined;
+      if (!gutter && canBuild && (this.view.gutter ?? 48) > 0) {
         this.currentSlot = this.lineSlots.get(identity)!; this.currentLayer = 'text'; this.collecting = []; this.currentSegmentPending = false;
         this.drawRun(this.labelRun(String(line.number + 1), (this.view.gutter ?? 48) - 8), 4, 0, [], rgbaCss(this.palette.gutter), true);
         gutter = this.segments.set(gutterKey, this.collecting, 0) ?? undefined;

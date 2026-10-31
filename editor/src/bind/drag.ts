@@ -13,7 +13,7 @@
 
 import type { BindApi } from '../app/apis';
 import type { CodeSurface } from '../app/apis';
-import type { NumericGesture } from '../code/pointer';
+import type { NumericGesture } from 'emaki/engine';
 import type { EditorDecl } from '../protocol/types';
 import type { SiteEntry, SiteTable } from './sites';
 import { fromUnit, isIntegerLiteral, paramMeta, round6, toUnit } from './write';

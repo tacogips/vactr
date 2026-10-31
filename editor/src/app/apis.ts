@@ -5,7 +5,7 @@
 
 import type { EditorState, Transaction, TransactionSpec, ChangeSet } from '@codemirror/state';
 import type { InstrumentSelector, Span, WireSite } from '../protocol/types';
-import type { NumericGesture } from '../code/pointer';
+import type { NumericGesture } from 'emaki/engine';
 
 export interface MomentaryGesture { move(clientY: number): void; end(snap: boolean): void }
 export interface MomentaryStart { pos: number; clientY: number; kind: 'mouse' | 'touch' }

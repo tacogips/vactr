@@ -66,6 +66,17 @@ branches and no worktrees.
     `blocked-in-sandbox`, with the exact command. The orchestrator runs it
     outside the sandbox and appends the evidence. Never claim it passed.
 
+12. Standing operator authorization (added after sessions 586/596/597
+    blocked on small path issues): when a problem can be solved inside the
+    plan's writePaths/sharedPaths without changing the accepted design,
+    public API decisions, dependency versions or test assertions, solve it,
+    describe the resolution in the plan Progress Log and the result notes,
+    and continue. Examples: a moved test needing a package-local fixture
+    path, a missing barrel re-export, a relative import path, a config
+    include list. Stop and report only when a file outside writePaths and
+    sharedPaths must change, a dependency must be added or changed, or a
+    design decision must change.
+
 ## Wave-join gate and scoped per-plan gates (review EMK-R5-02)
 
 12a. **Wave-join gate.** The orchestrator runs this serially, not a worker.

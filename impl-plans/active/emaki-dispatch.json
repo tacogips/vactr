@@ -2,7 +2,10 @@
   "taskId": "emaki",
   "workflowMode": "issue-resolution",
   "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-597",
-  "previousWorkflowExecutionIds": ["opus-terra-design-and-implement-review-loop-session-586", "opus-terra-design-and-implement-review-loop-session-596"],
+  "previousWorkflowExecutionIds": [
+    "opus-terra-design-and-implement-review-loop-session-586",
+    "opus-terra-design-and-implement-review-loop-session-596"
+  ],
   "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; rerun session-596 plans accepted comm-011369; rerun session-597 plans accepted comm-011389). Target repo for the operator's later copy: https://github.com/tacogips/emaki @0d49bb0",
   "implementationBranch": "wf/emaki",
   "baseBranch": "wf/emaki",
@@ -103,11 +106,68 @@
   },
   "executionModel": "Six waves on one branch and one working directory. W1: EMK-CORE runs alone. It creates the package and pins the shared contract types, so it is the root of the DAG. W2: EMK-DECOR, EMK-WIDGETS, EMK-LANG and EMK-DIFF run in parallel with disjoint writePaths. W3: EMK-API and EMK-VAC-SWITCH run in parallel. EMK-VAC-SWITCH may edit the listed emaki engine sharedPaths only for parity defects that unchanged vactr tests expose; EMK-API does not edit those files. W4: EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE and EMK-VAC-PLUGINS run in parallel. W5: EMK-PERF runs alone, with perf-repair sharedPaths. W6: EMK-CLOSEOUT runs alone and runs all gates G1-G10 on the combined tree. Heavy runs (full vitest in editor, any Playwright, emaki and editor builds, mise run build-wasm-release) take the measurement lock at /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock. The lock serializes these runs but does not isolate a sibling's half-written files, so plans that share a wave are judged only on scoped gates (rule 12b). After every wave the orchestrator runs a serial wave-join gate (rule 12a: emaki check, full vitest and build; editor check from wave 3; editor full vitest at wave 3; diff e2e (G4), smoke and the dist page checks at wave 4) under the lock, with logs in tmp/emaki/wave-<n>-join/. Failures are routed by failing file path, and the next wave starts only when the join is green. Evidence goes under tmp/emaki/<planId>/ and is never in writePaths. Workers edit only their own plan file's Progress Log. The design and all plans are committed before native fanout starts.",
   "waveJoinGates": [
-    {"afterWave": 1, "runner": "orchestrator", "evidenceDir": "tmp/emaki/wave-1-join", "commands": ["cd emaki && npm run check", "cd emaki && ./node_modules/.bin/vitest run", "cd emaki && npm run build"]},
-    {"afterWave": 2, "runner": "orchestrator", "evidenceDir": "tmp/emaki/wave-2-join", "commands": ["cd emaki && npm run check", "cd emaki && ./node_modules/.bin/vitest run", "cd emaki && npm run build"]},
-    {"afterWave": 3, "runner": "orchestrator", "evidenceDir": "tmp/emaki/wave-3-join", "commands": ["cd emaki && npm run check", "cd emaki && ./node_modules/.bin/vitest run", "cd emaki && npm run build", "cd editor && npm run check", "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run"]},
-    {"afterWave": 4, "runner": "orchestrator", "evidenceDir": "tmp/emaki/wave-4-join", "commands": ["cd emaki && npm run check", "cd emaki && ./node_modules/.bin/vitest run", "cd emaki && npm run build", "cd editor && npm run check", "cd emaki && npm run e2e -- --browser all --out ../tmp/emaki/wave-4-join/e2e", "cd emaki && node scripts/smoke.mjs --browser all --out ../tmp/emaki/wave-4-join/smoke", "test -f emaki/dist/json-10k/index.html && test -f emaki/dist/diff/index.html && test -f emaki/dist/plugin-showcase/index.html"], "appendEvidenceTo": {"EMK-DIFF-DEMO": "diff e2e (G4)", "EMK-SHOWCASE": "smoke", "EMK-JSON-DEMO": "dist page check"}},
-    {"afterWave": 5, "runner": "orchestrator", "evidenceDir": "tmp/emaki/wave-5-join", "commands": ["cd emaki && npm run check", "cd emaki && ./node_modules/.bin/vitest run", "cd emaki && npm run build", "cd editor && npm run check"]}
+    {
+      "afterWave": 1,
+      "runner": "orchestrator",
+      "evidenceDir": "tmp/emaki/wave-1-join",
+      "commands": [
+        "cd emaki && npm run check",
+        "cd emaki && ./node_modules/.bin/vitest run",
+        "cd emaki && npm run build"
+      ]
+    },
+    {
+      "afterWave": 2,
+      "runner": "orchestrator",
+      "evidenceDir": "tmp/emaki/wave-2-join",
+      "commands": [
+        "cd emaki && npm run check",
+        "cd emaki && ./node_modules/.bin/vitest run",
+        "cd emaki && npm run build"
+      ]
+    },
+    {
+      "afterWave": 3,
+      "runner": "orchestrator",
+      "evidenceDir": "tmp/emaki/wave-3-join",
+      "commands": [
+        "cd emaki && npm run check",
+        "cd emaki && ./node_modules/.bin/vitest run",
+        "cd emaki && npm run build",
+        "cd editor && npm run check",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run"
+      ]
+    },
+    {
+      "afterWave": 4,
+      "runner": "orchestrator",
+      "evidenceDir": "tmp/emaki/wave-4-join",
+      "commands": [
+        "cd emaki && npm run check",
+        "cd emaki && ./node_modules/.bin/vitest run",
+        "cd emaki && npm run build",
+        "cd editor && npm run check",
+        "cd emaki && npm run e2e -- --browser all --out ../tmp/emaki/wave-4-join/e2e",
+        "cd emaki && node scripts/smoke.mjs --browser all --out ../tmp/emaki/wave-4-join/smoke",
+        "test -f emaki/dist/json-10k/index.html && test -f emaki/dist/diff/index.html && test -f emaki/dist/plugin-showcase/index.html"
+      ],
+      "appendEvidenceTo": {
+        "EMK-DIFF-DEMO": "diff e2e (G4)",
+        "EMK-SHOWCASE": "smoke",
+        "EMK-JSON-DEMO": "dist page check"
+      }
+    },
+    {
+      "afterWave": 5,
+      "runner": "orchestrator",
+      "evidenceDir": "tmp/emaki/wave-5-join",
+      "commands": [
+        "cd emaki && npm run check",
+        "cd emaki && ./node_modules/.bin/vitest run",
+        "cd emaki && npm run build",
+        "cd editor && npm run check"
+      ]
+    }
   ],
   "acceptedDependencies": [],
   "plans": [
@@ -167,6 +227,7 @@
         "emaki/test/render/atlas-cells.test.ts",
         "emaki/test/render/glyph-placement.test.ts",
         "emaki/test/layout/text-cells.test.ts",
+        "emaki/test/fixtures/kalimba.vact",
         "emaki/test/render/frame.test.ts",
         "emaki/test/render/cursor-shape.test.ts",
         "emaki/test/layout/heightmap.test.ts",
@@ -178,7 +239,10 @@
         "impl-plans/active/emaki-10-core.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "emaki/package.json has name emaki, MIT, the four exports (., ./engine, ./diff, ./json), exact-pinned peers @codemirror/state 6.7.6 and @codemirror/commands 6.11.1, and only the allowed devDependencies.",
         "src/types.ts and src/render/types.ts contain the T2 contract verbatim.",
@@ -201,7 +265,9 @@
       "planId": "EMK-DECOR",
       "planPath": "impl-plans/active/emaki-20-decor.md",
       "wave": 2,
-      "dependsOn": ["EMK-CORE"],
+      "dependsOn": [
+        "EMK-CORE"
+      ],
       "writePaths": [
         "emaki/src/decor/index.ts",
         "emaki/src/decor/marks.ts",
@@ -222,7 +288,10 @@
         "impl-plans/active/emaki-20-decor.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "MarkSet, LineFormatSet and DecorationStore map through edits as specified.",
         "Color/opacity changes re-tint without reshaping. Font variants reshape only the touched lines.",
@@ -239,7 +308,9 @@
       "planId": "EMK-WIDGETS",
       "planPath": "impl-plans/active/emaki-21-widgets.md",
       "wave": 2,
-      "dependsOn": ["EMK-CORE"],
+      "dependsOn": [
+        "EMK-CORE"
+      ],
       "writePaths": [
         "emaki/src/plugin/index.ts",
         "emaki/src/plugin/widgets.ts",
@@ -254,7 +325,10 @@
         "impl-plans/active/emaki-21-widgets.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "WidgetSet reconciles by key, maps with TrackDel, and sums heightmap entries per line.",
         "WidgetLayer mounts within the overscan and unmounts beyond 2x overscan (hysteresis). Canvas draw runs only while visible and active. Ledger bytes are released.",
@@ -269,7 +343,9 @@
       "planId": "EMK-LANG",
       "planPath": "impl-plans/active/emaki-22-lang.md",
       "wave": 2,
-      "dependsOn": ["EMK-CORE"],
+      "dependsOn": [
+        "EMK-CORE"
+      ],
       "writePaths": [
         "emaki/src/language/index.ts",
         "emaki/src/language/incremental.ts",
@@ -284,7 +360,10 @@
         "impl-plans/active/emaki-22-lang.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "IncrementalHighlighter: checkpoints every 32 lines, convergence stop, visible-first with a bounded budget (2000 lines or 2 ms), and a 4096-line LRU.",
         "The JSON tokenizer emits the specified tags. The fixture has exactly N lines, parses, is 300-600 KB at 10k, and has a pinned SHA-256.",
@@ -299,7 +378,9 @@
       "planId": "EMK-DIFF",
       "planPath": "impl-plans/active/emaki-23-diff.md",
       "wave": 2,
-      "dependsOn": ["EMK-CORE"],
+      "dependsOn": [
+        "EMK-CORE"
+      ],
       "writePaths": [
         "emaki/src/diff/index.ts",
         "emaki/src/diff/myers.ts",
@@ -314,7 +395,10 @@
         "impl-plans/active/emaki-23-diff.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "diffLines uses prefix/suffix trimming and Myers with a maxCost fallback to one replace hunk. The property test reconstructs b exactly.",
         "diffWords returns character ranges and handles long lines whole.",
@@ -329,7 +413,12 @@
       "planId": "EMK-API",
       "planPath": "impl-plans/active/emaki-30-api.md",
       "wave": 3,
-      "dependsOn": ["EMK-CORE", "EMK-DECOR", "EMK-WIDGETS", "EMK-LANG"],
+      "dependsOn": [
+        "EMK-CORE",
+        "EMK-DECOR",
+        "EMK-WIDGETS",
+        "EMK-LANG"
+      ],
       "writePaths": [
         "emaki/src/plugin/index.ts",
         "emaki/src/plugin/runtime.ts",
@@ -344,7 +433,10 @@
         "impl-plans/active/emaki-30-api.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "PluginRuntime namespaces owners, isolates plugin errors, and clears on remove.",
         "createEditor composes the engine blocks. readOnly, line and span languages, and widgets reach the heightmap.",
@@ -360,7 +452,12 @@
       "planId": "EMK-VAC-SWITCH",
       "planPath": "impl-plans/active/emaki-31-vactr-switch.md",
       "wave": 3,
-      "dependsOn": ["EMK-CORE", "EMK-DECOR", "EMK-WIDGETS", "EMK-LANG"],
+      "dependsOn": [
+        "EMK-CORE",
+        "EMK-DECOR",
+        "EMK-WIDGETS",
+        "EMK-LANG"
+      ],
       "writePaths": [
         "editor/package.json",
         "editor/package-lock.json",
@@ -443,17 +540,49 @@
         "emaki/src/core/editor-core.ts"
       ],
       "sharedPathNotes": [
-        {"path": "emaki/src/render/renderer.ts", "intendedEdit": "Parity repair only, for a draw-order/cache defect exposed by an unchanged vactr test (gpu, renderer-layers, renderer-hop, first-viewport, mount); record the failing test and hashes."},
-        {"path": "emaki/src/render/text-pass.ts", "intendedEdit": "Parity repair only, for glyph/token tint or gutter defects exposed by unchanged vactr tests; record the failing test and hashes."},
-        {"path": "emaki/src/render/decoration-pass.ts", "intendedEdit": "Parity repair only, for background/overlay order or geometry defects exposed by unchanged vactr tests; record the failing test and hashes."},
-        {"path": "emaki/src/layout/layout.ts", "intendedEdit": "Parity repair only, for coordinate/hit-test defects exposed by unchanged vactr tests; record the failing test and hashes."},
-        {"path": "emaki/src/input/input.ts", "intendedEdit": "Parity repair only, for input bridge/IME/presentation defects exposed by unchanged vactr input tests; record the failing test and hashes."},
-        {"path": "emaki/src/input/keyboard.ts", "intendedEdit": "Parity repair only, for key routing defects exposed by unchanged vactr tests; stop-all vs cut routing must stay tri-state."},
-        {"path": "emaki/src/input/pointer.ts", "intendedEdit": "Parity repair only, for pointer/selection/drag-gesture defects exposed by unchanged vactr tests."},
-        {"path": "emaki/src/view/view-host.ts", "intendedEdit": "Parity repair only, for scroll/caret-reveal defects exposed by unchanged vactr view-host tests."},
-        {"path": "emaki/src/core/editor-core.ts", "intendedEdit": "Parity repair only, for dispatch-order/undo-budget/subclass defects exposed by unchanged vactr state, sync or surface tests."}
+        {
+          "path": "emaki/src/render/renderer.ts",
+          "intendedEdit": "Parity repair only, for a draw-order/cache defect exposed by an unchanged vactr test (gpu, renderer-layers, renderer-hop, first-viewport, mount); record the failing test and hashes."
+        },
+        {
+          "path": "emaki/src/render/text-pass.ts",
+          "intendedEdit": "Parity repair only, for glyph/token tint or gutter defects exposed by unchanged vactr tests; record the failing test and hashes."
+        },
+        {
+          "path": "emaki/src/render/decoration-pass.ts",
+          "intendedEdit": "Parity repair only, for background/overlay order or geometry defects exposed by unchanged vactr tests; record the failing test and hashes."
+        },
+        {
+          "path": "emaki/src/layout/layout.ts",
+          "intendedEdit": "Parity repair only, for coordinate/hit-test defects exposed by unchanged vactr tests; record the failing test and hashes."
+        },
+        {
+          "path": "emaki/src/input/input.ts",
+          "intendedEdit": "Parity repair only, for input bridge/IME/presentation defects exposed by unchanged vactr input tests; record the failing test and hashes."
+        },
+        {
+          "path": "emaki/src/input/keyboard.ts",
+          "intendedEdit": "Parity repair only, for key routing defects exposed by unchanged vactr tests; stop-all vs cut routing must stay tri-state."
+        },
+        {
+          "path": "emaki/src/input/pointer.ts",
+          "intendedEdit": "Parity repair only, for pointer/selection/drag-gesture defects exposed by unchanged vactr tests."
+        },
+        {
+          "path": "emaki/src/view/view-host.ts",
+          "intendedEdit": "Parity repair only, for scroll/caret-reveal defects exposed by unchanged vactr view-host tests."
+        },
+        {
+          "path": "emaki/src/core/editor-core.ts",
+          "intendedEdit": "Parity repair only, for dispatch-order/undo-budget/subclass defects exposed by unchanged vactr state, sync or surface tests."
+        }
       ],
-      "artifactRoots": ["editor/node_modules", "editor/dist", "target", "tree-sitter-vact/tree-sitter-vact.wasm"],
+      "artifactRoots": [
+        "editor/node_modules",
+        "editor/dist",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
       "acceptanceCriteria": [
         "editor depends on emaki via file:../emaki, with dedupe, inline and preserveSymlinks config. The present-case clean npm ci, check and single-instance test pass.",
         "The 15 engine sources and 5 moved tests are deleted. vactr adapters exist: surface subclass, renderer adapter of at most 150 lines with no GL, decorations, theme, vact-language, reduced history.",
@@ -478,7 +607,10 @@
       "planId": "EMK-DIFF-DEMO",
       "planPath": "impl-plans/active/emaki-40-diff-demo.md",
       "wave": 4,
-      "dependsOn": ["EMK-API", "EMK-DIFF"],
+      "dependsOn": [
+        "EMK-API",
+        "EMK-DIFF"
+      ],
       "writePaths": [
         "emaki/examples/diff/index.html",
         "emaki/examples/diff/main.ts",
@@ -491,7 +623,10 @@
         "impl-plans/active/emaki-40-diff-demo.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "The diff demo uses only public mark, line-format and widget APIs. It shows red/green line backgrounds, word marks, hatched fillers, both gutters and synced scroll.",
         "__emakiDiff implements the pinned contract.",
@@ -507,7 +642,10 @@
       "planId": "EMK-JSON-DEMO",
       "planPath": "impl-plans/active/emaki-41-json-demo.md",
       "wave": 4,
-      "dependsOn": ["EMK-API", "EMK-LANG"],
+      "dependsOn": [
+        "EMK-API",
+        "EMK-LANG"
+      ],
       "writePaths": [
         "emaki/examples/json-10k/index.html",
         "emaki/examples/json-10k/main.ts",
@@ -518,7 +656,10 @@
         "impl-plans/active/emaki-41-json-demo.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "The json-10k page supports ?lines=1000|10000|100000 and ?autoload=0, and generates the fixture before measurement.",
         "__emakiPerf and keyMetrics implement the pinned contract and are unit-tested."
@@ -532,7 +673,9 @@
       "planId": "EMK-SHOWCASE",
       "planPath": "impl-plans/active/emaki-42-showcase.md",
       "wave": 4,
-      "dependsOn": ["EMK-API"],
+      "dependsOn": [
+        "EMK-API"
+      ],
       "writePaths": [
         "emaki/examples/plugin-showcase/index.html",
         "emaki/examples/plugin-showcase/main.ts",
@@ -546,7 +689,10 @@
         "impl-plans/active/emaki-42-showcase.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "The showcase has a video block widget (captureStream, no binary asset), an animated canvas widget, an EOL badge, marks including glow, and line formats.",
         "smoke.mjs passes the showcase checks in Chromium and WebKit."
@@ -561,7 +707,10 @@
       "planId": "EMK-VAC-PLUGINS",
       "planPath": "impl-plans/active/emaki-43-vactr-plugins.md",
       "wave": 4,
-      "dependsOn": ["EMK-API", "EMK-VAC-SWITCH"],
+      "dependsOn": [
+        "EMK-API",
+        "EMK-VAC-SWITCH"
+      ],
       "writePaths": [
         "editor/src/code/mount.ts",
         "editor/src/code/decorations.ts",
@@ -588,7 +737,12 @@
         "impl-plans/active/emaki-43-vactr-plugins.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["editor/node_modules", "editor/dist", "target", "tree-sitter-vact/tree-sitter-vact.wasm"],
+      "artifactRoots": [
+        "editor/node_modules",
+        "editor/dist",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm"
+      ],
       "acceptanceCriteria": [
         "Beat glow and eval flash come from the beat-glow animated-mark plugin. PLAYING_MARK has a glow. mount.ts no longer passes playing or eval kinds.",
         "The inline sequencer is anchored per EM-D13, reuses CycleSteps, lights the current step and animates only while running and visible.",
@@ -612,7 +766,11 @@
       "planId": "EMK-PERF",
       "planPath": "impl-plans/active/emaki-50-perf.md",
       "wave": 5,
-      "dependsOn": ["EMK-DIFF-DEMO", "EMK-JSON-DEMO", "EMK-SHOWCASE"],
+      "dependsOn": [
+        "EMK-DIFF-DEMO",
+        "EMK-JSON-DEMO",
+        "EMK-SHOWCASE"
+      ],
       "writePaths": [
         "emaki/scripts/perf.mjs",
         "emaki/node_modules",
@@ -638,24 +796,75 @@
         "emaki/examples/diff/diff-plugin.ts"
       ],
       "sharedPathNotes": [
-        {"path": "emaki/src/render/renderer.ts", "intendedEdit": "Perf repair only, driven by a measured failing gate with recorded before/after numbers; all emaki tests stay green."},
-        {"path": "emaki/src/render/text-pass.ts", "intendedEdit": "Perf repair only (segment/glyph work on scroll or keystroke), measured before/after."},
-        {"path": "emaki/src/render/decoration-pass.ts", "intendedEdit": "Perf repair only (per-frame decoration quad cost), measured before/after."},
-        {"path": "emaki/src/render/segments.ts", "intendedEdit": "Perf repair only (segment cache hit rate), measured before/after."},
-        {"path": "emaki/src/render/atlas.ts", "intendedEdit": "Perf repair only (atlas upload churn), measured before/after."},
-        {"path": "emaki/src/layout/layout.ts", "intendedEdit": "Perf repair only (O(n) work in setText/visible/widest tracking), measured before/after."},
-        {"path": "emaki/src/layout/advances.ts", "intendedEdit": "Perf repair only (advance measurement caching), measured before/after."},
-        {"path": "emaki/src/layout/heightmap.ts", "intendedEdit": "Perf repair only (lookup/rebuild cost), measured before/after; heightmap tests stay green."},
-        {"path": "emaki/src/language/incremental.ts", "intendedEdit": "Perf repair only (checkpoint splice/invalidations, budget), measured before/after; language tests stay green."},
-        {"path": "emaki/src/language/json-tokenizer.ts", "intendedEdit": "Perf repair only (tokenizer hot loop), measured before/after; json tests stay green."},
-        {"path": "emaki/src/decor/store.ts", "intendedEdit": "Perf repair only (collect/key cost), measured before/after."},
-        {"path": "emaki/src/view/view-host.ts", "intendedEdit": "Perf repair only (scroll handling cost), measured before/after."},
-        {"path": "emaki/src/input/input.ts", "intendedEdit": "Perf repair only (input bridge cost per keystroke), measured before/after."},
-        {"path": "emaki/src/editor.ts", "intendedEdit": "Perf repair only (composition-level per-frame work), measured before/after."},
-        {"path": "emaki/src/editor-frame.ts", "intendedEdit": "Perf repair only (frame loop work), measured before/after."},
-        {"path": "emaki/examples/diff/diff-plugin.ts", "intendedEdit": "Perf repair only for the diff visible-latency gate (recompute scheduling or line extraction), measured before/after; diff-plugin tests stay green."}
+        {
+          "path": "emaki/src/render/renderer.ts",
+          "intendedEdit": "Perf repair only, driven by a measured failing gate with recorded before/after numbers; all emaki tests stay green."
+        },
+        {
+          "path": "emaki/src/render/text-pass.ts",
+          "intendedEdit": "Perf repair only (segment/glyph work on scroll or keystroke), measured before/after."
+        },
+        {
+          "path": "emaki/src/render/decoration-pass.ts",
+          "intendedEdit": "Perf repair only (per-frame decoration quad cost), measured before/after."
+        },
+        {
+          "path": "emaki/src/render/segments.ts",
+          "intendedEdit": "Perf repair only (segment cache hit rate), measured before/after."
+        },
+        {
+          "path": "emaki/src/render/atlas.ts",
+          "intendedEdit": "Perf repair only (atlas upload churn), measured before/after."
+        },
+        {
+          "path": "emaki/src/layout/layout.ts",
+          "intendedEdit": "Perf repair only (O(n) work in setText/visible/widest tracking), measured before/after."
+        },
+        {
+          "path": "emaki/src/layout/advances.ts",
+          "intendedEdit": "Perf repair only (advance measurement caching), measured before/after."
+        },
+        {
+          "path": "emaki/src/layout/heightmap.ts",
+          "intendedEdit": "Perf repair only (lookup/rebuild cost), measured before/after; heightmap tests stay green."
+        },
+        {
+          "path": "emaki/src/language/incremental.ts",
+          "intendedEdit": "Perf repair only (checkpoint splice/invalidations, budget), measured before/after; language tests stay green."
+        },
+        {
+          "path": "emaki/src/language/json-tokenizer.ts",
+          "intendedEdit": "Perf repair only (tokenizer hot loop), measured before/after; json tests stay green."
+        },
+        {
+          "path": "emaki/src/decor/store.ts",
+          "intendedEdit": "Perf repair only (collect/key cost), measured before/after."
+        },
+        {
+          "path": "emaki/src/view/view-host.ts",
+          "intendedEdit": "Perf repair only (scroll handling cost), measured before/after."
+        },
+        {
+          "path": "emaki/src/input/input.ts",
+          "intendedEdit": "Perf repair only (input bridge cost per keystroke), measured before/after."
+        },
+        {
+          "path": "emaki/src/editor.ts",
+          "intendedEdit": "Perf repair only (composition-level per-frame work), measured before/after."
+        },
+        {
+          "path": "emaki/src/editor-frame.ts",
+          "intendedEdit": "Perf repair only (frame loop work), measured before/after."
+        },
+        {
+          "path": "emaki/examples/diff/diff-plugin.ts",
+          "intendedEdit": "Perf repair only for the diff visible-latency gate (recompute scheduling or line extraction), measured before/after; diff-plugin tests stay green."
+        }
       ],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist"
+      ],
       "acceptanceCriteria": [
         "perf.mjs implements the design 12.2 metrics, writes raw JSONL plus env.json and summary.json, and its self-test passes.",
         "run-final summary allPass is true in Chromium and WebKit: first paint every load <= 200 ms, scroll work p95 <= 16.7, keystroke work p95 <= 16.7 with >= 95% next-frame, diff latency p95 <= 100, and size scaling within bound.",
@@ -672,7 +881,20 @@
       "planId": "EMK-CLOSEOUT",
       "planPath": "impl-plans/active/emaki-60-closeout.md",
       "wave": 6,
-      "dependsOn": ["EMK-CORE", "EMK-DECOR", "EMK-WIDGETS", "EMK-LANG", "EMK-DIFF", "EMK-API", "EMK-VAC-SWITCH", "EMK-DIFF-DEMO", "EMK-JSON-DEMO", "EMK-SHOWCASE", "EMK-VAC-PLUGINS", "EMK-PERF"],
+      "dependsOn": [
+        "EMK-CORE",
+        "EMK-DECOR",
+        "EMK-WIDGETS",
+        "EMK-LANG",
+        "EMK-DIFF",
+        "EMK-API",
+        "EMK-VAC-SWITCH",
+        "EMK-DIFF-DEMO",
+        "EMK-JSON-DEMO",
+        "EMK-SHOWCASE",
+        "EMK-VAC-PLUGINS",
+        "EMK-PERF"
+      ],
       "writePaths": [
         "design-docs/specs/design-emaki.md",
         "design-docs/specs/architecture.md",
@@ -690,7 +912,15 @@
         "impl-plans/active/emaki-60-closeout.md"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["emaki/node_modules", "emaki/dist", "editor/node_modules", "editor/dist", "target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/src-tauri/target"],
+      "artifactRoots": [
+        "emaki/node_modules",
+        "emaki/dist",
+        "editor/node_modules",
+        "editor/dist",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/src-tauri/target"
+      ],
       "acceptanceCriteria": [
         "G1-G10 pass serially on the combined tree, with records. G5 is proven with and without emaki/node_modules. The G6 count holds (vactr + emaki >= 2384 + new tests; moved files equal).",
         "G9 measure profile run emaki-001 meets the repository thresholds in both browsers, with the 4 ms text-dirty target recorded.",

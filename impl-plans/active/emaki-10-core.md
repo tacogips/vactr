@@ -583,6 +583,15 @@ search. With zero blocks, `lineTop` is exactly `line * lineHeight`.
 | `editor/test/code/atlas-cells.test.ts` | `emaki/test/render/atlas-cells.test.ts` |
 | `editor/test/code/glyph-placement.test.ts` | `emaki/test/render/glyph-placement.test.ts` |
 | `editor/test/code/text-cells.test.ts` | `emaki/test/layout/text-cells.test.ts` |
+
+Operator amendment (after session 597): `text-cells.test.ts` reads
+`examples/kalimba.vact`, which is outside the package. Copy that file
+byte-identically to `emaki/test/fixtures/kalimba.vact` (added to this plan's
+writePaths) and change only the path expression in the moved test so it
+reads the package-local copy (resolve it relative to the test file, e.g.
+`new URL('../fixtures/kalimba.vact', import.meta.url)`). The test name may
+keep mentioning kalimba.vact; assertions and counts stay unchanged. Record
+the sha256 of both files.
 | `editor/test/canvas/frame.test.ts` | `emaki/test/render/frame.test.ts` |
 | `editor/test/canvas/cursor-shape.test.ts` | `emaki/test/render/cursor-shape.test.ts` |
 
@@ -768,3 +777,8 @@ source hashes are under `tmp/emaki/EMK-CORE/`.
 Supply the missing cached registry response and package dependencies, or amend
 the plan to permit fetching, before resuming installation, implementation,
 and all required package checks. No package installation completed.
+
+### Session: 2026-11-01 (fixture ownership blocker)
+**Progress**: Read the accepted design and plan and confirmed the assigned plan has no dependencies. No source files were changed. The initial `cd emaki && npm run check` passed (exit 0; `tmp/emaki/EMK-CORE/step6-check-initial.log`).
+**Blocker**: `emaki/test/layout/text-cells.test.ts` reads `../examples/kalimba.vact`, outside the standalone package. The moved-test rule permits only import-specifier changes, and no package-local fixture path is authorized. Amend the plan to authorize a self-contained fixture and the necessary test reference change, or otherwise reconcile the standalone requirement with the unchanged moved test. Renderer pass separation, required rendering tests, barrels and final verification remain incomplete.
+**Evidence**: `tmp/emaki/EMK-CORE/step6-fixture-blocker-sha256.txt` records the plan hashes. Formal review and integration remain downstream.

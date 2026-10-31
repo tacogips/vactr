@@ -1,6 +1,6 @@
 # EMK-JSON-DEMO: 10k-line JSON editor page and perf hook
 
-**Status**: Ready (after EMK-API and EMK-LANG)
+**Status**: Completed (accepted in session 616 wave 1: test-integrity, adversarial review and branch evidence passed)
 **Plan ID**: EMK-JSON-DEMO (wave 4; parallel with EMK-DIFF-DEMO, EMK-SHOWCASE, EMK-VAC-PLUGINS)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 11.1, 11.2, 12.2; decision EM-D12
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -131,15 +131,25 @@ case 2 fails. Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] J1-J3 delivered. The `__emakiPerf` shape matches J2 exactly (EMK-PERF
+- [x] J1-J3 delivered. The `__emakiPerf` shape matches J2 exactly (EMK-PERF
   depends on it).
-- [ ] Verification steps pass. Mutation evidence is recorded. Hashes are
+- [x] Verification steps pass. Mutation evidence is recorded. Hashes are
   logged.
 
 ## Progress Log
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Implementation session: 2026-11-01
+
+J1-J3 implemented: query-controlled fixture, editor and perf hook, paired input metrics, and unit tests. Pre/post edit hashes and per-edit intentions are recorded in `tmp/emaki/EMK-JSON-DEMO/sha256.txt` and `intent.txt`. No drift detected.
+
+- Scoped vitest: 4/4 passed, exit 0 (`tmp/emaki/EMK-JSON-DEMO/scoped-final.log`).
+- `npm run check`: exit 0 (`tmp/emaki/EMK-JSON-DEMO/check-final.log`).
+- Informational full vitest: 138/138 passed, exit 0 (`tmp/emaki/EMK-JSON-DEMO/full-final.log`).
+- Mutation: removing the frame-start condition caused the targeted test to fail as expected, exit 1 (`tmp/emaki/EMK-JSON-DEMO/mutation.log`); the original source was restored byte-identically (`mutation-original.txt`, hashes in `sha256.txt`).
+- Source line counts and final hashes are recorded in `tmp/emaki/EMK-JSON-DEMO/final-files.log`. The dist existence check belongs to the orchestrator's wave-4 join. Formal review remains pending.
 
 ## Operator note (after session 615)
 

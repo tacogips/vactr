@@ -1,6 +1,6 @@
 # EMK-PERF: emaki Playwright perf script, budget gates in WebKit and Chromium, perf repairs
 
-**Status**: Ready (after EMK-DIFF-DEMO and EMK-JSON-DEMO)
+**Status**: Blocked (mutation control ownership clarification)
 **Plan ID**: EMK-PERF (wave 5; runs alone)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 9.2, 12.1, 12.2, 18 (risks); decisions EM-D9, EM-D11, EM-D12; user-QA default EQ1
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -199,13 +199,38 @@ afterwards and verify the hash.
 
 ## Completion Criteria
 
-- [ ] `perf.mjs` is delivered per PF1. Self-test passes.
-- [ ] `run-final/summary.json` `allPass` is true for Chromium and WebKit.
+- [x] `perf.mjs` is delivered per PF1. Self-test passes.
+- [x] `run-final/summary.json` `allPass` is true for Chromium and WebKit.
   The raw files are present. The table is recorded.
-- [ ] Every sharedPath edit is justified with before/after numbers and
+- [x] Every sharedPath edit is justified with before/after numbers and
   hashes.
 
 ## Progress Log
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (EMK-PERF implementation)
+Implemented the harness and synthetic checks. The self-service non-browser
+wave-4 join passed (`tmp/emaki/wave-4-join/summary.json`); browser join
+checks remain assigned to the orchestrator. The full emaki check and 138
+tests passed (`tmp/emaki/EMK-PERF/full-final.log`). The first browser run failed
+because the diff locator matched a widget canvas; `run-1.log` preserves the
+failure, and the selector was corrected. The final locked build and full
+browser run passed (`tmp/emaki/EMK-PERF/run-final.log`, `run-final/`).
+No shared source path was edited; editor checks were not required.
+
+| Gate | Chromium | WebKit | Budget |
+|------|----------|--------|--------|
+| First paint maximum (ms) | 59 | 95 | 200 |
+| Scroll work p95 (ms) | 3.3 | 6 | 16.7 |
+| Key work p95 (ms) | 5.1 | 7 | 16.7 |
+| Next-frame fraction | 1 | 1 | >= 0.95 |
+| 100k key work p95 (ms) | 6.6 | 7 | 7.4 / 12 respectively |
+| Diff latency p95 (ms) | 31.8 | 31 | 100 |
+
+The required mutation control remains unexecuted: it calls for editing
+`emaki/src/language/incremental.ts`, a sharedPath reserved for measured
+gate repairs, while the dispatch requires negative controls to mutate an
+owned writePath. A checkpoint amendment resolving that ownership is needed.
+Formal reviews and finalization remain downstream.

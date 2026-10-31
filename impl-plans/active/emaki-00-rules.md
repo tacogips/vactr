@@ -111,6 +111,13 @@ branches and no worktrees.
     sibling in the same wave do not invalidate it (the next join covers
     them).
 
+15. Mutation controls (operator amendment after session 616): a
+    negative-control mutation may temporarily edit any file in the plan's
+    writePaths OR sharedPaths (for example `emaki/src/language/incremental.ts`
+    for EMK-PERF), provided it is restored byte-identically (record pre/post
+    sha256) before any other step. This never authorizes a persistent edit
+    to a sharedPath outside the plan's stated repair conditions.
+
 ## Wave-join gate and scoped per-plan gates (review EMK-R5-02)
 
 12a. **Wave-join gate.** The orchestrator runs this serially, not a worker.

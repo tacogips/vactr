@@ -110,7 +110,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   let momentaryPointer: MomentaryPointer;
   let viewHost: CodeViewHost;
   let disposed = false;
-  let evalRanges: CodeAnnotation[] = [];
+  let evalRanges: { from: number; to: number; className: string }[] = [];
   const [inlineOn, setInlineOn] = createSignal(readInlineWidgets(localStore(win)));
   let sequencer: ReturnType<typeof createSequencerPlugin>;
   let scope: ReturnType<typeof createScopePlugin>;
@@ -230,7 +230,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   runtime.add(createBeatGlowPlugin({ playing: () => playingRanges,
     flashes: () => evalRanges.map(r => ({ from: r.from, to: r.to, error: !!r.className?.includes('error') })) }));
   runtime.add(sequencer.plugin); runtime.add(scope.plugin);
-  let widgetRevision = widgets.revision;
+  let widgetRevision = -1;
   input = new InputController(surface, inputContainer, {
     label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
     evalSelection: () => { if (vim.enabled()) void evalCtl.evalAtCursor(); },
@@ -370,7 +370,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = 
   input.accessibility.textarea.addEventListener('keydown', keyRecord);
   for (const name of diagInputEvents) input.accessibility.textarea.addEventListener(name, noteDiagInput);
   const stopFlash = evalCtl.onFlash((range, kind) => {
-    if (kind) evalRanges = [...evalRanges.filter((r) => !(r.from === range.from && r.to === range.to)), { ...range, kind: 'eval', className: kind }];
+    if (kind) evalRanges = [...evalRanges.filter((r) => !(r.from === range.from && r.to === range.to)), { ...range, className: kind }];
     else evalRanges = evalRanges.filter((r) => !(r.from === range.from && r.to === range.to));
     scheduler.setActive('eval', evalRanges.length > 0); scheduler.request();
   });

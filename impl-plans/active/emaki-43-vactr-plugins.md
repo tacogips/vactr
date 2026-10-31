@@ -1,6 +1,6 @@
 # EMK-VAC-PLUGINS: beat glow and eval flash as marks, inline sequencer and oscilloscope widgets, show/hide toggle
 
-**Status**: Ready (after EMK-API and EMK-VAC-SWITCH)
+**Status**: Implemented; awaiting review
 **Plan ID**: EMK-VAC-PLUGINS (wave 4; parallel with EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 13.2-13.7; decisions EM-D10, EM-D13, EM-D16; user-QA defaults EQ2, EQ4, EQ5
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -340,7 +340,7 @@ Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] V1-V7 delivered. `mount.ts` no longer passes `kind: 'playing'` or
+- [x] V1-V7 delivered. `mount.ts` no longer passes `kind: 'playing'` or
   `kind: 'eval'` rows (check with
   `grep -n "kind: 'playing'\|kind: 'eval'" editor/src/code/mount.ts` ->
   none).
@@ -357,3 +357,33 @@ Restore afterwards.
 **Files and intent**: See `tmp/emaki/EMK-VAC-PLUGINS/intent-*.txt`, `widget-intent.txt`, and pre/post SHA-256 files in that directory. Sibling changes were preserved.
 **Verification**: `npm run check` passed (`check-7.log`, exit 0). Scoped vitest passed 148/148 (`scoped-7.log`, exit 0). An earlier geometry regression was corrected by preserving the visible caret when a block shifts it; earlier attempts are in `scoped-final.log` and `scoped-2.log`. The default-off diagnostic control was restored byte-identically (`control-before.sha256`, `control-after.sha256`).
 **Blocked**: Full vitest, wasm and release builds cannot take the required mkdir-based measurement lock: `/Users/taco/gits/tacogips/vactr-worktrees/.measure-lock` is an existing regular file. Resolve the lock protocol/state, then run all remaining gates and mutation controls. Browser gates require the orchestrator under rule 14. No completion criteria are checked.
+
+### Session: 2026-11-01 (implementation verification)
+**Tasks Completed**: Removed the obsolete eval annotation kind and ensured the initial widget revision is synchronized with the heightmap. V1-V7 are implemented.
+**Verification**: Final-source `npm run check` passed (`check-final-2.log`); scoped vitest passed 148/148 (`scoped-final-2.log`); wasm build, full vitest 2370/2370, release wasm build and editor build passed under the measurement lock (`wasm-final.log`, `full-final.log`, `release-final.log`, `build-final.log`). All source files listed in the plan remain under 1000 lines. The mount annotation-kind search has no matches.
+**Mutation evidence**: Removing glow and inverting step selection each caused its focused test to fail (`mutation-glow-session.log`, `mutation-step-session.log`); the original SHA-256 hashes were restored byte-identically: decorations `66bcb80348fede67f3831e7db6c4c1cf4611f941377b4bf7fc1a55892843d3a9`, sequencer `f8432e31a62a0f48d86fb1d96f16cbe4d339d9ddb5cd1f86d8c993a42bfd8da1`.
+**Deferred**: Browser-dependent `npm run test:style`, behavior e2e and `npm run e2e:examples` are assigned to the orchestrator under rules 11 and 14; the second completion checkbox remains pending that evidence. Formal reviews and finalization follow in later workflow steps.
+
+### Session: 2026-11-01 (redispatch verification)
+**Verification**: Current-source scoped vitest passed 148/148 (`scoped-redispatch.log`, exit 0); `npm run check` passed (`check-redispatch.log`, exit 0). Browser-dependent gates remain deferred to the orchestrator under rules 11 and 14. Formal review remains downstream.
+**Full-suite rerun**: Current-source editor vitest passed 2370/2370 under the measurement lock (`full-redispatch.log`, exit 0).
+
+## Operator note (after session 616): browser gates done
+
+The orchestrator ran the browser gates on the implemented tree after a
+fresh `mise run build-wasm-release` and `VACTR_REQUIRE_SESSION_ABI=1 npm run
+build` (summary `tmp/emaki/EMK-VAC-PLUGINS/orchestrator/summary.json`):
+- `npm run e2e -- --browser all --profile behavior`: 54 run, 40 passed; the
+  14 failures are exactly the rule-13 baseline list (parity; the baseline
+  passed 39).
+- `npm run e2e:examples`: 8/8 passed (exit 0).
+- `npm run test:style`: the only violations are the pre-existing
+  editor-options popover harness mismatch (rule 13 root cause); the added
+  inline-widgets toggle row changes which stacked neighbor pairs are
+  measured, not the layout.
+These satisfy the browser part of verification step 5 and the second
+completion criterion under rules 13/14. Reference the summary path in the
+result notes (not in `verification`), keep the non-browser records
+(check, scoped vitest, full vitest 2370/2370, wasm/release/editor builds,
+mutation evidence), check the completion box, and complete.
+

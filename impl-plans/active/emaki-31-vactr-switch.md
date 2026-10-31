@@ -381,9 +381,11 @@ Logs go to `tmp/emaki/EMK-VAC-SWITCH/`. Heavy steps take the lock.
 9. `ls editor/src/code`: none of the 15 deleted files is listed.
 
 **mutationEvidence**
-- Add `import '../../../emaki/src/render/atlas'` to a scratch file
-  `editor/src/code/zz-mutation.ts` -> `emaki-boundary.test.ts` fails. Delete
-  the file afterwards.
+- Do not create a scratch file (operator amendment: paths outside
+  writePaths are not allowed). Temporarily append
+  `import '../../../emaki/src/render/atlas';` to `editor/src/code/mount.ts`
+  (in this plan's writePaths) -> `emaki-boundary.test.ts` fails. Remove the
+  line afterwards so the file is byte-identical to its pre-mutation content.
 - Swap `PLAYING_MARK` and `EVAL_MARK` colors -> `gpu.test.ts` "draws all
   required feedback in order" fails. Restore afterwards.
 

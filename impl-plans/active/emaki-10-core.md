@@ -711,9 +711,12 @@ Run in `emaki/`. Logs go to `tmp/emaki/EMK-CORE/`.
 7. From the repo root: `git status --porcelain editor` -> empty.
 8. `node --check scripts/route-server.mjs`: exit 0.
 
-**mutationEvidence.** Add `import '../../editor/src/app/apis'` to a scratch
-file `emaki/src/zz-mutation.ts`. Boundary test fails. Delete the file and
-confirm the boundary test passes.
+**mutationEvidence.** Do not create any new file for this (operator
+amendment after wave 1: a scratch file outside writePaths is not allowed).
+Temporarily append the line `import '../../editor/src/app/apis';` to
+`emaki/src/types.ts` (already in this plan's writePaths). The boundary test
+fails. Remove the line again (the file must be byte-identical to its
+pre-mutation content) and confirm the boundary test passes.
 
 ## Completion Criteria
 

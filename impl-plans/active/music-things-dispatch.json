@@ -12,7 +12,7 @@
   ],
   "protocolPath": "impl-plans/active/music-things-protocol.md",
   "evidenceRoot": "tmp/music-things",
-  "evidenceLayout": "evidenceRoot tmp/music-things is the runtime-owned, gitignored evidence root. Each plan writes its complete command logs (NN-<name>.log, each ending with exit=<status>) and any scratch outputs to its evidence directory tmp/music-things/<planId>/, which is NOT listed in writePaths or artifactRoots (the dispatcher owns tmp/<evidenceRoot>; amended 2026-10-31 after wave 1 blocked on the former disjoint tmp/music-things-extraction/<planId> log roots). MTX-00 additionally writes tmp/music-things/MTX-00/baseline-tests.txt and check_test_names.py, which every later plan reads. tmp/ is gitignored and never committed. A missing or truncated log is not a pass.",
+  "evidenceLayout": "evidenceRoot tmp/music-things is the runtime-owned, gitignored evidence root. Each plan writes its complete command logs (NN-<name>.log, each ending with exit=<status>) and any scratch outputs to its evidence directory tmp/music-things/<planId>/, which every plan declares in both writePaths and artifactRoots (digest-only) so generated logs, binaries and scratch outputs stay inside a declared artifact root (amended twice on 2026-10-31: sessions 577 and 590 blocked on evidence-path ownership). MTX-00 additionally writes tmp/music-things/MTX-00/baseline-tests.txt and check_test_names.py, which every later plan reads. tmp/ is gitignored and never committed. A missing or truncated log is not a pass.",
   "checkpointHistory": [
     {
       "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-577",
@@ -187,14 +187,16 @@
         "impl-plans/active/music-things-00-foundation.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-00"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-00"
       ],
       "acceptanceCriteria": [
         "The baseline test list is captured before any edit, and the check_test_names.py self-test is recorded in mutationEvidence.",
@@ -309,7 +311,8 @@
         "impl-plans/active/music-things-s1-classic-mi.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-S1"
       ],
       "sharedPaths": [
         "src/dsp/ugen/mixer.rs",
@@ -328,7 +331,8 @@
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-S1"
       ],
       "acceptanceCriteria": [
         "27 modules (34 files, including elements_ominous) live in music-things-synth. The vactr copies are deleted, except the va_filter.rs and stage_chain.rs shims and the sample.rs and wavetable.rs adapters.",
@@ -405,14 +409,16 @@
         "impl-plans/active/music-things-f1-dynamics-time.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-F1"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-F1"
       ],
       "acceptanceCriteria": [
         "19 group files live in music-things-fx. The vactr copies are deleted, and effects/mod.rs changed only module lines.",
@@ -509,7 +515,8 @@
         "impl-plans/active/music-things-s2-pairs-lpg.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-S2"
       ],
       "sharedPaths": [
         "src/dsp/ugen/mixer.rs"
@@ -523,7 +530,8 @@
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-S2"
       ],
       "acceptanceCriteria": [
         "30 files have moved (lpg.rs replaces vactrol_gate.rs). 12 vactr shims or adapters keep exact &Kx<'_> signatures: the 7 pair shims, dual_kick, snare_pair, hat_pair, the voice_layer alias shim and the vactrol_gate adapter.",
@@ -581,14 +589,16 @@
         "impl-plans/active/music-things-f2-texture-granular.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-F2"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-F2"
       ],
       "acceptanceCriteria": [
         "10 modules, including granular, live in music-things-fx. src/dsp/granular.rs is an adapter of under 80 lines that keeps today's signatures and resolution order (Bus -> zeros; a missing resource -> zeros before Ctl::read).",
@@ -689,7 +699,8 @@
         "impl-plans/active/music-things-s3-braids-voices.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-S3"
       ],
       "sharedPaths": [
         "src/dsp/ugen/mixer.rs"
@@ -703,7 +714,8 @@
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-S3"
       ],
       "acceptanceCriteria": [
         "32 files have moved: 14 Braids, 6 bass_voice, 4 digital_drum, 3 hurdy_gurdy, plus kalimba, tonewheel, vosim, gendyn and scanned. The vactr digital_drum/mod.rs shim keeps exact signatures for render_drum, render_snare and the inline metal::{render_metal, render_hat}.",
@@ -771,14 +783,16 @@
         "impl-plans/active/music-things-f3-crossmod-banks.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-F3"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-F3"
       ],
       "acceptanceCriteria": [
         "14 files have moved with the flat #[path] layout intact. elements_bank uses music_things_synth::elements_ominous, and quad_mixer uses music_things_synth::frame_lfo.",
@@ -816,14 +830,16 @@
         "impl-plans/active/music-things-90-fx-dispatch.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-90"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-90"
       ],
       "acceptanceCriteria": [
         "Group, group, params, mem_len(&GrainLimits), requires_full_memory, init(&GrainLimits), process<C: FxContext> and mix_index live verbatim in music-things-fx/src/dispatch.rs and are re-exported at the crate root.",
@@ -861,14 +877,16 @@
         "impl-plans/active/music-things-91-notices-final.md",
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-91"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
         "target",
         "tree-sitter-vact/tree-sitter-vact.wasm",
-        "editor/node_modules"
+        "editor/node_modules",
+        "tmp/music-things/MTX-91"
       ],
       "acceptanceCriteria": [
         "music-things/THIRD_PARTY_NOTICES.md carries every moved-code section (the MIT permission text, the msfa Apache-2.0 text and the original-voices statement) plus the musicdsp research-reference note. It uses crate-relative paths and contains no banned token.",

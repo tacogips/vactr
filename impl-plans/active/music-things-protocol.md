@@ -245,6 +245,9 @@ V-nextest and V-vitest are the behavioral bit-identity proof. They must pass
 on the combined tree before the plan is accepted.
 
 Operator amendment (2026-10-31, after session 581 wave 1):
+- Each plan's evidence directory `tmp/music-things/<PLAN-ID>/` is declared in
+  that plan's `writePaths` and `artifactRoots`; write all logs, compiled
+  helpers and scratch outputs there.
 - `editor/test/canvas/mount.test.ts` > "does no whole-document work on an edit
   frame or active animation-only frames" fails identically on the unmodified
   checkpoint sources (baseline failure on origin/main a6e5bea, unrelated to

@@ -95,7 +95,6 @@ use crate::dsp::arena::SampleStore;
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
 use crate::dsp::controls;
-use crate::dsp::effects::prim::{Biquad, DelayLine};
 use crate::dsp::effects::{self, FxStats, MAX_FX_PARAMS};
 use crate::dsp::graph::{
     BankRef, EffectKind, GranSrc, InstDef, InstId, NodeAudioShape, TableRef, UGenSpec, DISCARD,
@@ -373,53 +372,7 @@ impl NodeSpec {
     };
 }
 
-/// Per-node scalar state inside a voice.
-#[derive(Clone, Copy, Default, PartialEq, Debug)]
-pub struct NodeState {
-    pub s: [f32; 8],
-    pub bq: [Biquad; 2],
-    pub dl: DelayLine,
-    pub u: [u32; 4],
-}
-
-impl NodeState {
-    /// Marks the node finished (an envelope or a one-shot player).
-    pub fn finish(&mut self) {
-        self.u[3] = 1;
-    }
-
-    /// True once `finish` ran.
-    #[must_use]
-    pub fn done(&self) -> bool {
-        self.u[3] == 1
-    }
-}
-
-/// One kernel input: an audio-rate buffer or a block-constant value.
-#[derive(Clone, Copy, Debug)]
-pub enum Inp<'a> {
-    Buf(&'a [f32]),
-    Val(f32),
-}
-
-impl Inp<'_> {
-    /// The value at frame `i` (the last frame past the end).
-    #[inline]
-    #[must_use]
-    pub fn at(&self, i: usize) -> f32 {
-        match self {
-            Inp::Val(v) => *v,
-            Inp::Buf(b) => b.get(i).or_else(|| b.last()).copied().unwrap_or(0.0),
-        }
-    }
-
-    /// The block's first value (control-rate reads).
-    #[inline]
-    #[must_use]
-    pub fn first(&self) -> f32 {
-        self.at(0)
-    }
-}
+pub use music_things_synth::{Inp, NodeState};
 
 /// What a kernel may read besides its inputs.
 pub struct Kx<'a> {
@@ -433,6 +386,16 @@ pub struct Kx<'a> {
     pub stats: &'a mut FxStats,
     /// The voice's seed for noise and grain randomness.
     pub seed: u32,
+}
+
+impl music_things_synth::KernelContext for Kx<'_> {
+    fn kernel_ctx(&self) -> music_things_synth::KernelCtx {
+        music_things_synth::KernelCtx {
+            sr: self.sr,
+            gate: self.gate,
+            seed: self.seed,
+        }
+    }
 }
 
 /// Why a graph cannot be compiled (reported as `graph-too-large` or an

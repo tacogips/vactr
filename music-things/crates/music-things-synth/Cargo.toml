@@ -1,0 +1,11 @@
+[package]
+name = "music-things-synth"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT"
+repository = "https://github.com/tacogips/music-things"
+description = "Oscillator, filter, envelope, drum and voice synthesis kernels"
+
+[dependencies]
+music-things-dsp = { path = "../music-things-dsp" }

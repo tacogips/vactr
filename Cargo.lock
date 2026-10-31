@@ -707,6 +707,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "music-things-dsp"
+version = "0.1.0"
+
+[[package]]
+name = "music-things-fx"
+version = "0.1.0"
+dependencies = [
+ "music-things-dsp",
+ "music-things-synth",
+]
+
+[[package]]
+name = "music-things-synth"
+version = "0.1.0"
+dependencies = [
+ "music-things-dsp",
+]
+
+[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1411,6 +1430,9 @@ dependencies = [
  "getrandom",
  "midir",
  "miniz_oxide",
+ "music-things-dsp",
+ "music-things-fx",
+ "music-things-synth",
  "serde",
  "serde_json",
  "tokio",

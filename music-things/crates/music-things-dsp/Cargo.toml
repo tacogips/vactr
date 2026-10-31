@@ -1,0 +1,10 @@
+[package]
+name = "music-things-dsp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT"
+repository = "https://github.com/tacogips/music-things"
+description = "Shared real-time DSP primitives (filters, delay lines, LFOs, FFT, sample views)"
+
+[dependencies]

@@ -13,7 +13,7 @@ pub mod controls;
 pub mod effects;
 pub mod elements_ominous;
 pub mod engine;
-pub mod fft;
+pub use music_things_dsp::fft;
 pub mod granular;
 pub mod graph;
 pub mod meta;

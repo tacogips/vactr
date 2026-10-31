@@ -1,6 +1,6 @@
 # MTX-00: Workspace, crate skeletons and adapter seam
 
-**Status**: Ready
+**Status**: In Progress
 **Plan ID**: MTX-00 (wave W0, alone)
 **Design Reference**: `design-docs/specs/design-music-things-extraction.md` sections 2, 3.1, 3.2 (core types), 3.3 (core types), 3.4, 4.1, 4.2, 4.3 (rows for `src/dsp/mod.rs`, `arena.rs`, `effects/mod.rs`, `ugen/mod.rs`, `catalog.rs`, `fx_adapter.rs`), 6.2
 **Protocol**: `impl-plans/active/music-things-protocol.md` (read first)
@@ -277,13 +277,13 @@ Every crate dependency edge is declared now, including fx -> synth, so
 
 ## Completion Criteria
 
-- [ ] The baseline list and `check_test_names.py` exist, and the self-test
+- [x] The baseline list and `check_test_names.py` exist, and the self-test
       is recorded in mutationEvidence.
-- [ ] The workspace, the three crate manifests and the core types exist
+- [x] The workspace, the three crate manifests and the core types exist
       exactly as specified, with no external dependencies.
-- [ ] vactr compiles through the re-exports, `KernelContext for Kx`,
+- [x] vactr compiles through the re-exports, `KernelContext for Kx`,
       `FxContext for FxCtx` and `SampleSource for SampleStore`.
-- [ ] The kind mirror, the `fx_kind_map` tests and the
+- [x] The kind mirror, the `fx_kind_map` tests and the
       `PortValues`/`ParamSet`/`NoSamples` tests pass.
 - [ ] Verification 1-12 pass, with logs.
 - [ ] The Progress Log is updated, with sha256 values for every edit.
@@ -291,3 +291,126 @@ Every crate dependency edge is declared now, including fx -> synth, so
 ## Progress Log
 
 (append sessions here per protocol section 8)
+
+### Session 2026-10-31 (MTX-00)
+- Status: implementation source completed; verification incomplete.
+- Baseline: 3108 names; `tmp/music-things/MTX-00/00-baseline-list.log` exit 0.
+- mutationEvidence: `python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-00/baseline-minus-one.txt` exit 1 as expected, unmatched=1; log `tmp/music-things/MTX-00/00-names-self-test.log`.
+- Per-edit intent and preimage contents: `tmp/music-things/MTX-00/edit-intentions.jsonl`; final SHA-256 values: `tmp/music-things/MTX-00/final-source-hashes.json`.
+- Edit: Cargo.toml pre=3cd3ba9916467e963fac5e0ae02fbccebd25feb974fda50b23cc15a558479edc intent=Add workspace and path dependencies
+- Edit: music-things/crates/music-things-dsp/Cargo.toml pre=absent intent=Create standalone manifest
+- Edit: music-things/crates/music-things-synth/Cargo.toml pre=absent intent=Create standalone manifest
+- Edit: music-things/crates/music-things-fx/Cargo.toml pre=absent intent=Create standalone manifest
+- Edit: music-things/crates/music-things-dsp/src/sample_view.rs pre=absent intent=Create sample views and empty source
+- Edit: music-things/crates/music-things-dsp/src/lib.rs pre=absent intent=Expose shared primitives and sample API
+- Edit: music-things/crates/music-things-dsp/src/prim.rs pre=absent intent=Move primitives unchanged, adding public item documentation
+- Edit: music-things/crates/music-things-dsp/src/fft.rs pre=absent intent=Move FFT unchanged
+- Edit: src/dsp/mod.rs pre=670418786442c4a15ba2edcfcc666b21b6d48d8cdb11d70efd06a177bf028299 intent=Re-export shared FFT
+- Edit: src/dsp/effects/mod.rs pre=b1e3c8dd1dcf3809a90cf607142bdb9b0da5c360df99926a3a820c27a95fdd28 intent=Re-export primitives and shared effect types; preserve FxCtx
+- Edit: music-things/crates/music-things-synth/src/lib.rs pre=absent intent=Move node state and inputs; expose kernel context
+- Edit: music-things/crates/music-things-synth/src/ports.rs pre=absent intent=Implement fixed-size port values and tests
+- Edit: src/dsp/ugen/mod.rs pre=ef860508725974ba09364d862e753ffd2e380c8c91b8eb7bbdd693a4a8b01db0 intent=Use shared node state and implement kernel context
+- Edit: src/dsp/ugen/catalog.rs pre=8ec9e1dbe3f4007c816d8e42442316b991cdaf19ebb5f37084d66e6bb96eca65 intent=Re-export port count
+- Edit: src/dsp/arena.rs pre=0531f91a6984c60fcbfa9b0fb4167ea6595a70e617e2ac51130f7ab13f263de4 intent=Re-export sample view and adapt sample store
+- Edit: music-things/crates/music-things-fx/src/lib.rs pre=absent intent=Move effect state and parameters and expose context
+- Edit: music-things/crates/music-things-fx/src/ctx.rs pre=absent intent=Define effect context and reborrow
+- Edit: music-things/crates/music-things-fx/src/param_set.rs pre=absent intent=Implement clamped fixed-size parameters and tests
+- Edit: music-things/crates/music-things-fx/src/kind.rs pre=absent intent=Mirror all analyzer and effect variants
+- Edit: src/dsp/effects/fx_adapter.rs pre=absent intent=Adapt contexts and exhaustively convert kinds
+- Edit: src/dsp/tests/dsp/fx_kind_map.rs pre=absent intent=Test exhaustive kind-name mapping
+- Edit: src/dsp/tests/dsp.rs pre=f16c1196c9557d4c2e3e890bf141dd8cb8a325c07938e4c99baceaaf95007fc8 intent=Register kind mapping tests
+- Edit: src/dsp/effects/prim.rs pre=71f431aadfea827ebe0af7ace88cd10fa01646e69dcdd225336cd4964882ea55 intent=Remove implementation after re-export
+- Edit: src/dsp/fft.rs pre=9bcdfecb033c78b9c71685c93ed92b9829871585bbf32ced5ea7899dd673b698 intent=Remove implementation after re-export
+- Edit: music-things/crates/music-things-dsp/src/prim.rs pre=cc1b600f24302058f25251b647cefa2fda949e02f86a2a9c26b069883a11175c intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-dsp/src/lib.rs pre=dd98d4cbcbb13a11a484236f143c2db6d63870c77568f3ad40eee7f315a4042d intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-dsp/src/sample_view.rs pre=f4c5c6291b047e90affbbb6c07e63aeb6aec3236b62e9ffc181e2f7c02db25e8 intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-dsp/src/fft.rs pre=9bcdfecb033c78b9c71685c93ed92b9829871585bbf32ced5ea7899dd673b698 intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-fx/src/lib.rs pre=fb8a95bf8f031a909bbd5b62eb6d008e7111335eeb52b698921ce1740fd75a6a intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-fx/src/param_set.rs pre=b4410ab73e8ae342587619073f6b34cc72479b112e69cacc156e76686f926511 intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-fx/src/kind.rs pre=4f14eb21381544395f6cf8b1fa00dd53eb76dfcfc8f0011e3d39f37ea749b8bc intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-fx/src/ctx.rs pre=17b6e7575d86622ac32c1404a7239e98023d93fd766e6133810dd3bc03516c8c intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-synth/src/ports.rs pre=6c0daf23e0bf0f5c864e81fc12bfbef98eb6b077438847996f6b8c0a09f13c37 intent=Format this owned Rust file only
+- Edit: music-things/crates/music-things-synth/src/lib.rs pre=75b1b6c7e55bb2fd14161d7526b0ac3c317a296d4e09c2948e3ce9aedcc9c2f4 intent=Format this owned Rust file only
+- Edit: src/dsp/mod.rs pre=5b4d10b3ce5adf52b8ce046d2791140aa880187c433e6708513a102f1f5ff0ec intent=Format this owned Rust file only
+- Edit: src/dsp/arena.rs pre=c07fa677dd7da8cc998297cb9e5eb6a518acb8cf365fddbb8f6c876225ee4c8c intent=Format this owned Rust file only
+- Edit: src/dsp/effects/mod.rs pre=734d92b9c0aa4db7137a9c8cfbe0f5c48bbae531be3bb36dc4fe091fc676e0fc intent=Format this owned Rust file only
+- Edit: src/dsp/effects/fx_adapter.rs pre=781ddc79ffb268655248e7042050a134086ba38da9f2ad07e83a07daff9010ca intent=Format this owned Rust file only
+- Edit: src/dsp/ugen/mod.rs pre=3d139ffb4b28aa79a818bcf039552947df4fdba06692b32aaabae90ca276f63a intent=Format this owned Rust file only
+- Edit: src/dsp/ugen/catalog.rs pre=0c162ad32a43b2ffe890b8c7f08a58120645fe596d0d19c08102bd7d79d2b1ab intent=Format this owned Rust file only
+- Edit: src/dsp/tests/dsp.rs pre=748ed441eda216573e3d5a75e83847a956ebf0bd0027238b4768d48ea468c4d1 intent=Format this owned Rust file only
+- Edit: src/dsp/tests/dsp/fx_kind_map.rs pre=8601422d9b2dc65a54d0c45a5cc3f021281de02db3221cec2981de48ecd9cac7 intent=Format this owned Rust file only
+- Edit: Cargo.lock pre=931c65d2f9188b91ad62c49334db23c27ff58feea87c6333283e33ce3f49d79c intent=Cargo adds the three path packages and root dependencies
+- Edit: music-things/crates/music-things-synth/src/lib.rs pre=53aacbecb59ade91feca4e2371ba792d9b35e0dc28570320f9ed935ab25d68ee intent=Document public fields with their actual meaning
+- Edit: music-things/crates/music-things-fx/src/lib.rs pre=fb8a95bf8f031a909bbd5b62eb6d008e7111335eeb52b698921ce1740fd75a6a intent=Document public fields with their actual meaning
+- Edit: music-things/crates/music-things-dsp/src/prim.rs pre=cc1b600f24302058f25251b647cefa2fda949e02f86a2a9c26b069883a11175c intent=Document public fields with their actual meaning
+- Final SHA-256: Cargo.toml 938e6065a1a8770ed97bd483a74c2c3ca21d12265a850c338231ad1b0fa80481
+- Final SHA-256: music-things/crates/music-things-dsp/Cargo.toml 679f1a0343f5502dc801d3c0783d6ae43a1f9baa21e941a900699fe913c0c8f8
+- Final SHA-256: music-things/crates/music-things-synth/Cargo.toml c7a0e20bd96c61ff59d913873b6b717623bf099637d8fec088b473704fa829af
+- Final SHA-256: music-things/crates/music-things-fx/Cargo.toml 7a08c257cbb0120f85fb8da552edf63ca20fabc066bcd2d1687f0531846a0ccc
+- Final SHA-256: music-things/crates/music-things-dsp/src/sample_view.rs ac9d0deb8f4a0e90d830020f46c1f26bf78da2547b37ac9fb8c76512c4888902
+- Final SHA-256: music-things/crates/music-things-dsp/src/lib.rs dd98d4cbcbb13a11a484236f143c2db6d63870c77568f3ad40eee7f315a4042d
+- Final SHA-256: music-things/crates/music-things-dsp/src/prim.rs 2a595782c194e729f4ecd08fa721abb99c28e0d26e52a0650959623d077e24ec
+- Final SHA-256: music-things/crates/music-things-dsp/src/fft.rs 9bcdfecb033c78b9c71685c93ed92b9829871585bbf32ced5ea7899dd673b698
+- Final SHA-256: src/dsp/mod.rs 5b4d10b3ce5adf52b8ce046d2791140aa880187c433e6708513a102f1f5ff0ec
+- Final SHA-256: src/dsp/effects/mod.rs 734d92b9c0aa4db7137a9c8cfbe0f5c48bbae531be3bb36dc4fe091fc676e0fc
+- Final SHA-256: music-things/crates/music-things-synth/src/lib.rs 4c8733d65015df9a5384f75d5bad95c74134b863ae20b4bbbf8e9b92f50f3064
+- Final SHA-256: music-things/crates/music-things-synth/src/ports.rs 7f64552ab7996901669ae98d0099e7f408de12ae5fb2ed4701b410f34906c384
+- Final SHA-256: src/dsp/ugen/mod.rs 1dfe798054390f8adf17958759d7a5937d6d2af280d59f3194aec42c23ee8fa4
+- Final SHA-256: src/dsp/ugen/catalog.rs 0c162ad32a43b2ffe890b8c7f08a58120645fe596d0d19c08102bd7d79d2b1ab
+- Final SHA-256: src/dsp/arena.rs 7c77bb690324e99e1bb6ad50467299206e7d74e7d629a23006812e35ca302750
+- Final SHA-256: music-things/crates/music-things-fx/src/lib.rs d06e894fbeb145f120023a724ad055cbd9db792284182310aa3427ec60f7f24b
+- Final SHA-256: music-things/crates/music-things-fx/src/ctx.rs 55465c4583b8a4b4bdfe305b5834e1cd42d48ee1e54039fd79bb80bcfbf82d47
+- Final SHA-256: music-things/crates/music-things-fx/src/param_set.rs c13a51968ec22051d13066278e80ade881b09bee003cfbc2c6d76c17de29bb45
+- Final SHA-256: music-things/crates/music-things-fx/src/kind.rs 4f14eb21381544395f6cf8b1fa00dd53eb76dfcfc8f0011e3d39f37ea749b8bc
+- Final SHA-256: src/dsp/effects/fx_adapter.rs e77190e78557360c482fd9350d3a931b839c2d3a69d2f6e1626397260ec0b237
+- Final SHA-256: src/dsp/tests/dsp/fx_kind_map.rs 414089b6ba83ef771079545911f2e402bc3d4ebbe217458e7d0d7b021b7e86cd
+- Final SHA-256: src/dsp/tests/dsp.rs 33cfc94cd0179077bf42314b559d5840e863922b548bd8f2ecbd27eb2b7fe219
+- Final SHA-256: src/dsp/effects/prim.rs absent
+- Final SHA-256: src/dsp/fft.rs absent
+- Final SHA-256: Cargo.lock 931c65d2f9188b91ad62c49334db23c27ff58feea87c6333283e33ce3f49d79c
+- Verification: workspace check, scoped rustfmt, all four package clippy gates, baseline-name comparison (unmatched=0), host and crate wasm builds, examples, LSP, binary, banned-token grep, protected diff, moved-file checks, line limits, and lock diff passed. Complete logs: `tmp/music-things/MTX-00/01-check.log`, `02-fmt.log`, `03-clippy-*.log`, `05-names.log`, `06-wasm.log`, `07-*.log`, `08-examples.log`, `09-lsp.log`, `10-bin.log`, `12-grep.log` through `16-lock.log`.
+- Verification: focused nextest 5 passed, 0 failed, exit 0 (`tmp/music-things/MTX-00/17-focused-nextest.log`).
+- Verification incomplete: full nextest interrupted after 1344 seconds; 3112 passed, one interrupted, exit 100 (`tmp/music-things/MTX-00/04-nextest.log`). Rerun full suite to completion.
+- Verification failed: editor vitest 2400 passed, one canvas assertion failed, exit 1 (`tmp/music-things/MTX-00/11-vitest.log`); retry 2398 passed, same assertion plus two timeouts, exit 1 (`tmp/music-things/MTX-00/18-vitest-retry.log`). Baseline disposition is unproven; investigate with appropriate editor ownership.
+- Protocol deviation: the two primitive moves were combined before the required intermediate per-module crate and vactr checks; those historical checks were not captured. Final workspace check passed.
+- Formal reviews, integration decision, staging, commit, and push remain downstream.
+
+- Verification records (full logs linked above):
+  - `{"command": "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-00/baseline-tests.txt", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/00-baseline-list.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo check --workspace --all-targets", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/01-check.log"}`
+  - `{"command": "rustfmt --edition 2021 --check music-things/crates/music-things-dsp/src/*.rs music-things/crates/music-things-synth/src/*.rs music-things/crates/music-things-fx/src/*.rs src/dsp/mod.rs src/dsp/arena.rs src/dsp/effects/mod.rs src/dsp/effects/fx_adapter.rs src/dsp/ugen/mod.rs src/dsp/ugen/catalog.rs src/dsp/tests/dsp.rs src/dsp/tests/dsp/fx_kind_map.rs", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/02-fmt.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo clippy -p music-things-dsp --all-targets -- -D warnings", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/03-clippy-music-things-dsp.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo clippy -p music-things-synth --all-targets -- -D warnings", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/03-clippy-music-things-synth.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo clippy -p music-things-fx --all-targets -- -D warnings", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/03-clippy-music-things-fx.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo clippy -p vactr --all-targets -- -D warnings", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/03-clippy-vactr.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace", "exitStatus": 100, "testsRun": 3113, "testsPassed": 3112, "failureCount": 1, "outcome": "failed", "log": "tmp/music-things/MTX-00/04-nextest.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo nextest list --workspace --message-format oneline > tmp/music-things/MTX-00/tests-after.txt && python3 -I tmp/music-things/MTX-00/check_test_names.py tmp/music-things/MTX-00/baseline-tests.txt tmp/music-things/MTX-00/tests-after.txt", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/05-names.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/06-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-dsp/Cargo.toml --target wasm32-unknown-unknown", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/07-music-things-dsp-manifest-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build -p music-things-dsp --target wasm32-unknown-unknown", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/07-music-things-dsp-workspace-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-synth/Cargo.toml --target wasm32-unknown-unknown", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/07-music-things-synth-manifest-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build -p music-things-synth --target wasm32-unknown-unknown", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/07-music-things-synth-workspace-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --manifest-path music-things/crates/music-things-fx/Cargo.toml --target wasm32-unknown-unknown", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/07-music-things-fx-manifest-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build -p music-things-fx --target wasm32-unknown-unknown", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/07-music-things-fx-workspace-wasm.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --examples", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/08-examples.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo check --features lsp", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/09-lsp.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --bin vactr", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/10-bin.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)", "exitStatus": 1, "testsRun": 2401, "testsPassed": 2400, "failureCount": 1, "outcome": "failed", "log": "tmp/music-things/MTX-00/11-vitest.log"}`
+  - `{"command": "! grep -rniE 'crate::|vactr|CtlId|InstDef|wire::Ctl' music-things/", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/12-grep.log"}`
+  - `{"command": "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/13-protected.log"}`
+  - `{"command": "for f in src/dsp/effects/prim.rs src/dsp/fft.rs; do test ! -e \"$f\" || echo \"LEFT $f\"; done", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/14-gone.log"}`
+  - `{"command": "wc -l music-things/crates/music-things-dsp/src/*.rs music-things/crates/music-things-synth/src/*.rs music-things/crates/music-things-fx/src/*.rs src/dsp/mod.rs src/dsp/arena.rs src/dsp/effects/mod.rs src/dsp/effects/fx_adapter.rs src/dsp/ugen/mod.rs src/dsp/ugen/catalog.rs src/dsp/tests/dsp.rs src/dsp/tests/dsp/fx_kind_map.rs", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/15-lines.log"}`
+  - `{"command": "git diff --stat a6e5bea -- Cargo.lock; git diff a6e5bea -- Cargo.lock", "exitStatus": 0, "testsRun": 0, "testsPassed": 0, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/16-lock.log"}`
+  - `{"command": "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --workspace -E 'package(music-things-dsp) | package(music-things-synth) | package(music-things-fx) | test(fx_kind_map)'", "exitStatus": 0, "testsRun": 5, "testsPassed": 5, "failureCount": 0, "outcome": "passed", "log": "tmp/music-things/MTX-00/17-focused-nextest.log"}`
+
+## Operator resume note (2026-10-31, after session 581 wave 1)
+
+Session 581 blocked MTX-00 only on verification gates, not on source defects:
+the editor vitest failures were a baseline failure plus load-induced timeouts,
+and the full nextest run was interrupted at 1344 s with 3112 of 3113 tests
+passing. The attempt's source changes are committed on `wf/music-things-extract`
+as the WIP commit that precedes this note's checkpoint; continue from that
+tree, finish any remaining deliverables, and re-run every gate with the
+amended V-vitest command and the uninterrupted V-nextest rule (protocol
+section 7). Earlier logs under `tmp/music-things/MTX-00/` are from the
+interrupted attempt; write fresh logs.

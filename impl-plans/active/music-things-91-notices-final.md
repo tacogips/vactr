@@ -159,3 +159,9 @@ into https://github.com/tacogips/music-things. This plan:
 ## Progress Log
 
 (append sessions here per protocol section 8)
+
+## Operator amendment (2026-10-31)
+
+Run `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run test/e2e/large-eval.test.ts`
+once and record its outcome (pass, or timeout with the load average at the time) in `notes`
+as informational evidence. It is not a `verification` entry; see protocol section 7.

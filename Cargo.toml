@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "music-things/crates/*"]
+resolver = "2"
+
 [package]
 name = "vactr"
 version = "0.1.2"
@@ -20,6 +24,9 @@ lsp = ["host-native", "dep:tower-lsp", "dep:tokio"]
 
 # Core dependencies (design 14.5.2): wasm32-clean.
 [dependencies]
+music-things-dsp = { path = "music-things/crates/music-things-dsp" }
+music-things-synth = { path = "music-things/crates/music-things-synth" }
+music-things-fx = { path = "music-things/crates/music-things-fx" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 miniz_oxide = "0.9"

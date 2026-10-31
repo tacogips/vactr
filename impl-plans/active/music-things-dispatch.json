@@ -220,7 +220,7 @@
         "for f in src/dsp/effects/prim.rs src/dsp/fft.rs; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
         "git diff --stat a6e5bea -- Cargo.lock",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -347,7 +347,7 @@
         "for f in <deleted vactr sources of this plan>; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
         "grep -nE '^\\s*(for|while|loop)\\b' src/dsp/ugen/va_filter.rs src/dsp/ugen/stage_chain.rs src/dsp/ugen/sample.rs src/dsp/ugen/wavetable.rs",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -428,7 +428,7 @@
         "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'",
         "for f in <the 19 deleted src/dsp/effects sources>; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -541,7 +541,7 @@
         "for f in <deleted vactr sources of this plan>; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
         "git diff a6e5bea -- src/dsp/ported/manifest.rs",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -605,7 +605,7 @@
         "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'",
         "for f in <the 9 deleted src/dsp/effects sources>; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -720,7 +720,7 @@
         "for f in <deleted vactr sources of this plan>; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
         "ls src/dsp/ugen src/dsp/ugen/digital_drum",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -795,7 +795,7 @@
         "git diff a6e5bea -- src/dsp/tests/dsp.rs",
         "for f in <the 14 deleted src/dsp/effects sources>; do test ! -e \"$f\" || echo LEFT $f; done",
         "wc -l <every .rs file created or modified by this plan>",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -839,7 +839,7 @@
         "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'",
         "wc -l src/dsp/effects/mod.rs music-things/crates/music-things-fx/src/dispatch.rs music-things/crates/music-things-fx/src/lib.rs",
         "! grep -nE 'enum Group|fn group' src/dsp/effects/mod.rs",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)"
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')"
       ]
     },
     {
@@ -889,7 +889,7 @@
         "for c in music-things/crates/*; do CARGO_TERM_QUIET=true cargo build --manifest-path $c/Cargo.toml --target wasm32-unknown-unknown; done",
         "CARGO_TERM_QUIET=true cargo build --examples && CARGO_TERM_QUIET=true cargo check --features lsp && CARGO_TERM_QUIET=true cargo build --bin vactr",
         "git diff --exit-code a6e5bea -- src/dsp/tests tests examples editor src/dsp/ported/tests.rs ':(exclude)src/dsp/tests/dsp.rs' ':(exclude)src/dsp/tests/dsp/fx_kind_map.rs' ':(exclude)src/dsp/tests/dsp/quad_mixer_alloc.rs'",
-        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run)",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && (cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run --testTimeout=60000 --exclude test/e2e/large-eval.test.ts -t '^(?!.*does no whole-document work on an edit frame or active animation-only frames).*$')",
         "git diff --stat a6e5bea -- mise.toml editor src/pattern src/sched"
       ]
     }

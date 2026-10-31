@@ -31,7 +31,9 @@ pub mod lofi;
 pub mod modulation;
 pub mod music_filters;
 pub mod musicdsp;
-pub mod prim;
+pub use music_things_dsp::prim;
+mod fx_adapter;
+pub use fx_adapter::grain_limits;
 pub mod quad_mixer;
 pub mod resonant_bank;
 pub mod resonator;
@@ -58,7 +60,7 @@ use crate::dsp::graph::{BusId, EffectKind};
 use crate::host::wire::Ctl;
 use crate::sched::slots::CtlId;
 
-use self::prim::{Biquad, DelayLine, Follower, Lfo, OnePole, Rng};
+pub use music_things_fx::{FxState, FxStats, ParamDef};
 
 /// Reserved codec parameter carrying a constant bus ID, outside the public catalog.
 pub const SIDECHAIN_BUS_CTL: CtlId = CtlId::new(0x7ffe);
@@ -89,88 +91,6 @@ pub fn sidechain_bus(ctl: Ctl) -> Option<BusId> {
         }
         _ => None,
     }
-}
-
-/// One named effect parameter.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct ParamDef {
-    pub name: &'static str,
-    pub default: f32,
-    pub min: f32,
-    pub max: f32,
-    /// Display unit (`"dB"`, `"s"`, `"Hz"`, `""`).
-    pub unit: &'static str,
-}
-
-impl ParamDef {
-    /// A unitless parameter.
-    #[must_use]
-    pub const fn new(name: &'static str, default: f32, min: f32, max: f32) -> Self {
-        Self {
-            name,
-            default,
-            min,
-            max,
-            unit: "",
-        }
-    }
-
-    /// A parameter with a display unit.
-    #[must_use]
-    pub const fn unit(
-        name: &'static str,
-        default: f32,
-        min: f32,
-        max: f32,
-        unit: &'static str,
-    ) -> Self {
-        Self {
-            name,
-            default,
-            min,
-            max,
-            unit,
-        }
-    }
-
-    /// `v` clamped into the parameter range (NaN -> default).
-    #[must_use]
-    pub fn clamp(&self, v: f32) -> f32 {
-        if v.is_nan() {
-            self.default
-        } else {
-            v.clamp(self.min, self.max)
-        }
-    }
-}
-
-/// The scalar state of one unit: a fixed bank of primitives. Kinds use the
-/// entries they need by index.
-#[derive(Clone, Copy, Default, PartialEq, Debug)]
-pub struct FxState {
-    pub bq: [Biquad; 16],
-    pub op: [OnePole; 8],
-    pub env: [Follower; 4],
-    pub lfo: [Lfo; 4],
-    pub dl: [DelayLine; 8],
-    pub s: [f32; 32],
-    pub rng: Rng,
-}
-
-/// Per-block counters effects report (granular and analyzers, 12.6).
-#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
-pub struct FxStats {
-    /// Grain spawns skipped (window violation or pool exhaustion).
-    pub grains_skipped: u32,
-    /// Controls clamped to a tier cap (density, size, capture depth).
-    pub clamped: u32,
-    /// Grains spawned.
-    pub grains_spawned: u32,
-    /// Grains short-gated at an unfreeze.
-    pub grains_gated: u32,
-    /// Live-buffer reads outside the written, not-yet-overwritten window
-    /// (must stay 0; the no-stale-read proof of 12.6).
-    pub stale_reads: u32,
 }
 
 /// What a unit may read while processing one block.

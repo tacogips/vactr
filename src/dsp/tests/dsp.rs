@@ -53,6 +53,7 @@ mod fm_drum;
 mod fm_pair;
 mod frame_keyframe;
 mod frame_lfo;
+mod fx_kind_map;
 mod gendyn;
 mod grain_pair;
 mod granular;

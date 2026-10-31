@@ -1,0 +1,12 @@
+[package]
+name = "music-things-fx"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT"
+repository = "https://github.com/tacogips/music-things"
+description = "Real-time stereo audio effects, granular and texture processors"
+
+[dependencies]
+music-things-dsp = { path = "../music-things-dsp" }
+music-things-synth = { path = "../music-things-synth" }

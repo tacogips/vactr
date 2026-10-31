@@ -10,25 +10,40 @@ use std::f32::consts::{PI, TAU};
 /// A transposed direct-form II biquad.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub struct Biquad {
+    /// First feed-forward coefficient.
     pub b0: f32,
+    /// Second feed-forward coefficient.
     pub b1: f32,
+    /// Third feed-forward coefficient.
     pub b2: f32,
+    /// First feedback coefficient.
     pub a1: f32,
+    /// Second feedback coefficient.
     pub a2: f32,
+    /// First filter state.
     pub z1: f32,
+    /// Second filter state.
     pub z2: f32,
 }
 
 /// The biquad responses (RBJ cookbook).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Shape {
+    /// Lowpass response.
     Lowpass,
+    /// Highpass response.
     Highpass,
+    /// Bandpass response.
     Bandpass,
+    /// Notch response.
     Notch,
+    /// Allpass response.
     Allpass,
+    /// Peak response.
     Peak,
+    /// LowShelf response.
     LowShelf,
+    /// HighShelf response.
     HighShelf,
 }
 
@@ -138,6 +153,7 @@ impl Biquad {
 /// A one-pole lowpass smoother.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub struct OnePole {
+    /// Filter state.
     pub z: f32,
 }
 
@@ -176,6 +192,7 @@ impl OnePole {
 /// A peak/RMS-ish envelope follower with separate attack and release.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub struct Follower {
+    /// Envelope level.
     pub env: f32,
 }
 
@@ -196,6 +213,7 @@ impl Follower {
 /// A sine LFO.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub struct Lfo {
+    /// Oscillator phase.
     pub phase: f32,
 }
 
@@ -219,8 +237,11 @@ impl Lfo {
 /// A circular delay line over a region of caller memory.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct DelayLine {
+    /// Offset into caller memory.
     pub off: u32,
+    /// Length in samples.
     pub len: u32,
+    /// Current write position.
     pub pos: u32,
 }
 
@@ -368,6 +389,7 @@ pub fn balance_gains(pan: f32) -> (f32, f32) {
 /// A seeded xorshift32 stream.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Rng {
+    /// Random generator state.
     pub s: u32,
 }
 

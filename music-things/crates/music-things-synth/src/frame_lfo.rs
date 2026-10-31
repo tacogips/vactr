@@ -6,6 +6,7 @@ use std::f32::consts::TAU;
 
 use super::{Inp, KernelContext, NodeState, MAX_PORTS};
 
+#[doc = "State floats constant."]
 pub const STATE_FLOATS: usize = 8;
 
 /// Host-rate parameters for one four-lane poly-LFO step. Spread, shape,
@@ -13,12 +14,19 @@ pub const STATE_FLOATS: usize = 8;
 /// as the `frame-lfo-core` node.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PolyLfoParams {
+    #[doc = "Sample rate value."]
     pub sample_rate: f32,
+    #[doc = "Frequency hz value."]
     pub frequency_hz: f32,
+    #[doc = "Shape value."]
     pub shape: f32,
+    #[doc = "Spread value."]
     pub spread: f32,
+    #[doc = "Shape spread value."]
     pub shape_spread: f32,
+    #[doc = "Coupling value."]
     pub coupling: f32,
+    #[doc = "Offset value."]
     pub offset: f32,
 }
 
@@ -90,6 +98,7 @@ fn wave(phase: f32, shape: f32) -> f32 {
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
+#[doc = "Render operation."]
 pub fn render<C: KernelContext + ?Sized>(
     ins: &[Inp<'_>; MAX_PORTS],
     st: &mut NodeState,

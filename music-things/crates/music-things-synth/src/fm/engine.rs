@@ -8,6 +8,7 @@ use super::scaling::{
     feedback_gain, midi_key, op_freq_hz, op_outlevel, op_rate_scaling, transpose_hz, velocity_midi,
 };
 
+#[doc = "Fm6 ports constant."]
 pub const FM6_PORTS: [(&str, f32); 6] = [
     ("freq", 440.0),
     ("velocity", 1.0),
@@ -17,25 +18,41 @@ pub const FM6_PORTS: [(&str, f32); 6] = [
     ("fm6-feedback", 4.0),
 ];
 
+#[doc = "Fm6 port module."]
 pub mod fm6_port {
+    #[doc = "Freq constant."]
     pub const FREQ: usize = 0;
+    #[doc = "Velocity constant."]
     pub const VELOCITY: usize = 1;
+    #[doc = "Algorithm constant."]
     pub const ALGORITHM: usize = 2;
+    #[doc = "Ratio constant."]
     pub const RATIO: usize = 3;
+    #[doc = "Index constant."]
     pub const INDEX: usize = 4;
+    #[doc = "Feedback constant."]
     pub const FEEDBACK: usize = 5;
 }
 
+#[doc = "Fm mod port module."]
 pub mod fm_mod_port {
+    #[doc = "In constant."]
     pub const IN: usize = 0;
+    #[doc = "Mod constant."]
     pub const MOD: usize = 1;
+    #[doc = "Index constant."]
     pub const INDEX: usize = 2;
+    #[doc = "Algorithm constant."]
     pub const ALGORITHM: usize = 3;
+    #[doc = "Freq constant."]
     pub const FREQ: usize = 4;
+    #[doc = "Ratio constant."]
     pub const RATIO: usize = 5;
+    #[doc = "Velocity constant."]
     pub const VELOCITY: usize = 6;
 }
 
+#[doc = "Macro feedback constant."]
 pub const MACRO_FEEDBACK: u8 = 4;
 
 const OP_STRIDE: usize = 6 + EG_FLOATS;

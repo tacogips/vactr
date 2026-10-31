@@ -17,50 +17,91 @@ pub const WIRE_VERSION: u8 = 1;
 
 /// Parameter offsets relative to an operator's base.
 pub mod op {
+    #[doc = "Parameter offset for r1."]
     pub const R1: usize = 0;
+    #[doc = "Parameter offset for r2."]
     pub const R2: usize = 1;
+    #[doc = "Parameter offset for r3."]
     pub const R3: usize = 2;
+    #[doc = "Parameter offset for r4."]
     pub const R4: usize = 3;
+    #[doc = "Parameter offset for l1."]
     pub const L1: usize = 4;
+    #[doc = "Parameter offset for l2."]
     pub const L2: usize = 5;
+    #[doc = "Parameter offset for l3."]
     pub const L3: usize = 6;
+    #[doc = "Parameter offset for l4."]
     pub const L4: usize = 7;
+    #[doc = "Parameter offset for break point."]
     pub const BREAK_POINT: usize = 8;
+    #[doc = "Parameter offset for left depth."]
     pub const LEFT_DEPTH: usize = 9;
+    #[doc = "Parameter offset for right depth."]
     pub const RIGHT_DEPTH: usize = 10;
+    #[doc = "Parameter offset for left curve."]
     pub const LEFT_CURVE: usize = 11;
+    #[doc = "Parameter offset for right curve."]
     pub const RIGHT_CURVE: usize = 12;
+    #[doc = "Parameter offset for rate scaling."]
     pub const RATE_SCALING: usize = 13;
+    #[doc = "Parameter offset for amp mod sens."]
     pub const AMP_MOD_SENS: usize = 14;
+    #[doc = "Parameter offset for velocity sens."]
     pub const VELOCITY_SENS: usize = 15;
+    #[doc = "Parameter offset for output level."]
     pub const OUTPUT_LEVEL: usize = 16;
+    #[doc = "Parameter offset for osc mode."]
     pub const OSC_MODE: usize = 17;
+    #[doc = "Parameter offset for coarse."]
     pub const COARSE: usize = 18;
+    #[doc = "Parameter offset for fine."]
     pub const FINE: usize = 19;
+    #[doc = "Parameter offset for detune."]
     pub const DETUNE: usize = 20;
 }
 
 /// Global parameter offsets in the unpacked voice.
 pub mod global {
+    #[doc = "Parameter offset for pitch r1."]
     pub const PITCH_R1: usize = 126;
+    #[doc = "Parameter offset for pitch r2."]
     pub const PITCH_R2: usize = 127;
+    #[doc = "Parameter offset for pitch r3."]
     pub const PITCH_R3: usize = 128;
+    #[doc = "Parameter offset for pitch r4."]
     pub const PITCH_R4: usize = 129;
+    #[doc = "Parameter offset for pitch l1."]
     pub const PITCH_L1: usize = 130;
+    #[doc = "Parameter offset for pitch l2."]
     pub const PITCH_L2: usize = 131;
+    #[doc = "Parameter offset for pitch l3."]
     pub const PITCH_L3: usize = 132;
+    #[doc = "Parameter offset for pitch l4."]
     pub const PITCH_L4: usize = 133;
+    #[doc = "Parameter offset for algorithm."]
     pub const ALGORITHM: usize = 134;
+    #[doc = "Parameter offset for feedback."]
     pub const FEEDBACK: usize = 135;
+    #[doc = "Parameter offset for osc key sync."]
     pub const OSC_KEY_SYNC: usize = 136;
+    #[doc = "Parameter offset for lfo speed."]
     pub const LFO_SPEED: usize = 137;
+    #[doc = "Parameter offset for lfo delay."]
     pub const LFO_DELAY: usize = 138;
+    #[doc = "Parameter offset for lfo pitch depth."]
     pub const LFO_PITCH_DEPTH: usize = 139;
+    #[doc = "Parameter offset for lfo amp depth."]
     pub const LFO_AMP_DEPTH: usize = 140;
+    #[doc = "Parameter offset for lfo key sync."]
     pub const LFO_KEY_SYNC: usize = 141;
+    #[doc = "Parameter offset for lfo wave."]
     pub const LFO_WAVE: usize = 142;
+    #[doc = "Parameter offset for pitch mod sens."]
     pub const PITCH_MOD_SENS: usize = 143;
+    #[doc = "Parameter offset for transpose."]
     pub const TRANSPOSE: usize = 144;
+    #[doc = "Parameter offset for name."]
     pub const NAME: usize = 145;
 }
 
@@ -119,6 +160,7 @@ pub const fn max_of(index: usize) -> u8 {
 /// A validated unpacked six-operator voice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Fm6Patch {
+    #[doc = "Params value."]
     pub params: [u8; VOICE_PARAMS],
 }
 

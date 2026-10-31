@@ -19,7 +19,12 @@ fn bounded(value: f32, lo: f32, hi: f32, fallback: f32) -> f32 {
 }
 
 /// Render one event-local hit from analytic oscillators and fixed node state.
-pub fn render<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn render<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     if st.u[1] == 0 {
         st.u[0] = Rng::new(kx.seed ^ 0x4D37_A912).s;

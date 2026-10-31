@@ -112,7 +112,12 @@ pub fn feedback<C: KernelContext + ?Sized>(
 
 /// Independent filtered-noise transient with envelope-controlled center
 /// frequency. The pitch modulation is expressed in cents.
-pub fn noise<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn noise<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut rng = seeded_rng(st, kx.seed ^ 0xA015_E302);
     let sr = kx.sr.max(1.0);
@@ -138,7 +143,12 @@ pub fn noise<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut Nod
 
 /// Sine carrier with a sine frequency modulator, key tracking, and a pitch
 /// envelope. The note's `freq` in hertz replaces the source's MIDI key.
-pub fn sine<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn sine<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let sr = kx.sr.max(1.0);
     let mut carrier_phase = st.s[0];

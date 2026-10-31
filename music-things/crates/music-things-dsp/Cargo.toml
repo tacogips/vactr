@@ -10,6 +10,6 @@ description = "Shared real-time DSP primitives (filters, delay lines, LFOs, FFT,
 [dependencies]
 
 [features]
-# Exposes test-only helpers to dependent crates' test suites (vactr enables it
+# Exposes test-only helpers to dependent crates' test suites (enable it only
 # from [dev-dependencies]); never enable it in production builds.
 test-support = []

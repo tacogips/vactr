@@ -3,22 +3,30 @@
 
 use super::{Inp, MAX_PORTS};
 
+#[doc = "Max frames constant."]
 pub const MAX_FRAMES: usize = 64;
+#[doc = "Max payloads constant."]
 pub const MAX_PAYLOADS: usize = 4;
+#[doc = "Wire version constant."]
 pub const WIRE_VERSION: u8 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[doc = "Frame data struct."]
 pub struct FrameData {
+    #[doc = "Len value."]
     pub len: u8,
+    #[doc = "Points value."]
     pub points: [[f32; 5]; MAX_FRAMES],
 }
 
 impl FrameData {
+    #[doc = "Empty constant."]
     pub const EMPTY: Self = Self {
         len: 0,
         points: [[0.0; 5]; MAX_FRAMES],
     };
 
+    #[doc = "From flat operation."]
     pub fn from_flat(xs: &[f32]) -> Result<Self, &'static str> {
         if xs.is_empty() || xs.len() % 5 != 0 || xs.len() > MAX_FRAMES * 5 {
             return Err("frames: requires 1..64 timestamp/value quadruples (stride 5)");
@@ -40,6 +48,7 @@ impl FrameData {
         Ok(data)
     }
 
+    #[doc = "Validate operation."]
     pub fn validate(&self) -> Result<(), &'static str> {
         let n = usize::from(self.len);
         if n == 0 || n > MAX_FRAMES {
@@ -59,6 +68,7 @@ impl FrameData {
         Ok(())
     }
 
+    #[doc = "Sample operation."]
     pub fn sample(&self, position: f32, lane: usize, ease: u8, response: f32) -> f32 {
         let n = usize::from(self.len);
         if n == 0 {
@@ -116,6 +126,7 @@ fn respond(y: f32, response: f32) -> f32 {
     y.clamp(0.0, 1.0).powf(1.0 + 3.0 * response)
 }
 
+#[doc = "Render operation."]
 pub fn render(data: &FrameData, ins: &[Inp<'_>; MAX_PORTS], out: &mut [f32]) {
     for (i, y) in out.iter_mut().enumerate() {
         let selected = ins[9].at(i);

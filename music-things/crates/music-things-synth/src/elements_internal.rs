@@ -16,11 +16,13 @@ const REVERB: usize = 512;
 const LOW_HZ: f32 = 20.0;
 
 #[must_use]
+#[doc = "Line len operation."]
 pub fn line_len(sr: f32) -> usize {
     (sr.max(1.0) / LOW_HZ).ceil() as usize + 2
 }
 
 #[must_use]
+#[doc = "Mem len operation."]
 pub fn mem_len(sr: f32) -> usize {
     STRINGS * line_len(sr) + EXTRA + REVERB
 }
@@ -126,6 +128,7 @@ fn strings(
     clippy::cast_sign_loss,
     clippy::too_many_lines
 )]
+#[doc = "Render operation."]
 pub fn render<C: KernelContext + ?Sized>(
     ins: &[Inp<'_>; MAX_PORTS],
     st: &mut NodeState,

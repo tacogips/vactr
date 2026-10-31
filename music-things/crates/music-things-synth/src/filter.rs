@@ -29,7 +29,12 @@ pub fn biquad<C: KernelContext + ?Sized>(
 }
 
 /// Ladder: inputs 0, 1, 2 are signal, cutoff and resonance; four stages with `tanh` feedback.
-pub fn ladder<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn ladder<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let fc = ins[1].first().clamp(10.0, 0.45 * kx.sr);
     let g = 1.0 - (-2.0 * PI * fc / kx.sr).exp();
@@ -51,7 +56,12 @@ pub fn ladder<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut No
 /// SVF: inputs 0, 1, 2, 3 are signal, cutoff, resonance and mode
 /// (mode 0 lowpass, 1 highpass, 2 bandpass,
 /// 3 notch).
-pub fn svf<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn svf<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let fc = ins[1].first().clamp(10.0, 0.45 * kx.sr);
     let g = (PI * fc / kx.sr).tan();

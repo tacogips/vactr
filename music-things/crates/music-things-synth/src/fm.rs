@@ -14,7 +14,12 @@ pub mod sysex;
 
 /// `fm-op freq ratio index mod`: a sine operator at `freq * ratio`, output
 /// amplitude `index`, phase-modulated by `mod` (radians).
-pub fn op<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn op<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut ph = st.s[0];
     for (i, y) in out.iter_mut().enumerate() {

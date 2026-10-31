@@ -169,3 +169,10 @@ section 7, "test-only helpers") and re-gated `silence_op`, `encode_single`,
 --workspace --all-targets` now passes on that tree. Continue from it, apply the
 same rule to any further moved test-only helpers, finish the remaining moves,
 and re-run every gate with fresh logs.
+
+### Session 2026-11-01 (MTX-F1 resume)
+- Existing committed extraction inspected; no Rust edits made in this session.
+- Moving-tree checks: workspace check and owned-file rustfmt passed (`602-check.log`, `602-fmt.log`); both Clippy gates failed in sibling synth documentation (`602-clippy-fx.log`, `602-clippy-vactr.log`). The protected-path baseline diff passed (`602-protected-independent.log`).
+- V-grep failed (`602-grep-independent.log`): test-support comments in the dsp, fx and synth Cargo manifests contain a prohibited token. These manifests are outside MTX-F1 writePaths; an authorized owner must repair them before rerunning gates.
+- Workspace nextest encountered shared-target executable replacement while sibling builds ran; see `602-nextest.log` for its complete terminal outcome. Rerun on a settled tree with isolated build output. Remaining verification criteria are pending.
+- Nextest terminal result: exit 100, 1820 run, 1818 passed, 2 spawn failures, 1293 not run; complete log `tmp/music-things/MTX-F1/602-nextest.log`.

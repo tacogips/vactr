@@ -32,7 +32,12 @@ fn envelope(position: f32) -> f32 {
 /// previous-sample pitch term, noise mix, AM envelope and soft drive.
 /// Pitch is recomputed every four voice samples, regardless of host block
 /// boundaries. The voice's `NodeState` and PRNG are reset on event start.
-pub fn render<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn render<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     if st.u[1] == 0 {
         st.u[0] = Rng::new(kx.seed ^ 0xF0D3_17A5).s;

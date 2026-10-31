@@ -148,3 +148,15 @@ pub mod musicdsp_synth;
 
 /// FM synthesis kernels.
 pub mod fm;
+
+/// va filter kernels.
+pub mod va_filter;
+
+/// stage chain kernels.
+pub mod stage_chain;
+
+/// Sample playback kernels.
+pub mod sample;
+
+/// Wavetable playback kernels.
+pub mod wavetable;

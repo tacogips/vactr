@@ -61,7 +61,12 @@ fn wave_at(wave: usize, ph: f32, dt: f32, width: f32) -> f32 {
 }
 
 /// `sin-osc`: input 0 is frequency.
-pub fn sine<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn sine<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut ph = st.s[0];
     for (i, y) in out.iter_mut().enumerate() {
@@ -72,7 +77,12 @@ pub fn sine<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut Node
 }
 
 /// `saw`: input 0 is frequency.
-pub fn saw<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn saw<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut ph = st.s[0];
     for (i, y) in out.iter_mut().enumerate() {
@@ -84,7 +94,12 @@ pub fn saw<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeS
 }
 
 /// `pulse`: inputs 0 and 1 are frequency and width.
-pub fn pulse<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn pulse<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut ph = st.s[0];
     for (i, y) in out.iter_mut().enumerate() {
@@ -96,7 +111,12 @@ pub fn pulse<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut Nod
 }
 
 /// `tri`: input 0 is frequency.
-pub fn tri<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn tri<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut ph = st.s[0];
     for (i, y) in out.iter_mut().enumerate() {
@@ -107,7 +127,12 @@ pub fn tri<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeS
 }
 
 /// `sub-osc`: input 0 is frequency; output is a square one octave below.
-pub fn sub<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn sub<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let mut ph = st.s[0];
     for (i, y) in out.iter_mut().enumerate() {

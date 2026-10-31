@@ -20,15 +20,40 @@ const BULK_FORMAT: u8 = 0x09;
 /// A failure while validating or unpacking a six-operator SysEx dump.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SysexError {
+    #[doc = "Empty error."]
     Empty,
+    #[doc = "Not sysex error."]
     NotSysex,
+    #[doc = "Manufacturer error."]
     Manufacturer,
+    #[doc = "Sub status error."]
     SubStatus,
+    #[doc = "Format error."]
     Format,
+    #[doc = "Byte count error."]
     ByteCount,
-    Length { expected: usize, actual: usize },
-    DataByte { offset: usize, value: u8 },
-    Checksum { expected: u8, actual: u8 },
+    #[doc = "Length error."]
+    Length {
+        #[doc = "Expected value."]
+        expected: usize,
+        #[doc = "Actual value."]
+        actual: usize,
+    },
+    #[doc = "Data byte error."]
+    DataByte {
+        #[doc = "Offset value."]
+        offset: usize,
+        #[doc = "Value value."]
+        value: u8,
+    },
+    #[doc = "Checksum error."]
+    Checksum {
+        #[doc = "Expected value."]
+        expected: u8,
+        #[doc = "Actual value."]
+        actual: u8,
+    },
+    #[doc = "Missing end error."]
     MissingEnd,
 }
 

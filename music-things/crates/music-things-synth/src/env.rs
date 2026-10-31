@@ -6,7 +6,12 @@ use super::{Inp, KernelContext, NodeState, MAX_PORTS};
 
 /// `env-perc`: inputs 0 and 1 are attack and release. A linear rise and squared fall; it ignores
 /// the gate.
-pub fn perc<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn perc<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let a = ins[0].first().max(0.0);
     let r = ins[1].first().max(1.0e-4);
@@ -40,7 +45,12 @@ const RELEASE: u32 = 3;
 /// Linear segments; the gate
 /// (`KernelCtx::gate` frames of this block) holds the sustain, its end starts the
 /// release from the current level.
-pub fn adsr<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn adsr<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let a = ins[0].first().max(1.0e-4) * kx.sr;
     let d = ins[1].first().max(1.0e-4) * kx.sr;
@@ -86,7 +96,12 @@ pub fn adsr<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut Node
 }
 
 /// `line`: inputs 0, 1, 2 are start, end and duration; holds the end value.
-pub fn line<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn line<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let (from, to) = (ins[0].first(), ins[1].first());
     let dur = ins[2].first().max(1.0e-4);

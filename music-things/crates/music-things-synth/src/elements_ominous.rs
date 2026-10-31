@@ -6,6 +6,7 @@
 
 use std::f32::consts::TAU;
 
+#[doc = "State floats constant."]
 pub const STATE_FLOATS: usize = 320;
 const ECHO_START: usize = 64;
 const ECHO_LEN: usize = 256;

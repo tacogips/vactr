@@ -218,3 +218,12 @@ section 7, "test-only helpers") and re-gated `silence_op`, `encode_single`,
 --workspace --all-targets` now passes on that tree. Continue from it, apply the
 same rule to any further moved test-only helpers, finish the remaining moves,
 and re-run every gate with fresh logs.
+
+### Session 2026-11-01 (MTX-S1 resume)
+- Moved va_filter and stage_chain with exact-signature shims, and sample and wavetable with resource adapters. Added public documentation and formatted scoped Rust files. Intentions and preimages: `tmp/music-things/MTX-S1/edit-intentions-resume.jsonl`.
+- The va_filter and stage_chain checks were run together after both moves instead of individually; both crate and vactr checks passed. Sample and wavetable checks passed individually.
+- EDITS-COMPLETE 2026-10-31T16:11:10.477276+00:00
+- Final gates pending; logs will be recorded below.
+
+- Final-source gates passed: workspace check, scoped rustfmt, synth and vactr clippy, nextest (3113 passed, 3 skipped), test names (unmatched=0), host and synth wasm builds, examples, and protected paths. Logs: `tmp/music-things/MTX-S1/final-20261101-*.log`.
+- BLOCKED: V-grep exits 1 (`final-20261101-grep.log`): test-support comments in `music-things/crates/music-things-{dsp,fx,synth}/Cargo.toml` contain the prohibited token. These manifests are outside this plan’s writePaths; an authorized owner or checkpoint amendment must repair them. Rerun V-grep and remaining V-gone, V-lines, adapter inspection and V-vitest on the repaired shared tree.

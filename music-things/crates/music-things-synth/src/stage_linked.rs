@@ -5,23 +5,32 @@ use std::f32::consts::TAU;
 
 use super::{Inp, KernelContext, KernelCtx, NodeState, MAX_PORTS};
 
+#[doc = "Max segments constant."]
 pub const MAX_SEGMENTS: usize = 36;
+#[doc = "Max payloads constant."]
 pub const MAX_PAYLOADS: usize = 2;
+#[doc = "Wire version constant."]
 pub const WIRE_VERSION: u8 = 1;
+#[doc = "State floats constant."]
 pub const STATE_FLOATS: usize = 12;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[doc = "Stage data struct."]
 pub struct StageData {
+    #[doc = "Len value."]
     pub len: u8,
+    #[doc = "Rows value."]
     pub rows: [[f32; 4]; MAX_SEGMENTS],
 }
 
 impl StageData {
+    #[doc = "Empty constant."]
     pub const EMPTY: Self = Self {
         len: 0,
         rows: [[0.0; 4]; MAX_SEGMENTS],
     };
 
+    #[doc = "From flat operation."]
     pub fn from_flat(xs: &[f32]) -> Result<Self, &'static str> {
         if xs.is_empty() || xs.len() % 4 != 0 || xs.len() > MAX_SEGMENTS * 4 {
             return Err("segments: requires 1..36 type/loop/primary/secondary rows (stride 4)");
@@ -35,6 +44,7 @@ impl StageData {
         Ok(data)
     }
 
+    #[doc = "Validate operation."]
     pub fn validate(&self) -> Result<(), &'static str> {
         let len = usize::from(self.len);
         if len == 0 || len > MAX_SEGMENTS {
@@ -221,6 +231,7 @@ fn curve(phase: f32, shape: f32) -> f32 {
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
+#[doc = "Render operation."]
 pub fn render<C: KernelContext + ?Sized>(
     data: &StageData,
     ins: &[Inp<'_>; MAX_PORTS],

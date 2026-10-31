@@ -72,12 +72,22 @@ fn run(
     }
 }
 /// Lorenz attractor, rate in simulation speed, chaos adjusts rho.
-pub fn lorenz<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn lorenz<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     run(ins, st, out, kx, false);
 }
 /// Rössler attractor, rate in simulation speed, chaos adjusts a and c.
-pub fn rossler<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn rossler<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     run(ins, st, out, kx, true);
 }

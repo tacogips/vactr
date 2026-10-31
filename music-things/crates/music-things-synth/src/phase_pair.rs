@@ -36,7 +36,12 @@ pub(super) fn equal_step_ratio(harmonics: f32) -> f32 {
 /// carrier wrap; mode one keeps its independent phase. The template places
 /// these nodes in parallel, sending the free-running path to `aux-out`.
 /// Two substeps per host sample are averaged without temporary buffers.
-pub fn render<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn render<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let sr = kx.sr.max(1.0);
     let (mut carrier_phase, mut mod_phase) = (st.s[0], st.s[1]);

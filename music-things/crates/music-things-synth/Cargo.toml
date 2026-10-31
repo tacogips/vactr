@@ -11,6 +11,6 @@ description = "Oscillator, filter, envelope, drum and voice synthesis kernels"
 music-things-dsp = { path = "../music-things-dsp" }
 
 [features]
-# Exposes test-only helpers to dependent crates' test suites (vactr enables it
+# Exposes test-only helpers to dependent crates' test suites (enable it only
 # from [dev-dependencies]); never enable it in production builds.
 test-support = ["music-things-dsp/test-support"]

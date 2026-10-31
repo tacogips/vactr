@@ -55,7 +55,12 @@ pub fn dsf_value(base: f32, spacing: f32, rolloff: f32, count: usize) -> f32 {
 }
 
 /// `dsf-osc freq spacing rolloff count`: independent geometric partial spacing.
-pub fn dsf<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn dsf<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let sr = kx.sr.max(100.0);
     for (i, y) in out.iter_mut().enumerate() {
@@ -80,7 +85,12 @@ pub fn dsf<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeS
 }
 
 /// `chebyshev-osc freq harmonic-1..8`: signed, independent harmonics.
-pub fn chebyshev<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn chebyshev<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     let sr = kx.sr.max(100.0);
     for (i, y) in out.iter_mut().enumerate() {
@@ -104,7 +114,12 @@ pub fn chebyshev<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut
 }
 
 /// `gaussian-noise sigma mean`: deterministic Box-Muller pairs, no clipping.
-pub fn gaussian<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn gaussian<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     if st.u[0] == 0 {
         st.u[0] = Rng::new(kx.seed).s;

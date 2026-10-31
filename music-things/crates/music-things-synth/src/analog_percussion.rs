@@ -26,7 +26,12 @@ fn step(phase: &mut f32, hz: f32, sr: f32) -> f32 {
 /// Renders one triggered bass, snare or hat voice. `mode` selects the
 /// architecture at 0, 1 or 2. All state fits in `NodeState`; the callback
 /// allocates no memory and uses the host sample rate for every time/frequency.
-pub fn render<C: KernelContext + ?Sized>(ins: &[Inp<'_>; MAX_PORTS], st: &mut NodeState, out: &mut [f32], kx: &C) {
+pub fn render<C: KernelContext + ?Sized>(
+    ins: &[Inp<'_>; MAX_PORTS],
+    st: &mut NodeState,
+    out: &mut [f32],
+    kx: &C,
+) {
     let kx = &kx.kernel_ctx();
     if st.u[1] == 0 {
         st.u[0] = Rng::new(kx.seed ^ 0xAB82_50A7).s;

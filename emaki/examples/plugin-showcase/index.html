@@ -1,3 +1,12 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Plugin showcase</title><link rel="stylesheet" href="../shared/demo.css"></head>
-<body><main><h1>Plugin showcase</h1><p>Not implemented yet.</p></main></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Plugin showcase</title><link rel="stylesheet" href="../shared/demo.css"><style>
+.layout { display: flex; gap: var(--emaki-space-3); align-items: stretch; }
+#editor { flex: 1; min-width: 0; height: 75vh; min-height: 400px; background: var(--emaki-bg); }
+aside { width: 180px; padding: var(--emaki-space-3); background: var(--emaki-panel); }
+#controls { display: flex; flex-direction: column; gap: var(--emaki-space-3); }
+label { display: flex; align-items: center; gap: var(--emaki-space-2); }
+input { width: 18px; height: 18px; margin: 0; border: 1px solid var(--emaki-muted); background: var(--emaki-bg); }
+input:checked { background: var(--emaki-accent); border-color: var(--emaki-accent); }
+input:focus-visible { outline: 2px solid var(--emaki-text); outline-offset: 2px; }
+@media (max-width: 600px) { .layout { flex-direction: column; } aside { width: auto; } }
+</style></head><body><main><h1>Plugin showcase</h1><div class="layout"><div id="editor" aria-label="Showcase editor"></div><aside><h2>Plugins</h2><div id="controls"></div></aside></div></main><script type="module" src="./main.ts"></script></body></html>

@@ -12,10 +12,12 @@ interface Entry { instance?: PluginInstance; active: boolean; remove(): void; re
 
 export class PluginRuntime {
   private entries: Entry[] = [];
+  private nextOwnerNamespace = 0;
   private lastViewport: PluginViewport | undefined;
   constructor(private readonly options: Options) {}
   add(plugin: EmakiPlugin): () => void {
     const owners = new Set<string>(); const animated = new Set<() => void>();
+    const namespace = this.nextOwnerNamespace++;
     let removed = false; let reported = false;
     const entry: Entry = { active: false, report: error => report(error), remove: () => {
       if (removed) return; removed = true;
@@ -25,7 +27,7 @@ export class PluginRuntime {
       for (const dispose of animated) dispose(); animated.clear(); this.options.requestFrame();
     } };
     const report = (error: unknown): void => { if (!reported) { reported = true; this.options.onError?.(plugin.name, error); } };
-    const owner = (name: string): string => { const key = `${plugin.name}:${name}`; owners.add(key); return key; };
+    const owner = (name: string): string => { const key = `${namespace}:${plugin.name}:${name}`; owners.add(key); return key; };
     const options = this.options;
     const host: PluginHost = {
       get state() { return options.getState(); },

@@ -29,6 +29,14 @@ describe('PluginRuntime', () => {
     for (const name of ['one', 'two']) s.runtime.add({ name, attach: host => { host.marks('x').set([mark]); } });
     expect(s.store.collect(0, s.state().doc).marks).toHaveLength(2);
   });
+  it('isolates owners of separate registrations with the same name', () => {
+    const s = setup();
+    const add = () => s.runtime.add({ name: 'same', attach: host => { host.marks('x').set([mark]); } });
+    const remove = add(); add();
+    expect(s.store.collect(0, s.state().doc).marks).toHaveLength(2);
+    remove();
+    expect(s.store.collect(0, s.state().doc).marks).toHaveLength(1);
+  });
   it('isolates a throwing hook and continues other plugins', () => {
     const s = setup(); const other = vi.fn(() => false); const destroy = vi.fn();
     s.runtime.add({ name: 'bad', attach: host => { host.marks('x').set([mark]); return { frame: () => { throw new Error('failure'); }, destroy }; } });

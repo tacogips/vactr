@@ -159,3 +159,11 @@ pixel-change check runs at the wave-4 join.
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (EMK-SHOWCASE implementation)
+**Tasks Completed**: P1-P4 implemented; browser smoke awaits the wave-4 orchestrator. The showcase uses public APIs, generated silent video, an animated waveform, formats and independent toggles.
+**Files Changed**: showcase page and plugins, `scripts/smoke.mjs`, `test/examples/showcase-plugins.test.ts`, and this plan. Per-edit intents and before/after hashes are under `tmp/emaki/EMK-SHOWCASE/` (`page-*`, `plugins-*`, `smoke-*`, `tests-*`, `plan-*`); final source hashes are in `final-source-before.sha256` and `final-source-after.sha256`, identical.
+**Verification**: scoped vitest 3/3 exit 0 (`scoped-final.log`); `npm run check` exit 0 (`check-final.log`); `node --check scripts/smoke.mjs` exit 0 (`node-final.log`); full vitest informational exit 0 (`full-informational.log`); source lengths below 1000 (`lines.log`). All logs are under `tmp/emaki/EMK-SHOWCASE/`.
+**Mutation Evidence**: constant waveform phase caused the focused assertion to fail (exit 1, `mutation.log`); original source restored with identical `mutation-before.sha256` and `mutation-after.sha256`.
+**Drift**: none in owned source during final verification. Shared-tree checks are subject to the serial wave join.
+**Blocked**: Chromium and WebKit smoke requires the browser-capable orchestrator and wave-4 build under the measurement lock (rules 11 and 12a); no browser result is claimed.

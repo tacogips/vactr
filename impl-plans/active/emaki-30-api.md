@@ -1,6 +1,6 @@
 # EMK-API: plugin runtime, createEditor, public entry and README
 
-**Status**: Implemented; awaiting review
+**Status**: Completed (accepted in session 614 wave 1: test-integrity, adversarial review and branch evidence passed; wave-3 join green on the combined tree in tmp/emaki/wave-3-join/summary.json)
 **Plan ID**: EMK-API (wave 3; parallel with EMK-VAC-SWITCH)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 3, 5.1-5.3, 7.1-7.2, 11.3 (README content); decision EM-D2
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -297,3 +297,9 @@ only for parity defects; keep edits small and localized.
 **Precondition**: `tmp/emaki/wave-2-join/summary.json` is green; dispatch `dependsOn` is empty.
 **Verification**: `npm run check` passed (`tmp/emaki/EMK-API/check-cont1-source-final.log`); scoped vitest passed 14 tests (`tmp/emaki/EMK-API/scoped-cont1-source-final.log`). Export names and file sizes passed (`exports-cont1.log`, `lines-cont1.log` in the same directory). Full vitest passed 125 tests and build passed under the measurement lock (`full-cont1-final.log`, `build-cont1-final.log`); these are informational per rule 12b and the serial wave join remains authoritative. Final source hashes are in `hashes-cont1.txt`; per-edit intentions and snapshots are in `intent-cont1.txt` and `*-before-*-cont1.txt`. Mutation evidence from the previous session is `mutation-session-611.log`, with byte-identical restoration hashes. jsdom logs its unimplemented canvas measurement context; the fallback is used and tests pass with injected GL and rasterizer.
 **Review**: Formal integrity, adversarial and integration reviews and final workflow steps remain downstream.
+
+### Session: 2026-11-01 (session 614 verification)
+**Tasks Completed**: Verified A1-A5 against the accepted design and current tree; fixed collisions between separate registrations with the same plugin name and added a regression test. Dispatch has no required predecessors and `tmp/emaki/wave-2-join/summary.json` is green.
+**Files and hashes**: Runtime and test pre/post hashes are in `tmp/emaki/EMK-API/session614-before.sha256` and `session614-after.sha256`; plan hashes are in `session614-plan-before.sha256` and `session614-plan-after.sha256`. Intent and snapshots are in the same evidence directory.
+**Verification**: Scoped vitest passed 15/15 (`session614-scoped.log`); `npm run check` passed (`session614-check.log`); export and file-size checks passed (`session614-exports-lines.log`). Informational full vitest passed 126/126 (`session614-full.log`) and build passed under the measurement lock (`session614-build.log`). All logs are under `tmp/emaki/EMK-API/` and include exit status. The existing error-isolation mutation and byte-identical restoration are recorded in `mutation-session-611.log` and its before/after hash files.
+**Drift and blocked items**: None identified. Formal review and workflow finalization remain downstream.

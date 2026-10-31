@@ -77,6 +77,34 @@ branches and no worktrees.
     sharedPaths must change, a dependency must be added or changed, or a
     design decision must change.
 
+13. Operator disposition of pre-existing browser failures (after session
+    614, finding IR-VS-1/IR-VS-2). These failures reproduce on the
+    pre-emaki baseline a6e5bea (worktree ../vactr-worktrees/emaki-baseline,
+    evidence `tmp/emaki/EMK-VAC-SWITCH/baseline/`) and are OUT OF SCOPE for
+    this feature; do not repair them and do not block on them:
+    - e2e behavior: vim-toggle, vim-dcyp, vim-visual, vim-dot,
+      vim-ime-normal, vim-shortcut (Chromium and WebKit: `.vact-vim-toggle`
+      is not visible since the e7face0 header change), code-pixels-dpr1 and
+      code-pixels-dpr2 (Chromium 151 glyph extents), WebKit
+      clipboard-synthetic-event and japanese-ime-synthetic exclusions;
+    - `npm run test:style`: the 8 `gap` + 2 `coarse-target` violations.
+    The vactr e2e/style gates are therefore "no new failure versus that
+    baseline list". canvas-only-text, touch-selection and vim-keymap-kj are
+    flaky in this environment (each failed in 1 of 3 runs on one side and
+    passed otherwise); such a check counts as passing when it passes in at
+    least one of up to 3 reruns. The orchestrator comparison for
+    EMK-VAC-SWITCH is `tmp/emaki/EMK-VAC-SWITCH/orchestrator/summary.json`
+    (verdict parity-with-baseline; e2e:examples 8/8 passed).
+14. Playwright in plans (clarifies rule 11). A Playwright command that the
+    sandbox cannot run is NOT a blocker and is NOT listed in `verification`:
+    list it in the result notes as `deferredVerification` with the exact
+    command, and finish the plan. The orchestrator runs browser gates at the
+    wave join (wave 4: diff e2e, showcase smoke, dist page check) and routes
+    any failure back to the owning plan. A wave n+1 plan may start when
+    `tmp/emaki/wave-<n>-join/summary.json` says green; later edits by a
+    sibling in the same wave do not invalidate it (the next join covers
+    them).
+
 ## Wave-join gate and scoped per-plan gates (review EMK-R5-02)
 
 12a. **Wave-join gate.** The orchestrator runs this serially, not a worker.

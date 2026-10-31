@@ -474,3 +474,62 @@ Resume: verify the remaining S1-S6 deliverables and completion criteria
 against the current tree, finish anything still missing, rerun this plan's
 gates and record the evidence. Do not revert the fixes above.
 
+
+### Session: 2026-11-01 (switch verification continuation)
+
+Added the boundary, single-instance and decoration integration tests. The input
+adapter remains under operator note 2; 14 engine sources and five moved tests
+are absent. The wave-2 join is green. The retained test files have no
+non-import changes against 9b8fa4e (`tmp/emaki/EMK-VAC-SWITCH/import-audit.log`).
+All changed source files are below 1000 lines (`source-audit.log`).
+
+Final checks: editor check, debug wasm build, emaki check and scoped tests
+(74/74) passed (`final-check.log`, `final-cargo.log`, `final-emaki-check.log`,
+`final-emaki-scoped.log`). Clean present-case npm ci, check and single-instance
+passed (`final-clean-install.log`, 1/1). Full editor tests passed 2362/2362
+(`final-editor-vitest.log`); full emaki tests passed 126/126
+(`final-emaki-vitest.log`). The combined count is 2488; moved counts and the
+2401 baseline are reconciled in `test-disposition.json`. Release wasm and
+editor builds passed (`final-wasm-release.log`, `final-editor-build.log`).
+All paths in this paragraph are under `tmp/emaki/EMK-VAC-SWITCH/`.
+
+Mutation controls: the forbidden import and swapped colors each caused the
+specified test to fail (exit 1, `mutation-boundary.log`, `mutation-colors.log`);
+both source files were restored byte-identically, with intentions and hashes in
+`intent-mutation-boundary.txt` and `intent-mutation-colors.txt`.
+
+Remaining: `npm run test:style`, behavior e2e in Chromium and WebKit, and
+`npm run e2e:examples` require the orchestrator's browser-capable environment
+under rule 11. Completion criteria remain unchecked until those gates pass.
+Formal review and acceptance belong to subsequent workflow steps.
+
+### Session: 2026-11-01 (integration feedback baseline investigation)
+
+IR-VS-1 and IR-VS-2 remain unresolved. Existing browser baseline logs in
+`tmp/emaki/EMK-VAC-SWITCH/baseline/` were run from worktree HEAD a6e5bea3,
+whose parent is 8235677 and whose sole difference is LICENSE; both commits
+have identical editor tree 04cbaccf26dabf1577fb03ca6f3584cafee380ae.
+The baseline style log reports the same 10 violations, including -114.890625px
+gap and 28px color input; behavior reports 39/54, with the same six vim
+checks failing in both browsers and both Chromium pixel checks failing.
+Baseline canvas-only-text passed in both browsers, whereas the current
+orchestrator log reports its Chromium failure. The mount DOM creation and
+presented-record forwarding match 8235677; the precise cause of the current
+canvas-only-text failure is unconfirmed. The 28px input rule was introduced
+before extraction in editor/src/app/app.css, outside this repair's allowed
+paths. Per IR-VS-1 ordered step 1, stop and request baseline disposition and
+scope authorization rather than alter unrelated behavior. Browser comparison
+and final gates remain pending; no product or test source was edited in this
+session. Intent and plan hashes: `intent-review-baseline-20261101.txt` and
+`review-baseline-plan-sha256.txt` under the evidence directory.
+
+## Operator note 3 (after session 614)
+
+Browser gates are disposed by rules 13 and 14: the orchestrator comparison
+`tmp/emaki/EMK-VAC-SWITCH/orchestrator/summary.json` shows parity with the
+baseline (no new e2e or style failure; e2e:examples 8/8). Do not repair the
+pre-existing failures listed in rule 13. The wave-3 join is green on the
+combined tree (`tmp/emaki/wave-3-join/summary.json`). Finish any remaining
+deliverable, rerun this plan's non-browser gates, reference the orchestrator
+summary for the browser gates in the notes, and complete.
+

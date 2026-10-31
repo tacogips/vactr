@@ -12,7 +12,19 @@
   ],
   "protocolPath": "impl-plans/active/music-things-protocol.md",
   "evidenceRoot": "tmp/music-things",
-  "evidenceLayout": "evidenceRoot tmp/music-things is the runtime-owned, gitignored evidence root. Each plan writes its complete command logs (NN-<name>.log, each ending with exit=<status>) and any scratch outputs to its evidence directory tmp/music-things/<planId>/, which is NOT listed in writePaths or artifactRoots (the dispatcher owns tmp/<evidenceRoot>; amended 2026-10-31 after wave 1 blocked on the former disjoint tmp/music-things/<planId> log roots). MTX-00 additionally writes tmp/music-things/MTX-00/baseline-tests.txt and check_test_names.py, which every later plan reads. tmp/ is gitignored and never committed. A missing or truncated log is not a pass.",
+  "evidenceLayout": "evidenceRoot tmp/music-things is the runtime-owned, gitignored evidence root. Each plan writes its complete command logs (NN-<name>.log, each ending with exit=<status>) and any scratch outputs to its evidence directory tmp/music-things/<planId>/, which is NOT listed in writePaths or artifactRoots (the dispatcher owns tmp/<evidenceRoot>; amended 2026-10-31 after wave 1 blocked on the former disjoint tmp/music-things-extraction/<planId> log roots). MTX-00 additionally writes tmp/music-things/MTX-00/baseline-tests.txt and check_test_names.py, which every later plan reads. tmp/ is gitignored and never committed. A missing or truncated log is not a pass.",
+  "checkpointHistory": [
+    {
+      "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-577",
+      "outcome": "wave-001 blocked MTX-00 before source edits: runtime evidence required tmp/music-things/MTX-00/ while the plans declared tmp/music-things-extraction/MTX-00/ (tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-577/wave-001/wave-summary.json).",
+      "resolution": "Commit 1b0ecc1 moved every plan, protocol and design evidence path under evidenceRoot tmp/music-things/<planId>/ and removed the tmp evidence dirs from writePaths and artifactRoots."
+    },
+    {
+      "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-581",
+      "outcome": "Step5 impl-plan review accepted all 9 plans (reviewDecision accepted; MTX-R1 verified-repaired; two low residual findings only). Re-dispatch from MTX-00 with unchanged plan IDs, waves and path ownership.",
+      "resolution": "No plan or design change; this manifest update records the accepted re-review."
+    }
+  ],
   "standardEnv": "CARGO_TERM_QUIET=true NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1",
   "executionModel": {
     "waves": [
@@ -48,7 +60,7 @@
     "serialReconciliation": "Workers do not do workspace-wide formatting, Cargo.lock regeneration (MTX-00 only), plan archiving or impl-plans/README.md updates. A defect found in another plan's files is recorded as a blocker and repaired serially by the review step, with file, cause, fix and pre/post sha256. Never edit test expectations, goldens or tolerances."
   },
   "reviewContext": {
-    "issueReference": "workflowInput 'Extract vactr synth/effect DSP kernels into reusable music-things crates (in-tree staging under music-things/crates)'; no GitHub issue number; target repo https://github.com/tacogips/music-things scaffold a72a955; baseline a6e5bea; workflow opus-terra-design-and-implement-review-loop-session-577",
+    "issueReference": "workflowInput 'Extract vactr synth/effect DSP kernels into reusable music-things crates (in-tree staging under music-things/crates)'; no GitHub issue number; target repo https://github.com/tacogips/music-things scaffold a72a955; baseline a6e5bea; branch wf/music-things-extract; workflows opus-terra-design-and-implement-review-loop-session-577 (wave-001 blocked on evidence root, amended at 1b0ecc1) and opus-terra-design-and-implement-review-loop-session-581 (plans re-reviewed and accepted)",
     "userProblem": "vactr's synth and effect DSP is mixed with engine code in src/dsp and cannot be reused. It must move into dependency-free, wasm32-clean crates staged at music-things/crates/*, with vactr staying bit-identical.",
     "requiredOutcomes": [
       "Three crates music-things-dsp, music-things-synth and music-things-fx under music-things/crates/, each building natively and for wasm32-unknown-unknown, standalone and inside the vactr workspace (design 2.1, 2.2; gates 4 and 10).",
@@ -131,7 +143,9 @@
     ],
     "residualRisks": [
       "The From mapping over 130 variants is written by hand; fx_kind_map and the goldens guard it.",
-      "Concurrent cargo builds in the same directory may fail transiently on a sibling's edits; the BLOCKED-BY-SIBLING retry handles this."
+      "Concurrent cargo builds in the same directory may fail transiently on a sibling's edits; the BLOCKED-BY-SIBLING retry handles this.",
+      "The sibling-wait duration depends on implementer pace. It is bounded by the 120-minute cap, which is below the node timeout.",
+      "The &mut Kx -> &C reborrow and the nextest oneline format are not compiled or run yet. The &*kx fallback and the first-space split are pre-authorized."
     ]
   },
   "plans": [

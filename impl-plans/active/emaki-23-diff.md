@@ -1,6 +1,6 @@
 # EMK-DIFF: reusable line/word diff and split alignment (`emaki/diff`)
 
-**Status**: Ready (after EMK-CORE)
+**Status**: In Progress (implementation complete; review pending)
 **Plan ID**: EMK-DIFF (wave 2; parallel with EMK-DECOR, EMK-WIDGETS, EMK-LANG)
 **Design Reference**: `design-docs/specs/design-emaki.md` section 10
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -145,11 +145,18 @@ property test fails. Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] F1-F3 delivered, and `diff/index.ts` exports exactly the F1 symbols.
-- [ ] Verification steps pass. Mutation evidence is recorded. Hashes are
+- [x] F1-F3 delivered, and `diff/index.ts` exports exactly the F1 symbols.
+- [x] Verification steps pass. Mutation evidence is recorded. Hashes are
   logged.
 
 ## Progress Log
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (EMK-DIFF implementation)
+**Tasks Completed**: F1-F3; bounded Myers, trimmed line hunks, character ranges and split alignment. Scoped tests and TypeScript check passed; full suite informational: 73 tests passed.
+**Evidence**: `tmp/emaki/EMK-DIFF/`. The 10k change took 1.320 ms; without suffix trimming 2.948 ms, and the fallback-hunk test detected the mutation. A separate backtracking mutation failed the property test. Both controls were restored byte-identically. The mutation-only <5 ms assertion passed on this machine; timing is informational. Formal reviews and the serial wave join remain downstream.
+
+### Session: 2026-11-01 (test-integrity repair EMK-DIFF-TI-01)
+**Tasks Completed**: Strengthened the cost-cap test with five scattered changes, asserting both the capped single hunk and five default-cost hunks. Ignoring the cap caused the focused test to fail; `lines.ts` was restored byte-identically. Evidence and refreshed hashes are under `tmp/emaki/EMK-DIFF/ti01-*`. Independent re-review remains downstream.

@@ -60,7 +60,7 @@ describe('TextLayout.textCells ASCII run offsets', () => {
 
   it('covers every line in examples/kalimba.vact', async () => {
     const fs = await import(/* @vite-ignore */ nodeFsModule) as NodeFs;
-    const document = fs.readFileSync(`${proc.cwd()}/../examples/kalimba.vact`, 'utf8');
+    const document = fs.readFileSync(new URL('../fixtures/kalimba.vact', import.meta.url).pathname, 'utf8');
     const layout = layoutFor(document);
     for (let number = 0; number < layout.lineCount; number++) {
       const line = layout.shape(number);

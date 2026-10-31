@@ -16,7 +16,7 @@ export class ViewHost {
   private phases: PhaseTimer | null = null;
   private rect: { left: number; top: number } | null = null;
   private rectStale = true;
-  private lastEvaluated: { state: EditorCore['state']; scrollTop: number; height: number; inset: number } | null = null;
+  private lastEvaluated: { state: EditorCore['state']; scrollTop: number; height: number; inset: number; heightmapRevision: number } | null = null;
   readonly stats = { caretEvaluations: 0, rectReads: 0 };
 
   constructor(private readonly element: HTMLElement, private readonly surface: EditorCore,
@@ -74,14 +74,14 @@ export class ViewHost {
     const height = Math.max(1, this.height - this.inset);
     const state = this.surface.state;
     const previous = this.lastEvaluated;
-    if (previous?.state === state && previous.scrollTop === this.scrollTop && previous.height === this.height && previous.inset === this.inset) return;
+    if (previous?.state === state && previous.scrollTop === this.scrollTop && previous.height === this.height && previous.inset === this.inset && previous.heightmapRevision === this.layout.heightmap.revision) return;
     this.stats.caretEvaluations++;
     const line = state.doc.lineAt(state.selection.main.head).number - 1;
     const top = this.layout.heightmap.lineTop(line), bottom = top + this.layout.font.lineHeight;
     if (top < this.scrollTop) this.scrollTop = top;
     else if (bottom > this.scrollTop + height) this.scrollTop = bottom - height;
     this.clampScroll();
-    this.lastEvaluated = { state, scrollTop: this.scrollTop, height: this.height, inset: this.inset };
+    this.lastEvaluated = { state, scrollTop: this.scrollTop, height: this.height, inset: this.inset, heightmapRevision: this.layout.heightmap.revision };
     } finally { this.phases?.end('caret'); }
   }
 

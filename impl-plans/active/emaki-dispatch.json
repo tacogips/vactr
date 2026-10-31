@@ -286,7 +286,8 @@
         "emaki/test/render/font-variants.test.ts",
         "emaki/node_modules",
         "emaki/dist",
-        "impl-plans/active/emaki-20-decor.md"
+        "impl-plans/active/emaki-20-decor.md",
+        "emaki/src/render/renderer.ts"
       ],
       "sharedPaths": [],
       "artifactRoots": [

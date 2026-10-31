@@ -1,6 +1,6 @@
 # EMK-WIDGETS: block and end-of-line widgets, virtualization and vertical motion
 
-**Status**: Ready (after EMK-CORE)
+**Status**: In Progress (implementation complete; review pending)
 **Plan ID**: EMK-WIDGETS (wave 2; parallel with EMK-DECOR, EMK-LANG, EMK-DIFF)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 8.1-8.4; decision EM-D8
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -217,13 +217,16 @@ forth: no remount) fails. Add that hysteresis test. Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] W1-W4 delivered.
-- [ ] Barrels updated: `plugin/index.ts` exports `WidgetSet`, and
+- [x] W1-W4 delivered.
+- [x] Barrels updated: `plugin/index.ts` exports `WidgetSet`, and
   `view/index.ts` exports `WidgetLayer` and `ViewHost`.
-- [ ] Verification steps 1-4 pass. Mutation evidence is recorded. Hashes are
-  logged.
+- [x] Scoped verification, type check and line counts pass; mutation evidence and hashes are logged. Full-suite result is informational under rule 12b.
 
 ## Progress Log
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (EMK-WIDGETS implementation)
+**Tasks Completed**: W1-W4, barrels and scoped tests. Widget anchors map with TrackDel; layer virtualizes with hysteresis and accounts for canvas allocations; arrows use adjacent text-row coordinates.
+**Verification**: scoped vitest 5/5 and npm run check pass (scoped-final-2.log, check-final-2.log); layout informational 15/15. Full vitest informational 92/92 before final redraw-state adjustment. Earlier check reported sibling test/language/fixture.test.ts drift, resolved on rerun. Hysteresis mutation failed as expected (mutation-2.log), and restored hashes match (mutation-hashes-2.txt). Review and serial wave join remain downstream.

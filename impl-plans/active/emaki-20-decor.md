@@ -58,14 +58,27 @@ Tests:
 Generated, plus this plan:
 - `emaki/node_modules`, `emaki/dist` (artifactRoots)
 - `impl-plans/active/emaki-20-decor.md`
+- `emaki/src/render/renderer.ts` (operator amendment, see sharedPaths note)
 
 ## sharedPaths
 
 None. Read-only: `emaki/src/types.ts`, `emaki/src/render/types.ts`,
-`emaki/src/render/renderer.ts`, `emaki/src/layout/heightmap.ts`.
+`emaki/src/layout/heightmap.ts`.
 
-If `renderer.ts` must change, stop and report a scope amendment. EMK-CORE
-pinned it to delegate everything to the two pass files.
+Operator amendment (after session 599 wave 2): `emaki/src/render/renderer.ts`
+is now in this plan's writePaths (EMK-CORE is complete and no other wave-2
+plan writes it). The wave-2 blocker showed that the renderer's text cache key
+excludes `decorationsKey` and `rebuildTextSegments` receives only tokens after
+visible lines are shaped, so color/opacity/font-variant marks and touched-line
+reshaping need a renderer seam change. Make the minimal seam change: include
+the text-affecting decoration key in the per-line text cache identity (only
+lines whose text-affecting marks changed are re-tinted or reshaped; quad-only
+marks such as background/glow/underline must NOT invalidate text), and pass
+the resolved text styles into the text pass. Keep everything else in
+renderer.ts delegated to the pass files, keep existing tests unchanged, and
+add tests for: a color-only mark change re-tints only the touched line, a
+weight/style mark reshapes only the touched line, and a glow-only change does
+not rebuild text.
 
 ## Tasks
 

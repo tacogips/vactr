@@ -1,6 +1,6 @@
 # EMK-LANG: incremental highlighter, JSON language and deterministic fixture
 
-**Status**: Ready (after EMK-CORE)
+**Status**: In Progress (implementation complete; review pending)
 **Plan ID**: EMK-LANG (wave 2; parallel with EMK-DECOR, EMK-WIDGETS, EMK-DIFF)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 9.1-9.3, 11.2; decision EM-D9
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -185,12 +185,16 @@ end) -> the convergence test fails. Restore afterwards.
 
 ## Completion Criteria
 
-- [ ] L1-L4 delivered. `language/index.ts` exports `IncrementalHighlighter`,
+- [x] L1-L4 delivered. `language/index.ts` exports `IncrementalHighlighter`,
   `jsonLanguage` and `generateJsonFixture`.
-- [ ] Verification steps pass. The fixture SHA-256 is recorded. Mutation
+- [x] Verification steps pass. The fixture SHA-256 is recorded. Mutation
   evidence is recorded. Hashes are logged.
 
 ## Progress Log
 
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
+
+### Session: 2026-11-01 (implementation)
+**Tasks Completed**: L1-L4. Implemented checkpointed incremental tokenization, bounded catch-up, LRU, JSON tokens, and deterministic fixture. Multi-range edits cannot converge before the last changed line.
+**Evidence**: scoped vitest 15/15 (`tmp/emaki/EMK-LANG/vitest-final-5.log`); `npm run check` exit 0 (`tmp/emaki/EMK-LANG/check-final-3.log`). Full vitest informational 93/93 (`tmp/emaki/EMK-LANG/full-final.log`); the serial wave join is authoritative. Convergence negative control failed as intended and was restored byte-identically (`tmp/emaki/EMK-LANG/mutation-3.log`, `mutation-3-before.sha256`, `mutation-3-after.sha256`). Fixture SHA-256: `78d56a6b3cd73f3c437f83203525c73eafbbc6c579f4fd7609cf06ea4fd8d46c`. Source hashes and line counts: `tmp/emaki/EMK-LANG/final-hashes.txt`, `tmp/emaki/EMK-LANG/final-lines.log`. Formal reviews and wave join remain downstream.

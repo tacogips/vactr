@@ -1,6 +1,6 @@
 # EMK-CORE: emaki package scaffold, shared contract types and engine extraction
 
-**Status**: Ready
+**Status**: Completed (accepted in session 599 wave 1: test-integrity, adversarial review and branch evidence passed; evidence tmp/emaki/EMK-CORE/continuation-2-final-*.log and tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-599/wave-001/wave-summary.json)
 **Plan ID**: EMK-CORE (wave 1, runs alone)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 2 (B3-B10, B15-B18), 3, 4.1, 4.4, 5.2, 6.3 (base order), 8.2, 11.3, 14.1; decisions EM-D2, EM-D3, EM-D7, EM-D8, EM-D17, EM-D18, EM-D19
 **Rules**: `impl-plans/active/emaki-00-rules.md` (mandatory)
@@ -739,12 +739,12 @@ pre-mutation content) and confirm the boundary test passes.
 
 ## Completion Criteria
 
-- [ ] T1-T5 deliverables exist at the listed paths. `package.json` matches
+- [x] T1-T5 deliverables exist at the listed paths. `package.json` matches
   T1 exactly (check with `node -e` printing `exports` and `peerDependencies`).
 - [ ] Verification steps 1-7 pass and are recorded in the record shape.
   Mutation evidence is recorded.
-- [ ] `test-disposition.json` shows equal counts for all 5 moved files.
-- [ ] The Progress Log has pre/post sha256 for every written file.
+- [x] `test-disposition.json` shows equal counts for all 5 moved files.
+- [x] The Progress Log has pre/post sha256 for every written file.
 
 ## Progress Log
 
@@ -782,3 +782,14 @@ and all required package checks. No package installation completed.
 **Progress**: Read the accepted design and plan and confirmed the assigned plan has no dependencies. No source files were changed. The initial `cd emaki && npm run check` passed (exit 0; `tmp/emaki/EMK-CORE/step6-check-initial.log`).
 **Blocker**: `emaki/test/layout/text-cells.test.ts` reads `../examples/kalimba.vact`, outside the standalone package. The moved-test rule permits only import-specifier changes, and no package-local fixture path is authorized. Amend the plan to authorize a self-contained fixture and the necessary test reference change, or otherwise reconcile the standalone requirement with the unchanged moved test. Renderer pass separation, required rendering tests, barrels and final verification remain incomplete.
 **Evidence**: `tmp/emaki/EMK-CORE/step6-fixture-blocker-sha256.txt` records the plan hashes. Formal review and integration remain downstream.
+
+### Session: 2026-11-01 (EMK-CORE continuation)
+**Progress**: Added engine and area barrels, copied the package-local fixture and updated the moved test fixture path, and added initial renderer order and heightmap geometry tests. The fixture hashes match: `40968a7beccd3413ff08ce3aa8472f2cc0aa01608969b3fe464f085e350e21b7`. Per-edit intentions and pre/post hashes are recorded in `tmp/emaki/EMK-CORE/step6-597-intentions.txt` and `step6-597-hashes.txt`.
+**Verification**: `npm run check` passed (exit 0, `step6-check-final.log`); full vitest passed 62 tests (exit 0, `step6-vitest-final.log`); locked `npm run build` passed (exit 0, `step6-build-final.log`); route syntax, forbidden strings, source line limits, and unchanged editor status passed (`step6-route.log`, `step6-forbidden.log`, `step6-line-count.log`, `step6-editor-status.log`). Boundary negative control failed as intended (exit 1, `step6-mutation.log`), and byte-identical restoration and two passing boundary tests are recorded in `step6-mutation-hash.txt` and `step6-boundary-restored.log`. An earlier band test failed due to an offscreen overscan assertion and was corrected to inspect visible nonempty geometry (`step6-band-attempt.log`, `step6-band-final.log`).
+**Remaining**: Full renderer pass separation and the complete prescribed heightmap geometry/cache and zero-block draw-list parity assertions remain. Audit remaining T1-T5 details and complete required final-source gates before marking criteria complete. The plan prohibits reinstalling the operator-provided dependencies; `npm ci --prefer-offline` remains for the orchestrator. No drift detected. Formal review and integration remain downstream.
+
+### Session: 2026-11-01 (renderer and geometry continuation)
+**Progress**: Moved text slots, segment construction and glyph rendering into `emaki/src/render/text-pass.ts`, and static/animated decoration construction into `emaki/src/render/decoration-pass.ts`; `renderer.ts` retains orchestration and cache keys. Expanded geometry tests for static background/overlay invalidation, idle reuse, block positions and full fixed-height draw-list parity. Exposed the render area exports and corrected `ViewHost` caret caching to include heightmap revision, with a regression test. Per-edit intentions and hashes are in `tmp/emaki/EMK-CORE/continuation-2-intentions.txt`, `continuation-2-hashes.txt` and `continuation-2-final-hashes.txt`; no drift detected.
+**Verification**: `npm run check` exit 0 (`continuation-2-final-check.log`); `./node_modules/.bin/vitest run` exit 0, 63 tests passed (`continuation-2-final-vitest.log`); locked `npm run build` exit 0 (`continuation-2-final-build.log`). Route syntax, forbidden text scan, line counts, package exports/peers, and unchanged editor status exited 0 (`continuation-2-final-route.log`, `continuation-2-final-forbidden.log`, `continuation-2-final-line-count.log`, `continuation-2-final-package.log`, `continuation-2-final-editor-status.log`). All logs are under `tmp/emaki/EMK-CORE/`.
+**Mutation evidence**: Escaping import control exited 1 (`continuation-2-mutation.log`); `continuation-2-mutation-hashes.txt` proves byte-identical restoration; boundary test then passed 2 tests (`continuation-2-restored-boundary.log`). The first check during extraction failed on an intermediate missing parameter and was repaired (`continuation-2-check-attempt.log`).
+**Remaining**: The operator amendment prohibits reinstalling the supplied dependencies; `npm ci --prefer-offline` is reserved for the orchestrator outside the sandbox. Formal review, integration and commit are downstream.

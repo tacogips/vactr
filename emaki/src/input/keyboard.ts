@@ -113,7 +113,9 @@ export class KeyboardController {
       } else if (mod) position = backward ? 0 : doc.length;
       else {
         const rect = this.surface.coordsAtPos(position);
-        const mapped = rect && this.surface.posAtCoords({ x: rect.left, y: (rect.top + rect.bottom) / 2 + (backward ? -1 : 1) * (rect.bottom - rect.top) });
+        const line = doc.lineAt(position), n = Math.max(1, Math.min(doc.lines, line.number + (backward ? -1 : 1)));
+        const targetRect = this.surface.coordsAtPos(doc.line(n).from);
+        const mapped = rect && targetRect && this.surface.posAtCoords({ x: rect.left, y: (rect.top + rect.bottom) / 2 + targetRect.top - rect.top });
         if (mapped != null) position = mapped;
         else {
           const line = this.surface.state.doc.lineAt(position), n = Math.max(1, Math.min(this.surface.state.doc.lines, line.number + (backward ? -1 : 1)));
